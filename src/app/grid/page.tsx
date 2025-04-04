@@ -80,28 +80,50 @@ const debugOptions = [
   },
 ]
 
+// Function to get coordinates for a specific ring
+function getHexRing(radius: number) {
+  if (radius === 0) return [{ q: 0, r: 0, s: 0 }]
+  
+  const results = []
+  
+  // Start from the top-right and move around clockwise
+  let q = radius
+  let r = -radius
+  let s = 0
+  
+  // For each of the 6 sides of the ring
+  for (let side = 0; side < 6; side++) {
+    // For each step along this side
+    for (let step = 0; step < radius; step++) {
+      results.push({ q, r, s })
+      
+      // Move along the side (different direction for each side)
+      switch(side) {
+        case 0: q--; r++; break;     // Move southeast
+        case 1: r++; s--; break;     // Move southwest
+        case 2: q--; s++; break;     // Move west
+        case 3: q++; r--; break;     // Move northwest
+        case 4: r--; s++; break;     // Move northeast
+        case 5: s--; q++; break;     // Move east
+      }
+    }
+  }
+  
+  return results
+}
+
 function HexGrid({ wireframe = false, hexSize = 1.2, colorScheme = 'default', ringCount = 1 }) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
     const gridPositions: { position: [number, number, number]; color: string }[] = []
     
-    // Define the cube coordinates for center and rings
-    let coordinates = [
-      // Center
-      { q: 0, r: 0, s: 0 },
-    ]
+    // Generate coordinates for all rings up to ringCount
+    let coordinates = [{ q: 0, r: 0, s: 0 }] // Center
     
-    // Add first ring
-    const ring1 = [
-      { q: 1, r: -1, s: 0 },
-      { q: 1, r: 0, s: -1 },
-      { q: 0, r: 1, s: -1 },
-      { q: -1, r: 1, s: 0 },
-      { q: -1, r: 0, s: 1 },
-      { q: 0, r: -1, s: 1 }
-    ]
-    
-    coordinates = [...coordinates, ...ring1]
+    // Add all rings up to ringCount
+    for (let ring = 1; ring <= ringCount; ring++) {
+      coordinates = [...coordinates, ...getHexRing(ring)]
+    }
     
     coordinates.forEach(({q, r, s}) => {
       // Generate a color based on coordinates and selected scheme
