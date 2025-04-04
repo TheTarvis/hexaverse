@@ -102,9 +102,9 @@ export default function Grid() {
           gl={{ antialias: true }}
         >
           <OrbitControls 
-            enablePan={true}
+            enablePan={false}
             enableZoom={true}
-            enableRotate={true}
+            enableRotate={false}
             minDistance={5}
             maxDistance={20}
           />
