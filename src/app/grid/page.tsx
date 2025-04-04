@@ -337,16 +337,35 @@ export default function Grid() {
           </Popover>
         </div>
         
+        {/* Grid navigation helper */}
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-black bg-opacity-50 text-white px-3 py-1.5 rounded-full text-sm flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+          </svg>
+          <span>Click and drag to pan | Pinch to zoom</span>
+        </div>
+        
         <Canvas
           camera={{ position: [0, 0, 12], fov: 45 }}
           gl={{ antialias: true }}
         >
           <OrbitControls 
-            enablePan={false}
+            enablePan={true}
             enableZoom={true}
             enableRotate={false}
             minDistance={5}
             maxDistance={20}
+            panSpeed={1.5}
+            zoomSpeed={1.2}
+            touches={{
+              ONE: THREE.TOUCH.ROTATE,
+              TWO: THREE.TOUCH.PAN
+            }}
+            mouseButtons={{
+              LEFT: THREE.MOUSE.PAN,
+              MIDDLE: THREE.MOUSE.DOLLY,
+              RIGHT: THREE.MOUSE.PAN
+            }}
           />
           <HexGrid 
             wireframe={debugState.wireframe}

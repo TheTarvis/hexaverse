@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.4] - 2025-04-07
+
+### Added
+- Enabled grid panning with mouse click and drag
+- Added support for two-finger pan gestures on mobile devices
+- Added visual helper for navigation controls
+- Optimized camera controls for better user experience
+
 ## [0.2.3] - 2025-04-06
 
 ### Added
