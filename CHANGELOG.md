@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.5] - 2025-04-08
+
+### Changed
+- Expanded grid visualization to fill the entire viewport 
+- Removed width constraints to maximize available screen space
+- Improved responsive layout for better viewing on different devices
+
 ## [0.2.4] - 2025-04-07
 
 ### Added

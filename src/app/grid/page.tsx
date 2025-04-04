@@ -273,8 +273,8 @@ export default function Grid() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
-      <div className="relative h-[800px] w-full">
+    <div className="h-screen w-full">
+      <div className="relative h-full w-full">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
             <div className="text-lg font-medium text-gray-700">Loading grid data...</div>
@@ -354,7 +354,7 @@ export default function Grid() {
             enableZoom={true}
             enableRotate={false}
             minDistance={5}
-            maxDistance={20}
+            maxDistance={80}
             panSpeed={1.5}
             zoomSpeed={1.2}
             touches={{
