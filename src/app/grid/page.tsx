@@ -1,6 +1,7 @@
 'use client'
 
 import { Canvas } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
 import { useMemo } from 'react'
 import * as THREE from 'three'
 
@@ -95,11 +96,18 @@ function HexGrid() {
 export default function Grid() {
   return (
     <div className="mx-auto max-w-7xl p-6">
-      <div className="h-[600px] w-full">
+      <div className="h-[800px] w-full">
         <Canvas
           camera={{ position: [0, 0, 12], fov: 45 }}
           gl={{ antialias: true }}
         >
+          <OrbitControls 
+            enablePan={true}
+            enableZoom={true}
+            enableRotate={true}
+            minDistance={5}
+            maxDistance={20}
+          />
           <HexGrid />
         </Canvas>
       </div>
