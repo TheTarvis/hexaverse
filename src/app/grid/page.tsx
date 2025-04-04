@@ -86,26 +86,39 @@ function getHexRing(radius: number) {
   
   const results = []
   
-  // Start from the top-right and move around clockwise
-  let q = radius
-  let r = -radius
-  let s = 0
+  // In cube coordinates, for each direction around the ring:
+  // NE: q=+1, r=0, s=-1
+  // E:  q=+1, r=-1, s=0
+  // SE: q=0, r=+1, s=-1
+  // SW: q=-1, r=+1, s=0
+  // W:  q=-1, r=0, s=+1
+  // NW: q=0, r=-1, s=+1
   
-  // For each of the 6 sides of the ring
+  // Start at the east corner and move clockwise
+  let cubeCoord = { q: radius, r: -radius, s: 0 }
+  
+  // Directions to move along the ring (in clockwise order)
+  const directions = [
+    { q: -1, r: +1, s: 0 }, // SE
+    { q: 0, r: +1, s: -1 }, // SW
+    { q: -1, r: 0, s: +1 }, // W
+    { q: 0, r: -1, s: +1 }, // NW
+    { q: +1, r: -1, s: 0 }, // NE
+    { q: +1, r: 0, s: -1 }, // E
+  ]
+  
+  // For each side of the ring
   for (let side = 0; side < 6; side++) {
+    const dir = directions[side]
+    
     // For each step along this side
     for (let step = 0; step < radius; step++) {
-      results.push({ q, r, s })
+      results.push({ ...cubeCoord })
       
-      // Move along the side (different direction for each side)
-      switch(side) {
-        case 0: q--; r++; break;     // Move southeast
-        case 1: r++; s--; break;     // Move southwest
-        case 2: q--; s++; break;     // Move west
-        case 3: q++; r--; break;     // Move northwest
-        case 4: r--; s++; break;     // Move northeast
-        case 5: s--; q++; break;     // Move east
-      }
+      // Move in the current direction
+      cubeCoord.q += dir.q
+      cubeCoord.r += dir.r
+      cubeCoord.s += dir.s
     }
   }
   
