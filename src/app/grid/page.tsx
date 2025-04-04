@@ -38,7 +38,6 @@ function HexagonMesh() {
 export default function Grid() {
   return (
     <div className="mx-auto max-w-7xl p-6">
-      <h1 className="mb-4 text-2xl font-bold">Grid</h1>
       <div className="h-[400px] w-full">
         <Canvas
           camera={{ position: [0, 0, 5], fov: 50 }}
