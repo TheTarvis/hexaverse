@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2025-04-05
+
+### Fixed
+- Implemented request caching to prevent duplicate API calls to the server
+- Fixed React strict mode causing double data fetching in development
+
 ## [0.2.1] - 2025-04-05
 
 ### Added
