@@ -2,12 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.3] - 2025-04-05
-
-### Added
-- Added "Refresh Shard" option to debug menu to request new data from server
-- Enhanced API service to support forced refresh
-
 ## [0.2.2] - 2025-04-05
 
 ### Fixed

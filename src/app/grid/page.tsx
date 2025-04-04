@@ -11,7 +11,6 @@ import {
   ViewfinderCircleIcon,
   SwatchIcon,
   BugAntIcon,
-  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import sampleGridData from './data/sample-grid.json'
 import { fetchShardData } from '@/services/api'
@@ -108,12 +107,6 @@ const debugOptions = [
     description: 'Change the color palette', 
     action: 'changeColorScheme', 
     icon: SwatchIcon 
-  },
-  {
-    name: 'Refresh Shard',
-    description: 'Request a new shard from the server',
-    action: 'refreshShard',
-    icon: ArrowPathIcon
   }
 ]
 
@@ -191,40 +184,39 @@ export default function Grid() {
   
   // Load the grid data on mount
   useEffect(() => {
+    async function loadGridData() {
+      try {
+        setLoading(true)
+        let gridData: GridData
+        
+        try {
+          // Try to fetch from API
+          gridData = await fetchShardData() as GridData
+        } catch (apiError) {
+          console.warn('Error fetching from API, falling back to sample data:', apiError)
+          // Fallback to sample data if API fails
+          gridData = sampleGridData as GridData
+        }
+        
+        // Create a map of cube coordinates to tiles
+        const tileMapData: TileMap = {}
+        gridData.tiles.forEach((tile: Tile) => {
+          const key = coordsToKey(tile.cords.X, tile.cords.Y, tile.cords.Z)
+          tileMapData[key] = tile
+        })
+        
+        setTileMap(tileMapData)
+        setError(null)
+      } catch (error) {
+        console.error('Error loading grid data:', error)
+        setError('Failed to load grid data')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
     loadGridData()
   }, [])
-  
-  // Extract loadGridData function to make it reusable
-  const loadGridData = async (forceRefresh = false) => {
-    try {
-      setLoading(true)
-      let gridData: GridData
-      
-      try {
-        // Try to fetch from API
-        gridData = await fetchShardData(forceRefresh) as GridData
-      } catch (apiError) {
-        console.warn('Error fetching from API, falling back to sample data:', apiError)
-        // Fallback to sample data if API fails
-        gridData = sampleGridData as GridData
-      }
-      
-      // Create a map of cube coordinates to tiles
-      const tileMapData: TileMap = {}
-      gridData.tiles.forEach((tile: Tile) => {
-        const key = coordsToKey(tile.cords.X, tile.cords.Y, tile.cords.Z)
-        tileMapData[key] = tile
-      })
-      
-      setTileMap(tileMapData)
-      setError(null)
-    } catch (error) {
-      console.error('Error loading grid data:', error)
-      setError('Failed to load grid data')
-    } finally {
-      setLoading(false)
-    }
-  }
   
   const handleDebugAction = (action: string) => {
     switch(action) {
@@ -243,9 +235,6 @@ export default function Grid() {
           colorScheme: prev.colorScheme === 'default' ? 'rainbow' : 
                       prev.colorScheme === 'rainbow' ? 'monochrome' : 'default'
         }))
-        break
-      case 'refreshShard':
-        loadGridData(true) // Force refresh from server
         break
     }
   }
