@@ -2,8 +2,17 @@
 
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import * as THREE from 'three'
+import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
+import { ChevronDownIcon } from '@heroicons/react/20/solid'
+import {
+  CubeTransparentIcon,
+  ViewfinderCircleIcon,
+  SwatchIcon,
+  PlusCircleIcon,
+  BugAntIcon,
+} from '@heroicons/react/24/outline'
 
 // Convert cube coordinates to pixel coordinates (for pointy-top orientation)
 function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number, number] {
@@ -13,7 +22,7 @@ function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number
   return [x, y, 0]
 }
 
-function HexagonMesh({ position = [0, 0, 0] as [number, number, number], color = 'teal' }) {
+function HexagonMesh({ position = [0, 0, 0] as [number, number, number], color = 'teal', wireframe = false }) {
   // Create a hexagon shape
   const hexShape = useMemo(() => {
     const shape = new THREE.Shape()
@@ -39,22 +48,51 @@ function HexagonMesh({ position = [0, 0, 0] as [number, number, number], color =
   return (
     <mesh position={position}>
       <shapeGeometry args={[hexShape]} />
-      <meshBasicMaterial color={color} wireframe={false} />
+      <meshBasicMaterial color={color} wireframe={wireframe} />
     </mesh>
   )
 }
 
-function HexGrid() {
+const debugOptions = [
+  { 
+    name: 'Wireframe', 
+    description: 'Toggle wireframe rendering of hexagons', 
+    action: 'toggleWireframe', 
+    icon: CubeTransparentIcon 
+  },
+  { 
+    name: 'Hexagon Size', 
+    description: 'Adjust the size of hexagons', 
+    action: 'adjustSize', 
+    icon: ViewfinderCircleIcon 
+  },
+  { 
+    name: 'Color Scheme', 
+    description: 'Change the color palette', 
+    action: 'changeColorScheme', 
+    icon: SwatchIcon 
+  },
+  { 
+    name: 'Add Ring', 
+    description: 'Add another ring of hexagons', 
+    action: 'addRing', 
+    icon: PlusCircleIcon 
+  },
+]
+
+function HexGrid({ wireframe = false, hexSize = 1.2, colorScheme = 'default', ringCount = 1 }) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
     const gridPositions: { position: [number, number, number]; color: string }[] = []
-    const hexSize = 1.2 // Size parameter for coordinate conversion
     
-    // Define the cube coordinates for center and one ring
-    const coordinates = [
+    // Define the cube coordinates for center and rings
+    let coordinates = [
       // Center
       { q: 0, r: 0, s: 0 },
-      // Ring 1
+    ]
+    
+    // Add first ring
+    const ring1 = [
       { q: 1, r: -1, s: 0 },
       { q: 1, r: 0, s: -1 },
       { q: 0, r: 1, s: -1 },
@@ -63,13 +101,29 @@ function HexGrid() {
       { q: 0, r: -1, s: 1 }
     ]
     
+    coordinates = [...coordinates, ...ring1]
+    
     coordinates.forEach(({q, r, s}) => {
-      // Generate a color based on coordinates
-      const color = new THREE.Color(
-        0.4 + 0.4 * Math.sin(q * 0.8 + r * 0.3),
-        0.5 + 0.3 * Math.sin(r * 0.5 + s * 0.4),
-        0.6 + 0.4 * Math.sin(s * 0.6 + q * 0.2)
-      )
+      // Generate a color based on coordinates and selected scheme
+      let color
+      
+      // Different color generation based on scheme
+      if (colorScheme === 'monochrome') {
+        color = new THREE.Color(0.4, 0.4, 0.4)
+      } else if (colorScheme === 'rainbow') {
+        color = new THREE.Color(
+          0.5 + 0.5 * Math.sin(q + r),
+          0.5 + 0.5 * Math.sin(r + s),
+          0.5 + 0.5 * Math.sin(s + q)
+        )
+      } else {
+        // Default color scheme
+        color = new THREE.Color(
+          0.4 + 0.4 * Math.sin(q * 0.8 + r * 0.3),
+          0.5 + 0.3 * Math.sin(r * 0.5 + s * 0.4),
+          0.6 + 0.4 * Math.sin(s * 0.6 + q * 0.2)
+        )
+      }
       
       gridPositions.push({
         position: cubeToPixel(q, r, s, hexSize),
@@ -78,7 +132,7 @@ function HexGrid() {
     })
     
     return gridPositions
-  }, [])
+  }, [hexSize, colorScheme, ringCount])
 
   return (
     <>
@@ -87,6 +141,7 @@ function HexGrid() {
           key={index}
           position={props.position}
           color={props.color}
+          wireframe={wireframe}
         />
       ))}
     </>
@@ -94,9 +149,84 @@ function HexGrid() {
 }
 
 export default function Grid() {
+  const [debugState, setDebugState] = useState({
+    wireframe: false,
+    hexSize: 1.2,
+    colorScheme: 'default',
+    ringCount: 1
+  })
+  
+  const handleDebugAction = (action: string) => {
+    switch(action) {
+      case 'toggleWireframe':
+        setDebugState(prev => ({ ...prev, wireframe: !prev.wireframe }))
+        break
+      case 'adjustSize':
+        setDebugState(prev => ({ 
+          ...prev, 
+          hexSize: prev.hexSize === 1.2 ? 1.5 : prev.hexSize === 1.5 ? 0.9 : 1.2
+        }))
+        break
+      case 'changeColorScheme':
+        setDebugState(prev => ({ 
+          ...prev, 
+          colorScheme: prev.colorScheme === 'default' ? 'rainbow' : 
+                      prev.colorScheme === 'rainbow' ? 'monochrome' : 'default'
+        }))
+        break
+      case 'addRing':
+        setDebugState(prev => ({ ...prev, ringCount: Math.min(prev.ringCount + 1, 3) }))
+        break
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl p-6">
-      <div className="h-[800px] w-full">
+      <div className="relative h-[800px] w-full">
+        <div className="absolute top-4 right-4 z-10">
+          <Popover className="relative">
+            <PopoverButton className="flex items-center gap-x-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+              <BugAntIcon className="h-5 w-5 mr-1" />
+              <span>Debug</span>
+              <ChevronDownIcon className="h-5 w-5" aria-hidden="true" />
+            </PopoverButton>
+
+            <PopoverPanel
+              transition
+              className="absolute right-0 z-10 mt-2 w-80 origin-top-right transition data-[closed]:translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in"
+            >
+              <div className="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                <div className="p-4">
+                  {debugOptions.map((item) => (
+                    <div 
+                      key={item.name} 
+                      className="group relative flex gap-x-6 rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => handleDebugAction(item.action)}
+                    >
+                      <div className="mt-1 flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
+                        <item.icon className="h-6 w-6 text-gray-600 group-hover:text-indigo-600" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900">
+                          {item.name}
+                        </div>
+                        <p className="mt-1 text-sm text-gray-600">{item.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-gray-50 px-4 py-3">
+                  <div className="text-xs font-medium text-gray-500">
+                    Current settings: {debugState.wireframe ? 'Wireframe' : 'Solid'}, 
+                    Size: {debugState.hexSize.toFixed(1)}, 
+                    Colors: {debugState.colorScheme}
+                  </div>
+                </div>
+              </div>
+            </PopoverPanel>
+          </Popover>
+        </div>
+        
         <Canvas
           camera={{ position: [0, 0, 12], fov: 45 }}
           gl={{ antialias: true }}
@@ -108,7 +238,12 @@ export default function Grid() {
             minDistance={5}
             maxDistance={20}
           />
-          <HexGrid />
+          <HexGrid 
+            wireframe={debugState.wireframe}
+            hexSize={debugState.hexSize}
+            colorScheme={debugState.colorScheme}
+            ringCount={debugState.ringCount}
+          />
         </Canvas>
       </div>
     </div>
