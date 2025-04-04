@@ -95,9 +95,9 @@ function HexGrid() {
 export default function Grid() {
   return (
     <div className="mx-auto max-w-7xl p-6">
-      <div className="h-[400px] w-full">
+      <div className="h-[600px] w-full">
         <Canvas
-          camera={{ position: [0, 0, 10], fov: 50 }}
+          camera={{ position: [0, 0, 12], fov: 45 }}
           gl={{ antialias: true }}
         >
           <HexGrid />
