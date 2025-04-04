@@ -14,6 +14,16 @@ import {
   BugAntIcon,
 } from '@heroicons/react/24/outline'
 
+// Hex directions matching the Go implementation
+const HEX_DIRECTIONS = [
+  { q: 1, r: -1, s: 0 },  // UpRight
+  { q: 0, r: -1, s: 1 },  // Up
+  { q: -1, r: 0, s: 1 },  // UpLeft
+  { q: -1, r: 1, s: 0 },  // DownLeft
+  { q: 0, r: 1, s: -1 },  // Down
+  { q: 1, r: 0, s: -1 },  // DownRight
+]
+
 // Convert cube coordinates to pixel coordinates (for pointy-top orientation)
 function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number, number] {
   // For pointy-top hexagons
@@ -80,46 +90,42 @@ const debugOptions = [
   },
 ]
 
-// Function to get coordinates for a specific ring
-function getHexRing(radius: number) {
-  if (radius === 0) return [{ q: 0, r: 0, s: 0 }]
+// Get a ring of hexagons at a specified radius using cube coordinates
+function getHexRing(center: { q: number, r: number, s: number }, radius: number) {
+  if (radius === 0) return [{ ...center }]
   
   const results = []
   
-  // In cube coordinates, for each direction around the ring:
-  // NE: q=+1, r=0, s=-1
-  // E:  q=+1, r=-1, s=0
-  // SE: q=0, r=+1, s=-1
-  // SW: q=-1, r=+1, s=0
-  // W:  q=-1, r=0, s=+1
-  // NW: q=0, r=-1, s=+1
+  // Start with hex at the given direction and move around
+  let hex = {
+    q: center.q + HEX_DIRECTIONS[4].q * radius,  // Start at "Down" position
+    r: center.r + HEX_DIRECTIONS[4].r * radius,
+    s: center.s + HEX_DIRECTIONS[4].s * radius
+  }
   
-  // Start at the east corner and move clockwise
-  let cubeCoord = { q: radius, r: -radius, s: 0 }
-  
-  // Directions to move along the ring (in clockwise order)
-  const directions = [
-    { q: -1, r: +1, s: 0 }, // SE
-    { q: 0, r: +1, s: -1 }, // SW
-    { q: -1, r: 0, s: +1 }, // W
-    { q: 0, r: -1, s: +1 }, // NW
-    { q: +1, r: -1, s: 0 }, // NE
-    { q: +1, r: 0, s: -1 }, // E
-  ]
-  
-  // For each side of the ring
+  // For each of the 6 sides
   for (let side = 0; side < 6; side++) {
-    const dir = directions[side]
-    
     // For each step along this side
     for (let step = 0; step < radius; step++) {
-      results.push({ ...cubeCoord })
+      results.push({ ...hex })
       
-      // Move in the current direction
-      cubeCoord.q += dir.q
-      cubeCoord.r += dir.r
-      cubeCoord.s += dir.s
+      // Move one step in the current direction
+      const direction = HEX_DIRECTIONS[(side + 2) % 6]  // +2 to start from the right direction
+      hex.q += direction.q
+      hex.r += direction.r
+      hex.s += direction.s
     }
+  }
+  
+  return results
+}
+
+// Get a spiral of hexagons up to the specified radius
+function getHexSpiral(center: { q: number, r: number, s: number }, maxRadius: number) {
+  let results = [{ ...center }]
+  
+  for (let radius = 1; radius <= maxRadius; radius++) {
+    results = [...results, ...getHexRing(center, radius)]
   }
   
   return results
@@ -128,15 +134,10 @@ function getHexRing(radius: number) {
 function HexGrid({ wireframe = false, hexSize = 1.2, colorScheme = 'default', ringCount = 1 }) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
-    const gridPositions: { position: [number, number, number]; color: string }[] = []
+    const gridPositions: { position: [number, number, number]; color: string; q: number; r: number; s: number }[] = []
     
-    // Generate coordinates for all rings up to ringCount
-    let coordinates = [{ q: 0, r: 0, s: 0 }] // Center
-    
-    // Add all rings up to ringCount
-    for (let ring = 1; ring <= ringCount; ring++) {
-      coordinates = [...coordinates, ...getHexRing(ring)]
-    }
+    // Use the spiral generation function to get all hexes
+    const coordinates = getHexSpiral({ q: 0, r: 0, s: 0 }, ringCount)
     
     coordinates.forEach(({q, r, s}) => {
       // Generate a color based on coordinates and selected scheme
@@ -161,6 +162,7 @@ function HexGrid({ wireframe = false, hexSize = 1.2, colorScheme = 'default', ri
       }
       
       gridPositions.push({
+        q, r, s,
         position: cubeToPixel(q, r, s, hexSize),
         color: color.getStyle()
       })
@@ -254,7 +256,8 @@ export default function Grid() {
                   <div className="text-xs font-medium text-gray-500">
                     Current settings: {debugState.wireframe ? 'Wireframe' : 'Solid'}, 
                     Size: {debugState.hexSize.toFixed(1)}, 
-                    Colors: {debugState.colorScheme}
+                    Colors: {debugState.colorScheme},
+                    Rings: {debugState.ringCount}
                   </div>
                 </div>
               </div>
