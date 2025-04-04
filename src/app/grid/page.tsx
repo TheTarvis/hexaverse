@@ -2,7 +2,7 @@
 
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import * as THREE from 'three'
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
@@ -13,6 +13,27 @@ import {
   PlusCircleIcon,
   BugAntIcon,
 } from '@heroicons/react/24/outline'
+import sampleGridData from './data/sample-grid.json'
+
+// Types based on the server model
+interface CubeCoords {
+  X: number
+  Y: number
+  Z: number
+}
+
+interface Tile {
+  cords: CubeCoords
+}
+
+interface GridData {
+  id: string
+  tiles: Tile[]
+}
+
+interface TileMap {
+  [key: string]: Tile
+}
 
 // Hex directions matching the Go implementation
 const HEX_DIRECTIONS = [
@@ -23,6 +44,11 @@ const HEX_DIRECTIONS = [
   { q: 0, r: 1, s: -1 },  // Down
   { q: 1, r: 0, s: -1 },  // DownRight
 ]
+
+// Function to create a unique key for a cube coordinate
+function coordsToKey(q: number, r: number, s: number): string {
+  return `${q},${r},${s}`
+}
 
 // Convert cube coordinates to pixel coordinates (for pointy-top orientation)
 function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number, number] {
@@ -83,9 +109,9 @@ const debugOptions = [
     icon: SwatchIcon 
   },
   { 
-    name: 'Add Ring', 
-    description: 'Add another ring of hexagons', 
-    action: 'addRing', 
+    name: 'Use Grid Data', 
+    description: 'Toggle between generated grid and server data', 
+    action: 'toggleGridData', 
     icon: PlusCircleIcon 
   },
 ]
@@ -131,45 +157,88 @@ function getHexSpiral(center: { q: number, r: number, s: number }, maxRadius: nu
   return results
 }
 
-function HexGrid({ wireframe = false, hexSize = 1.2, colorScheme = 'default', ringCount = 1 }) {
+function HexGrid({ 
+  wireframe = false, 
+  hexSize = 1.2, 
+  colorScheme = 'default', 
+  ringCount = 1,
+  useServerData = false,
+  tileMap = {} as TileMap
+}) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
     const gridPositions: { position: [number, number, number]; color: string; q: number; r: number; s: number }[] = []
     
-    // Use the spiral generation function to get all hexes
-    const coordinates = getHexSpiral({ q: 0, r: 0, s: 0 }, ringCount)
-    
-    coordinates.forEach(({q, r, s}) => {
-      // Generate a color based on coordinates and selected scheme
-      let color
-      
-      // Different color generation based on scheme
-      if (colorScheme === 'monochrome') {
-        color = new THREE.Color(0.4, 0.4, 0.4)
-      } else if (colorScheme === 'rainbow') {
-        color = new THREE.Color(
-          0.5 + 0.5 * Math.sin(q + r),
-          0.5 + 0.5 * Math.sin(r + s),
-          0.5 + 0.5 * Math.sin(s + q)
-        )
-      } else {
-        // Default color scheme
-        color = new THREE.Color(
-          0.4 + 0.4 * Math.sin(q * 0.8 + r * 0.3),
-          0.5 + 0.3 * Math.sin(r * 0.5 + s * 0.4),
-          0.6 + 0.4 * Math.sin(s * 0.6 + q * 0.2)
-        )
-      }
-      
-      gridPositions.push({
-        q, r, s,
-        position: cubeToPixel(q, r, s, hexSize),
-        color: color.getStyle()
+    if (useServerData) {
+      // Use the tile data from the server
+      Object.values(tileMap).forEach((tile: Tile) => {
+        const q = tile.cords.X
+        const r = tile.cords.Y
+        const s = tile.cords.Z
+        
+        // Generate a color based on coordinates and selected scheme
+        let color
+        
+        // Different color generation based on scheme
+        if (colorScheme === 'monochrome') {
+          color = new THREE.Color(0.4, 0.4, 0.4)
+        } else if (colorScheme === 'rainbow') {
+          color = new THREE.Color(
+            0.5 + 0.5 * Math.sin(q + r),
+            0.5 + 0.5 * Math.sin(r + s),
+            0.5 + 0.5 * Math.sin(s + q)
+          )
+        } else {
+          // Default color scheme
+          color = new THREE.Color(
+            0.4 + 0.4 * Math.sin(q * 0.8 + r * 0.3),
+            0.5 + 0.3 * Math.sin(r * 0.5 + s * 0.4),
+            0.6 + 0.4 * Math.sin(s * 0.6 + q * 0.2)
+          )
+        }
+        
+        gridPositions.push({
+          q, r, s,
+          position: cubeToPixel(q, r, s, hexSize),
+          color: color.getStyle()
+        })
       })
-    })
+    } else {
+      // Use the generated spiral of hexagons
+      const coordinates = getHexSpiral({ q: 0, r: 0, s: 0 }, ringCount)
+      
+      coordinates.forEach(({q, r, s}) => {
+        // Generate a color based on coordinates and selected scheme
+        let color
+        
+        // Different color generation based on scheme
+        if (colorScheme === 'monochrome') {
+          color = new THREE.Color(0.4, 0.4, 0.4)
+        } else if (colorScheme === 'rainbow') {
+          color = new THREE.Color(
+            0.5 + 0.5 * Math.sin(q + r),
+            0.5 + 0.5 * Math.sin(r + s),
+            0.5 + 0.5 * Math.sin(s + q)
+          )
+        } else {
+          // Default color scheme
+          color = new THREE.Color(
+            0.4 + 0.4 * Math.sin(q * 0.8 + r * 0.3),
+            0.5 + 0.3 * Math.sin(r * 0.5 + s * 0.4),
+            0.6 + 0.4 * Math.sin(s * 0.6 + q * 0.2)
+          )
+        }
+        
+        gridPositions.push({
+          q, r, s,
+          position: cubeToPixel(q, r, s, hexSize),
+          color: color.getStyle()
+        })
+      })
+    }
     
     return gridPositions
-  }, [hexSize, colorScheme, ringCount])
+  }, [hexSize, colorScheme, ringCount, useServerData, tileMap])
 
   return (
     <>
@@ -190,8 +259,29 @@ export default function Grid() {
     wireframe: false,
     hexSize: 1.2,
     colorScheme: 'default',
-    ringCount: 1
+    ringCount: 1,
+    useServerData: false
   })
+
+  const [tileMap, setTileMap] = useState<TileMap>({})
+  
+  // Load the grid data on mount
+  useEffect(() => {
+    try {
+      const gridData = sampleGridData as GridData
+      
+      // Create a map of cube coordinates to tiles
+      const tileMapData: TileMap = {}
+      gridData.tiles.forEach(tile => {
+        const key = coordsToKey(tile.cords.X, tile.cords.Y, tile.cords.Z)
+        tileMapData[key] = tile
+      })
+      
+      setTileMap(tileMapData)
+    } catch (error) {
+      console.error('Error loading grid data:', error)
+    }
+  }, [])
   
   const handleDebugAction = (action: string) => {
     switch(action) {
@@ -211,8 +301,8 @@ export default function Grid() {
                       prev.colorScheme === 'rainbow' ? 'monochrome' : 'default'
         }))
         break
-      case 'addRing':
-        setDebugState(prev => ({ ...prev, ringCount: Math.min(prev.ringCount + 1, 3) }))
+      case 'toggleGridData':
+        setDebugState(prev => ({ ...prev, useServerData: !prev.useServerData }))
         break
     }
   }
@@ -257,7 +347,7 @@ export default function Grid() {
                     Current settings: {debugState.wireframe ? 'Wireframe' : 'Solid'}, 
                     Size: {debugState.hexSize.toFixed(1)}, 
                     Colors: {debugState.colorScheme},
-                    Rings: {debugState.ringCount}
+                    {debugState.useServerData ? ' Using server data' : ` Rings: ${debugState.ringCount}`}
                   </div>
                 </div>
               </div>
@@ -281,6 +371,8 @@ export default function Grid() {
             hexSize={debugState.hexSize}
             colorScheme={debugState.colorScheme}
             ringCount={debugState.ringCount}
+            useServerData={debugState.useServerData}
+            tileMap={tileMap}
           />
         </Canvas>
       </div>
