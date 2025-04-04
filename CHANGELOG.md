@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2025-04-06
+
+### Added
+- Added "Add New Shard" debug menu option to request and append a new shard to the grid
+- Created API function to request a new shard without using cache
+- Added loading state for shard addition process
+
 ## [0.2.2] - 2025-04-05
 
 ### Fixed

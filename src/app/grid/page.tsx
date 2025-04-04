@@ -11,9 +11,10 @@ import {
   ViewfinderCircleIcon,
   SwatchIcon,
   BugAntIcon,
+  PlusCircleIcon,
 } from '@heroicons/react/24/outline'
 import sampleGridData from './data/sample-grid.json'
-import { fetchShardData } from '@/services/api'
+import { fetchShardData, addNewShard } from '@/services/api'
 
 // Types based on the server model
 interface CubeCoords {
@@ -107,6 +108,12 @@ const debugOptions = [
     description: 'Change the color palette', 
     action: 'changeColorScheme', 
     icon: SwatchIcon 
+  },
+  {
+    name: 'Add New Shard',
+    description: 'Request a new shard from the server and add it to the grid',
+    action: 'addNewShard',
+    icon: PlusCircleIcon
   }
 ]
 
@@ -181,6 +188,7 @@ export default function Grid() {
   const [tileMap, setTileMap] = useState<TileMap>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [addingShardLoading, setAddingShardLoading] = useState(false)
   
   // Load the grid data on mount
   useEffect(() => {
@@ -236,6 +244,31 @@ export default function Grid() {
                       prev.colorScheme === 'rainbow' ? 'monochrome' : 'default'
         }))
         break
+      case 'addNewShard':
+        setAddingShardLoading(true)
+        
+        addNewShard()
+          .then((newShardData: GridData) => {
+            // Create a new map merging existing and new tiles
+            const updatedTileMap = { ...tileMap }
+            
+            // Add all new tiles to the map
+            newShardData.tiles.forEach((tile: Tile) => {
+              const key = coordsToKey(tile.cords.X, tile.cords.Y, tile.cords.Z)
+              updatedTileMap[key] = tile
+            })
+            
+            setTileMap(updatedTileMap)
+            setError(null)
+          })
+          .catch((error) => {
+            console.error('Error adding new shard:', error)
+            setError('Failed to add new shard')
+          })
+          .finally(() => {
+            setAddingShardLoading(false)
+          })
+        break
     }
   }
 
@@ -245,6 +278,12 @@ export default function Grid() {
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
             <div className="text-lg font-medium text-gray-700">Loading grid data...</div>
+          </div>
+        )}
+        
+        {addingShardLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
+            <div className="text-lg font-medium text-gray-700">Adding new shard...</div>
           </div>
         )}
         

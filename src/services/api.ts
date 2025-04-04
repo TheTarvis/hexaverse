@@ -61,4 +61,30 @@ export async function fetchShardData() {
   } finally {
     shardRequestInProgress = false;
   }
+}
+
+/**
+ * Add a new shard without using the cache
+ * @returns Promise with the new shard data
+ */
+export async function addNewShard() {
+  try {
+    console.log('Requesting a new shard from server');
+    
+    const response = await fetch(`${API_BASE_URL}/shard`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server responded with status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error adding new shard:', error);
+    throw error;
+  }
 } 
