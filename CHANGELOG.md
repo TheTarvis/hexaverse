@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2025-04-05
+
+### Added
+- Environment variable configuration for server API base URL
+- API service with fetch function for grid data
+- Loading and error states for grid data fetching
+
+### Changed
+- Updated Grid page to fetch data from API with fallback to sample data
+- Improved error handling for API requests
+
 ## [0.2.0] - 2025-04-04
 
 ### Added

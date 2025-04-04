@@ -63,3 +63,16 @@ To learn more about the technologies used in this site template, see the followi
 - [React](https://react.dev) - the official React documentation
 - [Framer Motion](https://www.framer.com/docs/) - the official Framer Motion documentation
 - [clsx](https://github.com/lukeed/clsx) - the GitHub repo for the `clsx` helper
+
+## Environment Configuration
+
+This project uses environment variables for configuration. To set up your environment:
+
+1. Copy `.env.example` to `.env.local`
+2. Modify the values in `.env.local` to match your environment
+
+### Available Environment Variables
+
+- `NEXT_PUBLIC_API_BASE_URL`: The base URL for the API server (default: http://localhost:8081)
+
+For production deployment, set these environment variables on your hosting platform.

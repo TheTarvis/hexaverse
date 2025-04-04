@@ -13,6 +13,7 @@ import {
   BugAntIcon,
 } from '@heroicons/react/24/outline'
 import sampleGridData from './data/sample-grid.json'
+import { fetchShardData } from '@/services/api'
 
 // Types based on the server model
 interface CubeCoords {
@@ -178,23 +179,43 @@ export default function Grid() {
   })
 
   const [tileMap, setTileMap] = useState<TileMap>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   // Load the grid data on mount
   useEffect(() => {
-    try {
-      const gridData = sampleGridData as GridData
-      
-      // Create a map of cube coordinates to tiles
-      const tileMapData: TileMap = {}
-      gridData.tiles.forEach((tile: Tile) => {
-        const key = coordsToKey(tile.cords.X, tile.cords.Y, tile.cords.Z)
-        tileMapData[key] = tile
-      })
-      
-      setTileMap(tileMapData)
-    } catch (error) {
-      console.error('Error loading grid data:', error)
+    async function loadGridData() {
+      try {
+        setLoading(true)
+        let gridData: GridData
+        
+        try {
+          // Try to fetch from API
+          gridData = await fetchShardData() as GridData
+        } catch (apiError) {
+          console.warn('Error fetching from API, falling back to sample data:', apiError)
+          // Fallback to sample data if API fails
+          gridData = sampleGridData as GridData
+        }
+        
+        // Create a map of cube coordinates to tiles
+        const tileMapData: TileMap = {}
+        gridData.tiles.forEach((tile: Tile) => {
+          const key = coordsToKey(tile.cords.X, tile.cords.Y, tile.cords.Z)
+          tileMapData[key] = tile
+        })
+        
+        setTileMap(tileMapData)
+        setError(null)
+      } catch (error) {
+        console.error('Error loading grid data:', error)
+        setError('Failed to load grid data')
+      } finally {
+        setLoading(false)
+      }
     }
+    
+    loadGridData()
   }, [])
   
   const handleDebugAction = (action: string) => {
@@ -221,6 +242,18 @@ export default function Grid() {
   return (
     <div className="mx-auto max-w-7xl p-6">
       <div className="relative h-[800px] w-full">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
+            <div className="text-lg font-medium text-gray-700">Loading grid data...</div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-red-100 bg-opacity-40 z-10">
+            <div className="text-lg font-medium text-red-700">{error}</div>
+          </div>
+        )}
+        
         <div className="absolute top-4 right-4 z-10">
           <Popover className="relative">
             <PopoverButton className="flex items-center gap-x-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
