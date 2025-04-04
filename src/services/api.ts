@@ -11,11 +11,12 @@ let shardRequestInProgress = false;
 
 /**
  * Fetch shard data from the server
+ * @param forceRefresh If true, ignores the cache and fetches fresh data
  * @returns Promise with the grid data
  */
-export async function fetchShardData() {
-  // Return cached response if available
-  if (shardDataCache) {
+export async function fetchShardData(forceRefresh = false) {
+  // Return cached response if available and not forcing refresh
+  if (shardDataCache && !forceRefresh) {
     console.log('Using cached shard data');
     return shardDataCache;
   }
