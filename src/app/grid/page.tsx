@@ -4,6 +4,14 @@ import { Canvas } from '@react-three/fiber'
 import { useMemo } from 'react'
 import * as THREE from 'three'
 
+// Convert cube coordinates to pixel coordinates (for pointy-top orientation)
+function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number, number] {
+  // For pointy-top hexagons
+  const x = size * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r)
+  const y = size * (3/2 * r)
+  return [x, y, 0]
+}
+
 function HexagonMesh({ position = [0, 0, 0] as [number, number, number], color = 'teal' }) {
   // Create a hexagon shape
   const hexShape = useMemo(() => {
@@ -36,37 +44,37 @@ function HexagonMesh({ position = [0, 0, 0] as [number, number, number], color =
 }
 
 function HexGrid() {
-  // Generate hexagon positions in a grid layout
+  // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
-    const gridPositions = []
-    const size = 1.8 // Size with spacing between hexagons
-    const rows = 3
-    const cols = 4
+    const gridPositions: { position: [number, number, number]; color: string }[] = []
+    const hexSize = 1.2 // Size parameter for coordinate conversion
     
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        // Offset every other row to create proper hexagonal grid
-        const offset = r % 2 === 0 ? 0 : size * 0.86 / 2
-        
-        // Calculate x position with offset for odd rows
-        const x = c * size * 0.86 + offset
-        
-        // For pointy-top hexagons, y position is 3/4 * size apart
-        const y = r * size * 0.75
-        
-        // Generate a color based on position
-        const color = new THREE.Color(
-          0.3 + 0.5 * Math.sin(c * 0.8 + r * 0.3),
-          0.4 + 0.5 * Math.sin(c * 0.3 + r * 0.2),
-          0.5 + 0.5 * Math.sin(c * 0.2 + r * 0.8)
-        )
-        
-        gridPositions.push({
-          position: [x, -y, 0] as [number, number, number],
-          color: color.getStyle()
-        })
-      }
-    }
+    // Define the cube coordinates for center and one ring
+    const coordinates = [
+      // Center
+      { q: 0, r: 0, s: 0 },
+      // Ring 1
+      { q: 1, r: -1, s: 0 },
+      { q: 1, r: 0, s: -1 },
+      { q: 0, r: 1, s: -1 },
+      { q: -1, r: 1, s: 0 },
+      { q: -1, r: 0, s: 1 },
+      { q: 0, r: -1, s: 1 }
+    ]
+    
+    coordinates.forEach(({q, r, s}) => {
+      // Generate a color based on coordinates
+      const color = new THREE.Color(
+        0.4 + 0.4 * Math.sin(q * 0.8 + r * 0.3),
+        0.5 + 0.3 * Math.sin(r * 0.5 + s * 0.4),
+        0.6 + 0.4 * Math.sin(s * 0.6 + q * 0.2)
+      )
+      
+      gridPositions.push({
+        position: cubeToPixel(q, r, s, hexSize),
+        color: color.getStyle()
+      })
+    })
     
     return gridPositions
   }, [])
@@ -89,7 +97,7 @@ export default function Grid() {
     <div className="mx-auto max-w-7xl p-6">
       <div className="h-[400px] w-full">
         <Canvas
-          camera={{ position: [0, 0, 5], fov: 50 }}
+          camera={{ position: [0, 0, 10], fov: 50 }}
           gl={{ antialias: true }}
         >
           <HexGrid />
