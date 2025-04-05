@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.7] - 2025-04-20
+
+### Fixed
+- Updated SlideUpPanel component to fix deprecated `Dialog.Panel` and `Dialog.Title` usage
+- Replaced with `DialogPanel` and `DialogTitle` components from Headlessui v2 API
+
 ## [0.3.6] - 2025-04-19
 
 ### Fixed
