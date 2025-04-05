@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.7] - 2025-04-10
+
+### Fixed
+- Fixed touch controls for mobile devices 
+- Improved pinch-to-zoom and one-finger panning on touchscreens
+- Added responsive navigation helper text that changes based on device type
+- Disabled page touch actions to prevent conflicts with canvas interactions
+
 ## [0.2.6] - 2025-04-09
 
 ### Added

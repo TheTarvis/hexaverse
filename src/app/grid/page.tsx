@@ -371,12 +371,14 @@ export default function Grid() {
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
           </svg>
-          <span>Click and drag to pan | Pinch to zoom</span>
+          <span className="hidden md:inline">Click and drag to pan | Scroll to zoom</span>
+          <span className="md:hidden">Drag with one finger to pan | Pinch to zoom</span>
         </div>
         
         <Canvas
           camera={{ position: [0, 0, 12], fov: 45 }}
           gl={{ antialias: true }}
+          style={{ touchAction: 'none' }}
         >
           <OrbitControls 
             enablePan={true}
@@ -387,8 +389,8 @@ export default function Grid() {
             panSpeed={1.5}
             zoomSpeed={1.2}
             touches={{
-              ONE: THREE.TOUCH.ROTATE,
-              TWO: THREE.TOUCH.PAN
+              ONE: THREE.MOUSE.PAN,
+              TWO: THREE.TOUCH.DOLLY_PAN
             }}
             mouseButtons={{
               LEFT: THREE.MOUSE.PAN,
