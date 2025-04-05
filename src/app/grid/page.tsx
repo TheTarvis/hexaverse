@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline'
 import sampleGridData from './data/sample-grid.json'
 import { fetchShardData, addNewShard } from '@/services/api'
+import { SlideUpPanel } from '@/components/slide-up-panel'
 
 // Types based on the server model
 interface CubeCoords {
@@ -358,43 +359,34 @@ export default function Grid() {
           </div>
         )}
         
-        {/* Tile info panel */}
-        {selectedTile && (
-          <div className="absolute bottom-0 left-0 right-0 flex justify-center z-20">
-            <div className="w-full max-w-md md:max-w-lg lg:max-w-xl bg-white rounded-t-xl shadow-xl transform transition-transform duration-300 ease-out" 
-                 style={{ maxHeight: '50vh' }}>
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900">Tile Information</h3>
-                  <button
-                    onClick={closePanel}
-                    className="p-1 rounded-full hover:bg-gray-100"
-                  >
-                    <XMarkIcon className="h-5 w-5 text-gray-500" />
-                  </button>
+        {/* Use the SlideUpPanel component instead of custom implementation */}
+        <SlideUpPanel
+          isOpen={selectedTile !== null}
+          onClose={closePanel}
+          title="Tile Information"
+          maxWidth="lg"
+        >
+          {selectedTile && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-500">Cube Coordinates</div>
+                <div className="font-mono mt-1">
+                  q: {selectedTile.q}, r: {selectedTile.r}, s: {selectedTile.s}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="text-sm font-medium text-gray-500">Cube Coordinates</div>
-                    <div className="font-mono mt-1">
-                      q: {selectedTile.q}, r: {selectedTile.r}, s: {selectedTile.s}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="text-sm font-medium text-gray-500">Color</div>
-                    <div className="flex items-center mt-1">
-                      <div 
-                        className="h-6 w-6 rounded mr-2" 
-                        style={{ backgroundColor: selectedTile.color }}
-                      ></div>
-                      <code className="text-xs">{selectedTile.color}</code>
-                    </div>
-                  </div>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-500">Color</div>
+                <div className="flex items-center mt-1">
+                  <div 
+                    className="h-6 w-6 rounded mr-2" 
+                    style={{ backgroundColor: selectedTile.color }}
+                  ></div>
+                  <code className="text-xs">{selectedTile.color}</code>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </SlideUpPanel>
         
         <div className="absolute top-4 right-4 z-10">
           <Popover className="relative">

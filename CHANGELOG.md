@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2025-04-13
+
+### Added
+- Created reusable SlideUpPanel component for consistent bottom sheet UI
+- Implemented smooth animations and transitions for the panel
+- Added customization options for width, height, and title
+- Added semi-transparent overlay background
+- Refactored tile information panel to use the new reusable component
+
 ## [0.2.9] - 2025-04-12
 
 ### Changed
