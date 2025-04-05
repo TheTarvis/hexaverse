@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.6] - 2025-04-09
+
+### Added
+- Added click interaction to individual hexagon tiles
+- Implemented mouse hover cursor change to indicate clickable tiles  
+- Added console logging of clicked tile's cube coordinates (q,r,s)
+
 ## [0.2.5] - 2025-04-08
 
 ### Changed

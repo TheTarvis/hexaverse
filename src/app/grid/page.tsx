@@ -59,7 +59,21 @@ function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number
   return [x, y, 0]
 }
 
-function HexagonMesh({ position = [0, 0, 0] as [number, number, number], color = 'teal', wireframe = false }) {
+function HexagonMesh({ 
+  position = [0, 0, 0] as [number, number, number], 
+  color = 'teal', 
+  wireframe = false,
+  q, 
+  r, 
+  s
+}: { 
+  position?: [number, number, number], 
+  color?: string, 
+  wireframe?: boolean,
+  q: number,
+  r: number,
+  s: number
+}) {
   // Create a hexagon shape
   const hexShape = useMemo(() => {
     const shape = new THREE.Shape()
@@ -82,8 +96,20 @@ function HexagonMesh({ position = [0, 0, 0] as [number, number, number], color =
     return shape
   }, [])
 
+  const handleClick = (event: { stopPropagation: () => void }) => {
+    // Stop event propagation to prevent it from reaching Canvas
+    event.stopPropagation()
+    console.log(`Clicked hex at cube coordinates: q=${q}, r=${r}, s=${s}`)
+  }
+
   return (
-    <mesh position={position}>
+    <mesh 
+      position={position} 
+      onClick={handleClick}
+      // Make cursor change to pointer when hovering over hexagons
+      onPointerOver={(e) => document.body.style.cursor = 'pointer'}
+      onPointerOut={(e) => document.body.style.cursor = 'default'}
+    >
       <shapeGeometry args={[hexShape]} />
       <meshBasicMaterial color={color} wireframe={wireframe} />
     </mesh>
@@ -172,6 +198,9 @@ function HexGrid({
           position={props.position}
           color={props.color}
           wireframe={wireframe}
+          q={props.q}
+          r={props.r}
+          s={props.s}
         />
       ))}
     </>
