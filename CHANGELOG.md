@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.8] - 2025-04-11
+
+### Added
+- Added tile information panel that slides up when a tile is clicked
+- Implemented panel to display cube coordinates and tile color
+- Added close button to dismiss the panel
+- Enhanced UI with responsive grid layout for tile details
+
 ## [0.2.7] - 2025-04-10
 
 ### Fixed

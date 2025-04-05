@@ -12,6 +12,7 @@ import {
   SwatchIcon,
   BugAntIcon,
   PlusCircleIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
 import sampleGridData from './data/sample-grid.json'
 import { fetchShardData, addNewShard } from '@/services/api'
@@ -34,6 +35,14 @@ interface GridData {
 
 interface TileMap {
   [key: string]: Tile
+}
+
+// Add an interface for the selected tile
+interface SelectedTile {
+  q: number;
+  r: number;
+  s: number;
+  color: string;
 }
 
 // Hex directions matching the Go implementation
@@ -65,14 +74,16 @@ function HexagonMesh({
   wireframe = false,
   q, 
   r, 
-  s
+  s,
+  onTileSelect
 }: { 
   position?: [number, number, number], 
   color?: string, 
   wireframe?: boolean,
   q: number,
   r: number,
-  s: number
+  s: number,
+  onTileSelect: (tile: SelectedTile) => void
 }) {
   // Create a hexagon shape
   const hexShape = useMemo(() => {
@@ -100,6 +111,14 @@ function HexagonMesh({
     // Stop event propagation to prevent it from reaching Canvas
     event.stopPropagation()
     console.log(`Clicked hex at cube coordinates: q=${q}, r=${r}, s=${s}`)
+    
+    // Call the selection handler with tile info
+    onTileSelect({
+      q,
+      r,
+      s,
+      color
+    })
   }
 
   return (
@@ -147,7 +166,14 @@ function HexGrid({
   wireframe = false, 
   hexSize = 1.2, 
   colorScheme = 'default', 
-  tileMap = {} as TileMap
+  tileMap = {} as TileMap,
+  onTileSelect
+}: {
+  wireframe?: boolean,
+  hexSize?: number,
+  colorScheme?: string,
+  tileMap?: TileMap,
+  onTileSelect: (tile: SelectedTile) => void
 }) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
@@ -201,6 +227,7 @@ function HexGrid({
           q={props.q}
           r={props.r}
           s={props.s}
+          onTileSelect={onTileSelect}
         />
       ))}
     </>
@@ -218,6 +245,7 @@ export default function Grid() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [addingShardLoading, setAddingShardLoading] = useState(false)
+  const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   
   // Load the grid data on mount
   useEffect(() => {
@@ -301,6 +329,14 @@ export default function Grid() {
     }
   }
 
+  const handleTileSelect = (tile: SelectedTile) => {
+    setSelectedTile(tile)
+  }
+
+  const closePanel = () => {
+    setSelectedTile(null)
+  }
+
   return (
     <div className="h-screen w-full">
       <div className="relative h-full w-full">
@@ -319,6 +355,42 @@ export default function Grid() {
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-red-100 bg-opacity-40 z-10">
             <div className="text-lg font-medium text-red-700">{error}</div>
+          </div>
+        )}
+        
+        {/* Tile info panel */}
+        {selectedTile && (
+          <div className="absolute bottom-0 left-0 right-0 z-20 bg-white rounded-t-xl shadow-xl transform transition-transform duration-300 ease-out" 
+               style={{ maxHeight: '50vh' }}>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-900">Tile Information</h3>
+                <button
+                  onClick={closePanel}
+                  className="p-1 rounded-full hover:bg-gray-100"
+                >
+                  <XMarkIcon className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <div className="text-sm font-medium text-gray-500">Cube Coordinates</div>
+                  <div className="font-mono mt-1">
+                    q: {selectedTile.q}, r: {selectedTile.r}, s: {selectedTile.s}
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <div className="text-sm font-medium text-gray-500">Color</div>
+                  <div className="flex items-center mt-1">
+                    <div 
+                      className="h-6 w-6 rounded mr-2" 
+                      style={{ backgroundColor: selectedTile.color }}
+                    ></div>
+                    <code className="text-xs">{selectedTile.color}</code>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         
@@ -403,6 +475,7 @@ export default function Grid() {
             hexSize={debugState.hexSize}
             colorScheme={debugState.colorScheme}
             tileMap={tileMap}
+            onTileSelect={handleTileSelect}
           />
         </Canvas>
       </div>
