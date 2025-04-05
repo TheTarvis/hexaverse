@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.5] - 2025-04-17
+
+### Added
+- Added dark mode background and text colors to tile information panel
+- Enhanced readability in dark mode for Cube Coordinates and Color sections
+
 ## [0.3.4] - 2025-04-16
 
 ### Fixed

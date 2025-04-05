@@ -370,20 +370,20 @@ export default function Grid() {
         >
           {selectedTile && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <div className="text-sm font-medium text-gray-500">Cube Coordinates</div>
-                <div className="font-mono mt-1">
+              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Cube Coordinates</div>
+                <div className="font-mono mt-1 dark:text-gray-200">
                   q: {selectedTile?.q}, r: {selectedTile?.r}, s: {selectedTile?.s}
                 </div>
               </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <div className="text-sm font-medium text-gray-500">Color</div>
+              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Color</div>
                 <div className="flex items-center mt-1">
                   <div 
                     className="h-6 w-6 rounded mr-2" 
                     style={{ backgroundColor: selectedTile?.color }}
                   ></div>
-                  <code className="text-xs">{selectedTile?.color}</code>
+                  <code className="text-xs dark:text-gray-200">{selectedTile?.color}</code>
                 </div>
               </div>
             </div>
