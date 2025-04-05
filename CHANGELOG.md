@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.9] - 2025-04-12
+
+### Changed
+- Improved tile information panel with responsive width constraints
+- Added maximum width limits that adapt to different screen sizes
+- Centered panel for better visual balance on larger displays
+- Enhanced layout consistency across device sizes
+
 ## [0.2.8] - 2025-04-11
 
 ### Added
