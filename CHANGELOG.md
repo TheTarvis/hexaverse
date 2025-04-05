@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.6] - 2025-04-19
+
+### Fixed
+- Updated SlideUpPanel component to fix deprecated `Transition.Child` usage
+- Replaced with `TransitionChild` component from Headlessui v2 API
+
 ## [0.3.5] - 2025-04-17
 
 ### Added

@@ -42,7 +42,7 @@ export function SlideUpPanel({
       >
         {/* Background overlay */}
         {showOverlay && (
-          <Headless.Transition.Child
+          <Headless.TransitionChild
             as={Fragment}
             enter="ease-out duration-300"
             enterFrom="opacity-0"
@@ -52,14 +52,14 @@ export function SlideUpPanel({
             leaveTo="opacity-0"
           >
             <div className="fixed inset-0 bg-black bg-opacity-25" />
-          </Headless.Transition.Child>
+          </Headless.TransitionChild>
         )}
 
         {/* Panel */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 overflow-hidden">
             <div className="pointer-events-none fixed inset-x-0 bottom-0 flex justify-center max-h-full">
-              <Headless.Transition.Child
+              <Headless.TransitionChild
                 as={Fragment}
                 enter="transform transition ease-out duration-300"
                 enterFrom="translate-y-full"
@@ -91,7 +91,7 @@ export function SlideUpPanel({
                     {children}
                   </div>
                 </Headless.Dialog.Panel>
-              </Headless.Transition.Child>
+              </Headless.TransitionChild>
             </div>
           </div>
         </div>
