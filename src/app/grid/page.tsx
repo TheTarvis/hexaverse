@@ -331,11 +331,12 @@ export default function Grid() {
   }
 
   const handleTileSelect = (tile: SelectedTile) => {
-    setSelectedTile(tile)
+    console.log('Setting selected tile:', tile);
+    setSelectedTile(tile);
   }
 
   const closePanel = () => {
-    setSelectedTile(null)
+    setSelectedTile(null);
   }
 
   return (
@@ -372,7 +373,7 @@ export default function Grid() {
               <div className="bg-gray-50 p-3 rounded-lg">
                 <div className="text-sm font-medium text-gray-500">Cube Coordinates</div>
                 <div className="font-mono mt-1">
-                  q: {selectedTile.q}, r: {selectedTile.r}, s: {selectedTile.s}
+                  q: {selectedTile?.q}, r: {selectedTile?.r}, s: {selectedTile?.s}
                 </div>
               </div>
               <div className="bg-gray-50 p-3 rounded-lg">
@@ -380,9 +381,9 @@ export default function Grid() {
                 <div className="flex items-center mt-1">
                   <div 
                     className="h-6 w-6 rounded mr-2" 
-                    style={{ backgroundColor: selectedTile.color }}
+                    style={{ backgroundColor: selectedTile?.color }}
                   ></div>
-                  <code className="text-xs">{selectedTile.color}</code>
+                  <code className="text-xs">{selectedTile?.color}</code>
                 </div>
               </div>
             </div>

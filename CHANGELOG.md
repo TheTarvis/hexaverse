@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.4] - 2025-04-16
+
+### Fixed
+- Fixed issue with tile coordinates not displaying in the SlideUpPanel
+- Added optional chaining to prevent potential null reference errors
+- Improved debugging with additional console logs
+
 ## [0.3.2] - 2025-04-15
 
 ### Changed
