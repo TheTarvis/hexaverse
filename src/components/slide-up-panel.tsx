@@ -69,17 +69,17 @@ export function SlideUpPanel({
                 leaveTo="translate-y-full"
               >
                 <Headless.Dialog.Panel 
-                  className={`pointer-events-auto w-full ${maxWidthClasses[maxWidth]} bg-white rounded-t-xl shadow-xl transform transition-all`}
+                  className={`pointer-events-auto w-full ${maxWidthClasses[maxWidth]} bg-white dark:bg-zinc-900 rounded-t-xl shadow-xl transform transition-all`}
                   style={{ maxHeight }}
                 >
                   {title && (
-                    <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-                      <Headless.Dialog.Title className="text-lg font-semibold text-gray-900">
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/5 px-4 py-3">
+                      <Headless.Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
                         {title}
                       </Headless.Dialog.Title>
                       <button
                         type="button"
-                        className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="rounded-md bg-white dark:bg-zinc-900 text-gray-400 hover:text-gray-500 dark:text-zinc-400 dark:hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         onClick={onClose}
                       >
                         <span className="sr-only">Close panel</span>

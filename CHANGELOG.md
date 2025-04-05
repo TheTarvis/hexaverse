@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2025-04-15
+
+### Changed
+- Updated SlideUpPanel component to use the same background colors as the sidebar
+- Added dark mode support with zinc-900 background color
+- Improved text and border color contrast in dark mode
+
 ## [0.3.1] - 2025-04-14
 
 ### Changed
