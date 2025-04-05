@@ -11,6 +11,7 @@ interface SlideUpPanelProps {
   title?: string
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
   maxHeight?: string
+  showOverlay?: boolean
 }
 
 export function SlideUpPanel({
@@ -19,7 +20,8 @@ export function SlideUpPanel({
   onClose,
   title,
   maxWidth = 'md',
-  maxHeight = '50vh'
+  maxHeight = '50vh',
+  showOverlay = false
 }: SlideUpPanelProps) {
   // Map maxWidth to Tailwind classes
   const maxWidthClasses = {
@@ -39,20 +41,22 @@ export function SlideUpPanel({
         onClose={onClose}
       >
         {/* Background overlay */}
-        <Headless.Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
-        </Headless.Transition.Child>
+        {showOverlay && (
+          <Headless.Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </Headless.Transition.Child>
+        )}
 
         {/* Panel */}
-        <div className="fixed inset-0 overflow-hidden">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 overflow-hidden">
             <div className="pointer-events-none fixed inset-x-0 bottom-0 flex justify-center max-h-full">
               <Headless.Transition.Child

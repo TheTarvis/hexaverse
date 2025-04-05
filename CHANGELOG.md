@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2025-04-14
+
+### Changed
+- Made background overlay optional in SlideUpPanel component
+- Updated grid tile information panel to show without darkening the background
+- Improved user experience by maintaining visibility of the grid while viewing tile details
+- Fixed pointer event handling to prevent accidental click-through
+
 ## [0.3.0] - 2025-04-13
 
 ### Added
