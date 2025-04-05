@@ -12,6 +12,7 @@ interface SlideUpPanelProps {
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
   maxHeight?: string
   showOverlay?: boolean
+  closeOnOutsideClick?: boolean
 }
 
 export function SlideUpPanel({
@@ -21,7 +22,8 @@ export function SlideUpPanel({
   title,
   maxWidth = 'md',
   maxHeight = '50vh',
-  showOverlay = false
+  showOverlay = false,
+  closeOnOutsideClick = false
 }: SlideUpPanelProps) {
   // Map maxWidth to Tailwind classes
   const maxWidthClasses = {
@@ -38,7 +40,8 @@ export function SlideUpPanel({
       <Headless.Dialog 
         as="div" 
         className="relative z-50" 
-        onClose={onClose}
+        onClose={closeOnOutsideClick ? onClose : () => {}}
+        static
       >
         {/* Background overlay */}
         {showOverlay && (

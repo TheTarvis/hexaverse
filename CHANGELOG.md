@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.8] - 2025-04-21
+
+### Changed
+- Enhanced SlideUpPanel to prevent automatic closing when clicking outside
+- Added closeOnOutsideClick prop with default false for better control
+- Updated tile information panel to use static dialog behavior
+- Improved user experience by allowing interaction with grid while panel is open
+
 ## [0.3.7] - 2025-04-20
 
 ### Fixed

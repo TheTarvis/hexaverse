@@ -367,6 +367,7 @@ export default function Grid() {
           title="Tile Information"
           maxWidth="lg"
           showOverlay={false}
+          closeOnOutsideClick={false}
         >
           {selectedTile && (
             <div className="grid grid-cols-2 gap-3">
