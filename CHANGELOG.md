@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.5] - 2025-04-26
+
+### Added
+- Implemented colony management functionality
+- Created Firestore integration for storing user colony data
+- Added colony creation flow with name input
+- Created colony information display component
+- Added Colony page in the navigation
+- Implemented proper error handling for colony operations
+
 ## [0.4.4] - 2025-04-25
 
 ### Fixed

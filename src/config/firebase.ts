@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 
 // Firebase configuration (will be populated from environment variables)
 const firebaseConfig = {
@@ -35,6 +36,7 @@ const validateConfig = () => {
 // Initialize Firebase
 let firebaseApp;
 let auth;
+let firestore;
 
 try {
   console.log('Initializing Firebase app...');
@@ -57,25 +59,33 @@ try {
   console.log('Initializing Firebase auth...');
   auth = getAuth(firebaseApp);
   
-  // Additional authentication setup
+  // Initialize Firestore
+  console.log('Initializing Firestore...');
+  firestore = getFirestore(firebaseApp);
+  
+  // Additional setup for auth and Firestore
   if (typeof window !== 'undefined') {
     console.log(`Auth domain: ${firebaseConfig.authDomain}`);
     console.log(`Current origin: ${window.location.origin}`);
     
-    // Optionally connect to emulator in development
+    // Optionally connect to emulators in development
     if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
       connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
       console.log('Connected to Firebase Auth emulator');
+      
+      connectFirestoreEmulator(firestore, 'localhost', 8080);
+      console.log('Connected to Firestore emulator');
     }
   }
   
-  console.log('Firebase auth initialized successfully!');
+  console.log('Firebase auth and Firestore initialized successfully!');
 } catch (error) {
   console.error('Error initializing Firebase:', error);
   // Create dummy exports to prevent app from crashing
   firebaseApp = {} as any;
   auth = {} as any;
+  firestore = {} as any;
 }
 
-export { firebaseApp, auth };
+export { firebaseApp, auth, firestore };
 export default firebaseApp; 
