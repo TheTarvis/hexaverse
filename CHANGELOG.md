@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2025-04-06
+
+### Added
+- Implemented complete Firebase Cloud Functions infrastructure with TypeScript
+- Created HTTP endpoints (helloWorld, countUsers, createTestUser)
+- Added Firestore document trigger for text transformation (makeUppercase)
+- Configured Firebase emulators for local development including Functions and Firestore
+- Set up robust error handling and graceful fallbacks in Cloud Functions
+- Added test user creation utility for local development
+
 ## [0.4.9] - 2025-04-06
 
 ### Added
