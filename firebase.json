@@ -1,7 +1,22 @@
 {
   "hosting": {
-    "source": ".",
-    "cleanUrls": true
+    "public": "public",
+    "cleanUrls": true,
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "predeploy": ["npm run build:firebase"],
+    "frameworksBackend": {
+      "region": "us-central1"
+    }
   },
   "functions": {
     "source": "functions",

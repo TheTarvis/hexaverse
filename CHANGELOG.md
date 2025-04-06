@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.7] - 2025-04-10
+
+### Fixed
+- Fixed styling issues in Firebase emulator environment
+- Updated Firebase hosting configuration to correctly serve static assets
+- Added specialized build command for Firebase emulator
+- Configured Next.js to output static files for Firebase deployment
+
 ## [0.5.6] - 2025-04-10
 
 ### Fixed
