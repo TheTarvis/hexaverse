@@ -48,7 +48,11 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       onClose();
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message);
+        if (err.message.includes('auth/popup-closed-by-user')) {
+          console.log('User closed the sign-in popup');
+        } else {
+          setError(err.message);
+        }
       } else {
         setError('An unknown error occurred');
       }

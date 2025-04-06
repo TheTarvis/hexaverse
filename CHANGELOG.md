@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.3] - 2025-04-24
+
+### Fixed
+- Fixed Firebase authentication configuration issues
+- Added validation for Firebase configuration parameters
+- Improved error handling for Google sign-in popup
+- Updated sign-in flow to gracefully handle popup-closed-by-user errors
+- Enhanced Google authentication with better UX parameters
+
 ## [0.4.0] - 2025-04-23
 
 ### Added

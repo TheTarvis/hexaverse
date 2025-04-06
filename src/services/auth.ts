@@ -24,8 +24,23 @@ export async function signInWithEmail(email: string, password: string): Promise<
  */
 export async function signInWithGoogle(): Promise<User> {
   const provider = new GoogleAuthProvider();
-  const userCredential = await signInWithPopup(auth, provider);
-  return userCredential.user;
+  
+  // Add scopes if needed - uncomment and customize as necessary
+  // provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+  // provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+  
+  // Set custom parameters for better UX
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  });
+  
+  try {
+    const userCredential = await signInWithPopup(auth, provider);
+    return userCredential.user;
+  } catch (error) {
+    console.error('Google sign-in error:', error);
+    throw error;
+  }
 }
 
 /**
