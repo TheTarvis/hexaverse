@@ -25,6 +25,10 @@
     },
     "ui": {
       "enabled": true
-    }
+    },
+    "firestore": {
+      "port": "8080"
+    },
+    "singleProjectMode": true
   }
-} 
+}

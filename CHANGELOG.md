@@ -11,6 +11,12 @@ All notable changes to this project will be documented in this file.
 - Added user count function example
 - Updated Firebase configuration to support TypeScript functions
 - Added proper TypeScript configuration for functions
+- Configured Firestore emulator for local development
+- Added test user creation function for development
+
+### Fixed
+- Improved countUsers function to handle empty collections gracefully
+- Enhanced error handling in cloud functions
 
 ## [0.4.8] - 2025-04-28
 
