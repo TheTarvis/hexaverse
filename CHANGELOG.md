@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2025-04-23
+
+### Added
+- Successfully deployed application to Firebase
+- Added Firebase configuration for Next.js with webframeworks support
+- Configured Firebase Hosting and Cloud Functions for dynamic routes
+
+### Fixed
+- Resolved Tailwind CSS configuration issues
+- Fixed TypeScript JSX type errors in grid component
+- Improved dark mode support with consistent background colors
+
 ## [0.3.14] - 2025-04-22
 
 ### Fixed
