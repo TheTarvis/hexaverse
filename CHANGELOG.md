@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.8] - 2025-04-10
+
+### Fixed
+- Fixed Next.js configuration for Firebase emulator by removing invalid distDir
+- Restored source directive in Firebase configuration
+- Corrected build:firebase script to use proper Next.js static export
+
 ## [0.5.7] - 2025-04-10
 
 ### Fixed
