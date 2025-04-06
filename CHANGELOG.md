@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.3] - 2025-04-09
+
+### Added
+- Implemented secure Firebase Authentication between frontend and cloud functions
+- Added authentication middleware for cloud functions to verify Firebase tokens
+- Enhanced colony APIs to use authenticated users instead of passing UIDs in request body
+- Created secure API endpoints that validate user permissions
+- Added helper utilities for obtaining and using auth tokens in frontend API calls
+
+### Changed
+- Refactored cloud functions to break circular dependencies between files
+- Improved error handling for authentication failures
+- Enhanced security by preventing users from accessing other users' colonies
+
 ## [0.5.2] - 2025-04-08
 
 ### Added

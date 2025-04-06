@@ -12,11 +12,29 @@ import {
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
-import { firestore } from '@/config/firebase';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 import { Colony, CreateColonyRequest, CreateColonyResponse } from '@/types/colony';
 
 // API base URL for backend calls
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8081';
+
+// Get auth and firestore instances
+const auth = getAuth();
+const firestore = getFirestore();
+
+/**
+ * Get authentication token for API requests
+ * @returns The ID token or throws error if not authenticated
+ */
+async function getAuthToken(): Promise<string> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('User must be logged in to make authenticated requests');
+  }
+  
+  return currentUser.getIdToken();
+}
 
 /**
  * Fetch a user's colony from Firestore
@@ -63,6 +81,48 @@ export async function fetchUserColony(uid: string): Promise<Colony | null> {
 }
 
 /**
+ * Fetch a colony by ID using the secure API endpoint
+ * @param colonyId - The ID of the colony to fetch
+ * @returns Colony data
+ */
+export async function fetchColonyById(colonyId: string): Promise<Colony> {
+  if (!colonyId) {
+    throw new Error('Colony ID is required');
+  }
+  
+  try {
+    console.log(`Fetching colony with ID: ${colonyId}`);
+    
+    // Get auth token
+    const idToken = await getAuthToken();
+    
+    // Call the secure API endpoint
+    const response = await fetch(`${API_BASE_URL}/colony?id=${colonyId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${idToken}`
+      }
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+      throw new Error(`Server responded with status: ${response.status}. ${errorData.message || ''}`);
+    }
+    
+    const apiResponse = await response.json();
+    
+    if (!apiResponse.success) {
+      throw new Error(apiResponse.message || 'Failed to fetch colony');
+    }
+    
+    return apiResponse.colony as Colony;
+  } catch (error) {
+    console.error('Error fetching colony by ID:', error);
+    throw error;
+  }
+}
+
+/**
  * Create a new colony for a user
  * @param colonyData - The colony creation data
  * @returns The created colony data
@@ -79,20 +139,26 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
   try {
     console.log(`Creating colony for user: ${colonyData.uid}`);
     
+    // Get the current user's ID token
+    const idToken = await getAuthToken();
+    
     // 1. Call the backend API to generate initial colony data
     const response = await fetch(`${API_BASE_URL}/colony/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
       },
       body: JSON.stringify({ name: colonyData.name }),
     });
     
     if (!response.ok) {
-      throw new Error(`Server responded with status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+      throw new Error(`Server responded with status: ${response.status}. ${errorData.message || ''}`);
     }
     
-    const apiResponse: CreateColonyResponse = await response.json();
+    const apiResponse = await response.json();
+    const colonyResponse = apiResponse.colony as CreateColonyResponse;
     
     // 2. Save the colony to Firestore
     const coloniesRef = collection(firestore, 'colonies');
@@ -101,10 +167,10 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
     const newColony: Colony = {
       id: newColonyRef.id,
       uid: colonyData.uid,
-      name: apiResponse.name,
+      name: colonyResponse.name,
       createdAt: serverTimestamp() as any,
-      startCoordinates: apiResponse.startCoordinates,
-      tiles: apiResponse.tiles
+      startCoordinates: colonyResponse.startCoordinates,
+      tiles: colonyResponse.tiles
     };
     
     await setDoc(newColonyRef, newColony);

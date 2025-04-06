@@ -6,3 +6,5 @@ alwaysApply: false
 - The database is firestore.
 - All items should have a UID.
 - When saving records for a user add the user's User UID from firebase.
+- The agent will priortize cost and speed on database reads and writes.
+- All timestamps will be in utc.

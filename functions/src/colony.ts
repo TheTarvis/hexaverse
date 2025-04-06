@@ -1,13 +1,27 @@
 import { onRequest } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import { Colony, CreateColonyRequest, CreateColonyResponse } from "./types/colony";
+import { Colony, CreateColonyResponse } from "./types/colony";
+import { authenticatedHttpsOptions, authenticateRequest } from "./middleware/auth";
 
 /**
  * Example function to get a colony by ID
  */
-export const getColony = onRequest(async (req, res) => {
+export const getColony = onRequest(authenticatedHttpsOptions, async (req, res) => {
   try {
+    // Authenticate the request and get the user ID
+    let uid: string;
+    try {
+      uid = await authenticateRequest(req);
+    } catch (authError) {
+      logger.error("Authentication error:", authError);
+      res.status(401).json({ 
+        success: false,
+        message: "Authentication failed"
+      });
+      return;
+    }
+
     const colonyId = req.query.id as string;
     
     if (!colonyId) {
@@ -31,6 +45,15 @@ export const getColony = onRequest(async (req, res) => {
     
     const colonyData = colonyDoc.data() as Colony;
     
+    // Check that the user has permission to access this colony
+    if (colonyData.uid !== uid) {
+      res.status(403).json({
+        success: false,
+        message: "You don't have permission to access this colony"
+      });
+      return;
+    }
+    
     res.json({ 
       success: true,
       colony: colonyData
@@ -47,15 +70,28 @@ export const getColony = onRequest(async (req, res) => {
 /**
  * Function to create a new colony
  */
-export const createColony = onRequest(async (req, res) => {
+export const createColony = onRequest(authenticatedHttpsOptions, async (req, res) => {
   try {
-    // Extract request data
-    const { name, uid } = req.body as CreateColonyRequest;
+    // Authenticate the request and get the user ID
+    let uid: string;
+    try {
+      uid = await authenticateRequest(req);
+    } catch (authError) {
+      logger.error("Authentication error:", authError);
+      res.status(401).json({ 
+        success: false,
+        message: "Authentication failed"
+      });
+      return;
+    }
+
+    // Extract request data (only need name now, uid comes from auth token)
+    const { name } = req.body;
     
-    if (!name || !uid) {
+    if (!name) {
       res.status(400).json({ 
         success: false,
-        message: "Colony name and user ID are required"
+        message: "Colony name is required"
       });
       return;
     }

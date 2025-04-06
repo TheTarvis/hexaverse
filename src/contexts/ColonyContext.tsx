@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { Colony } from '@/types/colony';
-import { fetchUserColony, createColony, hasColony } from '@/services/colony';
+import { fetchUserColony, createColony, hasColony, fetchColonyById } from '@/services/colony';
 
 interface ColonyContextType {
   colony: Colony | null;
@@ -9,6 +9,7 @@ interface ColonyContextType {
   hasColony: boolean;
   createNewColony: (name: string) => Promise<Colony>;
   refreshColony: () => Promise<void>;
+  fetchColonyById: (colonyId: string) => Promise<Colony>;
   error: string | null;
 }
 
@@ -62,6 +63,8 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
+      // We still need to pass the UID for Firestore storage,
+      // but the backend API will authenticate via token
       const newColony = await createColony({
         name,
         uid: user.uid
@@ -76,6 +79,19 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       throw err;
     } finally {
       setIsLoadingColony(false);
+    }
+  };
+
+  const getColonyById = async (colonyId: string): Promise<Colony> => {
+    if (!user) {
+      throw new Error('User must be logged in to fetch a colony');
+    }
+
+    try {
+      return await fetchColonyById(colonyId);
+    } catch (error) {
+      console.error('Error fetching colony by ID:', error);
+      throw error;
     }
   };
 
@@ -105,6 +121,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     hasColony: hasExistingColony,
     createNewColony,
     refreshColony,
+    fetchColonyById: getColonyById,
     error
   };
 

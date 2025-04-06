@@ -6,6 +6,13 @@
   - [x] Check if user is logged in
   - [x] Show login prompt if not authenticated
   - [x] Create helper functions to manage auth state
+  - [ ] Create list of pages and permissions.
+    - For example, grid should be visible but not interactable when not logged in.
+    - [ ] Request login when going to restricted pages.
+
+- [ ] **Login Flow**
+  - [ ] Once Athentication Flow is complete
+    - [ ] Fetch Users Colony
 
 - [ ] **Colony Management**
   - [ ] Implement "Fetch User's Colony" API
@@ -33,4 +40,6 @@
 - [ ] Create secure authentication token handling
 - [ ] Implement proper loading states and error handling
 
+## Technical Requirements
+= [ ] Fix punycode deprication error
 *Note: Items will be implemented one by one, not all at once.* 
