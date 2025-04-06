@@ -72,7 +72,7 @@ export function SlideUpPanel({
                 leaveTo="translate-y-full"
               >
                 <Headless.DialogPanel 
-                  className={`pointer-events-auto w-full ${maxWidthClasses[maxWidth]} bg-white dark:bg-zinc-900 rounded-t-xl shadow-xl transform transition-all`}
+                  className={`pointer-events-auto w-full ${maxWidthClasses[maxWidth]} bg-white dark:bg-zinc-900 lg:dark:bg-zinc-950 rounded-t-xl shadow-xl transform transition-all`}
                   style={{ maxHeight }}
                 >
                   {title && (

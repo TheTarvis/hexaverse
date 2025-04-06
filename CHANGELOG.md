@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.14] - 2025-04-22
+
+### Fixed
+- Fixed TypeScript JSX type errors in grid component by adding proper type declarations
+- Resolved "JSX element implicitly has type 'any'" errors with correct React imports
+- Added dark:lg:bg-zinc-950 background color to SlideUpPanel for better dark mode consistency
+- Added missing TypeScript event handler types for ThreeJS interactions
+
 ## [0.3.8] - 2025-04-21
 
 ### Changed
