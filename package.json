@@ -1,6 +1,6 @@
 {
   "name": "hexaverse-app",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -33,6 +33,7 @@
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
     "postcss": "^8",
+    "postcss-functions": "^4.0.2",
     "prettier": "^3.3.2",
     "prettier-plugin-organize-imports": "^4.0.0",
     "prettier-plugin-tailwindcss": "^0.6.11",

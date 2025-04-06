@@ -1,10 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-@layer base {
-  :root {
-    --font-sans: Inter, sans-serif;
-    --font-feature-settings: 'cv11';
-  }
+@theme {
+  --font-sans: Inter, sans-serif;
+  --font-sans--font-feature-settings: 'cv11';
 }

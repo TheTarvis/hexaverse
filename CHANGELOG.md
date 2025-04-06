@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.4] - 2025-04-10
+
+### Fixed
+- Fixed button and dropdown CSS styling issues by updating Tailwind configuration
+- Added CSS variable support through postcss-functions plugin
+- Updated tailwind.css to use the import syntax for better compatibility
+- Added proper CSS variable definitions in Tailwind configuration
+
 ## [0.5.3] - 2025-04-09
 
 ### Added

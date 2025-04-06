@@ -2,6 +2,7 @@ import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
 import React, { forwardRef } from 'react'
 import { Link } from './link'
+import { TouchTarget } from './touch-target'
 
 const styles = {
   base: [
@@ -195,7 +196,7 @@ export function TouchTarget({ children }: { children: React.ReactNode }) {
   return (
     <>
       <span
-        className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 [@media(pointer:fine)]:hidden"
+        className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 [@media(pointer:fine)]:hidden max-w-full max-h-full"
         aria-hidden="true"
       />
       {children}
