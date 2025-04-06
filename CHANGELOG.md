@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2025-04-07
+
+### Changed
+- Removed hello world function as it's no longer needed
+- Refactored user functions into a dedicated file (user.ts)
+- Improved code organization with better separation of concerns
+
 ## [0.5.0] - 2025-04-06
 
 ### Added
