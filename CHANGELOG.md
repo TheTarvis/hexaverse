@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.8] - 2025-04-28
+
+### Fixed
+- Removed .firebase directory from Git tracking
+- Ensured .firebase directory is properly ignored in .gitignore
+- Reduced repository size by removing build artifacts
+- Improved Git history hygiene
+
 ## [0.4.7] - 2025-04-28
 
 ### Added
