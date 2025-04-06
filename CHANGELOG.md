@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.5] - 2025-04-10
+
+### Changed
+- Upgraded to Tailwind CSS v4
+- Replaced custom CSS variable implementation with native Tailwind v4 support
+- Added @tailwindcss/postcss plugin
+- Simplified configuration files for better compatibility
+
 ## [0.5.4] - 2025-04-10
 
 ### Fixed
