@@ -31,4 +31,28 @@ img[src*="/teams/"] {
   height: auto;
   max-width: 100%;
   object-fit: contain;
+}
+
+/* Fix for Heroicons SVG components - target by specific path patterns */
+svg:has(path[d*="11.39 1.578a2"]), /* Cog8ToothIcon pattern */
+svg:has(path[d*="M8.293 12.95"]),  /* Common pattern in many Heroicons */
+svg:has(path[d*="M10.28 4.305"]),
+svg:has(path[d*="M8 4.754a3.246"]) {
+  width: 1em !important;
+  height: 1em !important;
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* Fallback fixes for browser that don't support :has() */
+svg[aria-hidden="true"] {
+  width: 1em;
+  height: 1em;
+}
+
+/* Specific sizing fix for Heroicons based on common class patterns */
+.h-4, .h-5, .h-6, .w-4, .w-5, .w-6 {
+  height: 1em;
+  width: 1em;
 } 

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.14] - 2025-04-12
+
+### Fixed
+- Added specialized fixes for Heroicons SVG sizing in Firebase emulator
+- Created IconWrapper component for consistent sizing of Heroicon components
+- Added CSS rules targeting specific Heroicons patterns
+- Fixed Cog8ToothIcon and other Heroicons components appearing too large
+
 ## [0.5.13] - 2025-04-12
 
 ### Fixed
