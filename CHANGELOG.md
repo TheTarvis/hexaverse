@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.13] - 2025-04-12
+
+### Fixed
+- Enhanced SVG sizing fixes for Firebase emulator with dedicated CSS file
+- Added explicit width/height attributes to SVGs to prevent sizing issues
+- Created comprehensive firebase-fixes.css with targeted rules for different SVG types
+- Fixed navigation icon SVG display in the grid component
+
 ## [0.5.12] - 2025-04-11
 
 ### Fixed

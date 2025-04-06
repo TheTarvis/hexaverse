@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './firebase-fixes.css';
 
 @theme {
   --font-sans: Inter, sans-serif;

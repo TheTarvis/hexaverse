@@ -1,0 +1,34 @@
+/* Fix SVG sizing issues in Firebase emulator */
+
+/* Set default sizing for all SVGs */
+svg {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Specific fix for icon SVGs */
+svg[data-slot="icon"] {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* Fix for SVGs that have specific viewBox values */
+svg[viewBox="0 0 16 16"] {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Force flag SVGs to maintain aspect ratio and set limits */
+img[src$=".svg"], 
+img[src*="/flags/"], 
+img[src*="/teams/"] {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  object-fit: contain;
+} 
