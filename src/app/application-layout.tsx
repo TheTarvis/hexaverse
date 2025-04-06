@@ -44,27 +44,42 @@ import {
 } from '@heroicons/react/20/solid'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { IconWrapper } from '@/components/icon-wrapper'
 
 function AccountDropdownMenu({ anchor, onSignOut }: { anchor: 'top start' | 'bottom end', onSignOut: () => void }) {
   return (
     <DropdownMenu className="min-w-64" anchor={anchor}>
       <DropdownItem href="#">
-        <IconWrapper icon={UserCircleIcon} className="h-5 w-5 text-gray-600" size="1.25em" />
+        <UserCircleIcon 
+          className="h-5 w-5 text-gray-600" 
+          style={{ width: '1.25em', height: '1.25em', flexShrink: 0 }}
+          aria-hidden="true"
+        />
         <DropdownLabel>My account</DropdownLabel>
       </DropdownItem>
       <DropdownDivider />
       <DropdownItem href="#">
-        <IconWrapper icon={ShieldCheckIcon} className="h-5 w-5 text-emerald-500" size="1.25em" />
+        <ShieldCheckIcon 
+          className="h-5 w-5 text-emerald-500" 
+          style={{ width: '1.25em', height: '1.25em', flexShrink: 0 }}
+          aria-hidden="true"
+        />
         <DropdownLabel>Privacy policy</DropdownLabel>
       </DropdownItem>
       <DropdownItem href="#">
-        <IconWrapper icon={LightBulbIcon} className="h-5 w-5 text-gray-600" size="1.25em" />
+        <LightBulbIcon 
+          className="h-5 w-5 text-gray-600" 
+          style={{ width: '1.25em', height: '1.25em', flexShrink: 0 }}
+          aria-hidden="true"
+        />
         <DropdownLabel>Share feedback</DropdownLabel>
       </DropdownItem>
       <DropdownDivider />
       <DropdownItem href="#" onClick={onSignOut}>
-        <IconWrapper icon={ArrowRightStartOnRectangleIcon} className="h-5 w-5 text-red-500" size="1.25em" />
+        <ArrowRightStartOnRectangleIcon 
+          className="h-5 w-5 text-red-500" 
+          style={{ width: '1.25em', height: '1.25em', flexShrink: 0 }}
+          aria-hidden="true"
+        />
         <DropdownLabel>Sign out</DropdownLabel>
       </DropdownItem>
     </DropdownMenu>
@@ -103,11 +118,19 @@ export function ApplicationLayout({
               <DropdownButton as={SidebarItem}>
                 <Avatar src="/teams/catalyst.svg" />
                 <SidebarLabel>Catalyst</SidebarLabel>
-                <IconWrapper icon={ChevronDownIcon} className="h-5 w-5 ml-2.5" size="1.25em" />
+                <ChevronDownIcon 
+                  className="h-5 w-5 ml-2.5" 
+                  style={{ width: '1.25em', height: '1.25em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
               </DropdownButton>
               <DropdownMenu className="min-w-80 lg:min-w-64" anchor="bottom start">
                 <DropdownItem href="/settings">
-                  <IconWrapper icon={Cog8ToothIcon} className="h-6 w-6 text-gray-600" size="1.5em" />
+                  <Cog8ToothIcon 
+                    className="h-5 w-5 text-gray-600" 
+                    style={{ width: '1.25em', height: '1.25em', flexShrink: 0 }}
+                    aria-hidden="true"
+                  />
                   <DropdownLabel>Settings</DropdownLabel>
                 </DropdownItem>
                 <DropdownDivider />
@@ -121,7 +144,11 @@ export function ApplicationLayout({
                 </DropdownItem>
                 <DropdownDivider />
                 <DropdownItem href="#">
-                  <IconWrapper icon={PlusIcon} className="h-5 w-5" size="1.25em" />
+                  <PlusIcon 
+                    className="h-5 w-5" 
+                    style={{ width: '1.25em', height: '1.25em', flexShrink: 0 }}
+                    aria-hidden="true"
+                  />
                   <DropdownLabel>New team&hellip;</DropdownLabel>
                 </DropdownItem>
               </DropdownMenu>
@@ -131,27 +158,51 @@ export function ApplicationLayout({
           <SidebarBody>
             <SidebarSection>
               <SidebarItem href="/" current={pathname === '/'}>
-                <IconWrapper icon={HomeIcon} className="h-6 w-6" size="1.5em" />
+                <HomeIcon 
+                  className="h-6 w-6" 
+                  style={{ width: '1.5em', height: '1.5em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
                 <SidebarLabel>Home</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/colony" current={pathname.startsWith('/colony')}>
-                <IconWrapper icon={SparklesIcon} className="h-6 w-6" size="1.5em" />
+                <SparklesIcon 
+                  className="h-6 w-6" 
+                  style={{ width: '1.5em', height: '1.5em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
                 <SidebarLabel>Colony</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/events" current={pathname.startsWith('/events')}>
-                <IconWrapper icon={Square2StackIcon} className="h-6 w-6" size="1.5em" />
+                <Square2StackIcon 
+                  className="h-6 w-6" 
+                  style={{ width: '1.5em', height: '1.5em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
                 <SidebarLabel>Events</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/orders" current={pathname.startsWith('/orders')}>
-                <IconWrapper icon={TicketIcon} className="h-6 w-6" size="1.5em" />
+                <TicketIcon 
+                  className="h-6 w-6" 
+                  style={{ width: '1.5em', height: '1.5em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
                 <SidebarLabel>Orders</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/grid" current={pathname.startsWith('/grid')}>
-                <IconWrapper icon={ViewColumnsIcon} className="h-6 w-6" size="1.5em" />
+                <ViewColumnsIcon 
+                  className="h-6 w-6" 
+                  style={{ width: '1.5em', height: '1.5em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
                 <SidebarLabel>Grid</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/settings" current={pathname.startsWith('/settings')}>
-                <IconWrapper icon={Cog6ToothIcon} className="h-6 w-6" size="1.5em" />
+                <Cog6ToothIcon 
+                  className="h-6 w-6" 
+                  style={{ width: '1.5em', height: '1.5em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
                 <SidebarLabel>Settings</SidebarLabel>
               </SidebarItem>
             </SidebarSection>
@@ -169,11 +220,19 @@ export function ApplicationLayout({
 
             <SidebarSection>
               <SidebarItem href="#">
-                <IconWrapper icon={QuestionMarkCircleIcon} className="h-6 w-6" size="1.5em" />
+                <QuestionMarkCircleIcon 
+                  className="h-6 w-6" 
+                  style={{ width: '1.5em', height: '1.5em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
                 <SidebarLabel>Support</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="#">
-                <IconWrapper icon={SparklesIcon} className="h-6 w-6" size="1.5em" />
+                <SparklesIcon 
+                  className="h-6 w-6" 
+                  style={{ width: '1.5em', height: '1.5em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
                 <SidebarLabel>Changelog</SidebarLabel>
               </SidebarItem>
             </SidebarSection>
@@ -191,7 +250,11 @@ export function ApplicationLayout({
                     </span>
                   </span>
                 </span>
-                <IconWrapper icon={ChevronUpIcon} className="h-5 w-5 ml-2.5" size="1.25em" />
+                <ChevronUpIcon 
+                  className="h-5 w-5 ml-2.5" 
+                  style={{ width: '1.25em', height: '1.25em', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
               </DropdownButton>
               <AccountDropdownMenu anchor="top start" onSignOut={signOut} />
             </Dropdown>

@@ -2,13 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.5.15] - 2025-04-12
+## [0.5.16] - 2025-04-12
 
 ### Fixed
-- Implemented IconWrapper component consistently across the application
-- Updated all Heroicons in application-layout.tsx to use the IconWrapper
-- Fixed Heroicons in events page that were appearing too large
-- Ensured consistent sizing across all icon components
+- Applied high-specificity inline styles to all Heroicons for Firebase emulator
+- Fixed SVG sizing by adding explicit width/height styles and aria-hidden attributes
+- Implemented direct styling with !important rules to override any conflicting CSS
+- Enhanced icon presentation consistency across all components
 
 ## [0.5.14] - 2025-04-12
 
