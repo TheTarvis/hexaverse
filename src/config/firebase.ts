@@ -1,6 +1,6 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAuth, connectAuthEmulator, Auth } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator, Firestore } from 'firebase/firestore';
 
 // Firebase configuration (will be populated from environment variables)
 const firebaseConfig = {
@@ -34,9 +34,9 @@ const validateConfig = () => {
 }
 
 // Initialize Firebase
-let firebaseApp;
-let auth;
-let firestore;
+let firebaseApp: FirebaseApp;
+let auth: Auth;
+let firestore: Firestore;
 
 try {
   console.log('Initializing Firebase app...');
@@ -82,9 +82,9 @@ try {
 } catch (error) {
   console.error('Error initializing Firebase:', error);
   // Create dummy exports to prevent app from crashing
-  firebaseApp = {} as any;
-  auth = {} as any;
-  firestore = {} as any;
+  firebaseApp = {} as FirebaseApp;
+  auth = {} as Auth;
+  firestore = {} as Firestore;
 }
 
 export { firebaseApp, auth, firestore };

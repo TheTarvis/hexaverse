@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.9] - 2025-04-10
+
+### Fixed
+- Fixed TypeScript type error in Firebase configuration
+- Added proper type definitions for Firebase objects
+- Improved type safety for Auth, Firestore, and FirebaseApp
+
 ## [0.5.8] - 2025-04-10
 
 ### Fixed
