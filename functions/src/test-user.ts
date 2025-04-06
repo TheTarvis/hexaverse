@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import { onRequest } from "firebase-functions/v2/https";
+import { FieldValue } from "firebase-admin/firestore";
 
 // No need to initialize Firebase Admin here as it's already done in index.ts
 
@@ -14,7 +15,8 @@ export async function addTestUser() {
     await userRef.set({
       name: 'Test User',
       email: 'test@example.com',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: new Date().toISOString(), // Simple ISO string timestamp
+      serverCreatedAt: FieldValue.serverTimestamp() // Using proper server timestamp
     });
     
     logger.info('Test user added successfully');
