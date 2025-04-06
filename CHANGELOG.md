@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.7] - 2025-04-28
+
+### Added
+- Configured Firebase emulators for local development
+- Set up hosting emulator on port 5000
+- Set up functions emulator on port 5001
+- Enabled emulator UI for easier testing and debugging
+- Fixed Go runtime configuration for proper local function emulation
+
+## [0.4.6] - 2025-04-27
+
+### Added
+- Implemented Go-based Firebase Cloud Functions structure
+- Added example HTTP function for simple API endpoints
+- Created example Firestore trigger function for document change monitoring
+- Added example Pub/Sub function for handling message queue events
+- Updated firebase.json to support Go functions deployment
+- Added deployment and emulator scripts to package.json
+
 ## [0.4.5] - 2025-04-26
 
 ### Added

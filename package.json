@@ -1,12 +1,15 @@
 {
   "name": "hexaverse-app",
-  "version": "0.4.5",
+  "version": "0.4.7",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deploy": "next build && firebase deploy",
+    "deploy:functions": "firebase deploy --only functions",
+    "emulators": "firebase emulators:start"
   },
   "dependencies": {
     "@headlessui/react": "^2.1.6",
