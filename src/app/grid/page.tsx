@@ -1,6 +1,7 @@
 'use client'
 
-import { Canvas } from '@react-three/fiber'
+import React from 'react'
+import { Canvas, ThreeEvent } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { useMemo, useState, useEffect } from 'react'
 import * as THREE from 'three'
@@ -108,7 +109,7 @@ function HexagonMesh({
     return shape
   }, [])
 
-  const handleClick = (event: { stopPropagation: () => void }) => {
+  const handleClick = (event: ThreeEvent<MouseEvent>) => {
     // Stop event propagation to prevent it from reaching Canvas
     event.stopPropagation()
     console.log(`Clicked hex at cube coordinates: q=${q}, r=${r}, s=${s}`)
@@ -127,8 +128,8 @@ function HexagonMesh({
       position={position} 
       onClick={handleClick}
       // Make cursor change to pointer when hovering over hexagons
-      onPointerOver={(e) => document.body.style.cursor = 'pointer'}
-      onPointerOut={(e) => document.body.style.cursor = 'default'}
+      onPointerOver={(e: ThreeEvent<PointerEvent>) => document.body.style.cursor = 'pointer'}
+      onPointerOut={(e: ThreeEvent<PointerEvent>) => document.body.style.cursor = 'default'}
     >
       <shapeGeometry args={[hexShape]} />
       <meshBasicMaterial color={color} wireframe={wireframe} />
@@ -222,7 +223,7 @@ function HexGrid({
       {positions.map((props, index) => (
         <HexagonMesh 
           key={index}
-          position={props.position}
+          position={props.position as [number, number, number]}
           color={props.color}
           wireframe={wireframe}
           q={props.q}
@@ -287,16 +288,16 @@ export default function Grid() {
   const handleDebugAction = (action: string) => {
     switch(action) {
       case 'toggleWireframe':
-        setDebugState(prev => ({ ...prev, wireframe: !prev.wireframe }))
+        setDebugState((prev: typeof debugState) => ({ ...prev, wireframe: !prev.wireframe }))
         break
       case 'adjustSize':
-        setDebugState(prev => ({ 
+        setDebugState((prev: typeof debugState) => ({ 
           ...prev, 
           hexSize: prev.hexSize === 1.2 ? 1.5 : prev.hexSize === 1.5 ? 0.9 : 1.2
         }))
         break
       case 'changeColorScheme':
-        setDebugState(prev => ({ 
+        setDebugState((prev: typeof debugState) => ({ 
           ...prev, 
           colorScheme: prev.colorScheme === 'default' ? 'rainbow' : 
                       prev.colorScheme === 'rainbow' ? 'monochrome' : 'default'
