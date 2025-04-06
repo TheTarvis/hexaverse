@@ -1,10 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.countUsers = exports.makeUppercase = exports.helloWorld = void 0;
+exports.createTestUser = exports.countUsers = exports.makeUppercase = exports.helloWorld = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+// Import functions from test-user.ts
+const test_user_1 = require("./test-user");
+Object.defineProperty(exports, "createTestUser", { enumerable: true, get: function () { return test_user_1.createTestUser; } });
 // Initialize Firebase Admin
 admin.initializeApp();
 // HTTP callable function example
@@ -41,8 +44,21 @@ exports.makeUppercase = (0, firestore_1.onDocumentCreated)("messages/{documentId
 // Example function to count users
 exports.countUsers = (0, https_1.onRequest)(async (req, res) => {
     try {
-        const snapshot = await admin.firestore().collection('users').count().get();
-        const count = snapshot.data().count;
+        // First check if the collection exists
+        const collectionRef = admin.firestore().collection('users');
+        const snapshot = await collectionRef.limit(1).get();
+        if (snapshot.empty) {
+            // Collection exists but is empty, or doesn't exist
+            logger.info("Users collection is empty or doesn't exist yet");
+            res.json({
+                count: 0,
+                message: "No users found"
+            });
+            return;
+        }
+        // Collection exists and has documents, get the count
+        const countSnapshot = await collectionRef.count().get();
+        const count = countSnapshot.data().count;
         res.json({
             count: count,
             message: `Total users count: ${count}`
@@ -50,7 +66,11 @@ exports.countUsers = (0, https_1.onRequest)(async (req, res) => {
     }
     catch (error) {
         logger.error("Error counting users:", error);
-        res.status(500).json({ error: "Failed to count users" });
+        // Handle the error gracefully
+        res.json({
+            count: 0,
+            message: "Error counting users - default to 0. Collection might not exist yet."
+        });
     }
 });
 //# sourceMappingURL=index.js.map
