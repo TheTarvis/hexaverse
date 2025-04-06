@@ -71,8 +71,4 @@ This project uses environment variables for configuration. To set up your enviro
 1. Copy `.env.example` to `.env.local`
 2. Modify the values in `.env.local` to match your environment
 
-### Available Environment Variables
-
-- `NEXT_PUBLIC_API_BASE_URL`: The base URL for the API server (default: http://localhost:8081)
-
 For production deployment, set these environment variables on your hosting platform.

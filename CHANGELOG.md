@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.12] - 2025-04-11
+
+### Fixed
+- Fixed SVG sizing issues in Firebase emulator environment
+- Added explicit size constraints for icon SVGs to ensure consistent display across all environments
+
 ## [0.5.11] - 2025-04-11
 
 ### Fixed
