@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.9] - 2025-04-06
+
+### Added
+- Implemented Node.js TypeScript Cloud Functions
+- Added HTTP function example (helloWorld)
+- Added Firestore trigger function (makeUppercase)
+- Added user count function example
+- Updated Firebase configuration to support TypeScript functions
+- Added proper TypeScript configuration for functions
+
 ## [0.4.8] - 2025-04-28
 
 ### Fixed

@@ -1,0 +1,21 @@
+# Compiled JavaScript files
+lib/
+
+# TypeScript v1 declaration files
+typings/
+
+# Node.js dependency directory
+node_modules/
+
+# npm debug logs
+npm-debug.log*
+
+# Local environment variables
+.env
+.env.local
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo 
