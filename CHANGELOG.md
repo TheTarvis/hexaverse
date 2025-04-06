@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.6] - 2025-04-10
+
+### Fixed
+- Fixed duplicate TouchTarget component definition causing build errors
+- Added proper CSS variable definitions in Tailwind v4 configuration
+- Configured theme variables for styling components correctly
+
 ## [0.5.5] - 2025-04-10
 
 ### Changed
