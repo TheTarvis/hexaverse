@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from 'firebase/auth';
+import { User, getRedirectResult } from 'firebase/auth';
 import { 
   getCurrentUser, 
   subscribeToAuthChanges, 
@@ -8,6 +8,7 @@ import {
   signOutUser,
   createUser
 } from '@/services/auth';
+import { auth } from '@/config/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -25,6 +26,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Check for redirect result on component mount
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log('Redirect result processed successfully:', result.user.uid);
+        }
+      } catch (error) {
+        console.error('Error processing redirect result:', error);
+      }
+    };
+
+    // Run once on mount
+    checkRedirectResult();
+    
     // Initialize auth state
     const unsubscribe = subscribeToAuthChanges((authUser) => {
       setUser(authUser);

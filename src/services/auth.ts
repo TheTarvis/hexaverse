@@ -25,9 +25,9 @@ export async function signInWithEmail(email: string, password: string): Promise<
 export async function signInWithGoogle(): Promise<User> {
   const provider = new GoogleAuthProvider();
   
-  // Add scopes if needed - uncomment and customize as necessary
-  // provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-  // provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+  // Add scopes for better user information
+  provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+  provider.addScope('https://www.googleapis.com/auth/userinfo.email');
   
   // Set custom parameters for better UX
   provider.setCustomParameters({
@@ -35,10 +35,27 @@ export async function signInWithGoogle(): Promise<User> {
   });
   
   try {
+    console.log('Starting Google sign-in process...');
     const userCredential = await signInWithPopup(auth, provider);
+    console.log('Google sign-in successful!', userCredential.user.uid);
     return userCredential.user;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Google sign-in error:', error);
+    
+    // Provide more specific error messages based on Firebase error codes
+    if (error.code === 'auth/popup-closed-by-user') {
+      throw new Error('Sign-in popup was closed before completion.');
+    } else if (error.code === 'auth/popup-blocked') {
+      console.warn('Popup was blocked by the browser. Try signing in with redirect instead.');
+      // You could implement signInWithRedirect here as a fallback
+      // await signInWithRedirect(auth, provider);
+      // throw new Error('Popup was blocked. Please try again.');
+    } else if (error.code === 'auth/cancelled-popup-request') {
+      throw new Error('Another popup is already open. Please close it first.');
+    } else if (error.code === 'auth/network-request-failed') {
+      throw new Error('Network error. Please check your connection and try again.');
+    }
+    
     throw error;
   }
 }

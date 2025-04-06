@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
 // Firebase configuration (will be populated from environment variables)
 const firebaseConfig = {
@@ -42,12 +42,33 @@ try {
   if (!validateConfig()) {
     throw new Error('Invalid Firebase configuration');
   }
+
+  // Check if Firebase is already initialized
+  if (getApps().length === 0) {
+    console.log('Creating new Firebase app instance...');
+    firebaseApp = initializeApp(firebaseConfig);
+  } else {
+    console.log('Firebase app already initialized, using existing instance.');
+    firebaseApp = getApps()[0];
+  }
   
-  firebaseApp = initializeApp(firebaseConfig);
-  console.log('Firebase app initialized successfully!');
+  console.log('Firebase app initialized successfully:', firebaseApp.name);
   
   console.log('Initializing Firebase auth...');
   auth = getAuth(firebaseApp);
+  
+  // Additional authentication setup
+  if (typeof window !== 'undefined') {
+    console.log(`Auth domain: ${firebaseConfig.authDomain}`);
+    console.log(`Current origin: ${window.location.origin}`);
+    
+    // Optionally connect to emulator in development
+    if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
+      connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+      console.log('Connected to Firebase Auth emulator');
+    }
+  }
+  
   console.log('Firebase auth initialized successfully!');
 } catch (error) {
   console.error('Error initializing Firebase:', error);

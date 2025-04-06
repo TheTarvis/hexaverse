@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.4] - 2025-04-25
+
+### Fixed
+- Enhanced Firebase authentication callback handling
+- Added OAuth redirect result processing to handle authentication callbacks
+- Improved Google sign-in error handling with specific error messages
+- Added additional logging for debugging authentication flow
+- Enhanced Firebase initialization with better app instance management
+- Added optional Firebase emulator support for local development
+
 ## [0.4.3] - 2025-04-24
 
 ### Fixed

@@ -44,17 +44,25 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setIsLoading(true);
 
     try {
+      console.log('Starting Google sign-in from LoginModal...');
       await signInWithGoogle();
+      console.log('Google sign-in completed, closing modal...');
       onClose();
     } catch (err) {
+      console.error('Google sign-in error in LoginModal:', err);
       if (err instanceof Error) {
+        // Display friendly error message to the user
         if (err.message.includes('auth/popup-closed-by-user')) {
-          console.log('User closed the sign-in popup');
+          setError('Sign-in popup was closed before completion. Please try again.');
+        } else if (err.message.includes('auth/popup-blocked')) {
+          setError('Sign-in popup was blocked by your browser. Please enable popups for this site and try again.');
+        } else if (err.message.includes('network')) {
+          setError('Network error occurred. Please check your internet connection and try again.');
         } else {
           setError(err.message);
         }
       } else {
-        setError('An unknown error occurred');
+        setError('An unknown error occurred during sign-in. Please try again later.');
       }
     } finally {
       setIsLoading(false);
