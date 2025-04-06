@@ -44,26 +44,27 @@ import {
 } from '@heroicons/react/20/solid'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { IconWrapper } from '@/components/icon-wrapper'
 
 function AccountDropdownMenu({ anchor, onSignOut }: { anchor: 'top start' | 'bottom end', onSignOut: () => void }) {
   return (
     <DropdownMenu className="min-w-64" anchor={anchor}>
       <DropdownItem href="#">
-        <UserCircleIcon />
+        <IconWrapper icon={UserCircleIcon} className="h-5 w-5 text-gray-600" size="1.25em" />
         <DropdownLabel>My account</DropdownLabel>
       </DropdownItem>
       <DropdownDivider />
       <DropdownItem href="#">
-        <ShieldCheckIcon />
+        <IconWrapper icon={ShieldCheckIcon} className="h-5 w-5 text-emerald-500" size="1.25em" />
         <DropdownLabel>Privacy policy</DropdownLabel>
       </DropdownItem>
       <DropdownItem href="#">
-        <LightBulbIcon />
+        <IconWrapper icon={LightBulbIcon} className="h-5 w-5 text-gray-600" size="1.25em" />
         <DropdownLabel>Share feedback</DropdownLabel>
       </DropdownItem>
       <DropdownDivider />
       <DropdownItem href="#" onClick={onSignOut}>
-        <ArrowRightStartOnRectangleIcon />
+        <IconWrapper icon={ArrowRightStartOnRectangleIcon} className="h-5 w-5 text-red-500" size="1.25em" />
         <DropdownLabel>Sign out</DropdownLabel>
       </DropdownItem>
     </DropdownMenu>
@@ -102,11 +103,11 @@ export function ApplicationLayout({
               <DropdownButton as={SidebarItem}>
                 <Avatar src="/teams/catalyst.svg" />
                 <SidebarLabel>Catalyst</SidebarLabel>
-                <ChevronDownIcon />
+                <IconWrapper icon={ChevronDownIcon} className="h-5 w-5 ml-2.5" size="1.25em" />
               </DropdownButton>
               <DropdownMenu className="min-w-80 lg:min-w-64" anchor="bottom start">
                 <DropdownItem href="/settings">
-                  <Cog8ToothIcon />
+                  <IconWrapper icon={Cog8ToothIcon} className="h-6 w-6 text-gray-600" size="1.5em" />
                   <DropdownLabel>Settings</DropdownLabel>
                 </DropdownItem>
                 <DropdownDivider />
@@ -120,7 +121,7 @@ export function ApplicationLayout({
                 </DropdownItem>
                 <DropdownDivider />
                 <DropdownItem href="#">
-                  <PlusIcon />
+                  <IconWrapper icon={PlusIcon} className="h-5 w-5" size="1.25em" />
                   <DropdownLabel>New team&hellip;</DropdownLabel>
                 </DropdownItem>
               </DropdownMenu>
@@ -130,27 +131,27 @@ export function ApplicationLayout({
           <SidebarBody>
             <SidebarSection>
               <SidebarItem href="/" current={pathname === '/'}>
-                <HomeIcon />
+                <IconWrapper icon={HomeIcon} className="h-6 w-6" size="1.5em" />
                 <SidebarLabel>Home</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/colony" current={pathname.startsWith('/colony')}>
-                <SparklesIcon />
+                <IconWrapper icon={SparklesIcon} className="h-6 w-6" size="1.5em" />
                 <SidebarLabel>Colony</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/events" current={pathname.startsWith('/events')}>
-                <Square2StackIcon />
+                <IconWrapper icon={Square2StackIcon} className="h-6 w-6" size="1.5em" />
                 <SidebarLabel>Events</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/orders" current={pathname.startsWith('/orders')}>
-                <TicketIcon />
+                <IconWrapper icon={TicketIcon} className="h-6 w-6" size="1.5em" />
                 <SidebarLabel>Orders</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/grid" current={pathname.startsWith('/grid')}>
-                <ViewColumnsIcon />
+                <IconWrapper icon={ViewColumnsIcon} className="h-6 w-6" size="1.5em" />
                 <SidebarLabel>Grid</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/settings" current={pathname.startsWith('/settings')}>
-                <Cog6ToothIcon />
+                <IconWrapper icon={Cog6ToothIcon} className="h-6 w-6" size="1.5em" />
                 <SidebarLabel>Settings</SidebarLabel>
               </SidebarItem>
             </SidebarSection>
@@ -168,11 +169,11 @@ export function ApplicationLayout({
 
             <SidebarSection>
               <SidebarItem href="#">
-                <QuestionMarkCircleIcon />
+                <IconWrapper icon={QuestionMarkCircleIcon} className="h-6 w-6" size="1.5em" />
                 <SidebarLabel>Support</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="#">
-                <SparklesIcon />
+                <IconWrapper icon={SparklesIcon} className="h-6 w-6" size="1.5em" />
                 <SidebarLabel>Changelog</SidebarLabel>
               </SidebarItem>
             </SidebarSection>
@@ -190,7 +191,7 @@ export function ApplicationLayout({
                     </span>
                   </span>
                 </span>
-                <ChevronUpIcon />
+                <IconWrapper icon={ChevronUpIcon} className="h-5 w-5 ml-2.5" size="1.25em" />
               </DropdownButton>
               <AccountDropdownMenu anchor="top start" onSignOut={signOut} />
             </Dropdown>

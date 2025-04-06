@@ -9,6 +9,7 @@ import { Select } from '@/components/select'
 import { getEvents } from '@/data'
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/16/solid'
 import type { Metadata } from 'next'
+import { IconWrapper } from '@/components/icon-wrapper'
 
 export const metadata: Metadata = {
   title: 'Events',
@@ -25,8 +26,17 @@ export default async function Events() {
           <div className="mt-4 flex max-w-xl gap-4">
             <div className="flex-1">
               <InputGroup>
-                <MagnifyingGlassIcon />
-                <Input name="search" placeholder="Search events&hellip;" />
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <IconWrapper
+                      icon={MagnifyingGlassIcon}
+                      className="h-5 w-5 text-gray-400"
+                      size="1.25em"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <Input name="search" placeholder="Search events&hellip;" />
+                </div>
               </InputGroup>
             </div>
             <div>
@@ -69,7 +79,14 @@ export default async function Events() {
                 </Badge>
                 <Dropdown>
                   <DropdownButton plain aria-label="More options">
-                    <EllipsisVerticalIcon />
+                    <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:text-gray-600">
+                      <IconWrapper 
+                        icon={EllipsisVerticalIcon} 
+                        className="h-5 w-5" 
+                        size="1.25em" 
+                        aria-hidden="true" 
+                      />
+                    </button>
                   </DropdownButton>
                   <DropdownMenu anchor="bottom end">
                     <DropdownItem href={event.url}>View</DropdownItem>
