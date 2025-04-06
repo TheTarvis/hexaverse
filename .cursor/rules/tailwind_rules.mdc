@@ -1,0 +1,30 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+ # Tailwind CSS Configuration Rules
+
+## Version Requirements
+- DO NOT change the Tailwind CSS version from ^4.1.3
+- DO NOT change the @tailwindcss/postcss version from ^4.1.3
+- These specific versions are required for proper component styling and CSS variable support
+
+## CSS Variables
+- All components depend on CSS variables defined in the tailwind.config.mjs file
+- The `--color`, `--spacing`, and `--radius-lg` variables are essential for component styling
+- Never remove or modify these variable definitions
+
+## PostCSS Configuration
+- Always use @tailwindcss/postcss plugin in postcss.config.mjs
+- DO NOT replace with standard tailwindcss plugin - it lacks required features
+- Keep autoprefixer enabled
+
+## CSS Import Syntax
+- Use `@import 'tailwindcss'` in src/styles/tailwind.css
+- DO NOT replace with @tailwind directives as they're incompatible with v4 
+
+## Component Styling
+- Button and Dropdown components rely on specific CSS variable syntax
+- CSS references like `bg-(--btn-border)` require the Tailwind v4 variable handling
+- Never "simplify" these class names as they depend on v4's CSS variable resolution 
