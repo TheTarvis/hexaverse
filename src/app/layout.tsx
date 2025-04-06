@@ -3,13 +3,14 @@ import '@/styles/tailwind.css'
 import type { Metadata } from 'next'
 import type React from 'react'
 import { ApplicationLayout } from './application-layout'
+import { AuthProviderWrapper } from '@/components/auth/AuthProviderWrapper'
 
 export const metadata: Metadata = {
   title: {
-    template: '%s - Catalyst',
-    default: 'Catalyst',
+    template: '%s - Hexaverse',
+    default: 'Hexaverse',
   },
-  description: '',
+  description: 'Explore your colony in the Hexaverse grid',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -25,7 +26,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
       </head>
       <body>
-        <ApplicationLayout events={events}>{children}</ApplicationLayout>
+        <AuthProviderWrapper>
+          <ApplicationLayout events={events}>{children}</ApplicationLayout>
+        </AuthProviderWrapper>
       </body>
     </html>
   )

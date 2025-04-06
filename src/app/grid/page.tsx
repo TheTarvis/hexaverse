@@ -18,6 +18,7 @@ import {
 import sampleGridData from './data/sample-grid.json'
 import { fetchShardData, addNewShard } from '@/services/api'
 import { SlideUpPanel } from '@/components/slide-up-panel'
+import { AuthGuard } from '@/components/auth/AuthGuard'
 
 // Types based on the server model
 interface CubeCoords {
@@ -341,142 +342,144 @@ export default function Grid() {
   }
 
   return (
-    <div className="h-screen w-full">
-      <div className="relative h-full w-full">
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
-            <div className="text-lg font-medium text-gray-700">Loading grid data...</div>
-          </div>
-        )}
-        
-        {addingShardLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
-            <div className="text-lg font-medium text-gray-700">Adding new shard...</div>
-          </div>
-        )}
-        
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-red-100 bg-opacity-40 z-10">
-            <div className="text-lg font-medium text-red-700">{error}</div>
-          </div>
-        )}
-        
-        {/* Use the SlideUpPanel component instead of custom implementation */}
-        <SlideUpPanel
-          isOpen={selectedTile !== null}
-          onClose={closePanel}
-          title="Tile Information"
-          maxWidth="lg"
-          showOverlay={false}
-          closeOnOutsideClick={false}
-        >
-          {selectedTile && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Cube Coordinates</div>
-                <div className="font-mono mt-1 dark:text-gray-200">
-                  q: {selectedTile?.q}, r: {selectedTile?.r}, s: {selectedTile?.s}
-                </div>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Color</div>
-                <div className="flex items-center mt-1">
-                  <div 
-                    className="h-6 w-6 rounded mr-2" 
-                    style={{ backgroundColor: selectedTile?.color }}
-                  ></div>
-                  <code className="text-xs dark:text-gray-200">{selectedTile?.color}</code>
-                </div>
-              </div>
+    <AuthGuard>
+      <div className="h-screen w-full">
+        <div className="relative h-full w-full">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
+              <div className="text-lg font-medium text-gray-700">Loading grid data...</div>
             </div>
           )}
-        </SlideUpPanel>
-        
-        <div className="absolute top-4 right-4 z-10">
-          <Popover className="relative">
-            <PopoverButton className="flex items-center gap-x-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-              <BugAntIcon className="h-5 w-5 mr-1" />
-              <span>Debug</span>
-              <ChevronDownIcon className="h-5 w-5" aria-hidden="true" />
-            </PopoverButton>
-
-            <PopoverPanel
-              transition
-              className="absolute right-0 z-10 mt-2 w-80 origin-top-right transition data-[closed]:translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in"
-            >
-              <div className="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
-                <div className="p-4">
-                  {debugOptions.map((item) => (
-                    <div 
-                      key={item.name} 
-                      className="group relative flex gap-x-6 rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => handleDebugAction(item.action)}
-                    >
-                      <div className="mt-1 flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                        <item.icon className="h-6 w-6 text-gray-600 group-hover:text-indigo-600" aria-hidden="true" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">
-                          {item.name}
-                        </div>
-                        <p className="mt-1 text-sm text-gray-600">{item.description}</p>
-                      </div>
-                    </div>
-                  ))}
+          
+          {addingShardLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
+              <div className="text-lg font-medium text-gray-700">Adding new shard...</div>
+            </div>
+          )}
+          
+          {error && (
+            <div className="absolute inset-0 flex items-center justify-center bg-red-100 bg-opacity-40 z-10">
+              <div className="text-lg font-medium text-red-700">{error}</div>
+            </div>
+          )}
+          
+          {/* Use the SlideUpPanel component instead of custom implementation */}
+          <SlideUpPanel
+            isOpen={selectedTile !== null}
+            onClose={closePanel}
+            title="Tile Information"
+            maxWidth="lg"
+            showOverlay={false}
+            closeOnOutsideClick={false}
+          >
+            {selectedTile && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Cube Coordinates</div>
+                  <div className="font-mono mt-1 dark:text-gray-200">
+                    q: {selectedTile?.q}, r: {selectedTile?.r}, s: {selectedTile?.s}
+                  </div>
                 </div>
-                <div className="bg-gray-50 px-4 py-3">
-                  <div className="text-xs font-medium text-gray-500">
-                    Current settings: {debugState.wireframe ? 'Wireframe' : 'Solid'}, 
-                    Size: {debugState.hexSize.toFixed(1)}, 
-                    Colors: {debugState.colorScheme}
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Color</div>
+                  <div className="flex items-center mt-1">
+                    <div 
+                      className="h-6 w-6 rounded mr-2" 
+                      style={{ backgroundColor: selectedTile?.color }}
+                    ></div>
+                    <code className="text-xs dark:text-gray-200">{selectedTile?.color}</code>
                   </div>
                 </div>
               </div>
-            </PopoverPanel>
-          </Popover>
+            )}
+          </SlideUpPanel>
+          
+          <div className="absolute top-4 right-4 z-10">
+            <Popover className="relative">
+              <PopoverButton className="flex items-center gap-x-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+                <BugAntIcon className="h-5 w-5 mr-1" />
+                <span>Debug</span>
+                <ChevronDownIcon className="h-5 w-5" aria-hidden="true" />
+              </PopoverButton>
+
+              <PopoverPanel
+                transition
+                className="absolute right-0 z-10 mt-2 w-80 origin-top-right transition data-[closed]:translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in"
+              >
+                <div className="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                  <div className="p-4">
+                    {debugOptions.map((item) => (
+                      <div 
+                        key={item.name} 
+                        className="group relative flex gap-x-6 rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => handleDebugAction(item.action)}
+                      >
+                        <div className="mt-1 flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
+                          <item.icon className="h-6 w-6 text-gray-600 group-hover:text-indigo-600" aria-hidden="true" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">
+                            {item.name}
+                          </div>
+                          <p className="mt-1 text-sm text-gray-600">{item.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-gray-50 px-4 py-3">
+                    <div className="text-xs font-medium text-gray-500">
+                      Current settings: {debugState.wireframe ? 'Wireframe' : 'Solid'}, 
+                      Size: {debugState.hexSize.toFixed(1)}, 
+                      Colors: {debugState.colorScheme}
+                    </div>
+                  </div>
+                </div>
+              </PopoverPanel>
+            </Popover>
+          </div>
+          
+          {/* Grid navigation helper */}
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-black bg-opacity-50 text-white px-3 py-1.5 rounded-full text-sm flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+            </svg>
+            <span className="hidden md:inline">Click and drag to pan | Scroll to zoom</span>
+            <span className="md:hidden">Drag with one finger to pan | Pinch to zoom</span>
+          </div>
+          
+          <Canvas
+            camera={{ position: [0, 0, 12], fov: 45 }}
+            gl={{ antialias: true }}
+            style={{ touchAction: 'none' }}
+          >
+            <OrbitControls 
+              enablePan={true}
+              enableZoom={true}
+              enableRotate={false}
+              minDistance={5}
+              maxDistance={80}
+              panSpeed={1.5}
+              zoomSpeed={1.2}
+              touches={{
+                ONE: THREE.TOUCH.PAN,
+                TWO: THREE.TOUCH.DOLLY_PAN
+              }}
+              mouseButtons={{
+                LEFT: THREE.MOUSE.PAN,
+                MIDDLE: THREE.MOUSE.DOLLY,
+                RIGHT: THREE.MOUSE.PAN
+              }}
+            />
+            <HexGrid 
+              wireframe={debugState.wireframe}
+              hexSize={debugState.hexSize}
+              colorScheme={debugState.colorScheme}
+              tileMap={tileMap}
+              onTileSelect={handleTileSelect}
+            />
+          </Canvas>
         </div>
-        
-        {/* Grid navigation helper */}
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-black bg-opacity-50 text-white px-3 py-1.5 rounded-full text-sm flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-          </svg>
-          <span className="hidden md:inline">Click and drag to pan | Scroll to zoom</span>
-          <span className="md:hidden">Drag with one finger to pan | Pinch to zoom</span>
-        </div>
-        
-        <Canvas
-          camera={{ position: [0, 0, 12], fov: 45 }}
-          gl={{ antialias: true }}
-          style={{ touchAction: 'none' }}
-        >
-          <OrbitControls 
-            enablePan={true}
-            enableZoom={true}
-            enableRotate={false}
-            minDistance={5}
-            maxDistance={80}
-            panSpeed={1.5}
-            zoomSpeed={1.2}
-            touches={{
-              ONE: THREE.MOUSE.PAN,
-              TWO: THREE.TOUCH.DOLLY_PAN
-            }}
-            mouseButtons={{
-              LEFT: THREE.MOUSE.PAN,
-              MIDDLE: THREE.MOUSE.DOLLY,
-              RIGHT: THREE.MOUSE.PAN
-            }}
-          />
-          <HexGrid 
-            wireframe={debugState.wireframe}
-            hexSize={debugState.hexSize}
-            colorScheme={debugState.colorScheme}
-            tileMap={tileMap}
-            onTileSelect={handleTileSelect}
-          />
-        </Canvas>
       </div>
-    </div>
+    </AuthGuard>
   )
 }
