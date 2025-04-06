@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.11] - 2025-04-11
+
+### Fixed
+- Added `generateStaticParams` function to the orders/[id] page to make it compatible with static export
+- Fixed additional dynamic route for Firebase emulator build
+
 ## [0.5.10] - 2025-04-11
 
 ### Fixed
