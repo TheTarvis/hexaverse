@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.2] - 2025-04-08
+
+### Added
+- Added shared type definitions between web app and Firebase functions
+- Created colony management API functions (getColony and createColony)
+- Set up proper TypeScript configuration for shared types
+
+### Fixed
+- Fixed Firebase emulator configuration for proper function discovery
+- Resolved punycode deprecation warning in development environment
+- Improved functions compilation process for more reliable builds
+
 ## [0.5.1] - 2025-04-07
 
 ### Changed

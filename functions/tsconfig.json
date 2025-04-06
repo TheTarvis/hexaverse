@@ -7,7 +7,12 @@
     "sourceMap": true,
     "strict": true,
     "target": "es2017",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": "..",
+    "paths": {
+      "@shared/*": ["shared/*"]
+    },
+    "rootDirs": [".", "../shared"]
   },
   "compileOnSave": true,
   "include": [
