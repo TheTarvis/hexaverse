@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.10] - 2025-04-11
+
+### Fixed
+- Added `generateStaticParams` function to the events/[id] page to make it compatible with static export
+- Fixed Firebase emulator build error when using `output: export` with dynamic routes
+
 ## [0.5.9] - 2025-04-10
 
 ### Fixed

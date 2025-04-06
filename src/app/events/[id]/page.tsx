@@ -9,6 +9,17 @@ import { ChevronLeftIcon } from '@heroicons/react/16/solid'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
+// Add generateStaticParams to support static export
+export async function generateStaticParams() {
+  // Ideally, we would fetch all event IDs here
+  // For now, just provide a default set of IDs that should be pre-rendered
+  return [
+    { id: 'event-1' },
+    { id: 'event-2' },
+    // Add more event IDs as needed
+  ]
+}
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   let event = await getEvent(params.id)
 
