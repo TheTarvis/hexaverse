@@ -8,3 +8,4 @@ alwaysApply: true
 - Use the version from the package.json and should update that value before commiting.
 - Read the CHANGELOG.md
 - Never change the major and minor versions, only patch versions. [vmajor.minor.patch]
+- Before committing changes run tests.

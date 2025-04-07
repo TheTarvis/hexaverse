@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2] - 2025-04-15
+
+### Added
+- Added unit tests for colony.ts Firebase Cloud Functions
+- Created test structure with Jest and mock implementations
+- Added proper error handling and validation testing
+
 ## [0.6.1] - 2025-04-14
 
 ### Changed

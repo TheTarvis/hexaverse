@@ -1,16 +1,12 @@
 @import 'tailwindcss';
-@import './firebase-fixes.css';
+@import 'tailwindcss/utilities';
 
 @theme {
   --font-sans: Inter, sans-serif;
   --font-sans--font-feature-settings: 'cv11';
 }
 
-/* Fix SVG sizing in all environments, especially Firebase emulator */
-svg[data-slot="icon"] {
-  width: 1em;
-  height: 1em;
-  display: inline-block;
-  flex-shrink: 0;
-  vertical-align: middle;
+/* Hide Firebase emulator warning banner */
+.firebase-emulator-warning {
+  display: none !important;
 }

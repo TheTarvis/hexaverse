@@ -438,23 +438,6 @@ export default function Grid() {
             </Popover>
           </div>
           
-          {/* Grid navigation helper */}
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-black bg-opacity-50 text-white px-3 py-1.5 rounded-full text-sm flex items-center">
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-4 w-4 mr-1.5" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-              width="16" 
-              height="16"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-            </svg>
-            <span className="hidden md:inline">Click and drag to pan | Scroll to zoom</span>
-            <span className="md:hidden">Drag with one finger to pan | Pinch to zoom</span>
-          </div>
-          
           <Canvas
             camera={{ position: [0, 0, 12], fov: 45 }}
             gl={{ antialias: true }}

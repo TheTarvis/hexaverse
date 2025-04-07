@@ -4,7 +4,6 @@ import type { Metadata } from 'next'
 import type React from 'react'
 import { ApplicationLayout } from './application-layout'
 import { AuthProviderWrapper } from '@/components/auth/AuthProviderWrapper'
-import { ColonyProvider } from '@/contexts/ColonyContext'
 
 export const metadata: Metadata = {
   title: {
