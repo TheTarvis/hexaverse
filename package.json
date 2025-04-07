@@ -1,6 +1,6 @@
 {
   "name": "hexaverse-app",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,10 @@
     "lint": "next lint",
     "deploy": "next build && firebase deploy",
     "deploy:functions": "firebase deploy --only functions",
-    "emulators": "npm run build:firebase && firebase emulators:start"
+    "emulators": "npm run build:firebase && firebase emulators:start",
+    "test:ui": "echo \"No UI tests configured yet\" && exit 0",
+    "test:functions": "cd functions && npm test",
+    "test": "npm run test:ui && npm run test:functions"
   },
   "dependencies": {
     "@headlessui/react": "^2.1.6",

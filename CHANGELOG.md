@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.3] - 2025-04-16
+
+### Added
+- Added combined test command in package.json to run both UI and Functions tests
+- Created placeholder for UI tests
+- Improved developer workflow with unified testing commands
+
 ## [0.6.2] - 2025-04-15
 
 ### Added
