@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2025-04-13
+
+### Fixed
+- Fixed massive CSS issue affecting entire application
+- Resolved styling inconsistencies across all components
+- Improved overall UI rendering and appearance
+
 ## [0.5.16] - 2025-04-12
 
 ### Fixed
