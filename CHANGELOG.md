@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - 2025-04-14
+
+### Changed
+- Performed minor code cleanup
+- Improved code organization and readability
+
 ## [0.6.0] - 2025-04-13
 
 ### Fixed

@@ -1,11 +1,10 @@
 {
   "name": "hexaverse-app",
-  "version": "0.5.16",
+  "version": "0.6.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:firebase": "NEXT_PUBLIC_FIREBASE_ENV=emulator next build",
     "start": "next start",
     "lint": "next lint",
     "deploy": "next build && firebase deploy",
@@ -31,7 +30,6 @@
     "@types/react": "^18.3.20",
     "@types/react-dom": "^18.3.6",
     "@types/three": "^0.175.0",
-    "autoprefixer": "^10.4.18",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
     "postcss": "^8",
