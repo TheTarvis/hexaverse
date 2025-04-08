@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.3] - 2025-04-21
+
+### Added
+- Enhanced grid visualization to display colony tiles
+- Added type-based coloring to represent different terrain types
+- Implemented resource density visualization mode
+- Extended tile information panel to show tile type and resource details
+- Added multiple color schemes for different visualization needs
+
 ## [0.7.2] - 2025-04-21
 
 ### Security

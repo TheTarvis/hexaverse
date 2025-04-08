@@ -13,31 +13,14 @@ import {
   SwatchIcon,
   BugAntIcon,
   PlusCircleIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline'
-import sampleGridData from './data/sample-grid.json'
-import { fetchShardData, addNewShard } from '@/services/api'
 import { SlideUpPanel } from '@/components/slide-up-panel'
 import { AuthGuard } from '@/components/auth/AuthGuard'
-
-// Types based on the server model
-interface CubeCoords {
-  X: number
-  Y: number
-  Z: number
-}
-
-interface Tile {
-  cords: CubeCoords
-}
-
-interface GridData {
-  id: string
-  tiles: Tile[]
-}
+import { useColony } from '@/contexts/ColonyContext'
+import { ColonyTile } from '@/types/colony'
 
 interface TileMap {
-  [key: string]: Tile
+  [key: string]: ColonyTile
 }
 
 // Add an interface for the selected tile
@@ -46,6 +29,8 @@ interface SelectedTile {
   r: number;
   s: number;
   color: string;
+  type?: string;
+  resourceDensity?: number;
 }
 
 // Hex directions matching the Go implementation
@@ -78,6 +63,8 @@ function HexagonMesh({
   q, 
   r, 
   s,
+  type,
+  resourceDensity,
   onTileSelect
 }: { 
   position?: [number, number, number], 
@@ -86,6 +73,8 @@ function HexagonMesh({
   q: number,
   r: number,
   s: number,
+  type?: string,
+  resourceDensity?: number,
   onTileSelect: (tile: SelectedTile) => void
 }) {
   // Create a hexagon shape
@@ -113,14 +102,16 @@ function HexagonMesh({
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     // Stop event propagation to prevent it from reaching Canvas
     event.stopPropagation()
-    console.log(`Clicked hex at cube coordinates: q=${q}, r=${r}, s=${s}`)
+    console.log(`Clicked hex at cube coordinates: q=${q}, r=${r}, s=${s}, type=${type}`)
     
     // Call the selection handler with tile info
     onTileSelect({
       q,
       r,
       s,
-      color
+      color,
+      type,
+      resourceDensity
     })
   }
 
@@ -156,19 +147,63 @@ const debugOptions = [
     description: 'Change the color palette', 
     action: 'changeColorScheme', 
     icon: SwatchIcon 
-  },
-  {
-    name: 'Add New Shard',
-    description: 'Request a new shard from the server and add it to the grid',
-    action: 'addNewShard',
-    icon: PlusCircleIcon
   }
 ]
+
+// Get color based on tile type
+function getTileColor(type: string, colorScheme: string, q: number, r: number, s: number, resourceDensity = 0.5): string {
+  if (colorScheme === 'monochrome') {
+    return new THREE.Color(0.4, 0.4, 0.4).getStyle();
+  }
+  
+  if (colorScheme === 'type') {
+    // Color based on tile type
+    switch(type.toLowerCase()) {
+      case 'normal': return new THREE.Color(0.3, 0.7, 0.4).getStyle(); // Green
+      case 'water': return new THREE.Color(0.2, 0.4, 0.8).getStyle(); // Blue
+      case 'mountain': return new THREE.Color(0.6, 0.6, 0.6).getStyle(); // Gray
+      case 'desert': return new THREE.Color(0.9, 0.8, 0.3).getStyle(); // Yellow
+      case 'forest': return new THREE.Color(0.1, 0.5, 0.1).getStyle(); // Dark green
+      case 'plain': return new THREE.Color(0.8, 0.9, 0.3).getStyle(); // Light green
+      default: 
+        // Fallback to rainbow if type is unknown
+        return new THREE.Color(
+          0.5 + 0.5 * Math.sin(q + r),
+          0.5 + 0.5 * Math.sin(r + s),
+          0.5 + 0.5 * Math.sin(s + q)
+        ).getStyle();
+    }
+  }
+  
+  if (colorScheme === 'resources') {
+    // Color based on resource density
+    return new THREE.Color(
+      0.2 + 0.8 * resourceDensity,
+      0.7 - 0.5 * resourceDensity,
+      0.3
+    ).getStyle();
+  }
+  
+  if (colorScheme === 'rainbow') {
+    return new THREE.Color(
+      0.5 + 0.5 * Math.sin(q + r),
+      0.5 + 0.5 * Math.sin(r + s),
+      0.5 + 0.5 * Math.sin(s + q)
+    ).getStyle();
+  }
+  
+  // Default color scheme
+  return new THREE.Color(
+    0.4 + 0.4 * Math.sin(q * 0.8 + r * 0.3),
+    0.5 + 0.3 * Math.sin(r * 0.5 + s * 0.4),
+    0.6 + 0.4 * Math.sin(s * 0.6 + q * 0.2)
+  ).getStyle();
+}
 
 function HexGrid({ 
   wireframe = false, 
   hexSize = 1.2, 
-  colorScheme = 'default', 
+  colorScheme = 'type', 
   tileMap = {} as TileMap,
   onTileSelect
 }: {
@@ -180,39 +215,25 @@ function HexGrid({
 }) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
-    const gridPositions: { position: [number, number, number]; color: string; q: number; r: number; s: number }[] = []
+    const gridPositions: { position: [number, number, number]; color: string; q: number; r: number; s: number; type?: string; resourceDensity?: number }[] = []
     
-    // Use the tile data from the sample JSON
-    Object.values(tileMap).forEach((tile: Tile) => {
-      const q = tile.cords.X
-      const r = tile.cords.Y
-      const s = tile.cords.Z
+    // Use the tile data from the tileMap
+    Object.values(tileMap).forEach((tile) => {
+      const q = tile.q;
+      const r = tile.r;
+      const s = tile.s;
+      const type = tile.type;
+      const resourceDensity = tile.resourceDensity || 0.5;
       
-      // Generate a color based on coordinates and selected scheme
-      let color
-      
-      // Different color generation based on scheme
-      if (colorScheme === 'monochrome') {
-        color = new THREE.Color(0.4, 0.4, 0.4)
-      } else if (colorScheme === 'rainbow') {
-        color = new THREE.Color(
-          0.5 + 0.5 * Math.sin(q + r),
-          0.5 + 0.5 * Math.sin(r + s),
-          0.5 + 0.5 * Math.sin(s + q)
-        )
-      } else {
-        // Default color scheme
-        color = new THREE.Color(
-          0.4 + 0.4 * Math.sin(q * 0.8 + r * 0.3),
-          0.5 + 0.3 * Math.sin(r * 0.5 + s * 0.4),
-          0.6 + 0.4 * Math.sin(s * 0.6 + q * 0.2)
-        )
-      }
+      // Generate color based on tile type and selected scheme
+      const color = getTileColor(type, colorScheme, q, r, s, resourceDensity);
       
       gridPositions.push({
         q, r, s,
         position: cubeToPixel(q, r, s, hexSize),
-        color: color.getStyle()
+        color,
+        type,
+        resourceDensity
       })
     })
     
@@ -230,6 +251,8 @@ function HexGrid({
           q={props.q}
           r={props.r}
           s={props.s}
+          type={props.type}
+          resourceDensity={props.resourceDensity}
           onTileSelect={onTileSelect}
         />
       ))}
@@ -238,53 +261,53 @@ function HexGrid({
 }
 
 export default function Grid() {
+  const { colony } = useColony();
+  
   const [debugState, setDebugState] = useState({
     wireframe: false,
     hexSize: 1.2,
-    colorScheme: 'default'
+    colorScheme: 'type' // Default to type-based coloring
   })
 
   const [tileMap, setTileMap] = useState<TileMap>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [addingShardLoading, setAddingShardLoading] = useState(false)
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   
-  // Load the grid data on mount
+  // Load the grid data when colony changes
   useEffect(() => {
     async function loadGridData() {
       try {
-        setLoading(true)
-        let gridData: GridData
+        setLoading(true);
         
-        try {
-          // Try to fetch from API
-          gridData = await fetchShardData() as GridData
-        } catch (apiError) {
-          console.warn('Error fetching from API, falling back to sample data:', apiError)
-          // Fallback to sample data if API fails
-          gridData = sampleGridData as GridData
+        // If we have colony tiles, use them
+        if (colony && colony.tiles && colony.tiles.length > 0) {
+          console.log(`Loading ${colony.tiles.length} tiles from colony`);
+          
+          // Create a map of cube coordinates to tiles
+          const tileMapData: TileMap = {};
+          colony.tiles.forEach((tile) => {
+            const key = coordsToKey(tile.q, tile.r, tile.s);
+            tileMapData[key] = tile;
+          });
+          
+          setTileMap(tileMapData);
+          setError(null);
+        } else {
+          console.log('No colony tiles available');
+          setTileMap({});
+          setError('No colony tiles available. Please create a colony first.');
         }
-        
-        // Create a map of cube coordinates to tiles
-        const tileMapData: TileMap = {}
-        gridData.tiles.forEach((tile: Tile) => {
-          const key = coordsToKey(tile.cords.X, tile.cords.Y, tile.cords.Z)
-          tileMapData[key] = tile
-        })
-        
-        setTileMap(tileMapData)
-        setError(null)
       } catch (error) {
-        console.error('Error loading grid data:', error)
-        setError('Failed to load grid data')
+        console.error('Error loading grid data:', error);
+        setError('Failed to load grid data');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
     
-    loadGridData()
-  }, [])
+    loadGridData();
+  }, [colony]);
   
   const handleDebugAction = (action: string) => {
     switch(action) {
@@ -298,37 +321,14 @@ export default function Grid() {
         }))
         break
       case 'changeColorScheme':
-        setDebugState((prev: typeof debugState) => ({ 
-          ...prev, 
-          colorScheme: prev.colorScheme === 'default' ? 'rainbow' : 
-                      prev.colorScheme === 'rainbow' ? 'monochrome' : 'default'
-        }))
-        break
-      case 'addNewShard':
-        setAddingShardLoading(true)
-        
-        addNewShard()
-          .then((newShardData: GridData) => {
-            // Create a new map merging existing and new tiles
-            const updatedTileMap = { ...tileMap }
-            
-            // Add all new tiles to the map
-            newShardData.tiles.forEach((tile: Tile) => {
-              const key = coordsToKey(tile.cords.X, tile.cords.Y, tile.cords.Z)
-              updatedTileMap[key] = tile
-            })
-            
-            setTileMap(updatedTileMap)
-            setError(null)
-          })
-          .catch((error) => {
-            console.error('Error adding new shard:', error)
-            setError('Failed to add new shard')
-          })
-          .finally(() => {
-            setAddingShardLoading(false)
-          })
-        break
+        setDebugState((prev: typeof debugState) => {
+          // Cycle through color schemes
+          const schemes = ['type', 'resources', 'rainbow', 'default', 'monochrome'];
+          const currentIndex = schemes.indexOf(prev.colorScheme);
+          const nextIndex = (currentIndex + 1) % schemes.length;
+          return { ...prev, colorScheme: schemes[nextIndex] };
+        });
+        break;
     }
   }
 
@@ -351,19 +351,13 @@ export default function Grid() {
             </div>
           )}
           
-          {addingShardLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
-              <div className="text-lg font-medium text-gray-700">Adding new shard...</div>
-            </div>
-          )}
-          
           {error && (
             <div className="absolute inset-0 flex items-center justify-center bg-red-100 bg-opacity-40 z-10">
               <div className="text-lg font-medium text-red-700">{error}</div>
             </div>
           )}
           
-          {/* Use the SlideUpPanel component instead of custom implementation */}
+          {/* Enhanced SlideUpPanel with more tile information */}
           <SlideUpPanel
             isOpen={selectedTile !== null}
             onClose={closePanel}
@@ -377,7 +371,7 @@ export default function Grid() {
                 <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                   <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Cube Coordinates</div>
                   <div className="font-mono mt-1 dark:text-gray-200">
-                    q: {selectedTile?.q}, r: {selectedTile?.r}, s: {selectedTile?.s}
+                    q: {selectedTile.q}, r: {selectedTile.r}, s: {selectedTile.s}
                   </div>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
@@ -385,11 +379,27 @@ export default function Grid() {
                   <div className="flex items-center mt-1">
                     <div 
                       className="h-6 w-6 rounded mr-2" 
-                      style={{ backgroundColor: selectedTile?.color }}
+                      style={{ backgroundColor: selectedTile.color }}
                     ></div>
-                    <code className="text-xs dark:text-gray-200">{selectedTile?.color}</code>
+                    <code className="text-xs dark:text-gray-200">{selectedTile.color}</code>
                   </div>
                 </div>
+                {selectedTile.type && (
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Tile Type</div>
+                    <div className="mt-1 dark:text-gray-200">
+                      {selectedTile.type}
+                    </div>
+                  </div>
+                )}
+                {selectedTile.resourceDensity !== undefined && (
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Resource Density</div>
+                    <div className="mt-1 dark:text-gray-200">
+                      {Math.round(selectedTile.resourceDensity * 100)}%
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </SlideUpPanel>
