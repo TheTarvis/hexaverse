@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.8.3] - 2025-04-08
+### Update
+- Commented out template stuff from sidebar.
+- Copied grid page to main page.tsx to make it the landing page.
+
 ## [v0.8.2] - 2025-04-08
 ### Added
 - Logs for colony creation.
