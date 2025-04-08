@@ -44,6 +44,7 @@ import {
   Square2StackIcon,
   TicketIcon,
   ViewColumnsIcon,
+  CalendarIcon,
 } from '@heroicons/react/20/solid'
 import { usePathname } from 'next/navigation'
 
@@ -176,8 +177,11 @@ export function ApplicationLayout({
                   <SidebarLabel>Support</SidebarLabel>
                 </SidebarItem>
                 <SidebarItem href="/changelog">
-                  <SparklesIcon />
-                  <SidebarLabel>Changelog</SidebarLabel>
+                  <SparklesIcon/>
+                  <SidebarLabel>
+                    Changelog
+                    <div className="text-xs text-gray-500 dark:text-gray-400">v0.8.5</div>
+                  </SidebarLabel>
                 </SidebarItem>
               </SidebarSection>
             </SidebarBody>
