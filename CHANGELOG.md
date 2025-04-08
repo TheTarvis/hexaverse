@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.8] - 2025-04-20
+
+### Fixed
+- Updated API endpoint URLs to match Firebase Functions v2 naming convention
+- Changed `/colony?id=` to `/getColony?id=` and `/colony/create` to `/createColony`
+- Fixed 404 errors when calling Firebase Functions endpoints from client
+
 ## [0.6.7] - 2025-04-20
 
 ### Fixed

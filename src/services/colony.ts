@@ -101,7 +101,7 @@ export async function fetchColonyById(colonyId: string): Promise<Colony> {
     const idToken = await getAuthToken();
     
     // Call the secure API endpoint
-    const response = await fetch(`${API_BASE_URL}/colony?id=${colonyId}`, {
+    const response = await fetch(`${API_BASE_URL}/getColony?id=${colonyId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${idToken}`
@@ -146,7 +146,7 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
     }
     
     // 1. Call the backend API to generate initial colony data
-    const response = await fetch(`${API_BASE_URL}/colony/create`, {
+    const response = await fetch(`${API_BASE_URL}/createColony`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
