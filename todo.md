@@ -2,6 +2,10 @@
 
 ## Authentication & Colony Management
 
+- [ ] **Must Fix Bugs** 
+  - [ ] Fix the tile details slide up from capturing all touches on the screen. If I touch away from it just close it unless i've selected another tile.
+  - [ ] Multiple attempts to load the colony on 
+
 - [x] **Authentication Flow**
   - [x] Check if user is logged in
   - [x] Show login prompt if not authenticated

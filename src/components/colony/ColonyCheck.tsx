@@ -22,7 +22,13 @@ export function ColonyCheck() {
 
   // Navigate to colony creation page
   const handleCreateColony = () => {
+    setShowCreatePrompt(false); // Close the modal first
     router.push('/colony');
+  };
+
+  // Handle modal close
+  const handleClose = () => {
+    setShowCreatePrompt(false);
   };
 
   if (isLoadingAuth || isLoadingColony || !user || hasColony) {
@@ -30,7 +36,7 @@ export function ColonyCheck() {
   }
 
   return (
-    <Dialog open={showCreatePrompt} onClose={() => {}} size="md">
+    <Dialog open={showCreatePrompt} onClose={handleClose} size="md">
       <div className="w-full transform overflow-hidden p-6 text-left align-middle">
         <DialogTitle className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
           Welcome to Hexaverse!
@@ -42,6 +48,12 @@ export function ColonyCheck() {
         </div>
 
         <div className="mt-4 flex justify-end space-x-3">
+          <Button
+            color="zinc"
+            onClick={handleClose}
+          >
+            Close
+          </Button>
           <Button
             color="indigo"
             onClick={handleCreateColony}

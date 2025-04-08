@@ -215,6 +215,7 @@ export const createColony = onRequest(authenticatedHttpsOptions, async (req, res
     // Create response object that includes both tileIds (for persistence) and tiles (for immediate use)
     const response: CreateColonyResponse = {
       id: colonyRef.id,
+      uid, // Include the uid in the response for client-side use
       name,
       startCoordinates,
       tileIds,

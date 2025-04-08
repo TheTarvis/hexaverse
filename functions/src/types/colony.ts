@@ -47,6 +47,7 @@ export interface CreateColonyRequest {
 // Colony creation response type
 export interface CreateColonyResponse {
   id: string;
+  uid: string;  // Firebase user ID
   name: string;
   startCoordinates: {
     q: number;

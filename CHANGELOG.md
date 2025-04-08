@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - 2025-04-21
+
+### Security
+- Implemented Firestore security rules to restrict write access to Cloud Functions only
+- Removed client-side Firestore write operations from colony service
+- Enhanced security model by enforcing proper separation between client and server responsibilities
+- Added ownership-based read restrictions for user data
+
 ## [0.7.1] - 2025-04-21
 
 ### Fixed

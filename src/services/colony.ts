@@ -190,7 +190,7 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
       throw new Error('Id Token is required to create a colony');
     }
     
-    // 1. Call the backend API to generate initial colony data
+    // Call the backend API to generate initial colony data
     const response = await fetch(`${API_BASE_URL}/createColony`, {
       method: 'POST',
       headers: {
@@ -206,33 +206,26 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
     }
     
     const apiResponse = await response.json();
-    const colonyResponse = apiResponse.colony as CreateColonyResponse;
+    const responseData = apiResponse.colony as CreateColonyResponse;
     
-    // 2. Save the colony to Firestore
-    const coloniesRef = collection(firestore, 'colonies');
-    const newColonyRef = doc(coloniesRef);
-    
-    const newColony: Colony = {
-      id: newColonyRef.id,
-      uid: colonyData.uid,
-      name: colonyResponse.name,
-      createdAt: serverTimestamp() as any,
-      startCoordinates: colonyResponse.startCoordinates,
-      tileIds: colonyResponse.tileIds,
-      units: colonyResponse.units,
-      unplacedUnits: colonyResponse.unplacedUnits,
-      territoryScore: colonyResponse.territoryScore,
-      visibilityRadius: colonyResponse.visibilityRadius
+    // Convert the response to a Colony object
+    const colony: Colony = {
+      id: responseData.id,
+      uid: colonyData.uid, // Use the UID from the request
+      name: responseData.name,
+      createdAt: new Date(),
+      startCoordinates: responseData.startCoordinates,
+      tileIds: responseData.tileIds,
+      tiles: responseData.tiles,
+      units: responseData.units,
+      unplacedUnits: responseData.unplacedUnits,
+      territoryScore: responseData.territoryScore,
+      visibilityRadius: responseData.visibilityRadius
     };
     
-    await setDoc(newColonyRef, newColony);
-    console.log(`Colony created with ID: ${newColony.id}`);
+    console.log(`Colony created with ID: ${colony.id}`);
     
-    // Return colony with tiles included for immediate use in the client
-    return {
-      ...newColony,
-      tiles: colonyResponse.tiles
-    };
+    return colony;
   } catch (error) {
     console.error('Error creating colony:', error);
     throw error;
