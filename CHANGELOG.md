@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.8.2] - 2025-04-08
+### Added
+- Logs for colony creation.
+
+### Updated
+- Trying to improve commit rules.
+
+### Removed
+- Api.ts as it was an old PoC file.
+- Sample Grid JSON as we no longer need it.
+
+
 ## [v0.8.1] - 2025-04-23
 ### Fixed
 - Updated Firestore security rules to allow client-side querying for user colonies

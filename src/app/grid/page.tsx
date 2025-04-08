@@ -269,17 +269,21 @@ export default function Grid() {
     colorScheme: 'type' // Default to type-based coloring
   })
 
-  // Calculate world coordinates for the target tile
-  const [worldCoords] = useState(() => {
-    // Calculate initial world position for tile q:19, r:14, s:-33
-    const worldX = debugState.hexSize * (Math.sqrt(3) * 19 + Math.sqrt(3)/2 * 14)
-    const worldY = debugState.hexSize * (3/2 * 14)
-    return { x: worldX, y: worldY }
-  })
+  // Calculate world coordinates for the target tile based on colony start coordinates
+  const worldCoords = useMemo(() => {
+    if (!colony?.startCoordinates) {
+      return { x: 0, y: 0 };
+    }
+
+    const { q, r } = colony.startCoordinates;
+    const worldX = debugState.hexSize * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r);
+    const worldY = debugState.hexSize * (3/2 * r);
+    return { x: worldX, y: worldY };
+  }, [colony?.startCoordinates, debugState.hexSize]);
 
   // Camera will be positioned directly above the target
-  const cameraPosition: [number, number, number] = [worldCoords.x, worldCoords.y, 12]
-  const cameraTarget: [number, number, number] = [worldCoords.x, worldCoords.y, 0]
+  const cameraPosition: [number, number, number] = [worldCoords.x, worldCoords.y, 20];
+  const cameraTarget: [number, number, number] = [worldCoords.x, worldCoords.y, 0];
 
   const [tileMap, setTileMap] = useState<TileMap>({})
   const [loading, setLoading] = useState(true)
@@ -460,38 +464,41 @@ export default function Grid() {
             </Popover>
           </div>
           
-          <Canvas
-            camera={{ position: cameraPosition, fov: 45 }}
-            gl={{ antialias: true }}
-            style={{ touchAction: 'none' }}
-          >
-            <OrbitControls 
-              target={cameraTarget}
-              enablePan={true}
-              enableZoom={true}
-              enableRotate={false}
-              minDistance={5}
-              maxDistance={80}
-              panSpeed={1.5}
-              zoomSpeed={1.2}
-              touches={{
-                ONE: THREE.TOUCH.PAN,
-                TWO: THREE.TOUCH.DOLLY_PAN
-              }}
-              mouseButtons={{
-                LEFT: THREE.MOUSE.PAN,
-                MIDDLE: THREE.MOUSE.DOLLY,
-                RIGHT: THREE.MOUSE.PAN
-              }}
-            />
-            <HexGrid 
-              wireframe={debugState.wireframe}
-              hexSize={debugState.hexSize}
-              colorScheme={debugState.colorScheme}
-              tileMap={tileMap}
-              onTileSelect={handleTileSelect}
-            />
-          </Canvas>
+          {/* Only render the Canvas when not loading and no errors */}
+          {!loading && !error && Object.keys(tileMap).length > 0 && (
+            <Canvas
+              camera={{ position: cameraPosition, fov: 45 }}
+              gl={{ antialias: true }}
+              style={{ touchAction: 'none' }}
+            >
+              <OrbitControls
+                target={cameraTarget}
+                enablePan={true}
+                enableZoom={true}
+                enableRotate={false}
+                minDistance={5}
+                maxDistance={800}
+                panSpeed={1.5}
+                zoomSpeed={1.2}
+                touches={{
+                  ONE: THREE.TOUCH.PAN,
+                  TWO: THREE.TOUCH.DOLLY_PAN
+                }}
+                mouseButtons={{
+                  LEFT: THREE.MOUSE.PAN,
+                  MIDDLE: THREE.MOUSE.DOLLY,
+                  RIGHT: THREE.MOUSE.PAN
+                }}
+              />
+              <HexGrid
+                wireframe={debugState.wireframe}
+                hexSize={debugState.hexSize}
+                colorScheme={debugState.colorScheme}
+                tileMap={tileMap}
+                onTileSelect={handleTileSelect}
+              />
+            </Canvas>
+          )}
         </div>
       </div>
     </AuthGuard>

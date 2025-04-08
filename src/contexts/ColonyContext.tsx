@@ -30,6 +30,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setColony(null);
         setHasExistingColony(false);
+        setIsLoadingColony(false);
         return;
       }
 
@@ -37,23 +38,37 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       try {
+        console.log("Checking if user has colony:", user.uid);
         // Check if user has a colony
         const userHasColony = await hasColony(user.uid);
         setHasExistingColony(userHasColony);
 
         if (userHasColony) {
+          console.log("Fetching colony data for user:", user.uid);
           const colonyData = await fetchUserColony(user.uid);
+          console.log('Colony data loaded:', colonyData);
           setColony(colonyData);
+        } else {
+          console.log("User has no colony yet");
+          setColony(null);
         }
       } catch (err) {
         console.error('Error loading colony:', err);
         setError('Failed to load colony data');
+        setColony(null);
       } finally {
         setIsLoadingColony(false);
       }
     }
 
-    loadUserColony();
+    // Only attempt to load colony if we have a valid user
+    if (user && user.uid) {
+      loadUserColony();
+    } else {
+      setIsLoadingColony(false);
+      setColony(null);
+      setHasExistingColony(false);
+    }
   }, [user]);
 
   const createNewColony = async (name: string): Promise<Colony> => {
