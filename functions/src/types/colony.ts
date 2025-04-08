@@ -30,7 +30,7 @@ export interface Colony {
     r: number;
     s: number;
   };
-  tiles: ColonyTile[];
+  tileIds: string[]; // References to tiles in the 'tiles' collection
   units: Unit[];
   unplacedUnits: UnplacedUnit[];
   // Territory metrics
@@ -53,9 +53,10 @@ export interface CreateColonyResponse {
     r: number;
     s: number;
   };
-  tiles: ColonyTile[];
+  tileIds: string[]; // References to tiles in the 'tiles' collection
+  tiles: ColonyTile[]; // Include full tile data in response for initial setup
   units: Unit[];
   unplacedUnits: UnplacedUnit[];
-  territoryScore: number; // TODO TW: Discuss what this is
-  visibilityRadius: number; // TODO TW: Move visi
+  territoryScore: number;
+  visibilityRadius: number;
 } 

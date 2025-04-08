@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2025-04-21
+
+### Changed
+- Refactored Firestore data model to separate tiles into their own collection
+- Updated Colony model to store tile IDs instead of embedding tile data
+- Created dedicated tiles module for tile generation and management
+- Improved database efficiency by reducing document size and preventing duplication
+- Enhanced code organization with better separation of concerns
+
 ## [0.6.10] - 2025-04-20
 
 ### Fixed

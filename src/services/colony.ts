@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { Colony, CreateColonyRequest, CreateColonyResponse } from '@/types/colony';
+import { Colony, CreateColonyRequest, CreateColonyResponse, ColonyTile } from '@/types/colony';
 
 // API base URL for backend calls
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001/hexaverse/us-central1';
@@ -66,21 +66,59 @@ export async function fetchUserColony(uid: string): Promise<Colony | null> {
       ? colonyData.createdAt.toDate() 
       : colonyData.createdAt;
     
-    return {
+    // Create colony object with tileIds
+    const colony: Colony = {
       id: colonyDoc.id,
       uid: colonyData.uid,
       name: colonyData.name,
       createdAt,
       startCoordinates: colonyData.startCoordinates,
-      tiles: colonyData.tiles || [],
+      tileIds: colonyData.tileIds || [],
       units: colonyData.units || [],
       unplacedUnits: colonyData.unplacedUnits || [],
       territoryScore: colonyData.territoryScore || 0,
       visibilityRadius: colonyData.visibilityRadius || 0
     };
+    
+    // Load tiles for the colony
+    colony.tiles = await fetchTilesForColony(colony.tileIds);
+    
+    return colony;
   } catch (error) {
     console.error('Error fetching user colony:', error);
     throw error;
+  }
+}
+
+/**
+ * Fetch tiles for a colony by their IDs
+ * @param tileIds - Array of tile IDs to fetch
+ * @returns Array of tile objects
+ */
+export async function fetchTilesForColony(tileIds: string[]): Promise<ColonyTile[]> {
+  if (!tileIds.length) return [];
+  
+  try {
+    const tiles: ColonyTile[] = [];
+    const tilesRef = collection(firestore, 'tiles');
+    
+    // Firestore can only handle batches of 10 in where in queries
+    const batchSize = 10;
+    
+    for (let i = 0; i < tileIds.length; i += batchSize) {
+      const batch = tileIds.slice(i, i + batchSize);
+      const q = query(tilesRef, where('id', 'in', batch));
+      const querySnapshot = await getDocs(q);
+      
+      querySnapshot.forEach(doc => {
+        tiles.push(doc.data() as ColonyTile);
+      });
+    }
+    
+    return tiles;
+  } catch (error) {
+    console.error('Error fetching tiles:', error);
+    return [];
   }
 }
 
@@ -119,7 +157,14 @@ export async function fetchColonyById(colonyId: string): Promise<Colony> {
       throw new Error(apiResponse.message || 'Failed to fetch colony');
     }
     
-    return apiResponse.colony as Colony;
+    const colony = apiResponse.colony as Colony;
+    
+    // Load tiles if they're not included
+    if (!colony.tiles && colony.tileIds && colony.tileIds.length > 0) {
+      colony.tiles = await fetchTilesForColony(colony.tileIds);
+    }
+    
+    return colony;
   } catch (error) {
     console.error('Error fetching colony by ID:', error);
     throw error;
@@ -173,6 +218,7 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
       name: colonyResponse.name,
       createdAt: serverTimestamp() as any,
       startCoordinates: colonyResponse.startCoordinates,
+      tileIds: colonyResponse.tileIds,
       tiles: colonyResponse.tiles,
       units: colonyResponse.units,
       unplacedUnits: colonyResponse.unplacedUnits,

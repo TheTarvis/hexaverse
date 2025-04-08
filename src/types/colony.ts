@@ -12,6 +12,7 @@ export interface ColonyTile {
   type: string;
   controllerUid: string;  // Firebase user ID of the controller
   visibility: 'visible' | 'fogged' | 'unexplored'; // TODO TW: Discuss unexplored
+  resourceDensity?: number; // Value from 0-1 indicating resource richness
   resources?: {
     [key: string]: number;
   };
@@ -28,7 +29,8 @@ export interface Colony {
     r: number;
     s: number;
   };
-  tiles: ColonyTile[];
+  tileIds: string[]; // References to tiles in the 'tiles' collection
+  tiles?: ColonyTile[]; // Optional tiles array for when tiles are loaded
   units: Unit[];
   unplacedUnits: UnplacedUnit[];
   // Territory metrics
@@ -51,7 +53,8 @@ export interface CreateColonyResponse {
     r: number;
     s: number;
   };
-  tiles: ColonyTile[];
+  tileIds: string[]; // References to tiles in the 'tiles' collection
+  tiles: ColonyTile[]; // Include full tile data in response for initial setup
   units: Unit[];
   unplacedUnits: UnplacedUnit[];
   territoryScore: number;

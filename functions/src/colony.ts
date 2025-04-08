@@ -1,17 +1,11 @@
 import { onRequest } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import { Colony, CreateColonyResponse, ColonyTile } from "./types/colony";
+import { Colony, CreateColonyResponse } from "./types/colony";
 import { Unit, UnitType, Base, Ship, UnplacedUnit } from "./types/units";
 import { authenticatedHttpsOptions, authenticateRequest } from "./middleware/auth";
 import { findSpawnLocation as findNoiseBasedSpawnLocation } from "./utils/colonyGeneration";
-import { 
-  createNoiseGenerator, 
-  getNoiseForCoordinates, 
-  getTileTypeFromNoise, 
-  calculateResourceDensity,
-  TileType 
-} from "./utils/noise";
+import { generateInitialTiles, saveTilesToFirestore } from "./utils/tiles/tileOperations";
 
 // Configuration constants
 const MIN_SPAWN_DISTANCE = 8;  // Minimum tiles between colonies
@@ -36,67 +30,6 @@ async function findSpawnLocation(): Promise<{q: number, r: number, s: number}> {
   }
   
   return location;
-}
-
-/**
- * Generate the initial tiles for a new colony
- */
-function generateInitialTiles(
-  colonyId: string,
-  uid: string,
-  startCoords: {q: number, r: number, s: number},
-  baseInfluenceRadius: number
-): ColonyTile[] {
-  const tiles: ColonyTile[] = [];
-  
-  // Create a noise generator for this colony's tiles
-  const noise2D = createNoiseGenerator();
-  
-  // Helper to create a tile with proper type based on noise
-  const createTile = (q: number, r: number, s: number): ColonyTile => {
-    // Get noise value at these coordinates
-    const noiseValue = getNoiseForCoordinates(noise2D, q, r);
-    
-    // Determine tile type based on noise
-    const tileType = getTileTypeFromNoise(noiseValue);
-    
-    // Calculate resource density based on tile type and noise
-    const resourceDensity = calculateResourceDensity(tileType, noiseValue);
-    
-    return {
-      id: `${q}#${r}#${s}`, // New ID format as per TODO
-      q, r, s,
-      type: tileType,
-      controllerUid: uid,
-      visibility: 'visible',
-      resourceDensity,
-      resources: {}  // Will be populated by resource generation logic
-    };
-  };
-  
-  // Add center tile (base location)
-  tiles.push({
-    ...createTile(startCoords.q, startCoords.r, startCoords.s),
-    type: TileType.NORMAL // Use a valid TileType for the base
-  });
-  
-  // Add tiles within influence radius
-  for (let dq = -baseInfluenceRadius; dq <= baseInfluenceRadius; dq++) {
-    for (let dr = -baseInfluenceRadius; dr <= baseInfluenceRadius; dr++) {
-      const ds = -dq - dr;
-      // Check if within radius and not the center tile
-      if (Math.abs(ds) <= baseInfluenceRadius && 
-          !(dq === 0 && dr === 0) &&
-          Math.max(Math.abs(dq), Math.abs(dr), Math.abs(ds)) <= baseInfluenceRadius) {
-        const q = startCoords.q + dq;
-        const r = startCoords.r + dr;
-        const s = startCoords.s + ds;
-        tiles.push(createTile(q, r, s));
-      }
-    }
-  }
-  
-  return tiles;
 }
 
 /**
@@ -247,6 +180,9 @@ export const createColony = onRequest(authenticatedHttpsOptions, async (req, res
     // Generate initial tiles
     const tiles = generateInitialTiles(colonyRef.id, uid, startCoordinates, TIER1_BASE_INFLUENCE);
     
+    // Save tiles to Firestore in their own collection
+    const tileIds = await saveTilesToFirestore(tiles);
+    
     // Create initial units
     const units = createInitialUnits(colonyRef.id, uid, startCoordinates);
     
@@ -260,7 +196,7 @@ export const createColony = onRequest(authenticatedHttpsOptions, async (req, res
       name,
       createdAt: new Date(),
       startCoordinates,
-      tiles,
+      tileIds,
       units,
       unplacedUnits,
       territoryScore: tiles.length,  // Initial score based on controlled tiles
@@ -276,11 +212,12 @@ export const createColony = onRequest(authenticatedHttpsOptions, async (req, res
     // Save to Firestore
     await colonyRef.set(colonyForFirestore);
     
-    // Create response object
+    // Create response object that includes both tileIds (for persistence) and tiles (for immediate use)
     const response: CreateColonyResponse = {
       id: colonyRef.id,
       name,
       startCoordinates,
+      tileIds,
       tiles,
       units,
       unplacedUnits,
