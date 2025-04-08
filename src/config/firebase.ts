@@ -68,11 +68,13 @@ try {
     console.log(`Auth domain: ${firebaseConfig.authDomain}`);
     console.log(`Current origin: ${window.location.origin}`);
     
-    // Optionally connect to emulators in development
-    if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
+    // Connect to emulators in development
+    if (process.env.NODE_ENV === 'development') {
+      // Connect to the Auth emulator
       connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
       console.log('Connected to Firebase Auth emulator');
       
+      // Connect to the Firestore emulator
       connectFirestoreEmulator(firestore, 'localhost', 8080);
       console.log('Connected to Firestore emulator');
     }

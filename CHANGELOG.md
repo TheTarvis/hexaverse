@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.9] - 2025-04-20
+
+### Fixed
+- Enabled Firebase Auth emulator connection in development environment
+- Fixed authentication token issues when running with Firebase emulators
+- Removed dependency on NEXT_PUBLIC_USE_FIREBASE_EMULATOR environment variable
+
 ## [0.6.8] - 2025-04-20
 
 ### Fixed
