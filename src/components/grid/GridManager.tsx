@@ -6,6 +6,7 @@ import { useColony } from '@/contexts/ColonyContext'
 import { ColonyTile } from '@/types/colony'
 import { DebugMenu } from '@/components/grid/DebugMenu'
 import { HexGridCanvas } from '@/components/grid/HexGridCanvas'
+import { coordsToKey, findFogTiles } from '@/utils/hexUtils'
 
 interface TileMap {
   [key: string]: ColonyTile
@@ -21,28 +22,14 @@ interface SelectedTile {
   resourceDensity?: number;
 }
 
-// Hex directions matching the Go implementation
-const HEX_DIRECTIONS = [
-  { q: 1, r: -1, s: 0 },  // UpRight
-  { q: 0, r: -1, s: 1 },  // Up
-  { q: -1, r: 0, s: 1 },  // UpLeft
-  { q: -1, r: 1, s: 0 },  // DownLeft
-  { q: 0, r: 1, s: -1 },  // Down
-  { q: 1, r: 0, s: -1 },  // DownRight
-]
-
-// Function to create a unique key for a cube coordinate
-function coordsToKey(q: number, r: number, s: number): string {
-  return `${q},${r},${s}`
-}
-
 export function GridManager() {
   const { colony } = useColony();
   
   const [debugState, setDebugState] = useState({
     wireframe: false,
     hexSize: 1.2,
-    colorScheme: 'type' // Default to type-based coloring
+    colorScheme: 'type', // Default to type-based coloring
+    fogDepth: 20, // Add fog depth to debug state
   })
 
   // Calculate world coordinates for the target tile based on colony start coordinates
@@ -62,32 +49,42 @@ export function GridManager() {
   const cameraTarget: [number, number, number] = [worldCoords.x, worldCoords.y, 0];
 
   const [tileMap, setTileMap] = useState<TileMap>({})
+  const [fogTiles, setFogTiles] = useState<{q: number, r: number, s: number}[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   
-  // Load the grid data when colony changes
+  // Recalculate fog tiles when fog depth changes or colony data loads
+  useEffect(() => {
+    if (colony && colony.tiles && colony.tiles.length > 0 && Object.keys(tileMap).length > 0) {
+      // Find fog tiles based on current depth
+      const fogTilesList = findFogTiles(tileMap, debugState.fogDepth);
+      console.log(`Found ${fogTilesList.length} potential fog tiles with depth ${debugState.fogDepth}`);
+      setFogTiles(fogTilesList);
+    }
+  }, [tileMap, debugState.fogDepth, colony]) // Depend on tileMap and fogDepth
+
+  // Load the initial grid data when colony changes
   useEffect(() => {
     async function loadGridData() {
       try {
         setLoading(true);
         
-        // If we have colony tiles, use them
         if (colony && colony.tiles && colony.tiles.length > 0) {
           console.log(`Loading ${colony.tiles.length} tiles from colony`);
           
-          // Create a map of cube coordinates to tiles
           const tileMapData: TileMap = {};
           colony.tiles.forEach((tile) => {
             const key = coordsToKey(tile.q, tile.r, tile.s);
             tileMapData[key] = tile;
           });
           
-          setTileMap(tileMapData);
+          setTileMap(tileMapData); // This triggers the fog calculation useEffect
           setError(null);
         } else {
           console.log('No colony tiles available');
           setTileMap({});
+          setFogTiles([]); // Clear fog tiles if no colony
           setError('No colony tiles available. Please create a colony first.');
         }
       } catch (error) {
@@ -99,27 +96,31 @@ export function GridManager() {
     }
     
     loadGridData();
-  }, [colony]);
+  }, [colony]); // Only depend on colony for initial load
   
-  const handleDebugAction = (action: string) => {
+  const handleDebugAction = (action: string, value?: any) => {
     switch(action) {
       case 'toggleWireframe':
-        setDebugState((prev: typeof debugState) => ({ ...prev, wireframe: !prev.wireframe }))
+        setDebugState((prev) => ({ ...prev, wireframe: !prev.wireframe }))
         break
       case 'adjustSize':
-        setDebugState((prev: typeof debugState) => ({ 
+        setDebugState((prev) => ({ 
           ...prev, 
           hexSize: prev.hexSize === 1.2 ? 1.5 : prev.hexSize === 1.5 ? 0.9 : 1.2
         }))
         break
       case 'changeColorScheme':
-        setDebugState((prev: typeof debugState) => {
-          // Cycle through color schemes
+        setDebugState((prev) => {
           const schemes = ['type', 'resources', 'rainbow', 'default', 'monochrome'];
           const currentIndex = schemes.indexOf(prev.colorScheme);
           const nextIndex = (currentIndex + 1) % schemes.length;
           return { ...prev, colorScheme: schemes[nextIndex] };
         });
+        break;
+      case 'changeFogDepth': // Add case for changing fog depth
+        if (typeof value === 'number' && value >= 0) {
+          setDebugState((prev) => ({ ...prev, fogDepth: value }));
+        }
         break;
     }
   }
@@ -194,8 +195,11 @@ export function GridManager() {
         )}
       </SlideUpPanel>
       
-      {/* Debug Menu Component */}
-      <DebugMenu debugState={debugState} onDebugAction={handleDebugAction} />
+      {/* Debug Menu Component - pass fogDepth and handler */}
+      <DebugMenu 
+        debugState={debugState} 
+        onDebugAction={handleDebugAction} 
+      />
       
       {/* Only render the Canvas when not loading and no errors */}
       {!loading && !error && Object.keys(tileMap).length > 0 && (
@@ -204,6 +208,7 @@ export function GridManager() {
           hexSize={debugState.hexSize}
           colorScheme={debugState.colorScheme}
           tileMap={tileMap}
+          fogTiles={fogTiles}
           cameraPosition={cameraPosition}
           cameraTarget={cameraTarget}
           onTileSelect={handleTileSelect}

@@ -1,3 +1,11 @@
+## [v0.8.6] - 2025-04-11
+### Added
+- Implemented fog of war system around colony tiles
+- Added adjustable fog depth control in Debug Menu
+- Created utility functions for hexagonal grid operations
+- Enhanced tile display with semi-transparent fog tiles
+- Improved performance with optimized fog calculation
+
 ## [v0.8.5] - 2025-04-10
 ### Added
 - Created a dedicated Changelog page to display version history

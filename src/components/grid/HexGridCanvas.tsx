@@ -25,6 +25,7 @@ interface HexGridCanvasProps {
   hexSize: number;
   colorScheme: string;
   tileMap: TileMap;
+  fogTiles: { q: number, r: number, s: number }[];
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
   onTileSelect: (tile: SelectedTile) => void;
@@ -40,6 +41,11 @@ function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number
 
 // Get color based on tile type
 function getTileColor(type: string, colorScheme: string, q: number, r: number, s: number, resourceDensity = 0.5): string {
+  // Always use the same color for fog tiles, regardless of color scheme
+  if (type === 'fog') {
+    return new THREE.Color(0.9, 0.4, 0.4).getStyle(); // Light red for fog tiles
+  }
+  
   if (colorScheme === 'monochrome') {
     return new THREE.Color(0.4, 0.4, 0.4).getStyle();
   }
@@ -97,6 +103,7 @@ function HexagonMesh({
   s,
   type,
   resourceDensity,
+  isFogTile = false,
   onTileSelect
 }: { 
   position?: [number, number, number], 
@@ -107,6 +114,7 @@ function HexagonMesh({
   s: number,
   type?: string,
   resourceDensity?: number,
+  isFogTile?: boolean,
   onTileSelect: (tile: SelectedTile) => void
 }) {
   // Create a hexagon shape
@@ -142,10 +150,14 @@ function HexagonMesh({
       r,
       s,
       color,
-      type,
+      type: isFogTile ? 'fog' : type,
       resourceDensity
     })
   }
+
+  // Determine material properties based on tile type
+  const opacity = isFogTile ? 0.7 : 1.0
+  const transparent = isFogTile
 
   return (
     <mesh 
@@ -156,7 +168,12 @@ function HexagonMesh({
       onPointerOut={(e: ThreeEvent<PointerEvent>) => document.body.style.cursor = 'default'}
     >
       <shapeGeometry args={[hexShape]} />
-      <meshBasicMaterial color={color} wireframe={wireframe} />
+      <meshBasicMaterial 
+        color={color} 
+        wireframe={wireframe} 
+        transparent={transparent}
+        opacity={opacity}
+      />
     </mesh>
   )
 }
@@ -166,17 +183,19 @@ function HexGrid({
   hexSize = 1.2, 
   colorScheme = 'type', 
   tileMap = {} as TileMap,
+  fogTiles = [] as { q: number, r: number, s: number }[],
   onTileSelect
 }: {
   wireframe?: boolean,
   hexSize?: number,
   colorScheme?: string,
   tileMap?: TileMap,
+  fogTiles?: { q: number, r: number, s: number }[],
   onTileSelect: (tile: SelectedTile) => void
 }) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
-    const gridPositions: { position: [number, number, number]; color: string; q: number; r: number; s: number; type?: string; resourceDensity?: number }[] = []
+    const gridPositions: { position: [number, number, number]; color: string; q: number; r: number; s: number; type?: string; resourceDensity?: number; isFogTile: boolean }[] = []
     
     // Use the tile data from the tileMap
     Object.values(tileMap).forEach((tile) => {
@@ -194,12 +213,32 @@ function HexGrid({
         position: cubeToPixel(q, r, s, hexSize),
         color,
         type,
-        resourceDensity
+        resourceDensity,
+        isFogTile: false
+      })
+    })
+    
+    // Add fog tiles
+    fogTiles.forEach((tile) => {
+      const q = tile.q;
+      const r = tile.r;
+      const s = tile.s;
+      
+      // Generate color for fog tiles
+      const color = getTileColor('fog', colorScheme, q, r, s);
+      
+      gridPositions.push({
+        q, r, s,
+        position: cubeToPixel(q, r, s, hexSize),
+        color,
+        type: 'fog',
+        resourceDensity: undefined,
+        isFogTile: true
       })
     })
     
     return gridPositions
-  }, [hexSize, colorScheme, tileMap])
+  }, [hexSize, colorScheme, tileMap, fogTiles])
 
   return (
     <>
@@ -214,6 +253,7 @@ function HexGrid({
           s={props.s}
           type={props.type}
           resourceDensity={props.resourceDensity}
+          isFogTile={props.isFogTile}
           onTileSelect={onTileSelect}
         />
       ))}
@@ -226,6 +266,7 @@ export function HexGridCanvas({
   hexSize, 
   colorScheme, 
   tileMap, 
+  fogTiles, 
   cameraPosition, 
   cameraTarget, 
   onTileSelect 
@@ -260,6 +301,7 @@ export function HexGridCanvas({
         hexSize={hexSize}
         colorScheme={colorScheme}
         tileMap={tileMap}
+        fogTiles={fogTiles}
         onTileSelect={onTileSelect}
       />
     </Canvas>
