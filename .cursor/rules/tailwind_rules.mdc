@@ -1,9 +1,9 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
- # Tailwind CSS Configuration Rules
+# Tailwind CSS Configuration Rules
 
 ## Version Requirements
 - DO NOT change the Tailwind CSS version from ^4.1.3

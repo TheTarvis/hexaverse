@@ -1,15 +1,16 @@
 {
   "name": "hexaverse-app",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "cp CHANGELOG.md public/",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "next build && firebase deploy",
-    "deploy:functions": "next build && firebase deploy --only functions",
-    "emulators": "next build && firebase emulators:start",
+    "deploy": "npm run prebuild && next build && firebase deploy",
+    "deploy:functions": "npm run prebuild && next build && firebase deploy --only functions",
+    "emulators": "npm run prebuild && next build && firebase emulators:start",
     "test:ui": "echo \"No UI tests configured yet\" && exit 0",
     "test:functions": "cd functions && npm test",
     "test": "npm run test:ui && npm run test:functions"
@@ -22,6 +23,7 @@
     "clsx": "^2.1.1",
     "firebase": "^11.6.0",
     "framer-motion": "^11.2.6",
+    "marked": "^15.0.8",
     "next": "14.2.3",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
@@ -29,6 +31,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.3",
+    "@types/marked": "^6.0.0",
     "@types/node": "^20",
     "@types/react": "^18.3.20",
     "@types/react-dom": "^18.3.6",

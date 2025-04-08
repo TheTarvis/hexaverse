@@ -175,7 +175,7 @@ export function ApplicationLayout({
                   <QuestionMarkCircleIcon />
                   <SidebarLabel>Support</SidebarLabel>
                 </SidebarItem>
-                <SidebarItem href="#">
+                <SidebarItem href="/changelog">
                   <SparklesIcon />
                   <SidebarLabel>Changelog</SidebarLabel>
                 </SidebarItem>
