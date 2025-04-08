@@ -269,6 +269,18 @@ export default function Grid() {
     colorScheme: 'type' // Default to type-based coloring
   })
 
+  // Calculate world coordinates for the target tile
+  const [worldCoords] = useState(() => {
+    // Calculate initial world position for tile q:19, r:14, s:-33
+    const worldX = debugState.hexSize * (Math.sqrt(3) * 19 + Math.sqrt(3)/2 * 14)
+    const worldY = debugState.hexSize * (3/2 * 14)
+    return { x: worldX, y: worldY }
+  })
+
+  // Camera will be positioned directly above the target
+  const cameraPosition: [number, number, number] = [worldCoords.x, worldCoords.y, 12]
+  const cameraTarget: [number, number, number] = [worldCoords.x, worldCoords.y, 0]
+
   const [tileMap, setTileMap] = useState<TileMap>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -449,11 +461,12 @@ export default function Grid() {
           </div>
           
           <Canvas
-            camera={{ position: [0, 0, 12], fov: 45 }}
+            camera={{ position: cameraPosition, fov: 45 }}
             gl={{ antialias: true }}
             style={{ touchAction: 'none' }}
           >
             <OrbitControls 
+              target={cameraTarget}
               enablePan={true}
               enableZoom={true}
               enableRotate={false}

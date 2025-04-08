@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.7.4]
+### Changed
+- Updated camera positioning to center on specific tile coordinates
+- Improved grid navigation by aligning camera position with target tile
+
 ## [0.7.3] - 2025-04-21
 
 ### Added
