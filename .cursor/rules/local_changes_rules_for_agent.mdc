@@ -3,8 +3,8 @@ description:
 globs: 
 alwaysApply: true
 ---
-- After the agent has completed the request from the user it will make a new commit. This commit name should follow this pattern. "[v0.0.0] - Commit Message Desbribing Changes".
-- For all local changes, just increment the minor value. For example, if the current version is v0.2.3, after the cahnges the version would be v.0.2.4. 
+- After the agent has completed the request from the user it will offer to make a new commit. This commit name should follow this pattern. "[v0.0.0] - Commit Message Desbribing Changes".
+- For all local changes, just increment the minor value. For example, if the current version is v0.2.11, after the cahnges the version would be v.0.2.12. 
 - Use the version from the package.json and should update that value before commiting.
 - Read the CHANGELOG.md
 - Never change the major and minor versions, only patch versions. [vmajor.minor.patch]

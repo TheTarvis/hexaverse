@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.8.0] - 2025-04-22
+### Added
+- Initial colony creation and management functionality
+- Colony information display with tile count and coordinates
+- Fixed TypeScript type safety for colony tiles
+- Enhanced error handling and loading states for colony data
+- Improved dark mode support for colony interface components
+
 ## [v0.7.4]
 ### Changed
 - Updated camera positioning to center on specific tile coordinates
