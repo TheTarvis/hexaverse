@@ -1,22 +1,22 @@
 /**
  * Types for colony management - shared between web app and Firebase functions
  */
+import { Unit, UnplacedUnit } from './units';
+import { TileType } from '../utils/noise';
 
 // Basic colony tile type matching server model
 export interface ColonyTile {
   id: string;
-  q: number;  // Cube coordinate X
-  r: number;  // Cube coordinate Y
-  s: number;  // Cube coordinate Z
-  type: string;
+  q: number;
+  r: number;  
+  s: number;  
+  type: TileType; // Tile type based on noise value
+  controllerUid: string;  // Firebase user ID of the controller
+  visibility: 'visible' | 'fogged' | 'unexplored';
+  resourceDensity?: number; // Value from 0-1 indicating resource richness
   resources?: {
     [key: string]: number;
   };
-  buildings?: {
-    id: string;
-    type: string;
-    level: number;
-  }[];
 }
 
 // Colony data structure
@@ -31,6 +31,11 @@ export interface Colony {
     s: number;
   };
   tiles: ColonyTile[];
+  units: Unit[];
+  unplacedUnits: UnplacedUnit[];
+  // Territory metrics
+  territoryScore: number;
+  visibilityRadius: number;
 }
 
 // Colony creation request type
@@ -49,4 +54,8 @@ export interface CreateColonyResponse {
     s: number;
   };
   tiles: ColonyTile[];
+  units: Unit[];
+  unplacedUnits: UnplacedUnit[];
+  territoryScore: number; // TODO TW: Discuss what this is
+  visibilityRadius: number; // TODO TW: Move visi
 } 

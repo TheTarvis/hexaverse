@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.4] - 2025-04-17
+
+### Added
+- Implemented noise-based colony spawn location system
+- Added procedural generation for galactic terrain with different tile types
+- Implemented resource density calculation based on tile type
+- Enhanced colony creation with proper tile types and resource allocation
+- Added custom tile IDs for improved game mechanics
+
 ## [0.6.3] - 2025-04-16
 
 ### Added

@@ -17,7 +17,7 @@ import { getFirestore } from 'firebase/firestore';
 import { Colony, CreateColonyRequest, CreateColonyResponse } from '@/types/colony';
 
 // API base URL for backend calls
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8081';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001';
 
 // Get auth and firestore instances
 const auth = getAuth();
@@ -128,10 +128,6 @@ export async function fetchColonyById(colonyId: string): Promise<Colony> {
  * @returns The created colony data
  */
 export async function createColony(colonyData: CreateColonyRequest): Promise<Colony> {
-  if (!colonyData.uid) {
-    throw new Error('User ID is required to create a colony');
-  }
-  
   if (!colonyData.name) {
     throw new Error('Colony name is required');
   }
@@ -141,6 +137,9 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
     
     // Get the current user's ID token
     const idToken = await getAuthToken();
+    if (!idToken) {
+      throw new Error('Id Token is required to create a colony');
+    }
     
     // 1. Call the backend API to generate initial colony data
     const response = await fetch(`${API_BASE_URL}/colony/create`, {

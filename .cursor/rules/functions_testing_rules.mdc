@@ -1,9 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-- The agent will always create unit test for new code.
-- After updating code and the test, it will run the test suite to make sure nothing broke.
-- The test should be quick
-- The agent should use mocks

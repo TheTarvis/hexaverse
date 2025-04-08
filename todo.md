@@ -7,6 +7,16 @@
   - [x] Show login prompt if not authenticated
   - [x] Create helper functions to manage auth state
   - [ ] Create list of pages and permissions.
+    - Home page: /src/app/page.tsx
+    - Colony page: /src/app/colony/page.tsx
+    - Grid page: /src/app/grid/page.tsx
+    - Events list page: /src/app/events/page.tsx
+    - Event detail page: /src/app/events/[id]/page.tsx
+    - Orders list page: /src/app/orders/page.tsx
+    - Order detail page: /src/app/orders/[id]/page.tsx
+    - Order refund page: /src/app/orders/[id]/refund.tsx
+    - Settings page: /src/app/settings/page.tsx
+    - Address settings page: /src/app/settings/address.tsx
     - For example, grid should be visible but not interactable when not logged in.
     - [ ] Request login when going to restricted pages.
 
