@@ -1,34 +1,47 @@
-import { getEvents } from '@/data'
 import '@/styles/tailwind.css'
+import { Inter } from 'next/font/google'
 import type { Metadata } from 'next'
-import type React from 'react'
+import { getEvents } from '@/data'
 import { ApplicationLayout } from './application-layout'
-import { AuthProviderWrapper } from '@/components/auth/AuthProviderWrapper'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { ColonyProvider } from '@/contexts/ColonyContext'
 
 export const metadata: Metadata = {
   title: {
-    template: '%s - Hexaverse',
+    template: '%s | Hexaverse',
     default: 'Hexaverse',
   },
-  description: 'Explore your colony in the Hexaverse grid',
+  description: 'Explore the Hexaverse',
 }
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  let events = await getEvents()
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+})
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const events = await getEvents()
 
   return (
     <html
       lang="en"
       className="text-zinc-950 antialiased lg:bg-zinc-100 dark:bg-zinc-900 dark:text-white dark:lg:bg-zinc-950"
+      suppressHydrationWarning
     >
       <head>
-        <link rel="preconnect" href="https://rsms.me/" />
-        <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body>
-        <AuthProviderWrapper>
-          <ApplicationLayout events={events}>{children}</ApplicationLayout>
-        </AuthProviderWrapper>
+      <body className={inter.variable}>
+        <AuthProvider>
+          <ColonyProvider>
+            <ApplicationLayout events={events}>{children}</ApplicationLayout>
+          </ColonyProvider>
+        </AuthProvider>
       </body>
     </html>
   )

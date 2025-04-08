@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.5] - 2025-04-18
+
+### Added
+- Implemented colony check on user login
+- Added notification to create colony if user doesn't have one
+- Integrated colony creation flow in main navigation
+- Enhanced user experience with personalized avatar and name display
+- Added sign out functionality
+
 ## [0.6.4] - 2025-04-17
 
 ### Added
