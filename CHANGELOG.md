@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.10] - 2025-04-20
+
+### Fixed
+- Fixed Firebase Functions server timestamp error in emulator environment
+- Modified colony creation to use Date objects instead of serverTimestamp() for compatibility
+- Resolved 500 server error when creating a new colony in the emulator
+
 ## [0.6.9] - 2025-04-20
 
 ### Fixed

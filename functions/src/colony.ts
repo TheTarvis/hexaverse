@@ -267,10 +267,10 @@ export const createColony = onRequest(authenticatedHttpsOptions, async (req, res
       visibilityRadius: BASE_VISIBILITY_RADIUS
     };
     
-    // Add server timestamp when saving to Firestore
+    // Use the same Date object instead of serverTimestamp in emulator environment
+    // This avoids the "Cannot read properties of undefined (reading 'serverTimestamp')" error
     const colonyForFirestore = {
-      ...colony,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      ...colony
     };
     
     // Save to Firestore
