@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.8.1] - 2025-04-23
+### Fixed
+- Updated Firestore security rules to allow client-side querying for user colonies
+- Added proper "list" permissions for colonies by uid and tiles by id
+- Configured Firebase project to properly deploy Firestore rules
+- Fixed permission issues when accessing colony data in production environment
+- Improved Firestore security model while maintaining client-side access
+
 ## [v0.8.0] - 2025-04-22
 ### Added
 - Initial colony creation and management functionality

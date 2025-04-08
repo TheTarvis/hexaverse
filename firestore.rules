@@ -12,16 +12,21 @@ service cloud.firestore {
       return resource.data.uid == request.auth.uid;
     }
 
-    // Only allow Cloud Functions to write to the database
-    // Allow users to read their own data
+    // Allow users to read their own colony and perform queries on uid field
     match /colonies/{colonyId} {
-      allow read: if request.auth != null && isOwner(resource);
+      allow read: if request.auth != null && (isOwner(resource) || request.auth.uid == resource.data.uid);
       allow write: if isRequestFromCloudFunction();
+      // Allow querying colonies by uid
+      allow list: if request.auth != null && request.query.limit <= 10 && 
+                    request.query.where.uid == request.auth.uid;
     }
     
     match /tiles/{tileId} {
       allow read: if request.auth != null;
       allow write: if isRequestFromCloudFunction();
+      // Allow querying tiles by ID in batches for colony data
+      allow list: if request.auth != null && request.query.limit <= 20 &&
+                   'id' in request.query.where && request.query.where.id is list;
     }
     
     // Default deny

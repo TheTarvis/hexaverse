@@ -1,6 +1,7 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator, Auth } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, Firestore } from 'firebase/firestore';
+import { getFunctions, connectFunctionsEmulator, Functions } from 'firebase/functions';
 
 // Firebase configuration (will be populated from environment variables)
 const firebaseConfig = {
@@ -37,6 +38,7 @@ const validateConfig = () => {
 let firebaseApp: FirebaseApp;
 let auth: Auth;
 let firestore: Firestore;
+let functions: Functions;
 
 try {
   console.log('Initializing Firebase app...');
@@ -63,6 +65,10 @@ try {
   console.log('Initializing Firestore...');
   firestore = getFirestore(firebaseApp);
   
+  // Initialize Firebase Functions
+  console.log('Initializing Firebase Functions...');
+  functions = getFunctions(firebaseApp, 'us-central1');
+  
   // Additional setup for auth and Firestore
   if (typeof window !== 'undefined') {
     console.log(`Auth domain: ${firebaseConfig.authDomain}`);
@@ -77,17 +83,22 @@ try {
       // Connect to the Firestore emulator
       connectFirestoreEmulator(firestore, 'localhost', 8080);
       console.log('Connected to Firestore emulator');
+      
+      // Connect to the Functions emulator
+      connectFunctionsEmulator(functions, 'localhost', 5001);
+      console.log('Connected to Firebase Functions emulator');
     }
   }
   
-  console.log('Firebase auth and Firestore initialized successfully!');
+  console.log('Firebase auth, Firestore, and Functions initialized successfully!');
 } catch (error) {
   console.error('Error initializing Firebase:', error);
   // Create dummy exports to prevent app from crashing
   firebaseApp = {} as FirebaseApp;
   auth = {} as Auth;
   firestore = {} as Firestore;
+  functions = {} as Functions;
 }
 
-export { firebaseApp, auth, firestore };
+export { firebaseApp, auth, firestore, functions };
 export default firebaseApp; 

@@ -15,9 +15,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { Colony, CreateColonyRequest, CreateColonyResponse, ColonyTile } from '@/types/colony';
-
-// API base URL for backend calls
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001/hexaverse/us-central1';
+import { callFunction, getFunctionUrl } from '@/utils/api';
 
 // Get auth and firestore instances
 const auth = getAuth();
@@ -138,26 +136,21 @@ export async function fetchColonyById(colonyId: string): Promise<Colony> {
     // Get auth token
     const idToken = await getAuthToken();
     
-    // Call the secure API endpoint
-    const response = await fetch(`${API_BASE_URL}/getColony?id=${colonyId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${idToken}`
+    // Call the secure API endpoint using our utility
+    const apiResponse = await callFunction<{success: boolean; message?: string; colony: Colony}>(
+      'getColony',
+      {
+        method: 'GET',
+        queryParams: { id: colonyId },
+        idToken
       }
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-      throw new Error(`Server responded with status: ${response.status}. ${errorData.message || ''}`);
-    }
-    
-    const apiResponse = await response.json();
+    );
     
     if (!apiResponse.success) {
       throw new Error(apiResponse.message || 'Failed to fetch colony');
     }
     
-    const colony = apiResponse.colony as Colony;
+    const colony = apiResponse.colony;
     
     // Load tiles if they're not included
     if (!colony.tiles && colony.tileIds && colony.tileIds.length > 0) {
@@ -190,23 +183,21 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
       throw new Error('Id Token is required to create a colony');
     }
     
-    // Call the backend API to generate initial colony data
-    const response = await fetch(`${API_BASE_URL}/createColony`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${idToken}`
-      },
-      body: JSON.stringify({ name: colonyData.name }),
-    });
+    // Call the backend API using our utility
+    const apiResponse = await callFunction<{success: boolean; message?: string; colony: CreateColonyResponse}>(
+      'createColony',
+      {
+        method: 'POST',
+        body: { name: colonyData.name },
+        idToken
+      }
+    );
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-      throw new Error(`Server responded with status: ${response.status}. ${errorData.message || ''}`);
+    if (!apiResponse.success) {
+      throw new Error(apiResponse.message || 'Failed to create colony');
     }
     
-    const apiResponse = await response.json();
-    const responseData = apiResponse.colony as CreateColonyResponse;
+    const responseData = apiResponse.colony;
     
     // Convert the response to a Colony object
     const colony: Colony = {
