@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.8.4] - 2025-04-09
+### Changed
+- Refactored grid system into modular components for better maintainability
+- Created DebugMenu component to separate debug UI from grid logic
+- Created HexGridCanvas component to encapsulate canvas rendering logic
+- Created GridManager component to handle state and coordinate child components
+- Moved grid content to main page for better user experience
+- Improved code organization with clear separation of concerns
+
 ## [v0.8.3] - 2025-04-08
 ### Update
 - Commented out template stuff from sidebar.
