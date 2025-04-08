@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.7] - 2025-04-20
+
+### Fixed
+- Fixed colony creation API URL in Firebase emulator environment
+- Updated API_BASE_URL to include project ID and region for proper endpoint routing
+- Resolved CORS preflight issues when creating a new colony
+
 ## [0.6.6] - 2025-04-19
 
 ### Fixed

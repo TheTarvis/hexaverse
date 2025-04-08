@@ -17,7 +17,7 @@ import { getFirestore } from 'firebase/firestore';
 import { Colony, CreateColonyRequest, CreateColonyResponse } from '@/types/colony';
 
 // API base URL for backend calls
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001/hexaverse/us-central1';
 
 // Get auth and firestore instances
 const auth = getAuth();
@@ -72,7 +72,11 @@ export async function fetchUserColony(uid: string): Promise<Colony | null> {
       name: colonyData.name,
       createdAt,
       startCoordinates: colonyData.startCoordinates,
-      tiles: colonyData.tiles || []
+      tiles: colonyData.tiles || [],
+      units: colonyData.units || [],
+      unplacedUnits: colonyData.unplacedUnits || [],
+      territoryScore: colonyData.territoryScore || 0,
+      visibilityRadius: colonyData.visibilityRadius || 0
     };
   } catch (error) {
     console.error('Error fetching user colony:', error);
@@ -169,7 +173,11 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
       name: colonyResponse.name,
       createdAt: serverTimestamp() as any,
       startCoordinates: colonyResponse.startCoordinates,
-      tiles: colonyResponse.tiles
+      tiles: colonyResponse.tiles,
+      units: colonyResponse.units,
+      unplacedUnits: colonyResponse.unplacedUnits,
+      territoryScore: colonyResponse.territoryScore,
+      visibilityRadius: colonyResponse.visibilityRadius
     };
     
     await setDoc(newColonyRef, newColony);
