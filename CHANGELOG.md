@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.6] - 2025-04-19
+
+### Fixed
+- Added 'use client' directive to AuthContext.tsx and ColonyContext.tsx
+- Fixed Next.js Server Component errors related to React hooks usage
+- Resolved build issues with client-side components
+
 ## [0.6.5] - 2025-04-18
 
 ### Added
