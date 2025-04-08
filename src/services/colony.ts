@@ -219,7 +219,6 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
       createdAt: serverTimestamp() as any,
       startCoordinates: colonyResponse.startCoordinates,
       tileIds: colonyResponse.tileIds,
-      tiles: colonyResponse.tiles,
       units: colonyResponse.units,
       unplacedUnits: colonyResponse.unplacedUnits,
       territoryScore: colonyResponse.territoryScore,
@@ -229,7 +228,11 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
     await setDoc(newColonyRef, newColony);
     console.log(`Colony created with ID: ${newColony.id}`);
     
-    return newColony;
+    // Return colony with tiles included for immediate use in the client
+    return {
+      ...newColony,
+      tiles: colonyResponse.tiles
+    };
   } catch (error) {
     console.error('Error creating colony:', error);
     throw error;

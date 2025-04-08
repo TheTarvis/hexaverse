@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2025-04-21
+
+### Fixed
+- Fixed bug where full tile data was being stored in Firestore colony documents
+- Removed tiles array from Firestore colony documents to reduce document size
+- Optimized client-side code to properly handle tile data in memory only
+
 ## [0.7.0] - 2025-04-21
 
 ### Changed
