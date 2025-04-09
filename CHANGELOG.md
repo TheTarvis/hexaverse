@@ -1,3 +1,11 @@
+## [v0.9.2] - 2025-04-17
+### Changed
+- Enhanced fog of war visualization to make fog tiles darker based on distance from colony
+- Updated findFogTiles utility to return distance information for each fog tile
+- Implemented distance-based coloring algorithm for better visual depth perception
+- Improved fog tile visibility with dynamic opacity based on distance
+- Enhanced visual cues for exploration boundaries with color gradient
+
 ## [v0.9.1] - 2025-04-16
 ### Added
 - Added colony color selection feature during colony creation

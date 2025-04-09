@@ -20,12 +20,20 @@ interface SelectedTile {
   resourceDensity?: number;
 }
 
+// Updated interface to include distance
+interface FogTile {
+  q: number;
+  r: number;
+  s: number;
+  distance: number;
+}
+
 interface HexGridCanvasProps {
   wireframe: boolean;
   hexSize: number;
   colorScheme: string;
   tileMap: TileMap;
-  fogTiles: { q: number, r: number, s: number }[];
+  fogTiles: FogTile[];
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
   onTileSelect: (tile: SelectedTile) => void;
@@ -42,10 +50,34 @@ function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number
 }
 
 // Get color based on tile type and colony color
-function getTileColor(type: string, colorScheme: string, q: number, r: number, s: number, resourceDensity = 0.5, colonyColor?: string): string {
-  // Always use the same color for fog tiles, regardless of color scheme
-  if (type === 'fog') {
-    return new THREE.Color(0.2, 0.2, 0.3).getStyle(); // Dark violet
+function getTileColor(
+  type: string, 
+  colorScheme: string, 
+  q: number, 
+  r: number, 
+  s: number, 
+  resourceDensity = 0.5, 
+  fogDistance?: number, 
+  colonyColor?: string
+): string {
+  console.log('colonyColor', colonyColor)
+  console.log('fogDistance', fogDistance)
+  // Enhanced fog tile coloring based on distance
+  if (type === 'fog' && fogDistance !== undefined) {
+    // Calculate the brightness based on fog distance
+    // Closer tiles are brighter, further tiles are darker
+    const maxDistance = 3; // Adjust based on your typical fog depth
+    const baseBrightness = 0.3; // Base brightness of the closest fog tile
+    const minBrightness = 0.05; // Minimum brightness of the furthest fog tile
+    
+    // Calculate the brightness factor: 1.0 for closest, approaching 0 for furthest
+    const distanceFactor = Math.max(0, 1 - (fogDistance - 1) / maxDistance);
+    
+    // Calculate final brightness
+    const brightness = minBrightness + (baseBrightness - minBrightness) * distanceFactor;
+    
+    // Dark violet with variable brightness
+    return new THREE.Color(brightness * 0.7, brightness * 0.7, brightness).getStyle();
   }
   
   if (colorScheme === 'monochrome') {
@@ -106,6 +138,7 @@ function HexagonMesh({
   type,
   resourceDensity,
   isFogTile = false,
+  fogDistance,
   onTileSelect,
   onTileAdd
 }: { 
@@ -118,6 +151,7 @@ function HexagonMesh({
   type?: string,
   resourceDensity?: number,
   isFogTile?: boolean,
+  fogDistance?: number,
   onTileSelect: (tile: SelectedTile) => void,
   onTileAdd?: (q: number, r: number, s: number) => void
 }) {
@@ -173,8 +207,9 @@ function HexagonMesh({
   }
 
   // Determine material properties based on tile type
-  const opacity = isFogTile ? 0.7 : 1.0
-  const transparent = isFogTile
+  // Adjust opacity based on distance for fog tiles
+  const opacity = isFogTile ? (fogDistance ? Math.max(0.4, 0.9 - (fogDistance * 0.1)) : 0.7) : 1.0;
+  const transparent = isFogTile;
 
   return (
     <mesh 
@@ -201,7 +236,7 @@ function HexGrid({
   hexSize = 1.2, 
   colorScheme = 'type', 
   tileMap = {} as TileMap,
-  fogTiles = [] as { q: number, r: number, s: number }[],
+  fogTiles = [] as FogTile[],
   onTileSelect,
   onTileAdd,
   colonyColor
@@ -210,14 +245,24 @@ function HexGrid({
   hexSize?: number,
   colorScheme?: string,
   tileMap?: TileMap,
-  fogTiles?: { q: number, r: number, s: number }[],
+  fogTiles?: FogTile[],
   onTileSelect: (tile: SelectedTile) => void,
   onTileAdd?: (q: number, r: number, s: number) => void,
   colonyColor?: string
 }) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
-    const gridPositions: { position: [number, number, number]; color: string; q: number; r: number; s: number; type?: string; resourceDensity?: number; isFogTile: boolean }[] = []
+    const gridPositions: { 
+      position: [number, number, number]; 
+      color: string; 
+      q: number; 
+      r: number; 
+      s: number; 
+      type?: string; 
+      resourceDensity?: number; 
+      isFogTile: boolean;
+      fogDistance?: number;
+    }[] = []
     
     // Use the tile data from the tileMap
     Object.values(tileMap).forEach((tile) => {
@@ -228,7 +273,7 @@ function HexGrid({
       const resourceDensity = tile.resourceDensity || 0.5;
       
       // Generate color based on tile type and selected scheme
-      const color = getTileColor(type, colorScheme, q, r, s, resourceDensity, colonyColor);
+      const color = getTileColor(type, colorScheme, q, r, s, resourceDensity, undefined, colonyColor);
       
       gridPositions.push({
         q, r, s,
@@ -240,14 +285,15 @@ function HexGrid({
       })
     })
     
-    // Add fog tiles
+    // Add fog tiles with distance information
     fogTiles.forEach((tile) => {
       const q = tile.q;
       const r = tile.r;
       const s = tile.s;
+      const distance = tile.distance;
       
-      // Generate color for fog tiles
-      const color = getTileColor('fog', colorScheme, q, r, s);
+      // Generate color for fog tiles based on distance
+      const color = getTileColor('fog', colorScheme, q, r, s, undefined, distance, colonyColor);
       
       gridPositions.push({
         q, r, s,
@@ -255,7 +301,8 @@ function HexGrid({
         color,
         type: 'fog',
         resourceDensity: undefined,
-        isFogTile: true
+        isFogTile: true,
+        fogDistance: distance
       })
     })
     
@@ -276,6 +323,7 @@ function HexGrid({
           type={props.type}
           resourceDensity={props.resourceDensity}
           isFogTile={props.isFogTile}
+          fogDistance={props.fogDistance}
           onTileSelect={onTileSelect}
           onTileAdd={onTileAdd}
         />

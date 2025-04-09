@@ -54,18 +54,18 @@ export const HEX_DIRECTIONS = [
   }
   
 // Find all valid fog tiles (neighbors of colony tiles up to a certain depth)
-export function findFogTiles(tileMap: { [key: string]: ColonyTile }, depth: number = 1): { q: number, r: number, s: number }[] {
+export function findFogTiles(tileMap: { [key: string]: ColonyTile }, depth: number = 1): { q: number, r: number, s: number, distance: number }[] {
   if (depth < 1) {
     return [];
   }
 
-  const fogTilesMap: { [key: string]: { q: number, r: number, s: number } } = {};
+  const fogTilesMap: { [key: string]: { q: number, r: number, s: number, distance: number } } = {};
   const visitedKeys = new Set<string>(Object.keys(tileMap)); // Keep track of colony and already found fog tiles
   let currentFrontier: { q: number, r: number, s: number }[] = Object.values(tileMap).map(tile => ({ q: tile.q, r: tile.r, s: tile.s })); // Start with colony tiles
 
   for (let d = 0; d < depth; d++) {
     const nextFrontier: { q: number, r: number, s: number }[] = [];
-    const newFogFoundInLayer: { [key: string]: { q: number, r: number, s: number } } = {};
+    const newFogFoundInLayer: { [key: string]: { q: number, r: number, s: number, distance: number } } = {};
 
     currentFrontier.forEach(tile => {
       const neighbors = getNeighbors(tile);
@@ -75,7 +75,7 @@ export function findFogTiles(tileMap: { [key: string]: ColonyTile }, depth: numb
 
         // If this neighbor is not part of the colony and hasn't been visited/added as fog yet
         if (!visitedKeys.has(neighborKey)) {
-          newFogFoundInLayer[neighborKey] = neighbor;
+          newFogFoundInLayer[neighborKey] = { ...neighbor, distance: d + 1 }; // Current depth + 1
           visitedKeys.add(neighborKey); // Mark as visited
           nextFrontier.push(neighbor); // Add to the frontier for the next layer
         }
