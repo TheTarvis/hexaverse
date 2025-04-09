@@ -14,12 +14,20 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Colony, CreateColonyRequest, CreateColonyResponse, ColonyTile } from '@/types/colony';
 import { callFunction, getFunctionUrl } from '@/utils/api';
 
 // Get auth and firestore instances
 const auth = getAuth();
 const firestore = getFirestore();
+const functions = getFunctions();
+
+// Create callable function references
+const createColonyFunction = httpsCallable<
+  { name: string },
+  { success: boolean; colony: CreateColonyResponse; message?: string }
+>(functions, 'createColony');
 
 /**
  * Get authentication token for API requests
@@ -177,27 +185,14 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
   try {
     console.log(`Creating colony for user: ${colonyData.uid}`);
     
-    // Get the current user's ID token
-    const idToken = await getAuthToken();
-    if (!idToken) {
-      throw new Error('Id Token is required to create a colony');
+    // Call the Firebase callable function
+    const result = await createColonyFunction({ name: colonyData.name });
+    
+    if (!result.data.success) {
+      throw new Error(result.data.message || 'Failed to create colony');
     }
     
-    // Call the backend API using our utility
-    const apiResponse = await callFunction<{success: boolean; message?: string; colony: CreateColonyResponse}>(
-      'createColony',
-      {
-        method: 'POST',
-        body: { name: colonyData.name },
-        idToken
-      }
-    );
-    
-    if (!apiResponse.success) {
-      throw new Error(apiResponse.message || 'Failed to create colony');
-    }
-    
-    const responseData = apiResponse.colony;
+    const responseData = result.data.colony;
     
     // Convert the response to a Colony object
     const colony: Colony = {

@@ -1,17 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createColony = exports.getColony = exports.countUsers = exports.createTestUser = exports.makeUppercase = void 0;
+exports.addTile = exports.createColony = exports.getColony = exports.makeUppercase = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 // Import functions from other files
-const test_user_1 = require("./test-user");
-Object.defineProperty(exports, "createTestUser", { enumerable: true, get: function () { return test_user_1.createTestUser; } });
-const user_1 = require("./user");
-Object.defineProperty(exports, "countUsers", { enumerable: true, get: function () { return user_1.countUsers; } });
 const colony_1 = require("./colony");
 Object.defineProperty(exports, "getColony", { enumerable: true, get: function () { return colony_1.getColony; } });
 Object.defineProperty(exports, "createColony", { enumerable: true, get: function () { return colony_1.createColony; } });
+const tiles_1 = require("./tiles");
+Object.defineProperty(exports, "addTile", { enumerable: true, get: function () { return tiles_1.addTile; } });
 // Initialize Firebase Admin
 admin.initializeApp();
 // Firestore trigger function example

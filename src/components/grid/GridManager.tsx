@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { SlideUpPanel } from '@/components/slide-up-panel'
 import { useColony } from '@/contexts/ColonyContext'
 import { ColonyTile } from '@/types/colony'
 import { DebugMenu } from '@/components/grid/DebugMenu'
 import { HexGridCanvas } from '@/components/grid/HexGridCanvas'
 import { coordsToKey, findFogTiles } from '@/utils/hexUtils'
+import { addTile } from '@/services/tiles'
 
 interface TileMap {
   [key: string]: ColonyTile
@@ -23,7 +24,7 @@ interface SelectedTile {
 }
 
 export function GridManager() {
-  const { colony } = useColony();
+  const { colony, refreshColony } = useColony();
   
   const [debugState, setDebugState] = useState({
     wireframe: false,
@@ -53,6 +54,7 @@ export function GridManager() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
+  const [addingTile, setAddingTile] = useState(false)
   
   // Recalculate fog tiles when fog depth changes or colony data loads
   useEffect(() => {
@@ -97,6 +99,54 @@ export function GridManager() {
     
     loadGridData();
   }, [colony]); // Only depend on colony for initial load
+  
+  // Handle adding a tile to the colony
+  const handleAddTile = useCallback(async (q: number, r: number, s: number) => {
+    if (addingTile) return; // Prevent multiple concurrent requests
+    
+    try {
+      setAddingTile(true);
+      console.log(`Adding tile at q=${q}, r=${r}, s=${s} to colony`);
+      
+      const result = await addTile(q, r, s);
+      
+      if (result.success && result.tile) {
+        // Add the new tile to the local tile map immediately for immediate feedback
+        setTileMap(prevTileMap => {
+          const key = coordsToKey(q, r, s);
+          return {
+            ...prevTileMap,
+            [key]: result.tile as ColonyTile
+          };
+        });
+        
+        // Refresh the colony data from the server to keep everything in sync
+        await refreshColony();
+        
+        // Show success message - could be replaced with a toast notification
+        if (result.captured) {
+          console.log(`Tile captured from another colony!`);
+        } else {
+          console.log(`New ${result.tile.type} tile added to your colony!`);
+        }
+      } else {
+        // Show error message
+        console.error(`Failed to add tile: ${result.message}`);
+        setError(result.message || "Failed to add tile");
+        
+        // Clear error after a few seconds
+        setTimeout(() => setError(null), 3000);
+      }
+    } catch (error) {
+      console.error('Error adding tile:', error);
+      setError(error instanceof Error ? error.message : "An unexpected error occurred");
+      
+      // Clear error after a few seconds
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setAddingTile(false);
+    }
+  }, [addingTile, refreshColony]);
   
   const handleDebugAction = (action: string, value?: any) => {
     switch(action) {
@@ -145,6 +195,13 @@ export function GridManager() {
       {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-red-100 bg-opacity-40 z-10">
           <div className="text-lg font-medium text-red-700">{error}</div>
+        </div>
+      )}
+      
+      {/* Show loading overlay when adding a tile */}
+      {addingTile && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-20">
+          <div className="text-lg font-medium text-white">Adding tile...</div>
         </div>
       )}
       
@@ -212,6 +269,7 @@ export function GridManager() {
           cameraPosition={cameraPosition}
           cameraTarget={cameraTarget}
           onTileSelect={handleTileSelect}
+          onTileAdd={handleAddTile}
         />
       )}
     </div>

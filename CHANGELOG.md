@@ -1,3 +1,12 @@
+## [v0.8.7] - 2025-04-12
+### Added
+- Implemented tile addition functionality allowing players to expand their colony
+- Added tile capture mechanic to take control of tiles from other colonies
+- Created cloud functions using Firebase callable functions for colony expansion
+- Added double-click interaction to add or capture tiles
+- Implemented adjacency verification to ensure colony continuity
+- Enhanced the fog of war system to show available expansion tiles
+
 ## [v0.8.6] - 2025-04-11
 ### Added
 - Implemented fog of war system around colony tiles

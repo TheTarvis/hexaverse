@@ -3,9 +3,8 @@ import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
 // Import functions from other files
-import { createTestUser } from "./test-user";
-import { countUsers } from "./user";
 import { getColony, createColony } from "./colony";
+import { addTile } from "./tiles";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -41,8 +40,7 @@ export const makeUppercase = onDocumentCreated("messages/{documentId}", (event) 
 
 // Export functions from other files
 export {
-  createTestUser,
-  countUsers,
   getColony,
-  createColony
+  createColony,
+  addTile
 }; 

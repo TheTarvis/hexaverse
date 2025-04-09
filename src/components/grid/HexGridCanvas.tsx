@@ -29,6 +29,7 @@ interface HexGridCanvasProps {
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
   onTileSelect: (tile: SelectedTile) => void;
+  onTileAdd?: (q: number, r: number, s: number) => void;
 }
 
 // Convert cube coordinates to pixel coordinates (for pointy-top orientation)
@@ -43,7 +44,7 @@ function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number
 function getTileColor(type: string, colorScheme: string, q: number, r: number, s: number, resourceDensity = 0.5): string {
   // Always use the same color for fog tiles, regardless of color scheme
   if (type === 'fog') {
-    return new THREE.Color(0.9, 0.4, 0.4).getStyle(); // Light red for fog tiles
+    return new THREE.Color(0.2, 0.2, 0.3).getStyle(); // Dark violet
   }
   
   if (colorScheme === 'monochrome') {
@@ -104,7 +105,8 @@ function HexagonMesh({
   type,
   resourceDensity,
   isFogTile = false,
-  onTileSelect
+  onTileSelect,
+  onTileAdd
 }: { 
   position?: [number, number, number], 
   color?: string, 
@@ -115,7 +117,8 @@ function HexagonMesh({
   type?: string,
   resourceDensity?: number,
   isFogTile?: boolean,
-  onTileSelect: (tile: SelectedTile) => void
+  onTileSelect: (tile: SelectedTile) => void,
+  onTileAdd?: (q: number, r: number, s: number) => void
 }) {
   // Create a hexagon shape
   const hexShape = useMemo(() => {
@@ -155,6 +158,17 @@ function HexagonMesh({
     })
   }
 
+  const handleDoubleClick = (event: ThreeEvent<MouseEvent>) => {
+    // Only handle double clicks for fog tiles
+    if (!isFogTile || !onTileAdd) return;
+    
+    event.stopPropagation();
+    console.log(`Double-clicked fog tile at: q=${q}, r=${r}, s=${s}`);
+    
+    // Call the add tile handler
+    onTileAdd(q, r, s);
+  }
+
   // Determine material properties based on tile type
   const opacity = isFogTile ? 0.7 : 1.0
   const transparent = isFogTile
@@ -163,6 +177,7 @@ function HexagonMesh({
     <mesh 
       position={position} 
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       // Make cursor change to pointer when hovering over hexagons
       onPointerOver={(e: ThreeEvent<PointerEvent>) => document.body.style.cursor = 'pointer'}
       onPointerOut={(e: ThreeEvent<PointerEvent>) => document.body.style.cursor = 'default'}
@@ -184,14 +199,16 @@ function HexGrid({
   colorScheme = 'type', 
   tileMap = {} as TileMap,
   fogTiles = [] as { q: number, r: number, s: number }[],
-  onTileSelect
+  onTileSelect,
+  onTileAdd
 }: {
   wireframe?: boolean,
   hexSize?: number,
   colorScheme?: string,
   tileMap?: TileMap,
   fogTiles?: { q: number, r: number, s: number }[],
-  onTileSelect: (tile: SelectedTile) => void
+  onTileSelect: (tile: SelectedTile) => void,
+  onTileAdd?: (q: number, r: number, s: number) => void
 }) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
@@ -255,6 +272,7 @@ function HexGrid({
           resourceDensity={props.resourceDensity}
           isFogTile={props.isFogTile}
           onTileSelect={onTileSelect}
+          onTileAdd={onTileAdd}
         />
       ))}
     </>
@@ -269,7 +287,8 @@ export function HexGridCanvas({
   fogTiles, 
   cameraPosition, 
   cameraTarget, 
-  onTileSelect 
+  onTileSelect,
+  onTileAdd
 }: HexGridCanvasProps) {
   return (
     <Canvas
@@ -303,6 +322,7 @@ export function HexGridCanvas({
         tileMap={tileMap}
         fogTiles={fogTiles}
         onTileSelect={onTileSelect}
+        onTileAdd={onTileAdd}
       />
     </Canvas>
   )

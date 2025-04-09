@@ -1,4 +1,4 @@
-import { onRequest } from "firebase-functions/v2/https";
+import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import { Colony, CreateColonyResponse } from "./types/colony";
@@ -6,12 +6,15 @@ import { Unit, UnitType, Base, Ship, UnplacedUnit } from "./types/units";
 import { authenticatedHttpsOptions, authenticateRequest } from "./middleware/auth";
 import { findSpawnLocation as findNoiseBasedSpawnLocation } from "./utils/colonyGeneration";
 import { generateInitialTiles, saveTilesToFirestore } from "./utils/tiles/tileOperations";
+import { functionConfig, gameConfig } from "./config";
 
-// Configuration constants
-const MIN_SPAWN_DISTANCE = 8;  // Minimum tiles between colonies
-const MAX_SPAWN_DISTANCE = 25; // Maximum tiles between colonies
-const BASE_VISIBILITY_RADIUS = 4;
-const TIER1_BASE_INFLUENCE = 3;
+// Use configuration constants from shared config
+const {
+  minSpawnDistance,
+  maxSpawnDistance,
+  baseVisibilityRadius,
+  tier1BaseInfluence
+} = gameConfig.colonySettings;
 
 /**
  * Find a suitable spawn location for a new colony
@@ -19,7 +22,7 @@ const TIER1_BASE_INFLUENCE = 3;
  */
 async function findSpawnLocation(): Promise<{q: number, r: number, s: number}> {
   // Use the noise-based spawn location finder
-  const location = await findNoiseBasedSpawnLocation(MIN_SPAWN_DISTANCE, MAX_SPAWN_DISTANCE);
+  const location = await findNoiseBasedSpawnLocation(minSpawnDistance, maxSpawnDistance);
   
   // If no valid location found, return a random one as a fallback
   if (!location) {
@@ -49,7 +52,7 @@ function createInitialUnits(
     position: startCoords,
     level: 1,
     ownerUid: uid,
-    influenceRadius: TIER1_BASE_INFLUENCE
+    influenceRadius: tier1BaseInfluence
   };
   units.push(base);
   
@@ -145,30 +148,23 @@ export const getColony = onRequest(authenticatedHttpsOptions, async (req, res) =
 /**
  * Function to create a new colony
  */
-export const createColony = onRequest(authenticatedHttpsOptions, async (req, res) => {
+export const createColony = onCall({
+  region: functionConfig.region,
+  timeoutSeconds: functionConfig.extendedTimeoutSeconds,
+  memory: functionConfig.memory
+}, async (request) => {
   try {
-    // Authenticate the request and get the user ID
-    let uid: string;
-    try {
-      uid = await authenticateRequest(req);
-    } catch (authError) {
-      logger.error("Authentication error:", authError);
-      res.status(401).json({ 
-        success: false,
-        message: "Authentication failed"
-      });
-      return;
+    // Get the authenticated user ID
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'User must be signed in to create a colony');
     }
 
-    // Extract request data (only need name now, uid comes from auth token)
-    const { name } = req.body;
+    // Extract colony name from the request data
+    const { name } = request.data;
     
     if (!name) {
-      res.status(400).json({ 
-        success: false,
-        message: "Colony name is required"
-      });
-      return;
+      throw new HttpsError('invalid-argument', 'Colony name is required');
     }
     
     // Create a document reference with auto-generated ID
@@ -178,7 +174,7 @@ export const createColony = onRequest(authenticatedHttpsOptions, async (req, res
     const startCoordinates = await findSpawnLocation();
     
     // Generate initial tiles
-    const tiles = generateInitialTiles(colonyRef.id, uid, startCoordinates, TIER1_BASE_INFLUENCE);
+    const tiles = generateInitialTiles(colonyRef.id, uid, startCoordinates, tier1BaseInfluence);
     
     // Save tiles to Firestore in their own collection
     const tileIds = await saveTilesToFirestore(tiles);
@@ -200,17 +196,11 @@ export const createColony = onRequest(authenticatedHttpsOptions, async (req, res
       units,
       unplacedUnits,
       territoryScore: tiles.length,  // Initial score based on controlled tiles
-      visibilityRadius: BASE_VISIBILITY_RADIUS
-    };
-    
-    // Use the same Date object instead of serverTimestamp in emulator environment
-    // This avoids the "Cannot read properties of undefined (reading 'serverTimestamp')" error
-    const colonyForFirestore = {
-      ...colony
+      visibilityRadius: baseVisibilityRadius
     };
     
     // Save to Firestore
-    await colonyRef.set(colonyForFirestore);
+    await colonyRef.set(colony);
     
     // Create response object that includes both tileIds (for persistence) and tiles (for immediate use)
     const response: CreateColonyResponse = {
@@ -223,18 +213,25 @@ export const createColony = onRequest(authenticatedHttpsOptions, async (req, res
       units,
       unplacedUnits,
       territoryScore: tiles.length,
-      visibilityRadius: BASE_VISIBILITY_RADIUS
+      visibilityRadius: baseVisibilityRadius
     };
     
-    res.json({ 
+    return { 
       success: true,
       colony: response
-    });
+    };
   } catch (error) {
     logger.error("Error creating colony:", error);
-    res.status(500).json({ 
-      success: false,
-      message: "Error creating colony"
-    });
+    
+    // If the error is already an HttpsError, rethrow it
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    
+    // Otherwise, wrap it in an HttpsError
+    throw new HttpsError(
+      'internal',
+      error instanceof Error ? error.message : 'Error creating colony'
+    );
   }
 }); 
