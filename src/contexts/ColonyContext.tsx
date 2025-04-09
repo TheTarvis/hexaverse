@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { Colony, ColonyTile } from '@/types/colony';
 import { fetchUserColony, createColony, hasColony, fetchColonyById, fetchTilesForColony } from '@/services/colony';
@@ -26,6 +26,24 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
   const [isLoadingTiles, setIsLoadingTiles] = useState(false);
   const [hasExistingColony, setHasExistingColony] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Add a ref to track when colony was last loaded to prevent redundant fetches
+  const lastLoadTime = useRef<number>(0);
+  const FETCH_DEBOUNCE_TIME = 5000; // 5 seconds
+  
+  // Helper function to check if we should fetch colony data
+  const shouldFetchColony = () => {
+    const now = Date.now();
+    const timeSinceLastLoad = now - lastLoadTime.current;
+    
+    if (timeSinceLastLoad < FETCH_DEBOUNCE_TIME) {
+      console.log(`Skipping colony fetch - last loaded ${timeSinceLastLoad}ms ago`);
+      return false;
+    }
+    
+    lastLoadTime.current = now;
+    return true;
+  };
 
   // Load colony data when user changes
   useEffect(() => {
@@ -34,6 +52,11 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
         setColony(null);
         setHasExistingColony(false);
         setIsLoadingColony(false);
+        return;
+      }
+
+      // Skip if we just loaded colony data recently
+      if (!shouldFetchColony()) {
         return;
       }
 
@@ -163,9 +186,15 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
   const refreshColony = async (options?: { 
     silent?: boolean; 
     forceRefresh?: boolean;
-    keepLocalChanges?: boolean; // New option to preserve local changes
+    keepLocalChanges?: boolean; 
   }): Promise<void> => {
     if (!user) {
+      return;
+    }
+
+    // Force-refresh ignores the debounce timing
+    if (!options?.forceRefresh && !shouldFetchColony()) {
+      console.log('Skipping manual colony refresh due to recent fetch');
       return;
     }
 

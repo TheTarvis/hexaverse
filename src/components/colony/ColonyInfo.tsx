@@ -4,6 +4,11 @@ import { useColony } from '@/contexts/ColonyContext';
 export function ColonyInfo() {
   const { colony, isLoadingColony, error, refreshColony } = useColony();
 
+  // Handler for manual refresh that forces a fresh fetch
+  const handleRefresh = () => {
+    refreshColony({ forceRefresh: true });
+  };
+
   if (isLoadingColony) {
     return (
       <div className="p-4 bg-white dark:bg-zinc-800 rounded-xl shadow-md animate-pulse">
@@ -21,7 +26,7 @@ export function ColonyInfo() {
         <h3 className="font-bold mb-2">Error Loading Colony</h3>
         <p>{error}</p>
         <button 
-          onClick={() => refreshColony()} 
+          onClick={handleRefresh} 
           className="mt-2 px-3 py-1 bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200 rounded hover:bg-red-300 dark:hover:bg-red-700"
         >
           Retry
@@ -63,7 +68,7 @@ export function ColonyInfo() {
       </div>
       
       <button 
-        onClick={() => refreshColony()}
+        onClick={handleRefresh}
         className="mt-3 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800/40"
       >
         Refresh

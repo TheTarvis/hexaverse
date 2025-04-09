@@ -1,3 +1,12 @@
+## [v0.9.5] - 2025-04-20
+### Fixed
+- Optimized colony data fetching to prevent redundant API calls
+- Added debounce mechanism to the ColonyContext to avoid multiple fetches
+- Fixed issue where navigating to the colony page triggered unnecessary refreshes
+- Improved manual refresh by explicitly using forceRefresh option
+- Enhanced performance by skipping fetches within a 5-second window
+- Reduced Firestore reads for improved quota efficiency
+
 ## [v0.9.4] - 2025-04-19
 ### Fixed
 - Fixed critical bug where tiles would disappear after being added to the colony
