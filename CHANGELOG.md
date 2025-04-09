@@ -1,3 +1,20 @@
+## [v0.9.0] - 2025-04-15
+### Changed
+- Swapped single and double click actions for better usability
+- Single click now adds a new tile
+- Double click now shows tile details (if enabled)
+- Replaced fullscreen errors with non-intrusive toast notifications
+- Added toast notification system for success and error messages
+- Fixed error handling for tile addition operations
+- Improved error visibility with toast notifications
+- Removed success notifications for better UX when adding tiles
+
+## [v0.8.9] - 2025-04-14
+### Changed
+- Disabled tile details slide-up panel by default for improved user experience
+- Added new Debug Menu option to toggle tile details panel visibility
+- Fixed potential issues with tile selection when panel is disabled
+
 ## [v0.8.8] - 2025-04-13
 ### Changed
 - Optimized tile addition process to prevent full canvas redrawing

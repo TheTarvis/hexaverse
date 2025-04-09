@@ -17,6 +17,7 @@ interface DebugMenuProps {
     hexSize: number;
     colorScheme: string;
     fogDepth: number;
+    tileDetailsEnabled: boolean;
   };
   onDebugAction: (action: string, value?: any) => void;
 }
@@ -39,6 +40,12 @@ const debugOptions = [
     description: 'Change the color palette', 
     action: 'changeColorScheme', 
     icon: SwatchIcon 
+  },
+  { 
+    name: 'Tile Details', 
+    description: 'Toggle tile details slide-up panel', 
+    action: 'toggleTileDetails', 
+    icon: BugAntIcon 
   },
   { 
     name: 'Fog Depth', 
@@ -71,7 +78,7 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
         >
           <div className="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
             <div className="p-4">
-              {debugOptions.slice(0, 3).map((item) => (
+              {debugOptions.slice(0, 4).map((item) => (
                 <div 
                   key={item.name} 
                   className="group relative flex gap-x-6 rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
@@ -123,7 +130,8 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
                 Current settings: {debugState.wireframe ? 'Wireframe' : 'Solid'}, 
                 Size: {debugState.hexSize.toFixed(1)}, 
                 Colors: {debugState.colorScheme},
-                Fog: {debugState.fogDepth}
+                Fog: {debugState.fogDepth},
+                Details: {debugState.tileDetailsEnabled ? 'On' : 'Off'}
               </div>
             </div>
           </div>

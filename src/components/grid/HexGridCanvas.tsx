@@ -145,7 +145,20 @@ function HexagonMesh({
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     // Stop event propagation to prevent it from reaching Canvas
     event.stopPropagation()
-    console.log(`Clicked hex at cube coordinates: q=${q}, r=${r}, s=${s}, type=${type}`)
+    
+    // Only handle clicks for fog tiles (adding tiles)
+    if (!isFogTile || !onTileAdd) return;
+    
+    console.log(`Clicked fog tile at: q=${q}, r=${r}, s=${s}`);
+    
+    // Call the add tile handler
+    onTileAdd(q, r, s);
+  }
+
+  const handleDoubleClick = (event: ThreeEvent<MouseEvent>) => {
+    // Stop event propagation
+    event.stopPropagation();
+    console.log(`Double-clicked hex at cube coordinates: q=${q}, r=${r}, s=${s}, type=${type}`)
     
     // Call the selection handler with tile info
     onTileSelect({
@@ -155,18 +168,7 @@ function HexagonMesh({
       color,
       type: isFogTile ? 'fog' : type,
       resourceDensity
-    })
-  }
-
-  const handleDoubleClick = (event: ThreeEvent<MouseEvent>) => {
-    // Only handle double clicks for fog tiles
-    if (!isFogTile || !onTileAdd) return;
-    
-    event.stopPropagation();
-    console.log(`Double-clicked fog tile at: q=${q}, r=${r}, s=${s}`);
-    
-    // Call the add tile handler
-    onTileAdd(q, r, s);
+    });
   }
 
   // Determine material properties based on tile type

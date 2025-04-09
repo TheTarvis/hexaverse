@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { SlideUpPanel } from '@/components/slide-up-panel'
 import { useColony } from '@/contexts/ColonyContext'
+import { useToast } from '@/contexts/ToastContext'
 import { ColonyTile } from '@/types/colony'
 import { DebugMenu } from '@/components/grid/DebugMenu'
 import { HexGridCanvas } from '@/components/grid/HexGridCanvas'
@@ -25,12 +26,14 @@ interface SelectedTile {
 
 export function GridManager() {
   const { colony, refreshColony } = useColony();
+  const { showToast } = useToast();
   
   const [debugState, setDebugState] = useState({
     wireframe: false,
     hexSize: 1.2,
     colorScheme: 'type', // Default to type-based coloring
     fogDepth: 20, // Add fog depth to debug state
+    tileDetailsEnabled: false, // Disabled by default
   })
 
   // Calculate world coordinates for the target tile based on colony start coordinates
@@ -87,10 +90,12 @@ export function GridManager() {
           console.log('No colony tiles available');
           setTileMap({});
           setFogTiles([]); // Clear fog tiles if no colony
+          showToast('No colony tiles available. Please create a colony first.', 'error');
           setError('No colony tiles available. Please create a colony first.');
         }
       } catch (error) {
         console.error('Error loading grid data:', error);
+        showToast('Failed to load grid data', 'error');
         setError('Failed to load grid data');
       } finally {
         setLoading(false);
@@ -98,7 +103,7 @@ export function GridManager() {
     }
     
     loadGridData();
-  }, [colony?.tiles]); // Only depend on colony.tiles, not the entire colony object
+  }, [colony?.tiles, showToast]); // Added showToast to dependencies
   
   // Handle adding a tile to the colony
   const handleAddTile = useCallback(async (q: number, r: number, s: number) => {
@@ -126,34 +131,32 @@ export function GridManager() {
         );
         
         // Update colony data without triggering a full grid reload
-        // This operation updates colony.tileIds and colony.territoryScore in the background
-        // without causing a redraw of our tiles that we've already updated locally
-        refreshColony({ silent: true }).catch(err => console.error('Background colony refresh error:', err));
+        refreshColony({ silent: true }).catch(err => {
+          console.error('Background colony refresh error:', err);
+          showToast('Error refreshing colony data', 'error');
+        });
         
-        // Show success message - could be replaced with a toast notification
+        // Log success but don't show toast
         if (result.captured) {
           console.log(`Tile captured from another colony!`);
         } else {
           console.log(`New ${result.tile.type} tile added to your colony!`);
         }
       } else {
-        // Show error message
+        // Show error toast
         console.error(`Failed to add tile: ${result.message}`);
-        setError(result.message || "Failed to add tile");
-        
-        // Clear error after a few seconds
-        setTimeout(() => setError(null), 3000);
+        showToast(result.message || "Failed to add tile", 'error');
+        setError(null); // Clear any existing error
       }
     } catch (error) {
       console.error('Error adding tile:', error);
-      setError(error instanceof Error ? error.message : "An unexpected error occurred");
-      
-      // Clear error after a few seconds
-      setTimeout(() => setError(null), 3000);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      showToast(errorMessage, 'error');
+      setError(null); // Clear any existing error
     } finally {
       setAddingTile(false);
     }
-  }, [addingTile, refreshColony, setFogTiles]);
+  }, [addingTile, refreshColony, setFogTiles, showToast]); // Added showToast to dependencies
   
   const handleDebugAction = (action: string, value?: any) => {
     switch(action) {
@@ -179,12 +182,24 @@ export function GridManager() {
           setDebugState((prev) => ({ ...prev, fogDepth: value }));
         }
         break;
+      case 'toggleTileDetails': // Add case for toggling tile details
+        setDebugState((prev) => ({ ...prev, tileDetailsEnabled: !prev.tileDetailsEnabled }));
+        // If disabling and a tile is selected, close the panel
+        if (debugState.tileDetailsEnabled && selectedTile) {
+          setSelectedTile(null);
+        }
+        break;
     }
   }
 
   const handleTileSelect = (tile: SelectedTile) => {
     console.log('Setting selected tile:', tile);
-    setSelectedTile(tile);
+    // Only set the selected tile if tile details are enabled
+    if (debugState.tileDetailsEnabled) {
+      setSelectedTile(tile);
+    } else {
+      console.log('Tile details are disabled. Enable in debug menu to see details.');
+    }
   }
 
   const closePanel = () => {
@@ -199,15 +214,9 @@ export function GridManager() {
         </div>
       )}
       
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-red-100 bg-opacity-40 z-10">
-          <div className="text-lg font-medium text-red-700">{error}</div>
-        </div>
-      )}
-      
-      {/* Enhanced SlideUpPanel with more tile information */}
+      {/* Enhanced SlideUpPanel with more tile information - only show if enabled */}
       <SlideUpPanel
-        isOpen={selectedTile !== null}
+        isOpen={selectedTile !== null && debugState.tileDetailsEnabled}
         onClose={closePanel}
         title="Tile Information"
         maxWidth="lg"

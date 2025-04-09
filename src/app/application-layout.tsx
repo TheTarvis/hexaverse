@@ -180,7 +180,7 @@ export function ApplicationLayout({
                   <SparklesIcon/>
                   <SidebarLabel>
                     Changelog
-                    <div className="text-xs text-gray-500 dark:text-gray-400">v0.8.5</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">v0.9.0</div>
                   </SidebarLabel>
                 </SidebarItem>
               </SidebarSection>

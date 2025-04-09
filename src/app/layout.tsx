@@ -5,6 +5,7 @@ import { getEvents } from '@/data'
 import { ApplicationLayout } from './application-layout'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ColonyProvider } from '@/contexts/ColonyContext'
+import { ToastProvider } from '@/contexts/ToastContext'
 
 export const metadata: Metadata = {
   title: {
@@ -39,7 +40,9 @@ export default async function RootLayout({
       <body className={inter.variable}>
         <AuthProvider>
           <ColonyProvider>
-            <ApplicationLayout events={events}>{children}</ApplicationLayout>
+            <ToastProvider>
+              <ApplicationLayout events={events}>{children}</ApplicationLayout>
+            </ToastProvider>
           </ColonyProvider>
         </AuthProvider>
       </body>

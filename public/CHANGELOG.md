@@ -1,3 +1,45 @@
+## [v0.9.0] - 2025-04-15
+### Changed
+- Swapped single and double click actions for better usability
+- Single click now adds a new tile
+- Double click now shows tile details (if enabled)
+- Replaced fullscreen errors with non-intrusive toast notifications
+- Added toast notification system for success and error messages
+- Fixed error handling for tile addition operations
+- Improved error visibility with toast notifications
+- Removed success notifications for better UX when adding tiles
+
+## [v0.8.9] - 2025-04-14
+### Changed
+- Disabled tile details slide-up panel by default for improved user experience
+- Added new Debug Menu option to toggle tile details panel visibility
+- Fixed potential issues with tile selection when panel is disabled
+
+## [v0.8.8] - 2025-04-13
+### Changed
+- Optimized tile addition process to prevent full canvas redrawing
+- Implemented silent colony refresh to update metadata without UI reload
+- Replaced intrusive full-screen overlay with a small unobtrusive indicator
+- Improved performance by updating state locally before background synchronization
+- Enhanced fog tile calculation to only recalculate when tileMap changes
+
+## [v0.8.7] - 2025-04-12
+### Added
+- Implemented tile addition functionality allowing players to expand their colony
+- Added tile capture mechanic to take control of tiles from other colonies
+- Created cloud functions using Firebase callable functions for colony expansion
+- Added double-click interaction to add or capture tiles
+- Implemented adjacency verification to ensure colony continuity
+- Enhanced the fog of war system to show available expansion tiles
+
+## [v0.8.6] - 2025-04-11
+### Added
+- Implemented fog of war system around colony tiles
+- Added adjustable fog depth control in Debug Menu
+- Created utility functions for hexagonal grid operations
+- Enhanced tile display with semi-transparent fog tiles
+- Improved performance with optimized fog calculation
+
 ## [v0.8.5] - 2025-04-10
 ### Added
 - Created a dedicated Changelog page to display version history
