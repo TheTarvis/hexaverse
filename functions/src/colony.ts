@@ -1,7 +1,7 @@
 import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import { Colony, CreateColonyResponse } from "./types/colony";
+import { Colony } from "./types/colony";
 import { Unit, UnitType, Base, Ship, UnplacedUnit } from "./types/units";
 import { authenticatedHttpsOptions, authenticateRequest } from "./middleware/auth";
 import { findSpawnLocation as findNoiseBasedSpawnLocation } from "./utils/colonyGeneration";

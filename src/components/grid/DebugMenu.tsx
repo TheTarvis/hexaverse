@@ -16,7 +16,7 @@ interface DebugMenuProps {
     wireframe: boolean;
     hexSize: number;
     colorScheme: string;
-    fogDepth: number;
+    fogDistance: number;
     tileDetailsEnabled: boolean;
   };
   onDebugAction: (action: string, value?: any) => void;
@@ -114,12 +114,12 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
                       min="0"
                       max="30"
                       step="1"
-                      value={debugState.fogDepth}
+                      value={debugState.fogDistance}
                       onChange={handleFogDepthChange}
                       className="w-full"
                     />
                     <span className="ml-2 text-sm text-gray-600 min-w-[2rem] text-right">
-                      {debugState.fogDepth}
+                      {debugState.fogDistance}
                     </span>
                   </div>
                 </div>
@@ -130,7 +130,7 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
                 Current settings: {debugState.wireframe ? 'Wireframe' : 'Solid'}, 
                 Size: {debugState.hexSize.toFixed(1)}, 
                 Colors: {debugState.colorScheme},
-                Fog: {debugState.fogDepth},
+                Fog: {debugState.fogDistance},
                 Details: {debugState.tileDetailsEnabled ? 'On' : 'Off'}
               </div>
             </div>

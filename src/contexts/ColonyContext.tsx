@@ -2,16 +2,18 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
-import { Colony } from '@/types/colony';
-import { fetchUserColony, createColony, hasColony, fetchColonyById } from '@/services/colony';
+import { Colony, ColonyTile } from '@/types/colony';
+import { fetchUserColony, createColony, hasColony, fetchColonyById, fetchTilesForColony } from '@/services/colony';
 
 interface ColonyContextType {
   colony: Colony | null;
   isLoadingColony: boolean;
   hasColony: boolean;
   createNewColony: (name: string, color?: string) => Promise<Colony>;
-  refreshColony: (options?: { silent?: boolean }) => Promise<void>;
+  refreshColony: (options?: { silent?: boolean; forceRefresh?: boolean; keepLocalChanges?: boolean }) => Promise<void>;
+  loadTiles: (options?: { forceRefresh?: boolean; specificTileIds?: string[] }) => Promise<void>;
   fetchColonyById: (colonyId: string) => Promise<Colony>;
+  setColony: React.Dispatch<React.SetStateAction<Colony | null>>;
   error: string | null;
 }
 
@@ -21,6 +23,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [colony, setColony] = useState<Colony | null>(null);
   const [isLoadingColony, setIsLoadingColony] = useState(false);
+  const [isLoadingTiles, setIsLoadingTiles] = useState(false);
   const [hasExistingColony, setHasExistingColony] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,9 +48,53 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
 
         if (userHasColony) {
           console.log("Fetching colony data for user:", user.uid);
-          const colonyData = await fetchUserColony(user.uid);
-          console.log('Colony data loaded:', colonyData);
+          
+          // First, get the colony metadata without tiles for faster initial state setup
+          const colonyData = await fetchUserColony(user.uid, { 
+            forceRefresh: false,
+            skipTiles: true // Skip tiles for faster initial load
+          });
+          
+          if (!colonyData) {
+            console.log("No colony data returned despite hasColony being true");
+            setColony(null);
+            setError("Failed to load colony data");
+            return;
+          }
+          
+          console.log('Colony metadata loaded:', colonyData);
+          
+          // Set initial colony metadata first
           setColony(colonyData);
+          
+          // Only proceed to load tiles if we have tileIds
+          if (colonyData.tileIds && colonyData.tileIds.length > 0) {
+            console.log(`Loading ${colonyData.tileIds.length} tiles for colony`);
+            
+            try {
+              // Load all tiles directly to ensure they're available
+              const tiles = await fetchTilesForColony(colonyData.tileIds);
+              
+              if (tiles && tiles.length > 0) {
+                console.log(`Loaded ${tiles.length} tiles for the colony`);
+                // Update colony with all tiles
+                setColony(prev => {
+                  if (!prev) return colonyData;
+                  return {
+                    ...prev,
+                    tiles: tiles
+                  };
+                });
+              } else {
+                console.warn(`No tiles were loaded despite having ${colonyData.tileIds.length} tileIds`);
+              }
+            } catch (tileError) {
+              console.error('Error loading colony tiles:', tileError);
+              // Don't set error state, we already have the colony metadata
+            }
+          } else {
+            console.log("Colony has no tileIds");
+          }
         } else {
           console.log("User has no colony yet");
           setColony(null);
@@ -60,7 +107,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
         setIsLoadingColony(false);
       }
     }
-
+    
     // Only attempt to load colony if we have a valid user
     if (user && user.uid) {
       loadUserColony();
@@ -113,7 +160,11 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const refreshColony = async (options?: { silent?: boolean }): Promise<void> => {
+  const refreshColony = async (options?: { 
+    silent?: boolean; 
+    forceRefresh?: boolean;
+    keepLocalChanges?: boolean; // New option to preserve local changes
+  }): Promise<void> => {
     if (!user) {
       return;
     }
@@ -125,20 +176,114 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const colonyData = await fetchUserColony(user.uid);
-      setColony(prev => {
-        // If this is a silent refresh and we have previous data, 
-        // only update metadata like tileIds and territoryScore,
-        // but keep the existing tiles array to prevent unnecessary reloads
-        if (options?.silent && prev && prev.tiles && colonyData) {
-          return {
-            ...colonyData,
-            tiles: prev.tiles
-          };
-        }
-        return colonyData;
+      // Get the current colony data to compare later
+      const currentColony = colony;
+      const currentTiles = currentColony?.tiles || [];
+      
+      // For refresh operations, we optimize by:
+      // 1. By default, force refresh for metadata but not tiles
+      // 2. Skip loading tiles and use existing tiles to prevent flicker
+      const colonyData = await fetchUserColony(user.uid, { 
+        forceRefresh: options?.forceRefresh !== false, // Default to true
+        skipTiles: true // Skip loading tiles immediately
       });
-      setHasExistingColony(colonyData !== null);
+      
+      if (!colonyData) {
+        setColony(null);
+        setHasExistingColony(false);
+        return;
+      }
+      
+      // Build a map of current tiles by ID and coordinates for fast lookup
+      const currentTileMap = new Map<string, ColonyTile>();
+      const currentTileCoordMap = new Map<string, ColonyTile>();
+      
+      currentTiles.forEach(tile => {
+        // Map by ID
+        if (tile.id) {
+          currentTileMap.set(tile.id, tile);
+        }
+        
+        // Map by coordinates
+        const coordKey = `${tile.q},${tile.r},${tile.s}`;
+        currentTileCoordMap.set(coordKey, tile);
+      });
+      
+      // Build a list of tiles to keep, merging current and new
+      let tilesToUse: ColonyTile[] = [];
+      
+      // If we want to keep local changes, merge current tiles with the tileIds from the new data
+      if (options?.keepLocalChanges !== false && currentTiles.length > 0) {
+        console.log(`Preserving ${currentTiles.length} local tiles during refresh`);
+        
+        // First, add all current tiles that are in the new tileIds list
+        if (colonyData.tileIds && colonyData.tileIds.length > 0) {
+          tilesToUse = currentTiles.filter(tile => 
+            tile.id && colonyData.tileIds.includes(tile.id)
+          );
+          
+          // Add any tiles that match by coordinates if they don't have an ID
+          const tilesToAdd = currentTiles.filter(tile => 
+            !tile.id && colonyData.tileIds.some(id => {
+              // Extract coordinates from tile ID if possible
+              const parts = id.split('_');
+              if (parts.length >= 3) {
+                const q = parseInt(parts[0], 10);
+                const r = parseInt(parts[1], 10);
+                const s = parseInt(parts[2], 10);
+                return tile.q === q && tile.r === r && tile.s === s;
+              }
+              return false;
+            })
+          );
+          
+          tilesToUse = [...tilesToUse, ...tilesToAdd];
+          
+          // If we're still missing tiles from the new tileIds, we'll load them later
+          console.log(`Kept ${tilesToUse.length} tiles out of ${colonyData.tileIds.length} total tileIds`);
+        }
+      } else if (colonyData.tiles && colonyData.tiles.length > 0) {
+        // Use the new tiles if available
+        tilesToUse = colonyData.tiles;
+      } else if (currentTiles.length > 0) {
+        // Fall back to current tiles as a last resort to prevent flicker
+        tilesToUse = currentTiles;
+      }
+      
+      // Update the colony state with merged tiles
+      setColony(prev => {
+        // If nothing has changed, don't trigger a re-render
+        if (prev && 
+            prev.id === colonyData.id && 
+            prev.tileIds.length === colonyData.tileIds.length &&
+            prev.tiles?.length === tilesToUse.length &&
+            JSON.stringify(prev.tileIds.sort()) === JSON.stringify(colonyData.tileIds.sort())) {
+          // No meaningful change, keep existing state to prevent unnecessary renders
+          return prev;
+        }
+        
+        return {
+          ...colonyData,
+          tiles: tilesToUse
+        };
+      });
+      
+      setHasExistingColony(true);
+      
+      // If we're missing any tiles, load them in the background
+      const missingTileIds = colonyData.tileIds.filter(id => 
+        !tilesToUse.some(tile => tile.id === id)
+      );
+      
+      if (missingTileIds.length > 0) {
+        console.log(`Loading ${missingTileIds.length} missing tiles in the background`);
+        loadTiles({ 
+          forceRefresh: options?.forceRefresh !== false,
+          specificTileIds: missingTileIds
+        }).catch(err => {
+          console.error('Error loading missing tiles during refresh:', err);
+        });
+      }
     } catch (err) {
       console.error('Error refreshing colony:', err);
       setError('Failed to refresh colony data');
@@ -148,6 +293,116 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       }
     }
   };
+  
+  /**
+   * Load tiles for the current colony with various optimization options
+   */
+  const loadTiles = async (options?: { 
+    forceRefresh?: boolean;
+    specificTileIds?: string[];
+  }): Promise<void> => {
+    if (!colony || !colony.tileIds.length) {
+      return;
+    }
+    
+    // If we're loading specific tiles, check if they already exist in the colony
+    if (options?.specificTileIds && colony.tiles?.length) {
+      const existingTileIds = colony.tiles.map(tile => tile.id);
+      const missingTileIds = options.specificTileIds.filter(id => !existingTileIds.includes(id));
+      
+      // If all requested tiles are already loaded, no need to fetch again
+      if (missingTileIds.length === 0) {
+        console.log('All requested tiles already exist in colony, skipping fetch');
+        return;
+      }
+      
+      // Update specificTileIds to only include missing tiles
+      options.specificTileIds = missingTileIds;
+    }
+    
+    setIsLoadingTiles(true);
+    
+    try {
+      const tiles = await fetchTilesForColony(
+        colony.tileIds,
+        {
+          forceRefresh: options?.forceRefresh,
+          onlyTileIds: options?.specificTileIds
+        }
+      );
+      
+      if (tiles.length > 0) {
+        setColony(prev => {
+          if (!prev) return prev;
+          
+          // If we're loading specific tiles, merge them with existing tiles
+          if (options?.specificTileIds && prev.tiles) {
+            // Create a map of existing tiles for fast lookup
+            const existingTileMap = new Map(
+              prev.tiles.map(tile => [tile.id, tile])
+            );
+            
+            // Update existing tiles with new ones
+            tiles.forEach(tile => {
+              if (tile.id) {
+                existingTileMap.set(tile.id, tile);
+              } else {
+                // If no ID, try to match by coordinates
+                const coordKey = `${tile.q},${tile.r},${tile.s}`;
+                const existingTileIndex = prev.tiles!.findIndex(t => 
+                  t.q === tile.q && t.r === tile.r && t.s === tile.s
+                );
+                
+                if (existingTileIndex >= 0) {
+                  // Don't update tiles that already exist without an ID - 
+                  // these might be newly added tiles that haven't synced yet
+                  console.log(`Preserving existing tile at ${coordKey}`);
+                } else {
+                  existingTileMap.set(coordKey, tile);
+                }
+              }
+            });
+            
+            return {
+              ...prev,
+              tiles: Array.from(existingTileMap.values())
+            };
+          }
+          
+          // For full refreshes, replace all tiles but check for unsynced new tiles
+          const newTiles = [...tiles];
+          
+          // Look for tiles in prev.tiles that aren't in the new tiles array
+          // These could be tiles that were just added but haven't synced with the server yet
+          if (prev.tiles) {
+            prev.tiles.forEach(prevTile => {
+              // Check if this tile exists in the new tiles array
+              const exists = newTiles.some(newTile => 
+                (prevTile.id && newTile.id && prevTile.id === newTile.id) || 
+                (prevTile.q === newTile.q && prevTile.r === newTile.r && prevTile.s === newTile.s)
+              );
+              
+              // If it doesn't exist in new tiles, it might be a newly added tile
+              // Add it to preserve local changes
+              if (!exists) {
+                console.log(`Preserving locally added tile at q=${prevTile.q}, r=${prevTile.r}, s=${prevTile.s}`);
+                newTiles.push(prevTile);
+              }
+            });
+          }
+          
+          return {
+            ...prev,
+            tiles: newTiles
+          };
+        });
+      }
+    } catch (err) {
+      console.error('Error loading tiles:', err);
+    } finally {
+      setIsLoadingTiles(false);
+    }
+  };
 
   const value = {
     colony,
@@ -155,7 +410,9 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     hasColony: hasExistingColony,
     createNewColony,
     refreshColony,
+    loadTiles,
     fetchColonyById: getColonyById,
+    setColony,
     error
   };
 

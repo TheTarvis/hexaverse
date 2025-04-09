@@ -29,6 +29,53 @@ const createColonyFunction = httpsCallable<
   { success: boolean; colony: CreateColonyResponse; message?: string }
 >(functions, 'createColony');
 
+// Cache configuration
+const COLONY_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes in milliseconds
+const TILES_CACHE_EXPIRY = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+// Cache keys
+const getColonyCacheKey = (uid: string) => `colony_${uid}`;
+const getTilesCacheKey = (tileIds: string[]) => `tiles_${tileIds.sort().join('_')}`;
+
+// Cache utility functions
+interface CachedData<T> {
+  data: T;
+  timestamp: number;
+}
+
+function getFromCache<T>(key: string, expiryTime: number): T | null {
+  try {
+    const cachedItem = localStorage.getItem(key);
+    if (!cachedItem) return null;
+    
+    const { data, timestamp }: CachedData<T> = JSON.parse(cachedItem);
+    const now = Date.now();
+    
+    if (now - timestamp > expiryTime) {
+      // Cache expired
+      localStorage.removeItem(key);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.warn('Error reading from cache:', error);
+    return null;
+  }
+}
+
+function saveToCache<T>(key: string, data: T): void {
+  try {
+    const cacheItem: CachedData<T> = {
+      data,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(cacheItem));
+  } catch (error) {
+    console.warn('Error saving to cache:', error);
+  }
+}
+
 /**
  * Get authentication token for API requests
  * @returns The ID token or throws error if not authenticated
@@ -45,11 +92,46 @@ async function getAuthToken(): Promise<string> {
 /**
  * Fetch a user's colony from Firestore
  * @param uid - The user's Firebase UID
+ * @param options - Optional parameters for controlling fetch behavior
  * @returns Colony data or null if not found
  */
-export async function fetchUserColony(uid: string): Promise<Colony | null> {
+export async function fetchUserColony(
+  uid: string, 
+  options?: { 
+    forceRefresh?: boolean;
+    skipTiles?: boolean; // Skip loading tiles initially for faster initial load
+  }
+): Promise<Colony | null> {
   if (!uid) {
     throw new Error('User ID is required to fetch colony');
+  }
+  
+  const cacheKey = getColonyCacheKey(uid);
+  
+  // Check cache first if not forcing refresh
+  if (!options?.forceRefresh && typeof window !== 'undefined') {
+    const cachedColony = getFromCache<Colony>(cacheKey, COLONY_CACHE_EXPIRY);
+    if (cachedColony) {
+      console.log(`Using cached colony data for user: ${uid}`);
+      
+      // If we need to refresh tiles, do that separately while still using cached colony data
+      if (options?.forceRefresh && cachedColony.tileIds?.length) {
+        // Start loading tiles in the background
+        fetchTilesForColony(cachedColony.tileIds, { 
+          forceRefresh: true
+        }).then(tiles => {
+          // Update the cache with new tiles
+          if (tiles.length > 0) {
+            cachedColony.tiles = tiles;
+            saveToCache(cacheKey, cachedColony);
+          }
+        }).catch(err => {
+          console.error('Background tile refresh failed:', err);
+        });
+      }
+      
+      return cachedColony;
+    }
   }
   
   try {
@@ -77,6 +159,7 @@ export async function fetchUserColony(uid: string): Promise<Colony | null> {
       id: colonyDoc.id,
       uid: colonyData.uid,
       name: colonyData.name,
+      color: colonyData.color,
       createdAt,
       startCoordinates: colonyData.startCoordinates,
       tileIds: colonyData.tileIds || [],
@@ -86,8 +169,15 @@ export async function fetchUserColony(uid: string): Promise<Colony | null> {
       visibilityRadius: colonyData.visibilityRadius || 0
     };
     
-    // Load tiles for the colony
-    colony.tiles = await fetchTilesForColony(colony.tileIds);
+    // Load tiles for the colony if not skipped
+    if (!options?.skipTiles && colony.tileIds.length > 0) {
+      colony.tiles = await fetchTilesForColony(colony.tileIds);
+    }
+    
+    // Save to cache
+    if (typeof window !== 'undefined') {
+      saveToCache(cacheKey, colony);
+    }
     
     return colony;
   } catch (error) {
@@ -99,10 +189,35 @@ export async function fetchUserColony(uid: string): Promise<Colony | null> {
 /**
  * Fetch tiles for a colony by their IDs
  * @param tileIds - Array of tile IDs to fetch
+ * @param options - Optional parameters for controlling fetch behavior
  * @returns Array of tile objects
  */
-export async function fetchTilesForColony(tileIds: string[]): Promise<ColonyTile[]> {
+export async function fetchTilesForColony(
+  tileIds: string[], 
+  options?: { 
+    forceRefresh?: boolean;
+    onlyTileIds?: string[]; // Only fetch these specific tiles (subset of tileIds)
+  }
+): Promise<ColonyTile[]> {
   if (!tileIds.length) return [];
+  
+  // If onlyTileIds is specified, filter the tileIds list
+  const tileIdsToFetch = options?.onlyTileIds 
+    ? tileIds.filter(id => options.onlyTileIds!.includes(id))
+    : tileIds;
+    
+  if (!tileIdsToFetch.length) return [];
+  
+  const cacheKey = getTilesCacheKey(tileIdsToFetch);
+  
+  // Check cache first if not forcing refresh
+  if (!options?.forceRefresh && typeof window !== 'undefined') {
+    const cachedTiles = getFromCache<ColonyTile[]>(cacheKey, TILES_CACHE_EXPIRY);
+    if (cachedTiles) {
+      console.log(`Using ${cachedTiles.length} cached tiles`);
+      return cachedTiles;
+    }
+  }
   
   try {
     const tiles: ColonyTile[] = [];
@@ -111,14 +226,19 @@ export async function fetchTilesForColony(tileIds: string[]): Promise<ColonyTile
     // Firestore can only handle batches of 10 in where in queries
     const batchSize = 10;
     
-    for (let i = 0; i < tileIds.length; i += batchSize) {
-      const batch = tileIds.slice(i, i + batchSize);
+    for (let i = 0; i < tileIdsToFetch.length; i += batchSize) {
+      const batch = tileIdsToFetch.slice(i, i + batchSize);
       const q = query(tilesRef, where('id', 'in', batch));
       const querySnapshot = await getDocs(q);
       
       querySnapshot.forEach(doc => {
         tiles.push(doc.data() as ColonyTile);
       });
+    }
+    
+    // Cache all tiles we fetched
+    if (typeof window !== 'undefined' && tiles.length > 0) {
+      saveToCache(cacheKey, tiles);
     }
     
     return tiles;
@@ -234,5 +354,63 @@ export async function hasColony(uid: string): Promise<boolean> {
   } catch (error) {
     console.error('Error checking if user has colony:', error);
     return false;
+  }
+}
+
+/**
+ * Invalidate colony cache for a specific user
+ * Use this when colony data changes from server-side events
+ * @param uid User ID to invalidate cache for
+ */
+export function invalidateColonyCache(uid: string): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const cacheKey = getColonyCacheKey(uid);
+    localStorage.removeItem(cacheKey);
+    console.log(`Invalidated colony cache for user: ${uid}`);
+  } catch (error) {
+    console.warn('Error invalidating colony cache:', error);
+  }
+}
+
+/**
+ * Invalidate tile cache for specific tile IDs
+ * Use this when tile data changes from server-side events
+ * @param tileIds IDs of tiles to invalidate
+ */
+export function invalidateTileCache(tileIds: string[]): void {
+  if (typeof window === 'undefined' || !tileIds.length) return;
+  
+  try {
+    // Since we don't know all the exact cache keys (which depend on combinations),
+    // iterate through localStorage keys and clear any that contain these tile IDs
+    const keys: string[] = [];
+    
+    // Get all localStorage keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('tiles_')) {
+        keys.push(key);
+      }
+    }
+    
+    // Check if any keys contain the tile IDs to invalidate
+    const sortedTileIds = tileIds.sort();
+    const keysToRemove = keys.filter(key => {
+      // Check if this key contains any of the tile IDs we want to invalidate
+      return sortedTileIds.some(tileId => key.includes(tileId));
+    });
+    
+    // Remove the keys
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    
+    if (keysToRemove.length > 0) {
+      console.log(`Invalidated ${keysToRemove.length} tile cache entries`);
+    }
+  } catch (error) {
+    console.warn('Error invalidating tile cache:', error);
   }
 } 

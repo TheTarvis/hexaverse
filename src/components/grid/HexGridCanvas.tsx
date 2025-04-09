@@ -60,8 +60,6 @@ function getTileColor(
   fogDistance?: number, 
   colonyColor?: string
 ): string {
-  console.log('colonyColor', colonyColor)
-  console.log('fogDistance', fogDistance)
   // Enhanced fog tile coloring based on distance
   if (type === 'fog' && fogDistance !== undefined) {
     // Calculate the brightness based on fog distance

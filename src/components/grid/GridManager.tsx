@@ -25,14 +25,14 @@ interface SelectedTile {
 }
 
 export function GridManager() {
-  const { colony, refreshColony } = useColony();
+  const { colony, refreshColony, setColony } = useColony();
   const { showToast } = useToast();
   
   const [debugState, setDebugState] = useState({
     wireframe: false,
     hexSize: 1.2,
     colorScheme: 'type', // Default to type-based coloring
-    fogDepth: 20, // Add fog depth to debug state
+    fogDistance: 5, // Add fog distance to debug state
     tileDetailsEnabled: false, // Disabled by default
   })
 
@@ -63,47 +63,109 @@ export function GridManager() {
   useEffect(() => {
     if (Object.keys(tileMap).length > 0) {
       // Find fog tiles based on current depth
-      const fogTilesList = findFogTiles(tileMap, debugState.fogDepth);
-      console.log(`Found ${fogTilesList.length} potential fog tiles with depth ${debugState.fogDepth}`);
+      const fogTilesList = findFogTiles(tileMap, debugState.fogDistance);
+      console.log(`Found ${fogTilesList.length} potential fog tiles with depth ${debugState.fogDistance}`);
       setFogTiles(fogTilesList);
     }
-  }, [tileMap, debugState.fogDepth]); // TODO TW: Figure out this warning.
+  }, [tileMap, debugState.fogDistance]); // TODO TW: Figure out this warning.
 
   // Load the initial grid data when colony tiles change
   useEffect(() => {
     async function loadGridData() {
       try {
-        setLoading(true);
+        // Don't set loading to true if we already have tiles - this prevents flickering
+        const hasExistingTiles = Object.keys(tileMap).length > 0;
+        if (!hasExistingTiles) {
+          setLoading(true);
+        }
         
-        if (colony && colony.tiles && colony.tiles.length > 0) {
-          console.log(`Loading ${colony.tiles.length} tiles from colony`);
-          
-          const tileMapData: TileMap = {};
-          colony.tiles.forEach((tile) => {
-            const key = coordsToKey(tile.q, tile.r, tile.s);
-            tileMapData[key] = tile;
-          });
-          
-          setTileMap(tileMapData); // This triggers the fog calculation useEffect
-          setError(null);
+        if (colony) {
+          if (colony.tiles && colony.tiles.length > 0) {
+            console.log(`Loading ${colony.tiles.length} tiles from colony`);
+            
+            // Create a map of all new tiles
+            const newTileMap: TileMap = {};
+            
+            // To ensure we don't lose our newly added tiles, merge with existing tileMap
+            colony.tiles.forEach((tile) => {
+              const key = coordsToKey(tile.q, tile.r, tile.s);
+              newTileMap[key] = tile;
+            });
+            
+            // Only update state if we actually have changes
+            setTileMap(prevTileMap => {
+              // Compare if we have the same keys to avoid unnecessary rerenders
+              const prevKeys = Object.keys(prevTileMap);
+              const newKeys = Object.keys(newTileMap);
+              
+              if (prevKeys.length !== newKeys.length || 
+                  newKeys.some(key => !prevTileMap[key])) {
+                // We have different keys, so update the map
+                return newTileMap;
+              }
+              
+              // Check if any tiles have different data
+              const hasChanges = newKeys.some(key => {
+                const prevTile = prevTileMap[key];
+                const newTile = newTileMap[key];
+                return JSON.stringify(prevTile) !== JSON.stringify(newTile);
+              });
+              
+              return hasChanges ? newTileMap : prevTileMap;
+            });
+            
+            setError(null);
+          } else if (colony.tileIds && colony.tileIds.length > 0) {
+            // We have a colony with tileIds but tiles aren't loaded yet
+            // Keep loading state true and don't show an error
+            console.log(`Colony has ${colony.tileIds.length} tiles, but they aren't loaded yet`);
+            setError(null);
+            // Loading state remains true until tiles are loaded
+          } else {
+            // Only show the "No colony tiles" error if we've finished loading and there are no tileIds
+            console.log('Colony exists but has no tiles');
+            
+            // Keep existing tiles if we have them during reload
+            if (!hasExistingTiles) {
+              setTileMap({});
+              setFogTiles([]); // Clear fog tiles if no colony
+            }
+            
+            setError('No colony tiles available. Please create a colony first.');
+            setLoading(false);
+          }
+        } else if (loading && colony === null) {
+          // Colony is still loading or being checked, don't show an error yet
+          console.log('Waiting for colony data to load...');
         } else {
-          console.log('No colony tiles available');
+          // Colony is definitely not available (finished loading and is null)
+          console.log('No colony available');
           setTileMap({});
-          setFogTiles([]); // Clear fog tiles if no colony
-          showToast('No colony tiles available. Please create a colony first.', 'error');
-          setError('No colony tiles available. Please create a colony first.');
+          setFogTiles([]);
+          setError('No colony available. Please create a colony first.');
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error loading grid data:', error);
-        showToast('Failed to load grid data', 'error');
         setError('Failed to load grid data');
-      } finally {
         setLoading(false);
+      } finally {
+        // Only set loading to false if we have tiles or we hit an error condition
+        if (Object.keys(tileMap).length > 0 || error) {
+          setLoading(false);
+        }
       }
     }
     
     loadGridData();
-  }, [colony?.tiles, showToast]); // Added showToast to dependencies
+  }, [colony, loading, tileMap, error]); // Added tileMap as a dependency to properly handle changes
+  
+  // Show toast only when we have a confirmed error, not during loading
+  useEffect(() => {
+    if (error) {
+      showToast(error, 'error');
+    }
+  }, [error, showToast]);
   
   // Handle adding a tile to the colony
   const handleAddTile = useCallback(async (q: number, r: number, s: number) => {
@@ -116,13 +178,15 @@ export function GridManager() {
       const result = await addTile(q, r, s);
       
       if (result.success && result.tile) {
+        const newTile = result.tile as ColonyTile;
+        const tileKey = coordsToKey(q, r, s);
+        
         // Add the new tile to the local tile map immediately for immediate feedback
+        // This needs to happen before we update the colony
         setTileMap(prevTileMap => {
-          const key = coordsToKey(q, r, s);
-          return {
-            ...prevTileMap,
-            [key]: result.tile as ColonyTile
-          };
+          const updatedMap = { ...prevTileMap };
+          updatedMap[tileKey] = newTile;
+          return updatedMap;
         });
         
         // Remove this tile from fog tiles since it's now part of the colony
@@ -130,11 +194,50 @@ export function GridManager() {
           prevFogTiles.filter(tile => !(tile.q === q && tile.r === r && tile.s === s))
         );
         
-        // Update colony data without triggering a full grid reload
-        refreshColony({ silent: true }).catch(err => {
-          console.error('Background colony refresh error:', err);
-          showToast('Error refreshing colony data', 'error');
-        });
+        // Clone the current colony and update it directly to prevent race conditions
+        // and ensure consistency between grid and colony data
+        if (colony) {
+          // This is a separate update from the local tileMap update
+          // to ensure both state objects are consistent
+          setColony(prevColony => {
+            if (!prevColony) return prevColony;
+            
+            // Clone the colony to avoid mutation
+            const updatedColony = { ...prevColony };
+            
+            // Ensure tileIds array exists
+            if (!updatedColony.tileIds) {
+              updatedColony.tileIds = [];
+            }
+            
+            // Ensure tiles array exists
+            if (!updatedColony.tiles) {
+              updatedColony.tiles = [];
+            }
+            
+            // Add the new tile ID if it doesn't already exist
+            if (!updatedColony.tileIds.includes(newTile.id)) {
+              updatedColony.tileIds = [...updatedColony.tileIds, newTile.id];
+            }
+            
+            // Check if the tile already exists in the tiles array
+            const existingTileIndex = updatedColony.tiles.findIndex(
+              t => t.id === newTile.id || (t.q === newTile.q && t.r === newTile.r && t.s === newTile.s)
+            );
+            
+            if (existingTileIndex >= 0) {
+              // Replace the existing tile
+              const updatedTiles = [...updatedColony.tiles];
+              updatedTiles[existingTileIndex] = newTile;
+              updatedColony.tiles = updatedTiles;
+            } else {
+              // Add the new tile
+              updatedColony.tiles = [...updatedColony.tiles, newTile];
+            }
+            
+            return updatedColony;
+          });
+        }
         
         // Log success but don't show toast
         if (result.captured) {
@@ -142,6 +245,9 @@ export function GridManager() {
         } else {
           console.log(`New ${result.tile.type} tile added to your colony!`);
         }
+        
+        // We don't need to refresh the colony as our direct updates are sufficient
+        // and the background refresh was causing issues with tiles disappearing
       } else {
         // Show error toast
         console.error(`Failed to add tile: ${result.message}`);
@@ -156,7 +262,7 @@ export function GridManager() {
     } finally {
       setAddingTile(false);
     }
-  }, [addingTile, refreshColony, setFogTiles, showToast]); // Remove colony as it's not used directly
+  }, [addingTile, colony, refreshColony, setColony, setFogTiles, showToast]); // Added colony back as a dependency
   
   const handleDebugAction = (action: string, value?: any) => {
     switch(action) {
@@ -274,7 +380,17 @@ export function GridManager() {
         </div>
       )}
       
-      {/* Only render the Canvas when not loading and no errors */}
+      {/* Show error message if there's an error and we're not loading */}
+      {error && !loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg max-w-md">
+            <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Error</h3>
+            <p className="text-gray-700 dark:text-gray-300">{error}</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Only render the Canvas when not loading, no errors, and we have tiles */}
       {!loading && !error && Object.keys(tileMap).length > 0 && (
         <HexGridCanvas
           wireframe={debugState.wireframe}

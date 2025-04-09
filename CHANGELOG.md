@@ -1,3 +1,13 @@
+## [v0.9.4] - 2025-04-19
+### Fixed
+- Fixed critical bug where tiles would disappear after being added to the colony
+- Improved tile persistence in the grid with optimized local state management
+- Removed problematic background refresh that was causing tiles to disappear
+- Enhanced colony context to better preserve locally added tiles
+- Implemented smarter tile merging logic during colony refreshes
+- Added safeguards to prevent tiles from being lost during state updates
+- Improved performance by reducing unnecessary re-renders in grid components
+
 ## [v0.9.3] - 2025-04-18
 ### Changed
 - Enhanced fog of war visualization with distance-based darkness for better depth perception

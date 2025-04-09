@@ -43,6 +43,7 @@
 - [ ] Update grid component to use new data flow
 - [ ] Create secure authentication token handling
 - [ ] Implement proper loading states and error handling
+- [ ] Load tiles once and then only listen for push notifications. Reads are rough right now.
 
 ## Technical Requirements
 = [ ] Fix punycode deprication error
