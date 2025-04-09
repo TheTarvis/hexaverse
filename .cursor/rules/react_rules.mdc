@@ -1,7 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-- The agent will only add react pages and components in /src
-- Always specify Types, if not possible let user know.

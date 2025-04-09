@@ -1,3 +1,27 @@
+## [v0.9.7] - 2025-04-22
+### Changed
+- Fixed duplicate colony creation dialog appearing on different pages
+- Updated ColonyCheck to check current route and skip modal on colony page
+- Enhanced user experience by preventing redundant colony creation prompts
+- Improved grid loading state with animated spinner for better visual feedback
+- Standardized loading UI across the application
+
+## [v0.9.6] - 2025-04-21
+### Changed
+- Improved user experience during colony creation flow
+- Modified ColonyCheck component to show colony creation form in-place instead of redirecting to /colony page
+- Added success message and feedback when colony is created
+- Enhanced modal transitions for a smoother onboarding experience
+
+## [v0.9.5] - 2025-04-20
+### Fixed
+- Optimized colony data fetching to prevent redundant API calls
+- Added debounce mechanism to the ColonyContext to avoid multiple fetches
+- Fixed issue where navigating to the colony page triggered unnecessary refreshes
+- Improved manual refresh by explicitly using forceRefresh option
+- Enhanced performance by skipping fetches within a 5-second window
+- Reduced Firestore reads for improved quota efficiency
+
 ## [v0.9.4] - 2025-04-19
 ### Fixed
 - Fixed critical bug where tiles would disappear after being added to the colony

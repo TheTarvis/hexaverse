@@ -315,8 +315,11 @@ export function GridManager() {
   return (
     <div className="relative h-full w-full">
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
-          <div className="text-lg font-medium text-gray-700">Loading grid data...</div>
+        <div className="flex items-center justify-center h-screen bg-white dark:bg-zinc-950 bg-opacity-70 absolute inset-0 z-10">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
+            <p className="mt-4 text-gray-700 dark:text-gray-300">Loading grid data...</p>
+          </div>
         </div>
       )}
       

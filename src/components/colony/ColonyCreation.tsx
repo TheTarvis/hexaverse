@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useColony } from '@/contexts/ColonyContext';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/contexts/ToastContext';
 
 // Define available colony colors
 const colonyColors = [
@@ -21,7 +23,9 @@ const colonyColors = [
 ];
 
 export function ColonyCreation() {
-  const { createNewColony, isLoadingColony, error } = useColony();
+  const router = useRouter();
+  const { createNewColony, isLoadingColony, error, refreshColony } = useColony();
+  const { showToast } = useToast();
   const [colonyName, setColonyName] = useState('');
   const [colonyColor, setColonyColor] = useState(colonyColors[0].value);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -35,7 +39,14 @@ export function ColonyCreation() {
     }
     
     try {
-      await createNewColony(colonyName.trim(), colonyColor);
+      const colony = await createNewColony(colonyName.trim(), colonyColor);
+      // Show success toast
+      showToast(`Colony "${colony.name}" created successfully!`, 'success', 2000);
+      
+      // Refresh the page after a short delay
+      setTimeout(() => {
+        router.refresh();
+      }, 1500);
     } catch (err) {
       // Error is already handled in the context
       console.error('Error in colony creation component:', err);
@@ -85,11 +96,12 @@ export function ColonyCreation() {
                 key={color.value}
                 type="button"
                 onClick={() => setColonyColor(color.value)}
+                disabled={isLoadingColony}
                 className={`w-full aspect-square rounded-md border ${
                   colonyColor === color.value 
                     ? 'ring-2 ring-offset-2 ring-indigo-500 dark:ring-offset-zinc-800' 
                     : 'border-gray-300 dark:border-zinc-700'
-                }`}
+                } ${isLoadingColony ? 'opacity-70 cursor-not-allowed' : ''}`}
                 style={{ backgroundColor: color.value }}
                 title={color.name}
                 aria-label={`Select ${color.name} color`}

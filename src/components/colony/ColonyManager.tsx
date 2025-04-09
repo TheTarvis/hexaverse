@@ -1,7 +1,6 @@
 import React from 'react';
 import { useColony } from '@/contexts/ColonyContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ColonyCreation } from './ColonyCreation';
 import { ColonyInfo } from './ColonyInfo';
 
 export function ColonyManager() {
@@ -18,7 +17,7 @@ export function ColonyManager() {
     );
   }
 
-  if (isLoadingColony) {
+  if (isLoadingColony || !hasColony) {
     return (
       <div className="p-6">
         <div className="max-w-md mx-auto p-6 bg-white dark:bg-zinc-800 rounded-xl shadow-md animate-pulse">
@@ -32,7 +31,7 @@ export function ColonyManager() {
 
   return (
     <div className="p-6">
-      {hasColony ? <ColonyInfo /> : <ColonyCreation />}
+      <ColonyInfo />
     </div>
   );
 } 

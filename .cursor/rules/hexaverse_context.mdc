@@ -1,7 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-- Firebase is the web hosting framework.
-- It is currently deployed and hosted here: @https://console.firebase.google.com/project/hexaverse/hosting/sites/hexaverse
