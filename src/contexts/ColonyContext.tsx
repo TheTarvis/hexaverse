@@ -10,7 +10,7 @@ interface ColonyContextType {
   isLoadingColony: boolean;
   hasColony: boolean;
   createNewColony: (name: string) => Promise<Colony>;
-  refreshColony: () => Promise<void>;
+  refreshColony: (options?: { silent?: boolean }) => Promise<void>;
   fetchColonyById: (colonyId: string) => Promise<Colony>;
   error: string | null;
 }
@@ -112,23 +112,39 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const refreshColony = async (): Promise<void> => {
+  const refreshColony = async (options?: { silent?: boolean }): Promise<void> => {
     if (!user) {
       return;
     }
 
-    setIsLoadingColony(true);
+    // If silent refresh is requested, don't set loading state
+    if (!options?.silent) {
+      setIsLoadingColony(true);
+    }
     setError(null);
 
     try {
       const colonyData = await fetchUserColony(user.uid);
-      setColony(colonyData);
+      setColony(prev => {
+        // If this is a silent refresh and we have previous data, 
+        // only update metadata like tileIds and territoryScore,
+        // but keep the existing tiles array to prevent unnecessary reloads
+        if (options?.silent && prev && prev.tiles && colonyData) {
+          return {
+            ...colonyData,
+            tiles: prev.tiles
+          };
+        }
+        return colonyData;
+      });
       setHasExistingColony(colonyData !== null);
     } catch (err) {
       console.error('Error refreshing colony:', err);
       setError('Failed to refresh colony data');
     } finally {
-      setIsLoadingColony(false);
+      if (!options?.silent) {
+        setIsLoadingColony(false);
+      }
     }
   };
 

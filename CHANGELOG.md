@@ -1,3 +1,11 @@
+## [v0.8.8] - 2025-04-13
+### Changed
+- Optimized tile addition process to prevent full canvas redrawing
+- Implemented silent colony refresh to update metadata without UI reload
+- Replaced intrusive full-screen overlay with a small unobtrusive indicator
+- Improved performance by updating state locally before background synchronization
+- Enhanced fog tile calculation to only recalculate when tileMap changes
+
 ## [v0.8.7] - 2025-04-12
 ### Added
 - Implemented tile addition functionality allowing players to expand their colony

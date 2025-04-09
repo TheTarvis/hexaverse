@@ -56,17 +56,17 @@ export function GridManager() {
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   const [addingTile, setAddingTile] = useState(false)
   
-  // Recalculate fog tiles when fog depth changes or colony data loads
+  // Recalculate fog tiles when fog depth changes or tileMap is updated
   useEffect(() => {
-    if (colony && colony.tiles && colony.tiles.length > 0 && Object.keys(tileMap).length > 0) {
+    if (Object.keys(tileMap).length > 0) {
       // Find fog tiles based on current depth
       const fogTilesList = findFogTiles(tileMap, debugState.fogDepth);
       console.log(`Found ${fogTilesList.length} potential fog tiles with depth ${debugState.fogDepth}`);
       setFogTiles(fogTilesList);
     }
-  }, [tileMap, debugState.fogDepth, colony]) // Depend on tileMap and fogDepth
+  }, [tileMap, debugState.fogDepth]); // Only depend on tileMap and fogDepth, not colony
 
-  // Load the initial grid data when colony changes
+  // Load the initial grid data when colony tiles change
   useEffect(() => {
     async function loadGridData() {
       try {
@@ -98,7 +98,7 @@ export function GridManager() {
     }
     
     loadGridData();
-  }, [colony]); // Only depend on colony for initial load
+  }, [colony?.tiles]); // Only depend on colony.tiles, not the entire colony object
   
   // Handle adding a tile to the colony
   const handleAddTile = useCallback(async (q: number, r: number, s: number) => {
@@ -120,8 +120,15 @@ export function GridManager() {
           };
         });
         
-        // Refresh the colony data from the server to keep everything in sync
-        await refreshColony();
+        // Remove this tile from fog tiles since it's now part of the colony
+        setFogTiles(prevFogTiles => 
+          prevFogTiles.filter(tile => !(tile.q === q && tile.r === r && tile.s === s))
+        );
+        
+        // Update colony data without triggering a full grid reload
+        // This operation updates colony.tileIds and colony.territoryScore in the background
+        // without causing a redraw of our tiles that we've already updated locally
+        refreshColony({ silent: true }).catch(err => console.error('Background colony refresh error:', err));
         
         // Show success message - could be replaced with a toast notification
         if (result.captured) {
@@ -146,7 +153,7 @@ export function GridManager() {
     } finally {
       setAddingTile(false);
     }
-  }, [addingTile, refreshColony]);
+  }, [addingTile, refreshColony, setFogTiles]);
   
   const handleDebugAction = (action: string, value?: any) => {
     switch(action) {
@@ -195,13 +202,6 @@ export function GridManager() {
       {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-red-100 bg-opacity-40 z-10">
           <div className="text-lg font-medium text-red-700">{error}</div>
-        </div>
-      )}
-      
-      {/* Show loading overlay when adding a tile */}
-      {addingTile && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-20">
-          <div className="text-lg font-medium text-white">Adding tile...</div>
         </div>
       )}
       
@@ -257,6 +257,13 @@ export function GridManager() {
         debugState={debugState} 
         onDebugAction={handleDebugAction} 
       />
+      
+      {/* Small loading indicator when adding tiles */}
+      {addingTile && (
+        <div className="absolute bottom-16 right-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded-md text-sm z-10">
+          Adding tile...
+        </div>
+      )}
       
       {/* Only render the Canvas when not loading and no errors */}
       {!loading && !error && Object.keys(tileMap).length > 0 && (
