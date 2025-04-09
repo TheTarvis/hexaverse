@@ -9,7 +9,7 @@ interface ColonyContextType {
   colony: Colony | null;
   isLoadingColony: boolean;
   hasColony: boolean;
-  createNewColony: (name: string) => Promise<Colony>;
+  createNewColony: (name: string, color?: string) => Promise<Colony>;
   refreshColony: (options?: { silent?: boolean }) => Promise<void>;
   fetchColonyById: (colonyId: string) => Promise<Colony>;
   error: string | null;
@@ -71,7 +71,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const createNewColony = async (name: string): Promise<Colony> => {
+  const createNewColony = async (name: string, color?: string): Promise<Colony> => {
     if (!user) {
       throw new Error('User must be logged in to create a colony');
     }
@@ -84,6 +84,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       // but the backend API will authenticate via token
       const newColony = await createColony({
         name,
+        color,
         uid: user.uid
       });
       

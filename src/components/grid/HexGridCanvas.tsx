@@ -30,6 +30,7 @@ interface HexGridCanvasProps {
   cameraTarget: [number, number, number];
   onTileSelect: (tile: SelectedTile) => void;
   onTileAdd?: (q: number, r: number, s: number) => void;
+  colonyColor?: string;
 }
 
 // Convert cube coordinates to pixel coordinates (for pointy-top orientation)
@@ -40,8 +41,8 @@ function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number
   return [x, y, 0]
 }
 
-// Get color based on tile type
-function getTileColor(type: string, colorScheme: string, q: number, r: number, s: number, resourceDensity = 0.5): string {
+// Get color based on tile type and colony color
+function getTileColor(type: string, colorScheme: string, q: number, r: number, s: number, resourceDensity = 0.5, colonyColor?: string): string {
   // Always use the same color for fog tiles, regardless of color scheme
   if (type === 'fog') {
     return new THREE.Color(0.2, 0.2, 0.3).getStyle(); // Dark violet
@@ -202,7 +203,8 @@ function HexGrid({
   tileMap = {} as TileMap,
   fogTiles = [] as { q: number, r: number, s: number }[],
   onTileSelect,
-  onTileAdd
+  onTileAdd,
+  colonyColor
 }: {
   wireframe?: boolean,
   hexSize?: number,
@@ -210,7 +212,8 @@ function HexGrid({
   tileMap?: TileMap,
   fogTiles?: { q: number, r: number, s: number }[],
   onTileSelect: (tile: SelectedTile) => void,
-  onTileAdd?: (q: number, r: number, s: number) => void
+  onTileAdd?: (q: number, r: number, s: number) => void,
+  colonyColor?: string
 }) {
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
@@ -225,7 +228,7 @@ function HexGrid({
       const resourceDensity = tile.resourceDensity || 0.5;
       
       // Generate color based on tile type and selected scheme
-      const color = getTileColor(type, colorScheme, q, r, s, resourceDensity);
+      const color = getTileColor(type, colorScheme, q, r, s, resourceDensity, colonyColor);
       
       gridPositions.push({
         q, r, s,
@@ -257,7 +260,7 @@ function HexGrid({
     })
     
     return gridPositions
-  }, [hexSize, colorScheme, tileMap, fogTiles])
+  }, [hexSize, colorScheme, tileMap, fogTiles, colonyColor])
 
   return (
     <>
@@ -290,7 +293,8 @@ export function HexGridCanvas({
   cameraPosition, 
   cameraTarget, 
   onTileSelect,
-  onTileAdd
+  onTileAdd,
+  colonyColor
 }: HexGridCanvasProps) {
   return (
     <Canvas
@@ -325,6 +329,7 @@ export function HexGridCanvas({
         fogTiles={fogTiles}
         onTileSelect={onTileSelect}
         onTileAdd={onTileAdd}
+        colonyColor={colonyColor}
       />
     </Canvas>
   )

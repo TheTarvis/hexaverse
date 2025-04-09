@@ -1,3 +1,10 @@
+## [v0.9.1] - 2025-04-16
+### Added
+- Added colony color selection feature during colony creation
+- Implemented color picker with 15 color options
+- Enhanced colony visual identification with custom colors
+- Updated interfaces to include color property for colonies
+
 ## [v0.9.0] - 2025-04-15
 ### Changed
 - Swapped single and double click actions for better usability

@@ -23,6 +23,7 @@ export interface Colony {
   id: string;
   uid: string;  // Firebase user ID
   name: string;
+  color?: string; // Colony color for visual identification
   createdAt: Date | number;
   startCoordinates: {
     q: number;
@@ -41,6 +42,7 @@ export interface Colony {
 // Colony creation request type
 export interface CreateColonyRequest {
   name: string;
+  color?: string; // Colony color for visual identification
   uid: string;
 }
 
@@ -49,6 +51,7 @@ export interface CreateColonyResponse {
   id: string;
   uid: string;  // Firebase user ID
   name: string;
+  color?: string; // Colony color for visual identification
   startCoordinates: {
     q: number;
     r: number;

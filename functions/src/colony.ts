@@ -161,7 +161,7 @@ export const createColony = onCall({
     }
 
     // Extract colony name from the request data
-    const { name } = request.data;
+    const { name, color } = request.data;
     
     if (!name) {
       throw new HttpsError('invalid-argument', 'Colony name is required');
@@ -190,6 +190,7 @@ export const createColony = onCall({
       id: colonyRef.id,
       uid,
       name,
+      color,
       createdAt: new Date(),
       startCoordinates,
       tileIds,
@@ -202,36 +203,33 @@ export const createColony = onCall({
     // Save to Firestore
     await colonyRef.set(colony);
     
-    // Create response object that includes both tileIds (for persistence) and tiles (for immediate use)
-    const response: CreateColonyResponse = {
-      id: colonyRef.id,
-      uid, // Include the uid in the response for client-side use
-      name,
-      startCoordinates,
-      tileIds,
-      tiles,
-      units,
-      unplacedUnits,
-      territoryScore: tiles.length,
-      visibilityRadius: baseVisibilityRadius
-    };
-    
-    return { 
+    return {
       success: true,
-      colony: response
+      message: 'Colony created successfully',
+      colony: {
+        id: colony.id,
+        uid: colony.uid,
+        name: colony.name,
+        color: colony.color,
+        startCoordinates: colony.startCoordinates,
+        tileIds: colony.tileIds,
+        tiles,  // Include full tile data in response
+        units: colony.units,
+        unplacedUnits: colony.unplacedUnits,
+        territoryScore: colony.territoryScore,
+        visibilityRadius: colony.visibilityRadius
+      }
     };
   } catch (error) {
-    logger.error("Error creating colony:", error);
+    console.error('Error creating colony:', error);
     
-    // If the error is already an HttpsError, rethrow it
     if (error instanceof HttpsError) {
-      throw error;
+      throw error;  // Re-throw Firebase HttpsError
     }
     
-    // Otherwise, wrap it in an HttpsError
     throw new HttpsError(
       'internal',
-      error instanceof Error ? error.message : 'Error creating colony'
+      error instanceof Error ? error.message : 'Unknown error creating colony'
     );
   }
 }); 

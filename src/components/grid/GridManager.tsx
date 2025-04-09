@@ -171,7 +171,7 @@ export function GridManager() {
         break
       case 'changeColorScheme':
         setDebugState((prev) => {
-          const schemes = ['type', 'resources', 'rainbow', 'default', 'monochrome'];
+          const schemes = ['type', 'resources', 'rainbow', 'colony', 'default', 'monochrome'];
           const currentIndex = schemes.indexOf(prev.colorScheme);
           const nextIndex = (currentIndex + 1) % schemes.length;
           return { ...prev, colorScheme: schemes[nextIndex] };
@@ -286,6 +286,7 @@ export function GridManager() {
           cameraTarget={cameraTarget}
           onTileSelect={handleTileSelect}
           onTileAdd={handleAddTile}
+          colonyColor={colony?.color}
         />
       )}
     </div>

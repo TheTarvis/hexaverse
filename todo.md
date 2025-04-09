@@ -11,28 +11,18 @@
   - [x] Show login prompt if not authenticated
   - [x] Create helper functions to manage auth state
   - [ ] Create list of pages and permissions.
-    - Home page: /src/app/page.tsx
-    - Colony page: /src/app/colony/page.tsx
-    - Grid page: /src/app/grid/page.tsx
-    - Events list page: /src/app/events/page.tsx
-    - Event detail page: /src/app/events/[id]/page.tsx
-    - Orders list page: /src/app/orders/page.tsx
-    - Order detail page: /src/app/orders/[id]/page.tsx
-    - Order refund page: /src/app/orders/[id]/refund.tsx
-    - Settings page: /src/app/settings/page.tsx
-    - Address settings page: /src/app/settings/address.tsx
     - For example, grid should be visible but not interactable when not logged in.
-    - [ ] Request login when going to restricted pages.
+    - [x] Request login when going to restricted pages.
 
-- [ ] **Login Flow**
-  - [ ] Once Athentication Flow is complete
-    - [ ] Fetch Users Colony
+- [x] **Login Flow**
+  - [x] Once Athentication Flow is complete
+    - [x] Fetch Users Colony
 
-- [ ] **Colony Management**
-  - [ ] Implement "Fetch User's Colony" API
-  - [ ] Create "Create New Colony" flow with name input
-  - [ ] Handle initial colony creation response (start coordinates + 7 tiles)
-  - [ ] Store colony data in application state
+- [x] **Colony Management**
+  - [x] Implement "Fetch User's Colony" API
+  - [x] Create "Create New Colony" flow with name input
+  - [x] Handle initial colony creation response (start coordinates + 7 tiles)
+  - [?] Store colony data in application state
 
 ## User Experience & Gameplay
 

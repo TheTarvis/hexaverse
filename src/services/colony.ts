@@ -25,7 +25,7 @@ const functions = getFunctions();
 
 // Create callable function references
 const createColonyFunction = httpsCallable<
-  { name: string },
+  { name: string, color?: string },
   { success: boolean; colony: CreateColonyResponse; message?: string }
 >(functions, 'createColony');
 
@@ -186,7 +186,10 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
     console.log(`Creating colony for user: ${colonyData.uid}`);
     
     // Call the Firebase callable function
-    const result = await createColonyFunction({ name: colonyData.name });
+    const result = await createColonyFunction({ 
+      name: colonyData.name,
+      color: colonyData.color 
+    });
     
     if (!result.data.success) {
       throw new Error(result.data.message || 'Failed to create colony');
@@ -199,6 +202,7 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
       id: responseData.id,
       uid: colonyData.uid, // Use the UID from the request
       name: responseData.name,
+      color: responseData.color,
       createdAt: new Date(),
       startCoordinates: responseData.startCoordinates,
       tileIds: responseData.tileIds,
