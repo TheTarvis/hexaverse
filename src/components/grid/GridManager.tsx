@@ -6,7 +6,7 @@ import { useColony } from '@/contexts/ColonyContext'
 import { useToast } from '@/contexts/ToastContext'
 import { ColonyTile } from '@/types/colony'
 import { DebugMenu } from '@/components/grid/DebugMenu'
-import { HexGridCanvas } from '@/components/grid/HexGridCanvas'
+import { FogTile, HexGridCanvas } from '@/components/grid/HexGridCanvas'
 import { coordsToKey, findFogTiles } from '@/utils/hexUtils'
 import { addTile } from '@/services/tiles'
 
@@ -53,7 +53,7 @@ export function GridManager() {
   const cameraTarget: [number, number, number] = [worldCoords.x, worldCoords.y, 0];
 
   const [tileMap, setTileMap] = useState<TileMap>({})
-  const [fogTiles, setFogTiles] = useState<{q: number, r: number, s: number}[]>([])
+  const [fogTiles, setFogTiles] = useState<FogTile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
@@ -67,7 +67,7 @@ export function GridManager() {
       console.log(`Found ${fogTilesList.length} potential fog tiles with depth ${debugState.fogDepth}`);
       setFogTiles(fogTilesList);
     }
-  }, [tileMap, debugState.fogDepth]); // Only depend on tileMap and fogDepth, not colony
+  }, [tileMap, debugState.fogDepth]); // TODO TW: Figure out this warning.
 
   // Load the initial grid data when colony tiles change
   useEffect(() => {
@@ -156,7 +156,7 @@ export function GridManager() {
     } finally {
       setAddingTile(false);
     }
-  }, [addingTile, refreshColony, setFogTiles, showToast]); // Added showToast to dependencies
+  }, [addingTile, refreshColony, setFogTiles, showToast]); // Remove colony as it's not used directly
   
   const handleDebugAction = (action: string, value?: any) => {
     switch(action) {

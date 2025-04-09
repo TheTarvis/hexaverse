@@ -1,3 +1,27 @@
+## [v0.9.3] - 2025-04-18
+### Changed
+- Enhanced fog of war visualization with distance-based darkness for better depth perception
+- Added dynamic version display using package.json version information
+- Created version utility functions for consistent version display across the app
+- Fixed TypeScript warnings in grid components
+- Improved fog tile coloring algorithm with enhanced visual gradient
+- Added support for dynamic opacity based on fog tile distance
+
+## [v0.9.2] - 2025-04-17
+### Changed
+- Enhanced fog of war visualization to make fog tiles darker based on distance from colony
+- Updated findFogTiles utility to return distance information for each fog tile
+- Implemented distance-based coloring algorithm for better visual depth perception
+- Improved fog tile visibility with dynamic opacity based on distance
+- Enhanced visual cues for exploration boundaries with color gradient
+
+## [v0.9.1] - 2025-04-16
+### Added
+- Added colony color selection feature during colony creation
+- Implemented color picker with 15 color options
+- Enhanced colony visual identification with custom colors
+- Updated interfaces to include color property for colonies
+
 ## [v0.9.0] - 2025-04-15
 ### Changed
 - Swapped single and double click actions for better usability

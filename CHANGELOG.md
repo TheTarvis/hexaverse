@@ -1,3 +1,12 @@
+## [v0.9.3] - 2025-04-18
+### Changed
+- Enhanced fog of war visualization with distance-based darkness for better depth perception
+- Added dynamic version display using package.json version information
+- Created version utility functions for consistent version display across the app
+- Fixed TypeScript warnings in grid components
+- Improved fog tile coloring algorithm with enhanced visual gradient
+- Added support for dynamic opacity based on fog tile distance
+
 ## [v0.9.2] - 2025-04-17
 ### Changed
 - Enhanced fog of war visualization to make fog tiles darker based on distance from colony

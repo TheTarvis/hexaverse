@@ -21,7 +21,7 @@ interface SelectedTile {
 }
 
 // Updated interface to include distance
-interface FogTile {
+export interface FogTile {
   q: number;
   r: number;
   s: number;
