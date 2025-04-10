@@ -4,6 +4,8 @@ import * as admin from "firebase-admin";
 import { ColonyTile } from "./types/colony";
 import { createNoiseGenerator, getNoiseForCoordinates, getTileTypeFromNoise, calculateResourceDensity } from "./utils/noise";
 import { functionConfig } from "./config";
+import { ReadCostTracker } from "./utils/analytics/readCostTracker";
+import { verifyTileAdjacency } from "./utils/tileHelpers";
 
 /**
  * Function to add a tile to a user's colony
@@ -20,6 +22,9 @@ export const addTile = onCall({
   timeoutSeconds: functionConfig.defaultTimeoutSeconds,
   memory: functionConfig.memory
 }, async (request) => {
+  // Create a tracker for this function call
+  const tracker = new ReadCostTracker('addTile');
+  console.log('addTile');
   try {
     // Authenticate the request and get the user ID
     const uid = request.auth?.uid;
@@ -43,6 +48,7 @@ export const addTile = onCall({
     // Fetch the user's colony
     const coloniesRef = admin.firestore().collection('colonies');
     const colonyQuery = await coloniesRef.where('uid', '==', uid).get();
+    tracker.trackRead('colonyQuery', colonyQuery.size);
     
     if (colonyQuery.empty) {
       throw new HttpsError('not-found', 'No colony found for this user');
@@ -60,32 +66,8 @@ export const addTile = onCall({
       throw new HttpsError('already-exists', 'This tile is already part of your colony');
     }
     
-    // Fetch all tiles owned by the user to verify adjacency
-    const userTiles = await admin.firestore().collection('tiles')
-      .where('controllerUid', '==', uid)
-      .get();
-    
-    // Check if the requested tile is adjacent to at least one existing colony tile
-    let isAdjacent = false;
-    
-    userTiles.forEach(userTileDoc => {
-      const userTileData = userTileDoc.data();
-      
-      // Check if tiles are adjacent (distance = 1)
-      const distance = Math.max(
-        Math.abs(userTileData.q - q),
-        Math.abs(userTileData.r - r),
-        Math.abs(userTileData.s - s)
-      );
-      
-      if (distance === 1) {
-        isAdjacent = true;
-      }
-    });
-    
-    if (!isAdjacent) {
-      throw new HttpsError('failed-precondition', 'New tile must be adjacent to your existing colony');
-    }
+    // Use the helper function to verify adjacency instead of fetching all tiles
+    verifyTileAdjacency(q, r, s, colonyData.tileIds || []);
     
     // Start a batch transaction
     const batch = admin.firestore().batch();
@@ -93,6 +75,7 @@ export const addTile = onCall({
     // Check if the tile exists in the database first
     const tileRef = admin.firestore().collection('tiles').doc(tileId);
     const tileDoc = await tileRef.get();
+    tracker.trackRead('tileDocGet', 1);
     
     let newTile: ColonyTile;
     let capturedFromUid: string | null = null;
@@ -107,6 +90,8 @@ export const addTile = onCall({
         
         // Find the colony the tile belonged to
         const previousColonyQuery = await coloniesRef.where('uid', '==', capturedFromUid).get();
+        tracker.trackRead('previousColonyQuery', previousColonyQuery.size);
+        
         if (!previousColonyQuery.empty) {
           const previousColonyDoc = previousColonyQuery.docs[0];
           capturedFromColony = previousColonyDoc.id;
@@ -164,6 +149,13 @@ export const addTile = onCall({
     
     // Commit the batch
     await batch.commit();
+    
+    // Store metrics in Firestore for analysis
+    await tracker.storeMetrics();
+    
+    // Log the read stats instead of including them in the response
+    const readSummary = tracker.getSummary();
+    logger.info(`[addTile] Read Summary: ${readSummary.total} total reads`);
     
     // Return success with the new or captured tile
     const response = {

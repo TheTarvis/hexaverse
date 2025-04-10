@@ -1,12 +1,12 @@
-import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import { Colony } from "./types/colony";
 import { Unit, UnitType, Base, Ship, UnplacedUnit } from "./types/units";
-import { authenticatedHttpsOptions, authenticateRequest } from "./middleware/auth";
 import { findSpawnLocation as findNoiseBasedSpawnLocation } from "./utils/colonyGeneration";
 import { generateInitialTiles, saveTilesToFirestore } from "./utils/tiles/tileOperations";
 import { functionConfig, gameConfig } from "./config";
+import { ReadCostTracker } from "./utils/analytics/readCostTracker";
 
 // Use configuration constants from shared config
 const {
@@ -83,69 +83,6 @@ function createUnplacedMiningUnits(): UnplacedUnit[] {
 }
 
 /**
- * Example function to get a colony by ID
- */
-export const getColony = onRequest(authenticatedHttpsOptions, async (req, res) => {
-  try {
-    // Authenticate the request and get the user ID
-    let uid: string;
-    try {
-      uid = await authenticateRequest(req);
-    } catch (authError) {
-      logger.error("Authentication error:", authError);
-      res.status(401).json({ 
-        success: false,
-        message: "Authentication failed"
-      });
-      return;
-    }
-
-    const colonyId = req.query.id as string;
-    
-    if (!colonyId) {
-      res.status(400).json({ 
-        success: false,
-        message: "Colony ID is required"
-      });
-      return;
-    }
-    
-    const colonyRef = admin.firestore().collection('colonies').doc(colonyId);
-    const colonyDoc = await colonyRef.get();
-    
-    if (!colonyDoc.exists) {
-      res.status(404).json({ 
-        success: false,
-        message: "Colony not found"
-      });
-      return;
-    }
-    
-    const colonyData = colonyDoc.data() as Colony;
-    
-    // Check that the user has permission to access this colony
-    if (colonyData.uid !== uid) {
-      res.status(403).json({
-        success: false,
-        message: "You don't have permission to access this colony"
-      });
-      return;
-    }
-    
-    res.json({ 
-      success: true,
-      colony: colonyData
-    });
-  } catch (error) {
-    logger.error("Error fetching colony:", error);
-    res.status(500).json({ 
-      success: false,
-      message: "Error fetching colony"
-    });
-  }
-});
-
-/**
  * Function to create a new colony
  */
 export const createColony = onCall({
@@ -153,6 +90,10 @@ export const createColony = onCall({
   timeoutSeconds: functionConfig.extendedTimeoutSeconds,
   memory: functionConfig.memory
 }, async (request) => {
+  console.log('createColony');
+  // Create a tracker for this function call
+  const tracker = new ReadCostTracker('createColony');
+  
   try {
     // Get the authenticated user ID
     const uid = request.auth?.uid;
@@ -178,6 +119,8 @@ export const createColony = onCall({
     
     // Save tiles to Firestore in their own collection
     const tileIds = await saveTilesToFirestore(tiles);
+    // Track the read costs for tile save 
+    tracker.trackRead('saveTilesToFirestore', tiles.length);
     
     // Create initial units
     const units = createInitialUnits(colonyRef.id, uid, startCoordinates);
@@ -202,6 +145,13 @@ export const createColony = onCall({
     
     // Save to Firestore
     await colonyRef.set(colony);
+    
+    // Store metrics in Firestore for analysis
+    await tracker.storeMetrics();
+    
+    // Log the read stats instead of including them in the response
+    const readSummary = tracker.getSummary();
+    logger.info(`[createColony] Read Summary: ${readSummary.total} total reads`);
     
     return {
       success: true,

@@ -12,16 +12,10 @@ import {
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
 import { Colony, CreateColonyRequest, CreateColonyResponse, ColonyTile } from '@/types/colony';
 import { callFunction, getFunctionUrl } from '@/utils/api';
-
-// Get auth and firestore instances
-const auth = getAuth();
-const firestore = getFirestore();
-const functions = getFunctions();
+import { auth, firestore, functions } from '@/config/firebase';
 
 // Create callable function references
 const createColonyFunction = httpsCallable<
@@ -249,50 +243,6 @@ export async function fetchTilesForColony(
 }
 
 /**
- * Fetch a colony by ID using the secure API endpoint
- * @param colonyId - The ID of the colony to fetch
- * @returns Colony data
- */
-export async function fetchColonyById(colonyId: string): Promise<Colony> {
-  if (!colonyId) {
-    throw new Error('Colony ID is required');
-  }
-  
-  try {
-    console.log(`Fetching colony with ID: ${colonyId}`);
-    
-    // Get auth token
-    const idToken = await getAuthToken();
-    
-    // Call the secure API endpoint using our utility
-    const apiResponse = await callFunction<{success: boolean; message?: string; colony: Colony}>(
-      'getColony',
-      {
-        method: 'GET',
-        queryParams: { id: colonyId },
-        idToken
-      }
-    );
-    
-    if (!apiResponse.success) {
-      throw new Error(apiResponse.message || 'Failed to fetch colony');
-    }
-    
-    const colony = apiResponse.colony;
-    
-    // Load tiles if they're not included
-    if (!colony.tiles && colony.tileIds && colony.tileIds.length > 0) {
-      colony.tiles = await fetchTilesForColony(colony.tileIds);
-    }
-    
-    return colony;
-  } catch (error) {
-    console.error('Error fetching colony by ID:', error);
-    throw error;
-  }
-}
-
-/**
  * Create a new colony for a user
  * @param colonyData - The colony creation data
  * @returns The created colony data
@@ -373,44 +323,3 @@ export function invalidateColonyCache(uid: string): void {
     console.warn('Error invalidating colony cache:', error);
   }
 }
-
-/**
- * Invalidate tile cache for specific tile IDs
- * Use this when tile data changes from server-side events
- * @param tileIds IDs of tiles to invalidate
- */
-export function invalidateTileCache(tileIds: string[]): void {
-  if (typeof window === 'undefined' || !tileIds.length) return;
-  
-  try {
-    // Since we don't know all the exact cache keys (which depend on combinations),
-    // iterate through localStorage keys and clear any that contain these tile IDs
-    const keys: string[] = [];
-    
-    // Get all localStorage keys
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('tiles_')) {
-        keys.push(key);
-      }
-    }
-    
-    // Check if any keys contain the tile IDs to invalidate
-    const sortedTileIds = tileIds.sort();
-    const keysToRemove = keys.filter(key => {
-      // Check if this key contains any of the tile IDs we want to invalidate
-      return sortedTileIds.some(tileId => key.includes(tileId));
-    });
-    
-    // Remove the keys
-    keysToRemove.forEach(key => {
-      localStorage.removeItem(key);
-    });
-    
-    if (keysToRemove.length > 0) {
-      console.log(`Invalidated ${keysToRemove.length} tile cache entries`);
-    }
-  } catch (error) {
-    console.warn('Error invalidating tile cache:', error);
-  }
-} 

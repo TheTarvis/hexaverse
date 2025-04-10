@@ -32,7 +32,7 @@
   - [ ] Apply user settings when loading grid
 
 - [ ] **Tile Rendering**
-  - [ ] Create API to fetch colony tiles
+  - [x] Create API to fetch colony tiles
   - [ ] Position camera at last known position (or colony start coordinates)
   - [ ] Render player's tiles on the canvas
   - [ ] Optimize tile rendering for better performance
@@ -45,6 +45,9 @@
 - [ ] Implement proper loading states and error handling
 - [ ] Load tiles once and then only listen for push notifications. Reads are rough right now.
 
-## Technical Requirements
-= [ ] Fix punycode deprication error
+## Technical Debt
+- [ ] Fix punycode deprication error
+- [ ] Lower Read cost
+
+
 *Note: Items will be implemented one by one, not all at once.* 

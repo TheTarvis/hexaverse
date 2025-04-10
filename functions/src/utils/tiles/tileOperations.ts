@@ -1,6 +1,8 @@
 import * as admin from "firebase-admin";
+import * as logger from "firebase-functions/logger";
 import { ColonyTile } from "../../types/colony";
 import { createNoiseGenerator, getNoiseForCoordinates, getTileTypeFromNoise, calculateResourceDensity, TileType } from "../noise";
+import { ReadCostTracker } from "../analytics/readCostTracker";
 
 /**
  * Generate the initial tiles for a new colony
@@ -95,6 +97,8 @@ export async function saveTilesToFirestore(tiles: ColonyTile[]): Promise<string[
  * @returns Array of tiles
  */
 export async function getTilesByIds(tileIds: string[]): Promise<ColonyTile[]> {
+  const tracker = new ReadCostTracker('getTilesByIds');
+  
   if (!tileIds.length) return [];
   
   // Firestore can only handle batches of 10 in where in queries
@@ -106,10 +110,20 @@ export async function getTilesByIds(tileIds: string[]): Promise<ColonyTile[]> {
     const tilesRef = admin.firestore().collection('tiles');
     const snapshot = await tilesRef.where(admin.firestore.FieldPath.documentId(), 'in', batch).get();
     
+    // Track the reads - each document returned counts as 1 read
+    tracker.trackRead(`batch_${i/batchSize}`, snapshot.size);
+    
     snapshot.forEach(doc => {
       tiles.push(doc.data() as ColonyTile);
     });
   }
+  
+  // Store metrics for analysis
+  await tracker.storeMetrics();
+  
+  // Log the summary instead of returning it
+  const readSummary = tracker.getSummary();
+  logger.info(`[getTilesByIds] Read Summary: ${readSummary.total} total reads`);
   
   return tiles;
 } 

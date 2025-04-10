@@ -1,3 +1,11 @@
+## [v0.9.8] - 2025-04-23
+### Changed
+- Optimized tile adjacency checking to dramatically reduce database reads
+- Created new tileHelpers utility functions for hexagon grid operations
+- Refactored addTile function to use the new adjacency checking method
+- Removed unnecessary Firebase queries for improved performance
+- Reduced overall function execution time by eliminating redundant tile fetching
+
 ## [v0.9.7] - 2025-04-22
 ### Changed
 - Fixed duplicate colony creation dialog appearing on different pages

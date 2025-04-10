@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { Colony, ColonyTile } from '@/types/colony';
-import { fetchUserColony, createColony, hasColony, fetchColonyById, fetchTilesForColony } from '@/services/colony';
+import { fetchUserColony, createColony, hasColony, fetchTilesForColony } from '@/services/colony';
 
 interface ColonyContextType {
   colony: Colony | null;
@@ -12,7 +12,6 @@ interface ColonyContextType {
   createNewColony: (name: string, color?: string) => Promise<Colony>;
   refreshColony: (options?: { silent?: boolean; forceRefresh?: boolean; keepLocalChanges?: boolean }) => Promise<void>;
   loadTiles: (options?: { forceRefresh?: boolean; specificTileIds?: string[] }) => Promise<void>;
-  fetchColonyById: (colonyId: string) => Promise<Colony>;
   setColony: React.Dispatch<React.SetStateAction<Colony | null>>;
   error: string | null;
 }
@@ -170,19 +169,6 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const getColonyById = async (colonyId: string): Promise<Colony> => {
-    if (!user) {
-      throw new Error('User must be logged in to fetch a colony');
-    }
-
-    try {
-      return await fetchColonyById(colonyId);
-    } catch (error) {
-      console.error('Error fetching colony by ID:', error);
-      throw error;
-    }
-  };
-
   const refreshColony = async (options?: { 
     silent?: boolean; 
     forceRefresh?: boolean;
@@ -227,7 +213,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       const currentTileMap = new Map<string, ColonyTile>();
       const currentTileCoordMap = new Map<string, ColonyTile>();
       
-      currentTiles.forEach(tile => {
+      currentTiles.forEach((tile: ColonyTile) => {
         // Map by ID
         if (tile.id) {
           currentTileMap.set(tile.id, tile);
@@ -372,7 +358,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
             );
             
             // Update existing tiles with new ones
-            tiles.forEach(tile => {
+            tiles.forEach((tile: ColonyTile) => {
               if (tile.id) {
                 existingTileMap.set(tile.id, tile);
               } else {
@@ -404,7 +390,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
           // Look for tiles in prev.tiles that aren't in the new tiles array
           // These could be tiles that were just added but haven't synced with the server yet
           if (prev.tiles) {
-            prev.tiles.forEach(prevTile => {
+            prev.tiles.forEach((prevTile: ColonyTile) => {
               // Check if this tile exists in the new tiles array
               const exists = newTiles.some(newTile => 
                 (prevTile.id && newTile.id && prevTile.id === newTile.id) || 
@@ -440,7 +426,6 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     createNewColony,
     refreshColony,
     loadTiles,
-    fetchColonyById: getColonyById,
     setColony,
     error
   };
