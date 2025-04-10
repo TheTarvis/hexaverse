@@ -4,10 +4,10 @@ import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { Canvas, ThreeEvent, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
-import { ColonyTile } from '@/types/colony'
+import { Tile } from '@/types/tiles'
 
 interface TileMap {
-  [key: string]: ColonyTile
+  [key: string]: Tile
 }
 
 // Add an interface for the selected tile
@@ -433,7 +433,7 @@ function HexGrid({
   )
 }
 
-export function HexGridCanvas({ 
+export function GridCanvas({
   wireframe, 
   hexSize, 
   colorScheme, 

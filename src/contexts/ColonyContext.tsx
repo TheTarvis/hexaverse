@@ -2,8 +2,10 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { Colony, ColonyTile } from '@/types/colony';
-import { fetchUserColony, createColony, hasColony, fetchTilesForColony } from '@/services/colony';
+import { useTiles } from './TileContext';
+import { Colony } from '@/types/colony';
+import { Tile } from '@/types/tiles';
+import { fetchUserColony, createColony, hasColony } from '@/services/colony';
 
 interface ColonyContextType {
   colony: Colony | null;
@@ -20,8 +22,10 @@ const ColonyContext = createContext<ColonyContextType | undefined>(undefined);
 
 export function ColonyProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { loadTiles: fetchTiles } = useTiles();
   const [colony, setColony] = useState<Colony | null>(null);
   const [isLoadingColony, setIsLoadingColony] = useState(false);
+  // TODO TW: Move this to the tiles context?
   const [isLoadingTiles, setIsLoadingTiles] = useState(false);
   const [hasExistingColony, setHasExistingColony] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +99,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
             
             try {
               // Load all tiles directly to ensure they're available
-              const tiles = await fetchTilesForColony(colonyData.tileIds);
+              const tiles = await fetchTiles(colonyData.tileIds);
               
               if (tiles && tiles.length > 0) {
                 console.log(`Loaded ${tiles.length} tiles for the colony`);
@@ -138,7 +142,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       setColony(null);
       setHasExistingColony(false);
     }
-  }, [user]);
+  }, [user, fetchTiles]);
 
   const createNewColony = async (name: string, color?: string): Promise<Colony> => {
     if (!user) {
@@ -210,10 +214,10 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       }
       
       // Build a map of current tiles by ID and coordinates for fast lookup
-      const currentTileMap = new Map<string, ColonyTile>();
-      const currentTileCoordMap = new Map<string, ColonyTile>();
+      const currentTileMap = new Map<string, Tile>();
+      const currentTileCoordMap = new Map<string, Tile>();
       
-      currentTiles.forEach((tile: ColonyTile) => {
+      currentTiles.forEach((tile: Tile) => {
         // Map by ID
         if (tile.id) {
           currentTileMap.set(tile.id, tile);
@@ -225,7 +229,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       });
       
       // Build a list of tiles to keep, merging current and new
-      let tilesToUse: ColonyTile[] = [];
+      let tilesToUse: Tile[] = [];
       
       // If we want to keep local changes, merge current tiles with the tileIds from the new data
       if (options?.keepLocalChanges !== false && currentTiles.length > 0) {
@@ -338,11 +342,11 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     setIsLoadingTiles(true);
     
     try {
-      const tiles = await fetchTilesForColony(
+      const tiles = await fetchTiles(
         colony.tileIds,
         {
           forceRefresh: options?.forceRefresh,
-          onlyTileIds: options?.specificTileIds
+          specificTileIds: options?.specificTileIds
         }
       );
       
@@ -358,7 +362,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
             );
             
             // Update existing tiles with new ones
-            tiles.forEach((tile: ColonyTile) => {
+            tiles.forEach((tile: Tile) => {
               if (tile.id) {
                 existingTileMap.set(tile.id, tile);
               } else {
@@ -390,7 +394,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
           // Look for tiles in prev.tiles that aren't in the new tiles array
           // These could be tiles that were just added but haven't synced with the server yet
           if (prev.tiles) {
-            prev.tiles.forEach((prevTile: ColonyTile) => {
+            prev.tiles.forEach((prevTile: Tile) => {
               // Check if this tile exists in the new tiles array
               const exists = newTiles.some(newTile => 
                 (prevTile.id && newTile.id && prevTile.id === newTile.id) || 

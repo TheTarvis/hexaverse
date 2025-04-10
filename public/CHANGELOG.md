@@ -1,3 +1,24 @@
+## [v0.9.11] - 2025-04-26
+### Changed
+- Renamed fetchTilesForColony to fetchTiles and moved it to src/services/tiles
+- Created a dedicated TileContext for better separation of concerns
+- Improved code organization with cleaner API for loading tiles
+- Decoupled tile loading logic from colony management
+- Renamed HexGridCanvas to GridCanvas
+
+## [v0.9.10] - 2025-04-25
+### Changed
+- Refactored tile type definitions by moving ColonyTile to its own file as Tile
+- Improved code organization with better separation of tile-related types
+- Updated all imports and references throughout the codebase
+
+## [v0.9.9] - 2025-04-24
+### Added
+- Added visual animation feedback when adding new tiles to the colony
+- Implemented pulsing hexagon effect on clicked fog tiles for better user experience
+- Created a more prominent loading indicator when tiles are being added
+- Improved overall tile addition UX with visual cues and animations
+
 ## [v0.9.8] - 2025-04-23
 ### Changed
 - Optimized tile adjacency checking to dramatically reduce database reads

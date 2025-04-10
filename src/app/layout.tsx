@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { getEvents } from '@/data'
 import { ApplicationLayout } from './application-layout'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { TileProvider } from '@/contexts/TileContext'
 import { ColonyProvider } from '@/contexts/ColonyContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 
@@ -39,11 +40,13 @@ export default async function RootLayout({
       </head>
       <body className={inter.variable}>
         <AuthProvider>
-          <ColonyProvider>
-            <ToastProvider>
-              <ApplicationLayout events={events}>{children}</ApplicationLayout>
-            </ToastProvider>
-          </ColonyProvider>
+          <TileProvider>
+            <ColonyProvider>
+              <ToastProvider>
+                <ApplicationLayout events={events}>{children}</ApplicationLayout>
+              </ToastProvider>
+            </ColonyProvider>
+          </TileProvider>
         </AuthProvider>
       </body>
     </html>

@@ -1,7 +1,8 @@
-import { ColonyTile } from '@/types/colony';
+import { Tile } from '@/types/tiles';
 import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
 import { invalidateColonyCache } from './colony';
-import { auth, functions } from '@/config/firebase';
+import { auth, functions, firestore } from '@/config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 // Types
 export interface AddTileRequest {
@@ -12,11 +13,56 @@ export interface AddTileRequest {
 
 export interface AddTileResponse {
   success: boolean;
-  tile?: ColonyTile;
+  tile?: Tile;
   message?: string;
   captured?: boolean;
   previousOwner?: string;
   previousColony?: string;
+}
+
+// Cache configuration
+const TILES_CACHE_EXPIRY = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+// Cache keys
+const getTilesCacheKey = (tileIds: string[]) => `tiles_${tileIds.sort().join('_')}`;
+
+/**
+ * Get from cache helper
+ */
+function getFromCache<T>(key: string, expiryTime: number): T | null {
+  try {
+    const cachedItem = localStorage.getItem(key);
+    if (!cachedItem) return null;
+    
+    const { data, timestamp } = JSON.parse(cachedItem);
+    const now = Date.now();
+    
+    if (now - timestamp > expiryTime) {
+      // Cache expired
+      localStorage.removeItem(key);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.warn('Error reading from cache:', error);
+    return null;
+  }
+}
+
+/**
+ * Save to cache helper
+ */
+function saveToCache<T>(key: string, data: T): void {
+  try {
+    const cacheItem = {
+      data,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(cacheItem));
+  } catch (error) {
+    console.warn('Error saving to cache:', error);
+  }
 }
 
 // Create a callable function reference
@@ -24,6 +70,63 @@ const addTileFunction = httpsCallable<AddTileRequest, AddTileResponse>(
   functions, 
   'addTile'
 );
+
+/**
+ * Fetch tiles by their IDs
+ * @param tileIds - Array of tile IDs to fetch
+ * @param options - Optional parameters for controlling fetch behavior
+ * @returns Array of tile objects
+ */
+export async function fetchTiles(
+  tileIds: string[], 
+  options?: { 
+    forceRefresh?: boolean;
+    specificTileIds?: string[];
+  }
+): Promise<Tile[]> {
+  if (!tileIds.length) return [];
+  
+  const cacheKey = getTilesCacheKey(tileIds);
+
+  console.log('Tile IDs', tileIds);
+  
+  // Check cache first if not forcing refresh
+  if (!options?.forceRefresh && typeof window !== 'undefined') {
+    const cachedTiles = getFromCache<Tile[]>(cacheKey, TILES_CACHE_EXPIRY);
+    if (cachedTiles) {
+      console.log(`Using ${cachedTiles.length} cached tiles`);
+      return cachedTiles;
+    }
+  }
+  
+  try {
+    const tiles: Tile[] = [];
+    
+    // Build document references for each tile
+    const tileRefs = tileIds.map(id => 
+      doc(firestore, 'tiles', id)
+    );
+    
+    // Use Promise.all and getDoc to fetch all documents in a single call
+    const tileSnapshots = await Promise.all(tileRefs.map(ref => getDoc(ref)));
+    
+    tileSnapshots.forEach(snapshot => {
+      if (snapshot.exists()) {
+        tiles.push(snapshot.data() as Tile);
+      }
+    });
+    
+    // Cache all tiles we fetched
+    if (typeof window !== 'undefined' && tiles.length > 0) {
+      saveToCache(cacheKey, tiles);
+    }
+    
+    return tiles;
+  } catch (error) {
+    console.error('Error fetching tiles:', error);
+    return [];
+  }
+}
 
 /**
  * Invalidate tile cache for specific tile IDs

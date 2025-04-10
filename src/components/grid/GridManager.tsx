@@ -4,14 +4,14 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { SlideUpPanel } from '@/components/slide-up-panel'
 import { useColony } from '@/contexts/ColonyContext'
 import { useToast } from '@/contexts/ToastContext'
-import { ColonyTile } from '@/types/colony'
+import { Tile } from '@/types/tiles'
 import { DebugMenu } from '@/components/grid/DebugMenu'
-import { FogTile, HexGridCanvas } from '@/components/grid/HexGridCanvas'
+import { FogTile, GridCanvas } from '@/components/grid/GridCanvas'
 import { coordsToKey, findFogTiles } from '@/utils/hexUtils'
 import { addTile } from '@/services/tiles'
 
 interface TileMap {
-  [key: string]: ColonyTile
+  [key: string]: Tile
 }
 
 // Add an interface for the selected tile
@@ -178,7 +178,7 @@ export function GridManager() {
       const result = await addTile(q, r, s);
       
       if (result.success && result.tile) {
-        const newTile = result.tile as ColonyTile;
+        const newTile = result.tile as Tile;
         const tileKey = coordsToKey(q, r, s);
         
         // Add the new tile to the local tile map immediately for immediate feedback
@@ -396,7 +396,7 @@ export function GridManager() {
       
       {/* Only render the Canvas when not loading, no errors, and we have tiles */}
       {!loading && !error && Object.keys(tileMap).length > 0 && (
-        <HexGridCanvas
+        <GridCanvas
           wireframe={debugState.wireframe}
           hexSize={debugState.hexSize}
           colorScheme={debugState.colorScheme}

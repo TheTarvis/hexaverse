@@ -13,7 +13,8 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { Colony, CreateColonyRequest, CreateColonyResponse, ColonyTile } from '@/types/colony';
+import { Colony, CreateColonyRequest, CreateColonyResponse } from '@/types/colony';
+import { Tile } from '@/types/tiles';
 import { callFunction, getFunctionUrl } from '@/utils/api';
 import { auth, firestore, functions } from '@/config/firebase';
 
@@ -107,23 +108,6 @@ export async function fetchUserColony(
     const cachedColony = getFromCache<Colony>(cacheKey, COLONY_CACHE_EXPIRY);
     if (cachedColony) {
       console.log(`Using cached colony data for user: ${uid}`);
-      
-      // If we need to refresh tiles, do that separately while still using cached colony data
-      if (options?.forceRefresh && cachedColony.tileIds?.length) {
-        // Start loading tiles in the background
-        fetchTilesForColony(cachedColony.tileIds, { 
-          forceRefresh: true
-        }).then(tiles => {
-          // Update the cache with new tiles
-          if (tiles.length > 0) {
-            cachedColony.tiles = tiles;
-            saveToCache(cacheKey, cachedColony);
-          }
-        }).catch(err => {
-          console.error('Background tile refresh failed:', err);
-        });
-      }
-      
       return cachedColony;
     }
   }
@@ -163,10 +147,11 @@ export async function fetchUserColony(
       visibilityRadius: colonyData.visibilityRadius || 0
     };
     
+    // TODO TW: Not sure if we should fetch these here or let it happen somwhere else?
     // Load tiles for the colony if not skipped
-    if (!options?.skipTiles && colony.tileIds.length > 0) {
-      colony.tiles = await fetchTilesForColony(colony.tileIds);
-    }
+    // if (!options?.skipTiles && colony.tileIds.length > 0) {
+    //   colony.tiles = await fetchTilesForColony(colony.tileIds);
+    // }
     
     // Save to cache
     if (typeof window !== 'undefined') {
@@ -177,68 +162,6 @@ export async function fetchUserColony(
   } catch (error) {
     console.error('Error fetching user colony:', error);
     throw error;
-  }
-}
-
-/**
- * Fetch tiles for a colony by their IDs
- * @param tileIds - Array of tile IDs to fetch
- * @param options - Optional parameters for controlling fetch behavior
- * @returns Array of tile objects
- */
-export async function fetchTilesForColony(
-  tileIds: string[], 
-  options?: { 
-    forceRefresh?: boolean;
-    onlyTileIds?: string[]; // Only fetch these specific tiles (subset of tileIds)
-  }
-): Promise<ColonyTile[]> {
-  if (!tileIds.length) return [];
-  
-  // If onlyTileIds is specified, filter the tileIds list
-  const tileIdsToFetch = options?.onlyTileIds 
-    ? tileIds.filter(id => options.onlyTileIds!.includes(id))
-    : tileIds;
-    
-  if (!tileIdsToFetch.length) return [];
-  
-  const cacheKey = getTilesCacheKey(tileIdsToFetch);
-  
-  // Check cache first if not forcing refresh
-  if (!options?.forceRefresh && typeof window !== 'undefined') {
-    const cachedTiles = getFromCache<ColonyTile[]>(cacheKey, TILES_CACHE_EXPIRY);
-    if (cachedTiles) {
-      console.log(`Using ${cachedTiles.length} cached tiles`);
-      return cachedTiles;
-    }
-  }
-  
-  try {
-    const tiles: ColonyTile[] = [];
-    const tilesRef = collection(firestore, 'tiles');
-    
-    // Firestore can only handle batches of 10 in where in queries
-    const batchSize = 10;
-    
-    for (let i = 0; i < tileIdsToFetch.length; i += batchSize) {
-      const batch = tileIdsToFetch.slice(i, i + batchSize);
-      const q = query(tilesRef, where('id', 'in', batch));
-      const querySnapshot = await getDocs(q);
-      
-      querySnapshot.forEach(doc => {
-        tiles.push(doc.data() as ColonyTile);
-      });
-    }
-    
-    // Cache all tiles we fetched
-    if (typeof window !== 'undefined' && tiles.length > 0) {
-      saveToCache(cacheKey, tiles);
-    }
-    
-    return tiles;
-  } catch (error) {
-    console.error('Error fetching tiles:', error);
-    return [];
   }
 }
 

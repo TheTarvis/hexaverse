@@ -1,4 +1,4 @@
-import { ColonyTile } from '@/types/colony' 
+import { Tile } from '@/types/tiles' 
 
 // Hex directions in cube coordinates (pointy-top orientation)
 export const HEX_DIRECTIONS = [
@@ -54,7 +54,7 @@ export const HEX_DIRECTIONS = [
   }
   
 // Find all valid fog tiles (neighbors of colony tiles up to a certain depth)
-export function findFogTiles(tileMap: { [key: string]: ColonyTile }, depth: number = 1): { q: number, r: number, s: number, distance: number }[] {
+export function findFogTiles(tileMap: { [key: string]: Tile }, depth: number = 1): { q: number, r: number, s: number, distance: number }[] {
   if (depth < 1) {
     return [];
   }
