@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import { Canvas, ThreeEvent } from '@react-three/fiber'
+import React, { useMemo, useState, useRef, useEffect } from 'react'
+import { Canvas, ThreeEvent, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { ColonyTile } from '@/types/colony'
@@ -126,6 +126,79 @@ function getTileColor(
   ).getStyle();
 }
 
+// Add a PulsingHexagon component for animation
+function PulsingHexagon({ 
+  position = [0, 0, 0] as [number, number, number],
+  color = 'white',
+  onAnimationComplete
+}: {
+  position: [number, number, number],
+  color: string,
+  onAnimationComplete: () => void
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const animationDuration = 0.8; // Increased from 0.5 to 0.8 seconds for slower animation
+
+  // Create a hexagon shape
+  const hexShape = useMemo(() => {
+    const shape = new THREE.Shape()
+    const size = 1
+    
+    // Create pointy-top hexagon
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i + Math.PI / 6
+      const x = size * Math.cos(angle)
+      const y = size * Math.sin(angle)
+      
+      if (i === 0) {
+        shape.moveTo(x, y)
+      } else {
+        shape.lineTo(x, y)
+      }
+    }
+    shape.closePath()
+    
+    return shape
+  }, [])
+
+  // Update animation every frame
+  useFrame((state, delta) => {
+    if (elapsedTime < animationDuration) {
+      // Update elapsed time
+      setElapsedTime(prev => prev + delta);
+      
+      // Calculate scale factor based on time (pulsing effect)
+      const progress = elapsedTime / animationDuration;
+      // Use Math.sin with reduced frequency (multiply by 1.5 instead of 2) for fewer, slower pulses
+      const scale = 1 + 0.3 * Math.sin(progress * Math.PI * 2);
+      
+      // Update scale
+      if (meshRef.current) {
+        meshRef.current.scale.set(scale, scale, scale);
+        
+        // Fade out opacity near the end
+        const opacity = 1 - (progress * 0.8);
+        (meshRef.current.material as THREE.MeshBasicMaterial).opacity = opacity;
+      }
+    } else {
+      // Animation complete
+      onAnimationComplete();
+    }
+  });
+
+  return (
+    <mesh ref={meshRef} position={position}>
+      <shapeGeometry args={[hexShape]} />
+      <meshBasicMaterial 
+        color={color} 
+        transparent={true}
+        opacity={0.8}
+      />
+    </mesh>
+  );
+}
+
 function HexagonMesh({ 
   position = [0, 0, 0] as [number, number, number], 
   color = 'teal', 
@@ -138,7 +211,8 @@ function HexagonMesh({
   isFogTile = false,
   fogDistance,
   onTileSelect,
-  onTileAdd
+  onTileAdd,
+  setClickedTile
 }: { 
   position?: [number, number, number], 
   color?: string, 
@@ -151,7 +225,8 @@ function HexagonMesh({
   isFogTile?: boolean,
   fogDistance?: number,
   onTileSelect: (tile: SelectedTile) => void,
-  onTileAdd?: (q: number, r: number, s: number) => void
+  onTileAdd?: (q: number, r: number, s: number) => void,
+  setClickedTile?: (coords: { q: number, r: number, s: number, position: [number, number, number], color: string } | null) => void
 }) {
   // Create a hexagon shape
   const hexShape = useMemo(() => {
@@ -183,6 +258,15 @@ function HexagonMesh({
     if (!isFogTile || !onTileAdd) return;
     
     console.log(`Clicked fog tile at: q=${q}, r=${r}, s=${s}`);
+    
+    // Set the clicked tile for animation
+    if (setClickedTile) {
+      setClickedTile({
+        q, r, s,
+        position,
+        color
+      });
+    }
     
     // Call the add tile handler
     onTileAdd(q, r, s);
@@ -248,6 +332,15 @@ function HexGrid({
   onTileAdd?: (q: number, r: number, s: number) => void,
   colonyColor?: string
 }) {
+  // Add state to track the clicked tile
+  const [clickedTile, setClickedTile] = useState<{
+    q: number,
+    r: number,
+    s: number,
+    position: [number, number, number],
+    color: string
+  } | null>(null);
+
   // Generate hexagon positions using cube coordinates
   const positions = useMemo(() => {
     const gridPositions: { 
@@ -324,8 +417,18 @@ function HexGrid({
           fogDistance={props.fogDistance}
           onTileSelect={onTileSelect}
           onTileAdd={onTileAdd}
+          setClickedTile={setClickedTile}
         />
       ))}
+      
+      {/* Render the animation if there's a clicked tile */}
+      {clickedTile && (
+        <PulsingHexagon 
+          position={clickedTile.position}
+          color={clickedTile.color}
+          onAnimationComplete={() => setClickedTile(null)}
+        />
+      )}
     </>
   )
 }

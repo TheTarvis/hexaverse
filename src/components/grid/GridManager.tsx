@@ -376,10 +376,11 @@ export function GridManager() {
         onDebugAction={handleDebugAction} 
       />
       
-      {/* Small loading indicator when adding tiles */}
+      {/* Improved adding tile indicator */}
       {addingTile && (
-        <div className="absolute bottom-16 right-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded-md text-sm z-10">
-          Adding tile...
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-80 text-white px-5 py-3 rounded-full shadow-lg z-20 flex items-center space-x-3">
+          <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+          <span className="font-medium">Adding tile to colony...</span>
         </div>
       )}
       

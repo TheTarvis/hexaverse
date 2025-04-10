@@ -1,3 +1,10 @@
+## [v0.9.9] - 2025-04-24
+### Added
+- Added visual animation feedback when adding new tiles to the colony
+- Implemented pulsing hexagon effect on clicked fog tiles for better user experience
+- Created a more prominent loading indicator when tiles are being added
+- Improved overall tile addition UX with visual cues and animations
+
 ## [v0.9.8] - 2025-04-23
 ### Changed
 - Optimized tile adjacency checking to dramatically reduce database reads
