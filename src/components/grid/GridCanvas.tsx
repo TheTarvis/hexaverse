@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo, useState, useRef, useEffect } from 'react'
-import { Canvas, ThreeEvent, useFrame } from '@react-three/fiber'
+import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { Tile } from '@/types/tiles'
@@ -39,6 +39,7 @@ interface HexGridCanvasProps {
   onTileSelect: (tile: SelectedTile) => void;
   onTileAdd?: (q: number, r: number, s: number) => void;
   colonyColor?: string;
+  followSelectedTile?: boolean;
 }
 
 // Convert cube coordinates to pixel coordinates (for pointy-top orientation)
@@ -433,6 +434,47 @@ function HexGrid({
   )
 }
 
+// Add new CameraController component
+function CameraController({ 
+  targetPosition, 
+  enabled = true 
+}: { 
+  targetPosition: [number, number, number]; 
+  enabled: boolean;
+}) {
+  const { camera, controls } = useThree();
+  const currentTarget = useRef<[number, number, number]>([0, 0, 0]);
+  
+  useFrame(() => {
+    if (!enabled || !controls) return;
+    
+    // Smoothly interpolate camera target position
+    currentTarget.current[0] += (targetPosition[0] - currentTarget.current[0]) * 0.05;
+    currentTarget.current[1] += (targetPosition[1] - currentTarget.current[1]) * 0.05;
+    currentTarget.current[2] += (targetPosition[2] - currentTarget.current[2]) * 0.05;
+    
+    // Update orbit controls target if it exists
+    if ('target' in controls) {
+      (controls as any).target.set(
+        currentTarget.current[0],
+        currentTarget.current[1],
+        currentTarget.current[2]
+      );
+      
+      if (typeof (controls as any).update === 'function') {
+        (controls as any).update();
+      }
+    }
+  });
+  
+  // Initialize current target on mount
+  useEffect(() => {
+    currentTarget.current = [...targetPosition];
+  }, []);
+  
+  return null;
+}
+
 export function GridCanvas({
   wireframe, 
   hexSize, 
@@ -443,8 +485,23 @@ export function GridCanvas({
   cameraTarget, 
   onTileSelect,
   onTileAdd,
-  colonyColor
+  colonyColor,
+  followSelectedTile = false
 }: HexGridCanvasProps) {
+  const [currentCameraTarget, setCurrentCameraTarget] = useState<[number, number, number]>(cameraTarget);
+  
+  // Update camera target when a tile is selected
+  const handleTileSelect = (tile: SelectedTile) => {
+    if (followSelectedTile) {
+      // Convert cube coordinates to pixel position
+      const [x, y, z] = cubeToPixel(tile.q, tile.r, tile.s, hexSize);
+      setCurrentCameraTarget([x, y, z]);
+    }
+    
+    // Pass the tile to the parent's handler
+    onTileSelect(tile);
+  };
+  
   return (
     <Canvas
       camera={{ position: cameraPosition, fov: 45 }}
@@ -469,6 +526,11 @@ export function GridCanvas({
           MIDDLE: THREE.MOUSE.DOLLY,
           RIGHT: THREE.MOUSE.PAN
         }}
+        makeDefault
+      />
+      <CameraController 
+        targetPosition={currentCameraTarget} 
+        enabled={followSelectedTile} 
       />
       <HexGrid
         wireframe={wireframe}
@@ -476,7 +538,7 @@ export function GridCanvas({
         colorScheme={colorScheme}
         tileMap={tileMap}
         fogTiles={fogTiles}
-        onTileSelect={onTileSelect}
+        onTileSelect={handleTileSelect}
         onTileAdd={onTileAdd}
         colonyColor={colonyColor}
       />

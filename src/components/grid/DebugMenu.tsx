@@ -9,6 +9,7 @@ import {
   SwatchIcon,
   BugAntIcon,
   AdjustmentsHorizontalIcon,
+  VideoCameraIcon
 } from '@heroicons/react/24/outline'
 
 interface DebugMenuProps {
@@ -18,6 +19,7 @@ interface DebugMenuProps {
     colorScheme: string;
     fogDistance: number;
     tileDetailsEnabled: boolean;
+    followSelectedTile: boolean;
   };
   onDebugAction: (action: string, value?: any) => void;
 }
@@ -46,6 +48,12 @@ const debugOptions = [
     description: 'Toggle tile details slide-up panel', 
     action: 'toggleTileDetails', 
     icon: BugAntIcon 
+  },
+  { 
+    name: 'Camera Follow', 
+    description: 'Toggle camera follow mode for selected tiles', 
+    action: 'toggleCameraFollow', 
+    icon: VideoCameraIcon 
   },
   { 
     name: 'Fog Depth', 
@@ -78,7 +86,7 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
         >
           <div className="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
             <div className="p-4">
-              {debugOptions.slice(0, 4).map((item) => (
+              {debugOptions.slice(0, 5).map((item) => (
                 <div 
                   key={item.name} 
                   className="group relative flex gap-x-6 rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
@@ -131,7 +139,8 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
                 Size: {debugState.hexSize.toFixed(1)}, 
                 Colors: {debugState.colorScheme},
                 Fog: {debugState.fogDistance},
-                Details: {debugState.tileDetailsEnabled ? 'On' : 'Off'}
+                Details: {debugState.tileDetailsEnabled ? 'On' : 'Off'},
+                Follow: {debugState.followSelectedTile ? 'On' : 'Off'}
               </div>
             </div>
           </div>

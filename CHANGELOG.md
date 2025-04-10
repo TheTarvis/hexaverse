@@ -1,3 +1,10 @@
+## [v0.9.12] - 2025-04-27
+### Fixed
+- Fixed performance issue in GridManager component causing excessive re-renders
+- Optimized useEffect dependencies by separating grid data loading from error handling
+- Improved grid rendering performance by only triggering loadGridData when colony status or ID changes
+- Reduced unnecessary calls to handleColonyWithTiles function
+
 ## [v0.9.11] - 2025-04-26
 ### Changed
 - Renamed fetchTilesForColony to fetchTiles and moved it to src/services/tiles

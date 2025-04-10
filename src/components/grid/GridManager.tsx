@@ -10,6 +10,16 @@ import { FogTile, GridCanvas } from '@/components/grid/GridCanvas'
 import { coordsToKey, findFogTiles } from '@/utils/hexUtils'
 import { addTile } from '@/services/tiles'
 
+// Define colony status enum for better state management
+enum ColonyStatus {
+  LOADING = 'loading',
+  HAS_TILES = 'has_tiles',
+  HAS_TILE_IDS = 'has_tile_ids',
+  NO_TILES = 'no_tiles',
+  NO_COLONY = 'no_colony',
+  ERROR = 'error'
+}
+
 interface TileMap {
   [key: string]: Tile
 }
@@ -34,6 +44,7 @@ export function GridManager() {
     colorScheme: 'type', // Default to type-based coloring
     fogDistance: 5, // Add fog distance to debug state
     tileDetailsEnabled: false, // Disabled by default
+    followSelectedTile: false, // Camera follow mode disabled by default
   })
 
   // Calculate world coordinates for the target tile based on colony start coordinates
@@ -58,110 +69,167 @@ export function GridManager() {
   const [error, setError] = useState<string | null>(null)
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   const [addingTile, setAddingTile] = useState(false)
+  const [colonyStatus, setColonyStatus] = useState<ColonyStatus>(ColonyStatus.LOADING)
   
   // Recalculate fog tiles when fog depth changes or tileMap is updated
   useEffect(() => {
-    if (Object.keys(tileMap).length > 0) {
+    const hasTilesLocal = Object.keys(tileMap).length > 0;
+    if (hasTilesLocal) {
       // Find fog tiles based on current depth
       const fogTilesList = findFogTiles(tileMap, debugState.fogDistance);
       console.log(`Found ${fogTilesList.length} potential fog tiles with depth ${debugState.fogDistance}`);
       setFogTiles(fogTilesList);
     }
   }, [tileMap, debugState.fogDistance]); // TODO TW: Figure out this warning.
+  
+  // Helper function to check if tileMap has tiles
+  const hasTiles = useCallback((map: TileMap): boolean => {
+    return Object.keys(map).length > 0;
+  }, []);
 
-  // Load the initial grid data when colony tiles change
-  useEffect(() => {
-    async function loadGridData() {
-      try {
-        // Don't set loading to true if we already have tiles - this prevents flickering
-        const hasExistingTiles = Object.keys(tileMap).length > 0;
-        if (!hasExistingTiles) {
-          setLoading(true);
-        }
-        
-        if (colony) {
-          if (colony.tiles && colony.tiles.length > 0) {
-            console.log(`Loading ${colony.tiles.length} tiles from colony`);
-            
-            // Create a map of all new tiles
-            const newTileMap: TileMap = {};
-            
-            // To ensure we don't lose our newly added tiles, merge with existing tileMap
-            colony.tiles.forEach((tile) => {
-              const key = coordsToKey(tile.q, tile.r, tile.s);
-              newTileMap[key] = tile;
-            });
-            
-            // Only update state if we actually have changes
-            setTileMap(prevTileMap => {
-              // Compare if we have the same keys to avoid unnecessary rerenders
-              const prevKeys = Object.keys(prevTileMap);
-              const newKeys = Object.keys(newTileMap);
-              
-              if (prevKeys.length !== newKeys.length || 
-                  newKeys.some(key => !prevTileMap[key])) {
-                // We have different keys, so update the map
-                return newTileMap;
-              }
-              
-              // Check if any tiles have different data
-              const hasChanges = newKeys.some(key => {
-                const prevTile = prevTileMap[key];
-                const newTile = newTileMap[key];
-                return JSON.stringify(prevTile) !== JSON.stringify(newTile);
-              });
-              
-              return hasChanges ? newTileMap : prevTileMap;
-            });
-            
-            setError(null);
-          } else if (colony.tileIds && colony.tileIds.length > 0) {
-            // We have a colony with tileIds but tiles aren't loaded yet
-            // Keep loading state true and don't show an error
-            console.log(`Colony has ${colony.tileIds.length} tiles, but they aren't loaded yet`);
-            setError(null);
-            // Loading state remains true until tiles are loaded
-          } else {
-            // Only show the "No colony tiles" error if we've finished loading and there are no tileIds
-            console.log('Colony exists but has no tiles');
-            
-            // Keep existing tiles if we have them during reload
-            if (!hasExistingTiles) {
-              setTileMap({});
-              setFogTiles([]); // Clear fog tiles if no colony
-            }
-            
-            setError('No colony tiles available. Please create a colony first.');
-            setLoading(false);
-          }
-        } else if (loading && colony === null) {
-          // Colony is still loading or being checked, don't show an error yet
-          console.log('Waiting for colony data to load...');
-        } else {
-          // Colony is definitely not available (finished loading and is null)
-          console.log('No colony available');
-          setTileMap({});
-          setFogTiles([]);
-          setError('No colony available. Please create a colony first.');
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Error loading grid data:', error);
-        setError('Failed to load grid data');
-        setLoading(false);
-      } finally {
-        // Only set loading to false if we have tiles or we hit an error condition
-        if (Object.keys(tileMap).length > 0 || error) {
-          setLoading(false);
-        }
-      }
+  // Create a new tile map from the colony's tiles
+  const createTileMapFromColony = useCallback((colonyTiles: Tile[]): TileMap => {
+    const newTileMap: TileMap = {};
+    colonyTiles.forEach((tile) => {
+      const key = coordsToKey(tile.q, tile.r, tile.s);
+      newTileMap[key] = tile;
+    });
+    return newTileMap;
+  }, []);
+
+  // Check if we should update the tile map based on changes
+  const shouldUpdateTileMap = useCallback((prevTileMap: TileMap, newTileMap: TileMap): boolean => {
+    const prevKeys = Object.keys(prevTileMap);
+    const newKeys = Object.keys(newTileMap);
+    
+    // Different number of keys means we need to update
+    if (prevKeys.length !== newKeys.length || newKeys.some(key => !prevTileMap[key])) {
+      return true;
     }
     
-    loadGridData();
-  }, [colony, loading, tileMap, error]); // Added tileMap as a dependency to properly handle changes
-  
-  // Show toast only when we have a confirmed error, not during loading
+    // Check if any tiles have different data
+    return newKeys.some(key => {
+      const prevTile = prevTileMap[key];
+      const newTile = newTileMap[key];
+      return JSON.stringify(prevTile) !== JSON.stringify(newTile);
+    });
+  }, []);
+
+  // Update colony status when colony changes
   useEffect(() => {
+    if (colony === null && loading) {
+      setColonyStatus(ColonyStatus.LOADING);
+    } else if (colony === null) {
+      setColonyStatus(ColonyStatus.NO_COLONY);
+    } else if (colony.tiles && colony.tiles.length > 0) {
+      setColonyStatus(ColonyStatus.HAS_TILES);
+    } else if (colony.tileIds && colony.tileIds.length > 0) {
+      setColonyStatus(ColonyStatus.HAS_TILE_IDS);
+    } else {
+      setColonyStatus(ColonyStatus.NO_TILES);
+    }
+  }, [colony, loading]);
+
+  // Handle the case when a colony has tiles
+  const handleColonyWithTiles = useCallback((colonyTiles: Tile[]) => {
+    console.log(`Loading ${colonyTiles.length} tiles from colony`);
+    
+    const newTileMap = createTileMapFromColony(colonyTiles);
+    
+    // Only update state if we actually have changes
+    setTileMap(prevTileMap => {
+      return shouldUpdateTileMap(prevTileMap, newTileMap) ? newTileMap : prevTileMap;
+    });
+    
+    setError(null);
+    setLoading(false);
+  }, [createTileMapFromColony, shouldUpdateTileMap]);
+
+  // Handle the case when a colony has tileIds but no tiles yet
+  const handleColonyWithTileIds = useCallback(() => {
+    console.log(`Colony has ${colony?.tileIds?.length} tiles, but they aren't loaded yet`);
+    setError(null);
+    // Loading state remains true until tiles are loaded
+  }, [colony?.tileIds?.length]);
+
+  // Handle the case when a colony has no tiles
+  const handleColonyWithNoTiles = useCallback((hasExistingTiles: boolean) => {
+    console.log('Colony exists but has no tiles');
+    
+    // Keep existing tiles if we have them during reload
+    if (!hasExistingTiles) {
+      setTileMap({});
+      setFogTiles([]); // Clear fog tiles if no colony
+    }
+    
+    setError('No colony tiles available. Please create a colony first.');
+    setLoading(false);
+  }, []);
+
+  // Handle the case when there's no colony
+  const handleNoColony = useCallback(() => {
+    console.log('No colony available');
+    setTileMap({});
+    setFogTiles([]);
+    setError('No colony available. Please create a colony first.');
+    setLoading(false);
+  }, []);
+
+  // Load grid data function hoisted outside the useEffect
+  const loadGridData = useCallback(async () => {
+    try {
+      // Don't set loading to true if we already have tiles - this prevents flickering
+      const hasExistingTiles = hasTiles(tileMap);
+      if (!hasExistingTiles) {
+        setLoading(true);
+      }
+      
+      // Use the colonyStatus to determine what to do
+      switch (colonyStatus) {
+        case ColonyStatus.HAS_TILES:
+          if (colony?.tiles) {
+            handleColonyWithTiles(colony.tiles);
+          }
+          break;
+        case ColonyStatus.HAS_TILE_IDS:
+          // TODO TW: Handle this case, should remove, but it's not needed for now.
+          handleColonyWithTileIds();
+          break;
+        case ColonyStatus.NO_TILES:
+          handleColonyWithNoTiles(hasExistingTiles);
+          break;
+        case ColonyStatus.NO_COLONY:
+          handleNoColony();
+          break;
+        case ColonyStatus.LOADING:
+          // Do nothing while loading
+          console.log('Waiting for colony data to load...');
+          break;
+        case ColonyStatus.ERROR:
+          // Already handled by the error state
+          break;
+      }
+    } catch (error) {
+      console.error('Error loading grid data:', error);
+      setError('Failed to load grid data');
+      setLoading(false);
+      setColonyStatus(ColonyStatus.ERROR);
+    } finally {
+      // Only set loading to false if we have tiles or we hit an error condition
+      if (hasTiles(tileMap) || error) {
+        setLoading(false);
+      }
+    }
+  }, [colonyStatus, colony, tileMap, hasTiles, handleColonyWithTiles, handleColonyWithTileIds, handleColonyWithNoTiles, handleNoColony]);
+
+  // Only call loadGridData when colonyStatus changes or on initial load
+  useEffect(() => {
+    loadGridData();
+  }, [colonyStatus, colony?.id]); // Only re-run when colony status or colony ID changes
+  
+  // Combined useEffect for error toast only
+  useEffect(() => {
+    // Show toast only when we have a confirmed error, not during loading
     if (error) {
       showToast(error, 'error');
     }
@@ -295,6 +363,9 @@ export function GridManager() {
           setSelectedTile(null);
         }
         break;
+      case 'toggleCameraFollow': // Add case for toggling camera follow mode
+        setDebugState((prev) => ({ ...prev, followSelectedTile: !prev.followSelectedTile }));
+        break;
     }
   }
 
@@ -375,15 +446,7 @@ export function GridManager() {
         debugState={debugState} 
         onDebugAction={handleDebugAction} 
       />
-      
-      {/* Improved adding tile indicator */}
-      {addingTile && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-80 text-white px-5 py-3 rounded-full shadow-lg z-20 flex items-center space-x-3">
-          <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
-          <span className="font-medium">Adding tile to colony...</span>
-        </div>
-      )}
-      
+
       {/* Show error message if there's an error and we're not loading */}
       {error && !loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-40 z-10">
@@ -407,6 +470,7 @@ export function GridManager() {
           onTileSelect={handleTileSelect}
           onTileAdd={handleAddTile}
           colonyColor={colony?.color}
+          followSelectedTile={debugState.followSelectedTile}
         />
       )}
     </div>
