@@ -5,6 +5,7 @@ import * as admin from "firebase-admin";
 // Import functions from other files
 import { createColony } from "./colony";
 import { addTile } from "./tiles";
+import { addRoadmapItem, updateRoadmapItem, deleteRoadmapItem } from "./roadmap";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -41,5 +42,8 @@ export const makeUppercase = onDocumentCreated("messages/{documentId}", (event) 
 // Export functions from other files
 export {
   createColony,
-  addTile
+  addTile,
+  addRoadmapItem,
+  updateRoadmapItem,
+  deleteRoadmapItem
 }; 

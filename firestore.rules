@@ -29,6 +29,15 @@ service cloud.firestore {
                    'id' in request.query.where && request.query.where.id is list;
     }
     
+    match /roadmapItems/{itemId} {
+      // Allow read access to all authenticated users
+      allow read: if request.auth != null;
+      // Only allow writes from Cloud Functions
+      allow write: if isRequestFromCloudFunction();
+      // Allow listing and querying roadmap items
+      allow list: if request.auth != null;
+    }
+    
     // Default deny
     match /{document=**} {
       allow read, write: if false;

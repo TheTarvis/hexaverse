@@ -6,9 +6,10 @@ import { useColony } from '@/contexts/ColonyContext'
 import { useToast } from '@/contexts/ToastContext'
 import { Tile } from '@/types/tiles'
 import { DebugMenu } from '@/components/grid/DebugMenu'
-import { FogTile, GridCanvas } from '@/components/grid/GridCanvas'
-import { coordsToKey, findFogTiles } from '@/utils/hexUtils'
+import { GridCanvas } from '@/components/grid/GridCanvas'
+import { coordsToKey } from '@/utils/hexUtils'
 import { addTile } from '@/services/tiles'
+import { useFog } from '@/hooks/useFog'
 
 // Define colony status enum for better state management
 enum ColonyStatus {
@@ -42,7 +43,7 @@ export function GridManager() {
     wireframe: false,
     hexSize: 1.2,
     colorScheme: 'type', // Default to type-based coloring
-    fogDistance: 5, // Add fog distance to debug state
+    fogDistance: 5, // Controls how many hex layers beyond the colony edge are shown as fog tiles
     tileDetailsEnabled: false, // Disabled by default
     followSelectedTile: false, // Camera follow mode disabled by default
   })
@@ -64,23 +65,14 @@ export function GridManager() {
   const cameraTarget: [number, number, number] = [worldCoords.x, worldCoords.y, 0];
 
   const [tileMap, setTileMap] = useState<TileMap>({})
-  const [fogTiles, setFogTiles] = useState<FogTile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   const [addingTile, setAddingTile] = useState(false)
   const [colonyStatus, setColonyStatus] = useState<ColonyStatus>(ColonyStatus.LOADING)
   
-  // Recalculate fog tiles when fog depth changes or tileMap is updated
-  useEffect(() => {
-    const hasTilesLocal = Object.keys(tileMap).length > 0;
-    if (hasTilesLocal) {
-      // Find fog tiles based on current depth
-      const fogTilesList = findFogTiles(tileMap, debugState.fogDistance);
-      console.log(`Found ${fogTilesList.length} potential fog tiles with depth ${debugState.fogDistance}`);
-      setFogTiles(fogTilesList);
-    }
-  }, [tileMap, debugState.fogDistance]); // TODO TW: Figure out this warning.
+  // Use the fog hook instead of managing fog state directly
+  const { fogTiles } = useFog(tileMap, debugState.fogDistance);
   
   // Helper function to check if tileMap has tiles
   const hasTiles = useCallback((map: TileMap): boolean => {
@@ -159,7 +151,6 @@ export function GridManager() {
     // Keep existing tiles if we have them during reload
     if (!hasExistingTiles) {
       setTileMap({});
-      setFogTiles([]); // Clear fog tiles if no colony
     }
     
     setError('No colony tiles available. Please create a colony first.');
@@ -170,7 +161,6 @@ export function GridManager() {
   const handleNoColony = useCallback(() => {
     console.log('No colony available');
     setTileMap({});
-    setFogTiles([]);
     setError('No colony available. Please create a colony first.');
     setLoading(false);
   }, []);
@@ -257,11 +247,6 @@ export function GridManager() {
           return updatedMap;
         });
         
-        // Remove this tile from fog tiles since it's now part of the colony
-        setFogTiles(prevFogTiles => 
-          prevFogTiles.filter(tile => !(tile.q === q && tile.r === r && tile.s === s))
-        );
-        
         // Clone the current colony and update it directly to prevent race conditions
         // and ensure consistency between grid and colony data
         if (colony) {
@@ -330,7 +315,7 @@ export function GridManager() {
     } finally {
       setAddingTile(false);
     }
-  }, [addingTile, colony, refreshColony, setColony, setFogTiles, showToast]); // Added colony back as a dependency
+  }, [addingTile, colony, refreshColony, setColony, showToast]); // Updated dependencies
   
   const handleDebugAction = (action: string, value?: any) => {
     switch(action) {
@@ -353,7 +338,7 @@ export function GridManager() {
         break;
       case 'changeFogDepth': // Add case for changing fog depth
         if (typeof value === 'number' && value >= 0) {
-          setDebugState((prev) => ({ ...prev, fogDepth: value }));
+          setDebugState((prev) => ({ ...prev, fogDistance: value }));
         }
         break;
       case 'toggleTileDetails': // Add case for toggling tile details

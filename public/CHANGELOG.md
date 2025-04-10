@@ -1,3 +1,19 @@
+## [v0.9.13] - 2025-04-28
+### Changed
+- Updated Roadmap Admin page to follow the same Tailwind CSS styling as Events page
+- Redesigned RoadmapAdminControls component with improved layout and UI components
+- Added search functionality to filter roadmap items
+- Enhanced roadmap item display with modern styling and dropdown menus
+- Improved form layout and input fields with consistent component usage
+- Converted progress input to an interactive slider for better user experience
+
+## [v0.9.12] - 2025-04-27
+### Fixed
+- Fixed performance issue in GridManager component causing excessive re-renders
+- Optimized useEffect dependencies by separating grid data loading from error handling
+- Improved grid rendering performance by only triggering loadGridData when colony status or ID changes
+- Reduced unnecessary calls to handleColonyWithTiles function
+
 ## [v0.9.11] - 2025-04-26
 ### Changed
 - Renamed fetchTilesForColony to fetchTiles and moved it to src/services/tiles

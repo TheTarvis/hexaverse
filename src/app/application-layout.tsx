@@ -173,6 +173,10 @@ export function ApplicationLayout({
               <SidebarSpacer />
 
               <SidebarSection>
+                <SidebarItem href="/roadmap" current={pathname.startsWith('/roadmap')}>
+                  <CalendarIcon />
+                  <SidebarLabel>Road Map</SidebarLabel>
+                </SidebarItem>
                 <SidebarItem href="#">
                   <QuestionMarkCircleIcon />
                   <SidebarLabel>Support</SidebarLabel>

@@ -15,6 +15,8 @@ import { auth } from '@/config/firebase';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  isAdmin: boolean;
+  isCheckingAdmin: boolean;
   signIn: (email: string, password: string) => Promise<User>;
   signInWithGoogle: () => Promise<User>;
   signUp: (email: string, password: string) => Promise<User>;
@@ -26,6 +28,29 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+
+  // Check if the user has admin claim
+  const checkAdminStatus = async (user: User | null) => {
+    setIsCheckingAdmin(true);
+    
+    if (!user) {
+      setIsAdmin(false);
+      setIsCheckingAdmin(false);
+      return;
+    }
+    
+    try {
+      const token = await user.getIdTokenResult();
+      setIsAdmin(token.claims.admin === true);
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdmin(false);
+    } finally {
+      setIsCheckingAdmin(false);
+    }
+  };
 
   useEffect(() => {
     // Check for redirect result on component mount
@@ -47,6 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = subscribeToAuthChanges((authUser) => {
       setUser(authUser);
       setIsLoading(false);
+      
+      // Check admin status whenever user changes
+      checkAdminStatus(authUser);
     });
 
     // Cleanup subscription
@@ -56,6 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     user,
     isLoading,
+    isAdmin,
+    isCheckingAdmin,
     signIn: signInWithEmail,
     signInWithGoogle,
     signUp: createUser,
