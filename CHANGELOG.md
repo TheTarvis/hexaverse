@@ -1,3 +1,9 @@
+## [v0.9.17] - 2025-04-16
+### Changed
+- Updated README.md
+- Added default values for firestore config env variables (for local running without .env file)
+- Removed firestore-debug.log
+
 ## [v0.9.16] - 2025-04-16
 ### Changed
 - Fog Tiles are now viewable Tiles.

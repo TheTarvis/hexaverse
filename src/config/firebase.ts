@@ -5,12 +5,12 @@ import { getFunctions, connectFunctionsEmulator, Functions } from 'firebase/func
 
 // Firebase configuration (will be populated from environment variables)
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'api_key',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'hexaverse.firebaseapp.com',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'hexaverse',
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'hexaverse.appspot.com',
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || 'message_sender_id',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || 'app_id',
 };
 
 // Validate Firebase config before initialization
@@ -76,6 +76,12 @@ try {
     
     // Connect to emulators in development
     if (process.env.NODE_ENV === 'development') {
+
+      console.log('Running in development mode, connecting to emulators...');
+      if (!firebaseConfig.projectId) {
+        firebaseConfig.projectId = 'hexaverse';
+      }
+
       // Connect to the Auth emulator
       connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
       console.log('Connected to Firebase Auth emulator');
