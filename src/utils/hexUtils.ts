@@ -1,4 +1,5 @@
 import { Tile } from '@/types/tiles' 
+import { ViewableTile } from '@/components/grid/GridCanvas'
 
 // Hex directions in cube coordinates (pointy-top orientation)
 export const HEX_DIRECTIONS = [
@@ -53,19 +54,19 @@ export const HEX_DIRECTIONS = [
     return edgeTiles
   }
   
-// Find all valid fog tiles (neighbors of colony tiles up to a certain depth)
-export function findFogTiles(tileMap: { [key: string]: Tile }, depth: number = 1): { q: number, r: number, s: number, distance: number }[] {
+// Find all valid viewable tiles (neighbors of colony tiles up to a certain depth)
+export function findViewableTiles(tileMap: { [key: string]: Tile }, depth: number = 1): ViewableTile[] {
   if (depth < 1) {
     return [];
   }
 
-  const fogTilesMap: { [key: string]: { q: number, r: number, s: number, distance: number } } = {};
-  const visitedKeys = new Set<string>(Object.keys(tileMap)); // Keep track of colony and already found fog tiles
+  const viewableTilesMap: { [key: string]: ViewableTile } = {};
+  const visitedKeys = new Set<string>(Object.keys(tileMap)); // Keep track of colony and already found viewable tiles
   let currentFrontier: { q: number, r: number, s: number }[] = Object.values(tileMap).map(tile => ({ q: tile.q, r: tile.r, s: tile.s })); // Start with colony tiles
 
   for (let d = 0; d < depth; d++) {
     const nextFrontier: { q: number, r: number, s: number }[] = [];
-    const newFogFoundInLayer: { [key: string]: { q: number, r: number, s: number, distance: number } } = {};
+    const newviewableFoundInLayer: { [key: string]: ViewableTile } = {};
 
     currentFrontier.forEach(tile => {
       const neighbors = getNeighbors(tile);
@@ -73,17 +74,22 @@ export function findFogTiles(tileMap: { [key: string]: Tile }, depth: number = 1
       neighbors.forEach(neighbor => {
         const neighborKey = coordsToKey(neighbor.q, neighbor.r, neighbor.s);
 
-        // If this neighbor is not part of the colony and hasn't been visited/added as fog yet
+        // If this neighbor is not part of the colony and hasn't been visited/added as viewable yet
         if (!visitedKeys.has(neighborKey)) {
-          newFogFoundInLayer[neighborKey] = { ...neighbor, distance: d + 1 }; // Current depth + 1
+          newviewableFoundInLayer[neighborKey] = { 
+            q: neighbor.q, 
+            r: neighbor.r, 
+            s: neighbor.s, 
+            distance: d + 1 
+          }; // Current depth + 1
           visitedKeys.add(neighborKey); // Mark as visited
           nextFrontier.push(neighbor); // Add to the frontier for the next layer
         }
       });
     });
 
-    // Add the newly found fog tiles for this layer to the main map
-    Object.assign(fogTilesMap, newFogFoundInLayer);
+    // Add the newly found viewable tiles for this layer to the main map
+    Object.assign(viewableTilesMap, newviewableFoundInLayer);
     
     // Prepare for the next iteration
     currentFrontier = nextFrontier;
@@ -95,7 +101,7 @@ export function findFogTiles(tileMap: { [key: string]: Tile }, depth: number = 1
   }
 
   // Convert map to array
-  return Object.values(fogTilesMap);
+  return Object.values(viewableTilesMap);
 }
   // Validate that a tile's cube coordinates sum to 0
   export function isValidCubeCoordinate(q: number, r: number, s: number): boolean {

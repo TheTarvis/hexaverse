@@ -6,10 +6,14 @@ import { useColony } from '@/contexts/ColonyContext'
 import { useToast } from '@/contexts/ToastContext'
 import { Tile } from '@/types/tiles'
 import { DebugMenu } from '@/components/grid/DebugMenu'
-import { GridCanvas } from '@/components/grid/GridCanvas'
+import { GridCanvas, ViewableTile } from '@/components/grid/GridCanvas'
 import { coordsToKey } from '@/utils/hexUtils'
+import { getTileColor } from '@/utils/tileColorUtils'
 import { addTile } from '@/services/tiles'
-import { useFog } from '@/hooks/useFog'
+import { useViewDistance } from '@/hooks/useViewDistance'
+import { useWebSocket } from '@/hooks/useWebSocket'
+import { useAuth } from '@/contexts/AuthContext'
+import { isTileMessage, isColonyMessage } from '@/types/websocket'
 
 // Define colony status enum for better state management
 enum ColonyStatus {
@@ -38,12 +42,13 @@ interface SelectedTile {
 export function GridManager() {
   const { colony, refreshColony, setColony } = useColony();
   const { showToast } = useToast();
+  const { user, userToken } = useAuth();
   
   const [debugState, setDebugState] = useState({
     wireframe: false,
     hexSize: 1.2,
     colorScheme: 'type', // Default to type-based coloring
-    fogDistance: 5, // Controls how many hex layers beyond the colony edge are shown as fog tiles
+    viewDistance: 5, // Controls how many hex layers beyond the colony edge are shown as viewable tiles
     tileDetailsEnabled: false, // Disabled by default
     followSelectedTile: false, // Camera follow mode disabled by default
   })
@@ -71,9 +76,66 @@ export function GridManager() {
   const [addingTile, setAddingTile] = useState(false)
   const [colonyStatus, setColonyStatus] = useState<ColonyStatus>(ColonyStatus.LOADING)
   
-  // Use the fog hook instead of managing fog state directly
-  const { fogTiles } = useFog(tileMap, debugState.fogDistance);
+  // Use the view distance hook to get base viewable tiles
+  const { viewableTiles: baseViewableTiles } = useViewDistance(tileMap, debugState.viewDistance);
   
+  // Process viewable tiles to include color
+  const viewableTiles = useMemo(() => {
+    return baseViewableTiles.map((tile: ViewableTile) => ({
+      ...tile,
+      color: getTileColor(
+        'viewable', 
+        debugState.colorScheme, 
+        tile.q, 
+        tile.r, 
+        tile.s, 
+        undefined, 
+        tile.distance, 
+        colony?.color,
+        undefined,
+        user?.uid
+      )
+    }));
+  }, [baseViewableTiles, debugState.colorScheme, colony?.color, user?.uid]);
+  
+  // Update tile colors when colorScheme or other relevant parameters change
+  useEffect(() => {
+    if (Object.keys(tileMap).length === 0) return;
+    
+    const updatedTileMap = { ...tileMap };
+    let hasChanges = false;
+    
+    // Update colors for all tiles based on current settings
+    Object.entries(updatedTileMap).forEach(([key, tile]) => {
+      const newColor = getTileColor(
+        tile.type,
+        debugState.colorScheme,
+        tile.q,
+        tile.r,
+        tile.s,
+        tile.resourceDensity,
+        undefined,
+        colony?.color,
+        tile.controllerUid,
+        user?.uid
+      );
+      
+      // Only update if color has changed
+      if (tile.color !== newColor) {
+        updatedTileMap[key] = {
+          ...tile,
+          color: newColor
+        };
+        hasChanges = true;
+      }
+    });
+    
+    // Only update state if colors have actually changed
+    if (hasChanges) {
+      setTileMap(updatedTileMap);
+    }
+  }, [debugState.colorScheme, colony?.color, user?.uid]);
+
   // Helper function to check if tileMap has tiles
   const hasTiles = useCallback((map: TileMap): boolean => {
     return Object.keys(map).length > 0;
@@ -106,7 +168,96 @@ export function GridManager() {
       return JSON.stringify(prevTile) !== JSON.stringify(newTile);
     });
   }, []);
-
+  
+  // WebSocket integration
+  const handleWebSocketMessage = useCallback((data: any) => {
+    console.log(`WebSocket: Received message`, data);
+    
+    // Handle tile updates
+    if (isTileMessage(data)) {
+      const tile = data.payload as Tile;
+      const tileKey = coordsToKey(tile.q, tile.r, tile.s);
+      
+      console.log(`WebSocket: Received tile update for ${tileKey}`, tile);
+      
+      // Update the tile map with the new tile data
+      setTileMap(prevTileMap => {
+        // Create a copy of the tile for potential modifications
+        let updatedTile = { ...tile };
+        
+        // Check if the tile is within view distance
+        const isInViewDistance = baseViewableTiles.some(
+          (viewTile: ViewableTile) => viewTile.q === tile.q && viewTile.r === tile.r && viewTile.s === tile.s
+        );
+        
+        // Check if the tile is owned by another player
+        const isEnemyTile = tile.controllerUid && tile.controllerUid !== userToken;
+        
+        if (isEnemyTile) {
+          console.log(`WebSocket: Tile ${tileKey} is controlled by another player (${tile.controllerUid})`);
+          console.log(`WebSocket: Current userToken=${userToken}`);
+          console.log(`WebSocket: isInViewDistance=${isInViewDistance}`);
+        }
+        
+        // Add the tile color based on its properties
+        updatedTile.color = getTileColor(
+          updatedTile.type,
+          debugState.colorScheme,
+          updatedTile.q,
+          updatedTile.r,
+          updatedTile.s,
+          updatedTile.resourceDensity,
+          undefined,
+          colony?.color,
+          updatedTile.controllerUid,
+          user?.uid
+        );
+        
+        // Only add/update the tile if:
+        // 1. It's already in our tileMap (we already know about it), or
+        // 2. It's in view distance (we can see it)
+        if (prevTileMap[tileKey] || isInViewDistance) {
+          // For enemy tiles in view distance, keep the controllerUid property
+          // so GridCanvas can color them appropriately
+          
+          // Check if this is an update to an existing tile or a new tile
+          const tileExists = prevTileMap[tileKey] !== undefined;
+          const tileHasChanged = JSON.stringify(prevTileMap[tileKey]) !== JSON.stringify(updatedTile);
+          
+          // Log more details for debugging
+          if (isEnemyTile && isInViewDistance) {
+            console.log(`WebSocket: Adding enemy tile to tileMap with controllerUid=${updatedTile.controllerUid}`);
+          }
+          
+          // Only update if the tile is new or has changed
+          if (!tileExists || tileHasChanged) {
+            console.log(`WebSocket: Updating tile ${tileKey} in tileMap`);
+            return {
+              ...prevTileMap,
+              [tileKey]: updatedTile
+            };
+          }
+        } else {
+          console.log(`WebSocket: Tile ${tileKey} is not within view distance, not adding to tileMap`);
+        }
+        
+        return prevTileMap;
+      });
+    }
+    
+    // Handle colony updates
+    if (isColonyMessage(data) && colony && data.payload.id === colony.id) {
+      console.log(`WebSocket: Received colony update`, data.payload);
+    }
+  }, [colony, baseViewableTiles, user?.uid, debugState.colorScheme]);
+  
+  // Initialize WebSocket connection
+  const { isConnected } = useWebSocket({
+    onMessage: handleWebSocketMessage,
+    autoConnect: true,
+    token: userToken
+  });
+  
   // Update colony status when colony changes
   useEffect(() => {
     if (colony === null && loading) {
@@ -126,7 +277,24 @@ export function GridManager() {
   const handleColonyWithTiles = useCallback((colonyTiles: Tile[]) => {
     console.log(`Loading ${colonyTiles.length} tiles from colony`);
     
-    const newTileMap = createTileMapFromColony(colonyTiles);
+    // Add colors to tiles before creating the tile map
+    const coloredTiles = colonyTiles.map(tile => ({
+      ...tile,
+      color: getTileColor(
+        tile.type,
+        debugState.colorScheme,
+        tile.q,
+        tile.r,
+        tile.s,
+        tile.resourceDensity,
+        undefined,
+        colony?.color,
+        tile.controllerUid,
+        user?.uid
+      )
+    }));
+    
+    const newTileMap = createTileMapFromColony(coloredTiles);
     
     // Only update state if we actually have changes
     setTileMap(prevTileMap => {
@@ -135,7 +303,7 @@ export function GridManager() {
     
     setError(null);
     setLoading(false);
-  }, [createTileMapFromColony, shouldUpdateTileMap]);
+  }, [createTileMapFromColony, shouldUpdateTileMap, debugState.colorScheme, colony?.color, user?.uid]);
 
   // Handle the case when a colony has tileIds but no tiles yet
   const handleColonyWithTileIds = useCallback(() => {
@@ -217,6 +385,11 @@ export function GridManager() {
     loadGridData();
   }, [colonyStatus, colony?.id]); // Only re-run when colony status or colony ID changes
   
+  // Add debug information about WebSocket connection
+  useEffect(() => {
+    console.log(`WebSocket connection status: ${isConnected ? 'Connected' : 'Disconnected'}`);
+  }, [isConnected]);
+  
   // Combined useEffect for error toast only
   useEffect(() => {
     // Show toast only when we have a confirmed error, not during loading
@@ -236,14 +409,32 @@ export function GridManager() {
       const result = await addTile(q, r, s);
       
       if (result.success && result.tile) {
+        // Get the new tile from the result
         const newTile = result.tile as Tile;
         const tileKey = coordsToKey(q, r, s);
+        
+        // Add color to the new tile
+        const coloredTile = {
+          ...newTile,
+          color: getTileColor(
+            newTile.type,
+            debugState.colorScheme,
+            newTile.q,
+            newTile.r,
+            newTile.s,
+            newTile.resourceDensity,
+            undefined,
+            colony?.color,
+            newTile.controllerUid,
+            user?.uid
+          )
+        };
         
         // Add the new tile to the local tile map immediately for immediate feedback
         // This needs to happen before we update the colony
         setTileMap(prevTileMap => {
           const updatedMap = { ...prevTileMap };
-          updatedMap[tileKey] = newTile;
+          updatedMap[tileKey] = coloredTile;
           return updatedMap;
         });
         
@@ -269,23 +460,23 @@ export function GridManager() {
             }
             
             // Add the new tile ID if it doesn't already exist
-            if (!updatedColony.tileIds.includes(newTile.id)) {
-              updatedColony.tileIds = [...updatedColony.tileIds, newTile.id];
+            if (!updatedColony.tileIds.includes(coloredTile.id)) {
+              updatedColony.tileIds = [...updatedColony.tileIds, coloredTile.id];
             }
             
             // Check if the tile already exists in the tiles array
             const existingTileIndex = updatedColony.tiles.findIndex(
-              t => t.id === newTile.id || (t.q === newTile.q && t.r === newTile.r && t.s === newTile.s)
+              t => t.id === coloredTile.id || (t.q === coloredTile.q && t.r === coloredTile.r && t.s === coloredTile.s)
             );
             
             if (existingTileIndex >= 0) {
               // Replace the existing tile
               const updatedTiles = [...updatedColony.tiles];
-              updatedTiles[existingTileIndex] = newTile;
+              updatedTiles[existingTileIndex] = coloredTile;
               updatedColony.tiles = updatedTiles;
             } else {
               // Add the new tile
-              updatedColony.tiles = [...updatedColony.tiles, newTile];
+              updatedColony.tiles = [...updatedColony.tiles, coloredTile];
             }
             
             return updatedColony;
@@ -315,7 +506,7 @@ export function GridManager() {
     } finally {
       setAddingTile(false);
     }
-  }, [addingTile, colony, refreshColony, setColony, showToast]); // Updated dependencies
+  }, [addingTile, colony, setColony, showToast, debugState.colorScheme, user?.uid]);
   
   const handleDebugAction = (action: string, value?: any) => {
     switch(action) {
@@ -336,9 +527,9 @@ export function GridManager() {
           return { ...prev, colorScheme: schemes[nextIndex] };
         });
         break;
-      case 'changeFogDepth': // Add case for changing fog depth
+      case 'changeViewDepth': // Add case for changing view depth
         if (typeof value === 'number' && value >= 0) {
-          setDebugState((prev) => ({ ...prev, fogDistance: value }));
+          setDebugState((prev) => ({ ...prev, viewDistance: value }));
         }
         break;
       case 'toggleTileDetails': // Add case for toggling tile details
@@ -426,7 +617,7 @@ export function GridManager() {
         )}
       </SlideUpPanel>
       
-      {/* Debug Menu Component - pass fogDepth and handler */}
+      {/* Debug Menu Component - pass view depth and handler */}
       <DebugMenu 
         debugState={debugState} 
         onDebugAction={handleDebugAction} 
@@ -447,14 +638,12 @@ export function GridManager() {
         <GridCanvas
           wireframe={debugState.wireframe}
           hexSize={debugState.hexSize}
-          colorScheme={debugState.colorScheme}
           tileMap={tileMap}
-          fogTiles={fogTiles}
+          viewTiles={viewableTiles}
           cameraPosition={cameraPosition}
           cameraTarget={cameraTarget}
           onTileSelect={handleTileSelect}
           onTileAdd={handleAddTile}
-          colonyColor={colony?.color}
           followSelectedTile={debugState.followSelectedTile}
         />
       )}

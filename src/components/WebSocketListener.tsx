@@ -357,30 +357,3 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
     </div>
   );
 };
-
-// Example of sending a message
-export const WebSocketSender: React.FC = () => {
-  const { userToken } = useAuth();
-  
-  const { sendMessage, isConnected } = useWebSocket({
-    token: userToken
-  });
-  
-  const handleSendPing = () => {
-    // Simple ping message
-    sendMessage({
-      type: 'PING',
-      timestamp: Date.now()
-    });
-  };
-  
-  return (
-    <button
-      onClick={handleSendPing}
-      disabled={!isConnected}
-      className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-    >
-      Send Ping
-    </button>
-  );
-};

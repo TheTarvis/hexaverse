@@ -1,3 +1,8 @@
+## [v0.9.16] - 2025-04-16
+### Changed
+- Fog Tiles are now viewable Tiles.
+- Moved some of the coloring logic into its own helper util.
+
 ## [v0.9.15] - 2025-04-30
 ### Changed
 - Refactored WebSocket implementation for improved efficiency

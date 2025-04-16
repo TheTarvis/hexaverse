@@ -6,11 +6,7 @@ import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { Tile } from '@/types/tiles'
 
-interface TileMap {
-  [key: string]: Tile
-}
-
-// Add an interface for the selected tile
+// Updated interface for SelectedTile to include potential color field
 interface SelectedTile {
   q: number;
   r: number;
@@ -20,25 +16,30 @@ interface SelectedTile {
   resourceDensity?: number;
 }
 
-// Updated interface to include distance
-export interface FogTile {
+// Updated ViewableTile interface
+export interface ViewableTile {
   q: number;
   r: number;
   s: number;
   distance: number;
+  color?: string;
 }
 
+// Updated interface for TileMap using standard Tile with color
+interface TileMap {
+  [key: string]: Tile;
+}
+
+// Updated props interface
 interface HexGridCanvasProps {
   wireframe: boolean;
   hexSize: number;
-  colorScheme: string;
   tileMap: TileMap;
-  fogTiles: FogTile[];
+  viewTiles: ViewableTile[];
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
   onTileSelect: (tile: SelectedTile) => void;
   onTileAdd?: (q: number, r: number, s: number) => void;
-  colonyColor?: string;
   followSelectedTile?: boolean;
 }
 
@@ -48,83 +49,6 @@ function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number
   const x = size * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r)
   const y = size * (3/2 * r)
   return [x, y, 0]
-}
-
-// Get color based on tile type and colony color
-function getTileColor(
-  type: string, 
-  colorScheme: string, 
-  q: number, 
-  r: number, 
-  s: number, 
-  resourceDensity = 0.5, 
-  fogDistance?: number, 
-  colonyColor?: string
-): string {
-  // Enhanced fog tile coloring based on distance
-  if (type === 'fog' && fogDistance !== undefined) {
-    // Calculate the brightness based on fog distance
-    // Closer tiles are brighter, further tiles are darker
-    const maxDistance = 3; // Adjust based on your typical fog depth
-    const baseBrightness = 0.3; // Base brightness of the closest fog tile
-    const minBrightness = 0.05; // Minimum brightness of the furthest fog tile
-    
-    // Calculate the brightness factor: 1.0 for closest, approaching 0 for furthest
-    const distanceFactor = Math.max(0, 1 - (fogDistance - 1) / maxDistance);
-    
-    // Calculate final brightness
-    const brightness = minBrightness + (baseBrightness - minBrightness) * distanceFactor;
-    
-    // Dark violet with variable brightness
-    return new THREE.Color(brightness * 0.7, brightness * 0.7, brightness).getStyle();
-  }
-  
-  if (colorScheme === 'monochrome') {
-    return new THREE.Color(0.4, 0.4, 0.4).getStyle();
-  }
-  
-  if (colorScheme === 'type') {
-    // Color based on tile type
-    switch(type.toLowerCase()) {
-      case 'normal': return new THREE.Color(0.3, 0.7, 0.4).getStyle(); // Green
-      case 'water': return new THREE.Color(0.2, 0.4, 0.8).getStyle(); // Blue
-      case 'mountain': return new THREE.Color(0.6, 0.6, 0.6).getStyle(); // Gray
-      case 'desert': return new THREE.Color(0.9, 0.8, 0.3).getStyle(); // Yellow
-      case 'forest': return new THREE.Color(0.1, 0.5, 0.1).getStyle(); // Dark green
-      case 'plain': return new THREE.Color(0.8, 0.9, 0.3).getStyle(); // Light green
-      default: 
-        // Fallback to rainbow if type is unknown
-        return new THREE.Color(
-          0.5 + 0.5 * Math.sin(q + r),
-          0.5 + 0.5 * Math.sin(r + s),
-          0.5 + 0.5 * Math.sin(s + q)
-        ).getStyle();
-    }
-  }
-  
-  if (colorScheme === 'resources') {
-    // Color based on resource density
-    return new THREE.Color(
-      0.2 + 0.8 * resourceDensity,
-      0.7 - 0.5 * resourceDensity,
-      0.3
-    ).getStyle();
-  }
-  
-  if (colorScheme === 'rainbow') {
-    return new THREE.Color(
-      0.5 + 0.5 * Math.sin(q + r),
-      0.5 + 0.5 * Math.sin(r + s),
-      0.5 + 0.5 * Math.sin(s + q)
-    ).getStyle();
-  }
-  
-  // Default color scheme
-  return new THREE.Color(
-    0.4 + 0.4 * Math.sin(q * 0.8 + r * 0.3),
-    0.5 + 0.3 * Math.sin(r * 0.5 + s * 0.4),
-    0.6 + 0.4 * Math.sin(s * 0.6 + q * 0.2)
-  ).getStyle();
 }
 
 // Add a PulsingHexagon component for animation
@@ -209,8 +133,8 @@ function HexagonMesh({
   s,
   type,
   resourceDensity,
-  isFogTile = false,
-  fogDistance,
+  isViewableTile = false,
+  viewDistance,
   onTileSelect,
   onTileAdd,
   setClickedTile
@@ -223,8 +147,8 @@ function HexagonMesh({
   s: number,
   type?: string,
   resourceDensity?: number,
-  isFogTile?: boolean,
-  fogDistance?: number,
+  isViewableTile?: boolean,
+  viewDistance?: number,
   onTileSelect: (tile: SelectedTile) => void,
   onTileAdd?: (q: number, r: number, s: number) => void,
   setClickedTile?: (coords: { q: number, r: number, s: number, position: [number, number, number], color: string } | null) => void
@@ -255,10 +179,10 @@ function HexagonMesh({
     // Stop event propagation to prevent it from reaching Canvas
     event.stopPropagation()
     
-    // Only handle clicks for fog tiles (adding tiles)
-    if (!isFogTile || !onTileAdd) return;
+    // Only handle clicks for Viewable tiles (adding tiles)
+    if (!isViewableTile || !onTileAdd) return;
     
-    console.log(`Clicked fog tile at: q=${q}, r=${r}, s=${s}`);
+    console.log(`Clicked viewable tile at: q=${q}, r=${r}, s=${s}`);
     
     // Set the clicked tile for animation
     if (setClickedTile) {
@@ -284,15 +208,15 @@ function HexagonMesh({
       r,
       s,
       color,
-      type: isFogTile ? 'fog' : type,
+      type: isViewableTile ? 'viewable' : type,
       resourceDensity
     });
   }
 
   // Determine material properties based on tile type
-  // Adjust opacity based on distance for fog tiles
-  const opacity = isFogTile ? (fogDistance ? Math.max(0.4, 0.9 - (fogDistance * 0.1)) : 0.7) : 1.0;
-  const transparent = isFogTile;
+  // Adjust opacity based on distance for viewable tiles
+  const opacity = isViewableTile ? (viewDistance ? Math.max(0.4, 0.9 - (viewDistance * 0.1)) : 0.7) : 1.0;
+  const transparent = isViewableTile;
 
   return (
     <mesh 
@@ -317,21 +241,17 @@ function HexagonMesh({
 function HexGrid({ 
   wireframe = false, 
   hexSize = 1.2, 
-  colorScheme = 'type', 
   tileMap = {} as TileMap,
-  fogTiles = [] as FogTile[],
+  viewableTiles = [] as ViewableTile[],
   onTileSelect,
   onTileAdd,
-  colonyColor
 }: {
   wireframe?: boolean,
   hexSize?: number,
-  colorScheme?: string,
   tileMap?: TileMap,
-  fogTiles?: FogTile[],
+  viewableTiles?: ViewableTile[],
   onTileSelect: (tile: SelectedTile) => void,
   onTileAdd?: (q: number, r: number, s: number) => void,
-  colonyColor?: string
 }) {
   // Add state to track the clicked tile
   const [clickedTile, setClickedTile] = useState<{
@@ -352,8 +272,8 @@ function HexGrid({
       s: number; 
       type?: string; 
       resourceDensity?: number; 
-      isFogTile: boolean;
-      fogDistance?: number;
+      isViewableTile: boolean;
+      viewDistance?: number;
     }[] = []
     
     // Use the tile data from the tileMap
@@ -364,8 +284,8 @@ function HexGrid({
       const type = tile.type;
       const resourceDensity = tile.resourceDensity || 0.5;
       
-      // Generate color based on tile type and selected scheme
-      const color = getTileColor(type, colorScheme, q, r, s, resourceDensity, undefined, colonyColor);
+      // Use the color from the tile object or fall back to a default
+      const color = tile.color || '#CCCCCC';
       
       gridPositions.push({
         q, r, s,
@@ -373,33 +293,33 @@ function HexGrid({
         color,
         type,
         resourceDensity,
-        isFogTile: false
+        isViewableTile: false
       })
     })
     
-    // Add fog tiles with distance information
-    fogTiles.forEach((tile) => {
+    // Add viewable tiles with distance information
+    viewableTiles.forEach((tile) => {
       const q = tile.q;
       const r = tile.r;
       const s = tile.s;
       const distance = tile.distance;
       
-      // Generate color for fog tiles based on distance
-      const color = getTileColor('fog', colorScheme, q, r, s, undefined, distance, colonyColor);
+      // Use the color from the viewable tile or fall back to a default
+      const color = tile.color || '#AAAAAA';
       
       gridPositions.push({
         q, r, s,
         position: cubeToPixel(q, r, s, hexSize),
         color,
-        type: 'fog',
+        type: 'viewable',
         resourceDensity: undefined,
-        isFogTile: true,
-        fogDistance: distance
+        isViewableTile: true,
+        viewDistance: distance
       })
     })
     
     return gridPositions
-  }, [hexSize, colorScheme, tileMap, fogTiles, colonyColor])
+  }, [hexSize, tileMap, viewableTiles])
 
   return (
     <>
@@ -414,8 +334,8 @@ function HexGrid({
           s={props.s}
           type={props.type}
           resourceDensity={props.resourceDensity}
-          isFogTile={props.isFogTile}
-          fogDistance={props.fogDistance}
+          isViewableTile={props.isViewableTile}
+          viewDistance={props.viewDistance}
           onTileSelect={onTileSelect}
           onTileAdd={onTileAdd}
           setClickedTile={setClickedTile}
@@ -478,15 +398,13 @@ function CameraController({
 export function GridCanvas({
   wireframe, 
   hexSize, 
-  colorScheme, 
   tileMap, 
-  fogTiles, 
+  viewTiles, 
   cameraPosition, 
   cameraTarget, 
   onTileSelect,
   onTileAdd,
-  colonyColor,
-  followSelectedTile = false
+  followSelectedTile = false,
 }: HexGridCanvasProps) {
   const [currentCameraTarget, setCurrentCameraTarget] = useState<[number, number, number]>(cameraTarget);
   
@@ -535,12 +453,10 @@ export function GridCanvas({
       <HexGrid
         wireframe={wireframe}
         hexSize={hexSize}
-        colorScheme={colorScheme}
         tileMap={tileMap}
-        fogTiles={fogTiles}
+        viewableTiles={viewTiles}
         onTileSelect={handleTileSelect}
         onTileAdd={onTileAdd}
-        colonyColor={colonyColor}
       />
     </Canvas>
   )

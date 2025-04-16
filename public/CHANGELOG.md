@@ -1,3 +1,16 @@
+## [v0.9.16] - 2025-04-16
+### Changed
+- Fog Tiles are now viewable Tiles.
+- Moved some of the coloring logic into its own helper util.
+
+## [v0.9.15] - 2025-04-30
+### Changed
+- Refactored WebSocket implementation for improved efficiency
+- Removed redundant WebSocketContext in favor of direct hook usage
+- Updated WebSocket connection to use AuthContext token directly
+- Improved WebSocket message handling with better component integration
+- Simplified the WebSocket architecture to reduce code duplication
+
 ## [v0.9.14] - 2025-04-29
 ### Changed
 - Updated WebSocket service to properly handle both local and dev environments

@@ -10,9 +10,10 @@ export interface Tile {
   s: number;  // Cube coordinate Z
   type: string;
   controllerUid: string;  // Firebase user ID of the controller
-  visibility: 'visible' | 'fogged' | 'unexplored'; // TODO TW: Discuss unexplored
+  visibility: 'visible' | 'unexplored'; // TODO TW: Discuss unexplored
   resourceDensity?: number; // Value from 0-1 indicating resource richness
   resources?: {
     [key: string]: number;
   };
+  color?: string;  // Color for rendering, used by UI only
 } 

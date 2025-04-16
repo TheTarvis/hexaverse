@@ -19,7 +19,7 @@ interface DebugMenuProps {
     wireframe: boolean;
     hexSize: number;
     colorScheme: string;
-    fogDistance: number;
+    viewDistance: number;
     tileDetailsEnabled: boolean;
     followSelectedTile: boolean;
   };
@@ -64,9 +64,9 @@ const debugOptions = [
     icon: SignalIcon 
   },
   { 
-    name: 'Fog Depth', 
-    description: 'Adjust the depth of fog tiles around the colony', 
-    action: 'fogDepthControl', 
+    name: 'View Depth',
+    description: 'Adjust the depth of view for tiles around the colony',
+    action: 'viewDepthControl',
     icon: AdjustmentsHorizontalIcon 
   }
 ]
@@ -74,10 +74,10 @@ const debugOptions = [
 export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
   const [showWebSocketMonitor, setShowWebSocketMonitor] = useState(false);
   
-  const handleFogDepthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleViewDepthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseInt(e.target.value, 10);
     if (!isNaN(newValue)) {
-      onDebugAction('changeFogDepth', newValue);
+      onDebugAction('changeViewDepth', newValue);
     }
   };
   
@@ -147,7 +147,7 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
                   </div>
                   <div className="ml-6">
                     <div className="font-semibold text-gray-900">
-                      Fog Depth
+                      View Depth
                     </div>
                   </div>
                 </div>
@@ -158,12 +158,12 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
                       min="0"
                       max="30"
                       step="1"
-                      value={debugState.fogDistance}
-                      onChange={handleFogDepthChange}
+                      value={debugState.viewDistance}
+                      onChange={handleViewDepthChange}
                       className="w-full"
                     />
                     <span className="ml-2 text-sm text-gray-600 min-w-[2rem] text-right">
-                      {debugState.fogDistance}
+                      {debugState.viewDistance}
                     </span>
                   </div>
                 </div>
@@ -174,7 +174,7 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
                 Current settings: {debugState.wireframe ? 'Wireframe' : 'Solid'}, 
                 Size: {debugState.hexSize.toFixed(1)}, 
                 Colors: {debugState.colorScheme},
-                Fog: {debugState.fogDistance},
+                View Distance: {debugState.viewDistance},
                 Details: {debugState.tileDetailsEnabled ? 'On' : 'Off'},
                 Follow: {debugState.followSelectedTile ? 'On' : 'Off'}
               </div>

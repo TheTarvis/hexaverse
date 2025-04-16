@@ -12,7 +12,7 @@ export interface ColonyTile {
   s: number;  
   type: TileType; // Tile type based on noise value
   controllerUid: string;  // Firebase user ID of the controller
-  visibility: 'visible' | 'fogged' | 'unexplored';
+  visibility: 'visible' | 'unexplored';
   resourceDensity?: number; // Value from 0-1 indicating resource richness
   resources?: {
     [key: string]: number;
