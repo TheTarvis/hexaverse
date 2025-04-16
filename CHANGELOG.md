@@ -1,3 +1,18 @@
+## [v0.9.15] - 2025-04-30
+### Changed
+- Refactored WebSocket implementation for improved efficiency
+- Removed redundant WebSocketContext in favor of direct hook usage
+- Updated WebSocket connection to use AuthContext token directly
+- Improved WebSocket message handling with better component integration
+- Simplified the WebSocket architecture to reduce code duplication
+
+## [v0.9.14] - 2025-04-29
+### Changed
+- Updated WebSocket service to properly handle both local and dev environments
+- Added protocol detection to automatically use ws:// for localhost and wss:// for deployed environments
+- Enhanced health check endpoint to use appropriate HTTP/HTTPS protocol
+- Improved WebSocket URL logging for better debugging
+
 ## [v0.9.13] - 2025-04-28
 ### Changed
 - Updated Roadmap Admin page to follow the same Tailwind CSS styling as Events page

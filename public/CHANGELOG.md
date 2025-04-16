@@ -1,3 +1,10 @@
+## [v0.9.14] - 2025-04-29
+### Changed
+- Updated WebSocket service to properly handle both local and dev environments
+- Added protocol detection to automatically use ws:// for localhost and wss:// for deployed environments
+- Enhanced health check endpoint to use appropriate HTTP/HTTPS protocol
+- Improved WebSocket URL logging for better debugging
+
 ## [v0.9.13] - 2025-04-28
 ### Changed
 - Updated Roadmap Admin page to follow the same Tailwind CSS styling as Events page

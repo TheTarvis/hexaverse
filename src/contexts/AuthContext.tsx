@@ -17,6 +17,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAdmin: boolean;
   isCheckingAdmin: boolean;
+  userToken: string | null;
   signIn: (email: string, password: string) => Promise<User>;
   signInWithGoogle: () => Promise<User>;
   signUp: (email: string, password: string) => Promise<User>;
@@ -30,6 +31,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+  const [userToken, setUserToken] = useState<string | null>(null);
+
+  // Get user token
+  const getUserToken = async (user: User | null) => {
+    if (!user) {
+      setUserToken(null);
+      return;
+    }
+    
+    try {
+      const token = await user.getIdToken();
+      setUserToken(token);
+    } catch (error) {
+      console.error('Error getting user token:', error);
+      setUserToken(null);
+    }
+  };
 
   // Check if the user has admin claim
   const checkAdminStatus = async (user: User | null) => {
@@ -75,6 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Check admin status whenever user changes
       checkAdminStatus(authUser);
+      
+      // Get user token whenever user changes
+      getUserToken(authUser);
     });
 
     // Cleanup subscription
@@ -86,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     isAdmin,
     isCheckingAdmin,
+    userToken,
     signIn: signInWithEmail,
     signInWithGoogle,
     signUp: createUser,

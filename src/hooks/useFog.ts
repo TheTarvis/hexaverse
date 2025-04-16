@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Tile } from '@/types/tiles';
 import { FogTile } from '@/components/grid/GridCanvas';
-import { findFogTiles, updateFogTilesForAddedTile } from '@/utils/hexUtils';
+import { findFogTiles } from '@/utils/hexUtils';
 
 interface TileMap {
   [key: string]: Tile;

@@ -6,6 +6,54 @@ import { createNoiseGenerator, getNoiseForCoordinates, getTileTypeFromNoise, cal
 import { functionConfig } from "./config";
 import { ReadCostTracker } from "./utils/analytics/readCostTracker";
 import { verifyTileAdjacency } from "./utils/tileHelpers";
+import { PubSub } from '@google-cloud/pubsub';
+
+// Initialize PubSub client
+const pubSubClient = new PubSub({
+  projectId: process.env.PUBSUB_PROJECT_ID || 'hexaverse'
+});
+
+// Topic ID for websocket events
+const topicName = process.env.PUBSUB_TOPIC_ID || 'websocket-events';
+
+/**
+ * Publishes events to PubSub for WebSocket communication
+ * @param eventType Type of event to publish
+ * @param data Event data payload
+ * @param scope Scope of the message ('broadcast' or 'direct')
+ * @param recipientId Optional recipient ID for direct messages
+ */
+async function publishEvent(
+  eventType: string, 
+  data: any, 
+  scope: 'broadcast' | 'direct' = 'broadcast',
+  recipientId?: string
+): Promise<string> {
+  try {
+    // Create message payload
+    const dataBuffer = Buffer.from(JSON.stringify(data));
+    
+    // Set message attributes
+    const attributes: Record<string, string> = {
+      scope,
+      eventType
+    };
+    
+    // Add recipient ID for direct messages
+    if (scope === 'direct' && recipientId) {
+      attributes.recipientId = recipientId;
+    }
+    
+    // Publish to PubSub
+    const messageId = await pubSubClient.topic(topicName).publish(dataBuffer, attributes);
+    logger.info(`Published ${scope} message to ${topicName} with ID: ${messageId}${recipientId ? `, recipient: ${recipientId}` : ''}`);
+    
+    return messageId;
+  } catch (error) {
+    logger.error(`Error publishing ${eventType} event to PubSub:`, error);
+    throw error;
+  }
+}
 
 /**
  * Function to add a tile to a user's colony
@@ -156,6 +204,39 @@ export const addTile = onCall({
     // Log the read stats instead of including them in the response
     const readSummary = tracker.getSummary();
     logger.info(`[addTile] Read Summary: ${readSummary.total} total reads`);
+    
+    // Prepare event data for PubSub 
+    const eventData = {
+      type: 'TILE_UPDATED',
+      timestamp: Date.now(),
+      payloadType: 'tile',
+      payload: newTile,
+      colonyId: colonyDoc.id,
+      userId: uid
+    };
+
+    try {
+      // Publish broadcast message for tile update
+      await publishEvent('TILE_UPDATED', eventData);
+      
+      // If tile was captured, send a direct notification to the previous owner
+      if (capturedFromUid) {
+        const tileCaptureLostEvent = {
+          type: 'TILE_LOST',
+          timestamp: Date.now(),
+          payloadType: 'tile',
+          payload: newTile,
+          capturedBy: uid,
+          colonyId: capturedFromColony
+        };
+        
+        // Publish direct message to previous owner
+        await publishEvent('TILE_LOST', tileCaptureLostEvent, 'direct', capturedFromUid);
+      }
+    } catch (pubsubError) {
+      // Log the error but don't fail the function
+      logger.error("Error publishing to PubSub:", pubsubError);
+    }
     
     // Return success with the new or captured tile
     const response = {

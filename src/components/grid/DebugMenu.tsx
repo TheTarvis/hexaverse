@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import {
@@ -9,8 +9,10 @@ import {
   SwatchIcon,
   BugAntIcon,
   AdjustmentsHorizontalIcon,
-  VideoCameraIcon
+  VideoCameraIcon,
+  SignalIcon
 } from '@heroicons/react/24/outline'
+import { WebSocketListener } from '@/components/WebSocketListener'
 
 interface DebugMenuProps {
   debugState: {
@@ -56,6 +58,12 @@ const debugOptions = [
     icon: VideoCameraIcon 
   },
   { 
+    name: 'WebSocket', 
+    description: 'Monitor WebSocket connections and messages', 
+    action: 'toggleWebSocket', 
+    icon: SignalIcon 
+  },
+  { 
     name: 'Fog Depth', 
     description: 'Adjust the depth of fog tiles around the colony', 
     action: 'fogDepthControl', 
@@ -64,15 +72,43 @@ const debugOptions = [
 ]
 
 export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
+  const [showWebSocketMonitor, setShowWebSocketMonitor] = useState(false);
+  
   const handleFogDepthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseInt(e.target.value, 10);
     if (!isNaN(newValue)) {
       onDebugAction('changeFogDepth', newValue);
     }
   };
+  
+  const handleDebugOptionClick = (action: string) => {
+    if (action === 'toggleWebSocket') {
+      setShowWebSocketMonitor(!showWebSocketMonitor);
+    } else {
+      onDebugAction(action);
+    }
+  };
 
   return (
     <div className="absolute top-4 right-4 z-10">
+      {showWebSocketMonitor && (
+        <div className="absolute right-0 top-12 w-96 mb-2 bg-white dark:bg-zinc-900 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-zinc-700">
+          <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-zinc-800 border-b border-gray-200 dark:border-zinc-700">
+            <h3 className="text-sm font-medium">WebSocket Monitor</h3>
+            <button 
+              onClick={() => setShowWebSocketMonitor(false)}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <span className="sr-only">Close</span>
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+          <WebSocketListener />
+        </div>
+      )}
+      
       <Popover className="relative">
         <PopoverButton className="flex items-center gap-x-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
           <BugAntIcon className="h-5 w-5 mr-1" />
@@ -86,11 +122,11 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
         >
           <div className="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
             <div className="p-4">
-              {debugOptions.slice(0, 5).map((item) => (
+              {debugOptions.slice(0, 6).map((item) => (
                 <div 
                   key={item.name} 
                   className="group relative flex gap-x-6 rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
-                  onClick={() => onDebugAction(item.action)}
+                  onClick={() => handleDebugOptionClick(item.action)}
                 >
                   <div className="mt-1 flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
                     <item.icon className="h-6 w-6 text-gray-600 group-hover:text-indigo-600" aria-hidden="true" />
