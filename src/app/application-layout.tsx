@@ -48,6 +48,7 @@ import {
   CalendarIcon,
 } from '@heroicons/react/20/solid'
 import { usePathname } from 'next/navigation'
+import { WebSocketStatusIndicator } from '@/components/websocket-status-indicator';
 
 function AccountDropdownMenu({ anchor }: { anchor: 'top start' | 'bottom end' }) {
   const { user, signOut } = useAuth();
@@ -105,6 +106,7 @@ export function ApplicationLayout({
         navbar={
           <Navbar>
             <NavbarSpacer />
+            <WebSocketStatusIndicator compact inNavbar />
             <NavbarSection>
               <Dropdown>
                 <DropdownButton as={NavbarItem}>
@@ -188,6 +190,7 @@ export function ApplicationLayout({
                     <div className="text-xs text-gray-500 dark:text-gray-400">{getVersionDisplay()}</div>
                   </SidebarLabel>
                 </SidebarItem>
+                <WebSocketStatusIndicator />
               </SidebarSection>
             </SidebarBody>
 
