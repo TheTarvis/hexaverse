@@ -2,12 +2,13 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useColony } from '@/contexts/ColonyContext'
-import { useWebSocket } from '@/hooks/useWebSocket'
 import { fetchTiles } from '@/services/tiles'
 import { Tile, TileMap, tilesToMap } from '@/types/tiles'
 import { isColonyMessage, isTileMessage } from '@/types/websocket'
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
 import {findViewableTiles} from "@/utils/hexUtils";
+import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription';
+import { WebSocketMessage } from '@/types/websocket';
 
 interface TileContextType {
   isLoadingTiles: boolean
@@ -23,8 +24,8 @@ export function TileProvider({ children }: { children: ReactNode }) {
   const [isLoadingTiles, setIsLoadingTiles] = useState(false)
   const { colony } = useColony()
   const { user } = useAuth()
-  const [colonyTiles, setColonyTiles] = useState<TileMap>({})
-  const [viewableTiles, setViewableTiles] = useState<TileMap>({})
+  const [colonyTiles, setColonyTiles] = useState<Record<string, Tile>>({})
+  const [viewableTiles, setViewableTiles] = useState<Record<string, Tile>>({})
 
   const addColonyTile = useCallback((tile: Tile) => {
     setColonyTiles((prev) => ({
@@ -68,37 +69,34 @@ export function TileProvider({ children }: { children: ReactNode }) {
     })()
   }, [colony])
 
-  const handleWebSocketMessage = useCallback((data: any) => {
-    console.log(`WebSocket: Received message`, data)
+  // Subscribe to WebSocket messages for tile updates
+  useWebSocketSubscription({
+    onMessage: (data: WebSocketMessage) => {
+      console.log(`WebSocket: Received message`, data)
 
-    // Handle tile updates
-    if (isTileMessage(data)) {
-      const tile = data.payload as Tile
+      // Handle tile updates
+      if (isTileMessage(data)) {
+        const tile = data.payload as Tile
 
-      // If the tile.controllerUid == user.id update colony tiles
-      if (user && tile.controllerUid == user.uid) {
-        console.log('Tile is in the colony map')
-        setColonyTiles((prev) => ({
-          ...prev,
-          ...tilesToMap([tile]),
-        }))
-      }
+        // If the tile.controllerUid == user.id update colony tiles
+        if (user && tile.controllerUid == user.uid) {
+          console.log('Tile is in the colony map')
+          setColonyTiles((prev) => ({
+            ...prev,
+            ...tilesToMap([tile]),
+          }))
+        }
 
-      if (viewableTiles[tile.id]) {
-        console.log('Tile is in the viewable map')
-        setViewableTiles((prev) => ({
-          ...prev,
-          ...tilesToMap([tile]),
-        }))
+        if (viewableTiles[tile.id]) {
+          console.log('Tile is in the viewable map')
+          setViewableTiles((prev) => ({
+            ...prev,
+            ...tilesToMap([tile]),
+          }))
+        }
       }
     }
-  }, [])
-
-  // Initialize WebSocket connection
-  useWebSocket({
-    onMessage: handleWebSocketMessage,
-    autoConnect: true,
-  })
+  });
 
   return <TileContext.Provider value={value}>{children}</TileContext.Provider>
 }

@@ -1,3 +1,12 @@
+## [v0.9.19] - 2025-04-17
+### Changed
+- Improved WebSocket connection management to prevent multiple simultaneous connection attempts
+- Enhanced WebSocket authentication handling with better auth state awareness
+- Added connection attempt throttling with 5-second cooldown
+- Improved connection state management with better logging
+- Optimized reconnection logic to prevent unnecessary attempts
+- Added safeguards against multiple connection attempts during auth loading
+
 ## [v0.9.18] - 2025-04-17
 ### Changed
 - Refactored ColonyStatus management to ColonyContext

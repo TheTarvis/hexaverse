@@ -7,7 +7,8 @@ import React, {createContext, ReactNode, useCallback, useContext, useEffect, use
 import { useAuth } from './AuthContext'
 import { useTiles } from './TileContext'
 import {isColonyMessage, isTileMessage} from "@/types/websocket";
-import {useWebSocket} from "@/hooks/useWebSocket";
+import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
+import { WebSocketMessage } from '@/types/websocket'
 
 // Define colony status enum for better state management
 export enum ColonyStatus {
@@ -15,6 +16,7 @@ export enum ColonyStatus {
   NO_COLONY = 'no_colony',
   ERROR = 'error',
   READY = 'ready',
+  INITIAL = 'initial',
 }
 
 interface ColonyContextType {
@@ -33,9 +35,18 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [colony, setColony] = useState<Colony | null>(null)
   const [isLoadingColony, setIsLoadingColony] = useState(false)
+  const [colonyStatus, setColonyStatus] = useState<ColonyStatus>(ColonyStatus.INITIAL)
   const [error, setError] = useState<string | null>(null)
-  const [colonyStatus, setColonyStatus] = useState<ColonyStatus>(ColonyStatus.LOADING)
 
+  // Subscribe to WebSocket messages for colony updates
+  useWebSocketSubscription({
+    onMessage: (data: WebSocketMessage) => {
+      // Handle colony updates
+      if (isColonyMessage(data) && colony && data.payload.id === colony.id) {
+        console.log(`WebSocket: Received colony update`, data.payload);
+      }
+    }
+  });
 
   // Load colony data when user changes
   useEffect(() => {
@@ -91,19 +102,6 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       setColonyStatus(ColonyStatus.NO_COLONY)
     }
   }, [user])
-
-  const handleWebSocketMessage = useCallback((data: any) => {
-    // Handle colony updates
-    if (isColonyMessage(data) && colony && data.payload.id === colony.id) {
-      console.log(`WebSocket: Received colony update`, data.payload);
-    }
-  }, [colony]);
-  useWebSocket({
-    onMessage: handleWebSocketMessage,
-    autoConnect: true,
-  });
-
-
 
   const createNewColony = async (name: string, color?: string): Promise<Colony> => {
     if (!user) {

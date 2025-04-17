@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import React, { useState, useEffect } from 'react';
+import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription';
+import { useWebSocketContext } from '@/contexts/WebSocketContext';
 import { checkHealth, getWebSocketEndpoint, testAuthentication } from '@/services/websocket';
 import { getAuthToken } from '@/services/auth';
-import { WebSocketMessage, createNotificationMessage, createPingMessage } from '@/types/websocket';
+import { WebSocketMessage, createPingMessage } from '@/types/websocket';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface WebSocketListenerProps {
@@ -13,16 +14,7 @@ interface WebSocketListenerProps {
 
 export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageType: initialMessageType }) => {
   const { userToken } = useAuth();
-  
-  const { isConnected, connect, disconnect, sendMessage, connectionState } = useWebSocket({
-    onMessage: (data) => {
-      if (!filterActive || (messageType && data.type === messageType)) {
-        setMessages((prev) => [data, ...prev].slice(0, 20)); // Keep last 20 messages
-      }
-    },
-    autoConnect: true,
-  });
-  
+  const { isConnected, connectionState, sendMessage, connect, disconnect } = useWebSocketContext();
   const [messages, setMessages] = useState<any[]>([]);
   const [messageType, setMessageType] = useState<string | undefined>(initialMessageType);
   const [filterActive, setFilterActive] = useState<boolean>(!!initialMessageType);
@@ -35,6 +27,15 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
   const [authTestResult, setAuthTestResult] = useState<string | null>(null);
   const [showNote, setShowNote] = useState(true);
 
+  // Subscribe to messages
+  useWebSocketSubscription({
+    onMessage: (data) => {
+      if (!filterActive || (messageType && data.type === messageType)) {
+        setMessages((prev) => [data, ...prev].slice(0, 20)); // Keep last 20 messages
+      }
+    }
+  });
+
   const handleClearMessages = () => {
     setMessages([]);
   };
@@ -42,24 +43,6 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.trim();
     setMessageType(value || undefined);
-  };
-
-  const toggleConnection = async () => {
-    if (isConnected) {
-      disconnect();
-    } else {
-      try {
-        setAuthError(null);
-        await connect();
-      } catch (error) {
-        console.error('Error connecting to WebSocket:', error);
-        if (error instanceof Error) {
-          setAuthError(`Connection error: ${error.message}`);
-        } else {
-          setAuthError('Unknown connection error');
-        }
-      }
-    }
   };
 
   const handleSendPing = () => {
@@ -156,41 +139,12 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
     checkAuthToken();
   }, []);
 
-  // Get connection state color
-  const getConnectionStateColor = () => {
-    switch (connectionState) {
-      case 'CONNECTED': return 'bg-green-500';
-      case 'CONNECTING': return 'bg-blue-500';
-      case 'RECONNECTING': return 'bg-yellow-500';
-      case 'DISCONNECTED': return 'bg-gray-500';
-      case 'ERROR': return 'bg-red-500';
-      default: return 'bg-gray-300';
-    }
-  };
-
   return (
-    <div className="p-3 h-full overflow-hidden flex flex-col">
-      {/* Connection header */}
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center">
-          <div
-            className={`w-3 h-3 rounded-full mr-2 ${getConnectionStateColor()}`}
-          />
-          <span className="text-sm font-medium">
-            {connectionState || 'Unknown'}
-          </span>
-          
-          {healthStatus && (
-            <span className={`ml-2 text-xs px-2 py-0.5 rounded ${
-              healthStatus === 'Healthy'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                : healthStatus === 'Checking...'
-                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-            }`}>
-              {healthStatus}
-            </span>
-          )}
+    <div className="p-4">
+      <div className="mb-4">
+        <div className="flex items-center space-x-2 mb-2">
+          <span className={`inline-block w-3 h-3 rounded-full ${getConnectionStateColor()}`} />
+          <span className="text-sm font-medium">{connectionState}</span>
         </div>
         
         <div className="flex space-x-2">
@@ -215,17 +169,6 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
             className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
           >
             Health Check
-          </button>
-          
-          <button
-            onClick={toggleConnection}
-            className={`px-3 py-1 text-xs rounded ${
-              isConnected 
-                ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800' 
-                : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800'
-            }`}
-          >
-            {isConnected ? 'Disconnect' : 'Connect'}
           </button>
           
           <button
@@ -280,79 +223,72 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
       )}
       
       {/* Auth token info */}
-      {(authTokenStatus || endpointUrl) && (
-        <div className="mb-3 bg-gray-50 p-2 rounded text-xs dark:bg-zinc-800">
-          {authTokenStatus && (
-            <div className="mb-1 break-all">
-              <span className="font-medium">Auth Token:</span> {authTokenStatus}
-            </div>
-          )}
+      {authTokenStatus && (
+        <div className="mb-3 p-2 bg-gray-100 text-gray-800 text-xs rounded dark:bg-zinc-800 dark:text-zinc-300">
+          <div className="font-medium">Auth Token</div>
+          <div className="font-mono text-xs break-all">{authTokenStatus}</div>
           {endpointUrl && (
-            <div className="break-all">
-              <span className="font-medium">Endpoint:</span> {endpointUrl}
-            </div>
+            <>
+              <div className="font-medium mt-2">WebSocket Endpoint</div>
+              <div className="font-mono text-xs break-all">{endpointUrl}</div>
+            </>
           )}
         </div>
       )}
       
-      {/* Filter controls */}
-      <div className="flex items-center mb-3 bg-gray-50 p-2 rounded dark:bg-zinc-800">
-        <div className="flex items-center mr-3">
+      {/* Message filter */}
+      <div className="mb-3">
+        <label className="flex items-center space-x-2">
           <input
-            id="filter-toggle" 
             type="checkbox"
             checked={filterActive}
-            onChange={() => setFilterActive(!filterActive)}
-            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            onChange={(e) => setFilterActive(e.target.checked)}
+            className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
           />
-          <label htmlFor="filter-toggle" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-            Filter
-          </label>
-        </div>
-        
-        <input
-          type="text"
-          placeholder="Message type (e.g. 'ping')"
-          value={messageType || ''}
-          onChange={handleFilterChange}
-          disabled={!filterActive}
-          className="flex-grow text-sm p-1 border rounded disabled:opacity-50 disabled:bg-gray-100 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white"
-        />
-        
-        <button
-          onClick={handleClearMessages}
-          className="ml-2 px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
-        >
-          Clear
-        </button>
-      </div>
-      
-      {/* Messages list */}
-      <div className="flex-grow overflow-auto">
-        {messages.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-gray-500 text-sm">No messages received yet</p>
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {messages.map((msg, index) => (
-              <li key={index} className="p-2 bg-gray-100 dark:bg-zinc-800 rounded text-xs">
-                <div className="flex justify-between mb-1">
-                  <span className="font-medium">
-                    {msg.type || 'Unknown'} 
-                  </span>
-                  <span className="text-gray-500">
-                    {new Date(msg.timestamp || Date.now()).toLocaleTimeString()}
-                  </span>
-                </div>
-                <pre className="whitespace-pre-wrap overflow-auto max-h-40 text-xs bg-white p-1 rounded dark:bg-zinc-900">
-                  {JSON.stringify(msg, null, 2)}
-                </pre>
-              </li>
-            ))}
-          </ul>
+          <span className="text-sm">Filter messages by type</span>
+        </label>
+        {filterActive && (
+          <input
+            type="text"
+            value={messageType || ''}
+            onChange={handleFilterChange}
+            placeholder="Enter message type to filter"
+            className="mt-2 w-full px-3 py-1 text-sm border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         )}
+      </div>
+
+      {/* Messages */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <h3 className="text-sm font-medium">Messages</h3>
+          <button
+            onClick={handleClearMessages}
+            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            Clear
+          </button>
+        </div>
+        <div className="space-y-2 max-h-96 overflow-auto">
+          {messages.map((msg, idx) => (
+            <pre key={idx} className="p-2 text-xs bg-gray-50 rounded overflow-auto dark:bg-zinc-800 dark:text-zinc-300">
+              {JSON.stringify(msg, null, 2)}
+            </pre>
+          ))}
+        </div>
       </div>
     </div>
   );
+
+  // Get connection state color
+  function getConnectionStateColor() {
+    switch (connectionState) {
+      case 'CONNECTED': return 'bg-green-500';
+      case 'CONNECTING': return 'bg-blue-500';
+      case 'RECONNECTING': return 'bg-yellow-500';
+      case 'DISCONNECTED': return 'bg-gray-500';
+      case 'ERROR': return 'bg-red-500';
+      default: return 'bg-gray-300';
+    }
+  }
 };

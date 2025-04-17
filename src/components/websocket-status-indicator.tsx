@@ -1,16 +1,10 @@
 "use client"
 import { NavbarItem, NavbarLabel } from '@/components/navbar';
 import { SidebarItem, SidebarLabel } from '@/components/sidebar';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { useAuth } from '@/contexts/AuthContext';
-import { useEffect } from 'react';
+import { useWebSocketContext } from '@/contexts/WebSocketContext';
 
 export function WebSocketStatusIndicator({ compact = false, inNavbar = false }: { compact?: boolean, inNavbar?: boolean } = {}) {
-  const { userToken } = useAuth();
-  const { isConnected, connectionState } = useWebSocket({
-    token: userToken,
-    autoConnect: true
-  });
+  const { isConnected, connectionState } = useWebSocketContext();
 
   const getStatus = () => {
     if (isConnected) {

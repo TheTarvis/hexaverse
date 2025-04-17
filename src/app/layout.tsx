@@ -2,6 +2,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { ColonyProvider } from '@/contexts/ColonyContext'
 import { TileProvider } from '@/contexts/TileContext'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { WebSocketProvider } from '@/contexts/WebSocketContext'
 import { getEvents } from '@/data'
 import '@/styles/tailwind.css'
 import type { Metadata } from 'next'
@@ -37,11 +38,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={inter.variable}>
         <ToastProvider>
           <AuthProvider>
-            <ColonyProvider>
-              <TileProvider>
-                <ApplicationLayout events={events}>{children}</ApplicationLayout>
-              </TileProvider>
-            </ColonyProvider>
+            <WebSocketProvider>
+              <ColonyProvider>
+                <TileProvider>
+                  <ApplicationLayout events={events}>{children}</ApplicationLayout>
+                </TileProvider>
+              </ColonyProvider>
+            </WebSocketProvider>
           </AuthProvider>
         </ToastProvider>
       </body>
