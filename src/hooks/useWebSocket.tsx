@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { getWebSocketEndpoint } from '@/services/websocket';
+import { getWebSocketEndpoint, checkHealth } from '@/services/websocket';
 import { WebSocketMessage, PayloadType, PingPongMessage } from '@/types/websocket';
 import {useAuth} from "@/contexts/AuthContext";
 
@@ -10,6 +10,18 @@ let globalWsInstance: WebSocket | null = null;
 let globalWsConnecting = false;
 let globalLastConnectionAttempt = 0;
 const CONNECTION_COOLDOWN_MS = 5000; // 5 second cooldown between connection attempts
+
+// Global state management
+type Listener = () => void;
+let globalIsConnected = false;
+let globalConnectionState = 'INITIAL';
+const listeners = new Set<Listener>();
+
+const updateGlobalState = (isConnected: boolean, state: string) => {
+  globalIsConnected = isConnected;
+  globalConnectionState = state;
+  listeners.forEach(listener => listener());
+};
 
 interface WebSocketHookOptions {
   onMessage?: <T = any>(data: WebSocketMessage<T>) => void;
@@ -51,8 +63,8 @@ export const useWebSocket = ({
   // Use the global instance instead of creating a new one per component
   const ws = useRef<WebSocket | null>(null);
   const reconnectCount = useRef(0);
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionState, setConnectionState] = useState<string>(ConnectionState.INITIAL);
+  const [isConnected, setIsConnected] = useState(globalIsConnected);
+  const [connectionState, setConnectionState] = useState<string>(globalConnectionState);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const connectingRef = useRef(false);
   const lastConnectionAttemptRef = useRef(0);
@@ -60,6 +72,18 @@ export const useWebSocket = ({
   const onConnectRef = useRef(onConnect);
   const onDisconnectRef = useRef(onDisconnect);
   const { user } = useAuth()
+  
+  // Subscribe to global state changes
+  useEffect(() => {
+    const listener = () => {
+      setIsConnected(globalIsConnected);
+      setConnectionState(globalConnectionState);
+    };
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
   
   // Update refs when props change
   useEffect(() => {
@@ -73,8 +97,7 @@ export const useWebSocket = ({
     // Check if we already have a connection
     if (globalWsInstance && globalWsInstance.readyState === WebSocket.OPEN) {
       ws.current = globalWsInstance;
-      setIsConnected(true);
-      setConnectionState(ConnectionState.CONNECTED);
+      updateGlobalState(true, ConnectionState.CONNECTED);
       console.log('Reusing existing WebSocket connection');
     }
   }, []);
@@ -98,7 +121,7 @@ export const useWebSocket = ({
       
       if (!user || !user.uid) {
         console.log('No authentication token available, cannot connect to WebSocket');
-        setConnectionState(ConnectionState.DISCONNECTED);
+        updateGlobalState(false, ConnectionState.DISCONNECTED);
         return;
       }
 
@@ -106,8 +129,7 @@ export const useWebSocket = ({
       if (globalWsInstance?.readyState === WebSocket.OPEN) {
         console.log('Global WebSocket already connected, reusing connection');
         ws.current = globalWsInstance;
-        setIsConnected(true);
-        setConnectionState(ConnectionState.CONNECTED);
+        updateGlobalState(true, ConnectionState.CONNECTED);
         return;
       }
       
@@ -120,7 +142,7 @@ export const useWebSocket = ({
       
       globalWsConnecting = true;
       connectingRef.current = true;
-      setConnectionState(ConnectionState.CONNECTING);
+      updateGlobalState(false, ConnectionState.CONNECTING);
 
       const endpoint = await getWebSocketEndpoint();
       console.log(`Connecting to WebSocket at ${endpoint} with token...`);
@@ -134,8 +156,7 @@ export const useWebSocket = ({
 
       globalWsInstance.onopen = () => {
         console.log(`WebSocket connected successfully to ${endpoint}`);
-        setIsConnected(true);
-        setConnectionState(ConnectionState.CONNECTED);
+        updateGlobalState(true, ConnectionState.CONNECTED);
         reconnectCount.current = 0;
         connectingRef.current = false;
         globalWsConnecting = false;
@@ -144,22 +165,16 @@ export const useWebSocket = ({
 
       globalWsInstance.onclose = (event) => {
         console.log(`WebSocket disconnected with code: ${event.code}, reason: ${event.reason || 'No reason provided'}`);
-        setIsConnected(false);
-        setConnectionState(ConnectionState.DISCONNECTED);
+        updateGlobalState(false, ConnectionState.DISCONNECTED);
         connectingRef.current = false;
         globalWsConnecting = false;
         globalWsInstance = null;
         onDisconnectRef.current?.();
-
-        // Retry logic disabled - no need to modify this section since autoReconnect is false by default
-        if (autoReconnect && reconnectCount.current < reconnectAttempts) {
-          console.log('Auto-reconnect is disabled');
-        }
       };
 
       globalWsInstance.onerror = (error) => {
         console.error('WebSocket error occurred:', error);
-        setConnectionState(ConnectionState.ERROR);
+        updateGlobalState(false, ConnectionState.ERROR);
         connectingRef.current = false;
         globalWsConnecting = false;
         
@@ -181,7 +196,7 @@ export const useWebSocket = ({
       };
     } catch (error) {
       console.error('Error creating WebSocket connection:', error);
-      setConnectionState(ConnectionState.ERROR);
+      updateGlobalState(false, ConnectionState.ERROR);
       connectingRef.current = false;
       globalWsConnecting = false;
       
@@ -205,8 +220,7 @@ export const useWebSocket = ({
     }
     
     ws.current = null;
-    setIsConnected(false);
-    setConnectionState(ConnectionState.DISCONNECTED);
+    updateGlobalState(false, ConnectionState.DISCONNECTED);
     globalWsConnecting = false;
   }, []);
 
@@ -242,6 +256,38 @@ export const useWebSocket = ({
     };
   }, [connect, autoConnect]);
 
+  // Periodic health check and reconnect when disconnected or error
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null;
+    // Only poll if not connected and not currently connecting
+    if ((connectionState === ConnectionState.DISCONNECTED || connectionState === ConnectionState.ERROR) && autoConnect && token) {
+      pollInterval = setInterval(async () => {
+        // Only attempt reconnect if we haven't exceeded max attempts
+        if (reconnectCount.current < reconnectAttempts) {
+          if (autoReconnect) {
+            console.log('Auto-reconnect enabled, attempting reconnect...');
+            reconnectCount.current += 1;
+            connect();
+          } else {
+            const healthy = await checkHealth();
+            if (healthy) {
+              console.log('WebSocket health check passed, attempting reconnect...');
+              reconnectCount.current += 1;
+              connect();
+            } else {
+              console.log('WebSocket health check failed, will retry...');
+            }
+          }
+        } else {
+          console.warn('Max reconnect attempts reached, stopping further attempts.');
+        }
+      }, reconnectInterval); // poll every 10 seconds
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [connectionState, autoConnect, autoReconnect, token, connect, reconnectAttempts]);
+
   return {
     sendMessage,
     isConnected,
@@ -249,4 +295,4 @@ export const useWebSocket = ({
     connect,
     connectionState,
   };
-}; 
+};
