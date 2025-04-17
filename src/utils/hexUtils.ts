@@ -1,5 +1,4 @@
-import { Tile } from '@/types/tiles' 
-import { ViewableTile } from '@/components/grid/GridCanvas'
+import {Tile, TileMap} from '@/types/tiles'
 
 // Hex directions in cube coordinates (pointy-top orientation)
 export const HEX_DIRECTIONS = [
@@ -55,18 +54,18 @@ export const HEX_DIRECTIONS = [
   }
   
 // Find all valid viewable tiles (neighbors of colony tiles up to a certain depth)
-export function findViewableTiles(tileMap: { [key: string]: Tile }, depth: number = 1): ViewableTile[] {
+export function findViewableTiles(tileMap: TileMap, depth: number = 1): TileMap {
   if (depth < 1) {
-    return [];
+    return {};
   }
 
-  const viewableTilesMap: { [key: string]: ViewableTile } = {};
+  const viewableTilesMap: TileMap = {};
   const visitedKeys = new Set<string>(Object.keys(tileMap)); // Keep track of colony and already found viewable tiles
   let currentFrontier: { q: number, r: number, s: number }[] = Object.values(tileMap).map(tile => ({ q: tile.q, r: tile.r, s: tile.s })); // Start with colony tiles
 
   for (let d = 0; d < depth; d++) {
     const nextFrontier: { q: number, r: number, s: number }[] = [];
-    const newviewableFoundInLayer: { [key: string]: ViewableTile } = {};
+    const newViewableFoundInLayer:TileMap = {};
 
     currentFrontier.forEach(tile => {
       const neighbors = getNeighbors(tile);
@@ -76,11 +75,15 @@ export function findViewableTiles(tileMap: { [key: string]: Tile }, depth: numbe
 
         // If this neighbor is not part of the colony and hasn't been visited/added as viewable yet
         if (!visitedKeys.has(neighborKey)) {
-          newviewableFoundInLayer[neighborKey] = { 
-            q: neighbor.q, 
-            r: neighbor.r, 
-            s: neighbor.s, 
-            distance: d + 1 
+          newViewableFoundInLayer[neighborKey] =  {
+            controllerUid: "",
+            id: `${neighbor.q}#${neighbor.r}#${neighbor.s}`,
+            type: "",
+            visibility: 'unexplored',
+            q: neighbor.q,
+            r: neighbor.r,
+            s: neighbor.s,
+            resourceDensity: 0
           }; // Current depth + 1
           visitedKeys.add(neighborKey); // Mark as visited
           nextFrontier.push(neighbor); // Add to the frontier for the next layer
@@ -89,7 +92,7 @@ export function findViewableTiles(tileMap: { [key: string]: Tile }, depth: numbe
     });
 
     // Add the newly found viewable tiles for this layer to the main map
-    Object.assign(viewableTilesMap, newviewableFoundInLayer);
+    Object.assign(viewableTilesMap, newViewableFoundInLayer);
     
     // Prepare for the next iteration
     currentFrontier = nextFrontier;
@@ -101,9 +104,5 @@ export function findViewableTiles(tileMap: { [key: string]: Tile }, depth: numbe
   }
 
   // Convert map to array
-  return Object.values(viewableTilesMap);
+  return viewableTilesMap;
 }
-  // Validate that a tile's cube coordinates sum to 0
-  export function isValidCubeCoordinate(q: number, r: number, s: number): boolean {
-    return q + r + s === 0
-  }

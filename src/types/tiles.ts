@@ -11,9 +11,20 @@ export interface Tile {
   type: string;
   controllerUid: string;  // Firebase user ID of the controller
   visibility: 'visible' | 'unexplored'; // TODO TW: Discuss unexplored
-  resourceDensity?: number; // Value from 0-1 indicating resource richness
+  resourceDensity: number; // Value from 0-1 indicating resource richness
   resources?: {
     [key: string]: number;
   };
   color?: string;  // Color for rendering, used by UI only
-} 
+}
+
+export interface TileMap {
+  [key: string]: Tile;
+}
+
+export function tilesToMap(tiles: Tile[]): TileMap {
+  return tiles.reduce<TileMap>((map, tile) => {
+    map[tile.id] = tile;
+    return map;
+  }, {});
+}

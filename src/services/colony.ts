@@ -17,6 +17,7 @@ import { Colony, CreateColonyRequest, CreateColonyResponse } from '@/types/colon
 import { Tile } from '@/types/tiles';
 import { callFunction, getFunctionUrl } from '@/utils/api';
 import { auth, firestore, functions } from '@/config/firebase';
+import {useAuth} from "@/contexts/AuthContext";
 
 // Create callable function references
 const createColonyFunction = httpsCallable<
@@ -26,11 +27,9 @@ const createColonyFunction = httpsCallable<
 
 // Cache configuration
 const COLONY_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes in milliseconds
-const TILES_CACHE_EXPIRY = 10 * 60 * 1000; // 10 minutes in milliseconds
 
 // Cache keys
 const getColonyCacheKey = (uid: string) => `colony_${uid}`;
-const getTilesCacheKey = (tileIds: string[]) => `tiles_${tileIds.sort().join('_')}`;
 
 // Cache utility functions
 interface CachedData<T> {
@@ -72,19 +71,6 @@ function saveToCache<T>(key: string, data: T): void {
 }
 
 /**
- * Get authentication token for API requests
- * @returns The ID token or throws error if not authenticated
- */
-async function getAuthToken(): Promise<string> {
-  const currentUser = auth.currentUser;
-  if (!currentUser) {
-    throw new Error('User must be logged in to make authenticated requests');
-  }
-  
-  return currentUser.getIdToken();
-}
-
-/**
  * Fetch a user's colony from Firestore
  * @param uid - The user's Firebase UID
  * @param options - Optional parameters for controlling fetch behavior
@@ -94,7 +80,6 @@ export async function fetchUserColony(
   uid: string, 
   options?: { 
     forceRefresh?: boolean;
-    skipTiles?: boolean; // Skip loading tiles initially for faster initial load
   }
 ): Promise<Colony | null> {
   if (!uid) {
@@ -146,13 +131,7 @@ export async function fetchUserColony(
       territoryScore: colonyData.territoryScore || 0,
       visibilityRadius: colonyData.visibilityRadius || 0
     };
-    
-    // TODO TW: Not sure if we should fetch these here or let it happen somwhere else?
-    // Load tiles for the colony if not skipped
-    // if (!options?.skipTiles && colony.tileIds.length > 0) {
-    //   colony.tiles = await fetchTilesForColony(colony.tileIds);
-    // }
-    
+
     // Save to cache
     if (typeof window !== 'undefined') {
       saveToCache(cacheKey, colony);
@@ -199,7 +178,6 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
       createdAt: new Date(),
       startCoordinates: responseData.startCoordinates,
       tileIds: responseData.tileIds,
-      tiles: responseData.tiles,
       units: responseData.units,
       unplacedUnits: responseData.unplacedUnits,
       territoryScore: responseData.territoryScore,
@@ -215,20 +193,6 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
   }
 }
 
-/**
- * Check if a user has a colony
- * @param uid - The user's Firebase UID
- * @returns boolean indicating if user has a colony
- */
-export async function hasColony(uid: string): Promise<boolean> {
-  try {
-    const colony = await fetchUserColony(uid);
-    return colony !== null;
-  } catch (error) {
-    console.error('Error checking if user has colony:', error);
-    return false;
-  }
-}
 
 /**
  * Invalidate colony cache for a specific user

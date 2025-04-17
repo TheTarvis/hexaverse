@@ -6,7 +6,7 @@ export function ColonyInfo() {
 
   // Handler for manual refresh that forces a fresh fetch
   const handleRefresh = () => {
-    refreshColony({ forceRefresh: true });
+    refreshColony();
   };
 
   if (isLoadingColony) {
@@ -63,7 +63,7 @@ export function ColonyInfo() {
       <div>
         <h4 className="font-semibold text-gray-700 dark:text-zinc-300 mb-1">Tiles</h4>
         <p className="text-sm text-gray-600 dark:text-zinc-400">
-        {colony.tiles?.length ?? 0} tiles in your colony
+        {colony.tileIds?.length ?? 0} tiles in your colony
         </p>
       </div>
       

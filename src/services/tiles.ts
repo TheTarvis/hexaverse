@@ -88,8 +88,6 @@ export async function fetchTiles(
   
   const cacheKey = getTilesCacheKey(tileIds);
 
-  console.log('Tile IDs', tileIds);
-  
   // Check cache first if not forcing refresh
   if (!options?.forceRefresh && typeof window !== 'undefined') {
     const cachedTiles = getFromCache<Tile[]>(cacheKey, TILES_CACHE_EXPIRY);
@@ -206,25 +204,26 @@ export async function addTile(
  * Handle successful tile addition by invalidating relevant caches
  */
 function handleSuccessfulTileAddition(result: HttpsCallableResult<AddTileResponse>): void {
-  const currentUser = auth.currentUser;
-  if (!currentUser) return;
-  
-  console.log(`Added tile succeeded, invalidating cache for user: ${currentUser.uid}`);
-  
+  console.log(`Added tile succeeded`);
+
   // If we captured a tile from another colony, invalidate that colony's cache too
   if (result.data.captured && result.data.previousColony) {
     console.log(`Captured tile from colony: ${result.data.previousColony}, invalidating its cache`);
     invalidateColonyCache(result.data.previousColony);
   }
-  
+
   // Invalidate the specific tile's cache if available
   if (result.data.tile?.id) {
     console.log(`Invalidating cache for tile: ${result.data.tile.id}`);
     invalidateTileCache([result.data.tile.id]);
   }
-  
-  // Invalidate current user's colony cache
-  invalidateColonyCache(currentUser.uid);
+
+
+  if (auth.currentUser){
+    console.log(`Invalidating cache for user: ${auth.currentUser.uid}`);
+    invalidateColonyCache(auth.currentUser.uid);
+  }
+
 }
 
 /**

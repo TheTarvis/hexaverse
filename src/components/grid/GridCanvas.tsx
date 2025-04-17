@@ -4,7 +4,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
-import { Tile } from '@/types/tiles'
+import {Tile, TileMap} from '@/types/tiles'
 
 // Updated interface for SelectedTile to include potential color field
 interface SelectedTile {
@@ -16,26 +16,12 @@ interface SelectedTile {
   resourceDensity?: number;
 }
 
-// Updated ViewableTile interface
-export interface ViewableTile {
-  q: number;
-  r: number;
-  s: number;
-  distance: number;
-  color?: string;
-}
-
-// Updated interface for TileMap using standard Tile with color
-interface TileMap {
-  [key: string]: Tile;
-}
 
 // Updated props interface
 interface HexGridCanvasProps {
   wireframe: boolean;
   hexSize: number;
   tileMap: TileMap;
-  viewTiles: ViewableTile[];
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
   onTileSelect: (tile: SelectedTile) => void;
@@ -242,14 +228,12 @@ function HexGrid({
   wireframe = false, 
   hexSize = 1.2, 
   tileMap = {} as TileMap,
-  viewableTiles = [] as ViewableTile[],
   onTileSelect,
   onTileAdd,
 }: {
   wireframe?: boolean,
   hexSize?: number,
   tileMap?: TileMap,
-  viewableTiles?: ViewableTile[],
   onTileSelect: (tile: SelectedTile) => void,
   onTileAdd?: (q: number, r: number, s: number) => void,
 }) {
@@ -293,33 +277,12 @@ function HexGrid({
         color,
         type,
         resourceDensity,
-        isViewableTile: false
-      })
-    })
-    
-    // Add viewable tiles with distance information
-    viewableTiles.forEach((tile) => {
-      const q = tile.q;
-      const r = tile.r;
-      const s = tile.s;
-      const distance = tile.distance;
-      
-      // Use the color from the viewable tile or fall back to a default
-      const color = tile.color || '#AAAAAA';
-      
-      gridPositions.push({
-        q, r, s,
-        position: cubeToPixel(q, r, s, hexSize),
-        color,
-        type: 'viewable',
-        resourceDensity: undefined,
-        isViewableTile: true,
-        viewDistance: distance
+        isViewableTile: tile.visibility == 'unexplored'
       })
     })
     
     return gridPositions
-  }, [hexSize, tileMap, viewableTiles])
+  }, [hexSize, tileMap])
 
   return (
     <>
@@ -399,8 +362,7 @@ export function GridCanvas({
   wireframe, 
   hexSize, 
   tileMap, 
-  viewTiles, 
-  cameraPosition, 
+  cameraPosition,
   cameraTarget, 
   onTileSelect,
   onTileAdd,
@@ -454,7 +416,6 @@ export function GridCanvas({
         wireframe={wireframe}
         hexSize={hexSize}
         tileMap={tileMap}
-        viewableTiles={viewTiles}
         onTileSelect={handleTileSelect}
         onTileAdd={onTileAdd}
       />

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { getWebSocketEndpoint } from '@/services/websocket';
 import { WebSocketMessage, PayloadType, PingPongMessage } from '@/types/websocket';
+import {useAuth} from "@/contexts/AuthContext";
 
 // Create a singleton instance that can be shared across renders
 let globalWsInstance: WebSocket | null = null;
@@ -18,7 +19,6 @@ interface WebSocketHookOptions {
   reconnectInterval?: number;
   autoReconnect?: boolean;
   autoConnect?: boolean;
-  token?: string | null;
 }
 
 interface WebSocketHookReturn {
@@ -47,7 +47,6 @@ export const useWebSocket = ({
   reconnectInterval = 3000,
   autoReconnect = false,
   autoConnect = true,
-  token = null,
 }: WebSocketHookOptions = {}): WebSocketHookReturn => {
   // Use the global instance instead of creating a new one per component
   const ws = useRef<WebSocket | null>(null);
@@ -60,6 +59,7 @@ export const useWebSocket = ({
   const onMessageRef = useRef(onMessage);
   const onConnectRef = useRef(onConnect);
   const onDisconnectRef = useRef(onDisconnect);
+  const { user } = useAuth()
   
   // Update refs when props change
   useEffect(() => {
@@ -96,7 +96,7 @@ export const useWebSocket = ({
       
       globalLastConnectionAttempt = now;
       
-      if (!token) {
+      if (!user || !user.uid) {
         console.log('No authentication token available, cannot connect to WebSocket');
         setConnectionState(ConnectionState.DISCONNECTED);
         return;
@@ -127,7 +127,7 @@ export const useWebSocket = ({
       
       // Append token as query parameter
       const wsUrl = new URL(endpoint);
-      wsUrl.searchParams.append('token', token);
+      wsUrl.searchParams.append('token', await user.getIdToken())
       
       globalWsInstance = new WebSocket(wsUrl.toString());
       ws.current = globalWsInstance;
@@ -190,7 +190,7 @@ export const useWebSocket = ({
         console.error('Error stack:', error.stack);
       }
     }
-  }, [token, autoReconnect, reconnectAttempts]);
+  }, [autoReconnect, reconnectAttempts]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -230,11 +230,9 @@ export const useWebSocket = ({
 
   useEffect(() => {
     // Only connect automatically if autoConnect is true and token exists
-    if (autoConnect && token) {
+    if (autoConnect) {
       console.log('Auto-connecting to WebSocket with token...');
       connect();
-    } else if (!token) {
-      console.log('Waiting for authentication token before connecting to WebSocket');
     } else {
       console.log('Auto-connect is disabled, waiting for manual connection');
     }
@@ -242,7 +240,7 @@ export const useWebSocket = ({
     return () => {
       console.log('Component unmounting, but keeping WebSocket connection for other subscribers');
     };
-  }, [connect, autoConnect, token]);
+  }, [connect, autoConnect]);
 
   return {
     sendMessage,

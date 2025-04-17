@@ -1,12 +1,12 @@
-import '@/styles/tailwind.css'
-import { Inter } from 'next/font/google'
-import type { Metadata } from 'next'
-import { getEvents } from '@/data'
-import { ApplicationLayout } from './application-layout'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { TileProvider } from '@/contexts/TileContext'
 import { ColonyProvider } from '@/contexts/ColonyContext'
+import { TileProvider } from '@/contexts/TileContext'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { getEvents } from '@/data'
+import '@/styles/tailwind.css'
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import { ApplicationLayout } from './application-layout'
 
 export const metadata: Metadata = {
   title: {
@@ -22,11 +22,7 @@ const inter = Inter({
   variable: '--font-inter',
 })
 
-export default async function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const events = await getEvents()
 
   return (
@@ -39,15 +35,15 @@ export default async function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className={inter.variable}>
-        <AuthProvider>
-          <TileProvider>
+        <ToastProvider>
+          <AuthProvider>
             <ColonyProvider>
-              <ToastProvider>
+              <TileProvider>
                 <ApplicationLayout events={events}>{children}</ApplicationLayout>
-              </ToastProvider>
+              </TileProvider>
             </ColonyProvider>
-          </TileProvider>
-        </AuthProvider>
+          </AuthProvider>
+        </ToastProvider>
       </body>
     </html>
   )

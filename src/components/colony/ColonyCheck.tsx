@@ -9,19 +9,19 @@ import { ColonyCreation } from './ColonyCreation';
 export function ColonyCheck() {
   const router = useRouter();
   const { user, isLoading: isLoadingAuth } = useAuth();
-  const { hasColony, isLoadingColony } = useColony();
+  const { colony, isLoadingColony } = useColony();
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showColonyCreation, setShowColonyCreation] = useState(false);
 
   // Check if user has a colony when authentication state changes
   useEffect(() => {
-    if (!isLoadingAuth && !isLoadingColony && user && !hasColony) {
+    if (!isLoadingAuth && !isLoadingColony && user && !colony) {
       setShowCreatePrompt(true);
     } else {
       setShowCreatePrompt(false);
       setShowColonyCreation(false);
     }
-  }, [user, hasColony, isLoadingAuth, isLoadingColony]);
+  }, [user, colony, isLoadingAuth, isLoadingColony]);
 
   // Show colony creation form instead of redirecting
   const handleCreateColony = () => {
@@ -34,7 +34,7 @@ export function ColonyCheck() {
     setShowColonyCreation(false);
   };
 
-  if (isLoadingAuth || isLoadingColony || !user || hasColony) {
+  if (isLoadingAuth || isLoadingColony || !user || colony) {
     return null; // Don't render anything if loading, no user, or user has colony
   }
 

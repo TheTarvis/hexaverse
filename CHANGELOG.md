@@ -1,3 +1,11 @@
+## [v0.9.18] - 2025-04-17
+### Changed
+- Refactored ColonyStatus management to ColonyContext
+- Moved colony status tracking from GridManager to ColonyContext for better centralization
+- Enhanced colony state management with more reactive grid updates
+- Optimized GridManager to consume colonyStatus from context instead of managing it locally
+- Reduced duplicate code and improved maintainability
+
 ## [v0.9.17] - 2025-04-16
 ### Changed
 - Updated README.md

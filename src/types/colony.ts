@@ -17,7 +17,6 @@ export interface Colony {
     s: number;
   };
   tileIds: string[]; // References to tiles in the 'tiles' collection
-  tiles?: Tile[]; // Optional tiles array for when tiles are loaded
   units: Unit[];
   unplacedUnits: UnplacedUnit[];
   // Territory metrics

@@ -21,7 +21,6 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
       }
     },
     autoConnect: true,
-    token: userToken
   });
   
   const [messages, setMessages] = useState<any[]>([]);

@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ColonyInfo } from './ColonyInfo';
 
 export function ColonyManager() {
-  const { hasColony, isLoadingColony } = useColony();
+  const { colony, isLoadingColony } = useColony();
   const { user, isLoading: isLoadingAuth } = useAuth();
 
   if (isLoadingAuth || !user) {
@@ -17,7 +17,7 @@ export function ColonyManager() {
     );
   }
 
-  if (isLoadingColony || !hasColony) {
+  if (isLoadingColony || !colony) {
     return (
       <div className="p-6">
         <div className="max-w-md mx-auto p-6 bg-white dark:bg-zinc-800 rounded-xl shadow-md animate-pulse">
