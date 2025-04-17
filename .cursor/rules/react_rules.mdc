@@ -1,0 +1,41 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# React Best Practices for useEffect and Context Providers
+
+## Rule: Avoid async functions directly in useEffect
+Pattern: useEffect\(async
+Message: Do not declare the useEffect callback as async. Wrap the logic inside an inner async function instead.
+Severity: warning
+
+## Rule: Missing dependency array in useEffect
+Pattern: useEffect\([^,]*\)
+Message: useEffect should include a dependency array. Without it, the effect will run on every render.
+Severity: warning
+
+## Rule: useEffect with no cleanup for subscriptions or intervals
+Pattern: useEffect\([^)]*\{\s*[^}]*(addEventListener|setInterval|setTimeout)[^}]*\}\s*\)
+Message: You are setting up a subscription or timer but not returning a cleanup function. This may cause memory leaks.
+Severity: warning
+
+## Rule: Do not compute derived state inside useEffect
+Pattern: useEffect\([^)]*set.*\(.*\.filter\(
+Message: Avoid computing derived data (like filtered lists) in useEffect. Use useMemo or compute directly during render.
+Severity: info
+
+## Rule: Context.Provider without memoizing the value
+Pattern: <\w+Provider value=\{\{[^}]+[^M]emo
+Message: Context value should be memoized using useMemo to avoid unnecessary re-renders.
+Severity: warning
+
+## Rule: useContext used without custom hook
+Pattern: useContext\(\w+Context\)
+Message: Wrap useContext in a custom hook (e.g., useAuth) for cleaner and safer access patterns.
+Severity: info
+
+## Rule: Large all-in-one Provider detected
+Pattern: <(Auth|App|Global|Root)Provider>
+Message: Consider breaking this Provider into smaller scoped providers to improve modularity and maintainability.
+Severity: info

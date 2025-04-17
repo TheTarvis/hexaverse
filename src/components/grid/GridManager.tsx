@@ -53,95 +53,44 @@ export function GridManager() {
   const cameraPosition: [number, number, number] = [worldCoords.x, worldCoords.y, 20]
   const cameraTarget: [number, number, number] = [worldCoords.x, worldCoords.y, 0]
 
-  const [tileMap, setTileMap] = useState<TileMap>({})
-
   const [error, setError] = useState<string | null>(null)
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   const [addingTile, setAddingTile] = useState(false)
 
-  // Update colony tiles colors when colorScheme, colony color or the colony tiles change.
-  useEffect(() => {
-    if (Object.keys(colonyTiles).length === 0) return
-
-    const updatedTileMap = { ...colonyTiles }
-    let hasChanges = false
-
-    console.log('Colony tiles changed. Attempting to recolor')
-    console.log(colony?.color)
-
-    // Update colors for all tiles based on current settings
-    Object.entries(updatedTileMap).forEach(([key, tile]) => {
-      const newColor = getTileColor(tile, user?.uid, {
-        colorScheme: debugState.colorScheme,
-        colonyColor: colony?.color,
-        distance: 5, // optional
+  // Compute the tileMap using useMemo based on dependencies
+  const tileMap = useMemo(() => {
+    // Initialize with viewable tiles, excluding any already in colonyTiles
+    const baseMap: TileMap = {}
+    Object.entries(viewableTiles)
+      .filter(([key]) => !colonyTiles[key])
+      .forEach(([key, tile]) => {
+        baseMap[key] = {
+          ...tile,
+          color: getTileColor(tile, user?.uid, {
+            colorScheme: debugState.colorScheme,
+            colonyColor: colony?.color,
+            distance: 5, // Consider making distance dynamic if needed
+          }),
+        }
       })
 
-      // Only update if color has changed
-      if (tile.color !== newColor) {
-        updatedTileMap[key] = {
-          ...tile,
-          color: newColor,
-        }
-        hasChanges = true
+    // Add or update colony tiles, always recalculating color
+    Object.entries(colonyTiles).forEach(([key, tile]) => {
+      baseMap[key] = {
+        ...tile,
+        color: getTileColor(tile, user?.uid, {
+          colorScheme: debugState.colorScheme,
+          colonyColor: colony?.color,
+          distance: 5, // Consider making distance dynamic if needed
+        }),
       }
     })
 
-    // Only update state if colors have actually changed
-    if (hasChanges) {
-      setTileMap((prev) => {
-        if (!prev) return updatedTileMap
-        return {
-          ...prev,
-          ...updatedTileMap,
-        }
-      })
-    }
-  }, [debugState.colorScheme, colony?.color, colonyTiles, user?.uid])
-
-  // Update viewable tiles colors when colorScheme, colony color or the viewable tiles change.
-  useEffect(() => {
-    if (Object.keys(viewableTiles).length === 0) return
-
-    const tilesToUpdate: Record<string, Tile> = {}
-    let hasChanges = false
-
-    console.log('Viewable tiles changed. Attempting to recolor')
-
-    // Update colors for all tiles based on current settings
-    Object.entries(viewableTiles)
-      .filter(([_, tile]) => !(tile.id in colonyTiles))
-      .forEach(([key, tile]) => {
-        const newColor = getTileColor(tile, user?.uid, {
-          colorScheme: debugState.colorScheme,
-          colonyColor: colony?.color,
-          distance: 5, // optional
-        })
-
-        // Only update if color has changed
-        if (tile.color !== newColor) {
-          tilesToUpdate[key] = {
-            ...tile,
-            color: newColor,
-          }
-          hasChanges = true
-        }
-      })
-
-    // Only update state if colors have actually changed
-    if (hasChanges) {
-      setTileMap((prev) => {
-        if (!prev) return { ...viewableTiles, ...tilesToUpdate }
-        return {
-          ...prev,
-          ...tilesToUpdate,
-        }
-      })
-    }
-  }, [colony?.color, colonyTiles, debugState.colorScheme, user?.uid, viewableTiles])
+    return baseMap
+  }, [colonyTiles, viewableTiles, debugState.colorScheme, colony?.color, user?.uid])
 
   // Handle adding a tile to the colony
-  const handleAddTile = useCallback(
+  const onAddTile = useCallback(
     async (q: number, r: number, s: number) => {
       try {
         setAddingTile(true)
@@ -294,7 +243,7 @@ export function GridManager() {
           cameraPosition={cameraPosition}
           cameraTarget={cameraTarget}
           onTileSelect={handleTileSelect}
-          onTileAdd={handleAddTile}
+          onTileAdd={onAddTile}
           followSelectedTile={debugState.followSelectedTile}
         />
       )}

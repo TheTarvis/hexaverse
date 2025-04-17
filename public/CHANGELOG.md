@@ -1,3 +1,8 @@
+## [v0.9.21] - 2025-04-17
+### Changed
+- Refactored Grid Manager to useMemo.
+- Added react best practices rules.
+
 ## [v0.9.20] - 2025-04-17
 ### Changed
 - Fixed issue with adding a tile having both viewable and colony tiles being drawn.
