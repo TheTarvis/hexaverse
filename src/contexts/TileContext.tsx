@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useColony } from '@/contexts/ColonyContext'
 import { fetchTiles } from '@/services/tiles'
 import { Tile, TileMap, tilesToMap } from '@/types/tiles'
-import { isColonyMessage, isTileMessage } from '@/types/websocket'
+import { isTileMessage } from '@/types/websocket'
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
 import {findViewableTiles} from "@/utils/hexUtils";
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription';
@@ -24,15 +24,30 @@ export function TileProvider({ children }: { children: ReactNode }) {
   const [isLoadingTiles, setIsLoadingTiles] = useState(false)
   const { colony } = useColony()
   const { user } = useAuth()
-  const [colonyTiles, setColonyTiles] = useState<Record<string, Tile>>({})
-  const [viewableTiles, setViewableTiles] = useState<Record<string, Tile>>({})
+  const [colonyTiles, setColonyTiles] = useState<TileMap>({})
+  const [viewableTiles, setViewableTiles] = useState<TileMap>({})
 
   const addColonyTile = useCallback((tile: Tile) => {
+    // Add to colony tiles
     setColonyTiles((prev) => ({
       ...prev,
       ...tilesToMap([tile]),
-    }))
-  }, [])
+    }));
+
+    //  Update viewable tiles off of tile change.
+    let tilesMap = tilesToMap([tile])
+    let viewableTiles: TileMap = Object.fromEntries(
+        Object.entries(findViewableTiles(tilesMap, 5))
+            .filter(([_, tile]) => !(tile.id in colonyTiles))
+    );
+    setViewableTiles((prev) => {
+      if (!prev) return viewableTiles
+      return {
+        ...prev,
+        ...viewableTiles,
+      }
+    });
+  }, []);
 
   const value = {
     isLoadingTiles,

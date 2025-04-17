@@ -12,7 +12,7 @@ export const HEX_DIRECTIONS = [
   
   // Create a unique key for cube coordinates
   export function coordsToKey(q: number, r: number, s: number): string {
-    return `${q},${r},${s}`
+    return `${q}#${r}#${s}`
   }
   
   // Convert a key back to coordinates
