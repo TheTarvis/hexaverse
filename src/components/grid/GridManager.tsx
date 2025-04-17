@@ -9,7 +9,6 @@ import { useTiles } from '@/contexts/TileContext'
 import { useToast } from '@/contexts/ToastContext'
 import { addTile } from '@/services/tiles'
 import { Tile, TileMap } from '@/types/tiles'
-import { coordsToKey } from '@/utils/hexUtils'
 import { getTileColor } from '@/utils/tileColorUtils'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 

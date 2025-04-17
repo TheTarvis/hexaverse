@@ -1,3 +1,8 @@
+## [v0.9.20] - 2025-04-17
+### Changed
+- Fixed issue with adding a tile having both viewable and colony tiles being drawn.
+- Updated find viewable tiles to use id format that cloud function generates.
+
 ## [v0.9.19] - 2025-04-17
 ### Changed
 - Improved WebSocket connection management to prevent multiple simultaneous connection attempts
