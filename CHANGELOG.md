@@ -1,3 +1,7 @@
+## [v0.9.18] - 2025-04-16
+### Changed
+- Added websocket connection indicator to sidebar/navbar
+
 ## [v0.9.17] - 2025-04-16
 ### Changed
 - Updated README.md

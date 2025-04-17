@@ -2,7 +2,7 @@
 
 import { getAuthToken } from '@/services/auth';
 
-const WEBSOCKET_BASE_URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL;
+const WEBSOCKET_BASE_URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'localhost:8081';
 
 /**
  * Get the WebSocket endpoint URL
