@@ -262,3 +262,56 @@ export async function updateColonyCacheWithNewTile(uid: string, tileId: string):
     console.warn('Error updating colony cache with new tile:', error);
   }
 }
+
+/**
+ * Remove a tile ID from the colony cache
+ * @param uid User ID whose colony to update
+ * @param tileId Tile ID to remove from the colony
+ */
+export async function removeColonyCacheWithTile(uid: string, tileId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    // Get colony cache key
+    const cacheKey = getColonyCacheKey(uid);
+    
+    // Try to get the colony from cache
+    const cachedColonyJson = localStorage.getItem(cacheKey);
+    if (!cachedColonyJson) {
+      console.log('Colony not found in cache, will be updated on next fetch');
+      return;
+    }
+    
+    // Parse the cached colony data
+    const cachedData = JSON.parse(cachedColonyJson);
+    const colony = cachedData.data;
+    
+    // Check if the colony has a tileIds array
+    if (!colony || !Array.isArray(colony.tileIds)) {
+      console.warn('Invalid colony data in cache');
+      return;
+    }
+    
+    // Check if tile exists in the colony's tileIds
+    if (!colony.tileIds.includes(tileId)) {
+      console.log(`Tile ${tileId} does not exist in colony cache`);
+      return;
+    }
+    
+    // Remove the tile ID from the tileIds array
+    colony.tileIds = colony.tileIds.filter((id: string) => id !== tileId);
+    
+    // Update territory score (optional)
+    if (typeof colony.territoryScore === 'number') {
+      colony.territoryScore = colony.tileIds.length;
+    }
+    
+    // Update the cache with the modified colony data
+    cachedData.data = colony;
+    localStorage.setItem(cacheKey, JSON.stringify(cachedData));
+    
+    console.log(`Removed tile ${tileId} from colony cache`);
+  } catch (error) {
+    console.warn('Error removing tile from colony cache:', error);
+  }
+}

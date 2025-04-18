@@ -70,27 +70,6 @@ export function GridManager() {
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   const [addingTile, setAddingTile] = useState(false)
 
-  // Helper function to get color from cache or fetch it
-  const getColorForUser = useCallback(async (userId?: string) => {
-    if (!userId) return '#FF3333';
-    
-    if (colorCache[userId]) {
-      return colorCache[userId];
-    }
-
-    try {
-      const color = await fetchColonyColor(userId);
-      setColorCache(prev => ({
-        ...prev,
-        [userId]: color
-      }));
-      return color;
-    } catch (error) {
-      console.error('Error getting color for user:', error);
-      return '#FF3333';
-    }
-  }, [fetchColonyColor, colorCache]);
-
   // Compute the tileMap using useMemo based on dependencies
   const tileMap = useMemo(() => {
     // Initialize with viewable tiles, excluding any already in colonyTiles

@@ -72,7 +72,7 @@ export const addTile = onCall({
 }, async (request) => {
   // Create a tracker for this function call
   const tracker = new ReadCostTracker('addTile');
-  console.log('addTile');
+
   try {
     // Authenticate the request and get the user ID
     const uid = request.auth?.uid;

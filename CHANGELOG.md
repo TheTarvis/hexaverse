@@ -1,3 +1,21 @@
+## [v0.10.4] - 2025-04-21
+### Fixed
+- Fixed issue where removed tiles weren't being added to viewableTiles
+- Added tile to viewableTiles immediately after removing it from colonyTiles
+- Improved grid visualization by ensuring removed tiles remain visible
+
+## [v0.10.3] - 2025-04-20
+### Improved
+- Fixed grid flashing issue by decoupling tile removal from colony state updates
+- Added removeColonyCacheWithTile function to update colony cache without state changes
+- Implemented UI-first approach that prioritizes visual consistency during tile removal
+- Optimized rendering performance by avoiding unnecessary colony state updates
+
+## [v0.10.2] - 2025-04-19
+### Fixed
+- Fixed TODO in TileContext to properly remove tiles from colony.tileIds cache
+- Updated removeColonyTile function to maintain colony state consistency
+
 ## [v0.10.1] - 2025-04-18
 ### Changed
 - Added ability to clear both colony and tile cache.
