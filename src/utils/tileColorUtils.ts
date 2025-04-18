@@ -9,20 +9,26 @@ export function getTileColor(
   currentUserUid?: string,
   options?: {
     colorScheme?: string;
-    colonyColor? : string,
-    distance? : number,
+    colonyColor?: string;
+    distance?: number;
+    enemyColor?: string;
   }
 ): string {
 
-  // // Handle enemy tiles - show them as red
+  // Handle enemy tiles
   if (tile.controllerUid && currentUserUid && tile.controllerUid !== currentUserUid) {
-    // Make enemy tiles bright red for high visibility
-    return '#FF3333'; // Brighter red color for enemy tiles
+    // Trigger the callback to load the enemy color if provided
+    if (options?.enemyColor) {
+      return options.enemyColor;
+    }
+    
+    // Return default red color initially
+    return '#FF3333';
   }
 
-  // // Handle enemy tiles - show them as red
-  if (tile.controllerUid && currentUserUid && tile.controllerUid == currentUserUid) {
-    return options?.colonyColor ? options?.colonyColor : '#FF3333'; // Brighter red color for enemy tiles
+  // Handle your own colony tiles - use your colony color
+  if (tile.controllerUid && currentUserUid && tile.controllerUid === currentUserUid) {
+    return options?.colonyColor || '#3388FF'; // Use colony color or default blue
   }
 
   // Enhanced Viewable tile coloring based on distance

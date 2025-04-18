@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteRoadmapItem = exports.updateRoadmapItem = exports.addRoadmapItem = exports.addTile = exports.createColony = exports.makeUppercase = void 0;
+exports.deleteRoadmapItem = exports.updateRoadmapItem = exports.addRoadmapItem = exports.fetchTilesByIds = exports.addTile = exports.createColony = exports.makeUppercase = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
@@ -9,6 +9,7 @@ const colony_1 = require("./colony");
 Object.defineProperty(exports, "createColony", { enumerable: true, get: function () { return colony_1.createColony; } });
 const tiles_1 = require("./tiles");
 Object.defineProperty(exports, "addTile", { enumerable: true, get: function () { return tiles_1.addTile; } });
+Object.defineProperty(exports, "fetchTilesByIds", { enumerable: true, get: function () { return tiles_1.fetchTilesByIds; } });
 const roadmap_1 = require("./roadmap");
 Object.defineProperty(exports, "addRoadmapItem", { enumerable: true, get: function () { return roadmap_1.addRoadmapItem; } });
 Object.defineProperty(exports, "updateRoadmapItem", { enumerable: true, get: function () { return roadmap_1.updateRoadmapItem; } });

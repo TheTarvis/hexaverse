@@ -1,6 +1,6 @@
 import { Tile } from '@/types/tiles';
 import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
-import { invalidateColonyCache } from './colony';
+import { invalidateColonyCache, fetchUserColony, updateColonyCacheWithNewTile } from './colony';
 import { auth, functions, firestore } from '@/config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -18,6 +18,16 @@ export interface AddTileResponse {
   captured?: boolean;
   previousOwner?: string;
   previousColony?: string;
+}
+
+export interface FetchTilesByIdsRequest {
+  tileIds: string[];
+}
+
+export interface FetchTilesByIdsResponse {
+  success: boolean;
+  tiles: Tile[];
+  count: number;
 }
 
 // Cache configuration
@@ -65,10 +75,15 @@ function saveToCache<T>(key: string, data: T): void {
   }
 }
 
-// Create a callable function reference
+// Create callable function references
 const addTileFunction = httpsCallable<AddTileRequest, AddTileResponse>(
   functions, 
   'addTile'
+);
+
+const fetchTilesByIdsFunction = httpsCallable<FetchTilesByIdsRequest, FetchTilesByIdsResponse>(
+  functions,
+  'fetchTilesByIds'
 );
 
 /**
@@ -111,69 +126,73 @@ export async function fetchTiles(
     missingTileIds.push(...tileIds);
   }
 
-  // Fetch missing tiles from Firestore
+  // Fetch missing tiles from Cloud Function
   try {
     let fetchedTiles: Tile[] = [];
+    
     if (missingTileIds.length > 0) {
-        console.log(`Fetching ${missingTileIds.length} tiles from Firestore...`);
+      console.log(`Fetching ${missingTileIds.length} tiles using fetchTilesByIds cloud function...`);
+      
+      // Call the cloud function with all missing tile IDs
+      const result = await fetchTilesByIdsFunction({ tileIds: missingTileIds });
+      
+      if (result.data.success) {
+        // Add the fetched tiles
+        const fetchedExistingTiles = result.data.tiles;
         
-        // Batch fetching logic
-        const batchSize = 100; // Adjust batch size as needed
-        for (let i = 0; i < missingTileIds.length; i += batchSize) {
-            const batchIds = missingTileIds.slice(i, i + batchSize);
-            console.log(`Fetching batch ${i / batchSize + 1} of ${Math.ceil(missingTileIds.length / batchSize)} (size: ${batchIds.length})`);
-            const tileRefs = batchIds.map(id => doc(firestore, 'tiles', id));
-            const tileSnapshots = await Promise.all(tileRefs.map(ref => getDoc(ref)));
-
-            tileSnapshots.forEach(snapshot => {
-                if (snapshot.exists()) {
-                    fetchedTiles.push(snapshot.data() as Tile);
-                } else {
-                    // Tile doesn't exist in Firestore, create a default 'unexplored' representation
-                    const tileId = snapshot.ref.id;
-                    const parts = tileId.split('#');
-                    if (parts.length === 3) {
-                        const q = parseInt(parts[0], 10);
-                        const r = parseInt(parts[1], 10);
-                        const s = parseInt(parts[2], 10);
-
-                        // Check if parsing was successful (q+r+s === 0 is a good sanity check)
-                        if (!isNaN(q) && !isNaN(r) && !isNaN(s) && q + r + s === 0) {
-                           const defaultTile: Tile = {
-                                id: tileId,
-                                q: q,
-                                r: r,
-                                s: s,
-                                controllerUid: "",
-                                type: "", // Or perhaps a specific 'unexplored' type?
-                                visibility: 'unexplored',
-                                resourceDensity: 0,
-                                // Add other required Tile fields with default values if necessary
-                                // resources: {}
-                            };
-                            fetchedTiles.push(defaultTile);
-                        } else {
-                             console.warn(`Failed to parse coordinates from non-existent tile ID: ${tileId}`);
-                        }
-                    } else {
-                         console.warn(`Invalid format for non-existent tile ID: ${tileId}`);
-                    }
-                }
-            });
-            
-             // Optional small delay between batches if needed to avoid rate limits
-             // await new Promise(resolve => setTimeout(resolve, 50)); 
-        }
-
-
-        // Cache the newly fetched tiles individually
-        if (typeof window !== 'undefined') {
-            fetchedTiles.forEach(tile => {
-                const cacheKey = `tile_${tile.id}`;
-                saveToCache(cacheKey, tile);
-            });
-             console.log(`Cached ${fetchedTiles.length} individual tiles.`);
-        }
+        // Process the response
+        console.log(`Received ${fetchedExistingTiles.length} tiles from server, ${missingTileIds.length - fetchedExistingTiles.length} not found`);
+        
+        // Keep track of what tiles were found
+        const foundTileIds = new Set(fetchedExistingTiles.map(tile => tile.id));
+        
+        // For tiles that don't exist in Firestore, create default 'unexplored' representations
+        missingTileIds.forEach(tileId => {
+          if (!foundTileIds.has(tileId)) {
+            // Create default tile
+            const parts = tileId.split('#');
+            if (parts.length === 3) {
+              const q = parseInt(parts[0], 10);
+              const r = parseInt(parts[1], 10);
+              const s = parseInt(parts[2], 10);
+              
+              // Check if parsing was successful (q+r+s === 0 is a good sanity check)
+              if (!isNaN(q) && !isNaN(r) && !isNaN(s) && q + r + s === 0) {
+                const defaultTile: Tile = {
+                  id: tileId,
+                  q: q,
+                  r: r,
+                  s: s,
+                  controllerUid: "",
+                  type: "", // Or perhaps a specific 'unexplored' type?
+                  visibility: 'unexplored',
+                  resourceDensity: 0,
+                  // Add other required Tile fields with default values if necessary
+                  // resources: {}
+                };
+                fetchedExistingTiles.push(defaultTile);
+              } else {
+                console.warn(`Failed to parse coordinates from non-existent tile ID: ${tileId}`);
+              }
+            } else {
+              console.warn(`Invalid format for non-existent tile ID: ${tileId}`);
+            }
+          }
+        });
+        
+        fetchedTiles = fetchedExistingTiles;
+      } else {
+        console.error('Error fetching tiles:', result.data);
+      }
+      
+      // Cache the newly fetched tiles individually
+      if (typeof window !== 'undefined') {
+        fetchedTiles.forEach(tile => {
+          const cacheKey = `tile_${tile.id}`;
+          saveToCache(cacheKey, tile);
+        });
+        console.log(`Cached ${fetchedTiles.length} individual tiles.`);
+      }
     }
 
     // Combine cached and newly fetched tiles
@@ -196,73 +215,67 @@ export async function fetchTiles(
 }
 
 /**
- * Invalidate tile cache for specific tile IDs
- * Use this when tile data changes from server-side events
- * @param tileIds IDs of tiles to invalidate
+ * Clear all tile cache entries
+ * Use this when you want to completely reset the tile cache
  */
-export function invalidateTileCache(tileIds: string[]): void;
-export function invalidateTileCache(tiles: Tile[]): void;
-export function invalidateTileCache(arg: string[] | Tile[]): void {
+export function clearAllTileCache(): void {
   if (typeof window === 'undefined') return;
 
-  let tileIdsToInvalidate: string[];
-
-  // Type guard to check if the argument is an array of Tiles
-  if (arg.length > 0 && typeof arg[0] !== 'string') {
-    // It's Tile[], extract the ids
-    tileIdsToInvalidate = (arg as Tile[]).map(tile => tile.id);
-  } else {
-    // It's string[]
-    tileIdsToInvalidate = arg as string[];
-  }
-
-  if (!tileIdsToInvalidate.length) return;
-
   try {
-    let invalidatedCount = 0;
+    let clearedCount = 0;
+    const keysToRemove: string[] = [];
     
-    // 1. Invalidate individual tile caches
-    tileIdsToInvalidate.forEach(id => {
-        const cacheKey = `tile_${id}`;
-        if (localStorage.getItem(cacheKey) !== null) {
-             localStorage.removeItem(cacheKey);
-             invalidatedCount++;
-        }
-    });
-     if (invalidatedCount > 0) {
-        console.log(`Invalidated ${invalidatedCount} individual tile cache entries.`);
-     }
-
-    // 2. Invalidate combined tile caches containing these IDs (existing logic)
-    const combinedKeysToRemove: string[] = [];
-    const keysToCheck: string[] = [];
+    // Find all tile-related cache keys
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      // Check only keys starting with the old combined pattern
-      if (key && key.startsWith('tiles_') && !key.startsWith('tile_')) { 
-        keysToCheck.push(key);
+      if (key && (key.startsWith('tile_') || key.startsWith('tiles_'))) {
+        keysToRemove.push(key);
       }
     }
-
-    const sortedIdsToInvalidate = tileIdsToInvalidate.sort();
-    keysToCheck.forEach(key => {
-      // Check if the combined key contains any of the IDs to invalidate
-      const containsInvalidId = sortedIdsToInvalidate.some(tileId => key.includes(tileId));
-      if (containsInvalidId) {
-        combinedKeysToRemove.push(key);
-      }
-    });
-
-    combinedKeysToRemove.forEach(key => {
+    
+    // Remove all found keys
+    keysToRemove.forEach(key => {
       localStorage.removeItem(key);
+      clearedCount++;
     });
-
-    if (combinedKeysToRemove.length > 0) {
-      console.log(`Invalidated ${combinedKeysToRemove.length} combined tile cache entries.`);
+    
+    if (clearedCount > 0) {
+      console.log(`Cleared ${clearedCount} tile cache entries`);
     }
-
   } catch (error) {
-    console.warn('Error invalidating tile cache:', error);
+    console.warn('Error clearing tile cache:', error);
+  }
+}
+
+/**
+ * Update the tile cache with new tile data
+ * @param tile Tile or array of tiles to update in the cache
+ */
+export function updateTileCache(tile: Tile): void;
+export function updateTileCache(tiles: Tile[]): void;
+export function updateTileCache(arg: Tile | Tile[]): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const tilesToUpdate = Array.isArray(arg) ? arg : [arg];
+    
+    if (tilesToUpdate.length === 0) return;
+    
+    let updatedCount = 0;
+    
+    tilesToUpdate.forEach(tile => {
+      if (tile?.id) {
+        const cacheKey = `tile_${tile.id}`;
+        saveToCache(cacheKey, tile);
+        updatedCount++;
+      }
+    });
+    
+    if (updatedCount > 0) {
+      console.log(`Updated cache for ${updatedCount} tiles`);
+    }
+  } catch (error) {
+    console.warn('Error updating tile cache:', error);
   }
 }
 
@@ -305,16 +318,24 @@ export async function addTile(
 function handleSuccessfulTileAddition(result: HttpsCallableResult<AddTileResponse>): void {
   console.log(`Added tile succeeded`);
 
+  // Get the current user ID
+  const uid = auth.currentUser?.uid;
+  
   // If we captured a tile from another colony, invalidate that colony's cache too
   if (result.data.captured && result.data.previousColony) {
     console.log(`Captured tile from colony: ${result.data.previousColony}, invalidating its cache`);
     invalidateColonyCache(result.data.previousColony);
   }
 
-  // Invalidate the specific tile's cache if available
-  if (result.data.tile?.id) {
-    console.log(`Invalidating cache for tile: ${result.data.tile.id}`);
-    invalidateTileCache([result.data.tile.id]);
+  // Update the tile cache with the new data
+  if (result.data.tile) {
+    console.log(`Updating cache for tile: ${result.data.tile.id}`);
+    updateTileCache(result.data.tile);
+    
+    // Update the colony cache with the new tile ID
+    if (uid && typeof window !== 'undefined') {
+      updateColonyCacheWithNewTile(uid, result.data.tile.id);
+    }
   }
 }
 

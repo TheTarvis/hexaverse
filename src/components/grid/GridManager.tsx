@@ -23,7 +23,7 @@ interface SelectedTile {
 }
 
 export function GridManager() {
-  const { colony, setColony, colonyStatus, isLoadingColony } = useColony()
+  const { colony, fetchColonyColor, setColony, colonyStatus, isLoadingColony, userColorMap } = useColony()
   const { colonyTiles, viewableTiles, addColonyTile, isLoadingTiles } = useTiles()
   const { showToast } = useToast()
   const { user } = useAuth()
@@ -36,6 +36,19 @@ export function GridManager() {
     tileDetailsEnabled: false, // Disabled by default
     followSelectedTile: false, // Camera follow mode disabled by default
   })
+
+  // Add state to store fetched colors
+  const [colorCache, setColorCache] = useState<Record<string, string>>({})
+
+  // Update local color cache when userColorMap changes
+  useEffect(() => {
+    if (Object.keys(userColorMap).length > 0) {
+      setColorCache(prev => ({
+        ...prev,
+        ...userColorMap
+      }));
+    }
+  }, [userColorMap]);
 
   // Calculate world coordinates for the target tile based on colony start coordinates
   const worldCoords = useMemo(() => {
@@ -57,6 +70,27 @@ export function GridManager() {
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   const [addingTile, setAddingTile] = useState(false)
 
+  // Helper function to get color from cache or fetch it
+  const getColorForUser = useCallback(async (userId?: string) => {
+    if (!userId) return '#FF3333';
+    
+    if (colorCache[userId]) {
+      return colorCache[userId];
+    }
+
+    try {
+      const color = await fetchColonyColor(userId);
+      setColorCache(prev => ({
+        ...prev,
+        [userId]: color
+      }));
+      return color;
+    } catch (error) {
+      console.error('Error getting color for user:', error);
+      return '#FF3333';
+    }
+  }, [fetchColonyColor, colorCache]);
+
   // Compute the tileMap using useMemo based on dependencies
   const tileMap = useMemo(() => {
     // Initialize with viewable tiles, excluding any already in colonyTiles
@@ -64,30 +98,85 @@ export function GridManager() {
     Object.entries(viewableTiles)
       .filter(([key]) => !colonyTiles[key])
       .forEach(([key, tile]) => {
+        // Get enemy color with validation
+        const enemyColor = tile.controllerUid && typeof tile.controllerUid === 'string'
+          ? colorCache[tile.controllerUid] || '#FF3333'
+          : '#FF3333';
+          
         baseMap[key] = {
           ...tile,
           color: getTileColor(tile, user?.uid, {
             colorScheme: debugState.colorScheme,
             colonyColor: colony?.color,
-            distance: 5, // Consider making distance dynamic if needed
+            distance: debugState.viewDistance, 
+            enemyColor: enemyColor,
           }),
         }
       })
 
     // Add or update colony tiles, always recalculating color
     Object.entries(colonyTiles).forEach(([key, tile]) => {
+      // Get enemy color with validation
+      const enemyColor = tile.controllerUid && typeof tile.controllerUid === 'string'
+        ? colorCache[tile.controllerUid] || '#FF3333'
+        : '#FF3333';
+        
       baseMap[key] = {
         ...tile,
         color: getTileColor(tile, user?.uid, {
           colorScheme: debugState.colorScheme,
           colonyColor: colony?.color,
-          distance: 5, // Consider making distance dynamic if needed
+          distance: debugState.viewDistance,
+          enemyColor: enemyColor,
         }),
       }
     })
 
     return baseMap
-  }, [colonyTiles, viewableTiles, debugState.colorScheme, colony?.color, user?.uid])
+  }, [colonyTiles, viewableTiles, debugState, colony?.color, user?.uid, colorCache])
+
+  // Load colors for tiles with controllers
+  useEffect(() => {
+    const controllerUids = new Set<string>();
+    
+    // Collect all unique controller UIDs with validation
+    Object.values(viewableTiles).forEach(tile => {
+      if (tile.controllerUid && 
+          typeof tile.controllerUid === 'string' && 
+          !colorCache[tile.controllerUid]) {
+        controllerUids.add(tile.controllerUid);
+      }
+    });
+    
+    Object.values(colonyTiles).forEach(tile => {
+      if (tile.controllerUid && 
+          typeof tile.controllerUid === 'string' && 
+          !colorCache[tile.controllerUid]) {
+        controllerUids.add(tile.controllerUid);
+      }
+    });
+    
+    // Fetch colors for all controllers in parallel
+    const fetchColors = async () => {
+      const promises = Array.from(controllerUids).map(async uid => {
+        const color = await fetchColonyColor(uid);
+        return { uid, color };
+      });
+      
+      const results = await Promise.all(promises);
+      
+      const newColorCache = { ...colorCache };
+      results.forEach(({ uid, color }) => {
+        newColorCache[uid] = color;
+      });
+      
+      setColorCache(newColorCache);
+    };
+    
+    if (controllerUids.size > 0) {
+      fetchColors();
+    }
+  }, [viewableTiles, colonyTiles, fetchColonyColor, colorCache]);
 
   // Handle adding a tile to the colony
   const onAddTile = useCallback(
@@ -104,6 +193,8 @@ export function GridManager() {
           setError(null) // Clear any existing error
           return
         }
+
+        console.log('Adding tile to colony:', result.tile)
 
         // Update the Tiles Context with the new colony tile.
         addColonyTile(result.tile)

@@ -271,4 +271,83 @@ export const addTile = onCall({
       error instanceof Error ? error.message : 'Error adding/capturing tile'
     );
   }
+});
+
+/**
+ * Function to fetch multiple tiles by their IDs
+ * 
+ * This function:
+ * 1. Validates the request contains an array of tile IDs
+ * 2. Fetches all tiles in a single batch
+ * 3. Returns the array of tiles
+ */
+export const fetchTilesByIds = onCall({
+  region: functionConfig.region,
+  timeoutSeconds: functionConfig.defaultTimeoutSeconds,
+  memory: functionConfig.memory
+}, async (request) => {
+  // Create a tracker for this function call
+  const tracker = new ReadCostTracker('fetchTilesByIds');
+  
+  try {
+    // Authenticate the request and get the user ID
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'User must be signed in to fetch tiles');
+    }
+
+    // Extract tile IDs from request data
+    const { tileIds } = request.data;
+    
+    // Validate tile IDs array
+    if (!tileIds || !Array.isArray(tileIds) || tileIds.length === 0) {
+      throw new HttpsError('invalid-argument', 'A non-empty array of tile IDs is required');
+    }
+    
+    // Limit the number of tiles that can be fetched at once
+    // if (tileIds.length > 100) {
+    //   throw new HttpsError('invalid-argument', 'Cannot fetch more than 100 tiles at once');
+    // }
+
+    // Get document references for all tile IDs
+    const tileRefs = tileIds.map(tileId => admin.firestore().doc(`tiles/${tileId}`));
+    
+    // Fetch all documents in a single batch
+    const tileSnapshots = await admin.firestore().getAll(...tileRefs);
+    
+    // Track read count
+    tracker.trackRead('tilesDocs', tileSnapshots.length);
+    
+    // Convert snapshots to tile data, filtering out any that don't exist
+    const tiles = tileSnapshots
+      .filter(snapshot => snapshot.exists)
+      .map(snapshot => snapshot.data() as ColonyTile);
+    
+    // Store metrics in Firestore for analysis
+    await tracker.storeMetrics();
+    
+    // Log the read stats
+    const readSummary = tracker.getSummary();
+    logger.info(`[fetchTilesByIds] Read Summary: ${readSummary.total} total reads`);
+    
+    // Return the tiles
+    return {
+      success: true,
+      tiles,
+      count: tiles.length
+    };
+  } catch (error) {
+    logger.error("Error fetching tiles by IDs:", error);
+    
+    // If the error is already an HttpsError, rethrow it
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    
+    // Otherwise, wrap it in an HttpsError
+    throw new HttpsError(
+      'internal',
+      error instanceof Error ? error.message : 'Error fetching tiles by IDs'
+    );
+  }
 }); 

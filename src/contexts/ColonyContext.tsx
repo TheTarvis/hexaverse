@@ -23,6 +23,8 @@ interface ColonyContextType {
   createNewColony: (name: string, color?: string) => Promise<Colony>
   refreshColony: (options?: { silent?: boolean }) => Promise<void>
   setColony: React.Dispatch<React.SetStateAction<Colony | null>>
+  fetchColonyColor: (userId: string) => Promise<string>
+  userColorMap: Record<string, string>
   error: string | null
 }
 
@@ -31,16 +33,56 @@ const ColonyContext = createContext<ColonyContextType | undefined>(undefined)
 export function ColonyProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [colony, setColony] = useState<Colony | null>(null)
-  const [isLoadingColony, setIsLoadingColony] = useState(false)
+  const [isLoadingColony, setIsLoadingColony] = useState<boolean>(true)
   const [colonyStatus, setColonyStatus] = useState<ColonyStatus>(ColonyStatus.INITIAL)
   const [error, setError] = useState<string | null>(null)
+  
+  // Add a cache for user colors to avoid repeated fetches
+  const [userColorMap, setUserColorMap] = useState<Record<string, string>>({})
 
   // Subscribe to WebSocket messages for colony updates
   useWebSocketSubscription({
-    onMessage: (data: WebSocketMessage) => {
+    onMessage: async (data: WebSocketMessage) => {
       // Handle colony updates
       if (isColonyMessage(data) && colony && data.payload.id === colony.id) {
         console.log(`WebSocket: Received colony update`, data.payload)
+      }
+      
+      // Handle enemy colony information in the message
+      if (isColonyMessage(data) && data.payload.uid && 
+          typeof data.payload.uid === 'string' && 
+          data.payload.uid !== user?.uid) {
+        
+        const enemyUid = data.payload.uid;
+        
+        // Only process if we don't already have this colony's color
+        if (!userColorMap[enemyUid]) {
+          // If color is directly available in the payload and is valid
+          if (typeof data.payload.color === 'string') {
+            setUserColorMap(prev => ({
+              ...prev,
+              [enemyUid]: data.payload.color as string
+            }));
+          } else {
+            // Otherwise fetch the colony to get its color, with validation
+            try {
+              // Skip fetch if uid is invalid
+              if (!enemyUid || typeof enemyUid !== 'string') {
+                return;
+              }
+              
+              const enemyColony = await fetchUserColony(enemyUid);
+              if (typeof enemyColony?.color === 'string') {
+                setUserColorMap(prev => ({
+                  ...prev,
+                  [enemyUid]: enemyColony.color as string
+                }));
+              }
+            } catch (error) {
+              console.error(`Error fetching enemy colony (${enemyUid}) color:`, error);
+            }
+          }
+        }
       }
     },
   })
@@ -171,6 +213,46 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const fetchColonyColor = async (userId: string): Promise<string> => {
+    // Validate userId to prevent FirebaseError permission-denied
+    if (!userId || typeof userId !== 'string') {
+      console.log(`Invalid userId: ${userId}, returning default color`);
+      return '#FF3333'; // Default red for invalid user
+    }
+
+    // Check if we already have this color in our cache
+    if (userColorMap[userId]) {
+      return userColorMap[userId];
+    }
+
+    try {
+      // Use a try-catch with a timeout to prevent hanging on permission issues
+      const fetchPromise = fetchUserColony(userId).then(it => it?.color || null);
+      
+      // Add timeout to prevent long-running requests
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 5000); // 5 second timeout
+      });
+      
+      // Race the fetch against the timeout
+      const color = await Promise.race([fetchPromise, timeoutPromise]);
+      
+      // Store the color in our cache if valid
+      if (color && typeof color === 'string') {
+        setUserColorMap(prev => ({
+          ...prev,
+          [userId]: color
+        }));
+        return color;
+      }
+      
+      return '#FF3333';
+    } catch (error) {
+      console.error(`Error fetching colony color for user ${userId}:`, error);
+      return '#FF3333';
+    }
+  }
+
   const value = {
     colony,
     isLoadingColony,
@@ -178,6 +260,8 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     createNewColony,
     refreshColony,
     setColony,
+    fetchColonyColor,
+    userColorMap,
     error,
   }
 
@@ -191,31 +275,3 @@ export function useColony() {
   }
   return context
 }
-
-/**
- *
- * // Update the colony status based on the tiles we have
- *       const hasAnyTiles = tilesToUse.length > 0
- *       const hasTileIds = colonyData.tileIds && colonyData.tileIds.length > 0
- *
- *       if (hasAnyTiles) {
- *         setColonyStatus(ColonyStatus.HAS_TILES)
- *       } else if (hasTileIds) {
- *         setColonyStatus(ColonyStatus.HAS_TILE_IDS)
- *       } else {
- *         setColonyStatus(ColonyStatus.NO_TILES)
- *       }
- *
- *       // If we're missing any tiles, load them in the background
- *       const missingTileIds = colonyData.tileIds.filter((id) => !tilesToUse.some((tile) => tile.id === id))
- *
- *       if (missingTileIds.length > 0) {
- *         console.log(`Loading ${missingTileIds.length} missing tiles in the background`)
- *         loadTiles({
- *           forceRefresh: options?.forceRefresh !== false,
- *           specificTileIds: missingTileIds,
- *         }).catch((err) => {
- *           console.error('Error loading missing tiles during refresh:', err)
- *         })
- *       }
- */

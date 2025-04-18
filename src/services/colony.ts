@@ -193,7 +193,6 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
   }
 }
 
-
 /**
  * Invalidate colony cache for a specific user
  * Use this when colony data changes from server-side events
@@ -208,5 +207,58 @@ export function invalidateColonyCache(uid: string): void {
     console.log(`Invalidated colony cache for user: ${uid}`);
   } catch (error) {
     console.warn('Error invalidating colony cache:', error);
+  }
+}
+
+/**
+ * Update the colony cache to include a new tile ID
+ * @param uid User ID whose colony to update
+ * @param tileId Tile ID to add to the colony
+ */
+export async function updateColonyCacheWithNewTile(uid: string, tileId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    // Get colony cache key
+    const cacheKey = getColonyCacheKey(uid);
+    
+    // Try to get the colony from cache
+    const cachedColonyJson = localStorage.getItem(cacheKey);
+    if (!cachedColonyJson) {
+      console.log('Colony not found in cache, will be updated on next fetch');
+      return;
+    }
+    
+    // Parse the cached colony data
+    const cachedData = JSON.parse(cachedColonyJson);
+    const colony = cachedData.data;
+    
+    // Check if the colony has a tileIds array
+    if (!colony || !Array.isArray(colony.tileIds)) {
+      console.warn('Invalid colony data in cache');
+      return;
+    }
+    
+    // Check if tile is already in the colony's tileIds
+    if (colony.tileIds.includes(tileId)) {
+      console.log(`Tile ${tileId} already exists in colony cache`);
+      return;
+    }
+    
+    // Add the new tile ID to the tileIds array
+    colony.tileIds.push(tileId);
+    
+    // Update territory score (optional)
+    if (typeof colony.territoryScore === 'number') {
+      colony.territoryScore = colony.tileIds.length;
+    }
+    
+    // Update the cache with the modified colony data
+    cachedData.data = colony;
+    localStorage.setItem(cacheKey, JSON.stringify(cachedData));
+    
+    console.log(`Updated colony cache with new tile: ${tileId}`);
+  } catch (error) {
+    console.warn('Error updating colony cache with new tile:', error);
   }
 }

@@ -1,3 +1,9 @@
+## [v0.10.0] - 2025-04-18
+### Changed
+- Added fetch all tiles cloud function
+- Added ability to fetch other colonies' tile color.
+- Improved loading times by using fetch all tiles.
+
 ## [v0.9.22] - 2025-04-18
 ### Changed
 - Added loading state to grid spinner in GridManager for improved UX
