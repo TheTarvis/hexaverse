@@ -1,3 +1,9 @@
+## [v0.10.5] - 2025-04-21
+### Fixed
+- Removed `functions/lib` directory from Git tracking
+- Ensured build artifacts are properly excluded via .gitignore
+- Improved repository hygiene by excluding compiled JavaScript files
+
 ## [v0.10.4] - 2025-04-21
 ### Fixed
 - Fixed issue where removed tiles weren't being added to viewableTiles
