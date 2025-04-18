@@ -218,26 +218,12 @@ export const addTile = onCall({
     try {
       // Publish broadcast message for tile update
       await publishEvent('TILE_UPDATED', eventData);
-      
-      // If tile was captured, send a direct notification to the previous owner
-      if (capturedFromUid) {
-        const tileCaptureLostEvent = {
-          type: 'TILE_LOST',
-          timestamp: Date.now(),
-          payloadType: 'tile',
-          payload: newTile,
-          capturedBy: uid,
-          colonyId: capturedFromColony
-        };
-        
-        // Publish direct message to previous owner
-        await publishEvent('TILE_LOST', tileCaptureLostEvent, 'direct', capturedFromUid);
-      }
+
     } catch (pubsubError) {
       // Log the error but don't fail the function
       logger.error("Error publishing to PubSub:", pubsubError);
     }
-    
+
     // Return success with the new or captured tile
     const response = {
       success: true,
