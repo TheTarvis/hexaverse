@@ -1,3 +1,8 @@
+## [v0.10.1] - 2025-04-18
+### Changed
+- Added ability to clear both colony and tile cache. 
+- Stopped emitting event for tile capture which was causing issues.
+
 ## [v0.10.0] - 2025-04-18
 ### Changed
 - Added fetch all tiles cloud function

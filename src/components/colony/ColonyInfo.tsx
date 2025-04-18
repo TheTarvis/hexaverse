@@ -1,12 +1,25 @@
 import React from 'react';
 import { useColony } from '@/contexts/ColonyContext';
+import { invalidateColonyCache } from '@/services/colony';
+import { useAuth } from '@/contexts/AuthContext';
+import {clearAllTileCache} from "@/services/tiles";
 
 export function ColonyInfo() {
   const { colony, isLoadingColony, error, refreshColony } = useColony();
+  const { user } = useAuth();
 
   // Handler for manual refresh that forces a fresh fetch
   const handleRefresh = () => {
     refreshColony();
+  };
+
+  // Handler for clearing colony cache
+  const handleClearCache = () => {
+    if (user && user.uid) {
+      invalidateColonyCache(user.uid);
+      clearAllTileCache()
+      refreshColony();
+    }
   };
 
   if (isLoadingColony) {
@@ -67,12 +80,20 @@ export function ColonyInfo() {
         </p>
       </div>
       
-      <button 
-        onClick={handleRefresh}
-        className="mt-3 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800/40"
-      >
-        Refresh
-      </button>
+      <div className="mt-3 flex gap-2">
+        <button 
+          onClick={handleRefresh}
+          className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800/40"
+        >
+          Refresh
+        </button>
+        <button 
+          onClick={handleClearCache}
+          className="px-3 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-800/40"
+        >
+          Clear Cache
+        </button>
+      </div>
     </div>
   );
 } 

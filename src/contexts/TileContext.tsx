@@ -188,7 +188,7 @@ export function TileProvider({ children }: { children: ReactNode }) {
           removeColonyTile(tile)
           // Get the colony color using the context function instead of direct API call
           await fetchColonyColor(tile.controllerUid)
-          console.log('Tile is in the viewable map')
+          console.log('Tile is in the colony map')
 
           setViewableTiles((prev) => ({
             ...prev,
