@@ -1,0 +1,34 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Project Structure
+
+## Main Directories
+
+- `/src/contexts` - React Context providers
+- `/src/reducers` - State reducers for complex state management
+- `/src/services` - API and data services
+- `/src/utils` - Utility functions
+- `/src/hooks` - Custom React hooks
+- `/src/types` - TypeScript type definitions
+- `/src/app` - Next.js app router components
+
+## Key Entry Points
+
+- [layout.tsx](mdc:src/app/layout.tsx) - Root layout with provider hierarchy
+- [TileContext.tsx](mdc:src/contexts/TileContext.tsx) - Manages the game tiles state
+- [AuthContext.tsx](mdc:src/contexts/AuthContext.tsx) - Handles authentication
+- [ColonyContext.tsx](mdc:src/contexts/ColonyContext.tsx) - Manages colony data
+
+## Provider Hierarchy
+
+Providers are nested in this order (outside to inside):
+1. ToastProvider
+2. AuthProvider
+3. WebSocketProvider
+4. ColonyProvider
+5. TileProvider
+
+This ordering is important as inner providers may depend on outer ones.

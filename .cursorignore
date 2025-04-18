@@ -1,0 +1,5 @@
+# Directories to ignore
+.next/
+/functions/lib/
+
+# Add more patterns as needed 

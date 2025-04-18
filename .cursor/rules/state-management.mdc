@@ -1,0 +1,40 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# State Management Architecture
+
+The application uses a hybrid approach to state management combining React Context, Reducers, and custom hooks.
+
+## Context Providers
+
+Context providers follow this pattern:
+- Create a typed context with `createContext<ContextType | undefined>(undefined)`
+- Export a provider component that wraps children with context
+- Export a custom hook to access context that throws if used outside provider
+
+Example: [TileContext.tsx](mdc:src/contexts/TileContext.tsx)
+
+## Reducer Pattern
+
+For complex state:
+1. Define state interface and initial state
+2. Define action types as discriminated union
+3. Implement reducer with switch statement per action type
+
+Example: [tileReducer.ts](mdc:src/reducers/tileReducer.ts)
+
+## WebSocket Message Handling
+
+WebSocket message handling is organized with:
+1. Predicates that determine message type [predicates.ts](mdc:src/utils/websocket/predicates.ts)
+2. Handlers that process each message type [handlers.ts](mdc:src/utils/websocket/handlers.ts)
+3. Dispatch table pattern in subscribers
+
+## Performance Optimization
+
+The application employs these optimization techniques:
+1. Message buffering with `useTileMessageBuffer` to batch updates
+2. Stable refs with `useRef` for dispatch and state in callbacks
+3. Memoization with `useCallback` to prevent unnecessary re-renders

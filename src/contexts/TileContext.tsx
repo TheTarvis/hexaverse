@@ -5,10 +5,14 @@ import { useColony } from '@/contexts/ColonyContext'
 import { clearAllTileCache, fetchTiles, updateTileCache } from '@/services/tiles'
 import { Tile, TileMap, toTileMap } from '@/types/tiles'
 import { isTileMessage, WebSocketMessage } from '@/types/websocket'
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
 import { findViewableTiles } from '@/utils/hexUtils'
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
-import { removeColonyCacheWithTile } from '@/services/colony'
+import { Colony } from '@/types/colony'
+import { tileReducer, initialState, TileAction } from '@/reducers/tileReducer'
+import { isOwnTileUpdate, isViewableTileUpdate, isOpponentTakingTile } from '@/utils/websocket/predicates'
+import { handleOwnTile, handleViewableTile, handleOpponentTile, HandlerContext } from '@/utils/websocket/handlers'
+import { useTileMessageBuffer } from '@/hooks/useTileMessageBuffer'
 
 interface TileContextType {
   isLoadingTiles: boolean
@@ -20,112 +24,225 @@ interface TileContextType {
 
 const TileContext = createContext<TileContextType | undefined>(undefined)
 
-export function TileProvider({ children }: { children: ReactNode }) {
-  // TODO TW: Set is loading tiles at some point, not critical just UX
-  const [isLoadingTiles, setIsLoadingTiles] = useState(false)
-  const { colony, fetchColonyColor, setColony } = useColony()
-  const { user } = useAuth()
-  const [colonyTiles, setColonyTiles] = useState<TileMap>({})
-  const [viewableTiles, setViewableTiles] = useState<TileMap>({})
+// Helper function to fetch and merge neighbors
+async function fetchAndMergeNeighbors(
+  tile: Tile,
+  dispatch: React.Dispatch<TileAction>,
+  colonyTiles: TileMap,
+  viewableTiles: TileMap
+) {
+  try {
+    // 1) Calculate placeholders for viewable neighbors
+    const tilesMap = toTileMap([tile]);
+    const placeholders = Object.fromEntries(
+      Object.entries(findViewableTiles(tilesMap, 5))
+        .filter(([id]) => !(id in colonyTiles) && !(id in viewableTiles))
+    );
+    
+    if (!Object.keys(placeholders).length) return;
 
+    // Update with placeholders
+    dispatch({ type: 'LOAD_VIEWABLE_TILES', payload: { ...viewableTiles, ...placeholders } });
+
+    // 2) Fetch actual data for the placeholders
+    const fetchedNeighbors = await fetchTiles(Object.keys(placeholders));
+    console.log(`Fetched ${fetchedNeighbors.length} newly viewable tiles`);
+    dispatch({ type: 'MERGE_VIEWABLE_TILES', payload: fetchedNeighbors });
+  } catch (error) {
+    console.error('Error in fetchAndMergeNeighbors:', error);
+  }
+}
+
+// Custom hook to manage colony tiles loading
+function useColonyTiles(colony: Colony | null | undefined) {
+  const [state, dispatch] = useReducer(tileReducer, {
+    ...initialState,
+    isDebugShowTiles: true // For development, can be set via configuration
+  });
+
+  useEffect(() => {
+    if (!colony?.tileIds?.length) return;
+
+    let canceled = false;
+    (async () => {
+      dispatch({ type: 'LOAD_START' });
+      try {
+        const tiles = await fetchTiles(colony.tileIds);
+        if (canceled) return;
+        
+        console.log(`Loaded ${tiles.length} tiles for the colony`);
+        dispatch({ type: 'LOAD_COLONY_TILES', payload: tiles });
+
+        const initialView = findViewableTiles(toTileMap(tiles), 5);
+        console.log(`Calculated ${Object.keys(initialView).length} initial viewable tiles.`);
+        dispatch({ type: 'LOAD_VIEWABLE_TILES', payload: initialView });
+
+        // Only proceed if there are viewable tiles to fetch
+        if (Object.keys(initialView).length === 0) {
+          dispatch({ type: 'LOAD_DONE' });
+          return;
+        }
+
+        console.log(`Starting async fetch for ${Object.keys(initialView).length} viewable tiles...`);
+        clearAllTileCache();
+        const fetchedView = await fetchTiles(Object.keys(initialView));
+        if (canceled) return;
+        
+        console.log(`Async fetch completed for ${fetchedView.length} viewable tiles.`);
+        updateTileCache(fetchedView);
+        dispatch({ type: 'MERGE_VIEWABLE_TILES', payload: fetchedView });
+        dispatch({ type: 'LOAD_DONE' });
+      } catch (error) {
+        console.error('Error loading colony tiles:', error);
+        if (!canceled) {
+          dispatch({ type: 'LOAD_DONE' });
+        }
+      }
+    })();
+
+    return () => { canceled = true };
+  }, [colony?.tileIds]);
+
+  return { 
+    state,
+    dispatch
+  };
+}
+
+export function TileProvider({ children }: { children: ReactNode }) {
+  const { colony, fetchColonyColor } = useColony()
+  const { user } = useAuth()
+  
+  // Use the extracted hook to manage colony tiles with reducer
+  const { state, dispatch } = useColonyTiles(colony);
+  const { isLoading: isLoadingTiles, colonyTiles, viewableTiles, isDebugShowTiles } = state;
+
+  // Create stable refs for dispatcher and state to use in callbacks
+  const dispatchRef = useRef(dispatch);
+  const stateRef = useRef(state);
+
+  // Update refs when values change
+  useEffect(() => {
+    dispatchRef.current = dispatch;
+    stateRef.current = state;
+  }, [dispatch, state]);
+
+  // Callback to add a colony tile
   const addColonyTile = useCallback(
     (tile: Tile) => {
       // Add to colony tiles
-      setColonyTiles((prev) => ({
-        ...prev,
-        ...toTileMap([tile]),
-      }))
+      dispatch({ type: 'ADD_COLONY_TILE', payload: tile });
 
-      //  Update viewable tiles off of tile change.
-      let tilesMap = toTileMap([tile])
-      let newlyViewableTiles: TileMap = Object.fromEntries(
-        Object.entries(findViewableTiles(tilesMap, 5))
-          .filter(([_, neighborTile]) => !(neighborTile.id in colonyTiles))
-          .filter(([_, neighborTile]) => !(neighborTile.id in viewableTiles))
-      )
-
-      // If there are new viewable tiles, fetch their actual data
-      const newViewableTileIds = Object.keys(newlyViewableTiles)
-      if (newViewableTileIds.length > 0) {
-        console.log(`Found ${newViewableTileIds.length} newly viewable tiles, fetching data...`)
-
-        // First, add the placeholder tiles to the viewable tiles state
-        setViewableTiles((prev) => ({
-          ...prev,
-          ...newlyViewableTiles,
-        }))
-
-        // Then, fetch the actual tile data asynchronously
-        ;(async () => {
-          try {
-            const fetchedTiles = await fetchTiles(newViewableTileIds)
-            console.log(`Fetched ${fetchedTiles.length} newly viewable tiles`)
-
-            // Update the viewable tiles state with the actual data
-            setViewableTiles((prev) => ({
-              ...prev,
-              ...toTileMap(fetchedTiles),
-            }))
-          } catch (error) {
-            console.error('Error fetching newly viewable tiles:', error)
-          }
-        })()
-      }
+      // Fetch neighbors using the helper function
+      fetchAndMergeNeighbors(
+        tile,
+        dispatch,
+        colonyTiles,
+        viewableTiles
+      );
     },
-    [colonyTiles, viewableTiles, setColonyTiles, setViewableTiles]
-  )
+    [colonyTiles, dispatch, viewableTiles]
+  );
 
+  // Callback to remove a colony tile
   const removeColonyTile = useCallback(
     (tile: Tile) => {
-      // Remove the tile from colonyTiles
-      const updatedColonyTiles = { ...colonyTiles }
-      delete updatedColonyTiles[tile.id]
-      setColonyTiles(updatedColonyTiles)
+      // Remove the tile from colonyTiles and add to viewableTiles
+      dispatch({ type: 'REMOVE_COLONY_TILE', payload: tile });
 
-      // Add the removed tile to viewableTiles
-      setViewableTiles(prev => ({
-        ...prev,
-        [tile.id]: tile
-      }))
+      // Fetch neighbors using the helper function
+      const updatedColonyTiles = { ...colonyTiles };
+      delete updatedColonyTiles[tile.id];
+      
+      fetchAndMergeNeighbors(
+        tile,
+        dispatch,
+        updatedColonyTiles,
+        viewableTiles
+      );
+    },
+    [colonyTiles, dispatch, viewableTiles]
+  );
 
-      //  Update viewable tiles off of tile change.
-      let tilesMap = toTileMap([tile])
-      let newlyViewableTiles: TileMap = Object.fromEntries(
-        Object.entries(findViewableTiles(tilesMap, 5))
-          .filter(([_, neighborTile]) => !(neighborTile.id in colonyTiles))
-          .filter(([_, neighborTile]) => !(neighborTile.id in viewableTiles))
-      )
-
-      // If there are new viewable tiles, fetch their actual data
-      const newViewableTileIds = Object.keys(newlyViewableTiles)
-      if (newViewableTileIds.length > 0) {
-        console.log(`Found ${newViewableTileIds.length} newly viewable tiles, fetching data...`)
-
-        // First, add the placeholder tiles to the viewable tiles state
-        setViewableTiles((prev) => ({
-          ...prev,
-          ...newlyViewableTiles,
-        }))
-
-        // Then, fetch the actual tile data asynchronously
-        ;(async () => {
-          try {
-            const fetchedTiles = await fetchTiles(newViewableTileIds)
-            console.log(`Fetched ${fetchedTiles.length} newly viewable tiles`)
-
-            // Update the viewable tiles state with the actual data
-            setViewableTiles((prev) => ({
-              ...prev,
-              ...toTileMap(fetchedTiles),
-            }))
-          } catch (error) {
-            console.error('Error fetching newly viewable tiles:', error)
-          }
-        })()
+  // Create handler context for the message handlers
+  const handlerContext = useCallback((): HandlerContext => ({
+    user,
+    state: stateRef.current,
+    addColonyTile,
+    removeColonyTile,
+    setViewableTiles: (updater) => {
+      // Convert the updater function to a direct dispatch
+      if (typeof updater === 'function') {
+        const newViewableTiles = updater(stateRef.current.viewableTiles);
+        dispatchRef.current({ type: 'LOAD_VIEWABLE_TILES', payload: newViewableTiles });
+      } else {
+        dispatchRef.current({ type: 'LOAD_VIEWABLE_TILES', payload: updater });
       }
     },
-    [colonyTiles, viewableTiles, setColonyTiles, setViewableTiles]
-  )
+    fetchColonyColor
+  }), [user, addColonyTile, removeColonyTile, fetchColonyColor]);
+
+  // Function to process a batch of tile messages
+  const processTileBatch = useCallback((tiles: Tile[]) => {
+    // Update the tile cache for all tiles
+    updateTileCache(tiles);
+    
+    // Process each tile through the handlers
+    tiles.forEach(async (tile) => {
+      const ctx = handlerContext();
+      
+      // Debug logging for tile processing
+      console.log('Processing tile:', {
+        tileId: tile.id,
+        position: `${tile.q},${tile.r},${tile.s}`,
+        controllerUid: tile.controllerUid,
+        type: tile.type,
+        resources: tile.resources
+      });
+      console.log('Current user:', user?.uid || 'Not logged in');
+      console.log('Context state:', {
+        colonyTilesCount: Object.keys(ctx.state.colonyTiles).length,
+        viewableTilesCount: Object.keys(ctx.state.viewableTiles).length
+      });
+      
+      // Create a dispatch table pattern for handlers
+      const messageHandlers = [
+        { match: () => isOwnTileUpdate(tile, user), run: () => handleOwnTile(tile, ctx) },
+        { match: () => isOpponentTakingTile(tile, user, ctx.state), run: () => handleOpponentTile(tile, ctx) },
+        { match: () => isViewableTileUpdate(tile, ctx.state), run: () => handleViewableTile(tile, ctx) },
+      ];
+
+      // Find the first matching handler and run it
+      for (const { match, run } of messageHandlers) {
+        if (match()) {
+          await run();
+          break;
+        }
+      }
+    });
+  }, [handlerContext, user]);
+
+  // Use the message buffer hook to batch process incoming tile messages
+  const bufferTileMessage = useTileMessageBuffer({
+    bufferTimeMs: 100, // Buffer updates for 100ms
+    onFlush: processTileBatch
+  });
+
+  // Handle WebSocket messages using the buffer
+  const handleMessage = useCallback((data: WebSocketMessage) => {
+    if (isTileMessage(data) && data.payload) {
+      const tile = data.payload;
+      console.log(`WebSocket: Received tile update for tile at ${tile.q},${tile.r},${tile.s}`);
+      
+      // Add the tile to the buffer instead of processing immediately
+      bufferTileMessage(tile);
+    }
+  }, [bufferTileMessage]);
+
+  // Subscribe to WebSocket messages for tile updates
+  useWebSocketSubscription({
+    onMessage: handleMessage
+  });
 
   const value = {
     isLoadingTiles,
@@ -133,116 +250,7 @@ export function TileProvider({ children }: { children: ReactNode }) {
     viewableTiles,
     addColonyTile,
     removeColonyTile,
-  }
-
-  // Handle colony tile changes.
-  useEffect(() => {
-    ;(async () => {
-      if (!colony || !colony.tileIds || colony.tileIds.length <= 0) {
-        console.log('Colony has no tileIds')
-        return
-      }
-
-      // Set loading state to true when starting to fetch tiles
-      setIsLoadingTiles(true)
-
-      try {
-        const tiles = await fetchTiles(colony.tileIds)
-        console.log(colony.tileIds)
-        let tilesMap = toTileMap(tiles)
-
-        // 1. Calculate the initial viewable tiles map (with default unexplored structure)
-        let initialViewableTiles = findViewableTiles(tilesMap, 5)
-        console.log(`Calculated ${Object.keys(initialViewableTiles).length} initial viewable tiles.`)
-
-        // 2. Set initial colony and viewable tiles state immediately
-        if (tiles.length > 0) {
-          console.log(`Loaded ${tiles.length} tiles for the colony`)
-          setColonyTiles(tilesMap)
-          setViewableTiles(initialViewableTiles) // Set the default viewable tiles first
-        }
-
-        // 3. Start fetching actual data for viewable tiles asynchronously
-        const loadViewableTiles = async () => {
-          const viewableTileIds = Object.keys(initialViewableTiles)
-          if (viewableTileIds.length === 0) {
-            setIsLoadingTiles(false) // No viewable tiles to load, so we're done
-            return
-          }
-
-          console.log(`Starting async fetch for ${viewableTileIds.length} viewable tiles...`)
-          try {
-            clearAllTileCache()
-
-            const fetchedViewableTiles = await fetchTiles(viewableTileIds)
-            console.log(`Async fetch completed for ${fetchedViewableTiles.length} viewable tiles.`)
-
-            // Update the cache with fresh data
-            updateTileCache(fetchedViewableTiles)
-
-            // 4. Update viewable tiles state with fetched data
-            const fetchedViewableMap = toTileMap(fetchedViewableTiles)
-            setViewableTiles((prev) => ({
-              ...prev, // Keep existing state (might have changed via WS)
-              ...fetchedViewableMap, // Overwrite with newly fetched data
-            }))
-
-            // Set loading to false once all data is loaded
-            setIsLoadingTiles(false)
-          } catch (error) {
-            console.error('Error fetching viewable tiles asynchronously:', error)
-            setIsLoadingTiles(false) // Set loading to false even if there's an error
-          }
-        }
-
-        loadViewableTiles()
-      } catch (tileError) {
-        console.error('Error loading colony tiles:', tileError)
-        setIsLoadingTiles(false) // Set loading to false if there's an error
-      }
-    })()
-  }, [colony])
-
-  // Subscribe to WebSocket messages for tile updates
-  useWebSocketSubscription({
-    onMessage: async (data: WebSocketMessage) => {
-      // Handle tile updates
-      if (isTileMessage(data) && data.payload) {
-        const tile = data.payload
-        updateTileCache(tile)
-        console.log(`WebSocket: Received tile update for tile at ${tile.q},${tile.r},${tile.s}`, tile)
-
-        // If the tile.controllerUid == user.id update colony tiles
-        if (user && tile.controllerUid == user.uid) {
-          addColonyTile(tile)
-          return
-        }
-
-        if (viewableTiles[tile.id]) {
-          console.log('Tile is in the viewable map')
-          setViewableTiles((prev) => ({
-            ...prev,
-            ...toTileMap([tile]),
-          }))
-        }
-
-        // If it is controlled by another player
-        if (user && tile.controllerUid && tile.controllerUid !== user.uid && colonyTiles[tile.id]) {
-          console.log('Tile is in the colony map')
-          removeColonyTile(tile)
-          // Only update the cache - do NOT update colony state directly
-          // This avoids triggering a colony state change which causes grid reloading
-          if (user && user.uid) {
-            await removeColonyCacheWithTile(user.uid, tile.id);
-          }
-          // Get the colony color using the context function instead of direct API call
-          await fetchColonyColor(tile.controllerUid)
-        }
-
-
-      }
-    },
-  })
+  };
 
   return <TileContext.Provider value={value}>{children}</TileContext.Provider>
 }

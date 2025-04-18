@@ -110,10 +110,8 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
         })
 
         if (!colonyData) {
-          console.log('No colony data returned despite hasColony being true')
           setColony(null)
-          setError('Failed to load colony data')
-          setColonyStatus(ColonyStatus.ERROR)
+          setColonyStatus(ColonyStatus.NO_COLONY)
           return
         }
 
