@@ -24,7 +24,7 @@ interface SelectedTile {
 
 export function GridManager() {
   const { colony, setColony, colonyStatus, isLoadingColony } = useColony()
-  const { colonyTiles, viewableTiles, addColonyTile } = useTiles()
+  const { colonyTiles, viewableTiles, addColonyTile, isLoadingTiles } = useTiles()
   const { showToast } = useToast()
   const { user } = useAuth()
 
@@ -98,7 +98,7 @@ export function GridManager() {
 
         const result = await addTile(q, r, s)
 
-        if (! result || !result.success || !result.tile) {
+        if (!result || !result.success || !result.tile) {
           console.error(`Failed to add tile: ${result.message}`)
           showToast(result.message || 'Failed to add tile', 'error')
           setError(null) // Clear any existing error
@@ -172,7 +172,7 @@ export function GridManager() {
 
   return (
     <div className="relative h-full w-full">
-      {isLoadingColony && (
+      {(isLoadingColony || isLoadingTiles) && (
         <div className="bg-opacity-70 absolute inset-0 z-10 flex h-screen items-center justify-center bg-white dark:bg-zinc-950">
           <div className="text-center">
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-t-2 border-b-2 border-indigo-500"></div>

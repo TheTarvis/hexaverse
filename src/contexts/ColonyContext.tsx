@@ -2,13 +2,10 @@
 
 import { createColony, fetchUserColony } from '@/services/colony'
 import { Colony } from '@/types/colony'
-import {Tile, TileMap, tilesToMap} from '@/types/tiles'
-import React, {createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState} from 'react'
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 import { useAuth } from './AuthContext'
-import { useTiles } from './TileContext'
-import {isColonyMessage, isTileMessage} from "@/types/websocket";
+import { isColonyMessage, WebSocketMessage } from '@/types/websocket'
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
-import { WebSocketMessage } from '@/types/websocket'
 
 // Define colony status enum for better state management
 export enum ColonyStatus {
@@ -24,7 +21,7 @@ interface ColonyContextType {
   isLoadingColony: boolean
   colonyStatus: ColonyStatus
   createNewColony: (name: string, color?: string) => Promise<Colony>
-  refreshColony: (options?: { silent?: boolean; }) => Promise<void>
+  refreshColony: (options?: { silent?: boolean }) => Promise<void>
   setColony: React.Dispatch<React.SetStateAction<Colony | null>>
   error: string | null
 }
@@ -43,10 +40,10 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     onMessage: (data: WebSocketMessage) => {
       // Handle colony updates
       if (isColonyMessage(data) && colony && data.payload.id === colony.id) {
-        console.log(`WebSocket: Received colony update`, data.payload);
+        console.log(`WebSocket: Received colony update`, data.payload)
       }
-    }
-  });
+    },
+  })
 
   // Load colony data when user changes
   useEffect(() => {
@@ -57,7 +54,6 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
         setColonyStatus(ColonyStatus.NO_COLONY)
         return
       }
-
 
       setIsLoadingColony(true)
       setColonyStatus(ColonyStatus.LOADING)
@@ -134,7 +130,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const refreshColony = async (options?: { silent?: boolean;}): Promise<void> => {
+  const refreshColony = async (options?: { silent?: boolean }): Promise<void> => {
     console.log('Refresh Colony')
     if (!user) {
       return

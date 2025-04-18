@@ -1,6 +1,6 @@
 {
   "name": "hexaverse-app",
-  "version": "0.9.21",
+  "version": "0.9.22",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -44,6 +44,7 @@
     "prettier-plugin-organize-imports": "^4.0.0",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "tailwindcss": "^4.1.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "worker-loader": "^3.0.8"
   }
 }

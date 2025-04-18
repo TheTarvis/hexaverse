@@ -166,9 +166,9 @@ function HexagonMesh({
     event.stopPropagation()
     
     // Only handle clicks for Viewable tiles (adding tiles)
-    if (!isViewableTile || !onTileAdd) return;
-    
-    console.log(`Clicked viewable tile at: q=${q}, r=${r}, s=${s}`);
+    if (!onTileAdd) return;
+
+    console.log(`Clicked tile at: q=${q}, r=${r}, s=${s}`);
     
     // Set the clicked tile for animation
     if (setClickedTile) {

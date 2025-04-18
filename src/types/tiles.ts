@@ -22,7 +22,7 @@ export interface TileMap {
   [key: string]: Tile;
 }
 
-export function tilesToMap(tiles: Tile[]): TileMap {
+export function toTileMap(tiles: Tile[]): TileMap {
   return tiles.reduce<TileMap>((map, tile) => {
     map[tile.id] = tile;
     return map;

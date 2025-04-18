@@ -1,3 +1,9 @@
+## [v0.9.22] - 2025-04-18
+### Changed
+- Added loading state to grid spinner in GridManager for improved UX
+- Implemented proper isLoadingTiles state handling in TileContext
+- Enhanced loading UI to wait for both colony and tile data to load
+
 ## [v0.9.21] - 2025-04-17
 ### Changed
 - Refactored Grid Manager to useMemo.
