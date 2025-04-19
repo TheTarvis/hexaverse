@@ -26,7 +26,7 @@ export function GridManager() {
   const { colony, fetchColonyColor, setColony, colonyStatus, isLoadingColony, userColorMap } = useColony()
   const { colonyTiles, viewableTiles, addColonyTile, isLoadingTiles } = useTiles()
   const { showToast } = useToast()
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
 
   const [debugState, setDebugState] = useState({
     wireframe: false,
@@ -291,8 +291,8 @@ export function GridManager() {
         )}
       </SlideUpPanel>
 
-      {/* Debug Menu Component - pass view depth and handler */}
-      <DebugMenu debugState={debugState} onDebugAction={handleDebugAction} />
+      {/* Debug Menu Component - only show for admin users */}
+      {isAdmin && <DebugMenu debugState={debugState} onDebugAction={handleDebugAction} />}
 
       {/* Show error message if there's an error and we're not loading */}
       {error && colonyStatus !== ColonyStatus.LOADING && (

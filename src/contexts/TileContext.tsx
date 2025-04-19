@@ -57,7 +57,7 @@ async function fetchAndMergeNeighbors(
 function useColonyTiles(colony: Colony | null | undefined) {
   const [state, dispatch] = useReducer(tileReducer, {
     ...initialState,
-    isDebugShowTiles: true // For development, can be set via configuration
+    isDebugShowTiles: false // For development, can be set via configuration
   });
 
   useEffect(() => {

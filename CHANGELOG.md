@@ -1,3 +1,8 @@
+## [v0.11.1] - 2025-04-22
+### Changed
+- Added admin-only access to debug menu in GridManager
+- Improved UI by hiding debug controls from non-admin users
+
 ## [v0.11.0] - 2025-04-22
 ### Added
 - Added support admin dashboard with request management
