@@ -1,0 +1,45 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Form Components Guide
+
+## Component Usage
+
+Forms should use the following components from our design system:
+
+- `Select` from [@/components/select](mdc:src/components/select.tsx) for dropdowns
+- `Input` and `InputGroup` from [@/components/input](mdc:src/components/input.tsx) for text inputs
+- `Button` from [@/components/button](mdc:src/components/button.tsx) for form submission
+- `Heading` from [@/components/heading](mdc:src/components/heading.tsx) for page titles
+
+## Form Structure
+
+Forms should follow this structure:
+```tsx
+<div className="space-y-6">
+  <div>
+    <label className="block text-sm font-medium mb-2 text-zinc-700 dark:text-zinc-300">
+      Label Text
+    </label>
+    <InputGroup>
+      <Input ... />
+    </InputGroup>
+  </div>
+</div>
+```
+
+## Textarea Styling
+
+Textareas should use these classes for consistency:
+```tsx
+className="w-full px-3 py-2 min-h-[150px] rounded-lg bg-white dark:bg-zinc-700 border-zinc-950/10 dark:border-white/10 text-zinc-950 dark:text-white placeholder:text-zinc-500"
+```
+
+## Form Container
+
+Forms should be wrapped in a white container with these classes:
+```tsx
+className="bg-white dark:bg-zinc-800 rounded-lg shadow-sm p-6"
+```

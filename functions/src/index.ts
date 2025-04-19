@@ -6,6 +6,7 @@ import * as admin from "firebase-admin";
 import { createColony } from "./colony";
 import { addTile, fetchTilesByIds } from "./tiles";
 import { addRoadmapItem, updateRoadmapItem, deleteRoadmapItem } from "./roadmap";
+import { submitSupportRequest } from "./support";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -46,5 +47,6 @@ export {
   fetchTilesByIds,
   addRoadmapItem,
   updateRoadmapItem,
-  deleteRoadmapItem
+  deleteRoadmapItem,
+  submitSupportRequest
 }; 

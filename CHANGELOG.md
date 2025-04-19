@@ -1,3 +1,11 @@
+## [v0.11.0] - 2025-04-22
+### Added
+- Added support admin dashboard with request management
+- Implemented support request submission form for users
+- Added Firestore security rules for support requests
+- Added admin-only access to support dashboard
+- Added ability for admins to update support request status
+
 ## [v0.10.5] - 2025-04-21
 ### Fixed
 - Removed `functions/lib` directory from Git tracking

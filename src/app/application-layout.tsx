@@ -179,7 +179,7 @@ export function ApplicationLayout({
                   <CalendarIcon />
                   <SidebarLabel>Road Map</SidebarLabel>
                 </SidebarItem>
-                <SidebarItem href="#">
+                <SidebarItem href="/support" current={pathname.startsWith('/support')}>
                   <QuestionMarkCircleIcon />
                   <SidebarLabel>Support</SidebarLabel>
                 </SidebarItem>

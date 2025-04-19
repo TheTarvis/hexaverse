@@ -6,10 +6,10 @@ service cloud.firestore {
     function isRequestFromCloudFunction() {
       return request.auth.token.firebase.sign_in_provider == 'custom';
     }
-    
-    // Function to check if the user owns a document
-    function isOwner(resource) {
-      return resource.data.uid == request.auth.uid;
+
+    // Function to check if user is admin
+    function isAdmin() {
+      return request.auth.token.admin == true;
     }
 
     // Allow users to read their own colony and perform queries on uid field
@@ -35,6 +35,15 @@ service cloud.firestore {
       allow write: if isRequestFromCloudFunction();
       // Allow listing and querying roadmap items
       allow list: if request.auth != null;
+    }
+
+    match /support_requests/{requestId} {
+      // Allow admins to read all support requests and update them
+      allow read, list, update: if request.auth != null && isAdmin();
+      // Allow authenticated users to create support requests
+      allow create: if request.auth != null;
+      // Allow users to read their own support requests
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
     }
     
     // Default deny
