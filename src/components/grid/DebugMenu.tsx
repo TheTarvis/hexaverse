@@ -10,9 +10,22 @@ import {
   BugAntIcon,
   AdjustmentsHorizontalIcon,
   VideoCameraIcon,
-  SignalIcon
+  SignalIcon,
+  Cog8ToothIcon
 } from '@heroicons/react/24/outline'
 import { WebSocketListener } from '@/components/WebSocketListener'
+import { Menu, Transition } from '@headlessui/react'
+import { Fragment } from 'react'
+
+interface DebugState {
+  wireframe: boolean
+  hexSize: number
+  colorScheme: string
+  viewDistance: number
+  tileDetailsEnabled: boolean
+  followSelectedTile: boolean
+  forceDarkMode: boolean
+}
 
 interface DebugMenuProps {
   debugState: {
@@ -90,7 +103,89 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
   };
 
   return (
-    <div className="absolute top-4 right-4 z-10">
+    <div className="absolute right-4 top-4 z-50">
+      <Menu as="div" className="relative inline-block text-left">
+        <div>
+          <Menu.Button className="inline-flex w-full justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700">
+            <Cog8ToothIcon className="h-5 w-5" aria-hidden="true" />
+          </Menu.Button>
+        </div>
+        <Transition
+          as={Fragment}
+          enter="transition ease-out duration-100"
+          enterFrom="transform opacity-0 scale-95"
+          enterTo="transform opacity-100 scale-100"
+          leave="transition ease-in duration-75"
+          leaveFrom="transform opacity-100 scale-100"
+          leaveTo="transform opacity-0 scale-95"
+        >
+          <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-zinc-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:divide-zinc-700 dark:bg-zinc-800">
+            <div className="px-1 py-1">
+              <Menu.Item>
+                {({ active }) => (
+                  <button
+                    onClick={() => onDebugAction('toggleWireframe')}
+                    className={`${
+                      active ? 'bg-indigo-500 text-white' : 'text-zinc-900 dark:text-zinc-100'
+                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                  >
+                    {debugState.wireframe ? 'Disable' : 'Enable'} Wireframe
+                  </button>
+                )}
+              </Menu.Item>
+              <Menu.Item>
+                {({ active }) => (
+                  <button
+                    onClick={() => onDebugAction('adjustSize')}
+                    className={`${
+                      active ? 'bg-indigo-500 text-white' : 'text-zinc-900 dark:text-zinc-100'
+                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                  >
+                    Adjust Size ({debugState.hexSize})
+                  </button>
+                )}
+              </Menu.Item>
+              <Menu.Item>
+                {({ active }) => (
+                  <button
+                    onClick={() => onDebugAction('changeColorScheme')}
+                    className={`${
+                      active ? 'bg-indigo-500 text-white' : 'text-zinc-900 dark:text-zinc-100'
+                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                  >
+                    Color Scheme: {debugState.colorScheme}
+                  </button>
+                )}
+              </Menu.Item>
+              <Menu.Item>
+                {({ active }) => (
+                  <button
+                    onClick={() => onDebugAction('toggleTileDetails')}
+                    className={`${
+                      active ? 'bg-indigo-500 text-white' : 'text-zinc-900 dark:text-zinc-100'
+                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                  >
+                    {debugState.tileDetailsEnabled ? 'Disable' : 'Enable'} Tile Details
+                  </button>
+                )}
+              </Menu.Item>
+              <Menu.Item>
+                {({ active }) => (
+                  <button
+                    onClick={() => onDebugAction('toggleCameraFollow')}
+                    className={`${
+                      active ? 'bg-indigo-500 text-white' : 'text-zinc-900 dark:text-zinc-100'
+                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                  >
+                    {debugState.followSelectedTile ? 'Disable' : 'Enable'} Camera Follow
+                  </button>
+                )}
+              </Menu.Item>
+            </div>
+          </Menu.Items>
+        </Transition>
+      </Menu>
+      
       {showWebSocketMonitor && (
         <div className="absolute right-0 top-12 w-96 mb-2 bg-white dark:bg-zinc-900 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-zinc-700">
           <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-zinc-800 border-b border-gray-200 dark:border-zinc-700">
@@ -108,80 +203,6 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
           <WebSocketListener />
         </div>
       )}
-      
-      <Popover className="relative">
-        <PopoverButton className="flex items-center gap-x-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-          <BugAntIcon className="h-5 w-5 mr-1" />
-          <span>Debug</span>
-          <ChevronDownIcon className="h-5 w-5" aria-hidden="true" />
-        </PopoverButton>
-
-        <PopoverPanel
-          transition
-          className="absolute right-0 z-10 mt-2 w-80 origin-top-right transition data-[closed]:translate-y-1 data-[closed]:opacity-0 data-[enter]:duration-200 data-[leave]:duration-150 data-[enter]:ease-out data-[leave]:ease-in"
-        >
-          <div className="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
-            <div className="p-4">
-              {debugOptions.slice(0, 6).map((item) => (
-                <div 
-                  key={item.name} 
-                  className="group relative flex gap-x-6 rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
-                  onClick={() => handleDebugOptionClick(item.action)}
-                >
-                  <div className="mt-1 flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                    <item.icon className="h-6 w-6 text-gray-600 group-hover:text-indigo-600" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">
-                      {item.name}
-                    </div>
-                    <p className="mt-1 text-sm text-gray-600">{item.description}</p>
-                  </div>
-                </div>
-              ))}
-              
-              <div className="group relative gap-x-6 rounded-lg p-3 hover:bg-gray-50">
-                <div className="flex items-center">
-                  <div className="flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                    <AdjustmentsHorizontalIcon className="h-6 w-6 text-gray-600 group-hover:text-indigo-600" aria-hidden="true" />
-                  </div>
-                  <div className="ml-6">
-                    <div className="font-semibold text-gray-900">
-                      View Depth
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2 pl-16 pr-2">
-                  <div className="flex items-center">
-                    <input
-                      type="range"
-                      min="0"
-                      max="30"
-                      step="1"
-                      value={debugState.viewDistance}
-                      onChange={handleViewDepthChange}
-                      className="w-full"
-                    />
-                    <span className="ml-2 text-sm text-gray-600 min-w-[2rem] text-right">
-                      {debugState.viewDistance}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-4 py-3">
-              <div className="text-xs font-medium text-gray-500">
-                Current settings: {debugState.wireframe ? 'Wireframe' : 'Solid'}, 
-                Size: {debugState.hexSize.toFixed(1)}, 
-                Colors: {debugState.colorScheme},
-                View Distance: {debugState.viewDistance},
-                Details: {debugState.tileDetailsEnabled ? 'On' : 'Off'},
-                Follow: {debugState.followSelectedTile ? 'On' : 'Off'}
-              </div>
-            </div>
-          </div>
-        </PopoverPanel>
-      </Popover>
     </div>
   )
 } 

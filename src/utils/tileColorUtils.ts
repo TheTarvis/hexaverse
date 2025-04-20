@@ -17,13 +17,27 @@ export function getTileColor(
 
   // Handle enemy tiles
   if (tile.controllerUid && currentUserUid && tile.controllerUid !== currentUserUid) {
-    // Trigger the callback to load the enemy color if provided
-    if (options?.enemyColor) {
-      return options.enemyColor;
+    // Get the enemy color
+    let enemyColor = options?.enemyColor || '#FF3333';
+    
+    // If enemy color matches user's colony color, darken it
+    if (options?.enemyColor && options.colonyColor && options.enemyColor === options.colonyColor) {
+      // Convert hex to RGB, darken, then back to hex
+      const hex = options.enemyColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      
+      // Darken by reducing each component by 20%
+      const darkenFactor = 0.8;
+      const darkenedR = Math.floor(r * darkenFactor);
+      const darkenedG = Math.floor(g * darkenFactor);
+      const darkenedB = Math.floor(b * darkenFactor);
+      
+      enemyColor = `#${darkenedR.toString(16).padStart(2, '0')}${darkenedG.toString(16).padStart(2, '0')}${darkenedB.toString(16).padStart(2, '0')}`;
     }
     
-    // Return default red color initially
-    return '#FF3333';
+    return enemyColor;
   }
 
   // Handle your own colony tiles - use your colony color

@@ -8,7 +8,7 @@ import { ColonyStatus, useColony } from '@/contexts/ColonyContext'
 import { useTiles } from '@/contexts/TileContext'
 import { useToast } from '@/contexts/ToastContext'
 import { addTile } from '@/services/tiles'
-import { Tile, TileMap } from '@/types/tiles'
+import { TileMap } from '@/types/tiles'
 import { getTileColor } from '@/utils/tileColorUtils'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 

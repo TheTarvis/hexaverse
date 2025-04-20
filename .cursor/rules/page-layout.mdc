@@ -1,10 +1,42 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: true
 ---
+# Page Layout Guide
 
-# Your rule content
+## Standard Page Structure
 
-- You can @ files here
-- You can use markdown but dont have to
+Pages should follow this layout structure for consistent spacing and centering:
+
+```tsx
+<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  <div className="mx-auto max-w-2xl">
+    {/* Page content */}
+  </div>
+</div>
+```
+
+## Page Header
+
+Page headers should use this structure:
+```tsx
+<div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+  <div className="max-sm:w-full sm:flex-1">
+    <Heading>Page Title</Heading>
+  </div>
+  {/* Optional action buttons */}
+</div>
+```
+
+## Example Pages
+
+Reference implementations:
+- [Support Page](mdc:src/app/support/page.tsx) - Basic form page layout
+- [Events Page](mdc:src/app/events/page.tsx) - List page with search and filters
+
+## Responsive Design
+
+- Use `max-sm:w-full` for full width on mobile
+- Use `sm:flex-1` for flexible width on larger screens
+- Maintain consistent padding with `px-4 sm:px-6 lg:px-8`
