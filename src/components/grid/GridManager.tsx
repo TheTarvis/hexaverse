@@ -11,6 +11,7 @@ import { addTile } from '@/services/tiles'
 import { TileMap } from '@/types/tiles'
 import { getTileColor } from '@/utils/tileColorUtils'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useWarmupFunctions } from '@/hooks/useWarmupFunctions'
 
 // Add an interface for the selected tile
 interface SelectedTile {
@@ -27,6 +28,9 @@ export function GridManager() {
   const { colonyTiles, viewableTiles, addColonyTile, isLoadingTiles } = useTiles()
   const { showToast } = useToast()
   const { user, isAdmin } = useAuth()
+
+  // Warm up cloud functions
+  useWarmupFunctions()
 
   const [debugState, setDebugState] = useState({
     wireframe: false,

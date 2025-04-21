@@ -1,3 +1,8 @@
+## [v0.11.3] - 2024-03-21
+### Added
+- Added explicit warmup support for cloud functions to improve first-request latency
+- Implemented warmup hook to automatically warm functions on page load 
+
 ## [v0.11.1] - 2025-04-22
 ### Changed
 - Added admin-only access to debug menu in GridManager

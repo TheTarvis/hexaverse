@@ -70,6 +70,12 @@ export const addTile = onCall({
   timeoutSeconds: functionConfig.defaultTimeoutSeconds,
   memory: functionConfig.memory
 }, async (request) => {
+  // Handle warmup requests immediately
+  if (request.data?.warmup === true) {
+    logger.info('Handling warmup request for addTile function');
+    return { success: true, message: 'Warmup request handled' };
+  }
+
   // Create a tracker for this function call
   const tracker = new ReadCostTracker('addTile');
 

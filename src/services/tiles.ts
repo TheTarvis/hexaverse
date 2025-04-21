@@ -9,6 +9,7 @@ export interface AddTileRequest {
   q: number;
   r: number; 
   s: number;
+  warmup?: boolean;
 }
 
 export interface AddTileResponse {
@@ -354,4 +355,21 @@ function handleTileAdditionError(error: any, coordinates: AddTileRequest): AddTi
     success: false,
     message: `Error (${errorCode}): ${errorMessage}`
   };
+}
+
+/**
+ * Makes a dummy call to warm up the addTile cloud function.
+ * This call is designed to be fast and explicit about being a warmup request.
+ * @returns A promise that resolves when the warmup call completes
+ */
+export async function warmupAddTile(): Promise<void> {
+  try {
+    // Make an explicit warmup call
+    // @ts-expect-error TypeScript doesn't know we handle warmup-only requests
+    await addTileFunction({ warmup: true });
+    console.log('AddTile function warmed up');
+  } catch (error) {
+    // Log any unexpected errors during warmup
+    console.error('Error warming up addTile function:', error);
+  }
 } 
