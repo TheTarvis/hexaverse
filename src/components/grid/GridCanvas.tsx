@@ -1,14 +1,16 @@
 'use client'
 
-import React, { useMemo, useState, useRef, useEffect } from 'react'
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Instances, Instance } from '@react-three/drei'
 import * as THREE from 'three'
 import {Tile, TileMap} from '@/types/tiles'
 import { useAuth } from '@/contexts/AuthContext'
+import { CameraTracker } from './CameraTracker'
+import { cubeToPixel, pixelToCube, cubeRound } from '@/utils/gridUtils'
 
 // Updated interface for SelectedTile to include potential color field
-interface SelectedTile {
+export interface SelectedTile {
   q: number;
   r: number;
   s: number;
@@ -25,47 +27,10 @@ interface HexGridCanvasProps {
   tileMap: TileMap;
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
+  onCameraStop: (pos: [number, number, number]) => void;
   onTileSelect: (tile: SelectedTile) => void;
   onTileAdd?: (q: number, r: number, s: number) => void;
   followSelectedTile?: boolean;
-}
-
-// Convert cube coordinates to pixel coordinates (for pointy-top orientation)
-function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number, number] {
-  // For pointy-top hexagons
-  const x = size * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r)
-  const y = size * (3/2 * r)
-  return [x, y, 0]
-}
-
-// Convert pixel coordinates to fractional cube coordinates (for pointy-top)
-function pixelToCube(x: number, y: number, size = 1): [number, number, number] {
-  const q = (Math.sqrt(3)/3 * x - 1/3 * y) / size;
-  const r = (2/3 * y) / size;
-  const s = -q - r; // s is derived
-  return [q, r, s];
-}
-
-// Round fractional cube coordinates to the nearest integer cube coordinates
-function cubeRound(q: number, r: number, s: number): [number, number, number] {
-  let qRounded = Math.round(q);
-  let rRounded = Math.round(r);
-  let sRounded = Math.round(s);
-
-  const qDiff = Math.abs(qRounded - q);
-  const rDiff = Math.abs(rRounded - r);
-  const sDiff = Math.abs(sRounded - s);
-
-  // Reset the component with the largest difference to ensure q + r + s = 0
-  if (qDiff > rDiff && qDiff > sDiff) {
-    qRounded = -rRounded - sRounded;
-  } else if (rDiff > sDiff) {
-    rRounded = -qRounded - sRounded;
-  } else {
-    sRounded = -qRounded - rRounded;
-  }
-
-  return [qRounded, rRounded, sRounded];
 }
 
 // Add a PulsingHexagon component for animation
@@ -160,12 +125,13 @@ const createHexShape = () => {
 const hexShape = createHexShape(); // Create shape once
 const hexGeometry = new THREE.ShapeGeometry(hexShape); // Create geometry from shape
 
-function HexGrid({
+// Wrap HexGrid in React.memo
+const HexGrid = React.memo(function HexGrid({
   wireframe = false,
   hexSize = 1.2,
   tileMap = {} as TileMap,
   onTileSelect,
-onTileAdd,
+  onTileAdd,
 }: {
   wireframe?: boolean,
   hexSize?: number,
@@ -253,30 +219,17 @@ onTileAdd,
         return; // No valid tile at this location
       }
       
-      // Determine if the tile can be added/captured
-      // Allow if it's unexplored OR controlled by someone else
-      const canAddOrCapture = tile.visibility === 'unexplored' || (tile.controllerUid && tile.controllerUid !== user?.uid);
+      const pixelPosition = cubeToPixel(q, r, s, hexSize);
 
-      console.log(`Clicked Tile: q=${q}, r=${r}, s=${s}, visibility=${tile.visibility}, controller=${tile.controllerUid}, canAdd=${canAddOrCapture}`);
+      setClickedTile({ 
+        q: q, 
+        r: r, 
+        s: s, 
+        position: pixelPosition, // Use calculated pixel position for center
+        color: tile.color || '#CCCCCC' // Use tile's color
+      });
 
-      if (canAddOrCapture) {
-        // Need pixel position for the animation - use the original cubeToPixel
-        const pixelPosition = cubeToPixel(q, r, s, hexSize);
-
-        setClickedTile({ 
-          q: q, 
-          r: r, 
-          s: s, 
-          position: pixelPosition, // Use calculated pixel position for center
-          color: tile.color || '#CCCCCC' // Use tile's color
-        });
-
-        onTileAdd?.(q, r, s);
-      } else {
-        console.log(`Tile ${tileKey} is controlled by the current user (${user?.uid}), cannot add.`);
-        // Optionally, trigger onTileSelect here if needed for own tiles
-        // onTileSelect({ q, r, s, color: tile.color || '#CCCCCC', type: tile.type, resourceDensity: tile.resourceDensity });
-      }
+      onTileAdd?.(q, r, s);
 
     } else {
       console.log("Raycast did not intersect Z=0 plane.");
@@ -351,73 +304,18 @@ onTileAdd,
       )}
     </>
   );
-}
-
-// Add new CameraController component
-function CameraController({ 
-  targetPosition, 
-  enabled = true 
-}: { 
-  targetPosition: [number, number, number]; 
-  enabled: boolean;
-}) {
-  const { camera, controls } = useThree();
-  const currentTarget = useRef<[number, number, number]>([0, 0, 0]);
-  
-  useFrame(() => {
-    if (!enabled || !controls) return;
-    
-    // Smoothly interpolate camera target position
-    currentTarget.current[0] += (targetPosition[0] - currentTarget.current[0]) * 0.05;
-    currentTarget.current[1] += (targetPosition[1] - currentTarget.current[1]) * 0.05;
-    currentTarget.current[2] += (targetPosition[2] - currentTarget.current[2]) * 0.05;
-    
-    // Update orbit controls target if it exists
-    if ('target' in controls) {
-      (controls as any).target.set(
-        currentTarget.current[0],
-        currentTarget.current[1],
-        currentTarget.current[2]
-      );
-      
-      if (typeof (controls as any).update === 'function') {
-        (controls as any).update();
-      }
-    }
-  });
-  
-  // Initialize current target on mount
-  useEffect(() => {
-    currentTarget.current = [...targetPosition];
-  }, []);
-  
-  return null;
-}
+})
 
 export function GridCanvas({
-  wireframe, 
-  hexSize, 
-  tileMap, 
+  wireframe,
+  hexSize,
+  tileMap,
   cameraPosition,
-  cameraTarget, 
+  cameraTarget,
+  onCameraStop,
   onTileSelect,
   onTileAdd,
-  followSelectedTile = false,
 }: HexGridCanvasProps) {
-  const [currentCameraTarget, setCurrentCameraTarget] = useState<[number, number, number]>(cameraTarget);
-  
-  // Update camera target when a tile is selected
-  const handleTileSelect = (tile: SelectedTile) => {
-    if (followSelectedTile) {
-      // Convert cube coordinates to pixel position
-      const [x, y, z] = cubeToPixel(tile.q, tile.r, tile.s, hexSize);
-      setCurrentCameraTarget([x, y, z]);
-    }
-    
-    // Pass the tile to the parent's handler
-    onTileSelect(tile);
-  };
-  
   return (
     <Canvas
       camera={{ position: cameraPosition, fov: 45 }}
@@ -433,6 +331,7 @@ export function GridCanvas({
         maxDistance={800}
         panSpeed={1.5}
         zoomSpeed={1.2}
+        dampingFactor={0.1}
         touches={{
           ONE: THREE.TOUCH.PAN,
           TWO: THREE.TOUCH.DOLLY_PAN
@@ -444,17 +343,18 @@ export function GridCanvas({
         }}
         makeDefault
       />
-      <CameraController 
-        targetPosition={currentCameraTarget} 
-        enabled={followSelectedTile} 
+      <CameraTracker
+        onStop={(pos) => onCameraStop(pos)}
+        minDistance={0.5}
+        stopDelayMs={200}
       />
       <HexGrid
         wireframe={wireframe}
         hexSize={hexSize}
         tileMap={tileMap}
-        onTileSelect={handleTileSelect}
+        onTileSelect={onTileSelect}
         onTileAdd={onTileAdd}
       />
     </Canvas>
   )
-} 
+}

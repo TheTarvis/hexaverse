@@ -1,7 +1,7 @@
 'use client'
 
 import { DebugMenu } from '@/components/grid/DebugMenu'
-import { GridCanvas } from '@/components/grid/GridCanvas'
+import { GridCanvas, SelectedTile } from '@/components/grid/GridCanvas'
 import { SlideUpPanel } from '@/components/slide-up-panel'
 import { useAuth } from '@/contexts/AuthContext'
 import { ColonyStatus, useColony } from '@/contexts/ColonyContext'
@@ -13,17 +13,7 @@ import { getTileColor } from '@/utils/tileColorUtils'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWarmupFunctions } from '@/hooks/useWarmupFunctions'
 
-// Add an interface for the selected tile
-interface SelectedTile {
-  q: number
-  r: number
-  s: number
-  color: string
-  type?: string
-  resourceDensity?: number
-}
-
-export function GridManager() {
+export function ColonyGridManager() {
   const { colony, fetchColonyColor, setColony, colonyStatus, isLoadingColony, userColorMap } = useColony()
   const { colonyTiles, viewableTiles, addColonyTile, isLoadingTiles } = useTiles()
   const { showToast } = useToast()
@@ -163,7 +153,24 @@ export function GridManager() {
 
   // Handle adding a tile to the colony
   const onAddTile = useCallback(
+
+    
     async (q: number, r: number, s: number) => {
+      // Determine if the tile can be added/captured
+      // Allow if it's unexplored OR controlled by someone else
+      // Storing this here for now but its because the refactor of grid canvas on v0.12.0
+      // const canAddOrCapture = tile.visibility === 'unexplored' || (tile.controllerUid && tile.controllerUid !== user?.uid);
+
+      // console.log(`Clicked Tile: q=${q}, r=${r}, s=${s}, visibility=${tile.visibility}, controller=${tile.controllerUid}, canAdd=${canAddOrCapture}`);
+
+      // if (canAddOrCapture) {
+      //   // Need pixel position for the animation - use the original cubeToPixel
+       
+      // } else {
+      //   console.log(`Tile ${tileKey} is controlled by the current user (${user?.uid}), cannot add.`);
+      //   // Optionally, trigger onTileSelect here if needed for own tiles
+      //   // onTileSelect({ q, r, s, color: tile.color || '#CCCCCC', type: tile.type, resourceDensity: tile.resourceDensity });
+      // }
       try {
         setAddingTile(true)
         console.log(`Adding tile at q=${q}, r=${r}, s=${s} to colony`)
