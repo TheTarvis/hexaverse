@@ -1,4 +1,10 @@
 # Changelog
+## [v0.11.6] - $(date +%Y-%m-%d)
+### Changed
+- Refactored `GridCanvas` click handler to use raycasting instead of instance IDs for tile selection.
+- Added helper functions `pixelToCube` and `cubeRound` for coordinate conversions.
+- Fixed click handler to correctly use canvas element for `getBoundingClientRect`.
+
 ## [v0.11.5] - 2024-04-21
 ### Removed
 - Removed adjacency requirement for adding tiles.
