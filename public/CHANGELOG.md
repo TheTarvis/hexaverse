@@ -1,18 +1,7 @@
-## [v0.11.2] - Colony Color Enhancements
-
+## [v0.11.3] - 2024-03-21
 ### Added
-- Enhanced colony color selection with dynamic color variations
-- Each base color now generates multiple unique variations
-- Improved visual distinction between colonies with similar colors
-- Added automatic darkening of enemy tiles when colors match
-
-### Changed
-- Modified colony creation to show 15 unique color variations
-- Updated tile color utility to handle color conflicts between colonies
-
-### Technical
-- Added HSL color space conversion utilities
-- Implemented color variation generation with hue and saturation adjustments
+- Added explicit warmup support for cloud functions to improve first-request latency
+- Implemented warmup hook to automatically warm functions on page load 
 
 ## [v0.11.1] - 2025-04-22
 ### Changed
@@ -804,4 +793,4 @@
 - Implemented TypeScript interfaces for grid data structures
 - Added coordinate conversion utilities
 - Optimized rendering with useMemo hooks
-- Fixed compatibility issues with React 18
+- Fixed compatibility issues with React 18 

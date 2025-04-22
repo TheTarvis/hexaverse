@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, Instances, Instance } from '@react-three/drei'
 import * as THREE from 'three'
 import {Tile, TileMap} from '@/types/tiles'
 
@@ -110,123 +110,28 @@ function PulsingHexagon({
   );
 }
 
-function HexagonMesh({ 
-  position = [0, 0, 0] as [number, number, number], 
-  color = 'teal', 
-  wireframe = false,
-  q, 
-  r, 
-  s,
-  type,
-  resourceDensity,
-  isViewableTile = false,
-  viewDistance,
-  onTileSelect,
-  onTileAdd,
-  setClickedTile
-}: { 
-  position?: [number, number, number], 
-  color?: string, 
-  wireframe?: boolean,
-  q: number,
-  r: number,
-  s: number,
-  type?: string,
-  resourceDensity?: number,
-  isViewableTile?: boolean,
-  viewDistance?: number,
-  onTileSelect: (tile: SelectedTile) => void,
-  onTileAdd?: (q: number, r: number, s: number) => void,
-  setClickedTile?: (coords: { q: number, r: number, s: number, position: [number, number, number], color: string } | null) => void
-}) {
-  // Create a hexagon shape
-  const hexShape = useMemo(() => {
-    const shape = new THREE.Shape()
-    const size = 1
-    
-    // Create pointy-top hexagon
-    for (let i = 0; i < 6; i++) {
-      const angle = (Math.PI / 3) * i + Math.PI / 6
-      const x = size * Math.cos(angle)
-      const y = size * Math.sin(angle)
-      
-      if (i === 0) {
-        shape.moveTo(x, y)
-      } else {
-        shape.lineTo(x, y)
-      }
-    }
-    shape.closePath()
-    
-    return shape
-  }, [])
+// Function to create hexagon shape (can be moved outside components if preferred)
+const createHexShape = () => {
+  const shape = new THREE.Shape()
+  const size = 1 // Base size before scaling by hexSize
 
-  const handleClick = (event: ThreeEvent<MouseEvent>) => {
-    // Stop event propagation to prevent it from reaching Canvas
-    event.stopPropagation()
-    
-    // Only handle clicks for Viewable tiles (adding tiles)
-    if (!onTileAdd) return;
-
-    console.log(`Clicked tile at: q=${q}, r=${r}, s=${s}`);
-    
-    // Set the clicked tile for animation
-    if (setClickedTile) {
-      setClickedTile({
-        q, r, s,
-        position,
-        color
-      });
-    }
-    
-    // Call the add tile handler
-    onTileAdd(q, r, s);
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i + Math.PI / 6 // Pointy-top orientation
+    const x = size * Math.cos(angle)
+    const y = size * Math.sin(angle)
+    if (i === 0) shape.moveTo(x, y)
+    else shape.lineTo(x, y)
   }
-
-  const handleDoubleClick = (event: ThreeEvent<MouseEvent>) => {
-    // Stop event propagation
-    event.stopPropagation();
-    console.log(`Double-clicked hex at cube coordinates: q=${q}, r=${r}, s=${s}, type=${type}`)
-    
-    // Call the selection handler with tile info
-    onTileSelect({
-      q,
-      r,
-      s,
-      color,
-      type: isViewableTile ? 'viewable' : type,
-      resourceDensity
-    });
-  }
-
-  // Determine material properties based on tile type
-  // Adjust opacity based on distance for viewable tiles
-  const opacity = isViewableTile ? (viewDistance ? Math.max(0.4, 0.9 - (viewDistance * 0.1)) : 0.7) : 1.0;
-  const transparent = isViewableTile;
-
-  return (
-    <mesh 
-      position={position} 
-      onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
-      // Make cursor change to pointer when hovering over hexagons
-      onPointerOver={(e: ThreeEvent<PointerEvent>) => document.body.style.cursor = 'pointer'}
-      onPointerOut={(e: ThreeEvent<PointerEvent>) => document.body.style.cursor = 'default'}
-    >
-      <shapeGeometry args={[hexShape]} />
-      <meshBasicMaterial 
-        color={color} 
-        wireframe={wireframe} 
-        transparent={transparent}
-        opacity={opacity}
-      />
-    </mesh>
-  )
+  shape.closePath()
+  return shape
 }
 
-function HexGrid({ 
-  wireframe = false, 
-  hexSize = 1.2, 
+const hexShape = createHexShape(); // Create shape once
+const hexGeometry = new THREE.ShapeGeometry(hexShape); // Create geometry from shape
+
+function HexGrid({
+  wireframe = false,
+  hexSize = 1.2,
   tileMap = {} as TileMap,
   onTileSelect,
   onTileAdd,
@@ -237,7 +142,6 @@ function HexGrid({
   onTileSelect: (tile: SelectedTile) => void,
   onTileAdd?: (q: number, r: number, s: number) => void,
 }) {
-  // Add state to track the clicked tile
   const [clickedTile, setClickedTile] = useState<{
     q: number,
     r: number,
@@ -245,76 +149,149 @@ function HexGrid({
     position: [number, number, number],
     color: string
   } | null>(null);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce timeout
 
-  // Generate hexagon positions using cube coordinates
-  const positions = useMemo(() => {
-    const gridPositions: { 
-      position: [number, number, number]; 
-      color: string; 
-      q: number; 
-      r: number; 
-      s: number; 
-      type?: string; 
-      resourceDensity?: number; 
-      isViewableTile: boolean;
-      viewDistance?: number;
-    }[] = []
-    
-    // Use the tile data from the tileMap
-    Object.values(tileMap).forEach((tile) => {
-      const q = tile.q;
-      const r = tile.r;
-      const s = tile.s;
-      const type = tile.type;
-      const resourceDensity = tile.resourceDensity || 0.5;
-      
-      // Use the color from the tile object or fall back to a default
-      const color = tile.color || '#CCCCCC';
-      
-      gridPositions.push({
+  // Generate hexagon instance data
+  const instanceData = useMemo(() => {
+    return Object.values(tileMap).map((tile) => {
+      const { q, r, s, type, resourceDensity = 0.5, color = '#CCCCCC', visibility } = tile;
+      const position = cubeToPixel(q, r, s, hexSize);
+      const isViewableTile = visibility === 'unexplored';
+      // Adjust opacity based on distance for viewable tiles - using alpha in color
+      const baseOpacity = isViewableTile ? 0.7 : 1.0; // Simplified opacity for now
+      const finalColor = new THREE.Color(color);
+
+
+      return {
+        key: tile.id || `${q}#${r}#${s}`, // Use tile.id if available, fallback to coords
         q, r, s,
-        position: cubeToPixel(q, r, s, hexSize),
-        color,
+        position,
+        color: finalColor, // Pass THREE.Color object for potential alpha control
         type,
         resourceDensity,
-        isViewableTile: tile.visibility == 'unexplored'
-      })
-    })
-    
-    return gridPositions
-  }, [hexSize, tileMap])
+        isViewableTile,
+        // viewDistance, // Need to recalculate viewDistance if needed for opacity
+        opacity: baseOpacity, // Store opacity separately if needed
+      };
+    });
+  }, [tileMap, hexSize]);
+
+  // Derive a stable key for the Instances component based on the tileMap content
+  const instancesKey = useMemo(() => Object.keys(tileMap).sort().join('-'), [tileMap]);
+
+  const handleInstanceClick = (event: ThreeEvent<MouseEvent>) => {
+    event.stopPropagation();
+    if (event.instanceId === undefined) return;
+
+    // Clear any existing timeout (debounce)
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+
+    // Set a new timeout to process the click after a short delay
+    clickTimeoutRef.current = setTimeout(() => {
+      // Check if onTileAdd is defined (essential for click logic)
+      if (!onTileAdd) return;
+      
+      // Retrieve instance data using the ID from the event
+      // Make sure instanceId is still valid as event object might be pooled/reused by R3F
+      const currentInstanceId = event.instanceId;
+      if (currentInstanceId === undefined) return;
+
+      const instance = instanceData[currentInstanceId];
+      
+      // Check if the tile is actually viewable and meant to be clicked
+      if (!instance || !instance.isViewableTile) return;
+
+      console.log(`Debounced Click: Instance ${currentInstanceId} at: q=${instance.q}, r=${instance.r}, s=${instance.s}`);
+
+      // Set the clicked tile for animation
+      setClickedTile({
+        q: instance.q,
+        r: instance.r,
+        s: instance.s,
+        position: instance.position,
+        color: instance.color.getStyle(),
+      });
+
+      // Call the add tile handler
+      onTileAdd(instance.q, instance.r, instance.s);
+
+    }, 50); // 50ms debounce delay
+  };
+
+  const handleInstanceDoubleClick = (event: ThreeEvent<MouseEvent>) => {
+    // Clear click timeout if double click happens quickly
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+    event.stopPropagation();
+    if (event.instanceId === undefined) return;
+
+    const instance = instanceData[event.instanceId];
+    if (!instance) return;
+
+    console.log(`Double-clicked instance ${event.instanceId} at cube coordinates: q=${instance.q}, r=${instance.r}, s=${instance.s}, type=${instance.type}`);
+
+    onTileSelect({
+      q: instance.q,
+      r: instance.r,
+      s: instance.s,
+      color: instance.color.getStyle(),
+      type: instance.isViewableTile ? 'viewable' : instance.type,
+      resourceDensity: instance.resourceDensity,
+    });
+  };
+
+  const handlePointerOver = (event: ThreeEvent<PointerEvent>) => {
+    event.stopPropagation();
+    document.body.style.cursor = 'pointer';
+  };
+
+  const handlePointerOut = (event: ThreeEvent<PointerEvent>) => {
+    event.stopPropagation();
+    document.body.style.cursor = 'default';
+  };
 
   return (
     <>
-      {positions.map((props, index) => (
-        <HexagonMesh 
-          key={index}
-          position={props.position as [number, number, number]}
-          color={props.color}
-          wireframe={wireframe}
-          q={props.q}
-          r={props.r}
-          s={props.s}
-          type={props.type}
-          resourceDensity={props.resourceDensity}
-          isViewableTile={props.isViewableTile}
-          viewDistance={props.viewDistance}
-          onTileSelect={onTileSelect}
-          onTileAdd={onTileAdd}
-          setClickedTile={setClickedTile}
-        />
-      ))}
-      
-      {/* Render the animation if there's a clicked tile */}
+      <Instances
+        key={instancesKey}
+        limit={instanceData.length} // Set limit based on data length
+        // range={instanceData.length} // Use range if limit is higher than needed
+        geometry={hexGeometry} // Use the ShapeGeometry
+        onClick={handleInstanceClick}
+        onDoubleClick={handleInstanceDoubleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
+        {/* Define the base material - remove vertexColors */}
+        <meshBasicMaterial wireframe={wireframe} side={THREE.DoubleSide} />
+        {/* Map data to Instance components */}
+        {instanceData.map((data) => (
+          <Instance
+            key={data.key}
+            position={data.position}
+            // Rotation and scale can be set here if needed
+            // rotation={[0, 0, 0]}
+            // scale={1}
+             color={data.color} // Pass the THREE.Color object
+            // For individual opacity control, you might need InstancedMesh directly
+            // or manipulate vertex colors/attributes if using a custom shader
+          />
+        ))}
+      </Instances>
+
+      {/* Render the animation separately */}
       {clickedTile && (
-        <PulsingHexagon 
+        <PulsingHexagon
           position={clickedTile.position}
           color={clickedTile.color}
           onAnimationComplete={() => setClickedTile(null)}
         />
       )}
     </>
-  )
+  );
 }
 
 // Add new CameraController component

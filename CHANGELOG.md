@@ -1,3 +1,9 @@
+# Changelog
+
+## v0.11.4 (2024-XX-XX)
+
+- **Refactor:** Updated `GridCanvas` to use efficient instanced rendering for hexagon tiles.
+
 ## [v0.11.3] - 2024-03-21
 ### Added
 - Added explicit warmup support for cloud functions to improve first-request latency
