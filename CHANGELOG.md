@@ -1,4 +1,7 @@
 # Changelog
+## [v0.11.5] - 2024-04-21
+### Removed
+- Removed adjacency requirement for adding tiles.
 
 ## v0.11.4 (2024-XX-XX)
 
