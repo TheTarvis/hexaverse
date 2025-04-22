@@ -37,6 +37,36 @@ function cubeToPixel(q: number, r: number, s: number, size = 1): [number, number
   return [x, y, 0]
 }
 
+// Convert pixel coordinates to fractional cube coordinates (for pointy-top)
+function pixelToCube(x: number, y: number, size = 1): [number, number, number] {
+  const q = (Math.sqrt(3)/3 * x - 1/3 * y) / size;
+  const r = (2/3 * y) / size;
+  const s = -q - r; // s is derived
+  return [q, r, s];
+}
+
+// Round fractional cube coordinates to the nearest integer cube coordinates
+function cubeRound(q: number, r: number, s: number): [number, number, number] {
+  let qRounded = Math.round(q);
+  let rRounded = Math.round(r);
+  let sRounded = Math.round(s);
+
+  const qDiff = Math.abs(qRounded - q);
+  const rDiff = Math.abs(rRounded - r);
+  const sDiff = Math.abs(sRounded - s);
+
+  // Reset the component with the largest difference to ensure q + r + s = 0
+  if (qDiff > rDiff && qDiff > sDiff) {
+    qRounded = -rRounded - sRounded;
+  } else if (rDiff > sDiff) {
+    rRounded = -qRounded - sRounded;
+  } else {
+    sRounded = -qRounded - rRounded;
+  }
+
+  return [qRounded, rRounded, sRounded];
+}
+
 // Add a PulsingHexagon component for animation
 function PulsingHexagon({ 
   position = [0, 0, 0] as [number, number, number],
@@ -142,6 +172,7 @@ onTileAdd,
   onTileSelect: (tile: SelectedTile) => void,
   onTileAdd?: (q: number, r: number, s: number) => void,
 }) {
+  const { gl } = useThree(); // Get the WebGL renderer context
   const [clickedTile, setClickedTile] = useState<{
     q: number,
     r: number,
@@ -162,7 +193,7 @@ onTileAdd,
 
 
       return {
-        key: tile.id || `${q}#${r}#${s}`, // Use tile.id if available, fallback to coords
+        key: `${q}#${r}#${s}`, // Use tile.id if available, fallback to coords
         q, r, s,
         position,
         color: finalColor, // Pass THREE.Color object for potential alpha control
@@ -179,20 +210,66 @@ onTileAdd,
   const instancesKey = useMemo(() => Object.keys(tileMap).sort().join('-'), [tileMap]);
 
   const handleInstanceClick = (event: ThreeEvent<MouseEvent>) => {
-    event.stopPropagation()
-    const instanceId = event.instanceId
-    if (instanceId === undefined) return
+    event.stopPropagation();
 
-    // snapshot all the data you care about right now
-    const { q, r, s, position, color, isViewableTile } = instanceData[instanceId]
+    // 1. Raycast from camera to click point
+    const camera = event.camera; // Camera used for the render
 
-    if (!isViewableTile) return
+    // Create a raycaster
+    const raycaster = new THREE.Raycaster();
+    // Need mouse coordinates normalized to [-1, +1] range
+    // Use gl.domElement (the canvas) to get the correct bounds
+    const rect = gl.domElement.getBoundingClientRect();
+    const x = ((event.nativeEvent.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.nativeEvent.clientY - rect.top) / rect.height) * 2 + 1;
+    const mouse = new THREE.Vector2(x, y);
 
-    console.log(`Click: q=${q}, r=${r}, s=${s}`)
+    raycaster.setFromCamera(mouse, camera);
 
-    setClickedTile({ q, r, s, position, color: color.getStyle() })
-    onTileAdd?.(q, r, s)
-  }
+    // Define the Z=0 plane
+    const planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const intersectionPoint = new THREE.Vector3();
+
+    // 2. Intersect ray with the plane
+    if (raycaster.ray.intersectPlane(planeZ, intersectionPoint)) {
+      // intersectionPoint now holds the x, y coordinates on the Z=0 plane
+
+      // 3. Convert pixel coordinates to cube coordinates
+      const [fq, fr, fs] = pixelToCube(intersectionPoint.x, intersectionPoint.y, hexSize);
+
+      // 4. Round cube coordinates
+      const [q, r, s] = cubeRound(fq, fr, fs);
+
+      console.log(`Raycast Click: Pixel=(${intersectionPoint.x.toFixed(2)}, ${intersectionPoint.y.toFixed(2)}), Cube=(${q}, ${r}, ${s})`);
+
+      // 5. Use cube coordinates to find the tile
+      const tileKey = `${q}#${r}#${s}`;
+      const tile = tileMap[tileKey];
+
+      if (!tile || tile.visibility !== 'unexplored') {
+        console.log(`Tile ${tileKey} not found or not viewable.`);
+        return; // No valid tile at this location or not viewable
+      }
+
+      console.log(`Clicked Tile: q=${q}, r=${r}, s=${s}`);
+
+      // Need pixel position for the animation - use the original cubeToPixel
+      const pixelPosition = cubeToPixel(q, r, s, hexSize);
+
+      setClickedTile({ 
+        q: q, 
+        r: r, 
+        s: s, 
+        position: pixelPosition, // Use calculated pixel position for center
+        color: tile.color || '#CCCCCC' // Use tile's color
+      });
+
+      onTileAdd?.(q, r, s);
+
+    } else {
+      console.log("Raycast did not intersect Z=0 plane.");
+    }
+  };
 
   const handleInstanceDoubleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
