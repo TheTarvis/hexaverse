@@ -134,7 +134,7 @@ function HexGrid({
   hexSize = 1.2,
   tileMap = {} as TileMap,
   onTileSelect,
-  onTileAdd,
+onTileAdd,
 }: {
   wireframe?: boolean,
   hexSize?: number,
@@ -149,7 +149,6 @@ function HexGrid({
     position: [number, number, number],
     color: string
   } | null>(null);
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce timeout
 
   // Generate hexagon instance data
   const instanceData = useMemo(() => {
@@ -180,51 +179,22 @@ function HexGrid({
   const instancesKey = useMemo(() => Object.keys(tileMap).sort().join('-'), [tileMap]);
 
   const handleInstanceClick = (event: ThreeEvent<MouseEvent>) => {
-    event.stopPropagation();
-    if (event.instanceId === undefined) return;
+    event.stopPropagation()
+    const instanceId = event.instanceId
+    if (instanceId === undefined) return
 
-    // Clear any existing timeout (debounce)
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-    }
+    // snapshot all the data you care about right now
+    const { q, r, s, position, color, isViewableTile } = instanceData[instanceId]
 
-    // Set a new timeout to process the click after a short delay
-    clickTimeoutRef.current = setTimeout(() => {
-      // Check if onTileAdd is defined (essential for click logic)
-      if (!onTileAdd) return;
-      
-      // Retrieve instance data using the ID from the event
-      // Make sure instanceId is still valid as event object might be pooled/reused by R3F
-      const currentInstanceId = event.instanceId;
-      if (currentInstanceId === undefined) return;
+    if (!isViewableTile) return
 
-      const instance = instanceData[currentInstanceId];
-      
-      // Check if the tile is actually viewable and meant to be clicked
-      if (!instance || !instance.isViewableTile) return;
+    console.log(`Click: q=${q}, r=${r}, s=${s}`)
 
-      console.log(`Debounced Click: Instance ${currentInstanceId} at: q=${instance.q}, r=${instance.r}, s=${instance.s}`);
-
-      // Set the clicked tile for animation
-      setClickedTile({
-        q: instance.q,
-        r: instance.r,
-        s: instance.s,
-        position: instance.position,
-        color: instance.color.getStyle(),
-      });
-
-      // Call the add tile handler
-      onTileAdd(instance.q, instance.r, instance.s);
-
-    }, 50); // 50ms debounce delay
-  };
+    setClickedTile({ q, r, s, position, color: color.getStyle() })
+    onTileAdd?.(q, r, s)
+  }
 
   const handleInstanceDoubleClick = (event: ThreeEvent<MouseEvent>) => {
-    // Clear click timeout if double click happens quickly
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-    }
     event.stopPropagation();
     if (event.instanceId === undefined) return;
 

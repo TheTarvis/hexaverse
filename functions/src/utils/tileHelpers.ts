@@ -37,6 +37,8 @@ export function isTileAdjacentToColony(q: number, r: number, s: number, colonyTi
  * @param colonyTileIds - Array of tile IDs in the colony
  */
 export function verifyTileAdjacency(q: number, r: number, s: number, colonyTileIds: string[]): void {
+  return;
+  // TODO:TW Game flag or set up?
   if (!isTileAdjacentToColony(q, r, s, colonyTileIds)) {
     throw new HttpsError('failed-precondition', 'New tile must be adjacent to your existing colony');
   }
