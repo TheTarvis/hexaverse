@@ -1,4 +1,10 @@
 # Changelog
+## [v0.12.1] - 2024-06-19
+### Fixed
+- Fixed click handling in GridCanvas by adding an invisible background plane to catch all clicks
+- Improved tile selection by using the plane intersection point to determine tile coordinates
+- Removed dependency on instanced mesh raycasting for more reliable click detection
+
 ## [v0.11.6] - $(date +%Y-%m-%d)
 ### Changed
 - Refactored `GridCanvas` click handler to use raycasting instead of instance IDs for tile selection.
