@@ -28,7 +28,6 @@ export function ColonyGridManager() {
     colorScheme: 'type', // Default to type-based coloring
     viewDistance: 5, // Controls how many hex layers beyond the colony edge are shown as viewable tiles
     tileDetailsEnabled: false, // Disabled by default
-    followSelectedTile: false, // Camera follow mode disabled by default
   })
 
   // Add state to store fetched colors
@@ -47,7 +46,7 @@ export function ColonyGridManager() {
   // Calculate world coordinates for the target tile based on colony start coordinates
   const worldCoords = useMemo(() => {
     if (!colony?.startCoordinates) {
-      return { x: 0, y: 0 }
+      return null;
     }
 
     const { q, r } = colony.startCoordinates
@@ -56,9 +55,15 @@ export function ColonyGridManager() {
     return { x: worldX, y: worldY }
   }, [colony?.startCoordinates, debugState.hexSize])
 
-  // Camera will be positioned directly above the target
-  const cameraPosition: [number, number, number] = [worldCoords.x, worldCoords.y, 20]
-  const cameraTarget: [number, number, number] = [worldCoords.x, worldCoords.y, 0]
+  // Camera position and target are only calculated if we have colony coordinates
+  const cameraProps = useMemo(() => {
+    if (!worldCoords) return {};
+    
+    return {
+      cameraPosition: [worldCoords.x, worldCoords.y, 20] as [number, number, number],
+      cameraTarget: [worldCoords.x, worldCoords.y, 0] as [number, number, number]
+    };
+  }, [worldCoords]);
 
   const [error, setError] = useState<string | null>(null)
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
@@ -158,7 +163,7 @@ export function ColonyGridManager() {
     async (q: number, r: number, s: number) => {
       // Determine if the tile can be added/captured
       // Allow if it's unexplored OR controlled by someone else
-      // Storing this here for now but its because the refactor of grid canvas on v0.12.0
+      
       // const canAddOrCapture = tile.visibility === 'unexplored' || (tile.controllerUid && tile.controllerUid !== user?.uid);
 
       // console.log(`Clicked Tile: q=${q}, r=${r}, s=${s}, visibility=${tile.visibility}, controller=${tile.controllerUid}, canAdd=${canAddOrCapture}`);
@@ -230,9 +235,6 @@ export function ColonyGridManager() {
         if (debugState.tileDetailsEnabled && selectedTile) {
           setSelectedTile(null)
         }
-        break
-      case 'toggleCameraFollow': // Add case for toggling camera follow mode
-        setDebugState((prev) => ({ ...prev, followSelectedTile: !prev.followSelectedTile }))
         break
     }
   }
@@ -321,11 +323,10 @@ export function ColonyGridManager() {
           wireframe={debugState.wireframe}
           hexSize={debugState.hexSize}
           tileMap={tileMap}
-          cameraPosition={cameraPosition}
-          cameraTarget={cameraTarget}
+          {...cameraProps}
           onTileSelect={handleTileSelect}
           onTileAdd={onAddTile}
-          followSelectedTile={debugState.followSelectedTile}
+          onCameraStop={(pos) => {}} // Empty handler to satisfy the interface
         />
       )}
     </div>

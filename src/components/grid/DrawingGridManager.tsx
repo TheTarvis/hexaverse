@@ -8,7 +8,7 @@ import { useWarmupFunctions } from '@/hooks/useWarmupFunctions'
 import { Tile, TileMap } from '@/types/tiles'
 import { pixelToCube, cubeRound, hexDistance } from '@/utils/gridUtils'; // Import hex grid utilities
 
-const RADIUS = 65; // Radius to fetch/generate around new center point
+const RADIUS = 400; // Radius to fetch/generate around new center point
 const MOVE_THRESHOLD = 8; // How many hex tiles camera needs to move to trigger fetch
 const HEX_SIZE = 1.2; // Make sure this matches GridCanvas prop
 
@@ -69,7 +69,6 @@ export function DrawingGridManager() {
 
   // Store camera position ref to access latest value in debounced function
   const cameraPositionRef = useRef<[number, number, number]>([0, 0, 20]);
-  const cameraTarget: [number, number, number] = [0, 0, 0];
 
   // Effect to keep refs updated with the latest state
   useEffect(() => {
@@ -148,7 +147,7 @@ export function DrawingGridManager() {
 
   // Log tileMap size changes for debugging
   useEffect(() => {
-     console.log(`Tile map updated. Size: ${Object.keys(tileMap).length} tiles. Last fetch center: ${lastFetchCenter.join(',')}`);
+    console.log(`Tile map updated. Size: ${Object.keys(tileMap).length} tiles. Last fetch center: ${lastFetchCenter.join(',')}`);
   }, [tileMap, lastFetchCenter]);
 
   return (
@@ -157,11 +156,8 @@ export function DrawingGridManager() {
         wireframe={false}
         hexSize={HEX_SIZE} // Pass HEX_SIZE constant
         tileMap={tileMap}
-        cameraPosition={cameraPositionRef.current} // Initial position
-        cameraTarget={cameraTarget}
         onTileSelect={handleTileSelect}
         onCameraStop={handleCameraMove} // Pass the callback
-        followSelectedTile={false}
       />
        {/* Optional: Loading indicator */}
        {isFetching && (

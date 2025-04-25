@@ -6,10 +6,10 @@ import { DrawingGridManager } from '@/components/grid/DrawingGridManager'
 
 export default function Home() {
   return (
-    <AuthGuard>
+    // <AuthGuard>
       <div className="h-screen w-full">
         <DrawingGridManager />
       </div>
-    </AuthGuard>
+    // </AuthGuard>
   )
 }

@@ -1,8 +1,7 @@
 import { Tile } from '@/types/tiles';
 import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
-import { invalidateColonyCache, fetchUserColony, updateColonyCacheWithNewTile } from './colony';
-import { auth, functions, firestore } from '@/config/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { invalidateColonyCache, updateColonyCacheWithNewTile } from './colony';
+import { auth, functions } from '@/config/firebase';
 
 // Types
 export interface AddTileRequest {

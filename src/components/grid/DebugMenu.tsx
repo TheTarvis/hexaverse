@@ -23,7 +23,6 @@ interface DebugState {
   colorScheme: string
   viewDistance: number
   tileDetailsEnabled: boolean
-  followSelectedTile: boolean
   forceDarkMode: boolean
 }
 
@@ -34,7 +33,6 @@ interface DebugMenuProps {
     colorScheme: string;
     viewDistance: number;
     tileDetailsEnabled: boolean;
-    followSelectedTile: boolean;
   };
   onDebugAction: (action: string, value?: any) => void;
 }
@@ -63,12 +61,6 @@ const debugOptions = [
     description: 'Toggle tile details slide-up panel', 
     action: 'toggleTileDetails', 
     icon: BugAntIcon 
-  },
-  { 
-    name: 'Camera Follow', 
-    description: 'Toggle camera follow mode for selected tiles', 
-    action: 'toggleCameraFollow', 
-    icon: VideoCameraIcon 
   },
   { 
     name: 'WebSocket', 
@@ -166,18 +158,6 @@ export function DebugMenu({ debugState, onDebugAction }: DebugMenuProps) {
                     } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
                   >
                     {debugState.tileDetailsEnabled ? 'Disable' : 'Enable'} Tile Details
-                  </button>
-                )}
-              </Menu.Item>
-              <Menu.Item>
-                {({ active }) => (
-                  <button
-                    onClick={() => onDebugAction('toggleCameraFollow')}
-                    className={`${
-                      active ? 'bg-indigo-500 text-white' : 'text-zinc-900 dark:text-zinc-100'
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
-                  >
-                    {debugState.followSelectedTile ? 'Disable' : 'Enable'} Camera Follow
                   </button>
                 )}
               </Menu.Item>
