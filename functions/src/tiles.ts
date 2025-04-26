@@ -65,19 +65,19 @@ async function publishEvent(
  * 4. Updates the colony with the new tile ID
  * 5. Returns the new/captured tile
  */
-export const addTile = onCall({
+export const addColonyTile = onCall({
   region: functionConfig.region,
   timeoutSeconds: functionConfig.defaultTimeoutSeconds,
   memory: functionConfig.memory
 }, async (request) => {
   // Handle warmup requests immediately
   if (request.data?.warmup === true) {
-    logger.info('Handling warmup request for addTile function');
+    logger.info('Handling warmup request for addColonyTile function');
     return { success: true, message: 'Warmup request handled' };
   }
 
   // Create a tracker for this function call
-  const tracker = new ReadCostTracker('addTile');
+  const tracker = new ReadCostTracker('addColonyTile');
 
   try {
     // Authenticate the request and get the user ID
@@ -209,7 +209,7 @@ export const addTile = onCall({
     
     // Log the read stats instead of including them in the response
     const readSummary = tracker.getSummary();
-    logger.info(`[addTile] Read Summary: ${readSummary.total} total reads`);
+    logger.info(`[addColonyTile] Read Summary: ${readSummary.total} total reads`);
     
     // Prepare event data for PubSub 
     const eventData = {
@@ -236,7 +236,7 @@ export const addTile = onCall({
       tile: newTile,
       message: capturedFromUid 
         ? `Tile captured successfully from another colony` 
-        : `Tile added successfully`
+        : `Tile added successfully to colony`
     };
     
     // Add capture information if applicable
@@ -250,7 +250,7 @@ export const addTile = onCall({
     
     return response;
   } catch (error) {
-    logger.error("Error adding/capturing tile:", error);
+    logger.error("Error adding/capturing colony tile:", error);
     
     // If the error is already an HttpsError, rethrow it
     if (error instanceof HttpsError) {
@@ -260,7 +260,7 @@ export const addTile = onCall({
     // Otherwise, wrap it in an HttpsError
     throw new HttpsError(
       'internal',
-      error instanceof Error ? error.message : 'Error adding/capturing tile'
+      error instanceof Error ? error.message : 'Error adding/capturing colony tile'
     );
   }
 });

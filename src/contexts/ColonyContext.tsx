@@ -1,6 +1,6 @@
 'use client'
 
-import { createColony, fetchUserColony } from '@/services/colony'
+import { createColony, fetchUserColony } from '@/services/colony/colony'
 import { Colony } from '@/types/colony'
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 import { useAuth } from './AuthContext'

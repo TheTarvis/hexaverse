@@ -5,22 +5,23 @@ import { GridCanvas, SelectedTile } from '@/components/grid/GridCanvas'
 import { SlideUpPanel } from '@/components/slide-up-panel'
 import { useAuth } from '@/contexts/AuthContext'
 import { ColonyStatus, useColony } from '@/contexts/ColonyContext'
-import { useTiles } from '@/contexts/TileContext'
+import { ColonyTilesProvider, useColonyTiles } from '@/contexts/ColonyTilesContext'
 import { useToast } from '@/contexts/ToastContext'
-import { addTile } from '@/services/tiles'
+import { addColonyTile as addColonyTileService, WarmupableFunctions } from '@/services/colony/ColonyTilesService'
 import { TileMap } from '@/types/tiles'
 import { getTileColor } from '@/utils/tileColorUtils'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWarmupFunctions } from '@/hooks/useWarmupFunctions'
 
-export function ColonyGridManager() {
+// Inner component that uses the colony context
+function ColonyGridInner() {
   const { colony, fetchColonyColor, setColony, colonyStatus, isLoadingColony, userColorMap } = useColony()
-  const { colonyTiles, viewableTiles, addColonyTile, isLoadingTiles } = useTiles()
+  const { colonyTiles, viewableTiles, addColonyTile, isLoadingTiles } = useColonyTiles()
   const { showToast } = useToast()
   const { user, isAdmin } = useAuth()
 
   // Warm up cloud functions
-  useWarmupFunctions()
+  useWarmupFunctions([WarmupableFunctions.addColonyTile])
 
   const [debugState, setDebugState] = useState({
     wireframe: false,
@@ -158,29 +159,12 @@ export function ColonyGridManager() {
 
   // Handle adding a tile to the colony
   const onAddTile = useCallback(
-
-    
     async (q: number, r: number, s: number) => {
-      // Determine if the tile can be added/captured
-      // Allow if it's unexplored OR controlled by someone else
-      
-      // const canAddOrCapture = tile.visibility === 'unexplored' || (tile.controllerUid && tile.controllerUid !== user?.uid);
-
-      // console.log(`Clicked Tile: q=${q}, r=${r}, s=${s}, visibility=${tile.visibility}, controller=${tile.controllerUid}, canAdd=${canAddOrCapture}`);
-
-      // if (canAddOrCapture) {
-      //   // Need pixel position for the animation - use the original cubeToPixel
-       
-      // } else {
-      //   console.log(`Tile ${tileKey} is controlled by the current user (${user?.uid}), cannot add.`);
-      //   // Optionally, trigger onTileSelect here if needed for own tiles
-      //   // onTileSelect({ q, r, s, color: tile.color || '#CCCCCC', type: tile.type, resourceDensity: tile.resourceDensity });
-      // }
       try {
         setAddingTile(true)
         console.log(`Adding tile at q=${q}, r=${r}, s=${s} to colony`)
 
-        const result = await addTile(q, r, s)
+        const result = await addColonyTileService(q, r, s)
 
         if (!result || !result.success || !result.tile) {
           console.error(`Failed to add tile: ${result.message}`)
@@ -330,5 +314,14 @@ export function ColonyGridManager() {
         />
       )}
     </div>
+  )
+}
+
+// Outer component that provides the context
+export function ColonyGridManager() {
+  return (
+    <ColonyTilesProvider>
+      <ColonyGridInner />
+    </ColonyTilesProvider>
   )
 }

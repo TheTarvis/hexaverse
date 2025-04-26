@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useColony } from '@/contexts/ColonyContext'
-import { clearAllTileCache, fetchTiles, updateTileCache } from '@/services/tiles'
+import { clearAllTileCache, fetchTiles, updateTileCache } from '@/services/colony/ColonyTilesService'
 import { Tile, TileMap, toTileMap } from '@/types/tiles'
 import { isTileMessage, WebSocketMessage } from '@/types/websocket'
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
@@ -14,7 +14,7 @@ import { isOwnTileUpdate, isViewableTileUpdate, isOpponentTakingTile } from '@/u
 import { handleOwnTile, handleViewableTile, handleOpponentTile, HandlerContext } from '@/utils/websocket/handlers'
 import { useTileMessageBuffer } from '@/hooks/useTileMessageBuffer'
 
-interface TileContextType {
+interface ColonyTilesContextType {
   isLoadingTiles: boolean
   colonyTiles: TileMap
   viewableTiles: TileMap
@@ -22,23 +22,23 @@ interface TileContextType {
   removeColonyTile: (tile: Tile) => void
 }
 
-const TileContext = createContext<TileContextType | undefined>(undefined)
+const ColonyTilesContext = createContext<ColonyTilesContextType | undefined>(undefined)
 
 // Helper function to fetch and merge neighbors
 async function fetchAndMergeNeighbors(
-  tile: Tile,
-  dispatch: React.Dispatch<TileAction>,
-  colonyTiles: TileMap,
-  viewableTiles: TileMap
+    tile: Tile,
+    dispatch: React.Dispatch<TileAction>,
+    colonyTiles: TileMap,
+    viewableTiles: TileMap
 ) {
   try {
     // 1) Calculate placeholders for viewable neighbors
     const tilesMap = toTileMap([tile]);
     const placeholders = Object.fromEntries(
-      Object.entries(findViewableTiles(tilesMap, 5))
-        .filter(([id]) => !(id in colonyTiles) && !(id in viewableTiles))
+        Object.entries(findViewableTiles(tilesMap, 5))
+            .filter(([id]) => !(id in colonyTiles) && !(id in viewableTiles))
     );
-    
+
     if (!Object.keys(placeholders).length) return;
 
     // Update with placeholders
@@ -53,8 +53,8 @@ async function fetchAndMergeNeighbors(
   }
 }
 
-// Custom hook to manage colony tiles loading
-function useColonyTiles(colony: Colony | null | undefined) {
+// Custom hook to manage colony tiles loading with reducer
+function useColonyTilesReducer(colony: Colony | null | undefined) {
   const [state, dispatch] = useReducer(tileReducer, {
     ...initialState,
     isDebugShowTiles: true // For development, can be set via configuration
@@ -69,7 +69,7 @@ function useColonyTiles(colony: Colony | null | undefined) {
       try {
         const tiles = await fetchTiles(colony.tileIds);
         if (canceled) return;
-        
+
         console.log(`Loaded ${tiles.length} tiles for the colony`);
         dispatch({ type: 'LOAD_COLONY_TILES', payload: tiles });
 
@@ -87,7 +87,7 @@ function useColonyTiles(colony: Colony | null | undefined) {
         clearAllTileCache();
         const fetchedView = await fetchTiles(Object.keys(initialView));
         if (canceled) return;
-        
+
         console.log(`Async fetch completed for ${fetchedView.length} viewable tiles.`);
         updateTileCache(fetchedView);
         dispatch({ type: 'MERGE_VIEWABLE_TILES', payload: fetchedView });
@@ -103,18 +103,18 @@ function useColonyTiles(colony: Colony | null | undefined) {
     return () => { canceled = true };
   }, [colony?.tileIds]);
 
-  return { 
+  return {
     state,
     dispatch
   };
 }
 
-export function TileProvider({ children }: { children: ReactNode }) {
+export function ColonyTilesProvider({ children }: { children: ReactNode }) {
   const { colony, fetchColonyColor } = useColony()
   const { user } = useAuth()
-  
+
   // Use the extracted hook to manage colony tiles with reducer
-  const { state, dispatch } = useColonyTiles(colony);
+  const { state, dispatch } = useColonyTilesReducer(colony);
   const { isLoading: isLoadingTiles, colonyTiles, viewableTiles, isDebugShowTiles } = state;
 
   // Create stable refs for dispatcher and state to use in callbacks
@@ -129,39 +129,39 @@ export function TileProvider({ children }: { children: ReactNode }) {
 
   // Callback to add a colony tile
   const addColonyTile = useCallback(
-    (tile: Tile) => {
-      // Add to colony tiles
-      dispatch({ type: 'ADD_COLONY_TILE', payload: tile });
+      (tile: Tile) => {
+        // Add to colony tiles
+        dispatch({ type: 'ADD_COLONY_TILE', payload: tile });
 
-      // Fetch neighbors using the helper function
-      fetchAndMergeNeighbors(
-        tile,
-        dispatch,
-        colonyTiles,
-        viewableTiles
-      );
-    },
-    [colonyTiles, dispatch, viewableTiles]
+        // Fetch neighbors using the helper function
+        fetchAndMergeNeighbors(
+            tile,
+            dispatch,
+            colonyTiles,
+            viewableTiles
+        );
+      },
+      [colonyTiles, dispatch, viewableTiles]
   );
 
   // Callback to remove a colony tile
   const removeColonyTile = useCallback(
-    (tile: Tile) => {
-      // Remove the tile from colonyTiles and add to viewableTiles
-      dispatch({ type: 'REMOVE_COLONY_TILE', payload: tile });
+      (tile: Tile) => {
+        // Remove the tile from colonyTiles and add to viewableTiles
+        dispatch({ type: 'REMOVE_COLONY_TILE', payload: tile });
 
-      // Fetch neighbors using the helper function
-      const updatedColonyTiles = { ...colonyTiles };
-      delete updatedColonyTiles[tile.id];
-      
-      fetchAndMergeNeighbors(
-        tile,
-        dispatch,
-        updatedColonyTiles,
-        viewableTiles
-      );
-    },
-    [colonyTiles, dispatch, viewableTiles]
+        // Fetch neighbors using the helper function
+        const updatedColonyTiles = { ...colonyTiles };
+        delete updatedColonyTiles[tile.id];
+
+        fetchAndMergeNeighbors(
+            tile,
+            dispatch,
+            updatedColonyTiles,
+            viewableTiles
+        );
+      },
+      [colonyTiles, dispatch, viewableTiles]
   );
 
   // Create handler context for the message handlers
@@ -186,11 +186,11 @@ export function TileProvider({ children }: { children: ReactNode }) {
   const processTileBatch = useCallback((tiles: Tile[]) => {
     // Update the tile cache for all tiles
     updateTileCache(tiles);
-    
+
     // Process each tile through the handlers
     tiles.forEach(async (tile) => {
       const ctx = handlerContext();
-      
+
       // Debug logging for tile processing
       console.log('Processing tile:', {
         tileId: tile.id,
@@ -204,7 +204,7 @@ export function TileProvider({ children }: { children: ReactNode }) {
         colonyTilesCount: Object.keys(ctx.state.colonyTiles).length,
         viewableTilesCount: Object.keys(ctx.state.viewableTiles).length
       });
-      
+
       // Create a dispatch table pattern for handlers
       const messageHandlers = [
         { match: () => isOwnTileUpdate(tile, user), run: () => handleOwnTile(tile, ctx) },
@@ -233,7 +233,7 @@ export function TileProvider({ children }: { children: ReactNode }) {
     if (isTileMessage(data) && data.payload) {
       const tile = data.payload;
       console.log(`WebSocket: Received tile update for tile at ${tile.q},${tile.r},${tile.s}`);
-      
+
       // Add the tile to the buffer instead of processing immediately
       bufferTileMessage(tile);
     }
@@ -252,13 +252,13 @@ export function TileProvider({ children }: { children: ReactNode }) {
     removeColonyTile,
   };
 
-  return <TileContext.Provider value={value}>{children}</TileContext.Provider>
+  return <ColonyTilesContext.Provider value={value}>{children}</ColonyTilesContext.Provider>
 }
 
-export function useTiles() {
-  const context = useContext(TileContext)
+export function useColonyTiles() {
+  const context = useContext(ColonyTilesContext)
   if (context === undefined) {
-    throw new Error('useTiles must be used within a TileProvider')
+    throw new Error('useColonyTiles must be used within a ColonyTilesProvider')
   }
   return context
 }

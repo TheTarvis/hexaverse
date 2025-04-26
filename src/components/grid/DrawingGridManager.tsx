@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { debounce } from 'lodash-es'; // Or your preferred debounce utility
 import { GridCanvas, SelectedTile } from '@/components/grid/GridCanvas'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWarmupFunctions } from '@/hooks/useWarmupFunctions'
@@ -80,7 +79,7 @@ export function DrawingGridManager() {
   }, [lastFetchCenter]);
 
   // Debounced function to check camera movement and fetch if needed
-  const fetchTilesAroundCamera = useCallback(debounce(async (cameraPos: [number, number, number]) => {
+  const fetchTilesAroundCamera = useCallback(async (cameraPos: [number, number, number]) => {
     if (isFetchingRef.current) return; // Check ref instead of state
 
     // 1. Convert camera's X/Y world position to fractional hex coordinates
@@ -131,7 +130,7 @@ export function DrawingGridManager() {
         isFetchingRef.current = false;
       }
     }
-  }, 50), []); // Debounce time is 50ms, dependencies removed
+  }, []); // Debounce time is 50ms, dependencies removed
 
   // Callback for GridCanvas camera movement
   const handleCameraMove = useCallback((pos: [number, number, number]) => {

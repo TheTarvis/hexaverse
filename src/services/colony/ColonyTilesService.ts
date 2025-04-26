@@ -1,7 +1,8 @@
 import { Tile } from '@/types/tiles';
 import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
-import { invalidateColonyCache, updateColonyCacheWithNewTile } from './colony/colony';
+import { invalidateColonyCache, updateColonyCacheWithNewTile } from './colony';
 import { auth, functions } from '@/config/firebase';
+import { makeWarmupable, createWarmupableRegistry } from '@/utils/functionUtils';
 
 // Types
 export interface AddTileRequest {
@@ -76,9 +77,9 @@ function saveToCache<T>(key: string, data: T): void {
 }
 
 // Create callable function references
-const addTileFunction = httpsCallable<AddTileRequest, AddTileResponse>(
+const addColonyTileFunction = httpsCallable<AddTileRequest, AddTileResponse>(
   functions, 
-  'addTile'
+  'addColonyTile'
 );
 
 const fetchTilesByIdsFunction = httpsCallable<FetchTilesByIdsRequest, FetchTilesByIdsResponse>(
@@ -286,7 +287,7 @@ export function updateTileCache(arg: Tile | Tile[]): void {
  * @param s S coordinate (axial coordinate system)
  * @returns Object containing success status and the new tile if successful
  */
-export async function addTile(
+export async function addColonyTile(
   q: number, 
   r: number, 
   s: number
@@ -294,16 +295,16 @@ export async function addTile(
   const coordinates = { q, r, s };
   
   try {
-    console.log(`Sending addTile request for coords: q=${q}, r=${r}, s=${s}`);
+    console.log(`Sending addColonyTile request for coords: q=${q}, r=${r}, s=${s}`);
     
     // Call the Firebase function
-    const result = await addTileFunction(coordinates);
+    const result = await addColonyTileFunction(coordinates);
     
     // Process successful response
     if (result.data.success) {
       handleSuccessfulTileAddition(result);
     } else {
-      console.error('Add tile failed:', result.data.message);
+      console.error('Add colony tile failed:', result.data.message);
     }
     
     return result.data;
@@ -316,7 +317,7 @@ export async function addTile(
  * Handle successful tile addition by invalidating relevant caches
  */
 function handleSuccessfulTileAddition(result: HttpsCallableResult<AddTileResponse>): void {
-  console.log(`Added tile succeeded`);
+  console.log(`Added colony tile succeeded`);
 
   // Get the current user ID
   const uid = auth.currentUser?.uid;
@@ -344,11 +345,11 @@ function handleSuccessfulTileAddition(result: HttpsCallableResult<AddTileRespons
  */
 function handleTileAdditionError(error: any, coordinates: AddTileRequest): AddTileResponse {
   const { q, r, s } = coordinates;
-  console.error(`Error adding tile at [${q},${r},${s}]:`, error);
+  console.error(`Error adding colony tile at [${q},${r},${s}]:`, error);
   
   // Parse the Firebase callable function error
   const errorCode = error.code || 'unknown';
-  const errorMessage = error.message || 'Unknown error adding tile';
+  const errorMessage = error.message || 'Unknown error adding colony tile';
   
   return {
     success: false,
@@ -357,18 +358,15 @@ function handleTileAdditionError(error: any, coordinates: AddTileRequest): AddTi
 }
 
 /**
- * Makes a dummy call to warm up the addTile cloud function.
- * This call is designed to be fast and explicit about being a warmup request.
- * @returns A promise that resolves when the warmup call completes
+ * Collection of warmupable cloud functions
  */
-export async function warmupAddTile(): Promise<void> {
-  try {
-    // Make an explicit warmup call
-    // @ts-expect-error TypeScript doesn't know we handle warmup-only requests
-    await addTileFunction({ warmup: true });
-    console.log('AddTile function warmed up');
-  } catch (error) {
-    // Log any unexpected errors during warmup
-    console.error('Error warming up addTile function:', error);
-  }
-} 
+export const WarmupableFunctions = createWarmupableRegistry({
+  addColonyTile: makeWarmupable('addColonyTile', addColonyTileFunction)
+});
+
+// Direct export of the warmup function
+export const warmupAddColonyTile = WarmupableFunctions.addColonyTile.warmup;
+
+// For backward compatibility - will be deprecated
+export const addTile = addColonyTile;
+export const warmupAddTile = warmupAddColonyTile; 

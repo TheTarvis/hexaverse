@@ -1,13 +1,13 @@
 import { Tile, TileMap, toTileMap } from '@/types/tiles';
-import { updateTileCache } from '@/services/tiles';
-import { removeColonyCacheWithTile } from '@/services/colony';
+import { updateTileCache } from '@/services/colony/ColonyTilesService';
+import { removeColonyCacheWithTile } from '@/services/colony/colony';
 import { User } from 'firebase/auth';
-import { TileState } from './predicates';
+import { ColonyTilesState } from './predicates';
 
 // Handler context interface - these are the dependencies needed by handlers
 export interface HandlerContext {
   user: User | null;
-  state: TileState;
+  state: ColonyTilesState;
   addColonyTile: (tile: Tile) => void;
   removeColonyTile: (tile: Tile) => void;
   setViewableTiles: React.Dispatch<React.SetStateAction<TileMap>>;

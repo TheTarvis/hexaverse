@@ -14,7 +14,7 @@ Context providers follow this pattern:
 - Export a provider component that wraps children with context
 - Export a custom hook to access context that throws if used outside provider
 
-Example: [TileContext.tsx](mdc:src/contexts/TileContext.tsx)
+Example: [ColonyTilesContext.tsx](mdc:src/contexts/ColonyTilesContext.tsx)
 
 ## Reducer Pattern
 

@@ -18,7 +18,7 @@ alwaysApply: true
 ## Key Entry Points
 
 - [layout.tsx](mdc:src/app/layout.tsx) - Root layout with provider hierarchy
-- [TileContext.tsx](mdc:src/contexts/TileContext.tsx) - Manages the game tiles state
+- [ColonyTilesContext.tsx](mdc:src/contexts/ColonyTilesContext.tsx) - Manages the game tiles state
 - [AuthContext.tsx](mdc:src/contexts/AuthContext.tsx) - Handles authentication
 - [ColonyContext.tsx](mdc:src/contexts/ColonyContext.tsx) - Manages colony data
 

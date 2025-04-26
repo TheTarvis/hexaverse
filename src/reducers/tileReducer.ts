@@ -1,7 +1,7 @@
 import { Tile, TileMap, toTileMap } from '@/types/tiles';
 
 // State interface for the tile reducer
-export interface TileState {
+export interface ColonyTilesState {
   isLoading: boolean;
   colonyTiles: TileMap;
   viewableTiles: TileMap;
@@ -9,7 +9,7 @@ export interface TileState {
 }
 
 // Initial state
-export const initialState: TileState = {
+export const initialState: ColonyTilesState = {
   isLoading: false,
   colonyTiles: {},
   viewableTiles: {},
@@ -30,7 +30,7 @@ export type TileAction =
   | { type: 'SET_DEBUG_MODE'; payload: boolean };
 
 // Reducer function
-export function tileReducer(state: TileState, action: TileAction): TileState {
+export function tileReducer(state: ColonyTilesState, action: TileAction): ColonyTilesState {
   switch (action.type) {
     case 'LOAD_START':
       return {

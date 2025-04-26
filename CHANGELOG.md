@@ -1,4 +1,13 @@
 # Changelog
+## [v0.12.2]
+### Changed
+- Refactored tile services architecture into modular structure
+- Created dedicated ColonyTilesService with improved caching
+- Reorganized colony services to use subdirectory structure
+- Enhanced tile fetching with better error handling and logging
+- Improved viewable tiles calculation and management
+- Added support for efficient batch processing of tile messages
+
 ## [v0.12.1]
 ### Fixed
 - Fixed click handling in GridCanvas by adding an invisible background plane to catch all clicks

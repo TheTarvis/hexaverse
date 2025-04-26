@@ -1,6 +1,6 @@
 import React from 'react';
 import { useColony } from '@/contexts/ColonyContext';
-import { invalidateColonyCache } from '@/services/colony';
+import { invalidateColonyCache } from '@/services/colony/colony';
 import { useAuth } from '@/contexts/AuthContext';
 import {clearAllTileCache} from "@/services/tiles";
 

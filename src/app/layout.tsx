@@ -1,6 +1,5 @@
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ColonyProvider } from '@/contexts/ColonyContext'
-import { TileProvider } from '@/contexts/TileContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { WebSocketProvider } from '@/contexts/WebSocketContext'
 import { getEvents } from '@/data'
@@ -40,9 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <AuthProvider>
             <WebSocketProvider>
               <ColonyProvider>
-                <TileProvider>
-                  <ApplicationLayout events={events}>{children}</ApplicationLayout>
-                </TileProvider>
+                <ApplicationLayout events={events}>{children}</ApplicationLayout>
               </ColonyProvider>
             </WebSocketProvider>
           </AuthProvider>
