@@ -13,21 +13,21 @@ const pubSubClient = new PubSub({
   projectId: process.env.PUBSUB_PROJECT_ID || 'hexaverse'
 });
 
-// Topic ID for websocket events
-const topicName = process.env.PUBSUB_TOPIC_ID || 'websocket-events';
-
+// TODO TW: Refactor this have a centralized publish event
 /**
  * Publishes events to PubSub for WebSocket communication
  * @param eventType Type of event to publish
  * @param data Event data payload
+ * @param topicName Topic we're sending the even to.
  * @param scope Scope of the message ('broadcast' or 'direct')
  * @param recipientId Optional recipient ID for direct messages
  */
 async function publishEvent(
   eventType: string, 
   data: any, 
+  topicName: string,
   scope: 'broadcast' | 'direct' = 'broadcast',
-  recipientId?: string
+  recipientId?: string,
 ): Promise<string> {
   try {
     // Create message payload
@@ -45,6 +45,7 @@ async function publishEvent(
     }
     
     // Publish to PubSub
+    logger.info(`Publishing ${scope} message to ${topicName} `);
     const messageId = await pubSubClient.topic(topicName).publish(dataBuffer, attributes);
     logger.info(`Published ${scope} message to ${topicName} with ID: ${messageId}${recipientId ? `, recipient: ${recipientId}` : ''}`);
     
@@ -100,7 +101,7 @@ export const addColonyTile = onCall({
     }
     
     // Fetch the user's colony
-    const coloniesRef = admin.firestore().collection('colonies');
+    const coloniesRef = admin.firestore().collection('colony/v1/colonies');
     const colonyQuery = await coloniesRef.where('uid', '==', uid).get();
     tracker.trackRead('colonyQuery', colonyQuery.size);
     
@@ -127,7 +128,7 @@ export const addColonyTile = onCall({
     const batch = admin.firestore().batch();
     
     // Check if the tile exists in the database first
-    const tileRef = admin.firestore().collection('tiles').doc(tileId);
+    const tileRef = admin.firestore().collection('colony/v1/tiles').doc(tileId);
     const tileDoc = await tileRef.get();
     tracker.trackRead('tileDocGet', 1);
     
@@ -223,7 +224,8 @@ export const addColonyTile = onCall({
 
     try {
       // Publish broadcast message for tile update
-      await publishEvent('TILE_UPDATED', eventData);
+      // TODO TW: Move the topic name to some where better
+      await publishEvent('TILE_UPDATED', eventData, 'colony-events');
 
     } catch (pubsubError) {
       // Log the error but don't fail the function
@@ -273,13 +275,13 @@ export const addColonyTile = onCall({
  * 2. Fetches all tiles in a single batch
  * 3. Returns the array of tiles
  */
-export const fetchTilesByIds = onCall({
+export const fetchColonyTilesByIds = onCall({
   region: functionConfig.region,
   timeoutSeconds: functionConfig.defaultTimeoutSeconds,
   memory: functionConfig.memory
 }, async (request) => {
   // Create a tracker for this function call
-  const tracker = new ReadCostTracker('fetchTilesByIds');
+  const tracker = new ReadCostTracker('fetchColonyTilesByIds');
   
   try {
     // Authenticate the request and get the user ID
@@ -302,7 +304,7 @@ export const fetchTilesByIds = onCall({
     // }
 
     // Get document references for all tile IDs
-    const tileRefs = tileIds.map(tileId => admin.firestore().doc(`tiles/${tileId}`));
+    const tileRefs = tileIds.map(tileId => admin.firestore().doc(`colony/v1/tiles/${tileId}`));
     
     // Fetch all documents in a single batch
     const tileSnapshots = await admin.firestore().getAll(...tileRefs);
@@ -329,7 +331,7 @@ export const fetchTilesByIds = onCall({
       count: tiles.length
     };
   } catch (error) {
-    logger.error("Error fetching tiles by IDs:", error);
+    logger.error("Error fetching colony tiles by IDs:", error);
     
     // If the error is already an HttpsError, rethrow it
     if (error instanceof HttpsError) {

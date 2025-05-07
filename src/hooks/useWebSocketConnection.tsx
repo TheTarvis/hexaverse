@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { getWebSocketEndpoint, checkHealth } from '@/services/websocket';
+import {getWebSocketEndpoint, checkHealth, addAuth, COLONY_WEBSOCKET_URL} from '@/services/websocket';
 import { useAuth } from '@/contexts/AuthContext';
 
 // WebSocket connection states
@@ -19,6 +19,7 @@ let globalWsInstance: WebSocket | null = null;
 let globalWsConnecting = false;
 let globalLastConnectionAttempt = 0;
 const CONNECTION_COOLDOWN_MS = 5000; // 5 second cooldown between connection attempts
+let globalServerUrl: string = COLONY_WEBSOCKET_URL;
 
 let globalIsConnected = false;
 let globalConnectionState = ConnectionState.INITIAL;
@@ -42,6 +43,7 @@ interface WebSocketConnectionOptions {
   reconnectInterval?: number;
   autoReconnect?: boolean;
   autoConnect?: boolean;
+  initialServerUrl?: string | null;
 }
 
 export const useWebSocketConnection = ({
@@ -49,13 +51,37 @@ export const useWebSocketConnection = ({
   reconnectInterval = 3000,
   autoReconnect = false,
   autoConnect = true,
+  initialServerUrl = null,
 }: WebSocketConnectionOptions = {}) => {
   const [isConnected, setIsConnected] = useState(globalIsConnected);
   const [connectionState, setConnectionState] = useState<ConnectionState>(globalConnectionState);
+  const [serverUrl, setServerUrlState] = useState<string | null>(initialServerUrl || globalServerUrl);
   const reconnectCount = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const { user, isLoading: isAuthLoading } = useAuth();
   const hasAttemptedInitialConnection = useRef(false);
+
+  // Initialize global server URL if provided and not already set
+  useEffect(() => {
+    if (initialServerUrl && !globalServerUrl) {
+      globalServerUrl = initialServerUrl;
+    }
+  }, [initialServerUrl]);
+
+  // Function to update the server URL
+  const setServerUrl = useCallback((url: string) => {
+    console.log(`Setting WebSocket server URL to: ${url}`);
+    globalServerUrl = url;
+    setServerUrlState(url);
+    
+    // If already connected, disconnect and reconnect with new URL
+    if (globalWsInstance) {
+      console.log('Reconnecting to new server URL...');
+      disconnect();
+      // Short delay to ensure disconnect completes before reconnecting
+      setTimeout(() => connect(), 300);
+    }
+  }, []);
 
   // Subscribe to global state changes
   useEffect(() => {
@@ -120,14 +146,12 @@ export const useWebSocketConnection = ({
       globalWsConnecting = true;
       updateGlobalState(false, ConnectionState.CONNECTING);
 
-      const endpoint = await getWebSocketEndpoint();
-      console.log(`Connecting to WebSocket at ${endpoint} with token...`);
+
+        // Add authentication to the provided URL
+      let endpoint = await getWebSocketEndpoint(globalServerUrl);
+      console.log(`Connecting to authenticated WebSocket at ${endpoint.substring(0, endpoint.includes('token') ? 50 : endpoint.length)}${endpoint.includes('token') ? '...' : ''}`);
       
-      // Append token as query parameter
-      const wsUrl = new URL(endpoint);
-      wsUrl.searchParams.append('token', await user.getIdToken())
-      
-      globalWsInstance = new WebSocket(wsUrl.toString());
+      globalWsInstance = new WebSocket(endpoint);
 
       globalWsInstance.onopen = () => {
         console.log(`WebSocket connected successfully to ${endpoint}`);
@@ -233,7 +257,7 @@ export const useWebSocketConnection = ({
             reconnectCount.current += 1;
             connect();
           } else {
-            const healthy = await checkHealth();
+            const healthy = await checkHealth(globalServerUrl);
             if (healthy) {
               console.log('WebSocket health check passed, attempting reconnect...');
               reconnectCount.current += 1;
@@ -258,6 +282,8 @@ export const useWebSocketConnection = ({
     connectionState,
     connect,
     disconnect,
+    serverUrl,
+    setServerUrl,
     sendMessage: useCallback((data: any) => {
       if (!globalWsInstance || globalWsInstance.readyState !== WebSocket.OPEN) {
         console.warn(`WebSocket is not connected. Current state: ${globalWsInstance ? globalWsInstance.readyState : 'null'}`);

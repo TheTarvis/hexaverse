@@ -60,3 +60,68 @@ This allows you to test admin functionality without affecting your production Fi
 ### Security Note
 
 Keep your `serviceAccountKey.json` secure and never commit it to version control. This file contains credentials with administrative access to your Firebase project. 
+
+## Migrating Collections
+
+The `migrate-collections.js` script helps you migrate data between Firestore collections, specifically:
+- From `/tiles` to `/colony/v1/tiles`
+- From `/colonies` to `/colony/v1/colonies`
+
+This is useful for updating your database structure while preserving all existing data.
+
+### Usage
+
+```bash
+# Migrate collections in production (LIVE run - will write data)
+npm run migrate
+
+# Migrate collections connecting to local emulator
+npm run migrate:dev
+
+# Test migration in production without writing data (dry run)
+npm run migrate:dry-run
+
+# Test migration with local emulator without writing data
+npm run migrate:dev:dry-run
+```
+
+### Features
+
+- **Batch Processing**: Efficiently processes documents in batches of 500 (Firestore limit)
+- **Dry Run Mode**: Test migrations without actually writing data
+- **Progress Reporting**: Shows detailed progress of the migration
+- **Error Handling**: Gracefully handles and reports errors
+- **Emulator Support**: Can connect to local Firestore emulator
+
+### Example Output
+
+```
+🔄 Starting collection migration in PRODUCTION mode
+⚠️ LIVE RUN - Data will be written
+
+📦 Starting migration: tiles -> colony/v1/tiles
+📄 Found 250 documents to migrate
+📝 Prepared final batch of 250 documents (total: 250)
+🚀 Committing 1 batches...
+✅ Successfully migrated 250 documents from 'tiles' to 'colony/v1/tiles'
+
+📦 Starting migration: colonies -> colony/v1/colonies
+📄 Found 50 documents to migrate
+📝 Prepared final batch of 50 documents (total: 50)
+🚀 Committing 1 batches...
+✅ Successfully migrated 50 documents from 'colonies' to 'colony/v1/colonies'
+
+--- 📊 Migration Summary ---
+📦 Collections processed: 2
+📦 Collections successfully migrated: 2/2
+📄 Total documents processed: 300
+❌ Errors encountered: 0
+
+✅ Migration completed successfully!
+```
+
+### Notes
+
+- The script preserves document IDs from the source collections
+- It migrates all fields from each document
+- When running in production, always do a dry run first to ensure everything is as expected 

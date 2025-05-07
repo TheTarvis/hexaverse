@@ -3,3 +3,6 @@
 /functions/lib/
 
 # Add more patterns as needed 
+
+# Do not run deploys
+*deploy*

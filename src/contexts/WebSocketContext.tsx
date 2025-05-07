@@ -10,18 +10,22 @@ interface WebSocketContextType {
   sendMessage: (data: any) => void;
   connect: () => Promise<void>;
   disconnect: () => void;
+  setServerUrl: (url: string) => void;
+  serverUrl: string | null;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
 export function WebSocketProvider({ 
   children,
+  initialServerUrl = null,
   autoConnect = true,
   autoReconnect = true,
   reconnectAttempts = 5,
   reconnectInterval = 3000,
 }: { 
   children: ReactNode;
+  initialServerUrl?: string | null;
   autoConnect?: boolean;
   autoReconnect?: boolean;
   reconnectAttempts?: number;
@@ -32,8 +36,11 @@ export function WebSocketProvider({
     connectionState, 
     sendMessage,
     connect,
-    disconnect
+    disconnect,
+    setServerUrl,
+    serverUrl
   } = useWebSocketConnection({
+    initialServerUrl,
     autoConnect,
     autoReconnect,
     reconnectAttempts,
@@ -46,7 +53,9 @@ export function WebSocketProvider({
       connectionState,
       sendMessage,
       connect,
-      disconnect
+      disconnect,
+      setServerUrl,
+      serverUrl
     }}>
       {children}
     </WebSocketContext.Provider>

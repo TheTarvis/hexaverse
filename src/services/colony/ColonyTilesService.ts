@@ -82,9 +82,9 @@ const addColonyTileFunction = httpsCallable<AddTileRequest, AddTileResponse>(
   'addColonyTile'
 );
 
-const fetchTilesByIdsFunction = httpsCallable<FetchTilesByIdsRequest, FetchTilesByIdsResponse>(
+const fetchColonyTilesByIdsFunction = httpsCallable<FetchTilesByIdsRequest, FetchTilesByIdsResponse>(
   functions,
-  'fetchTilesByIds'
+  'fetchColonyTilesByIds'
 );
 
 /**
@@ -135,7 +135,7 @@ export async function fetchTiles(
       console.log(`Fetching ${missingTileIds.length} tiles using fetchTilesByIds cloud function...`);
       
       // Call the cloud function with all missing tile IDs
-      const result = await fetchTilesByIdsFunction({ tileIds: missingTileIds });
+      const result = await fetchColonyTilesByIdsFunction({ tileIds: missingTileIds });
       
       if (result.data.success) {
         // Add the fetched tiles
@@ -369,4 +369,3 @@ export const warmupAddColonyTile = WarmupableFunctions.addColonyTile.warmup;
 
 // For backward compatibility - will be deprecated
 export const addTile = addColonyTile;
-export const warmupAddTile = warmupAddColonyTile; 

@@ -401,7 +401,7 @@ export function GridCanvas({
         enableZoom={true}
         enableRotate={false}
         minDistance={5}
-        maxDistance={800}
+        maxDistance={250}
         panSpeed={1.5}
         zoomSpeed={1.2}
         dampingFactor={0.1}

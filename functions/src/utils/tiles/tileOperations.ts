@@ -73,7 +73,7 @@ export function generateInitialTiles(
 export async function saveTilesToFirestore(tiles: ColonyTile[]): Promise<string[]> {
   // Create a batch to handle multiple writes efficiently
   const batch = admin.firestore().batch();
-  const tilesCollection = admin.firestore().collection('tiles');
+  const tilesCollection = admin.firestore().collection('colony/v1/tiles');
   
   // Track tile IDs for return
   const tileIds: string[] = [];
@@ -107,7 +107,7 @@ export async function getTilesByIds(tileIds: string[]): Promise<ColonyTile[]> {
   
   for (let i = 0; i < tileIds.length; i += batchSize) {
     const batch = tileIds.slice(i, i + batchSize);
-    const tilesRef = admin.firestore().collection('tiles');
+    const tilesRef = admin.firestore().collection('colony/v1/tiles');
     const snapshot = await tilesRef.where(admin.firestore.FieldPath.documentId(), 'in', batch).get();
     
     // Track the reads - each document returned counts as 1 read

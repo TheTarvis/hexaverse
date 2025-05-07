@@ -47,20 +47,7 @@ export function getTileColor(
 
   // Enhanced Viewable tile coloring based on distance
   if (tile.visibility == 'unexplored' && options?.distance !== undefined) {
-    // Calculate the brightness based on view distance
-    // Closer tiles are brighter, further tiles are darker
-    const maxDistance = 3; // Adjust based on your typical view depth
-    const baseBrightness = 0.3; // Base brightness of the closest viewable tile
-    const minBrightness = 0.05; // Minimum brightness of the furthest viewable tile
-    
-    // Calculate the brightness factor: 1.0 for closest, approaching 0 for furthest
-    const distanceFactor = Math.max(0, 1 - (options.distance - 1) / maxDistance);
-    
-    // Calculate final brightness
-    const brightness = minBrightness + (baseBrightness - minBrightness) * distanceFactor;
-    
-    // Dark violet with variable brightness
-    return new THREE.Color(brightness * 0.7, brightness * 0.7, brightness).getStyle();
+    return '#646464';
   }
   
   if (options?.colorScheme === 'monochrome') {

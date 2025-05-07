@@ -5,7 +5,11 @@
   "private": true,
   "scripts": {
     "set-admin": "node set-admin-claims.js",
-    "set-admin:dev": "node set-admin-claims.js --dev"
+    "set-admin:dev": "node set-admin-claims.js --dev",
+    "migrate": "node migrate-collections.js",
+    "migrate:dev": "node migrate-collections.js --dev",
+    "migrate:dry-run": "node migrate-collections.js --dry-run",
+    "migrate:dev:dry-run": "node migrate-collections.js --dev --dry-run"
   },
   "dependencies": {
     "firebase-admin": "^11.10.1"

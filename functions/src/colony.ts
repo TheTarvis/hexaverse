@@ -109,7 +109,7 @@ export const createColony = onCall({
     }
     
     // Create a document reference with auto-generated ID
-    const colonyRef = admin.firestore().collection('colonies').doc();
+    const colonyRef = admin.firestore().collection('colony/v1/colonies').doc();
     
     // Find spawn location
     const startCoordinates = await findSpawnLocation();

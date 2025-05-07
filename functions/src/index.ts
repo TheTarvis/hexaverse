@@ -4,7 +4,7 @@ import * as admin from "firebase-admin";
 
 // Import functions from other files
 import { createColony } from "./colony";
-import { addColonyTile, fetchTilesByIds } from "./tiles";
+import { addColonyTile, fetchColonyTilesByIds } from "./colonyTiles";
 import { addRoadmapItem, updateRoadmapItem, deleteRoadmapItem } from "./roadmap";
 import { submitSupportRequest } from "./support";
 
@@ -44,7 +44,7 @@ export const makeUppercase = onDocumentCreated("messages/{documentId}", (event) 
 export {
   createColony,
   addColonyTile,
-  fetchTilesByIds,
+  fetchColonyTilesByIds,
   addRoadmapItem,
   updateRoadmapItem,
   deleteRoadmapItem,

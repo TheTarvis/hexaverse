@@ -13,7 +13,7 @@ service cloud.firestore {
     }
 
     // Allow users to read their own colony and perform queries on uid field
-    match /colonies/{colonyId} {
+    match /colony/v1/colonies/{colonyId} {
       allow read: if request.auth != null;
       allow write: if isRequestFromCloudFunction();
       // Allow querying colonies by uid

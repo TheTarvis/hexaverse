@@ -1,4 +1,13 @@
 # Changelog
+## [v0.12.3]
+### Added
+- Added ability to switch websocket servers.
+- Added script to migrate colony data into new location in firestore.
+
+### Changed
+- Renamed most tile references to be specific to colony.
+- Adding in drawing manager.
+
 ## [v0.12.2]
 ### Changed
 - Refactored tile services architecture into modular structure

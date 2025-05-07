@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription';
 import { useWebSocketContext } from '@/contexts/WebSocketContext';
-import { checkHealth, getWebSocketEndpoint, testAuthentication } from '@/services/websocket';
+import {checkHealth, COLONY_WEBSOCKET_URL, getWebSocketEndpoint, testAuthentication} from '@/services/websocket';
 import { getAuthToken } from '@/services/auth';
 import { WebSocketMessage, createPingMessage } from '@/types/websocket';
 import { useAuth } from '@/contexts/AuthContext';
@@ -83,7 +83,7 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
     setHealthStatus('Checking...');
     
     try {
-      const isHealthy = await checkHealth();
+      const isHealthy = await checkHealth(COLONY_WEBSOCKET_URL);
       setHealthStatus(isHealthy ? 'Healthy' : 'Unhealthy');
     } catch (error) {
       console.error('Error checking health:', error);
@@ -114,7 +114,9 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
       }
       
       // Get the full endpoint URL
-      const endpoint = await getWebSocketEndpoint();
+      // TODO TW: Update this to use w/e the global websocket server is eventually.
+      // Might just kill the debugger?
+      const endpoint = await getWebSocketEndpoint(COLONY_WEBSOCKET_URL);
       setEndpointUrl(endpoint);
     } catch (error) {
       console.error('Error checking auth token:', error);

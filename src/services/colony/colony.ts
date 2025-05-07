@@ -99,7 +99,7 @@ export async function fetchUserColony(
   
   try {
     console.log(`Fetching colony for user: ${uid}`);
-    const coloniesRef = collection(firestore, 'colonies');
+    const coloniesRef = collection(firestore, 'colony/v1/colonies');
     const q = query(coloniesRef, where('uid', '==', uid));
     const querySnapshot = await getDocs(q);
     
@@ -107,7 +107,7 @@ export async function fetchUserColony(
       console.log('No colony found for this user');
       return null;
     }
-    
+    console.log(`Found colony for user: ${uid}`);
     // Take the first colony found
     const colonyDoc = querySnapshot.docs[0];
     const colonyData = colonyDoc.data();

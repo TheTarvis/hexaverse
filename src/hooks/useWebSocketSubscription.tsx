@@ -16,7 +16,7 @@ export const useWebSocketSubscription = <T = any>({
   onConnect,
   onDisconnect,
 }: WebSocketSubscriptionOptions<T> = {}) => {
-  const { isConnected, connectionState, sendMessage } = useWebSocketContext();
+  const { isConnected, connectionState, sendMessage, setServerUrl, serverUrl } = useWebSocketContext();
 
   // Handle messages
   useEffect(() => {
@@ -43,5 +43,7 @@ export const useWebSocketSubscription = <T = any>({
     isConnected,
     connectionState,
     sendMessage,
+    setServerUrl,
+    serverUrl,
   };
 }; 

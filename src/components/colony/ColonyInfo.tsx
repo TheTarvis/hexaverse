@@ -2,7 +2,7 @@ import React from 'react';
 import { useColony } from '@/contexts/ColonyContext';
 import { invalidateColonyCache } from '@/services/colony/colony';
 import { useAuth } from '@/contexts/AuthContext';
-import {clearAllTileCache} from "@/services/tiles";
+import {clearAllColonyTileCache} from "@/services/DrawingTilesService";
 
 export function ColonyInfo() {
   const { colony, isLoadingColony, error, refreshColony } = useColony();
@@ -17,7 +17,7 @@ export function ColonyInfo() {
   const handleClearCache = () => {
     if (user && user.uid) {
       invalidateColonyCache(user.uid);
-      clearAllTileCache()
+      clearAllColonyTileCache()
       refreshColony();
     }
   };

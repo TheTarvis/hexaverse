@@ -12,13 +12,26 @@ import { TileMap } from '@/types/tiles'
 import { getTileColor } from '@/utils/tileColorUtils'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWarmupFunctions } from '@/hooks/useWarmupFunctions'
+import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
+import { COLONY_WEBSOCKET_URL } from '@/services/websocket'
 
 // Inner component that uses the colony context
 function ColonyGridInner() {
-  const { colony, fetchColonyColor, setColony, colonyStatus, isLoadingColony, userColorMap } = useColony()
+  const { colony, fetchColonyColor, colonyStatus, isLoadingColony, userColorMap } = useColony()
   const { colonyTiles, viewableTiles, addColonyTile, isLoadingTiles } = useColonyTiles()
   const { showToast } = useToast()
   const { user, isAdmin } = useAuth()
+  
+  // Setup WebSocket connection with the provided URL
+  const { setServerUrl } = useWebSocketSubscription();
+
+  // Set WebSocket server URL only once when component mounts
+  useEffect(() => {
+    if (COLONY_WEBSOCKET_URL) {
+      console.log(`Setting WebSocket base URL for ColonyGrid: ${COLONY_WEBSOCKET_URL}`);
+      setServerUrl(COLONY_WEBSOCKET_URL);
+    }
+  }, [COLONY_WEBSOCKET_URL, setServerUrl]);
 
   // Warm up cloud functions
   useWarmupFunctions([WarmupableFunctions.addColonyTile])
