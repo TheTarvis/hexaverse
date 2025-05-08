@@ -14,11 +14,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWarmupFunctions } from '@/hooks/useWarmupFunctions'
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
 import { COLONY_WEBSOCKET_URL } from '@/services/websocket'
+import { useHexGridCamera } from '@/hooks/useHexGridCamera'
 
 // Inner component that uses the colony context
 function ColonyGridInner() {
   const { colony, fetchColonyColor, colonyStatus, isLoadingColony, userColorMap } = useColony()
-  const { colonyTiles, viewableTiles, addColonyTile, isLoadingTiles } = useColonyTiles()
+  const { colonyTiles, addColonyTile, isLoadingTiles } = useColonyTiles()
   const { showToast } = useToast()
   const { user, isAdmin } = useAuth()
   
@@ -43,6 +44,12 @@ function ColonyGridInner() {
     viewDistance: 5, // Controls how many hex layers beyond the colony edge are shown as viewable tiles
     tileDetailsEnabled: false, // Disabled by default
   })
+
+  // Use the centralized camera logic from the hook
+  const { tileMap: generatedTiles, isFetching, handleCameraMove } = useHexGridCamera({
+    hexSize: debugState.hexSize,
+    radius: 20,
+  });
 
   // Add state to store fetched colors
   const [colorCache, setColorCache] = useState<Record<string, string>>({})
@@ -83,29 +90,11 @@ function ColonyGridInner() {
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
   const [addingTile, setAddingTile] = useState(false)
 
-  // Compute the tileMap using useMemo based on dependencies
+  // Compute the final tileMap using useMemo based on dependencies
   const tileMap = useMemo(() => {
-    // Initialize with viewable tiles, excluding any already in colonyTiles
-    const baseMap: TileMap = {}
-    Object.entries(viewableTiles)
-      .filter(([key]) => !colonyTiles[key])
-      .forEach(([key, tile]) => {
-        // Get enemy color with validation
-        const enemyColor = tile.controllerUid && typeof tile.controllerUid === 'string'
-          ? colorCache[tile.controllerUid] || '#FF3333'
-          : '#FF3333';
-          
-        baseMap[key] = {
-          ...tile,
-          color: getTileColor(tile, user?.uid, {
-            colorScheme: debugState.colorScheme,
-            colonyColor: colony?.color,
-            distance: debugState.viewDistance, 
-            enemyColor: enemyColor,
-          }),
-        }
-      })
-
+    // Start with the auto-generated background tiles
+    const baseMap: TileMap = { ...generatedTiles };
+    
     // Add or update colony tiles, always recalculating color
     Object.entries(colonyTiles).forEach(([key, tile]) => {
       // Get enemy color with validation
@@ -125,21 +114,13 @@ function ColonyGridInner() {
     })
 
     return baseMap
-  }, [colonyTiles, viewableTiles, debugState, colony?.color, user?.uid, colorCache])
+  }, [generatedTiles, colonyTiles, debugState, colony?.color, user?.uid, colorCache])
 
   // Load colors for tiles with controllers
   useEffect(() => {
     const controllerUids = new Set<string>();
     
     // Collect all unique controller UIDs with validation
-    Object.values(viewableTiles).forEach(tile => {
-      if (tile.controllerUid && 
-          typeof tile.controllerUid === 'string' && 
-          !colorCache[tile.controllerUid]) {
-        controllerUids.add(tile.controllerUid);
-      }
-    });
-    
     Object.values(colonyTiles).forEach(tile => {
       if (tile.controllerUid && 
           typeof tile.controllerUid === 'string' && 
@@ -168,7 +149,7 @@ function ColonyGridInner() {
     if (controllerUids.size > 0) {
       fetchColors();
     }
-  }, [viewableTiles, colonyTiles, fetchColonyColor, colorCache]);
+  }, [colonyTiles, fetchColonyColor, colorCache]);
 
   // Handle adding a tile to the colony
   const onAddTile = useCallback(
@@ -323,8 +304,15 @@ function ColonyGridInner() {
           {...cameraProps}
           onTileSelect={handleTileSelect}
           onTileAdd={onAddTile}
-          onCameraStop={(pos) => {}} // Empty handler to satisfy the interface
+          onCameraStop={handleCameraMove} 
         />
+      )}
+      
+      {/* Loading indicator for tile generation */}
+      {isFetching && (
+        <div className="absolute top-2 left-2 bg-yellow-500 text-black p-2 rounded z-10">
+          Loading map area...
+        </div>
       )}
     </div>
   )

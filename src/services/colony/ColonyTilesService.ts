@@ -1,91 +1,25 @@
 import { Tile } from '@/types/tiles';
-import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
+import { HttpsCallableResult } from 'firebase/functions';
 import { invalidateColonyCache, updateColonyCacheWithNewTile } from './colony';
-import { auth, functions } from '@/config/firebase';
+import { auth } from '@/config/firebase';
 import { makeWarmupable, createWarmupableRegistry } from '@/utils/functionUtils';
+import { CACHE_TYPES } from '@/utils/tileCache';
+import {
+  AddTileRequest,
+  AddTileResponse,
+  FetchTilesByIdsRequest,
+  FetchTilesByIdsResponse,
+  TileCacheManager,
+  handleTileAdditionError,
+  createTileFunction
+} from '../TilesBaseService';
 
-// Types
-export interface AddTileRequest {
-  q: number;
-  r: number; 
-  s: number;
-  warmup?: boolean;
-}
-
-export interface AddTileResponse {
-  success: boolean;
-  tile?: Tile;
-  message?: string;
-  captured?: boolean;
-  previousOwner?: string;
-  previousColony?: string;
-}
-
-export interface FetchTilesByIdsRequest {
-  tileIds: string[];
-}
-
-export interface FetchTilesByIdsResponse {
-  success: boolean;
-  tiles: Tile[];
-  count: number;
-}
-
-// Cache configuration
-const TILES_CACHE_EXPIRY = 10 * 60 * 1000; // 10 minutes in milliseconds
-
-// Cache keys
-const getTilesCacheKey = (tileIds: string[]) => `tiles_${tileIds.sort().join('_')}`;
-
-/**
- * Get from cache helper
- */
-function getFromCache<T>(key: string, expiryTime: number): T | null {
-  try {
-    const cachedItem = localStorage.getItem(key);
-    if (!cachedItem) return null;
-    
-    const { data, timestamp } = JSON.parse(cachedItem);
-    const now = Date.now();
-    
-    if (now - timestamp > expiryTime) {
-      // Cache expired
-      localStorage.removeItem(key);
-      return null;
-    }
-    
-    return data;
-  } catch (error) {
-    console.warn('Error reading from cache:', error);
-    return null;
-  }
-}
-
-/**
- * Save to cache helper
- */
-function saveToCache<T>(key: string, data: T): void {
-  try {
-    const cacheItem = {
-      data,
-      timestamp: Date.now()
-    };
-    localStorage.setItem(key, JSON.stringify(cacheItem));
-  } catch (error) {
-    console.warn('Error saving to cache:', error);
-  }
-}
+// Create cache manager instance
+const colonyTileCacheManager = new TileCacheManager(CACHE_TYPES.COLONY);
 
 // Create callable function references
-const addColonyTileFunction = httpsCallable<AddTileRequest, AddTileResponse>(
-  functions, 
-  'addColonyTile'
-);
-
-const fetchColonyTilesByIdsFunction = httpsCallable<FetchTilesByIdsRequest, FetchTilesByIdsResponse>(
-  functions,
-  'fetchColonyTilesByIds'
-);
+const addColonyTileFunction = createTileFunction<AddTileRequest, AddTileResponse>('addColonyTile');
+const fetchColonyTilesByIdsFunction = createTileFunction<FetchTilesByIdsRequest, FetchTilesByIdsResponse>('fetchColonyTilesByIds');
 
 /**
  * Fetch tiles by their IDs
@@ -101,20 +35,15 @@ export async function fetchTiles(
 ): Promise<Tile[]> {
   if (!tileIds.length) return [];
 
-  const foundTiles: Tile[] = [];
-  const missingTileIds: string[] = [];
+  let foundTiles: Tile[] = [];
+  let missingTileIds: string[] = [];
 
   // Check cache for individual tiles if not forcing refresh
   if (!options?.forceRefresh && typeof window !== 'undefined') {
-    tileIds.forEach(id => {
-      const cacheKey = `tile_${id}`; // Individual cache key
-      const cachedTile = getFromCache<Tile>(cacheKey, TILES_CACHE_EXPIRY);
-      if (cachedTile) {
-        foundTiles.push(cachedTile);
-      } else {
-        missingTileIds.push(id);
-      }
-    });
+    // Use the cache manager to get tiles
+    const cacheResult = colonyTileCacheManager.getTilesFromCache(tileIds);
+    foundTiles = cacheResult.foundTiles;
+    missingTileIds = cacheResult.missingTileIds;
 
     console.log(`Found ${foundTiles.length} tiles in individual cache. Missing ${missingTileIds.length}.`);
 
@@ -124,7 +53,7 @@ export async function fetchTiles(
     }
   } else {
     // If forcing refresh, all IDs are considered missing
-    missingTileIds.push(...tileIds);
+    missingTileIds = [...tileIds];
   }
 
   // Fetch missing tiles from Cloud Function
@@ -186,27 +115,14 @@ export async function fetchTiles(
         console.error('Error fetching tiles:', result.data);
       }
       
-      // Cache the newly fetched tiles individually
-      if (typeof window !== 'undefined') {
-        fetchedTiles.forEach(tile => {
-          const cacheKey = `tile_${tile.id}`;
-          saveToCache(cacheKey, tile);
-        });
-        console.log(`Cached ${fetchedTiles.length} individual tiles.`);
+      // Cache the newly fetched tiles
+      if (fetchedTiles.length > 0) {
+        updateTileCache(fetchedTiles);
       }
     }
 
     // Combine cached and newly fetched tiles
-    const allTiles = [...foundTiles, ...fetchedTiles];
-    
-    // Optional: Update the combined cache key as well for potential future optimizations?
-    // For now, we rely purely on individual caches primarily.
-    // if (typeof window !== 'undefined' && allTiles.length > 0) {
-    //   const combinedCacheKey = getTilesCacheKey(tileIds); // Original combined key
-    //   saveToCache(combinedCacheKey, allTiles);
-    // }
-
-    return allTiles;
+    return [...foundTiles, ...fetchedTiles];
 
   } catch (error) {
     console.error('Error fetching missing tiles:', error);
@@ -216,68 +132,21 @@ export async function fetchTiles(
 }
 
 /**
- * Clear all tile cache entries
- * Use this when you want to completely reset the tile cache
+ * Clear all colony tile cache entries
+ * Use this when you want to completely reset the colony tile cache
  */
 export function clearAllTileCache(): void {
-  if (typeof window === 'undefined') return;
-
-  try {
-    let clearedCount = 0;
-    const keysToRemove: string[] = [];
-    
-    // Find all tile-related cache keys
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith('tile_') || key.startsWith('tiles_'))) {
-        keysToRemove.push(key);
-      }
-    }
-    
-    // Remove all found keys
-    keysToRemove.forEach(key => {
-      localStorage.removeItem(key);
-      clearedCount++;
-    });
-    
-    if (clearedCount > 0) {
-      console.log(`Cleared ${clearedCount} tile cache entries`);
-    }
-  } catch (error) {
-    console.warn('Error clearing tile cache:', error);
-  }
+  colonyTileCacheManager.clearCache();
 }
 
 /**
- * Update the tile cache with new tile data
+ * Update the colony tile cache with new tile data
  * @param tile Tile or array of tiles to update in the cache
  */
 export function updateTileCache(tile: Tile): void;
 export function updateTileCache(tiles: Tile[]): void;
 export function updateTileCache(arg: Tile | Tile[]): void {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    const tilesToUpdate = Array.isArray(arg) ? arg : [arg];
-    
-    if (tilesToUpdate.length === 0) return;
-    
-    let updatedCount = 0;
-    
-    tilesToUpdate.forEach(tile => {
-      if (tile?.id) {
-        const cacheKey = `tile_${tile.id}`;
-        saveToCache(cacheKey, tile);
-        updatedCount++;
-      }
-    });
-    
-    if (updatedCount > 0) {
-      console.log(`Updated cache for ${updatedCount} tiles`);
-    }
-  } catch (error) {
-    console.warn('Error updating tile cache:', error);
-  }
+  colonyTileCacheManager.updateCache(arg);
 }
 
 /**
@@ -309,7 +178,7 @@ export async function addColonyTile(
     
     return result.data;
   } catch (error: any) {
-    return handleTileAdditionError(error, coordinates);
+    return handleTileAdditionError(error, coordinates, 'colony');
   }
 }
 
@@ -338,23 +207,6 @@ function handleSuccessfulTileAddition(result: HttpsCallableResult<AddTileRespons
       updateColonyCacheWithNewTile(uid, result.data.tile.id);
     }
   }
-}
-
-/**
- * Handle errors during tile addition
- */
-function handleTileAdditionError(error: any, coordinates: AddTileRequest): AddTileResponse {
-  const { q, r, s } = coordinates;
-  console.error(`Error adding colony tile at [${q},${r},${s}]:`, error);
-  
-  // Parse the Firebase callable function error
-  const errorCode = error.code || 'unknown';
-  const errorMessage = error.message || 'Unknown error adding colony tile';
-  
-  return {
-    success: false,
-    message: `Error (${errorCode}): ${errorMessage}`
-  };
 }
 
 /**

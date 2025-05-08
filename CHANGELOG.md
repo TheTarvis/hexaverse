@@ -1,4 +1,8 @@
 # Changelog
+## [v0.12.4]
+### Changed
+- More refactoring to get shared logic into centralized location.
+
 ## [v0.12.3]
 ### Added
 - Added ability to switch websocket servers.
