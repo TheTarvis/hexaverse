@@ -1,0 +1,42 @@
+sequenceDiagram
+    participant DrawingGridManager as Drawing Grid Manager
+    participant DrawingTileService as Drawing Tiles Service
+    participant CloudFunction as addDrawingTile Cloud Function
+    participant Firestore as Firestore Database
+    participant PubSub as PubSub Service
+    participant WebSocket as WebSocket Server
+    participant WSContext as WebSocket Context
+    participant TilesContext as Drawing Tiles Context
+    participant Cache as Client-side Cache
+
+    DrawingGridManager->>DrawingTileService: updateDrawingTile(uid, color)
+    Note right of DrawingTileService: Update drawing tile's color.
+
+    DrawingTileService->>CloudFunction: updateDrawingTile(uid, color)
+    Note right of CloudFunction: Cloud function processes the update
+
+    CloudFunction->>Firestore: Update tile color, controllerUid and updatedAt timestamp.
+    Note right of Firestore: Using docRef.update()
+
+    CloudFunction->>PubSub: publishEvent("TILE_UPDATED", eventData, "drawing-events")
+    Note right of PubSub: Publishes tile update event<br/>to PubSub topic
+
+    CloudFunction-->>DrawingTileService: Return response with tile data
+
+    PubSub->>WebSocket: Forward event to WebSocket server
+    Note right of WebSocket: WebSocket server subscribes<br/>to PubSub topics
+
+    WebSocket-->>WSContext: Broadcast message to connected clients
+    Note right of WSContext: Message includes tile data<br/>and update type
+
+    WSContext->>TilesContext: handleMessage(WebSocketMessage)
+    Note right of TilesContext: Drawing context receives<br/>and processes the message
+
+    TilesContext->>Cache: updateTileCache(tile)
+
+    DrawingTileService->>DrawingTileService: handleSuccessfulTileAddition()
+    Note right of DrawingTileService: Process response and<br/>update local caches
+
+    DrawingTileService->>Cache: updateTileCache(tile)
+
+    DrawingTileService-->>DrawingGridManager: Return AddTileResponse

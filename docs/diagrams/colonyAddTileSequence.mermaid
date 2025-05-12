@@ -1,0 +1,85 @@
+sequenceDiagram
+    participant Client as Client Application
+    participant TileService as Colony Tiles Service
+    participant CloudFunction as addColonyTile Cloud Function
+    participant Firestore as Firestore Database
+    participant PubSub as PubSub Service
+    participant WebSocket as WebSocket Server
+    participant WSContext as WebSocket Context
+    participant TilesContext as Colony Tiles Context
+    participant Cache as Client-side Cache
+
+    Client->>TileService: addColonyTile(q, r, s)
+    Note right of TileService: Initiate adding a colony tile<br/>with cube coordinates q, r, s
+
+    TileService->>CloudFunction: addColonyTileFunction(coordinates)
+    Note right of CloudFunction: Cloud function processes<br/>the tile addition request
+
+    CloudFunction->>Firestore: Query colony by uid
+    Firestore-->>CloudFunction: Return colony data
+
+    CloudFunction->>CloudFunction: verifyTileAdjacency(q, r, s, colonyTileIds)
+    Note right of CloudFunction: Checks if the new tile is<br/>adjacent to existing colony tiles
+
+    CloudFunction->>Firestore: Check if tile exists
+    Firestore-->>CloudFunction: Return tile data (if exists)
+
+    alt Tile exists (capturing)
+        CloudFunction->>Firestore: Query previous owner's colony
+        Firestore-->>CloudFunction: Return previous colony
+        CloudFunction->>CloudFunction: Update tile properties
+    else Tile doesn't exist (new tile)
+        CloudFunction->>CloudFunction: Generate tile properties<br/>(noise, type, resources)
+        Note right of CloudFunction: Uses noise.ts utilities to<br/>procedurally generate tile
+    end
+
+    CloudFunction->>Firestore: Commit batch transaction<br/>(update/create tile, update colony)
+    Note right of CloudFunction: Updates are done in a batch<br/>to ensure data consistency
+
+    CloudFunction->>PubSub: publishEvent("TILE_UPDATED", eventData, "colony-events")
+    Note right of PubSub: Publishes tile update event<br/>to PubSub topic
+
+    PubSub->>WebSocket: Forward event to WebSocket server
+    Note right of WebSocket: WebSocket server subscribes<br/>to PubSub topics
+
+    WebSocket-->>WSContext: Broadcast message to connected clients
+    Note right of WSContext: Message includes tile data<br/>and update type
+
+    WSContext->>TilesContext: handleMessage(WebSocketMessage)
+    Note right of TilesContext: Colony context receives<br/>and processes the message
+
+    TilesContext->>TilesContext: bufferTileMessage(tile)
+    Note right of TilesContext: Messages are buffered to<br/>optimize performance
+
+    TilesContext->>TilesContext: processTileBatch(tiles)
+    Note right of TilesContext: After buffer period expires,<br/>process all queued messages
+
+    TilesContext->>TilesContext: Apply matching handler based on predicates
+    Note right of TilesContext: Uses dispatch table pattern<br/>to match handlers to tile updates
+
+    alt Own Tile Update
+        TilesContext->>Cache: updateTileCache(tile)
+        TilesContext->>TilesContext: addColonyTile(tile)
+    else Opponent Taking Tile
+        TilesContext->>Cache: updateTileCache(tile)
+        TilesContext->>TilesContext: removeColonyTile(tile)
+        TilesContext->>Cache: removeColonyCacheWithTile(uid, tileId)
+    else Viewable Tile Update
+        TilesContext->>Cache: updateTileCache(tile)
+        TilesContext->>TilesContext: updateViewableTiles(tile)
+    end
+
+    CloudFunction-->>TileService: Return response with tile data
+
+    TileService->>TileService: handleSuccessfulTileAddition()
+    Note right of TileService: Process response and<br/>update local caches
+
+    TileService->>Cache: updateTileCache(tile)
+
+    alt Tile was captured
+        TileService->>Cache: invalidateColonyCache(previousColony)
+    end
+
+    TileService->>Cache: updateColonyCacheWithNewTile(uid, tileId)
+
+    TileService-->>Client: Return AddTileResponse
