@@ -10,12 +10,13 @@ interface CachedItem<T> {
 
 // Configuration
 export const DEFAULT_CACHE_EXPIRY = 10 * 60 * 1000; // 10 minutes
+export const NO_EXPIRY = -1; // Special value to indicate no expiration
 
 /**
  * Get an item from cache with type prefix
  * @param key Base cache key
  * @param type Cache type prefix
- * @param expiryTime Time in ms before cache entry expires
+ * @param expiryTime Time in ms before cache entry expires. Use NO_EXPIRY for no expiration.
  * @returns The cached data or null if not found/expired
  */
 export function getFromCache<T>(key: string, type: string, expiryTime: number = DEFAULT_CACHE_EXPIRY): T | null {
@@ -29,7 +30,8 @@ export function getFromCache<T>(key: string, type: string, expiryTime: number = 
     const { data, timestamp } = JSON.parse(cachedItem) as CachedItem<T>;
     const now = Date.now();
     
-    if (now - timestamp > expiryTime) {
+    // Skip expiry check if NO_EXPIRY is set
+    if (expiryTime !== NO_EXPIRY && now - timestamp > expiryTime) {
       // Cache expired
       localStorage.removeItem(prefixedKey);
       return null;
@@ -47,8 +49,9 @@ export function getFromCache<T>(key: string, type: string, expiryTime: number = 
  * @param key Base cache key
  * @param type Cache type prefix
  * @param data Data to cache
+ * @param expiryTime Optional expiry time in ms. Use NO_EXPIRY for no expiration.
  */
-export function saveToCache<T>(key: string, type: string, data: T): void {
+export function saveToCache<T>(key: string, type: string, data: T, expiryTime: number = DEFAULT_CACHE_EXPIRY): void {
   if (typeof window === 'undefined') return;
   
   try {

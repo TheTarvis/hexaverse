@@ -13,18 +13,20 @@ export const CACHE_TYPES = {
  * Get a tile from cache by ID
  * @param tileId Tile ID
  * @param type Cache type (colony or drawing)
+ * @param expiryTime Optional expiry time in ms
  * @returns Tile object or null if not found
  */
-export function getTileFromCache(tileId: string, type: string): Tile | null {
-  return getFromCache<Tile>(`tile_${tileId}`, type, DEFAULT_CACHE_EXPIRY);
+export function getTileFromCache(tileId: string, type: string, expiryTime?: number): Tile | null {
+  return getFromCache<Tile>(`tile_${tileId}`, type, expiryTime);
 }
 
 /**
  * Save a tile to cache
  * @param tile Tile to save
  * @param type Cache type (colony or drawing)
+ * @param expiryTime Optional expiry time in ms
  */
-export function saveTileToCache(tile: Tile, type: string): void {
+export function saveTileToCache(tile: Tile, type: string, expiryTime?: number): void {
   if (tile?.id) {
     saveToCache(`tile_${tile.id}`, type, tile);
   }
@@ -33,10 +35,11 @@ export function saveTileToCache(tile: Tile, type: string): void {
 /**
  * Get tiles from cache by batch ID
  * @param tileIds Array of tile IDs
- * @param type Cache type (colony or drawing) 
+ * @param type Cache type (colony or drawing)
+ * @param expiryTime Optional expiry time in ms
  * @returns Array of tiles found in cache
  */
-export function getTilesFromCache(tileIds: string[], type: string): { 
+export function getTilesFromCache(tileIds: string[], type: string, expiryTime?: number): { 
   foundTiles: Tile[]; 
   missingTileIds: string[];
 } {
@@ -48,7 +51,7 @@ export function getTilesFromCache(tileIds: string[], type: string): {
   }
 
   tileIds.forEach(id => {
-    const cachedTile = getTileFromCache(id, type);
+    const cachedTile = getTileFromCache(id, type, expiryTime);
     if (cachedTile) {
       foundTiles.push(cachedTile);
     } else {
@@ -63,9 +66,10 @@ export function getTilesFromCache(tileIds: string[], type: string): {
  * Update the tile cache with new tile data
  * @param arg Tile or array of tiles to update in the cache
  * @param type Cache type (colony or drawing)
+ * @param expiryTime Optional expiry time in ms
  * @returns Number of tiles updated
  */
-export function updateTileCache(arg: Tile | Tile[], type: string): number {
+export function updateTileCache(arg: Tile | Tile[], type: string, expiryTime?: number): number {
   if (typeof window === 'undefined') return 0;
   
   const tilesToUpdate = Array.isArray(arg) ? arg : [arg];
@@ -76,7 +80,7 @@ export function updateTileCache(arg: Tile | Tile[], type: string): number {
   
   tilesToUpdate.forEach(tile => {
     if (tile?.id) {
-      saveTileToCache(tile, type);
+      saveTileToCache(tile, type, expiryTime);
       updatedCount++;
     }
   });

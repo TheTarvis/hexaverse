@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { getWebSocketEndpoint, checkHealth } from '@/services/websocket';
-import { WebSocketMessage, PayloadType, PingPongMessage } from '@/types/websocket';
+import { ColonyWebSocketMessage, PayloadType, PingPongMessage } from '@/types/websocket';
 import {useAuth} from "@/contexts/AuthContext";
 import { useWebSocketSubscription } from './useWebSocketSubscription';
 
@@ -25,7 +25,7 @@ const updateGlobalState = (isConnected: boolean, state: string) => {
 };
 
 interface WebSocketHookOptions {
-  onMessage?: <T = any>(data: WebSocketMessage<T>) => void;
+  onMessage?: <T = any>(data: ColonyWebSocketMessage<T>) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   reconnectAttempts?: number;
@@ -35,7 +35,7 @@ interface WebSocketHookOptions {
 }
 
 interface WebSocketHookReturn {
-  sendMessage: (data: WebSocketMessage<any> | PingPongMessage | any) => void;
+  sendMessage: (data: ColonyWebSocketMessage<any> | PingPongMessage | any) => void;
   isConnected: boolean;
   disconnect: () => void;
   connect: () => Promise<void>;

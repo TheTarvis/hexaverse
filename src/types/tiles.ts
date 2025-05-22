@@ -8,14 +8,18 @@ export interface Tile {
   q: number;  // Cube coordinate X
   r: number;  // Cube coordinate Y
   s: number;  // Cube coordinate Z
-  type: string;
   controllerUid: string;  // Firebase user ID of the controller
+  color?: string;  // Color for rendering, used by UI only
+  updatedAt: string;  // ISO timestamp of last update
+}
+
+export interface ColonyTile extends Tile {
+  type: string;
   visibility: 'visible' | 'unexplored'; // TODO TW: Discuss unexplored
   resourceDensity: number; // Value from 0-1 indicating resource richness
   resources?: {
     [key: string]: number;
   };
-  color?: string;  // Color for rendering, used by UI only
 }
 
 export interface TileMap {

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useWebSocketContext } from '@/contexts/WebSocketContext';
-import { WebSocketMessage } from '@/types/websocket';
+import { ColonyWebSocketMessage, WebSocketMessage } from '@/types/websocket'
 import { addMessageListener, removeMessageListener } from './useWebSocketConnection';
 
 interface WebSocketSubscriptionOptions<T = any> {

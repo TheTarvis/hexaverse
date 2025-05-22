@@ -1,43 +1,24 @@
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
 // Import functions from other files
 import { createColony } from "./colony";
-import { addColonyTile, fetchColonyTilesByIds } from "./colonyTiles";
+import { addColonyTile, COLONY_EVENTS_TOPIC, fetchColonyTilesByIds } from "./colonyTiles";
 import { addRoadmapItem, updateRoadmapItem, deleteRoadmapItem } from "./roadmap";
 import { submitSupportRequest } from "./support";
+import { fetchDrawingTilesAfterTimestamp, sendDrawingTileUpdate, DRAWING_EVENTS_TOPIC } from "./drawingTiles";
+import { createTopicIfNotExists } from "./utils/pubsub";
 
 // Initialize Firebase Admin
 admin.initializeApp();
 
-// Firestore trigger function example
-// This function will be triggered when a new document is created in the 'messages' collection
-// It will take the 'original' field and create an uppercase version in the same document
-export const makeUppercase = onDocumentCreated("messages/{documentId}", (event) => {
-  // Check if data exists
-  if (!event.data) {
-    logger.error("No data found in event");
-    return null;
-  }
+// Create required topics during initialization
+createTopicIfNotExists(DRAWING_EVENTS_TOPIC).catch(error => {
+  logger.error('Failed to create drawing-events topic:', error);
+});
 
-  // Get the data from the document
-  const data = event.data.data();
-  
-  // Check if the data has an 'original' field
-  if (!data.original) {
-    logger.error("No original field found");
-    return null;
-  }
-  
-  const original = data.original;
-  logger.info("Uppercasing", event.params.documentId, original);
-  
-  // Convert to uppercase
-  const uppercase = original.toUpperCase();
-  
-  // Update the document with the uppercase field
-  return event.data.ref.set({ uppercase }, { merge: true });
+createTopicIfNotExists(COLONY_EVENTS_TOPIC).catch(error => {
+  logger.error('Failed to create colony-events topic:', error);
 });
 
 // Export functions from other files
@@ -48,5 +29,7 @@ export {
   addRoadmapItem,
   updateRoadmapItem,
   deleteRoadmapItem,
-  submitSupportRequest
+  submitSupportRequest,
+  fetchDrawingTilesAfterTimestamp,
+  sendDrawingTileUpdate
 }; 

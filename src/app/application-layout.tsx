@@ -23,7 +23,6 @@ import {
 } from '@/components/sidebar'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import { getEvents } from '@/data'
-import { ColonyCheck } from '@/components/colony/ColonyCheck'
 import { useAuth } from '@/contexts/AuthContext'
 import { getVersionDisplay } from '@/utils/version'
 import {
@@ -46,9 +45,12 @@ import {
   TicketIcon,
   ViewColumnsIcon,
   CalendarIcon,
+  LockClosedIcon
 } from '@heroicons/react/20/solid'
 import { usePathname } from 'next/navigation'
 import { WebSocketStatusIndicator } from '@/components/websocket-status-indicator';
+import { useState } from 'react'
+import { LoginModal } from '@/components/auth/LoginModal'
 
 function AccountDropdownMenu({ anchor }: { anchor: 'top start' | 'bottom end' }) {
   const { user, signOut } = useAuth();
@@ -94,14 +96,19 @@ export function ApplicationLayout({
 }) {
   let pathname = usePathname()
   const { user } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
   
   // Get display name and email from user
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
   const email = user?.email || '';
 
+  const handleLoginClick = () => {
+    setShowLoginModal(true);
+  };
+
   return (
     <>
-      <ColonyCheck />
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
       <SidebarLayout
         navbar={
           <Navbar>
@@ -141,10 +148,24 @@ export function ApplicationLayout({
                   <HomeIcon />
                   <SidebarLabel>Home</SidebarLabel>
                 </SidebarItem>
-                <SidebarItem href="/colony" current={pathname.startsWith('/colony')}>
-                  <GlobeAltIcon />
-                  <SidebarLabel>Colony</SidebarLabel>
-                </SidebarItem>
+                {user ? (
+                  <SidebarItem href="/colony" current={pathname.startsWith('/colony')}>
+                    <GlobeAltIcon />
+                    <SidebarLabel>Colony</SidebarLabel>
+                  </SidebarItem>
+                ) : (
+                  <SidebarItem 
+                    onClick={handleLoginClick}
+                    className="text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400"
+                  >
+                    <LockClosedIcon className="text-amber-600 dark:text-amber-500" />
+                    <SidebarLabel>
+                      <span className="flex items-center gap-1">
+                        Colony <span className="text-xs">(Login required)</span>
+                      </span>
+                    </SidebarLabel>
+                  </SidebarItem>
+                )}
                 {/* <SidebarItem href="/events" current={pathname.startsWith('/events')}>
                   <Square2StackIcon />
                   <SidebarLabel>Events</SidebarLabel>
@@ -195,23 +216,44 @@ export function ApplicationLayout({
             </SidebarBody>
 
             <SidebarFooter className="max-lg:hidden">
-              <Dropdown>
-                <DropdownButton as={SidebarItem}>
-                  <span className="flex min-w-0 items-center gap-3">
-                    <Avatar src={user?.photoURL || ""} className="size-10" square alt="" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm/5 font-medium text-zinc-950 dark:text-white">
-                        {displayName}
+              {user ? (
+                <Dropdown>
+                  <DropdownButton as={SidebarItem}>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Avatar src={user?.photoURL || ""} className="size-10" square alt="" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm/5 font-medium text-zinc-950 dark:text-white">
+                          {displayName}
+                        </span>
+                        <span className="block truncate text-xs/5 font-normal text-zinc-500 dark:text-zinc-400">
+                          {email}
+                        </span>
                       </span>
-                      <span className="block truncate text-xs/5 font-normal text-zinc-500 dark:text-zinc-400">
-                        {email}
+                    </span>
+                    <ChevronUpIcon />
+                  </DropdownButton>
+                  <AccountDropdownMenu anchor="top start" />
+                </Dropdown>
+              ) : (
+                <SidebarItem 
+                  onClick={handleLoginClick}
+                  className="bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30"
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <Avatar className="size-10 bg-indigo-100 dark:bg-indigo-800" square alt="">
+                      <UserCircleIcon className="size-6 text-indigo-600 dark:text-indigo-300" />
+                    </Avatar>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm/5 font-medium text-indigo-600 dark:text-indigo-300">
+                        Sign In
+                      </span>
+                      <span className="block truncate text-xs/5 font-normal text-indigo-500 dark:text-indigo-400">
+                        Log in to access all features
                       </span>
                     </span>
                   </span>
-                  <ChevronUpIcon />
-                </DropdownButton>
-                <AccountDropdownMenu anchor="top start" />
-              </Dropdown>
+                </SidebarItem>
+              )}
             </SidebarFooter>
           </Sidebar>
         }

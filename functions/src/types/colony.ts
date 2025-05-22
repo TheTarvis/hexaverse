@@ -3,15 +3,11 @@
  */
 import { Unit, UnplacedUnit } from './units';
 import { TileType } from '../utils/noise';
+import { Tile } from './base'
 
 // Basic colony tile type matching server model
-export interface ColonyTile {
-  id: string;
-  q: number;
-  r: number;  
-  s: number;  
+export interface ColonyTile extends Tile{
   type: TileType; // Tile type based on noise value
-  controllerUid: string;  // Firebase user ID of the controller
   visibility: 'visible' | 'unexplored';
   resourceDensity?: number; // Value from 0-1 indicating resource richness
   resources?: {

@@ -6,55 +6,9 @@ import { createNoiseGenerator, getNoiseForCoordinates, getTileTypeFromNoise, cal
 import { functionConfig } from "./config";
 import { ReadCostTracker } from "./utils/analytics/readCostTracker";
 import { verifyTileAdjacency } from "./utils/tileHelpers";
-import { PubSub } from '@google-cloud/pubsub';
+import { publishEvent, EventType } from "./utils/pubsub";
 
-// Initialize PubSub client
-const pubSubClient = new PubSub({
-  projectId: process.env.PUBSUB_PROJECT_ID || 'hexaverse'
-});
-
-// TODO TW: Refactor this have a centralized publish event
-/**
- * Publishes events to PubSub for WebSocket communication
- * @param eventType Type of event to publish
- * @param data Event data payload
- * @param topicName Topic we're sending the even to.
- * @param scope Scope of the message ('broadcast' or 'direct')
- * @param recipientId Optional recipient ID for direct messages
- */
-async function publishEvent(
-  eventType: string, 
-  data: any, 
-  topicName: string,
-  scope: 'broadcast' | 'direct' = 'broadcast',
-  recipientId?: string,
-): Promise<string> {
-  try {
-    // Create message payload
-    const dataBuffer = Buffer.from(JSON.stringify(data));
-    
-    // Set message attributes
-    const attributes: Record<string, string> = {
-      scope,
-      eventType
-    };
-    
-    // Add recipient ID for direct messages
-    if (scope === 'direct' && recipientId) {
-      attributes.recipientId = recipientId;
-    }
-    
-    // Publish to PubSub
-    logger.info(`Publishing ${scope} message to ${topicName} `);
-    const messageId = await pubSubClient.topic(topicName).publish(dataBuffer, attributes);
-    logger.info(`Published ${scope} message to ${topicName} with ID: ${messageId}${recipientId ? `, recipient: ${recipientId}` : ''}`);
-    
-    return messageId;
-  } catch (error) {
-    logger.error(`Error publishing ${eventType} event to PubSub:`, error);
-    throw error;
-  }
-}
+export const COLONY_EVENTS_TOPIC = 'colony-events'
 
 /**
  * Function to add a tile to a user's colony
@@ -188,7 +142,9 @@ export const addColonyTile = onCall({
         controllerUid: uid,
         visibility: 'visible',
         resourceDensity,
-        resources: {}
+        resources: {},
+        color: '#000000', // Default color
+        updatedAt: new Date().toISOString()
       };
       
       // Add the new tile to the 'tiles' collection
@@ -214,7 +170,7 @@ export const addColonyTile = onCall({
     
     // Prepare event data for PubSub 
     const eventData = {
-      type: 'TILE_UPDATED',
+      type: EventType.TILE_UPDATED,
       timestamp: Date.now(),
       payloadType: 'tile',
       payload: newTile,
@@ -224,8 +180,7 @@ export const addColonyTile = onCall({
 
     try {
       // Publish broadcast message for tile update
-      // TODO TW: Move the topic name to some where better
-      await publishEvent('TILE_UPDATED', eventData, 'colony-events');
+      await publishEvent(EventType.TILE_UPDATED, eventData, COLONY_EVENTS_TOPIC);
 
     } catch (pubsubError) {
       // Log the error but don't fail the function

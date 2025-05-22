@@ -7,12 +7,14 @@ import {
   getTilesFromCache,
   CACHE_TYPES
 } from '@/utils/tileCache';
+import { DEFAULT_CACHE_EXPIRY } from '@/utils/cacheUtils';
 
 // Common Types
 export interface AddTileRequest {
   q: number;
   r: number; 
   s: number;
+  color?: string;
   warmup?: boolean;
 }
 
@@ -39,7 +41,10 @@ export interface FetchTilesByIdsResponse {
  * Base class for tile cache management utilities
  */
 export class TileCacheManager {
-  constructor(private cacheType: string) {}
+  constructor(
+    private cacheType: string,
+    private expiryTime: number = DEFAULT_CACHE_EXPIRY
+  ) {}
 
   /**
    * Clear all tile cache entries for this cache type
@@ -56,7 +61,7 @@ export class TileCacheManager {
    * @param arg Tile or array of tiles to update in the cache
    */
   updateCache(arg: Tile | Tile[]): void {
-    const updatedCount = updateCacheTiles(arg, this.cacheType);
+    const updatedCount = updateCacheTiles(arg, this.cacheType, this.expiryTime);
     if (updatedCount > 0) {
       console.log(`Updated cache for ${updatedCount} ${this.cacheType} tiles`);
     }
@@ -68,7 +73,7 @@ export class TileCacheManager {
    * @returns Object containing found tiles and missing tile IDs
    */
   getTilesFromCache(tileIds: string[]) {
-    return getTilesFromCache(tileIds, this.cacheType);
+    return getTilesFromCache(tileIds, this.cacheType, this.expiryTime);
   }
 }
 

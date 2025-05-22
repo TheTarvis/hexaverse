@@ -4,7 +4,7 @@ import { createColony, fetchUserColony } from '@/services/colony/colony'
 import { Colony } from '@/types/colony'
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 import { useAuth } from './AuthContext'
-import { isColonyMessage, WebSocketMessage } from '@/types/websocket'
+import { isColonyMessage, ColonyWebSocketMessage, WebSocketMessage } from '@/types/websocket'
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
 
 // Define colony status enum for better state management
@@ -42,7 +42,8 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
 
   // Subscribe to WebSocket messages for colony updates
   useWebSocketSubscription({
-    onMessage: async (data: WebSocketMessage) => {
+    onMessage: async (message: WebSocketMessage) => {
+      let data = message as ColonyWebSocketMessage
       // Handle colony updates
       if (isColonyMessage(data) && colony && data.payload.id === colony.id) {
         console.log(`WebSocket: Received colony update`, data.payload)

@@ -1,20 +1,21 @@
 'use client'
 
 import { DebugMenu } from '@/components/grid/DebugMenu'
-import { GridCanvas, SelectedTile } from '@/components/grid/GridCanvas'
+import { GridCanvas } from '@/components/grid/GridCanvas'
 import { SlideUpPanel } from '@/components/slide-up-panel'
 import { useAuth } from '@/contexts/AuthContext'
 import { ColonyStatus, useColony } from '@/contexts/ColonyContext'
 import { ColonyTilesProvider, useColonyTiles } from '@/contexts/ColonyTilesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { addColonyTile as addColonyTileService, WarmupableFunctions } from '@/services/colony/ColonyTilesService'
-import { TileMap } from '@/types/tiles'
+import { TileMap, Tile } from '@/types/tiles'
 import { getTileColor } from '@/utils/tileColorUtils'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWarmupFunctions } from '@/hooks/useWarmupFunctions'
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
 import { COLONY_WEBSOCKET_URL } from '@/services/websocket'
 import { useHexGridCamera } from '@/hooks/useHexGridCamera'
+import { ColonyCheck } from '@/components/colony/ColonyCheck'
 
 // Inner component that uses the colony context
 function ColonyGridInner() {
@@ -87,7 +88,7 @@ function ColonyGridInner() {
   }, [worldCoords]);
 
   const [error, setError] = useState<string | null>(null)
-  const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null)
+  const [selectedTile, setSelectedTile] = useState<Tile | null>(null)
   const [addingTile, setAddingTile] = useState(false)
 
   // Compute the final tileMap using useMemo based on dependencies
@@ -217,7 +218,7 @@ function ColonyGridInner() {
     }
   }
 
-  const handleTileSelect = (tile: SelectedTile) => {
+  const handleTileSelect = (tile: Tile) => {
     console.log('Setting selected tile:', tile)
     // Only set the selected tile if tile details are enabled
     if (debugState.tileDetailsEnabled) {
@@ -233,6 +234,7 @@ function ColonyGridInner() {
 
   return (
     <div className="relative h-full w-full">
+      <ColonyCheck />
       {(isLoadingColony || isLoadingTiles) && (
         <div className="bg-opacity-70 absolute inset-0 z-10 flex h-screen items-center justify-center bg-white dark:bg-zinc-950">
           <div className="text-center">

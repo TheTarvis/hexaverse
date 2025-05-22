@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useColony } from '@/contexts/ColonyContext'
 import { clearAllTileCache, fetchTiles, updateTileCache } from '@/services/colony/ColonyTilesService'
 import { Tile, TileMap, toTileMap } from '@/types/tiles'
-import { isTileMessage, WebSocketMessage } from '@/types/websocket'
+import { isTileMessage, ColonyWebSocketMessage } from '@/types/websocket'
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
 import { findViewableTiles } from '@/utils/hexUtils'
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
@@ -229,7 +229,7 @@ export function ColonyTilesProvider({ children }: { children: ReactNode }) {
   });
 
   // Handle WebSocket messages using the buffer
-  const handleMessage = useCallback((data: WebSocketMessage) => {
+  const handleMessage = useCallback((data: ColonyWebSocketMessage) => {
     if (isTileMessage(data) && data.payload) {
       const tile = data.payload;
       console.log(`WebSocket: Received tile update for tile at ${tile.q},${tile.r},${tile.s}`);

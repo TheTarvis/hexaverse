@@ -1,42 +1,73 @@
 sequenceDiagram
-    participant DrawingGridManager as Drawing Grid Manager
-    participant DrawingTileService as Drawing Tiles Service
-    participant CloudFunction as addDrawingTile Cloud Function
-    participant Firestore as Firestore Database
-    participant PubSub as PubSub Service
-    participant WebSocket as WebSocket Server
-    participant WSContext as WebSocket Context
-    participant TilesContext as Drawing Tiles Context
-    participant Cache as Client-side Cache
+    participant User
+    participant GridCanvas
+    participant DrawingGridManager as Grid Manager
+    participant DrawingService as Drawing Tiles Service
+    participant LocalCache as Local Tile Cache
+    participant CloudFunction as createDrawingTile()
+    participant Firestore as Firestore DB
 
-    DrawingGridManager->>DrawingTileService: updateDrawingTile(uid, color)
-    Note right of DrawingTileService: Update drawing tile's color.
+    alt On Grid Load
+    %% User loads grid
+        DrawingGridManager->>DrawingService: onLoadDrawingTiles()
+    %% Drawing service generates tile ID and updates cache
+        Note right of LocalCache: Key for timestmape: <br> drawing_grid_last_updated_at_timestamp
+        DrawingService->>LocalCache: fetchLastUpdatedTimestamp()
+        DrawingService->>CloudFunction: fetchAllTilesSinceUpdate({timestamp})
+        CloudFunction->>Firestore: query(updateAt > timestamp)
+        Firestore-->>CloudFunction: [tiles]
+        CloudFunction-->>DrawingService: [tiles]
+        DrawingService->>LocalCache: updateWithNewTiles({tiles})
+        DrawingService->>LocalCache: fetchAllDrawingTilesFromCache()
+        DrawingService-->>DrawingGridManager: [tilesFromCache]
+        DrawingGridManager->>DrawingGridManager: Updates its tileMap state with tilesFromCache
+        DrawingGridManager->>GridCanvas: renders with initial tiles
+    end
 
-    DrawingTileService->>CloudFunction: updateDrawingTile(uid, color)
-    Note right of CloudFunction: Cloud function processes the update
+    alt On Add Tile Function
+        User->>GridCanvas: Clicks on grid cell (q,r,s) to add tile
+        GridCanvas->>DrawingGridManager: onTileAddIntent(q, r, s) %% Abstracted interaction, GridCanvas informs Manager of click
 
-    CloudFunction->>Firestore: Update tile color, controllerUid and updatedAt timestamp.
-    Note right of Firestore: Using docRef.update()
+        DrawingGridManager->>DrawingGridManager: Determines new tile properties (e.g., color, initial ID if any)
+    %% Manager prepares to call service, does not update its main tileMap for rendering yet.
 
-    CloudFunction->>PubSub: publishEvent("TILE_UPDATED", eventData, "drawing-events")
-    Note right of PubSub: Publishes tile update event<br/>to PubSub topic
+        DrawingGridManager->>DrawingService: onAddTile({q, r, s, color, ...anyOtherProps}) %% As per original diagram call
 
-    CloudFunction-->>DrawingTileService: Return response with tile data
+    %% Drawing service generates final tile ID (if needed) and updates cache
+        DrawingService->>LocalCache: sendDrawingTileUpdate({id, q, r, s, color, controllerUid, updatedAt, viewHash})
+        Note right of LocalCache: Tile is now in local cache. viewHash = color|controllerUid
 
-    PubSub->>WebSocket: Forward event to WebSocket server
-    Note right of WebSocket: WebSocket server subscribes<br/>to PubSub topics
+    %% Grid updates immediately with optimistic draw
+        DrawingService-->>DrawingGridManager: tileAddedToCache(tileDataFromCache) %% Service confirms local cache update
+        DrawingGridManager->>DrawingGridManager: Updates its local tileMap state with tileDataFromCache (Optimistic Draw)
+        Note right of DrawingGridManager: This state update causes GridCanvas to re-render
+        DrawingGridManager->>GridCanvas: re-renders, displaying the new tile
 
-    WebSocket-->>WSContext: Broadcast message to connected clients
-    Note right of WSContext: Message includes tile data<br/>and update type
+    %% Async cloud function call
+        DrawingService->>CloudFunction: createDrawingTile({q, r, s, color, ...}) %% tileData sent to server
 
-    WSContext->>TilesContext: handleMessage(WebSocketMessage)
-    Note right of TilesContext: Drawing context receives<br/>and processes the message
+        Note right of CloudFunction: Server uses setDoc to <br>create or update <br> the record
+        CloudFunction->>Firestore: set(docPath, tileData)
+        Firestore-->>CloudFunction: Success
+        CloudFunction-->>DrawingService: 200 OK
 
-    TilesContext->>Cache: updateTileCache(tile)
+        alt Cloud function fails
+            CloudFunction--x DrawingService: error (non-200)
+            DrawingService-->>DrawingGridManager: notifyAddTileFailed(tileDataFromCache, error)
+            DrawingGridManager->>DrawingGridManager: Reverts optimistic update (removes tile from tileMap state)
+            DrawingGridManager->>GridCanvas: re-renders, removing the optimistically added tile
+            Note right of DrawingGridManager: Manager might also show an error toast to the User (not detailed in sequence)
+        end
 
-    DrawingTileService->>DrawingTileService: handleSuccessfulTileAddition()
-    Note right of DrawingTileService: Process response and<br/>update local caches
-
-    DrawingTileService->>Cache: updateTileCache(tile)
-
-    DrawingTileService-->>DrawingGridManager: Return AddTileResponse
+    %% Later: WebSocket tile update arrives (confirms or updates the added tile)
+        participant WebSocket as WebSocket Listener
+        WebSocket->>LocalCache: getTile(tile.id) %% Tile ID is of the newly added/updated tile
+        alt viewHash and fields match (e.g. simple confirmation or no change)
+            WebSocket->>LocalCache: update updatedAt only
+        else tile differs (e.g. server modifications, full confirmation data)
+            WebSocket->>LocalCache: update full tile + viewHash
+            LocalCache-->>DrawingGridManager: trigger tile map update (if DGM listens to cache changes or gets specific event)
+            DrawingGridManager->>DrawingGridManager: Updates its tileMap state with new data from LocalCache
+            DrawingGridManager->>GridCanvas: re-renders with confirmed/updated tile data
+        end
+    end

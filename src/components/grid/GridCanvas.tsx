@@ -10,15 +10,6 @@ import { CameraTracker } from './CameraTracker'
 import { cubeToPixel, pixelToCube, cubeRound } from '@/utils/gridUtils'
 import { getTileColor } from '@/utils/tileColorUtils'
 
-// Updated interface for SelectedTile to include potential color field
-export interface SelectedTile {
-  q: number;
-  r: number;
-  s: number;
-  color: string;
-  type?: string;
-  resourceDensity?: number;
-}
 
 
 // Updated props interface
@@ -29,7 +20,7 @@ interface HexGridCanvasProps {
   cameraPosition?: [number, number, number];
   cameraTarget?: [number, number, number];
   onCameraStop: (pos: [number, number, number]) => void;
-  onTileSelect: (tile: SelectedTile) => void;
+  onTileSelect: (tile: Tile) => void;
   onTileAdd?: (q: number, r: number, s: number) => void;
 }
 
@@ -38,7 +29,7 @@ const DEFAULT_CAMERA_POSITION: [number, number, number] = [0, 0, 20];
 const DEFAULT_CAMERA_TARGET: [number, number, number] = [0, 0, 0];
 
 // Add a PulsingHexagon component for animation
-function PulsingHexagon({ 
+function PulsingHexagon({
   position = [0, 0, 0] as [number, number, number],
   color = 'white',
   onAnimationComplete
@@ -55,13 +46,13 @@ function PulsingHexagon({
   const hexShape = useMemo(() => {
     const shape = new THREE.Shape()
     const size = 1
-    
+
     // Create pointy-top hexagon
     for (let i = 0; i < 6; i++) {
       const angle = (Math.PI / 3) * i + Math.PI / 6
       const x = size * Math.cos(angle)
       const y = size * Math.sin(angle)
-      
+
       if (i === 0) {
         shape.moveTo(x, y)
       } else {
@@ -69,7 +60,7 @@ function PulsingHexagon({
       }
     }
     shape.closePath()
-    
+
     return shape
   }, [])
 
@@ -78,16 +69,16 @@ function PulsingHexagon({
     if (elapsedTime < animationDuration) {
       // Update elapsed time
       setElapsedTime(prev => prev + delta);
-      
+
       // Calculate scale factor based on time (pulsing effect)
       const progress = elapsedTime / animationDuration;
       // Use Math.sin with reduced frequency (multiply by 1.5 instead of 2) for fewer, slower pulses
       const scale = 1 + 0.3 * Math.sin(progress * Math.PI * 2);
-      
+
       // Update scale
       if (meshRef.current) {
         meshRef.current.scale.set(scale, scale, scale);
-        
+
         // Fade out opacity near the end
         const opacity = 1 - (progress * 0.8);
         (meshRef.current.material as THREE.MeshBasicMaterial).opacity = opacity;
@@ -101,8 +92,8 @@ function PulsingHexagon({
   return (
     <mesh ref={meshRef} position={position}>
       <shapeGeometry args={[hexShape]} />
-      <meshBasicMaterial 
-        color={color} 
+      <meshBasicMaterial
+        color={color}
         transparent={true}
         opacity={0.8}
       />
@@ -133,7 +124,7 @@ const hexVertexShader = `
     vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
     gl_Position = projectionMatrix * viewMatrix * worldPosition;
   }
-`;
+`
 
 const hexFragmentShader = `
   varying vec3 vColor;
@@ -172,7 +163,7 @@ const HexGrid = React.memo(function HexGrid({
   wireframe?: boolean,
   hexSize?: number,
   tileMap?: TileMap,
-  onTileSelect: (tile: SelectedTile) => void,
+  onTileSelect: (tile: Tile) => void,
   onTileAdd?: (q: number, r: number, s: number) => void,
 }) {
   const { gl, camera } = useThree(); // Get the WebGL renderer context
@@ -184,181 +175,196 @@ const HexGrid = React.memo(function HexGrid({
     position: [number, number, number],
     color: string
   } | null>(null);
-  
+
   // Reference to the instanced mesh for raycasting
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  
+
   // Custom Instanced Mesh Geometry - Using a simple plane now, will be turned into hexagon by shader
   const geometry = useMemo(() => {
     return new THREE.PlaneGeometry(1.732, 2, 1, 1); // Width is sqrt(3) to match hexagon dimensions
   }, []);
-  
+
+  // Debug effect to monitor tile processing
+  useEffect(() => {
+    const tileCount = Object.keys(tileMap).length;
+    console.log(`[HexGrid] Processing ${tileCount} tiles for rendering`);
+    if (tileCount > 0) {
+      const sampleTile = tileMap[Object.keys(tileMap)[0]];
+      console.log('[HexGrid] Sample tile:', sampleTile);
+    }
+  }, [tileMap]);
+
   // Process tile data for instanced mesh attributes
   const { instanceData, instancePositions, instanceColors, instanceOpacities } = useMemo(() => {
     const tiles = Object.values(tileMap);
+    console.log(`[HexGrid] Creating instance data for ${tiles.length} tiles`);
+
     const positions = new Float32Array(tiles.length * 3);
     const colors = new Float32Array(tiles.length * 3);
     const opacities = new Float32Array(tiles.length);
-    
-    const tileData = tiles.map((tile, i) => {
-      const { q, r, s, type, resourceDensity = 0.5, color, visibility } = tile;
+
+    const tileData = tiles.map((tile: Tile, i) => {
+      const { q, r, s, color } = tile;
       const position = cubeToPixel(q, r, s, hexSize);
-      const isViewableTile = visibility === 'unexplored';
-      const baseOpacity = isViewableTile ? 0.7 : 1.0;
-      
+      const baseOpacity =  1.0;
+
       // Set the color to the value passed in from the tileMap
-      let tileColor = new THREE.Color(color);
-      
+      let tileColor = new THREE.Color(color || '#666666'); // Ensure default color
+
       // Set data in arrays
       positions[i * 3] = position[0];
       positions[i * 3 + 1] = position[1];
       positions[i * 3 + 2] = position[2];
-      
+
       colors[i * 3] = tileColor.r;
       colors[i * 3 + 1] = tileColor.g;
       colors[i * 3 + 2] = tileColor.b;
-      
+
       opacities[i] = baseOpacity;
-      
+
       return {
         index: i,
         key: `${q}#${r}#${s}`,
         q, r, s,
         position,
         color: tileColor,
-        type,
-        resourceDensity,
-        isViewableTile,
         opacity: baseOpacity,
       };
     });
-    
-    return { 
-      instanceData: tileData, 
-      instancePositions: positions, 
+
+    console.log(`[HexGrid] Instance data created with ${tileData.length} tiles`);
+    return {
+      instanceData: tileData,
+      instancePositions: positions,
       instanceColors: colors,
       instanceOpacities: opacities
     };
   }, [tileMap, hexSize, user?.uid]);
-  
+
   // Create a material with the custom shaders
   const material = useMemo(() => {
+    console.log('[HexGrid] Creating shader material');
     const mat = new THREE.ShaderMaterial({
       vertexShader: hexVertexShader,
       fragmentShader: hexFragmentShader,
-      transparent: false,
-      side: THREE.FrontSide,
+      transparent: true, // Enable transparency
+      side: THREE.DoubleSide, // Render both sides
       wireframe,
+      uniforms: {
+        time: { value: 0 },
+      }
     });
-    
+
     return mat;
   }, [wireframe]);
-  
+
   // Update the instance attributes when data changes
   useEffect(() => {
-    if (!meshRef.current) return;
-    
+    if (!meshRef.current) {
+      console.warn('[HexGrid] Mesh ref not available');
+      return;
+    }
+
+    console.log(`[HexGrid] Updating instance attributes for ${instanceData.length} tiles`);
+
     // Create and assign attributes
     const positionAttr = new THREE.InstancedBufferAttribute(instancePositions, 3);
     meshRef.current.geometry.setAttribute('instancePosition', positionAttr);
-    
+
     const colorAttr = new THREE.InstancedBufferAttribute(instanceColors, 3);
     meshRef.current.geometry.setAttribute('instanceColor', colorAttr);
-    
+
     const opacityAttr = new THREE.InstancedBufferAttribute(instanceOpacities, 1);
     meshRef.current.geometry.setAttribute('instanceOpacity', opacityAttr);
-    
+
     // Update instance count
     meshRef.current.count = instanceData.length;
     meshRef.current.frustumCulled = false;
+
+    console.log('[HexGrid] Instance attributes updated successfully');
   }, [instanceData, instancePositions, instanceColors, instanceOpacities]);
-  
+
   const handleClick = useCallback((event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
-    
+
     // Calculate the intersection point on the plane
     const intersectionPoint = event.point.clone();
-    
+
     // Convert the intersection point to cube coordinates
     const [fq, fr, fs] = pixelToCube(intersectionPoint.x, intersectionPoint.y, hexSize);
     const [q, r, s] = cubeRound(fq, fr, fs);
-    
+
     console.log(`Click: Pixel=(${intersectionPoint.x.toFixed(2)}, ${intersectionPoint.y.toFixed(2)}), Cube=(${q}, ${r}, ${s})`);
-    
+
     // Use cube coordinates to find the tile
     const tileKey = `${q}#${r}#${s}`;
     const tile = tileMap[tileKey];
-    
+
     if (tile) {
       const pixelPosition = cubeToPixel(q, r, s, hexSize);
-      
-      setClickedTile({ 
-        q: q, 
-        r: r, 
-        s: s, 
-        position: pixelPosition,
-        color: tile.color || getTileColor(tile, user?.uid)
-      });
-      
-      onTileAdd?.(q, r, s);
-    }
-  }, [hexSize, tileMap, onTileAdd, user?.uid]);
-  
-  const handleDoubleClick = useCallback((event: ThreeEvent<MouseEvent>) => {
-    event.stopPropagation();
-    
-    // Calculate the intersection point on the plane
-    const intersectionPoint = event.point.clone();
-    
-    // Convert the intersection point to cube coordinates
-    const [fq, fr, fs] = pixelToCube(intersectionPoint.x, intersectionPoint.y, hexSize);
-    const [q, r, s] = cubeRound(fq, fr, fs);
-    
-    console.log(`Double Click: Cube=(${q}, ${r}, ${s})`);
-    
-    // Use cube coordinates to find the tile
-    const tileKey = `${q}#${r}#${s}`;
-    const tile = tileMap[tileKey];
-    
-    if (tile) {
-      onTileSelect({
+      setClickedTile({
         q: q,
         r: r,
         s: s,
-        color: tile.color || getTileColor(tile, user?.uid),
-        type: tile.visibility === 'unexplored' ? 'viewable' : tile.type,
-        resourceDensity: tile.resourceDensity || 0.5,
+        position: pixelPosition,
+        color: tile.color || getTileColor(tile, user?.uid)
       });
+
+      onTileSelect?.(tile);
+      onTileAdd?.(q, r, s);
+    }
+  }, [hexSize, tileMap, onTileAdd, user?.uid]);
+
+  const handleDoubleClick = useCallback((event: ThreeEvent<MouseEvent>) => {
+    event.stopPropagation();
+
+    // Calculate the intersection point on the plane
+    const intersectionPoint = event.point.clone();
+
+    // Convert the intersection point to cube coordinates
+    const [fq, fr, fs] = pixelToCube(intersectionPoint.x, intersectionPoint.y, hexSize);
+    const [q, r, s] = cubeRound(fq, fr, fs);
+
+    console.log(`Double Click: Cube=(${q}, ${r}, ${s})`);
+
+    // Use cube coordinates to find the tile
+    const tileKey = `${q}#${r}#${s}`;
+    const tile = tileMap[tileKey];
+
+    if (tile) {
+      onTileSelect(tile);
     }
   }, [hexSize, tileMap, onTileSelect, user?.uid]);
-  
+
   const handlePointerOver = useCallback(() => {
     document.body.style.cursor = 'pointer';
   }, []);
-  
+
   const handlePointerOut = useCallback(() => {
     document.body.style.cursor = 'default';
   }, []);
-  
+
   return (
     <>
       <instancedMesh
         ref={meshRef}
         args={[geometry, material, instanceData.length]}
+        renderOrder={0}
       />
-      
+
       {/* Invisible plane to catch all clicks */}
-      <mesh 
-        position={[0, 0, -0.1]} 
+      <mesh
+        position={[0, 0, -0.1]}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
+        renderOrder={-1}
       >
         <planeGeometry args={[10000, 10000]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} />
       </mesh>
-      
+
       {/* Render the animation separately */}
       {clickedTile && (
         <PulsingHexagon
@@ -401,7 +407,7 @@ export function GridCanvas({
         enableZoom={true}
         enableRotate={false}
         minDistance={5}
-        maxDistance={250}
+        maxDistance={500}
         panSpeed={1.5}
         zoomSpeed={1.2}
         dampingFactor={0.1}
@@ -416,11 +422,7 @@ export function GridCanvas({
         }}
         makeDefault
       />
-      <CameraTracker
-        onStop={(pos) => onCameraStop(pos)}
-        minDistance={0.5}
-        stopDelayMs={200}
-      />
+      <CameraTracker onStop={(pos) => onCameraStop(pos)} minDistance={0.5} stopDelayMs={200} />
       <HexGrid
         wireframe={wireframe}
         hexSize={hexSize}

@@ -5,7 +5,7 @@ import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription';
 import { useWebSocketContext } from '@/contexts/WebSocketContext';
 import {checkHealth, COLONY_WEBSOCKET_URL, getWebSocketEndpoint, testAuthentication} from '@/services/websocket';
 import { getAuthToken } from '@/services/auth';
-import { WebSocketMessage, createPingMessage } from '@/types/websocket';
+import { ColonyWebSocketMessage, createPingMessage } from '@/types/websocket';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface WebSocketListenerProps {

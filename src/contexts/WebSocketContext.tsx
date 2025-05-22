@@ -2,7 +2,7 @@
 
 import { createContext, useContext, ReactNode } from 'react';
 import { useWebSocketConnection, ConnectionState } from '@/hooks/useWebSocketConnection';
-import { WebSocketMessage } from '@/types/websocket';
+import { ColonyWebSocketMessage } from '@/types/websocket';
 
 interface WebSocketContextType {
   isConnected: boolean;

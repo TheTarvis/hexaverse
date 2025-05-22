@@ -41,6 +41,24 @@ export class ReadCostTracker {
   }
 
   /**
+   * Track a read operation with associated cost
+   * @param operation The name of the operation being performed
+   * @param write The number of document reads
+   * @returns The number of reads for chaining
+   */
+  trackWrite(operation: string, write: number): number {
+    const cost: ReadCost = {
+      operation,
+      reads: write,
+      timestamp: Date.now(),
+      functionName: this.functionName
+    };
+    this.readCosts.push(cost);
+    logger.info(`[${this.functionName}] Firestore Write: [${operation}] - ${write} document writes`);
+    return write;
+  }
+
+  /**
    * Reset the read tracking
    */
   reset(): void {
