@@ -1,5 +1,5 @@
 import { Tile } from '@/types/tiles';
-import { getFromCache, saveToCache, clearCacheByPrefix, DEFAULT_CACHE_EXPIRY } from './cacheUtils';
+import { getFromCache, saveToCache, clearCacheByPrefix, getAllByPrefix, DEFAULT_CACHE_EXPIRY } from './cacheUtils';
 
 /**
  * Cache type constants to differentiate between different tile types
@@ -105,4 +105,14 @@ export function clearTileCache(type: string): number {
  */
 export function getTilesBatchCacheKey(tileIds: string[], type: string): string {
   return `${type}_tiles_${tileIds.sort().join('_')}`;
+}
+
+/**
+ * Get all tiles from cache for a specific type
+ * @param type Cache type (colony or drawing)
+ * @param expiryTime Optional expiry time in ms
+ * @returns Array of all tiles in cache for the given type
+ */
+export function getAllTilesFromCache(type: string, expiryTime?: number): Tile[] {
+  return getAllByPrefix<Tile>(`${type}_tile_`, expiryTime);
 } 

@@ -5,6 +5,7 @@ import {
   updateTileCache as updateCacheTiles,
   clearTileCache,
   getTilesFromCache,
+  getAllTilesFromCache,
   CACHE_TYPES
 } from '@/utils/tileCache';
 import { DEFAULT_CACHE_EXPIRY } from '@/utils/cacheUtils';
@@ -74,6 +75,14 @@ export class TileCacheManager {
    */
   getTilesFromCache(tileIds: string[]) {
     return getTilesFromCache(tileIds, this.cacheType, this.expiryTime);
+  }
+
+  /**
+   * Get all tiles from cache for this cache type
+   * @returns Array of all tiles in cache
+   */
+  getAllFromCache(): Tile[] {
+    return getAllTilesFromCache(this.cacheType, this.expiryTime);
   }
 }
 

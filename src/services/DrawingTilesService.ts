@@ -250,3 +250,14 @@ export async function onLoadDrawingTiles(): Promise<Tile[]> {
     return [];
   }
 }
+
+/**
+ * Get all drawing tiles currently in cache
+ * @returns Array of all tiles in the cache
+ */
+export function fetchAllDrawingTilesFromCache(): Tile[] {
+  // Get all tiles from cache - this will return all cached tiles regardless of ID
+  const allCachedTiles = drawingTileCacheManager.getAllFromCache();
+  console.log(`[DrawingTilesService] Retrieved ${allCachedTiles.length} tiles from cache`);
+  return allCachedTiles;
+}

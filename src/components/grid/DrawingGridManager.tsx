@@ -3,167 +3,179 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GridCanvas } from '@/components/grid/GridCanvas'
 import { useAuth } from '@/contexts/AuthContext'
-import { useHexGridCamera } from '@/hooks/useHexGridCamera';
 import { Tile, TileMap } from '@/types/tiles';
 import { 
-  fetchAllTilesByIdWithCache, 
-  updateLocalTileCache,
   onLoadDrawingTiles,
   onUpdateDrawingTile,
-  clearAllDrawingTileCache
+  updateLocalTileCache,
+  fetchAllDrawingTilesFromCache
 } from '@/services/DrawingTilesService';
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription';
-import { ColonyWebSocketMessage, DrawingEventsWebsocketMessage, WebSocketMessage } from '@/types/websocket'
+import { WebSocketMessage } from '@/types/websocket'
 import { HexColorPicker } from '@/components/grid/HexColorPicker';
 
 // Constant for hex size
-const HEX_SIZE = 1.2; // Make sure this matches GridCanvas prop
+const HEX_SIZE = 1.2;
 
 export function DrawingGridManager() {
   const { user } = useAuth();
+  const [tileMap, setTileMap] = useState<TileMap>({});
   const [selectedTile, setSelectedTile] = useState<Tile | null>(null);
   const [hoveredTile, setHoveredTile] = useState<Tile | null>(null);
-  const [selectedColor, setSelectedColor] = useState('#FF5252'); // Default color
-  const [previewMode, setPreviewMode] = useState(false); // Preview mode disabled by default
+  const [selectedColor, setSelectedColor] = useState('#FF5252');
+  const [previewMode, setPreviewMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Keep track of default tiles and initialization
-  const defaultTilesRef = useRef<TileMap>({});
+  // Keep track of initialization and preview state
   const hasInitializedRef = useRef(false);
   const originalTileColorsRef = useRef<Record<string, string>>({});
 
-  // Function to fetch tiles by their IDs (cache only)
-  const fetchTilesByIds = useCallback(async (tileIds: string[]): Promise<Tile[]> => {
-    console.log(`[DrawingGridManager] Fetching ${tileIds.length} drawing tiles from cache`);
-    const tiles = fetchAllTilesByIdWithCache(tileIds);
-    console.log(`[DrawingGridManager] Found ${tiles.length} tiles in cache`);
-
-    // For any tiles not found in cache, use default tiles
-    const missingTileIds = tileIds.filter(id => !tiles.find(t => t.id === id));
-    const defaultTiles = missingTileIds.map(id => defaultTilesRef.current[id]).filter(Boolean);
+  // Generate default tiles in a grid pattern
+  const generateDefaultTiles = useCallback((radius: number = 50): TileMap => {
+    const tiles: TileMap = {};
     
-    return [...tiles, ...defaultTiles];
+    for (let q = -radius; q <= radius; q++) {
+      for (let r = Math.max(-radius, -q - radius); r <= Math.min(radius, -q + radius); r++) {
+        const s = -q - r;
+        const tileId = `${q}#${r}#${s}`;
+        tiles[tileId] = {
+          id: tileId,
+          q,
+          r,
+          s,
+          color: '#666666', // Default gray color
+          controllerUid: '',
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
+    
+    console.log(`[DrawingGridManager] Generated ${Object.keys(tiles).length} default tiles`);
+    return tiles;
   }, []);
 
-  // Handle tile updates
-  const handleTileUpdate = useCallback((tile: Tile) => {
-    console.log(`[DrawingGridManager] Handling tile update for ${tile.id}`);
-    updateLocalTileCache(tile);
-  }, []);
+  // Initialize the grid following the sequence diagram
+  useEffect(() => {
+    let isMounted = true;
 
-  // Use the centralized camera logic from the hook
-  const { tileMap, isFetching, handleCameraMove, updateTile } = useHexGridCamera({
-    hexSize: HEX_SIZE,
-    radius: 100,
-    fetchTilesByIds,
-    onTileUpdate: handleTileUpdate
-  });
+    const initializeGrid = async () => {
+      if (hasInitializedRef.current || !isMounted) {
+        console.log('[DrawingGridManager] Skipping initialization - already initialized or unmounted');
+        return;
+      }
 
-  // Handle WebSocket messages
+      console.log('[DrawingGridManager] Starting grid initialization...');
+      setIsLoading(true);
+
+      try {
+        // Step 1: Generate default tiles for display
+        const defaultTiles = generateDefaultTiles();
+        setTileMap(defaultTiles);
+
+        // Step 2: Fetch tiles since last update from server
+        console.log('[DrawingGridManager] Calling onLoadDrawingTiles...');
+        const serverTiles = await onLoadDrawingTiles();
+        console.log(`[DrawingGridManager] Successfully loaded ${serverTiles.length} tiles from server`);
+
+        // Step 3: Get all tiles from cache (which now includes the new tiles from server)
+        const allCachedTiles = fetchAllDrawingTilesFromCache();
+        console.log(`[DrawingGridManager] Retrieved ${allCachedTiles.length} tiles from cache`);
+
+        // Step 4: Update tileMap with cached tiles (merge with defaults)
+        setTileMap(prev => {
+          const updatedTileMap = { ...prev };
+          
+          // Update with cached tiles, preserving default tiles for areas without data
+          allCachedTiles.forEach(tile => {
+            if (tile.id) {
+              updatedTileMap[tile.id] = tile;
+            }
+          });
+          
+          console.log(`[DrawingGridManager] Updated tileMap with ${allCachedTiles.length} cached tiles`);
+          return updatedTileMap;
+        });
+
+        hasInitializedRef.current = true;
+        setIsLoading(false);
+        console.log('[DrawingGridManager] Grid initialization complete');
+      } catch (error) {
+        console.error('[DrawingGridManager] Error during grid initialization:', error);
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeGrid();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [generateDefaultTiles]);
+
+  // Handle WebSocket messages for real-time updates
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
     console.log('[DrawingGridManager] Received WebSocket message:', message);
     
-      // TODO Check message type to make sure its safe
-      const tile = message as Tile;
+    // TODO: Add proper message type checking
+    const tile = message as Tile;
+    if (tile.id) {
       console.log('[DrawingGridManager] Processing tile update:', tile);
       
-      // Update the tile in the grid
-      updateTile(tile.id, tile);
-      
-      // Update the local cache
+      // Update local cache
       updateLocalTileCache(tile);
-  }, [updateTile]);
+      
+      // Update tile map
+      setTileMap(prev => ({
+        ...prev,
+        [tile.id]: tile
+      }));
+    }
+  }, []);
 
   // Subscribe to WebSocket messages
   useWebSocketSubscription({
     onMessage: handleWebSocketMessage
   });
 
-  // Initial fetch of all tiles
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchInitialTiles = async () => {
-      // Skip if we've already initialized or component unmounted
-      if (hasInitializedRef.current || !isMounted) {
-        console.log('[DrawingGridManager] Skipping initialization - already initialized or unmounted');
-        return;
-      }
-
-      try {
-        console.log('[DrawingGridManager] Starting initial tile fetch...');
-        
-        // Store current default tiles
-        defaultTilesRef.current = { ...tileMap };
-        console.log(`[DrawingGridManager] Stored ${Object.keys(defaultTilesRef.current).length} default tiles`);
-        
-        // Load tiles from the server
-        console.log('[DrawingGridManager] Calling onLoadDrawingTiles...');
-        const tiles = await onLoadDrawingTiles();
-        console.log(`[DrawingGridManager] Successfully loaded ${tiles.length} tiles from server`);
-        
-        // Only update if still mounted
-        if (isMounted) {
-          hasInitializedRef.current = true;
-          // Update the tile map with the loaded tiles
-          tiles.forEach(tile => {
-            console.log(`[DrawingGridManager] Updating tile ${tile.id} with color ${tile.color}`);
-            // Preserve existing tile data and merge with new data
-            const existingTile = tileMap[tile.id];
-            const updatedTile = {
-              ...existingTile,
-              ...tile
-            };
-            updateTile(tile.id, updatedTile);
-          });
-                
-          console.log('[DrawingGridManager] Initialization complete');
-        }
-      } catch (error) {
-        console.error('[DrawingGridManager] Error during initialization:', error);
-        // Don't reset initialization flag on error to prevent infinite retries
-      }
-    };
-
-    fetchInitialTiles();
-
-    // Cleanup function
-    return () => {
-      isMounted = false;
-    };
-  }, []); // Empty dependency array - only run once on mount
-
-  const handleTileSelect = (tile: Tile) => {
+  // Handle tile selection for painting
+  const handleTileSelect = useCallback((tile: Tile) => {
     console.log('[DrawingGridManager] handleTileSelect called with tile:', tile);
     setSelectedTile(tile);
     
-    // Construct tile ID based on coordinates
     const tileId = `${tile.q}#${tile.r}#${tile.s}`;
-    console.log('[DrawingGridManager] Looking for tile with ID:', tileId);
     
-    // Check if the tile exists before updating
     if (tileMap[tileId]) {
       console.log('[DrawingGridManager] Found tile, updating color to:', selectedColor);
-      // Preserve existing tile data when updating color
-      const existingTile = tileMap[tileId];
+      
+      // Create updated tile
       const updatedTile = {
-        ...existingTile,
+        ...tileMap[tileId],
         color: selectedColor
       };
-      // Update the tile with the new color while preserving other properties
-      updateTile(tileId, updatedTile);
+      
+      // Update UI immediately (optimistic update)
+      setTileMap(prev => ({
+        ...prev,
+        [tileId]: updatedTile
+      }));
+      
+      // Send to server
       onUpdateDrawingTile({
         q: tile.q,
         r: tile.r,
         s: tile.s,
         color: selectedColor
+      }).catch(error => {
+        console.error('[DrawingGridManager] Failed to update tile on server:', error);
+        // TODO: Revert optimistic update on error
       });
-    } else {
-      console.log('[DrawingGridManager] Tile not found in tileMap, cannot update color');
     }
-  }
+  }, [selectedColor, tileMap]);
 
-  const handleTileHover = (tile: Tile | null) => {
-    // Skip if preview mode is disabled
+  // Handle tile hover for preview
+  const handleTileHover = useCallback((tile: Tile | null) => {
     if (!previewMode) {
       setHoveredTile(null);
       return;
@@ -172,52 +184,58 @@ export function DrawingGridManager() {
     if (tile) {
       setHoveredTile(tile);
       
-      // Save original color if not already saved
       const tileId = `${tile.q}#${tile.r}#${tile.s}`;
       if (tileMap[tileId] && !originalTileColorsRef.current[tileId]) {
         originalTileColorsRef.current[tileId] = tileMap[tileId].color || '#666666';
       }
       
-      // Update with preview color
       if (tileMap[tileId]) {
-        updateTile(tileId, {
-          ...tileMap[tileId],
-          color: selectedColor,
-          isPreview: true // Mark as preview so we don't save this change
-        });
+        setTileMap(prev => ({
+          ...prev,
+          [tileId]: {
+            ...prev[tileId],
+            color: selectedColor,
+            isPreview: true
+          }
+        }));
       }
     } else if (hoveredTile) {
-      // Restore original color when not hovering anymore
       const prevTileId = `${hoveredTile.q}#${hoveredTile.r}#${hoveredTile.s}`;
       if (tileMap[prevTileId] && tileMap[prevTileId].isPreview && originalTileColorsRef.current[prevTileId]) {
-        updateTile(prevTileId, {
-          ...tileMap[prevTileId],
-          color: originalTileColorsRef.current[prevTileId],
-          isPreview: false
-        });
+        setTileMap(prev => ({
+          ...prev,
+          [prevTileId]: {
+            ...prev[prevTileId],
+            color: originalTileColorsRef.current[prevTileId],
+            isPreview: false
+          }
+        }));
         
-        // Clean up the saved color
         delete originalTileColorsRef.current[prevTileId];
       }
       
       setHoveredTile(null);
     }
-  };
+  }, [previewMode, selectedColor, tileMap]);
 
-  const handleColorSelect = (color: string) => {
+  // Handle color selection
+  const handleColorSelect = useCallback((color: string) => {
     console.log('[DrawingGridManager] Selected color:', color);
     setSelectedColor(color);
     
-    // If a tile is already selected, update it with the new color
     if (selectedTile) {
       const tileId = `${selectedTile.q}#${selectedTile.r}#${selectedTile.s}`;
       if (tileMap[tileId]) {
-        const existingTile = tileMap[tileId];
         const updatedTile = {
-          ...existingTile,
+          ...tileMap[tileId],
           color
         };
-        updateTile(tileId, updatedTile);
+        
+        setTileMap(prev => ({
+          ...prev,
+          [tileId]: updatedTile
+        }));
+        
         onUpdateDrawingTile({
           q: selectedTile.q,
           r: selectedTile.r,
@@ -226,39 +244,38 @@ export function DrawingGridManager() {
         });
       }
     }
-  };
+  }, [selectedTile, tileMap]);
 
-  const togglePreviewMode = () => {
-    setPreviewMode(!previewMode);
+  // Toggle preview mode
+  const togglePreviewMode = useCallback(() => {
+    setPreviewMode(prev => !prev);
     
-    // If turning off preview mode and there's a hovered tile, restore its original color
     if (previewMode && hoveredTile) {
       const tileId = `${hoveredTile.q}#${hoveredTile.r}#${hoveredTile.s}`;
       if (tileMap[tileId] && tileMap[tileId].isPreview && originalTileColorsRef.current[tileId]) {
-        updateTile(tileId, {
-          ...tileMap[tileId],
-          color: originalTileColorsRef.current[tileId],
-          isPreview: false
-        });
+        setTileMap(prev => ({
+          ...prev,
+          [tileId]: {
+            ...prev[tileId],
+            color: originalTileColorsRef.current[tileId],
+            isPreview: false
+          }
+        }));
         
-        // Clean up saved colors
         delete originalTileColorsRef.current[tileId];
       }
       
       setHoveredTile(null);
     }
-  };
-
-  const handleClearCache = () => {
-    console.log('[DrawingGridManager] Clearing drawing tile cache');
-    clearAllDrawingTileCache();
-    // Potentially, you might want to re-fetch or update the UI after clearing cache
-    // For now, just logging and clearing.
-  };
+  }, [previewMode, hoveredTile, tileMap]);
 
   return (
     <div className="relative h-full w-full">
-      {Object.keys(tileMap).length === 0 ? (
+      {isLoading ? (
+        <div className="absolute top-2 left-2 bg-yellow-500 text-black p-2 rounded z-10">
+          Initializing drawing grid...
+        </div>
+      ) : Object.keys(tileMap).length === 0 ? (
         <div className="absolute top-2 left-2 bg-red-500 text-white p-2 rounded z-10">
           Warning: No tiles available to render
         </div>
@@ -266,12 +283,6 @@ export function DrawingGridManager() {
         <>
           <div className="absolute top-2 right-2 bg-blue-500 text-white p-2 rounded z-10">
             Tiles in map: {Object.keys(tileMap).length}
-            {/* <button 
-              onClick={handleClearCache}
-              className="ml-2 mt-1 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-xs"
-            >
-              Clear Cache
-            </button> */}
           </div>
           
           {/* Color Picker */}
@@ -302,15 +313,10 @@ export function DrawingGridManager() {
             hexSize={HEX_SIZE}
             tileMap={tileMap}
             onTileSelect={handleTileSelect}
-            onCameraStop={handleCameraMove}
             onTileHover={handleTileHover}
+            onCameraStop={() => {}}
           />
         </>
-      )}
-      {isFetching && (
-        <div className="absolute top-2 left-2 bg-yellow-500 text-black p-2 rounded z-10">
-          Loading map area...
-        </div>
       )}
     </div>
   );

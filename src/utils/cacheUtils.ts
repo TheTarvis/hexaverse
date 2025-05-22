@@ -97,4 +97,52 @@ export function clearCacheByPrefix(prefix: string): number {
     console.warn(`Error clearing cache with prefix ${prefix}:`, error);
     return 0;
   }
+}
+
+/**
+ * Get all items from cache with a specific prefix
+ * @param prefix The prefix to match for retrieval
+ * @param expiryTime Time in ms before cache entry expires. Use NO_EXPIRY for no expiration.
+ * @returns Array of all cached items with the given prefix
+ */
+export function getAllByPrefix<T>(prefix: string, expiryTime: number = DEFAULT_CACHE_EXPIRY): T[] {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const items: T[] = [];
+    const now = Date.now();
+    const keysToRemove: string[] = [];
+    
+    // Find all cache keys with the given prefix
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) {
+        try {
+          const cachedItem = localStorage.getItem(key);
+          if (cachedItem) {
+            const { data, timestamp } = JSON.parse(cachedItem) as CachedItem<T>;
+            
+            // Skip expiry check if NO_EXPIRY is set
+            if (expiryTime !== NO_EXPIRY && now - timestamp > expiryTime) {
+              // Cache expired, mark for removal
+              keysToRemove.push(key);
+            } else {
+              items.push(data);
+            }
+          }
+        } catch (error) {
+          console.warn(`Error parsing cached item ${key}:`, error);
+          keysToRemove.push(key); // Remove corrupted entries
+        }
+      }
+    }
+    
+    // Remove expired or corrupted keys
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    return items;
+  } catch (error) {
+    console.warn(`Error getting all items with prefix ${prefix}:`, error);
+    return [];
+  }
 } 
