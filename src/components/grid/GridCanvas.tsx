@@ -22,6 +22,7 @@ interface HexGridCanvasProps {
   onCameraStop: (pos: [number, number, number]) => void;
   onTileSelect: (tile: Tile) => void;
   onTileAdd?: (q: number, r: number, s: number) => void;
+  onTileHover?: (tile: Tile | null) => void;
 }
 
 // Default camera values as stable references
@@ -159,12 +160,14 @@ const HexGrid = React.memo(function HexGrid({
   tileMap = {} as TileMap,
   onTileSelect,
   onTileAdd,
+  onTileHover,
 }: {
   wireframe?: boolean,
   hexSize?: number,
   tileMap?: TileMap,
   onTileSelect: (tile: Tile) => void,
   onTileAdd?: (q: number, r: number, s: number) => void,
+  onTileHover?: (tile: Tile | null) => void,
 }) {
   const { gl, camera } = useThree(); // Get the WebGL renderer context
   const { user } = useAuth(); // Get the authenticated user
@@ -344,6 +347,32 @@ const HexGrid = React.memo(function HexGrid({
     document.body.style.cursor = 'default';
   }, []);
 
+  const handlePointerMove = useCallback((event: ThreeEvent<PointerEvent>) => {
+    // Skip if no hover handler
+    if (!onTileHover) return;
+    
+    // Calculate the intersection point on the plane
+    const intersectionPoint = event.point.clone();
+    
+    // Convert the intersection point to cube coordinates
+    const [fq, fr, fs] = pixelToCube(intersectionPoint.x, intersectionPoint.y, hexSize);
+    const [q, r, s] = cubeRound(fq, fr, fs);
+    
+    // Use cube coordinates to find the tile
+    const tileKey = `${q}#${r}#${s}`;
+    const tile = tileMap[tileKey];
+    
+    if (tile) {
+      onTileHover(tile);
+    }
+  }, [hexSize, tileMap, onTileHover]);
+  
+  const handlePointerLeave = useCallback(() => {
+    if (onTileHover) {
+      onTileHover(null);
+    }
+  }, [onTileHover]);
+
   return (
     <>
       <instancedMesh
@@ -359,6 +388,8 @@ const HexGrid = React.memo(function HexGrid({
         onDoubleClick={handleDoubleClick}
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
         renderOrder={-1}
       >
         <planeGeometry args={[10000, 10000]} />
@@ -386,6 +417,7 @@ export function GridCanvas({
   onCameraStop,
   onTileSelect,
   onTileAdd,
+  onTileHover,
 }: HexGridCanvasProps) {
   // Internal camera state management
   const [internalCameraPosition, setInternalCameraPosition] = useState<[number, number, number]>(
@@ -429,6 +461,7 @@ export function GridCanvas({
         tileMap={tileMap}
         onTileSelect={onTileSelect}
         onTileAdd={onTileAdd}
+        onTileHover={onTileHover}
       />
     </Canvas>
   )

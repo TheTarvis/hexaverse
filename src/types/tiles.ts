@@ -11,6 +11,7 @@ export interface Tile {
   controllerUid: string;  // Firebase user ID of the controller
   color?: string;  // Color for rendering, used by UI only
   updatedAt: string;  // ISO timestamp of last update
+  isPreview?: boolean; // Flag for preview mode in UI
 }
 
 export interface ColonyTile extends Tile {
