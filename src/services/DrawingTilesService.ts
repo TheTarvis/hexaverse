@@ -12,6 +12,7 @@ import {
   handleTileAdditionError,
   createTileFunction
 } from './TilesBaseService';
+import logger from '@/utils/logger';
 
 // Create cache manager instance with no expiry
 const drawingTileCacheManager = new TileCacheManager(CACHE_TYPES.DRAWING, NO_EXPIRY);
@@ -39,12 +40,12 @@ export async function onUpdateDrawingTile(params: {
   s: number;
   color: string;
 }): Promise<AddTileResponse> {
-  console.log(`[DrawingTilesService] Adding tile at q=${params.q}, r=${params.r}, s=${params.s}`);
+  logger.debug(`[DrawingTilesService] Adding tile at q=${params.q}, r=${params.r}, s=${params.s}`);
   const { q, r, s, color } = params;
   const currentUser = auth.currentUser;
   
   if (!currentUser) {
-    console.error('User must be authenticated to add tiles');
+    logger.error('User must be authenticated to add tiles');
     return {
       success: false,
       message: 'User must be authenticated to add tiles'
@@ -103,7 +104,7 @@ export function clearAllDrawingTileCache(): void {
   drawingTileCacheManager.clearCache();
   if (typeof window !== 'undefined') {
     localStorage.removeItem('drawing_grid_last_updated_at_timestamp');
-    console.log('[DrawingTilesService] Cleared drawing_grid_last_updated_at_timestamp from localStorage');
+    logger.debug('[DrawingTilesService] Cleared drawing_grid_last_updated_at_timestamp from localStorage');
   }
 }
 
@@ -129,7 +130,7 @@ export function fetchAllTilesByIdWithCache(tileIds: string[]): Tile[] {
   const { foundTiles } = drawingTileCacheManager.getTilesFromCache(tileIds);
   const foundCount = foundTiles.length;
   const missedCount = tileIds.length - foundCount;
-  console.log(`[DrawingTilesService] Cache lookup: ${foundCount} hits, ${missedCount} misses`);
+  logger.debug(`[DrawingTilesService] Cache lookup: ${foundCount} hits, ${missedCount} misses`);
   
   return foundTiles;
 }
@@ -155,7 +156,7 @@ function setLastUpdateTimestamp(timestamp: string): void {
  * @param tile The modified tile to cache
  */
 export function updateLocalTileCache(tile: Tile): void {
-  console.log(`[DrawingTilesService] Updating local cache for tile ${tile.id}`);
+  logger.debug(`[DrawingTilesService] Updating local cache for tile ${tile.id}`);
   drawingTileCacheManager.updateCache(tile);
 }
 
@@ -164,7 +165,7 @@ export function updateLocalTileCache(tile: Tile): void {
  * @param tiles Array of tiles to update
  */
 export function updateLocalTileCacheMultiple(tiles: Tile[]): void {
-  console.log(`[DrawingTilesService] Batch updating local cache with ${tiles.length} tiles`);
+  logger.debug(`[DrawingTilesService] Batch updating local cache with ${tiles.length} tiles`);
   drawingTileCacheManager.updateCache(tiles);
 }
 
@@ -177,12 +178,12 @@ export async function fetchAllTilesSinceLastUpdate(): Promise<Tile[]> {
   try {
     // Get last update timestamp from cache
     const lastUpdateTimestamp = getLastUpdateTimestamp();
-    console.log(`[DrawingTilesService] Last update timestamp: ${lastUpdateTimestamp || 'none'}`);
+    logger.debug(`[DrawingTilesService] Last update timestamp: ${lastUpdateTimestamp || 'none'}`);
 
     const result = await fetchDrawingTilesAfterTimestamp({ timestamp: lastUpdateTimestamp });
     
     if (!result.data.success) {
-      console.error('[DrawingTilesService] Failed to fetch tiles since last update');
+      logger.error('[DrawingTilesService] Failed to fetch tiles since last update');
       return [];
     }
 
@@ -195,10 +196,10 @@ export async function fetchAllTilesSinceLastUpdate(): Promise<Tile[]> {
       setLastUpdateTimestamp(new Date().toISOString());
     }
 
-    console.log(`[DrawingTilesService] Fetched ${fetchedTiles.length} tiles since last update`);
+    logger.info(`[DrawingTilesService] Fetched ${fetchedTiles.length} tiles since last update`);
     return fetchedTiles;
   } catch (error) {
-    console.error('[DrawingTilesService] Error fetching tiles:', error);
+    logger.error('[DrawingTilesService] Error fetching tiles:', error);
     return [];
   }
 }
@@ -217,20 +218,20 @@ export async function onLoadDrawingTiles(): Promise<Tile[]> {
     // Debounce multiple rapid calls
     const now = Date.now();
     if (now - lastLoadInvocationTime < DEBOUNCE_THRESHOLD) {
-      console.log('[DrawingTilesService] Debounced call to onLoadDrawingTiles');
+      logger.debug('[DrawingTilesService] Debounced call to onLoadDrawingTiles');
       return [];
     }
     lastLoadInvocationTime = now;
 
     // Get last update timestamp from cache
     const lastUpdateTimestamp = getLastUpdateTimestamp();
-    console.log(`[DrawingTilesService] Loading tiles since last update: ${lastUpdateTimestamp || 'none'}`);
+    logger.debug(`[DrawingTilesService] Loading tiles since last update: ${lastUpdateTimestamp || 'none'}`);
 
     // Fetch tiles that have been updated since the last timestamp
     const result = await fetchDrawingTilesAfterTimestamp({ timestamp: lastUpdateTimestamp });
     
     if (!result.data.success) {
-      console.error('[DrawingTilesService] Failed to fetch tiles since last update');
+      logger.error('[DrawingTilesService] Failed to fetch tiles since last update');
       return [];
     }
 
@@ -243,10 +244,10 @@ export async function onLoadDrawingTiles(): Promise<Tile[]> {
       setLastUpdateTimestamp(new Date().toISOString());
     }
 
-    console.log(`[DrawingTilesService] Loaded ${fetchedTiles.length} tiles since last update`);
+    logger.info(`[DrawingTilesService] Loaded ${fetchedTiles.length} tiles since last update`);
     return fetchedTiles;
   } catch (error) {
-    console.error('[DrawingTilesService] Error loading tiles:', error);
+    logger.error('[DrawingTilesService] Error loading tiles:', error);
     return [];
   }
 }
@@ -258,6 +259,6 @@ export async function onLoadDrawingTiles(): Promise<Tile[]> {
 export function fetchAllDrawingTilesFromCache(): Tile[] {
   // Get all tiles from cache - this will return all cached tiles regardless of ID
   const allCachedTiles = drawingTileCacheManager.getAllFromCache();
-  console.log(`[DrawingTilesService] Retrieved ${allCachedTiles.length} tiles from cache`);
+  logger.debug(`[DrawingTilesService] Retrieved ${allCachedTiles.length} tiles from cache`);
   return allCachedTiles;
 }

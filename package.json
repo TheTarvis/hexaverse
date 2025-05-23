@@ -1,6 +1,6 @@
 {
   "name": "hexaverse",
-  "version": "0.12.4",
+  "version": "0.12.5",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -22,6 +22,7 @@
     "@react-three/fiber": "^8.18.0",
     "@reduxjs/toolkit": "^2.7.0",
     "clsx": "^2.1.1",
+    "consola": "^3.4.2",
     "firebase": "^11.6.0",
     "framer-motion": "^11.2.6",
     "marked": "^15.0.8",

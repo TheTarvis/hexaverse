@@ -6,6 +6,7 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 import { useAuth } from './AuthContext'
 import { isColonyMessage, ColonyWebSocketMessage, WebSocketMessage } from '@/types/websocket'
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
+import logger from '@/utils/logger';
 
 // Define colony status enum for better state management
 export enum ColonyStatus {
@@ -46,7 +47,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       let data = message as ColonyWebSocketMessage
       // Handle colony updates
       if (isColonyMessage(data) && colony && data.payload.id === colony.id) {
-        console.log(`WebSocket: Received colony update`, data.payload)
+        logger.debug(`WebSocket: Received colony update`, data.payload)
       }
       
       // Handle enemy colony information in the message
@@ -80,7 +81,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
                 }));
               }
             } catch (error) {
-              console.error(`Error fetching enemy colony (${enemyUid}) color:`, error);
+              logger.error(`Error fetching enemy colony (${enemyUid}) color:`, error);
             }
           }
         }
@@ -103,7 +104,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       setError(null)
 
       try {
-        console.log('Fetching colony data for user:', user.uid)
+        logger.info('Fetching colony data for user:', user.uid)
 
         // First, get the colony metadata without tiles for faster initial state setup
         const colonyData = await fetchUserColony(user.uid, {
@@ -116,12 +117,12 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        console.log('Colony metadata loaded:', colonyData)
+        logger.success('Colony metadata loaded:', colonyData)
 
         // Set initial colony metadata first
         setColony(colonyData)
       } catch (err) {
-        console.error('Error loading colony:', err)
+        logger.error('Error loading colony:', err)
         setError('Failed to load colony data')
         setColony(null)
         setColonyStatus(ColonyStatus.ERROR)
@@ -172,7 +173,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
   }
 
   const refreshColony = async (options?: { silent?: boolean }): Promise<void> => {
-    console.log('Refresh Colony')
+    logger.info('Refresh Colony')
     if (!user) {
       return
     }
@@ -202,7 +203,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
         }
       })
     } catch (err) {
-      console.error('Error refreshing colony:', err)
+      logger.error('Error refreshing colony:', err)
       setError('Failed to refresh colony data')
       setColonyStatus(ColonyStatus.ERROR)
     } finally {
@@ -215,7 +216,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
   const fetchColonyColor = async (userId: string): Promise<string> => {
     // Validate userId to prevent FirebaseError permission-denied
     if (!userId || typeof userId !== 'string') {
-      console.log(`Invalid userId: ${userId}, returning default color`);
+      logger.info(`Invalid userId: ${userId}, returning default color`);
       return '#FF3333'; // Default red for invalid user
     }
 
@@ -247,7 +248,7 @@ export function ColonyProvider({ children }: { children: ReactNode }) {
       
       return '#FF3333';
     } catch (error) {
-      console.error(`Error fetching colony color for user ${userId}:`, error);
+      logger.error(`Error fetching colony color for user ${userId}:`, error);
       return '#FF3333';
     }
   }

@@ -8,6 +8,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '@/componen
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { collection, query, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import logger from '@/utils/logger';
 
 interface SupportRequest {
   id: string;
@@ -37,7 +38,7 @@ export default function SupportAdminControls() {
       })) as SupportRequest[];
       setSupportRequests(requests);
     } catch (error) {
-      console.error('Error fetching support requests:', error);
+      logger.error('Error fetching support requests:', error);
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +62,7 @@ export default function SupportAdminControls() {
       // Refresh the requests after update
       await fetchSupportRequests();
     } catch (error) {
-      console.error('Error updating request status:', error);
+      logger.error('Error updating request status:', error);
     }
   };
 

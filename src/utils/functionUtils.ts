@@ -1,4 +1,5 @@
 import { HttpsCallableResult, HttpsCallable } from 'firebase/functions';
+import logger from '@/utils/logger';
 import { IsWarmupable } from '@/types/functions';
 
 /**
@@ -19,9 +20,9 @@ export function makeWarmupable<TData, TResult>(
         // Make an explicit warmup call
         // @ts-expect-error TypeScript doesn't know we handle warmup-only requests
         await callable({ warmup: true });
-        console.log(`${name} function warmed up`);
+        logger.debug(`${name} function warmed up`);
       } catch (error) {
-        console.error(`Error warming up ${name} function:`, error);
+        logger.error(`Error warming up ${name} function:`, error);
       }
     }
   };

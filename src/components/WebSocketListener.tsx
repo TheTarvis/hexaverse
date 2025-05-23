@@ -7,6 +7,7 @@ import {checkHealth, COLONY_WEBSOCKET_URL, getWebSocketEndpoint, testAuthenticat
 import { getAuthToken } from '@/services/auth';
 import { ColonyWebSocketMessage, createPingMessage } from '@/types/websocket';
 import { useAuth } from '@/contexts/AuthContext';
+import logger from '@/utils/logger';
 
 interface WebSocketListenerProps {
   messageType?: string;
@@ -62,10 +63,10 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
       setAuthTestResult(result.message);
       
       if (!result.success) {
-        console.warn('Authentication test failed:', result.message);
+        logger.warn('Authentication test failed:', result.message);
       }
     } catch (error) {
-      console.error('Error testing authentication:', error);
+      logger.error('Error testing authentication:', error);
       const message = error instanceof Error ? error.message : 'Unknown error';
       setAuthTestResult(`Auth test error: ${message}`);
     } finally {
@@ -86,7 +87,7 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
       const isHealthy = await checkHealth(COLONY_WEBSOCKET_URL);
       setHealthStatus(isHealthy ? 'Healthy' : 'Unhealthy');
     } catch (error) {
-      console.error('Error checking health:', error);
+      logger.error('Error checking health:', error);
       setHealthStatus('Error checking health');
     } finally {
       setIsCheckingHealth(false);
@@ -119,7 +120,7 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
       const endpoint = await getWebSocketEndpoint(COLONY_WEBSOCKET_URL);
       setEndpointUrl(endpoint);
     } catch (error) {
-      console.error('Error checking auth token:', error);
+      logger.error('Error checking auth token:', error);
       if (error instanceof Error) {
         setAuthError(`Auth error: ${error.message}`);
       } else {

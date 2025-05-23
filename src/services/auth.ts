@@ -8,6 +8,7 @@ import {
   signInWithPopup,
 } from 'firebase/auth';
 import { auth } from '@/config/firebase';
+import logger from '@/utils/logger';
 
 export type AuthUser = User;
 
@@ -35,18 +36,18 @@ export async function signInWithGoogle(): Promise<User> {
   });
   
   try {
-    console.log('Starting Google sign-in process...');
+    logger.info('Starting Google sign-in process...');
     const userCredential = await signInWithPopup(auth, provider);
-    console.log('Google sign-in successful!', userCredential.user.uid);
+    logger.success('Google sign-in successful!', userCredential.user.uid);
     return userCredential.user;
   } catch (error: any) {
-    console.error('Google sign-in error:', error);
+    logger.error('Google sign-in error:', error);
     
     // Provide more specific error messages based on Firebase error codes
     if (error.code === 'auth/popup-closed-by-user') {
       throw new Error('Sign-in popup was closed before completion.');
     } else if (error.code === 'auth/popup-blocked') {
-      console.warn('Popup was blocked by the browser. Try signing in with redirect instead.');
+      logger.warn('Popup was blocked by the browser. Try signing in with redirect instead.');
       // You could implement signInWithRedirect here as a fallback
       // await signInWithRedirect(auth, provider);
       // throw new Error('Popup was blocked. Please try again.');

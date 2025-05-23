@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import {getWebSocketEndpoint, checkHealth, addAuth, COLONY_WEBSOCKET_URL} from '@/services/websocket';
 import { useAuth } from '@/contexts/AuthContext';
+import logger from '@/utils/logger';
 
 // WebSocket connection states
 export const enum ConnectionState {
@@ -70,13 +71,13 @@ export const useWebSocketConnection = ({
 
   // Function to update the server URL
   const setServerUrl = useCallback((url: string) => {
-    console.log(`Setting WebSocket server URL to: ${url}`);
+    logger.info(`Setting WebSocket server URL to: ${url}`);
     globalServerUrl = url;
     setServerUrlState(url);
     
     // If already connected, disconnect and reconnect with new URL
     if (globalWsInstance) {
-      console.log('Reconnecting to new server URL...');
+      logger.info('Reconnecting to new server URL...');
       disconnect();
       // Short delay to ensure disconnect completes before reconnecting
       setTimeout(() => connect(), 300);
@@ -103,27 +104,27 @@ export const useWebSocketConnection = ({
     try {
       // Don't attempt connection if auth is still loading
       if (isAuthLoading) {
-        console.log('Auth is still loading, waiting before connection attempt');
+        logger.info('Auth is still loading, waiting before connection attempt');
         return;
       }
 
       // Don't attempt connection if no user
       if (!user) {
-        console.log('No user available, cannot connect to WebSocket');
+        logger.info('No user available, cannot connect to WebSocket');
         updateGlobalState(false, ConnectionState.DISCONNECTED);
         return;
       }
 
       // Use global variables for connection state to prevent multiple connections
       if (globalWsConnecting) {
-        console.log('Connection attempt already in progress globally, skipping');
+        logger.info('Connection attempt already in progress globally, skipping');
         return;
       }
       
       // Add cooldown between connection attempts to prevent spam
       const now = Date.now();
       if (now - globalLastConnectionAttempt < CONNECTION_COOLDOWN_MS) {
-        console.log(`Connection attempt throttled globally. Try again in ${Math.ceil((CONNECTION_COOLDOWN_MS - (now - globalLastConnectionAttempt)) / 1000)}s`);
+        logger.info(`Connection attempt throttled globally. Try again in ${Math.ceil((CONNECTION_COOLDOWN_MS - (now - globalLastConnectionAttempt)) / 1000)}s`);
         return;
       }
       
@@ -131,14 +132,14 @@ export const useWebSocketConnection = ({
 
       // Check if we already have a working connection
       if (globalWsInstance?.readyState === WebSocket.OPEN) {
-        console.log('Global WebSocket already connected, reusing connection');
+        logger.info('Global WebSocket already connected, reusing connection');
         updateGlobalState(true, ConnectionState.CONNECTED);
         return;
       }
       
       // Clean up any existing connection
       if (globalWsInstance) {
-        console.log('Closing existing global WebSocket connection');
+        logger.info('Closing existing global WebSocket connection');
         globalWsInstance.close();
         globalWsInstance = null;
       }
@@ -149,12 +150,12 @@ export const useWebSocketConnection = ({
 
         // Add authentication to the provided URL
       let endpoint = await getWebSocketEndpoint(globalServerUrl);
-      console.log(`Connecting to authenticated WebSocket at ${endpoint.substring(0, endpoint.includes('token') ? 50 : endpoint.length)}${endpoint.includes('token') ? '...' : ''}`);
+      logger.info(`Connecting to authenticated WebSocket at ${endpoint.substring(0, endpoint.includes('token') ? 50 : endpoint.length)}${endpoint.includes('token') ? '...' : ''}`);
       
       globalWsInstance = new WebSocket(endpoint);
 
       globalWsInstance.onopen = () => {
-        console.log(`WebSocket connected successfully to ${endpoint}`);
+        logger.info(`WebSocket connected successfully to ${endpoint}`);
         updateGlobalState(true, ConnectionState.CONNECTED);
         reconnectCount.current = 0;
         globalWsConnecting = false;
@@ -162,53 +163,53 @@ export const useWebSocketConnection = ({
       };
 
       globalWsInstance.onclose = (event) => {
-        console.log(`WebSocket disconnected with code: ${event.code}, reason: ${event.reason || 'No reason provided'}`);
+        logger.info(`WebSocket disconnected with code: ${event.code}, reason: ${event.reason || 'No reason provided'}`);
         updateGlobalState(false, ConnectionState.DISCONNECTED);
         globalWsConnecting = false;
         globalWsInstance = null;
       };
 
       globalWsInstance.onerror = (error) => {
-        console.error('WebSocket error occurred:', error);
+        logger.error('WebSocket error occurred:', error);
         updateGlobalState(false, ConnectionState.ERROR);
         globalWsConnecting = false;
         
         if (typeof error === 'object' && error !== null && 'message' in error) {
-          console.error('Error details:', (error as any).message);
+          logger.error('Error details:', (error as any).message);
         }
       };
 
       globalWsInstance.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.debug('WebSocket message received:', data);
+          logger.debug('WebSocket message received:', data);
           messageListeners.forEach(listener => listener(data));
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-          console.debug('Raw message content:', event.data);
+          logger.error('Error parsing WebSocket message:', error);
+          logger.debug('Raw message content:', event.data);
           messageListeners.forEach(listener => listener(event.data));
         }
       };
     } catch (error) {
-      console.error('Error creating WebSocket connection:', error);
+      logger.error('Error creating WebSocket connection:', error);
       updateGlobalState(false, ConnectionState.ERROR);
       globalWsConnecting = false;
       
       if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
+        logger.error('Error message:', error.message);
+        logger.error('Error stack:', error.stack);
       }
     }
   }, [user, isAuthLoading]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
-      console.log('Clearing reconnect timeout');
+      logger.info('Clearing reconnect timeout');
       clearTimeout(reconnectTimeoutRef.current);
     }
 
     if (globalWsInstance) {
-      console.log('Closing WebSocket connection...');
+      logger.info('Closing WebSocket connection...');
       globalWsInstance.close();
       globalWsInstance = null;
     }
@@ -224,12 +225,12 @@ export const useWebSocketConnection = ({
     }
 
     if (user) {
-      console.log('Auto-connecting to WebSocket...');
+      logger.info('Auto-connecting to WebSocket...');
       connect();
     }
 
     return () => {
-      console.debug('Component unmounting, but keeping WebSocket connection for other subscribers');
+      logger.debug('Component unmounting, but keeping WebSocket connection for other subscribers');
     };
   }, [connect, autoConnect, user, isAuthLoading]);
 
@@ -253,21 +254,21 @@ export const useWebSocketConnection = ({
       pollInterval = setInterval(async () => {
         if (reconnectCount.current < reconnectAttempts) {
           if (autoReconnect) {
-            console.log('Auto-reconnect enabled, attempting reconnect...');
+            logger.info('Auto-reconnect enabled, attempting reconnect...');
             reconnectCount.current += 1;
             connect();
           } else {
             const healthy = await checkHealth(globalServerUrl);
             if (healthy) {
-              console.log('WebSocket health check passed, attempting reconnect...');
+              logger.info('WebSocket health check passed, attempting reconnect...');
               reconnectCount.current += 1;
               connect();
             } else {
-              console.log('WebSocket health check failed, will retry...');
+              logger.info('WebSocket health check failed, will retry...');
             }
           }
         } else {
-          console.warn('Max reconnect attempts reached, stopping further attempts.');
+          logger.warn('Max reconnect attempts reached, stopping further attempts.');
         }
       }, reconnectInterval);
     }
@@ -286,18 +287,18 @@ export const useWebSocketConnection = ({
     setServerUrl,
     sendMessage: useCallback((data: any) => {
       if (!globalWsInstance || globalWsInstance.readyState !== WebSocket.OPEN) {
-        console.warn(`WebSocket is not connected. Current state: ${globalWsInstance ? globalWsInstance.readyState : 'null'}`);
+        logger.warn(`WebSocket is not connected. Current state: ${globalWsInstance ? globalWsInstance.readyState : 'null'}`);
         return;
       }
 
       try {
         const message = typeof data === 'string' ? data : JSON.stringify(data);
-        console.debug('Sending WebSocket message:', message.substring(0, 100) + (message.length > 100 ? '...' : ''));
+        logger.debug('Sending WebSocket message:', message.substring(0, 100) + (message.length > 100 ? '...' : ''));
         globalWsInstance.send(message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        logger.error('Error sending WebSocket message:', error);
         if (error instanceof Error) {
-          console.error('Error message:', error.message);
+          logger.error('Error message:', error.message);
         }
       }
     }, []),

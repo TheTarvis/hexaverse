@@ -2,6 +2,8 @@
  * Simple caching utility for storing and retrieving data from localStorage with expiration.
  */
 
+import logger from '@/utils/logger';
+
 interface CacheItem<T> {
   data: T;
   expiry: number;
@@ -22,7 +24,7 @@ export function saveToCache<T>(key: string, data: T, expiryMs: number = 60 * 60 
     
     localStorage.setItem(key, JSON.stringify(item));
   } catch (error) {
-    console.error(`Error saving to cache (key: ${key}):`, error);
+    logger.error(`Error saving to cache (key: ${key}):`, error);
   }
 }
 
@@ -57,7 +59,7 @@ export function getFromCache<T>(key: string, maxAgeMs?: number): T | null {
     
     return cachedItem.data;
   } catch (error) {
-    console.error(`Error retrieving from cache (key: ${key}):`, error);
+    logger.error(`Error retrieving from cache (key: ${key}):`, error);
     return null;
   }
 }
@@ -81,6 +83,6 @@ export function clearCache(key?: string): void {
       }
     }
   } catch (error) {
-    console.error('Error clearing cache:', error);
+    logger.error('Error clearing cache:', error);
   }
 } 

@@ -11,6 +11,7 @@ import {
   createUser
 } from '@/services/auth';
 import { auth } from '@/config/firebase';
+import logger from '@/utils/logger';
 
 interface AuthContextType {
   user: User | null;
@@ -44,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = await user.getIdToken();
       setUserToken(token);
     } catch (error) {
-      console.error('Error getting user token:', error);
+      logger.error('Error getting user token:', error);
       setUserToken(null);
     }
   };
@@ -63,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = await user.getIdTokenResult();
       setIsAdmin(token.claims.admin === true);
     } catch (error) {
-      console.error('Error checking admin status:', error);
+      logger.error('Error checking admin status:', error);
       setIsAdmin(false);
     } finally {
       setIsCheckingAdmin(false);
@@ -76,10 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const result = await getRedirectResult(auth);
         if (result) {
-          console.log('Redirect result processed successfully:', result.user.uid);
+          logger.success('Redirect result processed successfully:', result.user.uid);
         }
       } catch (error) {
-        console.error('Error processing redirect result:', error);
+        logger.error('Error processing redirect result:', error);
       }
     };
 

@@ -13,6 +13,7 @@ import { tileReducer, initialState, TileAction } from '@/reducers/tileReducer'
 import { isOwnTileUpdate, isViewableTileUpdate, isOpponentTakingTile } from '@/utils/websocket/predicates'
 import { handleOwnTile, handleViewableTile, handleOpponentTile, HandlerContext } from '@/utils/websocket/handlers'
 import { useTileMessageBuffer } from '@/hooks/useTileMessageBuffer'
+import logger from '@/utils/logger';
 
 interface ColonyTilesContextType {
   isLoadingTiles: boolean
@@ -46,10 +47,10 @@ async function fetchAndMergeNeighbors(
 
     // 2) Fetch actual data for the placeholders
     const fetchedNeighbors = await fetchTiles(Object.keys(placeholders));
-    console.log(`Fetched ${fetchedNeighbors.length} newly viewable tiles`);
+    logger.info(`Fetched ${fetchedNeighbors.length} newly viewable tiles`);
     dispatch({ type: 'MERGE_VIEWABLE_TILES', payload: fetchedNeighbors });
   } catch (error) {
-    console.error('Error in fetchAndMergeNeighbors:', error);
+    logger.error('Error in fetchAndMergeNeighbors:', error);
   }
 }
 
@@ -70,11 +71,11 @@ function useColonyTilesReducer(colony: Colony | null | undefined) {
         const tiles = await fetchTiles(colony.tileIds);
         if (canceled) return;
 
-        console.log(`Loaded ${tiles.length} tiles for the colony`);
+        logger.info(`Loaded ${tiles.length} tiles for the colony`);
         dispatch({ type: 'LOAD_COLONY_TILES', payload: tiles });
 
         const initialView = findViewableTiles(toTileMap(tiles), 5);
-        console.log(`Calculated ${Object.keys(initialView).length} initial viewable tiles.`);
+        logger.info(`Calculated ${Object.keys(initialView).length} initial viewable tiles.`);
         dispatch({ type: 'LOAD_VIEWABLE_TILES', payload: initialView });
 
         // Only proceed if there are viewable tiles to fetch
@@ -83,17 +84,17 @@ function useColonyTilesReducer(colony: Colony | null | undefined) {
           return;
         }
 
-        console.log(`Starting async fetch for ${Object.keys(initialView).length} viewable tiles...`);
+        logger.info(`Starting async fetch for ${Object.keys(initialView).length} viewable tiles...`);
         clearAllTileCache();
         const fetchedView = await fetchTiles(Object.keys(initialView));
         if (canceled) return;
 
-        console.log(`Async fetch completed for ${fetchedView.length} viewable tiles.`);
+        logger.success(`Async fetch completed for ${fetchedView.length} viewable tiles.`);
         updateTileCache(fetchedView);
         dispatch({ type: 'MERGE_VIEWABLE_TILES', payload: fetchedView });
         dispatch({ type: 'LOAD_DONE' });
       } catch (error) {
-        console.error('Error loading colony tiles:', error);
+        logger.error('Error loading colony tiles:', error);
         if (!canceled) {
           dispatch({ type: 'LOAD_DONE' });
         }
@@ -192,15 +193,15 @@ export function ColonyTilesProvider({ children }: { children: ReactNode }) {
       const ctx = handlerContext();
 
       // Debug logging for tile processing
-      console.log('Processing tile:', {
+      logger.info('Processing tile:', {
         tileId: tile.id,
         position: `${tile.q},${tile.r},${tile.s}`,
         controllerUid: tile.controllerUid,
         type: tile.type,
         resources: tile.resources
       });
-      console.log('Current user:', user?.uid || 'Not logged in');
-      console.log('Context state:', {
+      logger.info('Current user:', user?.uid || 'Not logged in');
+      logger.info('Context state:', {
         colonyTilesCount: Object.keys(ctx.state.colonyTiles).length,
         viewableTilesCount: Object.keys(ctx.state.viewableTiles).length
       });
@@ -232,7 +233,7 @@ export function ColonyTilesProvider({ children }: { children: ReactNode }) {
   const handleMessage = useCallback((data: ColonyWebSocketMessage) => {
     if (isTileMessage(data) && data.payload) {
       const tile = data.payload;
-      console.log(`WebSocket: Received tile update for tile at ${tile.q},${tile.r},${tile.s}`);
+      logger.debug(`WebSocket: Received tile update for tile at ${tile.q},${tile.r},${tile.s}`);
 
       // Add the tile to the buffer instead of processing immediately
       bufferTileMessage(tile);

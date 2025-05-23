@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { IsWarmupable } from '@/types/functions';
 import { WarmupableFunctions } from '@/services/colony/ColonyTilesService';
+import logger from '@/utils/logger';
 
 /**
  * Hook to warm up cloud functions when needed.
@@ -22,18 +23,18 @@ export function useWarmupFunctions(functionsToWarmup?: IsWarmupable[] | null) {
         // Warm up each function that hasn't been warmed up already
         await Promise.all(targetFunctions.map(async (func) => {
           if (!hasWarmedUp.current.has(func.name)) {
-            console.log(`Warming up ${func.name} function...`);
+            logger.info(`Warming up ${func.name} function...`);
             // Make sure func is IsWarmupable before calling warmup
             if ('warmup' in func && typeof func.warmup === 'function') {
               await func.warmup();
               hasWarmedUp.current.add(func.name);
             } else {
-              console.error(`Function ${func.name} doesn't have a warmup method`);
+              logger.error(`Function ${func.name} doesn't have a warmup method`);
             }
           }
         }));
       } catch (error) {
-        console.error('Error warming up functions:', error);
+        logger.error('Error warming up functions:', error);
       }
     };
 

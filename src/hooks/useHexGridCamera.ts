@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { pixelToCube, cubeRound, hexDistance } from '@/utils/gridUtils';
 import { TileMap, Tile } from '@/types/tiles';
+import logger from '@/utils/logger';
 
 // Type for the hook options
 interface UseHexGridCameraOptions {
@@ -37,7 +38,7 @@ function generateTileIdsInRadius(centerQ: number, centerR: number, radius: numbe
 
 // Helper to generate default tiles for empty areas
 function generateDefaultTiles(centerQ: number, centerR: number, radius: number): TileMap {
-  console.log(`[useHexGridCamera] Generating default tiles around (${centerQ}, ${centerR}) with radius ${radius}`);
+  logger.info(`[useHexGridCamera] Generating default tiles around (${centerQ}, ${centerR}) with radius ${radius}`);
   const map: TileMap = {};
   const centerS = -centerQ - centerR;
   const now = new Date().toISOString();
@@ -66,7 +67,7 @@ function generateDefaultTiles(centerQ: number, centerR: number, radius: number):
     }
   }
 
-  console.log(`[useHexGridCamera] Generated ${count} default tiles`);
+  logger.info(`[useHexGridCamera] Generated ${count} default tiles`);
   return map;
 }
 
@@ -121,12 +122,12 @@ export function useHexGridCamera({
   const initialTileMap = useMemo(() => {
     // Only generate tiles on the first initialization
     if (hasInitializedRef.current) {
-      console.log('[useHexGridCamera] Skipping duplicate initialization');
+      logger.info('[useHexGridCamera] Skipping duplicate initialization');
       return {};
     }
 
     initCountRef.current += 1;
-    console.log(`[useHexGridCamera] Initializing tiles (call #${initCountRef.current})`);
+    logger.info(`[useHexGridCamera] Initializing tiles (call #${initCountRef.current})`);
     
     const tiles = generateDefaultTiles(0, 0, radius);
     hasInitializedRef.current = true;
@@ -142,9 +143,9 @@ export function useHexGridCamera({
   // Debug effect to monitor tileMap changes
   useEffect(() => {
     const tileCount = Object.keys(tileMap).length;
-    console.log(`[useHexGridCamera] TileMap updated, now contains ${tileCount} tiles`);
+    logger.info(`[useHexGridCamera] TileMap updated, now contains ${tileCount} tiles`);
     if (tileCount === 0 && hasInitializedRef.current) {
-      console.warn('[useHexGridCamera] Warning: TileMap is empty but initialization has occurred!');
+      logger.warn('[useHexGridCamera] Warning: TileMap is empty but initialization has occurred!');
     }
   }, [tileMap]);
   
@@ -180,15 +181,15 @@ export function useHexGridCamera({
           }, {} as TileMap)
         );
 
-        console.log(`Initial fetch complete: ${initialTiles.length} tiles loaded`);
+        logger.info(`Initial fetch complete: ${initialTiles.length} tiles loaded`);
       } catch (error) {
-        console.error("Failed to fetch initial tiles:", error);
+        logger.error("Failed to fetch initial tiles:", error);
       } finally {
         setIsFetching(false);
       }
     };
 
-    fetchInitialTiles().then(() => { console.log('[useHexGridCamera] Initialized tiles loaded'); });
+    fetchInitialTiles().then(() => { logger.info('[useHexGridCamera] Initialized tiles loaded'); });
   }, [fetchTilesByIds, radius, initialTileMap]);
 
   // Effect to keep refs updated with the latest state
@@ -202,7 +203,7 @@ export function useHexGridCamera({
 
   // Function to update a specific tile
   const updateTile = useCallback((tileId: string, updates: Partial<TileMap[string]>) => {
-    console.log(`[useHexGridCamera] Updating tile ${tileId} with updates:`, updates);
+    logger.info(`[useHexGridCamera] Updating tile ${tileId} with updates:`, updates);
     setTileMap(prevTileMap => {
       if (!prevTileMap[tileId]) return prevTileMap;
       
@@ -249,7 +250,7 @@ export function useHexGridCamera({
 
     // Check if distance exceeds threshold
     if (distance > moveThreshold) {
-      console.log(`[useHexGridCamera] Camera moved ${distance.toFixed(1)} tiles, fetching new area`);
+      logger.info(`[useHexGridCamera] Camera moved ${distance.toFixed(1)} tiles, fetching new area`);
       setIsFetching(true);
       isFetchingRef.current = true;
 
@@ -306,7 +307,7 @@ export function useHexGridCamera({
         lastFetchCenterRef.current = [currentQ, currentR, currentS];
 
       } catch (error) {
-        console.error("Failed to fetch tiles:", error);
+        logger.error("Failed to fetch tiles:", error);
       } finally {
         setIsFetching(false);
         isFetchingRef.current = false;

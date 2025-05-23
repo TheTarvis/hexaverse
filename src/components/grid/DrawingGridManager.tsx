@@ -13,9 +13,11 @@ import {
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription';
 import { WebSocketMessage } from '@/types/websocket'
 import { HexColorPicker } from '@/components/grid/HexColorPicker';
+import logger from '@/utils/logger';
 
 // Constant for hex size
 const HEX_SIZE = 1.2;
+const GRID_RADIUS = 100;
 
 export function DrawingGridManager() {
   const { user } = useAuth();
@@ -31,7 +33,7 @@ export function DrawingGridManager() {
   const originalTileColorsRef = useRef<Record<string, string>>({});
 
   // Generate default tiles in a grid pattern
-  const generateDefaultTiles = useCallback((radius: number = 50): TileMap => {
+  const generateDefaultTiles = useCallback((radius: number = GRID_RADIUS): TileMap => {
     const tiles: TileMap = {};
     
     for (let q = -radius; q <= radius; q++) {
@@ -50,7 +52,7 @@ export function DrawingGridManager() {
       }
     }
     
-    console.log(`[DrawingGridManager] Generated ${Object.keys(tiles).length} default tiles`);
+    logger.info(`[DrawingGridManager] Generated ${Object.keys(tiles).length} default tiles`);
     return tiles;
   }, []);
 
@@ -60,11 +62,11 @@ export function DrawingGridManager() {
 
     const initializeGrid = async () => {
       if (hasInitializedRef.current || !isMounted) {
-        console.log('[DrawingGridManager] Skipping initialization - already initialized or unmounted');
+        logger.info('[DrawingGridManager] Skipping initialization - already initialized or unmounted');
         return;
       }
 
-      console.log('[DrawingGridManager] Starting grid initialization...');
+      logger.info('[DrawingGridManager] Starting grid initialization...');
       setIsLoading(true);
 
       try {
@@ -73,13 +75,13 @@ export function DrawingGridManager() {
         setTileMap(defaultTiles);
 
         // Step 2: Fetch tiles since last update from server
-        console.log('[DrawingGridManager] Calling onLoadDrawingTiles...');
+        logger.info('[DrawingGridManager] Calling onLoadDrawingTiles...');
         const serverTiles = await onLoadDrawingTiles();
-        console.log(`[DrawingGridManager] Successfully loaded ${serverTiles.length} tiles from server`);
+        logger.info(`[DrawingGridManager] Successfully loaded ${serverTiles.length} tiles from server`);
 
         // Step 3: Get all tiles from cache (which now includes the new tiles from server)
         const allCachedTiles = fetchAllDrawingTilesFromCache();
-        console.log(`[DrawingGridManager] Retrieved ${allCachedTiles.length} tiles from cache`);
+        logger.info(`[DrawingGridManager] Retrieved ${allCachedTiles.length} tiles from cache`);
 
         // Step 4: Update tileMap with cached tiles (merge with defaults)
         setTileMap(prev => {
@@ -92,15 +94,15 @@ export function DrawingGridManager() {
             }
           });
           
-          console.log(`[DrawingGridManager] Updated tileMap with ${allCachedTiles.length} cached tiles`);
+          logger.info(`[DrawingGridManager] Updated tileMap with ${allCachedTiles.length} cached tiles`);
           return updatedTileMap;
         });
 
         hasInitializedRef.current = true;
         setIsLoading(false);
-        console.log('[DrawingGridManager] Grid initialization complete');
+        logger.info('[DrawingGridManager] Grid initialization complete');
       } catch (error) {
-        console.error('[DrawingGridManager] Error during grid initialization:', error);
+        logger.error('[DrawingGridManager] Error during grid initialization:', error);
         if (isMounted) {
           setIsLoading(false);
         }
@@ -116,12 +118,12 @@ export function DrawingGridManager() {
 
   // Handle WebSocket messages for real-time updates
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
-    console.log('[DrawingGridManager] Received WebSocket message:', message);
+    logger.info('[DrawingGridManager] Received WebSocket message:', message);
     
     // TODO: Add proper message type checking
     const tile = message as Tile;
     if (tile.id) {
-      console.log('[DrawingGridManager] Processing tile update:', tile);
+      logger.info('[DrawingGridManager] Processing tile update:', tile);
       
       // Update local cache
       updateLocalTileCache(tile);
@@ -141,13 +143,13 @@ export function DrawingGridManager() {
 
   // Handle tile selection for painting
   const handleTileSelect = useCallback((tile: Tile) => {
-    console.log('[DrawingGridManager] handleTileSelect called with tile:', tile);
+    logger.info('[DrawingGridManager] handleTileSelect called with tile:', tile);
     setSelectedTile(tile);
     
     const tileId = `${tile.q}#${tile.r}#${tile.s}`;
     
     if (tileMap[tileId]) {
-      console.log('[DrawingGridManager] Found tile, updating color to:', selectedColor);
+      logger.info('[DrawingGridManager] Found tile, updating color to:', selectedColor);
       
       // Create updated tile
       const updatedTile = {
@@ -168,7 +170,7 @@ export function DrawingGridManager() {
         s: tile.s,
         color: selectedColor
       }).catch(error => {
-        console.error('[DrawingGridManager] Failed to update tile on server:', error);
+        logger.error('[DrawingGridManager] Failed to update tile on server:', error);
         // TODO: Revert optimistic update on error
       });
     }
@@ -220,7 +222,7 @@ export function DrawingGridManager() {
 
   // Handle color selection
   const handleColorSelect = useCallback((color: string) => {
-    console.log('[DrawingGridManager] Selected color:', color);
+    logger.info('[DrawingGridManager] Selected color:', color);
     setSelectedColor(color);
     
     if (selectedTile) {

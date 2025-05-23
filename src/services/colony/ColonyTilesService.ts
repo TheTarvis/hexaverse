@@ -13,6 +13,7 @@ import {
   handleTileAdditionError,
   createTileFunction
 } from '../TilesBaseService';
+import logger from '@/utils/logger';
 
 // Create cache manager instance
 const colonyTileCacheManager = new TileCacheManager(CACHE_TYPES.COLONY);
@@ -45,7 +46,7 @@ export async function fetchTiles(
     foundTiles = cacheResult.foundTiles;
     missingTileIds = cacheResult.missingTileIds;
 
-    console.log(`Found ${foundTiles.length} tiles in individual cache. Missing ${missingTileIds.length}.`);
+    logger.debug(`Found ${foundTiles.length} tiles in individual cache. Missing ${missingTileIds.length}.`);
 
     // If all tiles were found in cache, return them
     if (missingTileIds.length === 0) {
@@ -61,7 +62,7 @@ export async function fetchTiles(
     let fetchedTiles: Tile[] = [];
     
     if (missingTileIds.length > 0) {
-      console.log(`Fetching ${missingTileIds.length} tiles using fetchTilesByIds cloud function...`);
+      logger.debug(`Fetching ${missingTileIds.length} tiles using fetchTilesByIds cloud function...`);
       
       // Call the cloud function with all missing tile IDs
       const result = await fetchColonyTilesByIdsFunction({ tileIds: missingTileIds });
@@ -71,7 +72,7 @@ export async function fetchTiles(
         const fetchedExistingTiles = result.data.tiles;
         
         // Process the response
-        console.log(`Received ${fetchedExistingTiles.length} tiles from server, ${missingTileIds.length - fetchedExistingTiles.length} not found`);
+        logger.debug(`Received ${fetchedExistingTiles.length} tiles from server, ${missingTileIds.length - fetchedExistingTiles.length} not found`);
         
         // Keep track of what tiles were found
         const foundTileIds = new Set(fetchedExistingTiles.map(tile => tile.id));
@@ -94,25 +95,21 @@ export async function fetchTiles(
                   r: r,
                   s: s,
                   controllerUid: "",
-                  type: "", // Or perhaps a specific 'unexplored' type?
-                  visibility: 'unexplored',
-                  resourceDensity: 0,
-                  // Add other required Tile fields with default values if necessary
-                  // resources: {}
+                  updatedAt: new Date().toISOString()
                 };
                 fetchedExistingTiles.push(defaultTile);
               } else {
-                console.warn(`Failed to parse coordinates from non-existent tile ID: ${tileId}`);
+                logger.warn(`Failed to parse coordinates from non-existent tile ID: ${tileId}`);
               }
             } else {
-              console.warn(`Invalid format for non-existent tile ID: ${tileId}`);
+              logger.warn(`Invalid format for non-existent tile ID: ${tileId}`);
             }
           }
         });
         
         fetchedTiles = fetchedExistingTiles;
       } else {
-        console.error('Error fetching tiles:', result.data);
+        logger.error('Error fetching tiles:', result.data);
       }
       
       // Cache the newly fetched tiles
@@ -125,7 +122,7 @@ export async function fetchTiles(
     return [...foundTiles, ...fetchedTiles];
 
   } catch (error) {
-    console.error('Error fetching missing tiles:', error);
+    logger.error('Error fetching missing tiles:', error);
     // Return whatever we found in the cache, or empty array if refresh was forced/error occurred early
     return foundTiles; 
   }
@@ -164,7 +161,7 @@ export async function addColonyTile(
   const coordinates = { q, r, s };
   
   try {
-    console.log(`Sending addColonyTile request for coords: q=${q}, r=${r}, s=${s}`);
+    logger.debug(`Sending addColonyTile request for coords: q=${q}, r=${r}, s=${s}`);
     
     // Call the Firebase function
     const result = await addColonyTileFunction(coordinates);
@@ -173,7 +170,7 @@ export async function addColonyTile(
     if (result.data.success) {
       handleSuccessfulTileAddition(result);
     } else {
-      console.error('Add colony tile failed:', result.data.message);
+      logger.error('Add colony tile failed:', result.data.message);
     }
     
     return result.data;
@@ -186,20 +183,20 @@ export async function addColonyTile(
  * Handle successful tile addition by invalidating relevant caches
  */
 function handleSuccessfulTileAddition(result: HttpsCallableResult<AddTileResponse>): void {
-  console.log(`Added colony tile succeeded`);
+  logger.success(`Added colony tile succeeded`);
 
   // Get the current user ID
   const uid = auth.currentUser?.uid;
   
   // If we captured a tile from another colony, invalidate that colony's cache too
   if (result.data.captured && result.data.previousColony) {
-    console.log(`Captured tile from colony: ${result.data.previousColony}, invalidating its cache`);
+    logger.info(`Captured tile from colony: ${result.data.previousColony}, invalidating its cache`);
     invalidateColonyCache(result.data.previousColony);
   }
 
   // Update the tile cache with the new data
   if (result.data.tile) {
-    console.log(`Updating cache for tile: ${result.data.tile.id}`);
+    logger.debug(`Updating cache for tile: ${result.data.tile.id}`);
     updateTileCache(result.data.tile);
     
     // Update the colony cache with the new tile ID

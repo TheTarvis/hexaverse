@@ -9,6 +9,7 @@ import {
   deleteRoadmapItem as deleteRoadmapItemFromFirestore,
   fetchRoadmapItemsByStatus
 } from '@/services/roadmap';
+import logger from '@/utils/logger';
 
 // Define the roadmap item with an ID
 export interface RoadmapItem extends RoadmapItemProps {
@@ -45,7 +46,7 @@ export function RoadmapProvider({ children }: { children: ReactNode }) {
       setRoadmapItems(items);
       setError(null);
     } catch (err) {
-      console.error('Error loading roadmap items:', err);
+      logger.error('Error loading roadmap items:', err);
       setError(err instanceof Error ? err : new Error('Failed to load roadmap items'));
     } finally {
       setIsLoading(false);

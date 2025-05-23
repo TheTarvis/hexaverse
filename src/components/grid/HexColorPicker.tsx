@@ -1,5 +1,6 @@
 'use client'
 
+import logger from '@/utils/logger';
 import React, { useState, useCallback, useEffect } from 'react';
 
 // Default color palette - extended with more color options
@@ -40,7 +41,7 @@ export function HexColorPicker({ onColorSelect, initialColor }: HexColorPickerPr
         setRecentColors(JSON.parse(savedColors));
       }
     } catch (e) {
-      console.error('Failed to load recent colors:', e);
+      logger.error('Failed to load recent colors:', e);
     }
 
     // Set initial palette - first 6 colors or less if there are fewer
@@ -76,7 +77,7 @@ export function HexColorPicker({ onColorSelect, initialColor }: HexColorPickerPr
     try {
       localStorage.setItem('recentColors', JSON.stringify(newRecentColors));
     } catch (e) {
-      console.error('Failed to save recent colors:', e);
+      logger.error('Failed to save recent colors:', e);
     }
   }, [onColorSelect, recentColors]);
 

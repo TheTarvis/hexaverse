@@ -1,4 +1,11 @@
 # Changelog
+## [v0.12.5]
+### Changed
+- Replaced all console.log statements with structured logging using consola library
+- Added proper logging levels (debug, info, warn, error, success) throughout the application
+- Improved logging consistency across services, components, and utilities
+- Enhanced debugging capabilities with better log categorization
+
 ## [v0.12.4]
 ### Changed
 - More refactoring to get shared logic into centralized location.

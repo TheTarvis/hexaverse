@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { useAuth } from '@/contexts/AuthContext';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import logger from '@/utils/logger';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -44,12 +45,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setIsLoading(true);
 
     try {
-      console.log('Starting Google sign-in from LoginModal...');
+      logger.info('Starting Google sign-in from LoginModal...');
       await signInWithGoogle();
-      console.log('Google sign-in completed, closing modal...');
+      logger.info('Google sign-in completed, closing modal...');
       onClose();
     } catch (err) {
-      console.error('Google sign-in error in LoginModal:', err);
+      logger.error('Google sign-in error in LoginModal:', err);
       if (err instanceof Error) {
         // Display friendly error message to the user
         if (err.message.includes('auth/popup-closed-by-user')) {

@@ -11,6 +11,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firestore } from '@/config/firebase';
 import { RoadmapItem } from '@/contexts/RoadmapContext';
 import { getFromCache, saveToCache } from '@/utils/cache';
+import logger from '@/utils/logger';
 
 // Constants
 const COLLECTION_NAME = 'roadmapItems';
@@ -39,19 +40,19 @@ export async function fetchRoadmapItems(
   if (!options?.forceRefresh && typeof window !== 'undefined') {
     const cachedItems = getFromCache<RoadmapItem[]>(ROADMAP_CACHE_KEY, ROADMAP_CACHE_EXPIRY);
     if (cachedItems) {
-      console.log('Using cached roadmap data');
+      logger.debug('Using cached roadmap data');
       return cachedItems;
     }
   }
   
   try {
-    console.log('Fetching roadmap items from Firestore');
+    logger.info('Fetching roadmap items from Firestore');
     const roadmapRef = collection(firestore, COLLECTION_NAME);
     const q = query(roadmapRef, orderBy('createdAt', 'desc'));
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
-      console.log('No roadmap items found');
+      logger.info('No roadmap items found');
       return [];
     }
     
@@ -81,7 +82,7 @@ export async function fetchRoadmapItems(
     
     return roadmapItems;
   } catch (error) {
-    console.error('Error fetching roadmap items:', error);
+    logger.error('Error fetching roadmap items:', error);
     throw error;
   }
 }
@@ -95,7 +96,7 @@ export async function addRoadmapItem(
   item: Omit<RoadmapItem, 'id'>
 ): Promise<RoadmapItem> {
   try {
-    console.log('Adding roadmap item via Cloud Function');
+    logger.info('Adding roadmap item via Cloud Function');
     
     // Call the Cloud Function
     const result = await addRoadmapItemFunction(item);
@@ -108,7 +109,7 @@ export async function addRoadmapItem(
     
     return newItem;
   } catch (error) {
-    console.error('Error adding roadmap item:', error);
+    logger.error('Error adding roadmap item:', error);
     throw error;
   }
 }
@@ -123,7 +124,7 @@ export async function updateRoadmapItem(
   updates: Partial<Omit<RoadmapItem, 'id'>>
 ): Promise<void> {
   try {
-    console.log(`Updating roadmap item ${id} via Cloud Function`);
+    logger.info(`Updating roadmap item ${id} via Cloud Function`);
     
     // Call the Cloud Function
     await updateRoadmapItemFunction({ id, ...updates });
@@ -133,7 +134,7 @@ export async function updateRoadmapItem(
       localStorage.removeItem(ROADMAP_CACHE_KEY);
     }
   } catch (error) {
-    console.error('Error updating roadmap item:', error);
+    logger.error('Error updating roadmap item:', error);
     throw error;
   }
 }
@@ -144,7 +145,7 @@ export async function updateRoadmapItem(
  */
 export async function deleteRoadmapItem(id: string): Promise<void> {
   try {
-    console.log(`Deleting roadmap item ${id} via Cloud Function`);
+    logger.info(`Deleting roadmap item ${id} via Cloud Function`);
     
     // Call the Cloud Function
     await deleteRoadmapItemFunction({ id });
@@ -154,7 +155,7 @@ export async function deleteRoadmapItem(id: string): Promise<void> {
       localStorage.removeItem(ROADMAP_CACHE_KEY);
     }
   } catch (error) {
-    console.error('Error deleting roadmap item:', error);
+    logger.error('Error deleting roadmap item:', error);
     throw error;
   }
 }
@@ -176,13 +177,13 @@ export async function fetchRoadmapItemsByStatus(
   if (!options?.forceRefresh && typeof window !== 'undefined') {
     const cachedItems = getFromCache<RoadmapItem[]>(cacheKey, ROADMAP_CACHE_EXPIRY);
     if (cachedItems) {
-      console.log(`Using cached roadmap data for status: ${status}`);
+      logger.debug(`Using cached roadmap data for status: ${status}`);
       return cachedItems;
     }
   }
   
   try {
-    console.log(`Fetching roadmap items with status: ${status}`);
+    logger.info(`Fetching roadmap items with status: ${status}`);
     const roadmapRef = collection(firestore, COLLECTION_NAME);
     const q = query(
       roadmapRef, 
@@ -193,7 +194,7 @@ export async function fetchRoadmapItemsByStatus(
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
-      console.log(`No roadmap items found with status: ${status}`);
+      logger.info(`No roadmap items found with status: ${status}`);
       return [];
     }
     
@@ -225,7 +226,7 @@ export async function fetchRoadmapItemsByStatus(
     
     return roadmapItems;
   } catch (error) {
-    console.error(`Error fetching roadmap items with status ${status}:`, error);
+    logger.error(`Error fetching roadmap items with status ${status}:`, error);
     throw error;
   }
 } 

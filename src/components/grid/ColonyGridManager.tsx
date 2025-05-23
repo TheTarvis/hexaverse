@@ -16,6 +16,7 @@ import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
 import { COLONY_WEBSOCKET_URL } from '@/services/websocket'
 import { useHexGridCamera } from '@/hooks/useHexGridCamera'
 import { ColonyCheck } from '@/components/colony/ColonyCheck'
+import logger from '@/utils/logger';
 
 // Inner component that uses the colony context
 function ColonyGridInner() {
@@ -30,7 +31,7 @@ function ColonyGridInner() {
   // Set WebSocket server URL only once when component mounts
   useEffect(() => {
     if (COLONY_WEBSOCKET_URL) {
-      console.log(`Setting WebSocket base URL for ColonyGrid: ${COLONY_WEBSOCKET_URL}`);
+      logger.info(`Setting WebSocket base URL for ColonyGrid: ${COLONY_WEBSOCKET_URL}`);
       setServerUrl(COLONY_WEBSOCKET_URL);
     }
   }, [COLONY_WEBSOCKET_URL, setServerUrl]);
@@ -157,23 +158,23 @@ function ColonyGridInner() {
     async (q: number, r: number, s: number) => {
       try {
         setAddingTile(true)
-        console.log(`Adding tile at q=${q}, r=${r}, s=${s} to colony`)
+        logger.info(`Adding tile at q=${q}, r=${r}, s=${s} to colony`)
 
         const result = await addColonyTileService(q, r, s)
 
         if (!result || !result.success || !result.tile) {
-          console.error(`Failed to add tile: ${result.message}`)
+          logger.error(`Failed to add tile: ${result.message}`)
           showToast(result.message || 'Failed to add tile', 'error')
           setError(null) // Clear any existing error
           return
         }
 
-        console.log('Adding tile to colony:', result.tile)
+        logger.info('Adding tile to colony:', result.tile)
 
         // Update the Tiles Context with the new colony tile.
         addColonyTile(result.tile)
       } catch (error) {
-        console.error('Error adding tile:', error)
+        logger.error('Error adding tile:', error)
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
         showToast(errorMessage, 'error')
         setError(null) // Clear any existing error
@@ -219,12 +220,12 @@ function ColonyGridInner() {
   }
 
   const handleTileSelect = (tile: Tile) => {
-    console.log('Setting selected tile:', tile)
+    logger.info('Setting selected tile:', tile)
     // Only set the selected tile if tile details are enabled
     if (debugState.tileDetailsEnabled) {
       setSelectedTile(tile)
     } else {
-      console.log('Tile details are disabled. Enable in debug menu to see details.')
+      logger.info('Tile details are disabled. Enable in debug menu to see details.')
     }
   }
 

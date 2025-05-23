@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { marked } from 'marked';
+import logger from '@/utils/logger';
 
 export default function ChangelogPage() {
   const [content, setContent] = useState<string>('Loading changelog...');
@@ -32,7 +33,7 @@ export default function ChangelogPage() {
         }
       })
       .catch(error => {
-        console.error('Error loading changelog:', error);
+        logger.error('Error loading changelog:', error);
         setContent('Failed to load changelog. Please try again later.');
       });
   }, []);

@@ -3,6 +3,7 @@ import { updateTileCache } from '@/services/colony/ColonyTilesService';
 import { removeColonyCacheWithTile } from '@/services/colony/colony';
 import { User } from 'firebase/auth';
 import { ColonyTilesState } from './predicates';
+import logger from '@/utils/logger';
 
 // Handler context interface - these are the dependencies needed by handlers
 export interface HandlerContext {
@@ -18,7 +19,7 @@ export interface HandlerContext {
  * Handle a tile update for a tile owned by the current user
  */
 export async function handleOwnTile(tile: Tile, ctx: HandlerContext) {
-  console.log(`WebSocket: Handling own tile update at ${tile.q},${tile.r},${tile.s}`);
+  logger.debug(`WebSocket: Handling own tile update at ${tile.q},${tile.r},${tile.s}`);
   updateTileCache(tile);
   ctx.addColonyTile(tile);
 }
@@ -27,7 +28,7 @@ export async function handleOwnTile(tile: Tile, ctx: HandlerContext) {
  * Handle a tile update for a tile in the viewable area
  */
 export function handleViewableTile(tile: Tile, ctx: HandlerContext) {
-  console.log(`WebSocket: Handling viewable tile update at ${tile.q},${tile.r},${tile.s}`);
+  logger.debug(`WebSocket: Handling viewable tile update at ${tile.q},${tile.r},${tile.s}`);
   updateTileCache(tile);
   
   ctx.setViewableTiles((prev) => ({
@@ -40,7 +41,7 @@ export function handleViewableTile(tile: Tile, ctx: HandlerContext) {
  * Handle a tile update for a tile being taken by an opponent
  */
 export async function handleOpponentTile(tile: Tile, ctx: HandlerContext) {
-  console.log(`WebSocket: Handling opponent taking tile at ${tile.q},${tile.r},${tile.s}`);
+  logger.debug(`WebSocket: Handling opponent taking tile at ${tile.q},${tile.r},${tile.s}`);
   updateTileCache(tile);
   
   // Remove the tile from our colony

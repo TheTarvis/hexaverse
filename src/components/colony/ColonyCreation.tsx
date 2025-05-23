@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useColony } from '@/contexts/ColonyContext';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/contexts/ToastContext';
+import logger from '@/utils/logger';
 
 // Utility function to convert hex to HSL
 const hexToHSL = (hex: string): { h: number; s: number; l: number } => {
@@ -153,7 +154,7 @@ export function ColonyCreation() {
       }, 1500);
     } catch (err) {
       // Error is already handled in the context
-      console.error('Error in colony creation component:', err);
+      logger.error('Error in colony creation component:', err);
     }
   };
 

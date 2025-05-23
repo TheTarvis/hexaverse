@@ -18,6 +18,7 @@ import { Tile } from '@/types/tiles';
 import { callFunction, getFunctionUrl } from '@/utils/api';
 import { auth, firestore, functions } from '@/config/firebase';
 import {useAuth} from "@/contexts/AuthContext";
+import logger from '@/utils/logger';
 
 // Create callable function references
 const createColonyFunction = httpsCallable<
@@ -53,7 +54,7 @@ function getFromCache<T>(key: string, expiryTime: number): T | null {
     
     return data;
   } catch (error) {
-    console.warn('Error reading from cache:', error);
+    logger.warn('Error reading from cache:', error);
     return null;
   }
 }
@@ -66,7 +67,7 @@ function saveToCache<T>(key: string, data: T): void {
     };
     localStorage.setItem(key, JSON.stringify(cacheItem));
   } catch (error) {
-    console.warn('Error saving to cache:', error);
+    logger.warn('Error saving to cache:', error);
   }
 }
 
@@ -92,22 +93,22 @@ export async function fetchUserColony(
   if (!options?.forceRefresh && typeof window !== 'undefined') {
     const cachedColony = getFromCache<Colony>(cacheKey, COLONY_CACHE_EXPIRY);
     if (cachedColony) {
-      console.log(`Using cached colony data for user: ${uid}`);
+      logger.debug(`Using cached colony data for user: ${uid}`);
       return cachedColony;
     }
   }
   
   try {
-    console.log(`Fetching colony for user: ${uid}`);
+    logger.info(`Fetching colony for user: ${uid}`);
     const coloniesRef = collection(firestore, 'colony/v1/colonies');
     const q = query(coloniesRef, where('uid', '==', uid));
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
-      console.log('No colony found for this user');
+      logger.info('No colony found for this user');
       return null;
     }
-    console.log(`Found colony for user: ${uid}`);
+    logger.info(`Found colony for user: ${uid}`);
     // Take the first colony found
     const colonyDoc = querySnapshot.docs[0];
     const colonyData = colonyDoc.data();
@@ -139,7 +140,7 @@ export async function fetchUserColony(
     
     return colony;
   } catch (error) {
-    console.error('Error fetching user colony:', error);
+    logger.error('Error fetching user colony:', error);
     throw error;
   }
 }
@@ -155,7 +156,7 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
   }
   
   try {
-    console.log(`Creating colony for user: ${colonyData.uid}`);
+    logger.info(`Creating colony for user: ${colonyData.uid}`);
     
     // Call the Firebase callable function
     const result = await createColonyFunction({ 
@@ -184,11 +185,11 @@ export async function createColony(colonyData: CreateColonyRequest): Promise<Col
       visibilityRadius: responseData.visibilityRadius
     };
     
-    console.log(`Colony created with ID: ${colony.id}`);
+    logger.success(`Colony created with ID: ${colony.id}`);
     
     return colony;
   } catch (error) {
-    console.error('Error creating colony:', error);
+    logger.error('Error creating colony:', error);
     throw error;
   }
 }
@@ -204,9 +205,9 @@ export function invalidateColonyCache(uid: string): void {
   try {
     const cacheKey = getColonyCacheKey(uid);
     localStorage.removeItem(cacheKey);
-    console.log(`Invalidated colony cache for user: ${uid}`);
+    logger.debug(`Invalidated colony cache for user: ${uid}`);
   } catch (error) {
-    console.warn('Error invalidating colony cache:', error);
+    logger.warn('Error invalidating colony cache:', error);
   }
 }
 
@@ -225,7 +226,7 @@ export async function updateColonyCacheWithNewTile(uid: string, tileId: string):
     // Try to get the colony from cache
     const cachedColonyJson = localStorage.getItem(cacheKey);
     if (!cachedColonyJson) {
-      console.log('Colony not found in cache, will be updated on next fetch');
+      logger.debug('Colony not found in cache, will be updated on next fetch');
       return;
     }
     
@@ -235,13 +236,13 @@ export async function updateColonyCacheWithNewTile(uid: string, tileId: string):
     
     // Check if the colony has a tileIds array
     if (!colony || !Array.isArray(colony.tileIds)) {
-      console.warn('Invalid colony data in cache');
+      logger.warn('Invalid colony data in cache');
       return;
     }
     
     // Check if tile is already in the colony's tileIds
     if (colony.tileIds.includes(tileId)) {
-      console.log(`Tile ${tileId} already exists in colony cache`);
+      logger.debug(`Tile ${tileId} already exists in colony cache`);
       return;
     }
     
@@ -257,9 +258,9 @@ export async function updateColonyCacheWithNewTile(uid: string, tileId: string):
     cachedData.data = colony;
     localStorage.setItem(cacheKey, JSON.stringify(cachedData));
     
-    console.log(`Updated colony cache with new tile: ${tileId}`);
+    logger.debug(`Updated colony cache with new tile: ${tileId}`);
   } catch (error) {
-    console.warn('Error updating colony cache with new tile:', error);
+    logger.warn('Error updating colony cache with new tile:', error);
   }
 }
 
@@ -278,7 +279,7 @@ export async function removeColonyCacheWithTile(uid: string, tileId: string): Pr
     // Try to get the colony from cache
     const cachedColonyJson = localStorage.getItem(cacheKey);
     if (!cachedColonyJson) {
-      console.log('Colony not found in cache, will be updated on next fetch');
+      logger.debug('Colony not found in cache, will be updated on next fetch');
       return;
     }
     
@@ -288,13 +289,13 @@ export async function removeColonyCacheWithTile(uid: string, tileId: string): Pr
     
     // Check if the colony has a tileIds array
     if (!colony || !Array.isArray(colony.tileIds)) {
-      console.warn('Invalid colony data in cache');
+      logger.warn('Invalid colony data in cache');
       return;
     }
     
     // Check if tile exists in the colony's tileIds
     if (!colony.tileIds.includes(tileId)) {
-      console.log(`Tile ${tileId} does not exist in colony cache`);
+      logger.debug(`Tile ${tileId} does not exist in colony cache`);
       return;
     }
     
@@ -310,8 +311,8 @@ export async function removeColonyCacheWithTile(uid: string, tileId: string): Pr
     cachedData.data = colony;
     localStorage.setItem(cacheKey, JSON.stringify(cachedData));
     
-    console.log(`Removed tile ${tileId} from colony cache`);
+    logger.debug(`Removed tile ${tileId} from colony cache`);
   } catch (error) {
-    console.warn('Error removing tile from colony cache:', error);
+    logger.warn('Error removing tile from colony cache:', error);
   }
 }

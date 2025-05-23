@@ -9,6 +9,7 @@ import {
   CACHE_TYPES
 } from '@/utils/tileCache';
 import { DEFAULT_CACHE_EXPIRY } from '@/utils/cacheUtils';
+import logger from '@/utils/logger';
 
 // Common Types
 export interface AddTileRequest {
@@ -53,7 +54,7 @@ export class TileCacheManager {
   clearCache(): void {
     const clearedCount = clearTileCache(this.cacheType);
     if (clearedCount > 0) {
-      console.log(`Cleared ${clearedCount} ${this.cacheType} tile cache entries`);
+      logger.debug(`Cleared ${clearedCount} ${this.cacheType} tile cache entries`);
     }
   }
 
@@ -64,7 +65,7 @@ export class TileCacheManager {
   updateCache(arg: Tile | Tile[]): void {
     const updatedCount = updateCacheTiles(arg, this.cacheType, this.expiryTime);
     if (updatedCount > 0) {
-      console.log(`Updated cache for ${updatedCount} ${this.cacheType} tiles`);
+      logger.debug(`Updated cache for ${updatedCount} ${this.cacheType} tiles`);
     }
   }
 
@@ -99,7 +100,7 @@ export function handleTileAdditionError(
   serviceType: string
 ): AddTileResponse {
   const { q, r, s } = coordinates;
-  console.error(`Error adding ${serviceType} tile at [${q},${r},${s}]:`, error);
+  logger.error(`Error adding ${serviceType} tile at [${q},${r},${s}]:`, error);
   
   // Parse the Firebase callable function error
   const errorCode = error.code || 'unknown';

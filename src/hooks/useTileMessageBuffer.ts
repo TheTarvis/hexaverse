@@ -1,4 +1,5 @@
 import { Tile } from '@/types/tiles';
+import logger from '@/utils/logger';
 import { useCallback, useEffect, useRef } from 'react';
 
 interface BufferOptions {
@@ -26,7 +27,7 @@ export function useTileMessageBuffer({
     
     // Extract all tiles from the buffer (deduped by id)
     const tiles = Object.values(pendingTiles.current);
-    console.log(`Flushing buffer with ${tiles.length} tile updates`);
+    logger.info(`Flushing buffer with ${tiles.length} tile updates`);
     
     // Call the onFlush callback with the batched tiles
     onFlush(tiles);

@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { CameraTracker } from './CameraTracker'
 import { cubeToPixel, pixelToCube, cubeRound } from '@/utils/gridUtils'
 import { getTileColor } from '@/utils/tileColorUtils'
+import logger from '@/utils/logger';
 
 
 
@@ -190,17 +191,17 @@ const HexGrid = React.memo(function HexGrid({
   // Debug effect to monitor tile processing
   useEffect(() => {
     const tileCount = Object.keys(tileMap).length;
-    console.log(`[HexGrid] Processing ${tileCount} tiles for rendering`);
+    logger.info(`[HexGrid] Processing ${tileCount} tiles for rendering`);
     if (tileCount > 0) {
       const sampleTile = tileMap[Object.keys(tileMap)[0]];
-      console.log('[HexGrid] Sample tile:', sampleTile);
+      logger.info('[HexGrid] Sample tile:', sampleTile);
     }
   }, [tileMap]);
 
   // Process tile data for instanced mesh attributes
   const { instanceData, instancePositions, instanceColors, instanceOpacities } = useMemo(() => {
     const tiles = Object.values(tileMap);
-    console.log(`[HexGrid] Creating instance data for ${tiles.length} tiles`);
+    logger.info(`[HexGrid] Creating instance data for ${tiles.length} tiles`);
 
     const positions = new Float32Array(tiles.length * 3);
     const colors = new Float32Array(tiles.length * 3);
@@ -235,7 +236,7 @@ const HexGrid = React.memo(function HexGrid({
       };
     });
 
-    console.log(`[HexGrid] Instance data created with ${tileData.length} tiles`);
+    logger.info(`[HexGrid] Instance data created with ${tileData.length} tiles`);
     return {
       instanceData: tileData,
       instancePositions: positions,
@@ -246,7 +247,7 @@ const HexGrid = React.memo(function HexGrid({
 
   // Create a material with the custom shaders
   const material = useMemo(() => {
-    console.log('[HexGrid] Creating shader material');
+    logger.info('[HexGrid] Creating shader material');
     const mat = new THREE.ShaderMaterial({
       vertexShader: hexVertexShader,
       fragmentShader: hexFragmentShader,
@@ -264,11 +265,11 @@ const HexGrid = React.memo(function HexGrid({
   // Update the instance attributes when data changes
   useEffect(() => {
     if (!meshRef.current) {
-      console.warn('[HexGrid] Mesh ref not available');
+      logger.warn('[HexGrid] Mesh ref not available');
       return;
     }
 
-    console.log(`[HexGrid] Updating instance attributes for ${instanceData.length} tiles`);
+    logger.info(`[HexGrid] Updating instance attributes for ${instanceData.length} tiles`);
 
     // Create and assign attributes
     const positionAttr = new THREE.InstancedBufferAttribute(instancePositions, 3);
@@ -284,7 +285,7 @@ const HexGrid = React.memo(function HexGrid({
     meshRef.current.count = instanceData.length;
     meshRef.current.frustumCulled = false;
 
-    console.log('[HexGrid] Instance attributes updated successfully');
+    logger.info('[HexGrid] Instance attributes updated successfully');
   }, [instanceData, instancePositions, instanceColors, instanceOpacities]);
 
   const handleClick = useCallback((event: ThreeEvent<MouseEvent>) => {
@@ -297,7 +298,7 @@ const HexGrid = React.memo(function HexGrid({
     const [fq, fr, fs] = pixelToCube(intersectionPoint.x, intersectionPoint.y, hexSize);
     const [q, r, s] = cubeRound(fq, fr, fs);
 
-    console.log(`Click: Pixel=(${intersectionPoint.x.toFixed(2)}, ${intersectionPoint.y.toFixed(2)}), Cube=(${q}, ${r}, ${s})`);
+    logger.info(`Click: Pixel=(${intersectionPoint.x.toFixed(2)}, ${intersectionPoint.y.toFixed(2)}), Cube=(${q}, ${r}, ${s})`);
 
     // Use cube coordinates to find the tile
     const tileKey = `${q}#${r}#${s}`;
@@ -328,7 +329,7 @@ const HexGrid = React.memo(function HexGrid({
     const [fq, fr, fs] = pixelToCube(intersectionPoint.x, intersectionPoint.y, hexSize);
     const [q, r, s] = cubeRound(fq, fr, fs);
 
-    console.log(`Double Click: Cube=(${q}, ${r}, ${s})`);
+    logger.info(`Double Click: Cube=(${q}, ${r}, ${s})`);
 
     // Use cube coordinates to find the tile
     const tileKey = `${q}#${r}#${s}`;

@@ -1,6 +1,7 @@
 'use client'
 
 import { getAuthToken } from '@/services/auth'
+import logger from '@/utils/logger'
 
 // More specific environment variables for different websocket servers
 export const COLONY_WEBSOCKET_URL =
@@ -21,13 +22,13 @@ export const addAuth = async (baseUrl: string): Promise<string> => {
 
     // Log token info for debugging
     if (token) {
-      console.log(`Token available for WebSocket auth (length: ${token.length})`)
+      logger.debug(`Token available for WebSocket auth (length: ${token.length})`)
     } else {
-      console.warn('No authentication token available for WebSocket connection')
+      logger.warn('No authentication token available for WebSocket connection')
     }
 
     // Create URL object to properly handle query parameters
-    console.log('asdf: ' + baseUrl)
+    logger.debug('Base URL: ' + baseUrl)
     const wsUrl = new URL(baseUrl)
 
     // Add token as query parameter if available
@@ -37,13 +38,13 @@ export const addAuth = async (baseUrl: string): Promise<string> => {
 
     const endpoint = wsUrl.toString()
 
-    console.log(
+    logger.debug(
       `Authenticated WebSocket endpoint: ${endpoint.substring(0, endpoint.includes('token') ? 50 : endpoint.length)}${endpoint.includes('token') ? '...' : ''}`
     )
 
     return endpoint
   } catch (error) {
-    console.error('Error adding authentication to WebSocket URL:', error)
+    logger.error('Error adding authentication to WebSocket URL:', error)
     // Return original URL as fallback
     return baseUrl
   }
@@ -88,13 +89,13 @@ export const getHealthCheckEndpoint = (baseUrl: string): string => {
 export const checkHealth = async (baseUrl: string): Promise<boolean> => {
   try {
     const endpoint = getHealthCheckEndpoint(baseUrl)
-    console.log(`Checking health at ${endpoint}`)
+    logger.debug(`Checking health at ${endpoint}`)
     const response = await fetch(endpoint)
     const isHealthy = response.ok
-    console.log(`Health check result: ${isHealthy ? 'healthy' : 'unhealthy'}`)
+    logger.info(`Health check result: ${isHealthy ? 'healthy' : 'unhealthy'}`)
     return isHealthy
   } catch (error) {
-    console.error('Health check failed:', error)
+    logger.error('Health check failed:', error)
     return false
   }
 }

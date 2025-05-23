@@ -9,6 +9,7 @@ import { Select } from '@/components/select';
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '@/components/dropdown';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { Subheading } from '@/components/heading';
+import logger from '@/utils/logger';
 
 interface RoadmapFormData {
   title: string;
@@ -75,7 +76,7 @@ export function RoadmapAdminControls({ onAction }: RoadmapAdminControlsProps) {
       // Call optional callback
       if (onAction) onAction();
     } catch (error) {
-      console.error('Error saving roadmap item:', error);
+      logger.error('Error saving roadmap item:', error);
       setFormError(error instanceof Error ? error.message : 'Failed to save roadmap item');
     }
   };
@@ -102,7 +103,7 @@ export function RoadmapAdminControls({ onAction }: RoadmapAdminControlsProps) {
         // Call optional callback
         if (onAction) onAction();
       } catch (error) {
-        console.error('Error deleting roadmap item:', error);
+        logger.error('Error deleting roadmap item:', error);
         alert('Error deleting roadmap item: ' + (error instanceof Error ? error.message : 'Unknown error'));
       }
     }

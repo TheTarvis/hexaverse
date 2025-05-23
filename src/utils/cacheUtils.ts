@@ -2,6 +2,8 @@
  * Centralized cache utilities for the application
  */
 
+import logger from '@/utils/logger';
+
 // Types for cached data
 interface CachedItem<T> {
   data: T;
@@ -39,7 +41,7 @@ export function getFromCache<T>(key: string, type: string, expiryTime: number = 
     
     return data;
   } catch (error) {
-    console.warn(`Error reading from ${type} cache:`, error);
+    logger.warn(`Error reading from ${type} cache:`, error);
     return null;
   }
 }
@@ -62,7 +64,7 @@ export function saveToCache<T>(key: string, type: string, data: T, expiryTime: n
     };
     localStorage.setItem(prefixedKey, JSON.stringify(cacheItem));
   } catch (error) {
-    console.warn(`Error saving to ${type} cache:`, error);
+    logger.warn(`Error saving to ${type} cache:`, error);
   }
 }
 
@@ -94,7 +96,7 @@ export function clearCacheByPrefix(prefix: string): number {
     
     return clearedCount;
   } catch (error) {
-    console.warn(`Error clearing cache with prefix ${prefix}:`, error);
+    logger.warn(`Error clearing cache with prefix ${prefix}:`, error);
     return 0;
   }
 }
@@ -131,7 +133,7 @@ export function getAllByPrefix<T>(prefix: string, expiryTime: number = DEFAULT_C
             }
           }
         } catch (error) {
-          console.warn(`Error parsing cached item ${key}:`, error);
+          logger.warn(`Error parsing cached item ${key}:`, error);
           keysToRemove.push(key); // Remove corrupted entries
         }
       }
@@ -142,7 +144,7 @@ export function getAllByPrefix<T>(prefix: string, expiryTime: number = DEFAULT_C
     
     return items;
   } catch (error) {
-    console.warn(`Error getting all items with prefix ${prefix}:`, error);
+    logger.warn(`Error getting all items with prefix ${prefix}:`, error);
     return [];
   }
 } 

@@ -9,6 +9,7 @@ import { Heading } from '@/components/heading';
 import { submitSupportRequest } from '@/services/support';
 import { useToast } from '@/contexts/ToastContext';
 import Link from 'next/link';
+import logger from '@/utils/logger';
 
 type SupportCategory = 'idea' | 'problem' | 'other';
 
@@ -49,7 +50,7 @@ export default function SupportPage() {
         showToast('Your support request has been submitted successfully', 'success');
       }
     } catch (error) {
-      console.error('Error submitting support request:', error);
+      logger.error('Error submitting support request:', error);
       showToast(
         error instanceof Error ? error.message : 'An error occurred while submitting your request',
         'error'

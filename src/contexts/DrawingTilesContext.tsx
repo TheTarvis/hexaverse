@@ -7,6 +7,7 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
 import { useTileMessageBuffer } from '@/hooks/useTileMessageBuffer'
 import { updateDrawingTileCache } from '@/services/DrawingTilesService'
+import logger from '@/utils/logger';
 
 interface DrawingTilesContextType {
   drawingTiles: TileMap;
@@ -72,7 +73,7 @@ export function DrawingTilesProvider({ children }: { children: ReactNode }) {
   const handleMessage = useCallback((data: ColonyWebSocketMessage) => {
     if (isTileMessage(data) && data.payload) {
       const tile = data.payload;
-      console.log(`WebSocket: Received drawing tile update for tile at ${tile.q},${tile.r},${tile.s}`);
+      logger.debug(`WebSocket: Received drawing tile update for tile at ${tile.q},${tile.r},${tile.s}`);
       bufferTileMessage(tile);
     }
   }, [bufferTileMessage]);

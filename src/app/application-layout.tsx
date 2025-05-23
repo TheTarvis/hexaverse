@@ -51,6 +51,7 @@ import { usePathname } from 'next/navigation'
 import { WebSocketStatusIndicator } from '@/components/websocket-status-indicator';
 import { useState } from 'react'
 import { LoginModal } from '@/components/auth/LoginModal'
+import logger from '@/utils/logger';
 
 function AccountDropdownMenu({ anchor }: { anchor: 'top start' | 'bottom end' }) {
   const { user, signOut } = useAuth();
@@ -59,7 +60,7 @@ function AccountDropdownMenu({ anchor }: { anchor: 'top start' | 'bottom end' })
     try {
       await signOut();
     } catch (error) {
-      console.error('Error signing out:', error);
+      logger.error('Error signing out:', error);
     }
   };
 
