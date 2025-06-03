@@ -37,7 +37,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={inter.variable}>
         <ToastProvider>
           <AuthProvider>
-            <WebSocketProvider>
+            <WebSocketProvider 
+              requireAuth={false}
+            >
                 <ApplicationLayout events={events}>{children}</ApplicationLayout>
             </WebSocketProvider>
           </AuthProvider>
