@@ -31,13 +31,17 @@ export function generateInitialTiles(
     
     return {
       id: `${q}#${r}#${s}`, // New ID format as per TODO
-      q, r, s,
+      q,
+      r,
+      s,
       type: tileType,
       controllerUid: uid,
       visibility: 'visible',
       resourceDensity,
-      resources: {}  // Will be populated by resource generation logic
-    };
+      resources: {}, // Will be populated by resource generation logic
+      color: '#666666',
+      updatedAt: '',
+    }
   };
   
   // Add center tile (base location)
