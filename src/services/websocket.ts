@@ -13,33 +13,35 @@ export const DRAWING_WEBSOCKET_URL =
 /**
  * Add authentication to a WebSocket URL
  * @param baseUrl The base WebSocket URL to authenticate
- * @returns The WebSocket URL with authentication token added
+ * @param requireAuth Whether authentication is required
+ * @returns The WebSocket URL with authentication token added (if required)
  */
-export const addAuth = async (baseUrl: string): Promise<string> => {
+export const addAuth = async (baseUrl: string, requireAuth: boolean = true): Promise<string> => {
   try {
-    // Get the user's Firebase token for authentication
-    const token = await getAuthToken()
-
-    // Log token info for debugging
-    if (token) {
-      logger.debug(`Token available for WebSocket auth (length: ${token.length})`)
-    } else {
-      logger.warn('No authentication token available for WebSocket connection')
-    }
-
     // Create URL object to properly handle query parameters
     logger.debug('Base URL: ' + baseUrl)
     const wsUrl = new URL(baseUrl)
 
-    // Add token as query parameter if available
-    if (token) {
-      wsUrl.searchParams.append('token', token)
+    // Only add auth if required
+    if (requireAuth) {
+      // Get the user's Firebase token for authentication
+      const token = await getAuthToken()
+
+      // Log token info for debugging
+      if (token) {
+        logger.debug(`Token available for WebSocket auth (length: ${token.length})`)
+        wsUrl.searchParams.append('token', token)
+      } else {
+        logger.warn('No authentication token available for WebSocket connection')
+      }
+    } else {
+      logger.debug('Authentication not required for WebSocket connection')
     }
 
     const endpoint = wsUrl.toString()
 
     logger.debug(
-      `Authenticated WebSocket endpoint: ${endpoint.substring(0, endpoint.includes('token') ? 50 : endpoint.length)}${endpoint.includes('token') ? '...' : ''}`
+      `${requireAuth ? 'Authenticated' : 'Unauthenticated'} WebSocket endpoint: ${endpoint.substring(0, endpoint.includes('token') ? 50 : endpoint.length)}${endpoint.includes('token') ? '...' : ''}`
     )
 
     return endpoint
@@ -52,9 +54,11 @@ export const addAuth = async (baseUrl: string): Promise<string> => {
 
 /**
  * Get the WebSocket endpoint URL
+ * @param baseUrl The base WebSocket URL
+ * @param requireAuth Whether authentication is required (default: true)
  * @returns The complete WebSocket URL with protocol and path
  */
-export const getWebSocketEndpoint = async (baseUrl: string): Promise<string> => {
+export const getWebSocketEndpoint = async (baseUrl: string, requireAuth: boolean = true): Promise<string> => {
   if (!baseUrl) {
     throw new Error('WebSocket URL not configured in environment variables')
   }
@@ -65,8 +69,8 @@ export const getWebSocketEndpoint = async (baseUrl: string): Promise<string> => 
 
   const baseEndpoint = `${protocol}://${baseUrl}/ws`
 
-  // Use the new addAuth function to add authentication
-  return await addAuth(baseEndpoint)
+  // Use the addAuth function with requireAuth parameter
+  return await addAuth(baseEndpoint, requireAuth)
 }
 
 /**

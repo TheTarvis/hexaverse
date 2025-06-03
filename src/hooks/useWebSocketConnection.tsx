@@ -45,6 +45,7 @@ interface WebSocketConnectionOptions {
   autoReconnect?: boolean;
   autoConnect?: boolean;
   initialServerUrl?: string | null;
+  requireAuth?: boolean;
 }
 
 export const useWebSocketConnection = ({
@@ -53,6 +54,7 @@ export const useWebSocketConnection = ({
   autoReconnect = false,
   autoConnect = true,
   initialServerUrl = null,
+  requireAuth = true,
 }: WebSocketConnectionOptions = {}) => {
   const [isConnected, setIsConnected] = useState(globalIsConnected);
   const [connectionState, setConnectionState] = useState<ConnectionState>(globalConnectionState);
@@ -102,17 +104,22 @@ export const useWebSocketConnection = ({
 
   const connect = useCallback(async () => {
     try {
-      // Don't attempt connection if auth is still loading
-      if (isAuthLoading) {
-        logger.info('Auth is still loading, waiting before connection attempt');
-        return;
-      }
+      // Auth checks only if required
+      if (requireAuth) {
+        // Don't attempt connection if auth is still loading
+        if (isAuthLoading) {
+          logger.info('Auth is still loading, waiting before connection attempt');
+          return;
+        }
 
-      // Don't attempt connection if no user
-      if (!user) {
-        logger.info('No user available, cannot connect to WebSocket');
-        updateGlobalState(false, ConnectionState.DISCONNECTED);
-        return;
+        // Don't attempt connection if no user
+        if (!user) {
+          logger.info('No user available, cannot connect to WebSocket (auth required)');
+          updateGlobalState(false, ConnectionState.DISCONNECTED);
+          return;
+        }
+      } else {
+        logger.info('Auth not required for WebSocket connection');
       }
 
       // Use global variables for connection state to prevent multiple connections
@@ -147,10 +154,9 @@ export const useWebSocketConnection = ({
       globalWsConnecting = true;
       updateGlobalState(false, ConnectionState.CONNECTING);
 
-
-        // Add authentication to the provided URL
-      let endpoint = await getWebSocketEndpoint(globalServerUrl);
-      logger.info(`Connecting to authenticated WebSocket at ${endpoint.substring(0, endpoint.includes('token') ? 50 : endpoint.length)}${endpoint.includes('token') ? '...' : ''}`);
+      // Add authentication to the provided URL (will handle no-auth case)
+      let endpoint = await getWebSocketEndpoint(globalServerUrl, requireAuth);
+      logger.info(`Connecting to ${requireAuth ? 'authenticated' : 'unauthenticated'} WebSocket at ${endpoint.substring(0, endpoint.includes('token') ? 50 : endpoint.length)}${endpoint.includes('token') ? '...' : ''}`);
       
       globalWsInstance = new WebSocket(endpoint);
 
@@ -200,7 +206,7 @@ export const useWebSocketConnection = ({
         logger.error('Error stack:', error.stack);
       }
     }
-  }, [user, isAuthLoading]);
+  }, [user, isAuthLoading, requireAuth]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -220,19 +226,29 @@ export const useWebSocketConnection = ({
 
   // Auto-connect effect
   useEffect(() => {
-    if (!autoConnect || isAuthLoading || hasAttemptedInitialConnection.current) {
+    if (!autoConnect || hasAttemptedInitialConnection.current) {
       return;
     }
 
-    if (user) {
-      logger.info('Auto-connecting to WebSocket...');
+    // If auth is required, wait for it to complete and ensure user exists
+    if (requireAuth) {
+      if (isAuthLoading) {
+        return; // Wait for auth to complete
+      }
+      if (user) {
+        logger.info('Auto-connecting to WebSocket with authentication...');
+        connect();
+      }
+    } else {
+      // If auth is not required, connect immediately
+      logger.info('Auto-connecting to WebSocket without authentication...');
       connect();
     }
 
     return () => {
       logger.debug('Component unmounting, but keeping WebSocket connection for other subscribers');
     };
-  }, [connect, autoConnect, user, isAuthLoading]);
+  }, [connect, autoConnect, user, isAuthLoading, requireAuth]);
 
   // Periodic health check and reconnect when disconnected or error
   useEffect(() => {
@@ -241,16 +257,15 @@ export const useWebSocketConnection = ({
     // Only start polling if:
     // 1. We're disconnected or in error state
     // 2. Auto-connect is enabled
-    // 3. We have a user
-    // 4. Auth is not loading
-    // 5. We've attempted initial connection
-    if (
-      (connectionState === ConnectionState.DISCONNECTED || connectionState === ConnectionState.ERROR) && 
+    // 3. We've attempted initial connection
+    // 4. If auth is required: we have a user and auth is not loading
+    // 5. If auth is not required: always try to reconnect
+    const shouldPoll = (connectionState === ConnectionState.DISCONNECTED || connectionState === ConnectionState.ERROR) && 
       autoConnect && 
-      user && 
-      !isAuthLoading &&
-      hasAttemptedInitialConnection.current
-    ) {
+      hasAttemptedInitialConnection.current &&
+      (requireAuth ? (user && !isAuthLoading) : true);
+    
+    if (shouldPoll) {
       pollInterval = setInterval(async () => {
         if (reconnectCount.current < reconnectAttempts) {
           if (autoReconnect) {
@@ -276,7 +291,7 @@ export const useWebSocketConnection = ({
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [connectionState, autoConnect, autoReconnect, connect, reconnectAttempts, reconnectInterval, user, isAuthLoading]);
+  }, [connectionState, autoConnect, autoReconnect, connect, reconnectAttempts, reconnectInterval, user, isAuthLoading, requireAuth]);
 
   return {
     isConnected,

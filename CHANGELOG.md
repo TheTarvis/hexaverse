@@ -1,4 +1,11 @@
 # Changelog
+## [v0.13.0]
+### Added
+- Drawing Grid
+### Updated
+- Improved canvas drawing speed
+- Improved caching logic to lower total reads. 
+
 ## [v0.12.5]
 ### Changed
 - Replaced all console.log statements with structured logging using consola library

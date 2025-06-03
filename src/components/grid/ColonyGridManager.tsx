@@ -8,7 +8,7 @@ import { ColonyStatus, useColony } from '@/contexts/ColonyContext'
 import { ColonyTilesProvider, useColonyTiles } from '@/contexts/ColonyTilesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { addColonyTile as addColonyTileService, WarmupableFunctions } from '@/services/colony/ColonyTilesService'
-import { TileMap, Tile } from '@/types/tiles'
+import { TileMap, Tile, ColonyTile } from '@/types/tiles'
 import { getTileColor } from '@/utils/tileColorUtils'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useWarmupFunctions } from '@/hooks/useWarmupFunctions'
@@ -89,7 +89,7 @@ function ColonyGridInner() {
   }, [worldCoords]);
 
   const [error, setError] = useState<string | null>(null)
-  const [selectedTile, setSelectedTile] = useState<Tile | null>(null)
+  const [selectedTile, setSelectedTile] = useState<Tile | ColonyTile | null>(null)
   const [addingTile, setAddingTile] = useState(false)
 
   // Compute the final tileMap using useMemo based on dependencies
@@ -219,7 +219,7 @@ function ColonyGridInner() {
     }
   }
 
-  const handleTileSelect = (tile: Tile) => {
+  const handleTileSelect = (tile: Tile | ColonyTile) => {
     logger.info('Setting selected tile:', tile)
     // Only set the selected tile if tile details are enabled
     if (debugState.tileDetailsEnabled) {
@@ -269,16 +269,16 @@ function ColonyGridInner() {
                 <code className="text-xs dark:text-gray-200">{selectedTile.color}</code>
               </div>
             </div>
-            {selectedTile.type && (
+            {(selectedTile as ColonyTile)?.type && (
               <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Tile Type</div>
-                <div className="mt-1 dark:text-gray-200">{selectedTile.type}</div>
+                <div className="mt-1 dark:text-gray-200">{(selectedTile as ColonyTile).type}</div>
               </div>
             )}
-            {selectedTile.resourceDensity !== undefined && (
+            {(selectedTile as ColonyTile)?.resourceDensity !== undefined && (
               <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Resource Density</div>
-                <div className="mt-1 dark:text-gray-200">{Math.round(selectedTile.resourceDensity * 100)}%</div>
+                <div className="mt-1 dark:text-gray-200">{Math.round((selectedTile as ColonyTile).resourceDensity * 100)}%</div>
               </div>
             )}
           </div>

@@ -5,7 +5,6 @@ import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription';
 import { useWebSocketContext } from '@/contexts/WebSocketContext';
 import {checkHealth, COLONY_WEBSOCKET_URL, getWebSocketEndpoint, testAuthentication} from '@/services/websocket';
 import { getAuthToken } from '@/services/auth';
-import { ColonyWebSocketMessage, createPingMessage } from '@/types/websocket';
 import { useAuth } from '@/contexts/AuthContext';
 import logger from '@/utils/logger';
 
@@ -31,7 +30,7 @@ export const WebSocketListener: React.FC<WebSocketListenerProps> = ({ messageTyp
   // Subscribe to messages
   useWebSocketSubscription({
     onMessage: (data) => {
-      if (!filterActive || (messageType && data.type === messageType)) {
+      if (!filterActive) {
         setMessages((prev) => [data, ...prev].slice(0, 20)); // Keep last 20 messages
       }
     }

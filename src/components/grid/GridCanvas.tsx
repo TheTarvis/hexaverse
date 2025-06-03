@@ -432,7 +432,7 @@ export function GridCanvas({
     <Canvas
       camera={{ position: internalCameraPosition, fov: 45 }}
       gl={{ antialias: true }}
-      style={{ touchAction: 'none' }}
+      style={{ touchAction: 'none', maxHeight: '95vh' }}
     >
       <OrbitControls
         target={internalCameraTarget}
@@ -445,7 +445,7 @@ export function GridCanvas({
         zoomSpeed={1.2}
         dampingFactor={0.1}
         touches={{
-          ONE: THREE.TOUCH.PAN,
+          ONE: THREE.TOUCH.DOLLY_PAN,
           TWO: THREE.TOUCH.DOLLY_PAN
         }}
         mouseButtons={{

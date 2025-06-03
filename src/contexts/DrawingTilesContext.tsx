@@ -2,12 +2,12 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { Tile, TileMap } from '@/types/tiles'
-import { isTileMessage, ColonyWebSocketMessage } from '@/types/websocket'
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
+import { DrawingWebsocketMessage, isTileMessage, WebSocketMessage } from '@/types/websocket'
+import React, { createContext, ReactNode, useCallback, useContext, useState } from 'react'
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription'
 import { useTileMessageBuffer } from '@/hooks/useTileMessageBuffer'
 import { updateDrawingTileCache } from '@/services/DrawingTilesService'
-import logger from '@/utils/logger';
+import logger from '@/utils/logger'
 
 interface DrawingTilesContextType {
   drawingTiles: TileMap;
@@ -44,8 +44,7 @@ export function DrawingTilesProvider({ children }: { children: ReactNode }) {
           existingTile.r === tile.r &&
           existingTile.s === tile.s &&
           existingTile.color === tile.color &&
-          existingTile.controllerUid === tile.controllerUid &&
-          existingTile.viewHash === tile.viewHash
+          existingTile.controllerUid === tile.controllerUid
         ) {
           // Only updatedAt changed, no need to trigger UI update
           return;
@@ -70,9 +69,9 @@ export function DrawingTilesProvider({ children }: { children: ReactNode }) {
   });
 
   // Handle WebSocket messages using the buffer
-  const handleMessage = useCallback((data: ColonyWebSocketMessage) => {
-    if (isTileMessage(data) && data.payload) {
-      const tile = data.payload;
+  const handleMessage = useCallback((message: WebSocketMessage) => {
+    if (message) {
+      let tile = message as Tile
       logger.debug(`WebSocket: Received drawing tile update for tile at ${tile.q},${tile.r},${tile.s}`);
       bufferTileMessage(tile);
     }

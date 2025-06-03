@@ -21,7 +21,7 @@ export interface ColonyWebSocketMessage<T = any> extends WebSocketMessage{
   payload: T;
 }
 
-export interface DrawingEventsWebsocketMessage<T = any> extends Tile, WebSocketMessage {}
+export interface DrawingWebsocketMessage<T = any> extends Tile, WebSocketMessage {}
 
 // Available payload types
 export type PayloadType = 'tile' | 'colony' | 'unit' | 'building' | 'event' | 'notification';

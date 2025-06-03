@@ -197,8 +197,8 @@ export function ColonyTilesProvider({ children }: { children: ReactNode }) {
         tileId: tile.id,
         position: `${tile.q},${tile.r},${tile.s}`,
         controllerUid: tile.controllerUid,
-        type: tile.type,
-        resources: tile.resources
+        type: (tile as any).type,
+        resources: (tile as any).resources
       });
       logger.info('Current user:', user?.uid || 'Not logged in');
       logger.info('Context state:', {
@@ -230,7 +230,7 @@ export function ColonyTilesProvider({ children }: { children: ReactNode }) {
   });
 
   // Handle WebSocket messages using the buffer
-  const handleMessage = useCallback((data: ColonyWebSocketMessage) => {
+  const handleMessage = useCallback((data: any) => {
     if (isTileMessage(data) && data.payload) {
       const tile = data.payload;
       logger.debug(`WebSocket: Received tile update for tile at ${tile.q},${tile.r},${tile.s}`);

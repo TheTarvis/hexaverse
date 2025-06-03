@@ -1,4 +1,31 @@
 # Changelog
+## [v0.13.0]
+### Added
+- Drawing Grid
+### Updated
+- Improved canvas drawing speed
+- Improved caching logic to lower total reads. 
+
+## [v0.12.5]
+### Changed
+- Replaced all console.log statements with structured logging using consola library
+- Added proper logging levels (debug, info, warn, error, success) throughout the application
+- Improved logging consistency across services, components, and utilities
+- Enhanced debugging capabilities with better log categorization
+
+## [v0.12.4]
+### Changed
+- More refactoring to get shared logic into centralized location.
+
+## [v0.12.3]
+### Added
+- Added ability to switch websocket servers.
+- Added script to migrate colony data into new location in firestore.
+
+### Changed
+- Renamed most tile references to be specific to colony.
+- Adding in drawing manager.
+
 ## [v0.12.2]
 ### Changed
 - Refactored tile services architecture into modular structure

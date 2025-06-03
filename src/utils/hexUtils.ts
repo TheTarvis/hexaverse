@@ -76,14 +76,14 @@ export function findViewableTiles(tileMap: TileMap, depth: number = 1): TileMap 
         // If this neighbor is not part of the colony and hasn't been visited/added as viewable yet
         if (!visitedKeys.has(neighborKey)) {
           newViewableFoundInLayer[neighborKey] =  {
+            color: '',
+            isPreview: false,
+            updatedAt: '',
             controllerUid: "",
             id: `${neighbor.q}#${neighbor.r}#${neighbor.s}`,
-            type: "",
-            visibility: 'unexplored',
             q: neighbor.q,
             r: neighbor.r,
-            s: neighbor.s,
-            resourceDensity: 0
+            s: neighbor.s
           }; // Current depth + 1
           visitedKeys.add(neighborKey); // Mark as visited
           nextFrontier.push(neighbor); // Add to the frontier for the next layer

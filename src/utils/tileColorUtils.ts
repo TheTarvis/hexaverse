@@ -45,41 +45,8 @@ export function getTileColor(
     return options?.colonyColor || '#3388FF'; // Use colony color or default blue
   }
 
-  // Enhanced Viewable tile coloring based on distance
-  if (tile.visibility == 'unexplored' && options?.distance !== undefined) {
-    return '#646464';
-  }
-  
   if (options?.colorScheme === 'monochrome') {
     return new THREE.Color(0.4, 0.4, 0.4).getStyle();
-  }
-  
-  if (options?.colorScheme === 'type') {
-    // Color based on tile type
-    switch(tile.type.toLowerCase()) {
-      case 'normal': return new THREE.Color(0.3, 0.7, 0.4).getStyle(); // Green
-      case 'water': return new THREE.Color(0.2, 0.4, 0.8).getStyle(); // Blue
-      case 'mountain': return new THREE.Color(0.6, 0.6, 0.6).getStyle(); // Gray
-      case 'desert': return new THREE.Color(0.9, 0.8, 0.3).getStyle(); // Yellow
-      case 'forest': return new THREE.Color(0.1, 0.5, 0.1).getStyle(); // Dark green
-      case 'plain': return new THREE.Color(0.8, 0.9, 0.3).getStyle(); // Light green
-      default: 
-        // Fallback to rainbow if type is unknown
-        return new THREE.Color(
-          0.5 + 0.5 * Math.sin(tile.q + tile.r),
-          0.5 + 0.5 * Math.sin(tile.r + tile.s),
-          0.5 + 0.5 * Math.sin(tile.s + tile.q)
-        ).getStyle();
-    }
-  }
-  
-  if (options?.colorScheme === 'resources') {
-    // Color based on resource density
-    return new THREE.Color(
-      0.2 + 0.8 * tile.resourceDensity,
-      0.7 - 0.5 * tile.resourceDensity,
-      0.3
-    ).getStyle();
   }
   
   if (options?.colorScheme === 'rainbow') {
