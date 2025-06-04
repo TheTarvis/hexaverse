@@ -8,7 +8,7 @@ export const COLONY_WEBSOCKET_URL =
   process.env.NEXT_PUBLIC_COLONY_WEBSOCKET_URL || 'localhost:8081'
 
 export const DRAWING_WEBSOCKET_URL =
-  process.env.NEXT_PUBLIC_DRAWING_WEBSOCKET_URL || 'localhost:8081'
+  process.env.NEXT_PUBLIC_DRAWING_WEBSOCKET_URL || 'localhost:8082'
 
 /**
  * Add authentication to a WebSocket URL

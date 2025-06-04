@@ -1,7 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import {getWebSocketEndpoint, checkHealth, addAuth, COLONY_WEBSOCKET_URL} from '@/services/websocket';
+import {
+  getWebSocketEndpoint,
+  checkHealth,
+  DRAWING_WEBSOCKET_URL,
+} from '@/services/websocket'
 import { useAuth } from '@/contexts/AuthContext';
 import logger from '@/utils/logger';
 
@@ -20,7 +24,7 @@ let globalWsInstance: WebSocket | null = null;
 let globalWsConnecting = false;
 let globalLastConnectionAttempt = 0;
 const CONNECTION_COOLDOWN_MS = 5000; // 5 second cooldown between connection attempts
-let globalServerUrl: string = COLONY_WEBSOCKET_URL;
+let globalServerUrl: string = DRAWING_WEBSOCKET_URL;
 
 let globalIsConnected = false;
 let globalConnectionState = ConnectionState.INITIAL;
