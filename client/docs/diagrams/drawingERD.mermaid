@@ -1,0 +1,18 @@
+erDiagram
+    USERS {
+        string uid PK
+        string email
+        string displayName
+        string photoURL
+    }
+    DRAWING_TILES {
+        string id PK "q#r#s format"
+        int q
+        int r
+        int s
+        string controllerUid FK
+        string color
+        date updatedAt
+    }
+
+    USERS ||--o{ DRAWING_TILES : "updates"

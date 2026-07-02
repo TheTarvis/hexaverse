@@ -1,0 +1,12 @@
+# Directories to ignore
+.next/
+/functions/lib/
+/out/
+/node_modules/
+/.firebase/
+/.cursor/
+
+# Add more patterns as needed 
+
+# Do not run deploys
+*deploy*

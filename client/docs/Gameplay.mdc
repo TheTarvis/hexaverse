@@ -1,0 +1,167 @@
+---
+description: This defines the gameplay for hexaverse.
+globs: 
+alwaysApply: false
+---
+## 🧪 Mechanics
+
+### Fog of War / Scan Radius
+- Players only see a limited number of tiles around their closest unit or base (e.g. radius 4).
+- Exploration is required to discover resources, hazards, or other players.
+
+### Spawn with Padding, But Not Isolation
+- Players are spawned at least `minDistance` apart (e.g. 8–10 tiles).
+- But also within `maxDistance` of another colony (e.g. 20–25 tiles).
+- This ensures each player has space to grow, but always someone nearby to discover and engage with.
+
+### Procedural Galactic Terrain
+
+Use simplex or perlin noise to generate a rich, organic structure to the galaxy. Each tile’s noise value determines its underlying environment, creating strategic diversity across space:
+
+- **Star-Rich Sectors**: High-density stellar regions teeming with valuable systems, ancient ruins, and prime colony sites. These become hotspots for competition and conflict.
+- **Dead Zones**: Vast stretches of interstellar void, low-resource and sparsely populated. Often used as natural buffers between factions or hiding spots for fringe colonies.
+- **Galactic Barriers**: Features like dark nebulae, unstable asteroid fields, ion storms, or gravitic distortions. These form soft borders that impact movement, scanning, and expansion routes.
+
+> This system ensures the galaxy feels alive — with clustered opportunity, dangerous wilds, and strategically significant terrain shaping every decision.
+
+
+### Movement Limits / Travel Costs
+- Add movement limitations or designate "space lanes" to control player expansion rate.
+- Enables the creation of **choke points** and strategic zones.
+
+---
+
+## 📘 Dictionary
+
+- **Unit**: The base object type from which all other player entities (e.g. ships, bases, structures) are derived.
+- **Colony**: A collection of units controlled by a player; defines their first foothold and grows into a territory.
+- **Territory**: A system-defined collection of tiles considered under a player's influence. Used for expansion, leaderboard scoring, and conflict boundaries.
+
+---
+
+## 🚀 Unit Types *(name pending — “Assets”? “Entities”?)*
+
+- **Ship**
+  - Mobile unit capable of exploration, transport, or combat.
+
+- **Base**
+  - Stationary unit that establishes player presence and extends territorial influence.
+  - Influence radius increases with base strength or upgrades.
+
+- **Site**
+  - Specialized unit type focused on economy or science.
+  - Subtypes:
+    - **Mining Site**: Extracts nearby resources.
+    - **Research Site**: Generates research points or tech bonuses.
+
+- **[Other Ideas]**
+  - **Probe / Drone**: Lightweight exploratory unit.
+  - **Relay**: Extends visibility or communications range.
+  - **Outpost**: Minimal infrastructure for early presence or quick expansion.
+
+---
+
+## 🌍 Territory Logic
+
+A tile is considered to be under a player's **influence** (i.e. control) when it meets any of the following:
+
+### Presence Rule
+- The tile contains at least one of the player’s units *and* no units from other players.
+- Encourages active control and risk-taking.
+
+### Base Influence Rule
+- The tile lies within a set range of a **Base**.
+- Influence radius is determined by base strength or level.
+  - Example: Tier 1 base = radius 3; Tier 2 = radius 5.
+
+### Path Rule *(optional, future concept)*
+- Influence may only spread through contiguous paths of friendly-controlled tiles or structures.
+- Prevents isolated "reach" across space and encourages cohesion.
+
+> These rules define the **Territory Score** for leaderboards and strategic metrics.
+
+---
+
+## 🎮 Colony Creation
+
+When a player starts a new colony:
+- They are assigned a **starting territory** using spawn logic (noise, spacing, etc.).
+- They receive a **default unit package**, e.g.:
+  - 1× Base (Tier 1)
+  - 2× Ships
+  - 1× Mining Site (unplaced)
+
+- The surrounding tiles are fogged and must be explored.
+- The initial territory is seeded based on the base’s influence range.
+
+---
+
+---
+
+## 🛰️ Tile Adjacency + Travel Rules
+
+### Tile Scale
+- Each tile represents **1 light-year of space**.
+- Galaxy is modeled as a **hex grid** using axial coordinates.
+- Galaxy radius = ~50 tiles → ~7,651 tiles total (full map).
+- Most tiles are empty; only ~10–20% contain stars, systems, or anomalies.
+
+---
+
+### Movement Types
+
+#### 🚧 Sublight Travel (Default)
+- Ships can move **1 tile per turn** (or per X real-time minutes/hours).
+- Base movement available to all units.
+- Affected by tile traits (e.g. nebula = slow, void = blocked).
+
+#### ⚡ FTL Travel (Upgrades Required)
+- Tiered unlocks allow faster or longer-distance jumps:
+  - Tier 1: Jump in straight line up to 2 tiles.
+  - Tier 2: Jump radius of 2 tiles in any direction.
+  - Tier 3: Teleport within local sector.
+
+- FTL movement consumes energy or incurs cooldowns.
+
+#### 🌐 Relay Chains
+- Player-built infrastructure that allows near-instant travel between **connected relay stations**.
+- Enables fast travel across controlled space or faction networks.
+
+#### 🌀 Wormholes
+- Natural or constructed portals that enable **intergalactic or cross-galaxy travel**.
+- May be one-way, unstable, or require high-tier tech to use or activate.
+
+---
+
+### Scan & Visibility
+
+#### 👁️ Scan Radius
+- Units and structures provide vision in a radius (e.g. 2–4 tiles).
+- Visibility can be enhanced by relays or tech.
+- Certain tile traits (e.g. nebulas) reduce or block scans.
+
+#### 🛡️ Influence Radius
+- Bases project a control radius (e.g. 3–5 tiles) that defines owned territory.
+- Influence may only expand through **connected, occupied tiles**.
+
+---
+
+### Tile Traits (Optional Layer)
+
+| Trait     | Effect                                      |
+|-----------|---------------------------------------------|
+| **Nebula**| Slows movement, reduces scan range          |
+| **Void**  | May prevent FTL or block movement entirely  |
+| **Gravity Well** | Blocks jump-in from FTL; slingshot out allowed |
+| **Anomaly** | May grant bonuses or trigger special events |
+
+---
+
+### Advanced Concepts
+
+- **Directional movement costs** (space currents, seasonal distortions).
+- **Persistent drift**: units with no engine slowly move through space over real time.
+- **Deep-space beaconing**: players can call for help, reinforcements, or send messages across long distances.
+
+---
+

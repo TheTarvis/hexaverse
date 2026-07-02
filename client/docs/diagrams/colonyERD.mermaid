@@ -1,0 +1,54 @@
+erDiagram
+    USERS {
+        string uid PK
+        string email
+        string displayName
+        string photoURL
+    }
+    COLONIES {
+        string id PK
+        string uid FK
+        string name
+        string color
+        date createdAt
+        object startCoordinates
+        array tileIds
+        int territoryScore
+        int visibilityRadius
+    }
+    COLONY_TILES {
+        string id PK "q#r#s format"
+        int q
+        int r
+        int s
+        string type "star_rich|normal|dead_zone|barrier"
+        string controllerUid FK
+        string visibility "visible|unexplored"
+        float resourceDensity
+        object resources
+    }
+    UNITS {
+        string id PK "colonyId-unitType-number"
+        string type "ship|base|mining_site|research_site"
+        object position "q,r,s coordinates"
+        int level
+        string ownerUid FK
+        int influenceRadius "Only for base type"
+        string resourceType "Only for mining_site"
+        float extractionRate "Only for mining_site"
+        string researchField "Only for research_site"
+        float researchRate "Only for research_site"
+    }
+    UNPLACED_UNITS {
+        string colonyId FK
+        string type
+        int level
+        string resourceType "Optional"
+    }
+
+    USERS ||--o{ COLONIES : "owns"
+    USERS ||--o{ COLONY_TILES : "controls"
+    USERS ||--o{ UNITS : "owns"
+    COLONIES ||--o{ COLONY_TILES : "contains"
+    COLONIES ||--o{ UNITS : "contains"
+    COLONIES ||--o{ UNPLACED_UNITS : "contains"

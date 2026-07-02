@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+@import 'tailwindcss/utilities';
+
+@theme {
+  --font-sans: Inter, sans-serif;
+  --font-sans--font-feature-settings: 'cv11';
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Hide Firebase emulator warning banner */
+.firebase-emulator-warning {
+  display: none !important;
+}

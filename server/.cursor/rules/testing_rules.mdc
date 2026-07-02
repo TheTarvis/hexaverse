@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- The agent will write test to verify logic.
+- The agent will run make sure coverage does not fall below 90%
+- The agent will run the test before commit any changes.

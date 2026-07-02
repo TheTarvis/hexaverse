@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="[Local] Colony Websocket Server" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="websockets" />
+    <working_directory value="$PROJECT_DIR$" />
+    <envs>
+      <env name="PORT" value="8081" />
+      <env name="PUBSUB_EMULATOR_HOST" value="localhost:8085" />
+      <env name="PUBSUB_PROJECT_ID" value="hexaverse" />
+      <env name="PUBSUB_TOPIC_ID" value="colony-events" />
+    </envs>
+    <kind value="PACKAGE" />
+    <package value="websockets" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/main.go" />
+    <method v="2" />
+  </configuration>
+</component>

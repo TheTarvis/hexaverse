@@ -1,0 +1,42 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# WebSocket Message Handling
+
+The application uses a structured approach to handle WebSocket messages, especially for game state updates.
+
+## Message Processing Architecture
+
+1. Messages flow through this pipeline:
+   - WebSocketContext → useWebSocketSubscription → message predicates → message handlers
+
+2. The dispatch table pattern matches message to handler:
+```javascript
+const messageHandlers = [
+  { match: () => isOwnTileUpdate(tile, user), run: () => handleOwnTile(tile, ctx) },
+  { match: () => isViewableTileUpdate(tile, ctx.state), run: () => handleViewableTile(tile, ctx) },
+  { match: () => isOpponentTakingTile(tile, user, ctx.state), run: () => handleOpponentTile(tile, ctx) }
+];
+
+// Find and execute first matching handler
+for (const { match, run } of messageHandlers) {
+  if (match()) {
+    await run();
+    break;
+  }
+}
+```
+
+3. Performance optimization with buffering:
+   - Messages are collected for a time window (e.g., 100ms)
+   - Processed in batches to reduce render cycles
+   - Uses the `useTileMessageBuffer` hook
+
+## Adding New Message Types
+
+To add handling for a new message type:
+1. Add a predicate function to [predicates.ts](mdc:src/utils/websocket/predicates.ts)
+2. Add a handler function to [handlers.ts](mdc:src/utils/websocket/handlers.ts)
+3. Add a new entry to the messageHandlers array in the relevant context
