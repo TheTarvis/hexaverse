@@ -1,8 +1,0 @@
-/.idea/
-.terraform/
-remote_state.tf
-.terraform.lock.hcl
-main/main
-*.zip
-.env
-/main/.idea/main.iml
