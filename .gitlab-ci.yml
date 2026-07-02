@@ -1,0 +1,1015 @@
+# GitLab CI/CD pipeline for {{PROJECT_NAME}}.
+# Multi-environment deployment: dev → prod with promotion gates.
+# Project-specific values are templated as {{KEY}} placeholders — populate
+# them by running bootstrap/init.sh after editing bootstrap/config.env.
+
+# Pipeline Stages
+# 1. verify-dev - Linting, testing, and Docker builds for dev
+# 2. deploy-dev - Deploy to dev environment (Cloud Run + Vercel preview)
+# 3. promote - Manual gate to promote to production
+# 4. deploy-prod - Deploy to production (re-tag images, rebuild frontend)
+
+stages:
+  - verify-dev
+  - deploy-dev
+  - promote
+  - deploy-prod
+
+# =============================================================================
+# Global Variables (Non-Sensitive Configuration)
+# =============================================================================
+# These are public configuration values - no secrets!
+# Authentication uses Workload Identity Federation (WIF) with OIDC tokens
+
+variables:
+  # Docker Images (custom CI/CD runner images)
+  TEST_RUNNER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/test-runner:latest"
+  GCP_DEPLOYER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/gcp-deployer:latest"
+  TERRAFORM_DEPLOYER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/terraform-deployer:latest"
+  FRONTEND_BUILDER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/frontend-builder:latest"
+  PYTHON_BUILDER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/python-builder:latest"
+
+# =============================================================================
+# Change Detection Rules (YAML Anchors for Reusability)
+# =============================================================================
+
+# Backend changes: Go code, Dockerfile
+.backend-changes: &backend-changes
+  changes:
+    - backend/**/*
+    - .gitlab-ci.yml
+
+# Frontend changes: Next.js app, package.json
+.frontend-changes: &frontend-changes
+  changes:
+    - frontend/**/*
+    - .gitlab-ci.yml
+
+# Infrastructure changes: Terraform configs
+.infra-changes: &infra-changes
+  changes:
+    - infra/terraform/**/*
+    - .gitlab-ci.yml
+
+# Agent service changes: Python code, Dockerfile
+.agent-changes: &agent-changes
+  changes:
+    - claude-agent/**/*
+    - .gitlab-ci.yml
+
+# =============================================================================
+# Environment Configuration (YAML Anchors)
+# =============================================================================
+
+# Dev environment variables
+.dev-env-vars: &dev-env-vars
+  ENVIRONMENT: "dev"
+  GCP_PROJECT: "{{GCP_PROJECT_DEV}}"
+  ARTIFACT_REGISTRY_PROJECT_ID: "{{GCP_PROJECT_DEV}}"
+  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/118847994456/locations/global/workloadIdentityPools/gitlab-pool/providers/gitlab-provider"
+  GCP_SERVICE_ACCOUNT: "gitlab-ci-deployer@{{GCP_PROJECT_DEV}}.iam.gserviceaccount.com"
+  GCP_REGION: "us-central1"
+  IMAGE_TAG_PREFIX: "dev"
+
+# Prod environment variables
+.prod-env-vars: &prod-env-vars
+  ENVIRONMENT: "prod"
+  GCP_PROJECT: "{{GCP_PROJECT_PROD}}"
+  ARTIFACT_REGISTRY_PROJECT_ID: "{{GCP_PROJECT_PROD}}"
+  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/255694242424/locations/global/workloadIdentityPools/gitlab-pool/providers/gitlab-provider"
+  GCP_SERVICE_ACCOUNT: "gitlab-ci-deployer@{{GCP_PROJECT_PROD}}.iam.gserviceaccount.com"
+  GCP_REGION: "us-central1"
+  IMAGE_TAG_PREFIX: "prod"
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+
+# Default image for jobs without specific image
+default:
+  image: alpine:latest
+  # Retry configuration for transient failures
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+# Cache configuration for npm and Go modules
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - backend/.cache/
+
+# =============================================================================
+# Job Templates (Hidden Jobs for Reuse)
+# =============================================================================
+
+# GCP Authentication template (credentials file only, no gcloud CLI)
+.gcp-auth-creds-only: &gcp-auth-creds-only
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/${GCP_WORKLOAD_IDENTITY_PROVIDER}
+  before_script:
+    - |
+      cat > /tmp/gcp_cred_config.json <<EOF
+      {
+        "type": "external_account",
+        "audience": "//iam.googleapis.com/${GCP_WORKLOAD_IDENTITY_PROVIDER}",
+        "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+        "token_url": "https://sts.googleapis.com/v1/token",
+        "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${GCP_SERVICE_ACCOUNT}:generateAccessToken",
+        "credential_source": {
+          "file": "/tmp/oidc_token",
+          "format": {
+            "type": "text"
+          }
+        }
+      }
+      EOF
+    - echo ${GCP_ID_TOKEN} > /tmp/oidc_token
+    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_cred_config.json
+
+# GCP Authentication template (with gcloud CLI setup)
+.gcp-auth: &gcp-auth
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/${GCP_WORKLOAD_IDENTITY_PROVIDER}
+  before_script:
+    - |
+      cat > /tmp/gcp_cred_config.json <<EOF
+      {
+        "type": "external_account",
+        "audience": "//iam.googleapis.com/${GCP_WORKLOAD_IDENTITY_PROVIDER}",
+        "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+        "token_url": "https://sts.googleapis.com/v1/token",
+        "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${GCP_SERVICE_ACCOUNT}:generateAccessToken",
+        "credential_source": {
+          "file": "/tmp/oidc_token",
+          "format": {
+            "type": "text"
+          }
+        }
+      }
+      EOF
+    - echo ${GCP_ID_TOKEN} > /tmp/oidc_token
+    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_cred_config.json
+    - gcloud auth login --cred-file=/tmp/gcp_cred_config.json
+    - gcloud config set project $GCP_PROJECT
+
+# =============================================================================
+# VERIFY-DEV STAGE - Linting, Testing, Building for Dev
+# =============================================================================
+
+# Lint Frontend: ESLint + TypeScript checking
+lint-frontend:
+  stage: verify-dev
+  image: ${FRONTEND_BUILDER_IMAGE}
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *frontend-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *frontend-changes
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-frontend
+    paths:
+      - frontend/.npm/
+  script:
+    - cd frontend
+    - npm ci --cache .npm --prefer-offline
+    - npm run lint
+    # Fail on high/critical vulnerabilities in production deps (CASA T3 / ASVS V14.2)
+    - npm audit --omit=dev --audit-level=high
+
+# Test Frontend: Jest + React Testing Library
+test-frontend:
+  stage: verify-dev
+  image: ${FRONTEND_BUILDER_IMAGE}
+  tags:
+    - saas-linux-medium-amd64  
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *frontend-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *frontend-changes
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-frontend
+    paths:
+      - frontend/.npm/
+  script:
+    - cd frontend
+    - npm ci --cache .npm --prefer-offline
+    - npm run test:run -- --reporter=basic --silent
+  # coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  artifacts:
+    when: always
+    reports:
+      # junit: frontend/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: frontend/coverage/cobertura-coverage.xml
+
+# Test Backend: Go tests with Firebase emulators
+test-backend:
+  stage: verify-dev
+  image: ${TEST_RUNNER_IMAGE}
+  tags:
+    - saas-linux-medium-amd64  
+  services:
+    # PostgreSQL service for e2e tests
+    - name: us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/postgres-test:latest
+      alias: postgres
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *backend-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *backend-changes
+  cache:
+    - key: firebase-emulators
+      paths:
+        - .cache/firebase/emulators/
+    - key: ${CI_COMMIT_REF_SLUG}-go-backend
+      paths:
+        - backend/.cache/go-build/
+        - backend/.cache/go-mod/
+  variables:
+    <<: *dev-env-vars
+    # Test database configuration
+    TEST_POSTGRES_HOST: "postgres"
+    TEST_POSTGRES_PORT: "5432"
+    TEST_POSTGRES_USER: "{{PROJECT_SLUG}}_test"
+    TEST_POSTGRES_PASSWORD: "test_password"
+    TEST_POSTGRES_DB: "{{PROJECT_SLUG}}_test"
+
+    # GCS bucket configuration for e2e tests
+    # Seeds use E2E_TEST_BUCKET (defaults to IMPORT_BUCKET if not set)
+    # Pipeline sources read from IMPORT_BUCKET, sinks write to EXPORT_BUCKET
+    IMPORT_BUCKET: "{{PROJECT_SLUG}}-imports-dev"
+    EXPORT_BUCKET: "{{PROJECT_SLUG}}-exports-dev"
+
+    # Firebase emulator configuration
+    FIREBASE_PROJECT_ID: "{{PROJECT_SLUG}}-emulator"
+    FIRESTORE_EMULATOR_HOST: "localhost:9090"
+    FIREBASE_AUTH_EMULATOR_HOST: "localhost:10099"
+    PUBSUB_EMULATOR_HOST: "localhost:9096"
+    FIREBASE_EMULATORS_PATH: "${CI_PROJECT_DIR}/.cache/firebase/emulators"
+
+    # Go test configuration
+    CGO_ENABLED: "1"  # Required for -race flag
+    GOCACHE: "${CI_PROJECT_DIR}/backend/.cache/go-build"
+    GOMODCACHE: "${CI_PROJECT_DIR}/backend/.cache/go-mod"
+  <<: *gcp-auth-creds-only
+  script:
+    # Start Firebase emulators in background
+    - firebase emulators:start --only firestore,auth,pubsub --config firebase.test.json &
+    - cd backend
+    - EMULATOR_PID=$!
+
+    # Wait for emulators to be ready (max 30s)
+    - |
+      echo "Waiting for Firebase emulators to start..."
+      for i in {1..30}; do
+        if curl -s http://localhost:9090 > /dev/null 2>&1 && \
+            curl -s http://localhost:10099 > /dev/null 2>&1 && \
+            curl -s http://localhost:9096 > /dev/null 2>&1; then
+          echo "Emulators are ready!"
+          break
+        fi
+        echo "Waiting for emulators... ($i/30)"
+        sleep 1
+      done
+
+    # Wait for PostgreSQL to be ready
+    - |
+      echo "Waiting for PostgreSQL to be ready..."
+      for i in {1..30}; do
+        if pg_isready -h postgres -p 5432 -U {{PROJECT_SLUG}}_test > /dev/null 2>&1; then
+          echo "PostgreSQL ready!"
+          break
+        fi
+        echo "Waiting for postgres... ($i/30)"
+        sleep 1
+      done
+    # # Run all tests with coverage
+    # - go test -v -race -coverprofile=coverage.out -covermode=atomic ./... -count=1 -parallel 5 -timeout 120s
+
+    # # Generate coverage report
+    # - go tool cover -func=coverage.out
+
+    # # Convert coverage to Cobertura format for GitLab
+    # - go install github.com/boumenot/gocover-cobertura@latest
+    # - gocover-cobertura < coverage.out > coverage.xml
+    
+    - go test ./... -count=1 -parallel 5 -timeout 70s
+
+    # Dependency vulnerability scan (govulncheck baked into test-runner image).
+    # Fails only on vulnerabilities that are actually reachable from application
+    # code paths — not on unreachable imports. Satisfies CASA T3 / ASVS V14.2.
+    - govulncheck ./...
+  after_script:
+    # Clean up emulators
+    - kill $EMULATOR_PID || true
+  # coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+  # artifacts:
+  #   when: always
+  #   reports:
+  #     junit: backend/report.xml
+  #     coverage_report:
+  #       coverage_format: cobertura
+  #       path: backend/coverage.xml
+  #   paths:
+  #     - backend/coverage.out
+
+# Build Backend: Docker image for dev
+build-backend:
+  stage: verify-dev
+  image: ${GCP_DEPLOYER_IMAGE}
+  services:
+    - docker:dind
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *backend-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *backend-changes
+  variables:
+    <<: *dev-env-vars
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+    DOCKER_BUILDKIT: 1                    # Enable BuildKit for faster builds
+    BUILDKIT_PROGRESS: plain              # Better log output
+  <<: *gcp-auth
+  script:
+    # Build image
+    - export IMAGE_TAG="us-central1-docker.pkg.dev/${GCP_PROJECT}/{{PROJECT_SLUG}}/backend:${IMAGE_TAG_PREFIX}-${CI_COMMIT_SHORT_SHA}"
+    - export CACHE_IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT}/{{PROJECT_SLUG}}/backend:cache"
+
+    # Authenticate to Artifact Registry
+    - gcloud auth configure-docker us-central1-docker.pkg.dev
+
+    # Pull cache image if it exists (ignore errors if it doesn't)
+    - docker pull $CACHE_IMAGE || true
+
+    # Build with cache
+    - |
+      docker build \
+        --cache-from $CACHE_IMAGE \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
+        -t $IMAGE_TAG \
+        -f backend/Dockerfile \
+        backend/
+
+    # Push to Artifact Registry (only on main branch)
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag $IMAGE_TAG $CACHE_IMAGE
+        docker push $CACHE_IMAGE
+        docker push $IMAGE_TAG
+        echo "IMAGE_TAG=$IMAGE_TAG" >> build.env
+      else
+        echo "Skipping push - not on main branch"
+      fi
+  artifacts:
+    reports:
+      dotenv: build.env
+    expire_in: 7 days
+
+# Lint Agent: Python linting
+lint-agent:
+  stage: verify-dev
+  image: ${PYTHON_BUILDER_IMAGE}
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *agent-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *agent-changes
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-uv-agent
+    paths:
+      - claude-agent/.venv/
+  script:
+    - cd claude-agent
+    - uv sync --all-extras
+    - uv run ruff check .
+    - uv run ruff format --check .
+
+# Test Agent: Python tests
+test-agent:
+  stage: verify-dev
+  image: ${PYTHON_BUILDER_IMAGE}
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *agent-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *agent-changes
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-uv-agent
+    paths:
+      - claude-agent/.venv/
+  script:
+    - cd claude-agent
+    - uv sync --all-extras
+    - uv run pytest --cov=. --cov-report=xml --cov-report=term
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: claude-agent/coverage.xml
+
+# Build Agent: Docker image for dev
+build-agent:
+  stage: verify-dev
+  image: ${GCP_DEPLOYER_IMAGE}
+  services:
+    - docker:dind
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *agent-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *agent-changes
+  variables:
+    <<: *dev-env-vars
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+    DOCKER_BUILDKIT: 1                    # Enable BuildKit for faster builds
+    BUILDKIT_PROGRESS: plain              # Better log output
+  <<: *gcp-auth
+  script:
+    # Build image
+    - export AGENT_IMAGE_TAG="us-central1-docker.pkg.dev/${GCP_PROJECT}/{{PROJECT_SLUG}}/claude-agent:${IMAGE_TAG_PREFIX}-${CI_COMMIT_SHORT_SHA}"
+    - export AGENT_CACHE_IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT}/{{PROJECT_SLUG}}/claude-agent:cache"
+
+    # Authenticate to Artifact Registry
+    - gcloud auth configure-docker us-central1-docker.pkg.dev
+
+    # Pull cache image if it exists (ignore errors if it doesn't)
+    - docker pull $AGENT_CACHE_IMAGE || true
+
+    # Build with cache
+    - |
+      docker build \
+        --cache-from $AGENT_CACHE_IMAGE \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
+        -t $AGENT_IMAGE_TAG \
+        -f claude-agent/Dockerfile \
+        claude-agent/
+
+    # Push to Artifact Registry (only on main branch)
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag $AGENT_IMAGE_TAG $AGENT_CACHE_IMAGE
+        docker push $AGENT_CACHE_IMAGE
+        docker push $AGENT_IMAGE_TAG
+        echo "AGENT_IMAGE_TAG=$AGENT_IMAGE_TAG" >> agent-build.env
+      else
+        echo "Skipping push - not on main branch"
+      fi
+  artifacts:
+    reports:
+      dotenv: agent-build.env
+    expire_in: 7 days
+
+# Plan Dev: Terraform plan for dev infrastructure
+plan-dev:
+  stage: verify-dev
+  image:
+    name: ${TERRAFORM_DEPLOYER_IMAGE}
+    entrypoint: [""]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *infra-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *infra-changes
+  variables:
+    <<: *dev-env-vars
+    TF_HTTP_PASSWORD: "${CI_JOB_TOKEN}"
+  <<: *gcp-auth
+  script:
+    - cd infra/terraform
+
+    # Set Terraform variables from GitLab CI variables
+    - export TF_VAR_vercel_api_token="${VERCEL_API_TOKEN}"
+    - '[ -n "$GOOGLE_OAUTH_CLIENT_ID_DEV" ] && export TF_VAR_google_oauth_client_id="$GOOGLE_OAUTH_CLIENT_ID_DEV" || true'
+    - '[ -n "$GOOGLE_OAUTH_CLIENT_SECRET_DEV" ] && export TF_VAR_google_oauth_client_secret="$GOOGLE_OAUTH_CLIENT_SECRET_DEV" || true'
+    - '[ -n "$STRIPE_PUBLISHABLE_KEY_DEV" ] && export TF_VAR_stripe_publishable_key="$STRIPE_PUBLISHABLE_KEY_DEV" || true'
+    # Secret Manager values
+    - '[ -n "$ANTHROPIC_API_KEY_DEV" ] && export TF_VAR_anthropic_api_key="$ANTHROPIC_API_KEY_DEV" || true'
+    - '[ -n "$RESEND_API_KEY_DEV" ] && export TF_VAR_resend_api_key="$RESEND_API_KEY_DEV" || true'
+    - '[ -n "$STRIPE_SECRET_KEY_DEV" ] && export TF_VAR_stripe_secret_key="$STRIPE_SECRET_KEY_DEV" || true'
+    - '[ -n "$STRIPE_WEBHOOK_SECRET_DEV" ] && export TF_VAR_stripe_webhook_secret="$STRIPE_WEBHOOK_SECRET_DEV" || true'
+    - '[ -n "$STRIPE_PRO_MONTHLY_PRICE_ID_DEV" ] && export TF_VAR_stripe_pro_monthly_price_id="$STRIPE_PRO_MONTHLY_PRICE_ID_DEV" || true'
+    - '[ -n "$STRIPE_PRO_ANNUAL_PRICE_ID_DEV" ] && export TF_VAR_stripe_pro_annual_price_id="$STRIPE_PRO_ANNUAL_PRICE_ID_DEV" || true'
+
+    - |
+      terraform init \
+        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev" \
+        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev/lock" \
+        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev/lock"
+    - terraform fmt -check -recursive
+    - terraform validate
+    - terraform plan -var-file=environments/${ENVIRONMENT}.tfvars -out=tfplan
+    - terraform show -json tfplan > tfplan.json
+  artifacts:
+    reports:
+      terraform: infra/terraform/tfplan.json
+    paths:
+      - infra/terraform/tfplan
+      - infra/terraform/tfplan.json
+      - infra/terraform/.terraform.lock.hcl
+    expire_in: 1 day
+  resource_group: dev-infrastructure
+
+# =============================================================================
+# DEPLOY-DEV STAGE - Deploy to Dev Environment
+# =============================================================================
+
+
+# Apply Dev: Terraform apply for dev (automatic)
+apply-dev:
+  stage: deploy-dev
+  image:
+    name: ${TERRAFORM_DEPLOYER_IMAGE}
+    entrypoint: [""]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *infra-changes
+      when: never  # Don't apply on MRs
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *infra-changes
+  needs:
+    - job: plan-dev
+      artifacts: true
+    - job: build-backend
+      optional: true
+      artifacts: false
+    - job: build-agent
+      optional: true
+      artifacts: false
+    - job: test-backend
+      optional: true
+      artifacts: false
+    - job: test-frontend
+      optional: true
+      artifacts: false
+    - job: test-agent
+      optional: true
+      artifacts: false
+    - job: lint-frontend
+      optional: true
+      artifacts: false
+    - job: lint-agent
+      optional: true
+      artifacts: false
+  variables:
+    <<: *dev-env-vars
+    TF_HTTP_PASSWORD: "${CI_JOB_TOKEN}"
+  <<: *gcp-auth
+  script:
+    - cd infra/terraform
+
+    # Set Terraform variables from GitLab CI variables
+    - export TF_VAR_vercel_api_token="${VERCEL_API_TOKEN}"
+    - '[ -n "$GOOGLE_OAUTH_CLIENT_ID_DEV" ] && export TF_VAR_google_oauth_client_id="$GOOGLE_OAUTH_CLIENT_ID_DEV" || true'
+    - '[ -n "$GOOGLE_OAUTH_CLIENT_SECRET_DEV" ] && export TF_VAR_google_oauth_client_secret="$GOOGLE_OAUTH_CLIENT_SECRET_DEV" || true'
+    - '[ -n "$STRIPE_PUBLISHABLE_KEY_DEV" ] && export TF_VAR_stripe_publishable_key="$STRIPE_PUBLISHABLE_KEY_DEV" || true'
+    # Secret Manager values
+    - '[ -n "$ANTHROPIC_API_KEY_DEV" ] && export TF_VAR_anthropic_api_key="$ANTHROPIC_API_KEY_DEV" || true'
+    - '[ -n "$RESEND_API_KEY_DEV" ] && export TF_VAR_resend_api_key="$RESEND_API_KEY_DEV" || true'
+    - '[ -n "$STRIPE_SECRET_KEY_DEV" ] && export TF_VAR_stripe_secret_key="$STRIPE_SECRET_KEY_DEV" || true'
+    - '[ -n "$STRIPE_WEBHOOK_SECRET_DEV" ] && export TF_VAR_stripe_webhook_secret="$STRIPE_WEBHOOK_SECRET_DEV" || true'
+    - '[ -n "$STRIPE_PRO_MONTHLY_PRICE_ID_DEV" ] && export TF_VAR_stripe_pro_monthly_price_id="$STRIPE_PRO_MONTHLY_PRICE_ID_DEV" || true'
+    - '[ -n "$STRIPE_PRO_ANNUAL_PRICE_ID_DEV" ] && export TF_VAR_stripe_pro_annual_price_id="$STRIPE_PRO_ANNUAL_PRICE_ID_DEV" || true'
+
+    - |
+      terraform init \
+        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev" \
+        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev/lock" \
+        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev/lock"
+    - terraform apply -var-file=environments/${ENVIRONMENT}.tfvars -auto-approve
+    - echo "INFRA_APPLIED_DEV=true" >> ../../infra-dev.env
+  artifacts:
+    reports:
+      dotenv: infra-dev.env
+    expire_in: 7 days
+  environment:
+    name: dev
+    action: prepare
+  resource_group: dev-infrastructure
+
+# Deploy Backend Dev: Cloud Run deployment
+deploy-backend-dev:
+  stage: deploy-dev
+  image: google/cloud-sdk:alpine
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *backend-changes
+      when: never  # Don't deploy on MRs
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *backend-changes
+  needs:
+    - job: test-backend
+      artifacts: false
+    - job: build-backend
+      artifacts: true
+    - job: apply-dev
+      optional: true
+      artifacts: false
+  variables:
+    <<: *dev-env-vars
+    SERVICE_NAME: "{{PROJECT_SLUG}}-backend"
+  <<: *gcp-auth
+  script:
+    - |
+      gcloud run deploy $SERVICE_NAME \
+        --image $IMAGE_TAG \
+        --region $GCP_REGION \
+        --quiet
+    - echo "BACKEND_DEPLOYED_DEV=true" >> deploy-dev.env
+    - echo "BACKEND_URL_DEV=$(gcloud run services describe $SERVICE_NAME --region $GCP_REGION --format 'value(status.url)')" >> deploy-dev.env
+  artifacts:
+    reports:
+      dotenv: deploy-dev.env
+    expire_in: 7 days
+  environment:
+    name: dev
+    url: https://{{PROJECT_SLUG}}-backend-dev.run.app
+  resource_group: dev-backend
+
+# Deploy Frontend Dev: Vercel preview deployment
+deploy-frontend-dev:
+  stage: deploy-dev
+  image: ${FRONTEND_BUILDER_IMAGE}
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *frontend-changes
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *frontend-changes
+  needs:
+    - job: test-frontend
+      artifacts: false
+    - job: apply-dev
+      optional: true
+      artifacts: false
+    - job: deploy-backend-dev
+      optional: true
+      artifacts: false
+  variables:
+    <<: *dev-env-vars
+  script:
+    - cd frontend
+    # Pull Vercel environment variables (managed by Terraform)
+    - vercel pull --yes --environment=dev --token=$VERCEL_API_TOKEN
+    # Build for preview (includes source maps, debug symbols)
+    - vercel build --target=dev --token=$VERCEL_API_TOKEN
+    # Deploy to preview
+    - vercel deploy --prebuilt --target=dev --token=$VERCEL_API_TOKEN > deployment-url.txt
+    - export DEPLOYMENT_URL=$(cat deployment-url.txt)
+    - echo "FRONTEND_DEPLOYED_DEV=true" >> ../deploy-frontend-dev.env
+    - echo "FRONTEND_URL_DEV=$DEPLOYMENT_URL" >> ../deploy-frontend-dev.env
+  artifacts:
+    reports:
+      dotenv: deploy-frontend-dev.env
+    expire_in: 7 days
+  environment:
+    name: dev
+    url: https://{{PROJECT_SLUG}}-dev.vercel.app
+
+# Deploy Agent Dev: Cloud Run deployment
+deploy-agent-dev:
+  stage: deploy-dev
+  image: google/cloud-sdk:alpine
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *agent-changes
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *agent-changes
+  needs:
+    - job: test-agent
+      artifacts: false
+    - job: build-agent
+      artifacts: true
+    - job: apply-dev
+      optional: true
+      artifacts: false
+  variables:
+    <<: *dev-env-vars
+    SERVICE_NAME: "claude-agent-service"
+  <<: *gcp-auth
+  script:
+    - |
+      gcloud run deploy $SERVICE_NAME \
+        --image $AGENT_IMAGE_TAG \
+        --region $GCP_REGION \
+        --quiet
+    - echo "AGENT_DEPLOYED_DEV=true" >> deploy-agent-dev.env
+    - echo "AGENT_URL_DEV=$(gcloud run services describe $SERVICE_NAME --region $GCP_REGION --format 'value(status.url)')" >> deploy-agent-dev.env
+  artifacts:
+    reports:
+      dotenv: deploy-agent-dev.env
+    expire_in: 7 days
+  environment:
+    name: dev
+    url: https://claude-agent-service-dev.run.app
+  resource_group: dev-agent
+
+# =============================================================================
+# =============================================================================
+# PROMOTE STAGE - Manual Gate to Production
+# =============================================================================
+
+promote-to-prod:
+  stage: promote
+  image: ${GCP_DEPLOYER_IMAGE}
+  services:
+    - docker:dind
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  needs:
+    - job: plan-prod
+      optional: true
+      artifacts: false
+    - job: build-backend
+      artifacts: true
+      optional: true
+    - job: build-agent
+      artifacts: true
+      optional: true
+    - job: deploy-backend-dev
+      optional: true
+    - job: deploy-agent-dev
+      optional: true
+  variables:
+    <<: *prod-env-vars
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  <<: *gcp-auth
+  script:
+    # Authenticate to both dev and prod Artifact Registries
+    - gcloud auth configure-docker us-central1-docker.pkg.dev
+
+    # Promote backend image if it was built (IMAGE_TAG is set by build-backend job)
+    - |
+      if [ -n "$IMAGE_TAG" ]; then
+        export DEV_BACKEND_TAG="us-central1-docker.pkg.dev/{{GCP_PROJECT_DEV}}/{{PROJECT_SLUG}}/backend:dev-${CI_COMMIT_SHORT_SHA}"
+        export PROD_BACKEND_TAG="us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}/backend:prod-${CI_COMMIT_SHORT_SHA}"
+        echo "Promoting backend image..."
+        echo "From (dev) - $DEV_BACKEND_TAG"
+        echo "To (prod) - $PROD_BACKEND_TAG"
+        docker pull $DEV_BACKEND_TAG
+        docker tag $DEV_BACKEND_TAG $PROD_BACKEND_TAG
+        docker push $PROD_BACKEND_TAG
+        echo "PROMOTED_BACKEND_TAG=$PROD_BACKEND_TAG" >> promote.env
+      else
+        echo "Skipping backend promotion - no backend changes in this commit"
+      fi
+
+    # Promote agent image if it was built (AGENT_IMAGE_TAG is set by build-agent job)
+    - |
+      if [ -n "$AGENT_IMAGE_TAG" ]; then
+        export DEV_AGENT_TAG="us-central1-docker.pkg.dev/{{GCP_PROJECT_DEV}}/{{PROJECT_SLUG}}/claude-agent:dev-${CI_COMMIT_SHORT_SHA}"
+        export PROD_AGENT_TAG="us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}/claude-agent:prod-${CI_COMMIT_SHORT_SHA}"
+        echo "Promoting agent image..."
+        echo "From (dev) - $DEV_AGENT_TAG"
+        echo "To (prod) - $PROD_AGENT_TAG"
+        docker pull $DEV_AGENT_TAG
+        docker tag $DEV_AGENT_TAG $PROD_AGENT_TAG
+        docker push $PROD_AGENT_TAG
+        echo "PROMOTED_AGENT_TAG=$PROD_AGENT_TAG" >> promote.env
+      else
+        echo "Skipping agent promotion - no agent changes in this commit"
+      fi
+  artifacts:
+    reports:
+      dotenv: promote.env
+    expire_in: 7 days
+  environment:
+    name: prod
+    action: prepare
+
+# =============================================================================
+# DEPLOY-PROD STAGE - Deploy to Production
+# =============================================================================
+
+# Plan Prod: Terraform plan for prod infrastructure
+plan-prod:
+  stage: promote
+  image:
+    name: ${TERRAFORM_DEPLOYER_IMAGE}
+    entrypoint: [""]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *infra-changes
+  variables:
+    <<: *prod-env-vars
+    TF_HTTP_PASSWORD: "${CI_JOB_TOKEN}"
+  <<: *gcp-auth
+  script:
+    - cd infra/terraform
+
+    # Set Terraform variables from GitLab CI variables
+    - export TF_VAR_vercel_api_token="${VERCEL_API_TOKEN}"
+    - '[ -n "$GOOGLE_OAUTH_CLIENT_ID_PROD" ] && export TF_VAR_google_oauth_client_id="$GOOGLE_OAUTH_CLIENT_ID_PROD" || true'
+    - '[ -n "$GOOGLE_OAUTH_CLIENT_SECRET_PROD" ] && export TF_VAR_google_oauth_client_secret="$GOOGLE_OAUTH_CLIENT_SECRET_PROD" || true'
+    - '[ -n "$STRIPE_PUBLISHABLE_KEY_PROD" ] && export TF_VAR_stripe_publishable_key="$STRIPE_PUBLISHABLE_KEY_PROD" || true'
+    # Secret Manager values
+    - '[ -n "$ANTHROPIC_API_KEY_PROD" ] && export TF_VAR_anthropic_api_key="$ANTHROPIC_API_KEY_PROD" || true'
+    - '[ -n "$RESEND_API_KEY_PROD" ] && export TF_VAR_resend_api_key="$RESEND_API_KEY_PROD" || true'
+    - '[ -n "$STRIPE_SECRET_KEY_PROD" ] && export TF_VAR_stripe_secret_key="$STRIPE_SECRET_KEY_PROD" || true'
+    - '[ -n "$STRIPE_WEBHOOK_SECRET_PROD" ] && export TF_VAR_stripe_webhook_secret="$STRIPE_WEBHOOK_SECRET_PROD" || true'
+    - '[ -n "$STRIPE_PRO_MONTHLY_PRICE_ID_PROD" ] && export TF_VAR_stripe_pro_monthly_price_id="$STRIPE_PRO_MONTHLY_PRICE_ID_PROD" || true'
+    - '[ -n "$STRIPE_PRO_ANNUAL_PRICE_ID_PROD" ] && export TF_VAR_stripe_pro_annual_price_id="$STRIPE_PRO_ANNUAL_PRICE_ID_PROD" || true'
+
+    - |
+      terraform init \
+        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp" \
+        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp/lock" \
+        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp/lock"
+    - terraform fmt -check -recursive
+    - terraform validate
+    - terraform plan -var-file=environments/${ENVIRONMENT}.tfvars -out=tfplan-prod
+    - terraform show -json tfplan-prod > tfplan-prod.json
+  artifacts:
+    reports:
+      terraform: infra/terraform/tfplan-prod.json
+    paths:
+      - infra/terraform/tfplan-prod
+      - infra/terraform/tfplan-prod.json
+      - infra/terraform/.terraform.lock.hcl
+    expire_in: 1 day
+  environment:
+    name: prod
+    action: prepare
+  resource_group: prod-infrastructure
+
+# Apply Prod: Terraform apply for prod (automatic - no manual gate)
+apply-prod:
+  stage: deploy-prod
+  image:
+    name: ${TERRAFORM_DEPLOYER_IMAGE}
+    entrypoint: [""]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *infra-changes
+  needs:
+    - job: plan-prod
+      artifacts: true
+    - job: promote-to-prod
+  variables:
+    <<: *prod-env-vars
+    TF_HTTP_PASSWORD: "${CI_JOB_TOKEN}"
+  <<: *gcp-auth
+  script:
+    - cd infra/terraform
+
+    # Set Terraform variables from GitLab CI variables
+    - export TF_VAR_vercel_api_token="${VERCEL_API_TOKEN}"
+    - '[ -n "$GOOGLE_OAUTH_CLIENT_ID_PROD" ] && export TF_VAR_google_oauth_client_id="$GOOGLE_OAUTH_CLIENT_ID_PROD" || true'
+    - '[ -n "$GOOGLE_OAUTH_CLIENT_SECRET_PROD" ] && export TF_VAR_google_oauth_client_secret="$GOOGLE_OAUTH_CLIENT_SECRET_PROD" || true'
+    - '[ -n "$STRIPE_PUBLISHABLE_KEY_PROD" ] && export TF_VAR_stripe_publishable_key="$STRIPE_PUBLISHABLE_KEY_PROD" || true'
+    # Secret Manager values
+    - '[ -n "$ANTHROPIC_API_KEY_PROD" ] && export TF_VAR_anthropic_api_key="$ANTHROPIC_API_KEY_PROD" || true'
+    - '[ -n "$RESEND_API_KEY_PROD" ] && export TF_VAR_resend_api_key="$RESEND_API_KEY_PROD" || true'
+    - '[ -n "$STRIPE_SECRET_KEY_PROD" ] && export TF_VAR_stripe_secret_key="$STRIPE_SECRET_KEY_PROD" || true'
+    - '[ -n "$STRIPE_WEBHOOK_SECRET_PROD" ] && export TF_VAR_stripe_webhook_secret="$STRIPE_WEBHOOK_SECRET_PROD" || true'
+    - '[ -n "$STRIPE_PRO_MONTHLY_PRICE_ID_PROD" ] && export TF_VAR_stripe_pro_monthly_price_id="$STRIPE_PRO_MONTHLY_PRICE_ID_PROD" || true'
+    - '[ -n "$STRIPE_PRO_ANNUAL_PRICE_ID_PROD" ] && export TF_VAR_stripe_pro_annual_price_id="$STRIPE_PRO_ANNUAL_PRICE_ID_PROD" || true'
+
+    - |
+      terraform init \
+        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp" \
+        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp/lock" \
+        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp/lock"
+    - terraform apply -var-file=environments/${ENVIRONMENT}.tfvars -auto-approve
+    - echo "INFRA_APPLIED_PROD=true" >> ../../infra-prod.env
+  artifacts:
+    reports:
+      dotenv: infra-prod.env
+    expire_in: 7 days
+  environment:
+    name: prod
+    action: prepare
+  resource_group: prod-infrastructure
+
+
+# Deploy Backend Prod: Cloud Run deployment with promoted image
+deploy-backend-prod:
+  stage: deploy-prod
+  image: google/cloud-sdk:alpine
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *backend-changes
+  needs:
+    - job: promote-to-prod
+      artifacts: true
+    - job: apply-prod
+      optional: true
+      artifacts: false
+  variables:
+    <<: *prod-env-vars
+    SERVICE_NAME: "{{PROJECT_SLUG}}-backend"
+  <<: *gcp-auth
+  script:
+    - |
+      if [ -z "$PROMOTED_BACKEND_TAG" ]; then
+        echo "ERROR: PROMOTED_BACKEND_TAG not set - backend image was not promoted"
+        exit 1
+      fi
+    - |
+      gcloud run deploy $SERVICE_NAME \
+        --image $PROMOTED_BACKEND_TAG \
+        --region $GCP_REGION \
+        --quiet
+    - echo "BACKEND_DEPLOYED_PROD=true" >> deploy-prod.env
+    - echo "BACKEND_URL_PROD=$(gcloud run services describe $SERVICE_NAME --region $GCP_REGION --format 'value(status.url)')" >> deploy-prod.env
+  artifacts:
+    reports:
+      dotenv: deploy-prod.env
+    expire_in: 7 days
+  environment:
+    name: prod
+    url: https://{{PROJECT_SLUG}}-backend.run.app
+  resource_group: prod-backend
+
+# Deploy Frontend Prod: Vercel production deployment (full rebuild)
+deploy-frontend-prod:
+  stage: deploy-prod
+  image: ${FRONTEND_BUILDER_IMAGE}
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *frontend-changes
+  needs:
+    - job: promote-to-prod
+    - job: deploy-backend-prod
+      optional: true
+      artifacts: false
+  variables:
+    <<: *prod-env-vars
+  script:
+    - cd frontend
+    # Pull Vercel environment variables (managed by Terraform)
+    - vercel pull --yes --environment=production --token=$VERCEL_API_TOKEN
+    # Build for production (optimized, minified, no source maps)
+    - vercel build --prod --token=$VERCEL_API_TOKEN
+    # Deploy to production
+    - vercel deploy --prebuilt --prod --token=$VERCEL_API_TOKEN > deployment-url.txt
+    - export DEPLOYMENT_URL=$(cat deployment-url.txt)
+    - echo "FRONTEND_DEPLOYED_PROD=true" >> ../deploy-frontend-prod.env
+    - echo "FRONTEND_URL_PROD=$DEPLOYMENT_URL" >> ../deploy-frontend-prod.env
+  artifacts:
+    reports:
+      dotenv: deploy-frontend-prod.env
+    expire_in: 7 days
+  environment:
+    name: prod
+    url: https://{{PROJECT_SLUG}}-prod.vercel.app
+
+# Deploy Agent Prod: Cloud Run deployment with promoted image
+deploy-agent-prod:
+  stage: deploy-prod
+  image: google/cloud-sdk:alpine
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *agent-changes
+  needs:
+    - job: promote-to-prod
+      artifacts: true
+    - job: apply-prod
+      optional: true
+      artifacts: false
+  variables:
+    <<: *prod-env-vars
+    SERVICE_NAME: "claude-agent-service"
+  <<: *gcp-auth
+  script:
+    - |
+      if [ -z "$PROMOTED_AGENT_TAG" ]; then
+        echo "ERROR: PROMOTED_AGENT_TAG not set - agent image was not promoted"
+        exit 1
+      fi
+    - |
+      gcloud run deploy $SERVICE_NAME \
+        --image $PROMOTED_AGENT_TAG \
+        --region $GCP_REGION \
+        --quiet
+    - echo "AGENT_DEPLOYED_PROD=true" >> deploy-agent-prod.env
+    - echo "AGENT_URL_PROD=$(gcloud run services describe $SERVICE_NAME --region $GCP_REGION --format 'value(status.url)')" >> deploy-agent-prod.env
+  artifacts:
+    reports:
+      dotenv: deploy-agent-prod.env
+    expire_in: 7 days
+  environment:
+    name: prod
+    url: https://claude-agent-service.run.app
+  resource_group: prod-agent
+
+# =============================================================================

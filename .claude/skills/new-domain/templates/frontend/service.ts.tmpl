@@ -1,0 +1,31 @@
+import { apiClient } from '../api-client'
+import type { Create{{Singular}}Request, {{Singular}}, Update{{Singular}}Request } from '../types/{{singular}}'
+
+class {{Singular}}Service {
+  async list(): Promise<{{Singular}}[]> {
+    const response = await apiClient.get<{{Singular}}[]>('/v1/{{plural}}')
+    return response.data
+  }
+
+  async get({{singular}}Id: string): Promise<{{Singular}}> {
+    const response = await apiClient.get<{{Singular}}>(`/v1/{{plural}}/${{{singular}}Id}`)
+    return response.data
+  }
+
+  async create(req: Create{{Singular}}Request): Promise<{{Singular}}> {
+    const response = await apiClient.post<{{Singular}}>('/v1/{{plural}}', req)
+    return response.data
+  }
+
+  async update({{singular}}Id: string, req: Update{{Singular}}Request): Promise<{{Singular}}> {
+    const response = await apiClient.patch<{{Singular}}>(`/v1/{{plural}}/${{{singular}}Id}`, req)
+    return response.data
+  }
+
+  async delete({{singular}}Id: string): Promise<void> {
+    await apiClient.delete<void>(`/v1/{{plural}}/${{{singular}}Id}`)
+  }
+}
+
+export const {{singular}}Service = new {{Singular}}Service()
+export default {{singular}}Service

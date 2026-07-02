@@ -1,0 +1,64 @@
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ddbdata:/home/dynamodblocal/data
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/home/dynamodblocal/data"]
+    networks:
+      - flywheel-network
+
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:latest
+    container_name: flywheel-dynamodb-admin
+    ports:
+      - "8001:8001"
+    environment:
+      - DYNAMO_ENDPOINT=http://dynamodb-local:8000
+    depends_on:
+      - dynamodb-local
+    networks:
+      - flywheel-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: flywheel-minio
+    ports:
+      - "9550:9000"   # S3 API
+      - "9551:9001"   # Web Console
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - ./minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - flywheel-network
+
+  postgres:
+    # Custom image with pre-seeded test data for Flywheel e2e testing
+    # Local build: docker build --platform linux/arm64 -f infra/docker/postgres-test.Dockerfile -t flywheel-postgres-test:latest .
+    # Or use pre-built from GCP: us-central1-docker.pkg.dev/flywheel-etl-prod/flywheel-ci/postgres-test:latest
+    image: flywheel-postgres-test:latest
+    container_name: flywheel-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=testuser
+      - POSTGRES_PASSWORD=testpass
+      - POSTGRES_DB=testdb
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    networks:
+      - flywheel-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  flywheel-network:
+    name: flywheel-network
+    driver: bridge

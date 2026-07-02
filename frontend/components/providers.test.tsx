@@ -1,0 +1,48 @@
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { Providers } from './providers'
+
+vi.mock('@tanstack/react-query', () => ({
+  QueryClientProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="query-client-provider">{children}</div>
+  ),
+}))
+
+vi.mock('@/lib/query-client', () => ({
+  queryClient: {},
+}))
+
+vi.mock('./account-provider', () => ({
+  AccountProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="account-provider">{children}</div>
+  ),
+}))
+
+describe('Providers', () => {
+  it('renders children', () => {
+    render(
+      <Providers>
+        <div data-testid="test-child">Test Content</div>
+      </Providers>
+    )
+
+    expect(screen.getByTestId('test-child')).toBeInTheDocument()
+    expect(screen.getByText('Test Content')).toBeInTheDocument()
+  })
+
+  it('wraps children with QueryClientProvider and AccountProvider', () => {
+    render(
+      <Providers>
+        <div data-testid="child">Child</div>
+      </Providers>
+    )
+
+    const queryProvider = screen.getByTestId('query-client-provider')
+    const accountProvider = screen.getByTestId('account-provider')
+
+    expect(queryProvider).toBeInTheDocument()
+    expect(accountProvider).toBeInTheDocument()
+    expect(queryProvider).toContainElement(accountProvider)
+    expect(accountProvider).toContainElement(screen.getByTestId('child'))
+  })
+})

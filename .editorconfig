@@ -1,0 +1,33 @@
+# https://editorconfig.org
+# End the holy wars before they start.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Go: tabs are mandatory (gofmt enforces).
+[*.{go,mod,sum}]
+indent_style = tab
+
+# Makefiles: tabs are mandatory (make breaks on spaces).
+[{Makefile,*.mk}]
+indent_style = tab
+
+# Python: PEP 8 says 4 spaces.
+[*.py]
+indent_size = 4
+
+# Shell: 2 spaces is conventional, but some prefer 4. Sticking with 2.
+[*.sh]
+indent_size = 2
+
+# Markdown: trailing spaces are syntactically meaningful (= line break).
+# Leave them alone.
+[*.md]
+trim_trailing_whitespace = false

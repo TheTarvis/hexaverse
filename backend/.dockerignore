@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Environment files
+.env*
+!.env.example
+
+# Development tools
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Test files
+*_test.go
+testdata/
+
+# Scripts
+scripts/
+
+# Docker
+docker-compose.yml
+Dockerfile*
+
+# Build artifacts
+bin/
+dist/
+
+# OS generated files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,127 @@
+package {{plural}}
+
+import (
+	"context"
+	"errors"
+	"time"
+	"{{PROJECT_SLUG}}/common"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
+)
+
+var ErrNotFound = errors.New("{{singular}} not found")
+var ErrForbidden = errors.New("forbidden")
+
+type ServiceInterface interface {
+	Get(ctx context.Context, ownerId, id string) (*{{Singular}}, error)
+	List(ctx context.Context, ownerId string) ([]{{Singular}}, error)
+	Create(ctx context.Context, ownerId string, req CreateRequest) (*{{Singular}}, error)
+	Update(ctx context.Context, ownerId, id string, req UpdateRequest) (*{{Singular}}, error)
+	Delete(ctx context.Context, ownerId, id string) error
+}
+
+type Service struct {
+	dao Dao
+}
+
+func NewService() *Service {
+	return &Service{dao: NewDao()}
+}
+
+func NewServiceWithDao(dao Dao) *Service {
+	return &Service{dao: dao}
+}
+
+func (s *Service) Get(ctx context.Context, ownerId, id string) (*{{Singular}}, error) {
+	{{singular}}, err := s.dao.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if {{singular}} == nil {
+		return nil, ErrNotFound
+	}
+	if {{singular}}.OwnerId != ownerId {
+		return nil, ErrForbidden
+	}
+	return {{singular}}, nil
+}
+
+func (s *Service) List(ctx context.Context, ownerId string) ([]{{Singular}}, error) {
+	return s.dao.ListByOwner(ctx, ownerId)
+}
+
+func (s *Service) Create(ctx context.Context, ownerId string, req CreateRequest) (*{{Singular}}, error) {
+	now := time.Now().UTC()
+	{{singular}} := {{Singular}}{
+		Id:          uuid.New().String(),
+		OwnerId:     ownerId,
+		Name:        req.Name,
+		Description: req.Description,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err := s.dao.Save(ctx, {{singular}}); err != nil {
+		return nil, err
+	}
+
+	s.publishEvent(ctx, common.{{Singular}}Created, {{singular}})
+	return &{{singular}}, nil
+}
+
+func (s *Service) Update(ctx context.Context, ownerId, id string, req UpdateRequest) (*{{Singular}}, error) {
+	existing, err := s.Get(ctx, ownerId, id)
+	if err != nil {
+		return nil, err
+	}
+
+	updates := map[string]any{}
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if req.Description != nil {
+		updates["description"] = *req.Description
+	}
+	if len(updates) == 0 {
+		return existing, nil
+	}
+
+	updated, err := s.dao.Update(ctx, id, updates)
+	if err != nil {
+		return nil, err
+	}
+
+	s.publishEvent(ctx, common.{{Singular}}Updated, *updated)
+	return updated, nil
+}
+
+func (s *Service) Delete(ctx context.Context, ownerId, id string) error {
+	existing, err := s.Get(ctx, ownerId, id)
+	if err != nil {
+		return err
+	}
+
+	if err := s.dao.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	s.publishEvent(ctx, common.{{Singular}}Deleted, *existing)
+	return nil
+}
+
+func (s *Service) publishEvent(ctx context.Context, eventType string, {{singular}} {{Singular}}) {
+	envelope := common.NewEvent(ctx, eventType).
+		WithSource("{{plural}}-service").
+		WithTypedPayload(map[string]any{
+			"{{singular}}Id":    {{singular}}.Id,
+			"ownerId":   {{singular}}.OwnerId,
+			"name":      {{singular}}.Name,
+			"createdBy": {{singular}}.OwnerId,
+		}).
+		Build()
+
+	if err := common.PubSub().PublishWithContext(ctx, common.Topic{{Singular}}Events, envelope); err != nil {
+		log.Error().Ctx(ctx).Err(err).Str("eventType", eventType).Msg("Failed to publish {{singular}} event")
+	}
+}

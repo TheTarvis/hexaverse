@@ -1,0 +1,29 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="docBody" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="docFold" x1="14" y1="2" x2="20" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0369a1"/>
+      <stop offset="100%" stop-color="#0e7490"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Document body with rounded corners -->
+  <path
+    d="M6 2C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2H6Z"
+    fill="url(#docBody)"
+  />
+
+  <!-- Page fold - darker shade -->
+  <path
+    d="M14 2V6C14 7.10457 14.8954 8 16 8H20L14 2Z"
+    fill="url(#docFold)"
+  />
+
+  <!-- Data visualization: stacked horizontal bars with different widths -->
+  <rect x="7" y="11" width="10" height="2" rx="1" fill="white" fill-opacity="0.85"/>
+  <rect x="7" y="14.5" width="7" height="2" rx="1" fill="white" fill-opacity="0.7"/>
+  <rect x="7" y="18" width="4" height="2" rx="1" fill="white" fill-opacity="0.55"/>
+</svg>

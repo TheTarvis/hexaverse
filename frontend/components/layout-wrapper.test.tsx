@@ -1,0 +1,101 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { LayoutWrapper } from './layout-wrapper'
+
+const mockPush = vi.fn()
+vi.mock('next/navigation', () => ({
+  usePathname: vi.fn(() => '/'),
+  useRouter: vi.fn(() => ({
+    push: mockPush,
+  })),
+}))
+
+vi.mock('@/components/account-provider', () => ({
+  useAccountContext: vi.fn(() => ({
+    user: null,
+    authLoading: false,
+    account: null,
+    isLoading: false,
+  })),
+}))
+
+vi.mock('@/components/app-navigation', () => ({
+  AppNavigation: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-navigation">{children}</div>
+  ),
+}))
+
+import { usePathname } from 'next/navigation'
+import { useAccountContext } from '@/components/account-provider'
+
+describe('LayoutWrapper', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(usePathname).mockReturnValue('/')
+  })
+
+  it('renders public route children without app shell', () => {
+    vi.mocked(usePathname).mockReturnValue('/login')
+
+    render(
+      <LayoutWrapper>
+        <div data-testid="login-content">Login</div>
+      </LayoutWrapper>
+    )
+
+    expect(screen.getByTestId('login-content')).toBeInTheDocument()
+    expect(screen.queryByTestId('app-navigation')).not.toBeInTheDocument()
+  })
+
+  it('redirects unauthenticated user from protected route to /login', () => {
+    vi.mocked(useAccountContext).mockReturnValue({
+      user: null,
+      authLoading: false,
+      account: null,
+      isLoading: false,
+    } as ReturnType<typeof useAccountContext>)
+
+    render(
+      <LayoutWrapper>
+        <div data-testid="content">Content</div>
+      </LayoutWrapper>
+    )
+
+    expect(mockPush).toHaveBeenCalledWith('/login')
+  })
+
+  it('renders app shell for authenticated user with account', () => {
+    vi.mocked(useAccountContext).mockReturnValue({
+      user: { uid: 'u1' },
+      authLoading: false,
+      account: { id: 'a1' },
+      isLoading: false,
+    } as ReturnType<typeof useAccountContext>)
+
+    render(
+      <LayoutWrapper>
+        <div data-testid="content">Content</div>
+      </LayoutWrapper>
+    )
+
+    expect(screen.getByTestId('app-navigation')).toBeInTheDocument()
+    expect(screen.getByTestId('content')).toBeInTheDocument()
+  })
+
+  it('renders nothing while auth is loading', () => {
+    vi.mocked(useAccountContext).mockReturnValue({
+      user: null,
+      authLoading: true,
+      account: null,
+      isLoading: true,
+    } as ReturnType<typeof useAccountContext>)
+
+    const { container } = render(
+      <LayoutWrapper>
+        <div data-testid="content">Content</div>
+      </LayoutWrapper>
+    )
+
+    expect(container.firstChild).toBeNull()
+  })
+})

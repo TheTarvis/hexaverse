@@ -1,0 +1,51 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { {{singular}}Service } from '@/lib/services/{{singular}}-service'
+import { queryKeys } from '@/lib/query-keys'
+import type { Create{{Singular}}Request, Update{{Singular}}Request } from '@/lib/types/{{singular}}'
+
+export function use{{Plural}}() {
+  return useQuery({
+    queryKey: queryKeys.{{plural}}.lists(),
+    queryFn: () => {{singular}}Service.list(),
+  })
+}
+
+export function use{{Singular}}({{singular}}Id: string | undefined) {
+  return useQuery({
+    queryKey: {{singular}}Id ? queryKeys.{{plural}}.detail({{singular}}Id) : queryKeys.{{plural}}.all,
+    queryFn: () => {{singular}}Service.get({{singular}}Id!),
+    enabled: !!{{singular}}Id,
+  })
+}
+
+export function useCreate{{Singular}}() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (req: Create{{Singular}}Request) => {{singular}}Service.create(req),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.{{plural}}.lists() })
+    },
+  })
+}
+
+export function useUpdate{{Singular}}() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ {{singular}}Id, req }: { {{singular}}Id: string; req: Update{{Singular}}Request }) =>
+      {{singular}}Service.update({{singular}}Id, req),
+    onSuccess: (_data, { {{singular}}Id }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.{{plural}}.lists() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.{{plural}}.detail({{singular}}Id) })
+    },
+  })
+}
+
+export function useDelete{{Singular}}() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({{singular}}Id: string) => {{singular}}Service.delete({{singular}}Id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.{{plural}}.lists() })
+    },
+  })
+}

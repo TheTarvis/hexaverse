@@ -1,0 +1,103 @@
+package {{plural}}
+
+import (
+	"context"
+	"errors"
+	"time"
+	"{{PROJECT_SLUG}}/common"
+
+	"cloud.google.com/go/firestore"
+	"github.com/rs/zerolog/log"
+	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+const firestoreCollection = "{{plural}}"
+
+//go:generate mockgen -destination=dao_mock.go -package={{plural}} -source=dao.go Dao
+
+type Dao interface {
+	Get(ctx context.Context, id string) (*{{Singular}}, error)
+	ListByOwner(ctx context.Context, ownerId string) ([]{{Singular}}, error)
+	Save(ctx context.Context, {{singular}} {{Singular}}) error
+	Update(ctx context.Context, id string, updates map[string]any) (*{{Singular}}, error)
+	Delete(ctx context.Context, id string) error
+}
+
+type DaoImpl struct {
+	db common.FirestoreService
+}
+
+func NewDao() Dao {
+	return &DaoImpl{db: common.NewFirestoreService()}
+}
+
+func NewDaoWithClient(db common.FirestoreService) Dao {
+	return &DaoImpl{db: db}
+}
+
+func (dao *DaoImpl) Get(ctx context.Context, id string) (*{{Singular}}, error) {
+	doc, err := dao.db.Get(ctx, firestoreCollection, id)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		log.Error().Ctx(ctx).Err(err).Str("id", id).Msg("Unable to fetch {{singular}}")
+		return nil, err
+	}
+
+	if !doc.Exists() {
+		return nil, nil
+	}
+
+	var {{singular}} {{Singular}}
+	if err := doc.DataTo(&{{singular}}); err != nil {
+		return nil, err
+	}
+	return &{{singular}}, nil
+}
+
+func (dao *DaoImpl) ListByOwner(ctx context.Context, ownerId string) ([]{{Singular}}, error) {
+	query := dao.db.Collection(firestoreCollection).Where("ownerId", "==", ownerId)
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var {{plural}} []{{Singular}}
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var {{singular}} {{Singular}}
+		if err := doc.DataTo(&{{singular}}); err != nil {
+			return nil, err
+		}
+		{{plural}} = append({{plural}}, {{singular}})
+	}
+	return {{plural}}, nil
+}
+
+func (dao *DaoImpl) Save(ctx context.Context, {{singular}} {{Singular}}) error {
+	return dao.db.Set(ctx, firestoreCollection, {{singular}}.Id, {{singular}})
+}
+
+func (dao *DaoImpl) Update(ctx context.Context, id string, updates map[string]any) (*{{Singular}}, error) {
+	fsUpdates := make([]firestore.Update, 0, len(updates)+1)
+	for k, v := range updates {
+		fsUpdates = append(fsUpdates, firestore.Update{Path: k, Value: v})
+	}
+	fsUpdates = append(fsUpdates, firestore.Update{Path: "updatedAt", Value: time.Now().UTC()})
+
+	if err := dao.db.Update(ctx, firestoreCollection, id, fsUpdates); err != nil {
+		return nil, err
+	}
+	return dao.Get(ctx, id)
+}
+
+func (dao *DaoImpl) Delete(ctx context.Context, id string) error {
+	return dao.db.Delete(ctx, firestoreCollection, id)
+}

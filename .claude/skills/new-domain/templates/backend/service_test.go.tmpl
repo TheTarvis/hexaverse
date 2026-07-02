@@ -1,0 +1,79 @@
+package {{plural}}
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+)
+
+func TestService_Get_NotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dao := NewMockDao(ctrl)
+	dao.EXPECT().Get(gomock.Any(), "missing").Return(nil, nil)
+
+	svc := NewServiceWithDao(dao)
+	_, err := svc.Get(context.Background(), "owner-1", "missing")
+	assert.True(t, errors.Is(err, ErrNotFound))
+}
+
+func TestService_Get_Forbidden(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dao := NewMockDao(ctrl)
+	dao.EXPECT().Get(gomock.Any(), "i-1").Return(&{{Singular}}{Id: "i-1", OwnerId: "owner-2"}, nil)
+
+	svc := NewServiceWithDao(dao)
+	_, err := svc.Get(context.Background(), "owner-1", "i-1")
+	assert.True(t, errors.Is(err, ErrForbidden))
+}
+
+func TestService_Get_Found(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dao := NewMockDao(ctrl)
+	dao.EXPECT().Get(gomock.Any(), "i-1").Return(&{{Singular}}{Id: "i-1", OwnerId: "owner-1", Name: "test"}, nil)
+
+	svc := NewServiceWithDao(dao)
+	{{singular}}, err := svc.Get(context.Background(), "owner-1", "i-1")
+	require.NoError(t, err)
+	assert.Equal(t, "test", {{singular}}.Name)
+}
+
+func TestService_Create(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dao := NewMockDao(ctrl)
+	dao.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, {{singular}} {{Singular}}) error {
+		assert.Equal(t, "owner-1", {{singular}}.OwnerId)
+		assert.Equal(t, "thing", {{singular}}.Name)
+		assert.NotEmpty(t, {{singular}}.Id)
+		return nil
+	})
+
+	svc := NewServiceWithDao(dao)
+	created, err := svc.Create(context.Background(), "owner-1", CreateRequest{Name: "thing"})
+	require.NoError(t, err)
+	assert.Equal(t, "thing", created.Name)
+}
+
+func TestService_Update_NoFields_ReturnsExisting(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dao := NewMockDao(ctrl)
+	dao.EXPECT().Get(gomock.Any(), "i-1").Return(&{{Singular}}{Id: "i-1", OwnerId: "owner-1", Name: "thing"}, nil)
+
+	svc := NewServiceWithDao(dao)
+	updated, err := svc.Update(context.Background(), "owner-1", "i-1", UpdateRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, "thing", updated.Name)
+}

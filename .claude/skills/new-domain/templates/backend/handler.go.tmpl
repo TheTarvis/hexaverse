@@ -1,0 +1,129 @@
+package {{plural}}
+
+import (
+	"errors"
+	"net/http"
+	"{{PROJECT_SLUG}}/common"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
+)
+
+type Handler struct {
+	svc ServiceInterface
+}
+
+func NewHandler() *Handler {
+	return &Handler{svc: NewService()}
+}
+
+func NewHandlerWithService(svc ServiceInterface) *Handler {
+	return &Handler{svc: svc}
+}
+
+func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
+	g := authorized.Group("/{{plural}}")
+	{
+		g.GET("", h.List)
+		g.POST("", h.Create)
+		g.GET("/:{{singular}}Id", h.Get)
+		g.PATCH("/:{{singular}}Id", h.Update)
+		g.DELETE("/:{{singular}}Id", h.Delete)
+	}
+}
+
+func (h *Handler) List(c *gin.Context) {
+	ownerId := common.Actor(c)
+	{{plural}}, err := h.svc.List(c.Request.Context(), ownerId)
+	if err != nil {
+		log.Error().Ctx(c).Err(err).Msg("Failed to list {{plural}}")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if {{plural}} == nil {
+		{{plural}} = []{{Singular}}{}
+	}
+	c.JSON(http.StatusOK, {{plural}})
+}
+
+func (h *Handler) Get(c *gin.Context) {
+	ownerId := common.Actor(c)
+	{{singular}}Id := common.RequiredHttpParam(c, "{{singular}}Id")
+
+	{{singular}}, err := h.svc.Get(c.Request.Context(), ownerId, {{singular}}Id)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		c.AbortWithStatus(http.StatusNotFound)
+	case errors.Is(err, ErrForbidden):
+		c.AbortWithStatus(http.StatusForbidden)
+	case err != nil:
+		log.Error().Ctx(c).Err(err).Msg("Failed to get {{singular}}")
+		c.AbortWithStatus(http.StatusInternalServerError)
+	default:
+		c.JSON(http.StatusOK, {{singular}})
+	}
+}
+
+func (h *Handler) Create(c *gin.Context) {
+	ownerId := common.Actor(c)
+
+	var req CreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+	if req.Name == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
+		return
+	}
+
+	{{singular}}, err := h.svc.Create(c.Request.Context(), ownerId, req)
+	if err != nil {
+		log.Error().Ctx(c).Err(err).Msg("Failed to create {{singular}}")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusCreated, {{singular}})
+}
+
+func (h *Handler) Update(c *gin.Context) {
+	ownerId := common.Actor(c)
+	{{singular}}Id := common.RequiredHttpParam(c, "{{singular}}Id")
+
+	var req UpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	{{singular}}, err := h.svc.Update(c.Request.Context(), ownerId, {{singular}}Id, req)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		c.AbortWithStatus(http.StatusNotFound)
+	case errors.Is(err, ErrForbidden):
+		c.AbortWithStatus(http.StatusForbidden)
+	case err != nil:
+		log.Error().Ctx(c).Err(err).Msg("Failed to update {{singular}}")
+		c.AbortWithStatus(http.StatusInternalServerError)
+	default:
+		c.JSON(http.StatusOK, {{singular}})
+	}
+}
+
+func (h *Handler) Delete(c *gin.Context) {
+	ownerId := common.Actor(c)
+	{{singular}}Id := common.RequiredHttpParam(c, "{{singular}}Id")
+
+	err := h.svc.Delete(c.Request.Context(), ownerId, {{singular}}Id)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		c.AbortWithStatus(http.StatusNotFound)
+	case errors.Is(err, ErrForbidden):
+		c.AbortWithStatus(http.StatusForbidden)
+	case err != nil:
+		log.Error().Ctx(c).Err(err).Msg("Failed to delete {{singular}}")
+		c.AbortWithStatus(http.StatusInternalServerError)
+	default:
+		c.Status(http.StatusNoContent)
+	}
+}

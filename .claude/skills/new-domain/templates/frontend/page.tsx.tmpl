@@ -1,0 +1,103 @@
+'use client'
+
+import { useState } from 'react'
+import { Button } from '@/components/catalyst/button'
+import { Field, Label } from '@/components/catalyst/fieldset'
+import { Heading } from '@/components/catalyst/heading'
+import { Input } from '@/components/catalyst/input'
+import { Text } from '@/components/catalyst/text'
+import { Textarea } from '@/components/catalyst/textarea'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/catalyst/table'
+import { useCreate{{Singular}}, useDelete{{Singular}}, use{{Plural}} } from '@/hooks/use-{{plural}}'
+import { toast } from '@/lib/toast'
+
+export default function {{Plural}}Page() {
+  const { data: {{plural}}, isLoading } = use{{Plural}}()
+  const create{{Singular}} = useCreate{{Singular}}()
+  const delete{{Singular}} = useDelete{{Singular}}()
+
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return
+    try {
+      await create{{Singular}}.mutateAsync({ name: name.trim(), description: description.trim() || undefined })
+      setName('')
+      setDescription('')
+      toast.success('{{Singular}} created')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create {{singular}}')
+    }
+  }
+
+  async function handleDelete({{singular}}Id: string) {
+    try {
+      await delete{{Singular}}.mutateAsync({{singular}}Id)
+      toast.success('{{Singular}} deleted')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete {{singular}}')
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      <Heading>{{Plural}}</Heading>
+
+      <form
+        onSubmit={handleCreate}
+        className="mt-6 flex flex-col gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800/50 dark:bg-white/[0.12]"
+      >
+        <Field>
+          <Label>Name</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} required />
+        </Field>
+        <Field>
+          <Label>Description</Label>
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+          />
+        </Field>
+        <div>
+          <Button type="submit" color="dark" disabled={create{{Singular}}.isPending}>
+            {create{{Singular}}.isPending ? 'Creating...' : 'Add {{singular}}'}
+          </Button>
+        </div>
+      </form>
+
+      <div className="mt-8">
+        {isLoading ? (
+          <Text>Loading...</Text>
+        ) : {{plural}} && {{plural}}.length > 0 ? (
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeader>Name</TableHeader>
+                <TableHeader>Description</TableHeader>
+                <TableHeader className="text-right">Actions</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {{{plural}}.map(({{singular}}) => (
+                <TableRow key={{{singular}}.id}>
+                  <TableCell>{{{singular}}.name}</TableCell>
+                  <TableCell>{{{singular}}.description}</TableCell>
+                  <TableCell className="text-right">
+                    <Button plain onClick={() => handleDelete({{singular}}.id)}>
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <Text>No {{plural}} yet — add your first one above.</Text>
+        )}
+      </div>
+    </div>
+  )
+}

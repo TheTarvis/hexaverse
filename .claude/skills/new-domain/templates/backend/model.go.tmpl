@@ -1,0 +1,25 @@
+package {{plural}}
+
+import "time"
+
+type {{Singular}} struct {
+	Id          string    `json:"id" firestore:"id"`
+	OwnerId     string    `json:"ownerId" firestore:"ownerId"`
+	Name        string    `json:"name" firestore:"name"`
+	Description string    `json:"description,omitempty" firestore:"description,omitempty"`
+	CreatedAt   time.Time `json:"createdAt" firestore:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt" firestore:"updatedAt"`
+}
+
+// CreateRequest is the request body for POST /v1/{{plural}}.
+type CreateRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+// UpdateRequest is the request body for PATCH /v1/{{plural}}/:{{singular}}Id.
+// Pointer fields distinguish "not set" from "set to empty string".
+type UpdateRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+}

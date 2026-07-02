@@ -1,0 +1,18 @@
+export interface {{Singular}} {
+  id: string
+  ownerId: string
+  name: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Create{{Singular}}Request {
+  name: string
+  description?: string
+}
+
+export interface Update{{Singular}}Request {
+  name?: string
+  description?: string
+}
