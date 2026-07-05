@@ -1,7 +1,7 @@
 package middlewares
 
 import (
-	apiconfig "{{PROJECT_SLUG}}/config"
+	apiconfig "hexaverse/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

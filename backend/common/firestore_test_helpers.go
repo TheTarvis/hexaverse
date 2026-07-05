@@ -15,8 +15,11 @@ import (
 //
 //goland:noinspection GoUnhandledErrorResult
 func SetupFirestoreTestClient(t *testing.T) *firestore.Client {
+	if testing.Short() {
+		t.Skip("integration test needs the Firestore emulator; skipped with -short")
+	}
 	// Ensure we're using the test emulator
-	os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:9090")
+	os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:9100")
 
 	ctx := context.Background()
 	// Project ID must match the emulator's --project flag to see data in UI

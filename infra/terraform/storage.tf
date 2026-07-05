@@ -1,12 +1,12 @@
 # =============================================================================
 # Cloud Storage Buckets
 # =============================================================================
-# This file manages GCS buckets for {{PROJECT_NAME}}.
+# This file manages GCS buckets for Hexaverse.
 #
 # Buckets:
-# - {{PROJECT_SLUG}}-imports-{env}: User file uploads (7-day retention prod, 1-day retention dev)
-# - {{PROJECT_SLUG}}-exports-{env}: User file downloads/exports (7-day retention prod, 1-day retention dev)
-# - {{PROJECT_SLUG}}-pipelines-{env}: Internal pipeline artifacts - chunks, documents (1-day retention)
+# - hexaverse-imports-{env}: User file uploads (7-day retention prod, 1-day retention dev)
+# - hexaverse-exports-{env}: User file downloads/exports (7-day retention prod, 1-day retention dev)
+# - hexaverse-pipelines-{env}: Internal pipeline artifacts - chunks, documents (1-day retention)
 
 # -----------------------------------------------------------------------------
 # Managed Import Bucket
@@ -23,7 +23,7 @@
 # - Prod: Files auto-delete after 7 days (handles orphaned uploads)
 
 resource "google_storage_bucket" "import_files" {
-  name     = "{{PROJECT_SLUG}}-imports-${var.environment}"
+  name     = "hexaverse-imports-${var.environment}"
   location = var.region
   project  = var.project_id
 
@@ -44,7 +44,7 @@ resource "google_storage_bucket" "import_files" {
   # CORS configuration for direct browser uploads
   # Allows PUT requests from the frontend to upload files directly to GCS
   cors {
-    origin          = ["https://www.{{PROD_DOMAIN}}", "https://www.{{DEV_DOMAIN}}", "http://localhost:3000"]
+    origin          = ["https://www.hexaverse.io", "https://hexaverse-dev.vercel.app", "http://localhost:3000"]
     method          = ["PUT", "GET", "HEAD", "OPTIONS"]
     response_header = ["Content-Type", "Content-Length", "ETag", "Content-MD5"]
     max_age_seconds = 3600
@@ -66,7 +66,7 @@ resource "google_storage_bucket_iam_member" "ci_import_bucket_access" {
   count  = var.environment == "dev" ? 1 : 0
   bucket = google_storage_bucket.import_files.name
   role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:gitlab-ci-deployer@{{PROJECT_SLUG}}-etl-prod.iam.gserviceaccount.com"
+  member = "serviceAccount:gitlab-ci-deployer@hexaverse.iam.gserviceaccount.com"
 }
 
 # -----------------------------------------------------------------------------
@@ -84,7 +84,7 @@ resource "google_storage_bucket_iam_member" "ci_import_bucket_access" {
 # - Prod: Files auto-delete after 7 days (users should download promptly)
 
 resource "google_storage_bucket" "export_files" {
-  name     = "{{PROJECT_SLUG}}-exports-${var.environment}"
+  name     = "hexaverse-exports-${var.environment}"
   location = var.region
   project  = var.project_id
 
@@ -105,7 +105,7 @@ resource "google_storage_bucket" "export_files" {
   # CORS configuration for direct browser downloads
   # Allows GET requests from the frontend to download files directly from GCS
   cors {
-    origin          = ["https://www.{{PROD_DOMAIN}}", "https://www.{{DEV_DOMAIN}}", "http://localhost:3000"]
+    origin          = ["https://www.hexaverse.io", "https://hexaverse-dev.vercel.app", "http://localhost:3000"]
     method          = ["GET", "HEAD", "OPTIONS"]
     response_header = ["Content-Type", "Content-Length", "Content-Disposition"]
     max_age_seconds = 3600
@@ -138,7 +138,7 @@ resource "google_storage_bucket" "export_files" {
 # - Artifacts are ephemeral cache - no need to keep long-term
 
 resource "google_storage_bucket" "pipeline_artifacts" {
-  name     = "{{PROJECT_SLUG}}-pipelines-${var.environment}"
+  name     = "hexaverse-pipelines-${var.environment}"
   location = var.region
   project  = var.project_id
 
@@ -169,5 +169,5 @@ resource "google_storage_bucket_iam_member" "ci_pipeline_artifacts_bucket_access
   count  = var.environment == "dev" ? 1 : 0
   bucket = google_storage_bucket.pipeline_artifacts.name
   role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:gitlab-ci-deployer@{{PROJECT_SLUG}}-etl-prod.iam.gserviceaccount.com"
+  member = "serviceAccount:gitlab-ci-deployer@hexaverse.iam.gserviceaccount.com"
 }

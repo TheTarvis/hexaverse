@@ -5,7 +5,7 @@
 # Uses v2 API with invoker_iam_disabled for public access (bypasses org policy).
 
 resource "google_cloud_run_v2_service" "backend" {
-  name     = "{{PROJECT_SLUG}}-backend"
+  name     = "hexaverse-backend"
   location = var.region
 
   # Disable IAM invoker check - makes service publicly accessible
@@ -45,7 +45,7 @@ resource "google_cloud_run_v2_service" "backend" {
 
       env {
         name  = "FRONTEND_URL"
-        value = "https://www.{{PROD_DOMAIN}}"
+        value = "https://www.hexaverse.io"
       }
 
       # OAuth secrets - mounted from Secret Manager
@@ -79,7 +79,7 @@ resource "google_cloud_run_v2_service" "backend" {
         }
       }
 
-      # Resend API Key (platform-managed {{PROJECT_NAME}} email sender)
+      # Resend API Key (platform-managed Hexaverse email sender)
       env {
         name = "RESEND_API_KEY"
         value_source {
@@ -92,7 +92,7 @@ resource "google_cloud_run_v2_service" "backend" {
 
       # From address used by the platform-managed email provider
       env {
-        name  = "FLYWHEEL_EMAIL_SENDER"
+        name  = "EMAIL_SENDER"
         value = var.email_sender
       }
 
@@ -222,9 +222,9 @@ resource "google_cloud_run_v2_service" "backend" {
 # =============================================================================
 
 resource "google_service_account" "backend" {
-  account_id   = "{{PROJECT_SLUG}}-backend"
-  display_name = "{{PROJECT_NAME}} Backend Service Account"
-  description  = "Service account for {{PROJECT_NAME}} Cloud Run backend"
+  account_id   = "hexaverse-backend"
+  display_name = "Hexaverse Backend Service Account"
+  description  = "Service account for Hexaverse Cloud Run backend"
 
   depends_on = [google_project_service.iam]
 }
@@ -328,7 +328,7 @@ resource "google_cloud_run_v2_service" "claude_agent" {
       # service while iterating, plus both apex and www of the public domain.
       env {
         name  = "CORS_ALLOWED_ORIGINS"
-        value = "http://localhost:3000,https://www.{{PROD_DOMAIN}},https://{{PROD_DOMAIN}}"
+        value = "http://localhost:3000,https://www.hexaverse.io,https://hexaverse.io"
       }
 
       # Anthropic API Key - mounted from Secret Manager

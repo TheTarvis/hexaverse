@@ -2,7 +2,7 @@ package account
 
 import (
 	"net/http"
-	"{{PROJECT_SLUG}}/common"
+	"hexaverse/common"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

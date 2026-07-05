@@ -51,13 +51,13 @@ provider "vercel" {
 # Artifact Registry
 # =============================================================================
 
-# {{PROJECT_NAME}} backend Docker repository
+# Hexaverse backend Docker repository
 # Note: Previously imported from manually-created repository
 resource "google_artifact_registry_repository" "backend" {
   location      = var.region
-  repository_id = "{{PROJECT_SLUG}}"
+  repository_id = "hexaverse"
   format        = "DOCKER"
-  description   = "Docker images for {{PROJECT_NAME}} backend"
+  description   = "Docker images for Hexaverse backend"
 
   cleanup_policies {
     id     = "keep-recent-images"
@@ -100,5 +100,5 @@ resource "google_artifact_registry_repository_iam_member" "prod_ci_reader" {
   location   = google_artifact_registry_repository.backend.location
   repository = google_artifact_registry_repository.backend.name
   role       = "roles/artifactregistry.reader"
-  member     = "serviceAccount:gitlab-ci-deployer@{{PROJECT_SLUG}}-etl-prod.iam.gserviceaccount.com"
+  member     = "serviceAccount:gitlab-ci-deployer@hexaverse-etl-prod.iam.gserviceaccount.com"
 }

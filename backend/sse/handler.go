@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	"{{PROJECT_SLUG}}/common"
+	"hexaverse/common"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"

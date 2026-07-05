@@ -6,7 +6,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
-	"{{PROJECT_SLUG}}/common"
+	"hexaverse/common"
 )
 
 // SubscriptionHandler is a placeholder push subscription handler.

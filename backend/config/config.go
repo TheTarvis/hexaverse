@@ -35,16 +35,16 @@ type ServiceConfiguration struct {
 	// Used by the `email` provider — Flywheel-branded transactional sender that
 	// sends to the workflow owner only (recipient locked to pipeline.CreatedBy).
 	ResendAPIKey        string // Resend API key for the platform-managed Flywheel sender
-	FlywheelEmailSender string // From address for platform-managed emails (e.g. "Flywheel <pipelines@flywheeletl.io>")
+	EmailSender string // From address for platform-managed emails (e.g. "Hexaverse <pipelines@hexaverse.io>")
 
 	// Scheduler Configuration (local development)
 	SchedulerTriggerInterval int // Interval in seconds for local scheduler trigger (default 60)
 
 	// GCS Managed Bucket Configuration
-	ImportBucket                 string // GCS bucket for user file uploads (default: flywheel-imports-dev)
-	ExportBucket                 string // GCS bucket for user file downloads/exports (default: flywheel-exports-dev)
-	PipelineArtifactsBucket      string // GCS bucket for internal pipeline artifacts - chunks, intermediate documents (default: flywheel-pipelines-dev)
-	GCSSigningSA                 string // Service account for signing URLs (default: flywheel-backend@flywheel-etl-prod.iam.gserviceaccount.com)
+	ImportBucket                 string // GCS bucket for user file uploads (default: hexaverse-imports-dev)
+	ExportBucket                 string // GCS bucket for user file downloads/exports (default: hexaverse-exports-dev)
+	PipelineArtifactsBucket      string // GCS bucket for internal pipeline artifacts - chunks, intermediate documents (default: hexaverse-pipelines-dev)
+	GCSSigningSA                 string // Service account for signing URLs (default: hexaverse-backend@hexaverse.iam.gserviceaccount.com)
 	GCSPathPrefix                string // Path prefix prepended to all managed bucket paths (for e2e test isolation)
 	GoogleApplicationCredentials string
 
@@ -92,11 +92,11 @@ func init() {
 	flag.StringVar(&ServiceConfig.ApiPort, "PORT", "8080", "Specifies what port the API uses")
 
 	// Firestore Configuration (uses FIREBASE_PROJECT_ID for consistency)
-	flag.StringVar(&ServiceConfig.FirebaseProjectID, "FIREBASE_PROJECT_ID", "flywheel-etl-prod", "Firebase project ID")
+	flag.StringVar(&ServiceConfig.FirebaseProjectID, "FIREBASE_PROJECT_ID", "hexaverse", "Firebase project ID")
 
 	// Pub/Sub Configuration
-	flag.StringVar(&ServiceConfig.GCPProjectID, "GCP_PROJECT_ID", "flywheel", "GCP Project ID for Pub/Sub (required)")
-	flag.StringVar(&ServiceConfig.PubSubTopicPrefix, "PUBSUB_TOPIC_PREFIX", "flywheel", "Prefix for Pub/Sub topic names")
+	flag.StringVar(&ServiceConfig.GCPProjectID, "GCP_PROJECT_ID", "hexaverse", "GCP Project ID for Pub/Sub (required)")
+	flag.StringVar(&ServiceConfig.PubSubTopicPrefix, "PUBSUB_TOPIC_PREFIX", "hexaverse", "Prefix for Pub/Sub topic names")
 	flag.StringVar(&ServiceConfig.PubSubEmulatorHost, "PUBSUB_EMULATOR_HOST", "", "Pub/Sub emulator host for local development")
 
 	// OAuth Configuration
@@ -109,16 +109,16 @@ func init() {
 
 	// Email (platform-managed Resend sender) Configuration
 	flag.StringVar(&ServiceConfig.ResendAPIKey, "RESEND_API_KEY", "", "Resend API key for platform-managed email sender")
-	flag.StringVar(&ServiceConfig.FlywheelEmailSender, "FLYWHEEL_EMAIL_SENDER", "Flywheel <pipelines@flywheeletl.io>", "From address used by the platform-managed email provider")
+	flag.StringVar(&ServiceConfig.EmailSender, "EMAIL_SENDER", "Hexaverse <pipelines@hexaverse.io>", "From address used by the platform-managed email provider")
 
 	// Scheduler Configuration (local development)
 	flag.IntVar(&ServiceConfig.SchedulerTriggerInterval, "SCHEDULER_TRIGGER_INTERVAL", 60, "Interval in seconds for local scheduler trigger")
 
 	// GCS Managed Bucket Configuration
-	flag.StringVar(&ServiceConfig.ImportBucket, "IMPORT_BUCKET", "flywheel-imports-dev", "GCS bucket for user file uploads")
-	flag.StringVar(&ServiceConfig.ExportBucket, "EXPORT_BUCKET", "flywheel-exports-dev", "GCS bucket for user file downloads/exports")
-	flag.StringVar(&ServiceConfig.PipelineArtifactsBucket, "PIPELINE_ARTIFACTS_BUCKET", "flywheel-pipelines-dev", "GCS bucket for internal pipeline artifacts")
-	flag.StringVar(&ServiceConfig.GCSSigningSA, "GCS_SIGNING_SA", "flywheel-backend@flywheel-etl-prod.iam.gserviceaccount.com", "Service account for signing URLs for gcs")
+	flag.StringVar(&ServiceConfig.ImportBucket, "IMPORT_BUCKET", "hexaverse-imports-dev", "GCS bucket for user file uploads")
+	flag.StringVar(&ServiceConfig.ExportBucket, "EXPORT_BUCKET", "hexaverse-exports-dev", "GCS bucket for user file downloads/exports")
+	flag.StringVar(&ServiceConfig.PipelineArtifactsBucket, "PIPELINE_ARTIFACTS_BUCKET", "hexaverse-pipelines-dev", "GCS bucket for internal pipeline artifacts")
+	flag.StringVar(&ServiceConfig.GCSSigningSA, "GCS_SIGNING_SA", "hexaverse-backend@hexaverse.iam.gserviceaccount.com", "Service account for signing URLs for gcs")
 	flag.StringVar(&ServiceConfig.GCSPathPrefix, "GCS_PATH_PREFIX", "", "Path prefix prepended to all managed bucket paths (for e2e test isolation)")
 
 	// Stripe Billing Configuration

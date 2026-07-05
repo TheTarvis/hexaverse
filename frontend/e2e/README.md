@@ -1,0 +1,97 @@
+# Frontend E2E (Playwright)
+
+Browser E2E for the frontend. Runs against an **isolated local test stack** by
+default — never your dev servers or dev emulators — so a suite run can't corrupt
+the data you use day to day.
+
+## TL;DR — run it locally
+
+```bash
+cd frontend && npm run e2e         # that's it — no emulator to start first
+```
+
+`npm run e2e` (and `e2e:headed`) auto-manage the test emulator via
+`scripts/dev/with-test-emulators.sh`: if one is already running it reuses it,
+otherwise it starts a **throwaway** set for the run and tears it down after. Same
+for the backend Go suites (`npm run test:backend:e2e` etc. from the repo root) — no
+more "forgot to start the emulator."
+
+You do **not** need your dev frontend (`:3000`) or dev backend (`:9010`) — the suite
+boots its own on separate ports.
+
+**Optional (faster iteration):** keep a persistent emulator running and every run
+will reuse it instead of cold-starting one:
+
+```bash
+npm run firebase:emulators:test    # repo root — auth :10109, firestore :9100, pubsub :9106
+```
+
+The `--project hexaverse-emulator` flag that script passes is what pins the
+token audience the suite relies on (see the shared-project note below).
+`npm run e2e:ui` is the one command that does **not** auto-start an emulator
+(interactive mode) — have one running for it.
+
+## What a run does
+
+`playwright.config.ts` + `e2e/setup/` wire up a self-contained stack:
+
+0. **Emulator wrapper** (`scripts/dev/with-test-emulators.sh`, invoked by the
+   `e2e` npm script): reuses a running test emulator or starts a throwaway one for
+   the duration of the run.
+1. **`globalSetup`** (`e2e/setup/global-setup.ts` → `backend-stack.ts`):
+   - Verifies the test emulators are reachable (clear error if run raw via
+     `npx playwright test` without an emulator up).
+   - **Wipes** the emulator project's Firestore + Auth (REST clear endpoints) so the
+     long-lived local emulator doesn't accumulate data across runs.
+   - Builds and starts the `ENV=test` backend binary on **`:9012`** (rate limiting
+     off, pointed at the test emulators). Kills any leftover from a prior run first,
+     so you never reuse stale data or stale code.
+2. **`webServer`**: Playwright boots its **own** Next.js frontend on **`:3100`**,
+   into its **own build dir** (`.next-e2e`) so it can't clobber your dev server's
+   `.next`.
+3. **`setup` project** (`auth.setup.ts`): seeds the test user in the auth emulator,
+   logs in through the real UI, and writes `playwright/.auth/` state the specs reuse.
+4. **specs** run; **`globalTeardown`** stops the backend it started.
+
+### The stack at a glance
+
+| Piece | Local (default) | Your dev stack (untouched) |
+|---|---|---|
+| Frontend | `:3100` (`.next-e2e`) | `:3000` |
+| Backend | `:9012` (`ENV=test`) | `:9010` |
+| Emulators | firebase.test.json — auth `:10109`, firestore `:9100` | firebase.json — auth `:9109`, firestore `:8090` |
+| Firebase project | `hexaverse-emulator` (wiped each run) | your dev project |
+
+### Shared emulator project
+
+The auth emulator mints every token with `aud=<the --project flag>`, so the
+Playwright suite and the backend Go integration suite must share one project id
+(`hexaverse-emulator`) — isolation comes from the per-run wipe plus serial
+execution, not separate namespaces. Don't run both suites concurrently in separate
+terminals against a persistent emulator.
+
+## Targeting deployed environments
+
+Set `E2E_ENV=dev` (or `prod`) plus `E2E_BASE_URL`, `E2E_API_URL`,
+`E2E_USER_EMAIL`, `E2E_USER_PASSWORD` — real Firebase Auth with a dedicated test
+account, no emulator, no locally-booted stack. If the deployment sits behind
+Vercel Deployment Protection, also set `VERCEL_AUTOMATION_BYPASS_SECRET` (see
+`vercelBypassQuery` in `e2e/config/env.ts` for why it's a query param, not a
+header).
+
+## Layout
+
+```
+e2e/
+├── config/env.ts        # E2E_ENV resolution (local | dev | prod), ports, test user
+├── helpers/             # emulator REST helpers (signUp / signIn)
+├── setup/               # globalSetup/teardown, backend lifecycle, auth.setup
+└── tests/               # *.spec.ts — start from smoke.spec.ts
+```
+
+Conventions for new specs:
+
+- Assert on `data-testid` attributes, not text or CSS classes.
+- Specs run with the shared `storageState` (already logged in). Don't re-login.
+- Seed/clean data through the backend API (grab a token via
+  `helpers/firebase-emulator.ts` → `emulatorSignIn`), not by poking Firestore.

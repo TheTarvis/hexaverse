@@ -8,3 +8,33 @@ frontend/.env.production.local
 
 # Per-developer onboarding state (refreshed by /onboard)
 onboarding_checklist.md
+
+# Node (root workspace: concurrently + firebase-tools)
+node_modules/
+
+# Build output (npm run build:backend)
+/dist/
+
+# Backend env files (examples are committed; real values are not)
+backend/.env
+backend/.env.test
+backend/.env.local
+
+# Claude agent env (example is committed; real values are not)
+claude-agent/.env
+
+# Python bytecode + local agent logs (never commit build artifacts)
+__pycache__/
+*.py[cod]
+claude-agent/*.log
+
+# E2E artifacts (backend binary built by the Playwright suite)
+backend/test-server
+
+# Firebase emulator debug logs
+firestore-debug.log
+pubsub-debug.log
+ui-debug.log
+firebase-debug.log
+.firebase/
+/docs/screenshots/

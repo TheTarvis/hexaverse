@@ -59,7 +59,7 @@ resource "google_secret_manager_secret" "anthropic_api_key" {
   depends_on = [google_project_service.secretmanager]
 }
 
-# Resend API Key (platform-managed {{PROJECT_NAME}} email sender)
+# Resend API Key (platform-managed Hexaverse email sender)
 # Secret resource only - actual secret value synced by CI/CD sync-secrets job
 resource "google_secret_manager_secret" "resend_api_key" {
   secret_id = "resend-api-key"

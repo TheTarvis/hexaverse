@@ -62,7 +62,7 @@ go run .
 
 # In another terminal, test postgres endpoints
 # (Note: Replace {orgId} and {connId} with actual values from your test)
-curl http://localhost:9000/v1/connections/{orgId}/{connId}/postgres/schemas
+curl http://localhost:9010/v1/connections/{orgId}/{connId}/postgres/schemas
 ```
 
 ---
@@ -283,8 +283,8 @@ go run .
 
 # Run e2e tests (in another terminal)
 cd backend
-FIRESTORE_EMULATOR_HOST=localhost:9090 \
-PUBSUB_EMULATOR_HOST=localhost:9096 \
+FIRESTORE_EMULATOR_HOST=localhost:9100 \
+PUBSUB_EMULATOR_HOST=localhost:9106 \
 go test -v -run TestIndependentFlows/PostgresImport
 ```
 

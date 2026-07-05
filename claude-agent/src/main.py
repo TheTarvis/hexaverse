@@ -98,7 +98,7 @@ configure_logging()
 settings = get_settings()
 
 app = FastAPI(
-    title="{{PROJECT_NAME}} Claude Agent",
+    title="Hexaverse Claude Agent",
     description="Conversational agent using Claude with tool calling.",
     version="0.1.0",
     lifespan=lifespan,

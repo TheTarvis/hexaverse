@@ -5,13 +5,12 @@ core scaffolding (tool-use guidance, formatting hints) intact unless you have
 a strong reason — it's the part that makes tool calls reliable.
 """
 
-
 # Per-app guidance. Replace with what your agent actually does.
 # Be specific: what the user is trying to accomplish, what tools are available,
 # what edge cases to watch for, and any constraints (e.g. "never mention
 # pricing", "always confirm before deleting").
 APP_INSTRUCTIONS = """\
-You are a helpful assistant for {{PROJECT_NAME}}.
+You are a helpful assistant for Hexaverse.
 
 Your job is to:
 - Answer questions about the user's account.

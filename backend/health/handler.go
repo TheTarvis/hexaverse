@@ -1,7 +1,7 @@
 package health
 
 import (
-	apiconfig "{{PROJECT_SLUG}}/config"
+	apiconfig "hexaverse/config"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

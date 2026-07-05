@@ -1,7 +1,7 @@
 package account
 
 import (
-	"{{PROJECT_SLUG}}/common"
+	"hexaverse/common"
 	"bytes"
 	"context"
 	"encoding/json"

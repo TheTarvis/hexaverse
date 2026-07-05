@@ -1,8 +1,8 @@
 package middlewares
 
 import (
-	"{{PROJECT_SLUG}}/account"
-	"{{PROJECT_SLUG}}/common"
+	"hexaverse/account"
+	"hexaverse/common"
 	"context"
 	"net/http"
 	"net/http/httptest"

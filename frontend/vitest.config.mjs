@@ -13,7 +13,7 @@ export default defineConfig({
     globals: true,
     reporters: [['default', { summary: false }]],
     env: {
-      NEXT_PUBLIC_API_URL: 'http://localhost:9000',
+      NEXT_PUBLIC_API_URL: 'http://localhost:9010',
     },
     css: false, // Disable CSS processing for speed (not needed for most tests)
     testTimeout: 10000,
@@ -27,6 +27,9 @@ export default defineConfig({
       '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
       // Custom excludes
       '**/.next/**',
+      '**/.next-e2e/**',
+      // Playwright E2E suite — collected by `playwright test`, not Vitest
+      '**/e2e/**',
     ],
     coverage: {
       provider: 'v8',

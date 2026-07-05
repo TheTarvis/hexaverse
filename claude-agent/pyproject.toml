@@ -1,7 +1,7 @@
 [project]
-name = "{{PROJECT_SLUG}}-claude-agent"
+name = "hexaverse-claude-agent"
 version = "0.1.0"
-description = "Claude agent service for {{PROJECT_NAME}}"
+description = "Claude agent service for Hexaverse"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

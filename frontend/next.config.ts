@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  // Let the Playwright e2e frontend build into its own dir (NEXT_DIST_DIR=.next-e2e)
+  // so it doesn't share .next with the dev server. They inline different
+  // NEXT_PUBLIC_* values (project id, emulator ports, API url); a shared build
+  // cache serves whichever compiled last, silently poisoning the other.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   outputFileTracingRoot: path.join(__dirname, "./"),
   images: {
     remotePatterns: [

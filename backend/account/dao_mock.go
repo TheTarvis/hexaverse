@@ -99,7 +99,6 @@ func (mr *MockDaoMockRecorder) GetByAccountId(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByAccountId", reflect.TypeOf((*MockDao)(nil).GetByAccountId), ctx, id)
 }
 
-
 // SaveAccount mocks base method.
 func (m *MockDao) SaveAccount(ctx context.Context, a Account) error {
 	m.ctrl.T.Helper()

@@ -4,7 +4,7 @@ package common
 
 import (
 	"context"
-	"{{PROJECT_SLUG}}/config"
+	"hexaverse/config"
 	"encoding/json"
 	"errors"
 	"fmt"

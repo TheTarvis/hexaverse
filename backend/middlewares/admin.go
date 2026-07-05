@@ -1,7 +1,7 @@
 package middlewares
 
 import (
-	"{{PROJECT_SLUG}}/common"
+	"hexaverse/common"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

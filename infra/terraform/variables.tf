@@ -24,7 +24,7 @@ variable "scheduler_timezone" {
 variable "vercel_project_name" {
   description = "Name of the Vercel project for frontend deployment"
   type        = string
-  default     = "{{PROJECT_SLUG}}"
+  default     = "hexaverse"
 }
 
 variable "vercel_api_token" {
@@ -72,16 +72,16 @@ variable "anthropic_api_key" {
 }
 
 variable "resend_api_key" {
-  description = "Resend API key for the platform-managed {{PROJECT_NAME}} email sender"
+  description = "Resend API key for the platform-managed Hexaverse email sender"
   type        = string
   sensitive   = true
   default     = "placeholder"
 }
 
 variable "email_sender" {
-  description = "From address used by the platform-managed email provider (e.g. \"{{PROJECT_NAME}} <pipelines@{{PROD_DOMAIN}}>\")"
+  description = "From address used by the platform-managed email provider (e.g. \"Hexaverse <pipelines@hexaverse.io>\")"
   type        = string
-  default     = "{{PROJECT_NAME}} <pipelines@{{PROD_DOMAIN}}>"
+  default     = "Hexaverse <pipelines@hexaverse.io>"
 }
 
 variable "stripe_secret_key" {
@@ -113,7 +113,7 @@ variable "stripe_pro_annual_price_id" {
 }
 
 variable "production_auth_domain" {
-  description = "Custom domain for production Firebase Auth (e.g., www.{{PROD_DOMAIN}})"
+  description = "Custom domain for production Firebase Auth (e.g., www.hexaverse.io)"
   type        = string
-  default     = "www.{{PROD_DOMAIN}}"
+  default     = "www.hexaverse.io"
 }

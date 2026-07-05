@@ -82,7 +82,7 @@ def render(template_text: str, n: Names) -> str:
 
     Order matters: {{Plural}} before {{plural}} (case-insensitive prefix match
     isn't a concern since these are exact-string replacements, but ordering by
-    length keeps the intent clear). Other placeholders like {{PROJECT_NAME}}
+    length keeps the intent clear). Other placeholders like Hexaverse
     are left untouched — bootstrap/init.sh substitutes those.
     """
     return (
@@ -145,11 +145,11 @@ def print_wiring(n: Names) -> None:
 
 1) backend/router.go
    Add to imports:
-       "{{{{PROJECT_SLUG}}}}/{n.plural}"
+       "{{hexaverse}}/{n.plural}"
    Add after the existing account handler registration:
        {n.plural}Handler := {n.plural}.NewHandler()
        {n.plural}Handler.RegisterRoutes(authorized)
-   (replace {{{{PROJECT_SLUG}}}} with the actual module slug if
+   (replace {{hexaverse}} with the actual module slug if
    bootstrap/init.sh has already substituted it.)
 
 2) backend/common/pubsub.go

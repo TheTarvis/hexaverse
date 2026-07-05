@@ -1,7 +1,7 @@
 package middlewares
 
 import (
-	"{{PROJECT_SLUG}}/common"
+	"hexaverse/common"
 	"context"
 	"net/http"
 	"strings"

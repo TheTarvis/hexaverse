@@ -39,25 +39,25 @@ test-full:
 	@make check-services
 	@echo ""
 	@echo "Step 3: Running E2E integration tests..."
-	FIRESTORE_EMULATOR_HOST=localhost:9090 \
-	FIREBASE_AUTH_EMULATOR_HOST=localhost:10099 \
-	PUBSUB_EMULATOR_HOST=localhost:9096 \
+	FIRESTORE_EMULATOR_HOST=localhost:9100 \
+	FIREBASE_AUTH_EMULATOR_HOST=localhost:10109 \
+	PUBSUB_EMULATOR_HOST=localhost:9106 \
 	go test ./e2e/... -tags=integration -v -run TestIndependentFlows -count=1
 	@echo ""
 	@echo "All tests passed! ✅"
 
 test-integration: check-services
 	@echo "Running E2E integration tests only..."
-	FIRESTORE_EMULATOR_HOST=localhost:9090 \
-	FIREBASE_AUTH_EMULATOR_HOST=localhost:10099 \
-	PUBSUB_EMULATOR_HOST=localhost:9096 \
+	FIRESTORE_EMULATOR_HOST=localhost:9100 \
+	FIREBASE_AUTH_EMULATOR_HOST=localhost:10109 \
+	PUBSUB_EMULATOR_HOST=localhost:9106 \
 	go test ./e2e/... -tags=integration -v -run TestIndependentFlows -count=1
 
 test-integration-verbose: check-services
 	@echo "Running E2E integration tests with verbose output..."
-	FIRESTORE_EMULATOR_HOST=localhost:9090 \
-	FIREBASE_AUTH_EMULATOR_HOST=localhost:10099 \
-	PUBSUB_EMULATOR_HOST=localhost:9096 \
+	FIRESTORE_EMULATOR_HOST=localhost:9100 \
+	FIREBASE_AUTH_EMULATOR_HOST=localhost:10109 \
+	PUBSUB_EMULATOR_HOST=localhost:9106 \
 	go test ./e2e/... -tags=integration -v -run TestIndependentFlows -count=1
 
 test-all: test-full
@@ -81,8 +81,8 @@ stop-emulators:
 
 check-emulators:
 	@echo "Checking if Firebase emulators are running..."
-	@nc -z localhost 9090 || (echo "Firestore emulator not running on port 9090. Run 'make emulators' first" && exit 1)
-	@nc -z localhost 10099 || (echo "Auth emulator not running on port 10099. Run 'make emulators' first" && exit 1)
+	@nc -z localhost 9100 || (echo "Firestore emulator not running on port 9100. Run 'make emulators' first" && exit 1)
+	@nc -z localhost 10109 || (echo "Auth emulator not running on port 10109. Run 'make emulators' first" && exit 1)
 	@echo "Emulators are running"
 
 check-postgres:
@@ -104,8 +104,8 @@ run:
 
 run-with-emulators:
 	@echo "Running backend with emulators..."
-	FIRESTORE_EMULATOR_HOST=localhost:9090 \
-	FIREBASE_AUTH_EMULATOR_HOST=localhost:10099 \
+	FIRESTORE_EMULATOR_HOST=localhost:9100 \
+	FIREBASE_AUTH_EMULATOR_HOST=localhost:10109 \
 	go run .
 
 # Code generation

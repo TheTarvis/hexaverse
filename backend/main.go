@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
-	"{{PROJECT_SLUG}}/common"
-	"{{PROJECT_SLUG}}/config"
-	"{{PROJECT_SLUG}}/middlewares"
+	"hexaverse/common"
+	"hexaverse/config"
+	"hexaverse/middlewares"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"

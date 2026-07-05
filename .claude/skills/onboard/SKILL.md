@@ -166,7 +166,7 @@ step, so it's fine to surface it once and continue.
 bash bootstrap/init.sh
 ```
 
-Substitutes `{{PROJECT_SLUG}}`, `{{PROJECT_NAME}}`, `{{GCP_PROJECT_*}}`,
+Substitutes `hexaverse`, `Hexaverse`, `{{GCP_PROJECT_*}}`,
 and `{{*_DOMAIN}}` placeholders across the repo, and writes
 `frontend/.env.local` from the `FIREBASE_*_DEV` block.
 

@@ -69,7 +69,7 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-100 p-6 dark:bg-zinc-700">
       <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-zinc-50 p-8 dark:border-zinc-800/50 dark:bg-white/[0.12]">
-        <Heading>{isSignUp ? 'Create your {{PROJECT_NAME}} account' : 'Sign in to {{PROJECT_NAME}}'}</Heading>
+        <Heading>{isSignUp ? 'Create your Hexaverse account' : 'Sign in to Hexaverse'}</Heading>
         <Text className="mt-1">
           {isSignUp ? 'Create an account to get started.' : 'Welcome back.'}
         </Text>
@@ -83,6 +83,7 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
+              data-testid="login-email"
             />
           </Field>
           <Field>
@@ -93,6 +94,7 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              data-testid="login-password"
             />
           </Field>
           {isSignUp && (
@@ -108,15 +110,15 @@ function LoginForm() {
             </Field>
           )}
           {error && <Text className="text-red-600 dark:text-red-400">{error}</Text>}
-          <Button type="submit" color="dark" disabled={loading}>
+          <Button type="submit" color="dark" disabled={loading} data-testid="login-submit">
             {loading ? 'Working...' : isSignUp ? 'Create account' : 'Sign in'}
           </Button>
         </form>
 
         <div className="my-6 flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
-          <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800/50" />
           OR
-          <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800/50" />
         </div>
 
         <Button outline onClick={handleGoogle} disabled={loading} className="w-full">

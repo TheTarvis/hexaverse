@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Onboarding probe for the {{PROJECT_NAME}} skeleton.
+"""Onboarding probe for the Hexaverse skeleton.
 
 Inspects local state (prereqs, bootstrap, build, tests) and writes
 `onboarding_checklist.md` at the repo root with `[x]` / `[ ]` boxes reflecting
@@ -347,7 +347,7 @@ def main() -> int:
         text = config_env.read_text()
         m = re.search(r"^PROJECT_NAME=(.*)$", text, re.MULTILINE)
         if m and m.group(1).strip():
-            rendered = rendered.replace("{{PROJECT_NAME}}", m.group(1).strip())
+            rendered = rendered.replace("Hexaverse", m.group(1).strip())
 
     OUTPUT.write_text(rendered)
 

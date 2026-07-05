@@ -1,4 +1,4 @@
-# GitLab CI/CD pipeline for {{PROJECT_NAME}}.
+# GitLab CI/CD pipeline for Hexaverse.
 # Multi-environment deployment: dev → prod with promotion gates.
 # Project-specific values are templated as {{KEY}} placeholders — populate
 # them by running bootstrap/init.sh after editing bootstrap/config.env.
@@ -23,11 +23,11 @@ stages:
 
 variables:
   # Docker Images (custom CI/CD runner images)
-  TEST_RUNNER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/test-runner:latest"
-  GCP_DEPLOYER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/gcp-deployer:latest"
-  TERRAFORM_DEPLOYER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/terraform-deployer:latest"
-  FRONTEND_BUILDER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/frontend-builder:latest"
-  PYTHON_BUILDER_IMAGE: "us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/python-builder:latest"
+  TEST_RUNNER_IMAGE: "us-central1-docker.pkg.dev/hexaverse/hexaverse-ci/test-runner:latest"
+  GCP_DEPLOYER_IMAGE: "us-central1-docker.pkg.dev/hexaverse/hexaverse-ci/gcp-deployer:latest"
+  TERRAFORM_DEPLOYER_IMAGE: "us-central1-docker.pkg.dev/hexaverse/hexaverse-ci/terraform-deployer:latest"
+  FRONTEND_BUILDER_IMAGE: "us-central1-docker.pkg.dev/hexaverse/hexaverse-ci/frontend-builder:latest"
+  PYTHON_BUILDER_IMAGE: "us-central1-docker.pkg.dev/hexaverse/hexaverse-ci/python-builder:latest"
 
 # =============================================================================
 # Change Detection Rules (YAML Anchors for Reusability)
@@ -64,20 +64,20 @@ variables:
 # Dev environment variables
 .dev-env-vars: &dev-env-vars
   ENVIRONMENT: "dev"
-  GCP_PROJECT: "{{GCP_PROJECT_DEV}}"
-  ARTIFACT_REGISTRY_PROJECT_ID: "{{GCP_PROJECT_DEV}}"
+  GCP_PROJECT: "hexaverse-game-dev"
+  ARTIFACT_REGISTRY_PROJECT_ID: "hexaverse-game-dev"
   GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/118847994456/locations/global/workloadIdentityPools/gitlab-pool/providers/gitlab-provider"
-  GCP_SERVICE_ACCOUNT: "gitlab-ci-deployer@{{GCP_PROJECT_DEV}}.iam.gserviceaccount.com"
+  GCP_SERVICE_ACCOUNT: "gitlab-ci-deployer@hexaverse-game-dev.iam.gserviceaccount.com"
   GCP_REGION: "us-central1"
   IMAGE_TAG_PREFIX: "dev"
 
 # Prod environment variables
 .prod-env-vars: &prod-env-vars
   ENVIRONMENT: "prod"
-  GCP_PROJECT: "{{GCP_PROJECT_PROD}}"
-  ARTIFACT_REGISTRY_PROJECT_ID: "{{GCP_PROJECT_PROD}}"
+  GCP_PROJECT: "hexaverse"
+  ARTIFACT_REGISTRY_PROJECT_ID: "hexaverse"
   GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/255694242424/locations/global/workloadIdentityPools/gitlab-pool/providers/gitlab-provider"
-  GCP_SERVICE_ACCOUNT: "gitlab-ci-deployer@{{GCP_PROJECT_PROD}}.iam.gserviceaccount.com"
+  GCP_SERVICE_ACCOUNT: "gitlab-ci-deployer@hexaverse.iam.gserviceaccount.com"
   GCP_REGION: "us-central1"
   IMAGE_TAG_PREFIX: "prod"
 
@@ -217,7 +217,7 @@ test-backend:
     - saas-linux-medium-amd64  
   services:
     # PostgreSQL service for e2e tests
-    - name: us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}-ci/postgres-test:latest
+    - name: us-central1-docker.pkg.dev/hexaverse/hexaverse-ci/postgres-test:latest
       alias: postgres
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -237,21 +237,21 @@ test-backend:
     # Test database configuration
     TEST_POSTGRES_HOST: "postgres"
     TEST_POSTGRES_PORT: "5432"
-    TEST_POSTGRES_USER: "{{PROJECT_SLUG}}_test"
+    TEST_POSTGRES_USER: "hexaverse_test"
     TEST_POSTGRES_PASSWORD: "test_password"
-    TEST_POSTGRES_DB: "{{PROJECT_SLUG}}_test"
+    TEST_POSTGRES_DB: "hexaverse_test"
 
     # GCS bucket configuration for e2e tests
     # Seeds use E2E_TEST_BUCKET (defaults to IMPORT_BUCKET if not set)
     # Pipeline sources read from IMPORT_BUCKET, sinks write to EXPORT_BUCKET
-    IMPORT_BUCKET: "{{PROJECT_SLUG}}-imports-dev"
-    EXPORT_BUCKET: "{{PROJECT_SLUG}}-exports-dev"
+    IMPORT_BUCKET: "hexaverse-imports-dev"
+    EXPORT_BUCKET: "hexaverse-exports-dev"
 
     # Firebase emulator configuration
-    FIREBASE_PROJECT_ID: "{{PROJECT_SLUG}}-emulator"
-    FIRESTORE_EMULATOR_HOST: "localhost:9090"
-    FIREBASE_AUTH_EMULATOR_HOST: "localhost:10099"
-    PUBSUB_EMULATOR_HOST: "localhost:9096"
+    FIREBASE_PROJECT_ID: "hexaverse-emulator"
+    FIRESTORE_EMULATOR_HOST: "localhost:9100"
+    FIREBASE_AUTH_EMULATOR_HOST: "localhost:10109"
+    PUBSUB_EMULATOR_HOST: "localhost:9106"
     FIREBASE_EMULATORS_PATH: "${CI_PROJECT_DIR}/.cache/firebase/emulators"
 
     # Go test configuration
@@ -269,9 +269,9 @@ test-backend:
     - |
       echo "Waiting for Firebase emulators to start..."
       for i in {1..30}; do
-        if curl -s http://localhost:9090 > /dev/null 2>&1 && \
-            curl -s http://localhost:10099 > /dev/null 2>&1 && \
-            curl -s http://localhost:9096 > /dev/null 2>&1; then
+        if curl -s http://localhost:9100 > /dev/null 2>&1 && \
+            curl -s http://localhost:10109 > /dev/null 2>&1 && \
+            curl -s http://localhost:9106 > /dev/null 2>&1; then
           echo "Emulators are ready!"
           break
         fi
@@ -283,7 +283,7 @@ test-backend:
     - |
       echo "Waiting for PostgreSQL to be ready..."
       for i in {1..30}; do
-        if pg_isready -h postgres -p 5432 -U {{PROJECT_SLUG}}_test > /dev/null 2>&1; then
+        if pg_isready -h postgres -p 5432 -U hexaverse_test > /dev/null 2>&1; then
           echo "PostgreSQL ready!"
           break
         fi
@@ -342,8 +342,8 @@ build-backend:
   <<: *gcp-auth
   script:
     # Build image
-    - export IMAGE_TAG="us-central1-docker.pkg.dev/${GCP_PROJECT}/{{PROJECT_SLUG}}/backend:${IMAGE_TAG_PREFIX}-${CI_COMMIT_SHORT_SHA}"
-    - export CACHE_IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT}/{{PROJECT_SLUG}}/backend:cache"
+    - export IMAGE_TAG="us-central1-docker.pkg.dev/${GCP_PROJECT}/hexaverse/backend:${IMAGE_TAG_PREFIX}-${CI_COMMIT_SHORT_SHA}"
+    - export CACHE_IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT}/hexaverse/backend:cache"
 
     # Authenticate to Artifact Registry
     - gcloud auth configure-docker us-central1-docker.pkg.dev
@@ -441,8 +441,8 @@ build-agent:
   <<: *gcp-auth
   script:
     # Build image
-    - export AGENT_IMAGE_TAG="us-central1-docker.pkg.dev/${GCP_PROJECT}/{{PROJECT_SLUG}}/claude-agent:${IMAGE_TAG_PREFIX}-${CI_COMMIT_SHORT_SHA}"
-    - export AGENT_CACHE_IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT}/{{PROJECT_SLUG}}/claude-agent:cache"
+    - export AGENT_IMAGE_TAG="us-central1-docker.pkg.dev/${GCP_PROJECT}/hexaverse/claude-agent:${IMAGE_TAG_PREFIX}-${CI_COMMIT_SHORT_SHA}"
+    - export AGENT_CACHE_IMAGE="us-central1-docker.pkg.dev/${GCP_PROJECT}/hexaverse/claude-agent:cache"
 
     # Authenticate to Artifact Registry
     - gcloud auth configure-docker us-central1-docker.pkg.dev
@@ -507,9 +507,9 @@ plan-dev:
 
     - |
       terraform init \
-        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev" \
-        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev/lock" \
-        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev/lock"
+        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp-dev" \
+        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp-dev/lock" \
+        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp-dev/lock"
     - terraform fmt -check -recursive
     - terraform validate
     - terraform plan -var-file=environments/${ENVIRONMENT}.tfvars -out=tfplan
@@ -587,9 +587,9 @@ apply-dev:
 
     - |
       terraform init \
-        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev" \
-        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev/lock" \
-        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp-dev/lock"
+        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp-dev" \
+        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp-dev/lock" \
+        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp-dev/lock"
     - terraform apply -var-file=environments/${ENVIRONMENT}.tfvars -auto-approve
     - echo "INFRA_APPLIED_DEV=true" >> ../../infra-dev.env
   artifacts:
@@ -621,7 +621,7 @@ deploy-backend-dev:
       artifacts: false
   variables:
     <<: *dev-env-vars
-    SERVICE_NAME: "{{PROJECT_SLUG}}-backend"
+    SERVICE_NAME: "hexaverse-backend"
   <<: *gcp-auth
   script:
     - |
@@ -637,7 +637,7 @@ deploy-backend-dev:
     expire_in: 7 days
   environment:
     name: dev
-    url: https://{{PROJECT_SLUG}}-backend-dev.run.app
+    url: https://hexaverse-backend-dev.run.app
   resource_group: dev-backend
 
 # Deploy Frontend Dev: Vercel preview deployment
@@ -678,7 +678,7 @@ deploy-frontend-dev:
     expire_in: 7 days
   environment:
     name: dev
-    url: https://{{PROJECT_SLUG}}-dev.vercel.app
+    url: https://hexaverse-dev.vercel.app
 
 # Deploy Agent Dev: Cloud Run deployment
 deploy-agent-dev:
@@ -760,8 +760,8 @@ promote-to-prod:
     # Promote backend image if it was built (IMAGE_TAG is set by build-backend job)
     - |
       if [ -n "$IMAGE_TAG" ]; then
-        export DEV_BACKEND_TAG="us-central1-docker.pkg.dev/{{GCP_PROJECT_DEV}}/{{PROJECT_SLUG}}/backend:dev-${CI_COMMIT_SHORT_SHA}"
-        export PROD_BACKEND_TAG="us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}/backend:prod-${CI_COMMIT_SHORT_SHA}"
+        export DEV_BACKEND_TAG="us-central1-docker.pkg.dev/hexaverse-game-dev/hexaverse/backend:dev-${CI_COMMIT_SHORT_SHA}"
+        export PROD_BACKEND_TAG="us-central1-docker.pkg.dev/hexaverse/hexaverse/backend:prod-${CI_COMMIT_SHORT_SHA}"
         echo "Promoting backend image..."
         echo "From (dev) - $DEV_BACKEND_TAG"
         echo "To (prod) - $PROD_BACKEND_TAG"
@@ -776,8 +776,8 @@ promote-to-prod:
     # Promote agent image if it was built (AGENT_IMAGE_TAG is set by build-agent job)
     - |
       if [ -n "$AGENT_IMAGE_TAG" ]; then
-        export DEV_AGENT_TAG="us-central1-docker.pkg.dev/{{GCP_PROJECT_DEV}}/{{PROJECT_SLUG}}/claude-agent:dev-${CI_COMMIT_SHORT_SHA}"
-        export PROD_AGENT_TAG="us-central1-docker.pkg.dev/{{GCP_PROJECT_PROD}}/{{PROJECT_SLUG}}/claude-agent:prod-${CI_COMMIT_SHORT_SHA}"
+        export DEV_AGENT_TAG="us-central1-docker.pkg.dev/hexaverse-game-dev/hexaverse/claude-agent:dev-${CI_COMMIT_SHORT_SHA}"
+        export PROD_AGENT_TAG="us-central1-docker.pkg.dev/hexaverse/hexaverse/claude-agent:prod-${CI_COMMIT_SHORT_SHA}"
         echo "Promoting agent image..."
         echo "From (dev) - $DEV_AGENT_TAG"
         echo "To (prod) - $PROD_AGENT_TAG"
@@ -831,9 +831,9 @@ plan-prod:
 
     - |
       terraform init \
-        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp" \
-        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp/lock" \
-        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp/lock"
+        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp" \
+        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp/lock" \
+        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp/lock"
     - terraform fmt -check -recursive
     - terraform validate
     - terraform plan -var-file=environments/${ENVIRONMENT}.tfvars -out=tfplan-prod
@@ -886,9 +886,9 @@ apply-prod:
 
     - |
       terraform init \
-        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp" \
-        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp/lock" \
-        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/{{PROJECT_SLUG}}-gcp/lock"
+        -backend-config="address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp" \
+        -backend-config="lock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp/lock" \
+        -backend-config="unlock_address=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/terraform/state/hexaverse-gcp/lock"
     - terraform apply -var-file=environments/${ENVIRONMENT}.tfvars -auto-approve
     - echo "INFRA_APPLIED_PROD=true" >> ../../infra-prod.env
   artifacts:
@@ -916,7 +916,7 @@ deploy-backend-prod:
       artifacts: false
   variables:
     <<: *prod-env-vars
-    SERVICE_NAME: "{{PROJECT_SLUG}}-backend"
+    SERVICE_NAME: "hexaverse-backend"
   <<: *gcp-auth
   script:
     - |
@@ -937,7 +937,7 @@ deploy-backend-prod:
     expire_in: 7 days
   environment:
     name: prod
-    url: https://{{PROJECT_SLUG}}-backend.run.app
+    url: https://hexaverse-backend.run.app
   resource_group: prod-backend
 
 # Deploy Frontend Prod: Vercel production deployment (full rebuild)
@@ -971,7 +971,7 @@ deploy-frontend-prod:
     expire_in: 7 days
   environment:
     name: prod
-    url: https://{{PROJECT_SLUG}}-prod.vercel.app
+    url: https://hexaverse.vercel.app
 
 # Deploy Agent Prod: Cloud Run deployment with promoted image
 deploy-agent-prod:

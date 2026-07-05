@@ -3,7 +3,7 @@ package common
 //go:generate mockgen -destination=firestore_mock.go -package=common -source=firestore.go FirestoreService
 
 import (
-	"{{PROJECT_SLUG}}/config"
+	"hexaverse/config"
 	"context"
 	"errors"
 	"fmt"

@@ -26,8 +26,8 @@ resource "google_identity_platform_config" "default" {
     "${var.project_id}.firebaseapp.com",
     "${var.project_id}.web.app",
     "localhost",
-    "{{PROD_DOMAIN}}",
-    "www.{{PROD_DOMAIN}}",
+    "hexaverse.io",
+    "www.hexaverse.io",
     "${var.vercel_project_name}.vercel.app",
     "${var.vercel_project_name}-large-coffee-studios.vercel.app"
   ]

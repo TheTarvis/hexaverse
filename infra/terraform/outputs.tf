@@ -44,40 +44,40 @@ output "scheduler_service_account_email" {
 output "firebase_config" {
   description = "Complete Firebase web app configuration"
   value = {
-    apiKey            = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.api_key
-    authDomain        = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.auth_domain
+    apiKey            = data.google_firebase_web_app_config.hexaverse.api_key
+    authDomain        = data.google_firebase_web_app_config.hexaverse.auth_domain
     projectId         = var.project_id
-    messagingSenderId = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.messaging_sender_id
-    appId             = google_firebase_web_app.{{PROJECT_SLUG}}.app_id
-    measurementId     = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.measurement_id
+    messagingSenderId = data.google_firebase_web_app_config.hexaverse.messaging_sender_id
+    appId             = google_firebase_web_app.hexaverse.app_id
+    measurementId     = data.google_firebase_web_app_config.hexaverse.measurement_id
   }
 }
 
 output "firebase_api_key" {
   description = "Firebase API key for web app"
-  value       = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.api_key
+  value       = data.google_firebase_web_app_config.hexaverse.api_key
   sensitive   = true
 }
 
 output "firebase_auth_domain" {
   description = "Firebase Auth domain"
-  value       = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.auth_domain
+  value       = data.google_firebase_web_app_config.hexaverse.auth_domain
 }
 
 output "firebase_messaging_sender_id" {
   description = "Firebase Cloud Messaging sender ID"
-  value       = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.messaging_sender_id
+  value       = data.google_firebase_web_app_config.hexaverse.messaging_sender_id
   sensitive   = true
 }
 
 output "firebase_app_id" {
   description = "Firebase web app ID"
-  value       = google_firebase_web_app.{{PROJECT_SLUG}}.app_id
+  value       = google_firebase_web_app.hexaverse.app_id
 }
 
 output "firebase_measurement_id" {
   description = "Firebase Analytics measurement ID"
-  value       = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.measurement_id
+  value       = data.google_firebase_web_app_config.hexaverse.measurement_id
 }
 
 # =============================================================================

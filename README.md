@@ -1,4 +1,4 @@
-# {{PROJECT_NAME}}
+# Hexaverse
 
 Authenticated full-stack starter on GCP.
 
@@ -36,7 +36,7 @@ Three terminals:
 firebase emulators:start --only firestore,auth,pubsub --config firebase.test.json
 
 # Terminal 2 — backend
-cd backend && make run                # localhost:9000
+cd backend && make run                # localhost:9010
 
 # Terminal 3 — frontend
 cd frontend && npm run dev                 # localhost:3000

@@ -54,7 +54,7 @@ While applying:
   `<first-letter>.c/u/d` (e.g. `w.c` for `widget`). If another domain
   already uses that prefix, pick a unique two-letter abbreviation and
   tell the user.
-- **router.go import path**: use `{{PROJECT_SLUG}}/<plural>` if
+- **router.go import path**: use `hexaverse/<plural>` if
   bootstrap/init.sh hasn't run yet, or the actual module slug if it has.
 
 ### 4. Verify
@@ -73,7 +73,7 @@ files. Placeholders:
 - `{{Singular}}` — PascalCase singular (`Widget`)
 - `{{plural}}` — lowercase plural (`widgets`)
 - `{{Plural}}` — PascalCase plural (`Widgets`)
-- `{{PROJECT_SLUG}}` / `{{PROJECT_NAME}}` — handled by `bootstrap/init.sh`,
+- `hexaverse` / `Hexaverse` — handled by `bootstrap/init.sh`,
   not the scaffolder. Leave them as-is in templates.
 
 To change the default scaffold (add a field, change the route shape,

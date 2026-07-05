@@ -2,11 +2,11 @@ package main
 
 import (
 	"time"
-	"{{PROJECT_SLUG}}/account"
-	"{{PROJECT_SLUG}}/config"
-	"{{PROJECT_SLUG}}/health"
-	"{{PROJECT_SLUG}}/middlewares"
-	"{{PROJECT_SLUG}}/sse"
+	"hexaverse/account"
+	"hexaverse/config"
+	"hexaverse/health"
+	"hexaverse/middlewares"
+	"hexaverse/sse"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

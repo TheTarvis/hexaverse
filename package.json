@@ -1,0 +1,33 @@
+{
+  "name": "hexaverse",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && go run .",
+    "dev:agent": "cd claude-agent && PYTHONUNBUFFERED=1 uv run uvicorn src.main:app --reload --port 8100 --host 0.0.0.0 2>&1 | tee dev.log",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && go build -o ../dist/backend .",
+    "build": "npm run build:frontend && npm run build:backend",
+    "test:frontend": "cd frontend && npx vitest run",
+    "test:backend": "cd backend && make test",
+    "test:backend:e2e": "bash scripts/dev/with-test-emulators.sh 'cd backend && make test-integration'",
+    "test:backend:all": "bash scripts/dev/with-test-emulators.sh 'cd backend && ENV=TEST go run gotest.tools/gotestsum@latest -- -count=1 -parallel 5 ./...'",
+    "test:agent": "cd claude-agent && uv run pytest tests/ -v",
+    "lint:agent": "cd claude-agent && uv run ruff check . && uv run ruff format --check . && uv run pyright",
+    "firebase:emulators": "firebase emulators:start --project hexaverse-emulator",
+    "firebase:emulators:test": "firebase emulators:start --only firestore,auth,pubsub --config firebase.test.json --project hexaverse-emulator",
+    "firebase:deploy": "firebase deploy",
+    "firebase:deploy:hosting": "firebase deploy --only hosting",
+    "firebase:deploy:firestore": "firebase deploy --only firestore",
+    "install:frontend": "cd frontend && npm install",
+    "install:backend": "cd backend && go mod download",
+    "install:agent": "cd claude-agent && uv sync --all-extras",
+    "install:all": "npm run install:frontend && npm run install:backend && npm run install:agent"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "firebase-tools": "^14.20.0"
+  }
+}

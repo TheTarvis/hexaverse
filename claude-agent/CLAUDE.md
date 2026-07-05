@@ -96,7 +96,7 @@ The default `Agent._load_conversation_history` and `_save_conversation_history` 
 cd claude-agent
 uv sync                       # Install deps
 cp .env.example .env          # Fill in ANTHROPIC_API_KEY at minimum
-uv run python -m src.main     # Server at :8080
+uv run python -m src.main     # Server at :8100
 uv run pytest                 # Tests
 uv run ruff check src tests   # Lint
 uv run pyright src            # Type-check
@@ -116,7 +116,7 @@ Cloud Run service, defined in `infra/terraform/cloudrun.tf` (`claude_agent` reso
 
 ## Gotchas
 
-- **Firebase ADC locally.** `firebase-admin` needs Application Default Credentials. Either run `gcloud auth application-default login`, or set `FIREBASE_AUTH_EMULATOR_HOST=localhost:9099` and run the auth emulator (no credentials needed).
+- **Firebase ADC locally.** `firebase-admin` needs Application Default Credentials. Either run `gcloud auth application-default login`, or set `FIREBASE_AUTH_EMULATOR_HOST=localhost:9109` and run the auth emulator (no credentials needed).
 - **Streaming + nginx buffering.** The `X-Accel-Buffering: no` response header on `/chat` matters in production — Cloud Run's frontend will otherwise buffer the entire stream and the user sees nothing until completion.
 - **CORS.** `CORS_ALLOWED_ORIGINS` is a comma-separated list. Default is `http://localhost:3000` — add prod/preview hosts before deploying.
 - **Rate limit is per-process.** Multi-instance Cloud Run means the effective limit is `N × RATE_LIMIT_REQUESTS_PER_MINUTE`. Acceptable as a cost-control safety net; tighten with Redis only if needed.

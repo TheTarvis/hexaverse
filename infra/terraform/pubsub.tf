@@ -33,7 +33,7 @@ resource "google_service_account" "pubsub_push" {
 # Push subscriptions (example)
 # =============================================================================
 # Push subscriptions deliver to Cloud Run HTTP endpoints, letting the backend
-# scale to zero when idle. Audience "{{PROJECT_SLUG}}-backend" is verified by the OIDC
+# scale to zero when idle. Audience "hexaverse-backend" is verified by the OIDC
 # middleware in the backend.
 
 resource "google_pubsub_subscription" "sse_item_broadcast" {
@@ -44,7 +44,7 @@ resource "google_pubsub_subscription" "sse_item_broadcast" {
     push_endpoint = "${google_cloud_run_v2_service.backend.uri}/v1/push/sse-item"
     oidc_token {
       service_account_email = google_service_account.pubsub_push.email
-      audience              = "{{PROJECT_SLUG}}-backend"
+      audience              = "hexaverse-backend"
     }
   }
 

@@ -3,7 +3,7 @@ package common
 //go:generate mockgen -destination=secret_manager_mock.go -package=common -source=secret_manager.go SecretManager
 
 import (
-	"{{PROJECT_SLUG}}/config"
+	"hexaverse/config"
 	"context"
 	"encoding/base64"
 	"fmt"

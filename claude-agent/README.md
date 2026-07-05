@@ -1,4 +1,4 @@
-# {{PROJECT_NAME}} Claude Agent
+# Hexaverse Claude Agent
 
 Python (FastAPI) service that runs a Claude-powered agent with tool calling. Streams chat responses to the frontend over SSE.
 
@@ -15,7 +15,7 @@ cp .env.example .env
 # Fill in at least: ANTHROPIC_API_KEY, FIREBASE_PROJECT_ID
 
 # 3. Run
-uv run python -m src.main           # → http://localhost:8080
+uv run python -m src.main           # → http://localhost:8100
 ```
 
 ## Test

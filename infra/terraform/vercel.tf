@@ -38,7 +38,7 @@ locals {
 resource "vercel_project_environment_variable" "firebase_api_key" {
   project_id = data.vercel_project.frontend.id
   key        = "NEXT_PUBLIC_FIREBASE_API_KEY"
-  value      = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.api_key
+  value      = data.google_firebase_web_app_config.hexaverse.api_key
   target     = local.vercel_target
 }
 
@@ -46,7 +46,7 @@ resource "vercel_project_environment_variable" "firebase_auth_domain" {
   project_id = data.vercel_project.frontend.id
   key        = "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"
   # Production uses custom domain, dev uses Firebase default
-  value  = var.environment == "prod" ? var.production_auth_domain : data.google_firebase_web_app_config.{{PROJECT_SLUG}}.auth_domain
+  value  = var.environment == "prod" ? var.production_auth_domain : data.google_firebase_web_app_config.hexaverse.auth_domain
   target = local.vercel_target
 }
 
@@ -67,21 +67,21 @@ resource "vercel_project_environment_variable" "firebase_storage_bucket" {
 resource "vercel_project_environment_variable" "firebase_messaging_sender_id" {
   project_id = data.vercel_project.frontend.id
   key        = "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"
-  value      = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.messaging_sender_id
+  value      = data.google_firebase_web_app_config.hexaverse.messaging_sender_id
   target     = local.vercel_target
 }
 
 resource "vercel_project_environment_variable" "firebase_app_id" {
   project_id = data.vercel_project.frontend.id
   key        = "NEXT_PUBLIC_FIREBASE_APP_ID"
-  value      = google_firebase_web_app.{{PROJECT_SLUG}}.app_id
+  value      = google_firebase_web_app.hexaverse.app_id
   target     = local.vercel_target
 }
 
 resource "vercel_project_environment_variable" "firebase_measurement_id" {
   project_id = data.vercel_project.frontend.id
   key        = "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID"
-  value      = data.google_firebase_web_app_config.{{PROJECT_SLUG}}.measurement_id
+  value      = data.google_firebase_web_app_config.hexaverse.measurement_id
   target     = local.vercel_target
 }
 

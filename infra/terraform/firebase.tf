@@ -16,19 +16,19 @@ resource "google_firebase_project" "default" {
 }
 
 # Create Firebase Web App
-resource "google_firebase_web_app" "{{PROJECT_SLUG}}" {
+resource "google_firebase_web_app" "hexaverse" {
   provider     = google-beta
   project      = var.project_id
-  display_name = "{{PROJECT_NAME}} ${var.environment}"
+  display_name = "Hexaverse ${var.environment}"
 
   depends_on = [google_firebase_project.default]
 }
 
 # Get Firebase Web App configuration
-data "google_firebase_web_app_config" "{{PROJECT_SLUG}}" {
+data "google_firebase_web_app_config" "hexaverse" {
   provider   = google-beta
   project    = var.project_id
-  web_app_id = google_firebase_web_app.{{PROJECT_SLUG}}.app_id
+  web_app_id = google_firebase_web_app.hexaverse.app_id
 }
 
 # =============================================================================

@@ -104,8 +104,9 @@ fi
 if gcloud projects describe "$PROJECT_ID" >/dev/null 2>&1; then
   log "Project $PROJECT_ID already exists — reusing."
 else
-  log "Creating project $PROJECT_ID (name: \"$PROJECT_NAME ($ENV_NAME)\")..."
-  if ! gcloud projects create "$PROJECT_ID" --name="$PROJECT_NAME ($ENV_NAME)" 2>/dev/null; then
+  # GCP display names reject parentheses — "Name dev", not "Name (dev)".
+  log "Creating project $PROJECT_ID (name: \"$PROJECT_NAME $ENV_NAME\")..."
+  if ! gcloud projects create "$PROJECT_ID" --name="$PROJECT_NAME $ENV_NAME" 2>/dev/null; then
     fail "could not create project $PROJECT_ID. Either the ID is taken globally, or you've hit your project quota. Pick a different ID, or request a quota bump at console.cloud.google.com/iam-admin/quotas."
   fi
 fi
@@ -202,11 +203,23 @@ else
   access_token="$(gcloud auth print-access-token 2>/dev/null)" \
     || fail "could not get gcloud access token. Run: gcloud auth login"
 
-  current_cfg="$(curl -sS --fail \
+  # User-credential calls to identitytoolkit need an explicit quota project.
+  current_cfg="$(curl -sS \
       -H "Authorization: Bearer $access_token" \
+      -H "x-goog-user-project: $PROJECT_ID" \
       "https://identitytoolkit.googleapis.com/admin/v2/projects/$PROJECT_ID/config" 2>/dev/null)" \
-    || fail "could not fetch Identity Toolkit config for $PROJECT_ID. Check that the Identity Platform / Auth API has finished propagating, or re-run."
+    || fail "could not reach the Identity Toolkit API for $PROJECT_ID."
 
+  # The Auth config doesn't exist until Auth is first enabled in the Firebase
+  # console. That's a manual step anyway (sign-in providers), so warn and
+  # continue — re-running this script afterwards adds the domains.
+  if echo "$current_cfg" | grep -q 'CONFIGURATION_NOT_FOUND'; then
+    log "warning: Firebase Auth not initialized yet — skipping authorized-domain update."
+    log "         Enable sign-in providers at https://console.firebase.google.com/project/$PROJECT_ID/authentication/providers"
+    log "         then re-run this script to authorize $CUSTOM_DOMAIN."
+  elif echo "$current_cfg" | grep -q '"error"'; then
+    fail "could not fetch Identity Toolkit config for $PROJECT_ID: $current_cfg"
+  else
   python3 - "$current_cfg" "$CUSTOM_DOMAIN" "$access_token" "$PROJECT_ID" >&2 <<'PY'
 import json, sys, urllib.request, urllib.error
 current = json.loads(sys.argv[1] or "{}")
@@ -223,7 +236,11 @@ req = urllib.request.Request(
     f"https://identitytoolkit.googleapis.com/admin/v2/projects/{project_id}/config?updateMask=authorizedDomains",
     data=body,
     method="PATCH",
-    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "x-goog-user-project": project_id,
+    },
 )
 try:
     with urllib.request.urlopen(req) as resp:
@@ -233,6 +250,7 @@ except urllib.error.HTTPError as e:
     sys.exit(1)
 print(f"[{project_id}] added: {', '.join(to_add)}")
 PY
+  fi
 fi
 
 # 9. Pull SDK config and emit normalized JSON to stdout.

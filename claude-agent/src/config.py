@@ -21,10 +21,10 @@ class Settings(BaseSettings):
 
     # Firebase
     firebase_project_id: str = ""
-    firebase_auth_emulator_host: str | None = None  # e.g. "localhost:9099" for local dev
+    firebase_auth_emulator_host: str | None = None  # e.g. "localhost:9109" for local dev
 
     # Backend (Go service) — used by tools that call the backend with the user's token
-    backend_api_url: str = "http://localhost:9000"
+    backend_api_url: str = "http://localhost:9010"
 
     # Rate Limiting (per-user sliding window on /chat)
     rate_limit_requests_per_minute: int = 20

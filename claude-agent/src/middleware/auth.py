@@ -24,7 +24,7 @@ def init_firebase() -> None:
     in Cloud Run, or GOOGLE_APPLICATION_CREDENTIALS locally.
 
     For local development with the Firebase emulator, set
-    FIREBASE_AUTH_EMULATOR_HOST in the environment (e.g. "localhost:9099").
+    FIREBASE_AUTH_EMULATOR_HOST in the environment (e.g. "localhost:9109").
     """
     global _firebase_app
 

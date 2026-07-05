@@ -1,7 +1,7 @@
 package common
 
 import (
-	"{{PROJECT_SLUG}}/config"
+	"hexaverse/config"
 	"context"
 	"fmt"
 	"os"
@@ -16,8 +16,12 @@ import (
 func setupFirestoreTestClient(t *testing.T) *firestore.Client {
 	t.Helper()
 
+	if testing.Short() {
+		t.Skip("integration test needs the Firestore emulator; skipped with -short")
+	}
+
 	// Ensure we're using the test emulator
-	os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:9090")
+	os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:9100")
 
 	// Ensure emulator is being used
 	emulatorHost := os.Getenv("FIRESTORE_EMULATOR_HOST")

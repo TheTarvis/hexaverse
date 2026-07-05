@@ -11,7 +11,7 @@ export default function HomePage() {
     <div className="mx-auto max-w-3xl">
       <Heading>Welcome{account?.name ? `, ${account.name}` : ''}.</Heading>
       <Text className="mt-2">
-        {{PROJECT_NAME}} is up and running. This is a starter shell — replace it with your app.
+        Hexaverse is up and running. This is a starter shell — replace it with your app.
       </Text>
     </div>
   )

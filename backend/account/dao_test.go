@@ -3,7 +3,7 @@ package account
 import (
 	"context"
 	"testing"
-	"{{PROJECT_SLUG}}/common"
+	"hexaverse/common"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

@@ -68,7 +68,7 @@ TOOLS: list[dict[str, Any]] = [
         "description": (
             "Return the current UTC time as an ISO-8601 string. Use when the "
             "user asks for the time, or when you need to anchor a relative "
-            "request (\"today\", \"yesterday\", \"this week\") to a concrete date."
+            'request ("today", "yesterday", "this week") to a concrete date.'
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -77,7 +77,7 @@ TOOLS: list[dict[str, Any]] = [
         "description": (
             "Fetch the authenticated user's account profile from the backend "
             "(name, email, joined date). Use when the user refers to their "
-            "own account or asks personal questions like \"what's my email?\"."
+            'own account or asks personal questions like "what\'s my email?".'
         ),
         "input_schema": {"type": "object", "properties": {}},
     },

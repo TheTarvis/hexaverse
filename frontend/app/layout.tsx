@@ -11,8 +11,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: '{{PROJECT_NAME}}',
-  description: '{{PROJECT_NAME}} application',
+  title: 'Hexaverse',
+  description: 'Hexaverse application',
 }
 
 export default function RootLayout({

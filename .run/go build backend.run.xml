@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="go build backend" type="GoApplicationRunConfiguration" factoryName="Go Application" nameIsGenerated="true">
+    <module name="hexaverse" />
+    <working_directory value="$PROJECT_DIR$/backend" />
+    <kind value="PACKAGE" />
+    <package value="hexaverse" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/backend/main.go" />
+    <method v="2" />
+  </configuration>
+</component>

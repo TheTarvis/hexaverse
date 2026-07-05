@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"{{PROJECT_SLUG}}/common"
-	apiconfig "{{PROJECT_SLUG}}/config"
+	"hexaverse/common"
+	apiconfig "hexaverse/config"
 
 	"github.com/gin-gonic/gin"
 )
