@@ -60,4 +60,5 @@ worse than no spec.
 <!-- specs:index (the /spec tool appends rows below this line; keep it) -->
 | # | Spec | Status |
 |---|------|--------|
-| 0001 | [Hex-grid galaxy generation](0001-hex-grid-galaxy-generation.md) | draft |
+| 0002 | [Galaxy view (galactic graph UI)](0002-galaxy-view.md) | draft |
+| 0001 | [Galaxy generation](0001-galaxy-generation.md) | accepted |
