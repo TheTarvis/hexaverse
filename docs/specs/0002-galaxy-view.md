@@ -1,7 +1,7 @@
 ---
 number: 0002
 title: Galaxy view (galactic graph UI)
-status: draft   # draft | accepted | implemented | superseded
+status: accepted   # draft | accepted | implemented | superseded
 created: 2026-07-06
 owner: Travis Wilson
 supersedes:     # spec number(s) this replaces, if any
@@ -11,7 +11,7 @@ superseded_by:  # filled in when this spec is retired
 # 0002 — Galaxy view (galactic graph UI)
 
 > Render the generated galaxy (#0001) as an interactive, WebGraph-style 3D
-> force-directed graph — the strategic-layer screen where players navigate
+> force-directed graph — the strategic-layer screen where players orbit around
 > systems under fog — with a left intel panel and a right system inspector.
 
 ## Problem / motivation
@@ -21,16 +21,20 @@ view is still the Volt placeholder (`frontend/app/page.tsx`). The **galactic
 view is the game's primary screen** — the top half of the two-tier map
 (`../vision.md`) and step 2 of the first vertical slice — and it's where the
 **frozen start area** is shown to logged-out visitors (`../vision.md` → Auth &
-onboarding stance). It also has to *feel great*: the reference is kitakita's
-**WebGraph** (`../plans/canvas/README.md` + screenshot; live demo
-`webgraph.kitaaura.com`) — a dark, glowing 3D force-graph. This spec turns
-#0001's `(x,y,z)` systems + lanes into that interactive view.
+onboarding stance). It also has to *feel great*: the reference is
+kitakitaaura's **WebGraph** (`github.com/kitakitaaura/webgraph`, MIT; screenshot
+in `../plans/canvas/`; live demo `webgraph.kitaaura.com`) — a dark, glowing
+force-graph. WebGraph is a **pure visual reference**, not a codebase we build on
+(it's a bespoke 2D-`<canvas>` renderer — see Findings). This spec turns #0001's
+`(x,y,z)` systems + lanes into that interactive view.
 
 ## Goals
 
 - Render systems as **nodes** and lanes as **edges** in an interactive **3D
-  force-directed graph**, fed by #0001 data (`(x,y,z)` as seed positions).
-- **Camera controls** — pan, zoom, orbit/rotate.
+  force-directed graph**, fed by #0001 data (`(x,y,z)` rendered natively as
+  positions).
+- **Camera controls** — orbit/rotate, pan, zoom (reading depth/distance from any
+  angle is a first-class requirement, not a nice-to-have).
 - **Select a system** → a right-hand **inspector** shows its details (name,
   region, connections).
 - A left **intel panel** — galaxy / player summary + stat tiles (repurposing
@@ -54,8 +58,12 @@ onboarding stance). It also has to *feel great*: the reference is kitakita's
   "act" happens on the hex board.
 - **WebGraph's app-specific features** — the replay/timeline scrubber, JSON
   export, and URL-scan input are website-scanner concerns, not Hexaverse.
-- **Full layout-toggle set** — Organic / 3D / Sphere / Radial / Tree are
-  nice-to-have; ship one good default first (Open question #2).
+- **Layout toggles (Sphere / Radial / Tree)** — artifacts of the WebGraph
+  reference, whose nodes have *no real coordinates*, so it offers alternate
+  arrangements. Hexaverse renders #0001's true `(x,y,z)`, where on-screen
+  distance *is* in-game distance; re-arranging would discard that meaning.
+  Organic-native is the only layout that applies — not deferred, **N/A**
+  (Decisions).
 - **Live multiplayer / SSE updates** into the view — static-ish first; realtime
   later.
 - **Minimap & search** — defer unless nearly free.
@@ -65,13 +73,18 @@ onboarding stance). It also has to *feel great*: the reference is kitakita's
 A Next.js **client component** in the Hexaverse stack. Galaxy data arrives via a
 React Query hook → galaxy service → `apiClient` → the #0001 read API. Catalyst
 provides the panel/control chrome; a WebGL force-graph library provides the
-canvas.
+graph.
 
-1. **Graph canvas.** Build on **`react-force-graph-3d`** (the three.js-based
-   `3d-force-graph`) — the library family that produces the WebGraph look. Feed
-   it nodes (`{id, x, y, z, region, name, discovered}`, using #0001 coordinates
-   as initial positions) and links (`{source, target}`). Node color/size keyed
-   to `region`; edges styled per lane.
+1. **Graph canvas.** WebGraph is itself a bespoke 2D-`<canvas>` renderer (~2.3k
+   lines of vanilla JS — see Findings), so we match its *look*, not its code.
+   Adopt **`react-force-graph-3d`** (the three.js-based `3d-force-graph`) for
+   genuine orbit + depth (Decisions). Crucially, the glow needs **no shaders and
+   no bloom pass**: bake WebGraph's radial-gradient into a **sprite texture** and
+   draw nodes with **additive blending** (a sharp core sprite + a softer halo
+   sprite keeps dense clusters from blowing out to white). Feed it nodes (`{id,
+   x, y, z, region, name, discovered}`, pinned to #0001 `(x,y,z)` via `fx/fy/fz`)
+   and links (`{source, target}`). Node color/size keyed to `region`; edges
+   styled per lane; three.js supplies orbit controls, zoom, and click-picking.
 2. **Panels flank the canvas** (the screenshot layout): left **intel panel**
    (galaxy summary + stat tiles), right **inspector** (empty state → populates
    on node-select). Catalyst-styled overlays.
@@ -89,24 +102,76 @@ canvas.
   (client) → `hooks/use-galaxy` (React Query) → `lib/services/galaxy` →
   `apiClient` → backend galaxy read API (#0001). Query-key factory entry for the
   galaxy fetch.
-- **Library:** `react-force-graph-3d` (three.js). Nodes carry #0001 coordinates;
-  links reference system ids. (Verify bundle size / SSR handling — dynamic
-  import, client-only.)
-- **Styling:** Catalyst components for panels, pills, stat tiles; the repo color
-  system (no raw hex — extend the palette with region colors per
-  `frontend/CLAUDE.md`).
+- **Library:** `react-force-graph-3d` (three.js); WebGraph is visual reference
+  only. Nodes pinned to #0001 `(x,y,z)` (`fx/fy/fz`, `cooldownTicks={0}`) so
+  orbit reveals the real generated structure rather than a re-solved layout.
+  Glow authored as additive **sprite textures** (radial gradient baked to a
+  canvas texture — no shader, no bloom pass). Deps: `react-force-graph-3d`,
+  `three`, `@types/three`. (Dynamic import, client-only; the glow texture is a
+  lazy singleton guarded against SSR since it needs `document`.) **Bundle:**
+  three.js is a heavy dependency — the client-only dynamic import keeps it
+  code-split off the SSR/initial-render path; watch its weight and the
+  `npm audit` gate for its transitive deps.
+- **Selection & labels:** three.js has no cheap "ring" like the 2D canvas did —
+  indicate selected/hovered systems by brightening/scaling the node sprite (or an
+  outline sprite). System names show via `react-force-graph-3d`'s `nodeLabel`
+  hover tooltip for the slice; a persistent, collision-managed label layer is
+  deferred.
+- **Read-API contract** (pinned here per Decisions). One read fetches the whole
+  graph; the live authed path and the logged-out static asset return the **same
+  shape**, aligned with #0001's persistence model (`System`/`Lane`):
+  - `GET /v1/galaxy` — the live galaxy (authed).
+  - `/galaxy/start-area.json` — the frozen start area, a static/cached asset
+    generated once from #0001's fixed start-area seed (its Decision 3); never
+    hits live generation.
+
+  ```jsonc
+  {
+    "id": "gal_…", "seed": 0,
+    "bounds": { "x": [-520, 520], "y": [-520, 520], "z": [-90, 90] },
+    "systems": [
+      { "id": "sys-0", "coords": { "x": 12.3, "y": -8.1, "z": 4.0 },
+        "name": "Axion", "region": "star_rich", "discovered": true }
+    ],
+    "lanes": [ { "id": "lane-0", "aId": "sys-0", "bId": "sys-12" } ]
+  }
+  ```
+
+  The **galaxy service layer** adapts this to the renderer's node/link shape —
+  flattening `coords` → `{x,y,z}` and mapping `aId`/`bId` → `source`/`target` —
+  so the backend stays coupled to #0001, not to `react-force-graph-3d`. **Node
+  size** is derived from `region` in the view (star-rich largest → dead
+  smallest); the wire carries no importance field for the slice (the spike's
+  `val` was mock-only). `bounds` seeds the initial `zoomToFit`; `seed`/`id`
+  pass through for debugging, not rendered.
+- **Auth gating:** the app currently redirects unauthenticated users off every
+  non-public route to `/login` (`components/layout-wrapper.tsx`, `PUBLIC_ROUTES`).
+  Serving the galaxy as the **logged-out landing at `/`** therefore requires
+  making the home route public and having the view render in a logged-out mode
+  (the spike used a temporary `/spike` allowance — revert it when the spike is
+  removed).
+- **Styling & colors:** panels, pills, and stat tiles use Catalyst + the repo
+  Tailwind color system. The **graph layer is the exception**: three.js sprite /
+  line materials take color *strings*, not Tailwind classes, so region colors
+  live as a small raw-value palette constant (gold star-rich, sky normal, slate
+  dead, magenta barrier) — a deliberate, isolated exception to the no-raw-hex
+  rule the `/check` color validator enforces. Keep that palette in one module
+  shared by the graph and the panel region-dots.
 - **Fog contract:** `discovered: boolean` per system for now; real visibility
   payload defined by the fog spec.
 - **Performance:** hundreds of nodes (#0001 scale) render comfortably in
-  `3d-force-graph` without level-of-detail.
+  `3d-force-graph` without level-of-detail — the spike (~276 nodes / 522 lanes)
+  rendered instantly, comfortably the safe side of the old single-map hex-count
+  wall.
 - **Testing:** `data-testid`s on interactive controls; vitest for hook/service;
   component renders against mock galaxy data (per the `/check` harness).
 
 ## Acceptance criteria
 
 - [ ] An authed user sees the live galaxy (#0001 data) as an interactive 3D
-      force graph and can **pan / zoom / orbit**.
-- [ ] Clicking a system **selects** it and the **inspector** shows its details
+      force graph and can **orbit / pan / zoom**.
+- [ ] Clicking a system **selects** it — indicated **on the graph** (highlight),
+      not only in the inspector — and the **inspector** shows its details
       (name, region, connections).
 - [ ] The left **intel panel** shows galaxy / player summary stats.
 - [ ] Undiscovered systems render **dim/hidden** from the `discovered` flag
@@ -118,20 +183,61 @@ canvas.
       (dark, glowing nodes, colored edges).
 - [ ] vitest covers the hook/service; the component renders with mock data.
 
+## Findings (2026-07-06)
+
+Resolves Open question #1's gating task (inspected `github.com/kitakitaaura/webgraph`):
+
+- **WebGraph is a bespoke 2D-`<canvas>` renderer**, not a force-graph library:
+  one `app.js` (~2,284 lines of vanilla JS) drawing to `getContext("2d")` with
+  its own `requestAnimationFrame` loop — no three.js, no `d3-force`, no
+  React/Next. The 3D-ish look is depth-shaded 2D projection. Its `index.html`
+  already ships layout toggles (Organic/…) and a mini-map: the mini-map this
+  spec defers (Non-goals); the toggles **don't apply** — WebGraph needs them
+  precisely because its nodes have no real coordinates, whereas ours do
+  (Decisions / Non-goals).
+- **License: MIT** — vendoring is legally open if we ever want the exact look.
+- **Net:** there is **no shared library** to adopt *from* WebGraph; it's a pure
+  *visual* reference. WebGraph being 2D means its *look* doesn't force a 3D
+  renderer — but it doesn't preclude one either, and orbit/depth do (see
+  Decisions).
+
+## Decisions (2026-07-06)
+
+1. **Renderer → `react-force-graph-3d` (three.js).** Resolves Open question #1,
+   validated by a working spike (`frontend/app/spike/galaxy-3d/`; screenshots in
+   the session scratchpad). *We first leaned 2D* (`react-force-graph-2d`) on the
+   reasoning that WebGraph is itself 2D and 2D-canvas glow needs no shaders — but
+   two things flipped it: (a) **orbit/depth turned out to be a firm requirement**
+   — reading distance/structure from other angles is core to a *space* map, not a
+   nice-to-have; and (b) the shader worry was unfounded — the glow ports to 3D as
+   **additive sprite textures** (same radial gradient, no shader, no bloom pass),
+   which the spike confirmed looks right. three.js also gives orbit, zoom, and
+   click-picking for free. (The 2D spike was removed once 3D was chosen; the 3D
+   spike is retained until the real view is built out into the app.)
+2. **#0001's 3D data is rendered natively.** Systems' `(x,y,z)` (distance, travel
+   cost, noise field) are the render positions directly — no projection. This
+   *fulfils* #0001's "true 3D view," rather than trading it away.
+3. **Layout → organic-native only, permanently** (resolves Open question #1,
+   *Travis*). Not "one first, others later" — the Sphere/Radial/Tree toggles are
+   artifacts of the WebGraph example (whose nodes have no real coordinates).
+   Hexaverse's nodes carry #0001's true `(x,y,z)`, so alternate arrangements
+   would *discard* meaning rather than add a view. There is one layout and there
+   only ever will be.
+4. **Drill-in fully deferred** (resolves Open question #2, *Travis*). No "enter
+   system" affordance in this slice — not even a stubbed/disabled button. The
+   inspector shows details + connections only; the drill-to-hex-board action
+   arrives with the hex-board spec.
+5. **Fog stub → `discovered: boolean` per system** (resolves Open question #3,
+   *dev*). Interim contract until the fog spec defines the real per-player
+   visibility payload; undiscovered systems render dim/hidden.
+6. **Read-API contract pinned here** (resolves Open question #4, *dev*) — in this
+   view's service layer, not a shared #0001 addendum. Concrete response shape and
+   start-area asset format specified under Design details → "Read-API contract."
+
 ## Open questions
 
-1. **Integration strategy** *(Travis)* — build on the underlying force-graph
-   library (`react-force-graph-3d` / three.js) using WebGraph purely as *visual
-   reference* (**recommended** — avoids inheriting a website-scanner app and its
-   license/maintenance), vs. **fork/vendor** kitakita's WebGraph directly.
-   → **leaning "same library, our UI."** *Gating task: confirm WebGraph's
-   license and its actual renderer before locking this.*
-2. **Layout toggles** *(Travis)* — ship one good default (3D organic) for the
-   slice, or the full Organic/3D/Sphere/Radial/Tree set? → **leaning one now.**
-3. **Drill-in affordance** *(Travis)* — does node-select also surface an "enter
-   system" action now (stubbed, → hex-board spec), or is that fully deferred?
-4. **Fog stub shape** *(dev)* — confirm `discovered: boolean` per system as the
-   interim contract until the fog spec defines the real payload.
+*None outstanding* — all four resolved 2026-07-06 (see Decisions). This spec is
+ready to move from draft to accepted.
 
 ## References
 
@@ -139,6 +245,7 @@ canvas.
 - `../vision.md` — two-tier map; Auth & onboarding stance (frozen start area).
 - `../plans/BRAINSTORM.md` — galactic view (WebGraph), left/right panel pattern.
 - `../plans/canvas/README.md` + `Screenshot 2026-07-02 at 10.37.18.png` — the
-  WebGraph visual reference (kitakita; `webgraph.kitaaura.com`).
+  WebGraph visual reference (kitakitaaura; live demo `webgraph.kitaaura.com`,
+  source `github.com/kitakitaaura/webgraph`, MIT).
 - `frontend/CLAUDE.md` — component→hook→service→apiClient layering, color
   system, Catalyst-only UI.

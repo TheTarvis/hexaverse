@@ -55,10 +55,18 @@ worse than no spec.
 - One spec = one coherent feature or decision. Split if it sprawls.
 - Cross-link related specs and the vision doc (`../vision.md`).
 
+## What's not spec'd yet
+
+See **[BACKLOG.md](BACKLOG.md)** — a coverage map of every game mechanic the
+design implies, marked spec'd / plan-only / idea-only, so gaps are visible and
+each can be spec'd, folded, or scratched.
+
 ## Index
 
 <!-- specs:index (the /spec tool appends rows below this line; keep it) -->
 | # | Spec | Status |
 |---|------|--------|
-| 0002 | [Galaxy view (galactic graph UI)](0002-galaxy-view.md) | draft |
+| 0004 | [In-system movement (coast & thrust)](0004-movement-board.md) | accepted |
+| 0003 | [System interior generation](0003-system-interior.md) | accepted |
+| 0002 | [Galaxy view (galactic graph UI)](0002-galaxy-view.md) | accepted |
 | 0001 | [Galaxy generation](0001-galaxy-generation.md) | accepted |

@@ -6,7 +6,7 @@ import { useAccountContext } from '@/components/account-provider'
 import { AppNavigation } from '@/components/app-navigation'
 
 // Routes that should NOT have the dashboard layout (e.g. login, OAuth callbacks).
-const PUBLIC_ROUTES = ['/login', '/oauth']
+const PUBLIC_ROUTES = ['/login', '/oauth', '/spike']
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

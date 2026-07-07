@@ -60,6 +60,27 @@ share the world with other players **and AI bots that actually interact**.
   the chill vibe. ? How lethal — leaning toward setbacks over total wipes.
 - **Move** — ships traverse hexes; travel between systems happens on the graph.
 
+## Predictable drift vs. loud burn *(cool emergent idea — movement × intel × stealth)*
+
+Falls straight out of **"positions are computed"** (`movement-board.md`, #0003/#0004):
+a **coasting** fleet is on rails, so its **future position is deterministic** —
+knowable to anyone holding its orbital elements, and therefore **itself sellable
+intel** ("fleet X reaches hex Y at time T"). **Thrusting** flips you to a **volatile
+live snapshot**: you become **unpredictable** — juke a pursuer, break a targeting
+solution or a *sold* prediction — but you go **"loud,"** broadcasting a real-time
+position to anyone who can see you. Every move trades off: **drift = efficient,
+silent, foreseeable; burn = agile, evasive, but exposes you now.** One dynamic wiring
+**movement ↔ fog** (who sees the snapshot) **↔ intel market** (a fleet's *predicted
+ephemeris* as a product — richer than a stale "sighting") **↔ combat** (intercept vs.
+juke). Nearly free — it's already how the model works; the "cool" is deciding how far
+to lean in.
+
+- ? Can you **buy/sell a predicted trajectory**, not just a past sighting? (a new intel type)
+- ? Does going **loud** (thrust) carry a **detection cost** — a burn broadcasts wider
+  than a coast — so evasion trades stealth for agility?
+- ? Counter-play: **coast a decoy** to spoof predictability; **burn to invalidate** a
+  pursuer's stale elements. How much of this is emergent vs. explicit mechanic?
+
 ## Goals, progression & stakes
 
 ### What you're working toward
@@ -181,6 +202,23 @@ intel these are **physical mass** — they must move, and that constraint is the
   - **Building stations = building the trade network = a business.** Owners earn
     **tolls / transfer fees** (also a credit **sink**). This is what stops routes
     from dying — the road is somebody's livelihood.
+  - **DECIDED (2026-07-06) — the three constraints that keep hauling alive** (from
+    the fog/logistics session; see `fog-of-war.md` → *Your own assets & the
+    transmission gate*):
+    - **Teleport is lane-based and *short-range*** (adjacent stations, ~1 lane
+      hop) — **not** 3D, which would bypass the choke points the map is built on.
+      Crossing the galaxy = **multi-hop through a contiguous station chain**, with
+      **cumulative toll per hop** (distance ∝ cost → arbitrage survives).
+    - **Stations are *prohibitively expensive*** — otherwise everyone stations
+      every node and hauling dies. So a **lone frontier station connects to
+      nothing**; the mass net is a sparse, costly backbone built only on busy
+      corridors. **Hauling is the default** for the whole long tail + the frontier.
+      (Cost falls on *player* frontier extension; NPC hub stations still anchor the
+      core so newcomers trade day one.)
+    - **Choke points are *hard* for mass** — a laneless barrier can't be stationed
+      across, so mass hauls the long way or the route doesn't exist. Data still
+      slips out over a single cheap **relay**, so choke points are *soft* for
+      intel — the weightless-vs-heavy pillar, enforced by infrastructure cost.
 - **One network, two flows.** The same station/relay network carries both: mass
   **teleports** between stations (fee); intel **transmits** over it (subspace).
   - Consequence: **the frontier is off-grid.** Deep-frontier space (freshest,

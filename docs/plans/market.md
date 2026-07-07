@@ -11,6 +11,21 @@ Most space games trade *materials*. Hexaverse trades **knowledge** — what
 you've scanned and discovered is a first-class, tradable good. This is the
 differentiator, so it's worth getting the mechanics right before building.
 
+## Boundary with fog of war
+
+This doc owns **valuation**: how a recorded observation *ages* and what it's
+*worth* to a buyer. It does **not** own live visibility. `fog-of-war.md` owns the
+**filter** — can a player see something *right now* (sensor coverage, reveal,
+remember). The two share one data atom, `observation { place, asOf, whatWasSeen,
+type }`: fog *filters* it, this doc *values* it.
+
+- A **scan** mints the observation (born in scan/fog); this market trades copies.
+- **Buying intel** writes a snapshot into the buyer's *Remembered* fog (§8) — it
+  never grants live *Visible*.
+- "Fog creep" here (§6) is the *valuation* view of the same event fog calls
+  Visible→Remembered: fog says "not live," this doc says "and here's how its worth
+  decays." See `fog-of-war.md` → *Fog vs. intel — the boundary*.
+
 ## The key enabler: authoritative verification
 
 Real-world info markets fail on two problems:
@@ -53,6 +68,33 @@ fresh*.
 The three decay rates *are* the point of the market. (Scope note: the *build*
 can still phase these — Survey first is the natural MVP — but the design targets
 all three.)
+
+#### Why the decay rates differ — the physical "why"
+
+The three types decay at different rates because the *things they describe* change
+in fundamentally different ways. Useful as the mental model behind the confidence
+curves (§2), and it's what a buyer intuitively prices:
+
+- **Cartographic → evergreen.** A system's existence, location, and lane
+  connections are **static** — they never change. Sell once-scanned forever; value
+  falls only by *saturation* (everyone already knows), not by aging.
+- **Survey → medium.** A system's interior is a mix: some of it is **deterministic**
+  — orbits move, but if your scan captured the orbital parameters you can *compute*
+  planet/moon positions at any future T, so "# planets, # moons, belts, their
+  orbits" is essentially durable. What actually decays is **event-driven** change:
+  resources deplete, hazards shift, a base gets built. Your snapshot is right until
+  an event you didn't witness. So Survey is "durable skeleton + spoiling details."
+- **Sighting → fast.** A fleet at position P moving at velocity V is **drift**: you
+  can extrapolate, but only into a *growing cone of uncertainty* — reachable radius
+  ≈ speed × elapsed time. A few hours on, the cone covers the whole system and the
+  sighting is worthless. The decay isn't "confidence fades," it's "the possible-
+  location region expands until it's bigger than anything worth knowing."
+
+> This is the physics under the "produce" metaphor: Cartographic is canned goods,
+> Survey is a durable pantry with some perishables, Sighting is milk. The confidence
+> curve per type (§2) is just this made numeric. *(Live visibility of these same
+> things — can I see the fleet **now** — is fog's job, not this doc's:
+> `fog-of-war.md`.)*
 
 ### 2. Freshness — how value degrades
 
@@ -113,9 +155,12 @@ The mechanism that sustains ongoing demand.
   and the type model are one distinction viewed twice.
 - It's the liquidity engine: without it, intel is a one-time purchase per system
   and the market dries up once everyone's learned the map.
-- ? Re-fog rate for survey/sighting contents; does anything (a relay, a base, an
-  active ship in-system) hold local knowledge fresh so you're not re-buying your
-  own backyard.
+- **Resolved (via fog):** yes — **presence holds local knowledge fresh.** A
+  unit/base/relay in-system gives *ambient live vision*, so occupied space never
+  re-fogs and you never re-buy your own backyard. The market lives on *remote*
+  intel. See `fog-of-war.md` → *Passive vision vs. active scan* (DECIDED).
+- ? Re-fog *rate* for survey/sighting contents you're **not** actively observing
+  (the confidence curve per type) — still open, tuning.
 
 ### 7. Discovery → listing UX (chill = few clicks)
 
@@ -267,6 +312,14 @@ The self-sustaining loop, end to end:
   until you haul/relay it back or extend the net. Makes the frontier
   economically special. See the "one network, two flows" model in
   `BRAINSTORM.md` → Goods & logistics.
+  - **Refined (2026-07-06, fog session):** the **relay/data net** is the *cheap,
+    weightless* half — a **single in-system relay uplinks that system's intel to
+    the global exchange**, and intel transmits **instant + toll-free** across any
+    connected relay chain. Contrast the **station/mass net** (prohibitively
+    expensive, short-range adjacent lane-hops, per-hop toll). So **intel escapes
+    the frontier for the price of one relay; mass needs the whole backbone** —
+    choke points are *soft* for data, *hard* for mass. Full split in
+    `fog-of-war.md` → *Your own assets & the transmission gate*.
 - **A 4th intel type — Route/market intel** (prices, profitable spreads). **§11
   DECIDED: deferred** to v-next — waits on the goods economy. Fold into the §1
   table when trade routes are built.
