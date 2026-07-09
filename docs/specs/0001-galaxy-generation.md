@@ -73,16 +73,28 @@ time**, not per request — there is one persistent shared galaxy per environmen
 1. **Seed → noise field.** From a seed, define a **3D** region of space and a
    3D simplex-noise field over it. The noise value at a point classifies
    regional character: `star_rich | normal | dead | barrier`.
-2. **Place system nodes.** Sample candidate positions within a **flattened-disk
+2. **Place system nodes** with **minimum-spacing (Poisson-disc) rejection**, not
+   free gaussian scatter. Sample candidate positions within a **flattened-disk
    volume** (galaxy-shaped: broad in x/y, thin in z — legible in a 3D view, no
-   spherical occlusion blob) and accept/reject by a density that follows the
-   field — star-rich → dense clusters, dead zones → sparse, barriers →
-   near-empty seams. Each accepted point becomes a **System** node with `(x,y,z)`
-   coordinates, a region classification, and a generated name.
-3. **Connect lanes.** Derive lanes from proximity (e.g. a relative-neighborhood
-   / k-nearest graph) so the map is connected and locally clustered, plus a few
-   long-range lanes for topology. Barrier regions suppress edges → natural choke
-   points.
+   spherical occlusion blob); accept a candidate only if it clears a **minimum
+   gap** from every existing node, and **vary that gap by region** — small in
+   star-rich (tight clusters), large in dead zones (sparse voids). The *contrast*
+   between the per-region gaps is what makes clusters read as clusters and voids
+   as voids; the minimum gap itself is what stops nodes overlapping into an
+   unreadable blob. (Validated in the `/spike/galaxy-3d` prototype — pure density
+   sampling gave either overlapping blobs *or*, over-corrected, a uniform mesh;
+   region-varied minimum spacing is the lever that gives legible structure.) Each
+   accepted point becomes a **System** node with `(x,y,z)` coordinates, a region
+   classification, and a generated name.
+3. **Connect lanes via the relative-neighbourhood graph (RNG).** An edge (a,b) is
+   kept iff no third system lies in their "lune" (closer to both than they are to
+   each other). Chosen over k-nearest: the RNG **contains the Euclidean MST, so it
+   is connected *by construction*** (satisfies the connectivity criterion below
+   without a bridging pass), and it is **road-like with few crossings**, where
+   k-NN over-triangulates dense regions into an unreadable hairball. Long RNG
+   edges spanning a void are few and desirable — they *are* the sparse crossings
+   that make **choke points**; barrier seams stay sparse naturally. *(Also
+   validated in the spike.)*
 4. **Persist.** Write systems + lanes + galaxy metadata (seed, params, bounds,
    version) to Firestore.
 5. **Start area.** A fixed known seed produces the frozen start-area subgraph
@@ -105,8 +117,11 @@ consume.
   - `System` (node): `id`, `coords {x,y,z}`, `name`, `region`
     (`star_rich|normal|dead|barrier`), neighbor/`laneIds`. *(Interior contents
     deferred.)*
-  - `Lane` (edge): `id`, `aId`, `bId` — topology only for now (`type`/`cost`
-    deferred to the movement spec; Open question #6).
+  - `Lane` (edge): `id`, `aId`, `bId` — **topology only**. Travel **cost is not
+    stored**: `../plans/movement-galaxy.md` resolved it as a *derived* value
+    (length-weighted time from the endpoint coords), so generation needs only the
+    edge. A `cost`/`relayModifier` field is a reserved hook for *later* per-lane
+    modifiers (hazard/relay), not a generation output. (Decision #6.)
   - `Galaxy` metadata: `id`, `seed`, `params`, `bounds`, `version`, `createdAt`.
   - Firestore layout: `galaxies/{id}` with `systems/{id}` and `lanes/{id}`
     subcollections (vs. embedded neighbor lists — decide by read pattern).
@@ -150,7 +165,18 @@ consume.
    but the trigger/cadence is a later spec.
 5. **System-interior boundary → generation stops at the node.** Contents / the
    hex board are generated lazily on first visit in a later spec.
-6. **Lane semantics → topology only.** `cost`/`type` added later with movement.
+6. **Lane semantics → topology only.** No `cost`/`type` stored; travel cost is
+   *derived* (length-weighted time — `../plans/movement-galaxy.md`). A per-lane
+   modifier field stays a reserved hook for later.
+
+**Refined 2026-07-08 (validated in `/spike/galaxy-3d`):**
+
+7. **Placement → region-varied minimum spacing (Poisson-disc).** Not free
+   gaussian scatter. The *contrast* between per-region gaps (tight star-rich,
+   sparse dead) creates legible structure; the minimum gap prevents blobbing.
+8. **Lanes → relative-neighbourhood graph (RNG),** not k-nearest. Connected by
+   construction (contains the MST), road-like, few crossings; k-NN hairballs in
+   dense regions. Long void-spanning edges are the natural choke crossings.
 
 ## Open questions
 
@@ -161,6 +187,10 @@ consume.
 
 ## References
 
+- `frontend/app/spike/galaxy-3d/` — throwaway prototype standing in for this
+  spec's output; where placement + lane-algorithm choices (decisions #7/#8) were
+  eyeballed. Tuning constants there are spike-only, not spec.
+- `../plans/movement-galaxy.md` — graph-tier travel; owns the derived lane cost.
 - `../vision.md` — two-tier map; Auth & onboarding stance (frozen start area).
 - `../plans/BRAINSTORM.md` — galactic view (WebGraph), world shape /
   ever-growing frontier.

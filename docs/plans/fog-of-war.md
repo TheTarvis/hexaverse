@@ -56,7 +56,7 @@ The old design (`Gameplay.mdc`) had one hex map, so one fog. The 2.0 two-tier ma
 |---|---|---|
 | Unit of visibility | a **system node** | a **tile** |
 | What's hidden | which systems exist / their character | terrain, resources, hazards, enemy units |
-| Reveal by | adjacency along lanes, travel, survey-scan, bought intel | ambient unit vision + scan actions |
+| Reveal by | travel (charts onward lanes), survey-scan, bought intel — star map always visible | ambient unit vision + scan actions |
 | Re-fog feel | node stays; live activity stops updating | live layer stops updating; terrain stays drawn |
 | Slice stub today | `discovered: boolean` (#0001/#0002) | nothing yet (hex board unspec'd) |
 
@@ -72,9 +72,9 @@ in *what reveals what*.
   (full fog)           (live truth)   ◀──re-observe───   (last snapshot)
 ```
 
-1. **Unseen** — never observed. Full fog. On the graph you may not know the system
-   is there (or only that "a lane leads *somewhere*" — see progressive
-   revelation). On the board: black tile.
+1. **Unseen** — no *subspace* knowledge. On the graph you **still see the star**
+   (lightspeed/telescope is common knowledge — `../lore.md`); what you lack is any
+   subspace read: no charted lane to it, no current truth. On the board: black tile.
 2. **Visible** — inside an active sensor radius **right now**. Live, authoritative
    truth: current enemy positions, everything.
 3. **Remembered** — observed before, no longer in sensor range. The map **stays
@@ -189,40 +189,52 @@ extension.
 
 > **Movement model → now owned by `movement-galaxy.md`** (the graph-tier movement
 > doc). One line fog needs: **travel is lane-based** (follow #0001 edges;
-> "adjacent" = lane-connected), and **travel is the primary *Explored* trigger** —
-> you send a ship down a visible lane and *arriving reveals the system*. Lanes are
-> visible infrastructure, so neighbors are auto-Rumored (below). Everything else —
-> roads-vs-off-road, FTL range, lane cost, at-risk transit — lives in that doc.
+> "adjacent" = lane-connected), and **travel is the primary reveal trigger** — you
+> send a ship down a *known* lane and *arriving reveals the system **and its onward
+> lanes***. You learn the road network by **presence, not sight** (below). Everything
+> else — roads-vs-off-road, FTL range, lane cost, at-risk transit — lives in that doc.
 
-**DECIDED (2026-07-06): reveal by lane-adjacency, upgrade by investment.** Lanes
-are **visible infrastructure** — from any system you know, you see the lanes
-leaving it, so its neighbors are auto-**Rumored** for free (you see the road and
-that it leads *somewhere*). Learning *what's there* costs something. So the tiers:
+**DECIDED (2026-07-08 — supersedes the 2026-07-06 "lanes are visible infrastructure"
+call): the star map is always visible; the *road network* is discovered by presence.**
+Two channels (`../lore.md`): **lightspeed** shows every star from t=0 (position +
+coarse region) — common knowledge, always drawn. **Subspace lanes do not show at
+range** — you learn a system's onward lanes only by **reaching it**, so you start
+knowing only the lanes leaving places you've already been. The tiers therefore
+describe your *subspace* knowledge of a star you can already see:
 
-1. **Rumored** — a visible lane from a known system points here. You see a node
-   exists, labeled *"unexplored system"*; region/contents unknown. Free, from
-   adjacency. *(This is what makes the graph explorable — you always see the edge
-   of your known space beckoning.)*
-2. **Surveyed** — a **quick-sweep** scan down the lane (wide/fast/low-quality is
-   enough for "what region"), *or* bought survey intel, *or* travel adjacent. You
-   know its **region/character** — enough to decide if it's worth the trip — not
-   its interior.
+0. **Star-visible** — baseline, every system, free, from the telescope: it exists,
+   where, coarse region. No charted lane to it, no current truth. This is the
+   *aspirational* layer — you see the cluster you covet long before any road to it
+   exists. *(This is what makes the graph beckon — the whole sky, glittering and
+   unreached — the role the old "auto-Rumored neighbor" stubs used to play.)*
+1. **Rumored** — you've learned (by presence at an endpoint) that a **lane reaches
+   here**; it's reachable-next. Region already known from the star map; interior and
+   current state unknown.
+2. **Surveyed** — a **quick-sweep** scan, bought survey intel, or travel-adjacent:
+   current subspace character beyond the ancient light (rough contents / activity /
+   hazards) — not the full interior.
 3. **Explored** — **travel there** / station a unit / **deep-scan** in-system. Full
-   interior memory (that board's own fog then begins, one tier down).
+   current interior (that board's own fog then begins, one tier down).
 
-Systems don't move, so **graph reveal is monotonic** — once Rumored/Surveyed/
-Explored, it never drops back to Unseen. (What *ages* is the per-system snapshot's
-worth — a `market.md` concern, surfaced as "last scanned 3h ago" in the inspector,
-not as the node vanishing.)
+Why the reversal: route-finding becomes a real act — you must **trace subspace outward**
+toward the stars you can already see, one system at a time, rather than reading a road
+map handed to you for free. It's also lore-honest (subspace geometry ≠ real space, so
+the telescope can't show the roads). This **confirms `movement-galaxy.md`'s open rider →
+you can travel only *known* lanes** (no blind jump to a star with no charted route).
 
-This replaces #0001/#0002's stub `discovered: boolean` with a small enum
-(`unseen | rumored | surveyed | explored`) — a superset, so those consumers still
-work (treat `rumored+` as "render the node").
+The star map is permanent and systems don't move, so **subspace reveal is monotonic** —
+once Rumored/Surveyed/Explored, it never drops back. (What *ages* is a snapshot's
+*worth* — a `market.md` concern, surfaced as "last scanned 3h ago," not the node
+vanishing.)
 
-`?` Does Rumored show the *precise* position (real `(x,y,z)`) or a fuzzed one until
-Surveyed? Fuzzing makes survey-intel more valuable but complicates the #0002
-renderer (nodes pinned to true coords). Leaning **precise-but-dim** for slice
-simplicity.
+This replaces #0001/#0002's stub `discovered: boolean` with a small enum. Because every
+star is always drawn, the enum is about *subspace* knowledge:
+`starVisible (all) → rumored → surveyed → explored` (older `discovered` consumers treat
+`rumored+` as "has subspace knowledge"; the star layer renders regardless).
+
+**Position is always precise** — the telescope pins real `(x,y,z)` from t=0. This
+resolves the old Rumored-fuzzing question (no fuzzing) and happens to suit the #0002
+renderer, whose nodes are pinned to true coords anyway.
 
 ---
 
@@ -268,8 +280,10 @@ The first vertical slice (`vision.md`) needs *enough* fog that exploration reads
 as exploration — not more.
 
 **In the slice:**
-- Graph: replace the `discovered` stub with `unseen | rumored | explored` (survey
-  tier optional). **Reveal-on-adjacency** + reveal-on-travel. **Monotonic.**
+- Graph: **star map always drawn** (all systems visible, coarse region); replace the
+  `discovered` stub with subspace tiers `rumored | explored` (survey optional) over
+  it. **Onward lanes revealed on travel-arrival (presence)** — you begin knowing only
+  home's lanes. **Monotonic.**
 - Board: **two states** (Unseen / Seen) or a light three-state. Ambient vision
   around units + **one Scan action** that reveals a radius and persists.
 - **Scan mints an observation** (so "scanning produces intelligence" is true from

@@ -44,13 +44,19 @@ fog-reveal rides on them. **They live here now**; fog keeps a one-line pointer.
   (#0001 edges); "adjacent" = lane-connected, not merely near in 3D. Chosen because
   the vision's "map is the source of drama" needs real **choke points**, which
   free-travel dissolves.
-- **DECIDED (2026-07-06): lanes are visible infrastructure.** From any system you
-  know, you see the lanes leaving it → its neighbors are auto-**Rumored** for free
-  (`fog-of-war.md`). You always see the edge of your known space beckoning.
-- **Target: a "roads vs. off-road" hybrid.** Free flight always possible but *far
-  slower* than lanes, so barriers are **economic** choke points, not walls, and the
-  **off-grid frontier** = going off-road / extending the relay net (`market.md`).
-  `?` still-open rider: strict-lanes-forever vs. the hybrid (leaning hybrid).
+- **DECIDED (2026-07-08 — reverses the 2026-07-06 "lanes are visible" call): lanes
+  are discovered by *presence*, not sight.** The **star map** is always visible
+  (lightspeed/telescope — `../lore.md`), but **subspace lanes are not**: you learn a
+  system's onward lanes only by **reaching it**, so you begin knowing only *home's*
+  lanes and chart the road network outward one system at a time. The **star field**
+  is what beckons now (you see the cluster you covet, unreached), not free lane stubs
+  (`fog-of-war.md`).
+- **DECIDED (2026-07-07): "roads vs. off-road" hybrid, mechanized as drive jump
+  range.** Free flight (off-road) is always *possible* but slower/costlier than lanes,
+  so barriers are **economic** choke points, not walls, and the **off-grid frontier** =
+  going off-road / extending the relay net (`market.md`). The strict-lanes-vs-hybrid
+  rider is closed in favour of the hybrid; the mechanism is the **jump-range** axis
+  under Progression below (off-road unlocks as your drive tech grows).
 - **Slice ships lanes-only** — a clean subset; off-road / FTL-range / relay-extension
   layer on later with no rework.
 
@@ -74,57 +80,96 @@ so both tiers feel like one game. The geometry differs; the gesture doesn't.
 Rejected (same reasons as the board): manual heading (too fiddly), free-flight that
 ignores lanes (dissolves choke points — that's the whole *point* of lanes).
 
-### Can you travel into the unknown? (the key fork — leaning YES)
+### Reaching the frontier — one hop past your charted roads (DECIDED 2026-07-08)
 
-**You can commit to travel down any *visible* lane, even into a Rumored/Unseen
-system.** This is what makes exploration a **verb**, not a side effect:
+**You can plot a course over your *known* lane network to any charted system, and
+exactly one hop past its frontier** — to a **Rumored** neighbor (a system a known lane
+reaches but you haven't visited). Arriving charts *that* system's onward lanes, so its
+neighbors become the new Rumored frontier. Exploration is thus **stepping one hop past
+your known roads, repeatedly**, tracing subspace toward the stars you can already see.
 
-- You see a lane leaving your known space (fog: neighbors auto-Rumored). You send a
-  ship down it. **Arriving is what reveals the system** (→ Explored, `fog-of-war.md`).
-- The route may pass *through* unseen systems — you commit to the road and
-  **reveal-as-you-go**.
-- If you could only travel to already-known places, exploration would be impossible
-  (chicken-and-egg: reveal needs travel, travel needs reveal).
-- **Risk lives here:** pathing into the unknown is exactly where the dangerous-world
-  pillar bites — you don't know what's at the end. Ties to *at-risk in transit* below.
+- You **cannot** blind-jump to a star with no charted lane to it — the road-finding
+  rider is now resolved: **known-lane-reachable only** (`fog-of-war.md`, `../lore.md`).
+  You see the whole sky; you can only *drive* the roads you've mapped, plus the next
+  step off their edge.
+- **No reveal-as-you-go through *un*charted intermediates.** Because you don't know a
+  Rumored neighbor's onward lanes until you arrive, a single order can't leapfrog
+  multiple unknown hops — you advance the frontier one system per trip. (Multi-hop
+  routing still applies freely *within* charted space — crossing territory you've
+  already mapped.)
+- **Risk lives at the frontier step:** the star told you the region, but not what's
+  *there now* — you commit a hop into current-unknown space. Ties to *at-risk in
+  transit* below.
 
-`?` Confirm yes. `?` Can you target a node you can't yet *see* a lane to (blind
-jump), or only lane-reachable ones? (Leaning: only where a visible lane-path exists.)
+`?` A high-range subspace **sensor** that charts a neighbour's lanes *without*
+travelling (survey-at-range) is a natural progression hook — base case stays
+presence-only (`../lore.md` open thread).
 
 ## Cost & ETA — what a lane costs
 
-**Leaning: length-weighted, with hazard/tier as a later modifier.**
+**DECIDED (2026-07-07): cost is *time*, length-weighted, and the number is shown.**
+Two decisions were hiding in "cost"; both are now locked:
 
-- **Length-weighted (base).** #0001 nodes carry real coords, so lane cost ∝ 3D
-  distance. Makes the map's *geometry* matter — a compact cluster is quick to cross;
-  a long reach to the frontier is a real commitment. Barriers being physically far
-  reads naturally.
-- **Uniform-hop (slice fallback).** Every lane = 1 unit ("3 hops away"). Simplest and
-  most readable; use it if length-weighting muddies the read in the spike.
-- **Hazard / tier modifier (later).** A barrier or nebula-choked lane costs more
-  (slow/dangerous) — the same tile-trait lever fog/board movement use, one tier up.
+- **DECIDED — the currency is time (ETA in minutes), not fuel.** ETA is what the
+  async spine trades in ("arrives in 3h20m" *is* the promise), so lane cost is a
+  **duration**: base time = lane length ÷ drive speed. The galaxy tier is
+  **time-gated, not fuel-gated** — fuel/stranding stays a *board-tier-only* concern
+  (#0004 already owns it). One resource per tier; no unified fuel economy across both.
+- **DECIDED — length-weighted, not uniform-hop.** #0001 nodes carry real coords, so
+  cost ∝ 3D distance. This keeps the map's *geometry* load-bearing — a compact cluster
+  is quick to cross; a long reach to the frontier is a real commitment; barriers being
+  physically far reads naturally ("map is the source of drama").
+- **The 3D-legibility catch, and its fix.** In a 3D view you *can't* eyeball which
+  lane is longer (foreshortening, depth), so if cost were invisible, length-weighting
+  would feel arbitrary. The fix isn't to flatten to uniform-hop — it's to **surface the
+  number**: the route highlight shows **per-leg + total ETA**. Same philosophy as the
+  board tier's "assisted, not manual lead" — you never judge distance by eye, the game
+  tells you. (Uniform-hop is retained only as a pure display fallback if a build ever
+  needs it; the *model* is length-weighted.)
+- **Hazard / tier modifier (later, hook only).** A barrier- or nebula-choked lane
+  costs more — the same tile-trait lever fog/board movement use, one tier up. Reserve a
+  `cost` field on the lane (and a `relayModifier`); don't build the modifiers yet.
 
-`?` uniform-hop vs length-weighted for the slice. `?` does a **relay-connected
-corridor** cut cost (fast lanes you've built out — see progression)?
+`?` does a **relay-connected corridor** cut cost — resolved under Progression below
+(relays are a distinct mechanism, not just a cost modifier).
 
-## Progression — speed, FTL range, relay chains
+## Progression — three distinct ways to go fast (keep them from blurring)
 
 The movement half of the vision's progression pillar at this tier — mirrors the
-board's engine axes and fog's sensor axes. Keep them **gentle parallel drips**:
+board's engine axes and fog's sensor axes. The key clarity: there are **three**
+fast-travel mechanisms and they must stay **orthogonal**, or they blur into one
+confusing "go faster" knob:
 
-- **Speed** — faster lane traversal (shorter ETA per hop).
-- **FTL tier / jump range** — skip nodes: a high-tier drive hops 2 lanes at once, or
-  jumps point-to-point within a range ignoring the lane graph. **This is how
-  "roads vs off-road" becomes real** — off-road = jump/free-flight, always possible
-  but slow/costly until you tech into it, so barriers stay chokes, not walls.
-- **Relay chains** — the station/relay network (`fog-of-war.md` two-network model)
-  gives teleport/jump-gate hops along a *built-out corridor* (the "mass net":
-  short-range adjacent lane-hop, per-hop toll). **Player-built fast lanes** — the
-  frontier-extension verb.
+| Mechanism | What it is | Whose it is | Cost |
+|---|---|---|---|
+| **Lanes (roads)** | default graph traversal | everyone | time ∝ distance |
+| **FTL jump (off-road)** | direct point-to-point, *ignores* the graph, within drive range | **your capability** (drive tech you carry) | worse per-distance |
+| **Relay corridor (super-road)** | teleport/cheap hops along a *built-out* chain of relays | **world state** someone built | per-hop **toll** (credit sink) |
 
-`?` which axes survive. `?` does jump-range **gate reachable regions** (a far cluster
-needs a better drive), giving the galaxy a soft difficulty gradient — the graph-tier
-echo of the board's "capability gates inner rings."
+FTL is something you *carry* (personal tech); a relay corridor is infrastructure
+someone *laid down* (shared world state, tollable). Keeping them distinct is what makes
+each interesting.
+
+- **Speed** — faster lane traversal (shorter ETA per hop). The gentlest drip.
+- **DECIDED — FTL = a drive *jump range* (one unifying axis).** Collapse "skip 2 lanes"
+  and "point-to-point jump" into a single number: the drive has a **jump range (radius
+  in ly).** Tier 0 (the slice) ≈ 0 range → lanes only. Higher tiers grow the range →
+  you can make a **direct off-graph jump** between any two systems within range, at a
+  worse cost-per-distance than a lane. This *is* "roads vs off-road," and it keeps
+  barriers as **economic chokes, not walls**: you *can* jump the seam once your drive
+  reaches, but the lane is always cheaper, so traffic still funnels. It also answers
+  "does capability gate reachable regions?" — **yes**, naturally: a far cluster is
+  unreachable until your range clears the gap (soft difficulty gradient, the graph-tier
+  echo of the board's "capability gates inner rings").
+- **Relay chains** — the station/relay network (`fog-of-war.md` two-network model):
+  a chain of player-built relay structures forms a **corridor** with near-instant/cheap
+  hops and a **per-hop toll** (the "mass net"). **Player-built fast lanes** — the
+  frontier-extension verb, and a natural credit sink tying movement into the economy
+  (`market.md`). Spec hook: a system can host a `relay`; a relay-connected lane gets the
+  `relayModifier`. Built later.
+
+`?` which axes survive past these three. `?` FTL cost-per-distance curve (how much worse
+than a lane) — tuning, not structure.
 
 ## Interactions to nail
 
@@ -146,8 +191,12 @@ echo of the board's "capability gates inner rings."
   entry point). Leaving = reach a rim **exit** tile → hand back to graph travel.
   `?` is the exit the same tile you entered, any rim tile, or specific lane-exit
   tiles? (Open in *both* docs — resolve once, record in both.)
-- **What actually moves.** Ships travel; **bases/colonies stay put**. `?` do you move
-  a single marker or a fleet; can multiple units travel a route together?
+- **What actually moves — DECIDED (2026-07-07): the fleet is the mover.** Mirrors
+  #0004 (board tier): the **same fleet entity** crosses the lane and, on arrival, drops
+  onto the destination board *as* the fleet — no separate "galaxy marker" vs "board
+  ship". A fleet is therefore a first-class galaxy-tier entity, not just a board thing.
+  **Bases/colonies stay put.** (Deferred: multiple fleets travelling a route *together*
+  / grouping — one fleet at a time for the slice.)
 - **Re-tasking mid-transit.** `?` abort/redirect underway (recompute ETA, partial
   refund)? — mirrors the board's mid-burn re-task question. Determinism makes the
   recompute clean.
@@ -158,12 +207,18 @@ Slice = the BACKLOG "Inter-system travel" row (🎯) — the "navigate the galax
 the slice needs. Simplest thing that proves it:
 
 **In the slice:** a **"you are here"** home node → **click a lane-reachable system →
-ship travels the lane-path → arrives over real time → reveals it (Explored).**
-Lanes-only. Uniform-hop or simple length cost. Reveal-on-arrival (in-transit reveal
-optional).
+the fleet travels the lane-path → arrives over real time → reveals it (Explored).**
+Lanes-only. **Length-weighted time cost, ETA shown.** Reveal cadence = **destination-
+on-arrival** (light-up-each-node-in-transit is a nice-to-have, deferred — though the
+spike demonstrates it because it's cheap and compelling to eyeball).
 
-**Deferred:** FTL tiers / jump range, relay-chain teleport, off-road free-flight,
-at-risk interdiction, re-tasking mid-transit, multi-ship fleets, cost modifiers.
+**Reserve now (data-model hooks, not built):** `cost` on lanes, `relayModifier`, a
+drive `jumpRange` on the fleet, `relay` on a system — so FTL/relays layer on with no
+rework.
+
+**Deferred:** FTL jump / off-road free-flight, relay-corridor teleport + tolls,
+at-risk interdiction, re-tasking mid-transit, fleet grouping (multiple fleets on one
+route), cost modifiers.
 
 > Slice rule: **you can send a ship down a lane to another system and it gets there
 > over time, revealing it.** (Deliberately parallels the board slice rule — "you can
@@ -171,20 +226,36 @@ at-risk interdiction, re-tasking mid-transit, multi-ship fleets, cost modifiers.
 
 ## Open questions (rolled up)
 
-- Travel-into-unknown confirmed (leaning yes); blind-jump vs lane-reachable-only.
-- Cost model: uniform-hop vs length-weighted vs hazard-weighted; relay corridors cut
-  cost?
-- Roads-vs-off-road: strict-lanes-forever vs the hybrid (the fog-doc rider, now here).
-- Reveal cadence in transit (each node vs destination only).
-- Progression axes; does jump-range gate reachable regions.
-- Handoff exit-tile rules (shared with `movement-board.md` — resolve once).
-- Single marker vs fleet; re-tasking mid-transit.
+**Resolved 2026-07-07:** cost model (length-weighted **time**, ETA shown, time-gated
+not fuel-gated) · roads-vs-off-road (hybrid, mechanized as drive **jump range**) ·
+what moves (**the fleet**, mirroring #0004) · reveal cadence (**destination-on-arrival**
+for the slice) · the three fast-travel mechanisms held orthogonal (lanes / FTL jump /
+relay corridor).
+
+**Still open:**
+- ~~Travel-into-unknown / blind-jump vs lane-reachable-only~~ **RESOLVED
+  (2026-07-08): known-lane-reachable only** — star map visible, roads charted by
+  presence; travel reaches one hop past your frontier (`../lore.md`).
+- **Handoff exit-tile rules** (shared with `movement-board.md` — resolve once, record
+  in both): the same tile you entered, any rim tile, or specific lane-exit tiles?
+- **Re-tasking mid-transit** — abort/redirect underway (recompute ETA)? Determinism
+  makes the recompute clean.
+- FTL cost-per-distance curve; which progression axes survive past the three above
+  (tuning, not structure).
 
 ## Next step
 
-Graduate to **`/spec movement-galaxy`**, **paired with `/spec scan-and-fog`** (reveal
-rides on travel) and **after #0001/#0002** (the graph it moves on). Prototype the
-lane-travel verb on `/spike/galaxy-3d` first (it currently has *no* movement) to
-eyeball route-plotting + in-transit crawl before spec'ing. Flip the BACKLOG
-*Inter-system travel / movement on the graph* row to ✅ then. The board-tier sibling
-(`movement-board.md`) graduates on its own track.
+Core design is **locked** (the five 2026-07-07 decisions above): length-weighted time
+cost, jump-range FTL, fleet-is-the-mover, destination-on-arrival reveal, three
+orthogonal fast-travel mechanisms. What remains before `/spec` are the three small
+open riders (blind-jump target selection, handoff exit-tile, mid-transit re-task).
+
+Prototype step (in progress): the lane-travel verb is being wired into
+`/spike/galaxy-3d` (previously *no* movement) — pick a home node → select a system →
+preview the lane route + per-leg/total ETA → commit → watch the fleet crawl node-to-node
+and reveal as it goes. Eyeball route-plotting + length-cost *feel* there before spec'ing.
+
+Then graduate to **`/spec movement-galaxy`**, **paired with `/spec scan-and-fog`**
+(reveal rides on travel) and **after #0001/#0002** (the graph it moves on). Flip the
+BACKLOG *Inter-system travel / movement on the graph* row to ✅ then. The board-tier
+sibling (`movement-board.md`) graduates on its own track.
