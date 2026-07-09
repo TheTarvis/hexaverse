@@ -30,6 +30,34 @@ is the *interior* of a single system, not a patch of interstellar void.
 
 ---
 
+## What a hex-board *is* (the definition)
+
+**DECIDED (2026-07-09).**
+
+> A **hex-board** is the tactical interior of **exactly one star system** — what you
+> get when you drill into a single node on the galaxy graph. **One graph node ↔ one
+> hex-board.**
+
+- **One star, at the center** — hex `(0,0)`. **Single-star systems only** for now;
+  binaries/trinaries are a deferred content toggle, not a model change.
+- **Star-centered concentric rings** — hex-distance from the star = orbital distance;
+  bands **inner / mid (goldilocks) / outer** (below). Radius ~16 (~800 tiles) —
+  *mostly empty space with a few worlds*, not a packed grid.
+- **A solar system's worth of bodies** — the star, a handful of **planets** (rocky
+  and gas giants) in orbital rings, **moons** riding the gas giants, one or more
+  **asteroid belts** as ring-arcs, plus the earned small/dark stuff (ice bodies,
+  **anomalies**, **ruins**) and **hazards** (nebula, gravity well, radiation, debris).
+  All one unified `Feature` family (#0003); tiles store nothing.
+- **Everything orbits** — deterministic orbital elements from day one; motion off/slow
+  for the slice, on later, zero rework.
+- **You enter at the rim** on your inbound lane and work inward toward the goldilocks
+  prize — fog has a direction, arrival is a journey (`fog-of-war.md`).
+- **Born in two phases** — *skeleton* (star + major bodies) eager with the system and
+  graph-visible; *detail* (resources, small bodies, anomalies, hazards) rolled by the
+  first fleet to arrive, then locked (see *Two-phase generation* below).
+
+---
+
 ## The board model — star-centered concentric rings
 
 **DECIDED (2026-07-06).** Star at hex `(0,0)`; **distance-from-center = orbital
@@ -192,6 +220,48 @@ generator was set to* before they commit a trip. The graph promises; the board
 delivers. (Reinforces `market.md`: survey reports are a real product because they
 forecast interior worth.)
 
+**REFINED (2026-07-09) — the dial drives *detail*, not *count*.** The graph now shows
+each system's **major-body inventory** for free (`fog-of-war.md`, "option (a)"), so
+body *count* can no longer be the character tell — it would leak the paid appraisal.
+The fix: **character dials the *detail* (resource richness, hazard density,
+ruins/anomalies) more than the count.** A **dead** system isn't one with *fewer*
+planets — it's one whose planets are **barren**; a **star-rich** one has the same-ish
+skeleton but **loaded** bodies + belts. Same-looking inventories, different worth →
+you can't eyeball rich-vs-dead from the graph, you survey or you go. (The table rows
+above still hold as *flavor*; read "many bodies / a rock or two" as **worth**, not
+literal count.)
+
+---
+
+## Two-phase generation & the free/earned line
+
+**DECIDED (2026-07-09).** Generation splits on the **same seam as fog** (`fog-of-war.md`,
+board-tier): the free/known layer is rolled eagerly; the earned/detail layer is rolled
+on first presence. This also **resolves #0003's delegated "Explored" trigger.**
+
+| Phase | What | When | Mutable? | Visible |
+|---|---|---|---|---|
+| **Skeleton** | star + major bodies (planets, gas giants) + orbital geometry; *existence* of a major belt / big moon | **eager**, at system-creation (#0001) | no (you don't mine a planet away) | **on the galaxy graph** + free astronomical layer on arrival |
+| **Detail** | resources / richness, small & dark bodies, ruins, anomalies, all hazards, all composition | **lazy**, rolled by the **first fleet to arrive** via a lane, then **locked** | yes (mining depletes it) | earned per-player (presence / scan) |
+
+- **Why eager skeleton:** it's the free layer — must exist before anyone visits (it
+  shows on the graph) — and it's *immutable*, so safe to compute up front. **#0001
+  generates it; #0002 draws the inventory** (flagged in both).
+- **Why lazy+locked detail:** it's *mutable* (depletes), so it can't be recomputed
+  from seed each time — the first arriver **materializes** the canonical copy that
+  everyone then draws down together. **Arrival is the trigger**; a graph deep-scan
+  only *forecasts* character (keeps survey intel a promise), it does **not** generate
+  the board.
+- **Shared once, fogged per-player.** Detail is generated once (create-if-absent per
+  #0003's race guard); every later player fogs it fresh from their own rim entry.
+  "The board exists" and "*you've* explored it" are independent.
+
+**The free/earned line runs between body *types*:** *skeleton / free / on-the-graph* =
+star, planets, gas giants, and the *existence* of a belt or big moon (what a telescope
+resolves); *detail / earned / first-arrival* = what's *in* the belt (which rocks, how
+rich), small/dark bodies, ruins, anomalies, hazards, and all composition/activity —
+everything you'd **mine, fear, or sell.**
+
 ---
 
 ## Settled mechanics (this tier)
@@ -237,17 +307,23 @@ forecast interior worth.)
 
 ## Open forks (next design passes)
 
-- **Scan on the board** — quick-sweep vs deep-scan at *tile* level (mirrors the
-  graph-tier sweep/deep split in `fog-of-war.md`): radius, does a scan reveal
-  *tiles* or *a whole body*, what detail each tier yields. Ties to intel minting.
+- **Scan on the board** — *partially RESOLVED 2026-07-09 (`fog-of-war.md`):* two earn
+  mechanisms — **presence** (live activity + resolve the small/dark; no intel) vs.
+  **scan** (composition + threats + the sellable snapshot), the latter in **quick-sweep**
+  (wide/fast/coarse) and **deep-scan** (narrow/slow/high) flavors. *Still open:* does a
+  board sweep reveal the *bodies* it touches (leaning) or a disc of *tiles*; exact radii;
+  ambient type-vs-presence read of the small/dark.
 - **Mine + depletion** — extraction rate, finite lodes, how depletion surfaces
   (and feeds market freshness). The physical half of the freshness engine.
 - **Body taxonomy** — which body types exist (star / rocky planet / gas giant /
   moon / asteroid belt / ice body / anomaly / ruin) and what each yields.
 - **Generation recipe** — star class → body count → ring placement → per-body
   resources/hazards; how the graph-character dial (above) sets the odds.
-- **Entry point** — you arrive at the rim on your inbound lane; how the board's
-  first-reveal connects to the graph's Explored transition (`fog-of-war.md`).
+- **Entry point** — *RESOLVED 2026-07-09 (`fog-of-war.md`):* **arrival at the rim IS
+  the "Explored" trigger** — it materializes the detail layer (first visit) and starts
+  the board's own fog. First-reveal = the **free astronomical layer** (star + major
+  bodies) + your **ambient bubble** at the rim; you work inward. *(Still open: exact
+  rim entry/exit tile rules — co-owned with `movement-board.md`.)*
 - **Units on the board** — which of the archive's taxonomy (Ship, Base, Mining
   Site, Probe, Relay, Outpost) operate at this tier vs. the graph (BACKLOG ⬜
   "Units / assets taxonomy"). Mining Site + Ship are clearly board-tier.

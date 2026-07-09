@@ -162,8 +162,17 @@ type FgRef = {
 
 export default function Galaxy3DSpikePage() {
   const galaxy = useMemo(() => generateMockGalaxy(), [])
+  // Arrived back from a system drill-in (?focus=<id>)? Start on that system.
+  const focusParam = useMemo(
+    () => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('focus') : null),
+    [],
+  )
+  const startNodeId = useMemo(
+    () => (focusParam && galaxy.systems.some((s) => s.id === focusParam) ? focusParam : galaxy.homeId),
+    [focusParam, galaxy],
+  )
   const [selected, setSelected] = useState<GraphNode | null>(null)
-  const [fleetAt, setFleetAt] = useState(galaxy.homeId)
+  const [fleetAt, setFleetAt] = useState(startNodeId)
   const [transit, setTransit] = useState<Transit | null>(null)
   const [revealVersion, setRevealVersion] = useState(0)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -365,7 +374,7 @@ export default function Galaxy3DSpikePage() {
         // driven each frame by force-graph's own controls.update() loop.
         ctrls.enableDamping = true
         ctrls.dampingFactor = 0.12
-        focusOn(galaxy.homeId, 0)
+        focusOn(startNodeId, 0)
         focusedRef.current = true
       } else {
         raf = requestAnimationFrame(tryFocus)
@@ -375,7 +384,22 @@ export default function Galaxy3DSpikePage() {
     return () => {
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [size.w, size.h, galaxy.homeId, focusOn])
+  }, [size.w, size.h, startNodeId, focusOn])
+
+  // Arriving back from a drill-in: reveal + select the system we exited, so the map
+  // reads as "you are here" on the star you just left.
+  useEffect(() => {
+    if (!focusParam) return
+    const n = nodeById.get(focusParam)
+    if (!n) return
+    if (!n.discovered) {
+      n.discovered = true
+      recomputeFog()
+      fgRef.current?.refresh?.()
+      setRevealVersion((v) => v + 1)
+    }
+    setSelected(n)
+  }, [focusParam, nodeById, recomputeFog])
 
   // Two-finger trackpad swipe → ground-plane pan. macOS delivers a swipe as a plain
   // `wheel` event and a pinch as `wheel` + ctrlKey; OrbitControls reads *any* wheel as
@@ -801,6 +825,21 @@ export default function Galaxy3DSpikePage() {
                 <p className="text-xs text-white/40">
                   Uncharted — no known lane. Reach a neighbour to chart the roads onward.
                 </p>
+              )}
+            </div>
+
+            {/* --- drill in: the board is born on arrival, so you can only enter a
+                system the fleet has reached (discovered). --- */}
+            <div className="mt-2">
+              {selected.discovered ? (
+                <a
+                  href={`/spike/hex-board?seed=${encodeURIComponent(selected.id)}&char=${selected.region}&name=${encodeURIComponent(selected.name)}`}
+                  className="block w-full rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-center text-xs text-emerald-100 hover:bg-emerald-300/20"
+                >
+                  Enter system ↓ · drill into the hex board
+                </a>
+              ) : (
+                <p className="text-xs text-white/30">Reach this system to enter its interior.</p>
               )}
             </div>
 

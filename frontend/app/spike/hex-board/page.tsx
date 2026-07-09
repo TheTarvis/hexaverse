@@ -29,15 +29,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   generateMockSystem,
+  hashSeed,
   hexDistance,
   ringOf,
   type Axial,
   type Body,
   type BodyType,
   type Band,
+  type Character,
   type ResourceKind,
   type Tile,
 } from './mock-system'
+
+// --- fog of war (docs/plans/fog-of-war.md, board tier) ------------------------
+// Three visibility bands, plus "unknown". A body's render LEVEL is derived each
+// frame from (is it in the ship's live bubble now?) + (what we've stored about it).
+//   • ASTRONOMICAL (free): star + planets + gas giants + belts are known to exist
+//     from arrival — coarse (type + position), never composition. Shown dim.
+//   • LIVE: inside the ship's sensor bubble right now — full live truth.
+//   • REMEMBERED: a small/dark body we've had in the bubble before — geometry keeps
+//     orbiting (deterministic), but detail is last-known/stale.
+//   • HIDDEN: small/dark, never observed → not drawn (black space).
+// Composition (resources) + invisible hazards are earned by a SCAN, never by mere
+// presence — presence tells you a body is there; a scan tells you what it's worth.
+type FogLevel = 'live' | 'remembered' | 'coarse' | 'hidden'
+
+// The free "astronomical layer": luminous/large bodies you can see from arrival.
+const ASTRO_TYPES = new Set<BodyType>(['star', 'rocky', 'gas_giant', 'belt'])
+// Murk you can see (terrain); the rest are invisible until scanned/contacted.
+const VISIBLE_HAZARD = new Set<string>(['nebula'])
+
+// What the player has learned about one body. Mutated over time (a ref), so it
+// persists as the ship moves; `asOf` is the phase of the last live observation.
+interface Known {
+  discovered: boolean // ever inside the bubble → small/dark become permanent
+  scanned: boolean // deep-scanned → composition + hazards revealed
+  asOf: number // phase of last live sighting
+}
 
 // pointy-top axial → pixel
 const SIZE = 34
@@ -113,6 +141,27 @@ function hexLine(a: Axial, b: Axial): Axial[] {
   return out
 }
 
+// The star occupies the core hex (0,0). Burns route AROUND it — you don't fly
+// through a sun. If a straight line crosses the core, detour via the ring-1 hex
+// beside the star that adds the least distance.
+function pathHitsCore(path: Axial[]): boolean {
+  return path.some((h) => h.q === 0 && h.r === 0)
+}
+function routeAround(from: Axial, to: Axial): Axial[] {
+  const direct = hexLine(from, to)
+  if (!pathHitsCore(direct)) return direct
+  let best: Axial[] | null = null
+  for (const d of DIRS) {
+    const wp = { q: d.q, r: d.r } // a ring-1 hex beside the star
+    const a = hexLine(from, wp)
+    const b = hexLine(wp, to)
+    if (pathHitsCore(a) || pathHitsCore(b)) continue
+    const merged = [...a, ...b.slice(1)]
+    if (!best || merged.length < best.length) best = merged
+  }
+  return best ?? direct
+}
+
 const BAND: Record<Band, { label: string; tint: string }> = {
   core: { label: 'Star', tint: '#ffd27d' },
   inner: { label: 'Inner (hot · metals)', tint: '#ff9a5c' },
@@ -145,6 +194,13 @@ const HAZARD_LABEL: Record<string, string> = {
   nebula: 'Nebula (scan −)',
   gravity_well: 'Gravity well',
   debris: 'Debris',
+}
+
+const LEVEL_META: Record<FogLevel, { label: string; color: string }> = {
+  live: { label: 'LIVE', color: '#34d399' },
+  remembered: { label: 'MEMORY', color: '#fbbf24' },
+  coarse: { label: 'COARSE', color: '#8b98a9' },
+  hidden: { label: 'UNKNOWN', color: '#64748b' },
 }
 
 function rgba(hex: string, a: number): string {
@@ -222,7 +278,7 @@ type Sel = { kind: 'body'; id: string } | { kind: 'tile'; q: number; r: number }
 
 type ShipMode =
   | { kind: 'coast'; ring: number; ringHexes: Axial[]; i0: number; phase0: number }
-  | { kind: 'burn'; path: Axial[]; startPhase: number; arrivePhase: number; dockBodyId?: string; target: Sel; label: string }
+  | { kind: 'burn'; path: Axial[]; startPhase: number; arrivePhase: number; dockBodyId?: string; target: Sel; label: string; exit?: boolean }
   | { kind: 'docked'; bodyId: string }
 
 interface Plan {
@@ -280,8 +336,24 @@ function sameSel(a: Sel, b: Sel): boolean {
   return false
 }
 
+const CHARACTERS: Character[] = ['star_rich', 'normal', 'dead', 'barrier']
+
 export default function HexBoardSpikePage() {
-  const system = useMemo(() => generateMockSystem(), [])
+  // Identity of the system we drilled into — passed from the galaxy view
+  // (?seed & char & name). Same id → same interior (deterministic).
+  const params = useMemo(() => new URLSearchParams(typeof window !== 'undefined' ? window.location.search : ''), [])
+  const system = useMemo(() => {
+    const seedParam = params.get('seed')
+    const seed = seedParam ? hashSeed(seedParam) : 0x51a2c0de
+    const charParam = params.get('char') as Character | null
+    const character = charParam && CHARACTERS.includes(charParam) ? charParam : 'star_rich'
+    const s = generateMockSystem(seed, character)
+    const nameParam = params.get('name')
+    if (nameParam) s.name = nameParam
+    return s
+  }, [params])
+  // galaxy system id we drilled in from — used to re-focus the graph on exit.
+  const returnId = params.get('seed')
 
   // static pixel layout + fit viewBox
   const laid = useMemo(() => {
@@ -307,6 +379,9 @@ export default function HexBoardSpikePage() {
     for (const t of system.tiles) m.set(`${t.q},${t.r}`, t)
     return m
   }, [system])
+
+  // rim tiles that are charted lane exits (the graph↔board seam)
+  const laneExitKeys = useMemo(() => new Set(system.laneExits.map((e) => `${e.q},${e.r}`)), [system])
 
   // build orbiters from the generated bodies (star fixed, planets/belts orbit,
   // moons ride their planet)
@@ -375,6 +450,69 @@ export default function HexBoardSpikePage() {
   const shipModeRef = useRef(shipMode)
   shipModeRef.current = shipMode
 
+  // --- fog knowledge store ----------------------------------------------------
+  // Per-body memory (docs/plans/fog-of-war.md: sparse, per-feature). Mutated as the
+  // ship moves; bump `knownVersion` only when something NEW is learned, to repaint.
+  const knownRef = useRef<Map<string, Known>>(new Map())
+  const knownHazRef = useRef<Set<string>>(new Set()) // tile keys of revealed invisible hazards
+  const [knownVersion, setKnownVersion] = useState(0)
+  const lastKnownHexRef = useRef<string>('')
+
+  // Advance knowledge from the ship's current position: bodies inside the live
+  // bubble become discovered (asOf = now); invisible hazards there are revealed.
+  // Presence never mints composition — that needs a scan (deepScan below).
+  const updateKnowledge = useCallback(() => {
+    const ph = phaseRef.current
+    const ship = shipPosAt(shipModeRef.current, ph, orbById)
+    const shipQR = { q: ship.q, r: ship.r }
+    let changed = false
+    for (const orb of orbiters) {
+      const s = orbState(orb, ph, orbById)
+      if (hexDistance({ q: s.q, r: s.r }, shipQR) > system.scanRadius) continue
+      const k = knownRef.current.get(orb.id)
+      if (!k) {
+        knownRef.current.set(orb.id, { discovered: true, scanned: false, asOf: ph })
+        changed = true
+      } else {
+        if (!k.discovered) changed = true
+        k.discovered = true
+        k.asOf = ph
+      }
+    }
+    // invisible hazards near the ship — only walk tiles when the ship hex changed
+    const hexKey = `${shipQR.q},${shipQR.r}`
+    if (hexKey !== lastKnownHexRef.current) {
+      lastKnownHexRef.current = hexKey
+      for (const t of system.tiles) {
+        if (!t.hazard || VISIBLE_HAZARD.has(t.hazard)) continue
+        if (hexDistance({ q: t.q, r: t.r }, shipQR) > system.scanRadius) continue
+        const tk = `${t.q},${t.r}`
+        if (!knownHazRef.current.has(tk)) {
+          knownHazRef.current.add(tk)
+          changed = true
+        }
+      }
+    }
+    if (changed) setKnownVersion((v) => v + 1)
+    return changed
+  }, [orbiters, orbById, system])
+
+  // Deep-scan the selected body — the aimed action that mints composition (works at
+  // range; presence alone never reveals resources). Spike: resolves instantly.
+  const deepScan = useCallback((bodyId: string) => {
+    const k = knownRef.current.get(bodyId) ?? { discovered: true, scanned: false, asOf: phaseRef.current }
+    k.discovered = true
+    k.scanned = true
+    k.asOf = phaseRef.current
+    knownRef.current.set(bodyId, k)
+    setKnownVersion((v) => v + 1)
+  }, [])
+
+  // Discover whatever the arrival bubble already covers, before the first frame.
+  useEffect(() => {
+    updateKnowledge()
+  }, [updateKnowledge])
+
   // A committed burn resolves over sim-time. When the clock reaches its arrival
   // phase we transition: DOCK (ride the body) for an intercept, else COAST the
   // orbit of whatever hex we settled on. (movement-board §"a queued action".)
@@ -382,6 +520,11 @@ export default function HexBoardSpikePage() {
     const m = shipModeRef.current
     if (m.kind !== 'burn') return
     if (phaseRef.current < m.arrivePhase) return
+    if (m.exit) {
+      // reached a lane exit → hand off to graph-tier travel (back to the galaxy)
+      window.location.assign(returnId ? `/spike/galaxy-3d?focus=${encodeURIComponent(returnId)}` : '/spike/galaxy-3d')
+      return
+    }
     if (m.dockBodyId) {
       setShipMode({ kind: 'docked', bodyId: m.dockBodyId })
       return
@@ -395,7 +538,7 @@ export default function HexBoardSpikePage() {
     const ringHexes = hexRing(ring)
     const i0 = Math.max(0, ringHexes.findIndex((h) => h.q === dest.q && h.r === dest.r))
     setShipMode({ kind: 'coast', ring, ringHexes, i0, phase0: m.arrivePhase })
-  }, [])
+  }, [returnId])
 
   useEffect(() => {
     if (!playing) return
@@ -405,6 +548,7 @@ export default function HexBoardSpikePage() {
         phaseRef.current += dp
         setPhase(phaseRef.current)
         maybeArrive()
+        updateKnowledge()
       }
       lastRef.current = ts
       rafRef.current = requestAnimationFrame(tick)
@@ -414,12 +558,13 @@ export default function HexBoardSpikePage() {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
       lastRef.current = undefined
     }
-  }, [playing, speed, maybeArrive])
+  }, [playing, speed, maybeArrive, updateKnowledge])
 
   const stepForward = () => {
     phaseRef.current += 1
     setPhase(phaseRef.current)
     maybeArrive()
+    updateKnowledge()
   }
 
   // ship position this frame + nose direction (from velocity, works in every mode)
@@ -439,11 +584,17 @@ export default function HexBoardSpikePage() {
     () =>
       orbiters.map((orb) => {
         const s = orbState(orb, phase, orbById)
-        const dim = hexDistance({ q: s.q, r: s.r }, shipHex) > system.scanRadius
-        return { orb, ...s, dim }
+        const inBubble = hexDistance({ q: s.q, r: s.r }, shipHex) <= system.scanRadius
+        const k = knownRef.current.get(orb.id)
+        let level: FogLevel
+        if (inBubble) level = 'live'
+        else if (k?.discovered) level = 'remembered'
+        else if (ASTRO_TYPES.has(orb.body.type)) level = 'coarse'
+        else level = 'hidden'
+        return { orb, ...s, inBubble, level, scanned: !!k?.scanned, asOf: k?.asOf }
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orbiters, orbById, phase, system, shipHex.q, shipHex.r],
+    [orbiters, orbById, phase, system, shipHex.q, shipHex.r, knownVersion],
   )
   const posByKey = useMemo(() => {
     const m = new Map<string, (typeof positioned)[number]>()
@@ -459,7 +610,14 @@ export default function HexBoardSpikePage() {
   const selEntry = sel?.kind === 'body' ? positioned.find((p) => p.orb.id === sel.id) : undefined
   const selQR = selEntry ? { q: selEntry.q, r: selEntry.r } : sel?.kind === 'tile' ? { q: sel.q, r: sel.r } : undefined
   const selTile = selQR ? tileByKey.get(`${selQR.q},${selQR.r}`) : undefined
-  const selBodyHere = sel?.kind === 'body' ? selBodyOrb?.body : selQR ? posByKey.get(`${selQR.q},${selQR.r}`)?.orb.body : undefined
+  const selPosHere = selQR ? posByKey.get(`${selQR.q},${selQR.r}`) : undefined
+  // A hidden (undiscovered small/dark) body under a clicked tile reads as empty space.
+  const selBodyHere =
+    sel?.kind === 'body' ? selBodyOrb?.body : selPosHere && selPosHere.level !== 'hidden' ? selPosHere.orb.body : undefined
+  const selBodyId = sel?.kind === 'body' ? sel.id : selPosHere && selPosHere.level !== 'hidden' ? selPosHere.orb.id : undefined
+  const selLevel: FogLevel | undefined = sel?.kind === 'body' ? selEntry?.level : selPosHere?.level
+  const selKnown = selBodyId ? knownRef.current.get(selBodyId) : undefined
+  const selHazardKnown = selTile?.hazard ? VISIBLE_HAZARD.has(selTile.hazard) || knownHazRef.current.has(`${selTile.q},${selTile.r}`) : false
   const clickTile = (t: Tile) => {
     if (moved.current >= 6) return
     // click the already-selected tile again → deselect (toggle)
@@ -478,24 +636,27 @@ export default function HexBoardSpikePage() {
     if (s.kind === 'body') {
       const orb = orbById.get(s.id)
       if (!orb) return null
+      if (orb.body.type === 'star') return null // you do not dock the star
       const r = solveIntercept(from, orb, ph, orbById, system.radius)
+      const path = routeAround(from, r.meetHex)
       return {
         kind: 'intercept',
-        path: hexLine(from, r.meetHex),
+        path,
         meetHex: r.meetHex,
         startPhase: ph,
         arrivePhase: r.arrivePhase,
-        dist: r.dist,
+        dist: path.length - 1,
         reachable: r.reachable,
         dockBodyId: s.id,
         label: orb.body.name,
       }
     }
     const target = { q: s.q, r: s.r }
-    const dist = hexDistance(from, target)
+    const path = routeAround(from, target)
+    const dist = path.length - 1
     return {
       kind: 'burn',
-      path: hexLine(from, target),
+      path,
       meetHex: target,
       startPhase: ph,
       arrivePhase: ph + dist / BURN_SPEED,
@@ -525,6 +686,30 @@ export default function HexBoardSpikePage() {
     const i0 = Math.max(0, ringHexes.findIndex((h) => h.q === shipHex.q && h.r === shipHex.r))
     setShipMode({ kind: 'coast', ring, ringHexes, i0, phase0: phaseRef.current })
   }
+
+  // Depart via a charted rim lane → hand off to the galaxy graph. If already on the
+  // lane hex, leave now; otherwise burn to it and exit on arrival (exit flag).
+  const departViaLane = (e: Axial) => {
+    if (shipHex.q === e.q && shipHex.r === e.r) {
+      window.location.assign(returnId ? `/spike/galaxy-3d?focus=${encodeURIComponent(returnId)}` : '/spike/galaxy-3d')
+      return
+    }
+    const path = routeAround(shipHex, e)
+    const dist = path.length - 1
+    setShipMode({
+      kind: 'burn',
+      path,
+      startPhase: phaseRef.current,
+      arrivePhase: phaseRef.current + dist / BURN_SPEED,
+      target: { kind: 'tile', q: e.q, r: e.r },
+      label: 'outbound lane',
+      exit: true,
+    })
+    setSel(null)
+  }
+
+  // is the selected tile a charted lane exit?
+  const selIsLane = selTile ? laneExitKeys.has(`${selTile.q},${selTile.r}`) : false
 
   // ship-mode derived facts for status + inspector
   const burning = shipMode.kind === 'burn'
@@ -587,44 +772,40 @@ export default function HexBoardSpikePage() {
     })
 
   // static terrain layer — memoized so it doesn't re-render every frame.
+  // Base terrain is kept DARK (unseen space) — the astronomical layer (bodies) +
+  // the live scan bubble overlay are what light the board up. Fog by subtraction.
   const terrain = useMemo(
     () => (
       <>
         {laid.withPx.map(({ t, x, y }) => {
           const tint = BAND[t.band].tint
-          const fillA = t.band === 'mid' ? 0.09 : 0.06
+          const fillA = t.band === 'mid' ? 0.05 : 0.03
           return (
             <polygon
               key={`t-${t.q},${t.r}`}
               points={hexPoints(x, y, SIZE - 1)}
               fill={rgba(tint, fillA)}
-              stroke={rgba(tint, 0.2)}
+              stroke={rgba(tint, 0.09)}
               strokeWidth={1}
               className="cursor-pointer transition-colors hover:fill-white/10"
               onClick={() => clickTile(t)}
             />
           )
         })}
-        {laid.withPx.map(({ t, x, y }) =>
-          t.hazard ? (
-            <circle
-              key={`h-${t.q},${t.r}`}
-              cx={x + SIZE * 0.55}
-              cy={y - SIZE * 0.75}
-              r={3}
-              fill={t.hazard === 'nebula' ? '#f472b6' : t.hazard === 'radiation' ? '#fbbf24' : '#94a3b8'}
-              opacity={0.75}
-              pointerEvents="none"
-            />
-          ) : null,
-        )}
       </>
     ),
     [laid],
   )
 
+  // hazard tiles (rendered separately so fog can gate the invisible ones)
+  const hazardTiles = useMemo(() => laid.withPx.filter(({ t }) => t.hazard), [laid])
+
   // live scan bubble — hexes within scan range of the ship's current hex
   const scanHexes = laid.withPx.filter(({ t }) => hexDistance({ q: t.q, r: t.r }, shipHex) <= system.scanRadius)
+
+  // only draw orbit tracks for rings that hold a KNOWN body (astronomical or
+  // discovered) — an undiscovered outer body must not leak its ring.
+  const knownRings = new Set(positioned.filter((p) => p.level !== 'hidden').map((p) => p.orb.ring))
 
   // faint dashed track for the ship's current coast orbit (only while coasting)
   const coastTrackPts = shipMode.kind === 'coast' && shipMode.ring >= 1 ? toPts(hexRing(shipMode.ring)) : null
@@ -633,6 +814,14 @@ export default function HexBoardSpikePage() {
   const showPreview = !!plan && plan.reachable && plan.dist > 0 && !isBurningToSel && !isDockedToSel
   const meetPx = plan ? hexToPixel(plan.meetHex.q, plan.meetHex.r) : { x: 0, y: 0 }
   const planEtaMin = plan ? Math.max(0, Math.round((plan.arrivePhase - phase) * MIN_PER_PHASE)) : 0
+
+  // --- known-facts panel data (the fog verification list) ---------------------
+  const fmtAgo = (asOf: number | undefined) =>
+    asOf === undefined ? '—' : `${Math.max(0, Math.round((phase - asOf) * MIN_PER_PHASE))}m ago`
+  const factObjects = positioned.filter((p) => p.orb.body.type !== 'belt').sort((a, b) => a.orb.ring - b.orb.ring)
+  const knownObjects = factObjects.filter((p) => p.level !== 'hidden')
+  const hiddenCount = factObjects.length - knownObjects.length
+  const beltKnown = positioned.some((p) => p.orb.body.type === 'belt' && p.level !== 'hidden')
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#05070d] text-white">
@@ -665,17 +854,37 @@ export default function HexBoardSpikePage() {
           <polygon key={`scan-${t.q},${t.r}`} points={hexPoints(x, y, SIZE - 1)} fill="rgba(125,211,252,0.06)" stroke="rgba(125,211,252,0.3)" strokeWidth={1} pointerEvents="none" />
         ))}
 
-        {/* orbit tracks (predicted paths) */}
-        {trackPts.map(({ R, pts }) => (
-          <polygon
-            key={`track-${R}`}
-            points={pts}
-            fill="none"
-            stroke={selBodyOrb?.ring === R ? 'rgba(125,211,252,0.55)' : 'rgba(150,180,220,0.10)'}
-            strokeWidth={selBodyOrb?.ring === R ? 1.6 : 1}
-            pointerEvents="none"
-          />
-        ))}
+        {/* orbit tracks (predicted paths) — only for rings with a known body */}
+        {trackPts
+          .filter(({ R }) => knownRings.has(R))
+          .map(({ R, pts }) => (
+            <polygon
+              key={`track-${R}`}
+              points={pts}
+              fill="none"
+              stroke={selBodyOrb?.ring === R ? 'rgba(125,211,252,0.55)' : 'rgba(150,180,220,0.10)'}
+              strokeWidth={selBodyOrb?.ring === R ? 1.6 : 1}
+              pointerEvents="none"
+            />
+          ))}
+
+        {/* hazards — nebula (murk) always shows; invisible hazards only once revealed
+            (scanned / contacted). knownVersion in scope keeps this repainting. */}
+        {hazardTiles.map(({ t, x, y }) => {
+          const revealed = VISIBLE_HAZARD.has(t.hazard!) || knownHazRef.current.has(`${t.q},${t.r}`)
+          if (!revealed) return null
+          return (
+            <circle
+              key={`h-${t.q},${t.r}`}
+              cx={x + SIZE * 0.55}
+              cy={y - SIZE * 0.75}
+              r={3}
+              fill={t.hazard === 'nebula' ? '#f472b6' : t.hazard === 'radiation' ? '#fbbf24' : '#94a3b8'}
+              opacity={0.75}
+              pointerEvents="none"
+            />
+          )
+        })}
         {/* the ship's own coast orbit */}
         {coastTrackPts && <polygon points={coastTrackPts} fill="none" stroke="rgba(125,211,252,0.16)" strokeWidth={1} strokeDasharray="4 5" pointerEvents="none" />}
 
@@ -708,10 +917,35 @@ export default function HexBoardSpikePage() {
           <polygon points={hexPoints(hexToPixel(sel.q, sel.r).x, hexToPixel(sel.q, sel.r).y, SIZE - 1)} fill="none" stroke="#ffffff" strokeWidth={2} pointerEvents="none" />
         ) : null}
 
-        {/* moving bodies */}
-        {positioned.map(({ orb, x, y, dim }) => (
-          <BodyGlyph key={`b-${orb.id}`} type={orb.body.type} x={x} y={y} dim={dim} onClick={() => clickBody(orb.id)} />
-        ))}
+        {/* moving bodies — HIDDEN (undiscovered small/dark) aren't drawn at all */}
+        {positioned.map(({ orb, x, y, level }) =>
+          level === 'hidden' ? null : (
+            <BodyGlyph key={`b-${orb.id}`} type={orb.body.type} x={x} y={y} level={level} onClick={() => clickBody(orb.id)} />
+          ),
+        )}
+
+        {/* charted lane exits on the rim — always known (subspace geometry of the
+            system you're in). Click to select → depart hands off to graph travel. */}
+        {system.laneExits.map((e) => {
+          const p = hexToPixel(e.q, e.r)
+          const ang = (Math.atan2(p.y, p.x) * 180) / Math.PI
+          const atShip = shipHex.q === e.q && shipHex.r === e.r
+          const isEntry = e.q === system.entry.q && e.r === system.entry.r
+          const col = atShip ? '#34d399' : '#7dd3fc'
+          const t = tileByKey.get(`${e.q},${e.r}`)
+          return (
+            <g key={`lane-${e.q},${e.r}`} onClick={() => t && clickTile(t)} className="cursor-pointer">
+              <g transform={`translate(${p.x},${p.y}) rotate(${ang})`}>
+                <path d="M 3,-8 L 15,0 L 3,8" fill="none" stroke={col} strokeWidth={2} opacity={0.9} strokeLinejoin="round" />
+                <path d="M 10,-5 L 18,0 L 10,5" fill="none" stroke={col} strokeWidth={1.4} opacity={0.55} strokeLinejoin="round" />
+              </g>
+              <circle cx={p.x} cy={p.y} r={SIZE * 0.5} fill="transparent" />
+              <text x={p.x} y={p.y - SIZE * 0.95} fill={col} fontSize={9} textAnchor="middle" opacity={0.8} className="font-mono">
+                {isEntry ? 'lane · arrived' : 'lane'}
+              </text>
+            </g>
+          )
+        })}
 
         {/* the player's ship — coast (cyan) / burn (amber, thruster lit) / docked (green) */}
         <g transform={`translate(${shipState.x}, ${shipState.y})`} pointerEvents="none">
@@ -725,31 +959,60 @@ export default function HexBoardSpikePage() {
       </svg>
 
       {/* --- title --- */}
-      <div className="pointer-events-none absolute left-6 top-5">
-        <div className="font-mono text-[11px] tracking-[0.35em] text-white/40">HEXAVERSE</div>
-        <div className="font-mono text-lg tracking-[0.25em] text-white/85">
+      <div className="absolute left-6 top-5">
+        <a href="/spike/galaxy-3d" className="font-mono text-[11px] tracking-[0.35em] text-white/40 hover:text-white/80">
+          ← GALAXY
+        </a>
+        <div className="pointer-events-none font-mono text-lg tracking-[0.25em] text-white/85">
           SYSTEM // {system.name.toUpperCase()} · {system.starClass}-CLASS
         </div>
       </div>
 
-      {/* --- left: system intel --- */}
-      <aside className="absolute left-6 top-24 w-64 rounded-xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md">
-        <h2 className="mb-3 font-mono text-[10px] tracking-[0.3em] text-white/45">SYSTEM INTEL</h2>
-        <div className="grid grid-cols-2 gap-2">
-          <StatTile label="Bodies" value={orbiters.filter((o) => o.body.type !== 'belt').length} />
-          <StatTile label="Orbits" value={trackRings.length} />
+      {/* --- left: KNOWN FACTS — what we've learned, updating as we move/scan --- */}
+      <aside className="absolute left-6 top-24 flex max-h-[calc(100vh-8rem)] w-72 flex-col rounded-xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md">
+        <h2 className="mb-3 font-mono text-[10px] tracking-[0.3em] text-white/45">KNOWN FACTS</h2>
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <StatTile label="Known" value={`${knownObjects.length}/${factObjects.length}`} />
           <StatTile label="Char" value={system.character.replace('_', ' ')} />
-          <StatTile label="Orbit-t" value={phase.toFixed(0)} />
         </div>
-        <h3 className="mb-2 mt-4 font-mono text-[10px] tracking-[0.3em] text-white/45">ORBITAL BANDS</h3>
-        <ul className="space-y-1.5">
-          {(['inner', 'mid', 'outer'] as Band[]).map((b) => (
-            <li key={b} className="flex items-center gap-2 text-xs">
-              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: BAND[b].tint, boxShadow: `0 0 8px ${BAND[b].tint}` }} />
-              <span className="text-white/70">{BAND[b].label}</span>
-            </li>
-          ))}
+        <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+          {knownObjects.map((p) => {
+            const meta = LEVEL_META[p.level]
+            return (
+              <li key={p.orb.id} className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: BODY[p.orb.body.type].color, opacity: p.level === 'live' ? 1 : 0.5 }}
+                  />
+                  <span className="flex-1 truncate text-xs text-white/85">{p.orb.body.name}</span>
+                  <span className="font-mono text-[9px] tracking-wider" style={{ color: meta.color }}>
+                    {p.scanned ? 'SCANNED' : meta.label}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex items-center justify-between pl-[18px] font-mono text-[9px] text-white/40">
+                  <span>{BODY[p.orb.body.type].label}</span>
+                  <span>{p.level === 'live' ? 'live' : `seen ${fmtAgo(p.asOf)}`}</span>
+                </div>
+                {p.scanned ? (
+                  <div className="mt-1 flex flex-wrap gap-1 pl-[18px]">
+                    {p.orb.body.resources.map((r) => (
+                      <span key={r.kind} className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[9px] text-white/60">
+                        {RES_LABEL[r.kind]} {Math.round(r.richness * 100)}%
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-0.5 pl-[18px] font-mono text-[9px] text-white/25">composition unknown — scan</div>
+                )}
+              </li>
+            )
+          })}
         </ul>
+        <div className="mt-2 border-t border-white/10 pt-2 font-mono text-[10px] text-white/35">
+          {hiddenCount > 0 ? `${hiddenCount} object${hiddenCount === 1 ? '' : 's'} not yet detected` : 'all objects detected'}
+          {beltKnown ? ' · belt detected' : ''}
+        </div>
       </aside>
 
       {/* --- right: tile / body inspector + movement orders --- */}
@@ -766,6 +1029,14 @@ export default function HexBoardSpikePage() {
                   <span className="text-lg text-white/90">{selBodyHere.name}</span>
                 </div>
                 <div className="mt-1 text-[11px] text-white/50">{BODY[selBodyHere.type].label}</div>
+                {selLevel && selLevel !== 'hidden' && (
+                  <div className="mt-1.5 flex items-center gap-2 font-mono text-[10px]">
+                    <span style={{ color: LEVEL_META[selLevel].color }}>{selKnown?.scanned ? 'SCANNED' : LEVEL_META[selLevel].label}</span>
+                    <span className="text-white/35">
+                      {selLevel === 'live' ? 'live truth' : selKnown ? `last seen ${fmtAgo(selKnown.asOf)}` : 'astronomical — not surveyed'}
+                    </span>
+                  </div>
+                )}
               </>
             ) : (
               <div className="text-lg text-white/60">Empty space</div>
@@ -786,7 +1057,7 @@ export default function HexBoardSpikePage() {
                   {selTile.q}, {selTile.r}
                 </dd>
               </div>
-              {selTile.hazard && (
+              {selTile.hazard && selHazardKnown && (
                 <div className="flex justify-between">
                   <dt>hazard</dt>
                   <dd className="text-amber-300/80">{HAZARD_LABEL[selTile.hazard]}</dd>
@@ -794,29 +1065,60 @@ export default function HexBoardSpikePage() {
               )}
             </dl>
 
-            {selBodyHere && selBodyHere.resources.length > 0 && (
-              <>
-                <h3 className="mb-2 mt-4 font-mono text-[10px] tracking-[0.3em] text-white/45">RESOURCES</h3>
-                <ul className="space-y-2">
-                  {selBodyHere.resources.map((res) => (
-                    <li key={res.kind}>
-                      <div className="mb-1 flex items-center justify-between text-xs">
-                        <span className="text-white/70">{RES_LABEL[res.kind]}</span>
-                        <span className="font-mono tabular-nums text-white/45">{Math.round(res.richness * 100)}%</span>
-                      </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-                        <div className="h-full rounded-full" style={{ width: `${Math.round(res.richness * 100)}%`, background: BODY[selBodyHere.type].color }} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </>
+            {/* --- outbound lane (graph↔board handoff) --- */}
+            {selIsLane && selTile && (
+              <div className="mt-4 rounded-lg border border-cyan-300/25 bg-cyan-300/[0.06] p-3">
+                <div className="font-mono text-[10px] tracking-[0.2em] text-cyan-200/70">OUTBOUND LANE</div>
+                <p className="mt-1 text-[11px] text-white/55">Charted lane out of {system.name}. Depart to hand back to graph-tier travel.</p>
+                <button
+                  onClick={() => departViaLane({ q: selTile.q, r: selTile.r })}
+                  className="mt-2 w-full rounded-lg border border-cyan-300/40 bg-cyan-300/15 px-3 py-1.5 font-mono text-xs text-cyan-100 hover:bg-cyan-300/25"
+                >
+                  {shipHex.q === selTile.q && shipHex.r === selTile.r ? '⏏ Depart via lane → galaxy' : '▲ Burn to lane & depart'}
+                </button>
+              </div>
             )}
+
+            {/* RESOURCES are earned by a SCAN — presence alone never mints them. */}
+            {selBodyHere &&
+              (selKnown?.scanned ? (
+                selBodyHere.resources.length > 0 && (
+                  <>
+                    <h3 className="mb-2 mt-4 font-mono text-[10px] tracking-[0.3em] text-white/45">RESOURCES</h3>
+                    <ul className="space-y-2">
+                      {selBodyHere.resources.map((res) => (
+                        <li key={res.kind}>
+                          <div className="mb-1 flex items-center justify-between text-xs">
+                            <span className="text-white/70">{RES_LABEL[res.kind]}</span>
+                            <span className="font-mono tabular-nums text-white/45">{Math.round(res.richness * 100)}%</span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                            <div className="h-full rounded-full" style={{ width: `${Math.round(res.richness * 100)}%`, background: BODY[selBodyHere.type].color }} />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )
+              ) : (
+                <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                  <div className="font-mono text-[10px] tracking-[0.2em] text-white/40">COMPOSITION UNKNOWN</div>
+                  <p className="mt-1 text-[11px] text-white/50">Presence shows the body; a deep-scan reveals what it&apos;s worth.</p>
+                  <button
+                    onClick={() => selBodyId && deepScan(selBodyId)}
+                    className="mt-2 w-full rounded-lg border border-sky-300/40 bg-sky-300/10 px-3 py-1.5 font-mono text-xs text-sky-100 hover:bg-sky-300/20"
+                  >
+                    ⊙ Deep-scan {selBodyHere.name}
+                  </button>
+                </div>
+              ))}
 
             {/* --- movement orders --- */}
             <div className="mt-4 border-t border-white/10 pt-3">
               <h3 className="mb-2 font-mono text-[10px] tracking-[0.3em] text-white/45">MOVEMENT</h3>
-              {isDockedToSel ? (
+              {selBodyHere?.type === 'star' ? (
+                <p className="text-xs text-amber-300/70">☀ The star will vaporize anything that approaches — no docking here.</p>
+              ) : isDockedToSel ? (
                 <>
                   <p className="mb-2 text-xs text-emerald-300/80">Docked — riding {dockedName}. Station-keeping free.</p>
                   <OrderBtn tone="neutral" onClick={coastFromHere}>
@@ -904,7 +1206,7 @@ export default function HexBoardSpikePage() {
 
       {/* --- hint --- */}
       <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 font-mono text-[11px] tracking-wider text-white/35">
-        click a body → intercept &amp; dock · click a hex → burn there · coast is the resting state · scan follows the ship · scroll zoom · drag pan
+        planets show for free · fly into the dark to reveal the small/dark · deep-scan a body to learn its worth · rim ⟶ lanes to depart · scroll zoom · drag pan
       </div>
 
       {/* --- zoom controls --- */}
@@ -923,9 +1225,9 @@ export default function HexBoardSpikePage() {
   )
 }
 
-function BodyGlyph({ type, x, y, dim, onClick }: { type: BodyType; x: number; y: number; dim: boolean; onClick: () => void }) {
+function BodyGlyph({ type, x, y, level, onClick }: { type: BodyType; x: number; y: number; level: FogLevel; onClick: () => void }) {
   const { color, glyph } = BODY[type]
-  const o = dim ? 0.45 : 1
+  const o = level === 'live' ? 1 : level === 'remembered' ? 0.62 : 0.42 // coarse dimmest
   let visual: React.ReactNode
   if (glyph === 'star') {
     visual = (
@@ -970,6 +1272,10 @@ function BodyGlyph({ type, x, y, dim, onClick }: { type: BodyType; x: number; y:
   return (
     <g onClick={onClick} className="cursor-pointer">
       {visual}
+      {/* not-live (coarse / remembered) → a faint dashed ring reads as "last known" */}
+      {level !== 'live' && (
+        <circle cx={x} cy={y} r={SIZE * 0.34} fill="none" stroke={rgba(color, 0.5)} strokeWidth={0.75} strokeDasharray="2 3" />
+      )}
       {/* transparent hit target so small glyphs are easy to click */}
       <circle cx={x} cy={y} r={SIZE * 0.5} fill="transparent" />
     </g>

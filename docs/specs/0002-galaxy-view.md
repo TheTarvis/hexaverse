@@ -36,7 +36,9 @@ force-graph. WebGraph is a **pure visual reference**, not a codebase we build on
 - **Camera controls** — orbit/rotate, pan, zoom (reading depth/distance from any
   angle is a first-class requirement, not a nice-to-have).
 - **Select a system** → a right-hand **inspector** shows its details (name,
-  region, connections).
+  region, connections, and its **major-body inventory** — the free "skeleton" of
+  #0001 Decision #9 / `../plans/fog-of-war.md` "option (a)"; always visible, not
+  fogged).
 - A left **intel panel** — galaxy / player summary + stat tiles (repurposing
   WebGraph's "Site Intel" / "Live Stats" pattern).
 - Apply **fog of war** to the view: undiscovered systems render dim/hidden from
@@ -131,7 +133,10 @@ graph.
     "bounds": { "x": [-520, 520], "y": [-520, 520], "z": [-90, 90] },
     "systems": [
       { "id": "sys-0", "coords": { "x": 12.3, "y": -8.1, "z": 4.0 },
-        "name": "Axion", "region": "star_rich", "discovered": true }
+        "name": "Axion", "region": "star_rich", "discovered": true,
+        // major-body skeleton (#0001 Decision #9) — always visible, drawn in the inspector
+        "skeleton": { "starClass": "G",
+          "bodies": [ { "type": "rocky", "ring": 3 }, { "type": "gas_giant", "ring": 9 } ] } }
     ],
     "lanes": [ { "id": "lane-0", "aId": "sys-0", "bId": "sys-12" } ]
   }
@@ -174,6 +179,8 @@ graph.
       not only in the inspector — and the **inspector** shows its details
       (name, region, connections).
 - [ ] The left **intel panel** shows galaxy / player summary stats.
+- [ ] The inspector shows a selected system's **major-body inventory** (skeleton) —
+      always visible, not gated by `discovered` (Decision #7).
 - [ ] Undiscovered systems render **dim/hidden** from the `discovered` flag
       (rules stubbed).
 - [ ] **Logged-out** visitors see the frozen start-area galaxy in the same view;
@@ -233,6 +240,13 @@ Resolves Open question #1's gating task (inspected `github.com/kitakitaaura/webg
 6. **Read-API contract pinned here** (resolves Open question #4, *dev*) — in this
    view's service layer, not a shared #0001 addendum. Concrete response shape and
    start-area asset format specified under Design details → "Read-API contract."
+7. **The inspector draws the major-body inventory (2026-07-09).** Per #0001's
+   Decision #9 / `../plans/fog-of-war.md` "option (a)," each system's payload carries
+   a **skeleton** (star class + major-body list + rings) that is the **free
+   astronomical layer** — *"star + 4 planets + a gas giant"* — shown in the inspector
+   and available as an optional node size/detail hint. It is **not** gated by
+   `discovered`; only the *detail* (resource/hazard *worth*, the later drill-in) is
+   earned. Survey/worth stays hidden until the fog spec.
 
 ## Open questions
 

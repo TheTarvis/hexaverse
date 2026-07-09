@@ -56,9 +56,21 @@ export interface SystemInterior {
   character: Character
   starClass: string
   radius: number
-  entry: Axial // where you arrive from the inbound lane (rim)
+  entry: Axial // where you arrive from the inbound lane (rim) = laneExits[0]
+  laneExits: Axial[] // rim tiles where charted lanes leave the system (graph↔board seam)
   scanRadius: number // demo: ambient/scan vision bubble around entry
   tiles: Tile[]
+}
+
+// Hash an arbitrary id string → a stable 32-bit seed, so a galaxy system's id
+// deterministically picks its interior (same system → same board). FNV-1a.
+export function hashSeed(str: string): number {
+  let h = 2166136261 >>> 0
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
 }
 
 // --- seeded PRNG (mulberry32) -------------------------------------------------
@@ -218,16 +230,27 @@ export function generateMockSystem(seed = 0x51a2c0de, character: Character = 'st
     if (t.body?.type === 'belt' && !t.hazard && rng() < 0.3) t.hazard = 'debris'
   }
 
-  // Entry: a rim tile you arrive at from the inbound lane.
-  const rim = tiles.filter((t) => t.ring === radius)
-  const entry = rim[Math.floor(rng() * rim.length)]
+  // Lane exits: rim tiles where charted lanes leave the system (the graph↔board
+  // seam). You arrive via one (entry = laneExits[0]) and can depart via any.
+  // Spread ~evenly around the rim so they read as distinct outbound directions.
+  const rim = tiles
+    .filter((t) => t.ring === radius)
+    .sort((a, b) => Math.atan2(a.r, a.q + a.r / 2) - Math.atan2(b.r, b.q + b.r / 2))
+  const nLanes = 2 + Math.floor(rng() * 3) // 2..4 lanes
+  const offset = Math.floor(rng() * rim.length)
+  const laneExits: Axial[] = []
+  for (let i = 0; i < nLanes; i++) {
+    const t = rim[(offset + Math.floor((i * rim.length) / nLanes)) % rim.length]
+    laneExits.push({ q: t.q, r: t.r })
+  }
 
   return {
     name: sysName,
     character,
     starClass,
     radius,
-    entry: { q: entry.q, r: entry.r },
+    entry: laneExits[0],
+    laneExits,
     scanRadius: 3,
     tiles,
   }

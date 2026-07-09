@@ -49,8 +49,10 @@ what's inside them.
 
 ## Non-goals
 
-- **System interiors / hex boards** — what's *inside* a node is a separate spec;
-  this one stops at the node + region + connections.
+- **System interiors / hex boards** — the *mutable detail inside* a node (resources,
+  small bodies, hazards) is #0003, materialized on first arrival. **Refined 2026-07-09
+  (Decision #9):** the node's **major-body skeleton** (the graph-visible inventory)
+  *is* generated here — only the detail is deferred.
 - **Fog of war** — per-player visibility is its own spec; generation just
   produces the world that later gets fogged.
 - **Player spawn placement** — the `minDistance`/`maxDistance` padding rules are
@@ -115,8 +117,10 @@ consume.
   a user request.
 - **Data model (sketch):**
   - `System` (node): `id`, `coords {x,y,z}`, `name`, `region`
-    (`star_rich|normal|dead|barrier`), neighbor/`laneIds`. *(Interior contents
-    deferred.)*
+    (`star_rich|normal|dead|barrier`), neighbor/`laneIds`, and a **major-body
+    skeleton** (star + planets/gas giants + orbital geometry — the graph-visible
+    inventory; Decision #9). *(Mutable interior detail — resources, small bodies,
+    hazards — still deferred to #0003, materialized on first arrival.)*
   - `Lane` (edge): `id`, `aId`, `bId` — **topology only**. Travel **cost is not
     stored**: `../plans/movement-galaxy.md` resolved it as a *derived* value
     (length-weighted time from the endpoint coords), so generation needs only the
@@ -148,6 +152,9 @@ consume.
       (+ coordinates / layout hint).
 - [ ] Generation is **re-runnable and extendable** without corrupting an
       existing galaxy (append, or regenerate to a new id).
+- [ ] Each system carries a deterministic **major-body skeleton** (star +
+      planets/gas giants + orbital geometry) generated here and exposed for the graph
+      view — the free inventory, not the mutable detail (Decision #9).
 - [ ] Backend tests (against the Firebase emulator) cover **determinism**,
       **connectivity**, and **region distribution**.
 
@@ -177,6 +184,19 @@ consume.
 8. **Lanes → relative-neighbourhood graph (RNG),** not k-nearest. Connected by
    construction (contains the MST), road-like, few crossings; k-NN hairballs in
    dense regions. Long void-spanning edges are the natural choke crossings.
+
+**Refined 2026-07-09 (fog + system-interior handoff — `../plans/fog-of-war.md`, #0003):**
+
+9. **The node now carries a *skeleton* — refines Decision #5.** Generation no longer
+   stops at a bare node: each `System` also gets its **major-body inventory** (star +
+   planets + gas giants + orbital geometry — the immutable "skeleton" of #0003),
+   rolled **here, eagerly**, because it is **visible on the galaxy graph itself**
+   ("option (a)"): the graph shows *"star + 4 planets + a gas giant"* for free, from
+   t=0, the way stars are free. Only the **mutable detail** (resources, small/dark
+   bodies, hazards) still stops at the node — materialized by **#0003 on first
+   arrival**, not here. The character dial drives that detail's *worth* (rich vs.
+   barren) **more than the body count**, so the free inventory doesn't leak the paid
+   survey appraisal. **#0002 draws the inventory.**
 
 ## Open questions
 

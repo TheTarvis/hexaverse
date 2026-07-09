@@ -54,11 +54,12 @@ The old design (`Gameplay.mdc`) had one hex map, so one fog. The 2.0 two-tier ma
 
 | | **Galactic graph** (strategic) | **Hex board** (tactical) |
 |---|---|---|
-| Unit of visibility | a **system node** | a **tile** |
-| What's hidden | which systems exist / their character | terrain, resources, hazards, enemy units |
-| Reveal by | travel (charts onward lanes), survey-scan, bought intel — star map always visible | ambient unit vision + scan actions |
-| Re-fog feel | node stays; live activity stops updating | live layer stops updating; terrain stays drawn |
-| Slice stub today | `discovered: boolean` (#0001/#0002) | nothing yet (hex board unspec'd) |
+| Unit of visibility | a **system node** | a **tile** (but *memory* is per-**feature** — below) |
+| What's hidden | a system's **worth** (rich vs. picked-clean) + subspace roads + activity | detail (resources/hazards), activity (ships/mining), the small/dark |
+| Always free | the **star map** + each system's **major-body inventory** (skeleton) | the **astronomical layer** (star + major bodies + geometry) |
+| Reveal by | travel (charts onward lanes), survey-scan, bought intel | ambient unit vision + scan actions |
+| Re-fog feel | node stays; live activity stops updating | geometry stays (keeps orbiting!); activity stops updating |
+| Slice stub today | `discovered`→subspace enum (#0001/#0002) | three bands (below); memory per-feature |
 
 Both tiers use the same three states below; they differ only in granularity and
 in *what reveals what*.
@@ -203,18 +204,35 @@ knowing only the lanes leaving places you've already been. The tiers therefore
 describe your *subspace* knowledge of a star you can already see:
 
 0. **Star-visible** — baseline, every system, free, from the telescope: it exists,
-   where, coarse region. No charted lane to it, no current truth. This is the
-   *aspirational* layer — you see the cluster you covet long before any road to it
-   exists. *(This is what makes the graph beckon — the whole sky, glittering and
-   unreached — the role the old "auto-Rumored neighbor" stubs used to play.)*
+   where, coarse region, **and its major-body inventory** (star + planets + gas
+   giants — the skeleton; `hex-board.md`, DECIDED 2026-07-09 "option (a)"). No
+   charted lane to it, no current truth, and **no read on its *worth*** — rich vs.
+   picked-clean is the paid appraisal (Surveyed, below). This is the *aspirational*
+   layer — you see the cluster you covet, and now roughly *how big* each system is,
+   long before any road to it exists. *(This is what makes the graph beckon — the
+   whole sky, glittering and unreached — the role the old "auto-Rumored neighbor"
+   stubs used to play.)*
 1. **Rumored** — you've learned (by presence at an endpoint) that a **lane reaches
    here**; it's reachable-next. Region already known from the star map; interior and
    current state unknown.
 2. **Surveyed** — a **quick-sweep** scan, bought survey intel, or travel-adjacent:
-   current subspace character beyond the ancient light (rough contents / activity /
-   hazards) — not the full interior.
+   the **appraisal** the free inventory withholds — *worth* (rich vs. picked-clean),
+   hazards, current activity — the character beyond the ancient light. Now that the
+   inventory is free (tier 0), **this is what Survey sells: not "how big" but "how
+   good."** Not the full interior.
 3. **Explored** — **travel there** / station a unit / **deep-scan** in-system. Full
    current interior (that board's own fog then begins, one tier down).
+
+**DECIDED (2026-07-09): the graph shows the major-body *inventory*, not just the star
+("option (a)").** A system displays its skeleton — star + planets + gas giants — from
+t=0, galaxy-wide, the same way stars are free. This **beckons for free** (a six-body
+system is visibly tempting from across the galaxy) but withholds *worth*, so
+**survey-intel's product moves from "how big" (now free) to "how good" (the paid
+appraisal)** — a *stronger* product. The knob it forces: the graph-character dial must
+drive the *detail* (richness, hazard density, ruins) **more than the *count***, or the
+free inventory leaks the appraisal — a *dead* system isn't one with fewer planets, it's
+one whose planets are *barren* (`hex-board.md`). Impact: **#0001 generates each system's
+skeleton up front and #0002 draws the inventory** (both flagged there).
 
 Why the reversal: route-finding becomes a real act — you must **trace subspace outward**
 toward the stars you can already see, one system at a time, rather than reading a road
@@ -238,6 +256,134 @@ renderer, whose nodes are pinned to true coords anyway.
 
 ---
 
+## Board-tier: the three visibility bands (the arrival walkthrough)
+
+> **DECIDED (2026-07-09), worked out by walking "what do you see/do at a brand-new
+> star."** The board's version of the graph's *lightspeed-free vs. subspace-earned*
+> split — **one rule, both tiers.**
+
+**The organizing principle — astronomical layer free, detail earned.** A hex is an
+orbital sector *inside* one system (light-**hours** across, not light-years —
+`hex-board.md`). Light crosses it in an afternoon, so you can *see the system* the
+moment you arrive — you cannot hide a planet you're orbiting near. What you can't
+know by looking is what's *minable*, what's *dangerous*, what's *there right now*,
+and anything small or dark. So:
+
+> **The astronomical layer (star + major bodies + orbital geometry) is free and
+> permanent. Detail (resources, hazards), activity (ships, mining), and the
+> small/dark (individual asteroids, ice, ruins, anomalies) are earned — by presence
+> or by scanning.** The exact board-tier echo of the graph's "star map always
+> visible; subspace earned."
+
+**Three bands, not two** (supersedes the slice's old "Unseen/Seen" hedge):
+
+| Band | What it covers | How you get it | Live? |
+|---|---|---|---|
+| **Astronomical** (free) | star; each major body's position + **type + rough size/count**; ring geometry; visible murk (nebula) | free & permanent, from arrival (and on the graph) | n/a — static geometry |
+| **Ambient / Visible** (earn by *presence*) | resolves the small/dark you pass; **live activity** (ships, mining *now*) in your bubble | a unit's short sensor radius, riding the unit | **yes, live** |
+| **Scanned** (earn by *action*) | **composition / richness**, **threats** (incl. invisible gravity-well/radiation), an activity snapshot, hidden ruins/anomalies — **mints the sellable intel** | a slow, aimed scan action | snapshot |
+
+The free band's dial is set to **generous** (DECIDED 2026-07-09): major bodies show
+position + type + rough size/count — a *system inventory at a glance* — but **not**
+composition, richness, threats, activity, or the small/dark. Free tells you *the
+shape and inventory*; scanning tells you *what it's worth and what'll kill you*.
+
+**Uneven by body type** (accepted for now): luminous bodies reveal their *type* for
+free; **murk reveals itself but hides what's behind it** — a nebula is a visible
+cloud (astronomical layer) that also *cuts scanning into it*; **invisible killers
+reveal nothing** — a gravity well / radiation belt is blank on the free layer,
+learned only by scan or by getting hurt. The asymmetry is a feature: regions *feel*
+different to arrive at.
+
+### The two earn-mechanisms — presence vs. scan
+
+The `(range × speed × quality)` sensing model above, one tier down:
+
+- **Presence (ambient / "Visible")** — *free, continuous, live, but short & coarse.*
+  A unit's sensor bubble rides with it (`movement-board.md`: sensors move with the
+  sensor); burning inward sweeps Unseen → Visible → Remembered in its wake. Its
+  distinct job, since the generous free layer already named the major bodies:
+  **(a) resolve the small/dark** you pass, and **(b) show live activity** — ships,
+  mining *now*. It does **not** mint intel. (Board-tier of "presence keeps your
+  doorstep live so a chill player never re-scans home.")
+- **Scan (active)** — *costs an action, reaches far, returns high quality,* and is
+  the **only** thing that mints a sellable snapshot. Two flavors (mirror the graph
+  sweep/deep split):
+  - **Quick-sweep** — wide, fast, coarse; the natural first move on arrival ("sweep
+    the inner system — anything alive?"). Reveals the *bodies* it touches over a
+    wide area without you crossing it.
+  - **Deep-scan** — narrow, slow, high quality; aimed at one body → the full report
+    (composition, threats, activity) → mints the intel.
+
+**The clean division:** *presence = live activity + tripping over the small/dark;
+scan = composition + threats + the sellable report.* (Parked as a later sensor-tech
+upgrade: a *coarse* "something valuable / dangerous here" tingle from presence, so
+travel itself can hint at what's worth a deep look — not baseline.)
+
+### Re-fog: the geometry lives, only the activity freezes
+
+The board's fog is unusual — better than a classic RTS. Because orbits are a
+**deterministic function of world-time** (`hex-board.md`), once you've observed a
+body you know its elements, so you know where it *is* at any future time without
+looking. So **Remembered here is not a frozen ghost pinned in place** — a remembered
+body **keeps drifting to its correct orbital position** in your fogged view. What
+goes stale is only the **activity**: is someone mining that belt *now*? a fleet
+parked there? how far has the lode drawn down since you scanned?
+
+> **Remembered = the clockwork keeps ticking, the activity freezes.** Board fog
+> hides not *where* things are but *what's happening to them*. The fog line falls
+> exactly on the **ephemeris-vs-activity seam** `hex-board.md` named for intel
+> valuation — same seam, two jobs: fog says "no longer live here," the market
+> (`market.md`) later says "here's how fast that frozen snapshot loses worth."
+
+So: **major bodies** (astronomical layer) are free for everyone, never fogged. A
+**discovered small/dark body** (an asteroid you found, a ruin) gets the
+geometry-lives-in-memory treatment — it keeps orbiting correctly, but *"remaining
+materials: 340u, as of 2h ago"* is the frozen, staling number. **Empty space is
+never remembered** — nothing to store; it reverts to Unseen when your bubble leaves.
+Return to a worked system and it draws *instantly* (star + geometry + your found
+bodies, in their correct current positions), everything changeable greyed "last
+known" — the hook that keeps exploration and the intel market perpetual.
+
+### The board is born in two phases (resolves #0003's "Explored" trigger)
+
+Spec #0003 generates the interior but **delegated the exact "Explored" signal to
+this doc.** The arrival walkthrough answers it, and splits generation on the same
+seam as the fog:
+
+- **Skeleton — eager, at system-creation.** Star + major bodies + orbital geometry
+  are generated *when the system is added to the galaxy* (#0001): they're the
+  free/known layer (must exist before anyone visits) and **immutable** (you don't
+  mine a planet away), so safe to roll up front. **Visible on the galaxy graph
+  itself** (option (a) — graph-tier note above).
+- **Detail — lazy, on first arrival, then locked.** Resources, small bodies,
+  anomalies, hazards are rolled by the **first fleet to physically arrive** via a
+  lane, persisted, and become everyone's canon. This is **mutable** (mining depletes
+  it), so it must be materialized once and drawn down — it *can't* be recomputed
+  from seed each time. **Arrival is the "Explored" trigger**; a graph-tier deep-scan
+  does **not** generate the board (it only forecasts character — what keeps survey
+  intel a sellable promise).
+- **Shared once, fogged per-player.** Detail is generated *once* (first arriver's
+  roll is canon; create-if-absent per #0003's race guard); every *later* player
+  still **fogs it fresh** from their own rim entry. The world knows the asteroid;
+  *you* don't until you go — and if others mined it down, you won't know until you
+  scan (frozen activity). **"The board exists" and "you've explored it" are fully
+  independent.**
+
+**The free/earned line runs between body *types*:** *skeleton / free / on-the-graph*
+= star, planets, gas giants, and the *existence* of a major belt or big moon (what a
+telescope resolves); *detail / earned / first-arrival* = what's *in* the belt (which
+rocks, how rich), small/dark bodies, ruins, anomalies, all hazards, all
+composition/activity — everything you'd mine, fear, or sell.
+
+> **Prototyped (2026-07-09):** `frontend/app/spike/hex-board/` now demonstrates the
+> three bands live — free astronomical layer (dim planets from arrival), presence
+> reveal of the small/dark, **deep-scan** for composition, **Remembered** ghosts that
+> keep orbiting, and a **KNOWN FACTS** panel to verify the before/after — reached by
+> "Enter system" from the galaxy spike, with a rim lane-exit back.
+
+---
+
 ## Data model — the scary part (per-player-per-place)
 
 Naïve "store visibility per player per tile" explodes (players × tiles). Keep it
@@ -254,8 +400,8 @@ sane by separating **computed** from **stored**:
 Sketch (Firestore, per `backend/CLAUDE.md` layering — server-authoritative):
 
 ```
-players/{pid}/observations/{systemId}                 # graph tier: reveal-level + survey snapshot + asOf
-players/{pid}/observations/{systemId}/tiles/{tileId}  # board tier: static memory + asOf (lazy, visited systems only)
+players/{pid}/observations/{systemId}                       # graph tier: reveal-level + survey snapshot + asOf
+players/{pid}/observations/{systemId}/features/{featureId}  # board tier: per-FEATURE memory (elements + last-seen activity + asOf), NOT per-tile
 ```
 
 - **Server-authoritative and filtered.** The backend decides what a player may see
@@ -280,12 +426,16 @@ The first vertical slice (`vision.md`) needs *enough* fog that exploration reads
 as exploration — not more.
 
 **In the slice:**
-- Graph: **star map always drawn** (all systems visible, coarse region); replace the
+- Graph: **star map always drawn** (all systems visible, coarse region, **+ major-body
+  inventory** per option (a)); replace the
   `discovered` stub with subspace tiers `rumored | explored` (survey optional) over
   it. **Onward lanes revealed on travel-arrival (presence)** — you begin knowing only
   home's lanes. **Monotonic.**
-- Board: **two states** (Unseen / Seen) or a light three-state. Ambient vision
-  around units + **one Scan action** that reveals a radius and persists.
+- Board: the **three bands** (above) — **astronomical layer free** (star + major
+  bodies + geometry, from the eager skeleton), **ambient** vision around units
+  (live activity + resolve the small/dark), and **one Scan action** (reveals + mints
+  an observation). Memory **per-feature**, not per-tile. Detail generated on **first
+  arrival**; quick-sweep/deep-scan split can start collapsed to one scan.
 - **Scan mints an observation** (so "scanning produces intelligence" is true from
   day one) — but nothing *consumes* freshness yet.
 
@@ -310,6 +460,25 @@ as exploration — not more.
   (leaning hybrid). Noted here only because fog-reveal rides on the travel model.
 - **Rumored precision** — true coords vs. fuzzed until surveyed.
 - **Snapshot write cadence** — scan-completion only, or ambient-on-move too.
+- **Character dial: detail vs. count curve** — how much may body-*count* vary by
+  system character before the free graph inventory (option a) *leaks* the paid
+  appraisal? Leaning: count roughly uniform, with **richness / hazards / ruins**
+  carrying the character (a dead system = barren planets, not fewer planets).
+- **Board quick-sweep: bodies or radius?** — does a board sweep reveal the *bodies*
+  it touches (leaning — matches per-feature memory + the graph sweep) or paint a
+  disc of tiles?
+- **Ambient: type or just presence?** — since the generous free layer already names
+  *major*-body type, does ambient give a coarse *type* read of the small/dark it
+  resolves, or only "something's here — scan it"? Leaning presence-only.
+- **Frozen start-area board** — fog-**off** showcase (logged-out landing, no
+  per-player state) vs. fog-**on** tutorial (the tutorial instance, to *teach* the
+  reveal). Ties to `../vision.md`'s open "do signups play the start area as a
+  tutorial?"
+- ~~board-tier fog design~~ **RESOLVED (2026-07-09)** — see *Board-tier: the three
+  visibility bands*: astronomical-free/detail-earned; free dial = **generous**;
+  **presence vs. scan** division; **Remembered = geometry-lives / activity-freezes**;
+  **per-feature** memory; **two-phase** generation with **arrival = the "Explored"
+  trigger**; graph shows the **inventory** (option a).
 - *(In the sensing section:* what grants ambient / range-by-type, relays as
   sensors vs. network, trait effects on range/quality.*)*
 - ~~does fog apply to your own stuff?~~ **RESOLVED** — no fog on own perception;

@@ -165,12 +165,21 @@ to reach → need more capability), giving the board a soft difficulty gradient?
 - **Occupancy / collisions** — can a ship share a hex with a body? Leaning **yes**
   (ship in a planet's hex = "at" it); but a **coast path that drifts into a hazard**
   (gravity well, debris) should carry risk. `?` do units block each other's hexes?
+  **The star is the hard exception (prototyped in the spike):** you can't dock it and
+  burns **route around** its core hex — some bodies are *approach-hazards*, not dock
+  targets. A per-body-type property when body taxonomy firms up (`hex-board.md`), not a
+  `=== star` special-case.
 - **Terrain & hazards** — nebula slows burns, void blocks, gravity well bends/blocks
   (archive traits) — the same tile-trait lever fog/scan use. Cheap, shared.
 - **Graph↔board handoff** — you arrive from a lane at the **rim** on the rim orbit;
   to leave, reach a rim **exit** tile and hand off to graph movement
-  (`fog-of-war.md` lanes). `?` is the exit the same tile you entered, any rim tile,
-  or specific lane-exit tiles?
+  (`fog-of-war.md` lanes). **RESOLVED in #0004 (Decision #17): exits are
+  bearing-aligned** — each lane maps to the rim tile in its #0001 direction (rejected:
+  *any rim tile* / *the entry tile*). The spike now **prototypes the departure verb**
+  (select a rim lane → depart → back to the graph, re-focused on the system you left),
+  but with **placeholder generic exits, not yet bearing-aligned** — the board doesn't
+  receive the galaxy's per-lane bearings yet. Wiring real bearings lands with the
+  galaxy-movement spec at the shared seam.
 
 ## Slice MVP vs. deferred
 

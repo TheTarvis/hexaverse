@@ -57,8 +57,10 @@ distillation.
   or `fixed`) so its live hex(es) are **computed** from `(position, footprint,
   worldTime)`, never stored per tick. **Motion is a flag** (off/slow for the slice;
   on later — zero rework). Hazards move too; they are not static terrain.
-- **Generate lazily on first visit** and **persist** to Firestore as a stable,
-  mutable interior (later play mutates it — e.g. depletion).
+- **Generate in two phases** (Decision #14): the **skeleton** (star + major bodies +
+  geometry) **eagerly at system-creation** and graph-visible; the **detail**
+  (resources, small bodies, hazards) **lazily on first arrival** — then **persist** to
+  Firestore as a stable, mutable interior (later play mutates it — e.g. depletion).
 - Be **render-ready** for the SVG hex board (bodies + orbital elements + hazards +
   board metadata).
 - **Frozen start-area** systems (`../vision.md`) ship fully-generated static
@@ -82,9 +84,11 @@ distillation.
 ## Proposed approach
 
 Generate in the **backend (Go)**, persist to **Firestore**, expose a read endpoint
-the hex-board view consumes — mirroring #0001, one tier down. Generation runs
-**lazily on first visit** (a system's interior is materialized the first time it's
-Explored), not for the whole galaxy up front; start-area interiors are pre-generated.
+the hex-board view consumes — mirroring #0001, one tier down. Generation runs in
+**two phases** (Decision #14): the **skeleton** (major bodies + geometry) is rolled
+**eagerly with the galaxy** (#0001) and is graph-visible; the **detail** is
+materialized **lazily on first arrival** (not for the whole galaxy up front);
+start-area interiors are pre-generated.
 
 1. **Seed.** Derive a per-system seed from the galaxy seed + system id, so the
    interior is deterministic and reproducible without storing the whole board eagerly.
@@ -247,10 +251,34 @@ Explored), not for the whole galaxy up front; start-area interiors are pre-gener
     The **exact triggering event** ("Explored" = arrival vs. deep-scan vs. view-open)
     is **owned by the fog + movement specs**; this spec only requires *a* signal.
 
+## Decisions (resolved 2026-07-09 — fog + movement handoff, `../plans/fog-of-war.md`)
+
+14. **Two-phase generation; arrival is the "Explored" trigger.** The interior
+    generates in **two phases**, split on the **same seam as board-tier fog**
+    (astronomical-free vs. detail-earned):
+    - **Skeleton — eager, at system-creation.** The star + **major bodies** (planets,
+      gas giants) + orbital geometry are rolled **up front with the galaxy** (an
+      addition to **#0001**): they are the *free/known* layer (must exist before
+      anyone visits) and are **immutable** (a planet isn't mined away), so safe to
+      compute eagerly. They are **visible on the galaxy graph itself** ("option (a)")
+      — so #0001 carries a per-system **major-body inventory** and **#0002 draws it**.
+      This **refines #0001's Decision #5** ("generation stops at the node"): the node
+      now carries the *skeleton*; only the *detail* stops there.
+    - **Detail — lazy, on first arrival, then locked.** Resources/richness, small &
+      dark bodies, anomalies, and hazards are materialized by the **first fleet to
+      physically arrive** via a lane, then persisted and shared — the create-if-absent
+      of Decision #13. It is **mutable** (depletion), so it must be materialized once,
+      never recomputed from seed per read.
+    - **Arrival is the trigger** (resolves the Open question below): a fleet entering
+      the system materializes the detail; a **graph-tier deep-scan does *not*** — it
+      only forecasts the system's *character* (what keeps survey intel sellable). So
+      the character dial drives **detail richness / hazards more than body *count***,
+      or the free graph inventory would leak the paid appraisal.
+
 ## Open questions
-- **Triggering event (delegated)** — the precise "Explored" event that fires
-  first-visit generation is defined by the scan-and-fog + movement specs; #0003 only
-  requires *a* signal and a create-if-absent guard. *(Not blocking this spec.)*
+- ~~**Triggering event (delegated)**~~ **RESOLVED 2026-07-09 (Decision #14):**
+  **arrival** (a fleet entering via a lane) fires *detail* generation; the *skeleton*
+  is eager at system-creation. Still guarded by create-if-absent (Decision #13).
 
 ## References
 
