@@ -173,6 +173,7 @@ export default function Galaxy3DSpikePage() {
   const gridRef = useRef<THREE.GridHelper | null>(null)
   const stemRef = useRef<THREE.Line | null>(null)
   const focusedRef = useRef(false)
+  const lastClickRef = useRef<{ id: string; t: number }>({ id: '', t: 0 })
 
   // Pin nodes to their generated 3D positions so orbit reveals the real spatial
   // structure (flattened disk, clusters, seam) rather than a re-solved layout.
@@ -226,6 +227,28 @@ export default function Galaxy3DSpikePage() {
       c.target.set(n.x, n.y, n.z)
       c.update?.()
       return true
+    },
+    [nodeById],
+  )
+
+  // Fly to a system and make it the orbit target, but PRESERVE the current viewing
+  // angle and zoom (unlike focusOn's fixed oblique reset) — the camera just glides so
+  // the star lands centred. Used by double-click. Keeping the camera→target offset
+  // means orbit/pan/zoom now pivot on the new star with no jump.
+  const focusNode = useCallback(
+    (nodeId: string, ms = 600) => {
+      const fg = fgRef.current
+      const n = nodeById.get(nodeId)
+      const cam = fg?.camera?.()
+      if (!fg?.controls || !n || !cam) return
+      const c = fg.controls()
+      if (!c?.target) return
+      const offset = cam.position.clone().sub(c.target) // current angle + distance
+      const target = new THREE.Vector3(n.x, n.y, n.z)
+      const pos = target.clone().add(offset)
+      fg.cameraPosition({ x: pos.x, y: pos.y, z: pos.z }, { x: n.x, y: n.y, z: n.z }, ms)
+      c.target.set(n.x, n.y, n.z)
+      c.update?.()
     },
     [nodeById],
   )
@@ -332,10 +355,12 @@ export default function Galaxy3DSpikePage() {
           RIGHT: THREE.MOUSE.PAN,
         }
         ctrls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
-        // Clamp pitch so you can drop to a near-top-down tactical read or a low
-        // oblique, but never tumble under the disk or lose which-way-is-out.
-        ctrls.minPolarAngle = 0.08 * Math.PI // ~14° from straight-down
-        ctrls.maxPolarAngle = 0.46 * Math.PI // ~83° — low oblique, stays above z=0
+        // Pitch UNCLAMPED — full pole-to-pole orbit (min 0 / max π): the camera can
+        // tumble over the top and under the disk to view it from below. OrbitControls'
+        // makeSafe() keeps the exact poles gimbal-stable. (Trying this vs. the earlier
+        // "never go under the disk" clamp — see camera-and-input.md.)
+        ctrls.minPolarAngle = 0
+        ctrls.maxPolarAngle = Math.PI
         // Damping smooths the Mac trackpad's inertial scroll into a glide, and is
         // driven each frame by force-graph's own controls.update() loop.
         ctrls.enableDamping = true
@@ -374,7 +399,8 @@ export default function Galaxy3DSpikePage() {
       // foreground past you (the "too glidy when flat" feel). Height collapses as you
       // flatten out, so pan slows to match; at top-down height ≈ distance, so the
       // looking-down feel is unchanged.
-      const height = Math.max(1, cam.position.z - ctrls.target.z)
+      // abs() so swipe-pan keeps working when orbited under the disk (z < target.z)
+      const height = Math.max(1, Math.abs(cam.position.z - ctrls.target.z))
       const perPx = (2 * height * Math.tan(((cam.fov ?? 50) / 2) * (Math.PI / 180))) / (el.clientHeight || 1)
       // camera right + forward, both flattened onto the z=0 ground plane (up = Z)
       const right = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 0)
@@ -542,10 +568,12 @@ export default function Galaxy3DSpikePage() {
   }
 
   const makeNode = (node: GraphNode) => {
-    // every star is always drawn (telescope/lightspeed is common knowledge); the
-    // subspace tiers brighten it: explored (full) → rumored/charted-reachable → the
-    // dim star-visible baseline (you see it, you have no road or current truth).
-    const dim = node.discovered ? 1 : node.rumored ? 0.55 : 0.18
+    // Every star burns at full brightness: stars are common knowledge across
+    // light-years (telescope/spectroscopy), so the galaxy map is *geography, not fog*.
+    // Fog lives at the hex-board tier (a system's actual contents). What IS gated up
+    // here is the subspace LANE network — charted by presence (see linkVisibility +
+    // the charted-only pathfinding), never the stars themselves.
+    const dim = 1
     const color = REGION[node.region].color
     const group = new THREE.Group()
 
@@ -627,9 +655,21 @@ export default function Galaxy3DSpikePage() {
               routeKeys.has(pairKey(l.source.id, l.target.id)) ? 2 : 0.5
             }
             linkOpacity={0.8}
-            onNodeClick={(node: GraphNode) =>
+            onNodeClick={(node: GraphNode) => {
+              // force-graph has no node double-click event — detect it from click
+              // timing. Double-click a star → fly to it and make it the camera target;
+              // single click → toggle selection (open/close the inspector).
+              const now = performance.now()
+              const last = lastClickRef.current
+              if (last.id === node.id && now - last.t < 350) {
+                lastClickRef.current = { id: '', t: 0 }
+                setSelected(node)
+                focusNode(node.id, 600)
+                return
+              }
+              lastClickRef.current = { id: node.id, t: now }
               setSelected((cur) => (cur?.id === node.id ? null : node))
-            }
+            }}
             onBackgroundClick={() => setSelected(null)}
           />
         )}
@@ -790,7 +830,7 @@ export default function Galaxy3DSpikePage() {
 
       {/* --- controls hint --- */}
       <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 font-mono text-[11px] tracking-wider text-white/35">
-        drag to orbit · two-finger swipe to pan · pinch to zoom · ⌖ recenter · click a system → plot course
+        drag to orbit · two-finger swipe to pan · pinch to zoom · double-click to focus · ⌖ recenter · click → plot course
       </div>
     </div>
   )

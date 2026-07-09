@@ -64,15 +64,21 @@ The disk is the table; you hover above it and:
   scaling flings the near-field foreground past you ("too glidy when flat"); height
   collapses as you flatten out, so pan slows to match. (Gesture = two-finger swipe or
   right-drag; see mapping below.)
-- **Yaw** around the focus (horizontal), **pitch** between near-top-down and a low
-  oblique — **clamped** (~14°–83° from straight-down) so you never flip under the disk
-  or lose which-way-is-out. Straight-down is currently locked out; revisit if a pure
-  tactical 2D read is wanted.
+- **Yaw** around the focus (horizontal), **pitch unclamped — full pole-to-pole orbit**
+  (`minPolarAngle 0` / `maxPolarAngle π`). You can tilt from true top-down, through a
+  low oblique, all the way *under* the disk to view it from below. We deliberately tried
+  a "never go under the disk" clamp (~14°–83°) first and **rejected it**: bumping into an
+  invisible mid-tilt stop felt arbitrary and confusing, and the freedom of full orbit
+  reads better than the disorientation it risks. Trade-off accepted: under the disk your
+  left/right and core/rim sense mirror, and the exact poles can spin fast (gimbal) — worth
+  it. (`OrbitControls.makeSafe()` keeps the poles from breaking.)
 - **Zoom = dolly**, scroll/pinch. (Clamp range — system-close ↔ see-a-whole-arm — still
   to tune.)
 - **Damping on** so the Mac trackpad's inertial scroll reads as a glide, not a jerk.
-- **Focus/recenter jumps** the focus point to a system or the fleet (⌖ recenter button
-  wired; double-click-to-focus still to add).
+- **Focus/recenter.** **Double-click a system → fly to it and make it the orbit target**,
+  *preserving the current angle and zoom* (the camera glides so the star lands centred —
+  flying over the map, not cutting to a fixed framing). The **⌖ recenter button** snaps to
+  the fleet with the standard oblique framing. Both wired in the spike.
 
 The frontier framing falls out of this: spawned on the rim, the default view looks
 *inward across the disk*, galaxy sprawling toward the centre behind your home star.
@@ -114,8 +120,8 @@ The spike rides **react-force-graph-3d**'s built-in controls — a **prototyping
 With **Z-up + screen-space panning** enabled it's good enough to *feel out* the map, but
 its control set won't deliver the full pan/yaw/pitch/clamp/focus rig above. The spike now
 reaches the DECIDED feel by configuring the library's OrbitControls instance
-(ground-plane pan, clamps, damping, MapControls button map) **plus poking a private
-field** (`_quat`) to force Z-up — a library-specific hack that works but proves the point:
+(ground-plane height-scaled pan, damping, MapControls button map, unclamped pitch) **plus
+poking a private field** (`_quat`) to force Z-up — a library-specific hack that works but proves the point:
 **the real #0002 view should own its camera** (own OrbitControls/MapControls config or a
 hand-rolled RTS controller) rather than reach into force-graph internals. The settled
 feel above is the spec; the spike is just where it was proven.
@@ -124,8 +130,9 @@ feel above is the spec; the spike is just where it was proven.
 
 ## Open questions
 
-- **Pitch clamp** — *spike value:* ~14°–83° from straight-down; straight-down locked out.
-  Feels good; revisit only if a pure top-down "tactical" 2D read turns out to be wanted.
+- ~~**Pitch clamp**~~ **RESOLVED (2026-07-09): unclamped, full pole-to-pole orbit** —
+  tried a ~14°–83° "never under the disk" clamp and rejected it (the mid-tilt stop felt
+  arbitrary); full orbit reads better. See the decided model above.
 - **Auto-follow vs. manual recenter** — does the camera follow the fleet on each travel
   hop, or stay put with a recenter button? (Shared with `movement-galaxy.md`; lean
   *manual* for a strategic map, but worth trying follow-cam.)
