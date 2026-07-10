@@ -241,6 +241,11 @@ func (s *Service) Cancel(ctx context.Context, id string) (*Fleet, error) {
 // for spawn (#0009 replaces it). corporationId is set now so ownership is not a
 // retrofit.
 func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string, at board.Hex) (*Fleet, error) {
+	// Nothing rests on the star: a fleet can't be seeded onto the core (0,0), same
+	// rule that forbids moving there.
+	if at == (board.Hex{}) {
+		return nil, ErrCoreDestination
+	}
 	now := s.clock.Now()
 	f := &Fleet{
 		Id:            "fleet_" + uuid.NewString(),

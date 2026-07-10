@@ -196,6 +196,18 @@ func TestOrderTo_RejectsTheCore(t *testing.T) {
 	}
 }
 
+func TestSeedFleet_RejectsTheCore(t *testing.T) {
+	clk := &fakeClock{now: 0}
+	svc, _, _, ctrl := newSvc(t, clk)
+	defer ctrl.Finish()
+
+	// No dao.Save is expected — seeding onto the core (0,0) must reject first.
+	_, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", board.Hex{Q: 0, R: 0})
+	if err != ErrCoreDestination {
+		t.Fatalf("expected ErrCoreDestination, got %v", err)
+	}
+}
+
 func TestGet_ArrivalDocksAfterEta(t *testing.T) {
 	clk := &fakeClock{now: 500_000} // past arrival
 	svc, dao, _, ctrl := newSvc(t, clk)

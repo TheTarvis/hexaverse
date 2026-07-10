@@ -172,6 +172,10 @@ func (h *Handler) DevSeed(c *gin.Context) {
 		corp = "dev-corp"
 	}
 	f, err := h.svc.SeedFleet(c.Request.Context(), req.SystemId, corp, req.At)
+	if errors.Is(err, ErrCoreDestination) {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "cannot seed a fleet onto the star at the core"})
+		return
+	}
 	if err != nil {
 		log.Error().Ctx(c).Err(err).Msg("dev-seed fleet failed")
 		c.AbortWithStatus(http.StatusInternalServerError)
