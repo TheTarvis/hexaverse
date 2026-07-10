@@ -211,20 +211,20 @@ graph.
       never moves the camera.
 - [ ] **Double-click a system** glides it to centre preserving angle/zoom;
       the **⌖ recenter** control snaps to the fleet's standard framing.
-- [ ] Clicking a system **selects** it — indicated **on the graph** (highlight),
+- [x] Clicking a system **selects** it — indicated **on the graph** (highlight),
       not only in the inspector — and the **inspector** shows its details
       (name, region, connections).
-- [ ] The left **intel panel** shows galaxy / player summary stats.
-- [ ] The inspector shows a selected system's **major-body inventory** (skeleton) —
+- [x] The left **intel panel** shows galaxy / player summary stats.
+- [x] The inspector shows a selected system's **major-body inventory** (skeleton) —
       always visible, not gated by `discovered` (Decision #7).
-- [ ] Undiscovered systems render **dim/hidden** from the `discovered` flag
+- [x] Undiscovered systems render **dim/hidden** from the `discovered` flag
       (rules stubbed).
-- [ ] **Logged-out** visitors see the frozen start-area galaxy in the same view;
+- [x] **Logged-out** visitors see the frozen start-area galaxy in the same view;
       persistent/multiplayer actions prompt sign-in.
-- [ ] The view **replaces** `frontend/app/page.tsx`.
+- [x] The view **replaces** `frontend/app/page.tsx`.
 - [ ] Visuals match the WebGraph reference within the Catalyst/Tailwind system
       (dark, glowing nodes, colored edges).
-- [ ] vitest covers the hook/service; the component renders with mock data.
+- [x] vitest covers the hook/service; the component renders with mock data.
 
 ## Findings (2026-07-06)
 

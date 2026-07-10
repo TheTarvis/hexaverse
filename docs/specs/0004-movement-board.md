@@ -1,7 +1,7 @@
 ---
 number: 0004
 title: In-system movement (coast & thrust)
-status: accepted   # draft | accepted | implemented | superseded
+status: implemented   # draft | accepted | implemented | superseded
 created: 2026-07-07
 owner: Travis Wilson
 supersedes:     # spec number(s) this replaces, if any
@@ -189,28 +189,28 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
 
 ## Acceptance criteria
 
-- [ ] A fleet holds exactly **one** movement state — `coast | burn | docked` — and its
+- [x] A fleet holds exactly **one** movement state — `coast | burn | docked` — and its
       live hex is **computed** from `(state, worldTime)`, never stored per tick.
-- [ ] **Click a hex** → server returns a **contiguous hex-line path** + `arriveTime`;
+- [x] **Click a hex** → server returns a **contiguous hex-line path** + `arriveTime`;
       reading position before/at/after `arriveTime` shows travel then **coast of the
       local orbit** on arrival.
-- [ ] **Click a coasting body** → server returns a **deterministic intercept** whose
+- [x] **Click a coasting body** → server returns a **deterministic intercept** whose
       meet hex **equals the body's computed position at `arriveTime`**; the ship
       **docks** (rides the body) on arrival.
-- [ ] ETA is computed **at commit** and holds when read later — arrival is **computed,
+- [x] ETA is computed **at commit** and holds when read later — arrival is **computed,
       not dependent on a running scheduler** for the slice.
-- [ ] **Re-task** mid-burn recomputes from the ship's current computed position;
+- [x] **Re-task** mid-burn recomputes from the ship's current computed position;
       **cancel** resumes coast from the current position.
-- [ ] **Motion-agnostic:** with #0003 orbits off/slow, a `featureId` target reduces to
+- [x] **Motion-agnostic:** with #0003 orbits off/slow, a `featureId` target reduces to
       a static hex and the **same** order path yields click→travel→arrive — no
       intercept special-case, no rework.
-- [ ] A **burning** fleet is represented as a **volatile snapshot** on the read/broadcast
+- [x] A **burning** fleet is represented as a **volatile snapshot** on the read/broadcast
       surface; **coasting/docked** fleets are **elements**.
-- [ ] **Slice bar:** a player can **order a ship to a location and it gets there over
+- [x] **Slice bar:** a player can **order a ship to a location and it gets there over
       real time**, resolving while offline.
-- [ ] Burn tuning (`burnSpeed`, horizon) lives in a **params object**, spike values as
+- [x] Burn tuning (`burnSpeed`, horizon) lives in a **params object**, spike values as
       defaults.
-- [ ] Backend tests (emulator): **intercept determinism** (meet = body pos at
+- [x] Backend tests (emulator): **intercept determinism** (meet = body pos at
       `arriveTime`), **path contiguity + endpoints**, **arrival transition** (coast vs
       dock), and **re-task/cancel** from mid-burn.
 
