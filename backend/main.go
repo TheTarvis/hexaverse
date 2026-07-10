@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+
 	"hexaverse/common"
 	"hexaverse/config"
+	"hexaverse/galaxy"
 	"hexaverse/middlewares"
 
 	"github.com/gin-gonic/gin"
@@ -38,6 +41,16 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to initialize Firebase")
 	}
 	log.Info().Msg("Firebase initialized successfully")
+
+	// Local + e2e only: ensure a live galaxy exists so drill-in has a world to
+	// render (GET /v1/systems/:id 404s without one). Idempotent and synchronous —
+	// the e2e stack's health gate then implies the galaxy is ready. Prod seeds
+	// deliberately via `make seed`, never on boot.
+	if config.IsLocal() {
+		if err := galaxy.SeedDevGalaxy(context.Background()); err != nil {
+			log.Warn().Err(err).Msg("Dev galaxy seed failed (drill-in may 404 until seeded)")
+		}
+	}
 
 	// Cloud Run requires 0.0.0.0; local dev can override in .env.local.
 	hostAndPort := fmt.Sprintf("0.0.0.0:%s", config.ServiceConfig.ApiPort)
