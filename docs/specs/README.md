@@ -66,6 +66,7 @@ each can be spec'd, folded, or scratched.
 <!-- specs:index (the /spec tool appends rows below this line; keep it) -->
 | # | Spec | Status |
 |---|------|--------|
+| 0010 | [Mine (extraction verb)](0010-mine.md) | accepted |
 | 0009 | [Spawn & Corporation Identity](0009-spawn.md) | accepted |
 | 0008 | [Inter-system Movement (galaxy graph)](0008-movement-galaxy.md) | accepted |
 | 0007 | [Hex Board View (system renderer)](0007-hex-board-view.md) | accepted |

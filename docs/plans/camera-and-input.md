@@ -148,6 +148,8 @@ feel above is the spec; the spike is just where it was proven.
 
 ## Next step
 
-Prototype the RTS pan-orbit feel in `/spike/galaxy-3d` (Z-up landed; pan/yaw/pitch/clamp
-next). Fold the settled model into **#0002** (galaxy view) — as part of that spec, or a
-small `camera-and-input` spec if it grows its own weight.
+~~Prototype the RTS pan-orbit feel in `/spike/galaxy-3d`~~ — done. **Folded into
+#0002 (2026-07-09)** as its Decision #8 + the "Camera & input" design-details
+section: the decided model is spec; this doc stays as the rationale/war-story
+record and tracker for the decide-while-building questions above (auto-follow,
+pan bounds, tier-handoff zoom, keybindings, custom rig vs. library).

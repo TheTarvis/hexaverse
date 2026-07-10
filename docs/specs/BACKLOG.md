@@ -38,7 +38,7 @@
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
 | Galaxy view (3D force-graph UI, intel panel, inspector) | ✅ #0002 | Accepted. Camera/input model now scoped in `../plans/camera-and-input.md` (folds in — see below). |
-| **Camera & input** (galaxy-tier 3D camera: RTS pan-orbit, Z-up, gestures) | 📝 🎯 | **NEW row.** Scoped + **DECIDED** in `../plans/camera-and-input.md`, proven in the `galaxy-3d` spike. Feeds **#0002** — likely folds into that spec as its camera remit, or a small `camera-and-input` spec if it grows. |
+| **Camera & input** (galaxy-tier 3D camera: RTS pan-orbit, Z-up, gestures) | ✅ #0002 🎯 | **Folded into [#0002](0002-galaxy-view.md) 2026-07-09** (its Decision #8 + "Camera & input" design section): RTS pan-orbit, Z-up, height-scaled ground-plane pan, unclamped pitch, trackpad gesture map, double-click focus + ⌖ recenter — decided in `../plans/camera-and-input.md`, proven in the `galaxy-3d` spike. The plan doc keeps the decide-while-building questions. |
 | **Fog of war** (per-player visibility, scan radius, re-fogging) | ✅ #0006 🎯 | **Graduated 2026-07-09 as [#0006 scan-and-fog](0006-scan-and-fog.md) (accepted)** — the intel data model + live visibility; **absorbs the Scan row** below; replaces the #0001/#0002 `discovered` stub with a subspace enum. Design in `../plans/fog-of-war.md`; prototyped in the `hex-board` spike. |
 | **Inter-system travel / movement on the graph** (lane cost, FTL tiers, relay chains) | ✅ #0008 🎯 | **Graduated 2026-07-09 as [#0008 movement-galaxy](0008-movement-galaxy.md) (accepted)** — 5 locked decisions (length-weighted time cost, jump-range FTL, fleet-is-mover, destination-on-arrival reveal, three orthogonal fast-travel mechanisms); slice = lanes-only; **spike in progress**. Design in `../plans/movement-galaxy.md`. |
 
@@ -50,7 +50,7 @@
 | **Hex board view / renderer** (2D SVG) | ✅ #0007 🎯 | **Graduated 2026-07-09 as [#0007 hex-board-view](0007-hex-board-view.md) (accepted)** — SVG renderer, quantize-the-sim/interpolate-the-picture, three fog bands, select→preview→commit. Companion to #0003, like #0002 is to #0001. Design in `../plans/hex-board.md`; prototyped in the `hex-board` spike. |
 | **In-system movement** (ships across hexes, sublight/FTL, tile-trait effects) | ✅ #0004 | Accepted. **Coast & thrust** over the orbital board — coast rides your orbit, thrust plots a burn, click-to-intercept moving bodies, dock to ride; the **fleet** is the mover, movement resolves async. Design in `../plans/movement-board.md`. Pairs with #0003. **Assumes the action/timer spine (below) — currently unspec'd.** |
 | **Scan** (reveal tiles, detect resources/hazards/players → produce *intelligence*) | ✅ #0006 🎯 | **Absorbed into [#0006 scan-and-fog](0006-scan-and-fog.md)** (2026-07-09): a scan does double duty — reveals to me (fog) **and** mints a timestamped observation into intel inventory; rides #0005 (commit-time ETA; resolves correctly even late). |
-| **Mine** (extract materials from resource tiles) | 💭 🎯 | Core slice action. No dedicated plan doc; sketched in `hex-board.md` slice section (one action on a #0003 body). Small — its own tiny spec, or folds into the hex-board-view spec. |
+| **Mine** (extract materials from resource tiles) | ✅ #0010 🎯 | **Graduated 2026-07-09 as [#0010 mine](0010-mine.md) (accepted)** — first mutating verb on #0005's ledger; ships-compose/fleet-acts roster model, fleet-level cargo pool, docked-to-mine, tonnage-target runs, **lodes deplete in the slice** (keeps players exploring + moving); fuel–tonnage coupling explicitly deferred to #0004's fuel economy. |
 | **Research** (research points / tech unlocks) | 💭 ⏸ | Named as a core action; depth deferred. |
 | **Combat** (ship/unit fighting; loss stakes) | 💭 ⏸ | A real pillar "alongside, not above" exploration; lethality tuning open. Deferred past slice. |
 
@@ -96,8 +96,9 @@
   (**all accepted 2026-07-09**): **#0005 action-timer** (the async spine, spec'd
   first as planned), **#0006 scan-and-fog** (absorbs Scan), **#0007 hex-board-view**,
   **#0008 movement-galaxy**, **#0009 spawn**.
-- **Remaining 🎯 gaps: mine** (💭 — the last slice verb, small) and **camera & input**
-  (📝 — folds into #0002 when the real galaxy view is built).
+- **The last two 🎯 gaps closed 2026-07-09**: **mine** graduated as #0010
+  (accepted), and **camera & input** folded into #0002 (Decision #8).
+  **Every 🎯 row is now spec-backed.**
 - **The economy is well-thought-out but all deferred (⏸)** — `intel-market.md`
   (ready, but builds on #0006) plus several idea-level sketches.
 - **A few carryovers need a keep/scratch call (⬜):** unit taxonomy (now defused to a
@@ -107,11 +108,11 @@
 
 1. ~~Review + accept the #0005–#0009 drafts~~ — **done 2026-07-09**; all five
    accepted with their riders resolved.
-2. **Mine** — the last slice verb; its own tiny spec or folded into #0007. Its
-   hardest parts are already decided in #0005 (point-at-ETA, one window-capable
-   delta).
-3. **Camera & input** — fold into #0002 (or a small spec) whenever the real galaxy
-   view is built.
+2. ~~**Mine**~~ — **accepted 2026-07-09 as [#0010 mine](0010-mine.md)** (tonnage-
+   target runs; lodes deplete in the slice).
+3. ~~**Camera & input**~~ — **folded into #0002 2026-07-09** (Decision #8 + its
+   "Camera & input" design section).
 
-*(With #0005–#0009 accepted, every 🎯 row but mine is spec-backed — the slice is
-buildable in spec order.)*
+*(Every 🎯 row is spec-backed — the slice backlog is closed and buildable in
+spec order: #0001→#0010. Next up when appetite returns: the ⏸ economy stack,
+starting with `/spec intel-market`, and the ⬜ keep/scratch calls.)*

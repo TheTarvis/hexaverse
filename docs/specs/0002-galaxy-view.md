@@ -33,8 +33,9 @@ force-graph. WebGraph is a **pure visual reference**, not a codebase we build on
 - Render systems as **nodes** and lanes as **edges** in an interactive **3D
   force-directed graph**, fed by #0001 data (`(x,y,z)` rendered natively as
   positions).
-- **Camera controls** — orbit/rotate, pan, zoom (reading depth/distance from any
-  angle is a first-class requirement, not a nice-to-have).
+- **Camera controls** — the decided **RTS pan-orbit** model (Decision #8):
+  orbit, ground-plane pan, zoom over the Z-up disk (reading depth/distance from
+  any angle is a first-class requirement, not a nice-to-have).
 - **Select a system** → a right-hand **inspector** shows its details (name,
   region, connections, and its **major-body inventory** — the free "skeleton" of
   #0001 Decision #9 / `../plans/fog-of-war.md` "option (a)"; always visible, not
@@ -162,6 +163,34 @@ graph.
   dead, magenta barrier) — a deliberate, isolated exception to the no-raw-hex
   rule the `/check` color validator enforces. Keep that palette in one module
   shared by the graph and the panel region-dots.
+- **Camera & input** (folded from `../plans/camera-and-input.md` 2026-07-09,
+  where the full rationale + gotcha war stories live — Decision #8):
+  - **RTS pan-orbit over the disk, world up = Z.** The XY disk is the ground;
+    you hover above it. *Gotcha:* OrbitControls bakes its orbit basis from
+    `camera.up` **in its constructor** — the real view must own its camera
+    (own OrbitControls/MapControls config or a hand-rolled rig), not reach
+    into force-graph internals the way the spike pokes `_quat`.
+  - **Ground-plane pan moves the focus** (`screenSpacePanning = false`), with
+    pan speed scaled by the camera's **height** above the disk, not slant
+    distance (distance-scaling goes "too glidy" at grazing pitch). Panning
+    inward is how you "look toward the centre."
+  - **Pitch unclamped, full pole-to-pole** — a "never under the disk" clamp
+    was tried and rejected (the invisible mid-tilt stop felt arbitrary).
+    **Zoom = dolly** (range clamp still to tune); **damping on** so trackpad
+    inertia reads as a glide.
+  - **Gesture map (trackpad-first):** one-finger / left-drag = **orbit**;
+    two-finger swipe = **pan** (capture-phase wheel listener routes plain
+    `wheel` → pan, `ctrl+wheel` (pinch) falls through → zoom); click =
+    **select**, with a click-vs-drag threshold so camera and selection never
+    fight. Mouse-wheel users currently get pan-not-zoom — a delta-shape
+    heuristic is deferred until mouse support matters; touch-screen deferred.
+  - **Focus & recenter:** double-click a system → glide it to centre
+    preserving angle/zoom; a **⌖ recenter** control snaps to the fleet with
+    the standard oblique framing. Default framing = spawned on the rim,
+    looking inward across the disk.
+  - Still open, decide while building (tracked in the plan doc): auto-follow
+    vs. manual recenter, pan bounds, zoom-all-the-way-in as the board-tier
+    handoff, keybindings (WASD/Q/E/F/Esc).
 - **Fog contract:** `discovered: boolean` per system for now; real visibility
   payload defined by the fog spec.
 - **Performance:** hundreds of nodes (#0001 scale) render comfortably in
@@ -174,7 +203,14 @@ graph.
 ## Acceptance criteria
 
 - [ ] An authed user sees the live galaxy (#0001 data) as an interactive 3D
-      force graph and can **orbit / pan / zoom**.
+      force graph and can **orbit / pan / zoom** per the decided camera model
+      (Decision #8): Z-up RTS pan-orbit, height-scaled ground-plane pan,
+      unclamped pitch, damping on.
+- [ ] The gesture map holds: one-finger/left-drag orbits, two-finger swipe
+      pans, pinch zooms, click selects — and a drag never selects, a click
+      never moves the camera.
+- [ ] **Double-click a system** glides it to centre preserving angle/zoom;
+      the **⌖ recenter** control snaps to the fleet's standard framing.
 - [ ] Clicking a system **selects** it — indicated **on the graph** (highlight),
       not only in the inspector — and the **inspector** shows its details
       (name, region, connections).
@@ -247,15 +283,28 @@ Resolves Open question #1's gating task (inspected `github.com/kitakitaaura/webg
    and available as an optional node size/detail hint. It is **not** gated by
    `discovered`; only the *detail* (resource/hazard *worth*, the later drill-in) is
    earned. Survey/worth stays hidden until the fog spec.
+8. **Camera & input folded in from `../plans/camera-and-input.md` (2026-07-09,
+   *Travis*).** The camera model was brainstormed, decided, and spike-proven in
+   that doc (RTS pan-orbit, Z-up, height-scaled ground-plane pan, unclamped
+   pitch, the trackpad gesture map, double-click focus, ⌖ recenter) — it
+   **folds into this spec as its camera remit** rather than becoming its own
+   spec: what grew was decidedness, not scope, and it's the input model of
+   exactly one view. Summary under Design details → "Camera & input"; the plan
+   doc keeps the rationale and the remaining decide-while-building questions.
+   Closes the BACKLOG "Camera & input" row.
 
 ## Open questions
 
-*None outstanding* — all four resolved 2026-07-06 (see Decisions). This spec is
-ready to move from draft to accepted.
+*None outstanding* — the original four resolved 2026-07-06, camera & input
+folded in 2026-07-09 (see Decisions). The camera's decide-while-building
+items (auto-follow, pan bounds, tier-handoff zoom, keybindings) are tracked
+in `../plans/camera-and-input.md`, not blockers here.
 
 ## References
 
 - #0001 — Galaxy generation (produces the nodes/edges this renders).
+- `../plans/camera-and-input.md` — the decided camera/input model this spec
+  absorbs (Decision #8); rationale, spike gotchas, remaining feel questions.
 - `../vision.md` — two-tier map; Auth & onboarding stance (frozen start area).
 - `../plans/BRAINSTORM.md` — galactic view (WebGraph), left/right panel pattern.
 - `../plans/canvas/README.md` + `Screenshot 2026-07-02 at 10.37.18.png` — the
