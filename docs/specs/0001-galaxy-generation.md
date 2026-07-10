@@ -1,7 +1,7 @@
 ---
 number: 0001
 title: Galaxy generation
-status: accepted   # draft | accepted | implemented | superseded
+status: implemented   # draft | accepted | implemented | superseded
 created: 2026-07-06
 owner: Travis Wilson
 supersedes:     # spec number(s) this replaces, if any
@@ -139,23 +139,23 @@ consume.
 
 ## Acceptance criteria
 
-- [ ] Given a seed, generation produces a **connected** graph of N system nodes
+- [x] Given a seed, generation produces a **connected** graph of N system nodes
       with lanes; **same seed → same galaxy** (deterministic).
-- [ ] Systems carry a **region classification** from a noise field; star-rich
+- [x] Systems carry a **region classification** from a noise field; star-rich
       regions are visibly denser than dead zones, and barriers form sparse
       seams.
-- [ ] The galaxy (systems, lanes, metadata incl. seed) is **persisted to
+- [x] The galaxy (systems, lanes, metadata incl. seed) is **persisted to
       Firestore** and readable by a frontend service.
-- [ ] A **fixed known-seed start area** can be generated and served as the
+- [x] A **fixed known-seed start area** can be generated and served as the
       logged-out landing (`../vision.md`).
-- [ ] Output carries enough for the WebGraph view to render nodes + edges
+- [x] Output carries enough for the WebGraph view to render nodes + edges
       (+ coordinates / layout hint).
-- [ ] Generation is **re-runnable and extendable** without corrupting an
+- [x] Generation is **re-runnable and extendable** without corrupting an
       existing galaxy (append, or regenerate to a new id).
-- [ ] Each system carries a deterministic **major-body skeleton** (star +
+- [x] Each system carries a deterministic **major-body skeleton** (star +
       planets/gas giants + orbital geometry) generated here and exposed for the graph
       view — the free inventory, not the mutable detail (Decision #9).
-- [ ] Backend tests (against the Firebase emulator) cover **determinism**,
+- [x] Backend tests (against the Firebase emulator) cover **determinism**,
       **connectivity**, and **region distribution**.
 
 ## Decisions (resolved 2026-07-06)
