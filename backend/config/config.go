@@ -56,6 +56,11 @@ type ServiceConfiguration struct {
 
 	// Rate Limiting
 	DisableRateLimiting bool // Disable auth endpoint rate limiting (for CI/CD e2e tests)
+
+	// World simulation clock (spec #0005). scale warps sim time vs wall time:
+	// prod=1 (real time), dev/test fast so long burns resolve in seconds.
+	// NEVER change on a world holding data — stored stamps would reinterpret.
+	WorldTimeScale float64
 }
 
 var ServiceConfig ServiceConfiguration
@@ -129,6 +134,9 @@ func init() {
 
 	// Rate Limiting
 	flag.BoolVar(&ServiceConfig.DisableRateLimiting, "DISABLE_RATE_LIMITING", false, "Disable auth endpoint rate limiting (for CI/CD e2e tests)")
+
+	// World simulation clock. Default 1 (real time); dev/test override fast.
+	flag.Float64Var(&ServiceConfig.WorldTimeScale, "WORLD_TIME_SCALE", 1, "Simulation time-warp factor relative to wall clock")
 
 	flag.Parse()
 }

@@ -102,6 +102,15 @@ run:
 	@echo "Running backend service..."
 	go run .
 
+# Galaxy seeding (#0001)
+seed:
+	@echo "Seeding the live galaxy (uses Firestore/emulator)..."
+	go run ./cmd/seed
+
+seed-start-area:
+	@echo "Regenerating the frozen start-area static asset..."
+	go run ./cmd/seed start-area
+
 run-with-emulators:
 	@echo "Running backend with emulators..."
 	FIRESTORE_EMULATOR_HOST=localhost:9100 \

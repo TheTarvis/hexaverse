@@ -4,6 +4,7 @@ import (
 	"time"
 	"hexaverse/account"
 	"hexaverse/config"
+	"hexaverse/galaxy"
 	"hexaverse/health"
 	"hexaverse/middlewares"
 	"hexaverse/sse"
@@ -68,6 +69,7 @@ func SetupRouter() *gin.Engine {
 	accountHandler.RegisterRoutes(authorized, strictLimit)
 
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
+	galaxy.NewHandler().RegisterRoutes(authorized)
 
 	// SSE: EventSource can't send custom headers, so JWT comes from the query string.
 	sseHandler := sse.NewHandler()

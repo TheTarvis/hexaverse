@@ -1,0 +1,1126 @@
+{
+  "id": "gal_start_area",
+  "seed": 424242,
+  "bounds": {
+    "x": [
+      -151.29036759633797,
+      134.92895599083937
+    ],
+    "y": [
+      -144.69997568832304,
+      165.1427177992113
+    ],
+    "z": [
+      -37.93926281323556,
+      37.96785221566026
+    ]
+  },
+  "systems": [
+    {
+      "id": "sys-0",
+      "coords": {
+        "x": 134.92895599083937,
+        "y": 8.340524430755433,
+        "z": 20.073060895634598
+      },
+      "name": "Ithyara",
+      "region": "dead",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "K",
+        "bodies": [
+          {
+            "type": "barren",
+            "ring": 3
+          },
+          {
+            "type": "rocky",
+            "ring": 4
+          },
+          {
+            "type": "rocky",
+            "ring": 5
+          },
+          {
+            "type": "ice",
+            "ring": 8
+          },
+          {
+            "type": "ice",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-1",
+      "coords": {
+        "x": -88.47253515631657,
+        "y": -68.34998797396547,
+        "z": 29.841397273906054
+      },
+      "name": "Myriara",
+      "region": "star_rich",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "ice",
+            "ring": 7
+          },
+          {
+            "type": "ice",
+            "ring": 9
+          },
+          {
+            "type": "gas_giant",
+            "ring": 10
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-2",
+      "coords": {
+        "x": -151.29036759633797,
+        "y": -15.984419398385882,
+        "z": 13.89207717998529
+      },
+      "name": "Lyraesh",
+      "region": "star_rich",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 1
+          },
+          {
+            "type": "oceanic",
+            "ring": 3
+          },
+          {
+            "type": "rocky",
+            "ring": 4
+          },
+          {
+            "type": "rocky",
+            "ring": 6
+          },
+          {
+            "type": "gas_giant",
+            "ring": 8
+          },
+          {
+            "type": "ice",
+            "ring": 9
+          },
+          {
+            "type": "gas_giant",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-3",
+      "coords": {
+        "x": 24.64929149298943,
+        "y": 165.1427177992113,
+        "z": -27.951544242896958
+      },
+      "name": "Vorioyr Nexus",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 2
+          },
+          {
+            "type": "barren",
+            "ring": 4
+          },
+          {
+            "type": "rocky",
+            "ring": 6
+          },
+          {
+            "type": "ice",
+            "ring": 9
+          },
+          {
+            "type": "gas_giant",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-4",
+      "coords": {
+        "x": -125.70992455960798,
+        "y": 112.52679838928319,
+        "z": 9.174149395788769
+      },
+      "name": "Ophioeth II",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "rocky",
+            "ring": 2
+          },
+          {
+            "type": "barren",
+            "ring": 4
+          },
+          {
+            "type": "rocky",
+            "ring": 5
+          },
+          {
+            "type": "ice",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-5",
+      "coords": {
+        "x": 81.60741316393431,
+        "y": 147.53923056682365,
+        "z": -5.01207410623369
+      },
+      "name": "Zoraeion Nexus",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 2
+          },
+          {
+            "type": "rocky",
+            "ring": 5
+          },
+          {
+            "type": "ice",
+            "ring": 10
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-6",
+      "coords": {
+        "x": 10.146378185748018,
+        "y": -133.49885438237015,
+        "z": -37.93926281323556
+      },
+      "name": "Quauorn Prime",
+      "region": "barrier",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "F",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 0
+          },
+          {
+            "type": "molten",
+            "ring": 1
+          },
+          {
+            "type": "rocky",
+            "ring": 2
+          },
+          {
+            "type": "oceanic",
+            "ring": 3
+          },
+          {
+            "type": "oceanic",
+            "ring": 4
+          },
+          {
+            "type": "barren",
+            "ring": 6
+          },
+          {
+            "type": "ice",
+            "ring": 8
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-7",
+      "coords": {
+        "x": 66.31012308500262,
+        "y": 14.134116720280401,
+        "z": 37.96785221566026
+      },
+      "name": "Caeeiur II",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "G",
+        "bodies": [
+          {
+            "type": "ice",
+            "ring": 10
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-8",
+      "coords": {
+        "x": 48.05561498045195,
+        "y": -143.6496305827511,
+        "z": 17.004096020164738
+      },
+      "name": "Thalouen",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "G",
+        "bodies": [
+          {
+            "type": "rocky",
+            "ring": 2
+          },
+          {
+            "type": "oceanic",
+            "ring": 6
+          },
+          {
+            "type": "gas_giant",
+            "ring": 8
+          },
+          {
+            "type": "gas_giant",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-9",
+      "coords": {
+        "x": 5.591663543502845,
+        "y": -23.464685617811867,
+        "z": 28.535582068639815
+      },
+      "name": "Belouix",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 1
+          },
+          {
+            "type": "molten",
+            "ring": 2
+          },
+          {
+            "type": "rocky",
+            "ring": 4
+          },
+          {
+            "type": "barren",
+            "ring": 8
+          },
+          {
+            "type": "gas_giant",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-10",
+      "coords": {
+        "x": -77.43178410265672,
+        "y": -99.00899224768635,
+        "z": -6.238066374372906
+      },
+      "name": "Corouub",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "rocky",
+            "ring": 1
+          },
+          {
+            "type": "barren",
+            "ring": 5
+          },
+          {
+            "type": "ice",
+            "ring": 9
+          },
+          {
+            "type": "ice",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-11",
+      "coords": {
+        "x": 76.06062030347289,
+        "y": 95.57481270841299,
+        "z": 5.810256920269108
+      },
+      "name": "Talouub II",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "F",
+        "bodies": [
+          {
+            "type": "rocky",
+            "ring": 0
+          },
+          {
+            "type": "rocky",
+            "ring": 1
+          },
+          {
+            "type": "gas_giant",
+            "ring": 10
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-12",
+      "coords": {
+        "x": 20.820807415688638,
+        "y": 97.52288526648863,
+        "z": 29.77268686096295
+      },
+      "name": "Nyxioara",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "K",
+        "bodies": [
+          {
+            "type": "rocky",
+            "ring": 1
+          },
+          {
+            "type": "ice",
+            "ring": 10
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-13",
+      "coords": {
+        "x": 81.29453040687339,
+        "y": -118.50383217155279,
+        "z": 20.17654751075319
+      },
+      "name": "Seraeax Prime",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "G",
+        "bodies": [
+          {
+            "type": "rocky",
+            "ring": 1
+          },
+          {
+            "type": "rocky",
+            "ring": 4
+          },
+          {
+            "type": "barren",
+            "ring": 7
+          },
+          {
+            "type": "gas_giant",
+            "ring": 8
+          },
+          {
+            "type": "ice",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-14",
+      "coords": {
+        "x": -37.14758847227626,
+        "y": -76.04965867071033,
+        "z": 36.17231552951026
+      },
+      "name": "Thaloorn",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "K",
+        "bodies": [
+          {
+            "type": "barren",
+            "ring": 4
+          },
+          {
+            "type": "oceanic",
+            "ring": 6
+          },
+          {
+            "type": "gas_giant",
+            "ring": 7
+          },
+          {
+            "type": "ice",
+            "ring": 8
+          },
+          {
+            "type": "gas_giant",
+            "ring": 9
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-15",
+      "coords": {
+        "x": 41.97585321375419,
+        "y": -69.34911739017461,
+        "z": -13.497421801343986
+      },
+      "name": "Xanouara Prime",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "barren",
+            "ring": 3
+          },
+          {
+            "type": "gas_giant",
+            "ring": 8
+          },
+          {
+            "type": "ice",
+            "ring": 10
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-16",
+      "coords": {
+        "x": -127.16747094681729,
+        "y": -100.19012569468194,
+        "z": -31.50178400455448
+      },
+      "name": "Seryis Nexus",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "K",
+        "bodies": [
+          {
+            "type": "rocky",
+            "ring": 0
+          },
+          {
+            "type": "rocky",
+            "ring": 4
+          },
+          {
+            "type": "oceanic",
+            "ring": 6
+          },
+          {
+            "type": "ice",
+            "ring": 8
+          },
+          {
+            "type": "gas_giant",
+            "ring": 9
+          },
+          {
+            "type": "ice",
+            "ring": 10
+          },
+          {
+            "type": "ice",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-17",
+      "coords": {
+        "x": -75.87199406880109,
+        "y": 16.044873235958207,
+        "z": 16.249219341465697
+      },
+      "name": "Myrioax III",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "oceanic",
+            "ring": 5
+          },
+          {
+            "type": "barren",
+            "ring": 6
+          },
+          {
+            "type": "gas_giant",
+            "ring": 8
+          },
+          {
+            "type": "gas_giant",
+            "ring": 9
+          },
+          {
+            "type": "gas_giant",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-18",
+      "coords": {
+        "x": 121.21256833424458,
+        "y": -130.12751783135928,
+        "z": -2.6231191896921757
+      },
+      "name": "Caeaux",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "K",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 0
+          },
+          {
+            "type": "molten",
+            "ring": 2
+          },
+          {
+            "type": "oceanic",
+            "ring": 3
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-19",
+      "coords": {
+        "x": 102.6771594639793,
+        "y": -66.1033120697383,
+        "z": -5.395144309035111
+      },
+      "name": "Velaeara",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "K",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 2
+          },
+          {
+            "type": "barren",
+            "ring": 3
+          },
+          {
+            "type": "rocky",
+            "ring": 6
+          },
+          {
+            "type": "gas_giant",
+            "ring": 7
+          },
+          {
+            "type": "gas_giant",
+            "ring": 10
+          },
+          {
+            "type": "ice",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-20",
+      "coords": {
+        "x": -9.731558086937326,
+        "y": 143.57157898139613,
+        "z": 13.523830694166241
+      },
+      "name": "Taleiax",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "G",
+        "bodies": [
+          {
+            "type": "rocky",
+            "ring": 6
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-21",
+      "coords": {
+        "x": -120.6347215726406,
+        "y": 32.1149847077537,
+        "z": 14.06664603825214
+      },
+      "name": "Beleorn III",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "K",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 1
+          },
+          {
+            "type": "barren",
+            "ring": 4
+          },
+          {
+            "type": "rocky",
+            "ring": 5
+          },
+          {
+            "type": "barren",
+            "ring": 6
+          },
+          {
+            "type": "ice",
+            "ring": 7
+          },
+          {
+            "type": "ice",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-22",
+      "coords": {
+        "x": 21.215925758656454,
+        "y": 118.47166481937496,
+        "z": -26.402936474813924
+      },
+      "name": "Nyxiur",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "K",
+        "bodies": [
+          {
+            "type": "barren",
+            "ring": 5
+          },
+          {
+            "type": "gas_giant",
+            "ring": 7
+          },
+          {
+            "type": "ice",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-23",
+      "coords": {
+        "x": -91.490411069267,
+        "y": -144.69997568832304,
+        "z": 9.862345603620728
+      },
+      "name": "Caeuos Minor",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "F",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 1
+          },
+          {
+            "type": "rocky",
+            "ring": 3
+          },
+          {
+            "type": "barren",
+            "ring": 5
+          },
+          {
+            "type": "ice",
+            "ring": 7
+          },
+          {
+            "type": "ice",
+            "ring": 10
+          },
+          {
+            "type": "gas_giant",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-24",
+      "coords": {
+        "x": -19.752732992886298,
+        "y": -56.188137330581036,
+        "z": -21.700288072700133
+      },
+      "name": "Nyxoux III",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "G",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 1
+          },
+          {
+            "type": "molten",
+            "ring": 2
+          },
+          {
+            "type": "rocky",
+            "ring": 5
+          },
+          {
+            "type": "gas_giant",
+            "ring": 7
+          },
+          {
+            "type": "barren",
+            "ring": 8
+          },
+          {
+            "type": "gas_giant",
+            "ring": 9
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-25",
+      "coords": {
+        "x": 38.632735692892204,
+        "y": 151.49323853328116,
+        "z": 25.283530064092233
+      },
+      "name": "Keleos Prime",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "F",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 0
+          },
+          {
+            "type": "rocky",
+            "ring": 2
+          },
+          {
+            "type": "rocky",
+            "ring": 6
+          },
+          {
+            "type": "ice",
+            "ring": 10
+          },
+          {
+            "type": "ice",
+            "ring": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-26",
+      "coords": {
+        "x": -36.039984370206184,
+        "y": 3.947493553563362,
+        "z": -1.8927014584680624
+      },
+      "name": "Draeorn",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "K",
+        "bodies": [
+          {
+            "type": "gas_giant",
+            "ring": 8
+          }
+        ]
+      }
+    },
+    {
+      "id": "sys-27",
+      "coords": {
+        "x": 3.8438733526281164,
+        "y": -97.82395338177064,
+        "z": 35.99094456253083
+      },
+      "name": "Veloorn",
+      "region": "normal",
+      "discovered": true,
+      "skeleton": {
+        "starClass": "M",
+        "bodies": [
+          {
+            "type": "molten",
+            "ring": 0
+          },
+          {
+            "type": "molten",
+            "ring": 1
+          },
+          {
+            "type": "oceanic",
+            "ring": 3
+          },
+          {
+            "type": "rocky",
+            "ring": 4
+          },
+          {
+            "type": "rocky",
+            "ring": 6
+          }
+        ]
+      }
+    }
+  ],
+  "lanes": [
+    {
+      "id": "lane-0-7",
+      "aId": "sys-0",
+      "bId": "sys-7"
+    },
+    {
+      "id": "lane-0-19",
+      "aId": "sys-0",
+      "bId": "sys-19"
+    },
+    {
+      "id": "lane-1-2",
+      "aId": "sys-1",
+      "bId": "sys-2"
+    },
+    {
+      "id": "lane-1-10",
+      "aId": "sys-1",
+      "bId": "sys-10"
+    },
+    {
+      "id": "lane-1-14",
+      "aId": "sys-1",
+      "bId": "sys-14"
+    },
+    {
+      "id": "lane-2-21",
+      "aId": "sys-2",
+      "bId": "sys-21"
+    },
+    {
+      "id": "lane-3-22",
+      "aId": "sys-3",
+      "bId": "sys-22"
+    },
+    {
+      "id": "lane-3-25",
+      "aId": "sys-3",
+      "bId": "sys-25"
+    },
+    {
+      "id": "lane-4-20",
+      "aId": "sys-4",
+      "bId": "sys-20"
+    },
+    {
+      "id": "lane-4-21",
+      "aId": "sys-4",
+      "bId": "sys-21"
+    },
+    {
+      "id": "lane-5-11",
+      "aId": "sys-5",
+      "bId": "sys-11"
+    },
+    {
+      "id": "lane-5-25",
+      "aId": "sys-5",
+      "bId": "sys-25"
+    },
+    {
+      "id": "lane-6-8",
+      "aId": "sys-6",
+      "bId": "sys-8"
+    },
+    {
+      "id": "lane-6-15",
+      "aId": "sys-6",
+      "bId": "sys-15"
+    },
+    {
+      "id": "lane-7-9",
+      "aId": "sys-7",
+      "bId": "sys-9"
+    },
+    {
+      "id": "lane-7-11",
+      "aId": "sys-7",
+      "bId": "sys-11"
+    },
+    {
+      "id": "lane-8-13",
+      "aId": "sys-8",
+      "bId": "sys-13"
+    },
+    {
+      "id": "lane-8-27",
+      "aId": "sys-8",
+      "bId": "sys-27"
+    },
+    {
+      "id": "lane-9-24",
+      "aId": "sys-9",
+      "bId": "sys-24"
+    },
+    {
+      "id": "lane-9-26",
+      "aId": "sys-9",
+      "bId": "sys-26"
+    },
+    {
+      "id": "lane-10-16",
+      "aId": "sys-10",
+      "bId": "sys-16"
+    },
+    {
+      "id": "lane-10-23",
+      "aId": "sys-10",
+      "bId": "sys-23"
+    },
+    {
+      "id": "lane-11-12",
+      "aId": "sys-11",
+      "bId": "sys-12"
+    },
+    {
+      "id": "lane-12-25",
+      "aId": "sys-12",
+      "bId": "sys-25"
+    },
+    {
+      "id": "lane-13-18",
+      "aId": "sys-13",
+      "bId": "sys-18"
+    },
+    {
+      "id": "lane-13-19",
+      "aId": "sys-13",
+      "bId": "sys-19"
+    },
+    {
+      "id": "lane-14-24",
+      "aId": "sys-14",
+      "bId": "sys-24"
+    },
+    {
+      "id": "lane-14-27",
+      "aId": "sys-14",
+      "bId": "sys-27"
+    },
+    {
+      "id": "lane-15-19",
+      "aId": "sys-15",
+      "bId": "sys-19"
+    },
+    {
+      "id": "lane-15-24",
+      "aId": "sys-15",
+      "bId": "sys-24"
+    },
+    {
+      "id": "lane-15-27",
+      "aId": "sys-15",
+      "bId": "sys-27"
+    },
+    {
+      "id": "lane-17-21",
+      "aId": "sys-17",
+      "bId": "sys-21"
+    },
+    {
+      "id": "lane-17-26",
+      "aId": "sys-17",
+      "bId": "sys-26"
+    },
+    {
+      "id": "lane-20-22",
+      "aId": "sys-20",
+      "bId": "sys-22"
+    },
+    {
+      "id": "lane-20-25",
+      "aId": "sys-20",
+      "bId": "sys-25"
+    }
+  ],
+  "worldTime": 0
+}
