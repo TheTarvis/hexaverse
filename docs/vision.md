@@ -113,8 +113,10 @@ the start area *is* the landing.
 
 ## Core loop
 
-The persistent player entity is a **Corporation** — the operation you build up,
-and can lose then restart.
+The persistent player entity is a **Corporation** — not a place but a *mind*:
+an uploaded consciousness (Bobiverse-style) whose replicant copies crew your
+hulls. It lives as long as one fleet survives, dies with the last one, and
+restarts from a drifted backup (`docs/plans/spawn.md`).
 
 1. **Explore** the galaxy graph under fog — undiscovered systems are dim.
 2. **Drill in** to a system → its hex board.
@@ -138,8 +140,10 @@ and can lose then restart.
   finite **goods** both flow over a shared **station/relay network**. The
   frontier is *off-grid*: freshest intel and richest materials, but stranded
   until you haul back or extend the net.
-- **Corporation as the persistent stake** — high loss, guaranteed fresh start.
-  Danger is everywhere; safety comes from strength, not from a safe zone.
+- **Corporation as the persistent stake** — high loss (the Corporation dies
+  with its last fleet), guaranteed fresh start (a drifted backup of the mind
+  wakes at the frontier). Danger is everywhere; safety comes from strength,
+  not from a safe zone.
 - **Ever-growing frontier** — the galaxy expands outward; new players spawn at
   the fresh edge where their first-scans are genuinely valuable, so exploration
   never gets "solved."
@@ -160,7 +164,8 @@ Prove the **core loop feels good** before any economy. Roughly in build order:
 
 1. **Generate a galaxy** — procedural node graph of star systems.
 2. **Render it** in the graph view — systems as nodes under fog, most dim.
-3. **Spawn the player** — a starting system + a ship or two.
+3. **Spawn the player** — a mind wakes in its first hull, in a quiet frontier
+   system (`docs/plans/spawn.md`).
 4. **Drill into a system** — click a node → its hex board.
 5. **Do one satisfying thing** — move a ship, **scan** to reveal tiles, **mine**
    a resource. Scanning produces *intelligence*.

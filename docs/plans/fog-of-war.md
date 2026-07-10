@@ -3,7 +3,8 @@
 > **Living doc, high-level only.** Scratchpad to think through per-player
 > visibility before it hardens into a `/spec`. Nothing here is committed design.
 > `?` marks an open question; **TODO(travis)** marks a blank only you can fill.
-> Feeds a future `docs/specs/NNNN-scan-and-fog.md`. Created 2026-07-06.
+> **Graduated 2026-07-09 → `../specs/0006-scan-and-fog.md` (accepted).**
+> Created 2026-07-06.
 >
 > Context: `../vision.md` (two-tier map), `BRAINSTORM.md`, and specs **#0001** /
 > **#0002** (both *stub* a per-system `discovered` flag this doc makes real) and

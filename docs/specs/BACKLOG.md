@@ -8,7 +8,9 @@
 > `../plans/market.md`, and the archived `git show bf9c637:client/docs/Gameplay.mdc`.
 >
 > Keep it current: when a mechanic graduates to a spec, flip its row to ✅ and
-> link the spec number. Created 2026-07-06.
+> link the spec number. Created 2026-07-06; **last refreshed 2026-07-09** against
+> the plan docs (fog-of-war, movement-galaxy, movement-board, hex-board,
+> camera-and-input), which have moved well ahead of the original list.
 
 ## Legend
 
@@ -27,7 +29,7 @@
 
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
-| Galaxy generation (procedural node graph, regions, lanes) | ✅ #0001 | Accepted. |
+| Galaxy generation (procedural node graph, regions, lanes) | ✅ #0001 | Accepted. Now also generates each system's **major-body skeleton** up front (`../plans/fog-of-war.md` option (a) — the graph shows the inventory). |
 | Frozen start area (logged-out landing) | ✅ #0001 | Decided as an *acceptance criterion* on #0001, not its own spec (`vision.md`). |
 | Ever-growing frontier / expansion cadence | 💭 ⏸ | #0001 makes the model *appendable*; the **trigger + cadence** is a deferred spec. |
 
@@ -35,19 +37,20 @@
 
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
-| Galaxy view (3D force-graph UI, intel panel, inspector) | ✅ #0002 | Accepted. |
-| **Fog of war** (per-player visibility, scan radius, re-fogging) | 💭 🎯 | Referenced by #0001/#0002 (both *stub* a `discovered` flag). The **rules** — how visibility is computed and decays — need their own spec. Slice-relevant. |
-| **Inter-system travel / movement on the graph** (lane cost, FTL tiers, relay chains) | 📝 🎯 | Scoped in `../plans/movement-galaxy.md`: **lane travel** over the #0001 node graph — click a destination, game pathfinds the lanes, ETA async; travel into a visible lane *reveals* the system (fog Explored). Slice = lanes-only. |
+| Galaxy view (3D force-graph UI, intel panel, inspector) | ✅ #0002 | Accepted. Camera/input model now scoped in `../plans/camera-and-input.md` (folds in — see below). |
+| **Camera & input** (galaxy-tier 3D camera: RTS pan-orbit, Z-up, gestures) | 📝 🎯 | **NEW row.** Scoped + **DECIDED** in `../plans/camera-and-input.md`, proven in the `galaxy-3d` spike. Feeds **#0002** — likely folds into that spec as its camera remit, or a small `camera-and-input` spec if it grows. |
+| **Fog of war** (per-player visibility, scan radius, re-fogging) | ✅ #0006 🎯 | **Graduated 2026-07-09 as [#0006 scan-and-fog](0006-scan-and-fog.md) (accepted)** — the intel data model + live visibility; **absorbs the Scan row** below; replaces the #0001/#0002 `discovered` stub with a subspace enum. Design in `../plans/fog-of-war.md`; prototyped in the `hex-board` spike. |
+| **Inter-system travel / movement on the graph** (lane cost, FTL tiers, relay chains) | ✅ #0008 🎯 | **Graduated 2026-07-09 as [#0008 movement-galaxy](0008-movement-galaxy.md) (accepted)** — 5 locked decisions (length-weighted time cost, jump-range FTL, fleet-is-mover, destination-on-arrival reveal, three orthogonal fast-travel mechanisms); slice = lanes-only; **spike in progress**. Design in `../plans/movement-galaxy.md`. |
 
 ## Tactical layer — the per-system hex board
 
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
-| **System interior generation** (hex board: resource tiles, hazards, tile traits) | ✅ #0003 | Draft. Star-centered orbital rings, **bodies** as the anchor, orbital elements in-schema (motion deferred), generator dialed by graph-tier character. Design in `../plans/hex-board.md`. |
-| **Hex board view / renderer** (2D canvas/SVG?) | 📝 🎯 | **Renderer decided (`../plans/hex-board.md`): SVG** (bounded ~150-tile board). Companion to the interior-gen spec, like #0002 is to #0001. |
-| **In-system movement** (ships across hexes, sublight/FTL, tile-trait effects) | ✅ #0004 | Accepted. **Coast & thrust** over the orbital board — coast rides your orbit, thrust plots a burn, click-to-intercept moving bodies, dock to ride; the **fleet** is the mover, movement resolves async (arrival computed, not scheduled). Design in `../plans/movement-board.md`. Pairs with #0003. |
-| **Scan** (reveal tiles, detect resources/hazards/players → produce *intelligence*) | 💭 🎯 | Core slice action + the source of the knowledge economy. |
-| **Mine** (extract materials from resource tiles) | 💭 🎯 | Core slice action. |
+| **System interior generation** (hex board: resource tiles, hazards, tile traits) | ✅ #0003 | **Accepted** (was Draft). Star-centered orbital rings, **bodies** as the anchor, orbital elements in-schema (motion deferred), two-phase generation (skeleton eager / detail on first arrival — resolved in `fog-of-war.md`). Design in `../plans/hex-board.md`. |
+| **Hex board view / renderer** (2D SVG) | ✅ #0007 🎯 | **Graduated 2026-07-09 as [#0007 hex-board-view](0007-hex-board-view.md) (accepted)** — SVG renderer, quantize-the-sim/interpolate-the-picture, three fog bands, select→preview→commit. Companion to #0003, like #0002 is to #0001. Design in `../plans/hex-board.md`; prototyped in the `hex-board` spike. |
+| **In-system movement** (ships across hexes, sublight/FTL, tile-trait effects) | ✅ #0004 | Accepted. **Coast & thrust** over the orbital board — coast rides your orbit, thrust plots a burn, click-to-intercept moving bodies, dock to ride; the **fleet** is the mover, movement resolves async. Design in `../plans/movement-board.md`. Pairs with #0003. **Assumes the action/timer spine (below) — currently unspec'd.** |
+| **Scan** (reveal tiles, detect resources/hazards/players → produce *intelligence*) | ✅ #0006 🎯 | **Absorbed into [#0006 scan-and-fog](0006-scan-and-fog.md)** (2026-07-09): a scan does double duty — reveals to me (fog) **and** mints a timestamped observation into intel inventory; rides #0005 (commit-time ETA; resolves correctly even late). |
+| **Mine** (extract materials from resource tiles) | 💭 🎯 | Core slice action. No dedicated plan doc; sketched in `hex-board.md` slice section (one action on a #0003 body). Small — its own tiny spec, or folds into the hex-board-view spec. |
 | **Research** (research points / tech unlocks) | 💭 ⏸ | Named as a core action; depth deferred. |
 | **Combat** (ship/unit fighting; loss stakes) | 💭 ⏸ | A real pillar "alongside, not above" exploration; lethality tuning open. Deferred past slice. |
 
@@ -55,20 +58,20 @@
 
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
-| **Player spawn & placement** (starting system + package, min/max spawn padding) | 💭 🎯 | Slice step 3. Spawn-padding rules carried from `Gameplay.mdc`. |
-| **Corporation** (persistent stake; total-loss triggers; restart-fresh) | 💭 ⏸ | The persistent player entity. Loss/restart rules are open (`BRAINSTORM.md`). |
-| **Units / assets taxonomy** (Ship, Base, Site, Probe, Relay, Outpost) | 💭 ⬜ | From `Gameplay.mdc`; decide which survive the rebuild. |
+| **Player spawn & placement** (identity model, wake-up system, spawn spacing) | ✅ #0009 🎯 | **Graduated 2026-07-09 as [#0009 spawn](0009-spawn.md) (accepted)**; design in `../plans/spawn.md` (identity + death rules **DECIDED** 2026-07-09). Bobiverse frame: the player is an **uploaded mind**; Corporation = the *lineage of copies*, fleet = a replicant copy in a hull; starting package = **one hull**; drift lore is canon ("follow your own path"). Corp dies with its **last** fleet; restart = **backup-restore** (a drifted copy wakes fresh). Placement criteria leaning (unclaimed + bootstrap-guaranteed + frontier-weighted); **spacing formula deliberately open** — a whole-graph property, decide with real graphs + frontier cadence. |
+| **Corporation** (persistent stake; total-loss triggers; restart-fresh) | ✅ #0009 ⏸ | **Core rules DECIDED 2026-07-09 — recorded in [#0009 spawn](0009-spawn.md)** (`../plans/spawn.md`): the Corporation is the *mind's lineage* — alive while ≥1 fleet lives, gone with the last fleet; restart = backup-restore (a drifted copy wakes fresh, nothing mechanical carries). Full restart flow + orphaned-asset rules stay deferred (combat era). |
+| **Units / assets taxonomy** (Ship, Base, Site, Probe, Relay, Outpost) | 💭 ⬜ | From `Gameplay.mdc`; decide which survive the rebuild. Fog/movement docs already lean on it (relays as sensors/network, mining sites, the fleet). Spawn lore (`../plans/spawn.md`) defuses the urgency: nothing but the first hull exists at spawn, so this is a **build-tree** decision — decide it with the build verb, not before. |
 | **Territory / influence** (control rules, influence radius, territory score) | 💭 ⬜ | Heavy in the *old* single-map design; 2.0 leans reputation/leaderboards instead. **Decide if it survives** or is scratched. |
-| **Progression axes** (ships/exploration tech, research tree, fleet/infra, wealth) | 💭 ⏸ | Kept "gentle parallel drips"; pacing is an open decision. |
+| **Progression axes** (ships/exploration tech, research tree, fleet/infra, wealth) | 💭 ⏸ | Kept "gentle parallel drips"; pacing is an open decision. Concrete sub-axes now named: sensor (fog), engine (movement-board), drive jump-range (movement-galaxy). |
 | **Reputation / leaderboards** (discoveries, wealth, territory ranking) | 💭 ⏸ | Light ongoing competition throughline. |
 
 ## Economy
 
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
-| **Intel market** (knowledge economy: verified, freshness-gated auction house) | 📝 ⏸ | Deeply scoped in `../plans/market.md`. The **signature mechanic** — ready to graduate to a `/spec`. |
+| **Intel market** (knowledge economy: verified, freshness-gated auction house) | 📝 ⏸ | Deeply scoped in `../plans/market.md`; **core + shape-definers locked**, ready to `/spec intel-market`. The **signature mechanic** — but builds **on** `scan-and-fog` (where an intel item is born), so spec that first. |
 | **Goods / materials market** (regional pricing, arbitrage) | 💭 ⏸ | Sketched in `BRAINSTORM.md` (Goods & logistics). |
-| **Station / relay network** (jump-gate teleport, tolls, last-mile haul) | 💭 ⏸ | The shared network both economies ride; player-built frontier extension. |
+| **Station / relay network** (jump-gate teleport, tolls, last-mile haul) | 💭 ⏸ | The shared network both economies ride; player-built frontier extension. Two-network model (data vs. mass) now recorded in `fog-of-war.md` + `market.md`. |
 | **Currency & credits** (single credit; sinks/faucets) | 💭 ⏸ | Listing fees + transfer tolls are the primary sinks. |
 | **Async shipments / logistics** (queued freighter travel, at-risk in transit) | 💭 ⏸ | The last-mile-haul verb; ties to the pacing model. |
 
@@ -76,38 +79,39 @@
 
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
-| **Action / timer system** (real-time actions that resolve while offline) | 💭 🎯 | The *foundation* of the async cadence — scan/mine/research/travel all queue and complete over time (slice step 6, "see it persist"). Rides Volt SSE + Pub/Sub. Likely an early foundational spec, not a late one. |
+| **Action / timer system** (real-time actions that resolve while offline) | ✅ #0005 🎯 | **Graduated 2026-07-09 as [#0005 action-timer](0005-action-timer.md) (accepted)**; design in `../plans/action-timer.md` (core **DECIDED** 2026-07-09). The async spine every verb rides; #0004 (accepted) and both movement docs *assume* it. Architecture: **one `action` entity, two resolution strategies** (kinematic = computed from `worldTime`; mutating = appends to an **event-sourced ledger**), lazy ETA-ordered resolve-on-read **plus an in-slice ~15-min Scheduler sweep** (an ordinary reader on a clock — resolves anything outstanding; never the correctness mechanism), fleet-owns-state (#0004), one scaled `worldTime` function. Rides Volt SSE + Pub/Sub (invalidation-only). Riders closed 2026-07-09 (slice mines **point-at-ETA**, cycle-quantized flow later; notifications cut from the slice — Resend rides the sweep post-slice). Spec'd first, as planned — #0006–#0008 build on it. |
 | **Predictable-coast vs. loud-burn** (emergent: movement × intel × stealth) | 💭 ⏸ | *Cool emergent idea* — coasting is deterministic so a fleet's **future position is knowable → sellable intel**; thrusting goes **volatile/"loud"** → juke a pursuer but expose yourself *now*. Wires movement (#0004) ↔ fog ↔ intel market (predicted *ephemeris* as a product) ↔ combat. Nearly free from the model; design *toward* it, not a slice feature. See `../plans/BRAINSTORM.md` §Predictable drift vs. loud burn. |
 | **AI bots / living world** (populate, chat, small trades) | 💭 ⏸ | Fits `claude-agent`. Explicitly not in the slice. |
-| **Multiplayer contact / social** (alliances, messaging, shared discovery) | 💭 ⬜ | Beyond the market — open whether it's in scope at all. |
+| **Multiplayer contact / social** (alliances, messaging, shared discovery) | 💭 ⬜ | Beyond the market — open whether it's in scope at all. Fog is strictly per-Corporation (decided), so shared vision is a *market* problem, not a fog one. |
 | **New-player grace / danger tuning** | 💭 ⬜ | Open question; may live *inside* the spawn and combat specs rather than its own. |
 | **Tutorial / guided onboarding** (in the start area) | 💭 ⏸ | The start area "graduates" into a tutorial home later (`vision.md`). |
 | **Auth & onboarding** | ✅ (platform) | Firebase auth is Volt baseline; the game-specific piece (frozen start area as landing) folds into #0001/#0002. |
 
 ---
 
-## Reading the map — where the gaps cluster
+## Reading the map — where the gaps cluster (2026-07-09)
 
-- **The whole tactical layer is unspec'd.** #0001/#0002 build the *strategic*
-  (graph) layer; the entire hex board — interior generation, its renderer,
-  movement, **scan**, **mine** — has no specs yet, and most of it is
-  slice-critical (🎯).
-- **Two foundational cross-cutting mechanics have no spec but everything leans
-  on them:** **fog of war** (every view stubs it) and the **action/timer
-  system** (every action resolves through it). These are good candidates to
-  spec *before* the individual actions that depend on them.
-- **The economy is well-thought-out but all deferred (⏸)** — one plan doc
-  (intel market, ready to graduate) and several idea-level sketches.
-- **A few carryovers need a keep/scratch call (⬜):** territory/influence, the
-  full unit taxonomy, multiplayer-social.
+- **The strategic + tactical *generation* layers are spec'd and accepted** (#0001–#0004).
+- **The 2026-07-09 graduation batch put the verbs, glue, and renderers into spec**
+  (**all accepted 2026-07-09**): **#0005 action-timer** (the async spine, spec'd
+  first as planned), **#0006 scan-and-fog** (absorbs Scan), **#0007 hex-board-view**,
+  **#0008 movement-galaxy**, **#0009 spawn**.
+- **Remaining 🎯 gaps: mine** (💭 — the last slice verb, small) and **camera & input**
+  (📝 — folds into #0002 when the real galaxy view is built).
+- **The economy is well-thought-out but all deferred (⏸)** — `intel-market.md`
+  (ready, but builds on #0006) plus several idea-level sketches.
+- **A few carryovers need a keep/scratch call (⬜):** unit taxonomy (now defused to a
+  build-verb-time decision — #0009), territory/influence, multiplayer-social.
 
-## Suggested next specs (priority = slice-critical foundations first)
+## Suggested next steps (2026-07-09)
 
-1. **Action / timer system** — the async spine every verb needs.
-2. **Fog of war** — unblocks the stubs already sitting in #0001/#0002.
-3. **System interior generation** + **hex board view** — the #0001/#0002 pair,
-   one tier down.
-4. **Player spawn** — puts a Corporation on the board.
-5. **In-system movement + scan + mine** — the "do one satisfying thing" verbs.
+1. ~~Review + accept the #0005–#0009 drafts~~ — **done 2026-07-09**; all five
+   accepted with their riders resolved.
+2. **Mine** — the last slice verb; its own tiny spec or folded into #0007. Its
+   hardest parts are already decided in #0005 (point-at-ETA, one window-capable
+   delta).
+3. **Camera & input** — fold into #0002 (or a small spec) whenever the real galaxy
+   view is built.
 
-*(Order is a suggestion, not a decision — this backlog exists so you can pick.)*
+*(With #0005–#0009 accepted, every 🎯 row but mine is spec-backed — the slice is
+buildable in spec order.)*

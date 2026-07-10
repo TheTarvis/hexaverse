@@ -3,8 +3,9 @@
 > **Living doc, high-level only.** Scratchpad for the **tactical tier**: the
 > per-system hex grid you drill into from the galaxy graph. Nothing here is
 > committed design. `?` marks an open question; **DECIDED** = locked this
-> session. Feeds a future `docs/specs/NNNN-system-interior.md` (+ its renderer)
-> — the ⬜ companion to **#0001**/**#0002**, one tier down. Created 2026-07-06.
+> session. Fed `../specs/0003-system-interior.md` (accepted); **its renderer
+> graduated 2026-07-09 → `../specs/0007-hex-board-view.md` (accepted)** — the
+> companion pair to **#0001**/**#0002**, one tier down. Created 2026-07-06.
 >
 > Context: `../vision.md` (two-tier map), `BRAINSTORM.md` (§Two-tier map, §Core
 > actions), `fog-of-war.md` (board-tier fog, the three states), `market.md`

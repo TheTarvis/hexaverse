@@ -8,17 +8,22 @@
 >
 > **Grounds / grounded-by:** `vision.md` (what we're building & why), `plans/fog-of-war.md`
 > (subspace knowledge *is* the fog), `plans/movement-galaxy.md` (lanes *are* subspace
-> travel), `plans/market.md` (the market trades *current subspace* intel), and specs
-> #0001 (the star map) / #0004 (in-system movement).
+> travel), `plans/market.md` (the market trades *current subspace* intel),
+> `plans/spawn.md` (who the player *is* — the mind, its copies, death & backup),
+> and specs #0001 (the star map) / #0004 (in-system movement).
 
 ---
 
 ## Premise
 
-Players run **Corporations** operating across a procedurally generated galaxy of
-star systems. You explore, colonize, extract, and compete — and knowledge itself
-is the scarce, tradable prize. The galaxy is a shared, persistent, dangerous place;
-a Corporation can lose everything and start again. (See `vision.md` for the game's
+Every player is an **uploaded mind** — a consciousness archived long ago, woken
+into a self-replicating hull on the galactic frontier (Bobiverse-style;
+`plans/spawn.md`). The **Corporation** is the legal fiction a mind operates
+under — and, more truly, its **lineage**: every fleet you own carries a copy of
+you, and each copy **drifts**, developing its own personality and path. You
+explore, extract, build, and compete — and knowledge itself is the scarce,
+tradable prize. The galaxy is a shared, persistent, dangerous place; a lineage
+can end, and a drifted backup can begin again. (See `vision.md` for the game's
 goals and pillars; this doc explains the *world* those pillars sit in.)
 
 ---
@@ -82,23 +87,41 @@ visible everywhere, lanes sparse across the seam (spec #0001).
 
 ---
 
-## Corporations, loss, and restart
+## Corporations — a mind, its copies, and what death means
 
-A **Corporation** is the persistent player entity. The galaxy is dangerous and a
-Corporation can be wiped — or you can choose to fold and restart fresh. The lore
-draws a clean line through what a wipe touches:
+A **Corporation** is the persistent player entity — in-fiction, a **lineage**:
+one uploaded mind, copied into every hull it builds. **DECIDED (2026-07-09,
+`plans/spawn.md`):**
 
-- **The star map is universal astronomy — it persists.** The sky doesn't reset; the
-  galaxy is the galaxy for everyone.
-- **What a Corporation loses is its *subspace* estate:** the lanes it had mapped, the
-  systems it had surveyed and explored, its holdings, and its intel inventory. Your
-  *knowledge of the roads and the current truth* is the perishable thing, and it's
-  what starts over.
+- **Each fleet carries a replicant copy of the mind.** The fleet is the actor
+  (#0004) because a fleet *is* a player-instance — it moves, senses, and works
+  because someone is *in there*.
+- **Copies drift.** Like the Bobs, each replicant diverges — its own voice,
+  priorities, and path. Drift is the canon behind players (and later,
+  individual fleets) following their own path: specialization is personality,
+  not a menu.
+- **The lineage lives while any copy lives.** Lose nine of ten fleets and the
+  Corporation persists, bruised. Lose the last hull and the lineage is gone —
+  total loss.
+- **Restart is backup-restore.** An archived copy wakes in a new hull at the
+  fresh frontier — a **new** Corporation, lore-continuous but mechanically
+  fresh. *Leaning hand-wave for why nothing carries:* the archive holds the
+  **seed copy** — the original upload, not a running snapshot of the veteran
+  who died. What wakes is you, but not the you who mapped those roads; it has
+  drifted in storage besides.
 
-New Corporations spawn at the **fresh frontier edge** (`vision.md`), where the
-surrounding roads are unmapped and first-hand subspace intel is genuinely valuable.
-*(Restart triggers, total-loss conditions, and how much carries over are open —
-TODO(travis); the market and spawn specs own the details.)*
+The wipe respects the two channels:
+
+- **The star map is universal astronomy — it persists.** The sky doesn't reset;
+  the woken copy sees the same stars everyone does.
+- **What dies with the lineage is its *subspace* estate:** the lanes it had
+  mapped, the systems it had surveyed, its holdings, and its intel inventory.
+  The perishable, *earned* channel is exactly the one that starts over.
+
+New Corporations — first spawns and restarts alike — wake at the **fresh
+frontier edge** (`vision.md`), where the surrounding roads are unmapped and
+first-hand subspace intel is genuinely valuable. Spawn criteria, spacing, and
+the starting hull: `plans/spawn.md`.
 
 ---
 
@@ -116,6 +139,8 @@ rests on:
 | **Generator regions** (star-rich / dead / barrier) read at a glance | coarse stellar character is a telescope observation |
 | **Frontier** = the edge of *your mapped roads*, not the edge of what exists | you see the whole sky; you've charted little of it |
 | **Restart** wipes subspace holdings, keeps the sky | the star map is universal, your road-map is yours |
+| **Fleet as the actor** (#0004) — the fleet moves, senses, owns its state | each hull carries a copy of the mind; a fleet *is* a player-instance |
+| **Multi-fleet control** (later) arrives as *replication*, not recruitment | a self-replicating mind builds copies; drift gives each one its flavour |
 
 ---
 
@@ -128,7 +153,17 @@ rests on:
 - **Relays / sensors as remote subspace eyes** — can a good subspace sensor detect a
   *neighbouring* system's lanes without travelling there (survey-at-range), or is
   presence always required? (Progression hook; base case = presence-only.)
-- **Restart / total-loss rules** — TODO(travis); owned by the corporation/spawn specs.
+- **Where do backups live?** The seed-archive hand-wave covers *what* wakes;
+  *who keeps the archive* (an institution? automated vaults drifting between the
+  stars?) is open flavour. Whatever it is, it's also the diegetic frame for the
+  logged-out start area — the mind in **cold storage**, browsing before waking
+  (`plans/spawn.md`).
+- **How do copies share knowledge?** Fog is per-Corporation
+  (`plans/fog-of-war.md`), which implies a lineage's copies pool what they
+  sense — presumably over the subspace data network. Does a far-flung copy's
+  discovery reach the lineage instantly, or only within relay reach? Base
+  case: instant/abstracted; a relay-gated version is a progression hook that
+  ties into the two-network (data vs. mass) model.
 - **Why subspace geometry diverges from real space** — flavour depth we can leave
   vague, but a consistent hand-wave (subspace folds along mass/gravity, not distance)
   keeps barriers and long lanes feeling intentional.

@@ -69,7 +69,7 @@ buildable distillation.
 ## Non-goals
 
 - **Generic action / timer system** — the async spine (queue, resolve-while-offline,
-  notifications) is its own foundational spec (BACKLOG: *Action / timer system*).
+  notifications) is its own foundational spec — **#0005** (spec'd 2026-07-09).
   This spec defines the **burn action + its resolution semantics** and rides that
   spine; for the slice, arrival **resolves lazily/computed** (Decision #12), so it
   ships without the generic scheduler.
@@ -173,9 +173,12 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
 - **Graph↔board seam:** arriving from a lane places the fleet **coasting on the rim ring
   at the entry tile** (the `movement-galaxy.md` handoff); leaving = reach a **rim exit
   tile** and hand off to graph movement. **Exit tiles are bearing-aligned** — each
-  lane maps to the rim tile/arc in its galaxy-tier **direction**, so the two tiers stay
-  spatially coherent and departure positioning matters (Decision #17). This spec's
-  slice implements the **entry side only**; departure lands with the galaxy-movement spec.
+  lane maps to the rim tile in its galaxy-tier **direction**, so the two tiers stay
+  spatially coherent and departure positioning matters (Decision #17). *Resolved
+  2026-07-09 with #0008:* the geometry is **one fixed gate tile per lane**
+  (deterministic bearing projection onto the rim), and **departure ships in the #0008
+  slice** — the burn-to-gate is leg 0 of the trip action; this spec owns the burn,
+  #0008 owns the trip.
 - **Tuning is data, not code:** `burnSpeed` (hexes/tick), intercept search horizon, and
   later fuel/range live in a **params object** (as #0003's `GenerationParams`), with the
   spike's `BURN_SPEED` as the baseline default.
@@ -251,7 +254,7 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
     alive when #0003 motion turns on — **zero rework** either way.
 12. **Arrival is computed, not fired.** Deterministic path + known `arriveTime` makes
     position a pure function of `worldTime`, so the slice needs **no scheduler**. The
-    generic **action/timer system** (separate spec) is required only for
+    generic **action/timer system** (now **#0005**) is required only for
     **side-effecting** resolution (arrival-triggers-generation, notifications);
     movement rides it when it lands.
 13. **Re-task and cancel allowed underway**, recomputed from the ship's current
@@ -272,9 +275,11 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
     the north-west rim) — keeping the two tiers spatially coherent and making departure
     positioning a resource. Rejected: *any rim tile* (severs the tiers, positioning
     meaningless) and *the entry tile* (arbitrary). The **exact geometry** (single tile vs
-    arc; projecting #0001's lane bearing onto the hex rim) is **co-owned with the
-    galaxy-movement spec** at the shared seam; **this spec's slice implements only the
-    entry side** (arrive coasting at the rim entry tile) — departure lands with that spec.
+    arc; projecting #0001's lane bearing onto the hex rim) was co-owned with the
+    galaxy-movement spec at the shared seam — **resolved 2026-07-09 (#0008 Decision
+    #10): one fixed gate tile per lane**, deterministic bearing projection, entry and
+    departure sides alike; departure ships with #0008 (burn-to-gate as leg 0 of the
+    trip action).
 18. **Uniform burn cost; directional fidelity is a deferred knob.** A burn costs the same
     regardless of heading (prograde/retrograde/radial) — one `burnSpeed`, no per-heading
     modifier — keeping it *readable, not Kerbal* (Decision #1) and the intercept solve
@@ -294,8 +299,9 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
 ## Open questions
 
 - **None blocking.** All four opening questions are resolved (Decisions #8, #17, #18,
-  #19). Two are **cross-spec boundaries** delegated by design, not unknowns: the
-  graph↔board **exit-tile geometry** (co-owned with the galaxy-movement spec, #17) and
+  #19). Two were **cross-spec boundaries** delegated by design, not unknowns: the
+  graph↔board **exit-tile geometry** (co-owned with the galaxy-movement spec, #17 —
+  since resolved 2026-07-09: one fixed gate tile per lane, #0008 Decision #10) and
   the **volatile-snapshot cadence + audience** (owned by fog + the SSE surface, #19).
   Both are tracked in Decisions/References.
 
@@ -308,7 +314,10 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
 - `../plans/movement-galaxy.md` — the graph-tier sibling; **shares the rim handoff seam**.
 - `../plans/fog-of-war.md` — who sees the volatile snapshot; the scan bubble rides the ship.
 - `../plans/market.md` — the fuel/refuel economy, if cost ever turns on.
-- BACKLOG *Action / timer system* — the async spine this rides (a separate foundational spec).
+- **#0005 action-timer** — the async spine this rides. **Shared invariant (recorded
+  in both, 2026-07-09): the fleet owns its movement state (this spec); a #0005 action
+  is a thin lifecycle wrapper that *references* the fleet — never a second copy of
+  its state, and position reads never query the actions collection.**
 - `frontend/app/spike/hex-board/` — the throwaway prototype proving the feel + intercept.
 - `../vision.md` — step 5 "move a ship"; the two-tier map; the rim handoff.
 - Archived design: `git show bf9c637:client/docs/Gameplay.mdc` — original sublight/FTL/traits.

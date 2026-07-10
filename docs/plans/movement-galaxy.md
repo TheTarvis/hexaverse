@@ -3,8 +3,9 @@
 > **Living doc, high-level only.** Scratchpad for **how a unit crosses the galaxy**
 > on the node graph — traversing lanes system-to-system, plotting routes, revealing
 > as you go, the roads-vs-off-road question. Nothing here is committed design.
-> `?` = open question; **DECIDED** = locked. Feeds a future
-> `docs/specs/NNNN-movement-galaxy.md` (companion to #0001/#0002). Created 2026-07-07.
+> `?` = open question; **DECIDED** = locked. **Graduated 2026-07-09 →
+> `../specs/0008-movement-galaxy.md` (accepted)** (companion to #0001/#0002).
+> Created 2026-07-07.
 >
 > **Sibling doc:** `movement-board.md` owns the *board tier* (in-system coast &
 > thrust). Movement is split two ways because the tiers are entirely different
