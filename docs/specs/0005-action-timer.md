@@ -1,7 +1,7 @@
 ---
 number: 0005
 title: Action & Timer System
-status: accepted   # draft | accepted | implemented | superseded
+status: implemented   # draft | accepted | implemented | superseded
 created: 2026-07-09
 owner: Travis Wilson
 supersedes:     # spec number(s) this replaces, if any
