@@ -16,7 +16,7 @@ otherwise it starts a **throwaway** set for the run and tears it down after. Sam
 for the backend Go suites (`npm run test:backend:e2e` etc. from the repo root) — no
 more "forgot to start the emulator."
 
-You do **not** need your dev frontend (`:3000`) or dev backend (`:9010`) — the suite
+You do **not** need your dev frontend (`:3010`) or dev backend (`:9010`) — the suite
 boots its own on separate ports.
 
 **Optional (faster iteration):** keep a persistent emulator running and every run
@@ -46,7 +46,7 @@ token audience the suite relies on (see the shared-project note below).
    - Builds and starts the `ENV=test` backend binary on **`:9012`** (rate limiting
      off, pointed at the test emulators). Kills any leftover from a prior run first,
      so you never reuse stale data or stale code.
-2. **`webServer`**: Playwright boots its **own** Next.js frontend on **`:3100`**,
+2. **`webServer`**: Playwright boots its **own** Next.js frontend on **`:3110`**,
    into its **own build dir** (`.next-e2e`) so it can't clobber your dev server's
    `.next`.
 3. **`setup` project** (`auth.setup.ts`): seeds the test user in the auth emulator,
@@ -57,7 +57,7 @@ token audience the suite relies on (see the shared-project note below).
 
 | Piece | Local (default) | Your dev stack (untouched) |
 |---|---|---|
-| Frontend | `:3100` (`.next-e2e`) | `:3000` |
+| Frontend | `:3110` (`.next-e2e`) | `:3010` |
 | Backend | `:9012` (`ENV=test`) | `:9010` |
 | Emulators | firebase.test.json — auth `:10109`, firestore `:9100` | firebase.json — auth `:9109`, firestore `:8090` |
 | Firebase project | `hexaverse-emulator` (wiped each run) | your dev project |

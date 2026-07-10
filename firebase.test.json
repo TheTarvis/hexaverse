@@ -11,7 +11,7 @@
     },
     "ui": {
       "enabled": false,
-      "port": 4001
+      "port": 4011
     },
     "firestore": {
       "port": 9100
@@ -20,7 +20,7 @@
       "port": 9106
     },
     "storage": {
-      "port": 10199
+      "port": 10209
     },
     "hub": {
       "port": 9410

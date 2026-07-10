@@ -10,8 +10,8 @@ const cfg = resolveE2EConfig()
 // are auto-started by the `npm run e2e` wrapper (firebase.test.json).
 //
 // Command is env-overridable and defaults to the dev server on baseURL's port
-// (e.g. :3100 locally so it doesn't collide with your dev server on :3000).
-const devPort = new URL(cfg.baseURL).port || '3000'
+// (e.g. :3110 locally so it doesn't collide with your dev server on :3010).
+const devPort = new URL(cfg.baseURL).port || '3010'
 const defaultDevCommand = `npm run dev -- --port ${devPort}`
 const webServer = cfg.reuseServer
   ? undefined

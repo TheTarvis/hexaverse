@@ -96,7 +96,7 @@ make emulators-bg / stop-emulators         # Firebase emulators in background
 Frontend (`cd frontend`):
 
 ```bash
-npm run dev                                # localhost:3000
+npm run dev                                # localhost:3010
 npm run lint                               # ESLint + tsc
 npx vitest run                             # tests, one-shot
 npx vitest run path/to/file.test.tsx       # single file
@@ -165,14 +165,14 @@ npm run firebase:emulators
 # 2. Backend (:9010)
 npm run dev:backend
 
-# 3. Frontend (:3000)
+# 3. Frontend (:3010)
 npm run dev:frontend
 ```
 
 `npm run dev` runs frontend + backend concurrently in one terminal. E2E
 (`cd frontend && npm run e2e`) needs none of these — it boots its own
 isolated stack (test emulators, `ENV=test` backend on :9012, frontend on
-:3100).
+:3110).
 
 ## User profile
 

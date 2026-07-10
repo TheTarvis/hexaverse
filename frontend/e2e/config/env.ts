@@ -5,7 +5,7 @@
  *   - local (default): the ISOLATED test stack on the firebase.test.json emulators
  *     (auth 10109 / firestore 9100), NOT your dev stack. Auth is seeded via the
  *     emulator REST API (no real credentials). Playwright boots its own frontend
- *     (:3100) and globalSetup boots the ENV=test backend (:9012). Prerequisite:
+ *     (:3110) and globalSetup boots the ENV=test backend (:9012). Prerequisite:
  *     the test emulators must be running (`npm run e2e` auto-starts a throwaway
  *     set via scripts/dev/with-test-emulators.sh). To instead attach to an
  *     already-running stack, set E2E_REUSE_SERVER=1 and point
@@ -65,8 +65,8 @@ export function resolveE2EConfig(): E2EConfig {
       // Defaults target the ISOLATED test stack, not your dev stack, so a suite
       // run never writes to the Firestore/Auth your `make run` + `npm run dev`
       // use. The pieces:
-      //   - frontend on :3100 (Playwright boots its own — reuseServer=false — so
-      //     it doesn't grab your dev server on :3000).
+      //   - frontend on :3110 (Playwright boots its own — reuseServer=false — so
+      //     it doesn't grab your dev server on :3010).
       //   - backend on :9012 (the ENV=test binary; globalSetup builds+runs it,
       //     rate limiting disabled). Not your dev :9010, and not :9011 — that
       //     port is reserved for the backend Go integration suite, so both can
@@ -80,7 +80,7 @@ export function resolveE2EConfig(): E2EConfig {
       //     run to keep the long-lived local emulator from accumulating data (see
       //     e2e/setup/backend-stack.ts). CI uses a throwaway emulator.
       // Any of these is env-overridable for one-off targeting.
-      baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3100',
+      baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3110',
       apiURL: process.env.E2E_API_URL ?? 'http://localhost:9012',
       user: {
         email: process.env.E2E_USER_EMAIL ?? 'e2e@hexaverse.test',

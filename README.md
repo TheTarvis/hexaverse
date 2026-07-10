@@ -39,7 +39,7 @@ firebase emulators:start --only firestore,auth,pubsub --config firebase.test.jso
 cd backend && make run                # localhost:9010
 
 # Terminal 3 — frontend
-cd frontend && npm run dev                 # localhost:3000
+cd frontend && npm run dev                 # localhost:3010
 ```
 
 ## Where to look

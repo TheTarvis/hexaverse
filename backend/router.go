@@ -32,12 +32,13 @@ func SetupRouter() *gin.Engine {
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = []string{}
 	if config.IsLocal() {
-		// Next.js bumps to the next free port when 3000 is taken, so accept the
-		// common local dev ports rather than only 3000. :3100 is the dedicated
-		// e2e frontend port (playwright boots the dev server there) — without it
-		// the browser's API calls are CORS-blocked during e2e.
+		// Hexaverse dev frontend runs on :3010 (base +10 so it coexists with
+		// Flywheel on :3000). Next.js bumps to the next free port when 3010 is
+		// taken, so accept :3011 too. :3110 is the dedicated e2e frontend port
+		// (playwright boots the dev server there) — without it the browser's API
+		// calls are CORS-blocked during e2e.
 		corsConfig.AllowOrigins = append(corsConfig.AllowOrigins,
-			"http://localhost:3000", "http://localhost:3001", "http://localhost:3100")
+			"http://localhost:3010", "http://localhost:3011", "http://localhost:3110")
 	}
 	corsConfig.AllowCredentials = true
 	corsConfig.AllowHeaders = []string{

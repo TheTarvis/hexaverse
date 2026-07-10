@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # CORS — comma-separated list of allowed frontend origins
-    cors_allowed_origins: str = "http://localhost:3000"
+    cors_allowed_origins: str = "http://localhost:3010"
 
     # Anthropic
     anthropic_api_key: str = ""
