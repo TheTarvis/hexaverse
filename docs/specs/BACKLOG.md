@@ -114,5 +114,8 @@
    "Camera & input" design section).
 
 *(Every 🎯 row is spec-backed — the slice backlog is closed and buildable in
-spec order: #0001→#0010. Next up when appetite returns: the ⏸ economy stack,
-starting with `/spec intel-market`, and the ⬜ keep/scratch calls.)*
+spec order: #0001→#0010. **The implementation roadmap is
+[`../plans/build-order.md`](../plans/build-order.md)** (2026-07-09) — ten
+demoable milestones M1–M10 mapping onto the specs. Next up when appetite
+returns: the ⏸ economy stack, starting with `/spec intel-market`, and the ⬜
+keep/scratch calls.)*
