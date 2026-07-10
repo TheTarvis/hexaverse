@@ -168,19 +168,27 @@ client component tree:
 
 ## Acceptance criteria
 
-- [ ] Navigating from a #0002 graph node opens `/systems/[systemId]` and
+> **M7 landed the core (2026-07-10):** the drill-in board, animation, fog
+> bands, move+scan verbs, the three refetch rules, and fleet rendering. The
+> boxes that depend on later rungs stay open — **gates + depart** (#0008/M8),
+> **mine** (#0010/M10), and the **full slice e2e** (M10). This spec flips to
+> `implemented` at M8 when #0008 finishes it. Note: the "single backend read"
+> is realized as two server-fogged reads that fan in (interior + the fleet
+> layer, `GET /v1/fleets?systemId=`) — no unfogged data reaches the client.
+
+- [x] Navigating from a #0002 graph node opens `/systems/[systemId]` and
       renders that system's **fogged** board from a single backend read; the
       response is the only world state the client holds (no unfogged data in
       any payload, store, or cache).
-- [ ] The board draws as **star-centered concentric rings** at radius ~16
+- [x] The board draws as **star-centered concentric rings** at radius ~16
       with ring-band tinting; hexes are individually clickable SVG polygons.
-- [ ] Bodies and coasting fleets **animate from `(elements, worldTime)`**
+- [x] Bodies and coasting fleets **animate from `(elements, worldTime)`**
       via the server-time offset — no position refetching; a paused network
       still animates correctly between reads.
-- [ ] **Quantized logic, interpolated visuals**: glyphs glide (including the
+- [x] **Quantized logic, interpolated visuals**: glyphs glide (including the
       ring wrap-around) while selection, targeting, and all readouts use the
       integer logical hex, flipping at the halfway point.
-- [ ] The **three bands render distinctly**: astronomical layer visible-but-
+- [x] The **three bands render distinctly**: astronomical layer visible-but-
       dim from arrival; live content marked live; remembered features ghosted
       at their current computed orbital position with a frozen `asOf` age.
       Unseen content is absent, not hidden.
@@ -188,29 +196,30 @@ client component tree:
       move-to-body (led intercept point that tracks as the world turns +
       ETA), scan, mine, and depart-via-gate (burn-to-gate preview + trip
       ETA, the #0008 order); commit clears selection; clicking a selected
-      target deselects.
+      target deselects. *(M7: move-to-hex, move-to-body, scan done; mine
+      lands M10, depart-via-gate M8.)*
 - [ ] The system's **lane gates** render at their fixed rim tiles (#0008
-      geometry) for any player in-system, entry gate included.
-- [ ] Committing an action **self-schedules a refetch at its ETA**, and the
+      geometry) for any player in-system, entry gate included. *(M8.)*
+- [x] Committing an action **self-schedules a refetch at its ETA**, and the
       view refetches on SSE reconnect and polls gently while open (the three
       #0005 rules — observable in tests).
-- [ ] A **burning own-fleet** renders its committed path and glides along
+- [x] A **burning own-fleet** renders its committed path and glides along
       it; **other players' fleets** render only what the fogged read
       contains (snapshot position — never a path or ETA).
-- [ ] The scan bubble is drawn from each own-unit's **live** position and
+- [x] The scan bubble is drawn from each own-unit's **live** position and
       moves with it.
 - [ ] `lib/hex/` math is pure and vitest-covered (quantization, wrap,
       interpolation, intercept preview vs. fixtures); the e2e slice loop
       (drill in → move → scan → mine → fog states) passes on the isolated
-      test stack.
-- [ ] Layering holds: no raw `fetch`, all reads/mutations through
+      test stack. *(M7: `lib/hex/` pure + covered; the full slice e2e is M10.)*
+- [x] Layering holds: no raw `fetch`, all reads/mutations through
       service functions + the query-key factory; Catalyst-only chrome;
       color-system compliant; `data-testid` on interactive elements
       (`/check` clean).
 - [ ] **Slice bar:** a player can drill in, watch the system turn, order a
       move, scan a body, mine it, close the tab, come back after the ETA,
       and see the completed result — without a manual refresh — then depart
-      via a lane gate back to the galaxy tier.
+      via a lane gate back to the galaxy tier. *(Completes at M10.)*
 
 ## Decisions (imported from `../plans/hex-board.md`)
 

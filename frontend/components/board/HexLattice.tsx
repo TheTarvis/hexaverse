@@ -42,7 +42,11 @@ export function HexLattice({ radius, bandBounds, selectedHex, onSelectHex }: Hex
             stroke={selected ? '#ffffff' : tileStroke(band)}
             strokeWidth={selected ? 2 : 1}
             className="cursor-pointer transition-colors hover:fill-white/10"
-            onClick={() => onSelectHex?.(hex)}
+            onClick={(e) => {
+              // Stop the click reaching the board's click-empty-to-deselect handler.
+              e.stopPropagation()
+              onSelectHex?.(hex)
+            }}
           />
         )
       })}

@@ -1,13 +1,15 @@
 'use client'
 
-// HexBoard — the SVG viewport that hosts the tactical board (#0007). For this
-// slice it fits a static viewBox over the hex lattice and owns the one-selection
-// state (click to select, click again to deselect — the first half of the
-// select → preview → commit gesture). Glyph, fog, and preview layers slot in as
-// sibling <g> groups above the lattice as later slices land; wheel/drag pan-zoom
-// upgrades this component in place.
+// HexBoard — the SVG viewport that hosts the tactical board (#0007). It fits a
+// viewBox over the hex lattice and stacks, back to front: the static tinted
+// lattice, the pending-order preview, and the animated world scene (rings, sensor
+// bubble, glyphs). Selection lives in the container (SystemBoardView) so the facts
+// panel and verb gestures share it; HexBoard just wires tile clicks and a
+// click-empty-to-deselect through. The lattice is memoized so the per-frame
+// worldTime tick re-renders only the scene above it, never the 800 tiles.
 
-import { useMemo, useState } from 'react'
+import { memo, useMemo } from 'react'
+import type { ReactNode } from 'react'
 import type { Hex } from '@/lib/hex'
 import { fitViewBox, hexesWithinRadius } from '@/lib/hex/pixel'
 import { HexLattice } from './HexLattice'
@@ -16,14 +18,24 @@ import type { BandBounds } from './board-palette'
 export interface HexBoardProps {
   radius: number
   bandBounds?: BandBounds
+  selectedHex?: Hex | null
+  onSelectHex?: (hex: Hex) => void
+  onSelectEmpty?: () => void
+  // The animated world scene + preview, rendered as <g> layers above the lattice.
+  children?: ReactNode
 }
 
-export function HexBoard({ radius, bandBounds }: HexBoardProps) {
-  const viewBox = useMemo(() => fitViewBox(hexesWithinRadius(radius)), [radius])
-  const [selectedHex, setSelectedHex] = useState<Hex | null>(null)
+const MemoLattice = memo(HexLattice)
 
-  const toggleHex = (hex: Hex) =>
-    setSelectedHex((prev) => (prev && prev.q === hex.q && prev.r === hex.r ? null : hex))
+export function HexBoard({
+  radius,
+  bandBounds,
+  selectedHex,
+  onSelectHex,
+  onSelectEmpty,
+  children,
+}: HexBoardProps) {
+  const viewBox = useMemo(() => fitViewBox(hexesWithinRadius(radius)), [radius])
 
   return (
     <svg
@@ -31,13 +43,15 @@ export function HexBoard({ radius, bandBounds }: HexBoardProps) {
       className="absolute inset-0 h-full w-full"
       viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
       preserveAspectRatio="xMidYMid meet"
+      onClick={onSelectEmpty}
     >
-      <HexLattice
+      <MemoLattice
         radius={radius}
         {...(bandBounds ? { bandBounds } : {})}
         selectedHex={selectedHex}
-        onSelectHex={toggleHex}
+        {...(onSelectHex ? { onSelectHex } : {})}
       />
+      {children}
     </svg>
   )
 }

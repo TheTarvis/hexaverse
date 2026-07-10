@@ -24,7 +24,7 @@ test.describe('system board', () => {
     await expect(page.getByTestId('hex-lattice')).toBeVisible()
     await expect(page.getByTestId('hex-tile-0,0')).toBeVisible()
 
-    // The facts chip reflects the read (star class + radius/body facts).
-    await expect(page.getByTestId('system-facts')).toContainText('system')
+    // The facts panel reflects the read (star class + radius/body facts).
+    await expect(page.getByTestId('facts-panel')).toContainText('system')
   })
 })

@@ -30,6 +30,16 @@ export const queryKeys = {
     all: ['systemBoard'] as const,
     detail: (id: string) => [...queryKeys.systemBoard.all, 'detail', id] as const,
   },
+
+  fleets: {
+    // The fogged fleet layer (#0004/#0007). `inSystem` backs the board's fleet
+    // glyphs; `detail` a single fleet. Move/scan mutations invalidate both plus
+    // `systemBoard.detail` (a scan reveals features) and self-schedule the ETA
+    // refetch.
+    all: ['fleets'] as const,
+    inSystem: (systemId: string) => [...queryKeys.fleets.all, 'in-system', systemId] as const,
+    detail: (id: string) => [...queryKeys.fleets.all, 'detail', id] as const,
+  },
 } as const
 
 export type AccountQueryKey =

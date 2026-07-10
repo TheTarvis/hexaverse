@@ -1,22 +1,32 @@
 'use client'
 
 // SystemBoardView — the container the /systems/[systemId] route renders (#0007).
-//
-// For this slice it wires the fogged interior read (useSystemBoard) into the
-// SVG HexBoard: a star-centred hex lattice at the system's radius, full-bleed,
-// with a lightweight facts chip (the seed of the spike's KNOWN FACTS panel).
-// Glyph / fog / selection-preview layers and the verb gestures slot in above
-// the lattice on later slices; pan/zoom upgrades HexBoard in place.
+// It fans in the two fogged reads (the interior + the requester's fleets), runs
+// the shared world clock (useWorldTime), and owns the select → preview → commit
+// gesture for the slice verbs (move + scan). The heavy lifting lives in leaves:
+// HexBoard/BoardScene draw, FactsPanel commands, glyph-geometry/move-preview do
+// the math. The three #0005 refetch rules ride useBoardRealtime.
 
+import { useMemo, useState } from 'react'
 import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
+import { toast } from '@/lib/toast'
 import { useSystemBoard } from '@/hooks/use-system-board'
+import { useFleetsInSystem, useFleetOrders, useScan } from '@/hooks/use-fleets'
+import { useWorldTime } from '@/hooks/use-world-time'
+import { useBoardRealtime } from '@/hooks/use-board-realtime'
+import type { Hex, Target } from '@/lib/hex'
+import type { Fleet } from '@/lib/types/fleet'
 import { HexBoard } from './HexBoard'
-
-const PANEL =
-  'pointer-events-auto rounded-xl border border-zinc-200 bg-zinc-50/90 p-4 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]'
+import { BoardScene } from './BoardScene'
+import { SelectionPreview } from './SelectionPreview'
+import { FactsPanel, type BoardSelection } from './FactsPanel'
+import { featureLogicalHex, fleetLogicalHex } from './glyph-geometry'
+import { planToBody, planToHex, type MovePlan } from './move-preview'
 
 const STAGE = 'relative h-dvh w-full overflow-hidden bg-[#05070d]'
+const PANEL =
+  'pointer-events-auto rounded-xl border border-zinc-200 bg-zinc-50/90 p-4 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]'
 
 export interface SystemBoardViewProps {
   systemId: string
@@ -24,6 +34,56 @@ export interface SystemBoardViewProps {
 
 export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const { data: board, isLoading, isError, error } = useSystemBoard(systemId)
+  const { data: fleets } = useFleetsInSystem(systemId)
+  const worldTime = useWorldTime(board?.worldTime)
+
+  const [selection, setSelection] = useState<BoardSelection>(null)
+  const [activeFleetId, setActiveFleetId] = useState<string | null>(null)
+
+  const { order, cancel } = useFleetOrders(systemId)
+  const scan = useScan(systemId)
+  const pending = order.isPending || cancel.isPending || scan.isPending
+
+  const allFleets = useMemo(() => fleets ?? [], [fleets])
+  const ownFleets = useMemo(() => allFleets.filter((f) => f.own), [allFleets])
+  const activeFleet = useMemo<Fleet | null>(
+    () => ownFleets.find((f) => f.id === activeFleetId) ?? ownFleets[0] ?? null,
+    [ownFleets, activeFleetId],
+  )
+
+  // The acting fleet's live hex — the origin of every previewed order.
+  const fromHex = useMemo<Hex | null>(() => {
+    if (!activeFleet || !board) return null
+    const parent =
+      activeFleet.state.mode === 'docked'
+        ? board.features.find((f) => f.id === activeFleet.state.docked?.parentId)
+        : undefined
+    const parentHex = parent ? featureLogicalHex(parent, worldTime) : undefined
+    return fleetLogicalHex(activeFleet, worldTime, parentHex)
+  }, [activeFleet, board, worldTime])
+
+  // The live preview plan for the current selection — recomputed each frame so a
+  // led intercept tracks the moving target.
+  const plan = useMemo<MovePlan | null>(() => {
+    if (!fromHex || !selection) return null
+    if (selection.kind === 'feature') {
+      const f = selection.feature
+      if (f.orbit) return planToBody(fromHex, f.orbit, worldTime)
+      return planToHex(fromHex, featureLogicalHex(f, worldTime), worldTime)
+    }
+    if (selection.kind === 'hex') return planToHex(fromHex, selection.hex, worldTime)
+    return null
+  }, [fromHex, selection, worldTime])
+
+  // Own fleets' arrival ETAs feed the self-scheduled refetch (rule 1).
+  const etaCandidates = useMemo(
+    () =>
+      ownFleets
+        .filter((f) => f.state.mode === 'burn' && f.state.burn)
+        .map((f) => f.state.burn!.arriveTime),
+    [ownFleets],
+  )
+  useBoardRealtime({ systemId, worldTime, etaCandidates, enabled: !!board })
 
   if (isLoading) {
     return (
@@ -48,59 +108,100 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     )
   }
 
+  // --- selection (toggle-to-deselect) ---------------------------------------
+  const selectFeature = (id: string) => {
+    const feature = board.features.find((f) => f.id === id)
+    if (!feature) return
+    setSelection((prev) =>
+      prev?.kind === 'feature' && prev.feature.id === id ? null : { kind: 'feature', feature },
+    )
+  }
+  const selectFleet = (id: string) => {
+    const f = allFleets.find((fl) => fl.id === id)
+    if (!f) return
+    if (f.own) setActiveFleetId(id)
+    setSelection((prev) => (prev?.kind === 'fleet' && prev.fleet.id === id ? null : { kind: 'fleet', fleet: f }))
+  }
+  const selectHex = (hex: Hex) =>
+    setSelection((prev) =>
+      prev?.kind === 'hex' && prev.hex.q === hex.q && prev.hex.r === hex.r ? null : { kind: 'hex', hex },
+    )
+
+  // --- verbs -----------------------------------------------------------------
+  const commitMove = () => {
+    if (!activeFleet || !selection) return
+    let target: Target | null = null
+    if (selection.kind === 'feature') target = { featureId: selection.feature.id }
+    else if (selection.kind === 'hex') target = { hex: selection.hex }
+    if (!target) return
+    order.mutate(
+      { fleetId: activeFleet.id, target },
+      {
+        onSuccess: () => {
+          toast.success('Course laid in')
+          setSelection(null)
+        },
+        onError: (e) => toast.error(e.message || 'Order failed'),
+      },
+    )
+  }
+  const commitScan = () => {
+    if (!activeFleet) return
+    scan.mutate(activeFleet.id, {
+      onSuccess: () => toast.success('Scanning…'),
+      onError: (e) => toast.error(e.message || 'Scan failed'),
+    })
+  }
+  const commitCancel = () => {
+    if (!activeFleet) return
+    cancel.mutate(activeFleet.id, {
+      onSuccess: () => toast.success('Burn cancelled'),
+      onError: (e) => toast.error(e.message || 'Cancel failed'),
+    })
+  }
+
+  const selectedId =
+    selection?.kind === 'feature'
+      ? selection.feature.id
+      : selection?.kind === 'fleet'
+        ? selection.fleet.id
+        : null
+
   return (
     <div data-testid="system-board-view" className={STAGE}>
-      <HexBoard radius={board.radius} />
+      <HexBoard
+        radius={board.radius}
+        selectedHex={selection?.kind === 'hex' ? selection.hex : null}
+        onSelectHex={selectHex}
+        onSelectEmpty={() => setSelection(null)}
+      >
+        <BoardScene
+          worldTime={worldTime}
+          features={board.features}
+          fleets={allFleets}
+          selectedId={selectedId}
+          onSelectFeature={selectFeature}
+          onSelectFleet={selectFleet}
+        />
+        <SelectionPreview plan={selection?.kind === 'fleet' ? null : plan} />
+      </HexBoard>
 
-      {/* Overlay layer — the chip catches pointer events; the gap lets board
-          clicks through (glyph/selection layers land above the lattice later). */}
-      <div className="pointer-events-none absolute inset-0 flex justify-between gap-4 p-4">
-        <FactsChip
-          character={board.character}
+      <div className="pointer-events-none absolute inset-0 flex justify-end gap-4 p-4">
+        <FactsPanel
           starClass={board.starClass}
+          character={board.character}
           radius={board.radius}
           featureCount={board.features.length}
+          selection={selection}
+          activeFleet={activeFleet}
+          plan={plan}
+          worldTime={worldTime}
+          pending={pending}
+          onMove={commitMove}
+          onScan={commitScan}
+          onCancel={commitCancel}
         />
       </div>
-    </div>
-  )
-}
-
-function FactsChip({
-  character,
-  starClass,
-  radius,
-  featureCount,
-}: {
-  character: string
-  starClass: string
-  radius: number
-  featureCount: number
-}) {
-  return (
-    <aside
-      data-testid="system-facts"
-      className={`${PANEL} flex w-64 max-w-[80vw] flex-col gap-3 self-start`}
-    >
-      <div>
-        <Subheading className="!text-base !text-white">Class {starClass} system</Subheading>
-        <p className="mt-0.5 font-mono text-[11px] tracking-wide text-zinc-400 uppercase">
-          {character.replace('_', ' ')}
-        </p>
-      </div>
-      <dl className="grid grid-cols-2 gap-2 text-sm">
-        <Fact label="Radius" value={radius} />
-        <Fact label="Bodies" value={featureCount} />
-      </dl>
-    </aside>
-  )
-}
-
-function Fact({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-zinc-200 bg-zinc-100/60 px-3 py-2 dark:border-zinc-800/50 dark:bg-black/20">
-      <dd className="font-mono text-xl leading-none text-white">{value}</dd>
-      <dt className="mt-1 text-[11px] tracking-wide text-zinc-400 uppercase">{label}</dt>
     </div>
   )
 }

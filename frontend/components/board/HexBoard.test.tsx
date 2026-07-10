@@ -1,29 +1,37 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { HexBoard } from './HexBoard'
 
 describe('HexBoard', () => {
-  it('renders an svg viewport hosting the lattice', () => {
-    render(<HexBoard radius={2} />)
-    expect(screen.getByTestId('hex-board')).toBeInTheDocument()
-    expect(screen.getByTestId('hex-lattice')).toBeInTheDocument()
+  it('renders an svg viewport hosting the lattice and any child layers', () => {
+    render(
+      <HexBoard radius={2}>
+        <g data-testid="scene-layer" />
+      </HexBoard>,
+    )
     expect(screen.getByTestId('hex-board')).toHaveAttribute('viewBox')
+    expect(screen.getByTestId('hex-lattice')).toBeInTheDocument()
+    expect(screen.getByTestId('scene-layer')).toBeInTheDocument()
   })
 
-  it('toggles selection when the same tile is clicked twice', () => {
-    render(<HexBoard radius={1} />)
-    const tileId = 'hex-tile-0,0'
-    fireEvent.click(screen.getByTestId(tileId))
-    expect(screen.getByTestId(tileId)).toHaveAttribute('stroke', '#ffffff') // selected
-    fireEvent.click(screen.getByTestId(tileId))
-    expect(screen.getByTestId(tileId)).not.toHaveAttribute('stroke', '#ffffff') // deselected
-  })
-
-  it('moves the selection to a different clicked tile', () => {
-    render(<HexBoard radius={1} />)
-    fireEvent.click(screen.getByTestId('hex-tile-0,0'))
+  it('forwards tile clicks and highlights the controlled selection', () => {
+    const onSelectHex = vi.fn()
+    render(<HexBoard radius={1} selectedHex={{ q: 0, r: 0 }} onSelectHex={onSelectHex} />)
+    expect(screen.getByTestId('hex-tile-0,0')).toHaveAttribute('stroke', '#ffffff')
     fireEvent.click(screen.getByTestId('hex-tile-1,0'))
-    expect(screen.getByTestId('hex-tile-1,0')).toHaveAttribute('stroke', '#ffffff')
-    expect(screen.getByTestId('hex-tile-0,0')).not.toHaveAttribute('stroke', '#ffffff')
+    expect(onSelectHex).toHaveBeenCalledWith({ q: 1, r: 0 })
+  })
+
+  it('deselects on a background click but not on a tile click', () => {
+    const onSelectEmpty = vi.fn()
+    render(<HexBoard radius={1} onSelectEmpty={onSelectEmpty} />)
+
+    fireEvent.click(screen.getByTestId('hex-board'))
+    expect(onSelectEmpty).toHaveBeenCalledTimes(1)
+
+    // A tile stops propagation, so it never reaches click-empty-to-deselect.
+    onSelectEmpty.mockClear()
+    fireEvent.click(screen.getByTestId('hex-tile-0,0'))
+    expect(onSelectEmpty).not.toHaveBeenCalled()
   })
 })

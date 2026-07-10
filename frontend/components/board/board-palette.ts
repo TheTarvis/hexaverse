@@ -9,6 +9,9 @@
 //
 // (raw hex is intentional in this module; see above.)
 
+import type { FeatureType, FogBand } from '@/lib/types/system-board'
+import type { Mode } from '@/lib/hex'
+
 // The four ring bands of a system interior (backend: system.Band).
 export type Band = 'core' | 'inner' | 'mid' | 'outer'
 
@@ -58,3 +61,74 @@ export function tileFill(band: Band): string {
 export function tileStroke(band: Band): string {
   return rgba(BAND_STYLE[band].tint, 0.09)
 }
+
+// --- glyph + fog treatments (#0006/#0007) ----------------------------------
+//
+// The base terrain stays dark; the astronomical body layer and the live scan
+// bubble are what light the board up (fog by subtraction). These are all raw
+// SVG colour strings, so — like the tints above — they live only in this module.
+
+// The drawn shape for each feature family (the FeatureGlyph switches on this).
+export type GlyphShape = 'star' | 'disc' | 'giant' | 'belt' | 'moon' | 'diamond' | 'square'
+
+export interface FeatureStyle {
+  color: string
+  shape: GlyphShape
+}
+
+// Per-type glyph colour + shape (the spike's BODY palette, one family).
+export const FEATURE_STYLE: Record<FeatureType, FeatureStyle> = {
+  star: { color: '#ffd27d', shape: 'star' },
+  rocky: { color: '#c8a27a', shape: 'disc' },
+  gas_giant: { color: '#e0b877', shape: 'giant' },
+  ice: { color: '#bfe6f5', shape: 'disc' },
+  belt: { color: '#9aa7b4', shape: 'belt' },
+  moon: { color: '#cdd3da', shape: 'moon' },
+  anomaly: { color: '#c58bf0', shape: 'diamond' },
+  ruin: { color: '#e08b8b', shape: 'square' },
+  nebula: { color: '#8bb8f0', shape: 'disc' },
+  gravity_well: { color: '#b07de6', shape: 'diamond' },
+  debris: { color: '#9aa7b4', shape: 'belt' },
+  radiation: { color: '#e6d27d', shape: 'diamond' },
+}
+
+// How each fog band paints its glyph (#0006's three bands): live at full strength
+// with a live accent; remembered dimmed + ghosted with a frozen `asOf` age;
+// astronomical dimmest, geometry + type only.
+export interface FogTreatment {
+  opacity: number
+  ghost: boolean // draw the dashed "last known" ring
+  accent: string
+  label: string
+}
+
+export const FOG_TREATMENT: Record<FogBand, FogTreatment> = {
+  visible: { opacity: 1, ghost: false, accent: '#34d399', label: 'LIVE' },
+  remembered: { opacity: 0.62, ghost: true, accent: '#fbbf24', label: 'MEMORY' },
+  astronomical: { opacity: 0.42, ghost: true, accent: '#8b98a9', label: 'CHARTED' },
+}
+
+// A fleet's accent encodes its movement mode: coast cyan, burn amber, docked green.
+export const FLEET_ACCENT: Record<Mode, string> = {
+  coast: '#7dd3fc',
+  burn: '#fbbf24',
+  docked: '#34d399',
+}
+
+// A foreign fleet's muted snapshot marker (grey — no mode is inferred).
+export const FLEET_FOREIGN = '#9aa7b4'
+
+// The lit thruster flame on a burning own fleet (matches the burn accent).
+export const THRUSTER = '#fbbf24'
+
+// The white selection outline shared by every selectable glyph.
+export const SELECTION_STROKE = '#ffffff'
+
+// The live ambient-sensor bubble that rides own units, and the move/scan preview.
+export const SCAN_BUBBLE_FILL = 'rgba(125, 211, 252, 0.06)'
+export const SCAN_BUBBLE_STROKE = 'rgba(125, 211, 252, 0.30)'
+export const PREVIEW_ROUTE = 'rgba(125, 211, 252, 0.55)'
+export const PREVIEW_BURN = '#fbbf24'
+export const PREVIEW_MEET = '#fbbf24'
+export const ORBIT_RING = 'rgba(150, 180, 220, 0.10)'
+export const ORBIT_RING_HILITE = 'rgba(125, 211, 252, 0.55)'

@@ -6,8 +6,9 @@ import { useAccountContext } from '@/components/account-provider'
 import { AppNavigation } from '@/components/app-navigation'
 
 // Routes that should NOT have the dashboard layout (e.g. login, OAuth callbacks).
-// `/spike` stays here for the remaining hex-board/audio spikes (the galaxy-3d
-// spike was retired at M2; `/` is now the public galaxy landing, handled below).
+// `/spike` stays here for the remaining audio spike (galaxy-3d retired at M2,
+// hex-board at M7 — the production /systems/[id] board replaced it; `/` is now
+// the public galaxy landing, handled below).
 const PUBLIC_ROUTES = ['/login', '/oauth', '/spike']
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {

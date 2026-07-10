@@ -44,6 +44,7 @@ func (h *Handler) WithFog(fog AudienceFog) *Handler {
 func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	g := authorized.Group("/fleets")
 	{
+		g.GET("", h.List)
 		g.GET("/:fleetId", h.Get)
 		g.POST("/:fleetId/orders", h.Order)
 		g.POST("/:fleetId/cancel", h.Cancel)
@@ -76,6 +77,49 @@ func (h *Handler) Get(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, h.toDTO(c, f))
+}
+
+// List returns every fleet the requester may see in a system: their own units
+// always, plus foreign fleets currently inside their live sensor union (audience
+// fog, per fleet). It's the board's fleet layer — a single read alongside the
+// interior read, both fogged server-side, so no unfogged fleet ever reaches the
+// client (#0007). Read-only: it never settles a due arrival.
+func (h *Handler) List(c *gin.Context) {
+	systemID := common.RequiredQueryParam(c, "systemId")
+	if systemID == "" {
+		return // RequiredQueryParam already aborted with 400
+	}
+	fleets, err := h.svc.ListInSystem(c.Request.Context(), systemID)
+	if err != nil {
+		log.Error().Ctx(c).Err(err).Str("systemId", systemID).Msg("list fleets failed")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	requesterCid := common.ActorCorp(c)
+	out := make([]fleetDTO, 0, len(fleets))
+	for i := range fleets {
+		f := &fleets[i]
+		pos, err := h.svc.Position(c.Request.Context(), f)
+		if err != nil {
+			log.Warn().Ctx(c).Err(err).Str("fleetId", f.Id).Msg("could not resolve fleet position")
+		}
+		// Own units are never fogged; only foreign fleets face the audience check
+		// (which also spares a per-own-unit coverage computation).
+		if h.fog != nil && f.CorporationId != requesterCid {
+			vis, err := h.fog.FleetVisibleTo(c.Request.Context(), requesterCid,
+				observation.FleetPos{Id: f.Id, CorporationId: f.CorporationId, SystemId: f.SystemId, Hex: pos}, h.clock.Now())
+			if err != nil {
+				log.Error().Ctx(c).Err(err).Str("fleetId", f.Id).Msg("fleet audience check failed")
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+			if !vis {
+				continue
+			}
+		}
+		out = append(out, h.dtoFor(f, pos, requesterCid))
+	}
+	c.JSON(http.StatusOK, gin.H{"fleets": out, "worldTime": h.clock.Now()})
 }
 
 func (h *Handler) Scan(c *gin.Context) {
@@ -118,7 +162,12 @@ func (h *Handler) DevSeed(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "systemId is required"})
 		return
 	}
+	// Default ownership to the seeder's corporation so a dev-seeded fleet is one
+	// the requester can drive and see as their own (#0009 spawn replaces this).
 	corp := req.CorporationId
+	if corp == "" {
+		corp = common.ActorCorp(c)
+	}
 	if corp == "" {
 		corp = "dev-corp"
 	}
@@ -145,14 +194,18 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 	}
 }
 
-// fleetDTO is the read shape: the movement state plus the computed live
-// position and worldTime, so the client can render immediately.
+// fleetDTO is the read shape: the movement state plus the computed live position
+// and worldTime, so the client can render immediately. `own` tells the client
+// whether it may drive this fleet and render its committed path — a foreign
+// fleet's `state` is stripped to a snapshot (mode + position, no path or ETA),
+// so audience fog never leaks another corporation's plan (#0004/#0007).
 type fleetDTO struct {
 	Id            string              `json:"id"`
 	CorporationId string              `json:"corporationId"`
 	SystemId      string              `json:"systemId"`
 	State         board.MovementState `json:"state"`
 	Position      board.Hex           `json:"position"`
+	Own           bool                `json:"own"`
 	WorldTime     common.WorldMillis  `json:"worldTime"`
 }
 
@@ -161,12 +214,24 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) fleetDTO {
 	if err != nil {
 		log.Warn().Ctx(c).Err(err).Str("fleetId", f.Id).Msg("could not resolve fleet position")
 	}
+	return h.dtoFor(f, pos, common.ActorCorp(c))
+}
+
+func (h *Handler) dtoFor(f *Fleet, pos board.Hex, requesterCid string) fleetDTO {
+	own := requesterCid != "" && f.CorporationId == requesterCid
+	state := f.State
+	if !own {
+		// Snapshot only — the audience sees where a foreign fleet is, never its
+		// committed path, coast elements, or arrival ETA.
+		state = board.MovementState{Mode: f.State.Mode}
+	}
 	return fleetDTO{
 		Id:            f.Id,
 		CorporationId: f.CorporationId,
 		SystemId:      f.SystemId,
-		State:         f.State,
+		State:         state,
 		Position:      pos,
+		Own:           own,
 		WorldTime:     h.clock.Now(),
 	}
 }

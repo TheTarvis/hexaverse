@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"hexaverse/action"
@@ -17,11 +18,15 @@ import (
 // fakeFleetSvc is a hand fake of ServiceInterface for handler tests.
 type fakeFleetSvc struct {
 	fleet   *Fleet
+	list    []Fleet
 	scanErr error
 	getErr  error
 }
 
 func (f *fakeFleetSvc) Get(context.Context, string) (*Fleet, error) { return f.fleet, f.getErr }
+func (f *fakeFleetSvc) ListInSystem(context.Context, string) ([]Fleet, error) {
+	return f.list, nil
+}
 func (f *fakeFleetSvc) OrderTo(context.Context, string, OrderRequest) (*Fleet, error) {
 	return f.fleet, nil
 }
@@ -56,6 +61,38 @@ func TestScan_ConflictWhenBusy(t *testing.T) {
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/fleets/f1/scan", nil))
 	if w.Code != http.StatusConflict {
 		t.Fatalf("scan while busy: status = %d, want 409", w.Code)
+	}
+}
+
+// TestList_RequiresSystemId 400s a bare list (no whole-galaxy fleet dump).
+func TestList_RequiresSystemId(t *testing.T) {
+	r := newFleetRouter(&fakeFleetSvc{}, nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets", nil))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("list without systemId: status = %d, want 400", w.Code)
+	}
+}
+
+// TestList_AudienceFogsForeigns keeps the requester's own units and drops a
+// foreign fleet the audience filter can't sense — the board's fleet layer never
+// leaks an unsensed foreign.
+func TestList_AudienceFogsForeigns(t *testing.T) {
+	svc := &fakeFleetSvc{list: []Fleet{
+		{Id: "mine", CorporationId: "corp-user1", SystemId: "s1"},
+		{Id: "theirs", CorporationId: "corp-other", SystemId: "s1"},
+	}}
+	// The auth stub sets account "user1", so ActorCorp = "corp-user1" — "mine" is
+	// an own unit (skips the audience check); "theirs" is foreign and the fog
+	// rejects it. So the response keeps "mine" and drops "theirs".
+	r := newFleetRouter(svc, fakeAudience{visible: false})
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets?systemId=s1", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("list: status = %d, want 200", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "mine") || strings.Contains(w.Body.String(), "theirs") {
+		t.Fatalf("audience fog leaked or dropped a fleet: body = %s", w.Body.String())
 	}
 }
 

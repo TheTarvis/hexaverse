@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { BAND_STYLE, bandForRing, DEFAULT_BAND_BOUNDS, rgba, tileFill, tileStroke, type Band } from './board-palette'
+import {
+  BAND_STYLE,
+  bandForRing,
+  DEFAULT_BAND_BOUNDS,
+  FEATURE_STYLE,
+  FLEET_ACCENT,
+  FOG_TREATMENT,
+  rgba,
+  tileFill,
+  tileStroke,
+  type Band,
+} from './board-palette'
+import type { FeatureType } from '@/lib/types/system-board'
 
 describe('bandForRing', () => {
   it('maps rings to bands using the backend default boundaries', () => {
@@ -35,5 +47,32 @@ describe('tile styling', () => {
 
   it('warms the mid (habitable) band above the others', () => {
     expect(tileFill('mid')).not.toBe(tileFill('inner'))
+  })
+})
+
+describe('glyph + fog treatments', () => {
+  it('styles every feature family', () => {
+    const types: FeatureType[] = [
+      'star', 'rocky', 'gas_giant', 'ice', 'belt', 'moon',
+      'anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation',
+    ]
+    for (const t of types) {
+      expect(FEATURE_STYLE[t].color).toMatch(/^#/)
+      expect(FEATURE_STYLE[t].shape).toBeTruthy()
+    }
+  })
+
+  it('dims the fog bands live → remembered → astronomical', () => {
+    expect(FOG_TREATMENT.visible.opacity).toBeGreaterThan(FOG_TREATMENT.remembered.opacity)
+    expect(FOG_TREATMENT.remembered.opacity).toBeGreaterThan(FOG_TREATMENT.astronomical.opacity)
+    // Only live content reads as un-ghosted.
+    expect(FOG_TREATMENT.visible.ghost).toBe(false)
+    expect(FOG_TREATMENT.remembered.ghost).toBe(true)
+    expect(FOG_TREATMENT.astronomical.ghost).toBe(true)
+  })
+
+  it('gives each fleet mode a distinct accent', () => {
+    const accents = new Set([FLEET_ACCENT.coast, FLEET_ACCENT.burn, FLEET_ACCENT.docked])
+    expect(accents.size).toBe(3)
   })
 })

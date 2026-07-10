@@ -36,6 +36,10 @@ var (
 
 type ServiceInterface interface {
 	Get(ctx context.Context, id string) (*Fleet, error)
+	// ListInSystem returns every fleet currently in a system (unfiltered — the
+	// handler applies audience fog per fleet). Read-only: it never settles a due
+	// arrival, so it's side-effect-free (the authoritative settle runs on Get).
+	ListInSystem(ctx context.Context, systemID string) ([]Fleet, error)
 	OrderTo(ctx context.Context, id string, req OrderRequest) (*Fleet, error)
 	Cancel(ctx context.Context, id string) (*Fleet, error)
 	Scan(ctx context.Context, id string) (*Fleet, error)
@@ -99,6 +103,14 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 		return nil, err
 	}
 	return f, nil
+}
+
+// ListInSystem returns every fleet currently in a system. Unlike Get it does not
+// settle due arrivals — the board is a read surface, so it reports each fleet's
+// stored state and lets the client animate; the arrival settle stays on the
+// fleet's own Get/resolve path (one authoritative writer).
+func (s *Service) ListInSystem(ctx context.Context, systemID string) ([]Fleet, error) {
+	return s.dao.ListBySystem(ctx, systemID)
 }
 
 // OrderTo solves a burn to the target (hex or feature) from the fleet's current

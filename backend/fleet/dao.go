@@ -22,6 +22,9 @@ type Dao interface {
 	// ListByCorporation returns every fleet owned by a corporation — the input to
 	// the fog domain's live sensor-union (coverage) computation.
 	ListByCorporation(ctx context.Context, corporationID string) ([]Fleet, error)
+	// ListBySystem returns every fleet currently in a system — the input to the
+	// board's fleet layer (the requester's own units + audience-fogged foreigns).
+	ListBySystem(ctx context.Context, systemID string) ([]Fleet, error)
 }
 
 type DaoImpl struct {
@@ -56,8 +59,16 @@ func (dao *DaoImpl) Save(ctx context.Context, f Fleet) error {
 }
 
 func (dao *DaoImpl) ListByCorporation(ctx context.Context, corporationID string) ([]Fleet, error) {
+	return dao.listWhere(ctx, "corporationId", corporationID)
+}
+
+func (dao *DaoImpl) ListBySystem(ctx context.Context, systemID string) ([]Fleet, error) {
+	return dao.listWhere(ctx, "systemId", systemID)
+}
+
+func (dao *DaoImpl) listWhere(ctx context.Context, field, value string) ([]Fleet, error) {
 	iter := dao.db.Collection(firestoreCollection).
-		Where("corporationId", "==", corporationID).Documents(ctx)
+		Where(field, "==", value).Documents(ctx)
 	defer iter.Stop()
 
 	var out []Fleet

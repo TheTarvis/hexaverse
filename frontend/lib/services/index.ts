@@ -9,3 +9,6 @@ export { default as GalaxyService } from './galaxy-service'
 
 export { systemService } from './system-service'
 export { default as SystemService } from './system-service'
+
+export { fleetService } from './fleet-service'
+export { default as FleetService } from './fleet-service'
