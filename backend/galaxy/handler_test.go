@@ -20,6 +20,21 @@ func (f *fakeService) Generate(context.Context, int64, GenerationParams) (*Gener
 	return f.gen, f.err
 }
 func (f *fakeService) GetLive(context.Context) (*GeneratedGalaxy, error) { return f.gen, f.err }
+func (f *fakeService) GetLiveSystem(context.Context, string) (*System, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.gen == nil || len(f.gen.Systems) == 0 {
+		return nil, ErrSystemNotFound
+	}
+	return &f.gen.Systems[0], nil
+}
+func (f *fakeService) LiveGalaxyMeta(context.Context) (*Galaxy, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &f.gen.Galaxy, nil
+}
 
 func newTestRouter(svc ServiceInterface) *gin.Engine {
 	gin.SetMode(gin.TestMode)

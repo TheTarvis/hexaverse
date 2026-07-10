@@ -33,6 +33,7 @@ type Dao interface {
 	SaveGalaxy(ctx context.Context, g GeneratedGalaxy) error
 	GetGalaxyMeta(ctx context.Context, id string) (*Galaxy, error)
 	ListSystems(ctx context.Context, galaxyID string) ([]System, error)
+	GetSystem(ctx context.Context, galaxyID, systemID string) (*System, error)
 	ListLanes(ctx context.Context, galaxyID string) ([]Lane, error)
 	SetLivePointer(ctx context.Context, galaxyID string) error
 	GetLivePointer(ctx context.Context) (string, error)
@@ -131,6 +132,24 @@ func (dao *DaoImpl) ListSystems(ctx context.Context, galaxyID string) ([]System,
 		systems = append(systems, s)
 	}
 	return systems, nil
+}
+
+func (dao *DaoImpl) GetSystem(ctx context.Context, galaxyID, systemID string) (*System, error) {
+	doc, err := dao.db.Get(ctx, systemsPath(galaxyID), systemID)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if !doc.Exists() {
+		return nil, nil
+	}
+	var s System
+	if err := doc.DataTo(&s); err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 func (dao *DaoImpl) ListLanes(ctx context.Context, galaxyID string) ([]Lane, error) {

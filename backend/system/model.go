@@ -1,0 +1,121 @@
+package system
+
+import "hexaverse/common"
+
+// Band is a tile's orbital band, derived from its ring (a pure function of
+// radius — never stored per tile).
+type Band string
+
+const (
+	BandCore  Band = "core"
+	BandInner Band = "inner"
+	BandMid   Band = "mid"
+	BandOuter Band = "outer"
+)
+
+// FeatureType is the unified family covering both physical/minable bodies and
+// hazards (#0003 Decision #9). Hazards are just features with an `effects`
+// payload.
+type FeatureType string
+
+const (
+	FeatureStar        FeatureType = "star"
+	FeatureRocky       FeatureType = "rocky"
+	FeatureGasGiant    FeatureType = "gas_giant"
+	FeatureIce         FeatureType = "ice"
+	FeatureBelt        FeatureType = "belt"
+	FeatureMoon        FeatureType = "moon"
+	FeatureAnomaly     FeatureType = "anomaly"
+	FeatureRuin        FeatureType = "ruin"
+	FeatureNebula      FeatureType = "nebula"
+	FeatureGravityWell FeatureType = "gravity_well"
+	FeatureDebris      FeatureType = "debris"
+	FeatureRadiation   FeatureType = "radiation"
+)
+
+// ResourceKind is the minable resource family.
+type ResourceKind string
+
+const (
+	ResourceMetals    ResourceKind = "metals"
+	ResourceVolatiles ResourceKind = "volatiles"
+	ResourceWater     ResourceKind = "water"
+	ResourceOrganics  ResourceKind = "organics"
+	ResourceResearch  ResourceKind = "research"
+	ResourceExotic    ResourceKind = "exotic"
+)
+
+// Resource is a minable payload hanging off a feature. Richness is a 0..1 scale
+// dialed by the system's character; the economy (later) turns it into tonnage.
+type Resource struct {
+	Kind     ResourceKind `json:"kind" firestore:"kind"`
+	Richness float64      `json:"richness" firestore:"richness"`
+}
+
+// Effects is a hazard payload: it modifies scanning/movement or blocks a tile.
+type Effects struct {
+	ScanMod float64 `json:"scanMod,omitempty" firestore:"scanMod,omitempty"`
+	MoveMod float64 `json:"moveMod,omitempty" firestore:"moveMod,omitempty"`
+	Block   bool    `json:"block,omitempty" firestore:"block,omitempty"`
+}
+
+// Orbit holds a feature's orbital elements. Its live hex is a pure function of
+// (Orbit, worldTime); with motion off/slow the board reads static (#0003
+// Decision #5). Angle0 is the ring-position index at the world epoch; Period is
+// world-milliseconds for a full revolution; Dir is +1 / −1.
+type Orbit struct {
+	Ring   int                `json:"ring" firestore:"ring"`
+	Angle0 int                `json:"angle0" firestore:"angle0"`
+	Period common.WorldMillis `json:"period" firestore:"period"`
+	Dir    int                `json:"dir" firestore:"dir"`
+}
+
+// Feature is one stored object on the board. Position is exactly one of:
+// Orbit (orbits the star), ParentId (rides another feature — moons, a planet's
+// gravity well), or Fixed (the star at centre). Footprint is the feature's
+// epoch tile(s): a single anchor hex for point bodies, a tile-set for fields
+// (belt arcs, nebulae). Live hex(es) are computed, never stored per tick.
+type Feature struct {
+	Id        string       `json:"id" firestore:"id"`
+	Type      FeatureType  `json:"type" firestore:"type"`
+	Name      string       `json:"name,omitempty" firestore:"name,omitempty"`
+	Orbit     *Orbit       `json:"orbit,omitempty" firestore:"orbit,omitempty"`
+	ParentId  string       `json:"parentId,omitempty" firestore:"parentId,omitempty"`
+	Fixed     bool         `json:"fixed,omitempty" firestore:"fixed,omitempty"`
+	Footprint []Hex        `json:"footprint" firestore:"footprint"`
+	Resources []Resource   `json:"resources,omitempty" firestore:"resources,omitempty"`
+	Effects   *Effects     `json:"effects,omitempty" firestore:"effects,omitempty"`
+}
+
+// SystemInterior is the interior metadata doc — tiles and features are derived
+// / subcollected, never embedded here.
+type SystemInterior struct {
+	SystemId  string             `json:"systemId" firestore:"systemId"`
+	Seed      int64              `json:"seed" firestore:"seed"`
+	Radius    int                `json:"radius" firestore:"radius"`
+	Character string             `json:"character" firestore:"character"`
+	StarClass string             `json:"starClass" firestore:"starClass"`
+	Version   int                `json:"version" firestore:"version"`
+	CreatedAt common.WorldMillis `json:"createdAt" firestore:"createdAt"`
+}
+
+// GeneratedInterior is the full generation output held in memory before
+// persistence.
+type GeneratedInterior struct {
+	Interior SystemInterior
+	Features []Feature
+}
+
+// bandForRing maps a ring to its band using the params boundaries.
+func bandForRing(ring int, p GenerationParams) Band {
+	switch {
+	case ring == 0:
+		return BandCore
+	case ring <= p.InnerMaxRing:
+		return BandInner
+	case ring <= p.MidMaxRing:
+		return BandMid
+	default:
+		return BandOuter
+	}
+}

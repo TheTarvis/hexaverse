@@ -22,6 +22,15 @@ type ServiceInterface interface {
 	Generate(ctx context.Context, seed int64, params GenerationParams) (*GeneratedGalaxy, error)
 	// GetLive returns the current live galaxy (metadata + systems + lanes).
 	GetLive(ctx context.Context) (*GeneratedGalaxy, error)
+	// GetLiveSystem returns a single system node from the live galaxy — the
+	// lightweight graph-tier record (coords, region, name, skeleton). Used
+	// service-to-service by the system domain for the character dial + skeleton.
+	GetLiveSystem(ctx context.Context, systemID string) (*System, error)
+	// LiveGalaxyMeta returns the current live galaxy's metadata doc (id, seed,
+	// params, bounds) — one cheap read. The system domain needs the id (to nest
+	// per-system state under galaxies/{id}/...) and the seed (to derive the same
+	// per-system seed M1's skeleton used).
+	LiveGalaxyMeta(ctx context.Context) (*Galaxy, error)
 }
 
 type Service struct {
@@ -84,4 +93,43 @@ func (s *Service) GetLive(ctx context.Context) (*GeneratedGalaxy, error) {
 	}
 
 	return &GeneratedGalaxy{Galaxy: *meta, Systems: systems, Lanes: lanes}, nil
+}
+
+// ErrSystemNotFound means the requested system id isn't in the live galaxy.
+var ErrSystemNotFound = errors.New("system not found")
+
+func (s *Service) LiveGalaxyMeta(ctx context.Context) (*Galaxy, error) {
+	id, err := s.dao.GetLivePointer(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if id == "" {
+		return nil, ErrNoLiveGalaxy
+	}
+	meta, err := s.dao.GetGalaxyMeta(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if meta == nil {
+		return nil, ErrNoLiveGalaxy
+	}
+	return meta, nil
+}
+
+func (s *Service) GetLiveSystem(ctx context.Context, systemID string) (*System, error) {
+	id, err := s.dao.GetLivePointer(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if id == "" {
+		return nil, ErrNoLiveGalaxy
+	}
+	sys, err := s.dao.GetSystem(ctx, id, systemID)
+	if err != nil {
+		return nil, err
+	}
+	if sys == nil {
+		return nil, ErrSystemNotFound
+	}
+	return sys, nil
 }

@@ -70,6 +70,21 @@ func (mr *MockDaoMockRecorder) GetLivePointer(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLivePointer", reflect.TypeOf((*MockDao)(nil).GetLivePointer), ctx)
 }
 
+// GetSystem mocks base method.
+func (m *MockDao) GetSystem(ctx context.Context, galaxyID, systemID string) (*System, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSystem", ctx, galaxyID, systemID)
+	ret0, _ := ret[0].(*System)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSystem indicates an expected call of GetSystem.
+func (mr *MockDaoMockRecorder) GetSystem(ctx, galaxyID, systemID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSystem", reflect.TypeOf((*MockDao)(nil).GetSystem), ctx, galaxyID, systemID)
+}
+
 // ListLanes mocks base method.
 func (m *MockDao) ListLanes(ctx context.Context, galaxyID string) ([]Lane, error) {
 	m.ctrl.T.Helper()
