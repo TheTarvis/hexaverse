@@ -90,9 +90,10 @@ export function GalaxyGraph({ galaxy, selectedId, onSelect, onReady }: GalaxyGra
     (node: GalaxyNode) => {
       const style = REGION_PALETTE[node.region]
       const selected = selectedRef.current === node.id
-      // `discovered` stub: undiscovered systems render dim (a styling hook —
-      // all-true in the start area until the fog spec).
-      const dim = node.discovered ? 1 : 0.28
+      // The star map is common knowledge — every system renders fully visible
+      // (#0006). Subspace tier is surfaced in the inspector, not by dimming the
+      // graph; any explored-vs-charted emphasis is an M7 board-view decision.
+      const dim = 1
       const sel = selected ? 1.5 : 1
 
       const group = new THREE.Group()
@@ -142,9 +143,10 @@ export function GalaxyGraph({ galaxy, selectedId, onSelect, onReady }: GalaxyGra
       const a = typeof link.source === 'object' ? link.source : nodeById.get(link.source)
       const b = typeof link.target === 'object' ? link.target : nodeById.get(link.target)
       const seam = a?.region === 'barrier' || b?.region === 'barrier'
-      const both = (a?.discovered ?? true) && (b?.discovered ?? true)
-      if (seam) return `rgba(244,114,182,${both ? 0.5 : 0.22})`
-      return `rgba(150,185,230,${both ? 0.42 : 0.2})`
+      // Lanes render at full strength — the star map is common knowledge (#0006);
+      // lane-reveal-by-presence is an M8 (travel) concern.
+      if (seam) return `rgba(244,114,182,0.5)`
+      return `rgba(150,185,230,0.42)`
     },
     [nodeById],
   )

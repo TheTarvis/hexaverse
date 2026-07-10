@@ -13,7 +13,7 @@
     "test:frontend": "cd frontend && npx vitest run",
     "test:backend": "cd backend && make test",
     "test:backend:e2e": "bash scripts/dev/with-test-emulators.sh 'cd backend && make test-integration'",
-    "test:backend:all": "bash scripts/dev/with-test-emulators.sh 'cd backend && ENV=TEST go run gotest.tools/gotestsum@latest -- -count=1 -parallel 5 ./...'",
+    "test:backend:all": "bash scripts/dev/with-test-emulators.sh 'cd backend && ENV=TEST go run gotest.tools/gotestsum@latest -- -count=1 -parallel 5 -p 1 ./...'",
     "test:agent": "cd claude-agent && uv run pytest tests/ -v",
     "lint:agent": "cd claude-agent && uv run ruff check . && uv run ruff format --check . && uv run pyright",
     "firebase:emulators": "firebase emulators:start --project hexaverse-emulator",

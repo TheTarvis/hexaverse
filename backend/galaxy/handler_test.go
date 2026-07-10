@@ -72,10 +72,11 @@ func TestHandler_GetGalaxy_PinnedShape(t *testing.T) {
 	if payload.Id != "gal_h" || len(payload.Systems) == 0 || len(payload.Lanes) == 0 {
 		t.Fatalf("unexpected payload: id=%s systems=%d lanes=%d", payload.Id, len(payload.Systems), len(payload.Lanes))
 	}
-	// Fog stub: every system discovered=true, and the skeleton is present.
+	// Free star map: with no fog wired, every system reads starVisible and the
+	// skeleton is present (#0006 replaced the discovered stub with a subspace tier).
 	for _, s := range payload.Systems {
-		if !s.Discovered {
-			t.Fatalf("system %s not discovered=true (fog stub)", s.Id)
+		if s.Tier != "starVisible" {
+			t.Fatalf("system %s tier = %q, want starVisible (no fog wired)", s.Id, s.Tier)
 		}
 		if s.Skeleton.StarClass == "" {
 			t.Fatalf("system %s missing skeleton star class", s.Id)

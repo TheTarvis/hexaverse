@@ -83,7 +83,7 @@ export function GalaxyView() {
 
   if (isLoading) {
     return (
-      <div className="relative h-dvh w-full overflow-hidden bg-[#05070d]">
+      <div data-testid="galaxy-view" className="relative h-dvh w-full overflow-hidden bg-[#05070d]">
         <GraphFallback label="Charting the galaxy…" />
       </div>
     )
@@ -91,7 +91,10 @@ export function GalaxyView() {
 
   if (isError || !galaxy) {
     return (
-      <div className="relative grid h-dvh w-full place-items-center overflow-hidden bg-[#05070d] px-6">
+      <div
+        data-testid="galaxy-view"
+        className="relative grid h-dvh w-full place-items-center overflow-hidden bg-[#05070d] px-6"
+      >
         <div className={PANEL}>
           <Subheading className="!text-white">Couldn’t load the galaxy</Subheading>
           <Text className="mt-1 !text-zinc-400">
@@ -103,7 +106,7 @@ export function GalaxyView() {
   }
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-[#05070d]">
+    <div data-testid="galaxy-view" className="relative h-dvh w-full overflow-hidden bg-[#05070d]">
       <GalaxyGraph
         galaxy={galaxy}
         selectedId={selectedId}
@@ -305,8 +308,8 @@ function Inspector({ node, connections }: { node: GalaxyNode | null; connections
         )}
       </div>
 
-      {!node.discovered && (
-        <p className="text-xs text-zinc-500 italic">Undiscovered — survey to reveal detail.</p>
+      {node.tier === 'starVisible' && (
+        <p className="text-xs text-zinc-500 italic">Uncharted — survey or travel to chart subspace routes and reveal its worth.</p>
       )}
     </aside>
   )

@@ -36,5 +36,7 @@ firestore-debug.log
 pubsub-debug.log
 ui-debug.log
 firebase-debug.log
+emulator.log
+backend/emulator.log
 .firebase/
 /docs/screenshots/

@@ -11,6 +11,7 @@ import (
 	"hexaverse/galaxy"
 	"hexaverse/health"
 	"hexaverse/middlewares"
+	"hexaverse/observation"
 	"hexaverse/sse"
 	"hexaverse/system"
 
@@ -32,9 +33,11 @@ func SetupRouter() *gin.Engine {
 	corsConfig.AllowOrigins = []string{}
 	if config.IsLocal() {
 		// Next.js bumps to the next free port when 3000 is taken, so accept the
-		// common local dev ports rather than only 3000.
+		// common local dev ports rather than only 3000. :3100 is the dedicated
+		// e2e frontend port (playwright boots the dev server there) — without it
+		// the browser's API calls are CORS-blocked during e2e.
 		corsConfig.AllowOrigins = append(corsConfig.AllowOrigins,
-			"http://localhost:3000", "http://localhost:3001")
+			"http://localhost:3000", "http://localhost:3001", "http://localhost:3100")
 	}
 	corsConfig.AllowCredentials = true
 	corsConfig.AllowHeaders = []string{
@@ -76,21 +79,31 @@ func SetupRouter() *gin.Engine {
 	accountHandler := account.NewHandler()
 	accountHandler.RegisterRoutes(authorized, strictLimit)
 
-	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
-	galaxy.NewHandler().RegisterRoutes(authorized)
-	system.NewHandler().RegisterRoutes(authorized)
-
-	// The action spine (#0005) and fleet share ONE action.Service instance so the
-	// resolvers fleet registers are the same ones the sweep and reads dispatch
-	// through. Construct it explicitly, wire resolvers, then hand it to both.
+	// The action spine (#0005) and the verbs share ONE action.Service instance so
+	// the resolvers each verb registers are the same ones the sweep and reads
+	// dispatch through. Construct it explicitly, wire resolvers, then hand it out.
 	clock := common.WorldClock()
+	systemSvc := system.NewService()
 	actionSvc := action.NewService()
-	fleet.RegisterResolvers(actionSvc)
-	fleetSvc := fleet.NewServiceWith(fleet.NewDao(), system.NewService(), actionSvc, clock)
+	fleetSvc := fleet.NewServiceWith(fleet.NewDao(), systemSvc, actionSvc, clock)
+
+	// Fog of war (#0006): the fog-filter every read projects through, per
+	// Corporation. It reads live positions from fleet and interior geometry from
+	// system via interfaces (no import cycle), and registers the scan resolver.
+	fogSvc := observation.NewService(fleetSvc, systemSvc)
+	fogSvc.RegisterResolvers(actionSvc)
+
+	// Register the burn resolver AFTER the fog service exists, so a resolved move
+	// also mints path-swept ambient memory (#0006 Decision #14).
+	fleet.RegisterResolversWithAmbient(actionSvc, fogSvc)
+
+	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
+	galaxy.NewHandler().WithFog(fogSvc).RegisterRoutes(authorized)
+	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).RegisterRoutes(authorized)
 
 	actionHandler := action.NewHandler(actionSvc)
 	actionHandler.RegisterRoutes(authorized)
-	fleet.NewHandlerWith(fleetSvc, clock).RegisterRoutes(authorized)
+	fleet.NewHandlerWith(fleetSvc, clock).WithFog(fogSvc).RegisterRoutes(authorized)
 
 	// SSE: EventSource can't send custom headers, so JWT comes from the query string.
 	sseHandler := sse.NewHandler()

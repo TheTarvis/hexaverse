@@ -1,19 +1,30 @@
 package fleet
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
+	"hexaverse/action"
 	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/observation"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
 
+// AudienceFog resolves the #0004-delegated audience rule: a requester sees a
+// fleet only if it's their own or inside their live sensor union. Nil on the
+// dev path (no filtering).
+type AudienceFog interface {
+	FleetVisibleTo(ctx context.Context, requesterCid string, f observation.FleetPos, now common.WorldMillis) (bool, error)
+}
+
 type Handler struct {
 	svc   ServiceInterface
 	clock common.WorldTime
+	fog   AudienceFog
 }
 
 func NewHandler() *Handler {
@@ -24,12 +35,19 @@ func NewHandlerWith(svc ServiceInterface, clock common.WorldTime) *Handler {
 	return &Handler{svc: svc, clock: clock}
 }
 
+// WithFog wires the audience filter into fleet reads.
+func (h *Handler) WithFog(fog AudienceFog) *Handler {
+	h.fog = fog
+	return h
+}
+
 func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	g := authorized.Group("/fleets")
 	{
 		g.GET("/:fleetId", h.Get)
 		g.POST("/:fleetId/orders", h.Order)
 		g.POST("/:fleetId/cancel", h.Cancel)
+		g.POST("/:fleetId/scan", h.Scan)
 		// Dev-only: drop a fleet into a system. TODO(#0009): spawn replaces this.
 		g.POST("/dev-seed", h.DevSeed)
 	}
@@ -37,6 +55,35 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 
 func (h *Handler) Get(c *gin.Context) {
 	f, err := h.svc.Get(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
+	if err != nil {
+		h.respond(c, nil, err)
+		return
+	}
+	// Audience fog: own fleets are never fogged; a foreign fleet the requester
+	// can't currently sense reads as not-found (server-authoritative filtering).
+	if h.fog != nil {
+		pos, _ := h.svc.Position(c.Request.Context(), f)
+		vis, err := h.fog.FleetVisibleTo(c.Request.Context(), common.ActorCorp(c),
+			observation.FleetPos{Id: f.Id, CorporationId: f.CorporationId, SystemId: f.SystemId, Hex: pos}, h.clock.Now())
+		if err != nil {
+			log.Error().Ctx(c).Err(err).Str("fleetId", f.Id).Msg("fleet audience check failed")
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		if !vis {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+	}
+	c.JSON(http.StatusOK, h.toDTO(c, f))
+}
+
+func (h *Handler) Scan(c *gin.Context) {
+	f, err := h.svc.Scan(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
+	if errors.Is(err, action.ErrActiveActionExists) {
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet already has an action in progress"})
+		return
+	}
 	h.respond(c, f, err)
 }
 

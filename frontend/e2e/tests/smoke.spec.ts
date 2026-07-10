@@ -9,8 +9,10 @@ test.describe('smoke', () => {
     await page.goto('/')
     // Not bounced back to login → the restored session is valid.
     await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 })
-    // The app shell rendered (LayoutWrapper only renders it for a loaded account).
-    await expect(page.getByRole('heading', { name: /welcome/i })).toBeVisible({
+    // The authed home (the galaxy view, spec #0002) mounted — proving the
+    // restored account reached the app shell, independent of whether a live
+    // galaxy is seeded in this run.
+    await expect(page.getByTestId('galaxy-view')).toBeVisible({
       timeout: 15_000,
     })
   })

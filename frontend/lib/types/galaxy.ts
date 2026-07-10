@@ -12,6 +12,11 @@ export type Region = 'star_rich' | 'normal' | 'dead' | 'barrier'
 
 export type BodyType = 'rocky' | 'gas_giant' | 'ice' | 'molten' | 'oceanic' | 'barren'
 
+// A Corporation's monotonic subspace knowledge over the always-visible star map
+// (spec #0006, replacing the old `discovered` stub). `starVisible` is the free
+// baseline every system ships at; the ladder is earned by surveying / travelling.
+export type SubspaceTier = 'starVisible' | 'rumored' | 'surveyed' | 'explored'
+
 export interface WireBody {
   type: BodyType
   ring: number
@@ -29,7 +34,9 @@ export interface WireSystem {
   coords: { x: number; y: number; z: number }
   name: string
   region: Region
-  discovered: boolean
+  // The requester's subspace tier over the free star map (#0006). The star layer
+  // (position, region, skeleton) renders regardless of tier.
+  tier: SubspaceTier
   skeleton: Skeleton
 }
 
@@ -62,7 +69,7 @@ export interface GalaxyNode {
   id: string
   name: string
   region: Region
-  discovered: boolean
+  tier: SubspaceTier
   skeleton: Skeleton
   x: number
   y: number

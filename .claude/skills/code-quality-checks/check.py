@@ -630,10 +630,11 @@ def run_frontend_e2e(required: bool = True) -> dict:
     or emulator management is duplicated here, so wrapper changes are picked up
     automatically.
 
-    `required` (explicit `--e2e`): always run (the wrapper cold-starts an emulator
-    if none is up). Best-effort (`--run-all`/default `/check`): only run when a
-    test emulator is already up, so a routine `/check` isn't slowed by a
-    multi-minute cold-started e2e run.
+    `required` (explicit `--e2e`): always run — ensure-test-emulators.sh starts a
+    persistent test emulator first (or reuses one), so the wrapper and later runs
+    attach to it instead of cold-starting a throwaway set every time. Best-effort
+    (`--run-all`/default `/check`): only run when a test emulator is already up, so
+    a routine `/check` isn't slowed by a multi-minute cold-started e2e run.
     """
     print_header("Running Frontend E2E Tests (Playwright)")
 
@@ -649,6 +650,19 @@ def run_frontend_e2e(required: bool = True) -> dict:
         print_warning("Test emulator not running — skipping E2E.")
         print_info("Start it (npm run firebase:emulators:test) or run `/check --e2e` to cold-start one.")
         return {"passed": True, "skipped": True}
+
+    # Explicit --e2e: start (or reuse) a persistent test emulator so the wrapper —
+    # and any later /check run — attaches to it instead of cold-starting a
+    # throwaway one every time.
+    if required:
+        ensure = run_command(
+            "scripts/dev/ensure-test-emulators.sh",
+            check=False,
+            capture_output=False,
+        )
+        if ensure.returncode != 0:
+            print_error("Could not start the test emulators (see output above)")
+            return {"passed": False, "reason": "Test emulator failed to start"}
 
     print_info("Running Playwright (npm run e2e)...")
     try:

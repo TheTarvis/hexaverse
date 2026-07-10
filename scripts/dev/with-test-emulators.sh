@@ -36,16 +36,26 @@ export PUBSUB_EMULATOR_HOST=127.0.0.1:9106
 FIREBASE="$ROOT/node_modules/.bin/firebase"
 [ -x "$FIREBASE" ] || FIREBASE="firebase"
 
-# A listening Firestore emulator port means one is already up — reuse it. Use `nc`
-# rather than bash's /dev/tcp: the emulator binds an IPv6 socket on 127.0.0.1, which
-# /dev/tcp misreads (false "down"), which would make us start a second emulator and
-# collide on the port.
-if nc -z 127.0.0.1 9100 2>/dev/null; then
-  echo "[emulators] reusing the test emulator already running on :9100"
+# Reuse only a COMPLETE set (firestore + auth + pubsub all listening). Probing
+# only firestore is a trap: a stale partial set (e.g. `--only firestore`) holds
+# :9100 without auth/pubsub, and the command below would then run against a
+# broken emulator. Use `nc` rather than bash's /dev/tcp: the emulator binds an
+# IPv6 socket on 127.0.0.1, which /dev/tcp misreads (false "down").
+port_up() { nc -z 127.0.0.1 "$1" 2>/dev/null; }
+if port_up 9100 && port_up 10109 && port_up 9106; then
+  echo "[emulators] reusing the complete test set already running (firestore:9100 auth:10109 pubsub:9106)"
   exec bash -c "$CMD"
 fi
 
-echo "[emulators] no test emulator detected — starting a throwaway set for this run"
+# A partial/stale listener on any test port would make the throwaway start below
+# collide. Reap it first (ports are unique per repo, so this never touches
+# another project's emulator).
+for port in 9100 10109 9106; do
+  pids=$(lsof -ti tcp:"$port" 2>/dev/null || true)
+  [ -n "$pids" ] && { echo "[emulators] clearing stale listener on :$port"; kill $pids 2>/dev/null || true; }
+done
+
+echo "[emulators] no complete test emulator detected — starting a throwaway set for this run"
 exec "$FIREBASE" emulators:exec \
   --only firestore,auth,pubsub \
   --config firebase.test.json \

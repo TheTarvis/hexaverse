@@ -132,11 +132,28 @@ type Resolution struct {
 type ResolveResult struct {
 	Outcome string
 	// Delta, if non-nil, is appended to the ledger at deltas/{scope}/entries/
-	// {actionId} — exactly-once by doc id (mutating verbs).
+	// {actionId} — exactly-once by doc id (mutating verbs whose effect is an
+	// additive number, e.g. mine tonnage).
 	Delta *Delta
 	// ActorState, if non-nil, is merged onto the actor doc (the kinematic
 	// transition, e.g. a fleet's settled coast/dock state).
 	ActorState map[string]interface{}
+	// Writes are arbitrary structured documents a resolver mints as its effect,
+	// applied (MergeAll) in the same transaction as the status flip. This is the
+	// path for verbs whose effect is state, not an additive number — scan minting
+	// observations (#0006), later intel writes. action stays verb-agnostic: it
+	// merges the maps at the given paths without knowing what they mean. Safe to
+	// re-run only if the writes are idempotent (observations are: monotonic /
+	// last-write-wins); additive effects must use Delta instead.
+	Writes []DocWrite
+}
+
+// DocWrite is one structured document a resolver mints. Path is alternating
+// collection/doc segments (even length ≥ 2, e.g.
+// ["corporations", cid, "observations", sid]); Data is merged with MergeAll.
+type DocWrite struct {
+	Path []string
+	Data map[string]interface{}
 }
 
 // ResolveFunc is a verb's per-type effect. It is registered by Type and invoked

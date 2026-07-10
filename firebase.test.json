@@ -10,7 +10,7 @@
       "port": 10109
     },
     "ui": {
-      "enabled": true,
+      "enabled": false,
       "port": 4001
     },
     "firestore": {

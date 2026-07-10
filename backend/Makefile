@@ -1,6 +1,6 @@
 # Backend Makefile
 
-.PHONY: help test test-unit test-integration test-all clean build run emulators postgres
+.PHONY: help test test-unit test-integration test-all clean build run emulators emulators-bg ensure-emulators stop-emulators check-emulators postgres
 
 help:
 	@echo "Available targets:"
@@ -63,26 +63,43 @@ test-integration-verbose: check-services
 test-all: test-full
 
 # Emulator management
+# firebase.test.json lives at the repo root, and --project hexaverse-emulator is
+# required: without it the auth emulator namespaces users under the firebase
+# CLI's active project alias and e2e auth setup fails.
 emulators:
-	@echo "Starting Firebase emulators..."
+	@echo "Starting Firebase test emulators..."
 	@echo "Press Ctrl+C to stop"
-	firebase emulators:start --only firestore,auth, pubsub --config firebase.test.json
+	cd .. && firebase emulators:start --only firestore,auth,pubsub --config firebase.test.json --project hexaverse-emulator
 
-emulators-bg:
-	@echo "Starting Firebase emulators in background..."
-	@firebase emulators:start --only firestore,auth,pubsub --config firebase.test.json > emulator.log 2>&1 &
-	@echo "Emulators started. Check emulator.log for output"
-	@echo "Run 'make stop-emulators' to stop them"
+emulators-bg: ensure-emulators
 
+ensure-emulators:
+	@bash ../scripts/dev/ensure-test-emulators.sh
+
+# Only stops the TEST emulator set (firebase.test.json — ports 9100/10109/9106).
+# A dev emulator started with `npm run firebase:emulators` (default ports
+# 8090/9109/…) is left alone: we match the CLI process by its --config arg,
+# then reap any leftover child emulators still holding the test ports.
 stop-emulators:
-	@echo "Stopping Firebase emulators..."
-	@pkill -f "firebase emulators" || true
-	@echo "Emulators stopped"
+	@echo "Stopping test emulators (dev emulators untouched)..."
+	@pkill -f "firebase.test.json" || true
+	@for i in $$(seq 1 10); do \
+		nc -z localhost 9100 2>/dev/null || break; \
+		sleep 1; \
+	done
+	@for port in 9100 10109 9106; do \
+		pids=$$(lsof -ti tcp:$$port 2>/dev/null || true); \
+		if [ -n "$$pids" ]; then \
+			echo "Force-killing leftover emulator process on :$$port"; \
+			kill -9 $$pids 2>/dev/null || true; \
+		fi; \
+	done
+	@echo "Test emulators stopped"
 
 check-emulators:
 	@echo "Checking if Firebase emulators are running..."
-	@nc -z localhost 9100 || (echo "Firestore emulator not running on port 9100. Run 'make emulators' first" && exit 1)
-	@nc -z localhost 10109 || (echo "Auth emulator not running on port 10109. Run 'make emulators' first" && exit 1)
+	@nc -z localhost 9100 || (echo "Firestore emulator not running on port 9100. Run 'make ensure-emulators' first" && exit 1)
+	@nc -z localhost 10109 || (echo "Auth emulator not running on port 10109. Run 'make ensure-emulators' first" && exit 1)
 	@echo "Emulators are running"
 
 check-postgres:

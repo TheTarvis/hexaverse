@@ -13,6 +13,7 @@ const config = [
   {
     ignores: [
       ".next/**",
+      ".next-e2e/**",
       "node_modules/**",
       "out/**",
       ".storybook/storybook-static/**",

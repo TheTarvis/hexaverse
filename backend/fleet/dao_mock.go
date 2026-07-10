@@ -55,6 +55,21 @@ func (mr *MockDaoMockRecorder) Get(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockDao)(nil).Get), ctx, id)
 }
 
+// ListByCorporation mocks base method.
+func (m *MockDao) ListByCorporation(ctx context.Context, corporationID string) ([]Fleet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByCorporation", ctx, corporationID)
+	ret0, _ := ret[0].([]Fleet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListByCorporation indicates an expected call of ListByCorporation.
+func (mr *MockDaoMockRecorder) ListByCorporation(ctx, corporationID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByCorporation", reflect.TypeOf((*MockDao)(nil).ListByCorporation), ctx, corporationID)
+}
+
 // Save mocks base method.
 func (m *MockDao) Save(ctx context.Context, f Fleet) error {
 	m.ctrl.T.Helper()

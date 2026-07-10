@@ -25,7 +25,7 @@
       },
       "name": "Ithyara",
       "region": "dead",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "K",
         "bodies": [
@@ -61,7 +61,7 @@
       },
       "name": "Myriara",
       "region": "star_rich",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [
@@ -89,7 +89,7 @@
       },
       "name": "Lyraesh",
       "region": "star_rich",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [
@@ -133,7 +133,7 @@
       },
       "name": "Vorioyr Nexus",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [
@@ -169,7 +169,7 @@
       },
       "name": "Ophioeth II",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [
@@ -201,7 +201,7 @@
       },
       "name": "Zoraeion Nexus",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [
@@ -229,7 +229,7 @@
       },
       "name": "Quauorn Prime",
       "region": "barrier",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "F",
         "bodies": [
@@ -273,7 +273,7 @@
       },
       "name": "Caeeiur II",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "G",
         "bodies": [
@@ -293,7 +293,7 @@
       },
       "name": "Thalouen",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "G",
         "bodies": [
@@ -325,7 +325,7 @@
       },
       "name": "Belouix",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [
@@ -361,7 +361,7 @@
       },
       "name": "Corouub",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [
@@ -393,7 +393,7 @@
       },
       "name": "Talouub II",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "F",
         "bodies": [
@@ -421,7 +421,7 @@
       },
       "name": "Nyxioara",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "K",
         "bodies": [
@@ -445,7 +445,7 @@
       },
       "name": "Seraeax Prime",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "G",
         "bodies": [
@@ -481,7 +481,7 @@
       },
       "name": "Thaloorn",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "K",
         "bodies": [
@@ -517,7 +517,7 @@
       },
       "name": "Xanouara Prime",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [
@@ -545,7 +545,7 @@
       },
       "name": "Seryis Nexus",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "K",
         "bodies": [
@@ -589,7 +589,7 @@
       },
       "name": "Myrioax III",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [
@@ -625,7 +625,7 @@
       },
       "name": "Caeaux",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "K",
         "bodies": [
@@ -653,7 +653,7 @@
       },
       "name": "Velaeara",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "K",
         "bodies": [
@@ -693,7 +693,7 @@
       },
       "name": "Taleiax",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "G",
         "bodies": [
@@ -713,7 +713,7 @@
       },
       "name": "Beleorn III",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "K",
         "bodies": [
@@ -753,7 +753,7 @@
       },
       "name": "Nyxiur",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "K",
         "bodies": [
@@ -781,7 +781,7 @@
       },
       "name": "Caeuos Minor",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "F",
         "bodies": [
@@ -821,7 +821,7 @@
       },
       "name": "Nyxoux III",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "G",
         "bodies": [
@@ -861,7 +861,7 @@
       },
       "name": "Keleos Prime",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "F",
         "bodies": [
@@ -897,7 +897,7 @@
       },
       "name": "Draeorn",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "K",
         "bodies": [
@@ -917,7 +917,7 @@
       },
       "name": "Veloorn",
       "region": "normal",
-      "discovered": true,
+      "tier": "explored",
       "skeleton": {
         "starClass": "M",
         "bodies": [

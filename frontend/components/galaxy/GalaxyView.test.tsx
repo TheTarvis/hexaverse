@@ -81,7 +81,7 @@ const galaxy: Galaxy = {
       id: 'sys-0',
       name: 'Axion',
       region: 'star_rich',
-      discovered: true,
+      tier: 'explored',
       skeleton: {
         starClass: 'G',
         bodies: [
@@ -100,7 +100,7 @@ const galaxy: Galaxy = {
       id: 'sys-1',
       name: 'Borealis',
       region: 'dead',
-      discovered: true,
+      tier: 'explored',
       skeleton: { starClass: 'M', bodies: [] },
       x: -4,
       y: 5,

@@ -14,7 +14,7 @@ const wire: WireGalaxy = {
       coords: { x: 12.3, y: -8.1, z: 4 },
       name: 'Axion',
       region: 'star_rich',
-      discovered: true,
+      tier: 'explored',
       skeleton: {
         starClass: 'G',
         bodies: [
@@ -28,7 +28,7 @@ const wire: WireGalaxy = {
       coords: { x: -50, y: 20.5, z: -6 },
       name: 'Borealis',
       region: 'dead',
-      discovered: false,
+      tier: 'starVisible',
       skeleton: { starClass: 'M', bodies: [] },
     },
   ],
@@ -60,18 +60,18 @@ describe('adaptGalaxy', () => {
     })
   })
 
-  it('carries region, discovered, name, and the full skeleton through untouched', () => {
+  it('carries region, tier, name, and the full skeleton through untouched', () => {
     const galaxy = adaptGalaxy(wire)
 
     expect(galaxy.nodes[0]).toMatchObject({
       id: 'sys-0',
       name: 'Axion',
       region: 'star_rich',
-      discovered: true,
+      tier: 'explored',
     })
     expect(galaxy.nodes[0].skeleton).toEqual(wire.systems[0].skeleton)
-    // The `discovered` stub passes through per-system (fog is a later spec).
-    expect(galaxy.nodes[1].discovered).toBe(false)
+    // The per-system subspace tier passes through (#0006 replaced `discovered`).
+    expect(galaxy.nodes[1].tier).toBe('starVisible')
   })
 
   it('passes id/seed/bounds/worldTime metadata through', () => {

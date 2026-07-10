@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"hexaverse/galaxy"
+	"hexaverse/observation"
 )
 
 func main() {
@@ -69,7 +70,13 @@ func writeStartArea(out string) error {
 	gen.Galaxy.Id = "gal_start_area"
 	gen.Galaxy.CreatedAt = 0 // frozen
 
-	dto := galaxy.ToDTO(&gen, 0)
+	// The frozen start area is the fog-off showcase: every system ships explored,
+	// with no per-player state (#0006 acceptance).
+	tiers := make(map[string]observation.Tier, len(gen.Systems))
+	for _, s := range gen.Systems {
+		tiers[s.Id] = observation.TierExplored
+	}
+	dto := galaxy.ToDTO(&gen, 0, tiers)
 	data, err := json.MarshalIndent(dto, "", "  ")
 	if err != nil {
 		return err

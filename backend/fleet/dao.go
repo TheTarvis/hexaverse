@@ -2,10 +2,12 @@ package fleet
 
 import (
 	"context"
+	"errors"
 
 	"hexaverse/common"
 
 	"github.com/rs/zerolog/log"
+	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -17,6 +19,9 @@ const firestoreCollection = "fleets"
 type Dao interface {
 	Get(ctx context.Context, id string) (*Fleet, error)
 	Save(ctx context.Context, f Fleet) error
+	// ListByCorporation returns every fleet owned by a corporation — the input to
+	// the fog domain's live sensor-union (coverage) computation.
+	ListByCorporation(ctx context.Context, corporationID string) ([]Fleet, error)
 }
 
 type DaoImpl struct {
@@ -48,4 +53,27 @@ func (dao *DaoImpl) Get(ctx context.Context, id string) (*Fleet, error) {
 
 func (dao *DaoImpl) Save(ctx context.Context, f Fleet) error {
 	return dao.db.Set(ctx, firestoreCollection, f.Id, f)
+}
+
+func (dao *DaoImpl) ListByCorporation(ctx context.Context, corporationID string) ([]Fleet, error) {
+	iter := dao.db.Collection(firestoreCollection).
+		Where("corporationId", "==", corporationID).Documents(ctx)
+	defer iter.Stop()
+
+	var out []Fleet
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var f Fleet
+		if err := doc.DataTo(&f); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, nil
 }

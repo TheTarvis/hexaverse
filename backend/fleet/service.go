@@ -7,6 +7,7 @@ import (
 	"hexaverse/action"
 	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/observation"
 	"hexaverse/system"
 
 	"github.com/google/uuid"
@@ -17,6 +18,12 @@ import (
 // lifecycle wrapper (ETA, status, inbox, single slot) around the order that lives
 // in fleet.State.Burn — never a second copy of motion state (#0005 Decision #6).
 const burnType = "burn"
+
+// scanType is the action dispatch key for the scan verb (#0006). The fleet is
+// the actor (it carries the sensor), so scan COMMITS here — mirroring burn —
+// while the reveal RESOLVES in the observation domain (its registered resolver
+// mints the observations). Fleet imports observation only for the scan tuning.
+const scanType = "scan"
 
 // actorCollection is where fleet docs live, so the action domain can claim and
 // release the single-action slot generically without importing this package.
@@ -31,6 +38,7 @@ type ServiceInterface interface {
 	Get(ctx context.Context, id string) (*Fleet, error)
 	OrderTo(ctx context.Context, id string, req OrderRequest) (*Fleet, error)
 	Cancel(ctx context.Context, id string) (*Fleet, error)
+	Scan(ctx context.Context, id string) (*Fleet, error)
 	SeedFleet(ctx context.Context, systemID, corporationID string, at board.Hex) (*Fleet, error)
 	// Position resolves a fleet's live hex at the current world time (docked
 	// fleets need the interior, so this lives on the service, not board).
@@ -224,6 +232,62 @@ func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string,
 		return nil, err
 	}
 	return f, nil
+}
+
+// Scan commits a scan action for the fleet through the action spine: the ETA is
+// frozen at commit (now + scan duration), the single slot is claimed, and the
+// observation domain's registered resolver mints the survey at resolution. A
+// fleet already running an action (e.g. mid-burn) can't scan — the slot guard
+// rejects it (action.ErrActiveActionExists).
+func (s *Service) Scan(ctx context.Context, id string) (*Fleet, error) {
+	f, err := s.load(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	now := s.clock.Now()
+	scanParams := observation.DefaultScanParams()
+	a, err := s.actions.Commit(ctx, action.CommitSpec{
+		Type:            scanType,
+		Actor:           id,
+		ActorCollection: actorCollection,
+		Scope:           f.SystemId,
+		Params:          map[string]interface{}{"radius": scanParams.Radius},
+		Eta:             now.Add(scanParams.Duration),
+	})
+	if err != nil {
+		return nil, err
+	}
+	f.ActiveActionId = a.Id
+	f.UpdatedAt = now
+	log.Info().Ctx(ctx).Str("fleetId", id).Str("actionId", a.Id).
+		Int64("eta", int64(now.Add(scanParams.Duration))).Msg("Fleet ordered to scan")
+	return f, nil
+}
+
+// FleetsForCorp implements observation.FleetSource: every unit a corporation
+// owns, with its live hex resolved, so the fog domain can compute the corp's
+// sensor union. Passive sensors ride any moving unit, so all fleets contribute
+// regardless of movement mode.
+func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ common.WorldMillis) ([]observation.FleetPos, error) {
+	fleets, err := s.dao.ListByCorporation(ctx, corporationID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]observation.FleetPos, 0, len(fleets))
+	for i := range fleets {
+		f := &fleets[i]
+		hex, err := s.Position(ctx, f)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, observation.FleetPos{
+			Id:            f.Id,
+			CorporationId: f.CorporationId,
+			SystemId:      f.SystemId,
+			Hex:           hex,
+		})
+	}
+	return out, nil
 }
 
 // Position resolves the fleet's live hex at the current world time.

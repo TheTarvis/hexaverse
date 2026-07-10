@@ -76,6 +76,22 @@ func (dao *DaoImpl) deltaRef(scope, actionID string) *firestore.DocumentRef {
 	return dao.db.Collection(deltasCollection).Doc(scope).Collection(deltaEntries).Doc(actionID)
 }
 
+// refFromPath resolves an alternating collection/doc path
+// (["col", "doc", "col", "doc", ...], even length ≥ 2) to a document ref, so a
+// resolver's structured Writes can target any collection without the action
+// domain importing the verb's package.
+func (dao *DaoImpl) refFromPath(path []string) (*firestore.DocumentRef, error) {
+	if len(path) < 2 || len(path)%2 != 0 {
+		return nil, fmt.Errorf("resolve write path must be alternating collection/doc (even length ≥ 2), got %v", path)
+	}
+	col := dao.db.Collection(path[0])
+	doc := col.Doc(path[1])
+	for i := 2; i < len(path); i += 2 {
+		doc = doc.Collection(path[i]).Doc(path[i+1])
+	}
+	return doc, nil
+}
+
 func (dao *DaoImpl) Get(ctx context.Context, id string) (*Action, error) {
 	doc, err := dao.db.Get(ctx, actionsCollection, id)
 	if err != nil {
@@ -244,6 +260,18 @@ func (dao *DaoImpl) ResolveOne(ctx context.Context, id string, resolve ResolveFu
 			// concurrent resolver that already wrote it makes this txn fail and no-op.
 			if err := tx.Create(dao.deltaRef(a.Scope, a.Id), d); err != nil {
 				return fmt.Errorf("appending delta: %w", err)
+			}
+		}
+		// Structured effect writes (e.g. scan minting observations). Merged, not
+		// created — idempotent by contract, so a duplicate resolve overwrites with
+		// the same state rather than failing (unlike the additive Delta).
+		for _, w := range res.Writes {
+			ref, err := dao.refFromPath(w.Path)
+			if err != nil {
+				return err
+			}
+			if err := tx.Set(ref, w.Data, firestore.MergeAll); err != nil {
+				return fmt.Errorf("applying resolve write at %v: %w", w.Path, err)
 			}
 		}
 		a.Status = StatusDone

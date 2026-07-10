@@ -22,7 +22,7 @@ export function adaptGalaxy(wire: WireGalaxy): Galaxy {
     id: s.id,
     name: s.name,
     region: s.region,
-    discovered: s.discovered,
+    tier: s.tier,
     skeleton: s.skeleton,
     // Flatten coords, and pin the node to its generated position (fx/fy/fz) so
     // the force layout never moves it — on-screen distance is in-game distance.

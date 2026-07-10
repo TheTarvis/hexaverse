@@ -8,12 +8,28 @@ import (
 	"hexaverse/common"
 )
 
+// AmbientRecorder is the fog-domain dependency for passive-sensor reveal on move
+// (observation.Service implements it). Injected into the burn resolver so a
+// resolved move mints per-feature presence memory for what its sensor bubble
+// swept — path-swept ambient (#0006 Decision #14). Nil disables ambient reveal.
+type AmbientRecorder interface {
+	AmbientWrites(ctx context.Context, cid, systemID string, path []board.Hex, at common.WorldMillis) ([]action.DocWrite, error)
+}
+
 // RegisterResolvers wires fleet's per-type action resolvers onto the shared
 // action service. Called once at startup (and in tests) so the same service
 // instance that fleet commits through — and that the sweep resolves through —
-// knows how to settle a "burn".
+// knows how to settle a "burn". Without an AmbientRecorder the burn is purely
+// kinematic; use RegisterResolversWithAmbient to also mint on-move memory.
 func RegisterResolvers(a *action.Service) {
 	a.RegisterResolver(burnType, action.KindKinematic, BurnResolver(DefaultMovementParams()))
+}
+
+// RegisterResolversWithAmbient is RegisterResolvers plus path-swept ambient
+// reveal at move resolution (#0006). Wired at startup once the fog service
+// exists.
+func RegisterResolversWithAmbient(a *action.Service, ambient AmbientRecorder) {
+	a.RegisterResolver(burnType, action.KindKinematic, BurnResolverWithAmbient(DefaultMovementParams(), ambient))
 }
 
 // BurnResolver is the fleet's kinematic resolver, registered with the action
@@ -49,6 +65,34 @@ func BurnResolver(params MovementParams) action.ResolveFunc {
 			Outcome:    outcome,
 			ActorState: map[string]interface{}{"state": settled, "updatedAt": int64(r.At)},
 		}, nil
+	}
+}
+
+// BurnResolverWithAmbient wraps the kinematic burn resolver with path-swept
+// ambient reveal: after settling motion state, it mints presence memory for the
+// features the sensor bubble swept along the burn path (stamped asOf:eta). The
+// reveal writes ride the same resolve transaction as the status flip, so a move
+// resolved late still records exactly what the bubble passed (path is frozen).
+func BurnResolverWithAmbient(params MovementParams, ambient AmbientRecorder) action.ResolveFunc {
+	base := BurnResolver(params)
+	return func(ctx context.Context, r action.Resolution) (action.ResolveResult, error) {
+		res, err := base(ctx, r)
+		if err != nil || ambient == nil {
+			return res, err
+		}
+		var f Fleet
+		if err := r.DecodeActor(&f); err != nil {
+			return res, err
+		}
+		if f.State.Mode != board.ModeBurn || f.State.Burn == nil {
+			return res, nil // nothing swept (already settled)
+		}
+		writes, err := ambient.AmbientWrites(ctx, f.CorporationId, f.SystemId, f.State.Burn.Path, r.At)
+		if err != nil {
+			return action.ResolveResult{}, err
+		}
+		res.Writes = append(res.Writes, writes...)
+		return res, nil
 	}
 }
 
