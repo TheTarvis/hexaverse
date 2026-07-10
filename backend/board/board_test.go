@@ -29,6 +29,56 @@ func TestLine_ContiguousAndEndpoints(t *testing.T) {
 	}
 }
 
+func TestRouteAround_AvoidsTheCore(t *testing.T) {
+	// A straight line through the core must detour around it.
+	crossing := [][2]Hex{{{1, 0}, {-1, 0}}, {{3, -2}, {-3, 2}}, {{2, -1}, {-2, 1}}}
+	for _, c := range crossing {
+		direct := Line(c[0], c[1])
+		if !pathHitsCore(direct) {
+			t.Fatalf("test setup: %v→%v does not cross the core", c[0], c[1])
+		}
+		path := RouteAround(c[0], c[1])
+		if pathHitsCore(path) {
+			t.Fatalf("routed path still crosses the core: %v→%v = %v", c[0], c[1], path)
+		}
+		// Still a valid contiguous path between the same endpoints.
+		if path[0] != c[0] || path[len(path)-1] != c[1] {
+			t.Fatalf("routed path endpoints wrong: %v", path)
+		}
+		for i := 1; i < len(path); i++ {
+			if Distance(path[i-1], path[i]) != 1 {
+				t.Fatalf("routed path not contiguous at %d: %v", i, path)
+			}
+		}
+		// A core-avoiding path is never shorter than the straight line (which is a
+		// shortest path); often it's the same length routed around, sometimes longer.
+		if len(path) < len(direct) {
+			t.Fatalf("detour %d shorter than direct %d", len(path), len(direct))
+		}
+	}
+}
+
+func TestRouteAround_DirectWhenClear(t *testing.T) {
+	// A line that never touches the core is returned unchanged.
+	for _, c := range [][2]Hex{{{3, -1}, {5, -2}}, {{2, -4}, {5, 1}}} {
+		if got, want := RouteAround(c[0], c[1]), Line(c[0], c[1]); !equalPath(got, want) {
+			t.Fatalf("clear route changed: %v→%v got %v want %v", c[0], c[1], got, want)
+		}
+	}
+}
+
+func equalPath(a, b []Hex) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestOrbState_StaticWhenSlow(t *testing.T) {
 	// A huge period => effectively motionless within the slice window.
 	o := Orbit{Ring: 4, Angle0: 5, Period: 1 << 60, Dir: 1}

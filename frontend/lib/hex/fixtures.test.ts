@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { line, type Hex } from './hex'
+import { line, routeAround, type Hex } from './hex'
 import { orbState, type Orbit } from './orbit'
 import { solveHex, solveIntercept } from './intercept'
 
@@ -17,6 +17,12 @@ import { solveHex, solveIntercept } from './intercept'
 // from outside the frontend project root (its fs-allow list would reject it).
 
 interface LineCase {
+  from: Hex
+  to: Hex
+  path: Hex[]
+}
+
+interface RouteCase {
   from: Hex
   to: Hex
   path: Hex[]
@@ -42,6 +48,7 @@ interface SolveCase {
 
 interface Fixtures {
   line: LineCase[]
+  routeAround: RouteCase[]
   orbState: OrbCase[]
   solveHex: SolveCase[]
   solveIntercept: SolveCase[]
@@ -69,6 +76,10 @@ describe('board fixtures — Go↔TS determinism seam', () => {
     expect(line(c.from, c.to)).toEqual(c.path)
   })
 
+  it.each(fixtures.routeAround)('routeAround[%#]', (c) => {
+    expect(routeAround(c.from, c.to)).toEqual(c.path)
+  })
+
   it.each(fixtures.orbState)('orbState[%#]', (c) => {
     expect(orbState(c.orbit, c.t)).toEqual(c.hex)
   })
@@ -89,6 +100,7 @@ describe('board fixtures — Go↔TS determinism seam', () => {
 
   it('covers every recorded case group (guards a truncated golden)', () => {
     expect(fixtures.line.length).toBeGreaterThan(0)
+    expect(fixtures.routeAround.length).toBeGreaterThan(0)
     expect(fixtures.orbState.length).toBeGreaterThan(0)
     expect(fixtures.solveHex.length).toBeGreaterThan(0)
     expect(fixtures.solveIntercept.length).toBeGreaterThan(0)

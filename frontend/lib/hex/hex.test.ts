@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { distance, line, ringHexes, ringOf, roundf } from './hex'
+import { distance, line, ringHexes, ringOf, roundf, routeAround } from './hex'
 
 // Unit behaviour of the hex primitives. The cross-language golden lives in
 // fixtures.test.ts; these guard the properties and the one Go-parity trap
@@ -69,5 +69,29 @@ describe('line', () => {
     expect(path[0]).toEqual({ q: 0, r: 0 })
     expect(path[path.length - 1]).toEqual({ q: 3, r: -1 })
     for (let i = 1; i < path.length; i++) expect(distance(path[i - 1], path[i])).toBe(1)
+  })
+})
+
+describe('routeAround (star avoidance)', () => {
+  const hitsCore = (path: { q: number; r: number }[]) =>
+    path.some((h) => h.q === 0 && h.r === 0)
+
+  it('detours a burn that would fly through the star', () => {
+    const from = { q: 1, r: 0 }
+    const to = { q: -1, r: 0 }
+    expect(hitsCore(line(from, to))).toBe(true) // straight line crosses the core
+    const path = routeAround(from, to)
+    expect(hitsCore(path)).toBe(false)
+    expect(path[0]).toEqual(from)
+    expect(path[path.length - 1]).toEqual(to)
+    for (let i = 1; i < path.length; i++) expect(distance(path[i - 1], path[i])).toBe(1)
+    // Going around the core is never shorter than through it.
+    expect(path.length).toBeGreaterThanOrEqual(line(from, to).length)
+  })
+
+  it('leaves a clear line untouched', () => {
+    const from = { q: 3, r: -1 }
+    const to = { q: 5, r: -2 }
+    expect(routeAround(from, to)).toEqual(line(from, to))
   })
 })

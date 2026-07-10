@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { etaLabel, MS_PER_TILE, planToBody, planToHex } from './move-preview'
-import { distance, solveIntercept, type Orbit } from '@/lib/hex'
+import { solveIntercept, type Orbit } from '@/lib/hex'
 
 describe('planToHex', () => {
   it('routes a contiguous path and an ETA of distance × ms-per-tile', () => {
@@ -24,7 +24,8 @@ describe('planToBody', () => {
     const sol = solveIntercept(from, orbit, 0, MS_PER_TILE, 86_400_000)
     expect(plan.meetHex).toEqual(sol.meetHex)
     expect(plan.arriveTime).toBe(sol.arriveTime)
-    expect(plan.tiles).toBe(distance(from, sol.meetHex))
+    // tiles is the routed path length (matches the ETA even around a detour).
+    expect(plan.tiles).toBe(sol.path.length - 1)
   })
 })
 

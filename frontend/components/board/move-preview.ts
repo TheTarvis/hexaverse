@@ -4,7 +4,7 @@
 // server's solution stays canonical; this is only the live preview that leads a
 // moving target as the world turns.
 
-import { distance, solveHex, solveIntercept, type Hex, type Orbit, type Solution } from '@/lib/hex'
+import { solveHex, solveIntercept, type Hex, type Orbit, type Solution } from '@/lib/hex'
 
 // Mirror of backend fleet.DefaultMovementParams. The preview must solve with the
 // SAME knobs the server commits with, or the previewed route/ETA would drift from
@@ -20,30 +20,31 @@ export interface MovePlan {
   arriveTime: number
   // Time from `now` to arrival (world-ms) — what the ETA readout shows.
   etaMs: number
-  // Hex distance to the meeting point (tiles).
+  // Tiles the fleet actually traverses (the routed path length) — matches the ETA
+  // even when the route detours around the star.
   tiles: number
 }
 
-function toPlan(kind: MovePlan['kind'], sol: Solution, from: Hex, now: number): MovePlan {
+function toPlan(kind: MovePlan['kind'], sol: Solution, now: number): MovePlan {
   return {
     kind,
     path: sol.path,
     meetHex: sol.meetHex,
     arriveTime: sol.arriveTime,
     etaMs: Math.max(0, sol.arriveTime - now),
-    tiles: distance(from, sol.meetHex),
+    tiles: Math.max(0, sol.path.length - 1),
   }
 }
 
-// planToHex previews a straight burn to a fixed board hex.
+// planToHex previews a burn to a fixed board hex (routed around the star).
 export function planToHex(from: Hex, dest: Hex, now: number): MovePlan {
-  return toPlan('hex', solveHex(from, dest, now, MS_PER_TILE), from, now)
+  return toPlan('hex', solveHex(from, dest, now, MS_PER_TILE), now)
 }
 
 // planToBody previews a led intercept against a coasting body — the meeting point
 // tracks the body as the world turns (recompute each frame with a fresh `now`).
 export function planToBody(from: Hex, orbit: Orbit, now: number): MovePlan {
-  return toPlan('intercept', solveIntercept(from, orbit, now, MS_PER_TILE, INTERCEPT_HORIZON), from, now)
+  return toPlan('intercept', solveIntercept(from, orbit, now, MS_PER_TILE, INTERCEPT_HORIZON), now)
 }
 
 // etaLabel renders a world-ms duration as a compact human string (the ETA chip).

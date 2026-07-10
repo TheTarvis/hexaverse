@@ -40,8 +40,15 @@ type solveCase struct {
 	ArriveTime common.WorldMillis `json:"arriveTime"`
 }
 
+type routeCase struct {
+	From Hex   `json:"from"`
+	To   Hex   `json:"to"`
+	Path []Hex `json:"path"`
+}
+
 type fixtures struct {
 	Line           []lineCase  `json:"line"`
+	RouteAround    []routeCase `json:"routeAround"`
 	OrbState       []orbCase   `json:"orbState"`
 	SolveHex       []solveCase `json:"solveHex"`
 	SolveIntercept []solveCase `json:"solveIntercept"`
@@ -53,6 +60,16 @@ func computeFixtures() fixtures {
 
 	for _, c := range [][2]Hex{{{0, 0}, {3, -1}}, {{0, 0}, {-2, 5}}, {{2, -4}, {5, 1}}} {
 		f.Line = append(f.Line, lineCase{From: c[0], To: c[1], Path: Line(c[0], c[1])})
+	}
+
+	for _, c := range [][2]Hex{
+		{{1, 0}, {-1, 0}},   // straight through the core → detour around the star
+		{{3, -2}, {-3, 2}},  // across the system through the core → detour
+		{{2, -1}, {-2, 1}},  // another crossing pair → detour
+		{{3, -1}, {5, -2}},  // nowhere near the core → straight line
+		{{0, 0}, {5, 0}},    // from the core itself → nothing to avoid, straight
+	} {
+		f.RouteAround = append(f.RouteAround, routeCase{From: c[0], To: c[1], Path: RouteAround(c[0], c[1])})
 	}
 
 	orbits := []Orbit{

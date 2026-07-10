@@ -112,6 +112,30 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t
 }
 
+// routeAround returns the burn path from a to b that never crosses the star at the
+// core (0,0) — the client mirror of backend/board RouteAround. It's `line` unless
+// the straight line would pass through the core, in which case it detours via the
+// ring-1 hex beside the star that adds the least distance (ties: the first such
+// hex in ringHexes(1) order). If an endpoint IS the core (avoidance impossible),
+// it falls back to the direct line. Pinned by /fixtures/board/cases.json.
+export function routeAround(a: Hex, b: Hex): Hex[] {
+  const direct = line(a, b)
+  if (!pathHitsCore(direct)) return direct
+  let best: Hex[] | null = null
+  for (const wp of ringHexes(1)) {
+    const aLeg = line(a, wp)
+    const bLeg = line(wp, b)
+    if (pathHitsCore(aLeg) || pathHitsCore(bLeg)) continue
+    const merged = [...aLeg, ...bLeg.slice(1)]
+    if (best === null || merged.length < best.length) best = merged
+  }
+  return best ?? direct
+}
+
+function pathHitsCore(path: Hex[]): boolean {
+  return path.some((h) => h.q === 0 && h.r === 0)
+}
+
 // cubeRound rounds fractional cube coordinates to the nearest valid hex,
 // preserving x+y+z == 0.
 function cubeRound(x: number, y: number, z: number): Cube {

@@ -12,11 +12,12 @@ type Solution struct {
 	ArriveTime common.WorldMillis
 }
 
-// SolveHex plots a straight burn to a fixed hex: a contiguous hex line and an
-// arrival time of now + distance × msPerTile.
+// SolveHex plots a burn to a fixed hex: a contiguous path that routes around the
+// star (RouteAround) and an arrival time of now + pathLength × msPerTile — the
+// ETA follows the detour, not the straight-line distance.
 func SolveHex(from, dest Hex, now, msPerTile common.WorldMillis) Solution {
-	path := Line(from, dest)
-	arrive := now + common.WorldMillis(Distance(from, dest))*msPerTile
+	path := RouteAround(from, dest)
+	arrive := now + common.WorldMillis(len(path)-1)*msPerTile
 	return Solution{Path: path, MeetHex: dest, ArriveTime: arrive}
 }
 
@@ -33,16 +34,18 @@ func SolveIntercept(from Hex, target Orbit, now, msPerTile, horizon common.World
 	}
 	for t := now; t <= now+horizon; t += step {
 		pos := OrbState(target, t)
-		travel := common.WorldMillis(Distance(from, pos)) * msPerTile
+		path := RouteAround(from, pos)
+		travel := common.WorldMillis(len(path)-1) * msPerTile
 		if now+travel <= t {
-			return Solution{Path: Line(from, pos), MeetHex: pos, ArriveTime: t}
+			return Solution{Path: path, MeetHex: pos, ArriveTime: t}
 		}
 	}
 	// No feasible lead within the horizon — aim at the body's current position.
 	pos := OrbState(target, now)
+	path := RouteAround(from, pos)
 	return Solution{
-		Path:       Line(from, pos),
+		Path:       path,
 		MeetHex:    pos,
-		ArriveTime: now + common.WorldMillis(Distance(from, pos))*msPerTile,
+		ArriveTime: now + common.WorldMillis(len(path)-1)*msPerTile,
 	}
 }
