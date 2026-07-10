@@ -18,6 +18,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Heading, Subheading } from '@/components/catalyst/heading'
 import { Button } from '@/components/catalyst/button'
 import { Text, TextLink, Strong } from '@/components/catalyst/text'
+import { useAccountContext } from '@/components/account-provider'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import type { Galaxy, GalaxyNode, Region } from '@/lib/types/galaxy'
 import { REGION_PALETTE, REGIONS, regionColor } from './region-palette'
@@ -123,6 +124,32 @@ export function GalaxyView() {
         />
         <Inspector node={selected} connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0} />
       </div>
+
+      {/* Floating account affordance — the sidebar's job (email + sign out),
+          without the sidebar, so the authed home stays full-bleed. */}
+      <AccountChip />
+    </div>
+  )
+}
+
+// ---- Floating account chip (authed only) ----
+
+function AccountChip() {
+  const { user, account, signOut } = useAccountContext()
+  if (!user) return null
+  return (
+    <div className={`${PANEL} absolute bottom-4 left-4 flex items-center gap-3 !py-2`}>
+      <span className="max-w-[12rem] truncate text-xs text-zinc-300">
+        {account?.email ?? user.email}
+      </span>
+      <Button
+        plain
+        onClick={() => signOut()}
+        data-testid="sign-out-button"
+        className="!text-xs !text-white"
+      >
+        Sign out
+      </Button>
     </div>
   )
 }

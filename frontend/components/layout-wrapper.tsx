@@ -17,8 +17,9 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname?.startsWith(route))
   // The home route is the galaxy view (spec #0002): the logged-out landing AND
-  // the primary authed screen. Public to signed-out visitors (no /login
-  // redirect), but authed users still get the app shell around it.
+  // the primary authed screen. It is full-bleed in BOTH auth states — the canvas
+  // IS the window and its panels float over it — so it never gets the dashboard
+  // sidebar shell. Authed nav/account controls float within the view instead.
   const isHome = pathname === '/'
 
   useEffect(() => {
@@ -27,7 +28,8 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     }
   }, [authLoading, user, isPublicRoute, isHome, router])
 
-  if (isPublicRoute) {
+  // Public routes and the immersive home galaxy view render bare (no shell).
+  if (isPublicRoute || isHome) {
     return <>{children}</>
   }
 
@@ -35,13 +37,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     return null
   }
 
-  // Logged-out visitor on the home galaxy view: render it bare (no dashboard
-  // shell). The sign-in prompt lives inside the view, at the gated boundary.
-  if (!user) {
-    return isHome ? <>{children}</> : null
-  }
-
-  if (!account) {
+  if (!user || !account) {
     return null
   }
 

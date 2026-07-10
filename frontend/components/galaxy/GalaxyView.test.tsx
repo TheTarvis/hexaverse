@@ -64,6 +64,11 @@ vi.mock('react-force-graph-3d', () => ({ default: () => null }))
 
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
 
+// The floating account chip reads auth context; default to logged-out (no chip).
+vi.mock('@/components/account-provider', () => ({
+  useAccountContext: () => ({ user: null, account: null, signOut: vi.fn() }),
+}))
+
 const mockUseGalaxy = vi.mocked(useGalaxy)
 
 const galaxy: Galaxy = {

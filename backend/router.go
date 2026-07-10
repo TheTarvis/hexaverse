@@ -31,7 +31,10 @@ func SetupRouter() *gin.Engine {
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = []string{}
 	if config.IsLocal() {
-		corsConfig.AllowOrigins = append(corsConfig.AllowOrigins, "http://localhost:3000")
+		// Next.js bumps to the next free port when 3000 is taken, so accept the
+		// common local dev ports rather than only 3000.
+		corsConfig.AllowOrigins = append(corsConfig.AllowOrigins,
+			"http://localhost:3000", "http://localhost:3001")
 	}
 	corsConfig.AllowCredentials = true
 	corsConfig.AllowHeaders = []string{

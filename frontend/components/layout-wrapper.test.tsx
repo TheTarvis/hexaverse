@@ -85,7 +85,29 @@ describe('LayoutWrapper', () => {
     expect(screen.queryByTestId('app-navigation')).not.toBeInTheDocument()
   })
 
-  it('renders app shell for authenticated user with account', () => {
+  it('renders the home galaxy view bare for authenticated users too (no shell)', () => {
+    // The immersive home is full-bleed in BOTH auth states — the sidebar shell
+    // would push the canvas into a panel and break the "window is the canvas" feel.
+    vi.mocked(usePathname).mockReturnValue('/')
+    vi.mocked(useAccountContext).mockReturnValue({
+      user: { uid: 'u1' },
+      authLoading: false,
+      account: { id: 'a1' },
+      isLoading: false,
+    } as ReturnType<typeof useAccountContext>)
+
+    render(
+      <LayoutWrapper>
+        <div data-testid="galaxy-content">Galaxy</div>
+      </LayoutWrapper>
+    )
+
+    expect(screen.getByTestId('galaxy-content')).toBeInTheDocument()
+    expect(screen.queryByTestId('app-navigation')).not.toBeInTheDocument()
+  })
+
+  it('renders app shell for authenticated user with account on a protected route', () => {
+    vi.mocked(usePathname).mockReturnValue('/settings')
     vi.mocked(useAccountContext).mockReturnValue({
       user: { uid: 'u1' },
       authLoading: false,
@@ -103,7 +125,8 @@ describe('LayoutWrapper', () => {
     expect(screen.getByTestId('content')).toBeInTheDocument()
   })
 
-  it('renders nothing while auth is loading', () => {
+  it('renders nothing while auth is loading on a protected route', () => {
+    vi.mocked(usePathname).mockReturnValue('/settings')
     vi.mocked(useAccountContext).mockReturnValue({
       user: null,
       authLoading: true,
