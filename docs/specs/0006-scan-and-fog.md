@@ -219,41 +219,41 @@ which every later player still fogs fresh from their own entry.
 
 ## Acceptance criteria
 
-- [ ] The graph read returns **every** system (star layer: position, region,
+- [x] The graph read returns **every** system (star layer: position, region,
       major-body inventory) for any player from t=0, with a per-requester
       subspace tier `rumored | surveyed | explored`; the `discovered` boolean
       is gone from #0001/#0002 surfaces.
 - [ ] **Arriving in a system** (a #0005 travel resolution) sets it `explored`
       for the arriver and reveals its **onward lanes**; before that, the
       player knows only lanes leaving systems they've visited.
-- [ ] Subspace tiers are **monotonic** — no code path lowers one.
-- [ ] Board reads return the **astronomical layer for any arriver** (star,
+- [x] Subspace tiers are **monotonic** — no code path lowers one.
+- [x] Board reads return the **astronomical layer for any arriver** (star,
       major bodies, geometry — from the eager #0003 skeleton), ambient-live
       content only inside the requester's computed sensor union, and
       remembered features elsewhere.
-- [ ] **Remembered features keep orbiting**: a stored observation renders at
+- [x] **Remembered features keep orbiting**: a stored observation renders at
       its *current* computed orbital position, with activity/detail frozen at
       `asOf`. Empty space reverts to Unseen.
 - [ ] **First physical arrival** triggers the #0003 detail roll exactly once
       (create-if-absent under #0005's resolution guard); later arrivers fog
       the same canon fresh.
-- [ ] **Scan is a #0005 action**: commit stores the ETA; resolution mints an
+- [x] **Scan is a #0005 action**: commit stores the ETA; resolution mints an
       observation with `asOf: eta` — a scan resolved hours late yields the
       same snapshot as one resolved on time (emulator test).
-- [ ] Scanning **tiers-up** graph knowledge per quality and populates
+- [x] Scanning **tiers-up** graph knowledge per quality and populates
       per-feature detail on the board; the observation lands in the owner's
       inventory (the market's future input).
-- [ ] Every fleet/system/graph read is **fog-filtered server-side per
+- [x] Every fleet/system/graph read is **fog-filtered server-side per
       requester**; no API response contains world state the requester hasn't
       earned (verified by test: two players, one scans, the other's read is
       unchanged).
-- [ ] A burning fleet's snapshot reaches only observers whose **live sensor
+- [x] A burning fleet's snapshot reaches only observers whose **live sensor
       union covers it** (the #0004 audience contract).
-- [ ] Own-perception is never fogged: a player always reads their own units
+- [x] Own-perception is never fogged: a player always reads their own units
       and their coverage, anywhere in the galaxy.
-- [ ] The frozen start area serves all-`explored` static data with no
+- [x] The frozen start area serves all-`explored` static data with no
       per-player state.
-- [ ] Sensor radii, scan parameters, and quality tiers live in a **params
+- [x] Sensor radii, scan parameters, and quality tiers live in a **params
       object**, spike values as defaults.
 - [ ] **Slice bar:** move a ship into an unseen system → the astronomical
       layer appears; scan → detail + a timestamped observation you own;

@@ -186,7 +186,7 @@ Solo project of Travis Wilson.
 The richest design source is the archived gameplay doc —
 `git show bf9c637:client/docs/Gameplay.mdc`.)*
 
-**Backend domains built (M1–M5):**
+**Backend domains built (M1–M6):**
 
 - **`common/worldtime.go`** — the injectable simulation clock (#0005 contract,
   pulled forward). `WorldClock()` / `NewWorldTime(epoch, scale)`; all stored
@@ -226,10 +226,25 @@ The richest design source is the archived gameplay doc —
   ~15 min in `scheduler.tf`; correctness never depends on it. Composite indexes
   `(scope|actor|status, status, eta)` in `firestore-indexes.tf` (Travis must
   `terraform apply`). Mine (M10) is the first real mutating writer.
+- **`observation/`** (#0006, *built M6, spec still `accepted`*) — per-Corporation
+  fog. The observation atom (graph-tier `systemId→tier`
+  `starVisible|rumored|surveyed|explored`, monotonic; board-tier per-feature
+  memory) + the **fog-filter service** every read projects through
+  (`galaxy`/`system`/`fleet` handlers take `.WithFog(...)`; server-side only, no
+  ship-and-hide). Scan is an action `type` on the #0005 dispatch: resolution
+  mints `asOf: eta` observations (owner's inventory = the market's future input),
+  tiers-up graph knowledge, populates per-feature board detail — a late-resolved
+  scan yields the same snapshot. Board reads split into three bands (astronomical
+  free / live inside the sensor union / remembered elsewhere, geometry live +
+  activity frozen at `asOf`). Fleet reads carry **audience fog** (own fleets never
+  fogged; a foreign fleet outside your live sensor union reads 404). Ambient-on-
+  move reveals at movement resolution. Params in `observation/params.go`. **Not
+  yet done (M7/M8):** explored-on-arrival + onward-lane reveal, the first-arrival
+  detail roll (replaces #0003's dev trigger), the move→scan→leave slice bar.
 
-**Next:** M6 fog retrofit (write the two-player isolation tests first), then M7
-hex-board view (client refetch rules + worldTime animation land here), M8 travel,
-M9 spawn, M10 mine.
+**Next:** M7 hex-board view (client refetch rules + worldTime animation land
+here; `lib/hex/` asserts M4's fixtures), then M8 travel (finishes #0006's
+arrival-reveal + #0003/#0007), M9 spawn, M10 mine.
 
 - Core loop from the original design: players spawn colonies on a hex-grid
   galaxy (spaced 8–25 tiles apart), explore under fog of war (scan radius
