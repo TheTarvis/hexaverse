@@ -172,27 +172,27 @@ start-area interiors are pre-generated.
 
 ## Acceptance criteria
 
-- [ ] Given a system id/seed, generation produces a **star-centered hex board**
+- [x] Given a system id/seed, generation produces a **star-centered hex board**
       (radius R), and **same seed → same interior** (deterministic).
-- [ ] Tiles carry a **ring + band**; contents follow a **radial gradient + noise**
+- [x] Tiles carry a **ring + band**; contents follow a **radial gradient + noise**
       — inner bodies skew metals, outer skew ice/gas, mid holds the goldilocks/ruins.
-- [ ] The interior is populated by **bodies** (star at center; planets; ≥1 belt as
+- [x] The interior is populated by **bodies** (star at center; planets; ≥1 belt as
       a ring arc; moons riding gas giants; some mid-band anomaly/ruin), each with
       **resources hanging off the body** and band-appropriate kinds.
-- [ ] Generation is **dialed by graph-tier character** — a `star_rich` system is
+- [x] Generation is **dialed by graph-tier character** — a `star_rich` system is
       visibly denser/richer than a `dead` one from the same generator.
-- [ ] **Every non-star body carries orbital elements**; its position is computed
+- [x] **Every non-star body carries orbital elements**; its position is computed
       from `(elements, worldTime)`; with motion **off/slow**, the board reads static
       for the slice.
 - [ ] The interior is **generated once per system, lazily on first Explore**, as
       **shared** state (not per-player), **idempotent under races** (create-if-absent),
       and **persisted to Firestore**, readable by a frontend service.
 - [ ] A **frozen start-area** system ships a fully-generated static interior.
-- [ ] **All generation knobs live in one `GenerationParams` object** (radius, band
+- [x] **All generation knobs live in one `GenerationParams` object** (radius, band
       boundaries, per-character counts + richness, hazard rates, orbital periods)
       with the spike values as defaults — retuning is *edit a value + regenerate*,
       no generator-code changes.
-- [ ] Backend tests (Firebase emulator) cover **determinism**, **band
+- [x] Backend tests (Firebase emulator) cover **determinism**, **band
       distribution**, the **character dial**, and **presence of orbital elements**.
 
 ## Decisions (imported from `../plans/hex-board.md`, 2026-07-06/07)
