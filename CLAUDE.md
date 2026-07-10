@@ -182,8 +182,36 @@ Solo project of Travis Wilson.
 
 ## Domain quick-reference
 
-*(to be filled as the rebuild takes shape; the richest existing source is the
-archived gameplay doc — `git show bf9c637:client/docs/Gameplay.mdc`)*
+*(filled as the rebuild lands milestones — see `docs/plans/build-order.md`.
+The richest design source is the archived gameplay doc —
+`git show bf9c637:client/docs/Gameplay.mdc`.)*
+
+**Backend domains built (M1–M4):**
+
+- **`common/worldtime.go`** — the injectable simulation clock (#0005 contract,
+  pulled forward). `WorldClock()` / `NewWorldTime(epoch, scale)`; all stored
+  stamps are `WorldMillis`. Domain code never calls `time.Now()`; tests inject.
+- **`galaxy/`** (#0001, *implemented*) — generate-once + read. Deterministic
+  generator (`Generate(seed, params)`): simplex-noise regions, Poisson-disc
+  placement, relative-neighbourhood lanes, per-system major-body skeleton.
+  Persists `galaxies/{id}` + `systems/`/`lanes/` subcollections behind a live
+  pointer. `GET /v1/galaxy`. Seed via `make seed` / `cmd/seed`;
+  `cmd/seed start-area` writes `frontend/public/galaxy/start-area.json`.
+- **`system/`** (#0003 part 1) — lazy per-system interiors. `Generate` extends
+  the galaxy skeleton (same `galaxy.SystemSeed`) with belts/moons/hazards,
+  dialed by region character. Create-if-absent under
+  `galaxies/{gid}/systems/{sid}/interior` + `features/`. `GET /v1/systems/:id`
+  materializes on first read (dev trigger; TODO #0008 arrival). Unfogged (M6).
+- **`board/`** — pure shared tactical math (no Firestore/clock): axial/cube hex,
+  hex-line paths, `OrbState`, `ShipPos`, `SolveIntercept`. Go↔TS contract is
+  `/fixtures/board/cases.json` (golden test); M7's `lib/hex` asserts the same.
+- **`fleet/`** (#0004, *implemented*) — the map-mover. One movement state
+  (`coast|burn|docked`), `corporationId` from day one (dev-seeded until M9).
+  `POST /v1/fleets/:id/orders|cancel`, `GET /v1/fleets/:id` (arrival resolved
+  opportunistically on read — no scheduler). `POST /v1/fleets/dev-seed`.
+
+**Next:** M5 `action/` (the async spine — commit/resolve/inbox/sweep + ledger),
+then M6 fog retrofit, M7 hex-board view, M8 travel, M9 spawn, M10 mine.
 
 - Core loop from the original design: players spawn colonies on a hex-grid
   galaxy (spaced 8–25 tiles apart), explore under fog of war (scan radius

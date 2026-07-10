@@ -29,7 +29,7 @@
 
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
-| Galaxy generation (procedural node graph, regions, lanes) | ✅ #0001 | Accepted. Now also generates each system's **major-body skeleton** up front (`../plans/fog-of-war.md` option (a) — the graph shows the inventory). |
+| Galaxy generation (procedural node graph, regions, lanes) | ✅ #0001 | **Implemented (M1).** Now also generates each system's **major-body skeleton** up front (`../plans/fog-of-war.md` option (a) — the graph shows the inventory). |
 | Frozen start area (logged-out landing) | ✅ #0001 | Decided as an *acceptance criterion* on #0001, not its own spec (`vision.md`). |
 | Ever-growing frontier / expansion cadence | 💭 ⏸ | #0001 makes the model *appendable*; the **trigger + cadence** is a deferred spec. |
 
@@ -37,7 +37,7 @@
 
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
-| Galaxy view (3D force-graph UI, intel panel, inspector) | ✅ #0002 | Accepted. Camera/input model now scoped in `../plans/camera-and-input.md` (folds in — see below). |
+| Galaxy view (3D force-graph UI, intel panel, inspector) | ✅ #0002 | **Built (M2)** — structure/logic done; camera *feel* pending Travis. Camera/input model now scoped in `../plans/camera-and-input.md` (folds in — see below). |
 | **Camera & input** (galaxy-tier 3D camera: RTS pan-orbit, Z-up, gestures) | ✅ #0002 🎯 | **Folded into [#0002](0002-galaxy-view.md) 2026-07-09** (its Decision #8 + "Camera & input" design section): RTS pan-orbit, Z-up, height-scaled ground-plane pan, unclamped pitch, trackpad gesture map, double-click focus + ⌖ recenter — decided in `../plans/camera-and-input.md`, proven in the `galaxy-3d` spike. The plan doc keeps the decide-while-building questions. |
 | **Fog of war** (per-player visibility, scan radius, re-fogging) | ✅ #0006 🎯 | **Graduated 2026-07-09 as [#0006 scan-and-fog](0006-scan-and-fog.md) (accepted)** — the intel data model + live visibility; **absorbs the Scan row** below; replaces the #0001/#0002 `discovered` stub with a subspace enum. Design in `../plans/fog-of-war.md`; prototyped in the `hex-board` spike. |
 | **Inter-system travel / movement on the graph** (lane cost, FTL tiers, relay chains) | ✅ #0008 🎯 | **Graduated 2026-07-09 as [#0008 movement-galaxy](0008-movement-galaxy.md) (accepted)** — 5 locked decisions (length-weighted time cost, jump-range FTL, fleet-is-mover, destination-on-arrival reveal, three orthogonal fast-travel mechanisms); slice = lanes-only; **spike in progress**. Design in `../plans/movement-galaxy.md`. |
@@ -46,9 +46,9 @@
 
 | Mechanic | Coverage | Notes / next step |
 |----------|----------|-------------------|
-| **System interior generation** (hex board: resource tiles, hazards, tile traits) | ✅ #0003 | **Accepted** (was Draft). Star-centered orbital rings, **bodies** as the anchor, orbital elements in-schema (motion deferred), two-phase generation (skeleton eager / detail on first arrival — resolved in `fog-of-war.md`). Design in `../plans/hex-board.md`. |
+| **System interior generation** (hex board: resource tiles, hazards, tile traits) | ✅ #0003 | **Built (M3 part 1)** — interiors generate + persist; arrival trigger & start-area asset remain (M8). Was Accepted. Star-centered orbital rings, **bodies** as the anchor, orbital elements in-schema (motion deferred), two-phase generation (skeleton eager / detail on first arrival — resolved in `fog-of-war.md`). Design in `../plans/hex-board.md`. |
 | **Hex board view / renderer** (2D SVG) | ✅ #0007 🎯 | **Graduated 2026-07-09 as [#0007 hex-board-view](0007-hex-board-view.md) (accepted)** — SVG renderer, quantize-the-sim/interpolate-the-picture, three fog bands, select→preview→commit. Companion to #0003, like #0002 is to #0001. Design in `../plans/hex-board.md`; prototyped in the `hex-board` spike. |
-| **In-system movement** (ships across hexes, sublight/FTL, tile-trait effects) | ✅ #0004 | Accepted. **Coast & thrust** over the orbital board — coast rides your orbit, thrust plots a burn, click-to-intercept moving bodies, dock to ride; the **fleet** is the mover, movement resolves async. Design in `../plans/movement-board.md`. Pairs with #0003. **Assumes the action/timer spine (below) — currently unspec'd.** |
+| **In-system movement** (ships across hexes, sublight/FTL, tile-trait effects) | ✅ #0004 | **Implemented (M4).** **Coast & thrust** over the orbital board — coast rides your orbit, thrust plots a burn, click-to-intercept moving bodies, dock to ride; the **fleet** is the mover, movement resolves async. Design in `../plans/movement-board.md`. Pairs with #0003. **Assumes the action/timer spine (below) — currently unspec'd.** |
 | **Scan** (reveal tiles, detect resources/hazards/players → produce *intelligence*) | ✅ #0006 🎯 | **Absorbed into [#0006 scan-and-fog](0006-scan-and-fog.md)** (2026-07-09): a scan does double duty — reveals to me (fog) **and** mints a timestamped observation into intel inventory; rides #0005 (commit-time ETA; resolves correctly even late). |
 | **Mine** (extract materials from resource tiles) | ✅ #0010 🎯 | **Graduated 2026-07-09 as [#0010 mine](0010-mine.md) (accepted)** — first mutating verb on #0005's ledger; ships-compose/fleet-acts roster model, fleet-level cargo pool, docked-to-mine, tonnage-target runs, **lodes deplete in the slice** (keeps players exploring + moving); fuel–tonnage coupling explicitly deferred to #0004's fuel economy. |
 | **Research** (research points / tech unlocks) | 💭 ⏸ | Named as a core action; depth deferred. |
