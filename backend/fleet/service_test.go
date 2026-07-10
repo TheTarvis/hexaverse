@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"hexaverse/action"
 	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/system"
@@ -15,9 +16,32 @@ import (
 // fakeClock is a settable world clock for driving arrival transitions.
 type fakeClock struct{ now common.WorldMillis }
 
-func (c *fakeClock) Now() common.WorldMillis                 { return c.now }
-func (c *fakeClock) FromWall(time.Time) common.WorldMillis   { return c.now }
-func (c *fakeClock) Scale() float64                          { return 1 }
+func (c *fakeClock) Now() common.WorldMillis               { return c.now }
+func (c *fakeClock) FromWall(time.Time) common.WorldMillis { return c.now }
+func (c *fakeClock) Scale() float64                        { return 1 }
+
+// fakeActions is a hand fake of action.CommitInterface capturing what fleet
+// commits/cancels through the spine, so the unit tests can assert the wrapping
+// without a Firestore transaction.
+type fakeActions struct {
+	committed *action.CommitSpec
+	cancelled []string
+}
+
+func (f *fakeActions) Commit(_ context.Context, spec action.CommitSpec) (*action.Action, error) {
+	f.committed = &spec
+	return &action.Action{Id: "action_test", Type: spec.Type, Actor: spec.Actor,
+		Scope: spec.Scope, Eta: spec.Eta, Status: action.StatusRunning}, nil
+}
+
+func (f *fakeActions) Cancel(_ context.Context, id string, _ map[string]interface{}) (*action.Action, error) {
+	f.cancelled = append(f.cancelled, id)
+	return &action.Action{Id: id, Status: action.StatusCancelled}, nil
+}
+
+func (f *fakeActions) ResolveActive(context.Context, string) ([]action.Action, error) {
+	return nil, nil
+}
 
 // fakeSystem returns a fixed interior: a static star and a (slow ⇒ static)
 // planet, so the motion-off reduction is exercised.
@@ -43,23 +67,21 @@ func coastFleetAtCentre() *Fleet {
 	}
 }
 
-func newSvc(t *testing.T, clk *fakeClock) (*Service, *MockDao, *gomock.Controller) {
+func newSvc(t *testing.T, clk *fakeClock) (*Service, *MockDao, *fakeActions, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
 	dao := NewMockDao(ctrl)
-	return NewServiceWith(dao, &fakeSystem{}, clk), dao, ctrl
+	fa := &fakeActions{}
+	return NewServiceWith(dao, &fakeSystem{}, fa, clk), dao, fa, ctrl
 }
 
 func TestOrderTo_Hex_BurnPathAndEta(t *testing.T) {
 	clk := &fakeClock{now: 0}
-	svc, dao, ctrl := newSvc(t, clk)
+	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
+	// The burn commits through the action spine (Commit writes the fleet doc), so
+	// OrderTo no longer calls dao.Save directly.
 	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
-	var saved Fleet
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) error {
-		saved = f
-		return nil
-	})
 
 	dest := board.Hex{Q: 5, R: 0}
 	f, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{Hex: &dest}})
@@ -69,7 +91,10 @@ func TestOrderTo_Hex_BurnPathAndEta(t *testing.T) {
 	if f.State.Mode != board.ModeBurn {
 		t.Fatalf("expected burn, got %s", f.State.Mode)
 	}
-	b := saved.State.Burn
+	if f.ActiveActionId != "action_test" {
+		t.Fatalf("expected active action claimed, got %q", f.ActiveActionId)
+	}
+	b := f.State.Burn
 	if b.Path[0] != (board.Hex{Q: 0, R: 0}) || b.Path[len(b.Path)-1] != dest {
 		t.Fatalf("path endpoints wrong: %v", b.Path)
 	}
@@ -82,15 +107,21 @@ func TestOrderTo_Hex_BurnPathAndEta(t *testing.T) {
 			t.Fatalf("path not contiguous at %d", i)
 		}
 	}
+	// Committed as a burn action scoped to the system, eta = the arrival.
+	if fa.committed == nil || fa.committed.Type != burnType {
+		t.Fatalf("expected a burn commit, got %+v", fa.committed)
+	}
+	if fa.committed.Scope != "sys-0" || fa.committed.Eta != b.ArriveTime {
+		t.Fatalf("commit scope/eta wrong: %+v", fa.committed)
+	}
 }
 
 func TestOrderTo_Feature_InterceptMeetsBodyAndDocks(t *testing.T) {
 	clk := &fakeClock{now: 0}
-	svc, dao, ctrl := newSvc(t, clk)
+	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
 	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 
 	f, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{FeatureId: "feat-planet"}})
 	if err != nil {
@@ -105,6 +136,9 @@ func TestOrderTo_Feature_InterceptMeetsBodyAndDocks(t *testing.T) {
 	if b.Path[len(b.Path)-1] != board.OrbState(planet, b.ArriveTime) {
 		t.Fatalf("meet hex != body pos at arriveTime")
 	}
+	if fa.committed == nil || fa.committed.Params["dockOnArrive"] != "feat-planet" {
+		t.Fatalf("commit params should record the dock target: %+v", fa.committed)
+	}
 }
 
 func TestOrderTo_MotionOffReduction(t *testing.T) {
@@ -113,17 +147,15 @@ func TestOrderTo_MotionOffReduction(t *testing.T) {
 	planetHex := board.OrbState(board.Orbit{Ring: 5, Angle0: 3, Period: 1 << 60, Dir: 1}, 0)
 
 	clk := &fakeClock{now: 0}
-	svc, dao, ctrl := newSvc(t, clk)
+	svc, dao, _, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 	byFeature, _ := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{FeatureId: "feat-planet"}})
 
 	clk2 := &fakeClock{now: 0}
-	svc2, dao2, ctrl2 := newSvc(t, clk2)
+	svc2, dao2, _, ctrl2 := newSvc(t, clk2)
 	defer ctrl2.Finish()
 	dao2.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
-	dao2.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 	byHex, _ := svc2.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{Hex: &planetHex}})
 
 	if byFeature.State.Burn.ArriveTime != byHex.State.Burn.ArriveTime {
@@ -137,7 +169,7 @@ func TestOrderTo_MotionOffReduction(t *testing.T) {
 
 func TestGet_ArrivalDocksAfterEta(t *testing.T) {
 	clk := &fakeClock{now: 500_000} // past arrival
-	svc, dao, ctrl := newSvc(t, clk)
+	svc, dao, _, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
 	burning := coastFleetAtCentre()
@@ -163,7 +195,7 @@ func TestGet_ArrivalDocksAfterEta(t *testing.T) {
 
 func TestGet_ArrivalCoastsWhenNoDock(t *testing.T) {
 	clk := &fakeClock{now: 500_000}
-	svc, dao, ctrl := newSvc(t, clk)
+	svc, dao, _, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
 	burning := coastFleetAtCentre()
@@ -188,7 +220,7 @@ func TestGet_ArrivalCoastsWhenNoDock(t *testing.T) {
 
 func TestCancel_MidBurnResumesCoast(t *testing.T) {
 	clk := &fakeClock{now: 120_000} // partway through a 300k burn
-	svc, dao, ctrl := newSvc(t, clk)
+	svc, dao, _, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
 	burn := board.Burn{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"hexaverse/action"
 	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/system"
@@ -11,6 +12,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
+
+// burnType is the action dispatch key for a fleet's map-move. The burn is a thin
+// lifecycle wrapper (ETA, status, inbox, single slot) around the order that lives
+// in fleet.State.Burn — never a second copy of motion state (#0005 Decision #6).
+const burnType = "burn"
+
+// actorCollection is where fleet docs live, so the action domain can claim and
+// release the single-action slot generically without importing this package.
+const actorCollection = "fleets"
 
 var (
 	ErrNotFound      = errors.New("fleet not found")
@@ -30,33 +40,55 @@ type ServiceInterface interface {
 type Service struct {
 	dao       Dao
 	systemSvc system.ServiceInterface
+	actions   action.CommitInterface
 	clock     common.WorldTime
 	params    MovementParams
 }
 
 func NewService() *Service {
-	return &Service{dao: NewDao(), systemSvc: system.NewService(), clock: common.WorldClock(), params: DefaultMovementParams()}
+	params := DefaultMovementParams()
+	actions := action.NewService()
+	actions.RegisterResolver(burnType, action.KindKinematic, BurnResolver(params))
+	return &Service{
+		dao:       NewDao(),
+		systemSvc: system.NewService(),
+		actions:   actions,
+		clock:     common.WorldClock(),
+		params:    params,
+	}
 }
 
-func NewServiceWith(dao Dao, systemSvc system.ServiceInterface, clock common.WorldTime) *Service {
-	return &Service{dao: dao, systemSvc: systemSvc, clock: clock, params: DefaultMovementParams()}
+func NewServiceWith(dao Dao, systemSvc system.ServiceInterface, actions action.CommitInterface, clock common.WorldTime) *Service {
+	return &Service{dao: dao, systemSvc: systemSvc, actions: actions, clock: clock, params: DefaultMovementParams()}
 }
 
-// Get returns the fleet, opportunistically resolving a completed burn to
-// dock/coast (arrival is a computed fact, not a fired event — #0004 Decision
-// #12). No scheduler needed for the position to be correct.
+// Get returns the fleet, opportunistically resolving a completed burn (arrival
+// is a computed fact, not a fired event — #0004 Decision #12; no scheduler). When
+// the burn is wrapped in an action (the normal path since M5), resolution runs
+// through the spine so the motion-state settle AND the slot release happen in one
+// transaction. A burn with no action (dev-seeded/legacy) still settles locally.
 func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 	f, err := s.load(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	now := s.clock.Now()
-	if board.Arrived(f.State, now) {
-		s.settleArrival(f)
-		f.UpdatedAt = now
-		if err := s.dao.Save(ctx, *f); err != nil {
+	if !board.Arrived(f.State, now) {
+		return f, nil
+	}
+	if f.ActiveActionId != "" {
+		// Resolve the due burn through the action spine (settles state + releases
+		// the slot + flips the action to done, atomically), then re-read.
+		if _, err := s.actions.ResolveActive(ctx, id); err != nil {
 			return nil, err
 		}
+		return s.load(ctx, id)
+	}
+	// No wrapping action — settle motion state directly (there's no slot to free).
+	s.settleArrival(f)
+	f.UpdatedAt = now
+	if err := s.dao.Save(ctx, *f); err != nil {
+		return nil, err
 	}
 	return f, nil
 }
@@ -97,7 +129,7 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 		return nil, errors.New("order target must be a hex or a featureId")
 	}
 
-	f.State = board.MovementState{
+	burnState := board.MovementState{
 		Mode: board.ModeBurn,
 		Burn: &board.Burn{
 			Path:         sol.Path,
@@ -107,16 +139,41 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 			DockOnArrive: dockOnArrive,
 		},
 	}
-	f.UpdatedAt = now
-	if err := s.dao.Save(ctx, *f); err != nil {
+
+	// Re-task: releasing the current slot before claiming a new one (a running
+	// action while ordering is the norm mid-burn). ErrNotRunning means it already
+	// resolved — the slot is free, so proceed.
+	if f.ActiveActionId != "" {
+		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, nil); err != nil && !errors.Is(err, action.ErrNotRunning) {
+			return nil, err
+		}
+	}
+
+	// Commit the burn THROUGH the action spine: the action doc + the single-slot
+	// claim + the fleet's flip to burn all land in one transaction. Fleet still
+	// owns motion state — it rides in ActorState, not duplicated into params.
+	a, err := s.actions.Commit(ctx, action.CommitSpec{
+		Type:            burnType,
+		Actor:           id,
+		ActorCollection: actorCollection,
+		Scope:           f.SystemId,
+		Params:          map[string]interface{}{"target": req.Target, "dockOnArrive": dockOnArrive},
+		Eta:             sol.ArriveTime,
+		ActorState:      map[string]interface{}{"state": burnState, "updatedAt": int64(now)},
+	})
+	if err != nil {
 		return nil, err
 	}
-	log.Info().Ctx(ctx).Str("fleetId", id).Int("pathLen", len(sol.Path)).
+	f.State = burnState
+	f.ActiveActionId = a.Id
+	f.UpdatedAt = now
+	log.Info().Ctx(ctx).Str("fleetId", id).Str("actionId", a.Id).Int("pathLen", len(sol.Path)).
 		Int64("arriveTime", int64(sol.ArriveTime)).Msg("Fleet ordered to burn")
 	return f, nil
 }
 
-// Cancel drops the fleet to coast from wherever it currently is.
+// Cancel drops the fleet to coast from wherever it currently is, releasing its
+// action slot in the same transaction (the coast state rides in ActorState).
 func (s *Service) Cancel(ctx context.Context, id string) (*Fleet, error) {
 	f, err := s.load(ctx, id)
 	if err != nil {
@@ -126,8 +183,24 @@ func (s *Service) Cancel(ctx context.Context, id string) (*Fleet, error) {
 	if err != nil {
 		return nil, err
 	}
-	f.State = s.coastAt(cur)
-	f.UpdatedAt = s.clock.Now()
+	coast := s.coastAt(cur)
+	now := s.clock.Now()
+
+	if f.ActiveActionId != "" {
+		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, map[string]interface{}{
+			"state": coast, "updatedAt": int64(now),
+		}); err != nil && !errors.Is(err, action.ErrNotRunning) {
+			return nil, err
+		}
+		f.State = coast
+		f.ActiveActionId = ""
+		f.UpdatedAt = now
+		return f, nil
+	}
+
+	// No wrapping action — coast directly.
+	f.State = coast
+	f.UpdatedAt = now
 	if err := s.dao.Save(ctx, *f); err != nil {
 		return nil, err
 	}
@@ -197,11 +270,7 @@ func (s *Service) settleArrival(f *Fleet) {
 }
 
 func (s *Service) coastAt(h board.Hex) board.MovementState {
-	ring, idx := board.AngleOf(h)
-	return board.MovementState{
-		Mode:  board.ModeCoast,
-		Coast: &board.Orbit{Ring: ring, Angle0: idx, Period: s.params.CoastPeriod, Dir: 1},
-	}
+	return coastState(h, s.params.CoastPeriod)
 }
 
 func (s *Service) resolveFeature(ctx context.Context, systemID, featureID string) (*system.Feature, error) {

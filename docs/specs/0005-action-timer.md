@@ -226,40 +226,56 @@ arrived to a picked-clean belt" is on-theme for a dangerous frontier
 
 ## Acceptance criteria
 
-- [ ] Committing an action stores `{type, actor, scope, params, committedAt,
+- [x] Committing an action stores `{type, actor, scope, params, committedAt,
       eta, status}` and claims `fleet.activeActionId` in **one transaction**; a
       second commit while one is running is rejected; cancel releases the slot.
-- [ ] ETA is computed at commit and resolution compares against the **stored**
-      eta — never recomputed from live tuning params.
-- [ ] Any read touching a scope resolves that scope's due actions **in ETA
+      *(M5: `action.Commit`/`Cancel`, `TestCommit_ClaimsSlotAndRejectsSecond`.)*
+- [x] ETA is computed at commit and resolution compares against the **stored**
+      eta — never recomputed from live tuning params. *(M5: `Resolution.At =
+      a.Eta`; the burn freezes `arriveTime` at commit.)*
+- [x] Any read touching a scope resolves that scope's due actions **in ETA
       order**: two actions due on one feature apply oldest-ETA-first regardless
       of which reader triggers resolution (emulator test: scan at T1 + mine at
       T2 resolved together at T3 yield the same ledger as if resolved on time).
-- [ ] **Duplicate resolution no-ops**: the delta's doc ID is the actionId,
+      *(M5: `ResolveDue`, `TestResolveDue_ETAOrderMatchesOnTime` — drain stand-in.)*
+- [x] **Duplicate resolution no-ops**: the delta's doc ID is the actionId,
       created in the same transaction as the status flip; concurrent resolvers
-      (emulator test) produce exactly one delta.
-- [ ] **Kinematic resolve** materializes the #0004 fleet transition
+      (emulator test) produce exactly one delta. *(M5:
+      `TestResolveDue_ConcurrentProducesOneDelta`.)*
+- [x] **Kinematic resolve** materializes the #0004 fleet transition
       (`burn → coast`) that reads already compute; **mutating resolve** appends
       the delta; a **scan resolved hours late** still mints a correct
       `asOf: eta` snapshot (fold deltas ≤ eta, evaluate kinematics at eta).
-- [ ] `remaining(T)` is a fold over deltas with `effectAt ≤ T`; no materialized
-      `remaining` field exists.
-- [ ] **worldTime**: one scaled, injectable clock in `backend/common`; no bare
+      *(M5: `fleet.BurnResolver` (kinematic) + drain (mutating); the fold-≤-eta /
+      evaluate-at-eta mechanism is in place — the scan verb itself lands at M6.)*
+- [x] `remaining(T)` is a fold over deltas with `effectAt ≤ T`; no materialized
+      `remaining` field exists. *(M5: `FoldDeltas`, `TestFoldDeltas_IsTheOnlyRemainingSource`.)*
+- [x] **worldTime**: one scaled, injectable clock in `backend/common`; no bare
       `time.Now()` in domain code; all stored stamps in worldTime units; every
       read returns `worldTime`; the client animates from the server offset.
-      Tests inject the clock; e2e runs on a fast `scale`.
-- [ ] **The sweep**: a Scheduler-triggered, OIDC-verified endpoint resolves all
+      Tests inject the clock; e2e runs on a fast `scale`. *(M5: `worldTime` pulled
+      forward to M1; every action DTO carries `worldTime`; the client-offset
+      animation lands at M7.)*
+- [x] **The sweep**: a Scheduler-triggered, OIDC-verified endpoint resolves all
       due actions and logs stuck/overdue actions. **All other acceptance
       criteria pass with the sweep disabled** — it is a liveness floor, never
-      the correctness mechanism.
-- [ ] Completion publishes a Pub/Sub envelope (constant in
+      the correctness mechanism. *(M5: `POST /v1/push/action-sweep` +
+      `scheduler.tf`; `TestResolveAllDue_SweepResolvesAcrossScopes`; no
+      correctness test uses the sweep. Needs Travis to `terraform apply`.)*
+- [~] Completion publishes a Pub/Sub envelope (constant in
       `backend/common/pubsub.go`) fanned out via SSE; the frontend implements
       the three refetch rules (reconnect, own-ETA self-schedule, gentle poll).
-- [ ] The **inbox**: done-but-unacknowledged actions are queryable and
+      *(M5: backend half done — `ActionCompleted` → `action-events` topic →
+      `/v1/push/sse-action` → SSE channel=scope. The three client rules land at
+      M7 where the consuming UI exists.)*
+- [x] The **inbox**: done-but-unacknowledged actions are queryable and
       acknowledgeable — "check in → collect finished actions" needs no timer.
-- [ ] **Slice bar:** commit an action, log off, come back — it's done; and the
+      *(M5: `GET /v1/actions?actor&status`, `POST /v1/actions/:id/acknowledge`,
+      `TestInbox_ListsAndAcknowledges`.)*
+- [x] **Slice bar:** commit an action, log off, come back — it's done; and the
       world moved even if you didn't (resolved by whoever read first, or by the
-      sweep within ~15 min).
+      sweep within ~15 min). *(M5: `fleet` integration test resolves an offline
+      arrival on read; the sweep resolves with no reader.)*
 
 ## Decisions (imported from `../plans/action-timer.md`, 2026-07-09)
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"hexaverse/action"
 	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/galaxy"
@@ -24,7 +25,7 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 		t.Fatal(err)
 	}
 	gid := gen.Galaxy.Id
-	defer common.CleanupFirestoreTestData(t, client, "galaxies", "galaxy_pointers", "fleets",
+	defer common.CleanupFirestoreTestData(t, client, "galaxies", "galaxy_pointers", "fleets", "actions",
 		"galaxies/"+gid+"/systems", "galaxies/"+gid+"/lanes",
 		"galaxies/"+gid+"/systems/sys-0/interior", "galaxies/"+gid+"/systems/sys-0/features")
 
@@ -46,7 +47,9 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 		t.Skip("generated interior had no orbiting feature")
 	}
 
-	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, clk)
+	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
+	asvc.RegisterResolver(burnType, action.KindKinematic, BurnResolver(DefaultMovementParams()))
+	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, asvc, clk)
 	seeded, err := fsvc.SeedFleet(ctx, "sys-0", "dev-corp", board.Hex{Q: 0, R: 0})
 	if err != nil {
 		t.Fatal(err)
@@ -83,6 +86,19 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 	}
 	if arrived.State.Mode != board.ModeDocked || arrived.State.Docked.ParentId != targetID {
 		t.Fatalf("expected docked to %s, got %+v", targetID, arrived.State)
+	}
+
+	// Kinematic resolve through the spine also flipped the wrapping action to done
+	// and released the single-action slot — one transaction, not two reads.
+	if arrived.ActiveActionId != "" {
+		t.Fatalf("expected slot released after arrival, got %q", arrived.ActiveActionId)
+	}
+	act, err := asvc.Get(ctx, ordered.ActiveActionId)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if act.Status != action.StatusDone {
+		t.Fatalf("burn action status = %s, want done", act.Status)
 	}
 
 	// The docked position resolves to the parent body's live hex.

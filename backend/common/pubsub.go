@@ -4,10 +4,10 @@ package common
 
 import (
 	"context"
-	"hexaverse/config"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hexaverse/config"
 	"os"
 	"strings"
 	"sync"
@@ -21,7 +21,15 @@ import (
 // Event types — abbreviated to stay within GCP Pub/Sub's 256-char filter limit.
 // Pattern: entity.action. Per-domain constants are added by `/new-domain`.
 
+// ActionCompleted fans out an action's resolution (#0005). It is invalidation,
+// not truth — watchers refetch; missed events self-heal via the client refetch
+// rules. The payload carries channelId=scope for SSE routing.
+const ActionCompleted = "action.completed"
+
 // PubSub topics. Per-domain topics are added by `/new-domain`.
+
+// TopicActionEvents carries action-lifecycle envelopes (currently ActionCompleted).
+const TopicActionEvents = "action-events"
 
 // EventEnvelope payload attribute keys.
 const (

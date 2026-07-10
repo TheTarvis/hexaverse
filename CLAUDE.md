@@ -186,7 +186,7 @@ Solo project of Travis Wilson.
 The richest design source is the archived gameplay doc —
 `git show bf9c637:client/docs/Gameplay.mdc`.)*
 
-**Backend domains built (M1–M4):**
+**Backend domains built (M1–M5):**
 
 - **`common/worldtime.go`** — the injectable simulation clock (#0005 contract,
   pulled forward). `WorldClock()` / `NewWorldTime(epoch, scale)`; all stored
@@ -208,10 +208,28 @@ The richest design source is the archived gameplay doc —
 - **`fleet/`** (#0004, *implemented*) — the map-mover. One movement state
   (`coast|burn|docked`), `corporationId` from day one (dev-seeded until M9).
   `POST /v1/fleets/:id/orders|cancel`, `GET /v1/fleets/:id` (arrival resolved
-  opportunistically on read — no scheduler). `POST /v1/fleets/dev-seed`.
+  opportunistically on read — no scheduler). `POST /v1/fleets/dev-seed`. Since
+  M5 the burn order **commits through `action.Commit`** (`type:"burn"`); fleet
+  still owns motion state (`BurnResolver` settles it at resolve). `activeActionId`
+  carries the single-action slot.
+- **`action/`** (#0005) — the async spine every verb rides. Generic `Action`
+  (`running→done|cancelled`), commit-time ETA, single-slot claim, inbox
+  (`GET /v1/actions?actor&status`, `POST /v1/actions/:id/acknowledge|cancel`).
+  `ResolveDue(scope)`/`ResolveActive(actor)`/`ResolveAllDue` are ETA-ordered
+  folds any read runs; per-type `ResolveFunc` registered by verbs (fleet imports
+  action, never the reverse). Exactly-once ledger at `deltas/{scope}/entries/
+  {actionId}` (doc id = actionId, created in the resolve txn); `remaining(T)` =
+  fold of `effectAt ≤ T`, no materialized field. Kinematic resolvers settle actor
+  state, mutating ones append a delta. Completion → `ActionCompleted` →
+  `action-events` → `/v1/push/sse-action` → SSE(channel=scope). The **sweep**
+  (`POST /v1/push/action-sweep`, OIDC) is a liveness floor — Cloud Scheduler
+  ~15 min in `scheduler.tf`; correctness never depends on it. Composite indexes
+  `(scope|actor|status, status, eta)` in `firestore-indexes.tf` (Travis must
+  `terraform apply`). Mine (M10) is the first real mutating writer.
 
-**Next:** M5 `action/` (the async spine — commit/resolve/inbox/sweep + ledger),
-then M6 fog retrofit, M7 hex-board view, M8 travel, M9 spawn, M10 mine.
+**Next:** M6 fog retrofit (write the two-player isolation tests first), then M7
+hex-board view (client refetch rules + worldTime animation land here), M8 travel,
+M9 spawn, M10 mine.
 
 - Core loop from the original design: players spawn colonies on a hex-grid
   galaxy (spaced 8–25 tiles apart), explore under fog of war (scan radius

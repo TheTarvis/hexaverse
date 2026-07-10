@@ -2,14 +2,17 @@ package main
 
 import (
 	"time"
+
 	"hexaverse/account"
+	"hexaverse/action"
+	"hexaverse/common"
 	"hexaverse/config"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
-	"hexaverse/system"
 	"hexaverse/health"
 	"hexaverse/middlewares"
 	"hexaverse/sse"
+	"hexaverse/system"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -73,7 +76,18 @@ func SetupRouter() *gin.Engine {
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
 	galaxy.NewHandler().RegisterRoutes(authorized)
 	system.NewHandler().RegisterRoutes(authorized)
-	fleet.NewHandler().RegisterRoutes(authorized)
+
+	// The action spine (#0005) and fleet share ONE action.Service instance so the
+	// resolvers fleet registers are the same ones the sweep and reads dispatch
+	// through. Construct it explicitly, wire resolvers, then hand it to both.
+	clock := common.WorldClock()
+	actionSvc := action.NewService()
+	fleet.RegisterResolvers(actionSvc)
+	fleetSvc := fleet.NewServiceWith(fleet.NewDao(), system.NewService(), actionSvc, clock)
+
+	actionHandler := action.NewHandler(actionSvc)
+	actionHandler.RegisterRoutes(authorized)
+	fleet.NewHandlerWith(fleetSvc, clock).RegisterRoutes(authorized)
 
 	// SSE: EventSource can't send custom headers, so JWT comes from the query string.
 	sseHandler := sse.NewHandler()
@@ -88,6 +102,8 @@ func SetupRouter() *gin.Engine {
 	{
 		pushAccountSub.RegisterPushRoutes(pushGroup)
 		sse.RegisterPushRoutes(pushGroup)
+		// The Cloud Scheduler sweep (#0005) — an OIDC-verified reader on a clock.
+		actionHandler.RegisterPushRoutes(pushGroup)
 	}
 
 	return router

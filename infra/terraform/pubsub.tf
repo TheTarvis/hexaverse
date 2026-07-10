@@ -54,3 +54,40 @@ resource "google_pubsub_subscription" "sse_item_broadcast" {
     maximum_backoff = "60s"
   }
 }
+
+# =============================================================================
+# Action & Timer system (#0005)
+# =============================================================================
+# ActionCompleted envelopes fan out to SSE watchers of the action's scope. SSE
+# is invalidation, not truth — a dropped delivery self-heals via the client
+# refetch rules, so this subscription is a nicety, not a correctness dependency.
+
+resource "google_pubsub_topic" "action_events" {
+  name = "action-events"
+
+  labels = {
+    environment = var.environment
+    managed_by  = "terraform"
+  }
+
+  depends_on = [google_project_service.pubsub]
+}
+
+resource "google_pubsub_subscription" "sse_action_broadcast" {
+  name  = "sse-action-broadcast"
+  topic = google_pubsub_topic.action_events.id
+
+  push_config {
+    push_endpoint = "${google_cloud_run_v2_service.backend.uri}/v1/push/sse-action"
+    oidc_token {
+      service_account_email = google_service_account.pubsub_push.email
+      audience              = "hexaverse-backend"
+    }
+  }
+
+  ack_deadline_seconds = 30
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "60s"
+  }
+}
