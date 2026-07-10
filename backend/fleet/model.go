@@ -26,8 +26,22 @@ type Fleet struct {
 	UpdatedAt      common.WorldMillis `json:"updatedAt" firestore:"updatedAt"`
 }
 
-// OrderRequest is the body of POST /v1/fleets/:id/orders — a target hex OR a
-// feature to intercept (exactly one).
+// OrderRequest is the body of POST /v1/fleets/:id/orders. The server picks the
+// movement tier by target type: a board target (hex or feature to intercept) is
+// an in-system burn (#0004); a systemId is a graph-tier trip (#0008). Exactly one
+// of Target / SystemId is set.
 type OrderRequest struct {
-	Target board.Target `json:"target"`
+	Target   board.Target `json:"target"`
+	SystemId string       `json:"systemId,omitempty"`
+}
+
+// RoutePreview is the read a client shows before committing a trip: the system
+// chain and the frozen-at-commit ETAs (per leg + total), so a 3D view that can't
+// be eyeballed for distance still surfaces the numbers (#0008 Decision #4).
+type RoutePreview struct {
+	Route      []string             `json:"route"`
+	LegEtas    []common.WorldMillis `json:"legEtas"`
+	TotalEta   common.WorldMillis   `json:"totalEta"`
+	DepartGate board.Hex            `json:"departGate"`
+	WorldTime  common.WorldMillis   `json:"worldTime"`
 }

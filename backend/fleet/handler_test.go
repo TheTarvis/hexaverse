@@ -17,18 +17,26 @@ import (
 
 // fakeFleetSvc is a hand fake of ServiceInterface for handler tests.
 type fakeFleetSvc struct {
-	fleet   *Fleet
-	list    []Fleet
-	scanErr error
-	getErr  error
+	fleet      *Fleet
+	list       []Fleet
+	preview    *RoutePreview
+	scanErr    error
+	getErr     error
+	previewErr error
 }
 
 func (f *fakeFleetSvc) Get(context.Context, string) (*Fleet, error) { return f.fleet, f.getErr }
 func (f *fakeFleetSvc) ListInSystem(context.Context, string) ([]Fleet, error) {
 	return f.list, nil
 }
+func (f *fakeFleetSvc) ListForCorp(context.Context, string) ([]Fleet, error) {
+	return f.list, nil
+}
 func (f *fakeFleetSvc) OrderTo(context.Context, string, OrderRequest) (*Fleet, error) {
 	return f.fleet, nil
+}
+func (f *fakeFleetSvc) PreviewRoute(context.Context, string, string) (*RoutePreview, error) {
+	return f.preview, f.previewErr
 }
 func (f *fakeFleetSvc) Cancel(context.Context, string) (*Fleet, error) { return f.fleet, nil }
 func (f *fakeFleetSvc) Scan(context.Context, string) (*Fleet, error)   { return f.fleet, f.scanErr }

@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { line, routeAround, type Hex } from './hex'
 import { orbState, type Orbit } from './orbit'
 import { solveHex, solveIntercept } from './intercept'
+import { laneGateHex } from './gate'
 
 // The Go↔TS determinism seam (build-order cross-cutting rule).
 //
@@ -46,12 +47,22 @@ interface SolveCase {
   arriveTime: number
 }
 
+interface GateCase {
+  selfX: number
+  selfY: number
+  neighborX: number
+  neighborY: number
+  radius: number
+  gate: Hex
+}
+
 interface Fixtures {
   line: LineCase[]
   routeAround: RouteCase[]
   orbState: OrbCase[]
   solveHex: SolveCase[]
   solveIntercept: SolveCase[]
+  laneGate: GateCase[]
 }
 
 // Walk up from the working directory to the repo-root golden. Anchoring on cwd
@@ -98,11 +109,16 @@ describe('board fixtures — Go↔TS determinism seam', () => {
     expect(s.arriveTime).toBe(c.arriveTime)
   })
 
+  it.each(fixtures.laneGate)('laneGate[%#]', (c) => {
+    expect(laneGateHex(c.selfX, c.selfY, c.neighborX, c.neighborY, c.radius)).toEqual(c.gate)
+  })
+
   it('covers every recorded case group (guards a truncated golden)', () => {
     expect(fixtures.line.length).toBeGreaterThan(0)
     expect(fixtures.routeAround.length).toBeGreaterThan(0)
     expect(fixtures.orbState.length).toBeGreaterThan(0)
     expect(fixtures.solveHex.length).toBeGreaterThan(0)
     expect(fixtures.solveIntercept.length).toBeGreaterThan(0)
+    expect(fixtures.laneGate.length).toBeGreaterThan(0)
   })
 })

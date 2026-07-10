@@ -43,7 +43,13 @@ type ServiceInterface interface {
 	// handler applies audience fog per fleet). Read-only: it never settles a due
 	// arrival, so it's side-effect-free (the authoritative settle runs on Get).
 	ListInSystem(ctx context.Context, systemID string) ([]Fleet, error)
+	// ListForCorp returns every fleet a corporation owns, across systems and
+	// including those in lane transit — the galaxy view's fleet layer. Read-only.
+	ListForCorp(ctx context.Context, corporationID string) ([]Fleet, error)
 	OrderTo(ctx context.Context, id string, req OrderRequest) (*Fleet, error)
+	// PreviewRoute pathfinds to a destination system without committing (#0008):
+	// the route + per-leg/total ETA a client shows before departing.
+	PreviewRoute(ctx context.Context, id, destSystemID string) (*RoutePreview, error)
 	Cancel(ctx context.Context, id string) (*Fleet, error)
 	Scan(ctx context.Context, id string) (*Fleet, error)
 	SeedFleet(ctx context.Context, systemID, corporationID string, at board.Hex) (*Fleet, error)
@@ -58,6 +64,12 @@ type Service struct {
 	actions   action.CommitInterface
 	clock     common.WorldTime
 	params    MovementParams
+	// graph + tiers power graph-tier travel (#0008). They're set after
+	// construction via WithTravel because the fog service (TierSource) depends on
+	// this fleet service (FleetSource) — a construction cycle. Nil ⇒ travel orders
+	// are rejected (the fleet still moves inside a system).
+	graph GraphSource
+	tiers TierSource
 }
 
 func NewService() *Service {
@@ -77,6 +89,17 @@ func NewServiceWith(dao Dao, systemSvc system.ServiceInterface, actions action.C
 	return &Service{dao: dao, systemSvc: systemSvc, actions: actions, clock: clock, params: DefaultMovementParams()}
 }
 
+// WithTravel wires the graph-tier travel dependencies (#0008): the galaxy graph
+// for pathfinding + gate geometry, and the requester's knowledge tiers so routing
+// stays fog-honest. Called at startup once the fog service exists (it can't be a
+// constructor arg — fog depends on this service). Returns the receiver for
+// chaining.
+func (s *Service) WithTravel(graph GraphSource, tiers TierSource) *Service {
+	s.graph = graph
+	s.tiers = tiers
+	return s
+}
+
 // Get returns the fleet, opportunistically resolving a completed burn (arrival
 // is a computed fact, not a fired event — #0004 Decision #12; no scheduler). When
 // the burn is wrapped in an action (the normal path since M5), resolution runs
@@ -92,10 +115,25 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 		return f, nil
 	}
 	if f.ActiveActionId != "" {
-		// Resolve the due burn through the action spine (settles state + releases
+		// A lane arrival flips the fleet into a new system; remember the destination
+		// so we can trigger the #0003 first-arrival detail roll after the resolve.
+		var arrivedAt string
+		if f.State.Mode == board.ModeLaneTransit && f.State.LaneTransit != nil && len(f.State.LaneTransit.Route) > 0 {
+			arrivedAt = f.State.LaneTransit.Route[len(f.State.LaneTransit.Route)-1]
+		}
+		// Resolve the due order through the action spine (settles state + releases
 		// the slot + flips the action to done, atomically), then re-read.
 		if _, err := s.actions.ResolveActive(ctx, id); err != nil {
 			return nil, err
+		}
+		if arrivedAt != "" {
+			// First-arrival detail roll (#0003): materialize the destination interior
+			// create-if-absent. Idempotent and done post-resolve, so the heavy
+			// generation stays out of the resolve transaction. Non-fatal on error —
+			// the on-read trigger will materialize it later.
+			if _, err := s.systemSvc.GetOrCreateInterior(ctx, arrivedAt); err != nil {
+				log.Warn().Ctx(ctx).Err(err).Str("systemId", arrivedAt).Msg("Arrival detail roll deferred")
+			}
 		}
 		return s.load(ctx, id)
 	}
@@ -116,10 +154,27 @@ func (s *Service) ListInSystem(ctx context.Context, systemID string) ([]Fleet, e
 	return s.dao.ListBySystem(ctx, systemID)
 }
 
-// OrderTo solves a burn to the target (hex or feature) from the fleet's current
-// position and flips it to burn. Determinism makes the arriveTime truth. A new
-// order replaces any active one (re-task).
+// ListForCorp returns every fleet a corporation owns (across systems, transit
+// included) — the galaxy view's own-fleet layer. Read-only, like ListInSystem:
+// it reports stored state and lets the client animate; the arrival settle stays
+// on the fleet's own Get/resolve path.
+func (s *Service) ListForCorp(ctx context.Context, corporationID string) ([]Fleet, error) {
+	return s.dao.ListByCorporation(ctx, corporationID)
+}
+
+// OrderTo dispatches an order by tier: a systemId target is a graph-tier trip
+// (#0008), anything else is an in-system burn (#0004). A new order replaces any
+// active one (re-task), so this is also the redirect path for a traveling fleet.
 func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fleet, error) {
+	if req.SystemId != "" {
+		return s.orderTravel(ctx, id, req.SystemId)
+	}
+	return s.orderBurn(ctx, id, req)
+}
+
+// orderBurn solves a burn to the target (hex or feature) from the fleet's current
+// position and flips it to burn. Determinism makes the arriveTime truth.
+func (s *Service) orderBurn(ctx context.Context, id string, req OrderRequest) (*Fleet, error) {
 	f, err := s.load(ctx, id)
 	if err != nil {
 		return nil, err
@@ -202,39 +257,69 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	return f, nil
 }
 
-// Cancel drops the fleet to coast from wherever it currently is, releasing its
-// action slot in the same transaction (the coast state rides in ActorState).
+// Cancel halts the fleet where it currently is, releasing its action slot in the
+// same transaction (the halt state rides in ActorState). An in-system move or a
+// trip's board leg stops to coast; a fleet already out on a lane holds at its
+// frozen fraction (#0008 Decision #12), visible until re-ordered.
 func (s *Service) Cancel(ctx context.Context, id string) (*Fleet, error) {
 	f, err := s.load(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	cur, err := s.Position(ctx, f)
+	now := s.clock.Now()
+	halt, err := s.haltState(ctx, f, now)
 	if err != nil {
 		return nil, err
 	}
-	coast := s.coastAt(cur)
-	now := s.clock.Now()
 
 	if f.ActiveActionId != "" {
 		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, map[string]interface{}{
-			"state": coast, "updatedAt": int64(now),
+			"state": halt, "updatedAt": int64(now),
 		}); err != nil && !errors.Is(err, action.ErrNotRunning) {
 			return nil, err
 		}
-		f.State = coast
+		f.State = halt
 		f.ActiveActionId = ""
 		f.UpdatedAt = now
 		return f, nil
 	}
 
-	// No wrapping action — coast directly.
-	f.State = coast
+	// No wrapping action — apply the halt directly (re-holding a lane-hold no-ops).
+	f.State = halt
 	f.UpdatedAt = now
 	if err := s.dao.Save(ctx, *f); err != nil {
 		return nil, err
 	}
 	return f, nil
+}
+
+// haltState computes where a cancel leaves a fleet: coast at its current board hex
+// for an in-system move or a trip's board leg, or a lane-hold at the frozen
+// fraction once it's out on a lane (#0008).
+func (s *Service) haltState(ctx context.Context, f *Fleet, now common.WorldMillis) (board.MovementState, error) {
+	if f.State.Mode == board.ModeLaneTransit && f.State.LaneTransit != nil {
+		lt := f.State.LaneTransit
+		// Still on the origin board burning to the gate — stop-burn to coast.
+		if lt.BoardLeg != nil && now < lt.BoardLeg.GateEta {
+			pos, _ := board.ShipPos(f.State, now)
+			return s.coastAt(pos), nil
+		}
+		// Out on a lane — hold at the current fraction between two systems.
+		if fromIdx, toIdx, frac, ok := board.LaneFraction(*lt, now); ok {
+			return board.MovementState{
+				Mode:     board.ModeLaneHold,
+				LaneHold: &board.LaneHold{From: lt.Route[fromIdx], To: lt.Route[toIdx], Fraction: frac},
+			}, nil
+		}
+	}
+	if f.State.Mode == board.ModeLaneHold {
+		return f.State, nil // already held — cancel is a no-op
+	}
+	cur, err := s.Position(ctx, f)
+	if err != nil {
+		return board.MovementState{}, err
+	}
+	return s.coastAt(cur), nil
 }
 
 // SeedFleet drops a fleet into a system, coasting at a hex — the dev stand-in
@@ -303,6 +388,17 @@ func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ com
 	out := make([]observation.FleetPos, 0, len(fleets))
 	for i := range fleets {
 		f := &fleets[i]
+		// A fleet out on a lane (past its departure gate) or parked mid-lane has no
+		// board presence, so it lends no sensor coverage to any system.
+		if f.State.Mode == board.ModeLaneHold {
+			continue
+		}
+		if f.State.Mode == board.ModeLaneTransit {
+			lt := f.State.LaneTransit
+			if lt == nil || lt.BoardLeg == nil || s.clock.Now() >= lt.BoardLeg.GateEta {
+				continue
+			}
+		}
 		hex, err := s.Position(ctx, f)
 		if err != nil {
 			return nil, err

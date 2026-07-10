@@ -85,6 +85,7 @@ func SetupRouter() *gin.Engine {
 	// dispatch through. Construct it explicitly, wire resolvers, then hand it out.
 	clock := common.WorldClock()
 	systemSvc := system.NewService()
+	galaxySvc := galaxy.NewService()
 	actionSvc := action.NewService()
 	fleetSvc := fleet.NewServiceWith(fleet.NewDao(), systemSvc, actionSvc, clock)
 
@@ -94,9 +95,18 @@ func SetupRouter() *gin.Engine {
 	fogSvc := observation.NewService(fleetSvc, systemSvc)
 	fogSvc.RegisterResolvers(actionSvc)
 
+	// Graph-tier travel (#0008): the fleet service pathfinds over the galaxy graph
+	// and the requester's charted set (from fog). Wired after fog exists (fog
+	// depends on the fleet service — a construction cycle).
+	fleetSvc.WithTravel(galaxySvc, fogSvc)
+
 	// Register the burn resolver AFTER the fog service exists, so a resolved move
 	// also mints path-swept ambient memory (#0006 Decision #14).
 	fleet.RegisterResolversWithAmbient(actionSvc, fogSvc)
+
+	// The lane-travel resolver: arrival settles the fleet at the destination rim
+	// and mints the reveal (Explored + onward Rumored) in one transaction (#0008).
+	fleet.RegisterTravelResolver(actionSvc, fogSvc, fogSvc)
 
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
 	galaxy.NewHandler().WithFog(fogSvc).RegisterRoutes(authorized)

@@ -46,6 +46,7 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	{
 		g.GET("", h.List)
 		g.GET("/:fleetId", h.Get)
+		g.GET("/:fleetId/route", h.RoutePreview)
 		g.POST("/:fleetId/orders", h.Order)
 		g.POST("/:fleetId/cancel", h.Cancel)
 		g.POST("/:fleetId/scan", h.Scan)
@@ -85,17 +86,32 @@ func (h *Handler) Get(c *gin.Context) {
 // interior read, both fogged server-side, so no unfogged fleet ever reaches the
 // client (#0007). Read-only: it never settles a due arrival.
 func (h *Handler) List(c *gin.Context) {
-	systemID := common.RequiredQueryParam(c, "systemId")
-	if systemID == "" {
-		return // RequiredQueryParam already aborted with 400
+	requesterCid := common.ActorCorp(c)
+	ctx := c.Request.Context()
+
+	// `?mine=true` lists the requester's own fleets across systems (transit
+	// included) — the galaxy view's fleet layer; otherwise `?systemId=` scopes to
+	// one board (the #0007 layer).
+	var fleets []Fleet
+	var err error
+	if common.OptionalQueryParam(c, "mine") == "true" {
+		if requesterCid == "" {
+			c.JSON(http.StatusOK, gin.H{"fleets": []fleetDTO{}, "worldTime": h.clock.Now()})
+			return
+		}
+		fleets, err = h.svc.ListForCorp(ctx, requesterCid)
+	} else {
+		systemID := common.RequiredQueryParam(c, "systemId")
+		if systemID == "" {
+			return // RequiredQueryParam already aborted with 400
+		}
+		fleets, err = h.svc.ListInSystem(ctx, systemID)
 	}
-	fleets, err := h.svc.ListInSystem(c.Request.Context(), systemID)
 	if err != nil {
-		log.Error().Ctx(c).Err(err).Str("systemId", systemID).Msg("list fleets failed")
+		log.Error().Ctx(c).Err(err).Msg("list fleets failed")
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	requesterCid := common.ActorCorp(c)
 	out := make([]fleetDTO, 0, len(fleets))
 	for i := range fleets {
 		f := &fleets[i]
@@ -122,6 +138,33 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"fleets": out, "worldTime": h.clock.Now()})
 }
 
+// RoutePreview returns the shortest-time lane route to `?systemId=` with per-leg
+// and total ETA, without committing (#0008) — the preview a client shows before
+// departing. A destination with no charted route (or the fleet's own system) is a
+// 4xx with a clear reason, not a 500.
+func (h *Handler) RoutePreview(c *gin.Context) {
+	dest := common.RequiredQueryParam(c, "systemId")
+	if dest == "" {
+		return // RequiredQueryParam already aborted with 400
+	}
+	preview, err := h.svc.PreviewRoute(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"), dest)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		c.AbortWithStatus(http.StatusNotFound)
+	case errors.Is(err, ErrNoRoute):
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{"error": "no charted route to destination"})
+	case errors.Is(err, ErrSameSystem):
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "destination is the current system"})
+	case errors.Is(err, ErrTravelUnavailable):
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "travel is not available"})
+	case err != nil:
+		log.Error().Ctx(c).Err(err).Str("dest", dest).Msg("route preview failed")
+		c.AbortWithStatus(http.StatusInternalServerError)
+	default:
+		c.JSON(http.StatusOK, preview)
+	}
+}
+
 func (h *Handler) Scan(c *gin.Context) {
 	f, err := h.svc.Scan(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
 	if errors.Is(err, action.ErrActiveActionExists) {
@@ -137,8 +180,15 @@ func (h *Handler) Order(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	if req.Target.Hex == nil && req.Target.FeatureId == "" {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "target must be a hex or featureId"})
+	// A trip target is a systemId (#0008); a board target is a hex or feature
+	// (#0004). Exactly one must be present.
+	hasBoardTarget := req.Target.Hex != nil || req.Target.FeatureId != ""
+	if req.SystemId == "" && !hasBoardTarget {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "target must be a hex, featureId, or systemId"})
+		return
+	}
+	if req.SystemId != "" && hasBoardTarget {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "order a board target or a system, not both"})
 		return
 	}
 	f, err := h.svc.OrderTo(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"), req)
@@ -192,6 +242,12 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "target feature not found"})
 	case errors.Is(err, ErrCoreDestination):
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "cannot move to or dock the star at the core"})
+	case errors.Is(err, ErrNoRoute):
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{"error": "no charted route to destination"})
+	case errors.Is(err, ErrSameSystem):
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "destination is the current system"})
+	case errors.Is(err, ErrTravelUnavailable):
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "travel is not available"})
 	case err != nil:
 		log.Error().Ctx(c).Err(err).Msg("fleet operation failed")
 		c.AbortWithStatus(http.StatusInternalServerError)

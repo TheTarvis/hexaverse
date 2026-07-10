@@ -247,6 +247,38 @@ func (s *Service) AmbientWrites(ctx context.Context, cid, systemID string, path 
 	return writes, nil
 }
 
+// ArrivalWrites builds the destination-on-arrival reveal (#0008): the destination
+// → Explored, and each onward-lane neighbour not already at least Rumored →
+// Rumored. Returned as action.DocWrites so a trip's resolver applies them in its
+// resolve transaction (exactly-once with the motion settle). Explored is the top
+// tier (a blind MergeAll can never lower it); the onward writes are filtered by
+// the passed tiers so they never lower a neighbour you already know better —
+// keeping monotonicity without a per-doc read. asOf = arrival time.
+func (s *Service) ArrivalWrites(cid, destSystemID string, onward []string, tiers map[string]Tier, at common.WorldMillis) []action.DocWrite {
+	writes := []action.DocWrite{{
+		Path: []string{corporationsCollection, cid, observationsCollection, destSystemID},
+		Data: map[string]interface{}{
+			"systemId": destSystemID,
+			"tier":     string(TierExplored),
+			"asOf":     int64(at),
+		},
+	}}
+	for _, nb := range onward {
+		if nb == destSystemID || tiers[nb].AtLeast(TierRumored) {
+			continue
+		}
+		writes = append(writes, action.DocWrite{
+			Path: []string{corporationsCollection, cid, observationsCollection, nb},
+			Data: map[string]interface{}{
+				"systemId": nb,
+				"tier":     string(TierRumored),
+				"asOf":     int64(at),
+			},
+		})
+	}
+	return writes
+}
+
 // featureGeomHexAt is a feature's hex at a world time (orbital position or anchor).
 func featureGeomHexAt(f FeatureGeom, at common.WorldMillis) board.Hex {
 	if f.Elements != nil {

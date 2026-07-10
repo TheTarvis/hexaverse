@@ -46,12 +46,22 @@ type routeCase struct {
 	Path []Hex `json:"path"`
 }
 
+type gateCase struct {
+	SelfX     float64 `json:"selfX"`
+	SelfY     float64 `json:"selfY"`
+	NeighborX float64 `json:"neighborX"`
+	NeighborY float64 `json:"neighborY"`
+	Radius    int     `json:"radius"`
+	Gate      Hex     `json:"gate"`
+}
+
 type fixtures struct {
 	Line           []lineCase  `json:"line"`
 	RouteAround    []routeCase `json:"routeAround"`
 	OrbState       []orbCase   `json:"orbState"`
 	SolveHex       []solveCase `json:"solveHex"`
 	SolveIntercept []solveCase `json:"solveIntercept"`
+	LaneGate       []gateCase  `json:"laneGate"`
 }
 
 // computeFixtures builds the golden cases from the current board implementation.
@@ -63,11 +73,11 @@ func computeFixtures() fixtures {
 	}
 
 	for _, c := range [][2]Hex{
-		{{1, 0}, {-1, 0}},   // straight through the core → detour around the star
-		{{3, -2}, {-3, 2}},  // across the system through the core → detour
-		{{2, -1}, {-2, 1}},  // another crossing pair → detour
-		{{3, -1}, {5, -2}},  // nowhere near the core → straight line
-		{{0, 0}, {5, 0}},    // from the core itself → nothing to avoid, straight
+		{{1, 0}, {-1, 0}},  // straight through the core → detour around the star
+		{{3, -2}, {-3, 2}}, // across the system through the core → detour
+		{{2, -1}, {-2, 1}}, // another crossing pair → detour
+		{{3, -1}, {5, -2}}, // nowhere near the core → straight line
+		{{0, 0}, {5, 0}},   // from the core itself → nothing to avoid, straight
 	} {
 		f.RouteAround = append(f.RouteAround, routeCase{From: c[0], To: c[1], Path: RouteAround(c[0], c[1])})
 	}
@@ -113,6 +123,31 @@ func computeFixtures() fixtures {
 		f.SolveIntercept = append(f.SolveIntercept, solveCase{
 			From: c.from, Orbit: &orb, Now: c.now, MsPerTile: c.mspt, Horizon: c.hori,
 			Path: s.Path, MeetHex: s.MeetHex, ArriveTime: s.ArriveTime,
+		})
+	}
+
+	// Lane gates: a bearing in the galaxy XY-disk projected onto the board rim.
+	// Angles are deliberately offset from rim-tile bisectors so a float-ULP
+	// difference between Go and TS can never flip the chosen tile.
+	gates := []struct {
+		selfX, selfY, nbX, nbY float64
+		radius                 int
+	}{
+		{0, 0, 100, 8.7, 16},    // ~5° east-ish
+		{0, 0, 64, 76, 16},      // ~50°
+		{0, 0, -8.7, 100, 16},   // ~95° (near north)
+		{0, 0, -77, 64, 16},     // ~140°
+		{0, 0, -100, -8.7, 16},  // ~185° (near west)
+		{0, 0, -64, -76, 16},    // ~230°
+		{0, 0, 8.7, -100, 16},   // ~275° (near south)
+		{0, 0, 77, -64, 16},     // ~320°
+		{10, -20, 110, -12, 16}, // self offset, ~5° relative
+		{5, 5, 30, 90, 6},       // smaller board radius
+	}
+	for _, c := range gates {
+		f.LaneGate = append(f.LaneGate, gateCase{
+			SelfX: c.selfX, SelfY: c.selfY, NeighborX: c.nbX, NeighborY: c.nbY,
+			Radius: c.radius, Gate: LaneGateHex(c.selfX, c.selfY, c.nbX, c.nbY, c.radius),
 		})
 	}
 

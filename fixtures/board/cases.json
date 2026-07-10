@@ -618,5 +618,117 @@
       },
       "arriveTime": 6000
     }
+  ],
+  "laneGate": [
+    {
+      "selfX": 0,
+      "selfY": 0,
+      "neighborX": 100,
+      "neighborY": 8.7,
+      "radius": 16,
+      "gate": {
+        "q": 16,
+        "r": -2
+      }
+    },
+    {
+      "selfX": 0,
+      "selfY": 0,
+      "neighborX": 64,
+      "neighborY": 76,
+      "radius": 16,
+      "gate": {
+        "q": 16,
+        "r": -13
+      }
+    },
+    {
+      "selfX": 0,
+      "selfY": 0,
+      "neighborX": -8.7,
+      "neighborY": 100,
+      "radius": 16,
+      "gate": {
+        "q": 7,
+        "r": -16
+      }
+    },
+    {
+      "selfX": 0,
+      "selfY": 0,
+      "neighborX": -77,
+      "neighborY": 64,
+      "radius": 16,
+      "gate": {
+        "q": -6,
+        "r": -10
+      }
+    },
+    {
+      "selfX": 0,
+      "selfY": 0,
+      "neighborX": -100,
+      "neighborY": -8.7,
+      "radius": 16,
+      "gate": {
+        "q": -16,
+        "r": 2
+      }
+    },
+    {
+      "selfX": 0,
+      "selfY": 0,
+      "neighborX": -64,
+      "neighborY": -76,
+      "radius": 16,
+      "gate": {
+        "q": -16,
+        "r": 13
+      }
+    },
+    {
+      "selfX": 0,
+      "selfY": 0,
+      "neighborX": 8.7,
+      "neighborY": -100,
+      "radius": 16,
+      "gate": {
+        "q": -7,
+        "r": 16
+      }
+    },
+    {
+      "selfX": 0,
+      "selfY": 0,
+      "neighborX": 77,
+      "neighborY": -64,
+      "radius": 16,
+      "gate": {
+        "q": 6,
+        "r": 10
+      }
+    },
+    {
+      "selfX": 10,
+      "selfY": -20,
+      "neighborX": 110,
+      "neighborY": -12,
+      "radius": 16,
+      "gate": {
+        "q": 16,
+        "r": -1
+      }
+    },
+    {
+      "selfX": 5,
+      "selfY": 5,
+      "neighborX": 30,
+      "neighborY": 90,
+      "radius": 6,
+      "gate": {
+        "q": 5,
+        "r": -6
+      }
+    }
   ]
 }

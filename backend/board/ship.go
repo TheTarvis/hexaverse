@@ -10,6 +10,13 @@ const (
 	ModeCoast  Mode = "coast"
 	ModeBurn   Mode = "burn"
 	ModeDocked Mode = "docked"
+	// ModeLaneTransit — crossing the galaxy graph between systems (#0008): an
+	// optional board leg (burn to the departure gate) then lane hops, positioned
+	// piecewise from (route, legEtas, worldTime). Collapses to coast on arrival.
+	ModeLaneTransit Mode = "laneTransit"
+	// ModeLaneHold — halted mid-lane after a cancel, parked at a frozen fraction
+	// between two systems, visible, until re-ordered (#0008 Decision #12).
+	ModeLaneHold Mode = "laneHold"
 )
 
 // Target is a burn destination — a hex OR a feature to intercept (exactly one).
@@ -33,13 +40,75 @@ type Docked struct {
 	ParentId string `json:"parentId" firestore:"parentId"`
 }
 
-// MovementState is the fleet's single movement field, three shapes. No per-tick
-// position is stored — the live hex is computed from (state, worldTime).
+// BoardLeg is leg 0 of a trip (#0008): the #0004 burn from the fleet's current
+// position across the origin board to the departure gate tile, inside the one
+// trip action. Zero-length when the fleet already sits on the gate.
+type BoardLeg struct {
+	Path      []Hex              `json:"path" firestore:"path"`
+	StartTime common.WorldMillis `json:"startTime" firestore:"startTime"`
+	GateEta   common.WorldMillis `json:"gateEta" firestore:"gateEta"`
+}
+
+// LaneTransit is the graph-tier crossing (#0008): an optional board leg, then a
+// route of systemIds with cumulative arrival stamps. Route[0] is the origin;
+// LegEtas[i] is the world time the fleet reaches Route[i] (LegEtas[0] == the gate
+// ETA — when it enters the first lane). Position is computed piecewise; nothing
+// is stored per tick. EntryGate is the arriving lane's rim tile on the dest board.
+type LaneTransit struct {
+	BoardLeg   *BoardLeg            `json:"boardLeg,omitempty" firestore:"boardLeg,omitempty"`
+	Route      []string             `json:"route" firestore:"route"`
+	LegEtas    []common.WorldMillis `json:"legEtas" firestore:"legEtas"`
+	DepartTime common.WorldMillis   `json:"departTime" firestore:"departTime"`
+	ArriveTime common.WorldMillis   `json:"arriveTime" firestore:"arriveTime"`
+	EntryGate  Hex                  `json:"entryGate" firestore:"entryGate"`
+	// Onward is the destination's neighbour systemIds, frozen at commit so the
+	// arrival resolver charts them (→ Rumored) without a galaxy read inside the
+	// resolve transaction (#0008 destination-on-arrival reveal).
+	Onward []string `json:"onward,omitempty" firestore:"onward,omitempty"`
+}
+
+// LaneHold is a fleet parked mid-lane after a cancel: a frozen fraction between
+// two systems, visible until re-ordered (#0008 Decision #12).
+type LaneHold struct {
+	From     string  `json:"from" firestore:"from"`
+	To       string  `json:"to" firestore:"to"`
+	Fraction float64 `json:"fraction" firestore:"fraction"`
+}
+
+// MovementState is the fleet's single movement field, one shape at a time. No
+// per-tick position is stored — the live hex/graph position is computed from
+// (state, worldTime).
 type MovementState struct {
-	Mode   Mode    `json:"mode" firestore:"mode"`
-	Coast  *Orbit  `json:"coast,omitempty" firestore:"coast,omitempty"`
-	Burn   *Burn   `json:"burn,omitempty" firestore:"burn,omitempty"`
-	Docked *Docked `json:"docked,omitempty" firestore:"docked,omitempty"`
+	Mode        Mode         `json:"mode" firestore:"mode"`
+	Coast       *Orbit       `json:"coast,omitempty" firestore:"coast,omitempty"`
+	Burn        *Burn        `json:"burn,omitempty" firestore:"burn,omitempty"`
+	Docked      *Docked      `json:"docked,omitempty" firestore:"docked,omitempty"`
+	LaneTransit *LaneTransit `json:"laneTransit,omitempty" firestore:"laneTransit,omitempty"`
+	LaneHold    *LaneHold    `json:"laneHold,omitempty" firestore:"laneHold,omitempty"`
+}
+
+// LaneFraction returns which lane a transit is on at time t and how far along it
+// (0..1), as route indices from→to. Before the gate ETA it reports the first lane
+// at fraction 0; past arrival, the last lane at fraction 1. ok is false when the
+// transit has no lanes (route shorter than two systems).
+func LaneFraction(lt LaneTransit, t common.WorldMillis) (from, to int, frac float64, ok bool) {
+	n := len(lt.Route)
+	if n < 2 || len(lt.LegEtas) != n {
+		return 0, 0, 0, false
+	}
+	if t <= lt.LegEtas[0] {
+		return 0, 1, 0, true
+	}
+	for i := 0; i < n-1; i++ {
+		start, end := lt.LegEtas[i], lt.LegEtas[i+1]
+		if t < end {
+			if end <= start {
+				return i, i + 1, 0, true
+			}
+			return i, i + 1, float64(t-start) / float64(end-start), true
+		}
+	}
+	return n - 2, n - 1, 1, true
 }
 
 // BurnPos returns the fleet's quantized hex along its burn path at time t. The
@@ -67,9 +136,11 @@ func BurnPos(b Burn, t common.WorldMillis) Hex {
 	return b.Path[idx]
 }
 
-// ShipPos returns the fleet's computed hex for coast and burn states. Docked
-// returns ok=false because its hex is the parent's — the caller resolves it
-// from the interior.
+// ShipPos returns the fleet's computed board hex. It reports ok=false whenever
+// the fleet has no hex on the current system's board: docked (its hex is the
+// parent's, resolved from the interior), parked mid-lane (lane-hold), or already
+// out on a lane past the departure gate. During a trip's board leg the fleet is
+// still on the origin board burning to the gate, so ShipPos returns that hex.
 func ShipPos(s MovementState, t common.WorldMillis) (Hex, bool) {
 	switch s.Mode {
 	case ModeCoast:
@@ -82,12 +153,32 @@ func ShipPos(s MovementState, t common.WorldMillis) (Hex, bool) {
 			return Hex{0, 0}, false
 		}
 		return BurnPos(*s.Burn, t), true
-	default: // docked — needs the parent feature
+	case ModeLaneTransit:
+		lt := s.LaneTransit
+		if lt == nil || lt.BoardLeg == nil || len(lt.BoardLeg.Path) == 0 {
+			return Hex{0, 0}, false
+		}
+		// On the origin board only while burning to the gate; once past the gate
+		// the fleet is out on the lane (no board hex — the galaxy view shows it).
+		if t < lt.BoardLeg.GateEta {
+			return BurnPos(Burn{Path: lt.BoardLeg.Path, StartTime: lt.BoardLeg.StartTime, ArriveTime: lt.BoardLeg.GateEta}, t), true
+		}
+		return Hex{0, 0}, false
+	default: // docked / lane-hold — no board hex on the current system
 		return Hex{0, 0}, false
 	}
 }
 
-// Arrived reports whether a burning fleet has reached its arrival time.
+// Arrived reports whether a fleet's active kinematic order has reached its
+// completion time — a burn's arrival or a lane trip's destination arrival. The
+// read path settles it through the action spine on the next touch (no scheduler).
 func Arrived(s MovementState, t common.WorldMillis) bool {
-	return s.Mode == ModeBurn && s.Burn != nil && t >= s.Burn.ArriveTime
+	switch s.Mode {
+	case ModeBurn:
+		return s.Burn != nil && t >= s.Burn.ArriveTime
+	case ModeLaneTransit:
+		return s.LaneTransit != nil && t >= s.LaneTransit.ArriveTime
+	default:
+		return false
+	}
 }
