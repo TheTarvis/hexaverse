@@ -1,36 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { vi } from 'vitest'
 import HomePage from './page'
-import { useAccountContext } from '@/components/account-provider'
 
-vi.mock('@/components/account-provider', () => ({
-  useAccountContext: vi.fn(() => ({
-    account: null,
-  })),
+// The home page is now just a thin wrapper that renders the galaxy view; the
+// view itself (three.js) is covered by GalaxyView.test.tsx, so stub it here.
+vi.mock('@/components/galaxy/GalaxyView', () => ({
+  GalaxyView: () => <div data-testid="galaxy-view" />,
 }))
 
 describe('HomePage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('greets the account by name when available', () => {
-    vi.mocked(useAccountContext).mockReturnValue({
-      account: { id: 'a1', name: 'Travis' },
-    } as ReturnType<typeof useAccountContext>)
-
+  it('renders the galaxy view as the primary screen', () => {
     render(<HomePage />)
-
-    expect(screen.getByRole('heading')).toHaveTextContent('Welcome, Travis.')
-  })
-
-  it('falls back to a plain greeting without an account name', () => {
-    vi.mocked(useAccountContext).mockReturnValue({
-      account: null,
-    } as ReturnType<typeof useAccountContext>)
-
-    render(<HomePage />)
-
-    expect(screen.getByRole('heading')).toHaveTextContent('Welcome.')
+    expect(screen.getByTestId('galaxy-view')).toBeInTheDocument()
   })
 })

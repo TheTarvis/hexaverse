@@ -1,18 +1,12 @@
 'use client'
 
-import { Heading } from '@/components/catalyst/heading'
-import { Text } from '@/components/catalyst/text'
-import { useAccountContext } from '@/components/account-provider'
+// The home page IS the galaxy view (spec #0002) — the game's primary screen,
+// rendered for BOTH authed users (live galaxy) and logged-out visitors (frozen
+// start area). GalaxyView is a client component; it picks live-vs-start-area by
+// auth state via useGalaxy().
+
+import { GalaxyView } from '@/components/galaxy/GalaxyView'
 
 export default function HomePage() {
-  const { account } = useAccountContext()
-
-  return (
-    <div className="mx-auto max-w-3xl">
-      <Heading>Welcome{account?.name ? `, ${account.name}` : ''}.</Heading>
-      <Text className="mt-2">
-        Hexaverse is up and running. This is a starter shell — replace it with your app.
-      </Text>
-    </div>
-  )
+  return <GalaxyView />
 }

@@ -47,7 +47,8 @@ describe('LayoutWrapper', () => {
     expect(screen.queryByTestId('app-navigation')).not.toBeInTheDocument()
   })
 
-  it('redirects unauthenticated user from protected route to /login', () => {
+  it('redirects unauthenticated user from a protected route to /login', () => {
+    vi.mocked(usePathname).mockReturnValue('/widgets')
     vi.mocked(useAccountContext).mockReturnValue({
       user: null,
       authLoading: false,
@@ -62,6 +63,26 @@ describe('LayoutWrapper', () => {
     )
 
     expect(mockPush).toHaveBeenCalledWith('/login')
+  })
+
+  it('renders the home galaxy view bare for logged-out visitors (no redirect)', () => {
+    vi.mocked(usePathname).mockReturnValue('/')
+    vi.mocked(useAccountContext).mockReturnValue({
+      user: null,
+      authLoading: false,
+      account: null,
+      isLoading: false,
+    } as ReturnType<typeof useAccountContext>)
+
+    render(
+      <LayoutWrapper>
+        <div data-testid="galaxy-content">Galaxy</div>
+      </LayoutWrapper>
+    )
+
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.getByTestId('galaxy-content')).toBeInTheDocument()
+    expect(screen.queryByTestId('app-navigation')).not.toBeInTheDocument()
   })
 
   it('renders app shell for authenticated user with account', () => {

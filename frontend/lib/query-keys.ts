@@ -14,6 +14,14 @@ export const queryKeys = {
     all: ['system'] as const,
     health: () => [...queryKeys.system.all, 'health'] as const,
   },
+
+  galaxy: {
+    all: ['galaxy'] as const,
+    // The single galaxy graph. `live` = authed GET /v1/galaxy; `startArea` =
+    // the frozen static asset served to logged-out visitors.
+    live: () => [...queryKeys.galaxy.all, 'live'] as const,
+    startArea: () => [...queryKeys.galaxy.all, 'start-area'] as const,
+  },
 } as const
 
 export type AccountQueryKey =
