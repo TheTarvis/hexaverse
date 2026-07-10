@@ -1,0 +1,132 @@
+package board
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
+	"testing"
+
+	"hexaverse/common"
+)
+
+// fixturesPath is the repo-root shared fixtures file. Both this Go suite and
+// M7's TS lib/hex suite assert their implementations reproduce it — the
+// determinism-by-contract seam (build order cross-cutting rule). Regenerate
+// with UPDATE_FIXTURES=1 and commit the result.
+const fixturesPath = "../../fixtures/board/cases.json"
+
+type lineCase struct {
+	From Hex   `json:"from"`
+	To   Hex   `json:"to"`
+	Path []Hex `json:"path"`
+}
+
+type orbCase struct {
+	Orbit Orbit              `json:"orbit"`
+	T     common.WorldMillis `json:"t"`
+	Hex   Hex                `json:"hex"`
+}
+
+type solveCase struct {
+	From       Hex                `json:"from"`
+	Dest       *Hex               `json:"dest,omitempty"`
+	Orbit      *Orbit             `json:"orbit,omitempty"`
+	Now        common.WorldMillis `json:"now"`
+	MsPerTile  common.WorldMillis `json:"msPerTile"`
+	Horizon    common.WorldMillis `json:"horizon,omitempty"`
+	Path       []Hex              `json:"path"`
+	MeetHex    Hex                `json:"meetHex"`
+	ArriveTime common.WorldMillis `json:"arriveTime"`
+}
+
+type fixtures struct {
+	Line           []lineCase  `json:"line"`
+	OrbState       []orbCase   `json:"orbState"`
+	SolveHex       []solveCase `json:"solveHex"`
+	SolveIntercept []solveCase `json:"solveIntercept"`
+}
+
+// computeFixtures builds the golden cases from the current board implementation.
+func computeFixtures() fixtures {
+	var f fixtures
+
+	for _, c := range [][2]Hex{{{0, 0}, {3, -1}}, {{0, 0}, {-2, 5}}, {{2, -4}, {5, 1}}} {
+		f.Line = append(f.Line, lineCase{From: c[0], To: c[1], Path: Line(c[0], c[1])})
+	}
+
+	orbits := []Orbit{
+		{Ring: 3, Angle0: 2, Period: 1 << 60, Dir: 1}, // static
+		{Ring: 2, Angle0: 0, Period: 12_000, Dir: 1},  // moving prograde
+		{Ring: 4, Angle0: 7, Period: 48_000, Dir: -1}, // moving retrograde
+	}
+	for _, o := range orbits {
+		for _, tm := range []common.WorldMillis{0, 3_000, 6_000, 24_000} {
+			f.OrbState = append(f.OrbState, orbCase{Orbit: o, T: tm, Hex: OrbState(o, tm)})
+		}
+	}
+
+	hexSolves := []struct {
+		from, dest Hex
+		now, mspt  common.WorldMillis
+	}{
+		{Hex{0, 0}, Hex{5, 0}, 0, 1000},
+		{Hex{1, -1}, Hex{-3, 4}, 10_000, 500},
+	}
+	for _, c := range hexSolves {
+		s := SolveHex(c.from, c.dest, c.now, c.mspt)
+		dest := c.dest
+		f.SolveHex = append(f.SolveHex, solveCase{
+			From: c.from, Dest: &dest, Now: c.now, MsPerTile: c.mspt,
+			Path: s.Path, MeetHex: s.MeetHex, ArriveTime: s.ArriveTime,
+		})
+	}
+
+	interSolves := []struct {
+		from            Hex
+		orbit           Orbit
+		now, mspt, hori common.WorldMillis
+	}{
+		{Hex{0, 0}, Orbit{Ring: 5, Angle0: 3, Period: 1 << 60, Dir: 1}, 0, 1000, 10_000_000},
+		{Hex{0, 0}, Orbit{Ring: 6, Angle0: 0, Period: 600_000, Dir: 1}, 0, 1000, 5_000_000},
+	}
+	for _, c := range interSolves {
+		s := SolveIntercept(c.from, c.orbit, c.now, c.mspt, c.hori)
+		orb := c.orbit
+		f.SolveIntercept = append(f.SolveIntercept, solveCase{
+			From: c.from, Orbit: &orb, Now: c.now, MsPerTile: c.mspt, Horizon: c.hori,
+			Path: s.Path, MeetHex: s.MeetHex, ArriveTime: s.ArriveTime,
+		})
+	}
+
+	return f
+}
+
+func TestFixtures_MatchGolden(t *testing.T) {
+	computed := computeFixtures()
+
+	if os.Getenv("UPDATE_FIXTURES") == "1" {
+		if err := os.MkdirAll(filepath.Dir(fixturesPath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		data, _ := json.MarshalIndent(computed, "", "  ")
+		if err := os.WriteFile(fixturesPath, append(data, '\n'), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("wrote fixtures to %s", fixturesPath)
+		return
+	}
+
+	raw, err := os.ReadFile(fixturesPath)
+	if err != nil {
+		t.Fatalf("read golden fixtures (regenerate with UPDATE_FIXTURES=1): %v", err)
+	}
+	var golden fixtures
+	if err := json.Unmarshal(raw, &golden); err != nil {
+		t.Fatalf("unmarshal golden: %v", err)
+	}
+	if !reflect.DeepEqual(golden, computed) {
+		t.Fatal("board output drifted from committed /fixtures/board/cases.json — " +
+			"if intentional, regenerate with UPDATE_FIXTURES=1 (and update the TS side)")
+	}
+}
