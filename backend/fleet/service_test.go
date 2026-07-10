@@ -167,6 +167,35 @@ func TestOrderTo_MotionOffReduction(t *testing.T) {
 	}
 }
 
+func TestOrderTo_RejectsTheCore(t *testing.T) {
+	// The star at the core is a body, not a destination: neither a hex order to
+	// (0,0) nor an order to dock the star feature is allowed.
+	core := board.Hex{Q: 0, R: 0}
+	cases := []struct {
+		name string
+		req  OrderRequest
+	}{
+		{"hex (0,0)", OrderRequest{Target: board.Target{Hex: &core}}},
+		{"dock the star", OrderRequest{Target: board.Target{FeatureId: "feat-star"}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			clk := &fakeClock{now: 0}
+			svc, dao, fa, ctrl := newSvc(t, clk)
+			defer ctrl.Finish()
+			dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
+
+			_, err := svc.OrderTo(context.Background(), "fleet_1", tc.req)
+			if err != ErrCoreDestination {
+				t.Fatalf("expected ErrCoreDestination, got %v", err)
+			}
+			if fa.committed != nil {
+				t.Fatalf("a rejected order must not commit an action: %+v", fa.committed)
+			}
+		})
+	}
+}
+
 func TestGet_ArrivalDocksAfterEta(t *testing.T) {
 	clk := &fakeClock{now: 500_000} // past arrival
 	svc, dao, _, ctrl := newSvc(t, clk)

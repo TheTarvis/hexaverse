@@ -63,15 +63,17 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   }, [activeFleet, board, worldTime])
 
   // The live preview plan for the current selection — recomputed each frame so a
-  // led intercept tracks the moving target.
+  // led intercept tracks the moving target. The star at the core (0,0) is a body,
+  // not a destination (you can't fly onto it or dock it), so it yields no plan.
   const plan = useMemo<MovePlan | null>(() => {
     if (!fromHex || !selection) return null
     if (selection.kind === 'feature') {
       const f = selection.feature
+      if (f.fixed || isCore(featureLogicalHex(f, worldTime))) return null
       if (f.orbit) return planToBody(fromHex, f.orbit, worldTime)
       return planToHex(fromHex, featureLogicalHex(f, worldTime), worldTime)
     }
-    if (selection.kind === 'hex') return planToHex(fromHex, selection.hex, worldTime)
+    if (selection.kind === 'hex') return isCore(selection.hex) ? null : planToHex(fromHex, selection.hex, worldTime)
     return null
   }, [fromHex, selection, worldTime])
 
@@ -204,6 +206,12 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       </div>
     </div>
   )
+}
+
+// isCore reports whether a hex is the star's core cell (0,0) — never a valid
+// move destination.
+function isCore(h: Hex): boolean {
+  return h.q === 0 && h.r === 0
 }
 
 export default SystemBoardView

@@ -32,6 +32,9 @@ const actorCollection = "fleets"
 var (
 	ErrNotFound      = errors.New("fleet not found")
 	ErrFeatureAbsent = errors.New("target feature not found in system")
+	// ErrCoreDestination rejects an order whose destination is the star at the
+	// core (0,0): you can neither fly onto the core nor dock the star.
+	ErrCoreDestination = errors.New("the star at the core cannot be a destination")
 )
 
 type ServiceInterface interface {
@@ -147,6 +150,13 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 		sol = board.SolveHex(from, *req.Target.Hex, now, s.params.MsPerTile)
 	default:
 		return nil, errors.New("order target must be a hex or a featureId")
+	}
+
+	// The star occupies the core (0,0). It is a body, not a destination: you can
+	// neither fly a fleet onto it nor dock it. Burns already route AROUND the core
+	// (board.RouteAround); this rejects the core as an endpoint.
+	if sol.MeetHex == (board.Hex{}) {
+		return nil, ErrCoreDestination
 	}
 
 	burnState := board.MovementState{

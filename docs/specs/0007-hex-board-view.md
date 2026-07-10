@@ -197,7 +197,10 @@ client component tree:
       ETA), scan, mine, and depart-via-gate (burn-to-gate preview + trip
       ETA, the #0008 order); commit clears selection; clicking a selected
       target deselects. *(M7: move-to-hex, move-to-body, scan done; mine
-      lands M10, depart-via-gate M8.)*
+      lands M10, depart-via-gate M8.)* Move routes **around the star**
+      (#0004 `RouteAround`) and the **star at the core is not a movable
+      target** — selecting it offers no Move and the facts panel says why
+      (you can't fly onto `(0,0)` or dock a sun).
 - [ ] The system's **lane gates** render at their fixed rim tiles (#0008
       geometry) for any player in-system, entry gate included. *(M8.)*
 - [x] Committing an action **self-schedules a refetch at its ETA**, and the

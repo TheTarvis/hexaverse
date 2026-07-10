@@ -48,6 +48,13 @@ describe('FactsPanel', () => {
     expect(screen.getByTestId('move-eta')).toHaveTextContent('ETA')
   })
 
+  it('blocks moving onto the star (no plan → no move button, shows a note)', () => {
+    const star: BoardSelection = { kind: 'feature', feature: feature({ id: 'star', type: 'star', fixed: true }) }
+    render(<FactsPanel {...base} selection={star} activeFleet={ownFleet} plan={null} />)
+    expect(screen.queryByTestId('move-button')).not.toBeInTheDocument()
+    expect(screen.getByTestId('core-blocked')).toBeInTheDocument()
+  })
+
   it('ghosts a remembered body with its last-seen age; hides worth on astronomical', () => {
     const remembered: BoardSelection = {
       kind: 'feature',

@@ -153,6 +153,15 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
   target is **not** extrapolable, so an intercept aims at its **last-known Visible
   snapshot** (or is disallowed) — never a predicted lead. This is the juke: thrusting
   breaks a pursuer's solution.
+- **The star at the core is off-limits (added 2026-07-10).** The star occupies the
+  core hex `(0,0)` — it is a body, not a destination. A burn whose straight hex-line
+  would cross the core **routes around it** (`board.RouteAround`: detour via the
+  least-cost ring-1 hex beside the star; the ETA follows the routed length, not the
+  straight-line distance). Both ends run the identical routing (pinned by the
+  `routeAround` cases in `/fixtures/board/cases.json`), so the client preview matches
+  what the server commits. And the **core is rejected as a destination** — you can
+  neither fly a fleet onto `(0,0)` nor dock the star (`fleet.ErrCoreDestination` →
+  `400`); the client offers no move-onto-star and says so in the facts panel.
 - **API (sketch)** — a fleet is top-level (Decision #8), so routes are **not** nested
   under `system`:
   - `POST /v1/fleets/{id}/orders` `{ target: {hex}|{featureId} }` → server solves →
@@ -206,6 +215,10 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
       intercept special-case, no rework.
 - [x] A **burning** fleet is represented as a **volatile snapshot** on the read/broadcast
       surface; **coasting/docked** fleets are **elements**.
+- [x] **The star at the core is off-limits** (added 2026-07-10): a burn that would
+      cross `(0,0)` **routes around** it (identical both ends, fixture-pinned), and the
+      **core is rejected as a destination** — no flying onto `(0,0)`, no docking the
+      star (`ErrCoreDestination` → `400`).
 - [x] **Slice bar:** a player can **order a ship to a location and it gets there over
       real time**, resolving while offline.
 - [x] Burn tuning (`burnSpeed`, horizon) lives in a **params object**, spike values as

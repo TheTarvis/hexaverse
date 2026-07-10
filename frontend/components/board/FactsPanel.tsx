@@ -109,17 +109,20 @@ export function FactsPanel({
         )}
         {!selection && <Text className="!text-zinc-500">Select a body or tile.</Text>}
 
-        {canMoveToSelection && (
+        {canMoveToSelection && plan && (
           <div className="mt-3 flex items-center gap-3">
             <Button data-testid="move-button" color="cyan" disabled={pending} onClick={onMove}>
               {selection?.kind === 'feature' ? 'Intercept' : 'Move here'}
             </Button>
-            {plan && (
-              <span data-testid="move-eta" className="font-mono text-xs text-zinc-400">
-                {plan.tiles} hex · ETA {etaLabel(plan.etaMs)}
-              </span>
-            )}
+            <span data-testid="move-eta" className="font-mono text-xs text-zinc-400">
+              {plan.tiles} hex · ETA {etaLabel(plan.etaMs)}
+            </span>
           </div>
+        )}
+        {canMoveToSelection && !plan && (
+          <p data-testid="core-blocked" className="mt-3 text-[11px] text-zinc-500">
+            The star can’t be a destination — you can’t fly onto the core or dock a sun.
+          </p>
         )}
       </section>
     </aside>

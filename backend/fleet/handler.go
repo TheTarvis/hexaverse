@@ -186,6 +186,8 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatus(http.StatusNotFound)
 	case errors.Is(err, ErrFeatureAbsent):
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "target feature not found"})
+	case errors.Is(err, ErrCoreDestination):
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "cannot move to or dock the star at the core"})
 	case err != nil:
 		log.Error().Ctx(c).Err(err).Msg("fleet operation failed")
 		c.AbortWithStatus(http.StatusInternalServerError)
