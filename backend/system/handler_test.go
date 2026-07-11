@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/observation"
 
@@ -15,17 +16,22 @@ import (
 )
 
 type fakeSysSvc struct {
-	gen *GeneratedInterior
-	err error
+	gen   *GeneratedInterior
+	err   error
+	gates []LaneGate
 }
 
 func (f *fakeSysSvc) GetOrCreateInterior(context.Context, string) (*GeneratedInterior, error) {
 	return f.gen, f.err
 }
+func (f *fakeSysSvc) LaneGates(context.Context, string, int) ([]LaneGate, error) {
+	return f.gates, nil
+}
 
 type fakeBoardFog struct {
 	cov        observation.Coverage
 	remembered map[string]observation.FeatureMemory
+	tiers      map[string]observation.Tier
 }
 
 func (f fakeBoardFog) Coverage(context.Context, string, string, common.WorldMillis) (observation.Coverage, error) {
@@ -33,6 +39,9 @@ func (f fakeBoardFog) Coverage(context.Context, string, string, common.WorldMill
 }
 func (f fakeBoardFog) RememberedFeatures(context.Context, string, string) (map[string]observation.FeatureMemory, error) {
 	return f.remembered, nil
+}
+func (f fakeBoardFog) SystemTiers(context.Context, string) (map[string]observation.Tier, error) {
+	return f.tiers, nil
 }
 
 type sysTestClock struct{}
@@ -88,5 +97,44 @@ func TestGetInterior_FogsToAstronomicalLayer(t *testing.T) {
 	}
 	if _, leaked := bands["feat-belt-0"]; leaked {
 		t.Errorf("an unseen detail feature leaked past the fog filter")
+	}
+}
+
+// TestGetInterior_LaneGatesFogFilterToCharted proves the interior read ships lane
+// gates, filtered to the requester's charted neighbours — a Rumored/Explored lane
+// shows, an uncharted (star-visible) one never leaks.
+func TestGetInterior_LaneGatesFogFilterToCharted(t *testing.T) {
+	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1", Radius: 16}}
+	gates := []LaneGate{
+		{DestSystemId: "sys-known", Hex: board.Hex{Q: 16, R: 0}},
+		{DestSystemId: "sys-dark", Hex: board.Hex{Q: -16, R: 0}},
+	}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) { c.Set(common.AccountIdKey, "user1") })
+	NewHandlerWith(&fakeSysSvc{gen: gen, gates: gates}, sysTestClock{}).
+		WithFog(fakeBoardFog{
+			cov:   observation.NewCoverage(0),
+			tiers: map[string]observation.Tier{"sys-known": observation.TierRumored},
+		}).
+		RegisterRoutes(r.Group("/"))
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/systems/s1", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+
+	var body struct {
+		LaneGates []struct {
+			DestSystemId string `json:"destSystemId"`
+		} `json:"laneGates"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(body.LaneGates) != 1 || body.LaneGates[0].DestSystemId != "sys-known" {
+		t.Fatalf("gates = %+v, want only the charted sys-known", body.LaneGates)
 	}
 }

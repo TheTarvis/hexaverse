@@ -123,6 +123,10 @@ export const FLEET_ACCENT: Record<Mode, string> = {
 // A foreign fleet's muted snapshot marker (grey — no mode is inferred).
 export const FLEET_FOREIGN = '#9aa7b4'
 
+// A lane gate on the rim (#0008) — a cool violet-blue, distinct from the cyan
+// fleet/sensor accents so an exit doesn't read as a unit or a scan.
+export const GATE_ACCENT = '#8ab4f8'
+
 // The lit thruster flame on a burning own fleet (matches the burn accent).
 export const THRUSTER = '#fbbf24'
 

@@ -20,6 +20,10 @@ type ServiceInterface interface {
 	// first request (the dev-only trigger until #0008's arrival dispatch
 	// replaces it). Shared world state, generated once, idempotent under races.
 	GetOrCreateInterior(ctx context.Context, systemID string) (*GeneratedInterior, error)
+	// LaneGates returns the system's charted lane gates — the rim tiles where
+	// its lanes depart toward their neighbours, projected onto a board of the
+	// given radius (#0008 Decision #10). Unfogged; the read boundary filters.
+	LaneGates(ctx context.Context, systemID string, radius int) ([]LaneGate, error)
 }
 
 type Service struct {

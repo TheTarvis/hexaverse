@@ -11,7 +11,7 @@
 import { useMemo } from 'react'
 import { ringHexes, ringOf, type Hex } from '@/lib/hex'
 import { hexPolygonPoints, hexToPixel, type Point } from '@/lib/hex/pixel'
-import type { BoardFeature } from '@/lib/types/system-board'
+import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 import {
   featureGlidePixel,
@@ -23,6 +23,7 @@ import {
 } from './glyph-geometry'
 import { FeatureGlyph } from './FeatureGlyph'
 import { FleetGlyph } from './FleetGlyph'
+import { GateGlyph } from './GateGlyph'
 import { ORBIT_RING, ORBIT_RING_HILITE, PREVIEW_BURN, SCAN_BUBBLE_FILL, SCAN_BUBBLE_STROKE } from './board-palette'
 
 // The ambient-sensor radius (hexes) the backend uses (observation.DefaultSensorParams).
@@ -35,18 +36,24 @@ export interface BoardSceneProps {
   worldTime: number
   features: BoardFeature[]
   fleets: Fleet[]
+  gates?: LaneGate[]
   selectedId?: string | null
+  selectedGateId?: string | null
   onSelectFeature?: (id: string) => void
   onSelectFleet?: (id: string) => void
+  onSelectGate?: (destSystemId: string) => void
 }
 
 export function BoardScene({
   worldTime,
   features,
   fleets,
+  gates = [],
   selectedId,
+  selectedGateId,
   onSelectFeature,
   onSelectFleet,
+  onSelectGate,
 }: BoardSceneProps) {
   // Resolve every feature's glided point and logical hex in two passes so moons
   // can ride their parent (parents are always non-parented, so pass 1 covers them).
@@ -131,6 +138,18 @@ export function BoardScene({
             />
           )
         })}
+      </g>
+
+      <g data-testid="lane-gates">
+        {gates.map((g) => (
+          <GateGlyph
+            key={g.destSystemId}
+            destSystemId={g.destSystemId}
+            point={hexToPixel(g.hex.q, g.hex.r)}
+            selected={selectedGateId === g.destSystemId}
+            {...(onSelectGate ? { onSelect: onSelectGate } : {})}
+          />
+        ))}
       </g>
 
       <g data-testid="feature-glyphs">

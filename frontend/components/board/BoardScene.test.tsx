@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { BoardScene } from './BoardScene'
-import type { BoardFeature } from '@/lib/types/system-board'
+import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 
 const star: BoardFeature = { id: 'star', type: 'star', fixed: true, footprint: [{ q: 0, r: 0 }], band: 'visible', live: true }
@@ -42,6 +42,23 @@ describe('BoardScene', () => {
     expect(screen.getByTestId('fleet-glyph-theirs')).toBeInTheDocument()
     // The planet sits on ring 4, so an orbit ring is drawn.
     expect(screen.getByTestId('orbit-rings').querySelectorAll('polygon').length).toBeGreaterThan(0)
+  })
+
+  it('draws a gate glyph per lane gate and reports clicks', () => {
+    const gates: LaneGate[] = [
+      { destSystemId: 'sys-e', hex: { q: 16, r: 0 } },
+      { destSystemId: 'sys-n', hex: { q: 0, r: 16 } },
+    ]
+    const onSelectGate = vi.fn()
+    render(
+      <svg>
+        <BoardScene worldTime={0} features={[star]} fleets={[]} gates={gates} onSelectGate={onSelectGate} />
+      </svg>,
+    )
+    expect(screen.getByTestId('gate-glyph-sys-e')).toBeInTheDocument()
+    expect(screen.getByTestId('gate-glyph-sys-n')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('gate-glyph-sys-e'))
+    expect(onSelectGate).toHaveBeenCalledWith('sys-e')
   })
 
   it('draws the sensor bubble only around own units', () => {

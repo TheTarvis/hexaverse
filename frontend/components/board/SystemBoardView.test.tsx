@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { SystemBoardView } from './SystemBoardView'
 import { useSystemBoard } from '@/hooks/use-system-board'
-import { useFleetsInSystem, useFleetOrders, useScan } from '@/hooks/use-fleets'
+import { useFleetsInSystem, useFleetOrders, useScan, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
 import type { SystemBoard } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 import type { UseQueryResult } from '@tanstack/react-query'
@@ -12,6 +12,8 @@ vi.mock('@/hooks/use-fleets', () => ({
   useFleetsInSystem: vi.fn(),
   useFleetOrders: vi.fn(),
   useScan: vi.fn(),
+  useRoutePreview: vi.fn(),
+  useFleetTravel: vi.fn(),
 }))
 // The world clock is frozen and realtime is a no-op so the composed tree is
 // deterministic; the real HexBoard/BoardScene/FactsPanel all render.
@@ -23,6 +25,10 @@ const mockBoard = vi.mocked(useSystemBoard)
 const mockFleets = vi.mocked(useFleetsInSystem)
 const mockOrders = vi.mocked(useFleetOrders)
 const mockScan = vi.mocked(useScan)
+const mockRoutePreview = vi.mocked(useRoutePreview)
+const mockTravel = vi.mocked(useFleetTravel)
+
+const travelMutate = vi.fn()
 
 const orderMutate = vi.fn()
 const cancelMutate = vi.fn()
@@ -35,6 +41,7 @@ function boardFixture(): SystemBoard {
     character: 'star_rich',
     starClass: 'G',
     worldTime: 0,
+    laneGates: [],
     features: [
       { id: 'f-star', type: 'star', fixed: true, footprint: [{ q: 0, r: 0 }], band: 'visible', live: true },
       {
@@ -74,6 +81,12 @@ describe('SystemBoardView', () => {
       cancel: { mutate: cancelMutate, isPending: false },
     } as unknown as ReturnType<typeof useFleetOrders>)
     mockScan.mockReturnValue({ mutate: scanMutate, isPending: false } as unknown as ReturnType<typeof useScan>)
+    mockRoutePreview.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useRoutePreview>)
+    mockTravel.mockReturnValue({ mutate: travelMutate, isPending: false } as unknown as ReturnType<typeof useFleetTravel>)
     fleetsState([])
   })
 
@@ -132,5 +145,35 @@ describe('SystemBoardView', () => {
 
     fireEvent.click(screen.getByTestId('scan-button'))
     expect(scanMutate).toHaveBeenCalledWith('mine', expect.anything())
+  })
+
+  it('selects a lane gate, previews the route, and departs', () => {
+    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', hex: { q: 3, r: 0 } }] }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    fleetsState([ownFleet])
+    mockRoutePreview.mockReturnValue({
+      data: {
+        route: ['sys-7', 'sys-9'],
+        legEtas: [30_000, 90_000],
+        totalEta: 90_000,
+        departGate: { q: 3, r: 0 },
+        worldTime: 0,
+      },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useRoutePreview>)
+    render(<SystemBoardView systemId="sys-7" />)
+
+    // Select the rim gate → depart section with the route + a burn-to-gate overlay.
+    fireEvent.click(screen.getByTestId('gate-glyph-sys-9'))
+    expect(screen.getByTestId('gate-facts')).toBeInTheDocument()
+    expect(screen.getByTestId('selection-preview')).toBeInTheDocument()
+
+    // Commit → a trip to the neighbour system.
+    fireEvent.click(screen.getByTestId('depart-button'))
+    expect(travelMutate).toHaveBeenCalledWith(
+      { fleetId: 'mine', systemId: 'sys-9' },
+      expect.anything(),
+    )
   })
 })

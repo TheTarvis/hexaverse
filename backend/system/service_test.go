@@ -21,13 +21,17 @@ type fakeGalaxy struct {
 	meta   *galaxy.Galaxy
 	system *galaxy.System
 	sysErr error
+	live   *galaxy.GeneratedGalaxy
 }
 
 func (f *fakeGalaxy) Generate(context.Context, int64, galaxy.GenerationParams) (*galaxy.GeneratedGalaxy, error) {
 	return nil, errors.New("unused")
 }
 func (f *fakeGalaxy) GetLive(context.Context) (*galaxy.GeneratedGalaxy, error) {
-	return nil, errors.New("unused")
+	if f.live == nil {
+		return nil, errors.New("live galaxy not set")
+	}
+	return f.live, nil
 }
 func (f *fakeGalaxy) GetLiveSystem(context.Context, string) (*galaxy.System, error) {
 	return f.system, f.sysErr

@@ -69,6 +69,16 @@ export interface BoardFeature {
   asOf?: number
 }
 
+// A charted lane's fixed rim tile on this board (#0008 Decision #10) — where the
+// lane toward `destSystemId` departs. Bearing-projected and deterministic
+// (backend board.LaneGateHex; mirrored in lib/hex/gate.ts), so the glyph sits on
+// the exact tile a departing fleet burns to. Fog-filtered server-side: only lanes
+// the requester has charted ship, so an uncharted neighbour never leaks here.
+export interface LaneGate {
+  destSystemId: string
+  hex: Hex
+}
+
 // The fogged system interior — exactly what `GET /v1/systems/:id` returns.
 export interface SystemBoard {
   systemId: string
@@ -76,6 +86,9 @@ export interface SystemBoard {
   character: string
   starClass: string
   features: BoardFeature[]
+  // The charted lane gates on the rim — the departure tiles for inter-system
+  // travel (#0008), already filtered to the requester's charted lanes.
+  laneGates: LaneGate[]
   // Server world time at read (world-milliseconds) — the offset source that
   // drives client-side orbit/fleet animation (#0005).
   worldTime: number

@@ -19,6 +19,9 @@ import (
 type BoardFog interface {
 	Coverage(ctx context.Context, cid, systemID string, now common.WorldMillis) (observation.Coverage, error)
 	RememberedFeatures(ctx context.Context, cid, systemID string) (map[string]observation.FeatureMemory, error)
+	// SystemTiers is the requester's graph-tier knowledge, so lane gates ship
+	// only for charted neighbours (chartedGates) — no leaking uncharted stars.
+	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
 }
 
 type Handler struct {
@@ -65,6 +68,14 @@ func (h *Handler) GetInterior(c *gin.Context) {
 	}
 
 	now := h.clock.Now()
+
+	gates, err := h.svc.LaneGates(ctx, systemID, gen.Interior.Radius)
+	if err != nil {
+		log.Error().Ctx(c).Err(err).Str("systemId", systemID).Msg("Failed to compute lane gates")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
 	features := projectUnfogged(gen)
 	if h.fog != nil {
 		if cid := common.ActorCorp(c); cid != "" {
@@ -80,7 +91,14 @@ func (h *Handler) GetInterior(c *gin.Context) {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
+			tiers, err := h.fog.SystemTiers(ctx, cid)
+			if err != nil {
+				log.Error().Ctx(c).Err(err).Str("systemId", systemID).Msg("Failed to load system tiers")
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
 			features = projectFogged(gen, cov, remembered, now)
+			gates = chartedGates(gates, tiers)
 		}
 	}
 	c.JSON(http.StatusOK, interiorDTO{
@@ -89,6 +107,7 @@ func (h *Handler) GetInterior(c *gin.Context) {
 		Character: gen.Interior.Character,
 		StarClass: gen.Interior.StarClass,
 		Features:  features,
+		LaneGates: gates,
 		WorldTime: now,
 	})
 }
@@ -101,5 +120,6 @@ type interiorDTO struct {
 	Character string             `json:"character"`
 	StarClass string             `json:"starClass"`
 	Features  []fogFeatureDTO    `json:"features"`
+	LaneGates []LaneGate         `json:"laneGates"`
 	WorldTime common.WorldMillis `json:"worldTime"`
 }

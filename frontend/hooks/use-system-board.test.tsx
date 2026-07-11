@@ -20,6 +20,7 @@ function boardFixture(systemId: string): SystemBoard {
     character: 'star_rich',
     starClass: 'G',
     worldTime: 0,
+    laneGates: [],
     features: [],
   }
 }

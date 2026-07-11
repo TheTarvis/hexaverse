@@ -18,6 +18,7 @@ const board: SystemBoard = {
   character: 'star_rich',
   starClass: 'G',
   worldTime: 123456,
+  laneGates: [],
   features: [
     { id: 'f-star', type: 'star', fixed: true, footprint: [{ q: 0, r: 0 }], band: 'visible', live: true },
   ],

@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FactsPanel, type BoardSelection } from './FactsPanel'
 import { planToHex } from './move-preview'
-import type { Fleet } from '@/lib/types/fleet'
-import type { BoardFeature } from '@/lib/types/system-board'
+import type { Fleet, RoutePreview } from '@/lib/types/fleet'
+import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
 
 const ownFleet: Fleet = {
   id: 'mine',
@@ -22,9 +22,11 @@ const base = {
   featureCount: 4,
   worldTime: 1_000_000,
   pending: false,
+  route: null,
   onMove: vi.fn(),
   onScan: vi.fn(),
   onCancel: vi.fn(),
+  onDepart: vi.fn(),
 }
 
 function feature(over: Partial<BoardFeature>): BoardFeature {
@@ -68,6 +70,55 @@ describe('FactsPanel', () => {
     const astro: BoardSelection = { kind: 'feature', feature: feature({ band: 'astronomical' }) }
     rerender(<FactsPanel {...base} selection={astro} activeFleet={null} plan={null} />)
     expect(screen.getByTestId('selection')).toHaveTextContent(/scan to reveal/i)
+  })
+
+  const gate: LaneGate = { destSystemId: 'sys-neighbour', hex: { q: 16, r: 0 } }
+  const gateSelection: BoardSelection = { kind: 'gate', gate }
+
+  it('previews the route and departs through a selected gate', () => {
+    const route: RoutePreview = {
+      route: ['sys-here', 'sys-neighbour'],
+      legEtas: [1_030_000, 1_120_000], // gate ETA, then arrival
+      totalEta: 1_120_000,
+      departGate: { q: 16, r: 0 },
+      worldTime: 1_000_000,
+    }
+    render(
+      <FactsPanel
+        {...base}
+        selection={gateSelection}
+        activeFleet={ownFleet}
+        plan={null}
+        route={{ isLoading: false, isError: false, data: route }}
+      />,
+    )
+    expect(screen.getByTestId('gate-facts')).toBeInTheDocument()
+    const depart = screen.getByTestId('depart-button')
+    expect(depart).toHaveTextContent('Depart')
+    fireEvent.click(depart)
+    expect(base.onDepart).toHaveBeenCalled()
+  })
+
+  it('reports no charted route through a gate', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={gateSelection}
+        activeFleet={ownFleet}
+        plan={null}
+        route={{ isLoading: false, isError: true }}
+      />,
+    )
+    expect(screen.getByTestId('gate-no-route')).toBeInTheDocument()
+    expect(screen.queryByTestId('depart-button')).not.toBeInTheDocument()
+  })
+
+  it('asks for a fleet before departing when none is here', () => {
+    render(
+      <FactsPanel {...base} selection={gateSelection} activeFleet={null} plan={null} route={null} />,
+    )
+    expect(screen.getByTestId('gate-facts')).toHaveTextContent(/bring a fleet here/i)
+    expect(screen.queryByTestId('depart-button')).not.toBeInTheDocument()
   })
 
   it('offers cancel only while the active fleet is burning', () => {

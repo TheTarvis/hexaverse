@@ -13,8 +13,8 @@ import { Badge } from '@/components/catalyst/badge'
 import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import type { Hex } from '@/lib/hex'
-import type { BoardFeature } from '@/lib/types/system-board'
-import type { Fleet } from '@/lib/types/fleet'
+import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
+import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 import { etaLabel, type MovePlan } from './move-preview'
 import { FOG_TREATMENT } from './board-palette'
 
@@ -22,7 +22,16 @@ export type BoardSelection =
   | { kind: 'feature'; feature: BoardFeature }
   | { kind: 'hex'; hex: Hex }
   | { kind: 'fleet'; fleet: Fleet }
+  | { kind: 'gate'; gate: LaneGate }
   | null
+
+// The route-preview query state the depart section reads (a subset of the
+// useRoutePreview result) — a 422 no-charted-route surfaces as `isError`.
+export interface RouteState {
+  isLoading: boolean
+  isError: boolean
+  data?: RoutePreview
+}
 
 export interface FactsPanelProps {
   starClass: string
@@ -34,9 +43,11 @@ export interface FactsPanelProps {
   plan: MovePlan | null
   worldTime: number
   pending: boolean
+  route: RouteState | null
   onMove: () => void
   onScan: () => void
   onCancel: () => void
+  onDepart: () => void
 }
 
 const PANEL =
@@ -52,9 +63,11 @@ export function FactsPanel({
   plan,
   worldTime,
   pending,
+  route,
   onMove,
   onScan,
   onCancel,
+  onDepart,
 }: FactsPanelProps) {
   const burning = activeFleet?.state.mode === 'burn'
   const canMoveToSelection = !!activeFleet && (selection?.kind === 'feature' || selection?.kind === 'hex')
@@ -107,7 +120,17 @@ export function FactsPanel({
             {selection.fleet.own ? 'Your fleet' : 'Foreign contact'} — {selection.fleet.state.mode}
           </Text>
         )}
-        {!selection && <Text className="!text-zinc-500">Select a body or tile.</Text>}
+        {selection?.kind === 'gate' && (
+          <GateFacts
+            gate={selection.gate}
+            hasFleet={!!activeFleet}
+            route={route}
+            worldTime={worldTime}
+            pending={pending}
+            onDepart={onDepart}
+          />
+        )}
+        {!selection && <Text className="!text-zinc-500">Select a body, tile, or gate.</Text>}
 
         {canMoveToSelection && plan && (
           <div className="mt-3 flex items-center gap-3">
@@ -126,6 +149,78 @@ export function FactsPanel({
         )}
       </section>
     </aside>
+  )
+}
+
+// GateFacts is the board-tier depart gesture (#0008): a selected rim gate shows
+// its charted route (per-leg + total ETA) and offers Depart, mirroring the galaxy
+// view's TravelSection. Leg 0 (the in-system burn to this gate) rides in the trip
+// action server-side; the on-board dashed overlay draws it, so the panel shows the
+// journey past the gate. A no-charted-route destination surfaces as `route.isError`.
+function GateFacts({
+  gate,
+  hasFleet,
+  route,
+  worldTime,
+  pending,
+  onDepart,
+}: {
+  gate: LaneGate
+  hasFleet: boolean
+  route: RouteState | null
+  worldTime: number
+  pending: boolean
+  onDepart: () => void
+}) {
+  return (
+    <div data-testid="gate-facts">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-white">Lane gate</span>
+        <Badge color="sky">DEPART</Badge>
+      </div>
+      <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-400">→ {gate.destSystemId}</p>
+
+      {!hasFleet && (
+        <p className="mt-3 text-[11px] text-zinc-500">Bring a fleet here to depart through this gate.</p>
+      )}
+
+      {hasFleet && route?.isLoading && <p className="mt-3 text-sm text-zinc-400">Plotting a route…</p>}
+
+      {hasFleet && route?.isError && (
+        <p data-testid="gate-no-route" className="mt-3 text-sm text-amber-400">
+          No charted route this way. Explore toward it first.
+        </p>
+      )}
+
+      {hasFleet && route?.data && (
+        <div className="mt-3 flex flex-col gap-2">
+          <ul className="flex flex-col gap-0.5">
+            {route.data.route.slice(1).map((sysId, i) => (
+              <li
+                key={sysId}
+                className="flex items-center justify-between rounded-md border border-zinc-800/50 bg-black/20 px-2.5 py-1 text-sm text-white"
+              >
+                <span className="truncate font-mono text-xs">
+                  <span className="text-zinc-500">{i + 1}.</span> {sysId}
+                </span>
+                <span className="font-mono text-xs text-zinc-400">
+                  {etaLabel(Math.max(0, route.data!.legEtas[i + 1] - worldTime))}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Button
+            data-testid="depart-button"
+            color="sky"
+            disabled={pending}
+            onClick={onDepart}
+            className="w-full"
+          >
+            {`Depart · ${etaLabel(Math.max(0, route.data.totalEta - worldTime))}`}
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }
 

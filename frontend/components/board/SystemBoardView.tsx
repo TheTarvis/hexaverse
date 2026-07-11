@@ -12,7 +12,7 @@ import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import { toast } from '@/lib/toast'
 import { useSystemBoard } from '@/hooks/use-system-board'
-import { useFleetsInSystem, useFleetOrders, useScan } from '@/hooks/use-fleets'
+import { useFleetsInSystem, useFleetOrders, useScan, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
 import { useWorldTime } from '@/hooks/use-world-time'
 import { useBoardRealtime } from '@/hooks/use-board-realtime'
 import type { Hex, Target } from '@/lib/hex'
@@ -42,7 +42,8 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
 
   const { order, cancel } = useFleetOrders(systemId)
   const scan = useScan(systemId)
-  const pending = order.isPending || cancel.isPending || scan.isPending
+  const travel = useFleetTravel()
+  const pending = order.isPending || cancel.isPending || scan.isPending || travel.isPending
 
   const allFleets = useMemo(() => fleets ?? [], [fleets])
   const ownFleets = useMemo(() => allFleets.filter((f) => f.own), [allFleets])
@@ -50,6 +51,12 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     () => ownFleets.find((f) => f.id === activeFleetId) ?? ownFleets[0] ?? null,
     [ownFleets, activeFleetId],
   )
+
+  // A selected rim gate previews the charted route from the acting fleet to that
+  // neighbour (#0008) — disabled until both a fleet and a gate are in hand; a
+  // no-charted-route destination surfaces as the query's 422 error.
+  const selectedGateDest = selection?.kind === 'gate' ? selection.gate.destSystemId : null
+  const routeQuery = useRoutePreview(activeFleet?.id ?? null, selectedGateDest)
 
   // The acting fleet's live hex — the origin of every previewed order.
   const fromHex = useMemo<Hex | null>(() => {
@@ -74,6 +81,9 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       return planToHex(fromHex, featureLogicalHex(f, worldTime), worldTime)
     }
     if (selection.kind === 'hex') return isCore(selection.hex) ? null : planToHex(fromHex, selection.hex, worldTime)
+    // A gate previews the in-system burn to its rim tile (leg 0 of the trip); the
+    // lanes past it are shown as ETAs in the facts panel, not on the board.
+    if (selection.kind === 'gate') return planToHex(fromHex, selection.gate.hex, worldTime)
     return null
   }, [fromHex, selection, worldTime])
 
@@ -128,6 +138,13 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     setSelection((prev) =>
       prev?.kind === 'hex' && prev.hex.q === hex.q && prev.hex.r === hex.r ? null : { kind: 'hex', hex },
     )
+  const selectGate = (destSystemId: string) => {
+    const gate = board.laneGates.find((g) => g.destSystemId === destSystemId)
+    if (!gate) return
+    setSelection((prev) =>
+      prev?.kind === 'gate' && prev.gate.destSystemId === destSystemId ? null : { kind: 'gate', gate },
+    )
+  }
 
   // --- verbs -----------------------------------------------------------------
   const commitMove = () => {
@@ -161,6 +178,19 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       onError: (e) => toast.error(e.message || 'Cancel failed'),
     })
   }
+  const commitDepart = () => {
+    if (!activeFleet || selection?.kind !== 'gate') return
+    travel.mutate(
+      { fleetId: activeFleet.id, systemId: selection.gate.destSystemId },
+      {
+        onSuccess: () => {
+          toast.success('Fleet departing')
+          setSelection(null)
+        },
+        onError: (e) => toast.error(e.message || 'Departure failed'),
+      },
+    )
+  }
 
   const selectedId =
     selection?.kind === 'feature'
@@ -168,6 +198,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       : selection?.kind === 'fleet'
         ? selection.fleet.id
         : null
+  const selectedGateId = selection?.kind === 'gate' ? selection.gate.destSystemId : null
 
   return (
     <div data-testid="system-board-view" className={STAGE}>
@@ -181,9 +212,12 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           worldTime={worldTime}
           features={board.features}
           fleets={allFleets}
+          gates={board.laneGates}
           selectedId={selectedId}
+          selectedGateId={selectedGateId}
           onSelectFeature={selectFeature}
           onSelectFleet={selectFleet}
+          onSelectGate={selectGate}
         />
         <SelectionPreview plan={selection?.kind === 'fleet' ? null : plan} />
       </HexBoard>
@@ -199,9 +233,15 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           plan={plan}
           worldTime={worldTime}
           pending={pending}
+          route={
+            selection?.kind === 'gate'
+              ? { isLoading: routeQuery.isLoading, isError: routeQuery.isError, data: routeQuery.data }
+              : null
+          }
           onMove={commitMove}
           onScan={commitScan}
           onCancel={commitCancel}
+          onDepart={commitDepart}
         />
       </div>
     </div>

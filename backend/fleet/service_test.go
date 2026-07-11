@@ -60,6 +60,10 @@ func (f *fakeSystem) GetOrCreateInterior(context.Context, string) (*system.Gener
 	}, nil
 }
 
+func (f *fakeSystem) LaneGates(context.Context, string, int) ([]system.LaneGate, error) {
+	return nil, nil
+}
+
 func coastFleetAtCentre() *Fleet {
 	return &Fleet{
 		Id: "fleet_1", CorporationId: "dev-corp", SystemId: "sys-0",
