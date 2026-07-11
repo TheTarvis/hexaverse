@@ -136,9 +136,14 @@ func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]observ
 			Skeleton: skeletonDTO{StarClass: s.Skeleton.StarClass, Bodies: bodies},
 		}
 	}
-	lanes := make([]laneDTO, len(gen.Lanes))
-	for i, l := range gen.Lanes {
-		lanes[i] = laneDTO{Id: l.Id, AId: l.AId, BId: l.BId}
+	// Lanes are fog-filtered to the requester's charted network (#0006) — only
+	// nodes are the free star map; unknown lanes never ship (no ship-and-hide).
+	lanes := make([]laneDTO, 0, len(gen.Lanes))
+	for _, l := range gen.Lanes {
+		if !laneCharted(l, tiers) {
+			continue
+		}
+		lanes = append(lanes, laneDTO{Id: l.Id, AId: l.AId, BId: l.BId})
 	}
 	return galaxyDTO{
 		Id:        gen.Galaxy.Id,
@@ -148,4 +153,19 @@ func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]observ
 		Lanes:     lanes,
 		WorldTime: now,
 	}
+}
+
+// laneCharted reports whether a lane belongs to the requester's charted network
+// (#0006). A lane is known iff it is **incident to a system the Corporation has
+// Explored** (entered) — a Rumored neighbour is Rumored precisely because an
+// Explored system's lane reaches it, so this is the same charted-lane graph
+// #0008 routes over. A nil tiers map is the no-fog baseline (unit tests and the
+// logged-out static start area, served separately) — every lane ships. The other
+// future input to "charted" is purchased intel (a per-lane reveal set the market
+// will union in once a writer exists); the schema leaves room, no writer yet.
+func laneCharted(l Lane, tiers map[string]observation.Tier) bool {
+	if tiers == nil {
+		return true
+	}
+	return tiers[l.AId] == observation.TierExplored || tiers[l.BId] == observation.TierExplored
 }

@@ -218,7 +218,19 @@ graph.
 - [x] The inspector shows a selected system's **major-body inventory** (skeleton) —
       always visible, not gated by `discovered` (Decision #7).
 - [x] Undiscovered systems render **dim/hidden** from the `discovered` flag
-      (rules stubbed).
+      (rules stubbed). *(Superseded by #0006 — see Follow-ups 2026-07-11: nodes
+      always render; only lanes are fog-filtered.)*
+- [ ] The requester's **own fleets** render as a marker on their host system
+      node (galaxy-tier presence), so a freshly spawned player sees their hull
+      on home (#0009 places it; #0004/#0008 own it).
+- [ ] A selected system offers an **"Enter system"** affordance → `/systems/[id]`
+      (the #0007 hex board). Un-defers Decision #4, which held only until the
+      board spec existed; board detail stays arrival-gated (#0003/#0006).
+- [ ] On **wake** (first spawn) the view **focuses/selects home**, consuming the
+      `wakeFocus` handoff the wake-up flow sets (#0009); ⌖ recenter targets the
+      fleet's system when one exists.
+- [ ] The graph renders **only charted lanes** — the #0006 server-filtered read
+      (incident to an Explored system ∪ purchased intel); nodes still all render.
 - [x] **Logged-out** visitors see the frozen start-area galaxy in the same view;
       persistent/multiplayer actions prompt sign-in.
 - [x] The view **replaces** `frontend/app/page.tsx`.
@@ -292,6 +304,26 @@ Resolves Open question #1's gating task (inspected `github.com/kitakitaaura/webg
    exactly one view. Summary under Design details → "Camera & input"; the plan
    doc keeps the rationale and the remaining decide-while-building questions.
    Closes the BACKLOG "Camera & input" row.
+
+## Follow-ups (2026-07-11)
+
+Recorded while wiring the new-user slice (spec drifted from the build during
+spiking; these capture the galaxy view's real remit now that #0006–#0009 exist):
+
+- **Drill-in un-deferred.** Decision #4 deferred the "enter system" affordance
+  *until a hex-board spec existed*. #0007 now does, so the inspector gains an
+  **Enter system** button → `/systems/[id]`. Board detail stays arrival-gated
+  (#0003/#0006) — entering an unvisited system shows only the free skeleton.
+- **Fog framing follows #0006, not the `discovered` stub.** Nodes always render
+  (the star map is free knowledge); the earned dimensions are the per-system
+  subspace **tier** (surfaced in the inspector, not by dimming the graph) and
+  **lane visibility** — only **charted lanes** ship, filtered server-side
+  (#0006: incident to an Explored system ∪ purchased intel). The old
+  "undiscovered systems render dim/hidden" criterion is superseded.
+- **Fleet presence on the galaxy.** A Corporation's own fleets draw as a marker
+  on their host system node; ⌖ recenter and wake-focus target the fleet/home now
+  that a fleet exists — closing the `TODO(travis-feel)` the M2 view left in
+  `GalaxyGraph.tsx` (recenter re-framed the whole galaxy for lack of a fleet).
 
 ## Open questions
 

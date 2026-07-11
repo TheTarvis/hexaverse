@@ -29,10 +29,11 @@ interface FgRef {
   refresh: () => void
 }
 
-// Imperative handle handed up to GalaxyView so the ⌖ recenter control can drive
-// the camera without prop-drilling three internals.
+// Imperative handle handed up to GalaxyView so the ⌖ recenter control and the
+// wake-focus glide can drive the camera without prop-drilling three internals.
 export interface GalaxyGraphController {
   recenter: () => void
+  focusSystem: (id: string) => void
 }
 
 interface GalaxyGraphProps {
@@ -40,11 +41,24 @@ interface GalaxyGraphProps {
   selectedId: string | null
   onSelect: (node: GalaxyNode | null) => void
   onReady?: (controller: GalaxyGraphController) => void
+  // Systems hosting the requester's own fleets — drawn with a presence marker
+  // (#0002 Follow-ups 2026-07-11: own fleets show on the galaxy tier).
+  fleetSystemIds?: string[]
+  // The fleet/home system the ⌖ recenter snaps to when one exists (else the
+  // whole-galaxy framing) — resolves the M2 "no fleet to snap to" TODO.
+  homeSystemId?: string | null
 }
 
 const DBLCLICK_MS = 350
 
-export function GalaxyGraph({ galaxy, selectedId, onSelect, onReady }: GalaxyGraphProps) {
+export function GalaxyGraph({
+  galaxy,
+  selectedId,
+  onSelect,
+  onReady,
+  fleetSystemIds,
+  homeSystemId,
+}: GalaxyGraphProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<FgRef | null>(null)
   const rigRef = useRef<CameraRig | null>(null)
@@ -57,6 +71,17 @@ export function GalaxyGraph({ galaxy, selectedId, onSelect, onReady }: GalaxyGra
   // reads the current value without being recreated every render.
   const selectedRef = useRef<string | null>(selectedId)
   selectedRef.current = selectedId
+
+  // Which systems host an own fleet — read through a ref so makeNode (rebuilt on
+  // refresh) sees the current set without being recreated every render.
+  const fleetSet = useMemo(() => new Set(fleetSystemIds ?? []), [fleetSystemIds])
+  const fleetSetRef = useRef(fleetSet)
+  fleetSetRef.current = fleetSet
+
+  // The recenter/home target, read through a ref so the controller handed up at
+  // init reflects the fleet's system even though it loads after the rig mounts.
+  const homeIdRef = useRef<string | null>(homeSystemId ?? null)
+  homeIdRef.current = homeSystemId ?? null
 
   const graphData = useMemo(
     () => ({ nodes: galaxy.nodes, links: galaxy.links.map((l) => ({ ...l })) }),
@@ -126,25 +151,46 @@ export function GalaxyGraph({ galaxy, selectedId, onSelect, onReady }: GalaxyGra
 
       group.add(halo)
       group.add(core)
+
+      // Own-fleet presence marker — a bright cyan pip lifted above the star on
+      // +Z so it reads as "a hull is on station here" from the oblique disk view
+      // (#0002 Follow-ups 2026-07-11). A freshly spawned player sees it at home.
+      if (fleetSetRef.current.has(node.id)) {
+        const pip = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: glowTexture(),
+            color: new THREE.Color('#67e8f9'),
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            transparent: true,
+            opacity: 0.98,
+          }),
+        )
+        const ps = 3.6
+        pip.scale.set(ps, ps, 1)
+        pip.position.set(0, 0, 6 + style.size * 4)
+        group.add(pip)
+      }
       return group
     },
     [],
   )
 
-  // Rebuild node sprites when the selection changes so the highlight shows ON
-  // the graph (spec acceptance: selection indicated on the graph, not only the
-  // inspector).
+  // Rebuild node sprites when the selection OR the own-fleet set changes so both
+  // the highlight and the fleet marker show ON the graph (spec acceptance:
+  // selection + fleet presence indicated on the graph, not only the inspector).
   useEffect(() => {
     fgRef.current?.refresh?.()
-  }, [selectedId])
+  }, [selectedId, fleetSet])
 
   const linkColor = useCallback(
     (link: { source: GalaxyNode | string; target: GalaxyNode | string }) => {
       const a = typeof link.source === 'object' ? link.source : nodeById.get(link.source)
       const b = typeof link.target === 'object' ? link.target : nodeById.get(link.target)
       const seam = a?.region === 'barrier' || b?.region === 'barrier'
-      // Lanes render at full strength — the star map is common knowledge (#0006);
-      // lane-reveal-by-presence is an M8 (travel) concern.
+      // Every lane we receive renders at full strength: lane-reveal-by-presence
+      // is now enforced server-side (#0006) — the galaxy read only ships the
+      // requester's charted lanes, so there are no unknown lanes to dim here.
       if (seam) return `rgba(244,114,182,0.5)`
       return `rgba(150,185,230,0.42)`
     },
@@ -165,7 +211,12 @@ export function GalaxyGraph({ galaxy, selectedId, onSelect, onReady }: GalaxyGra
         if (camera && renderer?.domElement) {
           const rig = new CameraRig(camera, renderer.domElement, wrap, internal)
           rigRef.current = rig
-          rig.frameBounds(galaxy.bounds)
+          // Frame on the fleet's home if we already know it (spawn stashes it
+          // synchronously), else the whole disk; the wake-focus glide in
+          // GalaxyView re-centres once the fleet read settles.
+          const homeAtInit = homeIdRef.current ? nodeById.get(homeIdRef.current) : null
+          if (homeAtInit) rig.recenter({ x: homeAtInit.x, y: homeAtInit.y, z: homeAtInit.z }, 0)
+          else rig.frameBounds(galaxy.bounds)
 
           // reference grid on the z=0 galactic disk — reads depth at a glance.
           const scene = fg.scene()
@@ -191,9 +242,18 @@ export function GalaxyGraph({ galaxy, selectedId, onSelect, onReady }: GalaxyGra
 
           readyRef.current = true
           onReady?.({
-            // TODO(travis-feel): no fleet exists at M2, so ⌖ recenter re-frames
-            // the whole galaxy. When the fleet lands (M4+), snap to it instead.
-            recenter: () => rig.frameBounds(galaxy.bounds),
+            // ⌖ recenter snaps to the fleet's system when one exists, else the
+            // whole disk (homeIdRef stays fresh as the fleet read settles).
+            recenter: () => {
+              const hn = homeIdRef.current ? nodeById.get(homeIdRef.current) : null
+              if (hn) rig.recenter({ x: hn.x, y: hn.y, z: hn.z })
+              else rig.frameBounds(galaxy.bounds)
+            },
+            // Glide a specific system to centre (the wake-focus handoff #0009).
+            focusSystem: (id: string) => {
+              const n = nodeById.get(id)
+              if (n) rig.focus({ x: n.x, y: n.y, z: n.z })
+            },
           })
           return
         }
@@ -204,7 +264,7 @@ export function GalaxyGraph({ galaxy, selectedId, onSelect, onReady }: GalaxyGra
     return () => {
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [size.w, galaxy.bounds, onReady])
+  }, [size.w, galaxy.bounds, onReady, nodeById])
 
   // Tear the rig down on unmount.
   useEffect(() => {

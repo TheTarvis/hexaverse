@@ -191,6 +191,18 @@ which every later player still fogs fresh from their own entry.
   live truth where currently Visible and flagged `live: true`. The subspace
   enum replaces `discovered` (older consumers treat `rumored+` as "has
   subspace knowledge"; the star layer renders regardless).
+- **Charted lanes (graph-read filter):** the #0002 graph read ships the free
+  star map — **every node** — but only the requester's **charted lanes**. A lane
+  is charted iff it is **incident to a system the Corporation has Explored**
+  (entered), **or** was **revealed by purchased intel** (the market touchpoint;
+  the schema leaves room, no writer yet). Everything else is filtered
+  **server-side** (no ship-and-hide — Decision #13), so a fresh spawn sees
+  exactly home's incident lanes, never the whole network. This is the same
+  charted-lane graph #0008 routes over: a Rumored neighbor is Rumored *because*
+  an Explored system's lane reaches it, so "Explored-incident" and "Explored
+  lanes + Rumored terminal edges" name the same set. (Node subspace tier still
+  ships per-system so the inspector can label Uncharted/Rumored/Explored; only
+  *lanes* are filtered out of the payload.)
 - **Reveal writes:**
   - **Travel-arrival** (a #0005 lane-travel/burn resolution): system →
     `explored`, onward lanes revealed, first-arrival detail generation
@@ -226,6 +238,10 @@ which every later player still fogs fresh from their own entry.
 - [ ] **Arriving in a system** (a #0005 travel resolution) sets it `explored`
       for the arriver and reveals its **onward lanes**; before that, the
       player knows only lanes leaving systems they've visited.
+- [ ] The #0002 graph read returns only the requester's **charted lanes** —
+      incident to an Explored system, or purchased intel — filtered
+      **server-side**; a fresh spawn's read carries only home's incident lanes,
+      never the whole lane network. (Nodes still all ship; only lanes filter.)
 - [x] Subspace tiers are **monotonic** — no code path lowers one.
 - [x] Board reads return the **astronomical layer for any arriver** (star,
       major bodies, geometry — from the eager #0003 skeleton), ambient-live

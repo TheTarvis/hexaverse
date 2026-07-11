@@ -5,6 +5,9 @@ import { WakeUpFlow } from './wake-up-flow'
 import { corporationService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
 
+const { pushSpy } = vi.hoisted(() => ({ pushSpy: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushSpy }) }))
+
 vi.mock('@/lib/services', () => ({
   corporationService: { spawn: vi.fn() },
 }))
@@ -61,7 +64,7 @@ describe('WakeUpFlow', () => {
     expect(submit).not.toBeDisabled()
   })
 
-  it('spawns with the trimmed name and invalidates the corp + fleet queries', async () => {
+  it('spawns, invalidates the corp + fleet queries, and routes to the home board', async () => {
     mockSpawn.mockResolvedValue(spawnResult)
     const { invalidate } = renderWithClient()
 
@@ -73,6 +76,8 @@ describe('WakeUpFlow', () => {
       expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.corporations.me() }),
     )
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.fleets.all })
+    // The new player is dropped straight onto their home system's hex board.
+    await waitFor(() => expect(pushSpy).toHaveBeenCalledWith('/systems/sys-9'))
     expect(sessionStorage.getItem('wakeFocus')).toBe('sys-9')
   })
 })

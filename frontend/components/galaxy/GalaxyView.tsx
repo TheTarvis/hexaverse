@@ -14,12 +14,12 @@
 // so three.js stays off the SSR/initial-render path entirely.
 
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { Heading, Subheading } from '@/components/catalyst/heading'
 import { Button } from '@/components/catalyst/button'
 import { Text, TextLink, Strong } from '@/components/catalyst/text'
-import { useAccountContext } from '@/components/account-provider'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import { useMyFleets, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
 import { useWorldTime } from '@/hooks/use-world-time'
@@ -93,7 +93,9 @@ export function GalaxyView() {
   const { data: galaxy, isLoading, isError, error, isStartArea } = useGalaxy()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [graphReady, setGraphReady] = useState(false)
   const controllerRef = useRef<GalaxyGraphController | null>(null)
+  const router = useRouter()
   const qc = useQueryClient()
 
   // The requester's own fleets (#0008) — the travel actors. Disabled on the
@@ -102,6 +104,26 @@ export function GalaxyView() {
   const ownFleets = useMemo(() => myFleets ?? [], [myFleets])
   // The fleet a "Travel here" order commands: prefer an idle one, else the first.
   const activeFleet = useMemo(() => ownFleets.find(isIdle) ?? ownFleets[0] ?? null, [ownFleets])
+  // Systems hosting an own fleet → galaxy-tier presence markers; the fleet's
+  // system is the ⌖ recenter / wake-focus home target (#0002 Follow-ups).
+  const fleetSystemIds = useMemo(() => ownFleets.map((f) => f.systemId), [ownFleets])
+
+  // The wake-up handoff (#0009): spawn stashes the home system id so the view can
+  // select + glide to it on the first mount after waking. Read once, client-only
+  // (sessionStorage is unavailable during SSR), then cleared so it fires once.
+  const [wakeFocus, setWakeFocus] = useState<string | null>(null)
+  useEffect(() => {
+    try {
+      const w = sessionStorage.getItem('wakeFocus')
+      if (w) {
+        setWakeFocus(w)
+        sessionStorage.removeItem('wakeFocus')
+      }
+    } catch {
+      // sessionStorage may be unavailable (private mode) — non-fatal.
+    }
+  }, [])
+  const homeSystemId = activeFleet?.systemId ?? wakeFocus
   const transitFleets = useMemo(
     () => ownFleets.filter((f) => f.state.mode === 'laneTransit' || f.state.mode === 'laneHold'),
     [ownFleets],
@@ -160,6 +182,23 @@ export function GalaxyView() {
   }, [galaxy])
 
   const handleRecenter = () => controllerRef.current?.recenter()
+  const handleEnterSystem = useCallback(
+    (systemId: string) => router.push(`/systems/${systemId}`),
+    [router],
+  )
+
+  // On the first mount after waking (#0009): select home and glide the camera to
+  // it once the graph is ready — so the new player lands looking at their system
+  // with the inspector (and "Your fleet is here") already open. Runs once.
+  const wakeHandledRef = useRef(false)
+  useEffect(() => {
+    if (wakeHandledRef.current || !graphReady || !wakeFocus || !galaxy) return
+    if (galaxy.nodes.some((n) => n.id === wakeFocus)) {
+      setSelectedId(wakeFocus)
+      controllerRef.current?.focusSystem(wakeFocus)
+      wakeHandledRef.current = true
+    }
+  }, [graphReady, wakeFocus, galaxy])
 
   if (isLoading) {
     return (
@@ -191,8 +230,11 @@ export function GalaxyView() {
         galaxy={galaxy}
         selectedId={selectedId}
         onSelect={(node) => setSelectedId(node?.id ?? null)}
+        fleetSystemIds={fleetSystemIds}
+        homeSystemId={homeSystemId}
         onReady={(controller) => {
           controllerRef.current = controller
+          setGraphReady(true)
         }}
       />
 
@@ -208,6 +250,7 @@ export function GalaxyView() {
         <Inspector
           node={selected}
           connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
+          onEnter={isStartArea ? null : handleEnterSystem}
           travel={
             activeFleet
               ? {
@@ -234,9 +277,6 @@ export function GalaxyView() {
         </div>
       )}
 
-      {/* Floating account affordance — the sidebar's job (email + sign out),
-          without the sidebar, so the authed home stays full-bleed. */}
-      <AccountChip />
     </div>
   )
 }
@@ -313,28 +353,6 @@ function TransitBanner({
         In transit → <Strong className="!text-white">{name(dest)}</Strong>
       </span>
       <span className="font-mono text-xs text-zinc-400">arrives {remaining}</span>
-    </div>
-  )
-}
-
-// ---- Floating account chip (authed only) ----
-
-function AccountChip() {
-  const { user, account, signOut } = useAccountContext()
-  if (!user) return null
-  return (
-    <div className={`${PANEL} absolute bottom-4 left-4 flex items-center gap-3 !py-2`}>
-      <span className="max-w-[12rem] truncate text-xs text-zinc-300">
-        {account?.email ?? user.email}
-      </span>
-      <Button
-        plain
-        onClick={() => signOut()}
-        data-testid="sign-out-button"
-        className="!text-xs !text-white"
-      >
-        Sign out
-      </Button>
     </div>
   )
 }
@@ -431,10 +449,12 @@ function Inspector({
   node,
   connections,
   travel,
+  onEnter,
 }: {
   node: GalaxyNode | null
   connections: number
   travel: TravelInfo | null
+  onEnter: ((systemId: string) => void) | null
 }) {
   if (!node) {
     return (
@@ -474,6 +494,20 @@ function Inspector({
           <dd className="font-mono text-white">Class {node.skeleton.starClass}</dd>
         </div>
       </dl>
+
+      {/* Drill-in to the #0007 hex board (#0002 Follow-ups 2026-07-11 —
+          un-defers Decision #4). Board detail is arrival-gated (#0003/#0006);
+          an unvisited system shows only its free skeleton. */}
+      {onEnter && (
+        <Button
+          color="cyan"
+          onClick={() => onEnter(node.id)}
+          data-testid="enter-system-button"
+          className="w-full"
+        >
+          Enter system
+        </Button>
+      )}
 
       {/* Major-body skeleton — the free astronomical layer, ALWAYS shown
           (spec Decision #7); never gated by `discovered`. */}

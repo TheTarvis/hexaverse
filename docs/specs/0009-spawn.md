@@ -164,10 +164,13 @@ carries and why that's narratively honest rather than a save-wipe.
   storage** before waking — costs nothing and is noted for the eventual
   tutorial framing (`../plans/spawn.md`).
 - **Frontend:** the signed-in-but-corpless state routes to a minimal
-  wake-up flow (name the corporation → spawn → land on the #0002 galaxy
-  view centered home). Component→hook→service→apiClient per
-  `frontend/CLAUDE.md`; the corp lands in the session context the way the
-  auth account does today.
+  wake-up flow (name the corporation → spawn → land **directly on the home
+  system's #0007 hex board**, hull on station). *(Revised 2026-07-11 — the
+  new player starts on their board, where the game is played, not the #0002
+  galaxy view; the galaxy is one click away from the board. The galaxy still
+  centres home via the `wakeFocus` hint on a later visit.)*
+  Component→hook→service→apiClient per `frontend/CLAUDE.md`; the corp lands in
+  the session context the way the auth account does today.
 
 ## Acceptance criteria
 
@@ -209,10 +212,15 @@ carries and why that's narratively honest rather than a save-wipe.
 - [x] Spawn placement knobs (`minSpawnDistance`, `peripheryWeight`,
       mineable-archetype requirement) live in a **params object**.
       *(`corporations/params.go`.)*
+- [x] A freshly woken player lands **directly on their home system's #0007
+      hex board** with their hull on station (not the galaxy view); the galaxy
+      remains reachable from the board. *(Revised 2026-07-11; driven by
+      `frontend/e2e/tests/new-user.spec.ts`.)*
 - [x] **Slice bar:** sign in, name your corporation, wake in a quiet
       frontier system with one ship, and the fog/lore framing holds — you
       see the whole sky and know only home. *(Driven end-to-end by the e2e
-      wake flow in `frontend/e2e/setup/auth.setup.ts` + the board/smoke specs.)*
+      wake flow in `frontend/e2e/setup/auth.setup.ts` + the board/smoke/new-user
+      specs.)*
 
 ## Implementation notes (2026-07-10)
 

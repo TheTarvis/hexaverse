@@ -33,10 +33,8 @@ vi.mock('@/components/wake-up-flow', () => ({
   WakeUpFlow: () => <div data-testid="wake-up-flow">Wake</div>,
 }))
 
-vi.mock('@/components/app-navigation', () => ({
-  AppNavigation: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="app-navigation">{children}</div>
-  ),
+vi.mock('@/components/floating-nav', () => ({
+  FloatingNav: () => <div data-testid="floating-nav" />,
 }))
 
 import { usePathname } from 'next/navigation'
@@ -64,7 +62,7 @@ describe('LayoutWrapper', () => {
     )
 
     expect(screen.getByTestId('login-content')).toBeInTheDocument()
-    expect(screen.queryByTestId('app-navigation')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('floating-nav')).not.toBeInTheDocument()
   })
 
   it('redirects unauthenticated user from a protected route to /login', () => {
@@ -102,12 +100,13 @@ describe('LayoutWrapper', () => {
 
     expect(mockPush).not.toHaveBeenCalled()
     expect(screen.getByTestId('galaxy-content')).toBeInTheDocument()
-    expect(screen.queryByTestId('app-navigation')).not.toBeInTheDocument()
+    // Logged-out: no floating chrome (nothing to navigate/sign out of).
+    expect(screen.queryByTestId('floating-nav')).not.toBeInTheDocument()
   })
 
-  it('renders the home galaxy view bare for authenticated users too (no shell)', () => {
-    // The immersive home is full-bleed in BOTH auth states — the sidebar shell
-    // would push the canvas into a panel and break the "window is the canvas" feel.
+  it('renders the authed home galaxy bare with floating chrome (no shell)', () => {
+    // The whole app is full-bleed canvas — the floating nav/account card overlays
+    // the canvas instead of a sidebar shell.
     vi.mocked(usePathname).mockReturnValue('/')
     vi.mocked(useAccountContext).mockReturnValue({
       user: { uid: 'u1' },
@@ -123,11 +122,11 @@ describe('LayoutWrapper', () => {
     )
 
     expect(screen.getByTestId('galaxy-content')).toBeInTheDocument()
-    expect(screen.queryByTestId('app-navigation')).not.toBeInTheDocument()
+    expect(screen.getByTestId('floating-nav')).toBeInTheDocument()
   })
 
-  it('renders app shell for authenticated user with account on a protected route', () => {
-    vi.mocked(usePathname).mockReturnValue('/settings')
+  it('renders a protected route full-bleed with floating chrome (no sidebar shell)', () => {
+    vi.mocked(usePathname).mockReturnValue('/systems/sys-0')
     vi.mocked(useAccountContext).mockReturnValue({
       user: { uid: 'u1' },
       authLoading: false,
@@ -141,8 +140,8 @@ describe('LayoutWrapper', () => {
       </LayoutWrapper>
     )
 
-    expect(screen.getByTestId('app-navigation')).toBeInTheDocument()
     expect(screen.getByTestId('content')).toBeInTheDocument()
+    expect(screen.getByTestId('floating-nav')).toBeInTheDocument()
   })
 
   it('routes a signed-in but corpless account to the wake-up flow (even on home)', () => {

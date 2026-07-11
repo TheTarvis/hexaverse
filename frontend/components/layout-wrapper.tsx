@@ -5,12 +5,10 @@ import { useEffect } from 'react'
 import { useAccountContext } from '@/components/account-provider'
 import { useCorporationContext } from '@/components/corporation-provider'
 import { WakeUpFlow } from '@/components/wake-up-flow'
-import { AppNavigation } from '@/components/app-navigation'
+import { FloatingNav } from '@/components/floating-nav'
 
-// Routes that should NOT have the dashboard layout (e.g. login, OAuth callbacks).
-// `/spike` stays here for the remaining audio spike (galaxy-3d retired at M2,
-// hex-board at M7 — the production /systems/[id] board replaced it; `/` is now
-// the public galaxy landing, handled below).
+// Routes that should NOT be gated at all (e.g. login, OAuth callbacks, spikes).
+// `/spike` stays here for the remaining audio spike.
 const PUBLIC_ROUTES = ['/login', '/oauth', '/spike']
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
@@ -21,9 +19,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname?.startsWith(route))
   // The home route is the galaxy view (spec #0002): the logged-out landing AND
-  // the primary authed screen. It is full-bleed in BOTH auth states — the canvas
-  // IS the window and its panels float over it — so it never gets the dashboard
-  // sidebar shell. Authed nav/account controls float within the view instead.
+  // the primary authed screen.
   const isHome = pathname === '/'
 
   useEffect(() => {
@@ -38,27 +34,33 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   }
 
   // Wake gate (#0009): a signed-in account with no living corporation must wake
-  // before it can play — this takes over the whole screen, the home galaxy route
-  // included. While the corp is still resolving, hold a blank frame so a corpless
-  // user never flashes the live galaxy before the wake-up flow.
+  // before it can play — this takes over the whole screen. While the corp is
+  // still resolving, hold a blank frame so a corpless user never flashes the
+  // live app before the wake-up flow.
   if (user && account) {
     if (corpLoading) return null
     if (needsWake) return <WakeUpFlow />
+    // Woken: the WHOLE app is full-bleed canvas with floating cards — every
+    // route (galaxy, system board, …) renders bare, with the floating nav/account
+    // chrome over it. There is no sidebar shell (spec #0002 canvas model): the
+    // window IS the canvas, and every component floats over it.
+    return (
+      <>
+        {children}
+        <FloatingNav />
+      </>
+    )
   }
 
-  // The immersive home galaxy view renders bare (no shell) — logged-out start
-  // area, or a woken player's live galaxy.
+  // Logged-out home: the galaxy start area renders bare, with its own in-view
+  // sign-in prompt. Any other logged-out route is redirected by the effect above.
   if (isHome) {
     return <>{children}</>
   }
 
+  // Auth still resolving, or a logged-out user mid-redirect — render nothing.
   if (authLoading || accountLoading) {
     return null
   }
-
-  if (!user || !account) {
-    return null
-  }
-
-  return <AppNavigation>{children}</AppNavigation>
+  return null
 }

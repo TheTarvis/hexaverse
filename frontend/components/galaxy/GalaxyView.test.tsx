@@ -8,9 +8,17 @@ import { useMyFleets, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets
 import type { Galaxy } from '@/lib/types/galaxy'
 import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 
-// A spy the mocked graph hands back through onReady, so we can assert the
-// ⌖ recenter control drives the graph controller.
-const { recenterSpy } = vi.hoisted(() => ({ recenterSpy: vi.fn() }))
+// Spies the mocked graph hands back through onReady (recenter/focusSystem) so we
+// can assert the controls drive the controller; graphPropsSpy captures the fleet
+// marker / home props; pushSpy stands in for the router (drill-in navigation).
+const { recenterSpy, focusSpy, graphPropsSpy, pushSpy } = vi.hoisted(() => ({
+  recenterSpy: vi.fn(),
+  focusSpy: vi.fn(),
+  graphPropsSpy: vi.fn(),
+  pushSpy: vi.fn(),
+}))
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushSpy }) }))
 
 // next/dynamic: resolve the loader and render the (mocked) GalaxyGraph. Keeps
 // three.js off the test path entirely — jsdom has no WebGL.
@@ -45,9 +53,10 @@ vi.mock('@/components/galaxy/GalaxyGraph', async () => {
   const React = await import('react')
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    GalaxyGraph: ({ galaxy, onSelect, onReady }: any) => {
+    GalaxyGraph: ({ galaxy, onSelect, onReady, fleetSystemIds, homeSystemId }: any) => {
+      graphPropsSpy({ fleetSystemIds, homeSystemId })
       React.useEffect(() => {
-        onReady?.({ recenter: recenterSpy })
+        onReady?.({ recenter: recenterSpy, focusSystem: focusSpy })
       }, [onReady])
       return (
         <div data-testid="mock-graph">
@@ -165,6 +174,7 @@ function mockGalaxyState(overrides: Partial<ReturnType<typeof useGalaxy>> = {}) 
 describe('GalaxyView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    sessionStorage.clear()
     // Default: no fleets, no route, an inert travel mutation.
     mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
     mockUseRoutePreview.mockReturnValue({
@@ -216,6 +226,53 @@ describe('GalaxyView', () => {
     expect(inspector).toHaveTextContent(/gas giant/i)
     // Connections = its lane count (1).
     expect(inspector).toHaveTextContent('1')
+  })
+
+  it('offers "Enter system" on a selected node and drills into its board', async () => {
+    mockGalaxyState()
+    renderView()
+
+    // No selection → no Enter affordance.
+    expect(screen.queryByTestId('enter-system-button')).not.toBeInTheDocument()
+
+    fireEvent.click(await screen.findByTestId('select-sys-0'))
+    fireEvent.click(screen.getByTestId('enter-system-button'))
+    expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0')
+  })
+
+  it('hides "Enter system" on the logged-out start area', async () => {
+    mockGalaxyState({ isStartArea: true })
+    renderView()
+
+    fireEvent.click(await screen.findByTestId('select-sys-0'))
+    expect(screen.getByTestId('inspector-name')).toHaveTextContent('Axion')
+    expect(screen.queryByTestId('enter-system-button')).not.toBeInTheDocument()
+  })
+
+  it('marks the fleet’s system on the graph and targets it as home', async () => {
+    mockGalaxyState()
+    mockUseMyFleets.mockReturnValue({
+      data: [coastFleet('fleet_1', 'sys-0')],
+    } as unknown as ReturnType<typeof useMyFleets>)
+
+    renderView()
+    await screen.findByTestId('mock-graph')
+
+    const props = graphPropsSpy.mock.calls.at(-1)![0]
+    expect(props.fleetSystemIds).toContain('sys-0')
+    expect(props.homeSystemId).toBe('sys-0')
+  })
+
+  it('selects and glides to home on the wake-up handoff, then clears it', async () => {
+    sessionStorage.setItem('wakeFocus', 'sys-1')
+    mockGalaxyState()
+    renderView()
+
+    // The view selects the stashed home (inspector populates) and glides to it.
+    await waitFor(() => expect(screen.getByTestId('inspector-name')).toHaveTextContent('Borealis'))
+    expect(focusSpy).toHaveBeenCalledWith('sys-1')
+    // Consumed once — the handoff is cleared so a reload doesn't re-snap.
+    expect(sessionStorage.getItem('wakeFocus')).toBeNull()
   })
 
   it('drives the graph controller from the ⌖ recenter control', async () => {

@@ -106,6 +106,7 @@ function LoginForm() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
+                data-testid="login-confirm-password"
               />
             </Field>
           )}

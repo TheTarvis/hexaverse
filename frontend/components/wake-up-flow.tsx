@@ -2,14 +2,18 @@
 
 // The wake-up flow (#0009): a signed-in account with no corporation names its
 // lineage and wakes. Spawn creates the corp + one hull in a frontier system;
-// on success the corp query invalidates and the gate flips to the galaxy view,
-// where the new fleet is already on station at home.
+// on success the corp query invalidates (flipping the wake gate) and the new
+// player is routed straight into their home system's hex board — the board is
+// where you act (#0007), so a new player starts on it, with the galaxy a click
+// away. (The galaxy still consumes the wakeFocus hint to centre home on a later
+// visit.)
 //
 // Diegetic framing (spec / lore): the mind browses from cold storage, then wakes
-// into a hull. The screen mirrors the galaxy view's dark canvas so the transition
-// into play is seamless.
+// into a hull. The screen mirrors the game's dark canvas so the transition into
+// play is seamless.
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { corporationService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
@@ -20,23 +24,28 @@ import type { SpawnResult } from '@/lib/types/corporation'
 
 export function WakeUpFlow() {
   const qc = useQueryClient()
+  const router = useRouter()
   const [name, setName] = useState('')
 
   const spawn = useMutation({
     mutationFn: (n: string) => corporationService.spawn({ name: n }),
     onSuccess: (res: SpawnResult) => {
-      // Hint the galaxy view to glide to home once it mounts (best-effort polish;
-      // the fleet is visible regardless). Cleared by the view after it focuses.
+      // Flip the gate: the corp now exists, and the new hull should appear.
+      qc.invalidateQueries({ queryKey: queryKeys.corporations.me() })
+      qc.invalidateQueries({ queryKey: queryKeys.fleets.all })
       if (res.homeSystem?.id) {
+        // Hint the galaxy view to glide to home if the player opens it later
+        // (best-effort polish; cleared by the view after it focuses).
         try {
           sessionStorage.setItem('wakeFocus', res.homeSystem.id)
         } catch {
           // sessionStorage may be unavailable (private mode) — non-fatal.
         }
+        // Drop the new player straight into their home system's hex board: once
+        // the gate flips (corp resolves), this route renders the board, not the
+        // galaxy. No galaxy flash — the wake gate holds the screen until then.
+        router.push(`/systems/${res.homeSystem.id}`)
       }
-      // Flip the gate: the corp now exists, and the new hull should appear.
-      qc.invalidateQueries({ queryKey: queryKeys.corporations.me() })
-      qc.invalidateQueries({ queryKey: queryKeys.fleets.all })
     },
   })
 

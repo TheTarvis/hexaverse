@@ -67,7 +67,7 @@ each can be spec'd, folded, or scratched.
 | # | Spec | Status |
 |---|------|--------|
 | 0010 | [Mine (extraction verb)](0010-mine.md) | accepted |
-| 0009 | [Spawn & Corporation Identity](0009-spawn.md) | accepted |
+| 0009 | [Spawn & Corporation Identity](0009-spawn.md) | implemented |
 | 0008 | [Inter-system Movement (galaxy graph)](0008-movement-galaxy.md) | accepted |
 | 0007 | [Hex Board View (system renderer)](0007-hex-board-view.md) | accepted |
 | 0006 | [Scan & Fog of War](0006-scan-and-fog.md) | accepted |

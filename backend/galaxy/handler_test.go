@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"hexaverse/observation"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -81,6 +83,48 @@ func TestHandler_GetGalaxy_PinnedShape(t *testing.T) {
 		if s.Skeleton.StarClass == "" {
 			t.Fatalf("system %s missing skeleton star class", s.Id)
 		}
+	}
+}
+
+// TestToDTO_ChartedLaneFilter pins the #0006 fog rule for lanes: only lanes
+// incident to an Explored system ship; a nil tiers map is the no-fog baseline
+// (every lane). Home=sys-0 explored, sys-1 rumored, sys-2 star-visible.
+func TestToDTO_ChartedLaneFilter(t *testing.T) {
+	gen := &GeneratedGalaxy{
+		Galaxy: Galaxy{Id: "gal_fog"},
+		Systems: []System{
+			{Id: "sys-0", Skeleton: Skeleton{StarClass: "G"}},
+			{Id: "sys-1", Skeleton: Skeleton{StarClass: "M"}},
+			{Id: "sys-2", Skeleton: Skeleton{StarClass: "K"}},
+		},
+		Lanes: []Lane{
+			{Id: "l-home-nb", AId: "sys-0", BId: "sys-1"}, // incident to home → charted
+			{Id: "l-nb-far", AId: "sys-1", BId: "sys-2"},  // between rumored/unseen → not
+			{Id: "l-home-far", AId: "sys-2", BId: "sys-0"}, // incident to home → charted
+		},
+	}
+
+	// No fog wired → every lane ships (unit-test / logged-out baseline).
+	if got := ToDTO(gen, 0, nil); len(got.Lanes) != 3 {
+		t.Fatalf("nil tiers: lanes = %d, want 3 (no filtering)", len(got.Lanes))
+	}
+
+	// Fogged: only the two lanes touching the Explored home survive.
+	tiers := map[string]observation.Tier{
+		"sys-0": observation.TierExplored,
+		"sys-1": observation.TierRumored,
+	}
+	got := ToDTO(gen, 0, tiers)
+	gotIDs := map[string]bool{}
+	for _, l := range got.Lanes {
+		gotIDs[l.Id] = true
+	}
+	if len(got.Lanes) != 2 || !gotIDs["l-home-nb"] || !gotIDs["l-home-far"] {
+		t.Fatalf("fogged lanes = %v, want exactly {l-home-nb, l-home-far}", gotIDs)
+	}
+	// The lane between a rumored neighbour and an unseen system must NOT ship.
+	if gotIDs["l-nb-far"] {
+		t.Fatalf("uncharted lane l-nb-far leaked into the fogged read")
 	}
 }
 

@@ -42,7 +42,12 @@ setup('authenticate', async ({ page }) => {
   if (await page.getByTestId('wake-up-flow').isVisible()) {
     await page.getByTestId('wake-name-input').fill('E2E Lineage')
     await page.getByTestId('wake-submit').click()
-    await expect(page.getByTestId('galaxy-view')).toBeVisible({ timeout: 30_000 })
+    // Spawn drops the player onto their home system's board (#0009 → #0007); an
+    // already-woken account would instead show the galaxy. Either proves the
+    // woken session is ready to save.
+    await expect(
+      page.getByTestId('system-board-view').or(page.getByTestId('galaxy-view')),
+    ).toBeVisible({ timeout: 30_000 })
   }
 
   await page.context().storageState({ path: STORAGE_STATE, indexedDB: true })
