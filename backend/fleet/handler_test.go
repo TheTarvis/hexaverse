@@ -56,8 +56,13 @@ func (f fakeAudience) FleetVisibleTo(context.Context, string, observation.FleetP
 func newFleetRouter(svc ServiceInterface, fog AudienceFog) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	// Stand in for the auth middleware so ActorCorp resolves a requester.
-	r.Use(func(c *gin.Context) { c.Set(common.AccountIdKey, "user1") })
+	// Stand in for the auth + corp-resolver middleware so ActorCorp resolves a
+	// requester. Since #0009, ActorCorp reads the resolved corp id (CorpIdKey), not
+	// a derivation of the account — so the stub sets the corp directly.
+	r.Use(func(c *gin.Context) {
+		c.Set(common.AccountIdKey, "user1")
+		c.Set(common.CorpIdKey, "corp-user1")
+	})
 	NewHandlerWith(svc, &fakeClock{}).WithFog(fog).RegisterRoutes(r.Group("/"))
 	return r
 }

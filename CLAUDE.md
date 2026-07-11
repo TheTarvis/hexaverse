@@ -186,7 +186,7 @@ Solo project of Travis Wilson.
 The richest design source is the archived gameplay doc —
 `git show bf9c637:client/docs/Gameplay.mdc`.)*
 
-**Backend domains built (M1–M6):**
+**Backend domains built (M1–M9):**
 
 - **`common/worldtime.go`** — the injectable simulation clock (#0005 contract,
   pulled forward). `WorldClock()` / `NewWorldTime(epoch, scale)`; all stored
@@ -206,9 +206,11 @@ The richest design source is the archived gameplay doc —
   hex-line paths, `OrbState`, `ShipPos`, `SolveIntercept`. Go↔TS contract is
   `/fixtures/board/cases.json` (golden test); M7's `lib/hex` asserts the same.
 - **`fleet/`** (#0004, *implemented*) — the map-mover. One movement state
-  (`coast|burn|docked`), `corporationId` from day one (dev-seeded until M9).
+  (`coast|burn|docked`), `corporationId` from day one (dev-seeded through M8;
+  **ownership real since M9** — spawn is the only fleet-minter now).
   `POST /v1/fleets/:id/orders|cancel`, `GET /v1/fleets/:id` (arrival resolved
-  opportunistically on read — no scheduler). `POST /v1/fleets/dev-seed`. Since
+  opportunistically on read — no scheduler). `SeedFleet` survives as spawn's
+  placement primitive (the `/dev-seed` route retired at M9). Since
   M5 the burn order **commits through `action.Commit`** (`type:"burn"`); fleet
   still owns motion state (`BurnResolver` settles it at resolve). `activeActionId`
   carries the single-action slot.
@@ -238,13 +240,29 @@ The richest design source is the archived gameplay doc —
   free / live inside the sensor union / remembered elsewhere, geometry live +
   activity frozen at `asOf`). Fleet reads carry **audience fog** (own fleets never
   fogged; a foreign fleet outside your live sensor union reads 404). Ambient-on-
-  move reveals at movement resolution. Params in `observation/params.go`. **Not
-  yet done (M7/M8):** explored-on-arrival + onward-lane reveal, the first-arrival
-  detail roll (replaces #0003's dev trigger), the move→scan→leave slice bar.
+  move reveals at movement resolution. Params in `observation/params.go`.
+  M9 adds `RevealArrival` (the direct-write home/arrival reveal spawn uses).
+- **`corporations/`** (#0009, *implemented*) — spawn & identity. The
+  **Corporation** is the auth-account-linked player entity (the mind's lineage);
+  fleets carry `corporationId`, the fog store keys on it. `Spawn(accountId, name)`
+  orchestrates through the live galaxy/fleet/fog singletons: corp doc + account
+  pointer commit in **one transaction** (`corporations/{corpId}` +
+  `corpByAccount/{accountId}`, the uniqueness anchor), then the hull
+  (`fleet.SeedFleet` at a rim-ring hex) + initial fog (`observation.RevealArrival`:
+  home `explored`, onward lanes `rumored`) follow — **idempotent per account**
+  heals a partial spawn. `POST /v1/corporations` (idempotent), `GET
+  /v1/corporations/me`. Site selection (`siteselection.go`): mineable-skeleton ∧
+  ≥`minSpawnDistance` graph-hops from living corps' explored sets ∧
+  periphery-weighted, account-seeded pick (knobs in `params.go`, placeholder
+  constants). **The ownership seam:** `middlewares.ResolveCorporation` resolves
+  account→living-corp into `common.ActorCorp` (`CorpIdKey`), the one function
+  every fogged read already keyed on. Death invariant (`diedAt` only at zero
+  fleets) recorded + enforced; no slice path reaches it. Spawn is **instant**, not
+  a #0005 action. Frontend: corpless → wake-up flow (name → spawn → galaxy).
 
-**Next:** M7 hex-board view (client refetch rules + worldTime animation land
-here; `lib/hex/` asserts M4's fixtures), then M8 travel (finishes #0006's
-arrival-reveal + #0003/#0007), M9 spawn, M10 mine.
+**Next:** M10 mine (`backend/mine/` verb on the #0005 dispatch; fleet gains
+`ships[]` + `cargo`) + the slice e2e — drill in → move → scan → mine → depart →
+arrive → reveal → return → it persisted. Closes the loop.
 
 - Core loop from the original design: players spawn colonies on a hex-grid
   galaxy (spaced 8–25 tiles apart), explore under fog of war (scan radius

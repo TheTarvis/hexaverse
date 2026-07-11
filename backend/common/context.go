@@ -11,17 +11,12 @@ func Actor(c *gin.Context) string {
 
 // ActorCorp returns the Corporation the requester acts as. Fog of war and
 // ownership are strictly per-Corporation (#0006 Decision #12), so read filtering
-// keys on this, not the account. Until #0009 builds real account→corporation
-// membership, dev maps one corp per account so two accounts are two corps.
-//
-// TODO(#0009): resolve the requester's real corporation from membership; keep
-// this the single seam callers depend on so M9 is a one-function change.
+// keys on this, not the account. The ResolveCorporation middleware (#0009)
+// resolves account→living-corp once per request and stashes it here; empty means
+// the account hasn't woken yet (no corp), in which case fogged reads return the
+// baseline and own-asset lists are empty.
 func ActorCorp(c *gin.Context) string {
-	uid := Actor(c)
-	if uid == "" {
-		return ""
-	}
-	return "corp-" + uid
+	return c.GetString(CorpIdKey)
 }
 
 // FirestoreUid returns the FirestoreUid from the Gin context

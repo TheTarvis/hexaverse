@@ -31,5 +31,19 @@ setup('authenticate', async ({ page }) => {
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 45_000 })
   await expect(page).not.toHaveURL(/\/login/)
 
+  // Wake the account (#0009). A fresh account has no Corporation, so the wake-up
+  // flow gates the whole app; drive it once here so the saved session is a woken
+  // player — the corp persists server-side, so every dependent spec that restores
+  // this session already has a corp and reaches the galaxy/board. (If a prior run
+  // already woke this account, the galaxy shows straight away and we skip it.)
+  await expect(
+    page.getByTestId('wake-up-flow').or(page.getByTestId('galaxy-view')),
+  ).toBeVisible({ timeout: 30_000 })
+  if (await page.getByTestId('wake-up-flow').isVisible()) {
+    await page.getByTestId('wake-name-input').fill('E2E Lineage')
+    await page.getByTestId('wake-submit').click()
+    await expect(page.getByTestId('galaxy-view')).toBeVisible({ timeout: 30_000 })
+  }
+
   await page.context().storageState({ path: STORAGE_STATE, indexedDB: true })
 })

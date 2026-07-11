@@ -7,6 +7,7 @@ import (
 	"hexaverse/action"
 	"hexaverse/common"
 	"hexaverse/config"
+	"hexaverse/corporations"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
 	"hexaverse/health"
@@ -74,12 +75,6 @@ func SetupRouter() *gin.Engine {
 		generalLimit = middlewares.NewRateLimiter(600, time.Minute).Middleware()
 	}
 
-	authorized := v1.Group("/")
-	authorized.Use(generalLimit, middlewares.FirebaseJWTVerification(), middlewares.AuditAuthEvents(), middlewares.FirebaseUidToAccountMiddleware())
-
-	accountHandler := account.NewHandler()
-	accountHandler.RegisterRoutes(authorized, strictLimit)
-
 	// The action spine (#0005) and the verbs share ONE action.Service instance so
 	// the resolvers each verb registers are the same ones the sweep and reads
 	// dispatch through. Construct it explicitly, wire resolvers, then hand it out.
@@ -108,7 +103,31 @@ func SetupRouter() *gin.Engine {
 	// and mints the reveal (Explored + onward Rumored) in one transaction (#0008).
 	fleet.RegisterTravelResolver(actionSvc, fogSvc, fogSvc)
 
+	// Spawn & identity (#0009): the corporation service orchestrates spawn through
+	// the live galaxy/fleet/fog singletons above, and resolves account→living-corp
+	// for the ownership seam. Constructed before the authorized group so its
+	// resolver can join the request middleware chain.
+	corpSvc := corporations.NewService(galaxySvc, fleetSvc, fogSvc)
+
+	authorized := v1.Group("/")
+	authorized.Use(
+		generalLimit,
+		middlewares.FirebaseJWTVerification(),
+		middlewares.AuditAuthEvents(),
+		middlewares.FirebaseUidToAccountMiddleware(),
+		// Resolve the requester's Corporation once per request — the single seam
+		// common.ActorCorp reads for fog + ownership (#0009). Corpless is fine
+		// (the wake-up flow's own POST /corporations runs before a corp exists).
+		middlewares.ResolveCorporation(func(c *gin.Context, accountId string) (string, error) {
+			return corpSvc.CorpForAccount(c.Request.Context(), accountId)
+		}),
+	)
+
+	accountHandler := account.NewHandler()
+	accountHandler.RegisterRoutes(authorized, strictLimit)
+
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
+	corporations.NewHandler(corpSvc).RegisterRoutes(authorized, strictLimit)
 	galaxy.NewHandler().WithFog(fogSvc).RegisterRoutes(authorized)
 	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).RegisterRoutes(authorized)
 

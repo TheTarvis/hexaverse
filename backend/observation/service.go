@@ -247,6 +247,35 @@ func (s *Service) AmbientWrites(ctx context.Context, cid, systemID string, path 
 	return writes, nil
 }
 
+// RevealArrival writes the destination-on-arrival reveal directly through the DAO
+// (home/destination → Explored, onward lanes not already known → Rumored) — the
+// non-action path spawn (#0009) uses: waking IS arriving. Same records as
+// ArrivalWrites, but persisted through the monotonic upsert rather than staged as
+// resolve-transaction DocWrites (spawn is instant, not a #0005 action). Idempotent
+// — re-running never lowers a tier — so it's safe on an idempotent re-spawn.
+func (s *Service) RevealArrival(ctx context.Context, cid, destSystemID string, onward []string, at common.WorldMillis) error {
+	tiers, err := s.SystemTiers(ctx, cid)
+	if err != nil {
+		return err
+	}
+	if err := s.dao.UpsertSystemObservation(ctx, cid, SystemObservation{
+		SystemId: destSystemID, Tier: TierExplored, AsOf: at,
+	}); err != nil {
+		return err
+	}
+	for _, nb := range onward {
+		if nb == destSystemID || tiers[nb].AtLeast(TierRumored) {
+			continue
+		}
+		if err := s.dao.UpsertSystemObservation(ctx, cid, SystemObservation{
+			SystemId: nb, Tier: TierRumored, AsOf: at,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ArrivalWrites builds the destination-on-arrival reveal (#0008): the destination
 // → Explored, and each onward-lane neighbour not already at least Rumored →
 // Rumored. Returned as action.DocWrites so a trip's resolver applies them in its

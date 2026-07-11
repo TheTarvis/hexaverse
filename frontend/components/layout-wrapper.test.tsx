@@ -19,6 +19,20 @@ vi.mock('@/components/account-provider', () => ({
   })),
 }))
 
+vi.mock('@/components/corporation-provider', () => ({
+  // Default: a woken player (has a corp) — the wake gate is inert unless a test
+  // opts into needsWake.
+  useCorporationContext: vi.fn(() => ({
+    corporation: { id: 'corp_1' },
+    isLoading: false,
+    needsWake: false,
+  })),
+}))
+
+vi.mock('@/components/wake-up-flow', () => ({
+  WakeUpFlow: () => <div data-testid="wake-up-flow">Wake</div>,
+}))
+
 vi.mock('@/components/app-navigation', () => ({
   AppNavigation: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="app-navigation">{children}</div>
@@ -27,11 +41,17 @@ vi.mock('@/components/app-navigation', () => ({
 
 import { usePathname } from 'next/navigation'
 import { useAccountContext } from '@/components/account-provider'
+import { useCorporationContext } from '@/components/corporation-provider'
 
 describe('LayoutWrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(usePathname).mockReturnValue('/')
+    vi.mocked(useCorporationContext).mockReturnValue({
+      corporation: { id: 'corp_1' },
+      isLoading: false,
+      needsWake: false,
+    } as ReturnType<typeof useCorporationContext>)
   })
 
   it('renders public route children without app shell', () => {
@@ -123,6 +143,53 @@ describe('LayoutWrapper', () => {
 
     expect(screen.getByTestId('app-navigation')).toBeInTheDocument()
     expect(screen.getByTestId('content')).toBeInTheDocument()
+  })
+
+  it('routes a signed-in but corpless account to the wake-up flow (even on home)', () => {
+    vi.mocked(usePathname).mockReturnValue('/')
+    vi.mocked(useAccountContext).mockReturnValue({
+      user: { uid: 'u1' },
+      authLoading: false,
+      account: { id: 'a1' },
+      isLoading: false,
+    } as ReturnType<typeof useAccountContext>)
+    vi.mocked(useCorporationContext).mockReturnValue({
+      corporation: null,
+      isLoading: false,
+      needsWake: true,
+    } as ReturnType<typeof useCorporationContext>)
+
+    render(
+      <LayoutWrapper>
+        <div data-testid="galaxy-content">Galaxy</div>
+      </LayoutWrapper>
+    )
+
+    expect(screen.getByTestId('wake-up-flow')).toBeInTheDocument()
+    expect(screen.queryByTestId('galaxy-content')).not.toBeInTheDocument()
+  })
+
+  it('holds a blank frame while the corp is still resolving (no galaxy flash)', () => {
+    vi.mocked(usePathname).mockReturnValue('/')
+    vi.mocked(useAccountContext).mockReturnValue({
+      user: { uid: 'u1' },
+      authLoading: false,
+      account: { id: 'a1' },
+      isLoading: false,
+    } as ReturnType<typeof useAccountContext>)
+    vi.mocked(useCorporationContext).mockReturnValue({
+      corporation: null,
+      isLoading: true,
+      needsWake: false,
+    } as ReturnType<typeof useCorporationContext>)
+
+    const { container } = render(
+      <LayoutWrapper>
+        <div data-testid="galaxy-content">Galaxy</div>
+      </LayoutWrapper>
+    )
+
+    expect(container.firstChild).toBeNull()
   })
 
   it('renders nothing while auth is loading on a protected route', () => {

@@ -18,6 +18,12 @@ vi.mock('./account-provider', () => ({
   ),
 }))
 
+vi.mock('./corporation-provider', () => ({
+  CorporationProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="corporation-provider">{children}</div>
+  ),
+}))
+
 describe('Providers', () => {
   it('renders children', () => {
     render(
@@ -39,10 +45,13 @@ describe('Providers', () => {
 
     const queryProvider = screen.getByTestId('query-client-provider')
     const accountProvider = screen.getByTestId('account-provider')
+    const corporationProvider = screen.getByTestId('corporation-provider')
 
     expect(queryProvider).toBeInTheDocument()
     expect(accountProvider).toBeInTheDocument()
+    expect(corporationProvider).toBeInTheDocument()
     expect(queryProvider).toContainElement(accountProvider)
-    expect(accountProvider).toContainElement(screen.getByTestId('child'))
+    expect(accountProvider).toContainElement(corporationProvider)
+    expect(corporationProvider).toContainElement(screen.getByTestId('child'))
   })
 })

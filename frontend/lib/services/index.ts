@@ -4,6 +4,9 @@
 export { accountService } from './account-service'
 export { default as AccountService } from './account-service'
 
+export { corporationService } from './corporation-service'
+export { default as CorporationService } from './corporation-service'
+
 export { galaxyService, adaptGalaxy, START_AREA_URL } from './galaxy-service'
 export { default as GalaxyService } from './galaxy-service'
 

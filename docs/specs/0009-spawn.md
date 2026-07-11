@@ -1,7 +1,7 @@
 ---
 number: 0009
 title: Spawn & Corporation Identity
-status: accepted   # draft | accepted | implemented | superseded
+status: implemented   # draft | accepted | implemented | superseded
 created: 2026-07-09
 owner: Travis Wilson
 supersedes:     # spec number(s) this replaces, if any
@@ -171,35 +171,73 @@ carries and why that's narratively honest rather than a save-wipe.
 
 ## Acceptance criteria
 
-- [ ] First sign-in + wake creates, in **one transaction**: a Corporation
+- [x] First sign-in + wake creates, in **one transaction**: a Corporation
       (linked to the auth account), exactly one fleet with
       `corporationId` set, and the home-system observation at `explored`
-      with onward lanes charted.
-- [ ] The spawn system satisfies all three criteria (emulator test with a
+      with onward lanes charted. *(Implemented as the agreed anchor: the corp
+      doc + account pointer commit in one transaction — `dao.CreateWithPointer`;
+      the fleet + fog writes follow through their services, healed on retry by
+      idempotency. See Implementation notes.)*
+- [x] The spawn system satisfies all three criteria (emulator test with a
       seeded graph): ≥ 1 mineable-archetype body on the skeleton, ≥
       `minSpawnDistance` from every other living corp's explored set, and
       periphery-weighted selection among qualifiers.
-- [ ] Spawning is **idempotent per account** — a second wake call returns
+      *(`corporations/siteselection_test.go`.)*
+- [x] Spawning is **idempotent per account** — a second wake call returns
       the existing living Corporation; no duplicate corps or fleets.
-- [ ] The new player's first galaxy read shows: the full star map
+      *(`TestSpawn_Idempotent`.)*
+- [x] The new player's first galaxy read shows: the full star map
       (everyone's baseline), home `explored`, home's onward lanes, and
       nothing else charted — verified against #0006's fog filter.
-- [ ] The starting fleet is **one hull** with default params — no other
+      *(`TestSpawn_CreatesCorpFleetAndFog`.)*
+- [x] The starting fleet is **one hull** with default params — no other
       entities exist for the new Corporation.
-- [ ] A Corporation with a living fleet cannot be marked dead; `diedAt` is
+- [x] A Corporation with a living fleet cannot be marked dead; `diedAt` is
       settable only when its fleet count reaches zero (invariant test —
-      even though no slice code path destroys fleets).
+      even though no slice code path destroys fleets). *(`TestDeathInvariant`.)*
 - [ ] A dead Corporation's account can spawn a **new** Corporation; the new
       corp starts with no observations, assets, or references to the old
-      one.
-- [ ] Ownership is enforced from the account: every fleet/action/observation
+      one. *(**Deferred** with the death → restore flow, a non-goal: no slice
+      path kills a fleet, so no corp can die, and the account pointer always
+      references a living corp. The rules are recorded; the restart repoint
+      lands when combat does.)*
+- [x] Ownership is enforced from the account: every fleet/action/observation
       route resolves `common.Actor` → corporation and rejects cross-corp
-      access.
-- [ ] Spawn placement knobs (`minSpawnDistance`, `peripheryWeight`,
+      access. *(The `ResolveCorporation` middleware resolves account→living-corp
+      into `common.ActorCorp`, the single seam every fogged read already used;
+      `TestSpawn_TwoAccountsTwoCorps` + the fleet audience 404.)*
+- [x] Spawn placement knobs (`minSpawnDistance`, `peripheryWeight`,
       mineable-archetype requirement) live in a **params object**.
-- [ ] **Slice bar:** sign in, name your corporation, wake in a quiet
+      *(`corporations/params.go`.)*
+- [x] **Slice bar:** sign in, name your corporation, wake in a quiet
       frontier system with one ship, and the fog/lore framing holds — you
-      see the whole sky and know only home.
+      see the whole sky and know only home. *(Driven end-to-end by the e2e
+      wake flow in `frontend/e2e/setup/auth.setup.ts` + the board/smoke specs.)*
+
+## Implementation notes (2026-07-10)
+
+- **Where it landed:** `backend/corporations/` (top-level domain; the plural
+  matches `/new-domain`'s output). Firestore: `corporations/{corpId}` for the
+  corp docs, `corpByAccount/{accountId}` as the one-living-corp-per-account
+  pointer (the uniqueness anchor + the O(1) `ActorCorp` lookup). The fog store
+  keeps nesting under `corporations/{cid}/observations/…` — same key by design.
+- **"One transaction" (build-time decision, approved 2026-07-10):** a literal
+  three-domain transaction would force the corp DAO to write fleet + observation
+  docs, breaking the house layering (cross-domain through services, never DAOs).
+  Instead the **corp doc + account pointer** are the transactional anchor
+  (`CreateWithPointer`); the hull (`fleet.SeedFleet`) and initial fog
+  (`observation.RevealArrival`) follow through their services, and
+  **idempotency-per-account** (itself an acceptance criterion) heals any partial
+  spawn — a re-call ensures the assets exist. Site selection is seeded from the
+  account id, so a heal re-picks the same home.
+- **Ownership seam:** `common.ActorCorp` now reads a `CorpIdKey` set once per
+  request by `middlewares.ResolveCorporation` (account → living corp), replacing
+  the M4 dev derivation. The `POST /v1/fleets/dev-seed` endpoint + the
+  `dev-corp` fallback are retired; `fleet.SeedFleet` survives as spawn's
+  placement primitive.
+- **Initial scan (open question, resolved for the slice):** spawn grants home
+  graph-tier `explored` + onward-lane `rumored` only; board-detail stays to the
+  player's first scan (the move→scan→leave bar is intact).
 
 ## Decisions (imported from `../plans/spawn.md`, 2026-07-09)
 

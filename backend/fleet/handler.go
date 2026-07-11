@@ -50,8 +50,6 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 		g.POST("/:fleetId/orders", h.Order)
 		g.POST("/:fleetId/cancel", h.Cancel)
 		g.POST("/:fleetId/scan", h.Scan)
-		// Dev-only: drop a fleet into a system. TODO(#0009): spawn replaces this.
-		g.POST("/dev-seed", h.DevSeed)
 	}
 }
 
@@ -198,40 +196,6 @@ func (h *Handler) Order(c *gin.Context) {
 func (h *Handler) Cancel(c *gin.Context) {
 	f, err := h.svc.Cancel(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
 	h.respond(c, f, err)
-}
-
-type devSeedRequest struct {
-	SystemId      string    `json:"systemId"`
-	CorporationId string    `json:"corporationId"`
-	At            board.Hex `json:"at"`
-}
-
-func (h *Handler) DevSeed(c *gin.Context) {
-	var req devSeedRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.SystemId == "" {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "systemId is required"})
-		return
-	}
-	// Default ownership to the seeder's corporation so a dev-seeded fleet is one
-	// the requester can drive and see as their own (#0009 spawn replaces this).
-	corp := req.CorporationId
-	if corp == "" {
-		corp = common.ActorCorp(c)
-	}
-	if corp == "" {
-		corp = "dev-corp"
-	}
-	f, err := h.svc.SeedFleet(c.Request.Context(), req.SystemId, corp, req.At)
-	if errors.Is(err, ErrCoreDestination) {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "cannot seed a fleet onto the star at the core"})
-		return
-	}
-	if err != nil {
-		log.Error().Ctx(c).Err(err).Msg("dev-seed fleet failed")
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	c.JSON(http.StatusCreated, h.toDTO(c, f))
 }
 
 func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {

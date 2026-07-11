@@ -10,7 +10,7 @@
 
 import { apiClient } from '../api-client'
 import type { Fleet, FleetList, RoutePreview } from '../types/fleet'
-import type { Hex, Target } from '@/lib/hex'
+import type { Target } from '@/lib/hex'
 
 class FleetService {
   // GET /v1/fleets?systemId= — the requester's fogged fleet layer for one system.
@@ -66,17 +66,6 @@ class FleetService {
   // POST /v1/fleets/:id/scan — commit a scan (409 if the fleet is already busy).
   async scan(fleetId: string): Promise<Fleet> {
     const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/scan`, {})
-    return response.data
-  }
-
-  // POST /v1/fleets/dev-seed — drop a fleet into a system (dev stand-in for spawn,
-  // #0009). Returns the new fleet so the caller learns its id.
-  async devSeed(systemId: string, at: Hex, corporationId?: string): Promise<Fleet> {
-    const response = await apiClient.post<Fleet>('/v1/fleets/dev-seed', {
-      systemId,
-      at,
-      ...(corporationId ? { corporationId } : {}),
-    })
     return response.data
   }
 }

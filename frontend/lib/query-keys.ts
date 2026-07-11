@@ -10,6 +10,13 @@ export const queryKeys = {
     current: () => [...queryKeys.accounts.all, 'current'] as const,
   },
 
+  corporations: {
+    // The caller's living corporation (#0009), GET /v1/corporations/me — the
+    // session-bootstrap that decides wake-up-flow vs. play. Spawn invalidates it.
+    all: ['corporations'] as const,
+    me: () => [...queryKeys.corporations.all, 'me'] as const,
+  },
+
   system: {
     all: ['system'] as const,
     health: () => [...queryKeys.system.all, 'health'] as const,

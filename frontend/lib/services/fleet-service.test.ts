@@ -61,21 +61,4 @@ describe('fleetService', () => {
     await fleetService.scan('fleet_1')
     expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/scan', {})
   })
-
-  it('dev-seeds a fleet, omitting corporationId when not given', async () => {
-    mockPost.mockResolvedValue(ok(fleet))
-
-    await fleetService.devSeed('sys-7', { q: 0, r: 0 })
-    expect(mockPost).toHaveBeenCalledWith('/v1/fleets/dev-seed', {
-      systemId: 'sys-7',
-      at: { q: 0, r: 0 },
-    })
-
-    await fleetService.devSeed('sys-7', { q: 0, r: 0 }, 'corp-x')
-    expect(mockPost).toHaveBeenCalledWith('/v1/fleets/dev-seed', {
-      systemId: 'sys-7',
-      at: { q: 0, r: 0 },
-      corporationId: 'corp-x',
-    })
-  })
 })

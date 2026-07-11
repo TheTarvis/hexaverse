@@ -65,7 +65,10 @@ func TestGetInterior_FogsToAstronomicalLayer(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(func(c *gin.Context) { c.Set(common.AccountIdKey, "user1") })
+	r.Use(func(c *gin.Context) {
+		c.Set(common.AccountIdKey, "user1")
+		c.Set(common.CorpIdKey, "corp-user1") // #0009: ActorCorp now reads the resolved corp id
+	})
 	NewHandlerWith(&fakeSysSvc{gen: gen}, sysTestClock{}).
 		WithFog(fakeBoardFog{cov: observation.NewCoverage(0)}).
 		RegisterRoutes(r.Group("/"))
@@ -112,7 +115,10 @@ func TestGetInterior_LaneGatesFogFilterToCharted(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(func(c *gin.Context) { c.Set(common.AccountIdKey, "user1") })
+	r.Use(func(c *gin.Context) {
+		c.Set(common.AccountIdKey, "user1")
+		c.Set(common.CorpIdKey, "corp-user1") // #0009: ActorCorp now reads the resolved corp id
+	})
 	NewHandlerWith(&fakeSysSvc{gen: gen, gates: gates}, sysTestClock{}).
 		WithFog(fakeBoardFog{
 			cov:   observation.NewCoverage(0),
