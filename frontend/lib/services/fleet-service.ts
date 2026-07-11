@@ -9,7 +9,7 @@
 // at the committed ETA.
 
 import { apiClient } from '../api-client'
-import type { Fleet, FleetList } from '../types/fleet'
+import type { Fleet, FleetList, RoutePreview } from '../types/fleet'
 import type { Hex, Target } from '@/lib/hex'
 
 class FleetService {
@@ -19,6 +19,29 @@ class FleetService {
       `/v1/fleets?systemId=${encodeURIComponent(systemId)}`,
     )
     return response.data.fleets ?? []
+  }
+
+  // GET /v1/fleets?mine=true — the requester's own fleets across systems (transit
+  // included), the galaxy view's fleet layer (#0008).
+  async listMine(): Promise<Fleet[]> {
+    const response = await apiClient.get<FleetList>('/v1/fleets?mine=true')
+    return response.data.fleets ?? []
+  }
+
+  // GET /v1/fleets/:id/route?systemId= — preview the shortest lane route to a
+  // destination system (route + per-leg/total ETA) without committing (#0008).
+  async previewRoute(fleetId: string, destSystemId: string): Promise<RoutePreview> {
+    const response = await apiClient.get<RoutePreview>(
+      `/v1/fleets/${fleetId}/route?systemId=${encodeURIComponent(destSystemId)}`,
+    )
+    return response.data
+  }
+
+  // POST /v1/fleets/:id/orders {systemId} — commit a graph-tier trip. The server
+  // pathfinds + freezes the route; the response is the fleet now in lane transit.
+  async travel(fleetId: string, systemId: string): Promise<Fleet> {
+    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/orders`, { systemId })
+    return response.data
   }
 
   // GET /v1/fleets/:id — one fleet (404 if foreign and unsensed).

@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import { GalaxyView } from './GalaxyView'
 import { useGalaxy } from '@/hooks/use-galaxy'
+import { useMyFleets, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
 import type { Galaxy } from '@/lib/types/galaxy'
+import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 
 // A spy the mocked graph hands back through onReady, so we can assert the
 // ⌖ recenter control drives the graph controller.
@@ -64,12 +68,46 @@ vi.mock('react-force-graph-3d', () => ({ default: () => null }))
 
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
 
+// Fleet hooks + the world clock are mocked so the view renders synchronously
+// without a live backend; travel tests drive them per-case.
+vi.mock('@/hooks/use-fleets', () => ({
+  useMyFleets: vi.fn(),
+  useRoutePreview: vi.fn(),
+  useFleetTravel: vi.fn(),
+}))
+vi.mock('@/hooks/use-world-time', () => ({ useWorldTime: () => 0 }))
+
 // The floating account chip reads auth context; default to logged-out (no chip).
 vi.mock('@/components/account-provider', () => ({
   useAccountContext: () => ({ user: null, account: null, signOut: vi.fn() }),
 }))
 
 const mockUseGalaxy = vi.mocked(useGalaxy)
+const mockUseMyFleets = vi.mocked(useMyFleets)
+const mockUseRoutePreview = vi.mocked(useRoutePreview)
+const mockUseFleetTravel = vi.mocked(useFleetTravel)
+
+// GalaxyView calls useQueryClient (for the arrival self-schedule); wrap in a
+// provider. The fleet DATA comes from the mocked hooks above, not real queries.
+function renderView() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  )
+  return render(<GalaxyView />, { wrapper })
+}
+
+function coastFleet(id: string, systemId: string): Fleet {
+  return {
+    id,
+    corporationId: 'corp',
+    systemId,
+    state: { mode: 'coast', coast: { ring: 1, angle0: 0, period: 1, dir: 1 } },
+    position: { q: 1, r: 0 },
+    own: true,
+    worldTime: 0,
+  }
+}
 
 const galaxy: Galaxy = {
   id: 'gal_test',
@@ -127,11 +165,22 @@ function mockGalaxyState(overrides: Partial<ReturnType<typeof useGalaxy>> = {}) 
 describe('GalaxyView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: no fleets, no route, an inert travel mutation.
+    mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
+    mockUseRoutePreview.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useRoutePreview>)
+    mockUseFleetTravel.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useFleetTravel>)
   })
 
   it('renders the intel panel with system/lane/region stats', async () => {
     mockGalaxyState()
-    render(<GalaxyView />)
+    renderView()
 
     const panel = screen.getByTestId('intel-panel')
     expect(panel).toBeInTheDocument()
@@ -145,7 +194,7 @@ describe('GalaxyView', () => {
 
   it('shows the inspector empty state until a node is selected', () => {
     mockGalaxyState()
-    render(<GalaxyView />)
+    renderView()
 
     expect(screen.getByTestId('inspector')).toHaveTextContent(/select a system/i)
     expect(screen.queryByTestId('inspector-name')).not.toBeInTheDocument()
@@ -153,7 +202,7 @@ describe('GalaxyView', () => {
 
   it('populates the inspector when a node is selected', async () => {
     mockGalaxyState()
-    render(<GalaxyView />)
+    renderView()
 
     // Wait for the dynamically-loaded (mocked) graph to mount.
     fireEvent.click(await screen.findByTestId('select-sys-0'))
@@ -171,7 +220,7 @@ describe('GalaxyView', () => {
 
   it('drives the graph controller from the ⌖ recenter control', async () => {
     mockGalaxyState()
-    render(<GalaxyView />)
+    renderView()
 
     // Ensure onReady has run (graph mounted).
     await screen.findByTestId('mock-graph')
@@ -182,7 +231,7 @@ describe('GalaxyView', () => {
 
   it('shows the sign-in prompt only when viewing the frozen start area', () => {
     mockGalaxyState({ isStartArea: true })
-    const { rerender } = render(<GalaxyView />)
+    const { rerender } = renderView()
     expect(screen.getByTestId('signin-prompt')).toBeInTheDocument()
 
     mockGalaxyState({ isStartArea: false })
@@ -192,15 +241,89 @@ describe('GalaxyView', () => {
 
   it('renders a loading state while the galaxy is fetching', () => {
     mockGalaxyState({ data: undefined, isLoading: true })
-    render(<GalaxyView />)
+    renderView()
     expect(screen.queryByTestId('intel-panel')).not.toBeInTheDocument()
     expect(screen.getByText(/charting the galaxy/i)).toBeInTheDocument()
   })
 
   it('renders an error state when the galaxy read fails', () => {
     mockGalaxyState({ data: undefined, isError: true, error: new Error('boom') })
-    render(<GalaxyView />)
+    renderView()
     expect(screen.getByText(/couldn’t load the galaxy/i)).toBeInTheDocument()
     expect(screen.getByText(/boom/i)).toBeInTheDocument()
+  })
+
+  it('previews a route and commits a trip from the inspector', async () => {
+    mockGalaxyState()
+    mockUseMyFleets.mockReturnValue({
+      data: [coastFleet('fleet_1', 'sys-0')],
+    } as unknown as ReturnType<typeof useMyFleets>)
+    const preview: RoutePreview = {
+      route: ['sys-0', 'sys-1'],
+      legEtas: [60_000, 660_000],
+      totalEta: 660_000,
+      departGate: { q: 16, r: -2 },
+      worldTime: 0,
+    }
+    mockUseRoutePreview.mockReturnValue({
+      data: preview,
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useRoutePreview>)
+    const mutate = vi.fn()
+    mockUseFleetTravel.mockReturnValue({
+      mutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useFleetTravel>)
+
+    renderView()
+    // Select the OTHER system (not the fleet's) → route preview + Travel button.
+    fireEvent.click(await screen.findByTestId('select-sys-1'))
+    expect(screen.getByTestId('route-preview')).toHaveTextContent('Borealis')
+    fireEvent.click(screen.getByTestId('travel-button'))
+    expect(mutate).toHaveBeenCalledWith(
+      { fleetId: 'fleet_1', systemId: 'sys-1' },
+      expect.anything(),
+    )
+  })
+
+  it('says so when the destination has no charted route', async () => {
+    mockGalaxyState()
+    mockUseMyFleets.mockReturnValue({
+      data: [coastFleet('fleet_1', 'sys-0')],
+    } as unknown as ReturnType<typeof useMyFleets>)
+    mockUseRoutePreview.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    } as unknown as ReturnType<typeof useRoutePreview>)
+
+    renderView()
+    fireEvent.click(await screen.findByTestId('select-sys-1'))
+    expect(screen.getByTestId('no-route')).toBeInTheDocument()
+    expect(screen.queryByTestId('travel-button')).not.toBeInTheDocument()
+  })
+
+  it('shows a transit banner for a travelling fleet', () => {
+    mockGalaxyState()
+    const traveling: Fleet = {
+      ...coastFleet('fleet_1', 'sys-0'),
+      state: {
+        mode: 'laneTransit',
+        laneTransit: {
+          route: ['sys-0', 'sys-1'],
+          legEtas: [60_000, 660_000],
+          departTime: 0,
+          arriveTime: 660_000,
+          entryGate: { q: 16, r: -2 },
+        },
+      },
+    }
+    mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
+
+    renderView()
+    const banner = screen.getByTestId('transit-banner')
+    expect(banner).toHaveTextContent('Borealis')
+    expect(banner).toHaveTextContent(/arrives/i)
   })
 })

@@ -27,8 +27,22 @@ export interface Fleet {
   worldTime: number
 }
 
-// The `GET /v1/fleets?systemId=` envelope — the fogged fleet layer for one system.
+// The `GET /v1/fleets?systemId=` (or `?mine=true`) envelope — the fogged fleet
+// layer. `mine=true` returns the requester's own fleets across systems (transit
+// included), for the galaxy view.
 export interface FleetList {
   fleets: Fleet[]
+  worldTime: number
+}
+
+// RoutePreview is `GET /v1/fleets/:id/route?systemId=` — the shortest-time lane
+// route to a destination system with per-leg + total ETA, shown before committing
+// a trip (#0008). `route` is the systemId chain [origin, …, dest]; `legEtas[i]` is
+// the world time the fleet reaches `route[i]` (legEtas[0] = the departure gate ETA).
+export interface RoutePreview {
+  route: string[]
+  legEtas: number[]
+  totalEta: number
+  departGate: { q: number; r: number }
   worldTime: number
 }

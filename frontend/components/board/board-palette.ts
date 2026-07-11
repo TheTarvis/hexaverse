@@ -109,10 +109,15 @@ export const FOG_TREATMENT: Record<FogBand, FogTreatment> = {
 }
 
 // A fleet's accent encodes its movement mode: coast cyan, burn amber, docked green.
+// The graph-tier modes (laneTransit/laneHold, #0008) don't render on the board —
+// a transiting fleet is out on a lane, not on any hex — but the map is total, so
+// they reuse the coast accent for the brief board-leg window before the gate.
 export const FLEET_ACCENT: Record<Mode, string> = {
   coast: '#7dd3fc',
   burn: '#fbbf24',
   docked: '#34d399',
+  laneTransit: '#7dd3fc',
+  laneHold: '#8b98a9',
 }
 
 // A foreign fleet's muted snapshot marker (grey — no mode is inferred).

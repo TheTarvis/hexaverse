@@ -10,7 +10,7 @@ import {
 } from '@tanstack/react-query'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
-import type { Fleet } from '@/lib/types/fleet'
+import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 import type { Target } from '@/lib/hex'
 
 // useFleetsInSystem — the fogged fleet layer for one system (#0004/#0007), the
@@ -64,6 +64,58 @@ export function useFleetOrders(systemId: string): {
     onSuccess: (fleet) => invalidateBoard(qc, systemId, fleet),
   })
   return { order, cancel }
+}
+
+// useMyFleets — the requester's own fleets across systems (transit included), the
+// galaxy view's fleet layer (#0008). Enabled only when authed (a corp exists).
+export function useMyFleets(
+  options?: Omit<UseQueryOptions<Fleet[], Error>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<Fleet[], Error> {
+  return useQuery<Fleet[], Error>({
+    queryKey: queryKeys.fleets.mine(),
+    queryFn: () => fleetService.listMine(),
+    ...options,
+  })
+}
+
+// useRoutePreview — the shortest lane route + ETAs from a fleet to a destination
+// system (#0008), for the galaxy view's select→preview gesture. Disabled until
+// both ids are known and the destination differs from the fleet's system. A
+// no-charted-route destination surfaces as the query error (422), which the
+// component renders as "no charted route" rather than a preview.
+export function useRoutePreview(
+  fleetId: string | null,
+  destSystemId: string | null,
+  options?: Omit<UseQueryOptions<RoutePreview, Error>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<RoutePreview, Error> {
+  return useQuery<RoutePreview, Error>({
+    queryKey: queryKeys.fleets.route(fleetId ?? '', destSystemId ?? ''),
+    queryFn: () => fleetService.previewRoute(fleetId!, destSystemId!),
+    enabled: !!fleetId && !!destSystemId && (options?.enabled ?? true),
+    retry: false, // a 422 "no route" is an answer, not a transient failure
+    ...options,
+  })
+}
+
+// useFleetTravel — commit a graph-tier trip (#0008). Success flips the fleet to
+// lane-transit; invalidate the galaxy fleet layer, the fleet detail, and both the
+// origin and destination system boards. Toasts belong in the component.
+export function useFleetTravel(): UseMutationResult<
+  Fleet,
+  Error,
+  { fleetId: string; systemId: string }
+> {
+  const qc = useQueryClient()
+  return useMutation<Fleet, Error, { fleetId: string; systemId: string }>({
+    mutationFn: ({ fleetId, systemId }) => fleetService.travel(fleetId, systemId),
+    onSuccess: (fleet, { systemId }) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.fleets.mine() })
+      void qc.invalidateQueries({ queryKey: queryKeys.fleets.detail(fleet.id) })
+      void qc.invalidateQueries({ queryKey: queryKeys.fleets.inSystem(fleet.systemId) })
+      void qc.invalidateQueries({ queryKey: queryKeys.systemBoard.detail(fleet.systemId) })
+      void qc.invalidateQueries({ queryKey: queryKeys.systemBoard.detail(systemId) })
+    },
+  })
 }
 
 // useScan — the scan verb for a fleet. Resolution mints observations at the ETA;
