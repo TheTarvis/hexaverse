@@ -98,6 +98,19 @@ export function laneFraction(
   return { from: n - 2, to: n - 1, frac: 1, ok: true }
 }
 
+// boardLegBurn views a trip's leg 0 as a #0004 burn — the same shape the board
+// draws and positions any other burn with, so the run to the departure gate needs
+// no second code path. Null when the trip has no board leg (already on the gate).
+export function boardLegBurn(lt: LaneTransit): Burn | null {
+  if (!lt.boardLeg || lt.boardLeg.path.length === 0) return null
+  return {
+    path: lt.boardLeg.path,
+    startTime: lt.boardLeg.startTime,
+    arriveTime: lt.boardLeg.gateEta,
+    target: { hex: lt.boardLeg.path[lt.boardLeg.path.length - 1] },
+  }
+}
+
 // burnPos returns the fleet's quantized hex along its burn path at time t. The
 // logical hex is the nearest path cell (the pixel glides between; that's a
 // render concern). Clamped to the endpoints outside the burn window.
@@ -127,16 +140,9 @@ export function shipPos(s: MovementState, t: number): { hex: Hex; ok: boolean } 
       return { hex: burnPos(s.burn, t), ok: true }
     case 'laneTransit': {
       const lt = s.laneTransit
-      if (!lt?.boardLeg || lt.boardLeg.path.length === 0) return { hex: { q: 0, r: 0 }, ok: false }
-      if (t < lt.boardLeg.gateEta) {
-        return {
-          hex: burnPos(
-            { path: lt.boardLeg.path, startTime: lt.boardLeg.startTime, arriveTime: lt.boardLeg.gateEta, target: {} },
-            t,
-          ),
-          ok: true,
-        }
-      }
+      if (!lt) return { hex: { q: 0, r: 0 }, ok: false }
+      const leg = boardLegBurn(lt)
+      if (leg && t < leg.arriveTime) return { hex: burnPos(leg, t), ok: true }
       return { hex: { q: 0, r: 0 }, ok: false }
     }
     default: // docked / laneHold — no board hex on the current system

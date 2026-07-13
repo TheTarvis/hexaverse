@@ -16,19 +16,26 @@ type MovementParams struct {
 	// hooks multiply in here later without restructuring.
 	LaneMsPerDistance float64
 	// BoardRadius is the hex radius of every system board — where lane gates sit
-	// (ring == BoardRadius). It must match system.GenerationParams.Radius; the
-	// slice generates every interior at a fixed radius, so one constant is honest
-	// and spares an interior read to place a departure/entry gate.
+	// (ring == BoardRadius). It must match system.GenerationParams.Radius; both now
+	// source it from common.Tuning().BoardRadius, so the invariant holds by
+	// construction rather than by comment. The slice generates every interior at a
+	// fixed radius, so one constant is honest and spares an interior read to place
+	// a departure/entry gate.
 	BoardRadius int
 }
 
-// DefaultMovementParams are the spike baseline (BURN_SPEED as ms-per-tile).
+// DefaultMovementParams sources the live pacing knobs from common.Tuning() — the
+// single tuning file (backend/common/tuning.go), which an admin page will one day
+// write through. Tune movement THERE, not here: this function only shapes the
+// central numbers into the struct fleet's resolvers want. Callers clone and tweak
+// (tests do) without disturbing the global.
 func DefaultMovementParams() MovementParams {
+	t := common.Tuning()
 	return MovementParams{
-		MsPerTile:         60_000,        // one world-minute per hex
-		InterceptHorizon:  86_400_000,    // one world-day of lead search
-		CoastPeriod:       3_600_000_000, // ~1000 world-hours ⇒ static within the slice
-		LaneMsPerDistance: 60_000,        // one world-minute per unit of lane length
-		BoardRadius:       16,            // matches system.DefaultParams().Radius
+		MsPerTile:         t.MsPerTile,
+		InterceptHorizon:  t.InterceptHorizon,
+		CoastPeriod:       t.CoastPeriod,
+		LaneMsPerDistance: t.LaneMsPerDistance,
+		BoardRadius:       t.BoardRadius,
 	}
 }

@@ -90,6 +90,7 @@ each can be spec'd, folded, or scratched.
 <!-- specs:index (the /spec tool appends rows below this line; keep it) -->
 | # | Spec | Status |
 |---|------|--------|
+| 0011 | [Fleet Roster (where is everything?)](0011-fleet-roster.md) | implemented |
 | 0010 | [Mine (extraction verb)](0010-mine.md) | accepted |
 | 0009 | [Spawn & Corporation Identity](0009-spawn.md) | implemented |
 | 0008 | [Inter-system Movement (galaxy graph)](0008-movement-galaxy.md) | accepted |

@@ -5,6 +5,7 @@ import {
   featureLogicalHex,
   fleetGlidePixel,
   fleetLogicalHex,
+  fleetOnBoard,
   headingDeg,
   orbitGlidePixel,
   sensorBubbleHexes,
@@ -155,5 +156,45 @@ describe('fleet position', () => {
       },
     })
     expect(fleetGlidePixel(burning, 100)).toEqual(hexToPixel(1, 0))
+  })
+
+  it('glides a trip’s board leg like a burn, then leaves the board at the gate', () => {
+    const departing = fleet({
+      mode: 'laneTransit',
+      laneTransit: {
+        boardLeg: {
+          path: [
+            { q: 0, r: 0 },
+            { q: 1, r: 0 },
+          ],
+          startTime: 0,
+          gateEta: 100,
+        },
+        route: ['s', 'sys-e'],
+        legEtas: [100, 200],
+        departTime: 0,
+        arriveTime: 200,
+        entryGate: { q: -3, r: 0 },
+      },
+    })
+
+    // Half way along leg 0 the ship sits BETWEEN the two cells — glided, not
+    // snapped (the snap is what made a departure look like a hex-by-hex jump).
+    const mid = fleetGlidePixel(departing, 50)
+    expect(mid).not.toEqual(hexToPixel(0, 0))
+    expect(mid).not.toEqual(hexToPixel(1, 0))
+    expect(mid.x).toBeCloseTo((hexToPixel(0, 0).x + hexToPixel(1, 0).x) / 2, 5)
+    expect(fleetOnBoard(departing, 50)).toBe(true)
+
+    // At the gate it hands off to the lane: no hex here any more.
+    expect(fleetOnBoard(departing, 150)).toBe(false)
+  })
+
+  it('keeps a coasting fleet on the board and a mid-lane one off it', () => {
+    expect(fleetOnBoard(fleet({ mode: 'coast', coast: { ring: 2, angle0: 0, period: 100, dir: 1 } }), 0)).toBe(true)
+    expect(fleetOnBoard(fleet({ mode: 'docked', docked: { parentId: 'p' } }), 0)).toBe(true)
+    expect(
+      fleetOnBoard(fleet({ mode: 'laneHold', laneHold: { from: 'a', to: 'b', fraction: 0.5 } }), 0),
+    ).toBe(false)
   })
 })

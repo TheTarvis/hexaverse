@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { BoardScene } from './BoardScene'
 import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
@@ -59,6 +59,52 @@ describe('BoardScene', () => {
     expect(screen.getByTestId('gate-glyph-sys-n')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('gate-glyph-sys-e'))
     expect(onSelectGate).toHaveBeenCalledWith('sys-e')
+  })
+
+  // Spec: 0008/S5, 0008/S6
+  it('draws a departing fleet on its board leg, path and all, then drops it at the gate', () => {
+    const departing: Fleet = {
+      ...ownFleet,
+      state: {
+        mode: 'laneTransit',
+        laneTransit: {
+          boardLeg: {
+            path: [
+              { q: 2, r: 0 },
+              { q: 3, r: 0 },
+              { q: 4, r: 0 },
+            ],
+            startTime: 0,
+            gateEta: 10_000,
+          },
+          route: ['s', 'sys-e'],
+          legEtas: [10_000, 60_000],
+          departTime: 0,
+          arriveTime: 60_000,
+          entryGate: { q: -16, r: 0 },
+        },
+      },
+    }
+
+    // Mid-leg: still on this board, with its run out to the gate drawn.
+    const { container, rerender } = render(
+      <svg>
+        <BoardScene worldTime={5_000} features={[star]} fleets={[departing]} />
+      </svg>,
+    )
+    expect(within(container).getByTestId('fleet-glyph-mine')).toBeInTheDocument()
+    expect(container.querySelectorAll('[data-testid="burn-paths"] polyline').length).toBe(1)
+
+    // Past the gate ETA it's out on the lane — the galaxy view's picture, not this
+    // board's. It must not fall back to the star's (0,0) cell.
+    rerender(
+      <svg>
+        <BoardScene worldTime={20_000} features={[star]} fleets={[departing]} />
+      </svg>,
+    )
+    expect(within(container).queryByTestId('fleet-glyph-mine')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('[data-testid="burn-paths"] polyline').length).toBe(0)
+    expect(container.querySelectorAll('[data-testid="scan-bubble"] polygon').length).toBe(0)
   })
 
   it('draws the sensor bubble only around own units', () => {

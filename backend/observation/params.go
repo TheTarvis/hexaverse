@@ -10,9 +10,10 @@ type SensorParams struct {
 	AmbientRadius int
 }
 
-// DefaultSensorParams are the spike baseline.
+// DefaultSensorParams sources the live sensing knobs from common.Tuning() — the
+// single tuning file (backend/common/tuning.go). Tune sensing THERE, not here.
 func DefaultSensorParams() SensorParams {
-	return SensorParams{AmbientRadius: 3}
+	return SensorParams{AmbientRadius: common.Tuning().AmbientRadius}
 }
 
 // ScanParams tunes the active scan verb — the slow, aimed action that mints
@@ -30,12 +31,16 @@ type ScanParams struct {
 	GrantsTier Tier
 }
 
-// DefaultScanParams are the spike baseline: a system-wide sweep taking a world-
-// hour, granting Surveyed.
+// DefaultScanParams sources the scan pacing from common.Tuning() — the single
+// tuning file (backend/common/tuning.go). Tune scan duration/radius THERE.
+// GrantsTier stays here: it's a domain type (common can't import observation), and
+// it's a rule, not a knob — the collapsed slice scan surveys; travel-arrival is
+// what explores.
 func DefaultScanParams() ScanParams {
+	t := common.Tuning()
 	return ScanParams{
-		Radius:     0,
-		Duration:   3_600_000, // one world-hour
+		Radius:     t.ScanRadius,
+		Duration:   t.ScanDuration,
 		GrantsTier: TierSurveyed,
 	}
 }

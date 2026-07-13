@@ -63,10 +63,14 @@ func TestPlanRoute_ShortestChartedPath(t *testing.T) {
 	if got := plan.route; len(got) != 3 || got[0] != "A" || got[1] != "B" || got[2] != "C" {
 		t.Fatalf("route = %v, want [A B C]", got)
 	}
-	// Each 10-unit lane × 60_000 ms/unit = 600_000 ms.
+	// Each lane in the fixture is 10 units long; a leg costs length × the drive
+	// speed. Derived from the params (not a hardcoded number) so retuning the
+	// central knob in common/tuning.go doesn't break the routing math.
+	wantLeg := common.WorldMillis(10 * svc.params.LaneMsPerDistance)
 	for i, ms := range plan.legMs {
-		if ms != common.WorldMillis(600_000) {
-			t.Fatalf("legMs[%d] = %d, want 600000", i, ms)
+		if ms != wantLeg {
+			t.Fatalf("legMs[%d] = %d, want %d (10 units × %.0f ms/unit)",
+				i, ms, wantLeg, svc.params.LaneMsPerDistance)
 		}
 	}
 	// Arrival charts D (C's only onward neighbour beyond B).

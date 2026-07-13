@@ -25,6 +25,7 @@ func (f *fakeArrivals) ArrivalWrites(_ string, dest string, onward []string, _ m
 
 // The travel resolver lands the fleet coasting at the destination's entry gate,
 // flips its systemId to the destination, and triggers the arrival reveal.
+// Spec: 0008/S3
 func TestTravelResolver_LandsAtEntryGateAndReveals(t *testing.T) {
 	entry := board.Hex{Q: 16, R: -2}
 	lt := &board.LaneTransit{

@@ -15,6 +15,7 @@ import (
 // orderTravel freezes the trip as a lane-travel action (scope = destination) and
 // flips the fleet to lane-transit with a burn-to-gate board leg. (Shared test
 // fixtures — fakeGraph/fakeTiers/chainGalaxy/travelSvc — live in routing_test.go.)
+// Spec: 0008/S1
 func TestOrderTravel_FreezesTripAndCommits(t *testing.T) {
 	clk := &fakeClock{now: 0}
 	svc, dao, fa := travelSvc(t, clk, map[string]observation.Tier{
@@ -35,9 +36,12 @@ func TestOrderTravel_FreezesTripAndCommits(t *testing.T) {
 	if len(lt.Route) != 3 || lt.Route[2] != "C" {
 		t.Fatalf("route = %v", lt.Route)
 	}
-	// LegEtas: [gateEta, gateEta+600k, gateEta+1200k]; ArriveTime = last.
-	if lt.LegEtas[1]-lt.LegEtas[0] != 600_000 || lt.LegEtas[2]-lt.LegEtas[1] != 600_000 {
-		t.Fatalf("leg spacing wrong: %v", lt.LegEtas)
+	// LegEtas are evenly spaced by the per-leg cost: each fixture lane is 10 units
+	// long, so a leg costs 10 × the drive speed. Derived from the params (not a
+	// hardcoded number) so retuning common/tuning.go doesn't break the travel math.
+	wantLeg := common.WorldMillis(10 * svc.params.LaneMsPerDistance)
+	if lt.LegEtas[1]-lt.LegEtas[0] != wantLeg || lt.LegEtas[2]-lt.LegEtas[1] != wantLeg {
+		t.Fatalf("leg spacing wrong: %v (want each leg %d ms apart)", lt.LegEtas, wantLeg)
 	}
 	if lt.ArriveTime != lt.LegEtas[2] {
 		t.Fatalf("arriveTime %d != last legEta %d", lt.ArriveTime, lt.LegEtas[2])
@@ -56,6 +60,7 @@ func TestOrderTravel_FreezesTripAndCommits(t *testing.T) {
 	}
 }
 
+// Spec: 0008/S2
 func TestOrderTravel_NoRouteSurfacesSentinel(t *testing.T) {
 	clk := &fakeClock{now: 0}
 	svc, dao, _ := travelSvc(t, clk, map[string]observation.Tier{"A": observation.TierExplored})
@@ -69,6 +74,7 @@ func TestOrderTravel_NoRouteSurfacesSentinel(t *testing.T) {
 }
 
 // A mid-lane cancel parks the fleet in lane-hold at its frozen fraction.
+// Spec: 0008/S4
 func TestCancel_MidLaneHolds(t *testing.T) {
 	clk := &fakeClock{now: 400} // between B (300) and C (500) on the second lane
 	svc, dao, _ := travelSvc(t, clk, map[string]observation.Tier{"A": observation.TierExplored})

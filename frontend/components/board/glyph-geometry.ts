@@ -5,7 +5,7 @@
 // between logical cells so motion reads smooth, including the ring wrap-around.
 // Pure and presentational: no clock, no fetch.
 
-import { orbState, shipPos, type Hex, type MovementState, type Orbit } from '@/lib/hex'
+import { boardLegBurn, orbState, shipPos, type Hex, type MovementState, type Orbit } from '@/lib/hex'
 import type { Burn } from '@/lib/hex'
 import { hexesWithinRadius, hexToPixel, lerpPixel, type Point } from '@/lib/hex/pixel'
 import type { BoardFeature } from '@/lib/types/system-board'
@@ -87,8 +87,19 @@ export function fleetLogicalHex(fleet: Fleet, worldTime: number, parentHex?: Hex
   return hex
 }
 
+// fleetOnBoard reports whether a fleet has a hex on THIS system's board at
+// worldTime — false once a trip passes its departure gate (it's out on a lane
+// now, the galaxy view's to draw). Callers must check it before positioning a
+// fleet: shipPos's off-board answer is (0,0), which would otherwise plant the
+// ship on the star.
+export function fleetOnBoard(fleet: Fleet, worldTime: number): boolean {
+  if (fleet.state.mode === 'docked') return true
+  return shipPos(fleet.state, worldTime).ok
+}
+
 // fleetGlidePixel — a fleet's glided screen point. Coast glides on its orbit,
-// burn along its path, docked rides the parent feature's glided point.
+// burn along its path, docked rides the parent feature's glided point, and a
+// trip's leg 0 glides along the board leg exactly as a burn does.
 export function fleetGlidePixel(
   fleet: Fleet,
   worldTime: number,
@@ -98,6 +109,10 @@ export function fleetGlidePixel(
   if (s.mode === 'docked') return parentPixel ?? hexToPixel(fleet.position.q, fleet.position.r)
   if (s.mode === 'burn' && s.burn) return burnGlidePixel(s.burn, worldTime)
   if (s.mode === 'coast' && s.coast) return orbitGlidePixel(s.coast, worldTime)
+  if (s.mode === 'laneTransit' && s.laneTransit) {
+    const leg = boardLegBurn(s.laneTransit)
+    if (leg) return burnGlidePixel(leg, worldTime)
+  }
   const { hex } = shipPos(s, worldTime)
   return hexToPixel(hex.q, hex.r)
 }

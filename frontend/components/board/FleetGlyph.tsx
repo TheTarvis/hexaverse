@@ -39,7 +39,9 @@ export function FleetGlyph({ fleet, point, headingDeg = 0, selected, onSelect }:
           <circle r={ring} fill="none" stroke={accent} strokeWidth={1.5} opacity={0.9} />
           <g transform={`rotate(${headingDeg.toFixed(1)})`}>
             <path d={`M ${ring * 0.9} 0 L ${-ring * 0.55} ${ring * 0.5} L ${-ring * 0.55} ${-ring * 0.5} Z`} fill={accent} />
-            {fleet.state.mode === 'burn' && (
+            {/* A trip's leg 0 is a burn — the ship only appears here while it's
+                still crossing this board to the gate, so it's under thrust too. */}
+            {(fleet.state.mode === 'burn' || fleet.state.mode === 'laneTransit') && (
               <path d={`M ${-ring * 0.55} 0 L ${-ring * 1.2} ${ring * 0.25} L ${-ring * 1.2} ${-ring * 0.25} Z`} fill={THRUSTER} />
             )}
           </g>

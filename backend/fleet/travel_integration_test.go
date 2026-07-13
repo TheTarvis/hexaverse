@@ -17,6 +17,7 @@ import (
 // and an offline arrival resolved by advancing the clock — landing the fleet
 // coasting at the destination rim, flipping the destination to Explored, and
 // materializing its interior (the first-arrival detail roll).
+// Spec: 0008/S3
 func TestIntegration_TravelArriveReveals(t *testing.T) {
 	fs, client := common.SetupFirestoreTestDAO(t)
 	ctx := context.Background()

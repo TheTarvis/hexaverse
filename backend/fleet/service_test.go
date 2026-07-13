@@ -102,9 +102,11 @@ func TestOrderTo_Hex_BurnPathAndEta(t *testing.T) {
 	if b.Path[0] != (board.Hex{Q: 0, R: 0}) || b.Path[len(b.Path)-1] != dest {
 		t.Fatalf("path endpoints wrong: %v", b.Path)
 	}
-	// ETA = now + distance × msPerTile (5 × 60_000).
-	if want := common.WorldMillis(5 * 60_000); b.ArriveTime != want {
-		t.Fatalf("arriveTime = %d, want %d", b.ArriveTime, want)
+	// ETA = now + distance × msPerTile. Derived from the service's own params (not
+	// a hardcoded number) so retuning common/tuning.go doesn't break the burn math.
+	if want := common.WorldMillis(5) * svc.params.MsPerTile; b.ArriveTime != want {
+		t.Fatalf("arriveTime = %d, want %d (5 hexes × %d ms/tile)",
+			b.ArriveTime, want, svc.params.MsPerTile)
 	}
 	for i := 1; i < len(b.Path); i++ {
 		if board.Distance(b.Path[i-1], b.Path[i]) != 1 {

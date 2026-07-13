@@ -28,25 +28,24 @@ import { queryKeys } from '@/lib/query-keys'
 import { toast } from '@/lib/toast'
 import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 import type { Galaxy, GalaxyNode, Region } from '@/lib/types/galaxy'
+import { FleetRoster } from '@/components/fleet/FleetRoster'
+import { fleetStatus } from '@/components/fleet/fleet-status'
+// The route preview surfaces its numbers because a 3D view can't be eyeballed for
+// distance (#0008 Decision #4); the shared countdown label renders them.
+import { formatEta } from '@/lib/eta'
 import { REGION_PALETTE, REGIONS, regionColor } from './region-palette'
+import { transitPoint, type NodePositions } from './transit-geometry'
 import type { GalaxyGraphController } from './GalaxyGraph'
-
-// formatEta renders a world-ms duration as a compact "3h 20m" / "45s" label — the
-// route preview surfaces the numbers because a 3D view can't be eyeballed for
-// distance (#0008 Decision #4). worldTime runs at scale 1 today, so ms are real.
-function formatEta(ms: number): string {
-  if (ms <= 0) return 'now'
-  const s = Math.round(ms / 1000)
-  if (s < 60) return `${s}s`
-  const m = Math.round(s / 60)
-  if (m < 60) return `${m}m`
-  const h = Math.floor(m / 60)
-  return `${h}h ${m % 60}m`
-}
 
 // A fleet is idle (available to depart) when it isn't mid-order.
 function isIdle(f: Fleet): boolean {
   return f.state.mode === 'coast' || f.state.mode === 'docked'
+}
+
+// isTravelling — out on the lane graph: crossing it, or parked mid-lane after a
+// cancel. Either way the fleet is between systems, not in one.
+function isTravelling(f: Fleet): boolean {
+  return f.state.mode === 'laneTransit' || f.state.mode === 'laneHold'
 }
 
 // TravelInfo is the inspector's travel context: the acting fleet, the live route
@@ -93,6 +92,9 @@ export function GalaxyView() {
   const { data: galaxy, isLoading, isError, error, isStartArea } = useGalaxy()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // A fleet clicked on its lane (or in the roster) — the inspector's subject when
+  // the thing you're looking at is between systems (#0008).
+  const [selectedFleetId, setSelectedFleetId] = useState<string | null>(null)
   const [graphReady, setGraphReady] = useState(false)
   const controllerRef = useRef<GalaxyGraphController | null>(null)
   const router = useRouter()
@@ -105,8 +107,14 @@ export function GalaxyView() {
   // The fleet a "Travel here" order commands: prefer an idle one, else the first.
   const activeFleet = useMemo(() => ownFleets.find(isIdle) ?? ownFleets[0] ?? null, [ownFleets])
   // Systems hosting an own fleet → galaxy-tier presence markers; the fleet's
-  // system is the ⌖ recenter / wake-focus home target (#0002 Follow-ups).
-  const fleetSystemIds = useMemo(() => ownFleets.map((f) => f.systemId), [ownFleets])
+  // system is the ⌖ recenter / wake-focus home target (#0002 Follow-ups). A fleet
+  // out on a lane is NOT on station anywhere — its `systemId` still names the
+  // system it left until arrival resolves, so pinning a pip there would show it
+  // parked at home while it's actually in flight. The transit layer draws it.
+  const fleetSystemIds = useMemo(
+    () => ownFleets.filter((f) => !isTravelling(f)).map((f) => f.systemId),
+    [ownFleets],
+  )
 
   // The wake-up handoff (#0009): spawn stashes the home system id so the view can
   // select + glide to it on the first mount after waking. Read once, client-only
@@ -124,10 +132,7 @@ export function GalaxyView() {
     }
   }, [])
   const homeSystemId = activeFleet?.systemId ?? wakeFocus
-  const transitFleets = useMemo(
-    () => ownFleets.filter((f) => f.state.mode === 'laneTransit' || f.state.mode === 'laneHold'),
-    [ownFleets],
-  )
+  const transitFleets = useMemo(() => ownFleets.filter(isTravelling), [ownFleets])
 
   // Live clock (for ETA countdowns) anchored to the fleet read; scale 1 today.
   const worldTime = useWorldTime(myFleets?.[0]?.worldTime ?? galaxy?.worldTime)
@@ -187,6 +192,45 @@ export function GalaxyView() {
     [router],
   )
 
+  // Star positions, for pointing the camera at a fleet that's out on a lane.
+  const nodePositions = useMemo<NodePositions>(
+    () => new Map((galaxy?.nodes ?? []).map((n) => [n.id, { x: n.x, y: n.y, z: n.z }])),
+    [galaxy],
+  )
+
+  // Roster row → "show me this fleet". A fleet in a system selects and glides to
+  // its star; one on a lane glides to the point it currently occupies (and opens
+  // its card), so the click always lands the camera on the hull itself.
+  const handleShowFleet = useCallback(
+    (fleet: Fleet) => {
+      const lane = transitPoint(fleet, worldTime, nodePositions)
+      if (lane) {
+        setSelectedId(null)
+        setSelectedFleetId(fleet.id)
+        controllerRef.current?.focusPoint(lane)
+        return
+      }
+      setSelectedFleetId(null)
+      setSelectedId(fleet.systemId)
+      controllerRef.current?.focusSystem(fleet.systemId)
+    },
+    [worldTime, nodePositions],
+  )
+
+  // Clicking a fleet's lane marker on the graph opens its card (and drops any
+  // system selection — you're inspecting the hull, not a star).
+  const handleSelectFleet = useCallback((fleetId: string) => {
+    setSelectedId(null)
+    setSelectedFleetId(fleetId)
+  }, [])
+
+  // The card's subject; it closes itself when the fleet stops travelling (it
+  // arrived — the star's own card takes over).
+  const selectedFleet = useMemo(
+    () => transitFleets.find((f) => f.id === selectedFleetId) ?? null,
+    [transitFleets, selectedFleetId],
+  )
+
   // On the first mount after waking (#0009): select home and glide the camera to
   // it once the graph is ready — so the new player lands looking at their system
   // with the inspector (and "Your fleet is here") already open. Runs once.
@@ -229,8 +273,14 @@ export function GalaxyView() {
       <GalaxyGraph
         galaxy={galaxy}
         selectedId={selectedId}
-        onSelect={(node) => setSelectedId(node?.id ?? null)}
+        onSelect={(node) => {
+          setSelectedId(node?.id ?? null)
+          setSelectedFleetId(null)
+        }}
         fleetSystemIds={fleetSystemIds}
+        transitFleets={transitFleets}
+        onSelectFleet={handleSelectFleet}
+        worldTime={worldTime}
         homeSystemId={homeSystemId}
         onReady={(controller) => {
           controllerRef.current = controller
@@ -241,42 +291,52 @@ export function GalaxyView() {
       {/* Overlay layer — panels catch pointer events, the gap between lets the
           graph receive orbit/pan/zoom/clicks. */}
       <div className="pointer-events-none absolute inset-0 flex justify-between gap-4 p-4">
-        <IntelPanel
-          galaxy={galaxy}
-          isStartArea={isStartArea}
-          regionCounts={regionCounts}
-          onRecenter={handleRecenter}
-        />
-        <Inspector
-          node={selected}
-          connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
-          onEnter={isStartArea ? null : handleEnterSystem}
-          travel={
-            activeFleet
-              ? {
-                  activeFleet,
-                  isHere: !!selected && selected.id === activeFleet.systemId,
-                  route: routeQuery,
-                  worldTime,
-                  onTravel,
-                  committing: travel.isPending,
-                  nameById,
-                }
-              : null
-          }
-        />
+        <div className="flex flex-col gap-4 self-start">
+          <IntelPanel
+            galaxy={galaxy}
+            isStartArea={isStartArea}
+            regionCounts={regionCounts}
+            onRecenter={handleRecenter}
+          />
+          <FleetRoster
+            worldTime={worldTime}
+            activeFleetId={selectedFleetId ?? activeFleet?.id ?? null}
+            onSelect={handleShowFleet}
+            enabled={!isStartArea}
+          />
+        </div>
+        {selectedFleet ? (
+          <FleetCard
+            fleet={selectedFleet}
+            worldTime={worldTime}
+            nameById={nameById}
+            onClose={() => setSelectedFleetId(null)}
+          />
+        ) : (
+          <Inspector
+            node={selected}
+            connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
+            onEnter={isStartArea ? null : handleEnterSystem}
+            travel={
+              activeFleet
+                ? {
+                    activeFleet,
+                    isHere: !!selected && selected.id === activeFleet.systemId,
+                    route: routeQuery,
+                    worldTime,
+                    onTravel,
+                    committing: travel.isPending,
+                    nameById,
+                  }
+                : null
+            }
+          />
+        )}
       </div>
 
-      {/* In-transit trips — a floating banner per travelling fleet, with its route
-          and a live ETA (#0008). */}
-      {transitFleets.length > 0 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-2">
-          {transitFleets.map((f) => (
-            <TransitBanner key={f.id} fleet={f} worldTime={worldTime} nameById={nameById} />
-          ))}
-        </div>
-      )}
-
+      {/* A trip in flight needs no banner of its own: the roster carries every
+          fleet's route + live ETA, the graph draws the hull crawling its lane,
+          and clicking that hull opens its card. */}
     </div>
   )
 }
@@ -314,47 +374,6 @@ function useTravelArrivals(
     // Re-arm only when the set of (fleet, eta) changes, not every clock frame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, qc])
-}
-
-// TransitBanner shows a travelling fleet's route + live ETA (or a held state).
-function TransitBanner({
-  fleet,
-  worldTime,
-  nameById,
-}: {
-  fleet: Fleet
-  worldTime: number
-  nameById: Map<string, string>
-}) {
-  const name = (id: string) => nameById.get(id) ?? id
-  if (fleet.state.mode === 'laneHold' && fleet.state.laneHold) {
-    const h = fleet.state.laneHold
-    return (
-      <div
-        data-testid="transit-banner"
-        className={`${PANEL} flex items-center gap-3 !py-2 text-sm text-white`}
-      >
-        <span className="animate-pulse text-amber-400">◈</span>
-        Holding mid-lane · {name(h.from)} → {name(h.to)}
-      </div>
-    )
-  }
-  const lt = fleet.state.laneTransit
-  if (!lt) return null
-  const dest = lt.route[lt.route.length - 1]
-  const remaining = formatEta(lt.arriveTime - worldTime)
-  return (
-    <div
-      data-testid="transit-banner"
-      className={`${PANEL} flex items-center gap-3 !py-2 text-sm text-white`}
-    >
-      <span className="animate-pulse text-sky-400">➤</span>
-      <span>
-        In transit → <Strong className="!text-white">{name(dest)}</Strong>
-      </span>
-      <span className="font-mono text-xs text-zinc-400">arrives {remaining}</span>
-    </div>
-  )
 }
 
 // ---- Left intel panel ----
@@ -470,7 +489,10 @@ function Inspector({
   }
 
   return (
-    <aside data-testid="inspector" className={`${PANEL} flex w-72 max-w-[80vw] flex-col gap-3 self-start`}>
+    <aside
+      data-testid="inspector"
+      className={`${PANEL} flex w-72 max-w-[80vw] flex-col gap-3 self-start`}
+    >
       <div>
         <Heading level={2} data-testid="inspector-name" className="!text-base !text-white">
           {node.name}
@@ -533,7 +555,9 @@ function Inspector({
       </div>
 
       {node.tier === 'starVisible' && (
-        <p className="text-xs text-zinc-500 italic">Uncharted — survey or travel to chart subspace routes and reveal its worth.</p>
+        <p className="text-xs text-zinc-500 italic">
+          Uncharted — survey or travel to chart subspace routes and reveal its worth.
+        </p>
       )}
 
       {travel && <TravelSection node={node} travel={travel} />}
@@ -580,11 +604,80 @@ function TravelSection({ node, travel }: { node: GalaxyNode; travel: TravelInfo 
             data-testid="travel-button"
             className="mt-1 w-full"
           >
-            {committing ? 'Departing…' : `Travel here · ${formatEta(route.data.totalEta - worldTime)}`}
+            {committing
+              ? 'Departing…'
+              : `Travel here · ${formatEta(route.data.totalEta - worldTime)}`}
           </Button>
         </>
       )}
     </div>
+  )
+}
+
+// FleetCard is what a fleet on a lane says when you click its marker (or its
+// roster row): who it is, where it's headed, the lane chain still ahead of it,
+// and when it lands. The inspector's counterpart for a thing that is *between*
+// systems — a star's card can't describe it, because it isn't at one.
+function FleetCard({
+  fleet,
+  worldTime,
+  nameById,
+  onClose,
+}: {
+  fleet: Fleet
+  worldTime: number
+  nameById: Map<string, string>
+  onClose: () => void
+}) {
+  const name = (id: string) => nameById.get(id) ?? id
+  const status = fleetStatus(fleet, worldTime, name)
+  const lt = fleet.state.laneTransit
+
+  return (
+    <aside
+      data-testid="fleet-card"
+      className={`${PANEL} flex w-72 max-w-[80vw] flex-col gap-3 self-start`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <Heading level={2} className="!text-base !text-white">
+            Your fleet
+          </Heading>
+          <p className="mt-0.5 text-sm text-zinc-400">{status.where}</p>
+        </div>
+        <Button
+          plain
+          onClick={onClose}
+          data-testid="fleet-card-close"
+          className="!text-xs !text-zinc-400"
+        >
+          Close
+        </Button>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800/50">
+        <span className="text-white">{status.activity}</span>
+        {status.remainingMs !== undefined && (
+          <span data-testid="fleet-card-eta" className="font-mono text-xs text-zinc-400">
+            arrives {formatEta(status.remainingMs)}
+          </span>
+        )}
+      </div>
+
+      {lt && (
+        <RouteLegs
+          preview={{
+            route: lt.route,
+            legEtas: lt.legEtas,
+            totalEta: lt.arriveTime,
+            departGate: { q: 0, r: 0 },
+            worldTime,
+          }}
+          worldTime={worldTime}
+          nameById={nameById}
+        />
+      )}
+    </aside>
   )
 }
 

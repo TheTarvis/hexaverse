@@ -13,11 +13,13 @@ import { ringHexes, ringOf, type Hex } from '@/lib/hex'
 import { hexPolygonPoints, hexToPixel, type Point } from '@/lib/hex/pixel'
 import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
+import { boardLegBurn } from '@/lib/hex'
 import {
   featureGlidePixel,
   featureLogicalHex,
   fleetGlidePixel,
   fleetLogicalHex,
+  fleetOnBoard,
   headingDeg,
   sensorBubbleHexes,
 } from './glyph-geometry'
@@ -89,21 +91,29 @@ export function BoardScene({
       .map((r) => ({ ring: r, points: ringPolygon(r), hilite: r === selectedRing }))
   }, [features, hexById, selectedId])
 
+  // Only fleets that still have a hex here are drawn: one out on a lane past its
+  // departure gate belongs to the galaxy view, not this board.
+  const onBoard = useMemo(() => fleets.filter((f) => fleetOnBoard(f, worldTime)), [fleets, worldTime])
+
   // The live sensor bubble around own units.
   const bubble = useMemo(() => {
-    const centers = fleets
+    const centers = onBoard
       .filter((f) => f.own)
       .map((f) => fleetLogicalHex(f, worldTime, hexById.get(dockedParent(f) ?? '')))
     return sensorBubbleHexes(centers, AMBIENT_RADIUS)
-  }, [fleets, worldTime, hexById])
+  }, [onBoard, worldTime, hexById])
 
-  // Committed burn paths of own fleets (a foreign fleet is a snapshot — no path).
+  // Committed paths of own fleets — a burn, or a trip's leg 0 (the run out to the
+  // departure gate), which reads the same on the board. A foreign fleet is a
+  // snapshot: no path.
   const burnPaths = useMemo(
     () =>
-      fleets
-        .filter((f) => f.own && f.state.mode === 'burn' && f.state.burn)
-        .map((f) => ({ id: f.id, points: pathPolyline(f.state.burn!.path) })),
-    [fleets],
+      onBoard
+        .filter((f) => f.own)
+        .map((f) => ({ id: f.id, path: committedPath(f) }))
+        .filter((p): p is { id: string; path: Hex[] } => !!p.path)
+        .map((p) => ({ id: p.id, points: pathPolyline(p.path) })),
+    [onBoard],
   )
 
   return (
@@ -169,7 +179,7 @@ export function BoardScene({
       </g>
 
       <g data-testid="fleet-glyphs">
-        {fleets.map((f) => {
+        {onBoard.map((f) => {
           const parentId = dockedParent(f)
           const parentPixel = parentId ? pixelById.get(parentId) : undefined
           const p = fleetGlidePixel(f, worldTime, parentPixel)
@@ -201,6 +211,16 @@ function ringPolygon(ring: number): string {
 
 function dockedParent(f: Fleet): string | undefined {
   return f.state.mode === 'docked' ? f.state.docked?.parentId : undefined
+}
+
+// committedPath — the hex path a fleet is currently flying on this board: a burn,
+// or a trip's board leg. Null for a fleet that isn't flying one.
+function committedPath(f: Fleet): Hex[] | null {
+  if (f.state.mode === 'burn' && f.state.burn) return f.state.burn.path
+  if (f.state.mode === 'laneTransit' && f.state.laneTransit) {
+    return boardLegBurn(f.state.laneTransit)?.path ?? null
+  }
+  return null
 }
 
 function pathPolyline(path: Hex[]): string {

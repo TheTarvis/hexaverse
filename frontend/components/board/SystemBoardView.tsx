@@ -7,7 +7,8 @@
 // HexBoard/BoardScene draw, FactsPanel commands, glyph-geometry/move-preview do
 // the math. The three #0005 refetch rules ride useBoardRealtime.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import { toast } from '@/lib/toast'
@@ -17,11 +18,12 @@ import { useWorldTime } from '@/hooks/use-world-time'
 import { useBoardRealtime } from '@/hooks/use-board-realtime'
 import type { Hex, Target } from '@/lib/hex'
 import type { Fleet } from '@/lib/types/fleet'
+import { FleetRoster } from '@/components/fleet/FleetRoster'
 import { HexBoard } from './HexBoard'
 import { BoardScene } from './BoardScene'
 import { SelectionPreview } from './SelectionPreview'
 import { FactsPanel, type BoardSelection } from './FactsPanel'
-import { featureLogicalHex, fleetLogicalHex } from './glyph-geometry'
+import { featureLogicalHex, fleetLogicalHex, fleetOnBoard } from './glyph-geometry'
 import { planToBody, planToHex, type MovePlan } from './move-preview'
 
 const STAGE = 'relative h-dvh w-full overflow-hidden bg-[#05070d]'
@@ -36,6 +38,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const { data: board, isLoading, isError, error } = useSystemBoard(systemId)
   const { data: fleets } = useFleetsInSystem(systemId)
   const worldTime = useWorldTime(board?.worldTime)
+  const router = useRouter()
 
   const [selection, setSelection] = useState<BoardSelection>(null)
   const [activeFleetId, setActiveFleetId] = useState<string | null>(null)
@@ -87,15 +90,36 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     return null
   }, [fromHex, selection, worldTime])
 
-  // Own fleets' arrival ETAs feed the self-scheduled refetch (rule 1).
+  // Own fleets' arrival ETAs feed the self-scheduled refetch (rule 1) — a burn's
+  // arrival, and a trip's gate ETA (the moment the fleet leaves this board).
   const etaCandidates = useMemo(
     () =>
-      ownFleets
-        .filter((f) => f.state.mode === 'burn' && f.state.burn)
-        .map((f) => f.state.burn!.arriveTime),
+      ownFleets.flatMap((f) => {
+        if (f.state.mode === 'burn' && f.state.burn) return [f.state.burn.arriveTime]
+        const gateEta = f.state.mode === 'laneTransit' ? f.state.laneTransit?.boardLeg?.gateEta : undefined
+        return gateEta === undefined ? [] : [gateEta]
+      }),
     [ownFleets],
   )
   useBoardRealtime({ systemId, worldTime, etaCandidates, enabled: !!board })
+
+  // Departure hand-off (#0008): a fleet that transits its gate is out on a lane —
+  // it has no hex on this board any more, and the crawl it's now doing is the
+  // galaxy view's picture. Follow it there, but only for a departure we actually
+  // watched happen (a ref, so revisiting the board mid-trip doesn't bounce you).
+  const watchedDeparture = useRef(false)
+  useEffect(() => {
+    const inTransit = ownFleets.filter((f) => f.state.mode === 'laneTransit')
+    if (inTransit.length === 0) return
+    if (inTransit.some((f) => fleetOnBoard(f, worldTime))) {
+      watchedDeparture.current = true
+      return
+    }
+    if (watchedDeparture.current) {
+      watchedDeparture.current = false
+      router.push('/')
+    }
+  }, [ownFleets, worldTime, router])
 
   if (isLoading) {
     return (
@@ -146,6 +170,24 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     )
   }
 
+  // A roster row: a fleet on this board becomes the acting one (and gets
+  // selected); a fleet in another system opens that board; one out on a lane has
+  // no board at all — the galaxy is where it's visible.
+  const showFleet = (f: Fleet) => {
+    if (f.state.mode === 'laneTransit' || f.state.mode === 'laneHold') {
+      if (!fleetOnBoard(f, worldTime)) {
+        router.push('/')
+        return
+      }
+    }
+    if (f.systemId !== systemId) {
+      router.push(`/systems/${f.systemId}`)
+      return
+    }
+    setActiveFleetId(f.id)
+    setSelection({ kind: 'fleet', fleet: f })
+  }
+
   // --- verbs -----------------------------------------------------------------
   const commitMove = () => {
     if (!activeFleet || !selection) return
@@ -186,6 +228,9 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
         onSuccess: () => {
           toast.success('Fleet departing')
           setSelection(null)
+          // Arm the hand-off here too: a fleet already sitting on the gate has a
+          // zero-length board leg, so it's off-board before any frame renders it.
+          watchedDeparture.current = true
         },
         onError: (e) => toast.error(e.message || 'Departure failed'),
       },
@@ -222,7 +267,16 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
         <SelectionPreview plan={selection?.kind === 'fleet' ? null : plan} />
       </HexBoard>
 
-      <div className="pointer-events-none absolute inset-0 flex justify-end gap-4 p-4">
+      <div className="pointer-events-none absolute inset-0 flex justify-between gap-4 p-4">
+        {/* The roster is the same panel the galaxy shows — where every fleet is,
+            whichever canvas you're standing on. A fleet on this board becomes the
+            one you're commanding; one elsewhere drills into its system. */}
+        <FleetRoster
+          worldTime={worldTime}
+          activeFleetId={activeFleet?.id ?? null}
+          currentSystemId={systemId}
+          onSelect={showFleet}
+        />
         <FactsPanel
           starClass={board.starClass}
           character={board.character}

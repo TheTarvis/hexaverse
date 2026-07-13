@@ -11,9 +11,10 @@ import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 // Spies the mocked graph hands back through onReady (recenter/focusSystem) so we
 // can assert the controls drive the controller; graphPropsSpy captures the fleet
 // marker / home props; pushSpy stands in for the router (drill-in navigation).
-const { recenterSpy, focusSpy, graphPropsSpy, pushSpy } = vi.hoisted(() => ({
+const { recenterSpy, focusSpy, focusPointSpy, graphPropsSpy, pushSpy } = vi.hoisted(() => ({
   recenterSpy: vi.fn(),
   focusSpy: vi.fn(),
+  focusPointSpy: vi.fn(),
   graphPropsSpy: vi.fn(),
   pushSpy: vi.fn(),
 }))
@@ -52,14 +53,33 @@ vi.mock('next/dynamic', async () => {
 vi.mock('@/components/galaxy/GalaxyGraph', async () => {
   const React = await import('react')
   return {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    GalaxyGraph: ({ galaxy, onSelect, onReady, fleetSystemIds, homeSystemId }: any) => {
-      graphPropsSpy({ fleetSystemIds, homeSystemId })
+    GalaxyGraph: ({
+      galaxy,
+      onSelect,
+      onReady,
+      fleetSystemIds,
+      transitFleets,
+      onSelectFleet,
+      homeSystemId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }: any) => {
+      graphPropsSpy({ fleetSystemIds, transitFleets, homeSystemId })
       React.useEffect(() => {
-        onReady?.({ recenter: recenterSpy, focusSystem: focusSpy })
+        onReady?.({ recenter: recenterSpy, focusSystem: focusSpy, focusPoint: focusPointSpy })
       }, [onReady])
       return (
         <div data-testid="mock-graph">
+          {/* Stands in for clicking a fleet's lane marker (raycast in the real
+              graph, a button here). */}
+          {(transitFleets ?? []).map((f: Fleet) => (
+            <button
+              key={f.id}
+              data-testid={`click-lane-marker-${f.id}`}
+              onClick={() => onSelectFleet?.(f.id)}
+            >
+              marker
+            </button>
+          ))}
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           {galaxy.nodes.map((n: any) => (
             <button key={n.id} data-testid={`select-${n.id}`} onClick={() => onSelect(n)}>
@@ -361,7 +381,7 @@ describe('GalaxyView', () => {
     expect(screen.queryByTestId('travel-button')).not.toBeInTheDocument()
   })
 
-  it('shows a transit banner for a travelling fleet', () => {
+  it('shows a travelling fleet in the roster, with its route and a live ETA', () => {
     mockGalaxyState()
     const traveling: Fleet = {
       ...coastFleet('fleet_1', 'sys-0'),
@@ -379,8 +399,102 @@ describe('GalaxyView', () => {
     mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
 
     renderView()
-    const banner = screen.getByTestId('transit-banner')
-    expect(banner).toHaveTextContent('Borealis')
-    expect(banner).toHaveTextContent(/arrives/i)
+    const row = screen.getByTestId('fleet-row-fleet_1')
+    expect(row).toHaveTextContent('Axion → Borealis')
+    expect(row).toHaveTextContent('In transit')
+    expect(screen.getByTestId('fleet-row-eta-fleet_1')).toHaveTextContent('11m')
+  })
+
+  // Spec: 0008/S8
+  it('opens a card for the fleet whose lane marker is clicked, and closes it again', async () => {
+    mockGalaxyState()
+    const traveling: Fleet = {
+      ...coastFleet('fleet_1', 'sys-0'),
+      state: {
+        mode: 'laneTransit',
+        laneTransit: {
+          route: ['sys-0', 'sys-1'],
+          legEtas: [60_000, 660_000],
+          departTime: 0,
+          arriveTime: 660_000,
+          entryGate: { q: 16, r: -2 },
+        },
+      },
+    }
+    mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
+
+    renderView()
+    // Nothing selected: the inspector's empty state, no fleet card.
+    expect(screen.queryByTestId('fleet-card')).not.toBeInTheDocument()
+
+    fireEvent.click(await screen.findByTestId('click-lane-marker-fleet_1'))
+
+    const card = screen.getByTestId('fleet-card')
+    expect(card).toHaveTextContent('Axion → Borealis')
+    expect(card).toHaveTextContent('In transit')
+    expect(screen.getByTestId('fleet-card-eta')).toHaveTextContent('11m')
+    // It names the lane chain ahead of the hull.
+    expect(card).toHaveTextContent('Borealis')
+
+    fireEvent.click(screen.getByTestId('fleet-card-close'))
+    expect(screen.queryByTestId('fleet-card')).not.toBeInTheDocument()
+    expect(screen.getByTestId('inspector')).toBeInTheDocument()
+  })
+
+  // Spec: 0008/S8
+  it('a roster row for a fleet on a lane glides the camera to it and opens its card', async () => {
+    mockGalaxyState()
+    const traveling: Fleet = {
+      ...coastFleet('fleet_1', 'sys-0'),
+      state: {
+        mode: 'laneTransit',
+        laneTransit: {
+          route: ['sys-0', 'sys-1'],
+          legEtas: [0, 660_000],
+          departTime: 0,
+          arriveTime: 660_000,
+          entryGate: { q: 16, r: -2 },
+        },
+      },
+    }
+    mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
+
+    renderView()
+    await screen.findByTestId('mock-graph')
+    fireEvent.click(screen.getByTestId('fleet-row-fleet_1'))
+
+    // The camera goes to the hull's point on the lane — not to a star, because it
+    // isn't at one.
+    expect(focusPointSpy).toHaveBeenCalled()
+    expect(focusSpy).not.toHaveBeenCalled()
+    expect(screen.getByTestId('fleet-card')).toBeInTheDocument()
+  })
+
+  // Spec: 0008/S7
+  it('hands a travelling fleet to the transit layer instead of pinning it to the star it left', async () => {
+    mockGalaxyState()
+    const traveling: Fleet = {
+      ...coastFleet('fleet_1', 'sys-0'),
+      state: {
+        mode: 'laneTransit',
+        laneTransit: {
+          route: ['sys-0', 'sys-1'],
+          legEtas: [60_000, 660_000],
+          departTime: 0,
+          arriveTime: 660_000,
+          entryGate: { q: 16, r: -2 },
+        },
+      },
+    }
+    mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
+
+    renderView()
+    await screen.findByTestId('mock-graph')
+
+    const props = graphPropsSpy.mock.calls.at(-1)![0]
+    // It's drawn crawling its lane…
+    expect(props.transitFleets.map((f: Fleet) => f.id)).toEqual(['fleet_1'])
+    // …and NOT as a presence pip on sys-0, which it has already left.
+    expect(props.fleetSystemIds).not.toContain('sys-0')
   })
 })

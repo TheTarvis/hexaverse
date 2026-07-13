@@ -11,9 +11,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import * as THREE from 'three'
 import type { Galaxy, GalaxyNode } from '@/lib/types/galaxy'
+import type { Fleet } from '@/lib/types/fleet'
 import { REGION_PALETTE } from './region-palette'
 import { glowTexture } from './glow-texture'
 import { CameraRig } from './camera-rig'
+import { TransitLayer } from './transit-layer'
+import type { NodePositions } from './transit-geometry'
 
 // Client-only. Typed loosely — react-force-graph-3d's generics don't add value
 // here and the ref surface we use is a small, hand-declared slice (FgRef).
@@ -34,6 +37,9 @@ interface FgRef {
 export interface GalaxyGraphController {
   recenter: () => void
   focusSystem: (id: string) => void
+  // Glide to an arbitrary point in graph space — a fleet out on a lane sits
+  // between stars, so focusing it needs a point, not a system (#0008).
+  focusPoint: (p: { x: number; y: number; z: number }) => void
 }
 
 interface GalaxyGraphProps {
@@ -44,6 +50,15 @@ interface GalaxyGraphProps {
   // Systems hosting the requester's own fleets — drawn with a presence marker
   // (#0002 Follow-ups 2026-07-11: own fleets show on the galaxy tier).
   fleetSystemIds?: string[]
+  // Fleets out on a lane (laneTransit / laneHold) — drawn crawling their route by
+  // the TransitLayer (#0008). A travelling fleet is NOT in a system, so it must
+  // not also show up as a presence pip on the star it left.
+  transitFleets?: Fleet[]
+  // Clicked a fleet's lane marker. The markers are scene objects the force graph
+  // doesn't know about, so the click is raycast here.
+  onSelectFleet?: (fleetId: string) => void
+  // The live world clock, ticking per frame — the transit layer's animation input.
+  worldTime?: number
   // The fleet/home system the ⌖ recenter snaps to when one exists (else the
   // whole-galaxy framing) — resolves the M2 "no fleet to snap to" TODO.
   homeSystemId?: string | null
@@ -57,13 +72,18 @@ export function GalaxyGraph({
   onSelect,
   onReady,
   fleetSystemIds,
+  transitFleets,
+  onSelectFleet,
+  worldTime = 0,
   homeSystemId,
 }: GalaxyGraphProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<FgRef | null>(null)
   const rigRef = useRef<CameraRig | null>(null)
   const gridRef = useRef<THREE.GridHelper | null>(null)
+  const transitRef = useRef<TransitLayer | null>(null)
   const readyRef = useRef(false)
+  const [sceneReady, setSceneReady] = useState(false)
   const lastClickRef = useRef<{ id: string; t: number }>({ id: '', t: 0 })
   const [size, setSize] = useState({ w: 0, h: 0 })
 
@@ -89,6 +109,16 @@ export function GalaxyGraph({
   )
 
   const nodeById = useMemo(() => new Map(galaxy.nodes.map((n) => [n.id, n])), [galaxy])
+
+  // Star positions for the transit layer. One stable Map, refilled when the galaxy
+  // read changes (a newly revealed system), so the layer built at init keeps a
+  // valid reference without being torn down.
+  const nodePosRef = useRef<NodePositions>(new Map())
+  useEffect(() => {
+    const m = nodePosRef.current
+    m.clear()
+    for (const n of galaxy.nodes) m.set(n.id, { x: n.x, y: n.y, z: n.z })
+  }, [galaxy])
 
   const laneCount = useMemo(() => {
     const counts = new Map<string, number>()
@@ -240,6 +270,12 @@ export function GalaxyGraph({
             scene.add(grid)
           }
 
+          // The travelling-fleet overlay lives in the same scene (#0008).
+          if (scene && !transitRef.current) {
+            transitRef.current = new TransitLayer(scene, nodePosRef.current)
+            setSceneReady(true)
+          }
+
           readyRef.current = true
           onReady?.({
             // ⌖ recenter snaps to the fleet's system when one exists, else the
@@ -254,6 +290,8 @@ export function GalaxyGraph({
               const n = nodeById.get(id)
               if (n) rig.focus({ x: n.x, y: n.y, z: n.z })
             },
+            // Glide to a bare point — a fleet mid-lane (the roster's "show me").
+            focusPoint: (p) => rig.focus(p),
           })
           return
         }
@@ -266,11 +304,88 @@ export function GalaxyGraph({
     }
   }, [size.w, galaxy.bounds, onReady, nodeById])
 
-  // Tear the rig down on unmount.
+  // ---- the travelling-fleet overlay ----------------------------------------
+  // Rebuild the trails when the set of trips changes (a departure, a redirect, an
+  // arrival)…
+  const transit = useMemo(() => transitFleets ?? [], [transitFleets])
+  useEffect(() => {
+    if (!sceneReady) return
+    transitRef.current?.setFleets(transit)
+  }, [sceneReady, transit])
+
+  // …and slide the markers along their lanes on every clock tick. This is an
+  // imperative scene write, NOT a React render of the force graph — the position
+  // is computed from (route, legEtas, worldTime), so it keeps crawling between
+  // reads.
+  useEffect(() => {
+    if (!sceneReady) return
+    transitRef.current?.update(worldTime)
+  }, [sceneReady, worldTime])
+
+  // Lane markers are clickable: raycast them on the canvas ourselves, since the
+  // force graph only hit-tests its own nodes. A drag (orbit/pan) must never
+  // select, so a press that travels more than a few pixels isn't a click; and a
+  // hover over a marker shows the pointer cursor, the only affordance a bare
+  // sprite can offer.
+  const selectFleetRef = useRef(onSelectFleet)
+  selectFleetRef.current = onSelectFleet
+  useEffect(() => {
+    const fg = fgRef.current
+    const canvas = fg?.renderer()?.domElement
+    if (!sceneReady || !fg || !canvas) return
+
+    const raycaster = new THREE.Raycaster()
+    const ndc = new THREE.Vector2()
+    let downAt: { x: number; y: number } | null = null
+
+    const hitAt = (e: PointerEvent | MouseEvent): string | null => {
+      const layer = transitRef.current
+      if (!layer) return null
+      const r = canvas.getBoundingClientRect()
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
+      raycaster.setFromCamera(ndc, fg.camera())
+      return layer.pick(raycaster)
+    }
+
+    const onDown = (e: PointerEvent) => {
+      downAt = { x: e.clientX, y: e.clientY }
+    }
+    const onUp = (e: PointerEvent) => {
+      const from = downAt
+      downAt = null
+      if (!from) return
+      if (Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) return // a drag
+      const id = hitAt(e)
+      if (id) {
+        e.stopPropagation()
+        selectFleetRef.current?.(id)
+      }
+    }
+    const onMove = (e: PointerEvent) => {
+      if (downAt) return
+      canvas.style.cursor = hitAt(e) ? 'pointer' : ''
+    }
+
+    // Capture phase: the marker sits above the graph, so a hit is ours before the
+    // force graph treats the same press as a background click.
+    canvas.addEventListener('pointerdown', onDown, { capture: true })
+    canvas.addEventListener('pointerup', onUp, { capture: true })
+    canvas.addEventListener('pointermove', onMove)
+    return () => {
+      canvas.removeEventListener('pointerdown', onDown, { capture: true })
+      canvas.removeEventListener('pointerup', onUp, { capture: true })
+      canvas.removeEventListener('pointermove', onMove)
+      canvas.style.cursor = ''
+    }
+  }, [sceneReady])
+
+  // Tear the rig (and the overlay) down on unmount.
   useEffect(() => {
     return () => {
       rigRef.current?.dispose()
       rigRef.current = null
+      transitRef.current?.dispose()
+      transitRef.current = null
       readyRef.current = false
     }
   }, [])

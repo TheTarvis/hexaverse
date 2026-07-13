@@ -205,53 +205,138 @@ is *stepped*, not teleported.
   depart — is #0007's UI over this same order endpoint. Spike
   (`frontend/app/spike/galaxy-3d/`) is the feel reference, rebuilt on the
   layered stack.
+- **One trip, two canvases.** A trip is drawn by whichever view owns the tier
+  it's currently on, and the fleet is drawn **exactly once**: leg 0 is a #0004
+  burn on the origin *board* (path and all — the board draws a trip's board leg
+  with the same code it draws a burn with); past the gate ETA the fleet has no
+  hex on any board and the *galaxy* draws it crawling its lane. Crossing the
+  gate while you watch **hands the view off** to the galaxy, so the camera
+  follows the hull rather than staring at the board it left. The two pictures
+  can't disagree: both are computed from `(state, worldTime)`, and both drop the
+  fleet the moment the other picks it up. `frontend/components/board/glyph-
+  geometry.ts` (`fleetOnBoard`) is the seam.
 - **Reserved hooks (schema now, mechanics later):** `cost`/`relayModifier`
   on lanes, `jumpRange` on the fleet drive, `relay` on a system — so FTL and
   corridors layer on with zero rework.
 - **Tuning is data:** drive speed, and later the FTL cost curve, live in a
   params object with spike values as defaults.
 
+## Scenarios
+
+### S1 — Commit freezes the whole trip in one action
+
+- **Given** a fleet in a system with a charted lane route to a destination
+- **When** it is ordered to travel there
+- **Then** one `lane-travel` action is committed carrying the frozen
+  `{boardLeg, route, legEtas, arriveTime}`, and the fleet flips to
+  `laneTransit` in the same transaction
+  *(`TestOrderTravel_FreezesTripAndCommits`.)*
+
+### S2 — A destination with no charted route is refused
+
+- **Given** a fleet whose corporation has not charted a lane route to a system
+- **When** it is ordered to travel there
+- **Then** the order fails with the no-charted-route sentinel and the fleet
+  keeps its current state *(`TestOrderTravel_NoRouteSurfacesSentinel`.)*
+
+### S3 — Arrival lands at the rim entry gate and reveals the destination
+
+- **Given** a fleet whose trip's arrival time has passed
+- **When** any read resolves it (lazily, or via the sweep)
+- **Then** the fleet coasts at the destination board's entry-gate tile, the
+  destination is `explored` with its onward lanes charted, and the interior
+  detail is rolled exactly once
+  *(`TestTravelResolver_LandsAtEntryGateAndReveals`,
+  `TestIntegration_TravelArriveReveals`.)*
+
+### S4 — A cancel mid-lane parks the fleet where it is
+
+- **Given** a fleet out on a lane between two systems
+- **When** its trip is cancelled
+- **Then** it holds at its computed fraction of that lane, visible, until
+  re-ordered *(`TestCancel_MidLaneHolds`.)*
+
+### S5 — Departure is geometric: the fleet flies to the gate first
+
+- **Given** a fleet on a board that has committed a trip out through a lane gate
+- **When** the board is drawn before the trip's gate ETA
+- **Then** the fleet is on that board, gliding along its board leg, with the run
+  out to the gate drawn as a path — the same picture as any burn
+  *(`BoardScene > draws a departing fleet on its board leg…`.)*
+
+### S6 — Crossing the gate leaves the board and hands off to the galaxy
+
+- **Given** a fleet the player is watching depart, whose trip passes its gate ETA
+- **When** the clock crosses that ETA
+- **Then** the fleet is no longer drawn on the board (it has no hex there — in
+  particular it must not fall back to the star's centre cell), and the view
+  follows it to the galaxy; opening that board again mid-trip does **not** bounce
+  the player out *(`SystemBoardView > hands off to the galaxy view…`,
+  `SystemBoardView > stays put when opening a board whose fleet is already out on
+  a lane`.)*
+
+### S7 — A fleet on a lane crawls it, and is not parked at the star it left
+
+- **Given** a fleet whose trip is past its gate ETA (its `systemId` still names
+  the origin, which is only settled at arrival)
+- **When** the galaxy view is drawn at successive world times
+- **Then** it appears at the computed point along its current lane, advancing as
+  the clock runs, with its route lit — and **not** as a presence marker on the
+  system it departed *(`transitPoint > crawls the first lane, then the second…`,
+  `TransitLayer > slides a marker along its lane…`, `GalaxyView > hands a
+  travelling fleet to the transit layer…`.)*
+
+### S8 — The hull on the lane is clickable, and says what it is
+
+- **Given** a fleet drawn crawling a lane on the galaxy
+- **When** its marker is clicked (or its roster row is)
+- **Then** a card opens naming the fleet, its route, and its live arrival ETA —
+  and the camera goes to the hull's point on the lane, not to a star, because it
+  isn't at one *(`GalaxyView > opens a card for the fleet whose lane marker is
+  clicked…`, `GalaxyView > a roster row for a fleet on a lane glides the camera
+  to it…`, `TransitLayer > is pickable…`.)*
+
 ## Acceptance criteria
 
-- [ ] Requesting a route to a **charted** system returns the shortest-time
+- [x] Requesting a route to a **charted** system returns the shortest-time
       lane path with **per-leg and total ETA**; leg times are proportional to
       real 3D lane length.
-- [ ] Requesting a route to a **Rumored neighbor** succeeds as a terminal
+- [x] Requesting a route to a **Rumored neighbor** succeeds as a terminal
       hop; requesting one to any system with **no charted lane route**
       (unreached star, or through uncharted intermediates) fails with a
       sentinel error — verified with two players whose charted sets differ:
       the same target can route for one and refuse for the other.
-- [ ] Commit freezes `{boardLeg, route, legEtas, arriveTime}` in a #0005
+- [x] Commit freezes `{boardLeg, route, legEtas, arriveTime}` in a #0005
       action + flips the fleet to `lane-transit` in one transaction; the
       single-slot guard rejects a second order.
-- [ ] **Departure is geometric**: a trip ordered from a board includes leg 0
+- [x] **Departure is geometric**: a trip ordered from a board includes leg 0
       — the burn to the route's first lane's **fixed gate tile** (zero-length
       when already on it); the fleet visibly transits the gate before
       entering the lane.
-- [ ] **Gates are fixed and consistent**: a given lane always uses the same
+- [x] **Gates are fixed and consistent**: a given lane always uses the same
       rim tile on a given board (bearing-projected, deterministic), entry
       side and departure side alike; any player in a system can read its
       gates.
-- [ ] A traveling fleet's graph position is **computed** from
+- [x] A traveling fleet's graph position is **computed** from
       `(boardLeg, route, legEtas, worldTime)` — correct mid-leg answers with
       no stored per-tick position (emulator test at injected clock times).
-- [ ] **Mid-transit cancel** halts the fleet at its computed position:
+- [x] **Mid-transit cancel** halts the fleet at its computed position:
       board-leg → #0004's stop-burn; mid-lane → `lane-hold` at the frozen
       fraction, where it stays visible until re-ordered.
 - [ ] **Mid-transit redirect** reroutes from the current computed position
       (mid-lane: forward to the far node or back to the near one), cancelling
       the old action and committing the new frozen route + ETA in **one
       transaction** under the single-slot guard.
-- [ ] Arrival resolution (triggered lazily by any read, or by the sweep)
+- [x] Arrival resolution (triggered lazily by any read, or by the sweep)
       lands the fleet **coasting at the destination board's rim entry tile**,
       flips the destination to **Explored** with onward lanes charted, and
       triggers the #0003 detail roll exactly once on a first-ever arrival.
-- [ ] Reveal is **destination-on-arrival**; no reveal occurs at commit time
+- [x] Reveal is **destination-on-arrival**; no reveal occurs at commit time
       or mid-route.
 - [ ] The owner sees route + ETA; an **observer's** read shows the traveling
       fleet only per #0006's visibility rules, and never the route or ETA
       (#0005 owner-only projection).
-- [ ] The #0002 view: select a system → route preview with ETA labels →
+- [x] The #0002 view: select a system → route preview with ETA labels →
       commit → the fleet crawls the lane over real time and the destination
       lights up on arrival — surviving a page reload mid-trip (state is
       server-side; the client re-derives the animation from the read).
@@ -261,6 +346,38 @@ is *stepped*, not teleported.
       system; the fleet gets there over real time (offline included) and
       reveals it — and a mid-trip change of mind cleanly cancels or
       redirects it.
+
+## Implementation notes (2026-07-13)
+
+- **Where it landed:** `backend/fleet/travel.go` (`PreviewRoute` / `orderTravel`
+  / `buildTrip`), `travel_resolver.go` (the arrival epilogue), `routing.go` (the
+  fog-honest Dijkstra); `backend/board/ship.go` carries the `laneTransit` /
+  `laneHold` shapes. Client: `frontend/components/galaxy/transit-geometry.ts`
+  (pure: where a fleet is between stars) + `transit-layer.ts` (the three.js
+  overlay), `frontend/components/board/glyph-geometry.ts` (`fleetOnBoard`, the
+  board/galaxy seam), and `frontend/components/fleet/` (the roster, spec #0011).
+- **The first client build drew the trip only half-way, three ways** — all one
+  root cause: the board understood `burn` and nothing else. Leg 0's path wasn't
+  drawn (the path layer filtered on `mode === 'burn'`); the fleet *snapped*
+  hex-to-hex instead of gliding (the glide had no `laneTransit` branch, so it
+  fell back to the quantized logical hex); and past the gate the fleet was drawn
+  at the board's centre cell — `shipPos` correctly reports "no hex here"
+  (`ok: false`) with a `(0,0)` placeholder, and both callers ignored the flag,
+  planting the hull on the star. The fix makes leg 0 **a burn everywhere** (one
+  `boardLegBurn` view of it feeds the path, the glide, and the thruster) and
+  makes `ok: false` load-bearing via `fleetOnBoard`. Recorded because the shape
+  of the bug — *a state the renderer doesn't know about degrades to a plausible
+  wrong answer rather than an obvious one* — will recur with every new movement
+  mode.
+- **The hand-off (new, 2026-07-13):** crossing the gate while the player watches
+  navigates the board view to the galaxy (`/`), armed by a ref so only a
+  *watched* departure follows the fleet — revisiting the board mid-trip doesn't
+  bounce you. Without it, a correct departure looked like the fleet vanishing.
+- **Still open:** mid-transit **redirect** has code but no test; the observer
+  projection (a foreign fleet's read never carrying route/ETA) is unverified;
+  the reserved schema hooks (`cost`, `relayModifier`, `jumpRange`, `relay`) are
+  not in the structs yet; and the slice e2e is unwritten. Those four acceptance
+  boxes stay unticked.
 
 ## Decisions (imported from `../plans/movement-galaxy.md`)
 

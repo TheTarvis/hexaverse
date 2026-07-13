@@ -32,9 +32,15 @@ type GenerationParams struct {
 }
 
 // DefaultParams are the spike-baseline knobs: radius ~16, star_rich roomy-dense.
+//
+// Radius is the one value here that is NOT free to tune in isolation — it's a
+// cross-domain invariant (fleet's lane gates sit on this ring; spawn's rim ring is
+// one inside it), so it sources from common.Tuning().BoardRadius. The rest are
+// generation dials: they bake into an interior at generate time, so retuning them
+// only affects systems materialized afterwards.
 func DefaultParams() GenerationParams {
 	return GenerationParams{
-		Radius:       16,
+		Radius:       common.Tuning().BoardRadius,
 		InnerMaxRing: 5,
 		MidMaxRing:   11,
 		BasePeriod:   3_600_000, // 1 world-hour at ring 1

@@ -2,7 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { SystemBoardView } from './SystemBoardView'
 import { useSystemBoard } from '@/hooks/use-system-board'
-import { useFleetsInSystem, useFleetOrders, useScan, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
+import {
+  useFleetsInSystem,
+  useFleetOrders,
+  useScan,
+  useRoutePreview,
+  useFleetTravel,
+  useMyFleets,
+} from '@/hooks/use-fleets'
+import { useGalaxy } from '@/hooks/use-galaxy'
 import type { SystemBoard } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 import type { UseQueryResult } from '@tanstack/react-query'
@@ -14,12 +22,20 @@ vi.mock('@/hooks/use-fleets', () => ({
   useScan: vi.fn(),
   useRoutePreview: vi.fn(),
   useFleetTravel: vi.fn(),
+  // The roster the board mounts reads every own fleet (and the galaxy, for
+  // system names) — both stubbed so this suite stays about the board.
+  useMyFleets: vi.fn(),
 }))
-// The world clock is frozen and realtime is a no-op so the composed tree is
-// deterministic; the real HexBoard/BoardScene/FactsPanel all render.
-vi.mock('@/hooks/use-world-time', () => ({ useWorldTime: () => 0 }))
+vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
+// The world clock is frozen (advanced by hand where a test needs time to pass)
+// and realtime is a no-op, so the composed tree is deterministic; the real
+// HexBoard/BoardScene/FactsPanel all render.
+const clock = vi.hoisted(() => ({ now: 0 }))
+vi.mock('@/hooks/use-world-time', () => ({ useWorldTime: () => clock.now }))
 vi.mock('@/hooks/use-board-realtime', () => ({ useBoardRealtime: vi.fn() }))
 vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+const push = vi.hoisted(() => vi.fn())
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 
 const mockBoard = vi.mocked(useSystemBoard)
 const mockFleets = vi.mocked(useFleetsInSystem)
@@ -27,6 +43,8 @@ const mockOrders = vi.mocked(useFleetOrders)
 const mockScan = vi.mocked(useScan)
 const mockRoutePreview = vi.mocked(useRoutePreview)
 const mockTravel = vi.mocked(useFleetTravel)
+const mockMyFleets = vi.mocked(useMyFleets)
+const mockGalaxy = vi.mocked(useGalaxy)
 
 const travelMutate = vi.fn()
 
@@ -73,9 +91,35 @@ function fleetsState(fleets: Fleet[]) {
   mockFleets.mockReturnValue({ data: fleets } as UseQueryResult<Fleet[], Error>)
 }
 
+// A fleet mid-departure: burning across the board to the rim gate it leaves by.
+function departingFleet(gateEta: number): Fleet {
+  return {
+    ...ownFleet,
+    state: {
+      mode: 'laneTransit',
+      laneTransit: {
+        boardLeg: {
+          path: [
+            { q: 3, r: 0 },
+            { q: 2, r: 0 },
+          ],
+          startTime: 0,
+          gateEta,
+        },
+        route: ['sys-7', 'sys-9'],
+        legEtas: [gateEta, gateEta + 60_000],
+        departTime: 0,
+        arriveTime: gateEta + 60_000,
+        entryGate: { q: -3, r: 0 },
+      },
+    },
+  }
+}
+
 describe('SystemBoardView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clock.now = 0
     mockOrders.mockReturnValue({
       order: { mutate: orderMutate, isPending: false },
       cancel: { mutate: cancelMutate, isPending: false },
@@ -87,6 +131,8 @@ describe('SystemBoardView', () => {
       isError: false,
     } as unknown as ReturnType<typeof useRoutePreview>)
     mockTravel.mockReturnValue({ mutate: travelMutate, isPending: false } as unknown as ReturnType<typeof useFleetTravel>)
+    mockMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
+    mockGalaxy.mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useGalaxy>)
     fleetsState([])
   })
 
@@ -175,5 +221,50 @@ describe('SystemBoardView', () => {
       { fleetId: 'mine', systemId: 'sys-9' },
       expect.anything(),
     )
+  })
+
+  // Spec: 0008/S6
+  it('hands off to the galaxy view when a departing fleet transits its gate', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    fleetsState([departingFleet(10_000)])
+    const { rerender } = render(<SystemBoardView systemId="sys-7" />)
+
+    // Mid-leg the fleet is still here and we stay put.
+    expect(screen.getByTestId('fleet-glyph-mine')).toBeInTheDocument()
+    expect(push).not.toHaveBeenCalled()
+
+    // Past the gate ETA it's out on the lane: gone from the board, and the view
+    // follows it to the galaxy rather than leaving a ghost on the star.
+    clock.now = 12_000
+    rerender(<SystemBoardView systemId="sys-7" />)
+    expect(screen.queryByTestId('fleet-glyph-mine')).not.toBeInTheDocument()
+    expect(push).toHaveBeenCalledWith('/')
+  })
+
+  // Spec: 0011/S3
+  it('mounts the roster, and a row for a fleet elsewhere opens that board', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    fleetsState([ownFleet])
+    const away: Fleet = { ...ownFleet, id: 'away', systemId: 'sys-9' }
+    mockMyFleets.mockReturnValue({
+      data: [ownFleet, away],
+    } as unknown as ReturnType<typeof useMyFleets>)
+    render(<SystemBoardView systemId="sys-7" />)
+
+    // Both fleets are listed, wherever they are — that's the point of the roster.
+    expect(screen.getByTestId('fleet-row-mine')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('fleet-row-away'))
+    expect(push).toHaveBeenCalledWith('/systems/sys-9')
+  })
+
+  // Spec: 0008/S6
+  it('stays put when opening a board whose fleet is already out on a lane', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    fleetsState([departingFleet(10_000)])
+    clock.now = 12_000
+    render(<SystemBoardView systemId="sys-7" />)
+
+    // The departure wasn't watched from here — no bounce.
+    expect(push).not.toHaveBeenCalled()
   })
 })
