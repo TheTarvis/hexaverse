@@ -39,10 +39,35 @@ codebase where it lands (`backend/<domain>/`, `frontend/lib/...`, Pub/Sub
 constants in `backend/common/pubsub.go`, SSE channels). Diagrams/tables
 welcome.
 
+## Scenarios
+
+Behavioral use cases in **Given / When / Then**. Each is a `### S<n> — <title>`
+heading; its global ID is `NNNN/S<n>` (the spec number namespaces it). A test
+declares coverage by citing that ID in a comment (`// Spec: NNNN/S1`), and
+`frontend/lib/spec-scenarios.test.ts` fails if an `accepted`/`implemented` spec
+has a scenario with no such marker. Cover the behavior that matters — the happy
+path plus the edges that would bite (idempotency, races, fog boundaries,
+failure modes). Structural facts that aren't behavioral (a knob lives in a
+params object, a field is indexed) belong in Acceptance criteria, not here.
+
+### S1 — <short scenario name>
+
+- **Given** <the starting state / preconditions>
+- **When** <the trigger — an action, an event, a read>
+- **Then** <the observable outcome; add more Then/And lines as needed>
+
+### S2 — <next scenario>
+
+- **Given** ...
+- **When** ...
+- **Then** ...
+
 ## Acceptance criteria
 
-Concrete, checkable conditions for "done." These become the review checklist
-and, ideally, tests.
+Concrete, checkable conditions for "done" that aren't captured as a scenario
+above — invariants, structural facts, non-behavioral guarantees. These become
+the review checklist. (Behavioral "done" lives in **Scenarios**; don't
+duplicate it here.)
 
 - [ ] ...
 - [ ] ...

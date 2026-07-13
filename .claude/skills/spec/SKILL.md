@@ -52,9 +52,34 @@ answers into the file:
 - **Design details** — data model, events, edge cases; reference real paths
   (`backend/<domain>/`, `backend/common/pubsub.go`, SSE channels, frontend
   service/hook/component chain).
-- **Acceptance criteria** — concrete checkable conditions; these become the
-  review checklist / tests.
+- **Scenarios** — behavioral use cases in Given/When/Then (see below). This is
+  where the *testable behavior* lives.
+- **Acceptance criteria** — the non-behavioral remainder: invariants,
+  structural facts, guarantees that aren't a scenario. Don't restate scenarios.
 - **Open questions** — unresolved decisions, each with an owner.
+
+#### Scenarios (Given / When / Then)
+
+Draw out the concrete use cases with the user and write each as a
+`### S<n> — <title>` block under `## Scenarios`, in Given/When/Then form. Push
+for the edges, not just the happy path — idempotency, races, fog boundaries,
+cross-corp rejection, failure modes. Each scenario's global ID is `NNNN/S<n>`.
+
+The payoff is a **machine-checkable spec-to-test link, with no BDD runner**:
+tests stay in the normal Go/vitest/Playwright style, but each one cites the
+scenario it covers in a comment —
+
+```go
+// Spec: 0010/S1
+func TestMine_HappyPath(t *testing.T) { ... }
+```
+
+`frontend/lib/spec-scenarios.test.ts` — an ordinary frontend unit test (one case
+per scenario, scanning all four suites) — then fails if any scenario in an
+`accepted`/`implemented` spec has no test citing its ID. Scenarios in `draft`
+specs don't fail, so you can write them before the code exists; they arm the
+moment the spec is accepted. When you build against a spec, add the
+`Spec: NNNN/S<n>` marker to the test that covers each scenario.
 
 Cross-link `../vision.md` and related specs (`#NNNN`). Keep it tight — if a
 section has nothing real to say, a single honest line beats padding.

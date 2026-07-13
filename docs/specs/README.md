@@ -55,6 +55,30 @@ worse than no spec.
 - One spec = one coherent feature or decision. Split if it sprawls.
 - Cross-link related specs and the vision doc (`../vision.md`).
 
+## Scenarios — the spec-to-test link
+
+Testable behavior lives in a spec's `## Scenarios` section as **Given / When /
+Then** blocks. Each is a `### S<n> — <title>` heading, giving it a global ID of
+`NNNN/S<n>`. A test declares it covers a scenario by citing that ID in a
+comment:
+
+```go
+// Spec: 0009/S1
+func TestSpawn_CreatesCorpFleetAndFog(t *testing.T) { ... }
+```
+
+`frontend/lib/spec-scenarios.test.ts` — an ordinary **frontend unit test**, one
+case per scenario — fails if any scenario in an `accepted`/`implemented` spec
+has no test citing its ID. It scans all four suites (BE unit, BE e2e, FE unit,
+FE e2e), so a Go test losing its marker fails it too. Scenarios in `draft` specs
+don't fail — write them before the code exists and they arm the moment the spec
+is accepted.
+
+No BDD runner, no step definitions, no bespoke harness: tests stay idiomatic Go
+/ vitest / Playwright and just carry the marker. `0009-spawn.md` is the worked
+example. Non-behavioral guarantees (invariants, structural facts) stay in
+**Acceptance criteria**, not Scenarios.
+
 ## What's not spec'd yet
 
 See **[BACKLOG.md](BACKLOG.md)** — a coverage map of every game mechanic the

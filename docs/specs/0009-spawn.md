@@ -172,55 +172,79 @@ carries and why that's narratively honest rather than a save-wipe.
   Component→hook→service→apiClient per `frontend/CLAUDE.md`; the corp lands in
   the session context the way the auth account does today.
 
+## Scenarios
+
+### S1 — First wake creates a corporation, one hull, and home fog
+
+- **Given** an authenticated account with no Corporation
+- **When** it calls `POST /v1/corporations` to wake up
+- **Then** a Corporation linked to the account exists, with exactly one fleet
+  carrying its `corporationId`, and a home-system observation at `explored`
+  with the onward lanes charted — and nothing else charted
+  *(`TestSpawn_CreatesCorpFleetAndFog`.)*
+
+### S2 — Spawning is idempotent per account
+
+- **Given** an account that already woke and has a living Corporation
+- **When** it calls `POST /v1/corporations` a second time
+- **Then** the existing Corporation is returned, and no duplicate corp or fleet
+  is created *(`TestSpawn_Idempotent`.)*
+
+### S3 — Spawn site satisfies all three placement criteria
+
+- **Given** a seeded galaxy graph with living corps holding explored sets
+- **When** the spawn site is selected for a new account
+- **Then** the chosen system has ≥ 1 mineable-archetype body, is ≥
+  `minSpawnDistance` graph-hops from every living corp's explored set, and is
+  picked with periphery weighting among the qualifiers
+  *(`TestSiteSelection_RequiresMineable`, `TestSiteSelection_KeepsDistanceFromClaimed`,
+  `TestSiteSelection_PeripheryWeighted`.)*
+
+### S4 — Two accounts get isolated corporations
+
+- **Given** two distinct authenticated accounts
+- **When** each wakes up
+- **Then** each gets its own Corporation, and neither can read or act on the
+  other's fleets/observations (cross-corp access is rejected)
+  *(`TestSpawn_TwoAccountsTwoCorps`.)*
+
+### S5 — A corporation with a living fleet cannot die
+
+- **Given** a Corporation whose fleet count is ≥ 1
+- **When** something attempts to set `diedAt`
+- **Then** the write is rejected; `diedAt` is settable only once the fleet count
+  reaches zero *(`TestDeathInvariant`.)*
+
+### S6 — Waking lands the player on the home hex board
+
+- **Given** a signed-in account with no Corporation, on the wake-up flow
+- **When** the player names their corporation and wakes
+- **Then** they land directly on their home system's #0007 hex board with their
+  hull on station (not the galaxy view), the whole sky visible but only home
+  charted, and the galaxy remains reachable from the board
+  *(`frontend/e2e/tests/new-user.spec.ts`.)*
+
 ## Acceptance criteria
 
-- [x] First sign-in + wake creates, in **one transaction**: a Corporation
-      (linked to the auth account), exactly one fleet with
-      `corporationId` set, and the home-system observation at `explored`
-      with onward lanes charted. *(Implemented as the agreed anchor: the corp
-      doc + account pointer commit in one transaction — `dao.CreateWithPointer`;
-      the fleet + fog writes follow through their services, healed on retry by
-      idempotency. See Implementation notes.)*
-- [x] The spawn system satisfies all three criteria (emulator test with a
-      seeded graph): ≥ 1 mineable-archetype body on the skeleton, ≥
-      `minSpawnDistance` from every other living corp's explored set, and
-      periphery-weighted selection among qualifiers.
-      *(`corporations/siteselection_test.go`.)*
-- [x] Spawning is **idempotent per account** — a second wake call returns
-      the existing living Corporation; no duplicate corps or fleets.
-      *(`TestSpawn_Idempotent`.)*
-- [x] The new player's first galaxy read shows: the full star map
-      (everyone's baseline), home `explored`, home's onward lanes, and
-      nothing else charted — verified against #0006's fog filter.
-      *(`TestSpawn_CreatesCorpFleetAndFog`.)*
+Behavioral "done" lives in **Scenarios** above; these are the non-behavioral
+guarantees.
+
+- [x] The corp doc + account pointer commit in **one transaction**
+      (`dao.CreateWithPointer`, the uniqueness anchor); the fleet + fog writes
+      follow through their services and are healed on retry by idempotency
+      (see Implementation notes). *(Atomicity of the anchor; the resulting
+      state is asserted by S1.)*
 - [x] The starting fleet is **one hull** with default params — no other
       entities exist for the new Corporation.
-- [x] A Corporation with a living fleet cannot be marked dead; `diedAt` is
-      settable only when its fleet count reaches zero (invariant test —
-      even though no slice code path destroys fleets). *(`TestDeathInvariant`.)*
+- [x] Spawn placement knobs (`minSpawnDistance`, `peripheryWeight`,
+      mineable-archetype requirement) live in a **params object**.
+      *(`corporations/params.go`.)*
 - [ ] A dead Corporation's account can spawn a **new** Corporation; the new
       corp starts with no observations, assets, or references to the old
       one. *(**Deferred** with the death → restore flow, a non-goal: no slice
       path kills a fleet, so no corp can die, and the account pointer always
       references a living corp. The rules are recorded; the restart repoint
       lands when combat does.)*
-- [x] Ownership is enforced from the account: every fleet/action/observation
-      route resolves `common.Actor` → corporation and rejects cross-corp
-      access. *(The `ResolveCorporation` middleware resolves account→living-corp
-      into `common.ActorCorp`, the single seam every fogged read already used;
-      `TestSpawn_TwoAccountsTwoCorps` + the fleet audience 404.)*
-- [x] Spawn placement knobs (`minSpawnDistance`, `peripheryWeight`,
-      mineable-archetype requirement) live in a **params object**.
-      *(`corporations/params.go`.)*
-- [x] A freshly woken player lands **directly on their home system's #0007
-      hex board** with their hull on station (not the galaxy view); the galaxy
-      remains reachable from the board. *(Revised 2026-07-11; driven by
-      `frontend/e2e/tests/new-user.spec.ts`.)*
-- [x] **Slice bar:** sign in, name your corporation, wake in a quiet
-      frontier system with one ship, and the fog/lore framing holds — you
-      see the whole sky and know only home. *(Driven end-to-end by the e2e
-      wake flow in `frontend/e2e/setup/auth.setup.ts` + the board/smoke/new-user
-      specs.)*
 
 ## Implementation notes (2026-07-10)
 

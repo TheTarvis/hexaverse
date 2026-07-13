@@ -54,6 +54,7 @@ func spawnStack(t *testing.T) (*Service, *observation.Service, *galaxy.Generated
 // initial-fog criteria: one wake creates the corp (account-linked), exactly one
 // fleet owned by it, and the home observation at Explored with onward lanes
 // Rumored — and the home carries the bootstrap-mineable guarantee.
+// Spec: 0009/S1
 func TestSpawn_CreatesCorpFleetAndFog(t *testing.T) {
 	corpSvc, fogSvc, gen, _ := spawnStack(t)
 	ctx := context.Background()
@@ -120,6 +121,7 @@ func TestSpawn_CreatesCorpFleetAndFog(t *testing.T) {
 
 // TestSpawn_Idempotent covers acceptance #3: a second wake returns the same living
 // corp and the same single fleet — no duplicate corps or fleets.
+// Spec: 0009/S2
 func TestSpawn_Idempotent(t *testing.T) {
 	corpSvc, _, _, _ := spawnStack(t)
 	ctx := context.Background()
@@ -149,6 +151,7 @@ func TestSpawn_Idempotent(t *testing.T) {
 
 // TestSpawn_TwoAccountsTwoCorps covers ownership isolation: distinct accounts get
 // distinct corps and distinct fleets, and each account resolves to its own corp.
+// Spec: 0009/S4
 func TestSpawn_TwoAccountsTwoCorps(t *testing.T) {
 	corpSvc, _, _, _ := spawnStack(t)
 	ctx := context.Background()
@@ -180,6 +183,7 @@ func TestSpawn_TwoAccountsTwoCorps(t *testing.T) {
 
 // TestDeathInvariant covers acceptance #6: a corp with a living fleet cannot be
 // marked dead; a corp with zero fleets can.
+// Spec: 0009/S5
 func TestDeathInvariant(t *testing.T) {
 	corpSvc, _, _, clk := spawnStack(t)
 	ctx := context.Background()

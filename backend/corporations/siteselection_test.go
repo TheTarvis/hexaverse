@@ -33,6 +33,7 @@ func allMineable(int) bool { return true }
 
 // TestSiteSelection_RequiresMineable — every pick carries the bootstrap guarantee,
 // even when only a minority of systems qualify. (Criterion a.)
+// Spec: 0009/S3
 func TestSiteSelection_RequiresMineable(t *testing.T) {
 	// Only even-indexed systems are mineable.
 	gal := lineGalaxy(8, func(i int) bool { return i%2 == 0 })
@@ -53,6 +54,7 @@ func TestSiteSelection_RequiresMineable(t *testing.T) {
 
 // TestSiteSelection_KeepsDistanceFromClaimed — no pick lands within
 // MinSpawnDistance lane-hops of a claimed (explored) system. (Criterion b.)
+// Spec: 0009/S3
 func TestSiteSelection_KeepsDistanceFromClaimed(t *testing.T) {
 	gal := lineGalaxy(8, allMineable)
 	params := DefaultSpawnParams()
@@ -102,6 +104,7 @@ func TestSiteSelection_Deterministic(t *testing.T) {
 // TestSiteSelection_PeripheryWeighted — with a positive periphery weight, the
 // frontier ends are chosen more often than the graph centre. (Criterion c.) A
 // distribution check over many account seeds, not a single-pick assertion.
+// Spec: 0009/S3
 func TestSiteSelection_PeripheryWeighted(t *testing.T) {
 	gal := lineGalaxy(7, allMineable) // centre ≈ s3
 	params := DefaultSpawnParams()

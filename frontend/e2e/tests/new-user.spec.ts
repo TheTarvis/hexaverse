@@ -28,6 +28,7 @@ const cfg = resolveE2EConfig()
 test.use({ storageState: { cookies: [], origins: [] } })
 
 test.describe('new user first activities', () => {
+  // Spec: 0009/S6
   test('signs up, wakes directly onto the home board with a fleet', async ({ page }) => {
     test.skip(cfg.env !== 'local', 'new-user signup drives the auth emulator (local only)')
 
