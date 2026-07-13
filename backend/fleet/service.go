@@ -302,7 +302,7 @@ func (s *Service) haltState(ctx context.Context, f *Fleet, now common.WorldMilli
 		// Still on the origin board burning to the gate — stop-burn to coast.
 		if lt.BoardLeg != nil && now < lt.BoardLeg.GateEta {
 			pos, _ := board.ShipPos(f.State, now)
-			return s.coastAt(pos), nil
+			return s.coastAt(pos, now), nil
 		}
 		// Out on a lane — hold at the current fraction between two systems.
 		if fromIdx, toIdx, frac, ok := board.LaneFraction(*lt, now); ok {
@@ -319,7 +319,7 @@ func (s *Service) haltState(ctx context.Context, f *Fleet, now common.WorldMilli
 	if err != nil {
 		return board.MovementState{}, err
 	}
-	return s.coastAt(cur), nil
+	return s.coastAt(cur, now), nil
 }
 
 // SeedFleet drops a fleet into a system, coasting at a hex — the dev stand-in
@@ -336,7 +336,7 @@ func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string,
 		Id:            "fleet_" + uuid.NewString(),
 		CorporationId: corporationID,
 		SystemId:      systemID,
-		State:         s.coastAt(at),
+		State:         s.coastAt(at, now),
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -453,11 +453,13 @@ func (s *Service) settleArrival(f *Fleet) {
 		f.State = board.MovementState{Mode: board.ModeDocked, Docked: &board.Docked{ParentId: b.DockOnArrive}}
 		return
 	}
-	f.State = s.coastAt(meet)
+	// Settle at the burn's ARRIVAL time, not "now" — an arrival resolved late on
+	// read still puts the fleet in the orbit it entered when it actually got there.
+	f.State = s.coastAt(meet, b.ArriveTime)
 }
 
-func (s *Service) coastAt(h board.Hex) board.MovementState {
-	return coastState(h, s.params.CoastPeriod)
+func (s *Service) coastAt(h board.Hex, at common.WorldMillis) board.MovementState {
+	return coastState(h, at)
 }
 
 func (s *Service) resolveFeature(ctx context.Context, systemID, featureID string) (*system.Feature, error) {

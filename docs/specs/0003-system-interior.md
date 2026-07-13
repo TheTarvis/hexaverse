@@ -189,9 +189,11 @@ start-area interiors are pre-generated.
       and **persisted to Firestore**, readable by a frontend service.
 - [ ] A **frozen start-area** system ships a fully-generated static interior.
 - [x] **All generation knobs live in one `GenerationParams` object** (radius, band
-      boundaries, per-character counts + richness, hazard rates, orbital periods)
-      with the spike values as defaults — retuning is *edit a value + regenerate*,
-      no generator-code changes.
+      boundaries, per-character counts + richness, hazard rates) with the spike
+      values as defaults — retuning is *edit a value + regenerate*, no
+      generator-code changes. (**Orbital periods left for `common.GameTuning`** —
+      Decision #15: they're pacing, derived at read, and retuning them must reach
+      systems that already exist.)
 - [x] Backend tests (Firebase emulator) cover **determinism**, **band
       distribution**, the **character dial**, and **presence of orbital elements**.
 
@@ -274,6 +276,32 @@ start-area interiors are pre-generated.
       only forecasts the system's *character* (what keeps survey intel sellable). So
       the character dial drives **detail richness / hazards more than body *count***,
       or the free graph inventory would leak the paid appraisal.
+
+## Decisions (resolved 2026-07-13 — orbital pace is tuning, not generation)
+
+15. **Orbital period moves to `common.GameTuning` and is derived at read.** This
+    **amends Decision #11**, which put "orbital periods" in `GenerationParams`
+    alongside the body/hazard dials. The dials are baked at generation and *should*
+    be — a planet isn't re-rolled — but a period is **pacing**: it says how fast the
+    world *feels*, the same job as `MsPerTile` or `ScanDuration`, and an operator
+    retuning it means "make the board turn faster," including in the systems that
+    already exist. Baking it made that impossible: an interior materialized on
+    Monday would orbit at Monday's pace forever.
+    So `Feature.Orbit.Period` is **no longer persisted** (`firestore:"-"`) — it is a
+    pure function of `ring` and `Tuning().OrbitBasePeriod`, hydrated on the one read
+    path out of Firestore (`system.PeriodFor`, applied in `dao.ListFeatures`).
+    `Ring`/`Angle0`/`Dir` stay stored: those are the generator's dice.
+    The general rule this sets: **bake-in is what disqualifies a knob from tuning,
+    not subject matter** — anything derivable at read is welcome to follow it.
+    (Noted while chasing "orbits don't move": they did, at one hex per 10 real
+    minutes. `OrbitBasePeriod / 6` is the cell-crossing time, and the ring factor
+    cancels, so that rate is identical on every ring.)
+
+    It is also the world's **one** orbital law, exposed as
+    `common.GameTuning.OrbitPeriod(ring)` and obeyed by **coasting fleets** as well as
+    bodies — fleet's separate (and un-ring-scaled) `CoastPeriod` is gone. See **#0004
+    Decision #20**: a ship and a rock on the same ring keep the same period, because
+    they are the same physics.
 
 ## Open questions
 - ~~**Triggering event (delegated)**~~ **RESOLVED 2026-07-09 (Decision #14):**

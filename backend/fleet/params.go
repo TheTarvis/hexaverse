@@ -3,13 +3,15 @@ package fleet
 import "hexaverse/common"
 
 // MovementParams holds the burn-tuning knobs (tuning is data). MsPerTile is the
-// world-ms cost to cross one hex; InterceptHorizon bounds the lead-solve search;
-// CoastPeriod is the orbital period a fleet inherits when it settles into a
-// resting orbit (large ⇒ effectively static for the motion-off slice).
+// world-ms cost to cross one hex; InterceptHorizon bounds the lead-solve search.
+//
+// A coasting fleet's orbital period is NOT here: it's the world's shared orbital
+// law (common.GameTuning.OrbitPeriod), read live at settle time by coastState —
+// the same period the bodies on that ring have. Capturing it here would freeze
+// already-coasting fleets at the pace the resolver was registered with.
 type MovementParams struct {
 	MsPerTile        common.WorldMillis
 	InterceptHorizon common.WorldMillis
-	CoastPeriod      common.WorldMillis
 	// LaneMsPerDistance is the graph-tier drive speed (#0008): world-ms to cross
 	// one unit of 3D lane length between system coords. A leg's time is
 	// length × this, frozen at commit. The reserved lane.cost / relayModifier
@@ -34,7 +36,6 @@ func DefaultMovementParams() MovementParams {
 	return MovementParams{
 		MsPerTile:         t.MsPerTile,
 		InterceptHorizon:  t.InterceptHorizon,
-		CoastPeriod:       t.CoastPeriod,
 		LaneMsPerDistance: t.LaneMsPerDistance,
 		BoardRadius:       t.BoardRadius,
 	}

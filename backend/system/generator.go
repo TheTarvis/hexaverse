@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 
-	"hexaverse/common"
 	"hexaverse/galaxy"
 )
 
@@ -33,7 +32,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		ring := clampRing(b.Ring, params.Radius)
 		ft := featureTypeForBody(b.Type)
 		id := fmt.Sprintf("feat-body-%d", i)
-		f := orbitFeature(id, ft, ring, r, params)
+		f := orbitFeature(id, ft, ring, r)
 		f.Resources = resourcesFor(bandForRing(ring, params), ft, dial.RichnessMult, r)
 		features = append(features, f)
 		if ft == FeatureGasGiant {
@@ -51,7 +50,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 			ft = FeatureIce
 		}
 		id := fmt.Sprintf("feat-extra-%d", i)
-		f := orbitFeature(id, ft, ring, r, params)
+		f := orbitFeature(id, ft, ring, r)
 		f.Resources = resourcesFor(bandForRing(ring, params), ft, dial.RichnessMult, r)
 		features = append(features, f)
 	}
@@ -79,7 +78,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		if r.Float64() < 0.5 {
 			ft = FeatureRuin
 		}
-		f := orbitFeature(fmt.Sprintf("feat-special-%d", i), ft, ring, r, params)
+		f := orbitFeature(fmt.Sprintf("feat-special-%d", i), ft, ring, r)
 		if ft == FeatureAnomaly {
 			f.Resources = []Resource{{Kind: ResourceExotic, Richness: 0.4 + 0.6*r.Float64()*dial.RichnessMult}}
 		} else {
@@ -107,15 +106,18 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 
 // --- Feature builders ------------------------------------------------------
 
-func orbitFeature(id string, ft FeatureType, ring int, r *rand.Rand, params GenerationParams) Feature {
-	orb := orbitFor(ring, r, params)
+func orbitFeature(id string, ft FeatureType, ring int, r *rand.Rand) Feature {
+	orb := orbitFor(ring, r)
 	return Feature{
 		Id: id, Type: ft, Orbit: &orb,
 		Footprint: []Hex{hexAtRingAngle(ring, orb.Angle0)},
 	}
 }
 
-func orbitFor(ring int, r *rand.Rand, params GenerationParams) Orbit {
+// orbitFor rolls a body's orbit. Ring/Angle0/Dir are the generator's dice and are
+// persisted; Period is filled from live tuning here only so an in-memory interior
+// (the just-generated one) matches a re-read one — see PeriodFor.
+func orbitFor(ring int, r *rand.Rand) Orbit {
 	dir := 1
 	if r.Intn(2) == 0 {
 		dir = -1
@@ -123,7 +125,7 @@ func orbitFor(ring int, r *rand.Rand, params GenerationParams) Orbit {
 	return Orbit{
 		Ring:   ring,
 		Angle0: r.Intn(maxInt(1, 6*ring)),
-		Period: params.BasePeriod * common.WorldMillis(ring),
+		Period: PeriodFor(ring),
 		Dir:    dir,
 	}
 }
@@ -141,7 +143,7 @@ func beltFeature(id string, ring int, r *rand.Rand, params GenerationParams, dia
 	if bandForRing(ring, params) == BandOuter {
 		kind = ResourceWater
 	}
-	orb := orbitFor(ring, r, params)
+	orb := orbitFor(ring, r)
 	return Feature{
 		Id: id, Type: FeatureBelt, Orbit: &orb, Footprint: arc,
 		Resources: []Resource{{Kind: kind, Richness: 0.3 + 0.5*r.Float64()*dial.RichnessMult}},
@@ -163,7 +165,7 @@ func hazardFeature(id string, r *rand.Rand, params GenerationParams) Feature {
 	default:
 		ft, eff = FeatureDebris, Effects{MoveMod: 0.7}
 	}
-	orb := orbitFor(ring, r, params)
+	orb := orbitFor(ring, r)
 	return Feature{
 		Id: id, Type: ft, Orbit: &orb,
 		Footprint: []Hex{hexAtRingAngle(ring, orb.Angle0)},

@@ -22,9 +22,8 @@ type GenerationParams struct {
 	InnerMaxRing int `json:"innerMaxRing" firestore:"innerMaxRing"`
 	MidMaxRing   int `json:"midMaxRing" firestore:"midMaxRing"`
 
-	// BasePeriod is the world-ms for a full revolution at ring 1; outer rings
-	// scale up by ring. Motion is off/slow for the slice.
-	BasePeriod common.WorldMillis `json:"basePeriod" firestore:"basePeriod"`
+	// Orbital periods are NOT here: they're pacing, not generation, and are read
+	// live from common.Tuning().OrbitBasePeriod via PeriodFor (see model.go).
 
 	// ByCharacter is keyed by the #0001 region string (plain string, not a named
 	// type — Firestore only serializes string-keyed maps).
@@ -43,7 +42,6 @@ func DefaultParams() GenerationParams {
 		Radius:       common.Tuning().BoardRadius,
 		InnerMaxRing: 5,
 		MidMaxRing:   11,
-		BasePeriod:   3_600_000, // 1 world-hour at ring 1
 		ByCharacter: map[string]CharacterDial{
 			"star_rich": {ExtraPlanets: 3, Belts: 2, Specials: 2, Hazards: 2, RichnessMult: 1.0},
 			"normal":    {ExtraPlanets: 1, Belts: 1, Specials: 1, Hazards: 1, RichnessMult: 0.65},

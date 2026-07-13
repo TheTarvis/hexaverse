@@ -41,10 +41,43 @@ func TestDefaultTuning_PacingIsPositive(t *testing.T) {
 	if d.ScanDuration <= 0 {
 		t.Errorf("ScanDuration = %d, must be > 0 (else scans resolve instantly)", d.ScanDuration)
 	}
-	if d.CoastPeriod <= 0 {
-		t.Errorf("CoastPeriod = %d, must be > 0 (orbit period divides by it)", d.CoastPeriod)
+	if d.OrbitBasePeriod <= 0 {
+		t.Errorf("OrbitBasePeriod = %d, must be > 0 (orbit math divides by the period)", d.OrbitBasePeriod)
 	}
 	if d.BoardRadius <= 0 {
 		t.Errorf("BoardRadius = %d, must be > 0", d.BoardRadius)
+	}
+}
+
+// OrbitPeriod is the world's ONE orbital law, shared by system bodies and coasting
+// fleets — there is deliberately no second period for ships (there used to be, flat
+// and un-scaled by ring, which made rim ships cross hexes faster than inner ones).
+// These assertions pin the two properties that redundancy hid.
+func TestOrbitPeriod_ScalesWithRing(t *testing.T) {
+	d := DefaultTuning()
+
+	// Period grows with radius: the further out, the longer to come round.
+	if got, want := d.OrbitPeriod(1), d.OrbitBasePeriod; got != want {
+		t.Errorf("OrbitPeriod(1) = %d, want %d", got, want)
+	}
+	if got, want := d.OrbitPeriod(12), d.OrbitBasePeriod*12; got != want {
+		t.Errorf("OrbitPeriod(12) = %d, want %d (base × ring)", got, want)
+	}
+
+	// The ring factor cancels against a ring's 6 × N cells, so the rate you SEE is
+	// uniform: one hex every OrbitBasePeriod / 6, on every ring. This is what makes
+	// the board turn rigidly instead of shearing, and what a flat period broke.
+	for _, ring := range []int{1, 4, 16} {
+		cells := 6 * ring
+		perCell := d.OrbitPeriod(ring) / WorldMillis(cells)
+		if want := d.OrbitBasePeriod / 6; perCell != want {
+			t.Errorf("ring %d: one hex every %d, want %d (uniform across rings)", ring, perCell, want)
+		}
+	}
+
+	// The star has no orbit; callers short-circuit on ring 0 and must not divide by
+	// a period we pretended was meaningful.
+	if got := d.OrbitPeriod(0); got != 0 {
+		t.Errorf("OrbitPeriod(0) = %d, want 0 (the centre doesn't orbit)", got)
 	}
 }

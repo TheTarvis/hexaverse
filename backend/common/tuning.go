@@ -22,6 +22,13 @@ import "sync"
 // already exists, so an admin page editing them would be lying to the operator.
 // They stay in their domain's params.go.
 //
+// The bake-in is what disqualifies them, not the subject matter. OrbitBasePeriod
+// reads like a generation dial and used to live in system.GenerationParams, but a
+// body's period is DERIVED at read (system.PeriodFor) rather than persisted on the
+// feature — so retuning it re-paces bodies in worlds that already exist, and it
+// earns its place here. Anything else that can be made derived-at-read is welcome
+// to follow it.
+//
 // # Layering
 //
 // common imports no domain package, so this holds primitives and common types
@@ -62,9 +69,13 @@ type GameTuning struct {
 	// "felt" duration — it's a search bound. Raise it only if intercepts against
 	// slow, distant targets start failing to find a solution.
 	InterceptHorizon WorldMillis
-	// CoastPeriod is the orbital period a fleet inherits when it settles into a
-	// resting orbit. Large ⇒ effectively static (motion is off for the slice).
-	CoastPeriod WorldMillis
+
+	// ——— Orbits (everything on a board: bodies AND coasting fleets) ———
+
+	// OrbitBasePeriod is the world-ms for one revolution at ring 1. It is the
+	// world's ONE orbital law, applied through OrbitPeriod(ring) — see there for
+	// what it buys you and what it costs.
+	OrbitBasePeriod WorldMillis
 
 	// ——— Sensing & intel (observation) ———
 
@@ -96,10 +107,14 @@ type GameTuning struct {
 func DefaultTuning() GameTuning {
 	return GameTuning{
 		// Movement
-		MsPerTile:         2_500,         // 5s per hex   (was 60_000 — one world-minute)
-		LaneMsPerDistance: 2_500,         // 5s per unit of lane length (was 60_000)
-		InterceptHorizon:  86_400_000,    // one world-day of lead search
-		CoastPeriod:       3_600_000_000, // ~1000 world-hours ⇒ static within the slice
+		MsPerTile:         2_500,      // 5s per hex   (was 60_000 — one world-minute)
+		LaneMsPerDistance: 2_500,      // 5s per unit of lane length (was 60_000)
+		InterceptHorizon:  86_400_000, // one world-day of lead search
+
+		// Orbits — one revolution at ring 1; a hex is crossed every value/6, on
+		// every ring. 3_600_000 = a hex per 10 real minutes (imperceptible);
+		// 60_000 = a hex per 10s; 600 = a hex per 100ms (a spinning demo).
+		OrbitBasePeriod: 36000,
 
 		// Sensing
 		ScanDuration:  30_000, // 30s      (was 3_600_000 — one world-hour)
@@ -109,6 +124,34 @@ func DefaultTuning() GameTuning {
 		// Geometry
 		BoardRadius: 16,
 	}
+}
+
+// OrbitPeriod is the world's orbital law: one revolution on ring N takes
+// OrbitBasePeriod × N, so the further out you are the longer you take to come
+// round. It applies to EVERYTHING resting on a board — a planet and a coasting
+// fleet on the same ring keep the same period, because they're the same physics.
+// (There used to be a separate CoastPeriod for fleets, flat and un-scaled by ring,
+// which quietly meant a fleet at the rim crossed hexes faster than one near the
+// star. It read as a second knob; it was really the same knob with a bug in it.)
+//
+// Two consequences worth knowing before you retune:
+//
+//   - A ring has 6 × N cells, so the ring factor cancels and the rate you actually
+//     SEE is uniform: one hex crossed every OrbitBasePeriod / 6. At the 3_600_000
+//     baseline that's a hex every 10 real minutes — motion is on, but far below
+//     the threshold of noticing. 60_000 gives a hex every 10s.
+//   - A coasting fleet therefore DRIFTS. Parking beside a body no longer holds
+//     station beside it (bodies orbit either way; coast is always prograde) —
+//     docking is what holds station. That is the intended shape: coast = a free
+//     orbit at your radius, dock = attached to a body, riding it.
+//
+// Ring 0 (the star) has no orbit; the period there is meaningless and the callers
+// return the centre hex without consulting it.
+func (t GameTuning) OrbitPeriod(ring int) WorldMillis {
+	if ring <= 0 {
+		return 0
+	}
+	return t.OrbitBasePeriod * WorldMillis(ring)
 }
 
 var (

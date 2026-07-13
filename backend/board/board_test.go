@@ -153,3 +153,48 @@ func TestShipPos_BurnInterpolatesEndToEnd(t *testing.T) {
 		t.Fatalf("burn midpoint should be partway, got %v", p)
 	}
 }
+
+// TestOrbitThrough_PassesThroughHexAtSettleTime is the anti-teleport property: an
+// orbit built to settle at h at time `at` must actually BE at h at `at`. Angle0 is
+// an EPOCH index, so a settle that naively stores "the index I'm at now" gets that
+// index advanced by all the world-time since the epoch and lands the ship somewhere
+// it never was. Invisible while fleets coasted with a near-infinite period; obvious
+// the moment orbits got fast.
+func TestOrbitThrough_PassesThroughHexAtSettleTime(t *testing.T) {
+	periods := []common.WorldMillis{600, 9_600, 3_600_000, 1 << 60} // fast → motion-off
+	times := []common.WorldMillis{0, 1_300, 16_000_000_000}         // epoch → a real "now"
+
+	for _, ring := range []int{1, 4, 16} {
+		for _, h := range RingHexes(ring) {
+			for _, p := range periods {
+				for _, at := range times {
+					for _, dir := range []int{1, -1} {
+						o := OrbitThrough(h, at, p, dir)
+						if got := OrbState(o, at); got != h {
+							t.Fatalf("ring %d, period %d, at %d, dir %d: settled at %+v but OrbState says %+v",
+								ring, p, at, dir, h, got)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// TestOrbitThrough_ThenDrifts: having settled at h, the thing must actually MOVE
+// afterwards (the point of the whole exercise) — one ring cell per period/(6·ring).
+func TestOrbitThrough_ThenDrifts(t *testing.T) {
+	const ring, at = 4, 10_000
+	h := RingHexes(ring)[2]
+	period := common.WorldMillis(9_600) // one cell every 400ms at ring 4 (24 cells)
+	o := OrbitThrough(h, at, period, 1)
+
+	perCell := period / common.WorldMillis(6*ring)
+	if next := OrbState(o, at+perCell); next == h {
+		t.Errorf("still at %+v one cell-time later — a coasting fleet must drift", h)
+	}
+	// A full revolution brings it home.
+	if home := OrbState(o, at+period); home != h {
+		t.Errorf("after one full period: at %+v, want %+v", home, h)
+	}
+}

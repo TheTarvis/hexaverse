@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"hexaverse/board"
 	"hexaverse/common"
 
 	"github.com/rs/zerolog/log"
@@ -51,7 +52,18 @@ func (dao *DaoImpl) Get(ctx context.Context, id string) (*Fleet, error) {
 	if err := doc.DataTo(&f); err != nil {
 		return nil, err
 	}
+	hydrateCoast(&f)
 	return &f, nil
+}
+
+// hydrateCoast fills a decoded fleet's coast period from the live orbital law —
+// board.Orbit.Period isn't stored (see board/orbit.go). Without this a fleet keeps
+// orbiting at whatever pace it happened to SETTLE at, so retuning orbits would
+// spin the planets up and leave the ships hanging.
+func hydrateCoast(f *Fleet) {
+	if f.State.Mode == board.ModeCoast {
+		board.HydratePeriod(f.State.Coast)
+	}
 }
 
 func (dao *DaoImpl) Save(ctx context.Context, f Fleet) error {
@@ -84,6 +96,7 @@ func (dao *DaoImpl) listWhere(ctx context.Context, field, value string) ([]Fleet
 		if err := doc.DataTo(&f); err != nil {
 			return nil, err
 		}
+		hydrateCoast(&f)
 		out = append(out, f)
 	}
 	return out, nil

@@ -81,6 +81,14 @@ func (dao *DaoImpl) ListFeatures(ctx context.Context, galaxyID, systemID string)
 		if err := doc.DataTo(&f); err != nil {
 			return nil, err
 		}
+		// Period isn't stored (see model.go) — fill it from live tuning, so a
+		// retune re-paces the bodies of systems that already exist. This is the
+		// ONE read path out of Firestore for features; everything downstream
+		// (fog projection, the wire DTO, intercept solving) copies the Orbit it
+		// gets from here, so hydrating once here keeps them all agreeing.
+		if f.Orbit != nil {
+			f.Orbit.Period = PeriodFor(f.Orbit.Ring)
+		}
 		features = append(features, f)
 	}
 	return features, nil

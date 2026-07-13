@@ -309,6 +309,34 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
     juke) is parked in `../plans/BRAINSTORM.md` §Predictable drift vs. loud burn, not
     built here.
 
+20. **A coasting fleet obeys the same orbital law as a body** (2026-07-13). The Goals
+    above always said coast rides "the same orbital-element model as any #0003 body",
+    but the implementation gave fleets their own `CoastPeriod`: a **flat** period, not
+    scaled by ring. Since a ring holds `6 × N` cells, that meant a fleet's hex-crossing
+    rate was `CoastPeriod / 6N` — **a fleet at the rim drifted faster than one near the
+    star**, the reverse of the intended physics. It went unnoticed only because the
+    value (~1000 world-hours) was large enough to freeze ships outright.
+    There is now **one orbital law**, `common.GameTuning.OrbitPeriod(ring)` =
+    `OrbitBasePeriod × ring`, shared by bodies and coasting fleets; `CoastPeriod` and
+    `MovementParams.CoastPeriod` are gone. It is read **live at settle time**, so
+    retuning re-paces fleets already in flight.
+    This makes the coast/dock split load-bearing, as the Goals intended: **coast = a
+    free orbit at your radius** (so a parked ship *drifts*, and drifts away from a body
+    whose `dir` differs); **dock = attached to a body, riding it** — the station-keeping
+    mechanism, and the one that matters for mining (#0010).
+
+    Two things fell out of turning fleet motion on, both of which had been dormant
+    because a motionless ship can't expose them:
+    - **Settling must back-solve the epoch angle** (`board.OrbitThrough`). `Angle0` is
+      the ring index **at the world epoch**, but settling stored the index the ship was
+      at **now** — so `OrbState` advanced it by all the elapsed world-time and the ship
+      **teleported** on arrival. A settle therefore takes the *time* it settles at, and
+      the orbit is anchored so it passes through that hex at that instant.
+    - **`Period` is not persisted anywhere** an `Orbit` is stored (fleet coast state,
+      remembered observations, system features). It's hydrated from the live law on
+      every read, or a retune moves the planets and leaves the ships behind — which is
+      exactly what happened the first time.
+
 ## Open questions
 
 - **None blocking.** All four opening questions are resolved (Decisions #8, #17, #18,

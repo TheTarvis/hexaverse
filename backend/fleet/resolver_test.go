@@ -69,3 +69,45 @@ func TestBurnResolverWithAmbient_NilRecorderIsPlainBurn(t *testing.T) {
 		t.Errorf("nil ambient recorder should mint no writes, got %d", len(res.Writes))
 	}
 }
+
+// TestCoastState_ObeysTheSharedOrbitalLaw pins the seam that removed fleet's own
+// CoastPeriod: a fleet settling on ring N inherits the SAME period a body on ring N
+// has (common.Tuning().OrbitPeriod), so ships and rocks at one radius keep pace.
+// Regression guard — a flat, un-scaled fleet period made rim ships cross hexes
+// faster than inner ones, which is the bug the two redundant knobs were hiding.
+func TestCoastState_ObeysTheSharedOrbitalLaw(t *testing.T) {
+	// A hex on ring 4 (four steps out along one axis).
+	h := board.Hex{Q: 4, R: 0}
+	ring, _ := board.AngleOf(h)
+	if ring != 4 {
+		t.Fatalf("fixture: AngleOf(%+v) ring = %d, want 4", h, ring)
+	}
+
+	const settledAt = common.WorldMillis(16_000_000_000) // a realistic "now", not the epoch
+
+	st := coastState(h, settledAt)
+	if st.Mode != board.ModeCoast || st.Coast == nil {
+		t.Fatalf("coastState mode = %q, coast = %+v", st.Mode, st.Coast)
+	}
+	if want := common.Tuning().OrbitPeriod(ring); st.Coast.Period != want {
+		t.Errorf("coast period on ring %d = %d, want %d (the body law)", ring, st.Coast.Period, want)
+	}
+
+	// And the fleet is actually WHERE IT STOPPED at the moment it stopped — Angle0 is
+	// epoch-anchored, so a naive settle would advance it and teleport the ship.
+	if got := board.OrbState(*st.Coast, settledAt); got != h {
+		t.Errorf("settled at %+v but coasts through %+v at that instant (teleport)", h, got)
+	}
+
+	// And it re-paces when the world is retuned — the fleet is not frozen at the
+	// pace its resolver was registered with.
+	base := common.DefaultTuning()
+	fast := base
+	fast.OrbitBasePeriod = base.OrbitBasePeriod / 100
+	common.SetTuning(fast)
+	defer common.SetTuning(base)
+
+	if got, want := coastState(h, settledAt).Coast.Period, fast.OrbitPeriod(ring); got != want {
+		t.Errorf("after retune, coast period = %d, want %d", got, want)
+	}
+}

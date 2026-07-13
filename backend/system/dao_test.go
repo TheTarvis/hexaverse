@@ -43,6 +43,55 @@ func TestDao_RoundTrip(t *testing.T) {
 	}
 }
 
+// TestDao_OrbitPeriod_RehydratedFromLiveTuning is the whole point of not storing
+// Period: a system materialized under one tuning must re-pace when the operator
+// retunes orbits, rather than staying frozen at the pace it was generated with.
+func TestDao_OrbitPeriod_RehydratedFromLiveTuning(t *testing.T) {
+	fs, client := common.SetupFirestoreTestDAO(t)
+	ctx := context.Background()
+	dao := NewDaoWithClient(fs)
+
+	gid, sid := "gal_period", "sys-0"
+	gen := Generate(galaxy.SystemSeed(42, sid), "star_rich", sampleSkeleton(), DefaultParams())
+	gen.Interior.SystemId = sid
+
+	defer common.CleanupFirestoreTestData(t, client,
+		interiorPath(gid, sid), featuresPath(gid, sid))
+
+	// Persist under the baseline tuning.
+	if err := dao.CreateInterior(ctx, gid, gen); err != nil {
+		t.Fatalf("CreateInterior: %v", err)
+	}
+
+	// Retune orbits to 100× faster, as an admin page would.
+	base := common.DefaultTuning()
+	fast := base
+	fast.OrbitBasePeriod = base.OrbitBasePeriod / 100
+	common.SetTuning(fast)
+	defer common.SetTuning(base)
+
+	feats, err := dao.ListFeatures(ctx, gid, sid)
+	if err != nil {
+		t.Fatalf("ListFeatures: %v", err)
+	}
+
+	orbiting := 0
+	for _, f := range feats {
+		if f.Orbit == nil {
+			continue
+		}
+		orbiting++
+		want := fast.OrbitBasePeriod * common.WorldMillis(f.Orbit.Ring)
+		if f.Orbit.Period != want {
+			t.Fatalf("feature %s: period = %d, want %d (live tuning × ring %d)",
+				f.Id, f.Orbit.Period, want, f.Orbit.Ring)
+		}
+	}
+	if orbiting == 0 {
+		t.Fatal("no orbiting features — test asserts nothing")
+	}
+}
+
 // TestDao_CreateOnce_UnderRace verifies the create-if-absent claim: N concurrent
 // resolvers all try to materialize the same interior; exactly one wins the
 // meta-doc Create, the rest get ErrAlreadyExists, and the stored feature set is

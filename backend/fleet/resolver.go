@@ -58,7 +58,7 @@ func BurnResolver(params MovementParams) action.ResolveFunc {
 			outcome = "docked at " + b.DockOnArrive
 		} else {
 			meet := b.Path[len(b.Path)-1]
-			settled = coastState(meet, params.CoastPeriod)
+			settled = coastState(meet, r.At)
 			outcome = "arrived"
 		}
 		return action.ResolveResult{
@@ -96,11 +96,21 @@ func BurnResolverWithAmbient(params MovementParams, ambient AmbientRecorder) act
 	}
 }
 
-// coastState is the resting orbit a fleet inherits when it settles onto a hex.
-func coastState(h board.Hex, period common.WorldMillis) board.MovementState {
-	ring, idx := board.AngleOf(h)
-	return board.MovementState{
-		Mode:  board.ModeCoast,
-		Coast: &board.Orbit{Ring: ring, Angle0: idx, Period: period, Dir: 1},
-	}
+// coastState is the resting orbit a fleet inherits when it settles onto a hex: a
+// free orbit at the radius it stopped at, obeying the world's one orbital law
+// (common.GameTuning.OrbitPeriod — the same period a body on that ring has). Read
+// live rather than captured in MovementParams, so retuning orbits re-paces fleets
+// that are already coasting, exactly as it re-paces bodies.
+//
+// A coasting fleet therefore DRIFTS with its ring. To hold station on a body, dock
+// to it (board.ModeDocked) — that's the mode that rides a parent.
+//
+// `at` is the world time the fleet comes to rest, and it is load-bearing: the orbit
+// is back-solved to pass through h AT that instant (board.OrbitThrough). Pass the
+// arrival/settle time, never a bare zero — an orbit anchored at the wrong instant
+// puts the ship somewhere it never was.
+func coastState(h board.Hex, at common.WorldMillis) board.MovementState {
+	ring := board.Ring(h)
+	orbit := board.OrbitThrough(h, at, common.Tuning().OrbitPeriod(ring), 1)
+	return board.MovementState{Mode: board.ModeCoast, Coast: &orbit}
 }

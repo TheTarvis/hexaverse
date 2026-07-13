@@ -71,4 +71,12 @@ func TestFeatureObservation_RoundTrip(t *testing.T) {
 	if list[0].AsOf != 300 || list[0].Elements == nil {
 		t.Errorf("round-trip lost data: asOf=%d elements=%v", list[0].AsOf, list[0].Elements)
 	}
+
+	// A remembered body keeps orbiting at the world's CURRENT pace (#0006 Decision
+	// #9): its period isn't stored, it's hydrated from the live orbital law on read.
+	// Memory freezes what you saw, not how fast the sky turns.
+	if want := common.Tuning().OrbitPeriod(4); list[0].Elements.Period != want {
+		t.Errorf("remembered elements period = %d, want %d (live law, ring 4)",
+			list[0].Elements.Period, want)
+	}
 }

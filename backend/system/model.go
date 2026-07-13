@@ -63,11 +63,26 @@ type Effects struct {
 // (Orbit, worldTime); with motion off/slow the board reads static (#0003
 // Decision #5). Angle0 is the ring-position index at the world epoch; Period is
 // world-milliseconds for a full revolution; Dir is +1 / −1.
+//
+// Period is NOT persisted (`firestore:"-"`): it is a pure function of Ring and
+// common.Tuning().OrbitPeriod, so it is filled from live tuning on every read
+// (see PeriodFor and the DAO). Storing it would freeze the pace of every system
+// at the moment it was generated — retuning orbits would then only reach systems
+// nobody had visited yet. Ring/Angle0/Dir stay stored: they're the generator's
+// dice, not a pacing knob.
 type Orbit struct {
 	Ring   int                `json:"ring" firestore:"ring"`
 	Angle0 int                `json:"angle0" firestore:"angle0"`
-	Period common.WorldMillis `json:"period" firestore:"period"`
+	Period common.WorldMillis `json:"period" firestore:"-"`
 	Dir    int                `json:"dir" firestore:"dir"`
+}
+
+// PeriodFor is a body's orbital period on a ring, read live from tuning. The
+// generator and the DAO both go through it, so an in-memory interior and a re-read
+// one always agree. It is the SAME law a coasting fleet obeys — a planet and a
+// ship on ring N share a period because they share the physics.
+func PeriodFor(ring int) common.WorldMillis {
+	return common.Tuning().OrbitPeriod(ring)
 }
 
 // Feature is one stored object on the board. Position is exactly one of:

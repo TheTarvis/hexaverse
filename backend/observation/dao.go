@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"hexaverse/board"
 	"hexaverse/common"
 
 	"cloud.google.com/go/firestore"
@@ -112,6 +113,10 @@ func (dao *DaoImpl) ListFeatureObservations(ctx context.Context, cid, systemID s
 		if err := doc.DataTo(&o); err != nil {
 			return nil, err
 		}
+		// A remembered body keeps orbiting from its remembered elements (#0006
+		// Decision #9) — at the world's CURRENT pace, not the pace it wore when you
+		// last looked at it. Period isn't stored; fill it from the live law.
+		board.HydratePeriod(o.Elements)
 		out = append(out, o)
 	}
 	return out, nil
