@@ -146,20 +146,56 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 	return f, nil
 }
 
-// ListInSystem returns every fleet currently in a system. Unlike Get it does not
-// settle due arrivals — the board is a read surface, so it reports each fleet's
-// stored state and lets the client animate; the arrival settle stays on the
-// fleet's own Get/resolve path (one authoritative writer).
+// ListInSystem returns every fleet currently in a system. It does not WRITE a due
+// arrival — that stays on Get/resolve, one authoritative writer — but it does
+// project one (see projectSettled), so a ship that has arrived reads as coasting
+// rather than as a burn frozen on its last path hex.
 func (s *Service) ListInSystem(ctx context.Context, systemID string) ([]Fleet, error) {
-	return s.dao.ListBySystem(ctx, systemID)
+	fleets, err := s.dao.ListBySystem(ctx, systemID)
+	if err != nil {
+		return nil, err
+	}
+	now := s.clock.Now()
+	for i := range fleets {
+		fleets[i] = s.projectSettled(fleets[i], now)
+	}
+	return fleets, nil
 }
 
 // ListForCorp returns every fleet a corporation owns (across systems, transit
-// included) — the galaxy view's own-fleet layer. Read-only, like ListInSystem:
-// it reports stored state and lets the client animate; the arrival settle stays
-// on the fleet's own Get/resolve path.
+// included) — the galaxy view's own-fleet layer. Read-only like ListInSystem, and
+// projects due burn arrivals the same way.
 func (s *Service) ListForCorp(ctx context.Context, corporationID string) ([]Fleet, error) {
-	return s.dao.ListByCorporation(ctx, corporationID)
+	fleets, err := s.dao.ListByCorporation(ctx, corporationID)
+	if err != nil {
+		return nil, err
+	}
+	now := s.clock.Now()
+	for i := range fleets {
+		fleets[i] = s.projectSettled(fleets[i], now)
+	}
+	return fleets, nil
+}
+
+// projectSettled shows a reader the fleet it would SEE, not the doc as last written:
+// a burn whose arrival has passed is projected into the state it settles into — the
+// local coast orbit, or docked. In-memory only, on a copy.
+//
+// Without it a finished burn reads as a burn forever, and BurnPos pins a past-ETA
+// burn to its final path hex — so an arrived ship sat perfectly still on the board
+// while the whole system turned around it, until some other call happened to run the
+// authoritative settle. Physics doesn't wait for a write: a ship that arrived is in
+// orbit from the instant it arrives, which is exactly what settleArrival encodes
+// (it anchors the coast orbit at b.ArriveTime, so the projected and the eventually-
+// written state are the same state).
+//
+// Lane arrivals are deliberately NOT projected: those move the fleet to another
+// system and reveal what's there — facts only the resolve may establish.
+func (s *Service) projectSettled(f Fleet, now common.WorldMillis) Fleet {
+	if f.State.Mode == board.ModeBurn && board.Arrived(f.State, now) {
+		s.settleArrival(&f)
+	}
+	return f
 }
 
 // OrderTo dispatches an order by tier: a systemId target is a graph-tier trip
@@ -385,8 +421,16 @@ func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ com
 	if err != nil {
 		return nil, err
 	}
+	now := s.clock.Now()
 	out := make([]observation.FleetPos, 0, len(fleets))
 	for i := range fleets {
+		// Project a due arrival before taking the sensor position (see
+		// projectSettled). A ship that docked onto an ORBITING body keeps moving
+		// with it, so an unprojected read pins the sensor bubble to the hex the burn
+		// ended on — which the body has since orbited away from. The body then falls
+		// outside the corp's own coverage and vanishes from its board: the ship stops
+		// seeing the very thing it's holding onto.
+		fleets[i] = s.projectSettled(fleets[i], now)
 		f := &fleets[i]
 		// A fleet out on a lane (past its departure gate) or parked mid-lane has no
 		// board presence, so it lends no sensor coverage to any system.

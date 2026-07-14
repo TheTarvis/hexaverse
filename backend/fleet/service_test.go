@@ -296,3 +296,104 @@ func TestCancel_MidBurnResumesCoast(t *testing.T) {
 		t.Fatalf("coast ring %d != mid-burn hex ring %d", saved.State.Coast.Ring, board.Ring(midHex))
 	}
 }
+
+// TestListInSystem_ArrivedBurnReadsAsMoving is the "my ship stopped dead" bug: the
+// board's read (ListInSystem) doesn't WRITE the arrival settle — that's Get's job —
+// but it must still SHOW the fleet where physics puts it. An unprojected arrived
+// burn reads as a burn forever, and BurnPos pins a past-ETA burn to its last path
+// hex, so the ship sat frozen at its destination while the system turned around it.
+func TestListInSystem_ArrivedBurnReadsAsMoving(t *testing.T) {
+	const arriveTime = 300_000
+	clk := &fakeClock{now: arriveTime + 10_000} // the burn finished a while ago
+	svc, dao, _, ctrl := newSvc(t, clk)
+	defer ctrl.Finish()
+
+	dest := board.Hex{Q: 5, R: 0}
+	arrived := coastFleetAtCentre()
+	arrived.State = board.MovementState{Mode: board.ModeBurn, Burn: &board.Burn{
+		Path: board.Line(board.Hex{Q: 0, R: 0}, dest), StartTime: 0, ArriveTime: arriveTime,
+	}}
+	dao.EXPECT().ListBySystem(gomock.Any(), "sys-0").Return([]Fleet{*arrived}, nil)
+
+	list, err := svc.ListInSystem(context.Background(), "sys-0")
+	if err != nil || len(list) != 1 {
+		t.Fatalf("list: got %d fleets, err=%v", len(list), err)
+	}
+	f := list[0]
+
+	if f.State.Mode != board.ModeCoast || f.State.Coast == nil {
+		t.Fatalf("an arrived fleet must read as coasting, got %s", f.State.Mode)
+	}
+	// It is in the orbit it entered AT the moment it arrived — no teleport...
+	if got, _ := board.ShipPos(f.State, arriveTime); got != dest {
+		t.Errorf("at arrival the fleet is at %+v, want its destination %+v", got, dest)
+	}
+	// ...and it has MOVED since, because it's coasting, not parked.
+	perCell := common.Tuning().OrbitPeriod(board.Ring(dest)) / common.WorldMillis(6*board.Ring(dest))
+	if got, _ := board.ShipPos(f.State, arriveTime+perCell); got == dest {
+		t.Errorf("still on %+v a full cell-time after arrival — the ship is frozen", dest)
+	}
+}
+
+// movingBodySystem is an interior whose body actually ORBITS (the default fake's
+// planet is motion-off), so a dock onto it is a dock onto something that moves.
+type movingBodySystem struct{ orbit system.Orbit }
+
+func (f *movingBodySystem) GetOrCreateInterior(context.Context, string) (*system.GeneratedInterior, error) {
+	o := f.orbit
+	return &system.GeneratedInterior{
+		Interior: system.SystemInterior{SystemId: "sys-0", Radius: 16},
+		Features: []system.Feature{{Id: "feat-belt-0", Type: system.FeatureBelt, Orbit: &o,
+			Footprint: []system.Hex{{Q: o.Ring, R: 0}}}},
+	}, nil
+}
+
+func (f *movingBodySystem) LaneGates(context.Context, string, int) ([]system.LaneGate, error) {
+	return nil, nil
+}
+
+// TestFleetsForCorp_DockedToOrbitingBodyRidesIt: the fog's coverage source must see
+// a due arrival SETTLED, or a ship that docked onto an orbiting body lends its
+// sensor bubble to the hex the burn ended on — a hex the body has since orbited
+// away from. The body then falls outside the corp's own coverage and drops out of
+// its board payload: the ship stops seeing the very thing it is holding onto (and
+// the client, with no parent to ride, jumps the ship tile-to-tile instead of
+// gliding it around the orbit).
+func TestFleetsForCorp_DockedToOrbitingBodyRidesIt(t *testing.T) {
+	const arriveTime = 100_000
+	orbit := system.Orbit{Ring: 4, Angle0: 0, Period: 144_000, Dir: 1} // one cell / 6000ms
+	sys := &movingBodySystem{orbit: orbit}
+
+	elements := board.Orbit{Ring: orbit.Ring, Angle0: orbit.Angle0, Period: orbit.Period, Dir: orbit.Dir}
+	burnEnd := board.OrbState(elements, arriveTime) // where the belt was on arrival
+
+	// Long enough after arrival that the belt has swung well clear of that hex.
+	clk := &fakeClock{now: arriveTime + 60_000}
+	wantHex := board.OrbState(elements, clk.now)
+	if wantHex == burnEnd {
+		t.Fatal("fixture: the belt must have moved by now, or this test proves nothing")
+	}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	dao := NewMockDao(ctrl)
+	svc := NewServiceWith(dao, sys, &fakeActions{}, clk)
+
+	docked := coastFleetAtCentre()
+	docked.State = board.MovementState{Mode: board.ModeBurn, Burn: &board.Burn{
+		Path:         board.Line(board.Hex{Q: 0, R: 0}, burnEnd),
+		StartTime:    0,
+		ArriveTime:   arriveTime,
+		DockOnArrive: "feat-belt-0",
+	}}
+	dao.EXPECT().ListByCorporation(gomock.Any(), "dev-corp").Return([]Fleet{*docked}, nil)
+
+	got, err := svc.FleetsForCorp(context.Background(), "dev-corp", clk.now)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("FleetsForCorp: got %d, err=%v", len(got), err)
+	}
+	if got[0].Hex != wantHex {
+		t.Errorf("sensor position = %+v, want %+v (the belt's LIVE hex — %+v is where the burn ended)",
+			got[0].Hex, wantHex, burnEnd)
+	}
+}
