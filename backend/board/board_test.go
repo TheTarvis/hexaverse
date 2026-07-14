@@ -140,6 +140,30 @@ func TestSolveIntercept_MeetEqualsBodyPosAtArrive(t *testing.T) {
 	}
 }
 
+// TestSolveIntercept_ArrivesAsBodyEntersMeetCell pins the render seam of the
+// lead-solve. The client draws an orbiting body glided TOWARD its next cell by
+// the absolute window fraction, so the glyph sits on its logical cell centre
+// only at the instant the body ENTERS the cell. An intercept that arrives
+// mid-window is drawn a fraction of a tile behind the body, and the dock fold
+// then snaps the ship forward onto the parent glyph. So arrival must be the
+// body's cell-entry instant: on the meet hex at arriveTime, and not one
+// millisecond before. (Static bodies are exempt — they render snapped to their
+// cell centre; TestSolveIntercept_StaticEqualsSolveHex covers that path.)
+func TestSolveIntercept_ArrivesAsBodyEntersMeetCell(t *testing.T) {
+	o := Orbit{Ring: 2, Angle0: 0, Period: 12_000, Dir: 1} // one cell per second
+	from := Hex{6, -3}
+	for _, now := range []common.WorldMillis{0, 150, 400, 650, 900, 1_100} {
+		sol := SolveIntercept(from, o, now, 300, 60_000)
+		if got := OrbState(o, sol.ArriveTime); got != sol.MeetHex {
+			t.Fatalf("now=%d: meet %v != body@arrive %v", now, sol.MeetHex, got)
+		}
+		if OrbState(o, sol.ArriveTime-1) == sol.MeetHex {
+			t.Errorf("now=%d: arrival %d is mid-window — the body already occupied %v, so its glyph reads ahead of the meet hex",
+				now, sol.ArriveTime, sol.MeetHex)
+		}
+	}
+}
+
 func TestShipPos_BurnInterpolatesEndToEnd(t *testing.T) {
 	burn := Burn{Path: Line(Hex{0, 0}, Hex{4, 0}), StartTime: 0, ArriveTime: 4000}
 	state := MovementState{Mode: ModeBurn, Burn: &burn}

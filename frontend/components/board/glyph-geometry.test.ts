@@ -11,7 +11,7 @@ import {
   sensorBubbleHexes,
 } from './glyph-geometry'
 import { hexToPixel, lerpPixel } from '@/lib/hex/pixel'
-import { coastAt, orbState, orbitPeriod, stateAt, type Orbit } from '@/lib/hex'
+import { coastAt, orbState, orbitPeriod, solveIntercept, stateAt, type Orbit } from '@/lib/hex'
 import type { BoardFeature } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 
@@ -187,6 +187,36 @@ describe('fleet position', () => {
       expect(jump, `settled at ${at} drew ${jump.toFixed(1)}px from its halt hex`).toBeLessThanOrEqual(
         spacing * 0.51,
       )
+    }
+  })
+
+  it('meets the body glyph at the intercept arrival — the dock hand-off has no jump', () => {
+    // The body glyph glides toward its NEXT cell by the absolute window
+    // fraction (orbitGlidePixel), sitting on its logical cell centre only at
+    // the instant it enters the cell. The burn glide lands the ship exactly on
+    // the meet-hex CENTRE at arriveTime, and the dock fold then snaps it to the
+    // parent's glided point — so unless the solve arrives on a window boundary,
+    // the ship reads up to a tile behind the body and jumps onto it as the dock
+    // folds. Sweep order times across one cell window: at every one, ship and
+    // body must coincide at the arrival instant.
+    const orbit: Orbit = { ring: 2, angle0: 0, period: 12_000, dir: 1 } // oneStep = 1s
+    const from = { q: 6, r: -3 }
+    for (const now of [0, 150, 400, 650, 900, 1_100]) {
+      const sol = solveIntercept(from, orbit, now, 300, 60_000)
+      // The logical contract holds regardless: meet hex = body's hex at arrival.
+      expect(orbState(orbit, sol.arriveTime)).toEqual(sol.meetHex)
+      const ship = hexToPixel(sol.meetHex.q, sol.meetHex.r) // burn glide end
+      const body = orbitGlidePixel(orbit, sol.arriveTime)
+      const next = orbState(orbit, sol.arriveTime + 1_000)
+      const spacing = Math.hypot(
+        hexToPixel(next.q, next.r).x - ship.x,
+        hexToPixel(next.q, next.r).y - ship.y,
+      )
+      const gap = Math.hypot(body.x - ship.x, body.y - ship.y)
+      expect(
+        gap,
+        `ordered at ${now}: body glyph is ${gap.toFixed(1)}px (${(gap / spacing).toFixed(2)} cells) ahead of the meet hex at arrival`,
+      ).toBeLessThanOrEqual(spacing * 0.01)
     }
   })
 

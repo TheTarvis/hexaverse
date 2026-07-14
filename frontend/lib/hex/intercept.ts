@@ -33,19 +33,41 @@ export function solveHex(from: Hex, dest: Hex, now: number, msPerTile: number): 
 // player never eyeballs the lead (#0004). With motion off/slow the body's
 // position is constant and this collapses to a fixed-hex solve against its
 // current hex — the motion-agnostic property, no special case.
+//
+// Arrival is always a cell-ENTRY instant of the target's orbit (see the Go
+// side for the full why): the renderer glides an orbiting glyph toward its
+// next cell by the absolute window fraction, so only at a cell entry does the
+// body glyph sit on the meet-hex centre where the burn glide ends — meeting
+// mid-window drew the ship a tile behind the body and the dock fold snapped it
+// forward onto the parent glyph. BigInt mirrors Go's int64 truncating math.
 export function solveIntercept(from: Hex, target: Orbit, now: number, msPerTile: number, horizon: number): Solution {
-  let step = msPerTile
-  if (step <= 0) step = 1
-  for (let t = now; t <= now + horizon; t += step) {
-    const pos = orbState(target, t)
-    const path = routeAround(from, pos)
-    const travel = (path.length - 1) * msPerTile
-    if (now + travel <= t) {
-      return { path, meetHex: pos, arriveTime: t }
+  // Already co-occupying the target's hex → dock in place, no burn to pace.
+  const nowPos = orbState(target, now)
+  if (nowPos.q === from.q && nowPos.r === from.r) {
+    return { path: [from], meetHex: from, arriveTime: now }
+  }
+  if (target.ring > 0 && target.period > 0) {
+    const steps = BigInt(6 * target.ring)
+    const period = BigInt(Math.trunc(target.period))
+    // k counts the body's cell advances since the epoch (orbState's truncating
+    // division); its k-th cell entry is the first world-ms where the advance
+    // reaches k. Walk entries after `now` until one is reachable.
+    let k = (BigInt(Math.trunc(now)) * steps) / period
+    for (;;) {
+      k += BigInt(1)
+      const tk = Number((k * period + steps - BigInt(1)) / steps)
+      if (tk > now + horizon) break
+      const pos = orbState(target, tk)
+      const path = routeAround(from, pos)
+      const travel = (path.length - 1) * msPerTile
+      if (now + travel <= tk) {
+        return { path, meetHex: pos, arriveTime: tk }
+      }
     }
   }
-  // No feasible lead within the horizon — aim at the body's current position.
-  const pos = orbState(target, now)
-  const path = routeAround(from, pos)
-  return { path, meetHex: pos, arriveTime: now + (path.length - 1) * msPerTile }
+  // No cell entry within the horizon — an effectively static body (motion
+  // off/slow, drawn snapped to its cell centre) — or none reachable: aim at
+  // the body's current position, plain-burn ETA.
+  const path = routeAround(from, nowPos)
+  return { path, meetHex: nowPos, arriveTime: now + (path.length - 1) * msPerTile }
 }

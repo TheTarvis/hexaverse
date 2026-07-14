@@ -123,6 +123,12 @@ func computeFixtures() fixtures {
 	}{
 		{Hex{0, 0}, Orbit{Ring: 5, Angle0: 3, Period: 1 << 60, Dir: 1}, 0, 1000, 10_000_000},
 		{Hex{0, 0}, Orbit{Ring: 6, Angle0: 0, Period: 600_000, Dir: 1}, 0, 1000, 5_000_000},
+		// Mid-window order time against a moving body — pins that arrival is the
+		// body's cell-ENTRY instant (the glide seam), not now + travel.
+		{Hex{6, -3}, Orbit{Ring: 2, Angle0: 0, Period: 12_000, Dir: 1}, 650, 300, 60_000},
+		// Retrograde, period NOT divisible by steps — pins the ceil rounding of
+		// the entry instant across Go int64 and TS BigInt.
+		{Hex{5, 0}, Orbit{Ring: 4, Angle0: 7, Period: 50_000, Dir: -1}, 1_234, 700, 300_000},
 	}
 	for _, c := range interSolves {
 		s := SolveIntercept(c.from, c.orbit, c.now, c.mspt, c.hori)
