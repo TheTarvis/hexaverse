@@ -9,18 +9,23 @@
 import type { Fleet } from '@/lib/types/fleet'
 import type { Point } from '@/lib/hex/pixel'
 import { HEX_SIZE } from '@/lib/hex/pixel'
+import { stateAt } from '@/lib/hex'
 import { FLEET_ACCENT, FLEET_FOREIGN, SELECTION_STROKE, THRUSTER } from './board-palette'
 
 export interface FleetGlyphProps {
   fleet: Fleet
   point: Point
+  worldTime: number
   headingDeg?: number
   selected?: boolean
   onSelect?: (id: string) => void
 }
 
-export function FleetGlyph({ fleet, point, headingDeg = 0, selected, onSelect }: FleetGlyphProps) {
-  const accent = fleet.own ? FLEET_ACCENT[fleet.state.mode] : FLEET_FOREIGN
+export function FleetGlyph({ fleet, point, worldTime, headingDeg = 0, selected, onSelect }: FleetGlyphProps) {
+  // Accent/thruster/dock ring read the EFFECTIVE mode: an arrived burn is already
+  // docked/coasting, so the glyph doesn't keep its flame lit waiting on a refetch.
+  const mode = stateAt(fleet.state, worldTime).mode
+  const accent = fleet.own ? FLEET_ACCENT[mode] : FLEET_FOREIGN
   const ring = HEX_SIZE * 0.42
   return (
     <g
@@ -41,11 +46,11 @@ export function FleetGlyph({ fleet, point, headingDeg = 0, selected, onSelect }:
             <path d={`M ${ring * 0.9} 0 L ${-ring * 0.55} ${ring * 0.5} L ${-ring * 0.55} ${-ring * 0.5} Z`} fill={accent} />
             {/* A trip's leg 0 is a burn — the ship only appears here while it's
                 still crossing this board to the gate, so it's under thrust too. */}
-            {(fleet.state.mode === 'burn' || fleet.state.mode === 'laneTransit') && (
+            {(mode === 'burn' || mode === 'laneTransit') && (
               <path d={`M ${-ring * 0.55} 0 L ${-ring * 1.2} ${ring * 0.25} L ${-ring * 1.2} ${-ring * 0.25} Z`} fill={THRUSTER} />
             )}
           </g>
-          {fleet.state.mode === 'docked' && (
+          {mode === 'docked' && (
             <circle r={ring + 3} fill="none" stroke={accent} strokeWidth={0.75} strokeDasharray="3 3" />
           )}
         </>

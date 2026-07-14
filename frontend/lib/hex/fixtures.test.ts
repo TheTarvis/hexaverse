@@ -5,6 +5,7 @@ import { line, routeAround, type Hex } from './hex'
 import { orbState, type Orbit } from './orbit'
 import { solveHex, solveIntercept } from './intercept'
 import { laneGateHex } from './gate'
+import { stateAt, type MovementState } from './movement'
 
 // The Go↔TS determinism seam (build-order cross-cutting rule).
 //
@@ -56,6 +57,12 @@ interface GateCase {
   gate: Hex
 }
 
+interface StateAtCase {
+  state: MovementState
+  t: number
+  out: MovementState
+}
+
 interface Fixtures {
   line: LineCase[]
   routeAround: RouteCase[]
@@ -63,6 +70,7 @@ interface Fixtures {
   solveHex: SolveCase[]
   solveIntercept: SolveCase[]
   laneGate: GateCase[]
+  stateAt: StateAtCase[]
 }
 
 // Walk up from the working directory to the repo-root golden. Anchoring on cwd
@@ -113,6 +121,12 @@ describe('board fixtures — Go↔TS determinism seam', () => {
     expect(laneGateHex(c.selfX, c.selfY, c.neighborX, c.neighborY, c.radius)).toEqual(c.gate)
   })
 
+  // The effective-state fold, including the folded coast's period — which pins
+  // lib/hex/tuning.ts ORBIT_BASE_PERIOD to the backend's orbital law.
+  it.each(fixtures.stateAt)('stateAt[%#]', (c) => {
+    expect(stateAt(c.state, c.t)).toEqual(c.out)
+  })
+
   it('covers every recorded case group (guards a truncated golden)', () => {
     expect(fixtures.line.length).toBeGreaterThan(0)
     expect(fixtures.routeAround.length).toBeGreaterThan(0)
@@ -120,5 +134,6 @@ describe('board fixtures — Go↔TS determinism seam', () => {
     expect(fixtures.solveHex.length).toBeGreaterThan(0)
     expect(fixtures.solveIntercept.length).toBeGreaterThan(0)
     expect(fixtures.laneGate.length).toBeGreaterThan(0)
+    expect(fixtures.stateAt.length).toBeGreaterThan(0)
   })
 })

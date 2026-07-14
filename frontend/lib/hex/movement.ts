@@ -9,8 +9,9 @@
 
 import type { Hex } from './hex'
 import type { Orbit } from './orbit'
-import { orbState } from './orbit'
-import { roundf } from './hex'
+import { orbState, orbitThrough } from './orbit'
+import { ringOf, roundf } from './hex'
+import { orbitPeriod } from './tuning'
 
 // Mode is the fleet's movement-state discriminator. coast/burn/docked are board
 // tier (#0004); laneTransit/laneHold are graph tier (#0008).
@@ -126,11 +127,60 @@ export function burnPos(b: Burn, t: number): Hex {
   return b.path[idx]
 }
 
+// coastAt returns the resting state a fleet settles into on hex h at world time
+// `at` (Go: board.CoastAt): a free prograde orbit on h's ring, back-solved to
+// pass through h, paced by the world's one orbital law. `at` is load-bearing —
+// pass the arrival/settle time, never a bare zero.
+//
+// The anchor snaps to the NEAREST ring-cell window boundary (see the Go side for
+// the full why): the renderer glides every orbit by the absolute window
+// fraction, so a mid-window anchor draws a freshly settled ship up to a full
+// cell prograde of its halt hex. Snapping bounds the visual discontinuity to
+// half a cell either side.
+export function coastAt(h: Hex, at: number): MovementState {
+  const ring = ringOf(h)
+  const period = orbitPeriod(ring)
+  return { mode: 'coast', coast: orbitThrough(h, snapToCellBoundary(at, period, ring), period, 1) }
+}
+
+// snapToCellBoundary — Go: board.snapToCellBoundary, integer math mirrored exactly.
+function snapToCellBoundary(at: number, period: number, ring: number): number {
+  if (ring <= 0 || period <= 0) return at
+  const oneStep = Math.trunc(period / (6 * ring))
+  if (oneStep <= 0) return at
+  const k = Math.floor((Math.trunc(at) + Math.trunc(oneStep / 2)) / oneStep)
+  return k * oneStep
+}
+
+// stateAt returns the state the fleet is IN at time t (Go: board.StateAt): the
+// stored/wire state with any completed kinematics folded forward. A burn past
+// its arriveTime IS its settled state — docked onto its target, or coasting the
+// local orbit anchored at the arrival instant. The server's persisted doc (and
+// therefore the payload a poll delivered a moment ago) is a cache of this fold;
+// deriving anything from a raw past-ETA burn shows a ship frozen on its last
+// path hex while the system turns around it.
+//
+// Lane transit is deliberately NOT folded: a lane arrival moves the fleet to
+// another system and reveals what's there — facts only the server's resolve may
+// establish. A due transit reads unchanged until a refetch delivers the truth.
+export function stateAt(s: MovementState, t: number): MovementState {
+  if (s.mode !== 'burn' || !s.burn || s.burn.path.length === 0 || t < s.burn.arriveTime) return s
+  const b = s.burn
+  if (b.dockOnArrive) return { mode: 'docked', docked: { parentId: b.dockOnArrive } }
+  return coastAt(b.path[b.path.length - 1], b.arriveTime)
+}
+
 // shipPos returns the fleet's computed board hex. ok=false whenever the fleet has
 // no hex on the current system's board: docked (parent's hex), parked mid-lane,
 // or out on a lane past the departure gate. During a trip's board leg the fleet is
 // still on the origin board burning to the gate, so its burn hex is returned.
+//
+// It evaluates the EFFECTIVE state (stateAt), so a wire burn whose arrival has
+// passed answers as the coast it settled into — a caller that forgets to fold
+// still gets the right position — and a due dock-on-arrive answers ok=false (its
+// hex is the parent's, which has moved on since the burn ended).
 export function shipPos(s: MovementState, t: number): { hex: Hex; ok: boolean } {
+  s = stateAt(s, t)
   switch (s.mode) {
     case 'coast':
       if (!s.coast) return { hex: { q: 0, r: 0 }, ok: true }

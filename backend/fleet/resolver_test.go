@@ -85,7 +85,7 @@ func TestCoastState_ObeysTheSharedOrbitalLaw(t *testing.T) {
 
 	const settledAt = common.WorldMillis(16_000_000_000) // a realistic "now", not the epoch
 
-	st := coastState(h, settledAt)
+	st := board.CoastAt(h, settledAt)
 	if st.Mode != board.ModeCoast || st.Coast == nil {
 		t.Fatalf("coastState mode = %q, coast = %+v", st.Mode, st.Coast)
 	}
@@ -93,10 +93,18 @@ func TestCoastState_ObeysTheSharedOrbitalLaw(t *testing.T) {
 		t.Errorf("coast period on ring %d = %d, want %d (the body law)", ring, st.Coast.Period, want)
 	}
 
-	// And the fleet is actually WHERE IT STOPPED at the moment it stopped — Angle0 is
-	// epoch-anchored, so a naive settle would advance it and teleport the ship.
-	if got := board.OrbState(*st.Coast, settledAt); got != h {
+	// And the fleet is actually WHERE IT STOPPED — Angle0 is epoch-anchored, so a
+	// naive settle would advance it and teleport the ship across the ring. The
+	// anchor snaps to the nearest cell-window boundary (render continuity — see
+	// board.CoastAt), so at the settle instant the ship is within the cell it's
+	// crossing (distance ≤ 1 of h), and EXACTLY h at the snapped boundary.
+	if got := board.OrbState(*st.Coast, settledAt); board.Distance(got, h) > 1 {
 		t.Errorf("settled at %+v but coasts through %+v at that instant (teleport)", h, got)
+	}
+	oneStep := common.Tuning().OrbitPeriod(ring) / common.WorldMillis(6*ring)
+	boundary := (settledAt + oneStep/2) / oneStep * oneStep
+	if got := board.OrbState(*st.Coast, boundary); got != h {
+		t.Errorf("coast passes through %+v at the settle boundary, want %+v", got, h)
 	}
 
 	// And it re-paces when the world is retuned — the fleet is not frozen at the
@@ -107,7 +115,7 @@ func TestCoastState_ObeysTheSharedOrbitalLaw(t *testing.T) {
 	common.SetTuning(fast)
 	defer common.SetTuning(base)
 
-	if got, want := coastState(h, settledAt).Coast.Period, fast.OrbitPeriod(ring); got != want {
+	if got, want := board.CoastAt(h, settledAt).Coast.Period, fast.OrbitPeriod(ring); got != want {
 		t.Errorf("after retune, coast period = %d, want %d", got, want)
 	}
 }

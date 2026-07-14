@@ -122,11 +122,18 @@ describe('FactsPanel', () => {
   })
 
   it('offers cancel only while the active fleet is burning', () => {
+    // The burn's ETA sits ahead of the panel's worldTime — a past-ETA burn IS
+    // already settled (stateAt) and correctly offers no cancel.
     const burning: Fleet = {
       ...ownFleet,
       state: {
         mode: 'burn',
-        burn: { path: [{ q: 0, r: 0 }], startTime: 0, arriveTime: 10, target: { hex: { q: 0, r: 0 } } },
+        burn: {
+          path: [{ q: 0, r: 0 }],
+          startTime: 0,
+          arriveTime: 2_000_000,
+          target: { hex: { q: 0, r: 0 } },
+        },
       },
     }
     render(<FactsPanel {...base} selection={null} activeFleet={burning} plan={null} />)

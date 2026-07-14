@@ -13,10 +13,11 @@ import { ringHexes, ringOf, type Hex } from '@/lib/hex'
 import { hexPolygonPoints, hexToPixel, type Point } from '@/lib/hex/pixel'
 import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
-import { boardLegBurn } from '@/lib/hex'
+import { boardLegBurn, stateAt } from '@/lib/hex'
 import {
   featureGlidePixel,
   featureLogicalHex,
+  fleetDockedParentId,
   fleetGlidePixel,
   fleetLogicalHex,
   fleetOnBoard,
@@ -99,7 +100,7 @@ export function BoardScene({
   const bubble = useMemo(() => {
     const centers = onBoard
       .filter((f) => f.own)
-      .map((f) => fleetLogicalHex(f, worldTime, hexById.get(dockedParent(f) ?? '')))
+      .map((f) => fleetLogicalHex(f, worldTime, hexById.get(fleetDockedParentId(f, worldTime) ?? '')))
     return sensorBubbleHexes(centers, AMBIENT_RADIUS)
   }, [onBoard, worldTime, hexById])
 
@@ -110,10 +111,10 @@ export function BoardScene({
     () =>
       onBoard
         .filter((f) => f.own)
-        .map((f) => ({ id: f.id, path: committedPath(f) }))
+        .map((f) => ({ id: f.id, path: committedPath(f, worldTime) }))
         .filter((p): p is { id: string; path: Hex[] } => !!p.path)
         .map((p) => ({ id: p.id, points: pathPolyline(p.path) })),
-    [onBoard],
+    [onBoard, worldTime],
   )
 
   return (
@@ -180,7 +181,7 @@ export function BoardScene({
 
       <g data-testid="fleet-glyphs">
         {onBoard.map((f) => {
-          const parentId = dockedParent(f)
+          const parentId = fleetDockedParentId(f, worldTime)
           const parentPixel = parentId ? pixelById.get(parentId) : undefined
           const p = fleetGlidePixel(f, worldTime, parentPixel)
           const ahead = fleetGlidePixel(f, worldTime + HEADING_DT, parentPixel)
@@ -189,6 +190,7 @@ export function BoardScene({
               key={f.id}
               fleet={f}
               point={p}
+              worldTime={worldTime}
               headingDeg={headingDeg(p, ahead)}
               selected={selectedId === f.id}
               {...(onSelectFleet ? { onSelect: onSelectFleet } : {})}
@@ -209,16 +211,15 @@ function ringPolygon(ring: number): string {
     .join(' ')
 }
 
-function dockedParent(f: Fleet): string | undefined {
-  return f.state.mode === 'docked' ? f.state.docked?.parentId : undefined
-}
-
 // committedPath — the hex path a fleet is currently flying on this board: a burn,
-// or a trip's board leg. Null for a fleet that isn't flying one.
-function committedPath(f: Fleet): Hex[] | null {
-  if (f.state.mode === 'burn' && f.state.burn) return f.state.burn.path
-  if (f.state.mode === 'laneTransit' && f.state.laneTransit) {
-    return boardLegBurn(f.state.laneTransit)?.path ?? null
+// or a trip's board leg. Null for a fleet that isn't flying one — including a
+// burn that already ARRIVED (stateAt folds it to coast/docked), whose stale path
+// would otherwise keep drawing under a ship that finished flying it.
+function committedPath(f: Fleet, worldTime: number): Hex[] | null {
+  const s = stateAt(f.state, worldTime)
+  if (s.mode === 'burn' && s.burn) return s.burn.path
+  if (s.mode === 'laneTransit' && s.laneTransit) {
+    return boardLegBurn(s.laneTransit)?.path ?? null
   }
   return null
 }

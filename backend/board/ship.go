@@ -136,12 +136,80 @@ func BurnPos(b Burn, t common.WorldMillis) Hex {
 	return b.Path[idx]
 }
 
+// CoastAt returns the resting state a fleet settles into on hex h at world time
+// `at`: a free prograde orbit on h's ring, back-solved to pass through h
+// (OrbitThrough), paced by the world's one orbital law. `at` is load-bearing —
+// an orbit anchored at the wrong instant puts the ship somewhere it never was.
+// Pass the arrival/settle time, never a bare zero.
+//
+// The anchor is snapped to the NEAREST ring-cell window boundary, not to `at`
+// itself. Every orbit advances cells at the same absolute instants (multiples of
+// period/6ring — angle0 shifts which cell, never when), and the renderer glides
+// by that absolute window fraction. Anchoring mid-window therefore draws a
+// freshly settled ship up to a full cell prograde of its halt hex — cancel a
+// burn and the ship visibly lands one tile "ahead" on the ring. Snapping bounds
+// the discontinuity to half a cell either side; the quantized hex may read one
+// cell shy of h for the tail of the settle window (it eases INTO h at the
+// boundary), which the settle rule tolerates — the anti-teleport guarantee is
+// "where you stopped, give or take the cell you're crossing", not exactness.
+func CoastAt(h Hex, at common.WorldMillis) MovementState {
+	ring := Ring(h)
+	period := common.Tuning().OrbitPeriod(ring)
+	orbit := OrbitThrough(h, snapToCellBoundary(at, period, ring), period, 1)
+	return MovementState{Mode: ModeCoast, Coast: &orbit}
+}
+
+// snapToCellBoundary rounds `at` to the nearest absolute ring-cell window
+// boundary (see CoastAt). Integer math, mirrored exactly in lib/hex.
+func snapToCellBoundary(at, period common.WorldMillis, ring int) common.WorldMillis {
+	if ring <= 0 || period <= 0 {
+		return at
+	}
+	oneStep := period / common.WorldMillis(6*ring)
+	if oneStep <= 0 {
+		return at
+	}
+	k := (at + oneStep/2) / oneStep
+	return k * oneStep
+}
+
+// StateAt returns the state the fleet is IN at time t: the stored state with any
+// completed kinematics folded forward. A burn past its arriveTime IS its settled
+// state — docked onto its target, or coasting the local orbit anchored at the
+// arrival instant — that's not a projection or an estimate, it's what the state
+// is. The persisted doc is a cache of this fold; the authoritative settle
+// (Get/resolve through the action spine) writes the same state this computes,
+// plus the effects that must happen exactly once (slot release, reveals, deltas).
+// Nothing that answers "where/what is this fleet" may read a stored state
+// without going through here; only resolvers and the settle path itself read raw.
+//
+// Lane transit is deliberately NOT folded: a lane arrival moves the fleet to
+// another system and reveals what's there — facts beyond MovementState that only
+// the resolve may establish. A due transit reads unchanged (positioned at its
+// lane endpoint) until the authoritative resolve lands.
+func StateAt(s MovementState, t common.WorldMillis) MovementState {
+	if s.Mode != ModeBurn || s.Burn == nil || len(s.Burn.Path) == 0 || t < s.Burn.ArriveTime {
+		return s
+	}
+	b := s.Burn
+	if b.DockOnArrive != "" {
+		return MovementState{Mode: ModeDocked, Docked: &Docked{ParentId: b.DockOnArrive}}
+	}
+	return CoastAt(b.Path[len(b.Path)-1], b.ArriveTime)
+}
+
 // ShipPos returns the fleet's computed board hex. It reports ok=false whenever
 // the fleet has no hex on the current system's board: docked (its hex is the
 // parent's, resolved from the interior), parked mid-lane (lane-hold), or already
 // out on a lane past the departure gate. During a trip's board leg the fleet is
 // still on the origin board burning to the gate, so ShipPos returns that hex.
+//
+// It evaluates the EFFECTIVE state (StateAt), so a stored burn whose arrival has
+// passed answers as the coast it settled into — a reader that forgets to project
+// still gets the right position — and a due dock-on-arrive answers ok=false (its
+// hex is the parent's, which has moved on since the burn ended).
 func ShipPos(s MovementState, t common.WorldMillis) (Hex, bool) {
+	s = StateAt(s, t)
 	switch s.Mode {
 	case ModeCoast:
 		if s.Coast == nil {
@@ -172,6 +240,10 @@ func ShipPos(s MovementState, t common.WorldMillis) (Hex, bool) {
 // Arrived reports whether a fleet's active kinematic order has reached its
 // completion time — a burn's arrival or a lane trip's destination arrival. The
 // read path settles it through the action spine on the next touch (no scheduler).
+//
+// Arrived is a STORED-state question ("is there a due settle to run?"), asked by
+// the settle path before it resolves. Effective state (StateAt) never reports an
+// arrived burn — the fold already settled it — so ask Arrived of the raw doc.
 func Arrived(s MovementState, t common.WorldMillis) bool {
 	switch s.Mode {
 	case ModeBurn:

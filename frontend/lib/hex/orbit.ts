@@ -41,6 +41,26 @@ export function orbState(o: Orbit, worldTime: number): Hex {
   return ring[idx]
 }
 
+// orbitThrough builds an orbit on h's ring that passes through h AT `at` — the
+// orbit a thing inherits when it comes to rest "here, now" (Go: board.OrbitThrough).
+// angle0 is epoch-anchored, so the advance is run BACKWARDS from `at`; storing the
+// raw index would teleport the thing when orbState re-advanced it from the epoch.
+// Same BigInt truncating math as orbState so the round-trip
+// orbState(orbitThrough(h, at, …), at) === h is exact.
+export function orbitThrough(h: Hex, at: number, period: number, dir: number): Orbit {
+  const { ring, index } = angleOf(h)
+  const d = dir === 0 ? 1 : dir
+  if (ring <= 0) return { ring, angle0: 0, period, dir: d }
+  const steps = 6 * ring
+  let angle0 = index
+  if (period > 0) {
+    const advanced = (BigInt(Math.trunc(at)) * BigInt(steps)) / BigInt(Math.trunc(period))
+    angle0 = index - d * Number(advanced)
+  }
+  angle0 = ((angle0 % steps) + steps) % steps
+  return { ring, angle0, period, dir: d }
+}
+
 // angleOf returns the ring and ring-position index of a hex — the inverse of
 // placing a body on a ring (Go: board.AngleOf). Used to derive a coast orbit
 // for a fleet from the hex it's resting on. The centre is ring 0, index 0.

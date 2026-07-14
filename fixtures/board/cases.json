@@ -730,5 +730,328 @@
         "r": -6
       }
     }
+  ],
+  "stateAt": [
+    {
+      "state": {
+        "mode": "burn",
+        "burn": {
+          "path": [
+            {
+              "q": 1,
+              "r": 0
+            },
+            {
+              "q": 2,
+              "r": 0
+            },
+            {
+              "q": 3,
+              "r": 0
+            },
+            {
+              "q": 4,
+              "r": 0
+            },
+            {
+              "q": 5,
+              "r": 0
+            },
+            {
+              "q": 6,
+              "r": 0
+            }
+          ],
+          "startTime": 1000,
+          "arriveTime": 13500,
+          "target": {
+            "hex": {
+              "q": 6,
+              "r": 0
+            }
+          }
+        }
+      },
+      "t": 7000,
+      "out": {
+        "mode": "burn",
+        "burn": {
+          "path": [
+            {
+              "q": 1,
+              "r": 0
+            },
+            {
+              "q": 2,
+              "r": 0
+            },
+            {
+              "q": 3,
+              "r": 0
+            },
+            {
+              "q": 4,
+              "r": 0
+            },
+            {
+              "q": 5,
+              "r": 0
+            },
+            {
+              "q": 6,
+              "r": 0
+            }
+          ],
+          "startTime": 1000,
+          "arriveTime": 13500,
+          "target": {
+            "hex": {
+              "q": 6,
+              "r": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "state": {
+        "mode": "burn",
+        "burn": {
+          "path": [
+            {
+              "q": 1,
+              "r": 0
+            },
+            {
+              "q": 2,
+              "r": 0
+            },
+            {
+              "q": 3,
+              "r": 0
+            },
+            {
+              "q": 4,
+              "r": 0
+            },
+            {
+              "q": 5,
+              "r": 0
+            },
+            {
+              "q": 6,
+              "r": 0
+            }
+          ],
+          "startTime": 1000,
+          "arriveTime": 13500,
+          "target": {
+            "hex": {
+              "q": 6,
+              "r": 0
+            }
+          }
+        }
+      },
+      "t": 13500,
+      "out": {
+        "mode": "coast",
+        "coast": {
+          "ring": 6,
+          "angle0": 10,
+          "period": 216000,
+          "dir": 1
+        }
+      }
+    },
+    {
+      "state": {
+        "mode": "burn",
+        "burn": {
+          "path": [
+            {
+              "q": 1,
+              "r": 0
+            },
+            {
+              "q": 2,
+              "r": 0
+            },
+            {
+              "q": 3,
+              "r": 0
+            },
+            {
+              "q": 4,
+              "r": 0
+            },
+            {
+              "q": 5,
+              "r": 0
+            },
+            {
+              "q": 6,
+              "r": 0
+            }
+          ],
+          "startTime": 1000,
+          "arriveTime": 13500,
+          "target": {
+            "hex": {
+              "q": 6,
+              "r": 0
+            }
+          }
+        }
+      },
+      "t": 262000,
+      "out": {
+        "mode": "coast",
+        "coast": {
+          "ring": 6,
+          "angle0": 10,
+          "period": 216000,
+          "dir": 1
+        }
+      }
+    },
+    {
+      "state": {
+        "mode": "burn",
+        "burn": {
+          "path": [
+            {
+              "q": 1,
+              "r": 0
+            },
+            {
+              "q": 2,
+              "r": 0
+            },
+            {
+              "q": 3,
+              "r": 0
+            },
+            {
+              "q": 4,
+              "r": 0
+            },
+            {
+              "q": 5,
+              "r": 0
+            },
+            {
+              "q": 6,
+              "r": 0
+            }
+          ],
+          "startTime": 3000,
+          "arriveTime": 15500,
+          "target": {
+            "hex": {
+              "q": 6,
+              "r": 0
+            }
+          }
+        }
+      },
+      "t": 15500,
+      "out": {
+        "mode": "coast",
+        "coast": {
+          "ring": 6,
+          "angle0": 9,
+          "period": 216000,
+          "dir": 1
+        }
+      }
+    },
+    {
+      "state": {
+        "mode": "burn",
+        "burn": {
+          "path": [
+            {
+              "q": 2,
+              "r": -1
+            },
+            {
+              "q": 2,
+              "r": 0
+            },
+            {
+              "q": 3,
+              "r": 0
+            },
+            {
+              "q": 3,
+              "r": 1
+            },
+            {
+              "q": 4,
+              "r": 1
+            },
+            {
+              "q": 4,
+              "r": 2
+            }
+          ],
+          "startTime": 2000,
+          "arriveTime": 9000,
+          "target": {
+            "featureId": "feat-9"
+          },
+          "dockOnArrive": "feat-9"
+        }
+      },
+      "t": 20000,
+      "out": {
+        "mode": "docked",
+        "docked": {
+          "parentId": "feat-9"
+        }
+      }
+    },
+    {
+      "state": {
+        "mode": "laneTransit",
+        "laneTransit": {
+          "route": [
+            "sys-0",
+            "sys-2"
+          ],
+          "legEtas": [
+            5000,
+            30000
+          ],
+          "departTime": 1000,
+          "arriveTime": 30000,
+          "entryGate": {
+            "q": 16,
+            "r": 0
+          }
+        }
+      },
+      "t": 99999,
+      "out": {
+        "mode": "laneTransit",
+        "laneTransit": {
+          "route": [
+            "sys-0",
+            "sys-2"
+          ],
+          "legEtas": [
+            5000,
+            30000
+          ],
+          "departTime": 1000,
+          "arriveTime": 30000,
+          "entryGate": {
+            "q": 16,
+            "r": 0
+          }
+        }
+      }
+    }
   ]
 }

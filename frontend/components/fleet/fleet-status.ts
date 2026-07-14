@@ -6,6 +6,7 @@
 // the same (state, worldTime) the board and the galaxy animate from, so the
 // roster can never disagree with the picture.
 
+import { stateAt } from '@/lib/hex'
 import type { Fleet } from '@/lib/types/fleet'
 
 // tone drives the row's accent: idle (nothing to watch), moving (an order is
@@ -30,7 +31,10 @@ export interface FleetStatus {
 export type NameOf = (systemId: string) => string
 
 export function fleetStatus(fleet: Fleet, worldTime: number, nameOf: NameOf): FleetStatus {
-  const s = fleet.state
+  // Read the EFFECTIVE state (stateAt): a burn whose arrival has passed IS
+  // docked/coasting, so an arrived fleet never reads "Under way" with a negative
+  // countdown while it waits for the next refetch.
+  const s = stateAt(fleet.state, worldTime)
   const here = nameOf(fleet.systemId)
 
   switch (s.mode) {

@@ -23,7 +23,7 @@ import { HexBoard } from './HexBoard'
 import { BoardScene } from './BoardScene'
 import { SelectionPreview } from './SelectionPreview'
 import { FactsPanel, type BoardSelection } from './FactsPanel'
-import { featureLogicalHex, fleetLogicalHex, fleetOnBoard } from './glyph-geometry'
+import { featureLogicalHex, fleetDockedParentId, fleetLogicalHex, fleetOnBoard } from './glyph-geometry'
 import { planToBody, planToHex, type MovePlan } from './move-preview'
 
 const STAGE = 'relative h-dvh w-full overflow-hidden bg-[#05070d]'
@@ -61,13 +61,13 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const selectedGateDest = selection?.kind === 'gate' ? selection.gate.destSystemId : null
   const routeQuery = useRoutePreview(activeFleet?.id ?? null, selectedGateDest)
 
-  // The acting fleet's live hex — the origin of every previewed order.
+  // The acting fleet's live hex — the origin of every previewed order. The
+  // docked parent comes off the EFFECTIVE state (a finished dock-on-arrive burn
+  // rides its body from the arrival instant, not from the next refetch).
   const fromHex = useMemo<Hex | null>(() => {
     if (!activeFleet || !board) return null
-    const parent =
-      activeFleet.state.mode === 'docked'
-        ? board.features.find((f) => f.id === activeFleet.state.docked?.parentId)
-        : undefined
+    const parentId = fleetDockedParentId(activeFleet, worldTime)
+    const parent = parentId ? board.features.find((f) => f.id === parentId) : undefined
     const parentHex = parent ? featureLogicalHex(parent, worldTime) : undefined
     return fleetLogicalHex(activeFleet, worldTime, parentHex)
   }, [activeFleet, board, worldTime])

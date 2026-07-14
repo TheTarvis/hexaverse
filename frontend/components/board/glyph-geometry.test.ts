@@ -10,8 +10,8 @@ import {
   orbitGlidePixel,
   sensorBubbleHexes,
 } from './glyph-geometry'
-import { hexToPixel } from '@/lib/hex/pixel'
-import { orbState, type Orbit } from '@/lib/hex'
+import { hexToPixel, lerpPixel } from '@/lib/hex/pixel'
+import { coastAt, orbState, orbitPeriod, stateAt, type Orbit } from '@/lib/hex'
 import type { BoardFeature } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 
@@ -142,7 +142,7 @@ describe('fleet position', () => {
     expect(headingDeg({ x: 0, y: 0 }, { x: 0, y: 10 })).toBeCloseTo(90, 5)
   })
 
-  it('glides along a burn path', () => {
+  it('glides along a burn path and hands off to the coast at arrival', () => {
     const burning = fleet({
       mode: 'burn',
       burn: {
@@ -155,7 +155,39 @@ describe('fleet position', () => {
         target: { hex: { q: 1, r: 0 } },
       },
     })
-    expect(fleetGlidePixel(burning, 100)).toEqual(hexToPixel(1, 0))
+    // Mid-flight: halfway between the two path cells.
+    expect(fleetGlidePixel(burning, 50)).toEqual(lerpPixel({ q: 0, r: 0 }, { q: 1, r: 0 }, 0.5))
+    // At (and past) arrival the burn IS the coast it settled into (stateAt): the
+    // ship glides on the meet hex's ring instead of freezing on the meet pixel.
+    const settled = stateAt(burning.state, 100)
+    expect(settled.mode).toBe('coast')
+    expect(fleetGlidePixel(burning, 100)).toEqual(orbitGlidePixel(settled.coast!, 100))
+    expect(fleetGlidePixel(burning, 5_000)).toEqual(orbitGlidePixel(settled.coast!, 5_000))
+  })
+
+  it('settles within half a cell of the halt hex at any instant (no full-tile jump on cancel)', () => {
+    // The renderer glides every orbit by the ABSOLUTE cell-window fraction, so a
+    // coast anchored mid-window drew a freshly settled ship up to a full cell
+    // prograde of its halt hex — cancel a burn and the ship landed one tile
+    // "ahead" on the ring. coastAt snaps its anchor to the nearest window
+    // boundary, bounding the discontinuity to half the ring-cell spacing.
+    const h = { q: 5, r: 0 }
+    const target = hexToPixel(h.q, h.r)
+    const neighbor = orbState(coastAt(h, 0).coast!, orbitPeriod(5) / (6 * 5)) // next ring cell
+    const spacing = Math.hypot(
+      hexToPixel(neighbor.q, neighbor.r).x - target.x,
+      hexToPixel(neighbor.q, neighbor.r).y - target.y,
+    )
+    // Settle instants spread across one 6s cell window (fractions 0 → 0.98).
+    for (const at of [720_000, 721_500, 722_900, 723_400, 724_700, 725_900]) {
+      const st = coastAt(h, at)
+      expect(st.mode).toBe('coast')
+      const p = orbitGlidePixel(st.coast!, at)
+      const jump = Math.hypot(p.x - target.x, p.y - target.y)
+      expect(jump, `settled at ${at} drew ${jump.toFixed(1)}px from its halt hex`).toBeLessThanOrEqual(
+        spacing * 0.51,
+      )
+    }
   })
 
   it('glides a trip’s board leg like a burn, then leaves the board at the gate', () => {

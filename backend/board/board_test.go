@@ -146,8 +146,16 @@ func TestShipPos_BurnInterpolatesEndToEnd(t *testing.T) {
 	if p, _ := ShipPos(state, 0); p != (Hex{0, 0}) {
 		t.Fatalf("burn start pos wrong: %v", p)
 	}
-	if p, _ := ShipPos(state, 4000); p != (Hex{4, 0}) {
+	// Just before arrival the burn has carried the ship to its meet hex.
+	if p, _ := ShipPos(state, 3999); p != (Hex{4, 0}) {
 		t.Fatalf("burn end pos wrong: %v", p)
+	}
+	// At (and past) arrival the burn IS the settled coast (StateAt): on the meet
+	// hex's ring, within the cell it's crossing — the coast anchor snaps to the
+	// nearest cell-window boundary (see CoastAt), so the settle instant may sit
+	// one cell shy of the meet hex until the boundary passes.
+	if p, _ := ShipPos(state, 4000); Ring(p) != 4 || Distance(p, Hex{4, 0}) > 1 {
+		t.Fatalf("arrived pos should coast the meet ring beside %v, got %v", Hex{4, 0}, p)
 	}
 	if p, _ := ShipPos(state, 2000); Ring(p) == 0 || Ring(p) == 4 {
 		t.Fatalf("burn midpoint should be partway, got %v", p)

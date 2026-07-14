@@ -196,6 +196,35 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
   ship-mounted scan bubble, cancel/re-task, commit-clears-selection. The production
   client reuses the math but takes positions/orders from the backend.
 
+## Scenarios
+
+Arrival is a computed fact: at `arriveTime` the ship **is** in its settled state
+(coast of the local orbit, or docked), whether or not any read has run the
+authoritative settle yet. These scenarios pin the doors where a stored-but-stale
+`burn` must not leak: every verb and every read must act on the state the fleet
+is *in*, not the state last *written*. (Added 2026-07-14 after the frozen-ship
+regressions; implemented by the effective-state fold — `board.StateAt`, mirrored
+as `stateAt` in `lib/hex`, pinned by the `stateAt` golden fixture cases.)
+
+### S1 — a new order departs from where the ship actually is, even when its last arrival never settled
+
+- **Given** a fleet whose burn's `arriveTime` has passed, settling it (by the
+  arrival rule) into the local coast orbit — but whose doc still says `burn`
+  because no read has run the settle
+- **And** enough time has passed since arrival that the coast orbit has carried
+  the ship several hexes away from the burn's meet hex
+- **When** a new order is issued, with no intervening read
+- **Then** the new burn's origin (`path[0]`) is the ship's live coast position
+  at order time — not the meet hex the finished burn ended on
+
+### S2 — cancel after an unsettled arrival holds the ship at its live position
+
+- **Given** the same arrived-but-unsettled fleet, drifted along its ring since
+  arrival
+- **When** the order is cancelled
+- **Then** the resulting halt coast passes through the ship's live position at
+  cancel time — the ship does not teleport back to the finished burn's meet hex
+
 ## Acceptance criteria
 
 - [x] A fleet holds exactly **one** movement state — `coast | burn | docked` — and its

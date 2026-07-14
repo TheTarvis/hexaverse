@@ -5,7 +5,7 @@
 // between logical cells so motion reads smooth, including the ring wrap-around.
 // Pure and presentational: no clock, no fetch.
 
-import { boardLegBurn, orbState, shipPos, type Hex, type MovementState, type Orbit } from '@/lib/hex'
+import { boardLegBurn, orbState, shipPos, stateAt, type Hex, type MovementState, type Orbit } from '@/lib/hex'
 import type { Burn } from '@/lib/hex'
 import { hexesWithinRadius, hexToPixel, lerpPixel, type Point } from '@/lib/hex/pixel'
 import type { BoardFeature } from '@/lib/types/system-board'
@@ -79,11 +79,26 @@ export function featureGlidePixel(
   return hexToPixel(h.q, h.r)
 }
 
+// Every fleet helper below positions from the EFFECTIVE state (stateAt): a
+// payload burn whose arrival passes while it sits in the query cache IS the
+// coast (or dock) it settled into, from the instant it arrives. Deriving from
+// the raw wire state froze an arrived ship on its last path hex until the next
+// refetch — the ship sat still while the whole system turned around it.
+
+// fleetDockedParentId — the feature a fleet rides at worldTime, if any: its
+// stored dock, or the dock a finished dock-on-arrive burn has settled into.
+// Components resolve parent hex/pixel through this, never from raw state.
+export function fleetDockedParentId(fleet: Fleet, worldTime: number): string | undefined {
+  const s = stateAt(fleet.state, worldTime)
+  return s.mode === 'docked' ? s.docked?.parentId : undefined
+}
+
 // fleetLogicalHex — a fleet's integer board hex at worldTime. Docked rides the
 // resolved parent hex; coast/burn come from shipPos (the golden).
 export function fleetLogicalHex(fleet: Fleet, worldTime: number, parentHex?: Hex): Hex {
-  if (fleet.state.mode === 'docked') return parentHex ?? fleet.position
-  const { hex } = shipPos(fleet.state, worldTime)
+  const s = stateAt(fleet.state, worldTime)
+  if (s.mode === 'docked') return parentHex ?? fleet.position
+  const { hex } = shipPos(s, worldTime)
   return hex
 }
 
@@ -93,19 +108,23 @@ export function fleetLogicalHex(fleet: Fleet, worldTime: number, parentHex?: Hex
 // fleet: shipPos's off-board answer is (0,0), which would otherwise plant the
 // ship on the star.
 export function fleetOnBoard(fleet: Fleet, worldTime: number): boolean {
-  if (fleet.state.mode === 'docked') return true
-  return shipPos(fleet.state, worldTime).ok
+  const s = stateAt(fleet.state, worldTime)
+  if (s.mode === 'docked') return true
+  return shipPos(s, worldTime).ok
 }
 
 // fleetGlidePixel — a fleet's glided screen point. Coast glides on its orbit,
 // burn along its path, docked rides the parent feature's glided point, and a
-// trip's leg 0 glides along the board leg exactly as a burn does.
+// trip's leg 0 glides along the board leg exactly as a burn does. The fold is
+// what lets an arriving ship hand off seamlessly from the burn glide to the
+// coast glide: the settled orbit passes through the meet hex at the arrival
+// instant, so the pixel never jumps.
 export function fleetGlidePixel(
   fleet: Fleet,
   worldTime: number,
   parentPixel?: Point,
 ): Point {
-  const s: MovementState = fleet.state
+  const s: MovementState = stateAt(fleet.state, worldTime)
   if (s.mode === 'docked') return parentPixel ?? hexToPixel(fleet.position.q, fleet.position.r)
   if (s.mode === 'burn' && s.burn) return burnGlidePixel(s.burn, worldTime)
   if (s.mode === 'coast' && s.coast) return orbitGlidePixel(s.coast, worldTime)

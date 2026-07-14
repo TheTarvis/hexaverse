@@ -22,7 +22,7 @@ const fleet = (over: Partial<Fleet>): Fleet => ({
 describe('FleetGlyph', () => {
   it('draws an own fleet with a hull and reports clicks', () => {
     const onSelect = vi.fn()
-    renderInSvg(<FleetGlyph fleet={fleet({})} point={{ x: 5, y: 5 }} onSelect={onSelect} />)
+    renderInSvg(<FleetGlyph fleet={fleet({})} point={{ x: 5, y: 5 }} worldTime={0} onSelect={onSelect} />)
     const g = screen.getByTestId('fleet-glyph-fl1')
     expect(g).toHaveAttribute('data-own', 'true')
     expect(g.querySelector('path')).toBeTruthy() // hull
@@ -31,7 +31,7 @@ describe('FleetGlyph', () => {
   })
 
   it('draws a foreign fleet as a bare snapshot marker (no hull)', () => {
-    renderInSvg(<FleetGlyph fleet={fleet({ id: 'fx', own: false })} point={{ x: 0, y: 0 }} />)
+    renderInSvg(<FleetGlyph fleet={fleet({ id: 'fx', own: false })} point={{ x: 0, y: 0 }} worldTime={0} />)
     const g = screen.getByTestId('fleet-glyph-fx')
     expect(g).toHaveAttribute('data-own', 'false')
     expect(g.querySelector('path')).toBeNull()

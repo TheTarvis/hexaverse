@@ -115,30 +115,17 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 		return f, nil
 	}
 	if f.ActiveActionId != "" {
-		// A lane arrival flips the fleet into a new system; remember the destination
-		// so we can trigger the #0003 first-arrival detail roll after the resolve.
-		var arrivedAt string
-		if f.State.Mode == board.ModeLaneTransit && f.State.LaneTransit != nil && len(f.State.LaneTransit.Route) > 0 {
-			arrivedAt = f.State.LaneTransit.Route[len(f.State.LaneTransit.Route)-1]
-		}
-		// Resolve the due order through the action spine (settles state + releases
-		// the slot + flips the action to done, atomically), then re-read.
-		if _, err := s.actions.ResolveActive(ctx, id); err != nil {
-			return nil, err
-		}
-		if arrivedAt != "" {
-			// First-arrival detail roll (#0003): materialize the destination interior
-			// create-if-absent. Idempotent and done post-resolve, so the heavy
-			// generation stays out of the resolve transaction. Non-fatal on error —
-			// the on-read trigger will materialize it later.
-			if _, err := s.systemSvc.GetOrCreateInterior(ctx, arrivedAt); err != nil {
-				log.Warn().Ctx(ctx).Err(err).Str("systemId", arrivedAt).Msg("Arrival detail roll deferred")
-			}
-		}
-		return s.load(ctx, id)
+		return s.resolveDue(ctx, f)
 	}
-	// No wrapping action — settle motion state directly (there's no slot to free).
-	s.settleArrival(f)
+	// No wrapping action (dev-seeded/legacy) — fold the settle into the doc
+	// directly; there's no slot to free and no effects to mint. A due lane
+	// transit folds nowhere locally (only its resolve may move systems), so an
+	// unchanged fold writes nothing.
+	eff := board.StateAt(f.State, now)
+	if eff.Mode == f.State.Mode {
+		return f, nil
+	}
+	f.State = eff
 	f.UpdatedAt = now
 	if err := s.dao.Save(ctx, *f); err != nil {
 		return nil, err
@@ -146,10 +133,38 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 	return f, nil
 }
 
-// ListInSystem returns every fleet currently in a system. It does not WRITE a due
-// arrival — that stays on Get/resolve, one authoritative writer — but it does
-// project one (see projectSettled), so a ship that has arrived reads as coasting
-// rather than as a burn frozen on its last path hex.
+// resolveDue runs the authoritative settle for a fleet whose active action has
+// reached its ETA: resolution through the action spine (motion settle + slot
+// release + the exactly-once effects, one transaction), the #0003 first-arrival
+// detail roll when a lane trip just changed systems, then a re-read of the
+// settled doc. The settle establishes no new position fact — every read already
+// answers with board.StateAt — it lands the effects and refreshes the cache.
+func (s *Service) resolveDue(ctx context.Context, f *Fleet) (*Fleet, error) {
+	// A lane arrival flips the fleet into a new system; remember the destination
+	// so we can trigger the detail roll after the resolve.
+	var arrivedAt string
+	if f.State.Mode == board.ModeLaneTransit && f.State.LaneTransit != nil && len(f.State.LaneTransit.Route) > 0 {
+		arrivedAt = f.State.LaneTransit.Route[len(f.State.LaneTransit.Route)-1]
+	}
+	if _, err := s.actions.ResolveActive(ctx, f.Id); err != nil {
+		return nil, err
+	}
+	if arrivedAt != "" {
+		// First-arrival detail roll (#0003): materialize the destination interior
+		// create-if-absent. Idempotent and done post-resolve, so the heavy
+		// generation stays out of the resolve transaction. Non-fatal on error —
+		// the on-read trigger will materialize it later.
+		if _, err := s.systemSvc.GetOrCreateInterior(ctx, arrivedAt); err != nil {
+			log.Warn().Ctx(ctx).Err(err).Str("systemId", arrivedAt).Msg("Arrival detail roll deferred")
+		}
+	}
+	return s.load(ctx, f.Id)
+}
+
+// ListInSystem returns every fleet currently in a system. It does not WRITE a
+// due arrival — that stays on Get/resolve, one authoritative writer — but the
+// wire carries the EFFECTIVE state (board.StateAt), so a ship that has arrived
+// reads as the coast it settled into, never as a burn frozen on its last hex.
 func (s *Service) ListInSystem(ctx context.Context, systemID string) ([]Fleet, error) {
 	fleets, err := s.dao.ListBySystem(ctx, systemID)
 	if err != nil {
@@ -157,14 +172,14 @@ func (s *Service) ListInSystem(ctx context.Context, systemID string) ([]Fleet, e
 	}
 	now := s.clock.Now()
 	for i := range fleets {
-		fleets[i] = s.projectSettled(fleets[i], now)
+		fleets[i].State = board.StateAt(fleets[i].State, now)
 	}
 	return fleets, nil
 }
 
 // ListForCorp returns every fleet a corporation owns (across systems, transit
-// included) — the galaxy view's own-fleet layer. Read-only like ListInSystem, and
-// projects due burn arrivals the same way.
+// included) — the galaxy view's own-fleet layer. Read-only like ListInSystem,
+// carrying effective state the same way.
 func (s *Service) ListForCorp(ctx context.Context, corporationID string) ([]Fleet, error) {
 	fleets, err := s.dao.ListByCorporation(ctx, corporationID)
 	if err != nil {
@@ -172,30 +187,9 @@ func (s *Service) ListForCorp(ctx context.Context, corporationID string) ([]Flee
 	}
 	now := s.clock.Now()
 	for i := range fleets {
-		fleets[i] = s.projectSettled(fleets[i], now)
+		fleets[i].State = board.StateAt(fleets[i].State, now)
 	}
 	return fleets, nil
-}
-
-// projectSettled shows a reader the fleet it would SEE, not the doc as last written:
-// a burn whose arrival has passed is projected into the state it settles into — the
-// local coast orbit, or docked. In-memory only, on a copy.
-//
-// Without it a finished burn reads as a burn forever, and BurnPos pins a past-ETA
-// burn to its final path hex — so an arrived ship sat perfectly still on the board
-// while the whole system turned around it, until some other call happened to run the
-// authoritative settle. Physics doesn't wait for a write: a ship that arrived is in
-// orbit from the instant it arrives, which is exactly what settleArrival encodes
-// (it anchors the coast orbit at b.ArriveTime, so the projected and the eventually-
-// written state are the same state).
-//
-// Lane arrivals are deliberately NOT projected: those move the fleet to another
-// system and reveal what's there — facts only the resolve may establish.
-func (s *Service) projectSettled(f Fleet, now common.WorldMillis) Fleet {
-	if f.State.Mode == board.ModeBurn && board.Arrived(f.State, now) {
-		s.settleArrival(&f)
-	}
-	return f
 }
 
 // OrderTo dispatches an order by tier: a systemId target is a graph-tier trip
@@ -216,6 +210,15 @@ func (s *Service) orderBurn(ctx context.Context, id string, req OrderRequest) (*
 		return nil, err
 	}
 	now := s.clock.Now()
+
+	// An active order that already COMPLETED is a fact, not a re-taskable order:
+	// resolve it through the spine first (settle + exactly-once effects — the
+	// ambient sweep must not be lost to a cancel), then order from the settled doc.
+	if f.ActiveActionId != "" && board.Arrived(f.State, now) {
+		if f, err = s.resolveDue(ctx, f); err != nil {
+			return nil, err
+		}
+	}
 
 	from, err := s.Position(ctx, f)
 	if err != nil {
@@ -303,6 +306,14 @@ func (s *Service) Cancel(ctx context.Context, id string) (*Fleet, error) {
 		return nil, err
 	}
 	now := s.clock.Now()
+
+	// A completed order can't be cancelled — its arrival is already a fact.
+	// Resolve it (settle + effects, releasing the slot) and return the settled
+	// fleet; there is nothing left to halt.
+	if f.ActiveActionId != "" && board.Arrived(f.State, now) {
+		return s.resolveDue(ctx, f)
+	}
+
 	halt, err := s.haltState(ctx, f, now)
 	if err != nil {
 		return nil, err
@@ -338,7 +349,7 @@ func (s *Service) haltState(ctx context.Context, f *Fleet, now common.WorldMilli
 		// Still on the origin board burning to the gate — stop-burn to coast.
 		if lt.BoardLeg != nil && now < lt.BoardLeg.GateEta {
 			pos, _ := board.ShipPos(f.State, now)
-			return s.coastAt(pos, now), nil
+			return board.CoastAt(pos, now), nil
 		}
 		// Out on a lane — hold at the current fraction between two systems.
 		if fromIdx, toIdx, frac, ok := board.LaneFraction(*lt, now); ok {
@@ -355,7 +366,7 @@ func (s *Service) haltState(ctx context.Context, f *Fleet, now common.WorldMilli
 	if err != nil {
 		return board.MovementState{}, err
 	}
-	return s.coastAt(cur, now), nil
+	return board.CoastAt(cur, now), nil
 }
 
 // SeedFleet drops a fleet into a system, coasting at a hex — the dev stand-in
@@ -372,7 +383,7 @@ func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string,
 		Id:            "fleet_" + uuid.NewString(),
 		CorporationId: corporationID,
 		SystemId:      systemID,
-		State:         s.coastAt(at, now),
+		State:         board.CoastAt(at, now),
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -424,13 +435,6 @@ func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ com
 	now := s.clock.Now()
 	out := make([]observation.FleetPos, 0, len(fleets))
 	for i := range fleets {
-		// Project a due arrival before taking the sensor position (see
-		// projectSettled). A ship that docked onto an ORBITING body keeps moving
-		// with it, so an unprojected read pins the sensor bubble to the hex the burn
-		// ended on — which the body has since orbited away from. The body then falls
-		// outside the corp's own coverage and vanishes from its board: the ship stops
-		// seeing the very thing it's holding onto.
-		fleets[i] = s.projectSettled(fleets[i], now)
 		f := &fleets[i]
 		// A fleet out on a lane (past its departure gate) or parked mid-lane has no
 		// board presence, so it lends no sensor coverage to any system.
@@ -439,10 +443,15 @@ func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ com
 		}
 		if f.State.Mode == board.ModeLaneTransit {
 			lt := f.State.LaneTransit
-			if lt == nil || lt.BoardLeg == nil || s.clock.Now() >= lt.BoardLeg.GateEta {
+			if lt == nil || lt.BoardLeg == nil || now >= lt.BoardLeg.GateEta {
 				continue
 			}
 		}
+		// Position answers from effective state, so a ship that docked onto an
+		// orbiting body since its last write lends its sensor bubble from the
+		// body's LIVE hex — not the hex the burn ended on, which the body has
+		// since orbited away from (the ship would stop seeing the very thing
+		// it's holding onto).
 		hex, err := s.Position(ctx, f)
 		if err != nil {
 			return nil, err
@@ -457,14 +466,20 @@ func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ com
 	return out, nil
 }
 
-// Position resolves the fleet's live hex at the current world time.
+// Position resolves the fleet's live hex at the current world time. It answers
+// from the EFFECTIVE state (board.StateAt): a burn whose arrival has passed is
+// the coast — or the dock — it settled into, so a ship that docked onto an
+// ORBITING body rides that body from the instant it arrives, whether or not the
+// authoritative settle has written yet. (That also keeps the corp's own sensor
+// bubble on the body a fleet is holding onto — see FleetsForCorp.)
 func (s *Service) Position(ctx context.Context, f *Fleet) (board.Hex, error) {
 	now := s.clock.Now()
-	if f.State.Mode == board.ModeDocked {
-		if f.State.Docked == nil {
+	eff := board.StateAt(f.State, now)
+	if eff.Mode == board.ModeDocked {
+		if eff.Docked == nil {
 			return board.Hex{}, nil
 		}
-		feat, err := s.resolveFeature(ctx, f.SystemId, f.State.Docked.ParentId)
+		feat, err := s.resolveFeature(ctx, f.SystemId, eff.Docked.ParentId)
 		if err != nil {
 			return board.Hex{}, err
 		}
@@ -473,7 +488,7 @@ func (s *Service) Position(ctx context.Context, f *Fleet) (board.Hex, error) {
 		}
 		return featureAnchor(feat), nil
 	}
-	pos, _ := board.ShipPos(f.State, now)
+	pos, _ := board.ShipPos(eff, now)
 	return pos, nil
 }
 
@@ -488,22 +503,6 @@ func (s *Service) load(ctx context.Context, id string) (*Fleet, error) {
 		return nil, ErrNotFound
 	}
 	return f, nil
-}
-
-func (s *Service) settleArrival(f *Fleet) {
-	b := f.State.Burn
-	meet := b.Path[len(b.Path)-1]
-	if b.DockOnArrive != "" {
-		f.State = board.MovementState{Mode: board.ModeDocked, Docked: &board.Docked{ParentId: b.DockOnArrive}}
-		return
-	}
-	// Settle at the burn's ARRIVAL time, not "now" — an arrival resolved late on
-	// read still puts the fleet in the orbit it entered when it actually got there.
-	f.State = s.coastAt(meet, b.ArriveTime)
-}
-
-func (s *Service) coastAt(h board.Hex, at common.WorldMillis) board.MovementState {
-	return coastState(h, at)
 }
 
 func (s *Service) resolveFeature(ctx context.Context, systemID, featureID string) (*system.Feature, error) {

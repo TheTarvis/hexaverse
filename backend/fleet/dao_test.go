@@ -63,7 +63,7 @@ func TestDao_CoastPeriod_RehydratedFromLiveTuning(t *testing.T) {
 
 	if err := dao.Save(ctx, Fleet{
 		Id: "f1", CorporationId: "corp-A", SystemId: "s1",
-		State: coastState(board.Hex{Q: ring, R: 0}, 0),
+		State: board.CoastAt(board.Hex{Q: ring, R: 0}, 0),
 	}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}

@@ -203,8 +203,13 @@ The richest design source is the archived gameplay doc —
   `galaxies/{gid}/systems/{sid}/interior` + `features/`. `GET /v1/systems/:id`
   materializes on first read (dev trigger; TODO #0008 arrival). Unfogged (M6).
 - **`board/`** — pure shared tactical math (no Firestore/clock): axial/cube hex,
-  hex-line paths, `OrbState`, `ShipPos`, `SolveIntercept`. Go↔TS contract is
-  `/fixtures/board/cases.json` (golden test); M7's `lib/hex` asserts the same.
+  hex-line paths, `OrbState`, `ShipPos`, `SolveIntercept`, and **`StateAt`** —
+  the effective-state fold (a burn past its `arriveTime` IS its settled
+  coast/dock; lane transit never folds — arrival is effectful). Everything that
+  answers "where/what is this fleet" reads through `StateAt`/`ShipPos`; only
+  resolvers and the settle path read stored state raw (0004/S1–S2 pin this).
+  Go↔TS contract is `/fixtures/board/cases.json` (golden test); M7's `lib/hex`
+  asserts the same (`stateAt` there also pins the orbital-law period).
 - **`fleet/`** (#0004, *implemented*) — the map-mover. One movement state
   (`coast|burn|docked`), `corporationId` from day one (dev-seeded through M8;
   **ownership real since M9** — spawn is the only fleet-minter now).

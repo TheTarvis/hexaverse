@@ -68,6 +68,15 @@ func (s *Service) orderTravel(ctx context.Context, id, destSystemID string) (*Fl
 	}
 	now := s.clock.Now()
 
+	// An active order that already COMPLETED is a fact, not a re-taskable order:
+	// resolve it through the spine first (settle + exactly-once effects), then
+	// plan the trip from the settled doc. Mirrors orderBurn.
+	if f.ActiveActionId != "" && board.Arrived(f.State, now) {
+		if f, err = s.resolveDue(ctx, f); err != nil {
+			return nil, err
+		}
+	}
+
 	plan, err := s.planRoute(ctx, f.CorporationId, f.SystemId, destSystemID)
 	if err != nil {
 		return nil, err

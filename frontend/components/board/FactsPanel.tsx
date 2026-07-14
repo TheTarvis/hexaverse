@@ -12,7 +12,7 @@ import { Button } from '@/components/catalyst/button'
 import { Badge } from '@/components/catalyst/badge'
 import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
-import type { Hex } from '@/lib/hex'
+import { stateAt, type Hex } from '@/lib/hex'
 import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
 import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 import { etaLabel, type MovePlan } from './move-preview'
@@ -69,7 +69,10 @@ export function FactsPanel({
   onCancel,
   onDepart,
 }: FactsPanelProps) {
-  const burning = activeFleet?.state.mode === 'burn'
+  // Mode reads off the EFFECTIVE state (stateAt): a burn whose arrival passed is
+  // already docked/coasting, so the badge and verb gates don't lag the picture.
+  const activeMode = activeFleet ? stateAt(activeFleet.state, worldTime).mode : undefined
+  const burning = activeMode === 'burn'
   const canMoveToSelection = !!activeFleet && (selection?.kind === 'feature' || selection?.kind === 'hex')
   return (
     <aside data-testid="facts-panel" className={PANEL}>
@@ -84,8 +87,8 @@ export function FactsPanel({
         <section data-testid="active-fleet" className="border-t border-white/10 pt-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-white">Your fleet</span>
-            <Badge color={burning ? 'amber' : activeFleet.state.mode === 'docked' ? 'green' : 'cyan'}>
-              {activeFleet.state.mode}
+            <Badge color={burning ? 'amber' : activeMode === 'docked' ? 'green' : 'cyan'}>
+              {activeMode}
             </Badge>
           </div>
           <div className="mt-3 flex gap-2">
@@ -117,7 +120,8 @@ export function FactsPanel({
         )}
         {selection?.kind === 'fleet' && (
           <Text className="!text-zinc-300">
-            {selection.fleet.own ? 'Your fleet' : 'Foreign contact'} — {selection.fleet.state.mode}
+            {selection.fleet.own ? 'Your fleet' : 'Foreign contact'} —{' '}
+            {stateAt(selection.fleet.state, worldTime).mode}
           </Text>
         )}
         {selection?.kind === 'gate' && (

@@ -50,16 +50,14 @@ func BurnResolver(params MovementParams) action.ResolveFunc {
 		if f.State.Mode != board.ModeBurn || f.State.Burn == nil {
 			return action.ResolveResult{Outcome: "burn already settled"}, nil
 		}
-		b := f.State.Burn
-		var settled board.MovementState
-		var outcome string
-		if b.DockOnArrive != "" {
-			settled = board.MovementState{Mode: board.ModeDocked, Docked: &board.Docked{ParentId: b.DockOnArrive}}
-			outcome = "docked at " + b.DockOnArrive
-		} else {
-			meet := b.Path[len(b.Path)-1]
-			settled = coastState(meet, r.At)
-			outcome = "arrived"
+		// The settle IS the effective-state fold: r.At is the action's frozen eta —
+		// the burn's arriveTime — so StateAt folds the burn into exactly the state
+		// every read has been answering with since the ship arrived. The write adds
+		// nothing new; it caches the fold and rides the slot release.
+		settled := board.StateAt(f.State, r.At)
+		outcome := "arrived"
+		if settled.Mode == board.ModeDocked {
+			outcome = "docked at " + settled.Docked.ParentId
 		}
 		return action.ResolveResult{
 			Outcome:    outcome,
@@ -96,21 +94,8 @@ func BurnResolverWithAmbient(params MovementParams, ambient AmbientRecorder) act
 	}
 }
 
-// coastState is the resting orbit a fleet inherits when it settles onto a hex: a
-// free orbit at the radius it stopped at, obeying the world's one orbital law
-// (common.GameTuning.OrbitPeriod — the same period a body on that ring has). Read
-// live rather than captured in MovementParams, so retuning orbits re-paces fleets
-// that are already coasting, exactly as it re-paces bodies.
-//
-// A coasting fleet therefore DRIFTS with its ring. To hold station on a body, dock
-// to it (board.ModeDocked) — that's the mode that rides a parent.
-//
-// `at` is the world time the fleet comes to rest, and it is load-bearing: the orbit
-// is back-solved to pass through h AT that instant (board.OrbitThrough). Pass the
-// arrival/settle time, never a bare zero — an orbit anchored at the wrong instant
-// puts the ship somewhere it never was.
-func coastState(h board.Hex, at common.WorldMillis) board.MovementState {
-	ring := board.Ring(h)
-	orbit := board.OrbitThrough(h, at, common.Tuning().OrbitPeriod(ring), 1)
-	return board.MovementState{Mode: board.ModeCoast, Coast: &orbit}
-}
+// The resting-orbit settle primitive lives in board (board.CoastAt): the free
+// prograde orbit a thing inherits when it comes to rest on a hex, paced by the
+// world's one orbital law, read live so retuning re-paces settling fleets exactly
+// as it re-paces bodies. A coasting fleet therefore DRIFTS with its ring — to
+// hold station on a body, dock to it (board.ModeDocked rides a parent).

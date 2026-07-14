@@ -55,13 +55,20 @@ type gateCase struct {
 	Gate      Hex     `json:"gate"`
 }
 
+type stateAtCase struct {
+	State MovementState      `json:"state"`
+	T     common.WorldMillis `json:"t"`
+	Out   MovementState      `json:"out"`
+}
+
 type fixtures struct {
-	Line           []lineCase  `json:"line"`
-	RouteAround    []routeCase `json:"routeAround"`
-	OrbState       []orbCase   `json:"orbState"`
-	SolveHex       []solveCase `json:"solveHex"`
-	SolveIntercept []solveCase `json:"solveIntercept"`
-	LaneGate       []gateCase  `json:"laneGate"`
+	Line           []lineCase    `json:"line"`
+	RouteAround    []routeCase   `json:"routeAround"`
+	OrbState       []orbCase     `json:"orbState"`
+	SolveHex       []solveCase   `json:"solveHex"`
+	SolveIntercept []solveCase   `json:"solveIntercept"`
+	LaneGate       []gateCase    `json:"laneGate"`
+	StateAt        []stateAtCase `json:"stateAt"`
 }
 
 // computeFixtures builds the golden cases from the current board implementation.
@@ -149,6 +156,54 @@ func computeFixtures() fixtures {
 			SelfX: c.selfX, SelfY: c.selfY, NeighborX: c.nbX, NeighborY: c.nbY,
 			Radius: c.radius, Gate: LaneGateHex(c.selfX, c.selfY, c.nbX, c.nbY, c.radius),
 		})
+	}
+
+	// StateAt — the effective-state fold. A past-ETA burn IS its settled state on
+	// both sides of the wire; the folded coast's Period additionally pins the
+	// world's orbital law (OrbitBasePeriod × ring) across Go and TS — if the
+	// backend retunes, the TS mirror must follow or this golden breaks.
+	hexBurn := &Burn{
+		Path:       Line(Hex{1, 0}, Hex{6, 0}),
+		StartTime:  1_000,
+		ArriveTime: 13_500,
+		Target:     Target{Hex: &Hex{6, 0}},
+	}
+	dockBurn := &Burn{
+		Path:         Line(Hex{2, -1}, Hex{4, 2}),
+		StartTime:    2_000,
+		ArriveTime:   9_000,
+		Target:       Target{FeatureId: "feat-9"},
+		DockOnArrive: "feat-9",
+	}
+	dueTransit := &LaneTransit{
+		Route:      []string{"sys-0", "sys-2"},
+		LegEtas:    []common.WorldMillis{5_000, 30_000},
+		DepartTime: 1_000,
+		ArriveTime: 30_000,
+		EntryGate:  Hex{16, 0},
+	}
+	// lateBurn arrives past the midpoint of its ring-cell window (15_500 on a
+	// 6_000ms window), so the settled coast's boundary-snap rounds UP — pinning
+	// the snap direction across Go and TS, not just the floor case.
+	lateBurn := &Burn{
+		Path:       Line(Hex{1, 0}, Hex{6, 0}),
+		StartTime:  3_000,
+		ArriveTime: 15_500,
+		Target:     Target{Hex: &Hex{6, 0}},
+	}
+	stateAts := []struct {
+		s MovementState
+		t common.WorldMillis
+	}{
+		{MovementState{Mode: ModeBurn, Burn: hexBurn}, 7_000},   // mid-flight — unchanged
+		{MovementState{Mode: ModeBurn, Burn: hexBurn}, 13_500},  // exactly at arrival — folds to coast
+		{MovementState{Mode: ModeBurn, Burn: hexBurn}, 262_000}, // long past — the same coast (anchored at arrival)
+		{MovementState{Mode: ModeBurn, Burn: lateBurn}, 15_500}, // arrival late in the cell window — snap rounds up
+		{MovementState{Mode: ModeBurn, Burn: dockBurn}, 20_000}, // dock-on-arrive — folds to docked
+		{MovementState{Mode: ModeLaneTransit, LaneTransit: dueTransit}, 99_999}, // due transit — NOT folded (arrival is effectful)
+	}
+	for _, c := range stateAts {
+		f.StateAt = append(f.StateAt, stateAtCase{State: c.s, T: c.t, Out: StateAt(c.s, c.t)})
 	}
 
 	return f

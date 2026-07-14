@@ -25,6 +25,7 @@ import { useMyFleets, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets
 import { useWorldTime } from '@/hooks/use-world-time'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
+import { stateAt } from '@/lib/hex'
 import { toast } from '@/lib/toast'
 import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 import type { Galaxy, GalaxyNode, Region } from '@/lib/types/galaxy'
@@ -37,9 +38,12 @@ import { REGION_PALETTE, REGIONS, regionColor } from './region-palette'
 import { transitPoint, type NodePositions } from './transit-geometry'
 import type { GalaxyGraphController } from './GalaxyGraph'
 
-// A fleet is idle (available to depart) when it isn't mid-order.
-function isIdle(f: Fleet): boolean {
-  return f.state.mode === 'coast' || f.state.mode === 'docked'
+// A fleet is idle (available to depart) when it isn't mid-order. Judged on the
+// EFFECTIVE state (stateAt): a burn whose arrival has passed is already
+// coasting/docked — idle — even before a refetch delivers the settled doc.
+function isIdle(f: Fleet, worldTime: number): boolean {
+  const mode = stateAt(f.state, worldTime).mode
+  return mode === 'coast' || mode === 'docked'
 }
 
 // isTravelling — out on the lane graph: crossing it, or parked mid-lane after a
@@ -104,8 +108,14 @@ export function GalaxyView() {
   // logged-out start area (no auth token, and nothing to command).
   const { data: myFleets } = useMyFleets({ enabled: !isStartArea })
   const ownFleets = useMemo(() => myFleets ?? [], [myFleets])
+  // Live clock (for ETA countdowns and effective-state reads) anchored to the
+  // fleet read; scale 1 today.
+  const worldTime = useWorldTime(myFleets?.[0]?.worldTime ?? galaxy?.worldTime)
   // The fleet a "Travel here" order commands: prefer an idle one, else the first.
-  const activeFleet = useMemo(() => ownFleets.find(isIdle) ?? ownFleets[0] ?? null, [ownFleets])
+  const activeFleet = useMemo(
+    () => ownFleets.find((f) => isIdle(f, worldTime)) ?? ownFleets[0] ?? null,
+    [ownFleets, worldTime],
+  )
   // Systems hosting an own fleet → galaxy-tier presence markers; the fleet's
   // system is the ⌖ recenter / wake-focus home target (#0002 Follow-ups). A fleet
   // out on a lane is NOT on station anywhere — its `systemId` still names the
@@ -133,9 +143,6 @@ export function GalaxyView() {
   }, [])
   const homeSystemId = activeFleet?.systemId ?? wakeFocus
   const transitFleets = useMemo(() => ownFleets.filter(isTravelling), [ownFleets])
-
-  // Live clock (for ETA countdowns) anchored to the fleet read; scale 1 today.
-  const worldTime = useWorldTime(myFleets?.[0]?.worldTime ?? galaxy?.worldTime)
   useTravelArrivals(transitFleets, worldTime, qc)
 
   // Route preview for the select→preview gesture: only when an idle-ish active
