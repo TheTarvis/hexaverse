@@ -1,0 +1,42 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+context: |
+  Hexaverse: multiplayer space-colonization game on a procedurally
+  generated hex-grid galaxy (fog of war, colonies, resource tiles,
+  real-time interaction). 2026-07-01 rebuild on the Volt platform skeleton.
+  See openspec/project.md and the root CLAUDE.md for full detail.
+
+  Stack: Next.js 15 (App Router) + Tailwind v4 + Catalyst UI + React Query
+  + Firebase Auth frontend (Vercel); Go 1.26 + Gin backend on Cloud Run
+  (Firestore, Pub/Sub, SSE); Python 3.12+/FastAPI claude-agent (token
+  passthrough to the Go backend, no service-account path); Terraform infra.
+
+  Conventions: backend is strictly layered handler -> service -> DAO per
+  domain package (backend/<domain>/); frontend is strictly layered
+  component -> hook -> service -> apiClient. Domain design specs
+  (pre-implementation, may drift) live in docs/specs/0001-0011-*.md;
+  openspec/specs/ documents what the code actually does today. New CRUD
+  domains are scaffolded via /new-domain, not hand-rolled.
+
+  Run: `python3 .claude/skills/code-quality-checks/check.py` or
+  `bash .claude/scripts/check.sh` for the quality gate. Backend tests:
+  `cd backend && make test`. Frontend tests: `cd frontend && npx vitest
+  run`. Agent tests: `cd claude-agent && uv run pytest`.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
