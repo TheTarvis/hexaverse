@@ -45,18 +45,20 @@ func spawnStack(t *testing.T) (*Service, *observation.Service, *galaxy.Generated
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
 	fsvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), ssvc, asvc, clk)
-	fogSvc := observation.NewServiceWith(observation.NewDaoWithClient(fs), fsvc, ssvc, clk)
+	fogSvc := observation.NewServiceWith(observation.NewDaoWithClient(fs), fsvc, ssvc, gsvc, clk)
 	corpSvc := NewServiceWith(NewDaoWithClient(fs), gsvc, fsvc, fogSvc, clk)
 	return corpSvc, fogSvc, gen, clk
 }
 
 // TestSpawn_CreatesCorpFleetAndFog covers acceptance #1 + the starting-package and
 // initial-fog criteria: one wake creates the corp (account-linked), exactly one
-// fleet owned by it, and the home observation at Explored with onward lanes
-// Rumored — and the home carries the bootstrap-mineable guarantee.
+// fleet owned by it, and the home observation at Explored — with NO lanes charted
+// and no other system known (#0006 Decision #17, 2026-07-14: the first home scan
+// finds the roads). The home carries the bootstrap-mineable guarantee.
 // Spec: 0009/S1
+// Spec: 0006/S6
 func TestSpawn_CreatesCorpFleetAndFog(t *testing.T) {
-	corpSvc, fogSvc, gen, _ := spawnStack(t)
+	corpSvc, fogSvc, _, _ := spawnStack(t)
 	ctx := context.Background()
 
 	res, err := corpSvc.Spawn(ctx, "account-1", "Bob")
@@ -93,7 +95,8 @@ func TestSpawn_CreatesCorpFleetAndFog(t *testing.T) {
 		t.Fatalf("home %s has no mineable body — softlock risk", home)
 	}
 
-	// Initial fog: home Explored, its onward lanes Rumored, nothing else.
+	// Initial fog: home Explored — and NOTHING else. No onward rumor, no charted
+	// lanes: a fresh spawn knows no roads until its first home scan.
 	tiers, err := fogSvc.SystemTiers(ctx, res.Corporation.Id)
 	if err != nil {
 		t.Fatal(err)
@@ -101,21 +104,15 @@ func TestSpawn_CreatesCorpFleetAndFog(t *testing.T) {
 	if tiers[home] != observation.TierExplored {
 		t.Fatalf("home tier = %q, want explored", tiers[home])
 	}
-	onward := neighborsOf(gen, home)
-	for _, nb := range onward {
-		if tiers[nb] != observation.TierRumored {
-			t.Fatalf("onward %s tier = %q, want rumored", nb, tiers[nb])
-		}
+	if len(tiers) != 1 {
+		t.Fatalf("spawn charted %d systems (%v), want exactly home — no onward rumor", len(tiers), tiers)
 	}
-	// No system beyond home + its neighbours is charted.
-	allowed := map[string]bool{home: true}
-	for _, nb := range onward {
-		allowed[nb] = true
+	charted, err := fogSvc.ChartedLanes(ctx, res.Corporation.Id)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for sysID := range tiers {
-		if !allowed[sysID] {
-			t.Fatalf("unexpected charted system %s (tier %q) — only home + onward should be known", sysID, tiers[sysID])
-		}
+	if len(charted) != 0 {
+		t.Fatalf("spawn charted %d lanes (%v), want zero — the first scan finds the roads", len(charted), charted)
 	}
 }
 

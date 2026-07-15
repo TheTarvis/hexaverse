@@ -6,6 +6,7 @@ import {
   fleetGlidePixel,
   fleetLogicalHex,
   fleetOnBoard,
+  fleetScenePixel,
   headingDeg,
   orbitGlidePixel,
   sensorBubbleHexes,
@@ -258,5 +259,27 @@ describe('fleet position', () => {
     expect(
       fleetOnBoard(fleet({ mode: 'laneHold', laneHold: { from: 'a', to: 'b', fraction: 0.5 } }), 0),
     ).toBe(false)
+  })
+})
+
+describe('fleetScenePixel', () => {
+  it('rides a docked fleet on its parent body\u2019s glided point', () => {
+    const planet = feature({ id: 'p', orbit: { ring: 2, angle0: 0, period: 60, dir: 1 } })
+    const docked = fleet({ mode: 'docked', docked: { parentId: 'p' } })
+    expect(fleetScenePixel(docked, [planet], 10)).toEqual(featureGlidePixel(planet, 10))
+  })
+
+  it('resolves a moon parent through ITS parent with the sibling offset BoardScene draws', () => {
+    const planet = feature({ id: 'p', orbit: { ring: 2, angle0: 0, period: 60, dir: 1 } })
+    const moonA = feature({ id: 'mA', type: 'moon', parentId: 'p' })
+    const moonB = feature({ id: 'mB', type: 'moon', parentId: 'p' })
+    const docked = fleet({ mode: 'docked', docked: { parentId: 'mB' } })
+    const expected = featureGlidePixel(moonB, 10, featureGlidePixel(planet, 10), 1)
+    expect(fleetScenePixel(docked, [planet, moonA, moonB], 10)).toEqual(expected)
+  })
+
+  it('falls back to the fleet\u2019s own glide when it is not docked', () => {
+    const coasting = fleet({ mode: 'coast', coast: { ring: 3, angle0: 0, period: 100, dir: 1 } })
+    expect(fleetScenePixel(coasting, [], 25)).toEqual(fleetGlidePixel(coasting, 25))
   })
 })

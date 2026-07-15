@@ -14,6 +14,7 @@ import { Text } from '@/components/catalyst/text'
 import { toast } from '@/lib/toast'
 import { useSystemBoard } from '@/hooks/use-system-board'
 import { useFleetsInSystem, useFleetOrders, useScan, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
+import { useRunningScan } from '@/hooks/use-actions'
 import { useWorldTime } from '@/hooks/use-world-time'
 import { useBoardRealtime } from '@/hooks/use-board-realtime'
 import type { Hex, Target } from '@/lib/hex'
@@ -22,11 +23,27 @@ import { FleetRoster } from '@/components/fleet/FleetRoster'
 import { HexBoard } from './HexBoard'
 import { BoardScene } from './BoardScene'
 import { SelectionPreview } from './SelectionPreview'
+import { ScanOverlay } from './ScanOverlay'
 import { FactsPanel, type BoardSelection } from './FactsPanel'
-import { featureLogicalHex, fleetDockedParentId, fleetLogicalHex, fleetOnBoard } from './glyph-geometry'
+import {
+  featureLogicalHex,
+  fleetDockedParentId,
+  fleetLogicalHex,
+  fleetOnBoard,
+} from './glyph-geometry'
+import { ScanPing } from './ScanPing'
+import { ArcScan } from './ArcScan'
+import { hexToPixel } from '@/lib/hex/pixel'
 import { planToBody, planToHex, type MovePlan } from './move-preview'
+import { planSweep, type ScanPlan } from './scan-preview'
 
 const STAGE = 'relative h-dvh w-full overflow-hidden bg-[#05070d]'
+
+// The persisted playtest FX preference: which effect a running scan renders.
+// 'ping' is the slice mechanic's honest picture (radial echo); 'arc' is the
+// rotating-beam look kept alive as a future variant (ArcScan).
+const SCAN_FX_KEY = 'hexaverse.scanFx'
+type ScanFx = 'ping' | 'arc'
 const PANEL =
   'pointer-events-auto rounded-xl border border-zinc-200 bg-zinc-50/90 p-4 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]'
 
@@ -42,6 +59,22 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
 
   const [selection, setSelection] = useState<BoardSelection>(null)
   const [activeFleetId, setActiveFleetId] = useState<string | null>(null)
+  // True while the player hovers/focuses the Scan verb — the only moment the
+  // aim corridor draws (selecting things to plan a burn stays quiet).
+  const [scanPreview, setScanPreview] = useState(false)
+  // The scan-FX toggle, read from storage after mount (not in the initializer,
+  // so server and first client render agree) and persisted on change.
+  const [scanFx, setScanFx] = useState<ScanFx>('ping')
+  useEffect(() => {
+    const stored = window.localStorage.getItem(SCAN_FX_KEY)
+    if (stored === 'arc' || stored === 'ping') setScanFx(stored)
+  }, [])
+  const toggleScanFx = () =>
+    setScanFx((fx) => {
+      const next: ScanFx = fx === 'ping' ? 'arc' : 'ping'
+      window.localStorage.setItem(SCAN_FX_KEY, next)
+      return next
+    })
 
   const { order, cancel } = useFleetOrders(systemId)
   const scan = useScan(systemId)
@@ -72,6 +105,36 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     return fleetLogicalHex(activeFleet, worldTime, parentHex)
   }, [activeFleet, board, worldTime])
 
+  // The sweep preview: what a scan from HERE would leave in shadow (#0006
+  // Decision #21 — the sweep is 360°, so the shadow is the signal). Only
+  // computed while the Scan verb is being considered (hover/focus).
+  const sweepPreview = useMemo<ScanPlan | null>(() => {
+    if (!scanPreview || !board || !fromHex) return null
+    return planSweep(fromHex, board.features, board.radius, worldTime)
+  }, [scanPreview, board, fromHex, worldTime])
+
+  // The RUNNING scan's committed sweep: the origin is the EMISSION HEX pinned
+  // in the action's params at commit (#0006 Decision #26 — the pulse stays
+  // where it was fired; the durable sweep mints from the same hex), occluders
+  // evaluated at the frozen eta — exactly what resolution will cover — drawn
+  // until the eta passes and the reveal lands via the board refetch. A scan
+  // committed before the origin was pinned falls back to the fleet at eta.
+  const runningScan = useRunningScan(activeFleet?.id ?? null).data ?? null
+  const activeSweep = useMemo<ScanPlan | null>(() => {
+    if (!board || !activeFleet || !runningScan) return null
+    if (runningScan.status !== 'running' || worldTime >= runningScan.eta) return null
+    const eta = runningScan.eta
+    let origin = runningScan.params?.origin ?? null
+    if (!origin) {
+      const parentId = fleetDockedParentId(activeFleet, eta)
+      const parent = parentId ? board.features.find((f) => f.id === parentId) : undefined
+      const parentHex = parent ? featureLogicalHex(parent, eta) : undefined
+      origin = fleetLogicalHex(activeFleet, eta, parentHex)
+    }
+    if (!origin) return null
+    return planSweep(origin, board.features, board.radius, eta)
+  }, [board, activeFleet, runningScan, worldTime])
+
   // The live preview plan for the current selection — recomputed each frame so a
   // led intercept tracks the moving target. The star at the core (0,0) is a body,
   // not a destination (you can't fly onto it or dock it), so it yields no plan.
@@ -84,24 +147,28 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       return planToHex(fromHex, featureLogicalHex(f, worldTime), worldTime)
     }
     if (selection.kind === 'hex') return isCore(selection.hex) ? null : planToHex(fromHex, selection.hex, worldTime)
-    // A gate previews the in-system burn to its rim tile (leg 0 of the trip); the
+    // A gate previews the in-system burn to its gate tile (leg 0 of the trip); the
     // lanes past it are shown as ETAs in the facts panel, not on the board.
     if (selection.kind === 'gate') return planToHex(fromHex, selection.gate.hex, worldTime)
     return null
   }, [fromHex, selection, worldTime])
 
   // Own fleets' arrival ETAs feed the self-scheduled refetch (rule 1) — a burn's
-  // arrival, and a trip's gate ETA (the moment the fleet leaves this board).
+  // arrival, a trip's gate ETA (the moment the fleet leaves this board), and a
+  // running scan's eta (the refetched board read runs the #0005 fold, so this is
+  // what makes the reveal land the moment the sweep finishes).
   const etaCandidates = useMemo(
-    () =>
-      ownFleets.flatMap((f) => {
+    () => [
+      ...ownFleets.flatMap((f) => {
         if (f.state.mode === 'burn' && f.state.burn) return [f.state.burn.arriveTime]
         const gateEta = f.state.mode === 'laneTransit' ? f.state.laneTransit?.boardLeg?.gateEta : undefined
         return gateEta === undefined ? [] : [gateEta]
       }),
-    [ownFleets],
+      ...(runningScan?.status === 'running' ? [runningScan.eta] : []),
+    ],
+    [ownFleets, runningScan],
   )
-  useBoardRealtime({ systemId, worldTime, etaCandidates, enabled: !!board })
+  useBoardRealtime({ systemId, worldTime, etaCandidates, scanning: !!activeSweep, enabled: !!board })
 
   // Departure hand-off (#0008): a fleet that transits its gate is out on a lane —
   // it has no hex on this board any more, and the crawl it's now doing is the
@@ -206,6 +273,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       },
     )
   }
+  // The scan is a 360° sweep (#0006 Decision #21): one manual trigger, no aim.
   const commitScan = () => {
     if (!activeFleet) return
     scan.mutate(activeFleet.id, {
@@ -253,6 +321,31 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
         onSelectHex={selectHex}
         onSelectEmpty={() => setSelection(null)}
       >
+        {/* The committed sweep of a running scan (solid), or the hover preview
+            of what a sweep from here would leave in shadow (faint) — same
+            geometry, two moments. Drawn under the glyphs. */}
+        <ScanOverlay plan={activeSweep} variant="active" hideOrigin />
+        {!activeSweep && <ScanOverlay plan={sweepPreview} variant="aim" />}
+        {/* The running scan's effect, pinned at the emission hex (#0006
+            Decision #26 — the pulse stays where it was fired; the ship moves
+            on) — the theater; the hatching above is the contract, and the
+            server's fog read agrees with the ping's front. The FX toggle
+            (playtest) swaps in the arc-scan look. */}
+        {activeSweep &&
+          runningScan &&
+          activeFleet &&
+          (() => {
+            const fx = {
+              originHex: activeSweep.origin,
+              originPixel: hexToPixel(activeSweep.origin.q, activeSweep.origin.r),
+              features: board.features,
+              rimRing: board.radius,
+              committedAt: runningScan.committedAt,
+              eta: runningScan.eta,
+              worldTime,
+            }
+            return scanFx === 'arc' ? <ArcScan {...fx} /> : <ScanPing {...fx} />
+          })()}
         <BoardScene
           worldTime={worldTime}
           features={board.features}
@@ -287,6 +380,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           plan={plan}
           worldTime={worldTime}
           pending={pending}
+          scanEta={runningScan?.status === 'running' ? runningScan.eta : null}
           route={
             selection?.kind === 'gate'
               ? { isLoading: routeQuery.isLoading, isError: routeQuery.isError, data: routeQuery.data }
@@ -294,6 +388,9 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           }
           onMove={commitMove}
           onScan={commitScan}
+          onScanPreview={setScanPreview}
+          scanFx={scanFx}
+          onToggleScanFx={toggleScanFx}
           onCancel={commitCancel}
           onDepart={commitDepart}
         />

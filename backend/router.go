@@ -85,9 +85,10 @@ func SetupRouter() *gin.Engine {
 	fleetSvc := fleet.NewServiceWith(fleet.NewDao(), systemSvc, actionSvc, clock)
 
 	// Fog of war (#0006): the fog-filter every read projects through, per
-	// Corporation. It reads live positions from fleet and interior geometry from
-	// system via interfaces (no import cycle), and registers the scan resolver.
-	fogSvc := observation.NewService(fleetSvc, systemSvc)
+	// Corporation. It reads live positions from fleet, interior geometry from
+	// system, and the lane graph from galaxy via interfaces (no import cycle),
+	// and registers the scan resolver.
+	fogSvc := observation.NewService(fleetSvc, systemSvc, galaxySvc)
 	fogSvc.RegisterResolvers(actionSvc)
 
 	// Graph-tier travel (#0008): the fleet service pathfinds over the galaxy graph
@@ -100,8 +101,10 @@ func SetupRouter() *gin.Engine {
 	fleet.RegisterResolversWithAmbient(actionSvc, fogSvc)
 
 	// The lane-travel resolver: arrival settles the fleet at the destination rim
-	// and mints the reveal (Explored + onward Rumored) in one transaction (#0008).
-	fleet.RegisterTravelResolver(actionSvc, fogSvc, fogSvc)
+	// and mints the reveal (Explored + the crossed lanes charted) in one
+	// transaction (#0008, revised per #0006 Decision #17 — no onward rumor;
+	// scanning finds the roads).
+	fleet.RegisterTravelResolver(actionSvc, fogSvc)
 
 	// Spawn & identity (#0009): the corporation service orchestrates spawn through
 	// the live galaxy/fleet/fog singletons above, and resolves account→living-corp
@@ -129,7 +132,7 @@ func SetupRouter() *gin.Engine {
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
 	corporations.NewHandler(corpSvc).RegisterRoutes(authorized, strictLimit)
 	galaxy.NewHandler().WithFog(fogSvc).RegisterRoutes(authorized)
-	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).RegisterRoutes(authorized)
+	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).WithActions(actionSvc).RegisterRoutes(authorized)
 
 	actionHandler := action.NewHandler(actionSvc)
 	actionHandler.RegisterRoutes(authorized)

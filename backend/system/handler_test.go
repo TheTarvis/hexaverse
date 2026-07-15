@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"hexaverse/action"
 	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/observation"
@@ -142,5 +143,36 @@ func TestGetInterior_LaneGatesFogFilterToCharted(t *testing.T) {
 	}
 	if len(body.LaneGates) != 1 || body.LaneGates[0].DestSystemId != "sys-known" {
 		t.Fatalf("gates = %+v, want only the charted sys-known", body.LaneGates)
+	}
+}
+
+type fakeDueActions struct{ scopes []string }
+
+func (f *fakeDueActions) ResolveDue(_ context.Context, scope string) ([]action.Action, error) {
+	f.scopes = append(f.scopes, scope)
+	return nil, nil
+}
+
+// TestGetInterior_RunsTheReadFold proves the interior read resolves the
+// scope's due actions BEFORE serving (#0005): a scan that finished on a quiet
+// board settles — slot freed, reveal minted — on the very read the client's
+// poll/eta refetch issues, instead of waiting for another verb or the sweep.
+func TestGetInterior_RunsTheReadFold(t *testing.T) {
+	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1", Radius: 16}}
+	due := &fakeDueActions{}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	NewHandlerWith(&fakeSysSvc{gen: gen}, sysTestClock{}).
+		WithActions(due).
+		RegisterRoutes(r.Group("/"))
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/systems/s1", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	if len(due.scopes) != 1 || due.scopes[0] != "s1" {
+		t.Fatalf("read fold ran for scopes %v, want exactly [s1]", due.scopes)
 	}
 }

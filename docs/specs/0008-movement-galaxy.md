@@ -63,9 +63,11 @@ reveal-on-arrival). This spec is its buildable distillation.
   **cancel** halts it in place (mid-lane it holds, visible), **redirect**
   reroutes from its current computed position. Determinism makes the
   recompute cheap and the new ETA just as frozen.
-- **Arrival is the reveal trigger** (#0006): destination → Explored, its
-  onward lanes charted, first-ever arrival rolls the board's detail layer
-  (#0003), and the fleet enters at the board rim (#0004's handoff).
+- **Arrival is the reveal trigger** (#0006): destination → Explored,
+  first-ever arrival rolls the board's detail layer (#0003), and the fleet
+  enters at the board rim (#0004's handoff). *(Revised 2026-07-14, #0006
+  Decision #17: arrival no longer charts onward lanes — scanning in-system
+  does; you rode in on a lane you'd already charted.)*
 - **The three fast-travel mechanisms stay orthogonal** — lanes (everyone),
   FTL jump range (your tech), relay corridors (built world state) — with the
   slice shipping lanes-only and the other two reserved as data hooks.

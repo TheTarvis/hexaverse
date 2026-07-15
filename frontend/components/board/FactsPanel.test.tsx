@@ -34,12 +34,59 @@ function feature(over: Partial<BoardFeature>): BoardFeature {
 }
 
 describe('FactsPanel', () => {
-  it('offers scan on the active fleet and reports its mode', () => {
+  it('offers the 360° sweep on the active fleet, no aim required', () => {
     render(<FactsPanel {...base} selection={null} activeFleet={ownFleet} plan={null} />)
     expect(screen.getByTestId('active-fleet')).toHaveTextContent('coast')
+    expect(screen.getByTestId('active-fleet')).toHaveTextContent(/sweeps 360/i)
     expect(screen.getByTestId('scan-button')).toBeEnabled()
     fireEvent.click(screen.getByTestId('scan-button'))
     expect(base.onScan).toHaveBeenCalled()
+  })
+
+  it('toggles the scan FX between radial ping and arc-scan', () => {
+    const onToggleScanFx = vi.fn()
+    const { rerender } = render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={ownFleet}
+        plan={null}
+        scanFx="ping"
+        onToggleScanFx={onToggleScanFx}
+      />,
+    )
+    const toggle = screen.getByTestId('scan-fx-toggle')
+    expect(toggle).toHaveTextContent(/radial ping/i)
+    fireEvent.click(toggle)
+    expect(onToggleScanFx).toHaveBeenCalled()
+
+    rerender(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={ownFleet}
+        plan={null}
+        scanFx="arc"
+        onToggleScanFx={onToggleScanFx}
+      />,
+    )
+    expect(screen.getByTestId('scan-fx-toggle')).toHaveTextContent(/arc-scan/i)
+  })
+
+  it('counts down a running scan and blocks a second one', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={ownFleet}
+        plan={null}
+        worldTime={5_000}
+        scanEta={30_000}
+      />,
+    )
+    expect(screen.getByTestId('scan-button')).toBeDisabled()
+    expect(screen.getByTestId('scan-button')).toHaveTextContent(/scanning/i)
+    expect(screen.getByTestId('scan-countdown')).toHaveTextContent(/25s/)
   })
 
   it('shows a move commit + ETA for a selected body', () => {
@@ -138,7 +185,8 @@ describe('FactsPanel', () => {
     }
     render(<FactsPanel {...base} selection={null} activeFleet={burning} plan={null} />)
     expect(screen.getByTestId('cancel-button')).toBeInTheDocument()
-    // Scan is blocked while burning (single action slot).
-    expect(screen.getByTestId('scan-button')).toBeDisabled()
+    // Scanning stays available mid-burn — movement and sensing are separate
+    // channels (#0006 Decision #19).
+    expect(screen.getByTestId('scan-button')).toBeEnabled()
   })
 })

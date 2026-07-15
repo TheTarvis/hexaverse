@@ -75,7 +75,10 @@ this spec is its buildable distillation.
 - **Per-action timers (Cloud Tasks)** — rejected: infra lift, no emulator,
   precision nobody needs at minutes–hours durations.
 - **Action queues / chaining** (multi-leg, arrive-then-act) — deferred; the
-  single-slot field is shaped to allow it later.
+  single-slot field is shaped to allow it later. *(2026-07-14: #0006
+  Decision #19 cashes in the shape a different way — two single-slot
+  **channels** on the fleet, movement `activeActionId` + sensor
+  `activeScanId`; each channel stays queue-less.)*
 - **Cycle-quantized (flow) mining** — the slice mines point-at-ETA; the
   window-capable delta schema is the no-migration hedge. Continuous flow is
   rejected-leaning (inventory would become a fold).
@@ -155,8 +158,10 @@ arrived to a picked-clean belt" is on-theme for a dangerous frontier
                     deferred notification channel
 
   fleets/{fleetId}
-    activeActionId : single-slot guard — claimed transactionally at COMMIT,
-                     released at resolve/cancel
+    activeActionId : movement channel's single-slot guard — claimed
+                     transactionally at COMMIT, released at resolve/cancel
+    activeScanId   : sensor channel's slot, same claim/release contract
+                     (#0006 Decision #19, 2026-07-14)
 
   features/{featureId}/deltas/{actionId}   # the mutating ledger
     effectAt : worldTime the effect applies (= the action's eta)

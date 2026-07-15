@@ -80,10 +80,13 @@ type GameTuning struct {
 	// ——— Sensing & intel (observation) ———
 
 	// ScanDuration is the world-ms an active scan takes; its ETA is
-	// committedAt + ScanDuration.
+	// committedAt + ScanDuration. The scan is a full 360° line-of-sight sweep
+	// (#0006 Decision #21); the deferred directional variant's beam-width
+	// knobs return with it. The client's radar-sweep animation paces itself
+	// off the committed window (eta − committedAt), so turning this re-paces
+	// the visual too — no mirrored constant (frontend: board/scan-sweep.ts,
+	// SWEEP_TUNING, which holds the theater-only dials).
 	ScanDuration WorldMillis
-	// ScanRadius bounds what a scan reveals, in hexes. 0 = the whole system.
-	ScanRadius int
 	// AmbientRadius is the passive sensor bubble, in hexes, that rides any unit.
 	AmbientRadius int
 
@@ -117,8 +120,7 @@ func DefaultTuning() GameTuning {
 		OrbitBasePeriod: 36000,
 
 		// Sensing
-		ScanDuration:  30_000, // 30s      (was 3_600_000 — one world-hour)
-		ScanRadius:    0,      // 0 = whole system
+		ScanDuration:  15_000, // 15s — one faster origin-pinned ring (#0006 Decision #26; was 30s)
 		AmbientRadius: 3,      // hexes
 
 		// Geometry

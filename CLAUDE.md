@@ -203,9 +203,10 @@ The richest design source is the archived gameplay doc —
   `galaxies/{gid}/systems/{sid}/interior` + `features/`. `GET /v1/systems/:id`
   materializes on first read (dev trigger; TODO #0008 arrival). Unfogged (M6).
 - **`board/`** — pure shared tactical math (no Firestore/clock): axial/cube hex,
-  hex-line paths, `OrbState`, `ShipPos`, `SolveIntercept`, and **`StateAt`** —
+  hex-line paths, `OrbState`, `ShipPos`, `SolveIntercept`, **`StateAt`** —
   the effective-state fold (a burn past its `arriveTime` IS its settled
-  coast/dock; lane transit never folds — arrival is effectful). Everything that
+  coast/dock; lane transit never folds — arrival is effectful) — and
+  **`LineOfSight`/`BeamHexes`** (the #0006 occluded scan beam). Everything that
   answers "where/what is this fleet" reads through `StateAt`/`ShipPos`; only
   resolvers and the settle path read stored state raw (0004/S1–S2 pin this).
   Go↔TS contract is `/fixtures/board/cases.json` (golden test); M7's `lib/hex`
@@ -217,8 +218,11 @@ The richest design source is the archived gameplay doc —
   opportunistically on read — no scheduler). `SeedFleet` survives as spawn's
   placement primitive (the `/dev-seed` route retired at M9). Since
   M5 the burn order **commits through `action.Commit`** (`type:"burn"`); fleet
-  still owns motion state (`BurnResolver` settles it at resolve). `activeActionId`
-  carries the single-action slot.
+  still owns motion state (`BurnResolver` settles it at resolve). Two action
+  **channels** since the 2026-07-14 beam revision (#0006 Decision #19):
+  `activeActionId` (movement) + `activeScanId` (sensor) — a burning fleet can
+  scan; each channel stays single-slot. Routing runs over the corp's
+  **charted lanes** (per-lane docs), not tier-derived incidence.
 - **`action/`** (#0005) — the async spine every verb rides. Generic `Action`
   (`running→done|cancelled`), commit-time ETA, single-slot claim, inbox
   (`GET /v1/actions?actor&status`, `POST /v1/actions/:id/acknowledge|cancel`).
@@ -238,15 +242,27 @@ The richest design source is the archived gameplay doc —
   `starVisible|rumored|surveyed|explored`, monotonic; board-tier per-feature
   memory) + the **fog-filter service** every read projects through
   (`galaxy`/`system`/`fleet` handlers take `.WithFog(...)`; server-side only, no
-  ship-and-hide). Scan is an action `type` on the #0005 dispatch: resolution
-  mints `asOf: eta` observations (owner's inventory = the market's future input),
-  tiers-up graph knowledge, populates per-feature board detail — a late-resolved
-  scan yields the same snapshot. Board reads split into three bands (astronomical
-  free / live inside the sensor union / remembered elsewhere, geometry live +
-  activity frozen at `asOf`). Fleet reads carry **audience fog** (own fleets never
-  fogged; a foreign fleet outside your live sensor union reads 404). Ambient-on-
-  move reveals at movement resolution. Params in `observation/params.go`.
-  M9 adds `RevealArrival` (the direct-write home/arrival reveal spawn uses).
+  ship-and-hide). Scan (revised 2026-07-14, #0006 Decisions #15–#24) is a
+  **radial echo riding the fleet** on the #0005 dispatch, on the sensor
+  channel: echoes return by distance (`ScanDuration` = the rim round-trip),
+  and the running scan's growing **echo disc — centred on the unit's live
+  hex** — joins the corp's live coverage per read (Decision #23 —
+  `observation.Coverage`; no partial mints). Resolution still mints once at
+  eta: `asOf: eta` observations for the LOS-clear features from the fleet's
+  eta position (star/planets occlude — `board.LineOfSight`, occluders at
+  eta), charts
+  **all the system's lanes** + rumors far endpoints (lanes-by-scanning; travel
+  charts only lanes ridden, spawn charts none), grants **no graph tier**
+  (`surveyed` is market-reserved; ladder in play: starVisible→rumored→explored),
+  and **fizzles** if the fleet left the origin system. Board reads split into
+  three bands (astronomical free / live inside the **LOS-filtered** sensor
+  union / remembered elsewhere, geometry live + activity frozen at `asOf`).
+  Fleet reads carry **audience fog** (own fleets never fogged; a foreign fleet
+  outside your live union — or behind a planet — reads 404). Ambient-on-move
+  reveals at movement resolution, LOS-filtered. Params in
+  `observation/params.go` / `common.Tuning()` (beam width knobs).
+  `RevealArrival` (spawn) writes home `explored` only — the first home scan
+  finds the roads.
 - **`corporations/`** (#0009, *implemented*) — spawn & identity. The
   **Corporation** is the auth-account-linked player entity (the mind's lineage);
   fleets carry `corporationId`, the fog store keys on it. `Spawn(accountId, name)`
@@ -254,8 +270,9 @@ The richest design source is the archived gameplay doc —
   pointer commit in **one transaction** (`corporations/{corpId}` +
   `corpByAccount/{accountId}`, the uniqueness anchor), then the hull
   (`fleet.SeedFleet` at a rim-ring hex) + initial fog (`observation.RevealArrival`:
-  home `explored`, onward lanes `rumored`) follow — **idempotent per account**
-  heals a partial spawn. `POST /v1/corporations` (idempotent), `GET
+  home `explored` **only** — no lanes, revised 2026-07-14 per #0006 Decision
+  #17; scanning home is the first taught verb) follow — **idempotent per
+  account** heals a partial spawn. `POST /v1/corporations` (idempotent), `GET
   /v1/corporations/me`. Site selection (`siteselection.go`): mineable-skeleton ∧
   ≥`minSpawnDistance` graph-hops from living corps' explored sets ∧
   periphery-weighted, account-seeded pick (knobs in `params.go`, placeholder

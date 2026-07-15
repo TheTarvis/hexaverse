@@ -136,6 +136,32 @@ export const SELECTION_STROKE = '#ffffff'
 // The live ambient-sensor bubble that rides own units, and the move/scan preview.
 export const SCAN_BUBBLE_FILL = 'rgba(125, 211, 252, 0.06)'
 export const SCAN_BUBBLE_STROKE = 'rgba(125, 211, 252, 0.30)'
+
+// The scan effects (ScanPing live; ArcScan kept as a future variant): the
+// bright beam head, its soft wide underlay, and the leading blade wedge — all
+// the sensor cyan family. (Motion knobs live with the math: scan-ping.ts
+// PING_TUNING / arc-scan.ts ARC_TUNING.)
+export const SCAN_SWEEP_BEAM = 'rgba(125, 211, 252, 0.9)'
+export const SCAN_SWEEP_BEAM_HALO = 'rgba(125, 211, 252, 0.22)'
+export const SCAN_SWEEP_BLADE = 'rgba(125, 211, 252, 0.10)'
+// THE pulse ring (#0006 Decision #26): one ring, pinned at the emission hex,
+// pacing the returns — bright at the muzzle, thinning as it nears the rim.
+export const SCAN_PING_PULSE = 'rgba(125, 211, 252, 0.75)'
+// A body's echo-return blip the instant its echo arrives.
+export const SCAN_ECHO_RETURN = 'rgba(125, 211, 252, 0.85)'
+
+// A swept cell's glow at the beam head (glow 1), fading to nothing with lag.
+const SWEEP_GLOW_TINT = '#7dd3fc'
+const SWEEP_GLOW_FILL_ALPHA = 0.18
+const SWEEP_GLOW_STROKE_ALPHA = 0.35
+
+// A swept cell's glow, scaled by how recently the beam passed (glow ∈ [0,1]).
+export function sweepGlowFill(glow: number): string {
+  return rgba(SWEEP_GLOW_TINT, SWEEP_GLOW_FILL_ALPHA * glow)
+}
+export function sweepGlowStroke(glow: number): string {
+  return rgba(SWEEP_GLOW_TINT, SWEEP_GLOW_STROKE_ALPHA * glow)
+}
 export const PREVIEW_ROUTE = 'rgba(125, 211, 252, 0.55)'
 export const PREVIEW_BURN = '#fbbf24'
 export const PREVIEW_MEET = '#fbbf24'

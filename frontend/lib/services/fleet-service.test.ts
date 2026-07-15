@@ -58,6 +58,7 @@ describe('fleetService', () => {
     await fleetService.cancel('fleet_1')
     expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/cancel', {})
 
+    // The scan is a 360° sweep (#0006 Decision #21) — no aim, no body.
     await fleetService.scan('fleet_1')
     expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/scan', {})
   })

@@ -11,11 +11,15 @@ import {
   useMyFleets,
 } from '@/hooks/use-fleets'
 import { useGalaxy } from '@/hooks/use-galaxy'
+import { useRunningScan } from '@/hooks/use-actions'
+import { useBoardRealtime } from '@/hooks/use-board-realtime'
 import type { SystemBoard } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
+import type { GameAction } from '@/lib/types/action'
 import type { UseQueryResult } from '@tanstack/react-query'
 
 vi.mock('@/hooks/use-system-board', () => ({ useSystemBoard: vi.fn() }))
+vi.mock('@/hooks/use-actions', () => ({ useRunningScan: vi.fn() }))
 vi.mock('@/hooks/use-fleets', () => ({
   useFleetsInSystem: vi.fn(),
   useFleetOrders: vi.fn(),
@@ -45,6 +49,7 @@ const mockRoutePreview = vi.mocked(useRoutePreview)
 const mockTravel = vi.mocked(useFleetTravel)
 const mockMyFleets = vi.mocked(useMyFleets)
 const mockGalaxy = vi.mocked(useGalaxy)
+const mockRunningScan = vi.mocked(useRunningScan)
 
 const travelMutate = vi.fn()
 
@@ -133,6 +138,7 @@ describe('SystemBoardView', () => {
     mockTravel.mockReturnValue({ mutate: travelMutate, isPending: false } as unknown as ReturnType<typeof useFleetTravel>)
     mockMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
     mockGalaxy.mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useGalaxy>)
+    mockRunningScan.mockReturnValue({ data: null } as unknown as ReturnType<typeof useRunningScan>)
     fleetsState([])
   })
 
@@ -184,13 +190,65 @@ describe('SystemBoardView', () => {
     )
   })
 
-  it('commits a scan on the active fleet', () => {
+  it('commits the sweep, previewing its shadow coverage on hover', () => {
     boardState({ isLoading: false, isError: false, data: boardFixture() })
     fleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
 
+    // Clicking around to plan a burn stays quiet — no scan overlay.
+    fireEvent.click(screen.getByTestId('feature-glyph-p-1'))
+    expect(screen.queryByTestId('scan-overlay-aim')).not.toBeInTheDocument()
+
+    // Considering the Scan verb (hover) previews the sweep; leaving hides it.
+    fireEvent.mouseEnter(screen.getByTestId('scan-button'))
+    expect(screen.getByTestId('scan-overlay-aim')).toBeInTheDocument()
+    fireEvent.mouseLeave(screen.getByTestId('scan-button'))
+    expect(screen.queryByTestId('scan-overlay-aim')).not.toBeInTheDocument()
+
+    // Commit — the 360° sweep needs no aim (#0006 Decision #21).
     fireEvent.click(screen.getByTestId('scan-button'))
     expect(scanMutate).toHaveBeenCalledWith('mine', expect.anything())
+  })
+
+  it('draws the committed sweep and a countdown while a scan runs', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    fleetsState([ownFleet])
+    const running: GameAction = {
+      id: 'action_scan',
+      type: 'scan',
+      actor: 'mine',
+      scope: 'sys-7',
+      params: { systemId: 'sys-7' },
+      committedAt: 0,
+      eta: 30_000,
+      status: 'running',
+      worldTime: 0,
+    }
+    mockRunningScan.mockReturnValue({ data: running } as unknown as ReturnType<typeof useRunningScan>)
+    render(<SystemBoardView systemId="sys-7" />)
+
+    // The committed sweep is on the board, and the panel counts down.
+    expect(screen.getByTestId('scan-overlay-active')).toBeInTheDocument()
+    // The radial ping expands from the fleet's live point.
+    expect(screen.getByTestId('scan-ping')).toBeInTheDocument()
+    expect(screen.getByTestId('scan-ping-pulse')).toBeInTheDocument()
+    expect(screen.getByTestId('scan-countdown')).toHaveTextContent(/30s/)
+    expect(screen.getByTestId('scan-button')).toBeDisabled()
+    // The scan's eta feeds the realtime rules — the eta-scheduled board refetch
+    // is the read that resolves the scan server-side — and the poll tightens
+    // while echoes are landing (radial echo).
+    const realtimeArgs = vi.mocked(useBoardRealtime).mock.calls.at(-1)![0]
+    expect(realtimeArgs.etaCandidates).toContain(30_000)
+    expect(realtimeArgs.scanning).toBe(true)
+
+    // The FX toggle swaps the running scan's effect to the arc-scan look,
+    // then back. (Persistence rides localStorage — stubbed flat in this
+    // suite's environment, so asserted by behavior only.)
+    fireEvent.click(screen.getByTestId('scan-fx-toggle'))
+    expect(screen.queryByTestId('scan-ping')).not.toBeInTheDocument()
+    expect(screen.getByTestId('arc-scan')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('scan-fx-toggle'))
+    expect(screen.getByTestId('scan-ping')).toBeInTheDocument()
   })
 
   it('selects a lane gate, previews the route, and departs', () => {

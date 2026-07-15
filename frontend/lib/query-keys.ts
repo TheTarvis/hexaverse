@@ -54,6 +54,14 @@ export const queryKeys = {
     route: (fleetId: string, destSystemId: string) =>
       [...queryKeys.fleets.all, 'route', fleetId, destSystemId] as const,
   },
+
+  actions: {
+    // The #0005 inbox reads. `running(actorId)` backs the running-scan
+    // indicator (#0006): the committed beam + its eta countdown. The scan
+    // mutation invalidates it; past-eta entries hide client-side (worldTime).
+    all: ['actions'] as const,
+    running: (actorId: string) => [...queryKeys.actions.all, 'running', actorId] as const,
+  },
 } as const
 
 export type AccountQueryKey =

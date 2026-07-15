@@ -56,8 +56,8 @@ export interface SystemInterior {
   character: Character
   starClass: string
   radius: number
-  entry: Axial // where you arrive from the inbound lane (rim) = laneExits[0]
-  laneExits: Axial[] // rim tiles where charted lanes leave the system (graph↔board seam)
+  entry: Axial // where you arrive from the inbound lane (gate ring) = laneExits[0]
+  laneExits: Axial[] // gate tiles (inner edge of outer band) where lanes leave (graph↔board seam)
   scanRadius: number // demo: ambient/scan vision bubble around entry
   tiles: Tile[]
 }
@@ -230,17 +230,20 @@ export function generateMockSystem(seed = 0x51a2c0de, character: Character = 'st
     if (t.body?.type === 'belt' && !t.hazard && rng() < 0.3) t.hazard = 'debris'
   }
 
-  // Lane exits: rim tiles where charted lanes leave the system (the graph↔board
-  // seam). You arrive via one (entry = laneExits[0]) and can depart via any.
-  // Spread ~evenly around the rim so they read as distinct outbound directions.
-  const rim = tiles
-    .filter((t) => t.ring === radius)
+  // Lane exits: gate tiles where charted lanes leave the system (the graph↔board
+  // seam). They sit on the gate ring — the inner edge of the outer band, 3 rings
+  // in from the rim (2026-07-14 decision; mirrors board.GateRing) — so a 3-ring
+  // shell of outer dark sits outside them. You arrive via one (entry = laneExits[0])
+  // and can depart via any. Spread ~evenly so they read as distinct directions.
+  const gateRingIdx = Math.max(1, radius - 3)
+  const mouthRing = tiles
+    .filter((t) => t.ring === gateRingIdx)
     .sort((a, b) => Math.atan2(a.r, a.q + a.r / 2) - Math.atan2(b.r, b.q + b.r / 2))
   const nLanes = 2 + Math.floor(rng() * 3) // 2..4 lanes
-  const offset = Math.floor(rng() * rim.length)
+  const offset = Math.floor(rng() * mouthRing.length)
   const laneExits: Axial[] = []
   for (let i = 0; i < nLanes; i++) {
-    const t = rim[(offset + Math.floor((i * rim.length) / nLanes)) % rim.length]
+    const t = mouthRing[(offset + Math.floor((i * mouthRing.length) / nLanes)) % mouthRing.length]
     laneExits.push({ q: t.q, r: t.r })
   }
 

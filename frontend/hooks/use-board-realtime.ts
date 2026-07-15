@@ -19,6 +19,10 @@ import { queryKeys } from '@/lib/query-keys'
 // reads; the fog/animation layers pick the fresh state up on the next render.
 
 export const BOARD_POLL_MS = 20_000
+// The tightened poll while a scan is running (radial echo): the front reveals
+// progressively, and each board read is what materializes the echoes that have
+// returned since the last one — so the poll IS the reveal cadence mid-scan.
+export const SCAN_POLL_MS = 5_000
 // A small cushion so the ETA refetch fires just AFTER the server would resolve.
 const ETA_CUSHION_MS = 400
 
@@ -29,6 +33,8 @@ export interface UseBoardRealtimeOptions {
   worldTime: number
   // Future world-times to self-schedule a refetch at — own fleets' arrival ETAs.
   etaCandidates?: number[]
+  // True while an own scan is running here — tightens the poll to SCAN_POLL_MS.
+  scanning?: boolean
   enabled?: boolean
 }
 
@@ -41,6 +47,7 @@ export function useBoardRealtime({
   systemId,
   worldTime,
   etaCandidates,
+  scanning = false,
   enabled = true,
 }: UseBoardRealtimeOptions): void {
   const qc = useQueryClient()
@@ -67,12 +74,16 @@ export function useBoardRealtime({
     return () => clearTimeout(timer)
   }, [active, soonest, systemId, qc])
 
-  // Rule 3 — gentle poll while open.
+  // Rule 3 — gentle poll while open; tightened while a scan's echoes are
+  // landing (each read materializes the front's progress).
   useEffect(() => {
     if (!active) return
-    const interval = setInterval(() => invalidateBoard(qc, systemId), BOARD_POLL_MS)
+    const interval = setInterval(
+      () => invalidateBoard(qc, systemId),
+      scanning ? SCAN_POLL_MS : BOARD_POLL_MS,
+    )
     return () => clearInterval(interval)
-  }, [active, systemId, qc])
+  }, [active, systemId, qc, scanning])
 
   // Rule 2 — SSE on the system channel: refetch on completion and on reconnect.
   useEffect(() => {

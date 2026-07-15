@@ -63,7 +63,10 @@ class FleetService {
     return response.data
   }
 
-  // POST /v1/fleets/:id/scan — commit a scan (409 if the fleet is already busy).
+  // POST /v1/fleets/:id/scan — commit the 360° sweep (#0006 Decision #21):
+  // one manual trigger, an automatic all-around sweep occluded by large
+  // bodies. Rides the sensor channel, so a burning fleet can scan; 409 only
+  // if a scan is already running.
   async scan(fleetId: string): Promise<Fleet> {
     const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/scan`, {})
     return response.data

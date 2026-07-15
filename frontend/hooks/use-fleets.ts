@@ -118,14 +118,20 @@ export function useFleetTravel(): UseMutationResult<
   })
 }
 
-// useScan — the scan verb for a fleet. Resolution mints observations at the ETA;
-// completion arrives via SSE (useBoardRealtime), so success here just invalidates
-// to reflect the running action. A 409 (fleet already busy) surfaces as the
-// mutation error for the component to toast.
+// useScan — the 360° sweep verb (#0006 Decision #21): one manual trigger, no
+// aim. Resolution mints observations at the ETA; completion arrives via SSE
+// (useBoardRealtime), so success here just invalidates to reflect the running
+// action. A 409 (a scan already running — movement doesn't block, #0006
+// Decision #19) surfaces as the mutation error for the component to toast.
 export function useScan(systemId: string): UseMutationResult<Fleet, Error, string> {
   const qc = useQueryClient()
   return useMutation<Fleet, Error, string>({
     mutationFn: (fleetId) => fleetService.scan(fleetId),
-    onSuccess: (fleet) => invalidateBoard(qc, systemId, fleet),
+    onSuccess: (fleet) => {
+      invalidateBoard(qc, systemId, fleet)
+      // The running-scan indicator reads the actions inbox — refresh it so the
+      // committed sweep + countdown appear immediately.
+      void qc.invalidateQueries({ queryKey: queryKeys.actions.running(fleet.id) })
+    },
   })
 }

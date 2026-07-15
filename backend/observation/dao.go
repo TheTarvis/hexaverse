@@ -17,6 +17,7 @@ const (
 	corporationsCollection = "corporations"
 	observationsCollection = "observations"
 	featuresCollection     = "features"
+	lanesCollection        = "lanes"
 )
 
 //go:generate mockgen -destination=dao_mock.go -package=observation -source=dao.go Dao
@@ -37,6 +38,12 @@ type Dao interface {
 	// UpsertFeatureObservation writes a board-tier observation keyed by featureId,
 	// so repeat passes are idempotent overwrites.
 	UpsertFeatureObservation(ctx context.Context, cid, systemID string, obs FeatureObservation) error
+
+	// UpsertLane charts a lane for the corp — keyed by laneId, so recharting is
+	// an idempotent overwrite (presence of the doc IS "charted").
+	UpsertLane(ctx context.Context, cid string, obs LaneObservation) error
+	// ListLanes returns every lane the corp has charted.
+	ListLanes(ctx context.Context, cid string) ([]LaneObservation, error)
 }
 
 type DaoImpl struct {
@@ -152,4 +159,38 @@ func (dao *DaoImpl) UpsertSystemObservation(ctx context.Context, cid string, obs
 func (dao *DaoImpl) UpsertFeatureObservation(ctx context.Context, cid, systemID string, obs FeatureObservation) error {
 	_, err := dao.featureDoc(cid, systemID, obs.FeatureId).Set(ctx, obs)
 	return err
+}
+
+// laneDoc is corporations/{cid}/lanes/{laneId}.
+func (dao *DaoImpl) laneDoc(cid, laneID string) *firestore.DocumentRef {
+	return dao.db.Collection(corporationsCollection).Doc(cid).
+		Collection(lanesCollection).Doc(laneID)
+}
+
+func (dao *DaoImpl) UpsertLane(ctx context.Context, cid string, obs LaneObservation) error {
+	_, err := dao.laneDoc(cid, obs.LaneId).Set(ctx, obs)
+	return err
+}
+
+func (dao *DaoImpl) ListLanes(ctx context.Context, cid string) ([]LaneObservation, error) {
+	iter := dao.db.Collection(corporationsCollection).Doc(cid).
+		Collection(lanesCollection).Documents(ctx)
+	defer iter.Stop()
+
+	var out []LaneObservation
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var o LaneObservation
+		if err := doc.DataTo(&o); err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, nil
 }

@@ -43,9 +43,21 @@ export interface FactsPanelProps {
   plan: MovePlan | null
   worldTime: number
   pending: boolean
+  // The running scan's frozen eta (null when no scan is in flight) — drives the
+  // Scanning… countdown and blocks a second scan (#0006 Decision #19).
+  scanEta?: number | null
   route: RouteState | null
   onMove: () => void
   onScan: () => void
+  // Hover/focus intent on the Scan verb — the parent shows the aim-corridor
+  // overlay only while the player is actually considering a scan, so clicking
+  // around to plan a burn stays visually quiet.
+  onScanPreview?: (show: boolean) => void
+  // The playtest FX toggle: which effect a running scan renders — the radial
+  // ping (the slice mechanic's picture) or the arc-scan (kept as a future
+  // variant's look). Absent → no toggle shown.
+  scanFx?: 'ping' | 'arc'
+  onToggleScanFx?: () => void
   onCancel: () => void
   onDepart: () => void
 }
@@ -63,9 +75,13 @@ export function FactsPanel({
   plan,
   worldTime,
   pending,
+  scanEta = null,
   route,
   onMove,
   onScan,
+  onScanPreview,
+  scanFx,
+  onToggleScanFx,
   onCancel,
   onDepart,
 }: FactsPanelProps) {
@@ -74,6 +90,12 @@ export function FactsPanel({
   const activeMode = activeFleet ? stateAt(activeFleet.state, worldTime).mode : undefined
   const burning = activeMode === 'burn'
   const canMoveToSelection = !!activeFleet && (selection?.kind === 'feature' || selection?.kind === 'hex')
+  // The scan is a 360° sweep (#0006 Decision #21) — one manual trigger, no
+  // aim. Burning does NOT gate it: movement and sensing are separate channels
+  // (#0006 Decision #19). One scan at a time, though — a running scan holds
+  // the sensor slot until eta.
+  const scanning = scanEta !== null && scanEta > worldTime
+  const scanSecondsLeft = scanning ? Math.max(1, Math.ceil((scanEta - worldTime) / 1000)) : 0
   return (
     <aside data-testid="facts-panel" className={PANEL}>
       <div>
@@ -95,10 +117,14 @@ export function FactsPanel({
             <Button
               data-testid="scan-button"
               color="cyan"
-              disabled={pending || burning}
+              disabled={pending || scanning}
               onClick={onScan}
+              onMouseEnter={() => onScanPreview?.(true)}
+              onMouseLeave={() => onScanPreview?.(false)}
+              onFocus={() => onScanPreview?.(true)}
+              onBlur={() => onScanPreview?.(false)}
             >
-              Scan
+              {scanning ? 'Scanning…' : 'Scan'}
             </Button>
             {burning && (
               <Button data-testid="cancel-button" outline disabled={pending} onClick={onCancel}>
@@ -106,6 +132,25 @@ export function FactsPanel({
               </Button>
             )}
           </div>
+          {scanning ? (
+            <p data-testid="scan-countdown" className="mt-2 text-[11px] text-cyan-300/80">
+              Sensors sweeping — resolves in {scanSecondsLeft}s.
+            </p>
+          ) : (
+            <p className="mt-2 text-[11px] text-zinc-400">
+              Sweeps 360° from your position — large bodies shadow what’s behind them.
+            </p>
+          )}
+          {scanFx && onToggleScanFx && (
+            <Button
+              plain
+              data-testid="scan-fx-toggle"
+              onClick={onToggleScanFx}
+              className="mt-1 !px-0 !py-0 !font-mono !text-[10px] tracking-wide !text-zinc-500 uppercase hover:!text-cyan-300"
+            >
+              scan fx: {scanFx === 'arc' ? 'arc-scan' : 'radial ping'} ⇄
+            </Button>
+          )}
         </section>
       )}
 

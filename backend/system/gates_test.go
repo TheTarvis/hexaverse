@@ -50,10 +50,11 @@ func TestLaneGates_ProjectsEachLaneToItsRimTile(t *testing.T) {
 	if gates[1].Hex != wantN {
 		t.Errorf("north gate = %+v, want %+v", gates[1].Hex, wantN)
 	}
-	// Both gates sit on the rim (ring == radius).
+	// Both gates sit on the gate ring — the inner edge of the outer band.
+	wantRing := board.GateRing(16)
 	for _, g := range gates {
-		if r := board.Ring(g.Hex); r != 16 {
-			t.Errorf("gate %s at ring %d, want 16", g.DestSystemId, r)
+		if r := board.Ring(g.Hex); r != wantRing {
+			t.Errorf("gate %s at ring %d, want %d", g.DestSystemId, r, wantRing)
 		}
 	}
 }

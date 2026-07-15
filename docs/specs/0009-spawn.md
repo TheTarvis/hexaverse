@@ -58,7 +58,8 @@ in `../lore.md`.
 - **Spawn is instant** — not a #0005 action; you wake, you're there.
 - **Initial fog state** per #0006: the wake-up system explored for the new
   Corporation; the rest of the galaxy at its lore-correct baseline
-  (star-visible everywhere, no charted lanes beyond home's).
+  (star-visible everywhere, **no charted lanes at all** — revised 2026-07-14
+  per #0006 Decision #17: the first home scan finds the roads).
 
 ## Non-goals
 
@@ -95,8 +96,9 @@ it is simply the ownership root everything else hangs off.
 backend picks a spawn system and, in one transaction: creates the
 Corporation, creates its fleet (one hull, coasting at a rim-adjacent
 position in the wake-up system per #0004's position model), and writes the
-initial observations (#0006: home → `explored`, its onward lanes charted).
-The player wakes knowing home and seeing the whole sky.
+initial observations (#0006: home → `explored`; **no lanes charted** —
+revised 2026-07-14 per #0006 Decision #17). The player wakes knowing home
+and seeing the whole sky; the first taught verb is *scan to find the roads*.
 
 **Site selection.** Filter #0001's systems by the three criteria — no other
 Corporation's known space within the minimum graph distance,
@@ -157,8 +159,9 @@ carries and why that's narratively honest rather than a save-wipe.
   hull has by default (drive speed, sensor radius, cargo size) — this spec
   places the hull, the verb specs equip it; no spawn-specific stats.
 - **Initial fog writes** (#0006): home system observation at `explored`
-  (its skeleton + onward lanes), nothing else — the star map needs no
-  per-player rows (it's free for everyone by design).
+  (its skeleton), nothing else — no lanes charted (revised 2026-07-14 per
+  #0006 Decision #17; the first home scan charts them). The star map needs
+  no per-player rows (it's free for everyone by design).
 - **Frozen start area** (#0001/#0002): the logged-out landing is unchanged
   by this spec; its diegetic frame — the mind browsing from **cold
   storage** before waking — costs nothing and is noted for the eventual
@@ -180,7 +183,8 @@ carries and why that's narratively honest rather than a save-wipe.
 - **When** it calls `POST /v1/corporations` to wake up
 - **Then** a Corporation linked to the account exists, with exactly one fleet
   carrying its `corporationId`, and a home-system observation at `explored`
-  with the onward lanes charted — and nothing else charted
+  — and **no lanes charted at all** (revised 2026-07-14 per #0006 Decision
+  #17 / scenario 0006/S6; the first home scan charts them)
   *(`TestSpawn_CreatesCorpFleetAndFog`.)*
 
 ### S2 — Spawning is idempotent per account
@@ -268,8 +272,10 @@ guarantees.
   `dev-corp` fallback are retired; `fleet.SeedFleet` survives as spawn's
   placement primitive.
 - **Initial scan (open question, resolved for the slice):** spawn grants home
-  graph-tier `explored` + onward-lane `rumored` only; board-detail stays to the
-  player's first scan (the move→scan→leave bar is intact).
+  graph-tier `explored` only — onward-lane `rumored` removed 2026-07-14
+  (#0006 Decision #17); lanes and board-detail both stay to the player's
+  first scan (the scan→travel→scan bar is intact, and scanning home is the
+  tutorial's first beat).
 
 ## Decisions (imported from `../plans/spawn.md`, 2026-07-09)
 

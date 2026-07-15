@@ -37,9 +37,10 @@ type FleetSource interface {
 }
 
 // FogSource writes the initial observations and reads other corps' explored sets
-// for the unclaimed-distance test.
+// for the unclaimed-distance test. Spawn charts NO lanes (#0006 Decision #17,
+// 2026-07-14): the first home scan finds the roads — the wake-up tutorial beat.
 type FogSource interface {
-	RevealArrival(ctx context.Context, cid, destSystemID string, onward []string, at common.WorldMillis) error
+	RevealArrival(ctx context.Context, cid, destSystemID string, at common.WorldMillis) error
 	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
 }
 
@@ -146,9 +147,10 @@ func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResu
 }
 
 // ensureSpawnAssets makes the corp's derived assets exist (idempotently): its one
-// hull in a chosen home system, and the initial fog (home Explored + onward lanes
-// Rumored). Safe to re-run — an existing hull is reused, the fog upserts are
-// monotonic — which is what makes spawn idempotent per account.
+// hull in a chosen home system, and the initial fog (home Explored — no lanes;
+// scanning home is the first taught verb, #0006 Decision #17). Safe to re-run —
+// an existing hull is reused, the fog upserts are monotonic — which is what
+// makes spawn idempotent per account.
 func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*SpawnResult, error) {
 	now := s.clock.Now()
 	gal, err := s.graph.GetLive(ctx)
@@ -182,7 +184,7 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*Sp
 		}
 	}
 
-	if err := s.fog.RevealArrival(ctx, corp.Id, home, neighborsOf(gal, home), now); err != nil {
+	if err := s.fog.RevealArrival(ctx, corp.Id, home, now); err != nil {
 		return nil, err
 	}
 
@@ -269,17 +271,3 @@ func (s *Service) rimHex(accountId string) board.Hex {
 	return ring[idx]
 }
 
-// neighborsOf returns the systems one lane-hop from home — the onward lanes the
-// wake charts to Rumored.
-func neighborsOf(gal *galaxy.GeneratedGalaxy, home string) []string {
-	var out []string
-	for _, l := range gal.Lanes {
-		switch home {
-		case l.AId:
-			out = append(out, l.BId)
-		case l.BId:
-			out = append(out, l.AId)
-		}
-	}
-	return out
-}

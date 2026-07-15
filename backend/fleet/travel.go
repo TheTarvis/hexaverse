@@ -153,6 +153,6 @@ func (s *Service) buildTrip(ctx context.Context, f *Fleet, plan *routePlan, now 
 		DepartTime: now,
 		ArriveTime: legEtas[n-1],
 		EntryGate:  entryGate,
-		Onward:     plan.onward,
+		LaneIds:    plan.laneIds,
 	}, nil
 }

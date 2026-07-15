@@ -22,6 +22,7 @@ func (s *Service) Features(ctx context.Context, systemID string) ([]observation.
 		g := observation.FeatureGeom{
 			Id:           f.Id,
 			Astronomical: isAstronomical(f.Id),
+			Occludes:     occludes(f.Type),
 			Detail:       featureDetail(f),
 		}
 		if f.Orbit != nil {
@@ -33,6 +34,18 @@ func (s *Service) Features(ctx context.Context, systemID string) ([]observation.
 		out = append(out, g)
 	}
 	return out, nil
+}
+
+// occludes marks the large bodies that shadow the lightspeed channel (#0006
+// Decision #16): the star and planets block line of sight; belts, moons, and
+// hazards don't (murk-as-attenuator is a follow-on).
+func occludes(t FeatureType) bool {
+	switch t {
+	case FeatureStar, FeatureRocky, FeatureGasGiant, FeatureIce:
+		return true
+	default:
+		return false
+	}
 }
 
 // isAstronomical marks the free telescope layer — the star + the major-body

@@ -70,6 +70,21 @@ func (mr *MockDaoMockRecorder) ListFeatureObservations(ctx, cid, systemID any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFeatureObservations", reflect.TypeOf((*MockDao)(nil).ListFeatureObservations), ctx, cid, systemID)
 }
 
+// ListLanes mocks base method.
+func (m *MockDao) ListLanes(ctx context.Context, cid string) ([]LaneObservation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListLanes", ctx, cid)
+	ret0, _ := ret[0].([]LaneObservation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListLanes indicates an expected call of ListLanes.
+func (mr *MockDaoMockRecorder) ListLanes(ctx, cid any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLanes", reflect.TypeOf((*MockDao)(nil).ListLanes), ctx, cid)
+}
+
 // ListSystemObservations mocks base method.
 func (m *MockDao) ListSystemObservations(ctx context.Context, cid string) ([]SystemObservation, error) {
 	m.ctrl.T.Helper()
@@ -97,6 +112,20 @@ func (m *MockDao) UpsertFeatureObservation(ctx context.Context, cid, systemID st
 func (mr *MockDaoMockRecorder) UpsertFeatureObservation(ctx, cid, systemID, obs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertFeatureObservation", reflect.TypeOf((*MockDao)(nil).UpsertFeatureObservation), ctx, cid, systemID, obs)
+}
+
+// UpsertLane mocks base method.
+func (m *MockDao) UpsertLane(ctx context.Context, cid string, obs LaneObservation) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertLane", ctx, cid, obs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertLane indicates an expected call of UpsertLane.
+func (mr *MockDaoMockRecorder) UpsertLane(ctx, cid, obs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertLane", reflect.TypeOf((*MockDao)(nil).UpsertLane), ctx, cid, obs)
 }
 
 // UpsertSystemObservation mocks base method.

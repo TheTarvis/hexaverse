@@ -1,18 +1,26 @@
 // Lane-gate geometry — the client mirror of backend/board/gate.go (#0008).
 //
-// Each charted lane meets a system's board at ONE fixed rim tile: the lane's
-// galaxy-tier bearing projected onto the rim. The server is authoritative (it
-// stamps gate tiles into system reads and arrival), so this mirror drives
-// PREVIEWS only — the burn-to-gate path a depart preview draws. Pinned by
-// /fixtures/board/cases.json (see fixtures.test.ts); ported from the Go
+// Each charted lane meets a system's board at ONE fixed tile: the lane's
+// galaxy-tier bearing projected onto the gate ring (the inner edge of the outer
+// band, 3 rings in from the rim — 2026-07-14 decision). The server is
+// authoritative (it stamps gate tiles into system reads and arrival), so this
+// mirror drives PREVIEWS only — the burn-to-gate path a depart preview draws.
+// Pinned by /fixtures/board/cases.json (see fixtures.test.ts); ported from the Go
 // arithmetic exactly.
 
 import { type Hex, ringHexes } from './hex'
 
-// laneGateHex returns the rim tile (ring === radius) where the lane from `self`
-// toward `neighbor` meets self's board. Bearing = the lane's azimuth in the
-// galaxy XY-disk (#0001 coords, z ignored); the gate is the rim hex whose board
-// direction is angularly closest to it, ties to the earliest in ringHexes order.
+// gateRing is the ring a lane mouth sits on: three rings in from the rim, clamped
+// to a valid interior ring. Mirror of board.GateRing — keep the two in lock-step.
+export function gateRing(radius: number): number {
+  return Math.max(1, radius - 3)
+}
+
+// laneGateHex returns the tile on the gate ring (gateRing(radius)) where the lane
+// from `self` toward `neighbor` meets self's board. Bearing = the lane's azimuth
+// in the galaxy XY-disk (#0001 coords, z ignored); the gate is the gate-ring hex
+// whose board direction is angularly closest to it, ties to the earliest in
+// ringHexes order.
 export function laneGateHex(
   selfX: number,
   selfY: number,
@@ -24,7 +32,7 @@ export function laneGateHex(
   const bearing = Math.atan2(neighborY - selfY, neighborX - selfX)
   let best: Hex = { q: 0, r: 0 }
   let bestDelta = Number.MAX_VALUE
-  for (const h of ringHexes(radius)) {
+  for (const h of ringHexes(gateRing(radius))) {
     const [hx, hy] = hexDirection(h)
     const delta = angleDelta(Math.atan2(hy, hx), bearing)
     if (delta < bestDelta) {

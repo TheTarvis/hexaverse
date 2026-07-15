@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"hexaverse/action"
 	"hexaverse/common"
 	"hexaverse/galaxy"
 	"hexaverse/observation"
@@ -24,10 +25,20 @@ type BoardFog interface {
 	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
 }
 
+// DueActions is the #0005 read-fold seam: resolving a scope's due actions.
+// The interior read runs it first, so a verb that completed while nobody was
+// reading (a scan on a quiet board) settles — slot released, effects minted —
+// before this read's fog projects. That is what makes the client's poll/eta
+// refetches actually DELIVER a reveal instead of re-reading stale fog.
+type DueActions interface {
+	ResolveDue(ctx context.Context, scope string) ([]action.Action, error)
+}
+
 type Handler struct {
-	svc   ServiceInterface
-	clock common.WorldTime
-	fog   BoardFog
+	svc     ServiceInterface
+	clock   common.WorldTime
+	fog     BoardFog
+	actions DueActions
 }
 
 func NewHandler() *Handler {
@@ -44,6 +55,12 @@ func (h *Handler) WithFog(fog BoardFog) *Handler {
 	return h
 }
 
+// WithActions wires the #0005 read-fold into the interior read.
+func (h *Handler) WithActions(actions DueActions) *Handler {
+	h.actions = actions
+	return h
+}
+
 func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	authorized.GET("/systems/:systemId", h.GetInterior)
 }
@@ -55,6 +72,15 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 func (h *Handler) GetInterior(c *gin.Context) {
 	systemID := common.RequiredHttpParam(c, "systemId")
 	ctx := c.Request.Context()
+
+	// The read-fold (#0005): settle this scope's due actions before projecting,
+	// so a completed scan's observations are already minted in THIS response.
+	// Opportunistic — the read still serves if the fold fails.
+	if h.actions != nil {
+		if _, err := h.actions.ResolveDue(ctx, systemID); err != nil {
+			log.Warn().Ctx(c).Err(err).Str("systemId", systemID).Msg("Due-action resolve failed on interior read")
+		}
+	}
 
 	gen, err := h.svc.GetOrCreateInterior(ctx, systemID)
 	switch {

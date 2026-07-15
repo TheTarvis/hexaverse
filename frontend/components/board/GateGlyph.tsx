@@ -1,7 +1,7 @@
 'use client'
 
-// GateGlyph — a charted lane's departure gate on the board rim (#0008). Purely
-// presentational: the parent computes the rim point (hexToPixel of the gate tile)
+// GateGlyph — a charted lane's departure gate in the outer band (#0008). Purely
+// presentational: the parent computes the gate point (hexToPixel of the gate tile)
 // and passes it in. Drawn as a portal ring with an outward-pointing chevron —
 // aimed away from the core, toward the lane it opens onto — so a gate reads as an
 // exit, distinct from the body glyphs inside. Selecting one arms the depart verb.

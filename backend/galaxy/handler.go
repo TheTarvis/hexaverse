@@ -13,11 +13,14 @@ import (
 )
 
 // GraphFog is the fog dependency the graph read needs: the requester's monotonic
-// subspace tiers over the always-visible star map (#0006). The star layer renders
-// regardless; this only decorates each system with the requester's earned tier.
-// Nil on the logged-out path and in unit tests (every system reads starVisible).
+// subspace tiers over the always-visible star map, plus their charted-lane set
+// (#0006 Decision #17 — lanes are per-lane records written by travel and scan,
+// not derived from tiers). The star layer renders regardless. Nil on the
+// logged-out path and in unit tests (every system reads starVisible, every lane
+// ships).
 type GraphFog interface {
 	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
+	ChartedLanes(ctx context.Context, cid string) (map[string]bool, error)
 }
 
 type Handler struct {
@@ -61,6 +64,7 @@ func (h *Handler) GetGalaxy(c *gin.Context) {
 	}
 
 	var tiers map[string]observation.Tier
+	var charted map[string]bool
 	if h.fog != nil {
 		if cid := common.ActorCorp(c); cid != "" {
 			tiers, err = h.fog.SystemTiers(c.Request.Context(), cid)
@@ -69,9 +73,18 @@ func (h *Handler) GetGalaxy(c *gin.Context) {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
+			charted, err = h.fog.ChartedLanes(c.Request.Context(), cid)
+			if err != nil {
+				log.Error().Ctx(c).Err(err).Msg("Failed to load charted lanes")
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+			if charted == nil {
+				charted = map[string]bool{} // a corp with no charted lanes sees none
+			}
 		}
 	}
-	c.JSON(http.StatusOK, ToDTO(gen, h.clock.Now(), tiers))
+	c.JSON(http.StatusOK, ToDTO(gen, h.clock.Now(), tiers, charted))
 }
 
 // --- Wire DTOs (the pinned #0002 contract) ---------------------------------
@@ -115,8 +128,9 @@ type galaxyDTO struct {
 }
 
 // ToDTO maps the domain galaxy to the pinned wire contract. tiers is the
-// requester's subspace knowledge (nil ⇒ every system star-visible).
-func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]observation.Tier) galaxyDTO {
+// requester's subspace knowledge (nil ⇒ every system star-visible); charted is
+// their charted-lane set (nil ⇒ the no-fog baseline, every lane ships).
+func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]observation.Tier, charted map[string]bool) galaxyDTO {
 	systems := make([]systemDTO, len(gen.Systems))
 	for i, s := range gen.Systems {
 		bodies := make([]bodyDTO, len(s.Skeleton.Bodies))
@@ -140,7 +154,7 @@ func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]observ
 	// nodes are the free star map; unknown lanes never ship (no ship-and-hide).
 	lanes := make([]laneDTO, 0, len(gen.Lanes))
 	for _, l := range gen.Lanes {
-		if !laneCharted(l, tiers) {
+		if !laneCharted(l, charted) {
 			continue
 		}
 		lanes = append(lanes, laneDTO{Id: l.Id, AId: l.AId, BId: l.BId})
@@ -156,16 +170,16 @@ func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]observ
 }
 
 // laneCharted reports whether a lane belongs to the requester's charted network
-// (#0006). A lane is known iff it is **incident to a system the Corporation has
-// Explored** (entered) — a Rumored neighbour is Rumored precisely because an
-// Explored system's lane reaches it, so this is the same charted-lane graph
-// #0008 routes over. A nil tiers map is the no-fog baseline (unit tests and the
-// logged-out static start area, served separately) — every lane ships. The other
-// future input to "charted" is purchased intel (a per-lane reveal set the market
-// will union in once a writer exists); the schema leaves room, no writer yet.
-func laneCharted(l Lane, tiers map[string]observation.Tier) bool {
-	if tiers == nil {
+// (#0006 Decision #17, 2026-07-14): a per-lane record written when the corp
+// TRAVELED it or SCANNED a system it's incident to — no longer derived from
+// Explored-incidence, so a fresh spawn sees no lanes at all until its first
+// home scan. A nil set is the no-fog baseline (unit tests and the logged-out
+// static start area, served separately) — every lane ships. The future third
+// author of "charted" is purchased intel (the market); the schema leaves room,
+// no writer yet.
+func laneCharted(l Lane, charted map[string]bool) bool {
+	if charted == nil {
 		return true
 	}
-	return tiers[l.AId] == observation.TierExplored || tiers[l.BId] == observation.TierExplored
+	return charted[l.Id]
 }

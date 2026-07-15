@@ -163,13 +163,18 @@ func (h *Handler) RoutePreview(c *gin.Context) {
 	}
 }
 
+// Scan commits the 360° sweep (#0006 Decision #21) — no body: one manual
+// trigger, an automatic all-around sweep from wherever the fleet is at eta.
 func (h *Handler) Scan(c *gin.Context) {
 	f, err := h.svc.Scan(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
-	if errors.Is(err, action.ErrActiveActionExists) {
-		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet already has an action in progress"})
-		return
+	switch {
+	case errors.Is(err, action.ErrActiveActionExists):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet already has a scan in progress"})
+	case errors.Is(err, ErrNotOnBoard):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet is in lane transit — nothing around to scan"})
+	default:
+		h.respond(c, f, err)
 	}
-	h.respond(c, f, err)
 }
 
 func (h *Handler) Order(c *gin.Context) {

@@ -17,11 +17,24 @@ type fakeGraph struct{ gg *galaxy.GeneratedGalaxy }
 
 func (f *fakeGraph) GetLive(context.Context) (*galaxy.GeneratedGalaxy, error) { return f.gg, nil }
 
-// fakeTiers is a fixed per-system knowledge map (the requester's charted set).
-type fakeTiers struct{ m map[string]observation.Tier }
+// fakeTiers is a fixed per-system knowledge map plus the requester's charted
+// lane set (#0006 Decision #17: routing runs over charted lanes). A nil lanes
+// map means "all of chainGalaxy's lanes charted" — most tests probe the tier
+// rules, not lane charting.
+type fakeTiers struct {
+	m     map[string]observation.Tier
+	lanes map[string]bool
+}
 
 func (f *fakeTiers) SystemTiers(context.Context, string) (map[string]observation.Tier, error) {
 	return f.m, nil
+}
+
+func (f *fakeTiers) ChartedLanes(context.Context, string) (map[string]bool, error) {
+	if f.lanes == nil {
+		return map[string]bool{"l-ab": true, "l-bc": true, "l-cd": true}, nil
+	}
+	return f.lanes, nil
 }
 
 // chainGalaxy is a straight A—B—C—D lane chain, 10 units apart on the x axis.
@@ -73,9 +86,28 @@ func TestPlanRoute_ShortestChartedPath(t *testing.T) {
 				i, ms, wantLeg, svc.params.LaneMsPerDistance)
 		}
 	}
-	// Arrival charts D (C's only onward neighbour beyond B).
-	if len(plan.onward) == 0 {
-		t.Fatalf("expected onward neighbours for C")
+	// The crossed lanes are frozen in order — arrival charts them `via: traveled`.
+	if len(plan.laneIds) != 2 || plan.laneIds[0] != "l-ab" || plan.laneIds[1] != "l-bc" {
+		t.Fatalf("laneIds = %v, want [l-ab l-bc]", plan.laneIds)
+	}
+}
+
+// An uncharted lane is untravellable even between systems whose TIERS would
+// allow it (#0006 Decision #17): explored endpoints don't chart the road.
+func TestPlanRoute_UnchartedLaneRefused(t *testing.T) {
+	clk := &fakeClock{now: 0}
+	svc, dao, fa, ctrl := newSvc(t, clk)
+	defer ctrl.Finish()
+	_ = dao
+	_ = fa
+	svc.WithTravel(&fakeGraph{gg: chainGalaxy()}, &fakeTiers{
+		m: map[string]observation.Tier{
+			"A": observation.TierExplored, "B": observation.TierExplored, "C": observation.TierRumored,
+		},
+		lanes: map[string]bool{"l-ab": true}, // l-bc never charted
+	})
+	if _, err := svc.planRoute(context.Background(), "corp", "A", "C"); !errors.Is(err, ErrNoRoute) {
+		t.Fatalf("expected ErrNoRoute over the uncharted l-bc, got %v", err)
 	}
 }
 

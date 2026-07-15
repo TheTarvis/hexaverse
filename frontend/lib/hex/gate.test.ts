@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { laneGateHex } from './gate'
+import { laneGateHex, gateRing } from './gate'
 import { ringOf } from './hex'
 
 // Determinism against the Go side is covered by fixtures.test.ts (the golden
 // contract). These are focused unit checks of the projection's shape.
 describe('laneGateHex', () => {
-  it('places the gate on the board rim (ring === radius)', () => {
+  it('places the gate on the gate ring (inner edge of the outer band)', () => {
+    expect(gateRing(16)).toBe(13)
     for (const [nx, ny] of [
       [100, 0],
       [0, 100],
@@ -14,11 +15,17 @@ describe('laneGateHex', () => {
       [70, 70],
     ]) {
       const gate = laneGateHex(0, 0, nx, ny, 16)
-      expect(ringOf(gate)).toBe(16)
+      expect(ringOf(gate)).toBe(gateRing(16))
     }
   })
 
-  it('points a due-east neighbour at the +q side of the rim', () => {
+  it('clamps the gate ring on small boards', () => {
+    expect(gateRing(6)).toBe(3)
+    expect(gateRing(4)).toBe(1)
+    expect(gateRing(1)).toBe(1)
+  })
+
+  it('points a due-east neighbour at the +q side of the gate ring', () => {
     const gate = laneGateHex(0, 0, 100, 0, 16)
     // East ≈ the +q rim; the gate should be the far-east tile, q dominant.
     expect(gate.q).toBeGreaterThan(0)

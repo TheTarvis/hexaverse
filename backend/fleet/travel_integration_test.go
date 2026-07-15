@@ -30,15 +30,15 @@ func TestIntegration_TravelArriveReveals(t *testing.T) {
 	}
 	gid := gen.Galaxy.Id
 
-	// A neighbour of sys-0 to travel to.
-	var neighbor string
+	// A neighbour of sys-0 to travel to, and the lane that reaches it.
+	var neighbor, laneID string
 	for _, l := range gen.Lanes {
 		if l.AId == "sys-0" {
-			neighbor = l.BId
+			neighbor, laneID = l.BId, l.Id
 			break
 		}
 		if l.BId == "sys-0" {
-			neighbor = l.AId
+			neighbor, laneID = l.AId, l.Id
 			break
 		}
 	}
@@ -57,14 +57,20 @@ func TestIntegration_TravelArriveReveals(t *testing.T) {
 	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, asvc, clk)
 	// fog depends on the fleet service (live positions); the fleet service's
 	// travel depends on fog (tiers) — wire fog after fsvc, then back-inject.
-	fogSvc := observation.NewServiceWith(odao, fsvc, ssvc, clk)
+	fogSvc := observation.NewServiceWith(odao, fsvc, ssvc, gsvc, clk)
 	fsvc.WithTravel(gsvc, fogSvc)
-	RegisterTravelResolver(asvc, fogSvc, fogSvc)
+	RegisterTravelResolver(asvc, fogSvc)
 
 	const corp = "dev-corp"
-	// The corp knows the neighbour as a Rumored terminal (a lane endpoint it saw).
+	// The corp knows the neighbour as a Rumored terminal AND has charted the lane
+	// to it (#0006 Decision #17: a scan wrote both; routing needs the lane doc).
 	if err := odao.UpsertSystemObservation(ctx, corp, observation.SystemObservation{
 		SystemId: neighbor, Tier: observation.TierRumored, AsOf: 0,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := odao.UpsertLane(ctx, corp, observation.LaneObservation{
+		LaneId: laneID, Via: observation.ViaScanned, AsOf: 0,
 	}); err != nil {
 		t.Fatal(err)
 	}

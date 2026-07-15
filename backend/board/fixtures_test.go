@@ -61,6 +61,20 @@ type stateAtCase struct {
 	Out   MovementState      `json:"out"`
 }
 
+type losCase struct {
+	Origin    Hex   `json:"origin"`
+	Target    Hex   `json:"target"`
+	Occluders []Hex `json:"occluders"`
+	Visible   bool  `json:"visible"`
+}
+
+type beamCase struct {
+	Origin Hex        `json:"origin"`
+	Aim    Hex        `json:"aim"`
+	Params BeamParams `json:"params"`
+	Hexes  []Hex      `json:"hexes"`
+}
+
 type fixtures struct {
 	Line           []lineCase    `json:"line"`
 	RouteAround    []routeCase   `json:"routeAround"`
@@ -69,6 +83,8 @@ type fixtures struct {
 	SolveIntercept []solveCase   `json:"solveIntercept"`
 	LaneGate       []gateCase    `json:"laneGate"`
 	StateAt        []stateAtCase `json:"stateAt"`
+	LineOfSight    []losCase     `json:"lineOfSight"`
+	Beam           []beamCase    `json:"beam"`
 }
 
 // computeFixtures builds the golden cases from the current board implementation.
@@ -210,6 +226,49 @@ func computeFixtures() fixtures {
 	}
 	for _, c := range stateAts {
 		f.StateAt = append(f.StateAt, stateAtCase{State: c.s, T: c.t, Out: StateAt(c.s, c.t)})
+	}
+
+	// Line of sight (#0006 Decision #16): occluders strictly between block; the
+	// occluder's own hex and off-axis hexes stay visible.
+	losCases := []struct {
+		origin, target Hex
+		occluders      []Hex
+	}{
+		{Hex{0, 0}, Hex{1, 0}, []Hex{{2, 0}}},   // in front of the occluder
+		{Hex{0, 0}, Hex{2, 0}, []Hex{{2, 0}}},   // the occluder itself
+		{Hex{0, 0}, Hex{3, 0}, []Hex{{2, 0}}},   // directly behind
+		{Hex{0, 0}, Hex{5, 0}, []Hex{{2, 0}}},   // far behind
+		{Hex{0, 0}, Hex{0, 3}, []Hex{{2, 0}}},   // off the shadowed axis
+		{Hex{-3, 2}, Hex{3, -2}, []Hex{{0, 0}}}, // a diagonal through the star
+		{Hex{-4, 0}, Hex{4, 0}, []Hex{{-2, 0}, {2, 0}}}, // two occluders
+		{Hex{1, -1}, Hex{-2, 3}, nil},           // no occluders at all
+	}
+	for _, c := range losCases {
+		occ := make(map[Hex]bool, len(c.occluders))
+		for _, h := range c.occluders {
+			occ[h] = true
+		}
+		f.LineOfSight = append(f.LineOfSight, losCase{
+			Origin: c.origin, Target: c.target, Occluders: c.occluders,
+			Visible: LineOfSight(c.origin, c.target, occ),
+		})
+	}
+
+	// The beam corridor (#0006 Decision #15): spine through the aim to the rim,
+	// widened with distance. Sorted output, so the arrays compare byte-stable.
+	beamCases := []struct {
+		origin, aim Hex
+		params      BeamParams
+	}{
+		{Hex{0, 0}, Hex{1, 0}, BeamParams{HalfWidthBase: 0, Spread: 0.34, RimRing: 6}},
+		{Hex{-4, 0}, Hex{0, 0}, BeamParams{HalfWidthBase: 0, Spread: 0.25, RimRing: 8}},
+		{Hex{2, -3}, Hex{-1, 1}, BeamParams{HalfWidthBase: 1, Spread: 0.5, RimRing: 6}},
+	}
+	for _, c := range beamCases {
+		f.Beam = append(f.Beam, beamCase{
+			Origin: c.origin, Aim: c.aim, Params: c.params,
+			Hexes: BeamHexes(c.origin, c.aim, c.params),
+		})
 	}
 
 	return f

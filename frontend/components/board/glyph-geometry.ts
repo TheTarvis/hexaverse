@@ -136,6 +136,31 @@ export function fleetGlidePixel(
   return hexToPixel(hex.q, hex.r)
 }
 
+// fleetScenePixel — a fleet's glided screen point resolved against the full
+// feature list: the one-fleet equivalent of BoardScene's two-pass pixel map,
+// for layers outside the scene (the scan sweep rides the fleet) that must
+// pivot exactly where the glyph draws. A moon parent rides ITS parent with the
+// same sibling offset BoardScene assigns (moon index = position among the
+// parent's children).
+export function fleetScenePixel(fleet: Fleet, features: BoardFeature[], worldTime: number): Point {
+  const parentId = fleetDockedParentId(fleet, worldTime)
+  const parent = parentId ? features.find((f) => f.id === parentId) : undefined
+  let parentPixel: Point | undefined
+  if (parent) {
+    if (parent.parentId) {
+      const grand = features.find((f) => f.id === parent.parentId)
+      const grandPixel = grand ? featureGlidePixel(grand, worldTime) : undefined
+      const moonIndex = features
+        .filter((f) => f.parentId === parent.parentId)
+        .findIndex((f) => f.id === parent.id)
+      parentPixel = featureGlidePixel(parent, worldTime, grandPixel, Math.max(moonIndex, 0))
+    } else {
+      parentPixel = featureGlidePixel(parent, worldTime)
+    }
+  }
+  return fleetGlidePixel(fleet, worldTime, parentPixel)
+}
+
 // sensorBubbleHexes — the deduped union of every hex within `radius` of any
 // centre: the live ambient-sensor footprint the board draws around own units
 // (#0006 AmbientRadius). Centres are the units' current logical hexes.

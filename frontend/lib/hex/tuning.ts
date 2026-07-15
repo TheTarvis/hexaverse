@@ -18,3 +18,4 @@ export function orbitPeriod(ring: number): number {
   if (ring <= 0) return 0
   return ORBIT_BASE_PERIOD * ring
 }
+

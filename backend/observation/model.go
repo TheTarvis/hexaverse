@@ -29,10 +29,12 @@ const (
 	// region, and major-body skeleton, visible to everyone from t=0. It is never
 	// stored — an absent observation IS star-visible.
 	TierStarVisible Tier = "starVisible"
-	// TierRumored — presence at a lane endpoint taught you a lane reaches here.
+	// TierRumored — a charted lane reaches here: scanning a system charts its
+	// lanes and rumors their far endpoints (#0006 Decision #17).
 	TierRumored Tier = "rumored"
-	// TierSurveyed — the paid appraisal (worth, hazards, activity). A scan grants
-	// this in the slice (quick-sweep/deep-scan collapsed to one action).
+	// TierSurveyed — the paid appraisal. NO fog code path writes it (#0006
+	// Decision #20, 2026-07-14): the value stays in the enum reserved for the
+	// market's future bought-intel write.
 	TierSurveyed Tier = "surveyed"
 	// TierExplored — you went there: full current interior. Travel-arrival grants
 	// this (wired at M8); its board then fogs one tier down.
@@ -75,6 +77,23 @@ type SystemObservation struct {
 type SystemSnapshot struct {
 	FeatureCount int `json:"featureCount" firestore:"featureCount"`
 }
+
+// LaneObservation records one charted lane, stored at
+// corporations/{cid}/lanes/{laneId} — presence of the doc IS "charted"
+// (#0006 Decision #17). Written by travel (the lanes you rode) and by scan
+// (all lanes of the scanned system); the market's purchased-intel write is the
+// schema's third, future author.
+type LaneObservation struct {
+	LaneId string             `json:"laneId" firestore:"laneId"`
+	Via    string             `json:"via" firestore:"via"`
+	AsOf   common.WorldMillis `json:"asOf" firestore:"asOf"`
+}
+
+// The authors of a charted lane.
+const (
+	ViaTraveled = "traveled"
+	ViaScanned  = "scanned"
+)
 
 // FeatureObservation is the board-tier atom, stored per-feature (never per-tile)
 // at corporations/{cid}/observations/{systemId}/features/{featureId}. Geometry
@@ -148,6 +167,9 @@ type FleetPos struct {
 	CorporationId string
 	SystemId      string
 	Hex           board.Hex
+	// ActiveScanId is the unit's running scan, if any — the radial-echo
+	// revision reads it to grow the live echo disc during the scan.
+	ActiveScanId string
 }
 
 // FeatureGeom is the minimal geometry+composition observation needs from the
@@ -159,7 +181,11 @@ type FeatureGeom struct {
 	Elements     *board.Orbit
 	Anchor       board.Hex
 	Astronomical bool
-	Detail       *FeatureDetail
+	// Occludes marks a large body (the star, planets) that shadows everything
+	// behind it from both sensing modes (#0006 Decision #16). Which feature
+	// types qualify is the system domain's rule.
+	Occludes bool
+	Detail   *FeatureDetail
 }
 
 // FleetSource is the fleet-domain dependency (fleet.Service implements it). It
@@ -172,4 +198,19 @@ type FleetSource interface {
 // returning a system's features as minimal geometry.
 type InteriorSource interface {
 	Features(ctx context.Context, systemID string) ([]FeatureGeom, error)
+}
+
+// LaneEnd is one lane incident to a system: its id and the far endpoint —
+// what a scan charts and rumors (#0006 Decision #17).
+type LaneEnd struct {
+	LaneId        string
+	OtherSystemId string
+}
+
+// LaneSource is the galaxy-domain dependency (galaxy.Service implements it),
+// listing the lanes incident to a system. Lanes are subspace apertures: their
+// detection is non-directional and never occluded, unlike everything physical
+// the same scan sees (#0006 Decision #16).
+type LaneSource interface {
+	LanesOf(ctx context.Context, systemID string) ([]LaneEnd, error)
 }

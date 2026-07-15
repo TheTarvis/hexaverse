@@ -10,12 +10,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// fakeInteriors is a hand fake of InteriorSource returning fixed geometry.
+// fakeInteriors is a hand fake of InteriorSource returning fixed geometry on
+// an 8-ring board.
 type fakeInteriors struct{ feats map[string][]FeatureGeom }
 
 func (f fakeInteriors) Features(_ context.Context, systemID string) ([]FeatureGeom, error) {
 	return f.feats[systemID], nil
 }
+
 
 // fakeFleets is a hand fake of FleetSource returning each corp's units.
 type fakeFleets struct{ byCorp map[string][]FleetPos }
@@ -57,20 +59,21 @@ func TestFogIsolation_OneScans_OtherUnchanged(t *testing.T) {
 	fleets := fakeFleets{byCorp: map[string][]FleetPos{
 		corpA: {{Id: "fa", CorporationId: corpA, SystemId: sys, Hex: board.Hex{Q: 0, R: 0}}},
 	}}
-	svc := NewServiceWith(NewDaoWithClient(service), fleets, interiors, common.WorldClock())
+	svc := NewServiceWith(NewDaoWithClient(service), fleets, interiors, beamLanes{}, common.WorldClock())
 
 	at := common.WorldMillis(1_000)
-	if err := svc.MintScan(ctx, corpA, sys, at); err != nil {
+	if err := svc.MintScan(ctx, corpA, sys, board.Hex{Q: 0, R: 0}, at); err != nil {
 		t.Fatalf("corp A scan: %v", err)
 	}
 
-	// Corp A earned surveyed knowledge + per-feature memory.
+	// Corp A earned per-feature memory — and no graph tier: scanning reveals the
+	// board and charts lanes, it never writes surveyed (#0006 Decision #20).
 	tiersA, err := svc.SystemTiers(ctx, corpA)
 	if err != nil {
 		t.Fatalf("tiers A: %v", err)
 	}
-	if tiersA[sys] != TierSurveyed {
-		t.Errorf("corp A tier = %q, want surveyed", tiersA[sys])
+	if got, ok := tiersA[sys]; ok {
+		t.Errorf("corp A gained graph tier %q from a scan; scans grant none", got)
 	}
 	remA, err := svc.RememberedFeatures(ctx, corpA, sys)
 	if err != nil {
@@ -136,9 +139,9 @@ func TestRememberedKeepsOrbiting(t *testing.T) {
 	interiors := fakeInteriors{feats: map[string][]FeatureGeom{
 		sys: {{Id: "feat-body-0", Elements: &board.Orbit{Ring: 4, Angle0: 0, Period: 24_000, Dir: 1}}},
 	}}
-	svc := NewServiceWith(NewDaoWithClient(service), fakeFleets{}, interiors, common.WorldClock())
+	svc := NewServiceWith(NewDaoWithClient(service), fakeFleets{}, interiors, beamLanes{}, common.WorldClock())
 
-	if err := svc.MintScan(ctx, corp, sys, 1_000); err != nil {
+	if err := svc.MintScan(ctx, corp, sys, board.Hex{Q: 0, R: 0}, 1_000); err != nil {
 		t.Fatalf("scan: %v", err)
 	}
 	rem, err := svc.RememberedFeatures(ctx, corp, sys)

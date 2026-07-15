@@ -15,3 +15,6 @@ export { default as SystemService } from './system-service'
 
 export { fleetService } from './fleet-service'
 export { default as FleetService } from './fleet-service'
+
+export { actionService } from './action-service'
+export { default as ActionService } from './action-service'

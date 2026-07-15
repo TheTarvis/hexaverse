@@ -53,7 +53,7 @@ type BoardLeg struct {
 // route of systemIds with cumulative arrival stamps. Route[0] is the origin;
 // LegEtas[i] is the world time the fleet reaches Route[i] (LegEtas[0] == the gate
 // ETA — when it enters the first lane). Position is computed piecewise; nothing
-// is stored per tick. EntryGate is the arriving lane's rim tile on the dest board.
+// is stored per tick. EntryGate is the arriving lane's gate tile on the dest board.
 type LaneTransit struct {
 	BoardLeg   *BoardLeg            `json:"boardLeg,omitempty" firestore:"boardLeg,omitempty"`
 	Route      []string             `json:"route" firestore:"route"`
@@ -61,10 +61,11 @@ type LaneTransit struct {
 	DepartTime common.WorldMillis   `json:"departTime" firestore:"departTime"`
 	ArriveTime common.WorldMillis   `json:"arriveTime" firestore:"arriveTime"`
 	EntryGate  Hex                  `json:"entryGate" firestore:"entryGate"`
-	// Onward is the destination's neighbour systemIds, frozen at commit so the
-	// arrival resolver charts them (→ Rumored) without a galaxy read inside the
-	// resolve transaction (#0008 destination-on-arrival reveal).
-	Onward []string `json:"onward,omitempty" firestore:"onward,omitempty"`
+	// LaneIds are the lanes the route crosses (Route[i]→Route[i+1]), frozen at
+	// commit so the arrival resolver charts them `via: traveled` without a
+	// galaxy read inside the resolve transaction (#0006 Decision #17 — arrival
+	// explores the destination; onward roads wait for a scan).
+	LaneIds []string `json:"laneIds,omitempty" firestore:"laneIds,omitempty"`
 }
 
 // LaneHold is a fleet parked mid-lane after a cancel: a frozen fraction between

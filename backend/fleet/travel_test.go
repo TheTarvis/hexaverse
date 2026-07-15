@@ -46,11 +46,12 @@ func TestOrderTravel_FreezesTripAndCommits(t *testing.T) {
 	if lt.ArriveTime != lt.LegEtas[2] {
 		t.Fatalf("arriveTime %d != last legEta %d", lt.ArriveTime, lt.LegEtas[2])
 	}
-	if lt.BoardLeg == nil || board.Ring(lt.BoardLeg.Path[len(lt.BoardLeg.Path)-1]) != svc.params.BoardRadius {
-		t.Fatalf("board leg should burn to a rim gate: %+v", lt.BoardLeg)
+	gateRing := board.GateRing(svc.params.BoardRadius)
+	if lt.BoardLeg == nil || board.Ring(lt.BoardLeg.Path[len(lt.BoardLeg.Path)-1]) != gateRing {
+		t.Fatalf("board leg should burn to a gate on the gate ring (%d): %+v", gateRing, lt.BoardLeg)
 	}
-	if board.Ring(lt.EntryGate) != svc.params.BoardRadius {
-		t.Fatalf("entry gate should sit on the rim: %v", lt.EntryGate)
+	if board.Ring(lt.EntryGate) != gateRing {
+		t.Fatalf("entry gate should sit on the gate ring (%d): %v", gateRing, lt.EntryGate)
 	}
 	if fa.committed == nil || fa.committed.Type != travelType || fa.committed.Scope != "C" {
 		t.Fatalf("expected a lane-travel commit scoped to C, got %+v", fa.committed)

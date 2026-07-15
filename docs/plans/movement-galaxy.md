@@ -187,11 +187,32 @@ than a lane) — tuning, not structure.
 - **Choke points.** Barriers (sparse lanes, the #0001 seam) are **economic** chokes:
   few lanes across → traffic funnels → the map makes drama. Roads-vs-off-road keeps
   them chokes not walls (you *can* jump across, just slow/costly).
-- **Graph↔board handoff (shared seam with `movement-board.md`).** Arriving via a lane
-  drops you at the destination board's **rim**, on the rim orbit (the board doc's
-  entry point). Leaving = reach a rim **exit** tile → hand back to graph travel.
-  `?` is the exit the same tile you entered, any rim tile, or specific lane-exit
-  tiles? (Open in *both* docs — resolve once, record in both.)
+- **Graph↔board handoff (shared seam with `movement-board.md`) — DECIDED (2026-07-14):
+  fixed lane-mouth tiles in the outer dark, placed by neighbor bearing.** A lane
+  surfaces at a **specific, fixed, charted tile** — not the rim edge, and not
+  wherever you happened to enter. Two axes:
+  - **Radial: the inner edge of the outer band** (concretely `radius − 3`, ~ring 13 on
+    a 16-board; expressed band-relative so it survives a radius change). This leaves a
+    3-ring shell of board *outside* the mouth — the cold outer dark (`hex-board.md`),
+    now lurk/picket country on the *outside* of the door too, so interdiction has room
+    on both sides. Defense-in-depth holds (still far from the goldilocks prize) and the
+    coast-in physics still read right (slow outer orbit).
+  - **Angular: the real-space bearing to the neighbor node.** Project the lane's
+    galaxy-coord bearing onto the mouth ring, nearest hex → the door; multiple lanes
+    spread around the ring at their bearings (nudge to an adjacent hex on collision —
+    ~78 hexes on ring 13, rare). NE neighbor ⇒ door on the NE arc, so the lane lines up
+    across both map tiers.
+  - **Lore carve-out (recorded so future-me doesn't trip on it):** subspace geometry
+    diverges from real space in **connectivity and distance** (`../lore.md` — which
+    stars connect, how far the road runs), but a lane's **local mouth bearing still
+    roughly tracks its destination's direction.** You keep the disorienting part (can't
+    infer *routes* from the sky) and spend only the harmless part (the mouth points the
+    right way) — a pure readability win, since players can't see subspace layout anyway.
+  - Rejected: *same tile you entered* (route-dependent ⇒ can't be charted, defended, or
+    sold as intel — breaks the determinism/intel-market spine); *any rim tile* (no
+    outer buffer, doors not a stable feature). **Deep lanes** (a rare mouth anchored to
+    an interior gravity well, mass-folding-justified, a journey-skipping shortcut) are a
+    deferred *content* lever, not a change to this default.
 - **What actually moves — DECIDED (2026-07-07): the fleet is the mover.** Mirrors
   #0004 (board tier): the **same fleet entity** crosses the lane and, on arrival, drops
   onto the destination board *as* the fleet — no separate "galaxy marker" vs "board
@@ -237,8 +258,11 @@ relay corridor).
 - ~~Travel-into-unknown / blind-jump vs lane-reachable-only~~ **RESOLVED
   (2026-07-08): known-lane-reachable only** — star map visible, roads charted by
   presence; travel reaches one hop past your frontier (`../lore.md`).
-- **Handoff exit-tile rules** (shared with `movement-board.md` — resolve once, record
-  in both): the same tile you entered, any rim tile, or specific lane-exit tiles?
+- ~~Handoff exit-tile rules~~ **RESOLVED (2026-07-14): fixed lane-mouth tiles** on the
+  inner edge of the outer band (`radius − 3`), angularly placed by real-space neighbor
+  bearing; mouth-bearing is the one carve-out to subspace/real-space divergence. Deep
+  lanes (interior gravity-well mouths) deferred as a content lever. See the Graph↔board
+  handoff bullet above and `movement-board.md`.
 - **Re-tasking mid-transit** — abort/redirect underway (recompute ETA)? Determinism
   makes the recompute clean.
 - FTL cost-per-distance curve; which progression axes survive past the three above

@@ -171,15 +171,22 @@ to reach → need more capability), giving the board a soft difficulty gradient?
   `=== star` special-case.
 - **Terrain & hazards** — nebula slows burns, void blocks, gravity well bends/blocks
   (archive traits) — the same tile-trait lever fog/scan use. Cheap, shared.
-- **Graph↔board handoff** — you arrive from a lane at the **rim** on the rim orbit;
-  to leave, reach a rim **exit** tile and hand off to graph movement
-  (`fog-of-war.md` lanes). **RESOLVED in #0004 (Decision #17): exits are
-  bearing-aligned** — each lane maps to the rim tile in its #0001 direction (rejected:
-  *any rim tile* / *the entry tile*). The spike now **prototypes the departure verb**
-  (select a rim lane → depart → back to the graph, re-focused on the system you left),
-  but with **placeholder generic exits, not yet bearing-aligned** — the board doesn't
-  receive the galaxy's per-lane bearings yet. Wiring real bearings lands with the
-  galaxy-movement spec at the shared seam.
+- **Graph↔board handoff** — you arrive from a lane at a **fixed lane-mouth tile** and
+  leave by reaching one, handing off to graph movement (`fog-of-war.md` lanes). Two
+  axes, both now settled:
+  - **Angular — bearing-aligned. RESOLVED in #0004 (Decision #17):** each lane maps to
+    the mouth tile in its #0001 direction (rejected: *any tile* / *the entry tile*).
+  - **Radial — inner edge of the outer band, not the rim. REFINED (2026-07-14):** the
+    mouth sits at `radius − 3` (~ring 13 on a 16-board, band-relative so it survives a
+    radius change), leaving a 3-ring shell of outer dark *outside* the door — maneuver
+    room, retreat-into-the-dark, and lurk/picket country on both sides of the mouth.
+    This **supersedes the "rim" wording** in Decision #17 (angular part unchanged);
+    defense-in-depth and the slow-outer-orbit coast-in both still hold. Full rationale +
+    the subspace lore carve-out live at the shared seam in `movement-galaxy.md`.
+  - The spike **prototypes the departure verb** (select a lane → depart → back to the
+    graph, re-focused on the system you left), but with **placeholder generic exits, not
+    yet bearing-aligned or radius−3** — the board doesn't receive the galaxy's per-lane
+    bearings yet. Wiring real bearings lands with the galaxy-movement spec at the seam.
 
 ## Slice MVP vs. deferred
 
@@ -204,7 +211,9 @@ rendezvous.
 - Re-tasking mid-burn; behavior when an intercept target moves/dies in transit.
 - Progression axes; whether capability gates reachable rings.
 - Occupancy/collision rules; hazards on a coast path.
-- Graph↔board exit-tile rules.
+- ~~Graph↔board exit-tile rules.~~ **RESOLVED (2026-07-14):** fixed lane-mouth tiles,
+  bearing-aligned, at `radius − 3` (inner edge of the outer band). See the handoff
+  bullet above and `movement-galaxy.md`.
 - Fidelity dial — do we ever want burns to cost more against orbital direction?
 
 ## Next step

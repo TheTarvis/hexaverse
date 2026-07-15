@@ -26,9 +26,16 @@ func (c *fakeClock) Scale() float64                        { return 1 }
 type fakeActions struct {
 	committed *action.CommitSpec
 	cancelled []string
+	// Actors whose due actions were folded (ResolveActive calls, in order).
+	resolved []string
+	// When set, Commit fails with it — the spine's slot guard, scriptable.
+	commitErr error
 }
 
 func (f *fakeActions) Commit(_ context.Context, spec action.CommitSpec) (*action.Action, error) {
+	if f.commitErr != nil {
+		return nil, f.commitErr
+	}
 	f.committed = &spec
 	return &action.Action{Id: "action_test", Type: spec.Type, Actor: spec.Actor,
 		Scope: spec.Scope, Eta: spec.Eta, Status: action.StatusRunning}, nil
@@ -39,7 +46,8 @@ func (f *fakeActions) Cancel(_ context.Context, id string, _ map[string]interfac
 	return &action.Action{Id: id, Status: action.StatusCancelled}, nil
 }
 
-func (f *fakeActions) ResolveActive(context.Context, string) ([]action.Action, error) {
+func (f *fakeActions) ResolveActive(_ context.Context, actor string) ([]action.Action, error) {
+	f.resolved = append(f.resolved, actor)
 	return nil, nil
 }
 

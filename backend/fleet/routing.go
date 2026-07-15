@@ -28,25 +28,29 @@ type GraphSource interface {
 }
 
 // TierSource is the observation-domain dependency routing needs: the requester's
-// per-system knowledge tiers, so routing stays fog-honest (charted lanes only).
+// per-system knowledge tiers AND their charted-lane set, so routing stays
+// fog-honest — you travel only lanes you've charted (#0006 Decision #17).
 type TierSource interface {
 	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
+	ChartedLanes(ctx context.Context, cid string) (map[string]bool, error)
 }
 
 // routePlan is the frozen output of a pathfind: the system chain origin..dest,
-// the per-lane crossing times, and the systems it references (coords for the
-// caller's gate geometry).
+// the per-lane crossing times and ids, and the systems it references (coords
+// for the caller's gate geometry).
 type routePlan struct {
 	route   []string             // [origin, ..., dest]
 	legMs   []common.WorldMillis // len == len(route)-1
+	laneIds []string             // len == len(route)-1; arrival charts these `via: traveled`
 	systems map[string]galaxy.System
-	onward  []string // the destination's neighbour systemIds (arrival charts these)
 }
 
 // planRoute finds the shortest-time lane path from origin to dest over the
-// requester's charted lanes (Dijkstra, weight = 3D lane length ÷ drive speed),
-// allowing the destination to be a single Rumored terminal hop past the frontier.
-// Intermediates must be Explored — you can't route THROUGH uncharted space.
+// requester's CHARTED lanes (Dijkstra, weight = 3D lane length ÷ drive speed) —
+// per-lane records, #0006 Decision #17: an uncharted lane is untravellable even
+// between two systems you know. Intermediates must additionally be Explored
+// (you can't route THROUGH a system you've never entered); the destination may
+// be a single Rumored terminal hop past the frontier.
 func (s *Service) planRoute(ctx context.Context, cid, origin, dest string) (*routePlan, error) {
 	if origin == dest {
 		return nil, ErrSameSystem
@@ -63,10 +67,18 @@ func (s *Service) planRoute(ctx context.Context, cid, origin, dest string) (*rou
 		return nil, ErrNoRoute
 	}
 
-	adj := make(map[string][]string, len(systems))
+	charted, err := s.tiers.ChartedLanes(ctx, cid)
+	if err != nil {
+		return nil, err
+	}
+	type edge struct{ to, laneId string }
+	adj := make(map[string][]edge, len(systems))
 	for _, l := range gal.Lanes {
-		adj[l.AId] = append(adj[l.AId], l.BId)
-		adj[l.BId] = append(adj[l.BId], l.AId)
+		if !charted[l.Id] {
+			continue // an uncharted lane doesn't exist for this requester
+		}
+		adj[l.AId] = append(adj[l.AId], edge{to: l.BId, laneId: l.Id})
+		adj[l.BId] = append(adj[l.BId], edge{to: l.AId, laneId: l.Id})
 	}
 
 	tiers, err := s.tiers.SystemTiers(ctx, cid)
@@ -80,10 +92,12 @@ func (s *Service) planRoute(ctx context.Context, cid, origin, dest string) (*rou
 	}
 	rumored := func(id string) bool { return tiers[id] == observation.TierRumored }
 
-	// Dijkstra over Explored nodes; a Rumored neighbor is relaxable only when it
-	// IS the destination (a terminal hop) and is never expanded further.
+	// Dijkstra over Explored nodes joined by charted lanes; a Rumored neighbor is
+	// relaxable only when it IS the destination (a terminal hop) and is never
+	// expanded further.
 	dist := map[string]common.WorldMillis{origin: 0}
 	prev := map[string]string{}
+	prevLane := map[string]string{}
 	visited := map[string]bool{}
 	for {
 		cur := ""
@@ -103,15 +117,16 @@ func (s *Service) planRoute(ctx context.Context, cid, origin, dest string) (*rou
 		if !explored(cur) {
 			continue // never route through a non-charted system
 		}
-		for _, nb := range adj[cur] {
-			if !explored(nb) && !(nb == dest && rumored(nb)) {
+		for _, e := range adj[cur] {
+			if !explored(e.to) && !(e.to == dest && rumored(e.to)) {
 				continue
 			}
-			w := legMs(systems[cur], systems[nb], s.params.LaneMsPerDistance)
+			w := legMs(systems[cur], systems[e.to], s.params.LaneMsPerDistance)
 			nd := dist[cur] + w
-			if od, ok := dist[nb]; !ok || nd < od {
-				dist[nb] = nd
-				prev[nb] = cur
+			if od, ok := dist[e.to]; !ok || nd < od {
+				dist[e.to] = nd
+				prev[e.to] = cur
+				prevLane[e.to] = e.laneId
 			}
 		}
 	}
@@ -124,10 +139,12 @@ func (s *Service) planRoute(ctx context.Context, cid, origin, dest string) (*rou
 		return nil, ErrNoRoute
 	}
 	legs := make([]common.WorldMillis, len(route)-1)
+	laneIds := make([]string, len(route)-1)
 	for i := 0; i < len(route)-1; i++ {
 		legs[i] = legMs(systems[route[i]], systems[route[i+1]], s.params.LaneMsPerDistance)
+		laneIds[i] = prevLane[route[i+1]]
 	}
-	return &routePlan{route: route, legMs: legs, systems: systems, onward: adj[dest]}, nil
+	return &routePlan{route: route, legMs: legs, laneIds: laneIds, systems: systems}, nil
 }
 
 // reconstruct walks the predecessor chain from dest back to origin, returning the

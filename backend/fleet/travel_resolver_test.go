@@ -7,25 +7,28 @@ import (
 	"hexaverse/action"
 	"hexaverse/board"
 	"hexaverse/common"
-	"hexaverse/observation"
 )
 
 // fakeArrivals records the reveal call and returns no writes (the write shape is
 // tested in the observation package).
 type fakeArrivals struct {
-	dest   string
-	onward []string
+	dest    string
+	laneIds []string
 }
 
-func (f *fakeArrivals) ArrivalWrites(_ string, dest string, onward []string, _ map[string]observation.Tier, _ common.WorldMillis) []action.DocWrite {
+func (f *fakeArrivals) ArrivalWrites(_ string, dest string, traveledLaneIds []string, _ common.WorldMillis) []action.DocWrite {
 	f.dest = dest
-	f.onward = onward
+	f.laneIds = traveledLaneIds
 	return nil
 }
 
 // The travel resolver lands the fleet coasting at the destination's entry gate,
-// flips its systemId to the destination, and triggers the arrival reveal.
+// flips its systemId to the destination, and triggers the arrival reveal —
+// which explores the destination and charts ONLY the lanes the trip crossed
+// (#0006 Decision #17): the onward roads stay dark until a scan there.
+//
 // Spec: 0008/S3
+// Spec: 0006/S7
 func TestTravelResolver_LandsAtEntryGateAndReveals(t *testing.T) {
 	entry := board.Hex{Q: 16, R: -2}
 	lt := &board.LaneTransit{
@@ -33,13 +36,13 @@ func TestTravelResolver_LandsAtEntryGateAndReveals(t *testing.T) {
 		LegEtas:    []common.WorldMillis{100, 700, 1300},
 		ArriveTime: 1300,
 		EntryGate:  entry,
-		Onward:     []string{"D"},
+		LaneIds:    []string{"l-ab", "l-bc"},
 	}
 	f := Fleet{Id: "fleet_1", CorporationId: "corp", SystemId: "A",
 		State: board.MovementState{Mode: board.ModeLaneTransit, LaneTransit: lt}}
 
 	arr := &fakeArrivals{}
-	resolver := TravelResolver(DefaultMovementParams(), arr, &fakeTiers{m: map[string]observation.Tier{}})
+	resolver := TravelResolver(DefaultMovementParams(), arr)
 	res, err := resolver(context.Background(), action.Resolution{
 		At:          1300,
 		DecodeActor: func(target interface{}) error { *(target.(*Fleet)) = f; return nil },
@@ -58,7 +61,12 @@ func TestTravelResolver_LandsAtEntryGateAndReveals(t *testing.T) {
 	if board.OrbState(*st.Coast, 1300) != entry {
 		t.Fatalf("coast not at entry gate")
 	}
-	if arr.dest != "C" || len(arr.onward) != 1 || arr.onward[0] != "D" {
-		t.Fatalf("reveal call wrong: dest=%s onward=%v", arr.dest, arr.onward)
+	// The reveal call carries the destination and exactly the crossed lanes —
+	// nothing onward (C's lane to D is not among them).
+	if arr.dest != "C" {
+		t.Fatalf("reveal dest = %s, want C", arr.dest)
+	}
+	if len(arr.laneIds) != 2 || arr.laneIds[0] != "l-ab" || arr.laneIds[1] != "l-bc" {
+		t.Fatalf("reveal laneIds = %v, want [l-ab l-bc] (traveled lanes only)", arr.laneIds)
 	}
 }

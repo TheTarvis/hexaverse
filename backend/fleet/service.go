@@ -35,6 +35,9 @@ var (
 	// ErrCoreDestination rejects an order whose destination is the star at the
 	// core (0,0): you can neither fly onto the core nor dock the star.
 	ErrCoreDestination = errors.New("the star at the core cannot be a destination")
+	// ErrNotOnBoard rejects a scan from a fleet with no board presence (out on a
+	// lane or holding mid-lane) — there is no system around it to scan.
+	ErrNotOnBoard = errors.New("fleet has no board position to scan from")
 )
 
 type ServiceInterface interface {
@@ -111,10 +114,16 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 		return nil, err
 	}
 	now := s.clock.Now()
+	// A running scan resolves on read too (ResolveActive no-ops before its eta) —
+	// the sensor channel has no arrival to trigger on, so the claim itself is the
+	// signal.
 	if !board.Arrived(f.State, now) {
+		if f.ActiveScanId != "" {
+			return s.resolveDue(ctx, f)
+		}
 		return f, nil
 	}
-	if f.ActiveActionId != "" {
+	if f.ActiveActionId != "" || f.ActiveScanId != "" {
 		return s.resolveDue(ctx, f)
 	}
 	// No wrapping action (dev-seeded/legacy) — fold the settle into the doc
@@ -393,30 +402,62 @@ func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string,
 	return f, nil
 }
 
-// Scan commits a scan action for the fleet through the action spine: the ETA is
-// frozen at commit (now + scan duration), the single slot is claimed, and the
-// observation domain's registered resolver mints the survey at resolution. A
-// fleet already running an action (e.g. mid-burn) can't scan — the slot guard
-// rejects it (action.ErrActiveActionExists).
+// Scan commits a 360° sweep through the action spine on the SENSOR channel
+// (#0006 Decisions #19/#21): one manual trigger, an automatic all-around
+// sweep. The ETA is frozen at commit (now + scan duration), and the origin
+// system AND the emission hex ride in params (#0006 Decision #26 — the pulse
+// grows from where it was fired and stays there): the observation domain's
+// registered resolver mints the sweep from that pinned hex at resolution,
+// while a mid-burn fleet moves on and still collects the returns. Movement
+// is untouched: only a second SCAN is rejected (the sensor slot guard,
+// action.ErrActiveActionExists).
 func (s *Service) Scan(ctx context.Context, id string) (*Fleet, error) {
 	f, err := s.load(ctx, id)
 	if err != nil {
 		return nil, err
 	}
+
+	// A held sensor slot may be a scan that already FINISHED: resolution is
+	// read-triggered (#0005), so on a quiet board nothing has run the fold and
+	// the stale claim would 409 this commit. Resolve due actions first — the
+	// exact mirror of orderBurn's arrived-order rule — and commit from the
+	// settled doc. A scan still short of its eta resolves to nothing, keeps its
+	// claim, and the commit below returns ErrActiveActionExists as intended.
+	if f.ActiveScanId != "" {
+		if f, err = s.resolveDue(ctx, f); err != nil {
+			return nil, err
+		}
+	}
 	now := s.clock.Now()
+
+	// A fleet out on a lane (or holding mid-lane) has no system around it.
+	eff := board.StateAt(f.State, now)
+	if eff.Mode == board.ModeLaneHold ||
+		(eff.Mode == board.ModeLaneTransit && (eff.LaneTransit == nil || eff.LaneTransit.BoardLeg == nil || now >= eff.LaneTransit.BoardLeg.GateEta)) {
+		return nil, ErrNotOnBoard
+	}
+
+	// The emission hex, pinned at commit (#0006 Decision #26): the live front
+	// and the resolve-time mint both grow from where the pulse was fired.
+	origin, err := s.Position(ctx, f)
+	if err != nil {
+		return nil, err
+	}
+
 	scanParams := observation.DefaultScanParams()
 	a, err := s.actions.Commit(ctx, action.CommitSpec{
 		Type:            scanType,
 		Actor:           id,
 		ActorCollection: actorCollection,
 		Scope:           f.SystemId,
-		Params:          map[string]interface{}{"radius": scanParams.Radius},
+		Slot:            action.SlotSensor,
+		Params:          map[string]interface{}{"systemId": f.SystemId, "origin": origin},
 		Eta:             now.Add(scanParams.Duration),
 	})
 	if err != nil {
 		return nil, err
 	}
-	f.ActiveActionId = a.Id
+	f.ActiveScanId = a.Id
 	f.UpdatedAt = now
 	log.Info().Ctx(ctx).Str("fleetId", id).Str("actionId", a.Id).
 		Int64("eta", int64(now.Add(scanParams.Duration))).Msg("Fleet ordered to scan")
@@ -461,6 +502,7 @@ func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ com
 			CorporationId: f.CorporationId,
 			SystemId:      f.SystemId,
 			Hex:           hex,
+			ActiveScanId:  f.ActiveScanId,
 		})
 	}
 	return out, nil

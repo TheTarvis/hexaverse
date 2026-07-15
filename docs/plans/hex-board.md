@@ -51,8 +51,10 @@ is the *interior* of a single system, not a patch of interstellar void.
   All one unified `Feature` family (#0003); tiles store nothing.
 - **Everything orbits** — deterministic orbital elements from day one; motion off/slow
   for the slice, on later, zero rework.
-- **You enter at the rim** on your inbound lane and work inward toward the goldilocks
-  prize — fog has a direction, arrival is a journey (`fog-of-war.md`).
+- **You enter through a lane mouth in the outer dark** (`radius − 3`, the inner edge of
+  the outer band — *not* the rim edge; see `movement-board.md`) on your inbound lane,
+  and work inward toward the goldilocks prize — fog has a direction, arrival is a
+  journey (`fog-of-war.md`). The 3-ring shell outside the mouth is maneuver/lurk room.
 - **Born in two phases** — *skeleton* (star + major bodies) eager with the system and
   graph-visible; *detail* (resources, small bodies, anomalies, hazards) rolled by the
   first fleet to arrive, then locked (see *Two-phase generation* below).
@@ -77,8 +79,8 @@ noise). Why this model:
 - **Instantly readable** — a player sees *a solar system*, not an abstract grid.
 - **Scan/mine get texture** — the good stuff is concentrated, so *where* you aim a
   deep-scan matters.
-- **Fog gets a direction** — you arrive at the rim (via your inbound lane) and work
-  inward; exploration has a gradient, not a random reveal.
+- **Fog gets a direction** — you arrive at your lane mouth in the outer dark (via your
+  inbound lane) and work inward; exploration has a gradient, not a random reveal.
 - **Hazards become interior choke geometry** (a gravity well / debris belt between
   rings) — the galaxy's choke-point philosophy, one tier down.
 
@@ -147,9 +149,9 @@ faster than outer**. Consequences, all emergent:
 
 - **Conjunctions & travel windows.** Relative angles between planets constantly
   shift, so "when is III near the belt?" becomes real, calm, *predictable* planning.
-- **The rim is the slowest orbit.** Outer bodies barely creep; inner planets lap
-  them. (Ships arrive at the rim, so a coasting ship drifts slowly — fine, and
-  physically right.)
+- **The outer band is the slowest orbit.** Outer bodies barely creep; inner planets lap
+  them. (Ships arrive at a lane mouth in the outer dark, so a coasting ship drifts
+  slowly — fine, and physically right.)
 
 ### Deterministic → the intel bridge (this is the big one)
 

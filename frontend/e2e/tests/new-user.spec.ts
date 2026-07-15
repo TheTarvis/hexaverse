@@ -59,20 +59,20 @@ test.describe('new user first activities', () => {
       page.getByTestId('fleet-glyphs').locator('[data-testid^="fleet-glyph-"]').first(),
     ).toBeVisible({ timeout: 15_000 })
 
-    // 5. Lane fog (#0006): the galaxy read ships only CHARTED lanes — every lane
-    //    is incident to an Explored system. For a fresh spawn that's home only,
-    //    so no lane in the payload may connect two non-home systems.
+    // 5. Lane fog (#0006 Decision #17, revised 2026-07-14): lanes are found by
+    //    SCANNING, and spawn charts none — so a fresh corp's galaxy read ships
+    //    every node and ZERO lanes. The first home scan is what finds the roads
+    //    (the wake-up tutorial beat).
+    //    Spec: 0006/S6
     const { idToken } = await emulatorSignIn(cfg.emulator!, email, password)
     const galaxyRes = await page.request.get(`${cfg.apiURL}/v1/galaxy`, {
       headers: { Authorization: `Bearer ${idToken}` },
     })
     expect(galaxyRes.ok()).toBeTruthy()
     const galaxy = (await galaxyRes.json()) as { lanes: Array<{ aId: string; bId: string }> }
-    for (const lane of galaxy.lanes) {
-      expect(
-        lane.aId === homeId || lane.bId === homeId,
-        `lane ${lane.aId}↔${lane.bId} is not incident to home ${homeId} — fog leak`,
-      ).toBeTruthy()
-    }
+    expect(
+      galaxy.lanes ?? [],
+      `a fresh spawn charted ${galaxy.lanes?.length ?? 0} lanes — it should know no roads (home ${homeId})`,
+    ).toHaveLength(0)
   })
 })

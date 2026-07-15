@@ -92,7 +92,7 @@ describe('useFleetOrders / useScan', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.systemBoard.detail('sys-7') })
   })
 
-  it('scans a fleet and invalidates the board', async () => {
+  it('scans a fleet and invalidates the board + running-scan indicator', async () => {
     const { Wrapper, invalidate } = orderWrapper()
     const { result } = renderHook(() => useScan('sys-7'), { wrapper: Wrapper })
 
@@ -102,5 +102,6 @@ describe('useFleetOrders / useScan', () => {
 
     expect(mockService.scan).toHaveBeenCalledWith('fleet_1')
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.systemBoard.detail('sys-7') })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.actions.running('fleet_1') })
   })
 })

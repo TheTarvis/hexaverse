@@ -86,9 +86,13 @@ func TestHandler_GetGalaxy_PinnedShape(t *testing.T) {
 	}
 }
 
-// TestToDTO_ChartedLaneFilter pins the #0006 fog rule for lanes: only lanes
-// incident to an Explored system ship; a nil tiers map is the no-fog baseline
-// (every lane). Home=sys-0 explored, sys-1 rumored, sys-2 star-visible.
+// TestToDTO_ChartedLaneFilter pins the #0006 Decision #17 fog rule for lanes:
+// only the requester's PER-LANE charted records ship — written by travel and
+// scan, not derived from tiers — and a corp with an empty charted set sees no
+// lanes at all (the fresh-spawn read: every node, zero roads). A nil set is
+// the no-fog baseline (every lane).
+//
+// Spec: 0006/S6
 func TestToDTO_ChartedLaneFilter(t *testing.T) {
 	gen := &GeneratedGalaxy{
 		Galaxy: Galaxy{Id: "gal_fog"},
@@ -98,33 +102,39 @@ func TestToDTO_ChartedLaneFilter(t *testing.T) {
 			{Id: "sys-2", Skeleton: Skeleton{StarClass: "K"}},
 		},
 		Lanes: []Lane{
-			{Id: "l-home-nb", AId: "sys-0", BId: "sys-1"}, // incident to home → charted
-			{Id: "l-nb-far", AId: "sys-1", BId: "sys-2"},  // between rumored/unseen → not
-			{Id: "l-home-far", AId: "sys-2", BId: "sys-0"}, // incident to home → charted
+			{Id: "l-home-nb", AId: "sys-0", BId: "sys-1"},
+			{Id: "l-nb-far", AId: "sys-1", BId: "sys-2"},
+			{Id: "l-home-far", AId: "sys-2", BId: "sys-0"},
 		},
 	}
+	tiers := map[string]observation.Tier{"sys-0": observation.TierExplored}
 
 	// No fog wired → every lane ships (unit-test / logged-out baseline).
-	if got := ToDTO(gen, 0, nil); len(got.Lanes) != 3 {
-		t.Fatalf("nil tiers: lanes = %d, want 3 (no filtering)", len(got.Lanes))
+	if got := ToDTO(gen, 0, nil, nil); len(got.Lanes) != 3 {
+		t.Fatalf("nil charted set: lanes = %d, want 3 (no filtering)", len(got.Lanes))
 	}
 
-	// Fogged: only the two lanes touching the Explored home survive.
-	tiers := map[string]observation.Tier{
-		"sys-0": observation.TierExplored,
-		"sys-1": observation.TierRumored,
+	// A fresh spawn: home explored, NOTHING charted — every node, zero lanes.
+	fresh := ToDTO(gen, 0, tiers, map[string]bool{})
+	if len(fresh.Systems) != 3 {
+		t.Fatalf("fresh spawn systems = %d, want all 3 (nodes are the free star map)", len(fresh.Systems))
 	}
-	got := ToDTO(gen, 0, tiers)
+	if len(fresh.Lanes) != 0 {
+		t.Fatalf("fresh spawn lanes = %d, want 0 (no lanes until the first scan)", len(fresh.Lanes))
+	}
+
+	// After charting (scan/travel wrote per-lane docs): exactly those lanes ship
+	// — tier-derived incidence no longer plays.
+	got := ToDTO(gen, 0, tiers, map[string]bool{"l-home-nb": true})
 	gotIDs := map[string]bool{}
 	for _, l := range got.Lanes {
 		gotIDs[l.Id] = true
 	}
-	if len(got.Lanes) != 2 || !gotIDs["l-home-nb"] || !gotIDs["l-home-far"] {
-		t.Fatalf("fogged lanes = %v, want exactly {l-home-nb, l-home-far}", gotIDs)
+	if len(got.Lanes) != 1 || !gotIDs["l-home-nb"] {
+		t.Fatalf("charted lanes = %v, want exactly {l-home-nb}", gotIDs)
 	}
-	// The lane between a rumored neighbour and an unseen system must NOT ship.
-	if gotIDs["l-nb-far"] {
-		t.Fatalf("uncharted lane l-nb-far leaked into the fogged read")
+	if gotIDs["l-home-far"] {
+		t.Fatalf("l-home-far leaked: Explored-incidence must not chart a lane (#0006 Decision #17)")
 	}
 }
 

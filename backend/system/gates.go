@@ -9,8 +9,9 @@ import (
 	"hexaverse/observation"
 )
 
-// LaneGate is a charted lane's fixed rim tile on this system's board — the tile
-// where the lane toward DestSystemId meets the rim (#0008 Decision #10). The
+// LaneGate is a charted lane's fixed gate tile on this system's board — the tile
+// where the lane toward DestSystemId meets the gate ring, the inner edge of the
+// outer band (#0008 Decision #10; radial placement refined 2026-07-14). The
 // bearing is projected deterministically (board.LaneGateHex), so the server and
 // every client agree on it, and it is the SAME projection the fleet uses to
 // compute a departure gate (fleet/travel.go), so the rendered glyph and the tile
@@ -21,7 +22,7 @@ type LaneGate struct {
 }
 
 // LaneGates returns every lane gate on the given system's board: for each lane
-// touching the system, the rim tile where it departs toward its neighbour,
+// touching the system, the gate tile where it departs toward its neighbour,
 // bearing-projected onto a board of the given radius. Unfiltered by fog — the
 // read boundary applies the charted-lane rule per requester (chartedGates).
 func (s *Service) LaneGates(ctx context.Context, systemID string, radius int) ([]LaneGate, error) {

@@ -32,6 +32,16 @@ const (
 	KindMutating Kind = "mutating"
 )
 
+// Slot names the actor-doc field an action claims — its channel (#0006
+// Decision #19). Movement (burn, lane travel) and sensor (scan) are separate
+// single-slot channels on the same actor: a burning fleet can scan, but never
+// run two actions on one channel. The zero value means SlotMovement, so every
+// pre-channel action doc keeps resolving unchanged.
+const (
+	SlotMovement = "activeActionId"
+	SlotSensor   = "activeScanId"
+)
+
 // Action is the generic async entity every verb rides (#0005). The lifecycle,
 // commit-time ETA, cancel, and inbox are shared here; per-type behaviour is
 // confined to Params (frozen at commit) and the resolver registered for Type.
@@ -52,6 +62,10 @@ type Action struct {
 	// verbs, a featureId (the lode) for mutating verbs.
 	Scope  string                 `json:"scope" firestore:"scope"`
 	Params map[string]interface{} `json:"params" firestore:"params"`
+
+	// Slot is the actor-doc field this action claimed at commit — its channel.
+	// Empty means the movement slot (pre-channel docs keep resolving unchanged).
+	Slot string `json:"slot,omitempty" firestore:"slot,omitempty"`
 
 	CommittedAt common.WorldMillis `json:"committedAt" firestore:"committedAt"`
 	// Eta is the world time the effect applies, frozen at commit. Resolution
@@ -104,6 +118,9 @@ type CommitSpec struct {
 	Scope           string
 	Params          map[string]interface{}
 	Eta             common.WorldMillis
+	// Slot picks the actor channel to claim (SlotMovement | SlotSensor); empty
+	// defaults to the movement slot.
+	Slot string
 	// ActorState is merged onto the actor doc in the same transaction that claims
 	// the slot — so the fleet flips to burn and reserves its slot atomically.
 	ActorState map[string]interface{}

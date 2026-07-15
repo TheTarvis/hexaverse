@@ -76,7 +76,8 @@ func writeStartArea(out string) error {
 	for _, s := range gen.Systems {
 		tiers[s.Id] = observation.TierExplored
 	}
-	dto := galaxy.ToDTO(&gen, 0, tiers)
+	// nil charted set = the no-fog baseline: every lane ships in the showcase.
+	dto := galaxy.ToDTO(&gen, 0, tiers, nil)
 	data, err := json.MarshalIndent(dto, "", "  ")
 	if err != nil {
 		return err

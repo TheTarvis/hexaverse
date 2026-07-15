@@ -6,6 +6,7 @@ import { orbState, type Orbit } from './orbit'
 import { solveHex, solveIntercept } from './intercept'
 import { laneGateHex } from './gate'
 import { stateAt, type MovementState } from './movement'
+import { lineOfSight, beamHexes, hexKey, type BeamParams } from './visibility'
 
 // The Go↔TS determinism seam (build-order cross-cutting rule).
 //
@@ -63,6 +64,20 @@ interface StateAtCase {
   out: MovementState
 }
 
+interface LosCase {
+  origin: Hex
+  target: Hex
+  occluders: Hex[] | null
+  visible: boolean
+}
+
+interface BeamCase {
+  origin: Hex
+  aim: Hex
+  params: BeamParams
+  hexes: Hex[]
+}
+
 interface Fixtures {
   line: LineCase[]
   routeAround: RouteCase[]
@@ -71,6 +86,8 @@ interface Fixtures {
   solveIntercept: SolveCase[]
   laneGate: GateCase[]
   stateAt: StateAtCase[]
+  lineOfSight: LosCase[]
+  beam: BeamCase[]
 }
 
 // Walk up from the working directory to the repo-root golden. Anchoring on cwd
@@ -127,6 +144,18 @@ describe('board fixtures — Go↔TS determinism seam', () => {
     expect(stateAt(c.state, c.t)).toEqual(c.out)
   })
 
+  // Line of sight + the scan-beam corridor (#0006 Decisions #15/#16) — the
+  // geometry the aimed occluded scan and the shadowed ambient bubble share.
+  // Spec: 0006/S2
+  it.each(fixtures.lineOfSight)('lineOfSight[%#]', (c) => {
+    const occ = new Set((c.occluders ?? []).map(hexKey))
+    expect(lineOfSight(c.origin, c.target, occ)).toBe(c.visible)
+  })
+
+  it.each(fixtures.beam)('beam[%#]', (c) => {
+    expect(beamHexes(c.origin, c.aim, c.params)).toEqual(c.hexes)
+  })
+
   it('covers every recorded case group (guards a truncated golden)', () => {
     expect(fixtures.line.length).toBeGreaterThan(0)
     expect(fixtures.routeAround.length).toBeGreaterThan(0)
@@ -135,5 +164,7 @@ describe('board fixtures — Go↔TS determinism seam', () => {
     expect(fixtures.solveIntercept.length).toBeGreaterThan(0)
     expect(fixtures.laneGate.length).toBeGreaterThan(0)
     expect(fixtures.stateAt.length).toBeGreaterThan(0)
+    expect(fixtures.lineOfSight.length).toBeGreaterThan(0)
+    expect(fixtures.beam.length).toBeGreaterThan(0)
   })
 })

@@ -96,6 +96,7 @@ func (s *Service) Commit(ctx context.Context, spec CommitSpec) (*Action, error) 
 		ActorCollection: spec.ActorCollection,
 		Scope:           spec.Scope,
 		Params:          spec.Params,
+		Slot:            spec.Slot,
 		CommittedAt:     now,
 		Eta:             spec.Eta,
 		Status:          StatusRunning,

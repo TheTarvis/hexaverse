@@ -24,7 +24,7 @@ func TestAmbientWrites_PathSweptPresenceOnly(t *testing.T) {
 		},
 	}}
 	// dao is unused by AmbientWrites; default sensor radius is 3.
-	svc := NewServiceWith(nil, fakeFleets{}, interiors, common.WorldClock())
+	svc := NewServiceWith(nil, fakeFleets{}, interiors, beamLanes{}, common.WorldClock())
 
 	path := []board.Hex{{Q: 0, R: 0}, {Q: 1, R: 0}}
 	writes, err := svc.AmbientWrites(context.Background(), "corpX", sys, path, common.WorldMillis(0))

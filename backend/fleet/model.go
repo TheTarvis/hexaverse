@@ -18,12 +18,15 @@ type Fleet struct {
 	// State is the single movement field — coast | burn | docked. No per-tick
 	// position is stored; the live hex is computed from (State, worldTime).
 	State board.MovementState `json:"state" firestore:"state"`
-	// ActiveActionId is the single-action-slot guard (#0005): a fleet holds at
-	// most one running action (its burn). Claimed at commit, released at
-	// resolve/cancel — both transactionally, inside the action domain.
-	ActiveActionId string             `json:"activeActionId,omitempty" firestore:"activeActionId,omitempty"`
-	CreatedAt      common.WorldMillis `json:"createdAt" firestore:"createdAt"`
-	UpdatedAt      common.WorldMillis `json:"updatedAt" firestore:"updatedAt"`
+	// ActiveActionId is the MOVEMENT channel's single-slot guard (#0005, #0006
+	// Decision #19): at most one running burn/trip. Claimed at commit, released
+	// at resolve/cancel — both transactionally, inside the action domain.
+	ActiveActionId string `json:"activeActionId,omitempty" firestore:"activeActionId,omitempty"`
+	// ActiveScanId is the SENSOR channel's slot: at most one running scan,
+	// independent of movement — a burning fleet can scan (#0006 Decision #19).
+	ActiveScanId string             `json:"activeScanId,omitempty" firestore:"activeScanId,omitempty"`
+	CreatedAt    common.WorldMillis `json:"createdAt" firestore:"createdAt"`
+	UpdatedAt    common.WorldMillis `json:"updatedAt" firestore:"updatedAt"`
 }
 
 // OrderRequest is the body of POST /v1/fleets/:id/orders. The server picks the

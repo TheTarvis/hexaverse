@@ -17,10 +17,16 @@ const (
 	actionsCollection = "actions"
 	deltasCollection  = "deltas" // deltas/{scope}/entries/{actionId}
 	deltaEntries      = "entries"
-	// activeActionField is the single-action-slot guard on an actor doc, claimed
-	// at commit and released at resolve/cancel.
-	activeActionField = "activeActionId"
 )
+
+// slotField is the actor-doc field an action claims — its channel (#0006
+// Decision #19). Empty (pre-channel action docs) means the movement slot.
+func slotField(a Action) string {
+	if a.Slot == "" {
+		return SlotMovement
+	}
+	return a.Slot
+}
 
 //go:generate mockgen -destination=dao_mock.go -package=action -source=dao.go Dao
 
@@ -148,13 +154,13 @@ func (dao *DaoImpl) Commit(ctx context.Context, a Action, actorState map[string]
 		if err != nil {
 			return fmt.Errorf("reading actor %s/%s: %w", a.ActorCollection, a.Actor, err)
 		}
-		if active, _ := actorSnap.Data()[activeActionField].(string); active != "" {
+		if active, _ := actorSnap.Data()[slotField(a)].(string); active != "" {
 			return ErrActiveActionExists
 		}
 		if err := tx.Create(dao.actionRef(a.Id), a); err != nil {
 			return fmt.Errorf("creating action: %w", err)
 		}
-		return tx.Set(actorRef, mergeActorState(a.Id, actorState), firestore.MergeAll)
+		return tx.Set(actorRef, mergeActorState(slotField(a), a.Id, actorState), firestore.MergeAll)
 	})
 }
 
@@ -184,7 +190,7 @@ func (dao *DaoImpl) Cancel(ctx context.Context, id string, actorState map[string
 		if err := tx.Update(ref, []firestore.Update{{Path: "status", Value: string(StatusCancelled)}}); err != nil {
 			return err
 		}
-		if err := tx.Set(actorRef, mergeActorState("", actorState), firestore.MergeAll); err != nil {
+		if err := tx.Set(actorRef, mergeActorState(slotField(a), "", actorState), firestore.MergeAll); err != nil {
 			return err
 		}
 		out = &a
@@ -249,7 +255,7 @@ func (dao *DaoImpl) ResolveOne(ctx context.Context, id string, resolve ResolveFu
 		}); err != nil {
 			return err
 		}
-		if err := tx.Set(actorRef, mergeActorState("", res.ActorState), firestore.MergeAll); err != nil {
+		if err := tx.Set(actorRef, mergeActorState(slotField(a), "", res.ActorState), firestore.MergeAll); err != nil {
 			return err
 		}
 		if res.Delta != nil {
@@ -353,10 +359,11 @@ func (dao *DaoImpl) foldDeltasTx(tx *firestore.Transaction, scope string, upTo c
 	return sum, nil
 }
 
-// mergeActorState builds the actor-doc patch for a slot claim (actionID != "")
-// or release (actionID == ""), merged with any verb-supplied fields.
-func mergeActorState(actionID string, actorState map[string]interface{}) map[string]interface{} {
-	m := map[string]interface{}{activeActionField: actionID}
+// mergeActorState builds the actor-doc patch for a channel's slot claim
+// (actionID != "") or release (actionID == ""), merged with any verb-supplied
+// fields.
+func mergeActorState(slot, actionID string, actorState map[string]interface{}) map[string]interface{} {
+	m := map[string]interface{}{slot: actionID}
 	for k, v := range actorState {
 		m[k] = v
 	}

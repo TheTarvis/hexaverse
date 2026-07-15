@@ -67,13 +67,17 @@ func newFleetRouter(svc ServiceInterface, fog AudienceFog) *gin.Engine {
 	return r
 }
 
-// TestScan_ConflictWhenBusy maps the single-slot rejection to 409.
+// TestScan_ConflictWhenBusy maps the sensor-slot rejection to 409: a fleet may
+// burn and scan at once, but never run two scans (#0006 Decision #19). The
+// sweep takes no body (#0006 Decision #21) — one manual trigger.
+//
+// Spec: 0006/S4
 func TestScan_ConflictWhenBusy(t *testing.T) {
 	r := newFleetRouter(&fakeFleetSvc{scanErr: action.ErrActiveActionExists}, nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/fleets/f1/scan", nil))
 	if w.Code != http.StatusConflict {
-		t.Fatalf("scan while busy: status = %d, want 409", w.Code)
+		t.Fatalf("second scan while one runs: status = %d, want 409", w.Code)
 	}
 }
 

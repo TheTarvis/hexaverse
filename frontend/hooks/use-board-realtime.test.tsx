@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BOARD_POLL_MS, useBoardRealtime } from './use-board-realtime'
+import { BOARD_POLL_MS, SCAN_POLL_MS, useBoardRealtime } from './use-board-realtime'
 
 // A controllable EventSource stand-in.
 class MockEventSource {
@@ -67,6 +67,21 @@ describe('useBoardRealtime', () => {
     invalidate.mockClear()
 
     vi.advanceTimersByTime(BOARD_POLL_MS + 10)
+    expect(invalidate).toHaveBeenCalled()
+  })
+
+  it('rule 3: tightens the poll while a scan is running — the read cadence IS the echo cadence', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const invalidate = vi.spyOn(qc, 'invalidateQueries')
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    )
+    renderHook(() => useBoardRealtime({ systemId: 'sys-7', worldTime: 0, scanning: true }), {
+      wrapper,
+    })
+    invalidate.mockClear()
+
+    vi.advanceTimersByTime(SCAN_POLL_MS + 10)
     expect(invalidate).toHaveBeenCalled()
   })
 
