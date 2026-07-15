@@ -53,7 +53,12 @@ verb to the action spine and gives the fleet its cargo model.
   `action-dispatch` (ADDED: a per-verb ledger key nameable distinct from
   the action's channel scope, and a public commit-time ledger-fold surface
   on the action service — see design.md Decisions 12–13; both additive and
-  default-preserving for every existing verb)
+  default-preserving for every existing verb; MODIFIED: "Exactly-Once
+  Resolution" and "Additive Ledger Fold, No Materialized Total" are
+  reworded from scope-as-ledger to ledger-key terms — the ledger a resolve
+  appends to and folds is now the action's ledger key, defaulting to
+  `scope` when none was committed — so the base pair no longer contradicts
+  the decoupled ledger key added alongside them)
 - Affected code: new `backend/mine/` package (handler → service, per
   `backend/CLAUDE.md`'s domain shape); `backend/fleet/model.go` (add
   `Ships`/`Cargo` fields); `backend/fleet/params.go` (derived-capacity,

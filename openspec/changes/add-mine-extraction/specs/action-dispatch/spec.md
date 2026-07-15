@@ -36,3 +36,51 @@ owning service). This fold SHALL return the same total the resolver's
 - **WHEN** a verb's commit folds a ledger key at the current world time
   and a resolver later folds the same key at the same time
 - **THEN** both reads return the identical folded total
+
+## MODIFIED Requirements
+
+### Requirement: Exactly-Once Resolution
+The system SHALL resolve a running action exactly once, in a single
+transaction that: re-verifies the action is still running (a no-op if
+another resolver already settled it), invokes the type's registered
+resolver with the actor document already read and the action's frozen ETA
+as the effect time, then atomically flips the action to `done`, records the
+resolver's outcome and resolve timestamp, releases the claimed slot,
+applies any `ActorState` patch, appends any `Delta` to the ledger named by
+the action's ledger key (the action's `scope` when no distinct key was
+committed) (exactly-once by the action id as the delta document id), and
+applies any structured `Writes`.
+
+#### Scenario: Resolving an already-resolved action is a no-op
+- **WHEN** `ResolveOne` is invoked for an action whose status is no longer
+  `running` (already resolved by a racing reader)
+- **THEN** no error occurs, no writes are applied, and the call returns
+  no action
+
+#### Scenario: A resolver runs at the action's frozen ETA, not real time
+- **WHEN** an action is resolved
+- **THEN** the resolver's effect time (`Resolution.At`) is the action's
+  stored `Eta`, regardless of how much later the resolve transaction
+  actually runs
+
+#### Scenario: A mutating delta is exactly-once by action id
+- **WHEN** two concurrent resolve attempts for the same mutating action
+  both try to append a delta
+- **THEN** only one delta document (keyed by the action id) is created; the
+  losing attempt's transaction fails and the action remains resolved
+  exactly once
+
+#### Scenario: A resolver failure does not corrupt the action
+- **WHEN** a registered resolver function returns an error
+- **THEN** the resolve transaction is aborted, the action remains
+  `running`, and no partial state is written
+
+### Requirement: Additive Ledger Fold, No Materialized Total
+The system SHALL represent a ledger key's mutating-verb total as the fold
+(sum) of its append-only delta entries with `effectAt <= T`, computed at
+read time, never as a separately maintained running total field.
+
+#### Scenario: Folding sums only deltas up to the given time
+- **WHEN** a ledger key's deltas are folded up to a world time `T`
+- **THEN** the result is the sum of every delta entry for that ledger key
+  whose `effectAt` is at or before `T`, excluding later ones

@@ -285,6 +285,18 @@ pool; day-one lode depletion via the ledger fold; yield clamped by reality
     fold(deltas ≤ eta))`, `take = max(0, min(params.tons, remainingAtEta,
     freeHoldAtResolve))`. Defensive and independent of Decision 14 — it
     guards a case Decision 14 makes rarer, not one it rules out.
+    *Extended in review (Finding 2):* flooring `take` at zero is not enough
+    on its own — the resolver must also treat `take == 0` as "append no
+    delta," not "append a zero-amount delta." A contested-loser resolve
+    (an earlier-ETA run against the same ledger key already took the lode
+    to zero) and a dry/full-hold resolve landing on exactly zero both reach
+    `take == 0` by an ordinary, expected path, not only by the rare
+    float-drift case this decision was written for — and every one of them
+    still needs to flip the action to `done`, release the slot, and record
+    an honest `outcome`/reason code, it just must not write a ledger entry
+    to do it. "Exactly-Once Lode Delta" is worded accordingly (`at most
+    one` delta, none when `take == 0`); this is what keeps the "Unbounded
+    ledger growth" risk's stated bound (below) actually true.
 
 16. **A fleet's own cancel endpoint must not force an undock when the slot
     it releases was held by mine, not movement.** Decision 9 puts mine on
@@ -327,7 +339,7 @@ pool; day-one lode depletion via the ledger fold; yield clamped by reality
 18. **`MineParams.MinRunTons` is bound by a named, configured ceiling on
     delta count, not left a bare tuning note.** DBA review: the Risks
     section already names `MinRunTons` as the mechanism that bounds ledger
-    delta count (`lodeTonnage / MinRunTons`), but nothing ties it to a
+    delta count (`⌈lodeTonnage / MinRunTons⌉`), but nothing ties it to a
     lode's typical starting tonnage — the Open Questions entry left it "not
     a blocker, tuning-time." An under-tuned default lets a single popular
     lode's fold cost grow unbounded with no spec-level guard to catch it
@@ -392,9 +404,18 @@ pool; day-one lode depletion via the ledger fold; yield clamped by reality
   `MineParams.MinRunTons` (a minimum run-size floor — see
   "Minimum Mine Run Size" in the spec delta, now bound by a named ceiling
   per Decision 18's "Minimum Mine Run Size Is Bounded By Lode Tonnage")
-  bounds delta *count* per feature to `lodeTonnage / MinRunTons`, which
-  keeps the immediate fold cost sane, but no compaction/checkpoint strategy
-  is specified for the ledger's long-run lifecycle. Accepted as a known,
+  bounds delta *count* per feature to `⌈lodeTonnage / MinRunTons⌉`, which
+  keeps the immediate fold cost sane — this bound holds only because a
+  zero-take resolve appends no delta at all (Decision 15's extension,
+  "Exactly-Once Lode Delta"): a contested lode can draw an unbounded number
+  of *runs* (every fleet that ever targets it), but only the runs that
+  actually removed tonnage (`take > 0`) consume a ledger entry, so the
+  entry count stays bounded by `⌈startTons / MinRunTons⌉` regardless of how
+  many runs merely lost the race to an empty lode (the `+1` over the plain
+  quotient is the single sub-`MinRunTons` dry-clamp tail delta — the final
+  remainder when `startTons` is not an exact multiple of `MinRunTons`) — but no
+  compaction/checkpoint strategy is specified for the ledger's long-run
+  lifecycle. Accepted as a known,
   deferred risk at today's data volumes; the commit- and resolve-time depth
   logging added by Decision 17 ("Mine Ledger Depth Is Observable" in the
   spec delta) is this risk's monitoring hook, so the trigger to act on it

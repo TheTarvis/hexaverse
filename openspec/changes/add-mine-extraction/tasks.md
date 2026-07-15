@@ -99,7 +99,7 @@ acceptance suite against the surface, not the mine endpoint, first.
       validate the remaining preconditions (docked to feature, feature
       carries `kind`, feature's ledger-folded remaining tonnage of `kind`
       — read via the public commit-time fold added in 0.2, on this run's
-      ledger key — is not already zero, fleet's derived mining rate `> 0`,
+      ledger key — is not already at or below zero, fleet's derived mining rate `> 0`,
       `tons` ≤ free hold, movement slot free), reporting a distinguishing
       reason per failed precondition (`gin.H{"error": "<reason>"}`,
       matching `backend/fleet/handler.go`'s convention — a busy-slot
@@ -128,15 +128,22 @@ acceptance suite against the surface, not the mine endpoint, first.
       remaining; floored at zero), compute `take = max(0, min(params.tons,
       remainingAtEta, freeHoldAtResolve))` (also floored, so a resolve can
       never append a positive tonnage-restoring delta or credit negative
-      cargo), append the delta (`docId = actionId`, amount `-take`) under
-      the ledger key, credit `fleet.cargo[kind] += take` via a merge patch
-      that leaves other cargo kinds untouched, and set both an honest
-      `outcome` string ("mined Nt" / "lode ran dry at Nt" / "hold full at
-      Nt" — each reliably distinguishable by a caller, e.g. via a stable
-      substring or prefix) and a structured reason code (`clean` |
-      `lodeDry` | `holdFull`) alongside it. Log the ledger key's resulting
-      delta-entry count on both this resolve and the commit-time fold in
-      2.2(c) (per "Mine Ledger Depth Is Observable").
+      cargo). When `take > 0`, append the delta (`docId = actionId`, amount
+      `-take`) under the ledger key and credit `fleet.cargo[kind] += take`
+      via a merge patch that leaves other cargo kinds untouched; when
+      `take == 0`, append no delta document at all (not a zero-amount one)
+      and credit no cargo — the action still flips to `done`, its slot is
+      still released, and its `outcome`/reason code are still set, exactly
+      as in the `take > 0` case, so the only difference on a zero-take
+      resolve is that no ledger entry is written (keeps the ledger's
+      per-key delta count bounded by `⌈startTons / MinRunTons⌉`, not by the
+      number of contesting runs — see "Exactly-Once Lode Delta"). In both
+      cases, set both an honest `outcome` string ("mined Nt" / "lode ran
+      dry at Nt" / "hold full at Nt" — each reliably distinguishable by a
+      caller, e.g. via a stable substring or prefix) and a structured
+      reason code (`clean` | `lodeDry` | `holdFull`) alongside it. Log the
+      ledger key's resulting delta-entry count on both this resolve and the
+      commit-time fold in 2.2(c) (per "Mine Ledger Depth Is Observable").
 - [ ] 2.4 Wire `POST /v1/fleets/:fleetId/mine` in `handler.go`, following
       the existing fleet-orders handler's request/response shape.
 - [ ] 2.5 Register the mine service and its resolver in `backend/router.go`
@@ -190,10 +197,22 @@ acceptance suite against the surface, not the mine endpoint, first.
       mine currently holds the slot.
 - [ ] 4.2 Unit tests: clean-run full yield (`clean` reason code), dry-lode
       clamp with correct `outcome` text and `lodeDry` reason code,
-      full-hold clamp with correct `outcome` text and `holdFull` reason
-      code; a resolve against an already-fully-depleted ledger key yields
-      `take = 0` with no positive delta and no negative cargo credit
-      (floor-at-zero regression guard, design.md Decision 15).
+      full-hold clamp (fixture the fleet's stored cargo directly to leave
+      free hold below the requested `tons` — not "another action filled it
+      in the meantime," which no verb in this change can induce; see
+      "Resolve Clamps Yield to Reality"'s defensive-only note) with correct
+      `outcome` text and `holdFull` reason code; a resolve against an
+      already-fully-depleted ledger key yields
+      `take = 0` with no delta appended at all (not merely no positive
+      delta) and no negative cargo credit, while still resolving `done`
+      with its honest outcome/reason code (floor-at-zero regression guard,
+      design.md Decision 15); a contested-loser zero-take resolve — a
+      second run's ETA lands after an earlier-ETA run against the same
+      ledger key already took the lode to zero — asserts no delta document
+      is written for the losing action's id, yet that action still resolves
+      `done` with an honest `outcome`/`lodeDry` reason code and its
+      movement slot released (ledger-growth-bound regression guard, per
+      "Exactly-Once Lode Delta").
 - [ ] 4.3 Unit test: no-scan-required — committing against an unscanned
       feature the fleet is docked to succeeds when the feature actually
       carries the requested kind.
@@ -213,10 +232,11 @@ acceptance suite against the surface, not the mine endpoint, first.
       mining-capable ship in roster) is rejected at commit, not allowed to
       produce a `+Inf` ETA.
 - [ ] 4.8 Unit tests: a commit against a feature/kind whose ledger-folded
-      remaining tonnage is already zero is rejected ("Already-Depleted Lode
-      Rejected At Commit"); a commit against a lode with positive
-      as-of-now remaining tonnage still succeeds even when another
-      in-flight run may deplete it before this run's own ETA.
+      remaining tonnage is already at or below zero (both the exact-zero
+      case and a fixtured below-zero float-drift case) is rejected
+      ("Already-Depleted Lode Rejected At Commit"); a commit against a lode
+      with positive as-of-now remaining tonnage still succeeds even when
+      another in-flight run may deplete it before this run's own ETA.
 
 ## 5. Cancel/acknowledge and endpoint contract
 

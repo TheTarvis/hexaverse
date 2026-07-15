@@ -51,8 +51,8 @@ negative, `NaN`, and infinite values — creating no action.
 The system SHALL reject a mine commit whose requested `tons` is below a
 configured minimum run size (`MineParams.MinRunTons`), bounding the number
 of ledger delta entries a feature can accumulate to
-`lodeTonnage / MinRunTons` and capping read-time fold cost as a feature is
-mined repeatedly over the game's life.
+`⌈lodeTonnage / MinRunTons⌉` and capping read-time fold cost as a feature
+is mined repeatedly over the game's life.
 
 #### Scenario: A sub-minimum run is rejected
 - **WHEN** a mine commit requests `tons` greater than zero but below
@@ -63,21 +63,27 @@ mined repeatedly over the game's life.
 The system SHALL set `MineParams.MinRunTons`, per resource-bearing feature
 type, to a value related to that feature type's typical starting lode
 tonnage by a named, configured ceiling on total delta count
-(`startTons / MinRunTons`), so that a fully-depleted lode's ledger never
+(`⌈startTons / MinRunTons⌉`), so that a fully-depleted lode's ledger never
 grows past a bounded, known-in-advance number of entries regardless of how
 many separate runs, over the game's life, target it — keeping both the
 per-commit courtesy fold ("Already-Depleted Lode Rejected At Commit") and
 the per-resolve transactional fold ("Resolve Clamps Yield to Reality") cost
-safe for synchronous request handling. The specific tonnage curve, minimum
-run sizes, and ceiling value are tuning-time configuration (see design.md
-Open Questions); this requirement constrains only that a ceiling is named
-and honored, not its numeric value.
+safe for synchronous request handling. The bound is a ceiling, not a floor
+quotient: every take-bearing delta below the final one removes at least
+`MinRunTons`, but nothing requires a committed run's `tons` to fit within
+the lode's remaining tonnage (only that it not exceed free hold), so the
+last take-bearing delta against a lode can be a sub-`MinRunTons` dry-clamp
+tail that drives remaining to exactly zero — accounting for the `+1` over
+the plain quotient `startTons / MinRunTons`. The specific tonnage curve,
+minimum run sizes, and ceiling value are tuning-time configuration (see
+design.md Open Questions); this requirement constrains only that a ceiling
+is named and honored, not its numeric value.
 
 #### Scenario: A lode's maximum possible delta count is bounded
 - **WHEN** a lode of any richness is mined down to zero across any number
   of separate runs, each at or above `MineParams.MinRunTons`
 - **THEN** the total number of delta entries appended to that lode's ledger
-  key never exceeds `startTons / MinRunTons`, and that quotient is within
+  key never exceeds `⌈startTons / MinRunTons⌉`, and that count is within
   the configured ceiling for the feature's resource kind
 
 ### Requirement: Mine Commit Preconditions
@@ -89,7 +95,7 @@ the requested `tons` is a positive finite number at or above
 "Minimum Mine Run Size"); the fleet's effective state is `docked` to the
 named feature; the target feature's detail carries at least one resource
 entry of the requested `kind`; the feature's best-known remaining tonnage
-of that `kind` is not already zero (see "Already-Depleted Lode Rejected At
+of that `kind` is not already at or below zero (see "Already-Depleted Lode Rejected At
 Commit"); the fleet's derived mining rate is greater than zero; the
 requested `tons` does not exceed the fleet's current free hold (derived
 capacity minus current cargo); and the fleet's movement-channel action slot
@@ -161,16 +167,19 @@ situations for the first time.
 The system SHALL, at commit time, compute the feature's best-known
 remaining tonnage of the requested `kind` as of the current world time (the
 same ledger fold used at resolve, evaluated at the commit instant) and
-reject the commit if that remaining tonnage is zero, rather than creating
-an action that can only resolve to a zero-tonnage outcome. This is a
-courtesy fast-fail, not a reservation: a lode genuinely contested by an
-in-flight, not-yet-resolved run may still legitimately deplete further
-before this commit's own ETA (see "Optimistic Contested Lodes") — only a
-lode already known-empty at commit time is rejected up front.
+reject the commit if that remaining tonnage is at or below zero, rather
+than creating an action that can only resolve to a zero-tonnage outcome.
+This is a courtesy fast-fail, not a reservation: a lode genuinely contested
+by an in-flight, not-yet-resolved run may still legitimately deplete
+further before this commit's own ETA (see "Optimistic Contested Lodes") —
+only a lode already known-empty (zero, or — under the float drift the
+resolve-time floor in "Resolve Clamps Yield to Reality" guards against —
+below zero) at commit time is rejected up front, matching the `max(0, …)`
+floor that requirement already applies at resolve.
 
 #### Scenario: Committing against a fully depleted lode is rejected
 - **WHEN** a mine commit names a `kind` whose folded remaining tonnage, as
-  of the current world time, is already zero
+  of the current world time, is already at or below zero
 - **THEN** the commit fails with a validation error and no action is
   created, and no delta document is appended
 
@@ -179,7 +188,7 @@ lode already known-empty at commit time is rejected up front.
   of now is still positive, even though another run's not-yet-resolved ETA
   may deplete it further
 - **THEN** the commit succeeds, per "Optimistic Contested Lodes" — this
-  requirement only blocks commits against a lode already at zero
+  requirement only blocks commits against a lode already at or below zero
 
 ### Requirement: Ledger Key Is System-And-Kind-Qualified, Channel Scope Is Per-System
 The system SHALL key a mine run's depletion ledger by a
@@ -271,7 +280,16 @@ The three `outcome` text forms (full yield, lode-dry clamp, hold-full
 clamp) SHALL be reliably distinguishable by a caller inspecting the string
 (e.g. via a stable substring or prefix per reason code), not merely equal
 in narrative intent, so a later UI can safely branch on which constraint
-bound.
+bound. The `holdFull` branch is defensive in this change: mine is the only
+writer of `fleet.cargo` and holds the fleet's movement slot for the run's
+whole duration, so no other action can mutate cargo (or the roster, hence
+capacity) between this run's commit and resolve, and `freeHoldAtResolve`
+therefore always equals `freeHoldAtCommit` — the clamp cannot bind through
+any verb this change ships. It stays specified (the reason code and clamp
+math cost nothing extra and are exercised directly, not through a second
+writer) because a future cargo-mutating verb (e.g. a second concurrent mine
+run once ships can split, or jettison/transfer) will make it reachable, and
+resolve must already floor and report correctly when it is.
 
 #### Scenario: A clean run takes the full target
 - **WHEN** neither the lode's remaining tonnage nor the fleet's free hold
@@ -286,8 +304,8 @@ bound.
   the lode ran dry, and the resolved action's reason code is `lodeDry`
 
 #### Scenario: A full hold clamps to free capacity
-- **WHEN** the fleet's free hold at resolve is less than the requested
-  `tons` (e.g. another action filled it in the meantime)
+- **WHEN** the fleet's stored cargo at resolve leaves free hold below the
+  requested `tons`
 - **THEN** the take equals the free hold, the outcome records that the
   hold filled, and the resolved action's reason code is `holdFull`
 
@@ -295,24 +313,43 @@ bound.
 - **WHEN** a run resolves against a kind whose folded remaining at ETA
   would otherwise compute below zero (fully taken by earlier-ETA runs
   against the same ledger key)
-- **THEN** `remainingAtEta` and `take` are both floored at zero, no
-  positive (tonnage-restoring) delta is appended, and the fleet's cargo is
-  not decremented
+- **THEN** `remainingAtEta` and `take` are both floored at zero, no delta
+  is appended at all (never a positive, tonnage-restoring one, and never a
+  zero-amount one — see "Exactly-Once Lode Delta"), and the fleet's cargo
+  is not decremented
 
 ### Requirement: Exactly-Once Lode Delta
 The system SHALL, in the same transaction that computes the clamped take,
-append exactly one negative-tonnage delta entry to the target feature's
+append at most one negative-tonnage delta entry to the target feature's
 system-and-kind-qualified ledger key (see "Ledger Key Is
 System-And-Kind-Qualified, Channel Scope Is Per-System"), keyed by the
 action's own id as the delta document id (per `action-dispatch`'s
-exactly-once resolution contract), and credit that same tonnage onto the
-fleet's cargo pool for the run's `kind` — never as a separately mutated
-"remaining" field on the feature.
+exactly-once resolution contract): exactly one when the clamped `take` is
+greater than zero, crediting that same tonnage onto the fleet's cargo pool
+for the run's `kind` — never as a separately mutated "remaining" field on
+the feature — and none when the clamped `take` is zero. A zero-take resolve
+SHALL still flip the action to `done` with its honest `outcome` string and
+structured reason code (`lodeDry` | `holdFull`, as applicable), release the
+movement slot, and credit no cargo; it appends no delta document at all,
+rather than a zero-amount one, so that only take-bearing runs consume a
+ledger entry and the ledger's delta count per key stays bounded by
+`⌈startTons / MinRunTons⌉` (see "Minimum Mine Run Size Is Bounded By Lode
+Tonnage") rather than by the number of runs that ever targeted the lode.
 
 #### Scenario: Concurrent resolve attempts append exactly one delta
-- **WHEN** two resolve attempts race for the same mine action
+- **WHEN** two resolve attempts race for the same take-bearing (`take > 0`)
+  mine action
 - **THEN** exactly one delta document exists under the feature's ledger
   afterward, and the fleet's cargo is credited exactly once
+
+#### Scenario: A zero-take resolve appends no delta but still resolves done
+- **WHEN** a mine run resolves with a clamped take of zero — either a
+  contested lode already emptied by an earlier-ETA run against the same
+  ledger key, or the hold full or the lode dry to exactly zero at ETA
+- **THEN** no delta document is appended to the ledger key, the fleet's
+  cargo is unchanged, and the action still resolves `done` with an honest
+  `outcome` string and reason code (`lodeDry` or `holdFull`) and its
+  movement slot released
 
 ### Requirement: One Resource Kind Per Run
 The system SHALL require each mine run to target exactly one resource
