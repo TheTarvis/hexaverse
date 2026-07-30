@@ -28,6 +28,7 @@ export function FeatureGlyph({ feature, point, selected, onSelect }: FeatureGlyp
     <g
       data-testid={`feature-glyph-${feature.id}`}
       data-band={feature.band}
+      data-mineable={feature.resources?.length ? true : undefined}
       transform={`translate(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`}
       opacity={fog.opacity}
       className="cursor-pointer"

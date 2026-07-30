@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"errors"
+	"math"
 
 	"hexaverse/action"
 	"hexaverse/board"
@@ -67,6 +68,13 @@ type Service struct {
 	actions   action.CommitInterface
 	clock     common.WorldTime
 	params    MovementParams
+	// classStats is the roster stats table burn ETA / lane routing / capacity
+	// computations derive through (#0010 "Derived Fleet Speed" /
+	// "Derived Cargo Capacity and Mining Rate"). Always DefaultClassStats() —
+	// not a constructor param — mirroring how params defaults internally too;
+	// tests exercise the derived-rate helpers directly (roster_test.go) rather
+	// than injecting a fake table into the service.
+	classStats map[ShipClass]ClassStats
 	// graph + tiers power graph-tier travel (#0008). They're set after
 	// construction via WithTravel because the fog service (TierSource) depends on
 	// this fleet service (FleetSource) — a construction cycle. Nil ⇒ travel orders
@@ -80,16 +88,45 @@ func NewService() *Service {
 	actions := action.NewService()
 	actions.RegisterResolver(burnType, action.KindKinematic, BurnResolver(params))
 	return &Service{
-		dao:       NewDao(),
-		systemSvc: system.NewService(),
-		actions:   actions,
-		clock:     common.WorldClock(),
-		params:    params,
+		dao:        NewDao(),
+		systemSvc:  system.NewService(),
+		actions:    actions,
+		clock:      common.WorldClock(),
+		params:     params,
+		classStats: DefaultClassStats(),
 	}
 }
 
 func NewServiceWith(dao Dao, systemSvc system.ServiceInterface, actions action.CommitInterface, clock common.WorldTime) *Service {
-	return &Service{dao: dao, systemSvc: systemSvc, actions: actions, clock: clock, params: DefaultMovementParams()}
+	return &Service{dao: dao, systemSvc: systemSvc, actions: actions, clock: clock,
+		params: DefaultMovementParams(), classStats: DefaultClassStats()}
+}
+
+// msPerTileFor is the fleet's effective burn-tile cost — the inverse of its
+// roster-derived burn rate (#0010 "Derived Fleet Speed"), replacing the flat
+// global MsPerTile constant at every point a burn ETA is solved. Falls back
+// to the global default if the roster's derived rate is zero (defensive: a
+// zero rate must never divide-by-zero into an infinite per-tile cost here —
+// mine's commit path is what actually rejects a zero-mining-rate fleet;
+// movement itself has no "can't move" precondition today).
+func (s *Service) msPerTileFor(f *Fleet) common.WorldMillis {
+	rate := DerivedBurnRate(*f, s.classStats)
+	if rate <= 0 {
+		return s.params.MsPerTile
+	}
+	return common.WorldMillis(math.Round(1.0 / rate))
+}
+
+// msPerLaneUnitFor is the fleet's effective per-lane-length-unit cost — the
+// inverse of its roster-derived lane rate (#0010 "Derived Fleet Speed"),
+// replacing the flat global LaneMsPerDistance constant. Falls back to the
+// global default if the derived rate is zero.
+func (s *Service) msPerLaneUnitFor(f *Fleet) float64 {
+	rate := DerivedLaneRate(*f, s.classStats)
+	if rate <= 0 {
+		return s.params.LaneMsPerDistance
+	}
+	return 1.0 / rate
 }
 
 // WithTravel wires the graph-tier travel dependencies (#0008): the galaxy graph
@@ -234,6 +271,7 @@ func (s *Service) orderBurn(ctx context.Context, id string, req OrderRequest) (*
 		return nil, err
 	}
 
+	msPerTile := s.msPerTileFor(f)
 	var sol board.Solution
 	var dockOnArrive string
 	switch {
@@ -244,13 +282,13 @@ func (s *Service) orderBurn(ctx context.Context, id string, req OrderRequest) (*
 		}
 		dockOnArrive = feat.Id
 		if orb := featureOrbit(feat); orb != nil {
-			sol = board.SolveIntercept(from, *orb, now, s.params.MsPerTile, s.params.InterceptHorizon)
+			sol = board.SolveIntercept(from, *orb, now, msPerTile, s.params.InterceptHorizon)
 		} else {
 			// Fixed feature (e.g. the star) — a static hex, no lead-solve.
-			sol = board.SolveHex(from, featureAnchor(feat), now, s.params.MsPerTile)
+			sol = board.SolveHex(from, featureAnchor(feat), now, msPerTile)
 		}
 	case req.Target.Hex != nil:
-		sol = board.SolveHex(from, *req.Target.Hex, now, s.params.MsPerTile)
+		sol = board.SolveHex(from, *req.Target.Hex, now, msPerTile)
 	default:
 		return nil, errors.New("order target must be a hex or a featureId")
 	}
@@ -371,6 +409,13 @@ func (s *Service) haltState(ctx context.Context, f *Fleet, now common.WorldMilli
 	if f.State.Mode == board.ModeLaneHold {
 		return f.State, nil // already held — cancel is a no-op
 	}
+	// A docked fleet has no motion to halt into a coast (#0010 Decision #16):
+	// mine shares the movement channel (Decision #9), so a docked+mining fleet
+	// is a reachable state for the first time — releasing that co-resident
+	// verb's slot must never force the fleet off its dock.
+	if f.State.Mode == board.ModeDocked {
+		return f.State, nil
+	}
 	cur, err := s.Position(ctx, f)
 	if err != nil {
 		return board.MovementState{}, err
@@ -393,8 +438,13 @@ func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string,
 		CorporationId: corporationID,
 		SystemId:      systemID,
 		State:         board.CoastAt(at, now),
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		// A newly seeded fleet carries a default roster — never empty (#0010
+		// "Fleet Ship Composition") — and an empty cargo pool ("Fleet Cargo
+		// Pool"'s "a fresh fleet's cargo pool is empty").
+		Ships:     []ShipEntry{{Class: ClassSeed}},
+		Cargo:     map[string]float64{},
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 	if err := s.dao.Save(ctx, *f); err != nil {
 		return nil, err

@@ -12,6 +12,23 @@
 // sensor union (audience fog, #0006). No unsensed foreign ever reaches here.
 
 import type { Hex, MovementState } from '@/lib/hex'
+import type { ResourceKind } from '@/lib/types/system-board'
+
+// FleetRoster is the owner-only ships/cargo/derived-stats block on fleet reads
+// (#0010 "Fleet Read Surfaces Roster, Cargo, and Derived Capacity"). Absent
+// entirely on a foreign fleet (audience fog) — hence optional on Fleet. All
+// capacities/rates are server-derived from the roster; never recompute them
+// client-side from a mirrored stats table.
+export interface FleetRoster {
+  ships: { class: string }[]
+  // Tons held, by resource kind. Kinds the fleet holds none of are absent.
+  cargo: Record<string, number> | null
+  cargoCapacity: number
+  freeHold: number
+  // Summed extraction rate (tons/world-ms) — the mine ETA preview's divisor
+  // (add-mine-ui: eta = tons ÷ miningRate).
+  miningRate: number
+}
 
 export interface Fleet {
   id: string
@@ -24,6 +41,23 @@ export interface Fleet {
   // Whether the requester owns this fleet (may drive it, sees its committed path).
   // A foreign fleet's `state` is a snapshot — mode + position, no path or ETA.
   own: boolean
+  // Owner-only roster/cargo/derived-stats block; absent on foreign fleets.
+  roster?: FleetRoster
+  worldTime: number
+}
+
+// The mine verb's request/response (#0010, add-mine-ui). Commit returns the
+// created action's id and its FROZEN eta — countdowns derive from this, never
+// from the client's pre-commit preview.
+export interface MineRequest {
+  featureId: string
+  kind: ResourceKind
+  tons: number
+}
+
+export interface MineCommit {
+  actionId: string
+  eta: number
   worldTime: number
 }
 

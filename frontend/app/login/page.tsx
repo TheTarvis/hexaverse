@@ -10,17 +10,64 @@ import { Text } from '@/components/catalyst/text'
 import { GoogleIcon } from '@/components/google-icon'
 import { useAccountContext } from '@/components/account-provider'
 
+// D7 — the `redirect` query parameter is treated as a same-origin relative
+// path only: a single leading `/`, never `//`- or `/\`-prefixed, and
+// containing no backslash or control/whitespace character anywhere in the
+// value. Anything else falls back to `/` so the post-authentication handoff
+// can never navigate to an attacker-controlled origin.
+function sanitizeRedirect(raw: string | null): string {
+  if (!raw) return '/'
+  if (!raw.startsWith('/')) return '/'
+  if (raw.startsWith('//')) return '/'
+  if (raw.startsWith('/\\')) return '/'
+  if (/[\\\x00-\x1f\x7f\s]/.test(raw)) return '/'
+  return raw
+}
+
+// D12 — Firebase's wrong-credential/unknown-account/already-registered codes
+// must render one identical, provider-agnostic message so /login cannot be
+// used to enumerate which emails are registered. Includes
+// `auth/invalid-credential`, the single code Firebase returns for both
+// wrong-password and unknown-account once enumeration protection is enabled.
+const CREDENTIAL_FAILURE_CODES = new Set([
+  'auth/user-not-found',
+  'auth/wrong-password',
+  'auth/invalid-credential',
+  'auth/email-already-in-use',
+])
+
+const CREDENTIAL_FAILURE_MESSAGE =
+  'Unable to complete sign-in with those details. Please check and try again.'
+const NEUTRAL_FAILURE_MESSAGE = 'Sign-in failed. Please try again.'
+
+// Any other failure (network, rate-limit, disabled account, …) gets a
+// distinct neutral message — never the credential copy (which would falsely
+// imply a wrong email/password) and never the raw provider string.
+function describeAuthError(err: unknown): string {
+  const code = (err as { code?: string } | undefined)?.code
+  if (code && CREDENTIAL_FAILURE_CODES.has(code)) {
+    return CREDENTIAL_FAILURE_MESSAGE
+  }
+  return NEUTRAL_FAILURE_MESSAGE
+}
+
 function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { signIn, signUp, signInWithGoogle, user, authLoading } = useAccountContext()
+  const { signIn, signUp, signInWithGoogle, user, authLoading, redirectError } =
+    useAccountContext()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/'
+  const redirect = sanitizeRedirect(searchParams.get('redirect'))
   const [isSignUp, setIsSignUp] = useState(searchParams.get('signUp') === 'true')
+
+  // D13/M1 — a failed/cancelled mobile Google-redirect sign-in surfaces here,
+  // through the same inline error surface and live region as any other
+  // sign-in failure, instead of a silent return to an unremarkable form.
+  const displayError = error || redirectError?.message || ''
 
   useEffect(() => {
     setConfirmPassword('')
@@ -48,7 +95,7 @@ function LoginForm() {
         await signIn(email, password)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed.')
+      setError(describeAuthError(err))
     } finally {
       setLoading(false)
     }
@@ -60,7 +107,7 @@ function LoginForm() {
     try {
       await signInWithGoogle()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed.')
+      setError(describeAuthError(err))
     } finally {
       setLoading(false)
     }
@@ -110,7 +157,16 @@ function LoginForm() {
               />
             </Field>
           )}
-          {error && <Text className="text-red-600 dark:text-red-400">{error}</Text>}
+          {displayError && (
+            <Text
+              data-testid="login-error"
+              role="alert"
+              aria-live="assertive"
+              className="text-red-600 dark:text-red-400"
+            >
+              {displayError}
+            </Text>
+          )}
           <Button type="submit" color="dark" disabled={loading} data-testid="login-submit">
             {loading ? 'Working...' : isSignUp ? 'Create account' : 'Sign in'}
           </Button>

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useFleetsInSystem, useFleetOrders, useScan } from './use-fleets'
+import { useFleetsInSystem, useFleetOrders, useMine, useScan } from './use-fleets'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
 import type { Fleet } from '@/lib/types/fleet'
@@ -12,6 +12,7 @@ vi.mock('@/lib/services', () => ({
     order: vi.fn(),
     cancel: vi.fn(),
     scan: vi.fn(),
+    mine: vi.fn(),
   },
 }))
 
@@ -103,5 +104,58 @@ describe('useFleetOrders / useScan', () => {
     expect(mockService.scan).toHaveBeenCalledWith('fleet_1')
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.systemBoard.detail('sys-7') })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.actions.running('fleet_1') })
+  })
+})
+
+describe('useMine', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockService.mine.mockResolvedValue({ actionId: 'act_9', eta: 200_000, worldTime: 0 })
+  })
+
+  function mineWrapper() {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const invalidate = vi.spyOn(qc, 'invalidateQueries')
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    )
+    Wrapper.displayName = 'MineWrapper'
+    return { Wrapper, invalidate }
+  }
+
+  it('commits a run and refreshes the fleet reads + running-actions inbox', async () => {
+    const { Wrapper, invalidate } = mineWrapper()
+    const { result } = renderHook(() => useMine('sys-7'), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        fleetId: 'fleet_1',
+        request: { featureId: 'feat-belt', kind: 'metals', tons: 40 },
+      })
+    })
+
+    expect(mockService.mine).toHaveBeenCalledWith('fleet_1', {
+      featureId: 'feat-belt',
+      kind: 'metals',
+      tons: 40,
+    })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.fleets.inSystem('sys-7') })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.fleets.detail('fleet_1') })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.actions.running('fleet_1') })
+  })
+
+  it('surfaces the server’s distinguishable rejection as the mutation error', async () => {
+    mockService.mine.mockRejectedValue(new Error('mine: fleet is not docked to the target feature'))
+    const { Wrapper } = mineWrapper()
+    const { result } = renderHook(() => useMine('sys-7'), { wrapper: Wrapper })
+
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({
+          fleetId: 'fleet_1',
+          request: { featureId: 'feat-belt', kind: 'metals', tons: 40 },
+        }),
+      ).rejects.toThrow(/not docked/)
+    })
   })
 })

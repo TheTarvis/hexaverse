@@ -28,7 +28,12 @@ what's fixed here vs. D9/D10 for what's flagged out of scope instead).
   new home system's board), and the `/login` auth form route.
 - Specify (and implement) the following failure-path corrections:
   - `corporation-provider.tsx` SHALL stop treating a corp-lookup error
-    (non-`404`) the same as "no corporation yet."
+    (non-`404`) the same as "no corporation yet," scoped to when no living
+    corporation is already known for the session — a background refetch
+    failure (React Query v5 retains cached `data` and sets `isError:true`
+    on a failed background refetch, e.g. window refocus) SHALL keep
+    serving the already-resolved app rather than evicting the player into
+    the error state (sharpened this revision — B1, adversary BLOCKER).
   - `layout-wrapper.tsx` (plus one narrow, additive export from
     `account-provider.tsx`) SHALL surface an account-lookup failure as a
     retriable error instead of an indefinite blank frame — SHALL NOT show
@@ -55,15 +60,26 @@ what's fixed here vs. D9/D10 for what's flagged out of scope instead).
     understated what the fix required; see `design.md` D5).
   - `app/login/page.tsx` SHALL show a uniform, provider-agnostic error for
     sign-in/sign-up credential failures (wrong password vs. unknown
-    account vs. already-registered email are not distinguishable), closing
-    an account-enumeration leak (new this revision, security).
+    account vs. already-registered email are not distinguishable, including
+    the single `auth/invalid-credential` code Firebase returns for both
+    wrong-password and unknown-account once enumeration protection is
+    enabled), closing an account-enumeration leak (new this revision,
+    security; SHALL-NOT list and displayed-copy scenario sharpened this
+    revision — M3).
   - `layout-wrapper.tsx`'s `PUBLIC_ROUTES` match SHALL be by full path
     segment, not bare string prefix (new this revision, security).
-  - `hooks/use-auth.ts` (new file in this change's scope, D13) SHALL
-    surface a failed/cancelled mobile Google-redirect sign-in as state, and
-    `app/login/page.tsx` SHALL render it through the existing inline error
-    surface, instead of silently returning the visitor to an unremarkable
-    login form (new this revision, reliability BLOCKER).
+  - `hooks/use-auth.ts` (new file in this change's scope, D13) SHALL,
+    before a redirect-based Google sign-in navigates away, persist a
+    redirect-initiation marker, and SHALL surface a failed OR cancelled
+    mobile Google-redirect sign-in as `redirectError` state (a rejection,
+    or a no-user resolution while the marker is present); a narrow,
+    additive `account-provider.tsx` passthrough exposes that state on
+    `AccountContextValue`, and `app/login/page.tsx` SHALL render it through
+    the existing inline error surface via `useAccountContext()`, instead of
+    silently returning the visitor to an unremarkable login form (new this
+    revision, reliability BLOCKER; marker mechanism and wiring sharpened
+    this revision — M1/M2, since `getRedirectResult` alone cannot
+    distinguish "cancelled" from "no redirect pending").
 - Everything else in the delta documents current, unchanged behavior
   (route gating, blank-frame states, wake-up flow mechanics, login pending
   states, credential/name persistence on failure) — no code change for
@@ -78,13 +94,18 @@ what's fixed here vs. D9/D10 for what's flagged out of scope instead).
   `frontend/components/layout-wrapper.tsx` (account/corp error surfacing,
   gated on `!isCreating`; public-route segment-boundary matching),
   `frontend/components/corporation-provider.tsx` (corp-lookup error
-  surfacing), `frontend/components/account-provider.tsx` (additive retry
-  export only — no change to its auto-create behavior),
-  `frontend/components/wake-up-flow.tsx` (malformed-response handling,
-  invalidation guard), `frontend/hooks/use-auth.ts` (new file this
-  revision, D13 — additive: surface the mobile Google-redirect result's
-  rejection as state; no change to its sign-in/sign-up/redirect-initiation
-  behavior). Everything else in this file list is otherwise read-only for
+  surfacing, scoped to when no living corporation is already known for the
+  session — a background refetch failure keeps serving the resolved app),
+  `frontend/components/account-provider.tsx` (additive exports only —
+  retry affordance (D6) + redirectError passthrough (D13) — no change to
+  its auto-create behavior), `frontend/components/wake-up-flow.tsx`
+  (malformed-response handling, invalidation guard), `frontend/hooks/use-auth.ts`
+  (new file this revision, D13 — additive: persist a redirect-initiation
+  marker before `signInWithRedirect` navigates, and surface the mobile
+  Google-redirect result — rejection, or a no-user resolution while the
+  marker is present — as `redirectError` state; no change to
+  `signIn`/`signUp`/`signInWithGoogle`'s existing sign-in behavior on any
+  other path). Everything else in this file list is otherwise read-only for
   this change.
 - Not in scope (flagged, not fixed here — see `design.md` D9/D10):
   `account-provider.tsx`'s auto-create-on-404 dead end on creation failure

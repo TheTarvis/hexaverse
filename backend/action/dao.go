@@ -8,6 +8,7 @@ import (
 	"hexaverse/common"
 
 	"cloud.google.com/go/firestore"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -26,6 +27,18 @@ func slotField(a Action) string {
 		return SlotMovement
 	}
 	return a.Slot
+}
+
+// ledgerKeyOf is the ledger a resolve folds and appends its Delta to — the
+// action's LedgerKey when named, defaulting to Scope otherwise (#0010
+// Decision #12/#13 — "Ledger Key Decoupled From Channel Scope"). Every verb
+// before mine never names a distinct LedgerKey, so this preserves prior
+// scope-as-ledger behavior unchanged.
+func ledgerKeyOf(a Action) string {
+	if a.LedgerKey != "" {
+		return a.LedgerKey
+	}
+	return a.Scope
 }
 
 //go:generate mockgen -destination=dao_mock.go -package=action -source=dao.go Dao
@@ -78,8 +91,8 @@ func (dao *DaoImpl) actionRef(id string) *firestore.DocumentRef {
 	return dao.db.Collection(actionsCollection).Doc(id)
 }
 
-func (dao *DaoImpl) deltaRef(scope, actionID string) *firestore.DocumentRef {
-	return dao.db.Collection(deltasCollection).Doc(scope).Collection(deltaEntries).Doc(actionID)
+func (dao *DaoImpl) deltaRef(ledgerKey, actionID string) *firestore.DocumentRef {
+	return dao.db.Collection(deltasCollection).Doc(ledgerKey).Collection(deltaEntries).Doc(actionID)
 }
 
 // refFromPath resolves an alternating collection/doc path
@@ -237,11 +250,12 @@ func (dao *DaoImpl) ResolveOne(ctx context.Context, id string, resolve ResolveFu
 		if err != nil {
 			return fmt.Errorf("reading actor for resolve: %w", err)
 		}
+		ledgerKey := ledgerKeyOf(a)
 		res, err := resolve(ctx, Resolution{
 			Action:      a,
 			At:          a.Eta,
 			DecodeActor: actorSnap.DataTo,
-			Remaining:   func(t common.WorldMillis) (float64, error) { return dao.foldDeltasTx(tx, a.Scope, t) },
+			Remaining:   func(t common.WorldMillis) (float64, error) { return dao.foldDeltasTx(ctx, tx, ledgerKey, t) },
 		})
 		if err != nil {
 			return err
@@ -264,7 +278,7 @@ func (dao *DaoImpl) ResolveOne(ctx context.Context, id string, resolve ResolveFu
 			d.EffectAt = a.Eta
 			// Create fails if the delta already exists — the exactly-once guard. A
 			// concurrent resolver that already wrote it makes this txn fail and no-op.
-			if err := tx.Create(dao.deltaRef(a.Scope, a.Id), d); err != nil {
+			if err := tx.Create(dao.deltaRef(ledgerKey, a.Id), d); err != nil {
 				return fmt.Errorf("appending delta: %w", err)
 			}
 		}
@@ -314,11 +328,21 @@ func (dao *DaoImpl) DueIDs(ctx context.Context, field, value string, now common.
 	return ids, nil
 }
 
+// FoldDeltas sums delta amounts for a ledger key with effectAt ≤ upTo — the
+// read half of remaining(T), used by the public commit-time fold
+// (Service.Remaining, e.g. mine's "Already-Depleted Lode Rejected At
+// Commit"). Also logs the fold's delta-entry count against the ledger key
+// (#0010 "Mine Ledger Depth Is Observable" / design.md Decision #17): the
+// risk this guards is the O(entry-count) transactional fold cost, so the
+// count — not the folded tonnage — is the signal that must be attributable
+// to the ledger key, independent of whether the caller's own commit
+// ultimately succeeds.
 func (dao *DaoImpl) FoldDeltas(ctx context.Context, scope string, upTo common.WorldMillis) (float64, error) {
 	iter := dao.db.Collection(deltasCollection).Doc(scope).Collection(deltaEntries).
 		Where("effectAt", "<=", int64(upTo)).Documents(ctx)
 	defer iter.Stop()
 	var sum float64
+	var n int
 	for {
 		doc, err := iter.Next()
 		if errors.Is(err, iterator.Done) {
@@ -332,16 +356,22 @@ func (dao *DaoImpl) FoldDeltas(ctx context.Context, scope string, upTo common.Wo
 			return 0, err
 		}
 		sum += d.Amount
+		n++
 	}
+	log.Info().Ctx(ctx).Str("ledgerKey", scope).Int("deltaCount", n).Msg("Ledger fold delta count")
 	return sum, nil
 }
 
-// foldDeltasTx is the transaction-consistent fold used by a resolver's Remaining.
-func (dao *DaoImpl) foldDeltasTx(tx *firestore.Transaction, scope string, upTo common.WorldMillis) (float64, error) {
+// foldDeltasTx is the transaction-consistent fold used by a resolver's
+// Remaining (e.g. mine's "Resolve Clamps Yield to Reality"). Logs the same
+// ledger-key-attributed delta-entry count as FoldDeltas (#0010 Decision #17)
+// — mine pays this transactional fold cost at resolve, not just at commit.
+func (dao *DaoImpl) foldDeltasTx(ctx context.Context, tx *firestore.Transaction, scope string, upTo common.WorldMillis) (float64, error) {
 	iter := tx.Documents(dao.db.Collection(deltasCollection).Doc(scope).Collection(deltaEntries).
 		Where("effectAt", "<=", int64(upTo)))
 	defer iter.Stop()
 	var sum float64
+	var n int
 	for {
 		doc, err := iter.Next()
 		if errors.Is(err, iterator.Done) {
@@ -355,7 +385,9 @@ func (dao *DaoImpl) foldDeltasTx(tx *firestore.Transaction, scope string, upTo c
 			return 0, err
 		}
 		sum += d.Amount
+		n++
 	}
+	log.Info().Ctx(ctx).Str("ledgerKey", scope).Int("deltaCount", n).Msg("Ledger fold delta count")
 	return sum, nil
 }
 

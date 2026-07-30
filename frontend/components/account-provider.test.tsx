@@ -12,15 +12,39 @@ vi.mock('@/lib/services')
 
 // Test component to access context
 function TestComponent() {
-  const context = useAccountContext()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const context = useAccountContext() as any
   return (
     <div>
       <div data-testid="account-email">{context.account?.email}</div>
       <div data-testid="account-name">{context.account?.name}</div>
       <div data-testid="account-nickname">{context.account?.nickname}</div>
       <div data-testid="is-creating">{context.isCreating.toString()}</div>
+      <div data-testid="has-refetch-account">
+        {String(typeof context.refetchAccount === 'function')}
+      </div>
+      <div data-testid="redirect-error">
+        {context.redirectError ? context.redirectError.message : 'none'}
+      </div>
     </div>
   )
+}
+
+function baseUseAuthMock(overrides: Record<string, unknown> = {}) {
+  return {
+    user: null,
+    loading: false,
+    tokenLoading: false,
+    isAdmin: false,
+    isCheckingAdmin: false,
+    signOut: vi.fn(),
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    resetPassword: vi.fn(),
+    signInWithGoogle: vi.fn(),
+    getIdToken: vi.fn().mockResolvedValue('mock-token'),
+    ...overrides,
+  }
 }
 
 describe('AccountProvider', () => {
@@ -259,6 +283,59 @@ describe('AccountProvider', () => {
     // Wait and verify createAccount was never called
     await waitFor(() => {
       expect(mockCreateAccount).not.toHaveBeenCalled()
+    })
+  })
+
+  // --- D6/task 2.2: an additive retry affordance for a failed account lookup ---
+
+  it('Scenario: exposes refetchAccount for a user-triggered retry', async () => {
+    const mockUser: Partial<User> = {
+      uid: 'lookup-fail-user',
+      displayName: 'Lookup Fail',
+      email: 'lookup.fail@example.com',
+      emailVerified: true,
+    }
+    vi.mocked(useAuth).mockReturnValue(baseUseAuthMock({ user: mockUser as User }) as ReturnType<
+      typeof useAuth
+    >)
+
+    // A non-404 failure (a genuine lookup failure, not "no account yet") —
+    // must not trigger auto-create, and the provider must expose a retry.
+    vi.mocked(accountService).getCurrentAccount = vi.fn().mockRejectedValue({ status: 500 })
+
+    const { getByTestId } = render(
+      <QueryClientProvider client={queryClient}>
+        <AccountProvider>
+          <TestComponent />
+        </AccountProvider>
+      </QueryClientProvider>
+    )
+
+    await waitFor(() => {
+      expect(getByTestId('has-refetch-account')).toHaveTextContent('true')
+    })
+  })
+
+  // --- D13/M1/task 8.1b: redirectError passthrough from useAuth ---
+
+  it("Scenario: threads useAuth's redirectError through AccountContextValue", async () => {
+    vi.mocked(useAuth).mockReturnValue(
+      baseUseAuthMock({
+        redirectError: new Error('Google sign-in did not complete.'),
+      }) as ReturnType<typeof useAuth>
+    )
+    vi.mocked(accountService).getCurrentAccount = vi.fn().mockResolvedValue(null)
+
+    const { getByTestId } = render(
+      <QueryClientProvider client={queryClient}>
+        <AccountProvider>
+          <TestComponent />
+        </AccountProvider>
+      </QueryClientProvider>
+    )
+
+    await waitFor(() => {
+      expect(getByTestId('redirect-error')).toHaveTextContent('Google sign-in did not complete.')
     })
   })
 })

@@ -14,11 +14,21 @@ interface AccountContextValue {
   isLoading: boolean
   isCreating: boolean
   error: Error | null
+  // D6/task 2.2 — additive retry affordance for a failed account *lookup*
+  // (no change to what triggers auto-creation or what it sends). Optional at
+  // the type level only (always provided at runtime) so existing test
+  // doubles that predate this field keep type-checking.
+  refetchAccount?: () => void
   // Auth data (to avoid other components calling useAuth)
   user: User | null
   authLoading: boolean
   isAdmin: boolean
   isCheckingAdmin: boolean
+  // D13/M1 — additive passthrough of use-auth.ts's redirectError so
+  // app/login/page.tsx can read it via useAccountContext() (this frontend's
+  // convention against calling useAuth() directly from a component). Optional
+  // at the type level for the same reason as refetchAccount above.
+  redirectError?: Error | null
   signOut: () => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
@@ -41,6 +51,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     loading: authLoading,
     isAdmin,
     isCheckingAdmin,
+    redirectError,
     signOut,
     signIn,
     signUp,
@@ -148,11 +159,15 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     isLoading: authLoading || accountLoading || isCreating,
     isCreating,
     error: (accountError as { status?: number })?.status === 404 && !hasTriedCreation ? null : accountError,
+    refetchAccount: () => {
+      refetchAccount()
+    },
     // Auth data
     user,
     authLoading,
     isAdmin,
     isCheckingAdmin,
+    redirectError: redirectError ?? null,
     signOut,
     signIn: async (email: string, password: string) => {
       await signIn(email, password)

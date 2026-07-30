@@ -18,13 +18,16 @@ no fleets — before spawn, or while logged out.
 - **THEN** the roster panel does not render
 
 ### Requirement: One Row Per Owned Fleet, Derived From Effective State
-The system SHALL show one row per owned fleet, deriving its status purely
-from the fleet's movement state evaluated at the current world time (the
-effective, folded state — never the raw stored state) and a system-name
-lookup: a status tone (idle, moving, transit, or held), a "where" label (a
-system name, or "Origin → Destination" while on a lane), an activity
-label in player-facing language, and — when the current order has a known
-completion time — a remaining-time countdown.
+The system SHALL show one row per owned fleet, deriving its status from
+the fleet's movement state evaluated at the current world time (the
+effective, folded state — never the raw stored state), the fleet's running
+mine action if one exists with an ETA still in the future, and a
+system-name lookup: a status tone (idle, moving, transit, or held), a
+"where" label (a system name, or "Origin → Destination" while on a lane),
+an activity label in player-facing language, and — when the current order
+has a known completion time — a remaining-time countdown. A running mine
+action whose ETA has passed SHALL NOT drive the label; the row falls back
+to the movement-state-derived activity.
 
 #### Scenario: A coasting fleet reads as on station
 - **WHEN** a fleet's effective state is `coast`
@@ -35,6 +38,18 @@ completion time — a remaining-time countdown.
 - **WHEN** a fleet's effective state is `burn`
 - **THEN** its row shows tone `moving`, "Under way" (or "Docking" when the
   burn targets a dock), and a countdown to the burn's arrival time
+
+#### Scenario: A docked fleet with a running mine reads as mining
+- **WHEN** a fleet's effective state is `docked` and it has a running mine
+  action whose ETA is in the future
+- **THEN** its row shows a "Mining" activity with a countdown to the
+  run's ETA, instead of the docked state's idle label
+
+#### Scenario: A past-ETA mine action no longer drives the label
+- **WHEN** a fleet's running mine action's ETA is at or before the current
+  world time
+- **THEN** its row shows the movement-state-derived activity, not
+  "Mining"
 
 #### Scenario: A trip still crossing its origin board reads as departing
 - **WHEN** a fleet's effective state is `laneTransit` and world time is

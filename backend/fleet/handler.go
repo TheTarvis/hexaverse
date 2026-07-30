@@ -238,6 +238,44 @@ type fleetDTO struct {
 	Position      board.Hex           `json:"position"`
 	Own           bool                `json:"own"`
 	WorldTime     common.WorldMillis  `json:"worldTime"`
+	// Roster is the owner-only ships/cargo/derived-capacity surface (#0010
+	// "Fleet Read Surfaces Roster, Cargo, and Derived Capacity"). nil for a
+	// foreign fleet — omitted from the JSON entirely (`omitempty`), not merely
+	// zeroed, mirroring the same redaction dtoFor already applies to State.
+	Roster *rosterDTO `json:"roster,omitempty"`
+}
+
+// rosterDTO is the roster/cargo/derived-capacity read shape — populated only
+// for the requester's own fleet (see dtoFor's `own` branch).
+type rosterDTO struct {
+	Ships         []ShipEntry        `json:"ships"`
+	Cargo         map[string]float64 `json:"cargo"`
+	CargoCapacity float64            `json:"cargoCapacity"`
+	FreeHold      float64            `json:"freeHold"`
+	// MiningRate is the roster's summed extraction rate (tons/world-ms) —
+	// served so the mine UI's ETA preview (tons ÷ rate) never mirrors the
+	// class-stats table client-side ("Fleet Read Surfaces Roster, Cargo, and
+	// Derived Capacity", add-mine-ui).
+	MiningRate float64 `json:"miningRate"`
+}
+
+// rosterFieldsFor builds the owner-only roster/cargo DTO, or nil for a foreign
+// fleet (#0010 "Fleet Read Surfaces Roster, Cargo, and Derived Capacity").
+// Ships reports through effectiveRoster so an owner reading a legacy fleet
+// document (no stored Ships) still sees its one default seed hull, never an
+// empty roster.
+func rosterFieldsFor(f *Fleet, own bool) *rosterDTO {
+	if !own {
+		return nil
+	}
+	stats := DefaultClassStats()
+	return &rosterDTO{
+		Ships:         effectiveRoster(*f),
+		Cargo:         f.Cargo,
+		CargoCapacity: DerivedCapacity(*f, stats),
+		FreeHold:      FreeHold(*f, stats),
+		MiningRate:    DerivedMiningRate(*f, stats),
+	}
 }
 
 func (h *Handler) toDTO(c *gin.Context, f *Fleet) fleetDTO {
@@ -264,5 +302,6 @@ func (h *Handler) dtoFor(f *Fleet, pos board.Hex, requesterCid string) fleetDTO 
 		Position:      pos,
 		Own:           own,
 		WorldTime:     h.clock.Now(),
+		Roster:        rosterFieldsFor(f, own),
 	}
 }

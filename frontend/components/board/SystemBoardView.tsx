@@ -13,8 +13,9 @@ import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import { toast } from '@/lib/toast'
 import { useSystemBoard } from '@/hooks/use-system-board'
-import { useFleetsInSystem, useFleetOrders, useScan, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
-import { useRunningScan } from '@/hooks/use-actions'
+import { useFleetsInSystem, useFleetOrders, useMine, useScan, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
+import { useCancelAction, useRunningMine, useRunningScan } from '@/hooks/use-actions'
+import type { ResourceKind } from '@/lib/types/system-board'
 import { useWorldTime } from '@/hooks/use-world-time'
 import { useBoardRealtime } from '@/hooks/use-board-realtime'
 import type { Hex, Target } from '@/lib/hex'
@@ -78,8 +79,16 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
 
   const { order, cancel } = useFleetOrders(systemId)
   const scan = useScan(systemId)
+  const mine = useMine(systemId)
+  const cancelAction = useCancelAction(systemId)
   const travel = useFleetTravel()
-  const pending = order.isPending || cancel.isPending || scan.isPending || travel.isPending
+  const pending =
+    order.isPending ||
+    cancel.isPending ||
+    scan.isPending ||
+    mine.isPending ||
+    cancelAction.isPending ||
+    travel.isPending
 
   const allFleets = useMemo(() => fleets ?? [], [fleets])
   const ownFleets = useMemo(() => allFleets.filter((f) => f.own), [allFleets])
@@ -105,6 +114,15 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     return fleetLogicalHex(activeFleet, worldTime, parentHex)
   }, [activeFleet, board, worldTime])
 
+  // The feature the acting fleet is docked to, if any — the mine offer's
+  // anchor (add-mine-ui "Mine Offer on the Docked Fleet"): the verb needs no
+  // selection, just the docked state and the body's visible resources.
+  const dockedFeature = useMemo(() => {
+    if (!activeFleet || !board) return null
+    const parentId = fleetDockedParentId(activeFleet, worldTime)
+    return parentId ? (board.features.find((f) => f.id === parentId) ?? null) : null
+  }, [activeFleet, board, worldTime])
+
   // The sweep preview: what a scan from HERE would leave in shadow (#0006
   // Decision #21 — the sweep is 360°, so the shadow is the signal). Only
   // computed while the Scan verb is being considered (hover/focus).
@@ -120,6 +138,10 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   // until the eta passes and the reveal lands via the board refetch. A scan
   // committed before the origin was pinned falls back to the fleet at eta.
   const runningScan = useRunningScan(activeFleet?.id ?? null).data ?? null
+  // The RUNNING mine (#0010, add-mine-ui): the movement channel's busy signal.
+  // Its eta gates move/mine in the panel and joins the refetch candidates so
+  // the resolved cargo + freed slot land without user action.
+  const runningMine = useRunningMine(activeFleet?.id ?? null).data ?? null
   const activeSweep = useMemo<ScanPlan | null>(() => {
     if (!board || !activeFleet || !runningScan) return null
     if (runningScan.status !== 'running' || worldTime >= runningScan.eta) return null
@@ -165,8 +187,9 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
         return gateEta === undefined ? [] : [gateEta]
       }),
       ...(runningScan?.status === 'running' ? [runningScan.eta] : []),
+      ...(runningMine?.status === 'running' ? [runningMine.eta] : []),
     ],
-    [ownFleets, runningScan],
+    [ownFleets, runningScan, runningMine],
   )
   useBoardRealtime({ systemId, worldTime, etaCandidates, scanning: !!activeSweep, enabled: !!board })
 
@@ -288,6 +311,29 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       onError: (e) => toast.error(e.message || 'Cancel failed'),
     })
   }
+  // Mine (#0010, add-mine-ui): the panel picked kind + tons; the featureId is
+  // the fleet's dock parent — no selection involved. The countdown + refetch
+  // arming ride the invalidated inbox.
+  const commitMine = (kind: ResourceKind, tons: number) => {
+    if (!activeFleet || !dockedFeature) return
+    mine.mutate(
+      { fleetId: activeFleet.id, request: { featureId: dockedFeature.id, kind, tons } },
+      {
+        onSuccess: () => toast.success('Extractors running'),
+        onError: (e) => toast.error(e.message || 'Mine failed'),
+      },
+    )
+  }
+  const commitCancelMine = () => {
+    if (!activeFleet || !runningMine) return
+    cancelAction.mutate(
+      { actionId: runningMine.id, fleetId: activeFleet.id },
+      {
+        onSuccess: () => toast.success('Mining cancelled'),
+        onError: (e) => toast.error(e.message || 'Cancel failed'),
+      },
+    )
+  }
   const commitDepart = () => {
     if (!activeFleet || selection?.kind !== 'gate') return
     travel.mutate(
@@ -377,10 +423,12 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           featureCount={board.features.length}
           selection={selection}
           activeFleet={activeFleet}
+          dockedFeature={dockedFeature}
           plan={plan}
           worldTime={worldTime}
           pending={pending}
           scanEta={runningScan?.status === 'running' ? runningScan.eta : null}
+          mineEta={runningMine?.status === 'running' ? runningMine.eta : null}
           route={
             selection?.kind === 'gate'
               ? { isLoading: routeQuery.isLoading, isError: routeQuery.isError, data: routeQuery.data }
@@ -388,6 +436,8 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           }
           onMove={commitMove}
           onScan={commitScan}
+          onMine={commitMine}
+          onCancelMine={commitCancelMine}
           onScanPreview={setScanPreview}
           scanFx={scanFx}
           onToggleScanFx={toggleScanFx}

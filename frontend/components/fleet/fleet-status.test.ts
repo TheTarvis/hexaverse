@@ -22,6 +22,47 @@ describe('fleetStatus', () => {
     expect(s.remainingMs).toBeUndefined()
   })
 
+  // add-mine-ui, fleet-roster delta: a docked fleet with a running mine reads
+  // as mining, counting down to the run's eta.
+  it('reads a docked fleet with a running mine as Mining, with the run’s countdown', () => {
+    const s = fleetStatus(
+      fleet({ mode: 'docked', docked: { parentId: 'p1' } }),
+      10_000,
+      nameOf,
+      { eta: 40_000 },
+    )
+    expect(s).toMatchObject({ tone: 'moving', where: 'Axion', activity: 'Mining', goToSystemId: 'sys-0' })
+    expect(s.remainingMs).toBe(30_000)
+  })
+
+  // add-mine-ui, fleet-roster delta: a past-eta mine action no longer drives
+  // the label — the movement-state activity returns by world time alone.
+  it('falls back to the movement-state label once the mine’s eta passes', () => {
+    const s = fleetStatus(
+      fleet({ mode: 'docked', docked: { parentId: 'p1' } }),
+      50_000,
+      nameOf,
+      { eta: 40_000 },
+    )
+    expect(s).toMatchObject({ tone: 'idle', activity: 'Docked' })
+    expect(s.remainingMs).toBeUndefined()
+  })
+
+  it('lets movement win over a mine entry when the fleet is not docked', () => {
+    // A burn beside a (stale or racing) mine entry is the truer picture — the
+    // movement slot can't hold both; never show Mining on a moving fleet.
+    const s = fleetStatus(
+      fleet({
+        mode: 'burn',
+        burn: { path: [{ q: 0, r: 0 }], startTime: 0, arriveTime: 30_000, target: {} },
+      }),
+      10_000,
+      nameOf,
+      { eta: 40_000 },
+    )
+    expect(s).toMatchObject({ tone: 'moving', activity: 'Under way' })
+  })
+
   it('counts down a burn', () => {
     const s = fleetStatus(
       fleet({

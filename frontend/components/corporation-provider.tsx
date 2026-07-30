@@ -17,6 +17,16 @@ interface CorporationContextValue {
   isLoading: boolean
   // True once we KNOW the signed-in account has no living corp — the wake gate.
   needsWake: boolean
+  // D6 — a corp-lookup error (non-404, e.g. 5xx/network), distinct from the
+  // genuine "no living corporation yet" signal (a resolved null). Optional
+  // at the type level only (always provided at runtime by this provider) —
+  // additive fields stay optional so existing test doubles that predate them
+  // keep type-checking.
+  isError?: boolean
+  error?: unknown | null
+  // D6 — exposed so layout-wrapper.tsx can drive a user-triggered retry
+  // (parity with account-provider's refetchAccount).
+  refetch?: () => void
 }
 
 const CorporationContext = createContext<CorporationContextValue | undefined>(undefined)
@@ -35,7 +45,7 @@ export function CorporationProvider({ children }: { children: React.ReactNode })
   // Only ask once we have a signed-in account (the corp is keyed to it).
   const enabled = !!user && !!account && !accountLoading
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.corporations.me(),
     queryFn: () => corporationService.getMine(),
     enabled,
@@ -45,11 +55,26 @@ export function CorporationProvider({ children }: { children: React.ReactNode })
   const corporation = data ?? null
   const resolving = enabled && isLoading
   // getMine() returns null (not an error) for a corpless account, so a resolved
-  // null is the signal to wake — not a loading or logged-out state.
-  const needsWake = enabled && !resolving && corporation === null
+  // null is the signal to wake — not a loading or logged-out state. A
+  // corp-lookup error (5xx/network) is NOT evidence of corplessness (D6/B1):
+  // needsWake stays false whenever isError is true, whether or not a living
+  // corporation was already cached (a cached corporation already makes
+  // `corporation === null` false on its own — this guards the no-cache case).
+  const needsWake = enabled && !resolving && !isError && corporation === null
 
   return (
-    <CorporationContext.Provider value={{ corporation, isLoading: resolving, needsWake }}>
+    <CorporationContext.Provider
+      value={{
+        corporation,
+        isLoading: resolving,
+        needsWake,
+        isError,
+        error: error ?? null,
+        refetch: () => {
+          refetch()
+        },
+      }}
+    >
       {children}
     </CorporationContext.Provider>
   )

@@ -59,9 +59,23 @@ type Action struct {
 	Actor           string `json:"actor" firestore:"actor"`
 	ActorCollection string `json:"actorCollection" firestore:"actorCollection"`
 	// Scope is the resolve-ordering + due-query key: a systemId for kinematic
-	// verbs, a featureId (the lode) for mutating verbs.
-	Scope  string                 `json:"scope" firestore:"scope"`
-	Params map[string]interface{} `json:"params" firestore:"params"`
+	// verbs, a systemId for mutating verbs too (#0010 Decision #12 — Scope stays
+	// the coarser, board/channel-aligned granularity; a verb that needs finer
+	// per-target bookkeeping names a distinct LedgerKey instead of overloading
+	// Scope onto it). Scope also doubles as the ledger key's default (see
+	// LedgerKey below), and as such must never contain "/" — Firestore
+	// document ids cannot hold it.
+	Scope string `json:"scope" firestore:"scope"`
+	// LedgerKey is the ledger a resolve folds and appends its Delta to,
+	// decoupled from Scope (#0010 Decision #12/#13 — action-dispatch's "Ledger
+	// Key Decoupled From Channel Scope"). Empty means "use Scope" (every verb
+	// before mine; #0005's original scope-as-ledger behavior, unchanged). A
+	// composite ledger key (e.g. mine's `systemId::featureId::kind`) must NEVER
+	// contain "/" — Firestore document ids cannot hold it, and the ledger key
+	// doubles as the delta collection's parent document id
+	// (deltas/{ledgerKey}/entries/{actionId}).
+	LedgerKey string                 `json:"ledgerKey,omitempty" firestore:"ledgerKey,omitempty"`
+	Params    map[string]interface{} `json:"params" firestore:"params"`
 
 	// Slot is the actor-doc field this action claimed at commit — its channel.
 	// Empty means the movement slot (pre-channel docs keep resolving unchanged).
@@ -76,7 +90,18 @@ type Action struct {
 
 	// Outcome is what actually happened, recorded at resolve ("mined 40; belt ran
 	// dry"). Empty until resolved.
-	Outcome    string             `json:"outcome,omitempty" firestore:"outcome,omitempty"`
+	Outcome string `json:"outcome,omitempty" firestore:"outcome,omitempty"`
+	// ReasonCode is an optional structured classifier a mutating resolver may set
+	// alongside Outcome (e.g. mine's clean|lodeDry|holdFull — #0010 Decisions
+	// #15/#19), so a caller can group/count resolutions by reason without parsing
+	// Outcome prose. Empty for verbs that don't use it (kinematic resolves).
+	//
+	// SDET-INVENTED SURFACE (not in tasks.md's group-0 list): mine's spec
+	// ("Resolve Clamps Yield to Reality") requires a structured reason code
+	// distinct from Outcome's prose, and no existing action-dispatch field
+	// carries it. Pinned here as the minimal compile-contract addition; flagged
+	// upstream as a design.md gap (see the SDET handoff report).
+	ReasonCode string             `json:"reasonCode,omitempty" firestore:"reasonCode,omitempty"`
 	ResolvedAt common.WorldMillis `json:"resolvedAt,omitempty" firestore:"resolvedAt,omitempty"`
 
 	// AcknowledgedAt powers the check-in inbox (done-but-unacknowledged query).
@@ -116,8 +141,12 @@ type CommitSpec struct {
 	Actor           string
 	ActorCollection string
 	Scope           string
-	Params          map[string]interface{}
-	Eta             common.WorldMillis
+	// LedgerKey names a ledger distinct from Scope for this commit's mutating
+	// effect (#0010 Decisions #12/#13/#14). Empty defaults to Scope — every
+	// existing verb (burn, lane travel) is unaffected.
+	LedgerKey string
+	Params    map[string]interface{}
+	Eta       common.WorldMillis
 	// Slot picks the actor channel to claim (SlotMovement | SlotSensor); empty
 	// defaults to the movement slot.
 	Slot string
@@ -148,9 +177,15 @@ type Resolution struct {
 // transaction with the running→done flip and the slot release.
 type ResolveResult struct {
 	Outcome string
-	// Delta, if non-nil, is appended to the ledger at deltas/{scope}/entries/
-	// {actionId} — exactly-once by doc id (mutating verbs whose effect is an
-	// additive number, e.g. mine tonnage).
+	// ReasonCode is the structured classifier mirrored onto Action.ReasonCode at
+	// the same status flip (see Action.ReasonCode's doc comment — SDET-invented
+	// surface for mine's clean|lodeDry|holdFull requirement).
+	ReasonCode string
+	// Delta, if non-nil, is appended to the ledger at
+	// deltas/{ledgerKey}/entries/{actionId} — exactly-once by doc id (mutating
+	// verbs whose effect is an additive number, e.g. mine tonnage). ledgerKey is
+	// the action's LedgerKey, defaulting to Scope when unset (#0010 Decision
+	// #12).
 	Delta *Delta
 	// ActorState, if non-nil, is merged onto the actor doc (the kinematic
 	// transition, e.g. a fleet's settled coast/dock state).

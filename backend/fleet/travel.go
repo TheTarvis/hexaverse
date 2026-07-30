@@ -33,7 +33,7 @@ func (s *Service) PreviewRoute(ctx context.Context, id, destSystemID string) (*R
 		return nil, err
 	}
 	now := s.clock.Now()
-	plan, err := s.planRoute(ctx, f.CorporationId, f.SystemId, destSystemID)
+	plan, err := s.planRoute(ctx, f.CorporationId, f.SystemId, destSystemID, s.msPerLaneUnitFor(f))
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (s *Service) orderTravel(ctx context.Context, id, destSystemID string) (*Fl
 		}
 	}
 
-	plan, err := s.planRoute(ctx, f.CorporationId, f.SystemId, destSystemID)
+	plan, err := s.planRoute(ctx, f.CorporationId, f.SystemId, destSystemID, s.msPerLaneUnitFor(f))
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (s *Service) buildTrip(ctx context.Context, f *Fleet, plan *routePlan, now 
 	if err != nil {
 		return nil, err
 	}
-	boardSol := board.SolveHex(from, departGate, now, s.params.MsPerTile)
+	boardSol := board.SolveHex(from, departGate, now, s.msPerTileFor(f))
 	boardLeg := &board.BoardLeg{Path: boardSol.Path, StartTime: now, GateEta: boardSol.ArriveTime}
 
 	// LegEtas[0] is the gate ETA (when the fleet enters the first lane); each lane

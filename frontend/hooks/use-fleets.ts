@@ -10,7 +10,7 @@ import {
 } from '@tanstack/react-query'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
-import type { Fleet, RoutePreview } from '@/lib/types/fleet'
+import type { Fleet, MineCommit, MineRequest, RoutePreview } from '@/lib/types/fleet'
 import type { Target } from '@/lib/hex'
 
 // useFleetsInSystem — the fogged fleet layer for one system (#0004/#0007), the
@@ -132,6 +132,27 @@ export function useScan(systemId: string): UseMutationResult<Fleet, Error, strin
       // The running-scan indicator reads the actions inbox — refresh it so the
       // committed sweep + countdown appear immediately.
       void qc.invalidateQueries({ queryKey: queryKeys.actions.running(fleet.id) })
+    },
+  })
+}
+
+// useMine — the extraction verb (#0010, add-mine-ui): commit a run against the
+// docked-at feature. Rides the movement channel (a 409 names the occupying
+// action), so success refreshes the fleet reads (the claimed slot) and the
+// actions inbox (the running-mine countdown) — the interior is untouched at
+// commit; depletion lands at resolution via the board's refetch rules. The
+// server's distinguishable rejection reason surfaces as the mutation error for
+// the component to toast.
+export function useMine(
+  systemId: string,
+): UseMutationResult<MineCommit, Error, { fleetId: string; request: MineRequest }> {
+  const qc = useQueryClient()
+  return useMutation<MineCommit, Error, { fleetId: string; request: MineRequest }>({
+    mutationFn: ({ fleetId, request }) => fleetService.mine(fleetId, request),
+    onSuccess: (_, { fleetId }) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.fleets.inSystem(systemId) })
+      void qc.invalidateQueries({ queryKey: queryKeys.fleets.detail(fleetId) })
+      void qc.invalidateQueries({ queryKey: queryKeys.actions.running(fleetId) })
     },
   })
 }

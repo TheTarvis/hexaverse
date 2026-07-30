@@ -51,9 +51,21 @@ type routePlan struct {
 // between two systems you know. Intermediates must additionally be Explored
 // (you can't route THROUGH a system you've never entered); the destination may
 // be a single Rumored terminal hop past the frontier.
-func (s *Service) planRoute(ctx context.Context, cid, origin, dest string) (*routePlan, error) {
+//
+// msPerLaneUnit is variadic so every prior caller (and routing_test.go, which
+// pins this exact signature) keeps working unchanged: omitted, it falls back
+// to s.params.LaneMsPerDistance (the pre-#0010 global constant); orderTravel/
+// PreviewRoute pass the ordering fleet's roster-derived lane rate inverted
+// (#0010 "Derived Fleet Speed" — never a stored total, computed fresh per
+// call), so routing weight reflects the ACTUAL fleet doing the routing, not a
+// flat constant.
+func (s *Service) planRoute(ctx context.Context, cid, origin, dest string, msPerLaneUnit ...float64) (*routePlan, error) {
 	if origin == dest {
 		return nil, ErrSameSystem
+	}
+	perUnit := s.params.LaneMsPerDistance
+	if len(msPerLaneUnit) > 0 {
+		perUnit = msPerLaneUnit[0]
 	}
 	gal, err := s.graph.GetLive(ctx)
 	if err != nil {
@@ -121,7 +133,7 @@ func (s *Service) planRoute(ctx context.Context, cid, origin, dest string) (*rou
 			if !explored(e.to) && !(e.to == dest && rumored(e.to)) {
 				continue
 			}
-			w := legMs(systems[cur], systems[e.to], s.params.LaneMsPerDistance)
+			w := legMs(systems[cur], systems[e.to], perUnit)
 			nd := dist[cur] + w
 			if od, ok := dist[e.to]; !ok || nd < od {
 				dist[e.to] = nd
@@ -141,7 +153,7 @@ func (s *Service) planRoute(ctx context.Context, cid, origin, dest string) (*rou
 	legs := make([]common.WorldMillis, len(route)-1)
 	laneIds := make([]string, len(route)-1)
 	for i := 0; i < len(route)-1; i++ {
-		legs[i] = legMs(systems[route[i]], systems[route[i+1]], s.params.LaneMsPerDistance)
+		legs[i] = legMs(systems[route[i]], systems[route[i+1]], perUnit)
 		laneIds[i] = prevLane[route[i+1]]
 	}
 	return &routePlan{route: route, legMs: legs, laneIds: laneIds, systems: systems}, nil

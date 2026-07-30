@@ -15,8 +15,8 @@ import (
 // TestIntegration_TravelArriveReveals drives the full M8 stack against the
 // emulator: a real galaxy graph, a seeded fleet ordered to a Rumored neighbour,
 // and an offline arrival resolved by advancing the clock — landing the fleet
-// coasting at the destination rim, flipping the destination to Explored, and
-// materializing its interior (the first-arrival detail roll).
+// coasting at the destination's gate ring, flipping the destination to Explored,
+// and materializing its interior (the first-arrival detail roll).
 // Spec: 0008/S3
 func TestIntegration_TravelArriveReveals(t *testing.T) {
 	fs, client := common.SetupFirestoreTestDAO(t)
@@ -114,9 +114,11 @@ func TestIntegration_TravelArriveReveals(t *testing.T) {
 	if arrived.ActiveActionId != "" {
 		t.Fatalf("expected slot released after arrival")
 	}
-	// Landed coasting on the destination board's rim (a lane gate tile).
-	if pos := board.OrbState(*arrived.State.Coast, clk.now); board.Ring(pos) != DefaultMovementParams().BoardRadius {
-		t.Fatalf("expected coast on the rim, got ring %d", board.Ring(pos))
+	// Landed coasting on the destination's gate ring (the lane-mouth tile —
+	// three rings in from the rim, board.GateRing).
+	wantRing := board.GateRing(DefaultMovementParams().BoardRadius)
+	if pos := board.OrbState(*arrived.State.Coast, clk.now); board.Ring(pos) != wantRing {
+		t.Fatalf("expected coast on the gate ring %d, got ring %d", wantRing, board.Ring(pos))
 	}
 
 	// The destination flipped to Explored (the arrival reveal).

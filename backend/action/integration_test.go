@@ -79,7 +79,14 @@ func newActionService(t *testing.T) (*Service, common.FirestoreService, *fakeClo
 	svc := NewServiceWith(NewDaoWith(fs, clk), clk, nil) // nil publisher — no SSE fan-out under test
 	cleanup := func() {
 		common.CleanupFirestoreTestData(t, client, "actions", "fleets",
-			"deltas/lode-1/entries", "deltas/lode-2/entries")
+			"deltas/lode-1/entries", "deltas/lode-2/entries",
+			// ledger-scope-A: ledger_test.go's
+			// TestLedgerKey_Scenario_OmittedDefaultsToScope commits with an
+			// omitted LedgerKey, which defaults to Scope ("ledger-scope-A"),
+			// so its delta lands here — a path this helper didn't clean
+			// (QA Finding 1: non-repeatable against a persistent/reused
+			// emulator, deltas accumulated run over run).
+			"deltas/ledger-scope-A/entries")
 	}
 	return svc, fs, clk, cleanup
 }

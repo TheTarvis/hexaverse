@@ -62,6 +62,18 @@ describe('useBoardRealtime', () => {
     expect(invalidate).toHaveBeenCalled()
   })
 
+  it('rule 1: the ETA refetch covers the fleet reads AND the actions inbox', () => {
+    // A resolving mine credits cargo (the fleet read) and retires its running
+    // entry (the inbox) — one scheduled refetch must land both (add-mine-ui).
+    const { invalidate } = setup([10_000], 0)
+    invalidate.mockClear()
+
+    vi.advanceTimersByTime(11_000)
+    const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(['fleets', 'in-system', 'sys-7'])
+    expect(keys).toContainEqual(['actions'])
+  })
+
   it('rule 3: gently polls while the board is open', () => {
     const { invalidate } = setup()
     invalidate.mockClear()

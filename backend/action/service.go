@@ -18,6 +18,11 @@ var (
 	ErrNotRunning         = errors.New("action is not running")
 	// ErrUnknownType means no resolver is registered for the committed type.
 	ErrUnknownType = errors.New("unknown action type")
+	// ErrLedgerFoldNotImplemented marks Service.Remaining's red-phase compile
+	// stub (#0010 task 0.2 / design.md Decision #13's "Public Commit-Time Ledger
+	// Fold"). golang-dev replaces the body — see backend/action/CLAUDE.md /
+	// the SDET handoff report for the exact contract this must satisfy.
+	ErrLedgerFoldNotImplemented = errors.New("action: Remaining not implemented")
 )
 
 // CommitInterface is the narrow surface verb services depend on to ride the
@@ -95,6 +100,7 @@ func (s *Service) Commit(ctx context.Context, spec CommitSpec) (*Action, error) 
 		Actor:           spec.Actor,
 		ActorCollection: spec.ActorCollection,
 		Scope:           spec.Scope,
+		LedgerKey:       spec.LedgerKey,
 		Params:          spec.Params,
 		Slot:            spec.Slot,
 		CommittedAt:     now,
@@ -111,6 +117,16 @@ func (s *Service) Commit(ctx context.Context, spec CommitSpec) (*Action, error) 
 
 func (s *Service) Cancel(ctx context.Context, id string, actorState map[string]interface{}) (*Action, error) {
 	return s.dao.Cancel(ctx, id, actorState)
+}
+
+// Remaining folds a ledger key's delta entries with effectAt <= t and returns
+// the sum — the same total a resolver's Resolution.Remaining computes for that
+// key at resolve (#0010 Decision #13). Exposed publicly so a verb's COMMIT path
+// (outside any resolve transaction) can fast-fail against an already-exhausted
+// ledger without reaching into the private action.Dao (backend/CLAUDE.md's
+// layering rule: a DAO is private to its owning service).
+func (s *Service) Remaining(ctx context.Context, ledgerKey string, t common.WorldMillis) (float64, error) {
+	return s.dao.FoldDeltas(ctx, ledgerKey, t)
 }
 
 func (s *Service) Acknowledge(ctx context.Context, id string) (*Action, error) {

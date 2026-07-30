@@ -30,10 +30,13 @@ export function WakeUpFlow() {
   const spawn = useMutation({
     mutationFn: (n: string) => corporationService.spawn({ name: n }),
     onSuccess: (res: SpawnResult) => {
-      // Flip the gate: the corp now exists, and the new hull should appear.
-      qc.invalidateQueries({ queryKey: queryKeys.corporations.me() })
-      qc.invalidateQueries({ queryKey: queryKeys.fleets.all })
       if (res.homeSystem?.id) {
+        // Flip the gate: the corp now exists, and the new hull should appear.
+        // Guarded inside this branch (D5) so a malformed response (no home
+        // system id) does not flip the gate and unmount this flow before a
+        // resubmission is possible.
+        qc.invalidateQueries({ queryKey: queryKeys.corporations.me() })
+        qc.invalidateQueries({ queryKey: queryKeys.fleets.all })
         // Hint the galaxy view to glide to home if the player opens it later
         // (best-effort polish; cleared by the view after it focuses).
         try {
@@ -45,6 +48,12 @@ export function WakeUpFlow() {
         // the gate flips (corp resolves), this route renders the board, not the
         // galaxy. No galaxy flash — the wake gate holds the screen until then.
         router.push(`/systems/${res.homeSystem.id}`)
+      } else {
+        // Malformed success (no home system id): withhold the invalidation
+        // and wake-focus write so the gate does not flip and the flow stays
+        // mounted and resubmittable — a retriable error, not a silent drop
+        // onto the galaxy (D5).
+        toast.error('The hull failed to boot. Try again.')
       }
     },
   })

@@ -11,9 +11,12 @@
 // Clicking a row is the view's business — it hands the fleet back up.
 
 import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Fleet } from '@/lib/types/fleet'
+import type { GameAction } from '@/lib/types/action'
 import { useMyFleets } from '@/hooks/use-fleets'
 import { useGalaxy } from '@/hooks/use-galaxy'
+import { queryKeys } from '@/lib/query-keys'
 import { formatEta } from '@/lib/eta'
 import { fleetStatus, type StatusTone } from './fleet-status'
 
@@ -53,6 +56,24 @@ export function FleetRoster({
   const { data: fleets } = useMyFleets({ enabled })
   const { data: galaxy } = useGalaxy()
   const [open, setOpen] = useState(true)
+  const qc = useQueryClient()
+
+  // Running mines by actor (add-mine-ui, design Decision 5): read from the
+  // running-actions queries ALREADY cached by whoever commands fleets (the
+  // board's useRunningMine) — one cache sweep per tick, no per-row fetching,
+  // no new endpoint. A fleet whose inbox nobody fetched simply falls back to
+  // its movement-state label. worldTime re-arms the sweep every tick, so a
+  // label lifts at eta without waiting for a cache event.
+  const minesByActor = useMemo(() => {
+    const m = new Map<string, GameAction>()
+    for (const [, actions] of qc.getQueriesData<GameAction[]>({ queryKey: queryKeys.actions.all })) {
+      for (const a of actions ?? []) {
+        if (a.type === 'mine' && a.status === 'running') m.set(a.actor, a)
+      }
+    }
+    return m
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qc, worldTime])
 
   const nameById = useMemo(() => {
     const m = new Map<string, string>()
@@ -83,7 +104,7 @@ export function FleetRoster({
       {open && (
         <ul className="max-h-64 overflow-y-auto border-t border-zinc-200 dark:border-zinc-800/50">
           {own.map((f) => {
-            const status = fleetStatus(f, worldTime, nameOf)
+            const status = fleetStatus(f, worldTime, nameOf, minesByActor.get(f.id) ?? null)
             const active = f.id === activeFleetId
             const here = !!currentSystemId && status.goToSystemId === currentSystemId
             return (

@@ -30,6 +30,33 @@ describe('FleetGlyph', () => {
     expect(onSelect).toHaveBeenCalledWith('fl1')
   })
 
+  // add-mine-ui: a docked fleet draws exactly on its parent body, so its hit
+  // target shrinks to the hull — otherwise the body underneath (the mine
+  // gesture's click target) would be unclickable.
+  it('shrinks the hit circle while docked so the docked-at body stays clickable', () => {
+    const hitRadius = (id: string) => {
+      const circles = Array.from(screen.getByTestId(id).querySelectorAll('circle'))
+      const hit = circles.find((c) => c.getAttribute('fill') === 'transparent')!
+      return Number(hit.getAttribute('r'))
+    }
+
+    const { rerender } = renderInSvg(
+      <FleetGlyph fleet={fleet({})} point={{ x: 0, y: 0 }} worldTime={0} />,
+    )
+    const coastRadius = hitRadius('fleet-glyph-fl1')
+
+    rerender(
+      <svg>
+        <FleetGlyph
+          fleet={fleet({ state: { mode: 'docked', docked: { parentId: 'p1' } } })}
+          point={{ x: 0, y: 0 }}
+          worldTime={0}
+        />
+      </svg>,
+    )
+    expect(hitRadius('fleet-glyph-fl1')).toBeLessThan(coastRadius / 2)
+  })
+
   it('draws a foreign fleet as a bare snapshot marker (no hull)', () => {
     renderInSvg(<FleetGlyph fleet={fleet({ id: 'fx', own: false })} point={{ x: 0, y: 0 }} worldTime={0} />)
     const g = screen.getByTestId('fleet-glyph-fx')

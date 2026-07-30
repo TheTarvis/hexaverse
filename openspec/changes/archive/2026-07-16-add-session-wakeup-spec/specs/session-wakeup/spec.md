@@ -124,13 +124,16 @@ actual answer.
 ### Requirement: A Corp-Lookup Failure Shows a Retriable Error, Not the Wake-Up Flow
 The system SHALL, when the corporation lookup (`GET /v1/corporations/me`)
 fails for a reason other than "no living corporation" (any status other
-than `404`, or a network failure), render a retriable error state distinct
-from the wake-up flow, and SHALL NOT treat the failure as evidence of
-corplessness.
+than `404`, or a network failure) **and no living corporation is already
+known for the session**, render a retriable error state distinct from the
+wake-up flow, and SHALL NOT treat the failure as evidence of corplessness.
+A failure of a background refetch while a corporation is already resolved
+SHALL keep serving the resolved app, not replace it with the error state.
 
 #### Scenario: A network or server error on corp lookup does not trigger the wake-up flow
 - **WHEN** a signed-in user's corporation lookup fails with a network or
-  server error (not a `404`)
+  server error (not a `404`), and no living corporation is already known
+  for the session
 - **THEN** a retriable error is shown instead of the wake-up flow
 
 #### Scenario: Retrying a failed corp lookup resumes the normal gate
@@ -138,6 +141,13 @@ corplessness.
   succeeds
 - **THEN** the gate resumes normally — the wake-up flow renders only if
   the retried lookup itself resolves to "no living corporation"
+
+#### Scenario: A background refetch failure does not evict a woken player
+- **WHEN** a signed-in user whose living corporation is already resolved
+  triggers a corp-lookup refetch (e.g. on window refocus) that fails with a
+  network or server error
+- **THEN** the app content remains rendered from the last-known
+  corporation; the retriable error state does not replace it
 
 ### Requirement: Corpless Wake-Up Gate
 The system SHALL, once a signed-in user's corporation lookup has resolved
@@ -206,9 +216,10 @@ that home system's hex board route — never to the galaxy view first.
   away from the wake-up flow on this response), and the flow shows a
   retriable error while remaining mounted and resubmittable
 
-#### Scenario: A resubmission after a malformed response succeeds normally
+#### Scenario: A resubmission after a transient malformed response succeeds normally
 - **WHEN** the player resubmits from the wake-up flow after a malformed
-  success response
+  success response caused by a transient omission (the resubmission's
+  response includes the home system id)
 - **THEN** the resubmission rides `corporation-spawn`'s idempotent-spawn
   guarantee (the same corporation and home system already created), and —
   being well-formed — the gate re-evaluates, the wake-focus hint is
@@ -241,15 +252,9 @@ The system SHALL serve `/login` with a toggle between sign-in and sign-up
 modes (sign-up additionally requiring and validating a matching
 confirm-password field before submitting), a "Continue with Google" option,
 and SHALL, once authentication resolves to a signed-in user, navigate to
-the `redirect` query parameter's target rather than leaving the user on the
-login form. The system SHALL treat the `redirect` target as a same-origin
-relative path only — accepting it solely when it begins with a single `/`,
-is not `//`- or `/\`-prefixed, and contains no backslash (`\`) or
-control/whitespace character anywhere in the value — and SHALL fall back to
-`/` for any absolute URL, protocol-relative URL, backslash- or
-control-character-bearing value, or other non-local value, so the login
-handoff can never navigate an authenticated visitor to an attacker-controlled
-origin.
+the validated `redirect` target (see "Login Redirect Target Is Same-Origin
+Only" for the validation rule) rather than leaving the user on the login
+form.
 
 #### Scenario: Sign-in mode is the default
 - **WHEN** `/login` loads with no `signUp` query parameter
@@ -264,26 +269,6 @@ origin.
 - **WHEN** the sign-up form is submitted with a confirm-password value
   that does not match the password field
 - **THEN** an error is shown and no sign-up request is made
-
-#### Scenario: A successful sign-in redirects to the target
-- **WHEN** authentication resolves to a signed-in user while on `/login`
-  with `?redirect=/settings`
-- **THEN** the app navigates to `/settings`
-
-#### Scenario: An off-site redirect target is refused
-- **WHEN** `/login` is loaded with `?redirect=//evil.example` (or any
-  absolute or protocol-relative URL) and authentication resolves to a
-  signed-in user
-- **THEN** the post-authentication navigation goes to `/`, never to the
-  off-site target
-
-#### Scenario: A redirect value containing a backslash or control character is refused
-- **WHEN** `/login` is loaded with a `redirect` value that begins with `/`
-  but contains a backslash or a control/whitespace character (e.g.
-  `/\/evil.example`) and authentication resolves to a signed-in user
-- **THEN** the post-authentication navigation falls back to `/`, never
-  following the value (accepted redirect targets are a single leading `/`
-  followed only by printable, non-backslash path characters)
 
 #### Scenario: A sign-in failure shows an error inline
 - **WHEN** a sign-in attempt fails
@@ -306,14 +291,55 @@ origin.
 - **THEN** any email/password already entered remains in the form (the
   user is not made to retype it)
 
+### Requirement: Login Redirect Target Is Same-Origin Only
+The system SHALL treat the `redirect` query parameter as a same-origin
+relative path only — accepting it solely when it begins with a single `/`,
+is not `//`- or `/\`-prefixed, and contains no backslash (`\`) or
+control/whitespace character anywhere in the value — and SHALL fall back to
+`/` for any absolute URL, protocol-relative URL, backslash- or
+control-character-bearing value, or other non-local value, so the
+post-authentication login handoff can never navigate an authenticated
+visitor to an attacker-controlled origin.
+
+#### Scenario: A successful sign-in redirects to the target
+- **WHEN** authentication resolves to a signed-in user while on `/login`
+  with `?redirect=/settings`
+- **THEN** the app navigates to `/settings`
+
+#### Scenario: An off-site redirect target is refused
+- **WHEN** `/login` is loaded with `?redirect=//evil.example` (or any
+  absolute or protocol-relative URL) and authentication resolves to a
+  signed-in user
+- **THEN** the post-authentication navigation goes to `/`, never to the
+  off-site target
+
+#### Scenario: A redirect value containing a backslash or control character is refused
+- **WHEN** `/login` is loaded with a `redirect` value that begins with `/`
+  but contains a backslash or a control/whitespace character (e.g.
+  `/\/evil.example`) and authentication resolves to a signed-in user
+- **THEN** the post-authentication navigation falls back to `/`, never
+  following the value (accepted redirect targets are a single leading `/`
+  followed only by printable, non-backslash path characters)
+
 ### Requirement: Login Failures Do Not Reveal Whether an Account Exists
 The system SHALL present sign-in and sign-up credential failures with a
 uniform, provider-agnostic message for the wrong-credential and
 unknown-account cases, so the login form cannot be used to enumerate which
 email addresses have registered accounts, and SHALL rely on the identity
-provider's email-enumeration protection being enabled. Cause-specific
-provider strings (e.g. "user not found", "wrong password", "email already
-in use") SHALL NOT be shown verbatim on these paths.
+provider's email-enumeration protection being enabled. The raw provider
+error code or message — including, but not limited to, `auth/user-not-found`,
+`auth/wrong-password`, `auth/invalid-credential` (the single code Firebase
+returns for both wrong-password and unknown-account sign-in attempts once
+enumeration protection is enabled), and `auth/email-already-in-use` —
+SHALL NOT be shown verbatim on these paths. A non-credential failure (e.g.
+`auth/network-request-failed`, `auth/too-many-requests`,
+`auth/user-disabled`) SHALL NOT be presented using the credential-uniform
+copy; it SHALL show a separate, neutral generic-failure message instead, so
+a transient or account-status failure is never reported as a wrong email or
+password. This raw-provider-string prohibition also covers the mobile
+Google-redirect path (see "A Failed Google Redirect Sign-In Shows an
+Error, Not a Silent Return"), so the OAuth channel cannot leak what the
+credential paths already withhold.
 
 #### Scenario: A wrong password and an unknown account are indistinguishable
 - **WHEN** a sign-in attempt fails because no account exists for the email,
@@ -321,10 +347,23 @@ in use") SHALL NOT be shown verbatim on these paths.
 - **THEN** the same generic error message is shown in both cases, revealing
   nothing about account existence
 
+#### Scenario: A credential failure shows the app's uniform copy, not the provider string
+- **WHEN** a sign-in attempt fails with a provider error whose message is
+  `Firebase: Error (auth/invalid-credential)`
+- **THEN** the inline error shows the application's uniform
+  credential-failure copy, and the raw provider string is not rendered
+
 #### Scenario: A sign-up on an existing email does not confirm the account exists
 - **WHEN** a sign-up attempt fails because the email is already registered
 - **THEN** the error shown does not distinguish "already registered" from
   other sign-up failures
+
+#### Scenario: A non-credential sign-in error is not labeled as a credential failure
+- **WHEN** a sign-in attempt fails with a non-credential provider error
+  (e.g. `auth/network-request-failed` or `auth/too-many-requests`)
+- **THEN** the inline error shows a neutral generic-failure message —
+  neither the credential-specific copy nor the raw provider string — so a
+  transient failure is not reported as a wrong email or password
 
 ### Requirement: Login Errors Are Announced to Assistive Technology
 The system SHALL expose the login form's inline error message in a way
@@ -338,22 +377,50 @@ assertive live region), not only as visible red text.
   is notified without needing to re-scan the page
 
 ### Requirement: A Failed Google Redirect Sign-In Shows an Error, Not a Silent Return
-The system SHALL, when the mobile Google sign-in redirect flow
-(`signInWithRedirect`) completes without a successful sign-in (the user
-cancels or is denied at Google, or the redirect result otherwise rejects),
-surface a visible, retriable error on `/login` — the same inline error
-surface and live region used for a failed sign-in/sign-up/popup attempt —
-rather than silently returning the visitor to an unremarkable, non-pending
-login form with no explanation.
+The system SHALL, when a mobile Google sign-in redirect flow
+(`signInWithRedirect`) was initiated and the browser's return to `/login`
+does not produce a signed-in user — whether because the redirect result
+rejects (the user cancels or is denied at Google, or the flow otherwise
+errors) or because the redirect result resolves with no user despite a
+redirect having been initiated — surface a visible, retriable error on
+`/login`, using the same inline error surface and live region as a failed
+sign-in/sign-up/popup attempt, rather than silently returning the visitor
+to an unremarkable, non-pending login form with no explanation. An
+ordinary page load on which no Google redirect sign-in was initiated SHALL
+NOT surface this error, even though the redirect result also resolves with
+no user on that load. When the redirect result rejects with an
+identity-provider error, the message surfaced on `/login` SHALL be a
+neutral, provider-agnostic message — the same class of copy as a failed
+popup sign-in — and SHALL NOT contain the raw identity-provider error
+string (no `auth/…` code, no `Firebase` provider text), so the
+OAuth-redirect channel cannot be used to leak a provider error string or an
+account-existence signal, consistent with "Login Failures Do Not Reveal
+Whether an Account Exists".
 
 #### Scenario: A cancelled Google redirect sign-in shows an error on return
 - **WHEN** a mobile visitor initiates "Continue with Google," is redirected
-  to Google, and returns to `/login` without completing sign-in (cancelled,
-  denied, or failed)
+  to Google, and returns to `/login` without a signed-in user resulting
+  (cancelled, denied, or failed — whether the redirect result rejects or
+  resolves with no user)
 - **THEN** an inline error is shown on `/login`, in the same live region as
   other login errors, explaining that sign-in did not complete
+
+#### Scenario: A rejected redirect result does not leak the raw provider error
+- **WHEN** the Google redirect flow returns and `getRedirectResult` rejects
+  with an identity-provider error (e.g. `auth/account-exists-with-different-credential`
+  or `auth/network-request-failed`)
+- **THEN** the inline login error shows a neutral, provider-agnostic message
+  (e.g. that sign-in did not complete) and does NOT render the raw provider
+  string (no `auth/…` code, no `Firebase` provider text) or any signal of
+  whether the account exists
 
 #### Scenario: A successful Google redirect sign-in still redirects normally
 - **WHEN** a mobile visitor completes the Google redirect flow successfully
 - **THEN** the existing post-authentication redirect-to-target behavior
   fires unchanged, with no error shown
+
+#### Scenario: An ordinary page load with no redirect initiated shows no error
+- **WHEN** a visitor loads `/login` directly, having never initiated a
+  Google redirect sign-in in this browser
+- **THEN** no redirect-sign-in error is shown, even though the redirect
+  result resolves with no user on this load

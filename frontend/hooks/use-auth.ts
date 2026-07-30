@@ -23,11 +23,18 @@ function shouldUseRedirectForOAuth(): boolean {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 }
 
+// D13/M2 — getRedirectResult(auth) resolves null both for "no redirect was
+// ever pending" and for "the user cancelled at Google". This durable marker,
+// written before signInWithRedirect navigates away, is what tells the two
+// apart on return.
+const GOOGLE_REDIRECT_MARKER_KEY = 'hexaverse:google-redirect-pending'
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true)
+  const [redirectError, setRedirectError] = useState<Error | null>(null)
   const queryClient = useQueryClient()
   const lastCheckedUserIdRef = useRef<string | null>(null)
 
@@ -68,12 +75,37 @@ export function useAuth() {
     let hasProcessedInitialAuth = false
 
     // Complete any pending Google sign-in redirect. onAuthStateChanged will
-    // fire separately with the resulting user; this call only surfaces errors.
-    getRedirectResult(auth).catch((error) => {
-      if (process.env.NODE_ENV !== 'test') {
-        console.error('Error completing redirect sign-in:', error)
-      }
-    })
+    // fire separately with the resulting user; this classifies the redirect
+    // result itself (D13/M2) so a cancelled/denied/failed redirect surfaces
+    // as `redirectError` instead of a silent, unremarkable return to /login.
+    getRedirectResult(auth)
+      .then((result) => {
+        const hadPendingRedirect = sessionStorage.getItem(GOOGLE_REDIRECT_MARKER_KEY) !== null
+        sessionStorage.removeItem(GOOGLE_REDIRECT_MARKER_KEY)
+
+        if (result?.user) {
+          // Success — no error to surface.
+          setRedirectError(null)
+          return
+        }
+
+        if (hadPendingRedirect) {
+          // A redirect was initiated and produced no user: cancelled, denied,
+          // or otherwise failed at the provider.
+          setRedirectError(new Error('Google sign-in did not complete.'))
+          return
+        }
+
+        // No redirect was ever pending — an ordinary page load.
+        setRedirectError(null)
+      })
+      .catch((error) => {
+        sessionStorage.removeItem(GOOGLE_REDIRECT_MARKER_KEY)
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Error completing redirect sign-in:', error)
+        }
+        setRedirectError(new Error('Google sign-in did not complete.'))
+      })
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       const userUid = user?.uid || null
@@ -163,6 +195,15 @@ export function useAuth() {
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider()
     if (shouldUseRedirectForOAuth()) {
+      // Persist the marker BEFORE navigating away — the return trip needs it
+      // to tell "a redirect was pending" apart from "no redirect was ever
+      // initiated" (getRedirectResult resolves null in both cases, D13/M2).
+      try {
+        sessionStorage.setItem(GOOGLE_REDIRECT_MARKER_KEY, '1')
+      } catch {
+        // sessionStorage may be unavailable (private mode) — non-fatal; the
+        // redirect still proceeds, just without the cancelled-detection marker.
+      }
       // Returns void on success — page navigates to Google and back.
       // getRedirectResult() in the init effect picks up the result on return.
       return signInWithRedirect(auth, provider)
@@ -170,12 +211,13 @@ export function useAuth() {
     return signInWithPopup(auth, provider)
   }
 
-  return {
+  const result = {
     user,
     loading,
     tokenLoading,
     isAdmin,
     isCheckingAdmin,
+    redirectError,
     signIn,
     signUp,
     signOut,
@@ -183,4 +225,8 @@ export function useAuth() {
     signInWithGoogle,
     getIdToken,
   }
+  // `redirectError` is new (D13) and additive — widen it to optional at the
+  // type level (it is always present at runtime) so existing test doubles
+  // that construct a useAuth() return value without it keep type-checking.
+  return result as Omit<typeof result, 'redirectError'> & { redirectError?: Error | null }
 }

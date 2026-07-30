@@ -1,17 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SystemBoardView } from './SystemBoardView'
 import { useSystemBoard } from '@/hooks/use-system-board'
 import {
   useFleetsInSystem,
   useFleetOrders,
+  useMine,
   useScan,
   useRoutePreview,
   useFleetTravel,
   useMyFleets,
 } from '@/hooks/use-fleets'
 import { useGalaxy } from '@/hooks/use-galaxy'
-import { useRunningScan } from '@/hooks/use-actions'
+import { useCancelAction, useRunningMine, useRunningScan } from '@/hooks/use-actions'
+import { toast } from '@/lib/toast'
 import { useBoardRealtime } from '@/hooks/use-board-realtime'
 import type { SystemBoard } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
@@ -19,11 +22,16 @@ import type { GameAction } from '@/lib/types/action'
 import type { UseQueryResult } from '@tanstack/react-query'
 
 vi.mock('@/hooks/use-system-board', () => ({ useSystemBoard: vi.fn() }))
-vi.mock('@/hooks/use-actions', () => ({ useRunningScan: vi.fn() }))
+vi.mock('@/hooks/use-actions', () => ({
+  useRunningScan: vi.fn(),
+  useRunningMine: vi.fn(),
+  useCancelAction: vi.fn(),
+}))
 vi.mock('@/hooks/use-fleets', () => ({
   useFleetsInSystem: vi.fn(),
   useFleetOrders: vi.fn(),
   useScan: vi.fn(),
+  useMine: vi.fn(),
   useRoutePreview: vi.fn(),
   useFleetTravel: vi.fn(),
   // The roster the board mounts reads every own fleet (and the galaxy, for
@@ -50,12 +58,17 @@ const mockTravel = vi.mocked(useFleetTravel)
 const mockMyFleets = vi.mocked(useMyFleets)
 const mockGalaxy = vi.mocked(useGalaxy)
 const mockRunningScan = vi.mocked(useRunningScan)
+const mockRunningMine = vi.mocked(useRunningMine)
+const mockMine = vi.mocked(useMine)
+const mockCancelAction = vi.mocked(useCancelAction)
 
 const travelMutate = vi.fn()
 
 const orderMutate = vi.fn()
 const cancelMutate = vi.fn()
 const scanMutate = vi.fn()
+const mineMutate = vi.fn()
+const cancelActionMutate = vi.fn()
 
 function boardFixture(): SystemBoard {
   return {
@@ -87,6 +100,18 @@ const ownFleet: Fleet = {
   position: { q: 3, r: 0 },
   own: true,
   worldTime: 0,
+}
+
+// The mounted FleetRoster sweeps the query cache for running mines
+// (add-mine-ui), so the tree needs a provider; every hook it would fetch
+// through is mocked above, so the client itself stays inert.
+function render(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const wrap = (node: React.ReactElement) => (
+    <QueryClientProvider client={qc}>{node}</QueryClientProvider>
+  )
+  const view = rtlRender(wrap(ui))
+  return { ...view, rerender: (node: React.ReactElement) => view.rerender(wrap(node)) }
 }
 
 function boardState(state: Partial<UseQueryResult<SystemBoard, Error>>) {
@@ -139,6 +164,12 @@ describe('SystemBoardView', () => {
     mockMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
     mockGalaxy.mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useGalaxy>)
     mockRunningScan.mockReturnValue({ data: null } as unknown as ReturnType<typeof useRunningScan>)
+    mockRunningMine.mockReturnValue({ data: null } as unknown as ReturnType<typeof useRunningMine>)
+    mockMine.mockReturnValue({ mutate: mineMutate, isPending: false } as unknown as ReturnType<typeof useMine>)
+    mockCancelAction.mockReturnValue({
+      mutate: cancelActionMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useCancelAction>)
     fleetsState([])
   })
 
@@ -249,6 +280,105 @@ describe('SystemBoardView', () => {
     expect(screen.getByTestId('arc-scan')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('scan-fx-toggle'))
     expect(screen.getByTestId('scan-ping')).toBeInTheDocument()
+  })
+
+  // --- mine (#0010, add-mine-ui) --------------------------------------------
+
+  // A board whose planet carries lodes, and a fleet docked to it with the
+  // owner-only roster block the mine offer reads.
+  function mineFixtures() {
+    const board = boardFixture()
+    board.features[1] = {
+      ...board.features[1],
+      band: 'visible',
+      live: true,
+      resources: [
+        { kind: 'metals', richness: 0.5 },
+        { kind: 'water', richness: 0.8 },
+      ],
+    }
+    const docked: Fleet = {
+      ...ownFleet,
+      state: { mode: 'docked', docked: { parentId: 'p-1' } },
+      position: { q: 2, r: 0 },
+      roster: { ships: [{ class: 'seed' }], cargo: {}, cargoCapacity: 200, freeHold: 200, miningRate: 0.001 },
+    }
+    boardState({ isLoading: false, isError: false, data: board })
+    fleetsState([docked])
+  }
+
+  it('offers mine on the fleet card while docked at a lode — no selection — and commits the run', () => {
+    mineFixtures()
+    mineMutate.mockImplementation((_vars, opts) => (opts as { onSuccess?: () => void })?.onSuccess?.())
+    render(<SystemBoardView systemId="sys-7" />)
+
+    // Docked at the lode is enough — the offer needs no board click at all.
+    expect(screen.getByTestId('mine-section')).toBeInTheDocument()
+    // Defaults: the richest visible kind, and a fill-the-hold tonnage.
+    expect(screen.getByTestId('mine-kind-water')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('mine-tons-input')).toHaveValue(200)
+
+    fireEvent.click(screen.getByTestId('mine-button'))
+    // The featureId is the fleet's dock parent, resolved by the container.
+    expect(mineMutate).toHaveBeenCalledWith(
+      { fleetId: 'mine', request: { featureId: 'p-1', kind: 'water', tons: 200 } },
+      expect.anything(),
+    )
+    expect(vi.mocked(toast.success)).toHaveBeenCalled()
+  })
+
+  it('toasts the server reason when the commit is rejected, keeping the offer', () => {
+    mineFixtures()
+    mineMutate.mockImplementation((_vars, opts) =>
+      (opts as { onError?: (e: Error) => void })?.onError?.(
+        new Error("mine: lode's remaining tonnage is already at or below zero"),
+      ),
+    )
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('mine-button'))
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+      "mine: lode's remaining tonnage is already at or below zero",
+    )
+    // The offer survives a rejection — adjust and retry in place.
+    expect(screen.getByTestId('mine-section')).toBeInTheDocument()
+  })
+
+  it('gates move + mine while a run is in flight, keeps scan free, and arms the eta refetch', () => {
+    mineFixtures()
+    const running: GameAction = {
+      id: 'action_mine',
+      type: 'mine',
+      actor: 'mine',
+      scope: 'sys-7',
+      params: { featureId: 'p-1', kind: 'water', tons: 40 },
+      committedAt: 0,
+      eta: 30_000,
+      status: 'running',
+      worldTime: 0,
+    }
+    mockRunningMine.mockReturnValue({ data: running } as unknown as ReturnType<typeof useRunningMine>)
+    render(<SystemBoardView systemId="sys-7" />)
+
+    // The movement channel is busy: countdown shown, no fresh offer, move
+    // disabled — but the sensor channel stays open (#0006's mirror image).
+    expect(screen.getByTestId('mine-countdown')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('feature-glyph-p-1'))
+    expect(screen.queryByTestId('mine-section')).not.toBeInTheDocument()
+    expect(screen.getByTestId('move-button')).toBeDisabled()
+    expect(screen.getByTestId('scan-button')).toBeEnabled()
+
+    // The run's eta joins the self-scheduled refetch candidates (rule 1).
+    const realtimeArgs = vi.mocked(useBoardRealtime).mock.calls.at(-1)![0]
+    expect(realtimeArgs.etaCandidates).toContain(30_000)
+
+    // Cancelling rides the generic #0005 endpoint with the run's action id.
+    fireEvent.click(screen.getByTestId('cancel-mine-button'))
+    expect(cancelActionMutate).toHaveBeenCalledWith(
+      { actionId: 'action_mine', fleetId: 'mine' },
+      expect.anything(),
+    )
   })
 
   it('selects a lane gate, previews the route, and departs', () => {

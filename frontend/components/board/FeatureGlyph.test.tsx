@@ -39,4 +39,19 @@ describe('FeatureGlyph', () => {
     const live = screen.getByTestId('feature-glyph-f1')
     expect(live.getAttribute('opacity')).toBe('1')
   })
+
+  // add-mine-ui: the slice e2e picks its lode off the rendered board, so a
+  // glyph advertises whether its feature carries visible resources.
+  it('marks a resource-bearing body data-mineable; a bare one is not', () => {
+    const { rerender } = renderInSvg(
+      <FeatureGlyph
+        feature={feature({ resources: [{ kind: 'metals', richness: 0.5 }] })}
+        point={{ x: 0, y: 0 }}
+      />,
+    )
+    expect(screen.getByTestId('feature-glyph-f1')).toHaveAttribute('data-mineable', 'true')
+
+    rerender(<svg><FeatureGlyph feature={feature({})} point={{ x: 0, y: 0 }} /></svg>)
+    expect(screen.getByTestId('feature-glyph-f1')).not.toHaveAttribute('data-mineable')
+  })
 })

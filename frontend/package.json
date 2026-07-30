@@ -17,8 +17,6 @@
     "e2e:report": "playwright show-report"
   },
   "dependencies": {
-    "@eslint/compat": "^2.0.0",
-    "@eslint/eslintrc": "^3.3.3",
     "@headlessui/react": "^2.2.7",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.2.1",
@@ -61,6 +59,8 @@
     "zod": "^4.0.15"
   },
   "devDependencies": {
+    "@eslint/compat": "^2.0.0",
+    "@eslint/eslintrc": "^3.3.3",
     "@playwright/test": "^1.54.2",
     "@resvg/resvg-js": "^2.6.2",
     "@storybook/addon-a11y": "^9.1.1",
@@ -90,5 +90,9 @@
     "tailwindcss": "^4.1.11",
     "typescript": "^5",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "sharp": "^0.35.0",
+    "postcss": "^8.5.18"
   }
 }

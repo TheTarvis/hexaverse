@@ -19,6 +19,10 @@ const config = [
       ".storybook/storybook-static/**",
       "coverage/**",
       "next-env.d.ts",
+      // Playwright artifacts (gitignored too) — a failed e2e run must not
+      // break the lint gate with generated trace-viewer bundles.
+      "test-results/**",
+      "playwright-report/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),

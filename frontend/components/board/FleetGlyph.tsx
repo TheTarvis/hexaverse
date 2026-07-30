@@ -57,7 +57,12 @@ export function FleetGlyph({ fleet, point, worldTime, headingDeg = 0, selected, 
       ) : (
         <rect x={-ring * 0.5} y={-ring * 0.5} width={ring} height={ring} fill="none" stroke={FLEET_FOREIGN} strokeWidth={1.5} transform="rotate(45)" />
       )}
-      <circle r={HEX_SIZE * 0.5} fill="transparent" />
+      {/* Generous transparent hit target — EXCEPT while docked: a docked fleet
+          draws at exactly its parent's pixel, and a full-size hit circle would
+          eclipse the body underneath, making the mine gesture (select the
+          docked-at body) unclickable. Docked shrinks to the hull so clicks
+          around it fall through to the feature (add-mine-ui). */}
+      <circle r={mode === 'docked' ? HEX_SIZE * 0.18 : HEX_SIZE * 0.5} fill="transparent" />
     </g>
   )
 }

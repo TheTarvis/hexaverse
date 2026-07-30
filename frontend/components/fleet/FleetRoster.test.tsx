@@ -1,15 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { FleetRoster } from './FleetRoster'
 import { useMyFleets } from '@/hooks/use-fleets'
 import { useGalaxy } from '@/hooks/use-galaxy'
+import { queryKeys } from '@/lib/query-keys'
 import type { Fleet } from '@/lib/types/fleet'
+import type { GameAction } from '@/lib/types/action'
 
 vi.mock('@/hooks/use-fleets', () => ({ useMyFleets: vi.fn() }))
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
 
 const mockFleets = vi.mocked(useMyFleets)
 const mockGalaxy = vi.mocked(useGalaxy)
+
+// The roster sweeps the query cache for running mines (add-mine-ui), so every
+// render mounts inside a provider; tests seed the cache through `qc`.
+let qc: QueryClient
+function render(ui: React.ReactElement) {
+  return rtlRender(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
+}
 
 const fleet = (id: string, systemId: string, state: Fleet['state']): Fleet => ({
   id,
@@ -43,6 +53,7 @@ function setFleets(fleets: Fleet[]) {
 describe('FleetRoster', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     mockGalaxy.mockReturnValue({
       data: {
         nodes: [
@@ -100,5 +111,53 @@ describe('FleetRoster', () => {
     fireEvent.click(screen.getByTestId('fleet-roster-toggle'))
     expect(screen.queryByTestId('fleet-row-fleet_1')).not.toBeInTheDocument()
     expect(screen.getByTestId('fleet-roster')).toHaveTextContent('Fleets')
+  })
+
+  // add-mine-ui, fleet-roster delta: the honest mining label, read from the
+  // cached running-actions query — no per-row fetching.
+  it('reads a docked fleet with a cached running mine as Mining, with a countdown', () => {
+    const docked = fleet('fleet_1', 'sys-0', { mode: 'docked', docked: { parentId: 'p1' } })
+    setFleets([docked])
+    const mineAction: GameAction = {
+      id: 'action_mine',
+      type: 'mine',
+      actor: 'fleet_1',
+      scope: 'sys-0',
+      params: { featureId: 'p1', kind: 'metals', tons: 40 },
+      committedAt: 0,
+      eta: 90_000,
+      status: 'running',
+      worldTime: 0,
+    }
+    qc.setQueryData(queryKeys.actions.running('fleet_1'), [mineAction])
+
+    render(<FleetRoster worldTime={30_000} />)
+
+    const row = screen.getByTestId('fleet-row-fleet_1')
+    expect(row).toHaveTextContent('Mining')
+    expect(screen.getByTestId('fleet-row-eta-fleet_1')).toHaveTextContent('1m')
+  })
+
+  it('drops the mining label once the run’s eta passes, by world time alone', () => {
+    const docked = fleet('fleet_1', 'sys-0', { mode: 'docked', docked: { parentId: 'p1' } })
+    setFleets([docked])
+    qc.setQueryData(queryKeys.actions.running('fleet_1'), [
+      {
+        id: 'action_mine',
+        type: 'mine',
+        actor: 'fleet_1',
+        scope: 'sys-0',
+        committedAt: 0,
+        eta: 90_000,
+        status: 'running',
+        worldTime: 0,
+      } satisfies GameAction,
+    ])
+
+    render(<FleetRoster worldTime={91_000} />)
+
+    const row = screen.getByTestId('fleet-row-fleet_1')
+    expect(row).toHaveTextContent('Docked')
+    expect(row).not.toHaveTextContent('Mining')
   })
 })

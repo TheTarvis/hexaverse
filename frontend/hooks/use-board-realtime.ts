@@ -15,8 +15,11 @@ import { queryKeys } from '@/lib/query-keys'
 //  3. Gentle poll — a slow interval backstop while the board is open, covering
 //     verbs whose ETA the client can't know precisely (e.g. a scan).
 //
-// All three converge on one idempotent invalidation of the interior + fleet
-// reads; the fog/animation layers pick the fresh state up on the next render.
+// All three converge on one idempotent invalidation of the interior + fleet +
+// running-actions reads; the fog/animation layers pick the fresh state up on
+// the next render. The actions inbox rides along (add-mine-ui) so a resolved
+// verb's stale `running` entry clears with the same read that lands its
+// effects (a mine's credited cargo, a freed movement slot).
 
 export const BOARD_POLL_MS = 20_000
 // The tightened poll while a scan is running (radial echo): the front reveals
@@ -41,6 +44,7 @@ export interface UseBoardRealtimeOptions {
 function invalidateBoard(qc: QueryClient, systemId: string): void {
   void qc.invalidateQueries({ queryKey: queryKeys.systemBoard.detail(systemId) })
   void qc.invalidateQueries({ queryKey: queryKeys.fleets.inSystem(systemId) })
+  void qc.invalidateQueries({ queryKey: queryKeys.actions.all })
 }
 
 export function useBoardRealtime({

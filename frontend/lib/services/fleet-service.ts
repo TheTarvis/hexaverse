@@ -9,7 +9,7 @@
 // at the committed ETA.
 
 import { apiClient } from '../api-client'
-import type { Fleet, FleetList, RoutePreview } from '../types/fleet'
+import type { Fleet, FleetList, MineCommit, MineRequest, RoutePreview } from '../types/fleet'
 import type { Target } from '@/lib/hex'
 
 class FleetService {
@@ -69,6 +69,17 @@ class FleetService {
   // if a scan is already running.
   async scan(fleetId: string): Promise<Fleet> {
     const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/scan`, {})
+    return response.data
+  }
+
+  // POST /v1/fleets/:id/mine {featureId, kind, tons} — commit an extraction
+  // run (#0010, add-mine-ui). Rides the MOVEMENT channel: rejected 409 while
+  // burning or already mining. Every rejection carries a distinguishable
+  // `error` reason (not docked, unknown kind, over free hold, depleted lode,
+  // busy slot) which apiClient surfaces as the thrown error's message — the
+  // board toasts it verbatim.
+  async mine(fleetId: string, request: MineRequest): Promise<MineCommit> {
+    const response = await apiClient.post<MineCommit>(`/v1/fleets/${fleetId}/mine`, request)
     return response.data
   }
 }

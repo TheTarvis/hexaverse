@@ -2,12 +2,15 @@
 // on: where it is, what it's doing, when it's done, and where clicking it should
 // take you. Pure (no clock, no fetch): the roster passes the live world time in.
 //
-// The wire carries only the movement state, so the status is DERIVED from it —
-// the same (state, worldTime) the board and the galaxy animate from, so the
-// roster can never disagree with the picture.
+// The status is DERIVED from the movement state — the same (state, worldTime)
+// the board and the galaxy animate from, so the roster can never disagree with
+// the picture — plus one action input (add-mine-ui): a running mine occupies a
+// docked fleet's movement slot, and "Docked" would be a lie while extractors
+// run, so the caller may pass the fleet's running mine in.
 
 import { stateAt } from '@/lib/hex'
 import type { Fleet } from '@/lib/types/fleet'
+import type { GameAction } from '@/lib/types/action'
 
 // tone drives the row's accent: idle (nothing to watch), moving (an order is
 // running), transit (out on a lane), held (parked mid-lane, wants a decision).
@@ -30,12 +33,31 @@ export interface FleetStatus {
 // falls back to the id, so an unnamed/unknown system still reads sanely.
 export type NameOf = (systemId: string) => string
 
-export function fleetStatus(fleet: Fleet, worldTime: number, nameOf: NameOf): FleetStatus {
+export function fleetStatus(
+  fleet: Fleet,
+  worldTime: number,
+  nameOf: NameOf,
+  runningMine?: Pick<GameAction, 'eta'> | null,
+): FleetStatus {
   // Read the EFFECTIVE state (stateAt): a burn whose arrival has passed IS
   // docked/coasting, so an arrived fleet never reads "Under way" with a negative
   // countdown while it waits for the next refetch.
   const s = stateAt(fleet.state, worldTime)
   const here = nameOf(fleet.systemId)
+
+  // A running mine drives the label only while its eta is ahead by WORLD TIME —
+  // a stale past-eta entry falls back to the movement-state label (the same
+  // convention the board's gating uses), and only a docked fleet can be mining
+  // (any other mode means the picture moved on; movement wins).
+  if (runningMine && runningMine.eta > worldTime && s.mode === 'docked') {
+    return {
+      tone: 'moving',
+      where: here,
+      activity: 'Mining',
+      remainingMs: runningMine.eta - worldTime,
+      goToSystemId: fleet.systemId,
+    }
+  }
 
   switch (s.mode) {
     case 'laneTransit': {

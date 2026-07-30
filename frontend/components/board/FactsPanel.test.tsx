@@ -25,6 +25,8 @@ const base = {
   route: null,
   onMove: vi.fn(),
   onScan: vi.fn(),
+  onMine: vi.fn(),
+  onCancelMine: vi.fn(),
   onCancel: vi.fn(),
   onDepart: vi.fn(),
 }
@@ -166,6 +168,158 @@ describe('FactsPanel', () => {
     )
     expect(screen.getByTestId('gate-facts')).toHaveTextContent(/bring a fleet here/i)
     expect(screen.queryByTestId('depart-button')).not.toBeInTheDocument()
+  })
+
+  // --- mine (#0010, add-mine-ui) --------------------------------------------
+
+  const lodeFeature = feature({
+    id: 'p1',
+    resources: [
+      { kind: 'metals', richness: 0.5 },
+      { kind: 'water', richness: 0.8 },
+    ],
+  })
+  // Docked to the lode, with the owner-only roster block: 12t of metals
+  // aboard, 188t free of 200, one seed hull's rate. The mine offer anchors to
+  // this docked state — no board selection involved.
+  const dockedMiner: Fleet = {
+    ...ownFleet,
+    state: { mode: 'docked', docked: { parentId: 'p1' } },
+    roster: {
+      ships: [{ class: 'seed' }],
+      cargo: { metals: 12 },
+      cargoCapacity: 200,
+      freeHold: 188,
+      miningRate: 0.001,
+    },
+  }
+
+  it('offers mine while docked at a lode — no selection — defaulting to richest kind + full hold', () => {
+    render(
+      <FactsPanel {...base} selection={null} activeFleet={dockedMiner} dockedFeature={lodeFeature} plan={null} />,
+    )
+    expect(screen.getByTestId('mine-section')).toBeInTheDocument()
+    // Kind chips carry the visible richness; the richest is preselected.
+    expect(screen.getByTestId('mine-kind-water')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('mine-kind-water')).toHaveTextContent('80%')
+    expect(screen.getByTestId('mine-kind-metals')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('mine-tons-input')).toHaveValue(188)
+    fireEvent.click(screen.getByTestId('mine-button'))
+    expect(base.onMine).toHaveBeenCalledWith('water', 188)
+  })
+
+  it('switches the kind by chip — the commit follows the selection', () => {
+    render(
+      <FactsPanel {...base} selection={null} activeFleet={dockedMiner} dockedFeature={lodeFeature} plan={null} />,
+    )
+    fireEvent.click(screen.getByTestId('mine-kind-metals'))
+    expect(screen.getByTestId('mine-kind-metals')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('mine-kind-water')).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByTestId('mine-button'))
+    expect(base.onMine).toHaveBeenCalledWith('metals', 188)
+  })
+
+  it('refills the tonnage to the free hold via Fill hold', () => {
+    render(
+      <FactsPanel {...base} selection={null} activeFleet={dockedMiner} dockedFeature={lodeFeature} plan={null} />,
+    )
+    fireEvent.change(screen.getByTestId('mine-tons-input'), { target: { value: '60' } })
+    expect(screen.getByTestId('mine-tons-input')).toHaveValue(60)
+    fireEvent.click(screen.getByTestId('mine-fill-hold'))
+    expect(screen.getByTestId('mine-tons-input')).toHaveValue(188)
+  })
+
+  it('does not offer mine when merely co-located (coasting, not docked)', () => {
+    render(
+      <FactsPanel {...base} selection={null} activeFleet={ownFleet} dockedFeature={lodeFeature} plan={null} />,
+    )
+    expect(screen.queryByTestId('mine-section')).not.toBeInTheDocument()
+  })
+
+  it('does not offer mine when the docked body has no visible resources', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={dockedMiner}
+        dockedFeature={feature({ id: 'p1' })}
+        plan={null}
+      />,
+    )
+    expect(screen.queryByTestId('mine-section')).not.toBeInTheDocument()
+  })
+
+  it('clamps the tonnage input to the free hold', () => {
+    render(
+      <FactsPanel {...base} selection={null} activeFleet={dockedMiner} dockedFeature={lodeFeature} plan={null} />,
+    )
+    const input = screen.getByTestId('mine-tons-input')
+    fireEvent.change(input, { target: { value: '9999' } })
+    expect(input).toHaveValue(188)
+    fireEvent.change(input, { target: { value: '-5' } })
+    expect(input).toHaveValue(0)
+    // A zero-ton run is uncommittable — the server would reject it anyway.
+    expect(screen.getByTestId('mine-button')).toBeDisabled()
+  })
+
+  it('previews the eta as tons ÷ the served mining rate, tracking the input', () => {
+    render(
+      <FactsPanel {...base} selection={null} activeFleet={dockedMiner} dockedFeature={lodeFeature} plan={null} />,
+    )
+    // 188t ÷ 0.001 t/ms = 188_000 ms → "3m".
+    expect(screen.getByTestId('mine-eta')).toHaveTextContent('ETA 3m')
+    // The served rate reads in human units: 0.001 t/ms = 60 t/min.
+    expect(screen.getByTestId('mine-rate')).toHaveTextContent('at 60 t/min')
+    fireEvent.change(screen.getByTestId('mine-tons-input'), { target: { value: '60' } })
+    // 60t ÷ 0.001 = 60_000 ms → "1m".
+    expect(screen.getByTestId('mine-eta')).toHaveTextContent('ETA 1m')
+  })
+
+  it('shows the running mine as a countdown with cancel, gating move but never scan', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={{ kind: 'hex', hex: { q: 2, r: 0 } }}
+        activeFleet={dockedMiner}
+        dockedFeature={lodeFeature}
+        plan={planToHex({ q: 3, r: 0 }, { q: 2, r: 0 }, 0)}
+        worldTime={5_000}
+        mineEta={30_000}
+      />,
+    )
+    // The channel is busy: no fresh offer, a countdown + cancel instead.
+    expect(screen.queryByTestId('mine-section')).not.toBeInTheDocument()
+    expect(screen.getByTestId('mine-countdown')).toHaveTextContent(/25s/)
+    expect(screen.getByTestId('move-button')).toBeDisabled()
+    expect(screen.getByTestId('scan-button')).toBeEnabled()
+    fireEvent.click(screen.getByTestId('cancel-mine-button'))
+    expect(base.onCancelMine).toHaveBeenCalled()
+  })
+
+  it('lifts the mine gating once the eta passes, by world time alone', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={{ kind: 'hex', hex: { q: 2, r: 0 } }}
+        activeFleet={dockedMiner}
+        dockedFeature={lodeFeature}
+        plan={planToHex({ q: 3, r: 0 }, { q: 2, r: 0 }, 0)}
+        worldTime={31_000}
+        mineEta={30_000}
+      />,
+    )
+    // Past-eta: the stale running entry stops gating — offer + move return.
+    expect(screen.getByTestId('mine-section')).toBeInTheDocument()
+    expect(screen.queryByTestId('mine-countdown')).not.toBeInTheDocument()
+    expect(screen.getByTestId('move-button')).toBeEnabled()
+  })
+
+  it('reads the hold: used/total capacity, tons by kind, and the free remainder', () => {
+    render(<FactsPanel {...base} selection={null} activeFleet={dockedMiner} plan={null} />)
+    expect(screen.getByTestId('hold-readout')).toBeInTheDocument()
+    expect(screen.getByTestId('hold-capacity')).toHaveTextContent('12 / 200t')
+    expect(screen.getByTestId('hold-metals')).toHaveTextContent('12t')
+    expect(screen.getByTestId('hold-free')).toHaveTextContent('188t')
   })
 
   it('offers cancel only while the active fleet is burning', () => {

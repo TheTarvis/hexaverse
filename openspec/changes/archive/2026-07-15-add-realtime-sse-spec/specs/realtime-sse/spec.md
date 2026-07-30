@@ -49,11 +49,18 @@ is wired today (see design.md R3 and Open Question Q2).
   `Authorization` header nor the `token` query parameter)
 - **THEN** the connection is rejected before the SSE stream begins
 
+#### Scenario: A verified token with no backing account is rejected
+- **WHEN** a caller presents a valid Firebase token whose UID resolves to no
+  account record
+- **THEN** the stream is rejected with 401 before the connected event, even
+  though the token itself verified
+
 #### Scenario: An idle connection is kept alive by a heartbeat
-- **WHEN** a stream has been open with no channel events for the heartbeat
-  interval (30 seconds)
-- **THEN** the server sends a heartbeat comment to keep the connection
-  alive, without emitting a named event
+- **WHEN** a stream has been open for a 30-second heartbeat interval
+  (measured from connection open, on a fixed cadence not reset by event
+  delivery)
+- **THEN** the server sends a heartbeat comment (not a named event) to keep
+  the connection alive
 
 #### Scenario: A stream is terminated at the platform's request-timeout bound
 - **WHEN** a `GET /v1/channels/:channelId/stream` connection has been open
@@ -144,7 +151,9 @@ described behavior is accurate today.
 - **WHEN** a push delivers an `ActionCompleted` envelope with
   `channelId = "system-42"`
 - **THEN** the payload is broadcast to every client currently streaming
-  channel `system-42`
+  channel `system-42`, delivered as an SSE event named `action.completed`
+  (the string value of the `common.ActionCompleted` constant) whose `data`
+  is the envelope payload
 
 #### Scenario: In a deployed environment, the push route is currently unreachable (defect)
 - **WHEN** Pub/Sub delivers a push to `POST /v1/push/sse-action` in a

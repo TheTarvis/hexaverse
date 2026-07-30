@@ -1,10 +1,33 @@
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
 import * as firebaseAuth from 'firebase/auth'
 import { useAuth } from './use-auth'
+
+// D13/task 8.1 — the redirect-initiation marker's sessionStorage key. This is
+// an internal implementation detail of use-auth.ts, but the red-phase suite
+// needs a concrete, stable name to assert against; the dev implementing 8.1
+// MUST use this exact key (or the test stays red forever for the wrong
+// reason). See the SDET handoff notes for the full testid/key contract.
+const GOOGLE_REDIRECT_MARKER_KEY = 'hexaverse:google-redirect-pending'
+
+const ORIGINAL_USER_AGENT = window.navigator.userAgent
+
+function setMobileUserAgent() {
+  Object.defineProperty(window.navigator, 'userAgent', {
+    value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+    configurable: true,
+  })
+}
+
+function restoreUserAgent() {
+  Object.defineProperty(window.navigator, 'userAgent', {
+    value: ORIGINAL_USER_AGENT,
+    configurable: true,
+  })
+}
 
 // Test wrapper with React Query
 const createWrapper = () => {
@@ -360,6 +383,172 @@ describe('useAuth', () => {
         expect(result.current.isAdmin).toBe(false)
         expect(result.current.isCheckingAdmin).toBe(false)
       })
+    })
+  })
+
+  // --- D13/M2: a silent mobile Google-redirect sign-in failure must surface ---
+  describe('Google redirect sign-in (D13)', () => {
+    beforeEach(() => {
+      sessionStorage.clear()
+      // Default: getRedirectResult resolves null (no pending redirect) unless
+      // a test below overrides it.
+      vi.mocked(firebaseAuth.getRedirectResult).mockResolvedValue(null)
+      vi.mocked(firebaseAuth.onAuthStateChanged).mockImplementation((auth, callback) => {
+        setTimeout(() => {
+          if (typeof callback === 'function') callback(null)
+        }, 0)
+        return vi.fn()
+      })
+    })
+
+    afterEach(() => {
+      restoreUserAgent()
+    })
+
+    it('Scenario: signInWithGoogle persists a redirect-initiated marker before navigating away', async () => {
+      setMobileUserAgent()
+
+      const { result } = renderHook(() => useAuth(), { wrapper })
+      await waitFor(() => expect(result.current.loading).toBe(false))
+
+      expect(sessionStorage.getItem(GOOGLE_REDIRECT_MARKER_KEY)).toBeNull()
+
+      await result.current.signInWithGoogle()
+
+      // Mobile UA -> the redirect branch, not the popup branch.
+      expect(firebaseAuth.signInWithRedirect).toHaveBeenCalled()
+      expect(firebaseAuth.signInWithPopup).not.toHaveBeenCalled()
+      // The marker must be durable (written before the browser navigates
+      // away) so the return trip can tell "a redirect was pending" apart
+      // from "no redirect was ever initiated" (getRedirectResult resolves
+      // null in both cases).
+      expect(sessionStorage.getItem(GOOGLE_REDIRECT_MARKER_KEY)).not.toBeNull()
+    })
+
+    it('Scenario: A successful Google redirect result surfaces no error and clears the marker', async () => {
+      sessionStorage.setItem(GOOGLE_REDIRECT_MARKER_KEY, '1')
+      vi.mocked(firebaseAuth.getRedirectResult).mockResolvedValue({
+        user: mockUser,
+      } as unknown as firebaseAuth.UserCredential)
+      vi.mocked(firebaseAuth.onAuthStateChanged).mockImplementation((auth, callback) => {
+        setTimeout(() => {
+          if (typeof callback === 'function') callback(mockUser)
+        }, 0)
+        return vi.fn()
+      })
+
+      const { result } = renderHook(() => useAuth(), { wrapper })
+
+      await waitFor(() => expect(result.current.user).toEqual(mockUser))
+      expect((result.current as unknown as { redirectError: unknown }).redirectError).toBeFalsy()
+      // The defect this scenario guards: today nothing ever clears the
+      // marker, so a stale marker from a genuinely successful redirect could
+      // leak into a later, unrelated page load.
+      expect(sessionStorage.getItem(GOOGLE_REDIRECT_MARKER_KEY)).toBeNull()
+    })
+
+    it('Scenario: A rejected redirect result surfaces redirectError', async () => {
+      sessionStorage.setItem(GOOGLE_REDIRECT_MARKER_KEY, '1')
+      vi.mocked(firebaseAuth.getRedirectResult).mockRejectedValue(new Error('redirect failed'))
+
+      const { result } = renderHook(() => useAuth(), { wrapper })
+
+      await waitFor(() => {
+        expect(
+          (result.current as unknown as { redirectError: unknown }).redirectError
+        ).toBeTruthy()
+      })
+      expect(sessionStorage.getItem(GOOGLE_REDIRECT_MARKER_KEY)).toBeNull()
+    })
+
+    it('Scenario: A rejected redirect result does not leak the raw provider error', async () => {
+      // D13/task 8.5 — a rejected getRedirectResult (identity-provider error,
+      // e.g. account-exists-with-different-credential or a transient
+      // network failure) must surface as the SAME neutral, provider-agnostic
+      // copy the cancelled/denied path already uses — never the raw
+      // FirebaseError message/code, which would leak provider internals and
+      // (via account-exists-with-different-credential) an account-existence
+      // signal into the inline login error.
+      sessionStorage.setItem(GOOGLE_REDIRECT_MARKER_KEY, '1')
+      const providerError = Object.assign(
+        new Error('Firebase: Error (auth/account-exists-with-different-credential).'),
+        { code: 'auth/account-exists-with-different-credential' }
+      )
+      vi.mocked(firebaseAuth.getRedirectResult).mockRejectedValue(providerError)
+
+      const { result } = renderHook(() => useAuth(), { wrapper })
+
+      await waitFor(() => {
+        expect(
+          (result.current as unknown as { redirectError: Error | null }).redirectError
+        ).toBeTruthy()
+      })
+
+      const message = (result.current as unknown as { redirectError: Error }).redirectError
+        .message
+
+      // Same neutral copy the hook already uses for the cancelled/denied
+      // branch (line ~95) — one consistent message for every flavor of
+      // "the redirect didn't produce a signed-in user".
+      expect(message).toBe('Google sign-in did not complete.')
+      expect(message).not.toMatch(/auth\//)
+      expect(message).not.toMatch(/Firebase/i)
+    })
+
+    // SDET-added: a second provider error code (a transient/non-identity
+    // failure rather than an identity-conflict one) — pins that the leak
+    // guard isn't accidentally keyed to one specific error code.
+    it('SDET-added: a network-request-failed redirect rejection also shows neutral copy', async () => {
+      sessionStorage.setItem(GOOGLE_REDIRECT_MARKER_KEY, '1')
+      const providerError = Object.assign(
+        new Error('Firebase: Error (auth/network-request-failed).'),
+        { code: 'auth/network-request-failed' }
+      )
+      vi.mocked(firebaseAuth.getRedirectResult).mockRejectedValue(providerError)
+
+      const { result } = renderHook(() => useAuth(), { wrapper })
+
+      await waitFor(() => {
+        expect(
+          (result.current as unknown as { redirectError: Error | null }).redirectError
+        ).toBeTruthy()
+      })
+
+      const message = (result.current as unknown as { redirectError: Error }).redirectError
+        .message
+
+      expect(message).toBe('Google sign-in did not complete.')
+      expect(message).not.toMatch(/auth\//)
+      expect(message).not.toMatch(/Firebase/i)
+    })
+
+    it('Scenario: A redirect result with no user but a pending marker is a cancelled/denied redirect', async () => {
+      // getRedirectResult resolves null both for "no redirect was ever
+      // pending" and for "the user cancelled" — the marker is what tells
+      // these apart.
+      sessionStorage.setItem(GOOGLE_REDIRECT_MARKER_KEY, '1')
+      vi.mocked(firebaseAuth.getRedirectResult).mockResolvedValue(null)
+
+      const { result } = renderHook(() => useAuth(), { wrapper })
+
+      await waitFor(() => {
+        expect(
+          (result.current as unknown as { redirectError: unknown }).redirectError
+        ).toBeTruthy()
+      })
+      expect(sessionStorage.getItem(GOOGLE_REDIRECT_MARKER_KEY)).toBeNull()
+    })
+
+    it('Scenario: An ordinary page load with no redirect initiated shows no error', async () => {
+      // No marker present, getRedirectResult resolves null — an everyday
+      // page load, not a returning redirect.
+      sessionStorage.removeItem(GOOGLE_REDIRECT_MARKER_KEY)
+      vi.mocked(firebaseAuth.getRedirectResult).mockResolvedValue(null)
+
+      const { result } = renderHook(() => useAuth(), { wrapper })
+
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      expect((result.current as unknown as { redirectError: unknown }).redirectError).toBeFalsy()
     })
   })
 })

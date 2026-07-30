@@ -431,14 +431,62 @@ feedback. This is distinct from the popup path's `try`/`catch` in
 silently, in `use-auth.ts`.
 
 Unlike D9/D10 (root cause outside scope, fix deferred), this fix is narrow,
-additive, and the same shape/size as D6–D8: surface
-`getRedirectResult`'s rejection as state instead of only logging it, and
-render that state through the login form's *already-fixed* (D8) inline
-error surface and live region — no new UI, no new mechanism. Disposition:
-**added to this change's scope.** `hooks/use-auth.ts` joins the file list
-in `proposal.md`'s Impact section; the touch is additive only (a new
-returned error field), with no change to `signIn`/`signUp`/
-`signInWithGoogle`'s existing behavior on any other path.
+additive, and the same shape/size as D6–D8: surface the redirect result's
+failure as state instead of only logging it, and render that state through
+the login form's *already-fixed* (D8) inline error surface and live
+region. Disposition: **added to this change's scope.** `hooks/use-auth.ts`
+joins the file list in `proposal.md`'s Impact section; the touch is
+additive only, with no change to `signIn`/`signUp`/`signInWithGoogle`'s
+existing sign-in behavior on any other path.
+
+**Mechanism, revised this round (M2 — `getRedirectResult` alone cannot
+detect "cancelled").** `getRedirectResult(auth)` resolves `null` both on an
+ordinary page load (no redirect was ever pending) *and* on a user-cancelled
+or denied Google redirect; it only *rejects* on a genuine SDK/network
+error. A fix that surfaces only the `.catch` rejection therefore leaves
+D13's headline defect — the cancelled case — exactly as silent as before,
+and gives an SDET no injectable trigger to red-test "cancelled shows an
+error" against. The fix instead needs a **redirect-initiation marker**: a
+durable flag (e.g. `sessionStorage`) written *before*
+`signInWithRedirect` navigates the browser away, so the return trip can
+tell "a redirect was pending and produced no user" apart from "no redirect
+was ever pending." Sequence:
+
+1. `signInWithGoogle`'s redirect branch persists the marker, then calls
+   `signInWithRedirect`.
+2. On return, the auth-init effect awaits `getRedirectResult(auth)` and
+   classifies the settled outcome, clearing the marker in every branch:
+   - **resolves with a user** → success; no error surfaced.
+   - **rejects** → surface `redirectError`.
+   - **resolves with no user, marker present** → a cancelled/denied/failed
+     redirect; surface `redirectError`.
+   - **resolves with no user, no marker** → an ordinary page load; surface
+     nothing.
+
+This mechanism is HOW (design), not WHAT (spec) — the spec requirement
+("A Failed Google Redirect Sign-In Shows an Error, Not a Silent Return")
+states the observable trigger ("a redirect was initiated and did not
+produce a signed-in user on return") without naming `sessionStorage`
+specifically, so a different durable-marker implementation would still
+satisfy it; this section pins the concrete mechanism the tasks build.
+
+**Wiring, added this round (M1 — the login page cannot reach a bare
+`use-auth.ts` export).** `app/login/page.tsx` consumes auth state only
+through `useAccountContext()`; this frontend's convention forbids calling
+`useAuth()` directly from a component. A `redirectError` field added only
+to `use-auth.ts`'s return value is therefore invisible to the login form —
+task 8.2 as originally scoped was unimplementable, and it also contradicted
+`proposal.md`'s Impact line describing `account-provider.tsx`'s touch as
+"additive retry export only." Both are corrected this round:
+`account-provider.tsx` gains a second, narrow additive passthrough —
+re-exposing `use-auth.ts`'s `redirectError` on `AccountContextValue`,
+alongside D6's retry-affordance export — so `app/login/page.tsx` reads it
+the same way it reads everything else, via `useAccountContext()`. This is
+still a passthrough, not new account-lookup/auto-create behavior;
+`proposal.md`'s Impact wording is updated from "additive retry export
+only" to "additive exports only (retry affordance + redirectError
+passthrough)" to keep it honest about the second export. Task 8.1b names
+this wiring explicitly.
 
 This does **not** extend to the adjacent, more speculative gap `reliability`
 raised alongside it — `onAuthStateChanged`'s own lack of an error handler
@@ -487,15 +535,19 @@ Mostly documentation-only: on archive, `session-wakeup` joins
 `openspec/specs/` as a new capability with no data or contract migration.
 D6–D8 and D11–D13 require small, additive frontend code changes before this
 change's tasks are complete (see `tasks.md`) — surfacing already-available
-error state in `corporation-provider.tsx` and `layout-wrapper.tsx` (gated on
-`isCreating` per the D6 refinement), one narrow new export from
-`account-provider.tsx`, a same-origin + backslash/control-character check
-and a uniform credential-failure message in `app/login/page.tsx`, a live
-region on its error text, a segment-boundary fix to `layout-wrapper.tsx`'s
-`PUBLIC_ROUTES` match, an invalidation guard in `wake-up-flow.tsx`'s spawn
-`onSuccess`, and one new additive export from `hooks/use-auth.ts` (D13).
-None of these files' existing public behavior for the happy path changes;
-none require a data migration.
+error state in `corporation-provider.tsx`, scoped so a background refetch
+failure while a corporation is already resolved does not evict the player
+(B1), and in `layout-wrapper.tsx` (gated on `isCreating` per the D6
+refinement), two narrow additive exports from `account-provider.tsx` (a
+retry affordance for D6, and a `redirectError` passthrough for D13/M1), a
+same-origin + backslash/control-character check and a uniform
+credential-failure message (covering `auth/invalid-credential`, per M3) in
+`app/login/page.tsx`, a live region on its error text, a segment-boundary
+fix to `layout-wrapper.tsx`'s `PUBLIC_ROUTES` match, an invalidation guard
+in `wake-up-flow.tsx`'s spawn `onSuccess`, and a redirect-initiation marker
+plus a new additive `redirectError` export from `hooks/use-auth.ts`
+(D13/M2). None of these files' existing public behavior for the happy path
+changes; none require a data migration.
 
 ## Open Questions
 
@@ -529,6 +581,15 @@ none require a data migration.
   D3/D9's account-bootstrap gap, not silently dropped.
 - Should `corporation-spawn` bound the corporation name's server-side length
   and character class (D10, security)? Real gap, out of this change's scope.
+- Is there a bound on a *persistently* malformed spawn success (the backend
+  deterministically omitting `homeSystem.id` on every attempt for a given
+  corp, rather than a one-off transient omission)? The delta's
+  resubmission-succeeds scenario is now scoped to the transient case (m1,
+  adversary MINOR) — a deterministic omission would repeat the same
+  retriable error indefinitely, with no distinct state and no bound on
+  retry count. No design-doc-sourced behavior exists for this today;
+  flagged rather than invented, grouped with the blank-frame/submit-pending
+  SLO open questions above.
 - Is the focus destination after a sign-up password-mismatch error, or after
   the post-spawn navigation to the new home board, worth pinning explicitly?
   Neither is scripted in the current code (no `.focus()` call either place),

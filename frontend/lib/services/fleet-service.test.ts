@@ -62,4 +62,33 @@ describe('fleetService', () => {
     await fleetService.scan('fleet_1')
     expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/scan', {})
   })
+
+  it('commits a mine run through POST /mine and returns the action id + frozen eta', async () => {
+    const commit = { actionId: 'act_9', eta: 200_000, worldTime: 123_456 }
+    mockPost.mockResolvedValue(ok(commit))
+
+    const result = await fleetService.mine('fleet_1', {
+      featureId: 'feat-belt',
+      kind: 'metals',
+      tons: 40,
+    })
+
+    expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/mine', {
+      featureId: 'feat-belt',
+      kind: 'metals',
+      tons: 40,
+    })
+    expect(result).toEqual(commit)
+  })
+
+  it('lets a mine rejection propagate with the server reason intact', async () => {
+    // The backend answers every commit rejection with a distinguishable
+    // `error` reason; apiClient turns that into the thrown message, and the
+    // service must not swallow it — the board toasts it verbatim.
+    mockPost.mockRejectedValue(new Error('mine: requested tons exceed the fleet\'s free hold'))
+
+    await expect(
+      fleetService.mine('fleet_1', { featureId: 'feat-belt', kind: 'metals', tons: 999 }),
+    ).rejects.toThrow(/free hold/)
+  })
 })

@@ -12,6 +12,7 @@ import (
 	"hexaverse/galaxy"
 	"hexaverse/health"
 	"hexaverse/middlewares"
+	"hexaverse/mine"
 	"hexaverse/observation"
 	"hexaverse/sse"
 	"hexaverse/system"
@@ -137,6 +138,15 @@ func SetupRouter() *gin.Engine {
 	actionHandler := action.NewHandler(actionSvc)
 	actionHandler.RegisterRoutes(authorized)
 	fleet.NewHandlerWith(fleetSvc, clock).WithFog(fogSvc).RegisterRoutes(authorized)
+
+	// Mine (#0010): the action spine's first mutating resolver. Wired after
+	// fleet/fog/travel/spawn — it rides fleet's movement channel (Decision #9)
+	// and reads through fleetSvc/systemSvc/actionSvc, never their DAOs.
+	mineParams := mine.DefaultMineParams()
+	mineClassStats := fleet.DefaultClassStats()
+	mineSvc := mine.NewServiceWith(fleetSvc, systemSvc, actionSvc, clock, mineParams, mineClassStats)
+	mine.RegisterResolver(actionSvc, mineParams, mineClassStats)
+	mine.NewHandlerWith(mineSvc, clock).RegisterRoutes(authorized)
 
 	// SSE: EventSource can't send custom headers, so JWT comes from the query string.
 	sseHandler := sse.NewHandler()
