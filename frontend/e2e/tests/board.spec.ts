@@ -17,12 +17,20 @@ test.describe('system board', () => {
     // Auth-gated route: the restored session should keep us off /login.
     await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 })
 
-    // The container mounts, then the real SVG board + its star-centre tile render
-    // from the seeded interior read (past the "Charting the system…" state).
+    // The container mounts, then the real board renders from the seeded interior
+    // read (past the "Charting the system…" state).
     await expect(page.getByTestId('system-board-view')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('hex-board')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('hex-lattice')).toBeVisible()
-    await expect(page.getByTestId('hex-tile-0,0')).toBeVisible()
+
+    // The lattice produced real, selectable tiles. Deliberately ANY tile, not a
+    // pinned coordinate: the property under test is "the board rendered tiles and
+    // they take a click", and the observable is the resulting tile selection in
+    // the facts panel — which stays true of a renderer with no per-tile DOM node.
+    const tile = page.locator('[data-testid^="hex-tile-"]').first()
+    await expect(tile).toBeVisible()
+    await tile.click()
+    await expect(page.getByTestId('selection')).toContainText('Tile')
 
     // The facts panel reflects the read (star class + radius/body facts).
     await expect(page.getByTestId('facts-panel')).toContainText('system')
