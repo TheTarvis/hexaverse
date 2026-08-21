@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
@@ -7,17 +7,26 @@ import { useGalaxy } from '@/hooks/use-galaxy'
 import { useMyFleets, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
 import type { Galaxy } from '@/lib/types/galaxy'
 import type { Fleet, RoutePreview } from '@/lib/types/fleet'
+import { stubUnsupported } from '@/components/render-guard/test-canvas'
 
 // Spies the mocked graph hands back through onReady (recenter/focusSystem) so we
 // can assert the controls drive the controller; graphPropsSpy captures the fleet
 // marker / home props; pushSpy stands in for the router (drill-in navigation).
-const { recenterSpy, focusSpy, focusPointSpy, graphPropsSpy, pushSpy } = vi.hoisted(() => ({
-  recenterSpy: vi.fn(),
-  focusSpy: vi.fn(),
-  focusPointSpy: vi.fn(),
-  graphPropsSpy: vi.fn(),
-  pushSpy: vi.fn(),
-}))
+const { recenterSpy, focusSpy, focusPointSpy, graphPropsSpy, pushSpy, graphBehavior } = vi.hoisted(
+  () => ({
+    recenterSpy: vi.fn(),
+    focusSpy: vi.fn(),
+    focusPointSpy: vi.fn(),
+    graphPropsSpy: vi.fn(),
+    pushSpy: vi.fn(),
+    // add-renderer-availability-states: a mutable switch the '@/components/galaxy/GalaxyGraph'
+    // mock reads on every render — lets a single test make the mock throw
+    // synchronously (simulating a creation failure that survived the
+    // pre-flight probe, e.g. FG3D's own internal construction throw) without
+    // needing a second mock module. Reset to false in beforeEach.
+    graphBehavior: { throwOnRender: false },
+  }),
+)
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushSpy }) }))
 
@@ -64,11 +73,31 @@ vi.mock('@/components/galaxy/GalaxyGraph', async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }: any) => {
       graphPropsSpy({ fleetSystemIds, transitFleets, homeSystemId })
+      // SDET-added: a real (mock) canvas exposed via the controller's
+      // `canvas()` accessor — GalaxyView wires
+      // `setGuardCanvas(controller.canvas?.() ?? null)` from this, so a test
+      // can dispatch a genuine `webglcontextlost`/`webglcontextrestored` on
+      // the SAME element the production guard attaches its listeners to,
+      // without touching the real FG3D mount path (reserved for Playwright).
+      const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
       React.useEffect(() => {
-        onReady?.({ recenter: recenterSpy, focusSystem: focusSpy, focusPoint: focusPointSpy })
+        onReady?.({
+          recenter: recenterSpy,
+          focusSystem: focusSpy,
+          focusPoint: focusPointSpy,
+          canvas: () => canvasRef.current,
+        })
       }, [onReady])
+      // add-renderer-availability-states: simulates a construction throw
+      // that survives the pre-flight probe (three/FG3D's own internal
+      // throw) — the boundary GalaxyView wraps this component in must
+      // convert it to the unsupported state.
+      if (graphBehavior.throwOnRender) {
+        throw new Error('fg3d construction boom')
+      }
       return (
         <div data-testid="mock-graph">
+          <canvas ref={canvasRef} data-testid="mock-graph-canvas" />
           {/* Stands in for clicking a fleet's lane marker (raycast in the real
               graph, a button here). */}
           {(transitFleets ?? []).map((f: Fleet) => (
@@ -195,6 +224,7 @@ describe('GalaxyView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sessionStorage.clear()
+    graphBehavior.throwOnRender = false
     // Default: no fleets, no route, an inert travel mutation.
     mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
     mockUseRoutePreview.mockReturnValue({
@@ -496,5 +526,232 @@ describe('GalaxyView', () => {
     expect(props.transitFleets.map((f: Fleet) => f.id)).toEqual(['fleet_1'])
     // …and NOT as a presence pip on sys-0, which it has already left.
     expect(props.fleetSystemIds).not.toContain('sys-0')
+  })
+
+  // --- renderer availability (add-renderer-availability-states) --------------
+  //
+  // The mocked '@/components/galaxy/GalaxyGraph' above stands in for the
+  // whole renderer, per design.md's testability note — the REAL FG3D mount
+  // path is only exercised by the Playwright suite. These tests drive the
+  // guard through the REAL `getContext` global (default-available; overridden
+  // via `stubUnsupported()`), never through the mock's own behaviour — the
+  // mock renders `mock-graph` unconditionally, so it's the guard's `live`
+  // gate, not the mock, that decides whether it appears.
+  describe('renderer availability', () => {
+    let restoreCanvas: (() => void) | null = null
+    afterEach(() => {
+      restoreCanvas?.()
+      restoreCanvas = null
+    })
+
+    it('shows a named unsupported state when the rendering context cannot be created, with no uncaught error, and never mounts the graph (Scenario: Context creation failure shows a named unsupported state)', async () => {
+      restoreCanvas = stubUnsupported()
+      mockGalaxyState()
+      expect(() => renderView()).not.toThrow()
+
+      expect(await screen.findByTestId('renderer-unsupported')).toHaveTextContent(
+        /browser|graphics hardware|webgl|gpu/i,
+      )
+      expect(screen.queryByTestId('mock-graph')).not.toBeInTheDocument()
+    })
+
+    it('is independent of the galaxy data read: the galaxy read succeeds, but the unsupported state still shows because rendering cannot be created (Scenario: The unsupported state is independent of the galaxy data read)', async () => {
+      restoreCanvas = stubUnsupported()
+      mockGalaxyState()
+      renderView()
+      expect(await screen.findByTestId('renderer-unsupported')).toBeInTheDocument()
+    })
+
+    it('a failed galaxy data read takes precedence: no unsupported state renders when the galaxy read has already failed (Scenario: A failed data read takes precedence over the unsupported state)', async () => {
+      restoreCanvas = stubUnsupported()
+      mockGalaxyState({ data: undefined, isError: true, error: new Error('boom') })
+      renderView()
+      expect(screen.getByText(/couldn’t load the galaxy/i)).toBeInTheDocument()
+      expect(screen.queryByTestId('renderer-unsupported')).not.toBeInTheDocument()
+    })
+
+    it('the galaxy view container remains present while the canvas region shows the unsupported state (Scenario: The galaxy view container remains present)', async () => {
+      restoreCanvas = stubUnsupported()
+      mockGalaxyState()
+      renderView()
+      await screen.findByTestId('renderer-unsupported')
+      expect(screen.getByTestId('galaxy-view')).toBeInTheDocument()
+    })
+
+    it('the intel panel and fleet roster remain mounted and interactive for an authenticated requester with an own fleet (Scenario: Surrounding galaxy affordances remain usable)', async () => {
+      restoreCanvas = stubUnsupported()
+      mockGalaxyState()
+      mockUseMyFleets.mockReturnValue({
+        data: [coastFleet('fleet_1', 'sys-0')],
+      } as unknown as ReturnType<typeof useMyFleets>)
+      renderView()
+      await screen.findByTestId('renderer-unsupported')
+
+      expect(screen.getByTestId('intel-panel')).toBeInTheDocument()
+      expect(screen.getByTestId('fleet-row-fleet_1')).toBeInTheDocument()
+    })
+
+    it('roster selection still reaches a system, its inspector, and travel while the canvas is unsupported (Scenario: Roster selection still reaches a system, its inspector, and travel)', async () => {
+      restoreCanvas = stubUnsupported()
+      mockGalaxyState()
+      // QA fixture-gap fix: a SINGLE-fleet fixture makes `previewDest`
+      // permanently null — the acting fleet's roster row always selects its
+      // OWN system, so `selectedId === activeFleet.systemId` (isHere) on
+      // every click, and `travel-button` can never render. Two own fleets,
+      // at DIFFERENT systems, fix this: fleet_1 (first in the array, so the
+      // idle `activeFleet` GalaxyView commands travel for) stays at sys-0;
+      // fleet_2 sits at sys-1. Clicking fleet_2's row selects sys-1 — a
+      // system the acting fleet is NOT already at — so `previewDest` is
+      // genuinely non-null and TravelSection renders its live route +
+      // `travel-button`, not just the "Your fleet is here" note a
+      // same-system fixture would always hit.
+      mockUseMyFleets.mockReturnValue({
+        data: [coastFleet('fleet_1', 'sys-0'), coastFleet('fleet_2', 'sys-1')],
+      } as unknown as ReturnType<typeof useMyFleets>)
+      const preview: RoutePreview = {
+        route: ['sys-0', 'sys-1'],
+        legEtas: [60_000, 660_000],
+        totalEta: 660_000,
+        departGate: { q: 16, r: -2 },
+        worldTime: 0,
+      }
+      mockUseRoutePreview.mockReturnValue({
+        data: preview,
+        isLoading: false,
+        isError: false,
+      } as unknown as ReturnType<typeof useRoutePreview>)
+
+      renderView()
+      await screen.findByTestId('renderer-unsupported')
+
+      // handleShowFleet: a roster row for a fleet NOT at the acting fleet's
+      // own system selects that system directly — no graph selection
+      // involved — reaching it, its inspector, and a genuinely live
+      // travel-button, all through the fleet-roster path alone.
+      fireEvent.click(screen.getByTestId('fleet-row-fleet_2'))
+
+      expect(screen.getByTestId('inspector-name')).toHaveTextContent('Borealis')
+      expect(screen.getByTestId('route-preview')).toBeInTheDocument()
+      expect(screen.getByTestId('travel-button')).toBeInTheDocument()
+    })
+
+    it('surrounding affordances remain usable for a logged-out visitor: counts, region breakdown, and sign-in prompt shown; the roster is not mounted (Scenario: Surrounding galaxy affordances remain usable for a logged-out visitor)', async () => {
+      restoreCanvas = stubUnsupported()
+      mockGalaxyState({ isStartArea: true })
+      renderView()
+      await screen.findByTestId('renderer-unsupported')
+
+      const panel = screen.getByTestId('intel-panel')
+      expect(panel).toHaveTextContent('2') // systems
+      expect(panel).toHaveTextContent('1') // lanes
+      expect(panel).toHaveTextContent('Star-rich')
+      expect(screen.getByTestId('signin-prompt')).toBeInTheDocument()
+      expect(screen.queryByTestId('fleet-row-fleet_1')).not.toBeInTheDocument()
+    })
+
+    it('does not instruct the player to select a system on the graph when none is selected and there is no own fleet in the roster (Scenario: Choosing a system on the graph is unreachable without the canvas)', async () => {
+      restoreCanvas = stubUnsupported()
+      mockGalaxyState()
+      mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
+      renderView()
+      await screen.findByTestId('renderer-unsupported')
+
+      const inspector = screen.getByTestId('inspector')
+      expect(inspector).not.toHaveTextContent(/select a system to inspect/i)
+      expect(inspector).toHaveTextContent(/roster|fleet|available/i)
+    })
+
+    it('disables the recenter control while the canvas is unsupported (Scenario: A canvas-only control is disabled while the canvas is unavailable)', async () => {
+      restoreCanvas = stubUnsupported()
+      mockGalaxyState()
+      renderView()
+      await screen.findByTestId('renderer-unsupported')
+
+      expect(screen.getByTestId('galaxy-recenter')).toBeDisabled()
+    })
+
+    it('an in-flight system selection survives a transition into the unsupported state, by construction — `selectedId` lives in GalaxyView\'s own state, a sibling of `<GalaxyGraph>`, never inside it (Scenario: In-flight selection survives a context loss)', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockGalaxyState()
+      const { rerender } = renderView()
+      // Select a system while the graph is live.
+      fireEvent.click(await screen.findByTestId('select-sys-0'))
+      expect(screen.getByTestId('inspector-name')).toHaveTextContent('Axion')
+
+      // Drive the canvas region into the unsupported state via a fresh
+      // render pass (a stand-in for a runtime loss reaching the guard) —
+      // `selectedId` is GalaxyView's own `useState`, untouched by this.
+      graphBehavior.throwOnRender = true
+      rerender(<GalaxyView />)
+
+      await screen.findByTestId('renderer-unsupported')
+      // The selection is unchanged — never re-derived from, or reset by,
+      // the canvas region's own status.
+      expect(screen.getByTestId('inspector-name')).toHaveTextContent('Axion')
+      consoleErrorSpy.mockRestore()
+    })
+
+    // SDET-added (QA MAJOR, real-browser e2e finding): a runtime context
+    // loss must NOT unmount <GalaxyGraph> (and detach its canvas) — only
+    // 'unsupported' may tear the canvas region down. Composing
+    // `guard.status === 'live' ? <Boundary><GalaxyGraph/></Boundary> :
+    // <Notice/>` unmounts on ANY non-'live' status, including
+    // 'interrupted' — and once a canvas is detached from the document, the
+    // browser never fires `webglcontextrestored` for that context again,
+    // making "A restored context resumes without navigation" and "...its
+    // first frame reflects live state" permanently unreachable on the
+    // shipped surface. `BoardCanvas.test.tsx` carries the board-side
+    // twin of this pin.
+    it('SDET-added: the canvas region (and its <canvas>) remain mounted while the guard is INTERRUPTED — only "unsupported" may tear it down (Scenario: A restored context resumes without navigation / A restored context\'s first frame reflects live state, not a stale one)', async () => {
+      mockGalaxyState()
+      renderView()
+
+      const canvas = await screen.findByTestId('mock-graph-canvas')
+      expect(canvas).toBeInTheDocument()
+
+      // A genuine runtime context loss, dispatched on the exact element the
+      // production guard's listeners are attached to (via
+      // `controller.canvas?.()`). `onReady` (an inline prop) re-fires the
+      // mock's effect across GalaxyView's own settling re-renders, so the
+      // guard's listener-attachment effect can land a tick after the canvas
+      // itself first appears — poll the dispatch (harmless to repeat: a
+      // second 'contextLost' while already interrupted is an explicit no-op
+      // transition) rather than assume a fixed settle time.
+      await waitFor(() => {
+        fireEvent(canvas, new Event('webglcontextlost'))
+        expect(screen.getByTestId('renderer-interrupted')).toBeInTheDocument()
+      })
+
+      // The canvas region — and this same canvas element — must still be
+      // mounted: a real restore, dispatched later on this same context,
+      // must have somewhere live to land.
+      expect(screen.getByTestId('mock-graph')).toBeInTheDocument()
+      expect(screen.getByTestId('mock-graph-canvas')).toBe(canvas)
+      expect(document.body.contains(canvas)).toBe(true)
+    })
+
+    it('converts an unexpected render-phase throw (surviving the probe) to the unsupported state via the boundary — intel panel, inspector, and the container remain (Scenario: An unexpected rendering error is contained to the canvas region)', async () => {
+      // React logs a caught boundary error to console.error in dev
+      // regardless of our own handling — suppressed here only (not in
+      // vitest.setup.ts's filter), per the architect's watch-out.
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      graphBehavior.throwOnRender = true
+      mockGalaxyState()
+      expect(() => renderView()).not.toThrow()
+
+      expect(await screen.findByTestId('renderer-unsupported')).toBeInTheDocument()
+      expect(screen.getByTestId('galaxy-view')).toBeInTheDocument()
+      expect(screen.getByTestId('intel-panel')).toBeInTheDocument()
+      expect(screen.getByTestId('inspector')).toBeInTheDocument()
+      // SDET-added (security audit MINOR-2): the caught error's raw message
+      // never reaches the DOM — CanvasRegionBoundary discards it
+      // (`fallback` is a plain ReactNode, not a render-prop over the error)
+      // and RendererStateNotice only ever displays the fixed, enum-derived
+      // cause copy. Regression pin, not new behaviour (Scenario: The
+      // displayed cause is a user-actionable category, not raw diagnostic
+      // text).
+      expect(screen.queryByText(/fg3d construction boom/)).not.toBeInTheDocument()
+      consoleErrorSpy.mockRestore()
+    })
   })
 })

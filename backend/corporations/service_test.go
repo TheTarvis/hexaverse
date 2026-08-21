@@ -2,6 +2,7 @@ package corporations
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -175,6 +176,45 @@ func TestSpawn_TwoAccountsTwoCorps(t *testing.T) {
 		if got != want {
 			t.Fatalf("CorpForAccount(%s) = %s, want %s", acct, got, want)
 		}
+	}
+}
+
+// exhaustedGraph is a GraphSource with no spawnable systems — the site-exhaustion
+// case (every mineable system fenced off by MinSpawnDistance, or an empty graph).
+type exhaustedGraph struct{}
+
+func (exhaustedGraph) GetLive(context.Context) (*galaxy.GeneratedGalaxy, error) {
+	return &galaxy.GeneratedGalaxy{}, nil
+}
+func (exhaustedGraph) GetLiveSystem(context.Context, string) (*galaxy.System, error) {
+	return nil, errors.New("unreachable: a failed site pick must bail before the home read")
+}
+
+// TestSpawn_NoSpawnSite_LeavesAccountCorpless is the 2026-08-12 zombie-corp bug:
+// a wake that fails site selection (503 no-spawn-site at the handler) must not
+// commit the corp doc — the account stays corpless, gated back to the wake-up
+// flow and free to retry, never stranded on a fleetless corp.
+func TestSpawn_NoSpawnSite_LeavesAccountCorpless(t *testing.T) {
+	fs, client := common.SetupFirestoreTestDAO(t)
+	ctx := context.Background()
+	t.Cleanup(func() {
+		common.CleanupFirestoreTestData(t, client, corporationsCollection, accountPointerCollection)
+	})
+
+	// Fleet/fog services are nil on purpose: a failed site pick must bail before
+	// spawn touches either (or the corp DAO).
+	corpSvc := NewServiceWith(NewDaoWithClient(fs), exhaustedGraph{}, nil, nil, &fakeClock{now: 1000})
+
+	if _, err := corpSvc.Spawn(ctx, "account-1", "Bob"); !errors.Is(err, ErrNoSpawnSite) {
+		t.Fatalf("Spawn on an exhausted world: err = %v, want ErrNoSpawnSite", err)
+	}
+
+	// The account must remain corpless: no doc, no pointer.
+	if _, err := corpSvc.GetForAccount(ctx, "account-1"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("GetForAccount after a failed wake: err = %v, want ErrNotFound", err)
+	}
+	if corpID, err := corpSvc.CorpForAccount(ctx, "account-1"); err != nil || corpID != "" {
+		t.Fatalf("CorpForAccount after a failed wake = (%q, %v), want (\"\", nil)", corpID, err)
 	}
 }
 

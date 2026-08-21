@@ -38,8 +38,9 @@ export function projectWorldTime(anchor: WorldAnchor, wallNow: number, scale: nu
 }
 
 // Monotonic wall clock in ms (performance.now if present, else Date.now). Only
-// deltas are used, so the origin is irrelevant.
-function wallClock(): number {
+// deltas are used, so the origin is irrelevant. Exported so the board's frame
+// packer anchors against the SAME clock this hook projects with.
+export function wallClock(): number {
   return typeof performance !== 'undefined' && typeof performance.now === 'function'
     ? performance.now()
     : Date.now()

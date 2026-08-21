@@ -79,6 +79,33 @@ export function featureGlidePixel(
   return hexToPixel(h.q, h.r)
 }
 
+// featureMaps — every feature's glided pixel and logical hex at worldTime,
+// resolved in two passes so moons ride their parent (parents are always
+// non-parented, so pass 1 covers them). The one shared implementation behind
+// the scene layers: whoever draws features must position them through this so
+// a moon and its parent never disagree between layers.
+export function featureMaps(
+  features: BoardFeature[],
+  worldTime: number,
+): { pixelById: Map<string, Point>; hexById: Map<string, Hex> } {
+  const pixelById = new Map<string, Point>()
+  const hexById = new Map<string, Hex>()
+  const moonIndex = new Map<string, number>()
+  for (const f of features) {
+    if (f.parentId) continue
+    pixelById.set(f.id, featureGlidePixel(f, worldTime))
+    hexById.set(f.id, featureLogicalHex(f, worldTime))
+  }
+  for (const f of features) {
+    if (!f.parentId) continue
+    const i = moonIndex.get(f.parentId) ?? 0
+    moonIndex.set(f.parentId, i + 1)
+    pixelById.set(f.id, featureGlidePixel(f, worldTime, pixelById.get(f.parentId), i))
+    hexById.set(f.id, featureLogicalHex(f, worldTime, hexById.get(f.parentId)))
+  }
+  return { pixelById, hexById }
+}
+
 // Every fleet helper below positions from the EFFECTIVE state (stateAt): a
 // payload burn whose arrival passes while it sits in the query cache IS the
 // coast (or dock) it settled into, from the instant it arrives. Deriving from

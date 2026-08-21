@@ -4,8 +4,9 @@
 // It fans in the two fogged reads (the interior + the requester's fleets), runs
 // the shared world clock (useWorldTime), and owns the select → preview → commit
 // gesture for the slice verbs (move + scan). The heavy lifting lives in leaves:
-// HexBoard/BoardScene draw, FactsPanel commands, glyph-geometry/move-preview do
-// the math. The three #0005 refetch rules ride useBoardRealtime.
+// BoardStage draws (BoardCanvas's WebGL world + BoardOverlay's hit layer),
+// FactsPanel commands, glyph-geometry/move-preview do the math. The three
+// #0005 refetch rules ride useBoardRealtime.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -21,10 +22,8 @@ import { useBoardRealtime } from '@/hooks/use-board-realtime'
 import type { Hex, Target } from '@/lib/hex'
 import type { Fleet } from '@/lib/types/fleet'
 import { FleetRoster } from '@/components/fleet/FleetRoster'
-import { HexBoard } from './HexBoard'
-import { BoardScene } from './BoardScene'
-import { SelectionPreview } from './SelectionPreview'
-import { ScanOverlay } from './ScanOverlay'
+import { BoardStage } from './BoardStage'
+import type { ScanFxInput } from './BoardOverlay'
 import { FactsPanel, type BoardSelection } from './FactsPanel'
 import {
   featureLogicalHex,
@@ -32,9 +31,6 @@ import {
   fleetLogicalHex,
   fleetOnBoard,
 } from './glyph-geometry'
-import { ScanPing } from './ScanPing'
-import { ArcScan } from './ArcScan'
-import { hexToPixel } from '@/lib/hex/pixel'
 import { planToBody, planToHex, type MovePlan } from './move-preview'
 import { planSweep, type ScanPlan } from './scan-preview'
 
@@ -60,6 +56,13 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
 
   const [selection, setSelection] = useState<BoardSelection>(null)
   const [activeFleetId, setActiveFleetId] = useState<string | null>(null)
+  // The renderer's availability (BoardCanvas's guard) and first-frame signal —
+  // together they decide how long the loading placeholder persists (the
+  // MODIFIED `System Board Route and Data Fan-In`): loading holds until the
+  // canvas has produced a frame, but an unsupported/interrupted state takes
+  // precedence and replaces it.
+  const [boardAvailable, setBoardAvailable] = useState(true)
+  const [firstFrame, setFirstFrame] = useState(false)
   // True while the player hovers/focuses the Scan verb — the only moment the
   // aim corridor draws (selecting things to plan a burn stays quiet).
   const [scanPreview, setScanPreview] = useState(false)
@@ -359,52 +362,51 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
         : null
   const selectedGateId = selection?.kind === 'gate' ? selection.gate.destSystemId : null
 
+  // The running scan's effect, pinned at the emission hex (#0006 Decision #26
+  // — the pulse stays where it was fired; the ship moves on). The FX toggle
+  // (playtest) swaps in the arc-scan look. Prop-driven onto the overlay.
+  const scanFxInput: ScanFxInput | null =
+    activeSweep && runningScan && activeFleet
+      ? {
+          originHex: activeSweep.origin,
+          features: board.features,
+          rimRing: board.radius,
+          committedAt: runningScan.committedAt,
+          eta: runningScan.eta,
+          fx: scanFx,
+        }
+      : null
+
   return (
     <div data-testid="system-board-view" className={STAGE}>
-      <HexBoard
-        radius={board.radius}
+      <BoardStage
+        board={board}
+        fleets={allFleets}
+        worldTime={worldTime}
+        selectedId={selectedId}
+        selectedGateId={selectedGateId}
         selectedHex={selection?.kind === 'hex' ? selection.hex : null}
+        onSelectFeature={selectFeature}
+        onSelectFleet={selectFleet}
+        onSelectGate={selectGate}
         onSelectHex={selectHex}
         onSelectEmpty={() => setSelection(null)}
-      >
-        {/* The committed sweep of a running scan (solid), or the hover preview
-            of what a sweep from here would leave in shadow (faint) — same
-            geometry, two moments. Drawn under the glyphs. */}
-        <ScanOverlay plan={activeSweep} variant="active" hideOrigin />
-        {!activeSweep && <ScanOverlay plan={sweepPreview} variant="aim" />}
-        {/* The running scan's effect, pinned at the emission hex (#0006
-            Decision #26 — the pulse stays where it was fired; the ship moves
-            on) — the theater; the hatching above is the contract, and the
-            server's fog read agrees with the ping's front. The FX toggle
-            (playtest) swaps in the arc-scan look. */}
-        {activeSweep &&
-          runningScan &&
-          activeFleet &&
-          (() => {
-            const fx = {
-              originHex: activeSweep.origin,
-              originPixel: hexToPixel(activeSweep.origin.q, activeSweep.origin.r),
-              features: board.features,
-              rimRing: board.radius,
-              committedAt: runningScan.committedAt,
-              eta: runningScan.eta,
-              worldTime,
-            }
-            return scanFx === 'arc' ? <ArcScan {...fx} /> : <ScanPing {...fx} />
-          })()}
-        <BoardScene
-          worldTime={worldTime}
-          features={board.features}
-          fleets={allFleets}
-          gates={board.laneGates}
-          selectedId={selectedId}
-          selectedGateId={selectedGateId}
-          onSelectFeature={selectFeature}
-          onSelectFleet={selectFleet}
-          onSelectGate={selectGate}
-        />
-        <SelectionPreview plan={selection?.kind === 'fleet' ? null : plan} />
-      </HexBoard>
+        plan={selection?.kind === 'fleet' ? null : plan}
+        activeSweep={activeSweep}
+        sweepPreview={sweepPreview}
+        scanFx={scanFxInput}
+        onAvailabilityChange={setBoardAvailable}
+        onFirstFrame={() => setFirstFrame(true)}
+      />
+
+      {/* Loading persists through the first rendered frame (task 6.1a) — but
+          never over an unsupported/interrupted notice, which takes precedence
+          (the placeholder MUST NOT persist when no frame can ever come). */}
+      {!firstFrame && boardAvailable && (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#05070d] text-sm text-white/50">
+          Charting the system…
+        </div>
+      )}
 
       <div className="pointer-events-none absolute inset-0 flex justify-between gap-4 p-4">
         {/* The roster is the same panel the galaxy shows — where every fleet is,
@@ -441,6 +443,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           onScanPreview={setScanPreview}
           scanFx={scanFx}
           onToggleScanFx={toggleScanFx}
+          available={boardAvailable}
           onCancel={commitCancel}
           onDepart={commitDepart}
         />

@@ -38,6 +38,28 @@ export function hexPolygonPoints(center: Point, size: number = HEX_SIZE - 1): st
   return pts.join(' ')
 }
 
+// pixelToHex — the inverse of hexToPixel: the hex whose cell contains a board
+// pixel point (pointy-top axial, cube-rounded). A RENDER-side picking concern
+// (canvas click → unproject → containing hex), not part of the Go determinism
+// seam: no game rule ever feeds through it.
+export function pixelToHex(p: Point): Hex {
+  const qf = ((Math.sqrt(3) / 3) * p.x - (1 / 3) * p.y) / HEX_SIZE
+  const rf = ((2 / 3) * p.y) / HEX_SIZE
+  // Cube round: round each axis, then repair the axis with the largest error so
+  // q + r + s stays 0.
+  const sf = -qf - rf
+  let q = Math.round(qf)
+  let r = Math.round(rf)
+  const s = Math.round(sf)
+  const dq = Math.abs(q - qf)
+  const dr = Math.abs(r - rf)
+  const ds = Math.abs(s - sf)
+  if (dq > dr && dq > ds) q = -r - s
+  else if (dr > ds) r = -q - s
+  // Normalize -0 → 0 so picked hexes compare cleanly against stored ones.
+  return { q: q === 0 ? 0 : q, r: r === 0 ? 0 : r }
+}
+
 // Linear pixel interpolation between two hexes at frac ∈ [0,1] — the render-time
 // glide between logical cells. The logical-hex flip is lib/hex's job; this is
 // purely visual and never feeds a rule.

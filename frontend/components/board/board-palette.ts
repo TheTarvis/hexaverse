@@ -92,20 +92,31 @@ export const FEATURE_STYLE: Record<FeatureType, FeatureStyle> = {
   radiation: { color: '#e6d27d', shape: 'diamond' },
 }
 
-// How each fog band paints its glyph (#0006's three bands): live at full strength
-// with a live accent; remembered dimmed + ghosted with a frozen `asOf` age;
-// astronomical dimmest, geometry + type only.
+// How each fog band paints its glyph (#0006's three bands) — ONE record, both
+// renderers' fields merged (port-board-to-webgl-renderer, "the fog-record
+// merge"): `opacity`/`ghost` are the SVG-era expression, `dim`/`chroma`/
+// `breakUp`/`wireOnly` feed the WebGL body shader. The merge is pinned, not a
+// free import of the spike's tuned values: `remembered` and `visible` carry
+// `chroma: 0, breakUp: 0` — opacity-only, matching the SVG treatment exactly.
+// The signal-quality look (non-zero chroma/breakUp, animated dropout) is
+// deferred, named, to docs/plans/board-visual-language.md. `wireOnly: true` on
+// `astronomical` is the port's ONE deliberate visual change (predicted outline,
+// no lit surface — confirmed 2026-08-20).
 export interface FogTreatment {
   opacity: number
   ghost: boolean // draw the dashed "last known" ring
+  dim: number // radiance scale in the body shader
+  chroma: number // per-channel light-direction split (0 = registered)
+  breakUp: number // scanline dropout amount (0 = none)
+  wireOnly: boolean // draw only the predicted outline, no lit surface
   accent: string
   label: string
 }
 
 export const FOG_TREATMENT: Record<FogBand, FogTreatment> = {
-  visible: { opacity: 1, ghost: false, accent: '#34d399', label: 'LIVE' },
-  remembered: { opacity: 0.62, ghost: true, accent: '#fbbf24', label: 'MEMORY' },
-  astronomical: { opacity: 0.42, ghost: true, accent: '#8b98a9', label: 'CHARTED' },
+  visible: { opacity: 1, ghost: false, dim: 1, chroma: 0, breakUp: 0, wireOnly: false, accent: '#34d399', label: 'LIVE' },
+  remembered: { opacity: 0.62, ghost: true, dim: 0.5, chroma: 0, breakUp: 0, wireOnly: false, accent: '#fbbf24', label: 'MEMORY' },
+  astronomical: { opacity: 0.42, ghost: true, dim: 0.3, chroma: 0, breakUp: 0, wireOnly: true, accent: '#8b98a9', label: 'CHARTED' },
 }
 
 // A fleet's accent encodes its movement mode: coast cyan, burn amber, docked green.
@@ -167,3 +178,35 @@ export const PREVIEW_BURN = '#fbbf24'
 export const PREVIEW_MEET = '#fbbf24'
 export const ORBIT_RING = 'rgba(150, 180, 220, 0.10)'
 export const ORBIT_RING_HILITE = 'rgba(125, 211, 252, 0.55)'
+
+// --- WebGL board constants (port-board-to-webgl-renderer) --------------------
+
+// Space itself — the canvas clear colour. Not pure black: a black board reads
+// as "unrendered", a very dark blue reads as "deep". Deliberately DISTINCT from
+// SystemBoardView's stage background (#05070d) — do not conflate the two.
+export const VOID = '#04060c'
+
+// The live sensor cyan the lattice's uSignal and the fleet trail's cool end
+// share (the same hue family as SCAN_BUBBLE_* above).
+export const SIGNAL = '#7dd3fc'
+
+// Own-fleet hull white — the clean, readable chevron the ship is clicked by.
+export const HULL = '#e6eef8'
+
+// Spectral class → star colour temperature (O/B blue-white through M deep
+// orange). A decision on server data (`starClass`), so it lives here, not in
+// the star shader (the plumbing/decision rule).
+export const CLASS_TINT: Record<string, string> = {
+  O: '#a8c8ff',
+  B: '#c5daff',
+  A: '#e8f0ff',
+  F: '#fff4e8',
+  G: '#ffd27d',
+  K: '#ffb05c',
+  M: '#ff8347',
+}
+export const CLASS_TINT_FALLBACK = '#ffd27d'
+
+export function starTint(starClass: string): string {
+  return CLASS_TINT[starClass] ?? CLASS_TINT_FALLBACK
+}

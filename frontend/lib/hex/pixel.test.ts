@@ -1,6 +1,26 @@
 import { describe, it, expect } from 'vitest'
-import { fitViewBox, hexesWithinRadius, hexPolygonPoints, hexToPixel, lerpPixel } from './pixel'
+import { fitViewBox, hexesWithinRadius, hexPolygonPoints, hexToPixel, lerpPixel, pixelToHex } from './pixel'
 import { ringOf } from './hex'
+
+describe('pixelToHex', () => {
+  it('round-trips every hex centre on a radius-6 board', () => {
+    for (const h of hexesWithinRadius(6)) {
+      expect(pixelToHex(hexToPixel(h.q, h.r))).toEqual(h)
+    }
+  })
+
+  it('resolves points off-centre within the cell to the containing hex', () => {
+    const c = hexToPixel(3, -2)
+    // Well inside the cell (the apothem is ~29.4): nudges stay home.
+    expect(pixelToHex({ x: c.x + 10, y: c.y - 8 })).toEqual({ q: 3, r: -2 })
+  })
+
+  it('never emits negative zero', () => {
+    const h = pixelToHex({ x: -0.0001, y: -0.0001 })
+    expect(Object.is(h.q, -0)).toBe(false)
+    expect(Object.is(h.r, -0)).toBe(false)
+  })
+})
 
 describe('hexToPixel', () => {
   it('places the star at the origin', () => {

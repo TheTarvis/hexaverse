@@ -39,11 +39,31 @@ vi.mock('@/hooks/use-fleets', () => ({
   useMyFleets: vi.fn(),
 }))
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
+// Mock BoardCanvas ONLY (the one component that would reach three.js/GL):
+// BoardOverlay and useBoardProjection mount for real in jsdom, so every
+// structural assertion and glyph click below exercises the real hit layer.
+// The mock reports a live context, which is what keeps the overlay mounted.
+const guard = vi.hoisted(() => ({ available: true }))
+vi.mock('./BoardCanvas', async () => {
+  const React = await import('react')
+  function BoardCanvasMock({ onAvailabilityChange }: { onAvailabilityChange?: (a: boolean) => void }) {
+    React.useEffect(() => {
+      onAvailabilityChange?.(guard.available)
+    }, [onAvailabilityChange])
+    return React.createElement('div', { 'data-testid': 'board-canvas' })
+  }
+  return { BoardCanvas: BoardCanvasMock, default: BoardCanvasMock }
+})
 // The world clock is frozen (advanced by hand where a test needs time to pass)
-// and realtime is a no-op, so the composed tree is deterministic; the real
-// HexBoard/BoardScene/FactsPanel all render.
+// and realtime is a no-op, so the composed tree is deterministic.
 const clock = vi.hoisted(() => ({ now: 0 }))
-vi.mock('@/hooks/use-world-time', () => ({ useWorldTime: () => clock.now }))
+vi.mock('@/hooks/use-world-time', () => ({
+  useWorldTime: () => clock.now,
+  // BoardStage's frame packer anchors against the same module clock.
+  wallClock: () => clock.now,
+  projectWorldTime: (anchor: { world: number; wall: number }, wallNow: number, scale: number) =>
+    anchor.world + (wallNow - anchor.wall) * scale,
+}))
 vi.mock('@/hooks/use-board-realtime', () => ({ useBoardRealtime: vi.fn() }))
 vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 const push = vi.hoisted(() => vi.fn())
@@ -150,6 +170,7 @@ describe('SystemBoardView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     clock.now = 0
+    guard.available = true
     mockOrders.mockReturnValue({
       order: { mutate: orderMutate, isPending: false },
       cancel: { mutate: cancelMutate, isPending: false },
@@ -180,6 +201,32 @@ describe('SystemBoardView', () => {
     expect(screen.getByText(/charting the system/i)).toBeInTheDocument()
   })
 
+  it('keeps the loading placeholder up past the data reads, until the first rendered frame', () => {
+    // The reads have resolved but no frame has been produced (the mocked
+    // canvas region never fires onFirstFrame) — a black canvas must not show,
+    // so the charting placeholder persists over the mounted board.
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    fleetsState([ownFleet])
+    render(<SystemBoardView systemId="sys-7" />)
+    expect(screen.getByTestId('hex-board')).toBeInTheDocument()
+    expect(screen.getByText(/charting the system/i)).toBeInTheDocument()
+  })
+
+  it('lets an unavailable renderer take precedence over the loading placeholder', () => {
+    guard.available = false
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    fleetsState([ownFleet])
+    render(<SystemBoardView systemId="sys-7" />)
+    // No loading veil over the unsupported/interrupted notice — the
+    // placeholder must never persist when no frame can ever come.
+    expect(screen.queryByText(/charting the system/i)).not.toBeInTheDocument()
+    // The overlay's hit shapes are gone with it; verbs needing a board
+    // selection are unavailable, and the facts panel says why (task 7.10) —
+    // not the default "select a body" copy.
+    expect(screen.queryByTestId('hex-board')).not.toBeInTheDocument()
+    expect(screen.getByTestId('facts-panel')).toHaveTextContent(/board must be available/i)
+  })
+
   it('shows an error panel when the read fails', () => {
     boardState({ isLoading: false, isError: true, data: undefined, error: new Error('boom') })
     render(<SystemBoardView systemId="sys-7" />)
@@ -200,6 +247,24 @@ describe('SystemBoardView', () => {
     expect(facts).toHaveTextContent('Class G system')
     // An own fleet is present, so the scan verb is offered.
     expect(screen.getByTestId('scan-button')).toBeInTheDocument()
+  })
+
+  it('toggles selection off on re-click, and a board click outside the lattice clears it', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    fleetsState([ownFleet])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    // Select → the selection ring appears; re-click the same feature → deselect.
+    fireEvent.click(screen.getByTestId('feature-glyph-p-1'))
+    expect(screen.getByTestId('feature-glyph-p-1').querySelector('[data-testid="selection-ring"]')).not.toBeNull()
+    fireEvent.click(screen.getByTestId('feature-glyph-p-1'))
+    expect(screen.getByTestId('feature-glyph-p-1').querySelector('[data-testid="selection-ring"]')).toBeNull()
+
+    // Select again, then click the stage away from every hit shape (jsdom's
+    // unmeasured container puts the point outside the lattice) → cleared.
+    fireEvent.click(screen.getByTestId('feature-glyph-p-1'))
+    fireEvent.click(screen.getByTestId('board-stage'))
+    expect(screen.getByTestId('feature-glyph-p-1').querySelector('[data-testid="selection-ring"]')).toBeNull()
   })
 
   it('previews and commits a move to a selected body', () => {

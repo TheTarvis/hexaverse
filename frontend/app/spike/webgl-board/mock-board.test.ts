@@ -1,86 +1,70 @@
 import { describe, expect, it } from 'vitest'
 import { ringHexes, ringOf } from '@/lib/hex'
-import { axialDistance, bodyPoint, buildSpikeBoard } from './mock-board'
+import { axialDistance, buildMockSystemBoard } from './mock-board'
 
-describe('buildSpikeBoard', () => {
-  it('is deterministic for a seed, so both renderers get identical content', () => {
-    const a = buildSpikeBoard(1234, 'star_rich', 12)
-    const b = buildSpikeBoard(1234, 'star_rich', 12)
-    expect(b.bodies.map((x) => x.id)).toEqual(a.bodies.map((x) => x.id))
-    expect(b.bodies.map((x) => x.band)).toEqual(a.bodies.map((x) => x.band))
-    expect(b.fleet).toEqual(a.fleet)
+describe('buildMockSystemBoard', () => {
+  it('is deterministic for a seed', () => {
+    const a = buildMockSystemBoard(1234, 'star_rich', 12)
+    const b = buildMockSystemBoard(1234, 'star_rich', 12)
+    expect(b.board.features.map((x) => x.id)).toEqual(a.board.features.map((x) => x.id))
+    expect(b.board.features.map((x) => x.band)).toEqual(a.board.features.map((x) => x.band))
+    expect(b.fleets).toEqual(a.fleets)
   })
 
   it('always keeps the star live — it is the scene light, never fogged out', () => {
-    const board = buildSpikeBoard(99, 'normal', 12)
-    const star = board.bodies.find((x) => x.type === 'star')
+    const { board } = buildMockSystemBoard(99, 'normal', 12)
+    const star = board.features.find((x) => x.type === 'star')
     expect(star).toBeDefined()
     expect(star!.band).toBe('visible')
-    expect(star!.ring).toBe(0)
+    expect(star!.fixed).toBe(true)
   })
 
-  it('puts every body inside the sensor bubble on the live band', () => {
-    const board = buildSpikeBoard(7, 'star_rich', 14)
+  it('puts every body inside the demo sensor bubble on the live band', () => {
+    const { board, fleets } = buildMockSystemBoard(7, 'star_rich', 14)
+    const home = fleets[0]!.position
     let checked = 0
-    for (const b of board.bodies) {
-      // angle0 is the body's index on its own ring at the epoch, so this
-      // recovers the hex the generator actually placed it on.
-      const hex = ringHexes(b.ring)[b.angle0]!
-      if (axialDistance(hex, board.fleet.hex) <= board.sensorRadius) {
-        expect(b.band).toBe('visible')
+    for (const f of board.features) {
+      if (!f.orbit) continue
+      const hex = ringHexes(f.orbit.ring)[f.orbit.angle0]!
+      if (axialDistance(hex, home) <= 4) {
+        expect(f.band).toBe('visible')
         checked++
       }
     }
     expect(checked).toBeGreaterThan(0)
   })
 
-  it('shows all three fog bands at once, which is the point of the demo', () => {
-    const bands = new Set(buildSpikeBoard(0x51a2c0de, 'star_rich', 16).bodies.map((b) => b.band))
+  it('shows all three fog bands at once, which is the point of the bench', () => {
+    const bands = new Set(buildMockSystemBoard(0x51a2c0de, 'star_rich', 16).board.features.map((f) => f.band))
     expect(bands.has('visible')).toBe(true)
     expect(bands.has('remembered')).toBe(true)
     expect(bands.has('astronomical')).toBe(true)
   })
 
   it('gives outer bodies longer periods than inner ones (Kepler, near enough)', () => {
-    const board = buildSpikeBoard(42, 'star_rich', 16)
-    const orbiting = board.bodies.filter((b) => b.ring > 0).sort((a, b) => a.ring - b.ring)
+    const { board } = buildMockSystemBoard(42, 'star_rich', 16)
+    const orbiting = board.features.filter((f) => !!f.orbit).sort((a, b) => a.orbit!.ring - b.orbit!.ring)
     for (let i = 1; i < orbiting.length; i++) {
-      if (orbiting[i]!.ring > orbiting[i - 1]!.ring) {
-        expect(orbiting[i]!.period).toBeGreaterThan(orbiting[i - 1]!.period)
+      if (orbiting[i]!.orbit!.ring > orbiting[i - 1]!.orbit!.ring) {
+        expect(orbiting[i]!.orbit!.period).toBeGreaterThan(orbiting[i - 1]!.orbit!.period)
       }
     }
   })
-})
 
-describe('bodyPoint', () => {
-  const board = buildSpikeBoard(5, 'star_rich', 12)
-
-  it('pins a ring-0 body at the origin for all time', () => {
-    const star = board.bodies.find((b) => b.ring === 0)!
-    expect(bodyPoint(star, 0)).toEqual({ x: 0, y: 0 })
-    expect(bodyPoint(star, 987_654)).toEqual({ x: 0, y: 0 })
+  it('ships the own/foreign demo cast: a burner, a flotilla, and a bare contact', () => {
+    const { fleets } = buildMockSystemBoard()
+    expect(fleets.map((f) => f.own)).toEqual([true, true, false])
+    expect(fleets[0]!.roster?.ships.length).toBe(2)
+    expect(fleets[1]!.roster?.ships.length).toBe(4)
+    // Audience fog: the foreign read carries no roster at all.
+    expect(fleets[2]!.roster).toBeUndefined()
   })
 
-  it('keeps an orbiting body on its own ring as it travels', () => {
-    const body = board.bodies.find((b) => b.ring >= 3 && b.type !== 'belt')!
-    // A ring's hexes are not equidistant from the centre (it is a hexagon, not a
-    // circle), so assert the radius stays within the ring's own min/max band.
-    const inner = body.ring * 1.5 * 34 - 1
-    const outer = body.ring * Math.sqrt(3) * 34 + 1
-    for (let i = 0; i < 40; i++) {
-      const p = bodyPoint(body, (body.period * i) / 40)
-      const r = Math.hypot(p.x, p.y)
-      expect(r).toBeGreaterThanOrEqual(inner)
-      expect(r).toBeLessThanOrEqual(outer)
+  it('never marks an astronomical body mineable', () => {
+    const { board } = buildMockSystemBoard()
+    for (const f of board.features) {
+      if (f.band === 'astronomical') expect(f.resources).toBeUndefined()
     }
-  })
-
-  it('returns to its starting point after exactly one period', () => {
-    const body = board.bodies.find((b) => b.ring >= 2 && b.type !== 'belt')!
-    const start = bodyPoint(body, 0)
-    const round = bodyPoint(body, body.period)
-    expect(round.x).toBeCloseTo(start.x, 6)
-    expect(round.y).toBeCloseTo(start.y, 6)
   })
 })
 

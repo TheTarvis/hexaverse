@@ -110,14 +110,22 @@ func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResu
 		if corp, err := s.dao.Get(ctx, corpID); err != nil {
 			return nil, err
 		} else if corp != nil {
-			return s.ensureSpawnAssets(ctx, corp)
+			return s.ensureSpawnAssets(ctx, corp, nil)
 		}
 		// Dangling pointer (corp doc gone) — fall through and mint a fresh one.
 	}
 
-	// Fresh wake. The corp doc + account pointer commit in ONE transaction (the
-	// spawn anchor); the hull + fog follow through their services, healed on retry
-	// by the idempotent path above.
+	// Fresh wake. Site selection runs BEFORE the corp commit: a wake that cannot
+	// place its hull must leave the account corpless and retryable — never a
+	// fleetless zombie corp that gates the player into the game with no ship.
+	site, err := s.pickSpawnSite(ctx, "", accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	// The corp doc + account pointer commit in ONE transaction (the spawn
+	// anchor); the hull + fog follow through their services, healed on retry by
+	// the idempotent path above.
 	corp := Corporation{
 		Id:        "corp_" + uuid.NewString(),
 		AccountId: accountId,
@@ -138,25 +146,23 @@ func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResu
 			if existing == nil {
 				return nil, ErrNotFound
 			}
-			return s.ensureSpawnAssets(ctx, existing)
+			return s.ensureSpawnAssets(ctx, existing, nil)
 		}
 		return nil, err
 	}
 	log.Info().Ctx(ctx).Str("corpId", corp.Id).Str("accountId", accountId).Msg("Corporation woke")
-	return s.ensureSpawnAssets(ctx, &corp)
+	return s.ensureSpawnAssets(ctx, &corp, site)
 }
 
 // ensureSpawnAssets makes the corp's derived assets exist (idempotently): its one
-// hull in a chosen home system, and the initial fog (home Explored — no lanes;
-// scanning home is the first taught verb, #0006 Decision #17). Safe to re-run —
+// hull in the home system, and the initial fog (home Explored — no lanes;
+// scanning home is the first taught verb, #0006 Decision #17). site is the
+// pre-picked home from the fresh-wake path; nil means re-pick (the heal path —
+// deterministic per account, so a retry lands the same system). Safe to re-run —
 // an existing hull is reused, the fog upserts are monotonic — which is what
 // makes spawn idempotent per account.
-func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*SpawnResult, error) {
+func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation, site *galaxy.System) (*SpawnResult, error) {
 	now := s.clock.Now()
-	gal, err := s.graph.GetLive(ctx)
-	if err != nil {
-		return nil, err
-	}
 
 	fleets, err := s.fleets.ListForCorp(ctx, corp.Id)
 	if err != nil {
@@ -169,13 +175,11 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*Sp
 		hull = &fleets[0]
 		home = hull.SystemId
 	} else {
-		claimed, err := s.claimedSpace(ctx, corp.Id)
-		if err != nil {
-			return nil, err
-		}
-		site, err := selectSpawnSite(gal, claimed, s.params, corp.AccountId)
-		if err != nil {
-			return nil, err
+		if site == nil {
+			site, err = s.pickSpawnSite(ctx, corp.Id, corp.AccountId)
+			if err != nil {
+				return nil, err
+			}
 		}
 		home = site.Id
 		hull, err = s.fleets.SeedFleet(ctx, home, corp.Id, s.rimHex(corp.AccountId))
@@ -233,6 +237,22 @@ func (s *Service) MarkDead(ctx context.Context, corpID string) error {
 		return ErrHasLivingFleet
 	}
 	return s.dao.SetDiedAt(ctx, corpID, s.clock.Now())
+}
+
+// pickSpawnSite runs the #0009 site criteria over the live graph and returns the
+// wake-up system for accountId. exceptCorpID is excluded from the claimed-space
+// measurement so a heal-time re-pick doesn't fence itself out; "" excludes
+// nothing (the fresh-wake corp isn't living yet, so there's nothing to exclude).
+func (s *Service) pickSpawnSite(ctx context.Context, exceptCorpID, accountId string) (*galaxy.System, error) {
+	gal, err := s.graph.GetLive(ctx)
+	if err != nil {
+		return nil, err
+	}
+	claimed, err := s.claimedSpace(ctx, exceptCorpID)
+	if err != nil {
+		return nil, err
+	}
+	return selectSpawnSite(gal, claimed, s.params, accountId)
 }
 
 // claimedSpace is the union of every OTHER living corp's explored systems — the

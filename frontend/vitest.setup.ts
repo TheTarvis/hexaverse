@@ -108,3 +108,47 @@ Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
   writable: true,
 })
+
+// ---------------------------------------------------------------------------
+// Renderer-availability baseline (add-renderer-availability-states)
+//
+// jsdom has no WebGL: `frontend` does not install the `canvas` package, so
+// HTMLCanvasElement.prototype.getContext('webgl2') returns `null` (never
+// throws) and emits a "Not implemented" jsdomError to stderr. Left alone,
+// every test that renders a WebGL-gated surface (the galaxy graph; the
+// board once the WebGL port lands) would silently land in the renderer's
+// "unsupported" state — including the whole existing pre-change suite.
+//
+// Decided (design.md, "jsdom has no WebGL, so the test baseline must
+// declare availability globally"): stub `getContext` so the DEFAULT test
+// world declares WebGL AVAILABLE. Tests that want unavailability override
+// `getContext` per-test — see components/render-guard/test-canvas.ts
+// (stubUnsupported / stubCreationError), which restores this default
+// afterward.
+//
+// The fake context is intentionally minimal: it exists to satisfy `probe.ts`
+// (`getContext('webgl2') !== null` and
+// `getExtension('WEBGL_lose_context').loseContext()`), not to be a real GL
+// context. No production module in this change constructs a real
+// THREE.WebGLRenderer against it.
+function fakeWebglContext() {
+  return {
+    getExtension: (name: string) =>
+      name === 'WEBGL_lose_context' ? { loseContext: () => {} } : null,
+  }
+}
+
+const realGetContext = HTMLCanvasElement.prototype.getContext
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+;(HTMLCanvasElement.prototype as any).getContext = function (
+  this: HTMLCanvasElement,
+  contextId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ...args: any[]
+) {
+  if (contextId === 'webgl' || contextId === 'webgl2') {
+    return fakeWebglContext()
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (realGetContext as any)?.call(this, contextId, ...args)
+}

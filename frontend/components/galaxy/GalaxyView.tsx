@@ -34,6 +34,12 @@ import { fleetStatus } from '@/components/fleet/fleet-status'
 // The route preview surfaces its numbers because a 3D view can't be eyeballed for
 // distance (#0008 Decision #4); the shared countdown label renders them.
 import { formatEta } from '@/lib/eta'
+import {
+  useRenderGuard,
+  CanvasRegionBoundary,
+  RendererStateNotice,
+  type GuardStatus,
+} from '@/components/render-guard'
 import { REGION_PALETTE, REGIONS, regionColor } from './region-palette'
 import { transitPoint, type NodePositions } from './transit-geometry'
 import type { GalaxyGraphController } from './GalaxyGraph'
@@ -74,8 +80,27 @@ const GalaxyGraph = dynamic(() => import('./GalaxyGraph').then((m) => m.GalaxyGr
 
 function GraphFallback({ label }: { label: string }) {
   return (
-    <div className="absolute inset-0 grid place-items-center text-sm text-white/50">{label}</div>
+    <div
+      data-testid="graph-loading"
+      className="absolute inset-0 grid place-items-center text-sm text-white/50"
+    >
+      {label}
+    </div>
   )
+}
+
+// add-renderer-availability-states: the 'retrying' status carries no
+// presentation of its own — display as whichever of unsupported/interrupted
+// the preserved cause implies (the guard machine keeps `cause: 'lost'`
+// through a retry started from the interrupted state, and anything else
+// through one started from unsupported). Distinct testids from
+// `GraphFallback` above (design.md, "two testability notes") — the
+// unsupported/interrupted state is independent of, and never confused with,
+// the code-split loading fallback or the galaxy data read.
+function guardDisplayStatus(status: GuardStatus, cause: string | null): 'unsupported' | 'interrupted' {
+  if (status === 'interrupted') return 'interrupted'
+  if (status === 'retrying' && cause === 'lost') return 'interrupted'
+  return 'unsupported'
 }
 
 // A colored region dot — the ONE raw-value colour exception (region-palette).
@@ -103,6 +128,73 @@ export function GalaxyView() {
   const controllerRef = useRef<GalaxyGraphController | null>(null)
   const router = useRouter()
   const qc = useQueryClient()
+
+  // add-renderer-availability-states — the shared guard (design.md, "the
+  // shared guard module's public API"). Mounted unconditionally (hooks
+  // can't be conditional), ahead of the galaxy read's own loading/error
+  // early returns below — those still take precedence over anything the
+  // guard shows (task 3.1's regression pin: a failed data read is checked
+  // first). `canvas` stays null until GalaxyGraph's `onReady` hands up a
+  // controller exposing the already-mounted FG3D renderer's canvas — the
+  // right seam for loss/restore listeners, never for creation-failure
+  // detection (design.md).
+  const [attempt, setAttempt] = useState(0)
+  const [guardCanvas, setGuardCanvas] = useState<HTMLCanvasElement | null>(null)
+  const guard = useRenderGuard({
+    canvas: guardCanvas,
+    surface: 'galaxy',
+    // Optional-call degradation, not a cast: `GalaxyGraphController` is a
+    // hand-declared interface TypeScript never structurally checks against
+    // the library's real type (design.md Risks) — and test doubles for the
+    // controller (GalaxyView.test.tsx's mock) legitimately omit these. A
+    // missing accessor just means the loop keeps running, never a crash.
+    onSuspend: () => controllerRef.current?.pause?.(),
+    onResume: () => controllerRef.current?.resume?.(),
+  })
+  const canvasAvailable = guard.status === 'live'
+  // QA MAJOR fix (add-renderer-availability-states): whether the canvas
+  // REGION stays mounted, distinct from `canvasAvailable` (which also gates
+  // recenter/travel availability). 'unsupported' has no usable context —
+  // tearing the region down is correct. 'interrupted' must keep the SAME
+  // <GalaxyGraph>/FG3D canvas mounted and attached to the document, because
+  // that is what the browser's native context-restore path (and three's own
+  // already-registered `webglcontextrestored` re-init) depends on: once a
+  // canvas is detached, `webglcontextrestored` never fires for it again.
+  // 'retrying' is deliberately excluded — the explicit Retry escape hatch
+  // still tears down and remounts fresh (handleGuardRetry nulls the
+  // controller/canvas below), which is the one case a full remount is
+  // actually wanted.
+  const canvasRegionMounted = guard.status === 'live' || guard.status === 'interrupted'
+
+  // Retry remounts <GalaxyGraph> fresh (tasks.md 3.3) — FG3D exposes no
+  // recreate-in-place API. The guard's own re-probe (`probeWebgl2`,
+  // independent of FG3D) is what settles retrySucceeded/retryFailed; the
+  // remount that follows is a consequence of the composition below
+  // swapping back to the live branch below, with the boundary as the
+  // backstop if THAT construction throws again — converting straight back
+  // to the unsupported/interrupted state via `reportRenderError`, which the
+  // player observes identically to a `retryFailed` outcome.
+  const handleGuardRetry = useCallback(() => {
+    controllerRef.current = null
+    setGraphReady(false)
+    setGuardCanvas(null)
+    setAttempt((a) => a + 1)
+    guard.retry()
+  }, [guard])
+
+  // The canvas region unmounts <GalaxyGraph> only when it leaves
+  // live/interrupted (composition snippet below) — nothing should keep
+  // referencing its now-torn-down controller once that happens. Keyed on
+  // `canvasRegionMounted`, NOT `canvasAvailable`: the controller (and the
+  // canvas the guard's listeners are attached to) must survive the
+  // 'interrupted' state, since that's exactly what lets a real browser
+  // restore call `onResume` (-> `controllerRef.current?.resume?.()`) through
+  // a still-valid ref instead of a silently-nulled one.
+  useEffect(() => {
+    if (!canvasRegionMounted) {
+      controllerRef.current = null
+    }
+  }, [canvasRegionMounted])
 
   // The requester's own fleets (#0008) — the travel actors. Disabled on the
   // logged-out start area (no auth token, and nothing to command).
@@ -277,23 +369,98 @@ export function GalaxyView() {
 
   return (
     <div data-testid="galaxy-view" className="relative h-dvh w-full overflow-hidden bg-[#05070d]">
-      <GalaxyGraph
-        galaxy={galaxy}
-        selectedId={selectedId}
-        onSelect={(node) => {
-          setSelectedId(node?.id ?? null)
-          setSelectedFleetId(null)
-        }}
-        fleetSystemIds={fleetSystemIds}
-        transitFleets={transitFleets}
-        onSelectFleet={handleSelectFleet}
-        worldTime={worldTime}
-        homeSystemId={homeSystemId}
-        onReady={(controller) => {
-          controllerRef.current = controller
-          setGraphReady(true)
-        }}
-      />
+      {/* add-renderer-availability-states — the graph's canvas region only,
+          per design.md's composition snippet: the intel panel, roster,
+          inspector, and fleet card below sit OUTSIDE this boundary,
+          untouched by whether the renderer is available (A3's canvas-region-
+          only scoping).
+
+          QA MAJOR-defect fix: 'unsupported' and 'interrupted' are NOT the
+          same arm. 'unsupported' has no usable context, so tearing the
+          subtree down (below) is correct and unchanged. 'interrupted' keeps
+          <GalaxyGraph> — and the FG3D canvas the guard's loss/restore
+          listeners are attached to — mounted and attached to the document;
+          the notice renders as an overlay ABOVE it instead of replacing it.
+          Unmounting on every non-live status (the prior composition) tore
+          the canvas out of the document the instant a loss fired, and a
+          detached canvas never receives `webglcontextrestored` again — an
+          ordinary tab background/foreground cycle then could never
+          self-heal. The unsupported-arm's own notice and the interrupted
+          overlay are still mutually exclusive (only one status is active at
+          a time), so nothing double-renders. */}
+      {guard.status === 'unsupported' ? (
+        <div className="absolute inset-0 grid place-items-center p-6">
+          <RendererStateNotice
+            status="unsupported"
+            cause={guard.cause}
+            surface="galaxy"
+            retrying={false}
+            onRetry={handleGuardRetry}
+          />
+        </div>
+      ) : guard.status === 'retrying' ? (
+        <div className="absolute inset-0 grid place-items-center p-6">
+          <RendererStateNotice
+            status={guardDisplayStatus(guard.status, guard.cause)}
+            cause={guard.cause}
+            surface="galaxy"
+            retrying
+            onRetry={handleGuardRetry}
+          />
+        </div>
+      ) : (
+        <>
+          <CanvasRegionBoundary
+            key={attempt}
+            onError={guard.reportRenderError}
+            fallback={
+              <div className="absolute inset-0 grid place-items-center p-6">
+                <RendererStateNotice
+                  status="unsupported"
+                  cause={guard.cause}
+                  surface="galaxy"
+                  retrying={false}
+                  onRetry={handleGuardRetry}
+                />
+              </div>
+            }
+          >
+            <GalaxyGraph
+              key={attempt}
+              galaxy={galaxy}
+              selectedId={selectedId}
+              onSelect={(node) => {
+                setSelectedId(node?.id ?? null)
+                setSelectedFleetId(null)
+              }}
+              fleetSystemIds={fleetSystemIds}
+              transitFleets={transitFleets}
+              onSelectFleet={handleSelectFleet}
+              worldTime={worldTime}
+              homeSystemId={homeSystemId}
+              onReady={(controller) => {
+                controllerRef.current = controller
+                setGraphReady(true)
+                setGuardCanvas(controller.canvas?.() ?? null)
+              }}
+            />
+          </CanvasRegionBoundary>
+          {/* guard.status === 'interrupted' here (the only remaining case:
+              'live' shows no notice at all) — an overlay above the
+              still-mounted canvas region, per the fix above. */}
+          {guard.status === 'interrupted' && (
+            <div className="absolute inset-0 grid place-items-center p-6">
+              <RendererStateNotice
+                status="interrupted"
+                cause={guard.cause}
+                surface="galaxy"
+                retrying={false}
+                onRetry={handleGuardRetry}
+              />
+            </div>
+          )}
+        </>
+      )}
 
       {/* Overlay layer — panels catch pointer events, the gap between lets the
           graph receive orbit/pan/zoom/clicks. */}
@@ -304,6 +471,7 @@ export function GalaxyView() {
             isStartArea={isStartArea}
             regionCounts={regionCounts}
             onRecenter={handleRecenter}
+            available={canvasAvailable}
           />
           <FleetRoster
             worldTime={worldTime}
@@ -324,6 +492,8 @@ export function GalaxyView() {
             node={selected}
             connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
             onEnter={isStartArea ? null : handleEnterSystem}
+            available={canvasAvailable}
+            hasOwnFleet={ownFleets.length > 0}
             travel={
               activeFleet
                 ? {
@@ -390,11 +560,17 @@ function IntelPanel({
   isStartArea,
   regionCounts,
   onRecenter,
+  available,
 }: {
   galaxy: Galaxy
   isStartArea: boolean
   regionCounts: Map<Region, number>
   onRecenter: () => void
+  // add-renderer-availability-states (tasks.md 3.4): recenter is a
+  // canvas-only control — with no graph, it is a silent dead control —
+  // disabled while the canvas region shows the unsupported/interrupted
+  // state, rather than presented as operable.
+  available: boolean
 }) {
   return (
     <aside
@@ -413,6 +589,7 @@ function IntelPanel({
         <Button
           plain
           onClick={onRecenter}
+          disabled={!available}
           data-testid="galaxy-recenter"
           title="Recenter the view"
           aria-label="Recenter"
@@ -476,11 +653,22 @@ function Inspector({
   connections,
   travel,
   onEnter,
+  available,
+  hasOwnFleet,
 }: {
   node: GalaxyNode | null
   connections: number
   travel: TravelInfo | null
   onEnter: ((systemId: string) => void) | null
+  // add-renderer-availability-states (tasks.md 3.4): `available` is the
+  // graph canvas region's live status; `hasOwnFleet` is whether the
+  // requester has at least one own fleet in the roster — a real,
+  // canvas-free path to a system via the roster's own row callback
+  // (`handleShowFleet`). Together they pick the empty-selection prompt's
+  // three-way copy: the graph's own "select on the canvas" instruction only
+  // applies while a canvas exists to select on.
+  available: boolean
+  hasOwnFleet: boolean
 }) {
   if (!node) {
     return (
@@ -489,7 +677,11 @@ function Inspector({
         className={`${PANEL} flex w-72 max-w-[80vw] flex-col self-start`}
       >
         <p className="text-sm text-zinc-400">
-          Select a system to inspect its star, bodies, and lanes.
+          {available
+            ? 'Select a system to inspect its star, bodies, and lanes.'
+            : hasOwnFleet
+              ? 'Select an own fleet in the roster to inspect its system.'
+              : 'Select an own fleet in the roster, or wait until the graph is available to pick any other system.'}
         </p>
       </aside>
     )

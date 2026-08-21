@@ -30,6 +30,17 @@ interface FgRef {
   renderer: () => THREE.WebGLRenderer
   controls: () => Neuterable
   refresh: () => void
+  // add-renderer-availability-states (design.md "render-loop suspension is
+  // an implementation detail"): the accessors GalaxyView's guard calls to
+  // save CPU while the canvas region is unavailable/interrupted. Declared
+  // here for legibility, NOT for compile-time enforcement — `ForceGraph3D`
+  // is cast `as any` above, so TypeScript never structurally checks this
+  // interface against the library's real type (design.md Risks, "kickoff
+  // review" correction). The guard degrades to "interrupted state shown,
+  // loop not paused" via optional-call if the library ever renames/drops
+  // these.
+  pauseAnimation?: () => void
+  resumeAnimation?: () => void
 }
 
 // Imperative handle handed up to GalaxyView so the ⌖ recenter control and the
@@ -40,6 +51,20 @@ export interface GalaxyGraphController {
   // Glide to an arbitrary point in graph space — a fleet out on a lane sits
   // between stars, so focusing it needs a point, not a system (#0008).
   focusPoint: (p: { x: number; y: number; z: number }) => void
+  // add-renderer-availability-states (tasks.md 3.1/3.2): the seam GalaxyView's
+  // guard uses to attach webglcontextlost/webglcontextrestored listeners to
+  // the already-mounted FG3D renderer's canvas — never for creation-failure
+  // detection (design.md: that's the probe/boundary's job; construction
+  // failure never reaches this controller, since `onReady` is never called
+  // when construction throws). Null only if the renderer never exposed a
+  // `domElement` — should not happen once `onReady` has fired.
+  canvas: () => HTMLCanvasElement | null
+  // Save CPU while nothing is drawable; correctness never depends on this
+  // (design.md, "render-loop suspension is an implementation detail").
+  // Degrades silently to a no-op if the library's `pauseAnimation` accessor
+  // is absent.
+  pause: () => void
+  resume: () => void
 }
 
 interface GalaxyGraphProps {
@@ -292,6 +317,15 @@ export function GalaxyGraph({
             },
             // Glide to a bare point — a fleet mid-lane (the roster's "show me").
             focusPoint: (p) => rig.focus(p),
+            // add-renderer-availability-states: the already-mounted renderer's
+            // canvas — the seam GalaxyView's guard attaches
+            // webglcontextlost/webglcontextrestored listeners to.
+            canvas: () => renderer.domElement ?? null,
+            // Optional-call degradation, not a cast: an absent accessor on the
+            // library's real ref just means the loop keeps running while the
+            // interrupted state is shown — never a crash (design.md Risks).
+            pause: () => fg.pauseAnimation?.(),
+            resume: () => fg.resumeAnimation?.(),
           })
           return
         }
@@ -387,6 +421,15 @@ export function GalaxyGraph({
       transitRef.current?.dispose()
       transitRef.current = null
       readyRef.current = false
+      // renderer().dispose() (called by the FG3D/react-kapsule chain) frees
+      // programs and render lists but does not release the GL context itself
+      // — that's left to GC timing. Force it here so a lost -> retry -> lost
+      // cycle never leaves more than one live context per canvas (module 1.7).
+      // Deliberately read at cleanup time, not captured at effect-setup time:
+      // FG3D attaches this ref asynchronously (after its dynamic import
+      // resolves), so a captured value would be null at mount.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      fgRef.current?.renderer()?.forceContextLoss?.()
     }
   }, [])
 

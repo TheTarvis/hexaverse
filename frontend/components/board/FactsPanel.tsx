@@ -76,6 +76,13 @@ export interface FactsPanelProps {
   onToggleScanFx?: () => void
   onCancel: () => void
   onDepart: () => void
+  // Whether the board's rendering context is live (add-renderer-availability-states,
+  // tasks.md 2.2b) — defaults to true so every existing caller is unaffected.
+  // false while the board's canvas region shows the unsupported/interrupted
+  // state: the empty-selection prompt stops inviting a selection on a canvas
+  // that doesn't exist, and `scan-fx-toggle` (2.2c) — a canvas-only control —
+  // is disabled, since it only switches which effect the board draws.
+  available?: boolean
 }
 
 const PANEL =
@@ -104,6 +111,7 @@ export function FactsPanel({
   onToggleScanFx,
   onCancel,
   onDepart,
+  available = true,
 }: FactsPanelProps) {
   // Mode reads off the EFFECTIVE state (stateAt): a burn whose arrival passed is
   // already docked/coasting, so the badge and verb gates don't lag the picture.
@@ -203,6 +211,7 @@ export function FactsPanel({
           {scanFx && onToggleScanFx && (
             <Button
               plain
+              disabled={!available}
               data-testid="scan-fx-toggle"
               onClick={onToggleScanFx}
               className="mt-1 !px-0 !py-0 !font-mono !text-[10px] tracking-wide !text-zinc-500 uppercase hover:!text-cyan-300"
@@ -238,7 +247,16 @@ export function FactsPanel({
             onDepart={onDepart}
           />
         )}
-        {!selection && <Text className="!text-zinc-500">Select a body, tile, or gate.</Text>}
+        {!selection && available && (
+          <Text data-testid="selection-prompt" className="!text-zinc-500">
+            Select a body, tile, or gate.
+          </Text>
+        )}
+        {!selection && !available && (
+          <Text data-testid="selection-prompt" className="!text-zinc-500">
+            The board must be available to choose a move or departure target.
+          </Text>
+        )}
 
         {canMoveToSelection && plan && (
           <div className="mt-3 flex items-center gap-3">

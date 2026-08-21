@@ -343,4 +343,134 @@ describe('FactsPanel', () => {
     // channels (#0006 Decision #19).
     expect(screen.getByTestId('scan-button')).toBeEnabled()
   })
+
+  // --- renderer availability (add-renderer-availability-states, tasks.md 2.2) ---
+  //
+  // The `available` prop the guard eventually wires from `BoardCanvas`'s
+  // status (port-board-to-webgl-renderer's job) — testable today directly
+  // against FactsPanel, no canvas involved.
+
+  it('defaults `available` to true — every existing caller keeps the unchanged empty-selection copy (SDET-added regression: task 2.2b\'s explicit "no existing caller changes behaviour")', () => {
+    // Deliberately omits `available` entirely.
+    render(<FactsPanel {...base} selection={null} activeFleet={null} plan={null} />)
+    expect(screen.getByTestId('selection')).toHaveTextContent(/select a body, tile, or gate/i)
+  })
+
+  it('available=true (explicit) also shows the ordinary select-on-the-canvas prompt', () => {
+    render(<FactsPanel {...base} selection={null} activeFleet={null} plan={null} available />)
+    expect(screen.getByTestId('selection')).toHaveTextContent(/select a body, tile, or gate/i)
+  })
+
+  it('available=false: the empty-selection prompt does NOT invite selecting on a canvas that does not exist, and says the board must be available instead (Scenario: Move and departure verbs are unreachable without the canvas)', () => {
+    render(<FactsPanel {...base} selection={null} activeFleet={null} plan={null} available={false} />)
+    const selection = screen.getByTestId('selection')
+    expect(selection).not.toHaveTextContent(/select a body, tile, or gate/i)
+    expect(selection).toHaveTextContent(/board/i)
+    expect(selection).toHaveTextContent(/available/i)
+  })
+
+  it('available=false with a fleet present: scan, mine, cancel-burn, and cancel-mine remain invokable through FactsPanel WITHOUT a board selection (Scenario: Surrounding board affordances remain usable — SDET-added regression per task 2.2a: "pin it so a future refactor can\'t silently couple them to selection")', () => {
+    const burningDockedMiner = {
+      ...dockedMiner,
+      state: {
+        mode: 'burn' as const,
+        burn: {
+          path: [{ q: 0, r: 0 }],
+          startTime: 0,
+          arriveTime: 2_000_000,
+          target: { hex: { q: 0, r: 0 } },
+        },
+      },
+    }
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={burningDockedMiner}
+        dockedFeature={null}
+        plan={null}
+        available={false}
+        worldTime={5_000}
+        mineEta={30_000}
+      />,
+    )
+    // scan: always reads activeFleet, never selection.
+    expect(screen.getByTestId('scan-button')).toBeEnabled()
+    // cancel-burn: reads activeMode==='burn', never selection.
+    expect(screen.getByTestId('cancel-button')).toBeEnabled()
+    // cancel-mine: reads mineEta, never selection.
+    fireEvent.click(screen.getByTestId('cancel-mine-button'))
+    expect(base.onCancelMine).toHaveBeenCalled()
+  })
+
+  it('available=false does not affect the mine offer (still anchored to the docked state, never a selection)', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={dockedMiner}
+        dockedFeature={lodeFeature}
+        plan={null}
+        available={false}
+      />,
+    )
+    expect(screen.getByTestId('mine-section')).toBeInTheDocument()
+  })
+
+  // tasks.md 2.2(c): `scan-fx-toggle` switches only which effect the BOARD
+  // CANVAS draws for a running scan — with no board rendering, it is a dead
+  // control. This is the board's implementing task for hex-board-view's
+  // "Renderer Unavailability Is an Explicit State", Scenario: A canvas-only
+  // control is disabled while the canvas is unavailable.
+  it('available=false disables (or hides) scan-fx-toggle — a canvas-only control with nothing to draw to (Scenario: A canvas-only control is disabled while the canvas is unavailable)', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={ownFleet}
+        plan={null}
+        available={false}
+        scanFx="ping"
+        onToggleScanFx={vi.fn()}
+      />,
+    )
+    const toggle = screen.queryByTestId('scan-fx-toggle')
+    if (toggle) {
+      expect(toggle).toBeDisabled()
+    } else {
+      expect(toggle).not.toBeInTheDocument()
+    }
+  })
+
+  it('available=true (and the default, omitted) leaves scan-fx-toggle operable', () => {
+    const onToggleScanFx = vi.fn()
+    const { rerender } = render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={ownFleet}
+        plan={null}
+        available={true}
+        scanFx="ping"
+        onToggleScanFx={onToggleScanFx}
+      />,
+    )
+    expect(screen.getByTestId('scan-fx-toggle')).toBeEnabled()
+    fireEvent.click(screen.getByTestId('scan-fx-toggle'))
+    expect(onToggleScanFx).toHaveBeenCalledTimes(1)
+
+    // Defaulted (omitted entirely) behaves the same as explicit true — no
+    // existing caller changes behaviour.
+    rerender(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={ownFleet}
+        plan={null}
+        scanFx="ping"
+        onToggleScanFx={onToggleScanFx}
+      />,
+    )
+    expect(screen.getByTestId('scan-fx-toggle')).toBeEnabled()
+  })
 })
