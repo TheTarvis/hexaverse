@@ -52,6 +52,9 @@ var (
 	ErrLodeDepleted = errors.New("mine: lode's remaining tonnage is already at or below zero")
 	// ErrNoMiningCapability: the fleet's derived mining rate is zero.
 	ErrNoMiningCapability = errors.New("mine: fleet's derived mining rate is zero")
+	// ErrStationNotMineable: the named feature is a trading station (#0011).
+	// Dockable, sellable-at, but never mineable.
+	ErrStationNotMineable = errors.New("mine: a trading station cannot be mined")
 	// ErrOverFreeHold: the requested tons exceeds the fleet's current free
 	// hold.
 	ErrOverFreeHold = errors.New("mine: requested tons exceeds free hold")
@@ -156,6 +159,14 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 		return nil, fmt.Errorf("mine: reading system interior: %w", err)
 	}
 	feat := findFeature(interior, req.FeatureId)
+	// A station is a dockable but NOT mineable feature (#0011). Checked before
+	// the kind lookup so it reports its own reason: a station carries no
+	// resources, so falling through would reject it as "feature does not carry
+	// that kind" — true but misleading, and indistinguishable from naming a real
+	// body that happens to lack the kind.
+	if feat != nil && feat.Type == system.FeatureStation {
+		return nil, ErrStationNotMineable
+	}
 	var res system.Resource
 	var haveKind bool
 	if feat != nil {

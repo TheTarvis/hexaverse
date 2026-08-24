@@ -827,14 +827,36 @@ transaction that `action` itself owns.
 
 **Chosen mechanism:** the `market` sale service opens exactly one
 `db.RunTransaction` and composes narrow, transaction-scoped primitives
-that the owning domains implement and the consumer (market) declares:
-`corporations.ApplyCreditInTx(tx, corpId, operationKey, entry)`,
-`fleet.DebitCargoInTx(tx, fleetId, kind, tons)`, and a station-side
-`DecrementRequestInTx(tx, stationId, requestId, tons)`.
-`corporations.Service.ApplyCredit` becomes a thin wrapper that opens its
-own transaction and delegates to `ApplyCreditInTx` for every non-sale
-caller (the spawn opening grant remains a one-call, one-transaction
-mutation). The layering rule (`backend/CLAUDE.md`'s "cross-domain calls go
+that the owning domains implement and the consumer (market) declares.
+
+**Each primitive is a two-phase pair, not a single call — corrected at
+implementation.** Firestore transactions require **every read before every
+write**; this codebase's own multi-domain precedent
+(`backend/action/dao.go`'s `ResolveOne`) is explicitly structured that way
+and says so in a comment (`// --- reads first (Firestore transactions
+require reads before writes) ---`). Three single-call primitives that each
+read-then-write therefore **cannot** compose sequentially: the second
+one's `tx.Get` lands after the first one's `tx.Set` and the SDK rejects
+it. So each domain exposes a read phase returning an opaque, validated
+plan, and a write phase that stages it:
+
+- `corporations.PrepareCreditInTx(tx, corpId, operationKey, entry) (*CreditPlan, error)`
+  → `plan.Apply(tx) error`
+- `fleet.PrepareCargoDebitInTx(tx, fleetId, kind, tons) (*CargoDebitPlan, error)`
+  → `plan.Apply(tx) error`
+- station-side `PrepareRequestDecrementInTx(...)` → `plan.Apply(tx) error`
+
+The sale service runs all three prepares (every precondition re-evaluated
+against these transactional reads, per the re-read rule below), then all
+three applies. Ownership is unchanged — each phase is implemented by the
+domain that owns the data, against its own DAO, and `market` never
+reaches into another domain's persistence layer. The atomicity, re-read,
+and all-or-nothing guarantees `goods-sale`'s requirement states are
+unaffected; only the call shape changes.
+
+`corporations.Service.ApplyCredit` remains the thin wrapper that opens its
+own transaction and runs prepare-then-apply for every non-sale caller (the
+spawn opening grant stays a one-call, one-transaction mutation). The layering rule (`backend/CLAUDE.md`'s "cross-domain calls go
 through services, not DAOs") is satisfied because these are narrow
 service-level interfaces, declared by the consuming domain and
 implemented by the owning domain against its own DAO — never a direct
@@ -1084,9 +1106,18 @@ is shown versus the number that settles.
   shaped completion to fan out, and `market-board-panel`'s freshness comes
   from a stated poll cadence (`market-board-panel`'s "Quote Freshness Via
   Stated Refresh Cadence"), not a push channel.
-- No new Terraform (no scheduler, no index beyond what Firestore's own
-  per-collection query needs, which the implementer confirms against
-  `firestore-indexes.tf` during the build).
+- **One new Terraform entry, corrected at implementation:** the
+  reconciliation cadence (Decision 18) requires a periodic run
+  "independent of any particular mutation", which needs a Cloud Scheduler
+  job pointed at the new OIDC-verified `POST /v1/push/credit-reconcile`
+  route — the same liveness-floor shape `action`'s sweep already uses in
+  `scheduler.tf`. An earlier draft of this plan claimed "no new
+  Terraform"; that was only reachable by leaving the stated cadence
+  unimplemented. No new Firestore composite index is needed: the ledger's
+  windowed fold orders by `worldTime` with `__name__` as Firestore's own
+  implicit final tiebreaker, which the automatic single-field index
+  already serves, and the price-board read is a point-read fan-out
+  (Decision 12).
 
 ## Open Questions
 

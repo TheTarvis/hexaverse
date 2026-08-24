@@ -18,3 +18,5 @@ export { default as FleetService } from './fleet-service'
 
 export { actionService } from './action-service'
 export { default as ActionService } from './action-service'
+
+export { marketService, newOperationKey } from './market-service'

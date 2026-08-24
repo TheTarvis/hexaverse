@@ -11,10 +11,12 @@ import (
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
 	"hexaverse/health"
+	"hexaverse/market"
 	"hexaverse/middlewares"
 	"hexaverse/mine"
 	"hexaverse/observation"
 	"hexaverse/sse"
+	"hexaverse/stations"
 	"hexaverse/system"
 
 	"github.com/gin-contrib/cors"
@@ -111,7 +113,18 @@ func SetupRouter() *gin.Engine {
 	// the live galaxy/fleet/fog singletons above, and resolves account→living-corp
 	// for the ownership seam. Constructed before the authorized group so its
 	// resolver can join the request middleware chain.
-	corpSvc := corporations.NewService(galaxySvc, fleetSvc, fogSvc)
+	// Trading stations (#0011): provisioned as a spawn-home asset, spliced into
+	// every interior read, and the venue a sale settles against. Wired BEFORE the
+	// corp service so spawn's asset healing can provision the home station, and
+	// spliced into systemSvc so fleet's dock/position resolution sees it.
+	marketParams := market.DefaultParams()
+	stationSvc := stations.NewService(galaxySvc, fogSvc).
+		WithMinVisibilityTier(marketParams.MinVisibilityTier)
+	systemSvc.WithStations(stationSvc)
+
+	corpSvc := corporations.NewService(galaxySvc, fleetSvc, fogSvc).
+		WithMarket(stationSvc, marketParams.StartingCredits)
+	corpHandler := corporations.NewHandler(corpSvc)
 
 	authorized := v1.Group("/")
 	authorized.Use(
@@ -131,7 +144,7 @@ func SetupRouter() *gin.Engine {
 	accountHandler.RegisterRoutes(authorized, strictLimit)
 
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
-	corporations.NewHandler(corpSvc).RegisterRoutes(authorized, strictLimit)
+	corpHandler.RegisterRoutes(authorized, strictLimit)
 	galaxy.NewHandler().WithFog(fogSvc).RegisterRoutes(authorized)
 	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).WithActions(actionSvc).RegisterRoutes(authorized)
 
@@ -148,6 +161,31 @@ func SetupRouter() *gin.Engine {
 	mine.RegisterResolver(actionSvc, mineParams, mineClassStats)
 	mine.NewHandlerWith(mineSvc, clock).RegisterRoutes(authorized)
 
+	// The direct station read — gated by the requester's graph tier, which is why
+	// it lives here and not at the (requester-less) interior splice.
+	stations.NewHandler(stationSvc).RegisterRoutes(authorized)
+
+	// The market (#0011): the remote price board and the instant sell verb. It
+	// composes fleet's, corporations', and the station's transaction-scoped
+	// primitives inside the ONE transaction it opens — never their DAOs. It
+	// registers no action.ResolveFunc: nothing here rides the action spine.
+	//
+	// The sell route additionally carries a per-corporation write quota, keyed on
+	// the server-resolved actor corp — additive to the general per-IP tier, which
+	// its own spec documents as IP-spoofable and per-instance and therefore not a
+	// sufficient sole control for a balance-mutating route.
+	var corpWriteQuota gin.HandlerFunc
+	if config.ServiceConfig.DisableRateLimiting {
+		corpWriteQuota = func(c *gin.Context) { c.Next() }
+	} else {
+		corpWriteQuota = middlewares.NewCorpWriteQuota(60, time.Minute).Middleware()
+	}
+	marketSvc := market.NewService(
+		marketParams, galaxySvc, stationSvc, fleetSvc,
+		corpSvc.Credits(), fogSvc, clock, common.NewFirestoreService(),
+	)
+	market.NewHandler(marketSvc, clock).RegisterRoutes(authorized, corpWriteQuota)
+
 	// SSE: EventSource can't send custom headers, so JWT comes from the query string.
 	sseHandler := sse.NewHandler()
 	sseChannel := v1.Group("/channels/:channelId")
@@ -163,6 +201,9 @@ func SetupRouter() *gin.Engine {
 		sse.RegisterPushRoutes(pushGroup)
 		// The Cloud Scheduler sweep (#0005) — an OIDC-verified reader on a clock.
 		actionHandler.RegisterPushRoutes(pushGroup)
+		// The credit-reconciliation cadence (#0011) — the periodic backstop that
+		// finds a balance/ledger divergence nobody's next mutation would surface.
+		corpHandler.RegisterPushRoutes(pushGroup)
 	}
 
 	return router

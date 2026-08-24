@@ -14,7 +14,7 @@ type cube struct{ x, y, z int }
 func (h Hex) toCube() cube { return cube{x: h.Q, z: h.R, y: -h.Q - h.R} }
 func (c cube) toHex() Hex  { return Hex{Q: c.x, R: c.z} }
 
-func cubeAdd(a, b cube) cube    { return cube{a.x + b.x, a.y + b.y, a.z + b.z} }
+func cubeAdd(a, b cube) cube       { return cube{a.x + b.x, a.y + b.y, a.z + b.z} }
 func cubeScale(c cube, k int) cube { return cube{c.x * k, c.y * k, c.z * k} }
 
 // cubeDirections are the six neighbour steps, ordered so a ring walk is
@@ -49,6 +49,11 @@ func ringHexes(ring int) []Hex {
 
 // hexAtRingAngle picks the position on `ring` at the given angle index,
 // wrapping. This is the epoch anchor of an orbiting feature.
+// HexAtRingAngle is the exported form: the station store derives its board hex
+// from the same ring/angle law every orbiting feature obeys, without reaching
+// into this package's unexported helpers.
+func HexAtRingAngle(ring, angle int) Hex { return hexAtRingAngle(ring, angle) }
+
 func hexAtRingAngle(ring, angle int) Hex {
 	hs := ringHexes(ring)
 	n := len(hs)

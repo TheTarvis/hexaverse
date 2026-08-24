@@ -16,7 +16,7 @@ const corp: Corporation = {
   id: 'corp_1',
   accountId: 'account-1',
   name: 'Bob',
-  createdAt: 1000,
+  createdAt: 1000, credits: 0
 }
 
 describe('corporationService', () => {

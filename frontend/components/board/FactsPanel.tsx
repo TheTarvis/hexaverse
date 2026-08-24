@@ -17,8 +17,11 @@ import { Input } from '@/components/catalyst/input'
 import { stateAt, type Hex } from '@/lib/hex'
 import type { BoardFeature, LaneGate, ResourceKind } from '@/lib/types/system-board'
 import type { Fleet, FleetRoster, RoutePreview } from '@/lib/types/fleet'
+import type { Quote } from '@/lib/types/market'
 import { etaLabel, type MovePlan } from './move-preview'
 import { FOG_TREATMENT } from './board-palette'
+import { SellSection } from './SellSection'
+import { BalanceReadout } from './BalanceReadout'
 
 export type BoardSelection =
   | { kind: 'feature'; feature: BoardFeature }
@@ -65,6 +68,24 @@ export interface FactsPanelProps {
   onMine: (kind: ResourceKind, tons: number) => void
   // Cancel the running mine via the generic #0005 action endpoint.
   onCancelMine: () => void
+  // The station's live quotes when the acting fleet is docked at one, else null.
+  // The sell offer anchors on the DOCKED state exactly as the mine offer does —
+  // goods can only be sold where they physically are (#0011).
+  stationQuotes?: Quote[] | null
+  // Commit a sale of the docked-at station. The panel owns the kind/tonnage and
+  // the first-ton price it quoted; the container owns the featureId and the
+  // operation key.
+  onSell?: (kind: ResourceKind, tons: number, expectedUnitPrice: number) => void
+  // Set after a "price changed" rejection: the price the player HAD expected, so
+  // the re-priced offer can show what moved rather than freezing a stale one.
+  sellRepricedFrom?: number | null
+  // The corporation's credit balance, from session data. Credits are instant and
+  // location-independent, so there is no in-flight state to render.
+  credits?: number | null
+  // The last settled sale's proceeds, and the last failure's player-facing copy.
+  // Both are announced through the balance readout's live region.
+  lastSaleProceeds?: number | null
+  saleFailure?: string | null
   // Hover/focus intent on the Scan verb — the parent shows the aim-corridor
   // overlay only while the player is actually considering a scan, so clicking
   // around to plan a burn stays visually quiet.
@@ -106,6 +127,12 @@ export function FactsPanel({
   onScan,
   onMine,
   onCancelMine,
+  stationQuotes = null,
+  onSell,
+  sellRepricedFrom = null,
+  credits = null,
+  lastSaleProceeds = null,
+  saleFailure = null,
   onScanPreview,
   scanFx,
   onToggleScanFx,
@@ -144,6 +171,17 @@ export function FactsPanel({
         <p className="mt-0.5 font-mono text-[11px] tracking-wide text-zinc-400 uppercase">
           {character.replace('_', ' ')} · radius {radius} · {featureCount} bodies
         </p>
+        {/* The wealth axis, always on screen once a corporation exists — a
+            balance you have to navigate to isn't a balance you play against. */}
+        {credits !== null && (
+          <div className="mt-2">
+            <BalanceReadout
+              credits={credits}
+              lastDelta={lastSaleProceeds}
+              failure={saleFailure}
+            />
+          </div>
+        )}
       </div>
 
       {activeFleet && (
@@ -206,6 +244,17 @@ export function FactsPanel({
               roster={activeFleet.roster}
               pending={pending}
               onMine={onMine}
+            />
+          )}
+          {/* Docked at a station: the sell offer. A station is dockable but not
+              mineable, so this and the mine offer are never both shown. */}
+          {stationQuotes && onSell && activeFleet.roster && (
+            <SellSection
+              quotes={stationQuotes}
+              roster={activeFleet.roster}
+              pending={pending}
+              onSell={onSell}
+              repricedFrom={sellRepricedFrom}
             />
           )}
           {scanFx && onToggleScanFx && (

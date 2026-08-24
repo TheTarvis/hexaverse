@@ -10,6 +10,10 @@ export interface Corporation {
   name: string
   createdAt: number // worldMillis
   diedAt?: number // worldMillis; absent while the lineage lives
+  // Whole credits (#0011) — never fractional. The wealth axis: mining fills a
+  // hold, selling converts it here. Owner-only; the server discloses it to
+  // nobody else.
+  credits: number
 }
 
 export interface SpawnRequest {

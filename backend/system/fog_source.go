@@ -19,6 +19,16 @@ func (s *Service) Features(ctx context.Context, systemID string) ([]observation.
 	out := make([]observation.FeatureGeom, 0, len(gen.Features))
 	for i := range gen.Features {
 		f := &gen.Features[i]
+		// The station is excluded from the fog/scan feature source entirely
+		// (#0011 Decision 5). This is the actual mechanism that keeps
+		// observation-fog-and-scan untouched by the station splice: because
+		// GetOrCreateInterior now splices a station in ungated, an unfiltered
+		// projection here would make a scan mint a feature observation for it and
+		// give it occluder geometry. A station's visibility is governed entirely
+		// by its own graph-tier rule — never by anything sensed or remembered.
+		if f.Type == FeatureStation {
+			continue
+		}
 		g := observation.FeatureGeom{
 			Id:           f.Id,
 			Astronomical: isAstronomical(f.Id),

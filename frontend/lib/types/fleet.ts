@@ -22,6 +22,10 @@ import type { ResourceKind } from '@/lib/types/system-board'
 export interface FleetRoster {
   ships: { class: string }[]
   // Tons held, by resource kind. Kinds the fleet holds none of are absent.
+  //
+  // Cargo can now DECREASE as well as increase: mining credits it (#0010) and
+  // selling at a station debits it (#0011). A kind sold down to zero drops out
+  // of the map entirely rather than lingering as a 0-ton entry.
   cargo: Record<string, number> | null
   cargoCapacity: number
   freeHold: number

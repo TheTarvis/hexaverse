@@ -71,3 +71,11 @@ func LimitQuery(c *gin.Context) string {
 func OffsetQuery(c *gin.Context) string {
 	return OptionalQueryParam(c, "offset")
 }
+
+// CursorQuery is the opaque pagination cursor a keyset-paginated read continues
+// from — the trade ledger's (worldTime, docId) pair today. Distinct from
+// OffsetQuery: an offset re-scans everything before it, which does not age well
+// on a collection with no upper bound on its size.
+func CursorQuery(c *gin.Context) string {
+	return OptionalQueryParam(c, "cursor")
+}

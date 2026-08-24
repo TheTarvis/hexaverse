@@ -22,6 +22,9 @@ import { Button } from '@/components/catalyst/button'
 import { Text, TextLink, Strong } from '@/components/catalyst/text'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import { useMyFleets, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
+import { useMarketBoard } from '@/hooks/use-market'
+import { MarketBoardPanel } from '@/components/market/MarketBoardPanel'
+import type { Quote } from '@/lib/types/market'
 import { useWorldTime } from '@/hooks/use-world-time'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
@@ -285,6 +288,22 @@ export function GalaxyView() {
     return m
   }, [galaxy])
 
+  // The market board (#0011): every station this corporation has charted. The
+  // panel ranks them; this view decides a row selection focuses that system.
+  const marketBoard = useMarketBoard(!isStartArea)
+  const selectedStationQuotes = useMemo(() => {
+    if (!selectedId) return null
+    return marketBoard.data?.venues.find((v) => v.systemId === selectedId)?.quotes ?? null
+  }, [marketBoard.data, selectedId])
+
+  // Row selection, delegated from the shared panel: select the system and glide
+  // the camera to it — the galaxy view's own meaning for "show me this venue".
+  const handleSelectSystemId = useCallback((systemId: string) => {
+    setSelectedFleetId(null)
+    setSelectedId(systemId)
+    controllerRef.current?.focusSystem(systemId)
+  }, [])
+
   const handleRecenter = () => controllerRef.current?.recenter()
   const handleEnterSystem = useCallback(
     (systemId: string) => router.push(`/systems/${systemId}`),
@@ -479,6 +498,21 @@ export function GalaxyView() {
             onSelect={handleShowFleet}
             enabled={!isStartArea}
           />
+          {/* The market board's first mount point (the second is the station
+              inspector on the board view). The SAME shared panel: it ranks and
+              presents; this view decides that a row selection FOCUSES that
+              system on the graph. */}
+          {!isStartArea && (
+            <div className={PANEL}>
+              <MarketBoardPanel
+                board={marketBoard.data}
+                isLoading={marketBoard.isLoading}
+                isError={marketBoard.isError}
+                homeSystemId={activeFleet?.systemId ?? null}
+                onSelectSystem={handleSelectSystemId}
+              />
+            </div>
+          )}
         </div>
         {selectedFleet ? (
           <FleetCard
@@ -491,6 +525,7 @@ export function GalaxyView() {
           <Inspector
             node={selected}
             connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
+            stationQuotes={selectedStationQuotes}
             onEnter={isStartArea ? null : handleEnterSystem}
             available={canvasAvailable}
             hasOwnFleet={ownFleets.length > 0}
@@ -655,6 +690,7 @@ function Inspector({
   onEnter,
   available,
   hasOwnFleet,
+  stationQuotes = null,
 }: {
   node: GalaxyNode | null
   connections: number
@@ -669,6 +705,9 @@ function Inspector({
   // applies while a canvas exists to select on.
   available: boolean
   hasOwnFleet: boolean
+  // This system's station quotes (#0011), or null when it has none visible to
+  // the requester. Rendered as demand entries, never a floor/requests split.
+  stationQuotes?: Quote[] | null
 }) {
   if (!node) {
     return (
@@ -752,6 +791,48 @@ function Inspector({
           </ul>
         )}
       </div>
+
+      {/* The station section (#0011) — the free astronomical layer's commercial
+          half. Shown only when a station resolves for this system; a station
+          below the requester's graph tier reads 404 server-side, so "no station
+          visible" and "no station here" look identical, by design. */}
+      {stationQuotes && stationQuotes.length > 0 && (
+        <div data-testid="inspector-station">
+          <p className="mb-1.5 text-xs font-medium tracking-wide text-zinc-400 uppercase">
+            Trading station
+          </p>
+          <ul className="flex flex-col gap-1">
+            {stationQuotes.map((q) => {
+              const top = q.entries.find((e) =>
+                e.unlimited ? true : (e.remainingQuantity ?? 0) > 0,
+              )
+              if (!top) return null
+              return (
+                <li
+                  key={q.kind}
+                  data-testid={`inspector-quote-${q.kind}`}
+                  className="flex items-center justify-between rounded-md border border-zinc-200 bg-zinc-100/50 px-2.5 py-1.5 text-sm text-white dark:border-zinc-800/50 dark:bg-black/20"
+                >
+                  <span className="flex items-center gap-1.5">
+                    {/* Request vs floor carried by a glyph and a word, never by
+                        colour alone. */}
+                    <span aria-hidden="true" className="text-xs">
+                      {top.source === 'request' ? '★' : '·'}
+                    </span>
+                    <span className="capitalize">{q.kind}</span>
+                    <span className="font-mono text-[10px] text-zinc-500 uppercase">
+                      {top.source === 'request' ? 'request' : 'floor'}
+                    </span>
+                  </span>
+                  <span className="font-mono text-xs text-zinc-300 tabular-nums">
+                    {top.unitPrice} cr/t
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
 
       {node.tier === 'starVisible' && (
         <p className="text-xs text-zinc-500 italic">

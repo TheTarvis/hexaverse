@@ -69,3 +69,49 @@ resource "google_cloud_scheduler_job" "action_sweep" {
 
   depends_on = [google_project_service.cloudscheduler, google_cloud_run_v2_service.backend]
 }
+
+# =============================================================================
+# Credit-ledger reconciliation (#0011)
+# =============================================================================
+# The periodic half of the balance/ledger reconciliation invariant. Credits are
+# the one place this codebase keeps a MATERIALIZED total instead of folding a
+# ledger on every read (a credit ledger accrues entries for the life of an
+# account, so folding it per read doesn't age well) — and that deviation is only
+# safe for as long as the fold and the stored balance provably agree. This job is
+# what makes "provably" true on a cadence rather than on a hope.
+#
+# Correctness does not depend on it firing. Every settlement transaction already
+# runs an O(1) chained check against the previous entry's recorded resulting
+# balance, so a divergence is caught at the moment it would occur; this cycle is
+# the backstop that finds one nobody's next mutation would have surfaced —
+# including for a corporation that trades nothing all week.
+#
+# Hourly rather than the sweep's 15 minutes: the check is a windowed fold per
+# living corporation (never from genesis), so its cost scales with corporation
+# count, and an undetected divergence already halts further mutation the instant
+# anyone touches that balance.
+#
+# NOTE for Travis — this route inherits the audience bug flagged above: the
+# backend's `pushAudience` is still hardcoded to "flywheel-backend"
+# (backend/middlewares/oidc.go:13), so this job will 401 in prod exactly like
+# the sweep and the existing sse/account push subscriptions until that constant
+# becomes "hexaverse-backend". It is a one-word fix, but it changes the auth
+# behaviour of four live push consumers at once, so it is deliberately left for
+# you rather than folded silently into the market change.
+resource "google_cloud_scheduler_job" "credit_reconcile" {
+  name        = "credit-reconcile"
+  description = "Reconciles each corporation's credit balance against its trade ledger (#0011)"
+  schedule    = "0 * * * *"
+  time_zone   = var.scheduler_timezone
+
+  http_target {
+    uri         = "${google_cloud_run_v2_service.backend.uri}/v1/push/credit-reconcile"
+    http_method = "POST"
+    oidc_token {
+      service_account_email = google_service_account.scheduler.email
+      audience              = "hexaverse-backend"
+    }
+  }
+
+  depends_on = [google_project_service.cloudscheduler, google_cloud_run_v2_service.backend]
+}

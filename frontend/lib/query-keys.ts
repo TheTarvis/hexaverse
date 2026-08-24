@@ -62,6 +62,18 @@ export const queryKeys = {
     all: ['actions'] as const,
     running: (actorId: string) => [...queryKeys.actions.all, 'running', actorId] as const,
   },
+
+  market: {
+    // The #0011 market reads. `board()` is the aggregate price board across
+    // every station the requester has charted — polled on the server's stated
+    // refresh cadence rather than pushed, since a sale fires no SSE. `station`
+    // is one system's station (404 below the visibility tier). A settled sale
+    // invalidates both, plus the fleet reads (hold) and the corporation read
+    // (balance).
+    all: ['market'] as const,
+    board: () => [...queryKeys.market.all, 'board'] as const,
+    station: (systemId: string) => [...queryKeys.market.all, 'station', systemId] as const,
+  },
 } as const
 
 export type AccountQueryKey =

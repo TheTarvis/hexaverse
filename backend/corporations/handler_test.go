@@ -16,10 +16,13 @@ import (
 // canned value/error the test sets, so the handler's status mapping is exercised
 // without a Firestore stack.
 type fakeCorpSvc struct {
-	spawnRes *SpawnResult
-	spawnErr error
-	meCorp   *Corporation
-	meErr    error
+	spawnRes  *SpawnResult
+	spawnErr  error
+	meCorp    *Corporation
+	meErr     error
+	balance   int64
+	ledger    *LedgerPage
+	creditErr error
 }
 
 func (f *fakeCorpSvc) Spawn(context.Context, string, string) (*SpawnResult, error) {
@@ -30,6 +33,12 @@ func (f *fakeCorpSvc) GetForAccount(context.Context, string) (*Corporation, erro
 }
 func (f *fakeCorpSvc) CorpForAccount(context.Context, string) (string, error) { return "", nil }
 func (f *fakeCorpSvc) MarkDead(context.Context, string) error                 { return nil }
+func (f *fakeCorpSvc) Balance(context.Context, string) (int64, error) {
+	return f.balance, f.creditErr
+}
+func (f *fakeCorpSvc) Ledger(context.Context, string, string, int) (*LedgerPage, error) {
+	return f.ledger, f.creditErr
+}
 
 func newCorpRouter(svc ServiceInterface) *gin.Engine {
 	gin.SetMode(gin.TestMode)

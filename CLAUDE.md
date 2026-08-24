@@ -188,7 +188,7 @@ Solo project of Travis Wilson.
 The richest design source is the archived gameplay doc —
 `git show bf9c637:client/docs/Gameplay.mdc`.)*
 
-**Backend domains built (M1–M9):**
+**Backend domains built (M1–M11):**
 
 - **`common/worldtime.go`** — the injectable simulation clock (#0005 contract,
   pulled forward). `WorldClock()` / `NewWorldTime(epoch, scale)`; all stored
@@ -283,10 +283,59 @@ The richest design source is the archived gameplay doc —
   every fogged read already keyed on. Death invariant (`diedAt` only at zero
   fleets) recorded + enforced; no slice path reaches it. Spawn is **instant**, not
   a #0005 action. Frontend: corpless → wake-up flow (name → spawn → galaxy).
+  **Since M11** spawn healing also provisions the home station + the opening
+  credit grant, and **`GET /me` runs the same healing pass** — the migration
+  mechanism, so a pre-M11 corp heals on its next session bootstrap with no
+  backfill script. An `assetsCompleteAt` marker short-circuits a healed corp.
+- **`mine/`** (#0010, *implemented M10*) — the action spine's first mutating
+  verb. `POST /v1/fleets/:id/mine {featureId,kind,tons}` commits on the
+  **movement** channel (a run gates move + mine, never scan); the resolver
+  appends a delta at eta and credits `fleet.Cargo`. Per-lode remaining is the
+  #0005 fold, never a stored field, bounded by construction (`MinRunTons` × a
+  named ceiling — Decision #18). Since M11 a mine command naming a **station**
+  is rejected with its own reason (dockable, never mineable).
+- **`stations/`** (#0011, *implemented M11*) — the NPC trading post, one per
+  spawn home and nowhere else. Its own store
+  (`galaxies/{gid}/systems/{sid}/station/meta`, create-if-absent) — NOT the
+  interior's feature subcollection, whose one-shot atomic claim has no
+  add-a-feature path, and whose `system.Feature` deliberately has no owner
+  field. `OwnerCorpId` empty = NPC (present from day one so player ownership is
+  a value change, never a retrofit). The orbit is **derived, never rolled**:
+  a pure function of (systemId, galaxy seed), non-core, off the lane-gate ring,
+  and **prograde with its system's disk** via the one exported
+  `system.DominantOrbitDirection` the interior generator itself uses. Spliced
+  into `GetOrCreateInterior` **ungated** (that seam has no requester — arrival
+  settlement runs under the OIDC sweep), gated only at the requester-scoped
+  reads; **excluded from `fog_source.Features`**, which is what keeps
+  `observation` untouched (no scan mints a station observation, and it occludes
+  nothing). Degrades to no-station rather than failing an interior read.
+- **`market/`** (#0011, *implemented M11*) — credits, demand, and the sell
+  verb. **Credits** live on the corp doc as a materialized `int64`
+  (`corporations/credits.go`) — the one deliberate exception to #0005's
+  fold-of-deltas pattern, because a credit ledger accrues forever; the
+  reconciliation invariant is what keeps that safe (checkpointed **windowed**
+  fold, compound `(worldTime, docId)` cursor since the doc id is a client key
+  with no chronology, plus an O(1) write-time chain check and a divergence
+  halt that only an `adjustment` entry clears). Mutation is idempotent by a
+  client operation key scoped **per corporation** (`corporations/{id}/ledger/
+  {opKey}`), format-constrained, with `spawn:` reserved. Demand is a **uniform
+  ordered entry list** under an opaque venue key — the NPC floor is the entry
+  of last resort, not a fallback branch — so M12's player asks join the same
+  fold. `GET /v1/market/board` (point-read fan-out, no new index),
+  `POST /v1/fleets/:id/sell` — **instant, no action, no ETA**, settling in ONE
+  transaction that composes three domains' **two-phase** primitives (Firestore
+  forbids a read after a write, so every prepare runs before every apply).
+  Per-portion floored rounding pinned cross-stack by
+  `fixtures/market/cases.json`. Knobs in `market/params.go`.
+  **Cloud Scheduler `credit-reconcile` (hourly) in `scheduler.tf` — Travis must
+  `terraform apply`;** and note the route inherits the long-standing
+  `pushAudience = "flywheel-backend"` bug (`middlewares/oidc.go:13`) that 401s
+  every `/v1/push` OIDC in prod until that constant is fixed.
 
-**Next:** M10 mine (`backend/mine/` verb on the #0005 dispatch; fleet gains
-`ships[]` + `cargo`) + the slice e2e — drill in → move → scan → mine → depart →
-arrive → reveal → return → it persisted. Closes the loop.
+**Next:** the M11 slice e2e (mine → sell at home → spot a premium three lanes
+over → haul it → the profit lands), then M12's player exchange — player asks
+join `market`'s existing demand-entry fold under the same venue key, and the
+listing fee becomes this economy's first credit sink (M11 is a pure faucet).
 
 - Core loop from the original design: players spawn colonies on a hex-grid
   galaxy (spaced 8–25 tiles apart), explore under fog of war (scan radius

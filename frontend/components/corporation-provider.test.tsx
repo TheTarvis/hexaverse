@@ -106,7 +106,7 @@ describe('CorporationProvider', () => {
     // account-provider's `refetchAccount`).
     expect(screen.getByTestId('has-refetch')).toHaveTextContent('true')
 
-    mockGetMine.mockResolvedValue({ id: 'corp_1', accountId: 'a1', name: 'Bob', createdAt: 1 })
+    mockGetMine.mockResolvedValue({ id: 'corp_1', accountId: 'a1', name: 'Bob', createdAt: 1, credits: 0 })
     fireEvent.click(screen.getByTestId('refetch-btn'))
 
     await waitFor(() => {

@@ -39,6 +39,18 @@ export function useCorporationContext() {
   return ctx
 }
 
+// useCorporationOptional returns the corporation when a provider is present and
+// null when one isn't, instead of throwing.
+//
+// For surfaces where the corporation is SUPPLEMENTARY rather than load-bearing —
+// the board's credit readout, for instance. The board's real job is moving
+// fleets; it must not go blank because a balance readout could not find its
+// provider. Anything gated on having a corporation still uses the throwing
+// accessor, so a genuine missing-provider bug on those surfaces stays loud.
+export function useCorporationOptional(): Corporation | null {
+  return useContext(CorporationContext)?.corporation ?? null
+}
+
 export function CorporationProvider({ children }: { children: React.ReactNode }) {
   const { user, account, isLoading: accountLoading } = useAccountContext()
 

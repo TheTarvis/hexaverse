@@ -44,6 +44,14 @@ type FogSource interface {
 	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
 }
 
+// StationSource provisions the home system's NPC trading station as a spawn
+// asset (#0011). Idempotent per system id — two corporations sharing a home
+// converge on ONE station, never one each. Declared here (consumer-side) so
+// corporations depends on a narrow interface, not the stations package.
+type StationSource interface {
+	EnsureStation(ctx context.Context, systemID string) error
+}
+
 type ServiceInterface interface {
 	// Spawn wakes the account's mind: creates (or returns, idempotently) its living
 	// corporation, its one hull in a frontier system, and the home fog. Name is the
@@ -57,6 +65,11 @@ type ServiceInterface interface {
 	// MarkDead stamps diedAt — permitted ONLY when the corp has zero fleets (the
 	// death invariant). No slice path reaches it; it ships so combat inherits it.
 	MarkDead(ctx context.Context, corpID string) error
+	// Balance returns the corp's materialized credit balance (#0011). Owner-only:
+	// the handler resolves corpID from common.ActorCorp before calling.
+	Balance(ctx context.Context, corpID string) (int64, error)
+	// Ledger returns one bounded page of the corp's trade ledger, newest first.
+	Ledger(ctx context.Context, corpID, cursor string, pageSize int) (*LedgerPage, error)
 }
 
 type Service struct {
@@ -66,6 +79,18 @@ type Service struct {
 	fog    FogSource
 	clock  common.WorldTime
 	params SpawnParams
+	// credits is the transactional balance/ledger surface (#0011). Non-nil in
+	// production; a nil store makes the credit steps of healing no-ops, so every
+	// pre-#0011 test that constructs a Service without it still passes.
+	credits *CreditStore
+	// stations provisions the home station during asset healing. Nil ⇒ skipped,
+	// same tolerance as credits.
+	stations StationSource
+	// startingCredits is market.Params.StartingCredits, INJECTED rather than
+	// imported: market imports corporations (for the credit primitive), so
+	// corporations importing market would cycle. router.go is the one place the
+	// two meet.
+	startingCredits int64
 }
 
 // NewService wires the corporation domain. The galaxy/fleet/fog services are the
@@ -73,14 +98,36 @@ type Service struct {
 // spine), so spawn orchestrates through live singletons, not fresh copies.
 func NewService(graph GraphSource, fleets FleetSource, fog FogSource) *Service {
 	return &Service{
-		dao:    NewDao(),
-		graph:  graph,
-		fleets: fleets,
-		fog:    fog,
-		clock:  common.WorldClock(),
-		params: DefaultSpawnParams(),
+		dao:     NewDao(),
+		graph:   graph,
+		fleets:  fleets,
+		fog:     fog,
+		clock:   common.WorldClock(),
+		params:  DefaultSpawnParams(),
+		credits: NewCreditStore(),
 	}
 }
+
+// WithMarket wires the #0011 spawn assets: the home station's provisioner and
+// the opening credit grant's size (market.Params.StartingCredits, injected — see
+// Service.startingCredits). Follows the post-construction wiring shape
+// fleetSvc.WithTravel already uses for a dependency that isn't available at
+// construction time. Returns the service so it can be chained.
+func (s *Service) WithMarket(stations StationSource, startingCredits int64) *Service {
+	s.stations = stations
+	s.startingCredits = startingCredits
+	return s
+}
+
+// WithCreditStore swaps the credit store — the seam an emulator-backed test uses
+// to point the ledger at its own Firestore client.
+func (s *Service) WithCreditStore(store *CreditStore) *Service {
+	s.credits = store
+	return s
+}
+
+// Credits exposes the store for the handler's owner-only balance/ledger reads.
+func (s *Service) Credits() *CreditStore { return s.credits }
 
 func NewServiceWith(dao Dao, graph GraphSource, fleets FleetSource, fog FogSource, clock common.WorldTime) *Service {
 	return &Service{
@@ -192,11 +239,88 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation, site
 		return nil, err
 	}
 
+	// #0011: the home station and the opening balance are spawn assets too, and
+	// heal on the same idempotent pass every other asset does.
+	if err := s.ensureStation(ctx, home); err != nil {
+		return nil, err
+	}
+	if err := s.ensureOpeningGrant(ctx, corp, now); err != nil {
+		return nil, err
+	}
+	if err := s.markAssetsComplete(ctx, corp, now); err != nil {
+		return nil, err
+	}
+
 	homeSys, err := s.graph.GetLiveSystem(ctx, home)
 	if err != nil {
 		return nil, err
 	}
 	return &SpawnResult{Corporation: *corp, Fleet: hull, HomeSystem: homeSys, WorldTime: now}, nil
+}
+
+// healAssets is the read path's healing pass (#0011 Decision 14): GET
+// /v1/corporations/me runs it so a pre-#0011 corporation — one that only ever
+// reads and never re-spawns — gains its station and balance on its very next
+// session bootstrap, with no backfill script and no explicit re-spawn.
+//
+// The assets-complete marker short-circuits at entry reading NOTHING but the
+// marker already on the corp doc in hand: a healed corp's every later read costs
+// zero extra reads and zero writes.
+func (s *Service) healAssets(ctx context.Context, corp *Corporation) error {
+	if corp.AssetsCompleteAt != 0 {
+		return nil
+	}
+	if _, err := s.ensureSpawnAssets(ctx, corp, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ensureStation provisions the home system's NPC station, idempotently per
+// system id. Two corporations sharing a home system converge on one station.
+func (s *Service) ensureStation(ctx context.Context, systemID string) error {
+	if s.stations == nil {
+		return nil
+	}
+	return s.stations.EnsureStation(ctx, systemID)
+}
+
+// ensureOpeningGrant credits the configured starting balance exactly once, keyed
+// by the DERIVED "spawn:"+corpId anchor — a namespace ValidateOperationKey
+// forbids any client from supplying, so nobody can squat or suppress it.
+//
+// "Already granted" is decided ONLY by that ledger entry's existence, never by
+// Credits == 0: a corporation can legitimately spend to exactly zero, and
+// re-granting it would be a silent faucet.
+func (s *Service) ensureOpeningGrant(ctx context.Context, corp *Corporation, now common.WorldMillis) error {
+	if s.credits == nil || s.startingCredits <= 0 {
+		return nil
+	}
+	_, err := s.credits.ApplyCredit(ctx, corp.Id, spawnGrantKey(corp.Id), LedgerEntry{
+		AccountId: corp.AccountId,
+		Kind:      EntryStartingGrant,
+		Amount:    s.startingCredits,
+	}, now)
+	if err != nil {
+		// A replay is the normal healed path, not an error — ApplyCredit already
+		// answers it from the recorded entry. Anything else is real.
+		return err
+	}
+	return nil
+}
+
+// markAssetsComplete stamps the short-circuit marker once every derived asset is
+// confirmed present. Written last, so a pass that failed part-way never marks
+// itself done and the next call re-heals.
+func (s *Service) markAssetsComplete(ctx context.Context, corp *Corporation, now common.WorldMillis) error {
+	if corp.AssetsCompleteAt != 0 {
+		return nil
+	}
+	if err := s.dao.SetAssetsCompleteAt(ctx, corp.Id, now); err != nil {
+		return err
+	}
+	corp.AssetsCompleteAt = now
+	return nil
 }
 
 func (s *Service) GetForAccount(ctx context.Context, accountId string) (*Corporation, error) {
@@ -214,7 +338,69 @@ func (s *Service) GetForAccount(ctx context.Context, accountId string) (*Corpora
 	if corp == nil {
 		return nil, ErrNotFound
 	}
+	// The migration mechanism (#0011 Decision 14): the pure-read session bootstrap
+	// drives the same idempotent healing pass a spawn call does, so a corporation
+	// that predates the station/balance assets gains them here. A healed corp
+	// short-circuits on its marker — this costs it nothing.
+	if err := s.healAssets(ctx, corp); err != nil {
+		return nil, err
+	}
+	// Re-read: healing granted the opening balance through its own transaction, so
+	// the in-hand copy's Credits is stale on the pass that actually healed.
+	if corp.AssetsCompleteAt != 0 && corp.Credits == 0 {
+		if fresh, err := s.dao.Get(ctx, corpID); err == nil && fresh != nil {
+			corp = fresh
+		}
+	}
 	return corp, nil
+}
+
+// ReconcileLedgers is the periodic cadence's body (#0011 Decision 18): it
+// evaluates EVERY living corporation's reconciliation state, independently of
+// whether any mutation happened — a corporation that traded nothing this cycle
+// is still checked. Returns the divergent results.
+//
+// Driven by an OIDC-verified push route on a Cloud Scheduler cadence, the same
+// liveness-floor shape action's sweep already uses. Correctness never depends on
+// it firing: the O(1) write-time chained check catches a divergence at the
+// moment it would occur, and this is the backstop that finds one nobody's next
+// mutation would have surfaced.
+func (s *Service) ReconcileLedgers(ctx context.Context) ([]ReconResult, error) {
+	if s.credits == nil {
+		return nil, nil
+	}
+	living, err := s.dao.ListLiving(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(living))
+	for i := range living {
+		ids = append(ids, living[i].Id)
+	}
+	return s.credits.ReconcileAll(ctx, ids)
+}
+
+// Balance returns a corporation's materialized credit balance. Owner-only: the
+// caller (the handler) resolves corpID from common.ActorCorp, so a foreign id
+// can never be reached through this seam.
+func (s *Service) Balance(ctx context.Context, corpID string) (int64, error) {
+	corp, err := s.dao.Get(ctx, corpID)
+	if err != nil {
+		return 0, err
+	}
+	if corp == nil {
+		return 0, ErrNotFound
+	}
+	return corp.Credits, nil
+}
+
+// Ledger returns one bounded page of a corporation's trade ledger, newest first.
+// Owner-only by the same seam as Balance.
+func (s *Service) Ledger(ctx context.Context, corpID, cursor string, pageSize int) (*LedgerPage, error) {
+	if s.credits == nil {
+		return &LedgerPage{Entries: []LedgerEntry{}}, nil
+	}
+	return s.credits.ListLedger(ctx, corpID, cursor, pageSize)
 }
 
 func (s *Service) CorpForAccount(ctx context.Context, accountId string) (string, error) {
@@ -290,4 +476,3 @@ func (s *Service) rimHex(accountId string) board.Hex {
 	idx := int(uint64(seedFromAccount(accountId)) % uint64(len(ring)))
 	return ring[idx]
 }
-

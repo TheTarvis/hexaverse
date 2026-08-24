@@ -18,13 +18,10 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 	r := newRand(seed)
 	dial := params.dialFor(region)
 
-	// The disk's dominant spin, rolled once per system: every disk-born body
-	// (skeleton majors, belts, hazards) orbits prograde in it; only
-	// capture-plausible detail may rarely run against it (see diskOrCaptured).
-	sysDir := 1
-	if r.Intn(2) == 0 {
-		sysDir = -1
-	}
+	// The disk's dominant spin: every disk-born body (skeleton majors, belts,
+	// hazards) orbits prograde in it; only capture-plausible detail may rarely run
+	// against it (see diskOrCaptured).
+	sysDir := DominantOrbitDirection(seed)
 
 	features := make([]Feature, 0, 16)
 
@@ -134,6 +131,29 @@ func orbitFor(ring, dir int, r *rand.Rand) Orbit {
 		Period: PeriodFor(ring),
 		Dir:    dir,
 	}
+}
+
+// DominantOrbitDirection is a system's disk spin (+1 / −1), a PURE function of
+// the per-system seed. Every disk-born feature of that system's interior orbits
+// in it, and so does the system's trading station (#0011) — which is why this is
+// exported: the station store derives its orbit without reading the interior,
+// and both must agree.
+//
+// Deliberately NOT a draw from the generator's rand stream. Sharing that stream
+// would couple the station's direction to generation draw ORDER, so inserting
+// one roll anywhere earlier in Generate would silently flip stations against
+// their own disks — the exact divergence this being one function prevents.
+func DominantOrbitDirection(seed int64) int {
+	// splitmix64 finalizer: adjacent seeds (systems in one galaxy share a
+	// derivation base) must not correlate into visible banding.
+	x := uint64(seed) + 0x9E3779B97F4A7C15
+	x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9
+	x = (x ^ (x >> 27)) * 0x94D049BB133111EB
+	x ^= x >> 31
+	if x&1 == 0 {
+		return -1
+	}
+	return 1
 }
 
 // diskOrCaptured rolls a capture-plausible body's direction: the disk's

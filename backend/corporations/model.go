@@ -23,6 +23,20 @@ type Corporation struct {
 	// fleets (the death invariant). Zero ⇒ living. No slice code path reaches it —
 	// nothing destroys a fleet yet — but the rule ships so combat inherits it.
 	DiedAt common.WorldMillis `json:"diedAt,omitempty" firestore:"diedAt,omitempty"`
+	// Credits is the materialized whole-credit balance (#0011). A deliberate
+	// deviation from #0005's fold-of-deltas: a credit ledger accrues forever, so
+	// folding every read doesn't age well — the ledger is the record, the balance
+	// is the truth, and reconciliation (credits.go) keeps that claim checkable.
+	// int64, never float: whole indivisible units, no accumulated FP drift.
+	// Mutated ONLY through PrepareCreditInTx/CreditPlan.Apply. Absent on a
+	// pre-#0011 doc ⇒ "never granted", NOT "granted zero" — the opening grant's
+	// only signal is its "spawn:"-keyed ledger entry, never Credits == 0.
+	Credits int64 `json:"credits" firestore:"credits"`
+	// AssetsCompleteAt stamps the moment ensureSpawnAssets confirmed ALL derived
+	// assets present (hull, fog, station, opening balance). Non-zero short-circuits
+	// the healing pass at entry on every later read — the marker is the only doc
+	// read, no per-asset checks. Zero/absent ⇒ fall through and check each asset.
+	AssetsCompleteAt common.WorldMillis `json:"assetsCompleteAt,omitempty" firestore:"assetsCompleteAt,omitempty"`
 }
 
 // Living reports whether the corporation still has its lineage (no death stamp).

@@ -1,0 +1,117 @@
+{
+  "_comment": "Shared Go/TS golden for market settlement math (#0011 Decision 22). The Go settlement fold (backend/market) and the TS proceeds preview (frontend/lib) both assert against these exact cases, so the number a player is SHOWN can never silently diverge from the number that SETTLES. Mirrors fixtures/board/cases.json's precedent.",
+  "fold": [
+    {
+      "name": "fully covered by the top entry",
+      "_why": "The ordinary case: one open request covers the whole sale, so nothing reaches the floor.",
+      "entries": [
+        { "unitPrice": 140, "source": "request", "remainingQuantity": 200, "requestId": "req-1" },
+        { "unitPrice": 100, "source": "floor", "unlimited": true }
+      ],
+      "tons": 50,
+      "fills": [
+        { "requestId": "req-1", "source": "request", "unitPrice": 140, "tons": 50, "proceeds": 7000 }
+      ],
+      "totalProceeds": 7000
+    },
+    {
+      "name": "split across a request and the floor",
+      "_why": "The request runs out mid-sale and the remainder falls to the floor — the split that must be reported per portion, not blended into one number.",
+      "entries": [
+        { "unitPrice": 140, "source": "request", "remainingQuantity": 30, "requestId": "req-1" },
+        { "unitPrice": 100, "source": "floor", "unlimited": true }
+      ],
+      "tons": 50,
+      "fills": [
+        { "requestId": "req-1", "source": "request", "unitPrice": 140, "tons": 30, "proceeds": 4200 },
+        { "source": "floor", "unitPrice": 100, "tons": 20, "proceeds": 2000 }
+      ],
+      "totalProceeds": 6200
+    },
+    {
+      "name": "split across two requests and the floor",
+      "_why": "More than two entries, price-descending: proves the fold is one general rule rather than a two-case request/floor branch.",
+      "entries": [
+        { "unitPrice": 150, "source": "request", "remainingQuantity": 10, "requestId": "req-hi" },
+        { "unitPrice": 120, "source": "request", "remainingQuantity": 15, "requestId": "req-lo" },
+        { "unitPrice": 100, "source": "floor", "unlimited": true }
+      ],
+      "tons": 40,
+      "fills": [
+        { "requestId": "req-hi", "source": "request", "unitPrice": 150, "tons": 10, "proceeds": 1500 },
+        { "requestId": "req-lo", "source": "request", "unitPrice": 120, "tons": 15, "proceeds": 1800 },
+        { "source": "floor", "unitPrice": 100, "tons": 15, "proceeds": 1500 }
+      ],
+      "totalProceeds": 4800
+    },
+    {
+      "name": "floor only",
+      "_why": "No open requests at all — the floor is the entry of last resort, not a fallback branch.",
+      "entries": [{ "unitPrice": 100, "source": "floor", "unlimited": true }],
+      "tons": 12.5,
+      "fills": [{ "source": "floor", "unitPrice": 100, "tons": 12.5, "proceeds": 1250 }],
+      "totalProceeds": 1250
+    },
+    {
+      "name": "per-portion rounding, not total rounding",
+      "_why": "THE case that pins Decision 1's rounding granularity. Each portion floors separately: floor(10.5*140)=1470 and floor(9.5*100)=950, summing to 2420. Rounding the pre-summed fractional total instead would give floor(1470.0+950.0)=2420 here but diverges wherever the fractions compound — the two stacks must agree on which granularity they use.",
+      "entries": [
+        { "unitPrice": 140, "source": "request", "remainingQuantity": 10.5, "requestId": "req-1" },
+        { "unitPrice": 100, "source": "floor", "unlimited": true }
+      ],
+      "tons": 20,
+      "fills": [
+        { "requestId": "req-1", "source": "request", "unitPrice": 140, "tons": 10.5, "proceeds": 1470 },
+        { "source": "floor", "unitPrice": 100, "tons": 9.5, "proceeds": 950 }
+      ],
+      "totalProceeds": 2420
+    },
+    {
+      "name": "fractional portions each floor down",
+      "_why": "Both portions carry a fraction that must be dropped: floor(3.33*7)=23 (23.31) and floor(6.67*3)=20 (20.01). Rounding the exact total (43.32) once would also give 43 here, but the per-portion loss is bounded per PORTION, which is the smaller, more conservative leak the milestone chose.",
+      "entries": [
+        { "unitPrice": 7, "source": "request", "remainingQuantity": 3.33, "requestId": "req-1" },
+        { "unitPrice": 3, "source": "floor", "unlimited": true }
+      ],
+      "tons": 10,
+      "fills": [
+        { "requestId": "req-1", "source": "request", "unitPrice": 7, "tons": 3.33, "proceeds": 23 },
+        { "source": "floor", "unitPrice": 3, "tons": 6.67, "proceeds": 20 }
+      ],
+      "totalProceeds": 43
+    },
+    {
+      "name": "a sub-ton sale that prices to zero",
+      "_why": "Cargo is float64, so a fleet can hold a sub-ton fraction whose proceeds floor to zero. The fold reports 0 and the caller must REJECT the sale rather than debit cargo for nothing in return.",
+      "entries": [{ "unitPrice": 2, "source": "floor", "unlimited": true }],
+      "tons": 0.4,
+      "fills": [{ "source": "floor", "unitPrice": 2, "tons": 0.4, "proceeds": 0 }],
+      "totalProceeds": 0
+    }
+  ],
+  "firstTonPrice": [
+    {
+      "name": "the top request sets the first-ton price",
+      "_why": "The slippage guard compares against this figure — the same one the price board showed the player moments earlier.",
+      "entries": [
+        { "unitPrice": 140, "source": "request", "remainingQuantity": 200, "requestId": "req-1" },
+        { "unitPrice": 100, "source": "floor", "unlimited": true }
+      ],
+      "firstTonPrice": 140
+    },
+    {
+      "name": "a nearly-drained request still sets it",
+      "_why": "THE case a first-ton-only guard fails on: one ton left at the premium keeps the guard passing while the rest of a large haul settles at the floor. This is why the optional minimum-total-proceeds guard exists beside it.",
+      "entries": [
+        { "unitPrice": 140, "source": "request", "remainingQuantity": 1, "requestId": "req-1" },
+        { "unitPrice": 100, "source": "floor", "unlimited": true }
+      ],
+      "firstTonPrice": 140
+    },
+    {
+      "name": "floor only",
+      "entries": [{ "unitPrice": 100, "source": "floor", "unlimited": true }],
+      "firstTonPrice": 100
+    }
+  ]
+}

@@ -21,7 +21,7 @@ vi.mock('@/lib/toast', () => ({
 const mockSpawn = vi.mocked(corporationService.spawn)
 
 const spawnResult = {
-  corporation: { id: 'corp_1', accountId: 'account-1', name: 'Bob', createdAt: 1000 },
+  corporation: { id: 'corp_1', accountId: 'account-1', name: 'Bob', createdAt: 1000, credits: 0 },
   fleet: {
     id: 'fleet_1',
     corporationId: 'corp_1',

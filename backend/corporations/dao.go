@@ -53,6 +53,9 @@ type Dao interface {
 	// SetDiedAt stamps the death time on a corp doc. No slice path calls it
 	// (nothing destroys a fleet); it exists so the death invariant is enforceable.
 	SetDiedAt(ctx context.Context, id string, at common.WorldMillis) error
+	// SetAssetsCompleteAt stamps the spawn-assets-complete marker (#0011), the
+	// short-circuit every later healing pass checks first.
+	SetAssetsCompleteAt(ctx context.Context, id string, at common.WorldMillis) error
 }
 
 type DaoImpl struct {
@@ -152,5 +155,11 @@ func (dao *DaoImpl) CreateWithPointer(ctx context.Context, corp Corporation) err
 func (dao *DaoImpl) SetDiedAt(ctx context.Context, id string, at common.WorldMillis) error {
 	return dao.db.Update(ctx, corporationsCollection, id, []firestore.Update{
 		{Path: "diedAt", Value: int64(at)},
+	})
+}
+
+func (dao *DaoImpl) SetAssetsCompleteAt(ctx context.Context, id string, at common.WorldMillis) error {
+	return dao.db.Update(ctx, corporationsCollection, id, []firestore.Update{
+		{Path: "assetsCompleteAt", Value: int64(at)},
 	})
 }

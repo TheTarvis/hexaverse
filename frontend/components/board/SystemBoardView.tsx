@@ -16,6 +16,11 @@ import { Text } from '@/components/catalyst/text'
 import { toast } from '@/lib/toast'
 import { useSystemBoard } from '@/hooks/use-system-board'
 import { useFleetsInSystem, useFleetOrders, useMine, useScan, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
+import { useMarketBoard, useSell, useStation } from '@/hooks/use-market'
+import { useCorporationOptional } from '@/components/corporation-provider'
+import { newOperationKey } from '@/lib/services/market-service'
+import { isPriceChanged, saleErrorCopy } from '@/lib/market-copy'
+import { MarketBoardPanel } from '@/components/market/MarketBoardPanel'
 import { useCancelAction, useRunningMine, useRunningScan } from '@/hooks/use-actions'
 import type { ResourceKind } from '@/lib/types/system-board'
 import { useWorldTime } from '@/hooks/use-world-time'
@@ -115,6 +120,21 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const { order, cancel } = useFleetOrders(systemId)
   const scan = useScan(systemId)
   const mine = useMine(systemId)
+
+  // The market (#0011). The station read is gated server-side by graph tier, so
+  // a system whose station the requester cannot see simply resolves to nothing.
+  const stationQuery = useStation(systemId)
+  const station = stationQuery.data ?? null
+  const boardQuery = useMarketBoard(!!station)
+  const sell = useSell(systemId)
+  // Optional: the balance is supplementary here, and the board must not go
+  // blank because the readout could not find its provider.
+  const corporation = useCorporationOptional()
+  // Sale feedback the panel announces: the last settled proceeds, the last
+  // failure's player-facing copy, and the price a re-priced offer moved FROM.
+  const [lastSaleProceeds, setLastSaleProceeds] = useState<number | null>(null)
+  const [saleFailure, setSaleFailure] = useState<string | null>(null)
+  const [sellRepricedFrom, setSellRepricedFrom] = useState<number | null>(null)
   const cancelAction = useCancelAction(systemId)
   const travel = useFleetTravel()
   const pending =
@@ -123,7 +143,10 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     scan.isPending ||
     mine.isPending ||
     cancelAction.isPending ||
-    travel.isPending
+    travel.isPending ||
+    // The sell control's double-submit guard: disabled from commit until the
+    // sale settles or fails, so a double-click cannot become two sales.
+    sell.isPending
 
   const allFleets = useMemo(() => fleets ?? [], [fleets])
   const ownFleets = useMemo(() => allFleets.filter((f) => f.own), [allFleets])
@@ -157,6 +180,20 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     const parentId = fleetDockedParentId(activeFleet, worldTime)
     return parentId ? (board.features.find((f) => f.id === parentId) ?? null) : null
   }, [activeFleet, board, worldTime])
+
+  // Docked at THIS system's station — the sell offer's anchor, the same
+  // docked-state test the mine offer uses. A station is dockable but never
+  // mineable, so the two offers are mutually exclusive by construction.
+  const dockedAtStation = !!station && !!activeFleet &&
+    fleetDockedParentId(activeFleet, worldTime) === station.featureId
+
+  // This station's live quotes, pulled out of the aggregate board read rather
+  // than fetched separately — the board already carries every visible venue.
+  const stationQuotes = useMemo(() => {
+    if (!station) return null
+    const venue = boardQuery.data?.venues.find((v) => v.systemId === station.systemId)
+    return venue?.quotes ?? null
+  }, [station, boardQuery.data])
 
   // The sweep preview: what a scan from HERE would leave in shadow (#0006
   // Decision #21 — the sweep is 360°, so the shadow is the signal). Only
@@ -359,6 +396,49 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       },
     )
   }
+  // Sell (#0011): the panel picked kind + tons and quoted a first-ton price; the
+  // featureId is the fleet's dock parent, exactly as mine's is.
+  //
+  // ONE operation key per user-initiated attempt — the key is the entire guard
+  // against a lost response becoming a double sale, since a sale claims no
+  // action slot and so inherits none of the spine's retry safety. A re-priced
+  // re-commit mints a fresh key; reusing the old one would be answered as a
+  // replay of the previous sale.
+  const commitSell = (kind: ResourceKind, tons: number, expectedUnitPrice: number) => {
+    if (!activeFleet || !station) return
+    setSaleFailure(null)
+    sell.mutate(
+      {
+        fleetId: activeFleet.id,
+        request: {
+          featureId: station.featureId,
+          kind,
+          tons,
+          operationKey: newOperationKey(),
+          expectedUnitPrice,
+        },
+      },
+      {
+        onSuccess: (res) => {
+          setLastSaleProceeds(res.totalProceeds)
+          setSellRepricedFrom(null)
+          toast.success(`Sold for ${res.totalProceeds} cr`)
+        },
+        onError: (e) => {
+          const copy = saleErrorCopy(e.message)
+          setSaleFailure(copy)
+          // A price-changed rejection after a multi-minute haul must not leave a
+          // stale, un-committable offer on screen: re-price it and say what
+          // moved. The invalidated board read supplies the new price.
+          if (isPriceChanged(e.message)) {
+            setSellRepricedFrom(expectedUnitPrice)
+            void stationQuery.refetch()
+          }
+          toast.error(copy)
+        },
+      },
+    )
+  }
   const commitCancelMine = () => {
     if (!activeFleet || !runningMine) return
     cancelAction.mutate(
@@ -451,6 +531,21 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           currentSystemId={systemId}
           onSelect={showFleet}
         />
+        {/* The market board's second mount point (the first is the galaxy view).
+            The SAME shared panel: it ranks and presents, and this view decides
+            what a row selection means — here, drilling into that system's board.
+            Shown only where there is a station to trade at. */}
+        {station && (
+          <div className={PANEL}>
+            <MarketBoardPanel
+              board={boardQuery.data}
+              isLoading={boardQuery.isLoading}
+              isError={boardQuery.isError}
+              homeSystemId={systemId}
+              onSelectSystem={(id) => router.push(`/systems/${encodeURIComponent(id)}`)}
+            />
+          </div>
+        )}
         <FactsPanel
           starClass={board.starClass}
           character={board.character}
@@ -473,6 +568,12 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           onScan={commitScan}
           onMine={commitMine}
           onCancelMine={commitCancelMine}
+          stationQuotes={dockedAtStation ? stationQuotes : null}
+          onSell={commitSell}
+          sellRepricedFrom={sellRepricedFrom}
+          credits={corporation?.credits ?? null}
+          lastSaleProceeds={lastSaleProceeds}
+          saleFailure={saleFailure}
           onScanPreview={setScanPreview}
           scanFx={scanFx}
           onToggleScanFx={toggleScanFx}
