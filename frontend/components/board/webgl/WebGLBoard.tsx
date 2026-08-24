@@ -33,13 +33,12 @@ import { createBodies, createStar } from './scene-bodies'
 import { createFleets } from './scene-fleets'
 import { createOrbitRings } from './scene-rings'
 import { InstrumentShader } from './instrument-pass'
-import type { BoardCameraState, FrameData, PackedFleetInstance, PackedScene } from './contract'
+import { TUNED_LOOK } from './contract'
+import type { BoardCameraState, FrameData, PackedFleetInstance, PackedScene, Rgb } from './contract'
 
-// The tuned production defaults (Travis's 2026-08-11 settings): the effects
+// The tuned production defaults (TUNED_LOOK in ./contract): the effects
 // should make the board legible, not announce themselves. Constants, not spec
-// thresholds; the tuning bench overrides them through `settings`.
-const BLOOM_STRENGTH = 0.25
-const INSTRUMENT_AMOUNT = 0.15
+// thresholds; the tuning bench and dev panel override them through `settings`.
 // Threshold 0.78 is the load-bearing number: set so ONLY the star, the exhaust
 // and the brightest field stars clear it.
 const BLOOM_THRESHOLD = 0.78
@@ -48,6 +47,12 @@ export interface WebGLBoardSettings {
   bloom: number
   instrument: number
   starfield: boolean
+  // Live scene-look knobs (BoardTuning): star photosphere scale, a linear-RGB
+  // tint overriding the starClass colour (null = packed tint; it also drives
+  // the planets' rim light), and a size multiplier for every non-star body.
+  starScale: number
+  starTint: Rgb | null
+  bodyScale: number
 }
 
 export interface WebGLBoardProps {
@@ -130,7 +135,7 @@ export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, 
 
     const composer = new EffectComposer(renderer)
     composer.addPass(new RenderPass(world, cam))
-    const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM_STRENGTH, 0.4, BLOOM_THRESHOLD)
+    const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), TUNED_LOOK.bloom, 0.4, BLOOM_THRESHOLD)
     composer.addPass(bloom)
     const instrument = new ShaderPass(InstrumentShader)
     composer.addPass(instrument)
@@ -175,19 +180,20 @@ export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, 
       const s = settingsRef.current
       const f = getFrameRef.current(now)
 
-      bodies.update(f.bodyOffsets, f.fxTime, c.worldPerPixel)
+      const starTint = s?.starTint ?? null
+      bodies.update(f.bodyOffsets, f.fxTime, c.worldPerPixel, s?.bodyScale ?? TUNED_LOOK.bodyScale, starTint)
       fleetsVisual.update(f.fleets, f.fxTime, dt, c.worldPerPixel)
       lattice.update(f.fxTime, f.pulse, f.sensor, c.worldPerPixel)
       rings.update(f.selectedRing)
-      star?.update(f.fxTime, c.worldPerPixel)
+      star?.update(f.fxTime, c.worldPerPixel, s?.starScale ?? TUNED_LOOK.starScale, starTint)
       const wantStarfield = s?.starfield ?? true
       if (wantStarfield) starfield.update(f.fxTime, c.worldPerPixel)
       starfield.group.visible = wantStarfield
 
-      const bloomStrength = s?.bloom ?? BLOOM_STRENGTH
+      const bloomStrength = s?.bloom ?? TUNED_LOOK.bloom
       bloom.enabled = bloomStrength > 0
       bloom.strength = bloomStrength
-      const instrumentAmount = s?.instrument ?? INSTRUMENT_AMOUNT
+      const instrumentAmount = s?.instrument ?? TUNED_LOOK.instrument
       instrument.enabled = instrumentAmount > 0
       instrument.uniforms.uAmount!.value = instrumentAmount
       instrument.uniforms.uTime!.value = f.fxTime

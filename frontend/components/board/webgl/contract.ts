@@ -8,6 +8,13 @@
 
 export type Rgb = [number, number, number]
 
+// The tuned production look (Travis's 2026-08-11 settings; starScale retuned
+// 2026-08-24) — the one source of truth for the renderer's defaults, the
+// tuning bench's opening position, and the dev tuning panel's reset target.
+// Bloom's threshold is not here: it is a load-bearing renderer constant, not
+// a look preference.
+export const TUNED_LOOK = { bloom: 0.25, instrument: 0.15, starfield: true, starScale: 0.35, bodyScale: 1 } as const
+
 // One body's static instance data, resolved from the fogged feature by
 // packBodyInstance (outside webgl/). `fog` is the band → treatment decision,
 // already made: the shader consumes it without re-deriving any part of it.

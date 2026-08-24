@@ -56,18 +56,23 @@ station.
 - **WHEN** a system that is nobody's spawn home is read for its station
 - **THEN** no station is reported for that system
 
-### Requirement: Deterministic, Non-Core, Off-Gate-Ring, Orbiting Placement
+### Requirement: Deterministic, Non-Core, Off-Gate-Ring, Prograde, Orbiting Placement
 A station's board position SHALL be derived deterministically from its
-system id and no other volatile input: its orbital ring, initial angle,
-period, and direction SHALL be generated identically on every derivation
-(including a healed re-placement), SHALL never place it at the core, and
-SHALL never place its orbit on that system's lane-gate ring. The station
-SHALL orbit — it is not a fixed, non-moving feature — riding the same
-`board.OrbState` resolution any other orbiting feature uses, so a docked
-fleet's position and any burn-intercept solve against it use the existing
-orbiting-feature code path with no new intercept case (see design.md
-Decision 4; this reverses an earlier "fixed, not orbiting" draft of this
-requirement).
+system id and the live galaxy's seed, and no other volatile input: its
+orbital ring, initial angle, period, and direction SHALL be generated
+identically on every derivation (including a healed re-placement), SHALL
+never place it at the core, and SHALL never place its orbit on that
+system's lane-gate ring. Its direction SHALL NOT be rolled independently:
+it SHALL equal the system's dominant orbital direction — the direction
+every disk-born feature of that system's interior shares
+(`system-interior`'s "Coherent Orbital Direction") — computed as a pure
+function of the per-system seed, never by reading the materialized
+interior or the station store. The station SHALL orbit — it is not a
+fixed, non-moving feature — riding the same `board.OrbState` resolution
+any other orbiting feature uses, so a docked fleet's position and any
+burn-intercept solve against it use the existing orbiting-feature code
+path with no new intercept case (see design.md Decision 4; this reverses
+an earlier "fixed, not orbiting" draft of this requirement).
 
 #### Scenario: A healed re-derivation lands on the same orbit
 - **WHEN** a station's position is re-derived for the same system id (e.g.,
@@ -83,6 +88,12 @@ requirement).
 - **WHEN** a station's position is derived for any system id
 - **THEN** its orbital ring never coincides with that system's configured
   lane-gate ring
+
+#### Scenario: The station orbits prograde with its system's disk
+- **WHEN** a station's orbit is derived for any system
+- **THEN** its direction equals that system's dominant orbital direction —
+  the same direction the interior's skeleton bodies, belts, and hazards
+  share
 
 ### Requirement: Station Is a Dockable, Non-Mineable Board Feature
 A system's station SHALL appear in that system's board feature set as a
@@ -111,8 +122,9 @@ omitted from its features, rather than failing the entire interior read.
 The interior read has no market dependency today, and this splice SHALL
 NOT introduce one. A fleet already `docked` to a station SHALL resolve its
 position by recomputing the station's deterministic orbit from the system
-id directly (per "Deterministic, Non-Core, Off-Gate-Ring, Orbiting
-Placement") rather than by re-reading the station store, so an
+id and live galaxy seed directly (per "Deterministic, Non-Core,
+Off-Gate-Ring, Prograde, Orbiting Placement") rather than by re-reading
+the station store, so an
 already-docked fleet's position resolution never depends on station-store
 availability — only a fresh dock order or a fresh interior read does.
 

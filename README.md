@@ -52,6 +52,7 @@ cd frontend && npm run dev                 # localhost:3010
 | Infra patterns (Terraform, CI/CD, Pub/Sub, secrets) | [`infra/CLAUDE.md`](infra/CLAUDE.md) |
 | Bootstrap script + per-project values | [`bootstrap/README.md`](bootstrap/README.md) |
 | Onboarding probe | [`.claude/skills/onboard/SKILL.md`](.claude/skills/onboard/SKILL.md) |
+| Granting a user the admin claim | [`scripts/dev/admin/README.md`](scripts/dev/admin/README.md) |
 
 ## Adding a domain
 

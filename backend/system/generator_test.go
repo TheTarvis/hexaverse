@@ -99,6 +99,95 @@ func TestGenerate_HasBeltAndMoonRidesGiant(t *testing.T) {
 	}
 }
 
+func TestGenerate_DiskBornFeaturesShareDominantDirection(t *testing.T) {
+	// Skeleton majors, belts, and hazards are disk-born: within any one system
+	// they all orbit in the system's dominant direction, whatever the
+	// capture-plausible detail does.
+	for seed := int64(0); seed < 40; seed++ {
+		g := Generate(seed, "star_rich", sampleSkeleton(), DefaultParams())
+		dirs := map[int]bool{}
+		for _, f := range g.Features {
+			if f.Orbit == nil {
+				continue
+			}
+			switch f.Type {
+			case FeatureRocky, FeatureGasGiant, FeatureIce:
+				if len(f.Id) >= 9 && f.Id[:9] == "feat-body" {
+					dirs[f.Orbit.Dir] = true
+				}
+			case FeatureBelt, FeatureGravityWell, FeatureRadiation, FeatureNebula, FeatureDebris:
+				dirs[f.Orbit.Dir] = true
+			}
+		}
+		if len(dirs) != 1 {
+			t.Fatalf("seed %d: disk-born features split across directions %v", seed, dirs)
+		}
+	}
+}
+
+func TestGenerate_DominantDirectionVariesAcrossSystems(t *testing.T) {
+	// Half the galaxy's disks spin each way (viewed top-down): across a seed
+	// sweep both dominant directions must occur.
+	seen := map[int]bool{}
+	for seed := int64(0); seed < 40; seed++ {
+		g := Generate(seed, "normal", sampleSkeleton(), DefaultParams())
+		for _, f := range g.Features {
+			if f.Orbit != nil && len(f.Id) >= 9 && f.Id[:9] == "feat-body" {
+				seen[f.Orbit.Dir] = true
+				break
+			}
+		}
+	}
+	if !seen[1] || !seen[-1] {
+		t.Fatalf("dominant direction never varied across 40 seeds: %v", seen)
+	}
+}
+
+func TestGenerate_RetrogradeChanceKnob(t *testing.T) {
+	// The knob at 0 makes every orbit prograde; at 1 every capture-plausible
+	// detail feature (extra body, anomaly, ruin) runs against the dominant
+	// direction while disk-born features stay prograde.
+	for seed := int64(0); seed < 10; seed++ {
+		zero := DefaultParams()
+		zero.RetrogradeChance = 0
+		g := Generate(seed, "star_rich", sampleSkeleton(), zero)
+		dirs := map[int]bool{}
+		for _, f := range g.Features {
+			if f.Orbit != nil {
+				dirs[f.Orbit.Dir] = true
+			}
+		}
+		if len(dirs) != 1 {
+			t.Fatalf("seed %d: RetrogradeChance=0 still produced mixed directions %v", seed, dirs)
+		}
+
+		always := DefaultParams()
+		always.RetrogradeChance = 1
+		g = Generate(seed, "star_rich", sampleSkeleton(), always)
+		var sysDir int
+		for _, f := range g.Features {
+			if f.Orbit != nil && len(f.Id) >= 9 && f.Id[:9] == "feat-body" {
+				sysDir = f.Orbit.Dir
+				break
+			}
+		}
+		for _, f := range g.Features {
+			if f.Orbit == nil {
+				continue
+			}
+			switch f.Type {
+			case FeatureAnomaly, FeatureRuin:
+				if f.Orbit.Dir != -sysDir {
+					t.Fatalf("seed %d: %s should be retrograde at chance 1, got dir %d (sysDir %d)", seed, f.Id, f.Orbit.Dir, sysDir)
+				}
+			}
+			if len(f.Id) >= 10 && f.Id[:10] == "feat-extra" && f.Orbit.Dir != -sysDir {
+				t.Fatalf("seed %d: %s should be retrograde at chance 1, got dir %d (sysDir %d)", seed, f.Id, f.Orbit.Dir, sysDir)
+			}
+		}
+	}
+}
+
 func TestGenerate_CharacterDial_RichVsDead(t *testing.T) {
 	sk := sampleSkeleton()
 	rich := Generate(5, "star_rich", sk, DefaultParams())

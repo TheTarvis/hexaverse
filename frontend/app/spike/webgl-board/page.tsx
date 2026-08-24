@@ -21,7 +21,8 @@ import { buildMockSystemBoard } from './mock-board'
 import { FOG_TREATMENT, VOID } from '@/components/board/board-palette'
 import { createPackedScene, packFleetInstance } from '@/components/board/board-pack'
 import { createFramePacker } from '@/components/board/board-frame'
-import { useBoardProjection } from '@/components/board/use-board-projection'
+import { BOARD_TILT_DEG, useBoardProjection } from '@/components/board/use-board-projection'
+import { TUNED_LOOK } from '@/components/board/webgl/contract'
 import type { Character } from '../hex-board/mock-system'
 
 // three needs a GL context, so the renderer stays off the SSR path entirely.
@@ -83,12 +84,12 @@ export default function WebGLBoardSpikePage() {
   const [character, setCharacter] = useState<Character>('normal')
   const [seedTick, setSeedTick] = useState(0)
 
-  // Travis's tuned look (2026-08-11) — the PRODUCTION constants; the bench
-  // opens at them and lets you stray.
-  const [bloom, setBloom] = useState(0.25)
-  const [starfield, setStarfield] = useState(true)
-  const [instrument, setInstrument] = useState(0.15)
-  const [tiltDeg, setTiltDeg] = useState(14)
+  // Travis's tuned look (TUNED_LOOK / BOARD_TILT_DEG) — the PRODUCTION
+  // constants; the bench opens at them and lets you stray.
+  const [bloom, setBloom] = useState<number>(TUNED_LOOK.bloom)
+  const [starfield, setStarfield] = useState<boolean>(TUNED_LOOK.starfield)
+  const [instrument, setInstrument] = useState<number>(TUNED_LOOK.instrument)
+  const [tiltDeg, setTiltDeg] = useState<number>(BOARD_TILT_DEG)
   const [speed, setSpeed] = useState(0.5)
 
   const seed = 0x51a2c0de + seedTick * 7919

@@ -24,7 +24,8 @@ retrofit.
 - Add **`trading-station`**: an NPC-owned (`ownerCorpId` unset) station
   provisioned as a spawn-home asset — one per home system, idempotently, at
   a deterministic non-core, off-gate-ring, **orbiting** position (reversed
-  from an earlier "fixed" draft — see design.md Decision 4) — a dockable,
+  from an earlier "fixed" draft — see design.md Decision 4), prograde with
+  the system's dominant orbital direction — a dockable,
   non-mineable board feature visible on the very first board read (no scan
   required), gated below that by a configured minimum graph tier rather than
   sensor coverage. Splices into the system-interior read at the service

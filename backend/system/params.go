@@ -22,6 +22,12 @@ type GenerationParams struct {
 	InnerMaxRing int `json:"innerMaxRing" firestore:"innerMaxRing"`
 	MidMaxRing   int `json:"midMaxRing" firestore:"midMaxRing"`
 
+	// RetrogradeChance is the probability that a capture-plausible detail
+	// feature (extra small body, anomaly, ruin) orbits against the system's
+	// dominant direction. Disk-born features (skeleton majors, belts, hazards)
+	// always orbit prograde and ignore this knob.
+	RetrogradeChance float64 `json:"retrogradeChance" firestore:"retrogradeChance"`
+
 	// Orbital periods are NOT here: they're pacing, not generation, and are read
 	// live from common.Tuning().OrbitBasePeriod via PeriodFor (see model.go).
 
@@ -39,9 +45,10 @@ type GenerationParams struct {
 // only affects systems materialized afterwards.
 func DefaultParams() GenerationParams {
 	return GenerationParams{
-		Radius:       common.Tuning().BoardRadius,
-		InnerMaxRing: 5,
-		MidMaxRing:   11,
+		Radius:           common.Tuning().BoardRadius,
+		InnerMaxRing:     5,
+		MidMaxRing:       11,
+		RetrogradeChance: 0.1,
 		ByCharacter: map[string]CharacterDial{
 			"star_rich": {ExtraPlanets: 3, Belts: 2, Specials: 2, Hazards: 2, RichnessMult: 1.0},
 			"normal":    {ExtraPlanets: 1, Belts: 1, Specials: 1, Hazards: 1, RichnessMult: 0.65},

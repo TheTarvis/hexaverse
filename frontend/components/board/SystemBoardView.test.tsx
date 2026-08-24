@@ -39,6 +39,12 @@ vi.mock('@/hooks/use-fleets', () => ({
   useMyFleets: vi.fn(),
 }))
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
+// The admin claim gating the tuning panel (BoardTuning). NODE_ENV is 'test'
+// here, so the dev-build half of the gate is off and the claim alone decides.
+const adminState = vi.hoisted(() => ({ isAdmin: false }))
+vi.mock('@/components/account-provider', () => ({
+  useAccountContext: () => ({ isAdmin: adminState.isAdmin }),
+}))
 // Mock BoardCanvas ONLY (the one component that would reach three.js/GL):
 // BoardOverlay and useBoardProjection mount for real in jsdom, so every
 // structural assertion and glyph click below exercises the real hit layer.
@@ -171,6 +177,7 @@ describe('SystemBoardView', () => {
     vi.clearAllMocks()
     clock.now = 0
     guard.available = true
+    adminState.isAdmin = false
     mockOrders.mockReturnValue({
       order: { mutate: orderMutate, isPending: false },
       cancel: { mutate: cancelMutate, isPending: false },
@@ -247,6 +254,20 @@ describe('SystemBoardView', () => {
     expect(facts).toHaveTextContent('Class G system')
     // An own fleet is present, so the scan verb is offered.
     expect(screen.getByTestId('scan-button')).toBeInTheDocument()
+  })
+
+  it('offers the tuning panel to an admin, and hides it otherwise', () => {
+    // NODE_ENV is 'test' here, so the dev-build half of the gate is off and
+    // the admin claim alone decides.
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    fleetsState([ownFleet])
+    const { unmount } = render(<SystemBoardView systemId="sys-7" />)
+    expect(screen.queryByTestId('board-tuning-toggle')).not.toBeInTheDocument()
+    unmount()
+
+    adminState.isAdmin = true
+    render(<SystemBoardView systemId="sys-7" />)
+    expect(screen.getByTestId('board-tuning-toggle')).toBeInTheDocument()
   })
 
   it('toggles selection off on re-click, and a board click outside the lattice clears it', () => {

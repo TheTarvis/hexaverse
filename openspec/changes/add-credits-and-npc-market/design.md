@@ -280,8 +280,9 @@ require a station-store existence check (not every system has one). But a
 fleet already `docked` to a station got that way through a prior `Order`
 that already confirmed the station exists — existence is not in question
 again on every subsequent read. Since the station's geometry (ring, angle0,
-period, direction) is a pure, deterministic function of the system id
-alone (this decision's placement rule), **`Position` resolves an
+period, direction) is a pure, deterministic function of the system id and
+the live galaxy's seed — both non-volatile and available in-process, no
+store read (this decision's placement rule) — **`Position` resolves an
 already-docked-to-station fleet's live position by recomputing that
 deterministic orbit in-process, never by re-reading the station store** —
 so a station-store outage degrades new dock orders and fresh interior
@@ -304,9 +305,15 @@ The earlier draft justified a fixed (non-orbiting) station partly on
 now), nil }` for any feature carrying orbital elements — an orbiting
 station costs **zero new code** at that seam, only orbital elements
 (ring/angle0/period/direction) generated deterministically from the system
-id alongside the station's placement (Decision 4's other placement rule),
-the same discipline `corporations.Service.rimHex`'s account-seeded pick
-already uses. **Corrected: the station orbits**, keeping the game's world
+id and the live galaxy's seed alongside the station's placement (Decision
+4's other placement rule), the same discipline
+`corporations.Service.rimHex`'s account-seeded pick already uses. The
+direction is not an independent roll: it equals the system's dominant
+orbital direction (`system-interior`'s "Coherent Orbital Direction";
+confirmed by Travis 2026-08-24), computed as a pure function of the
+per-system seed — a station orbiting against its own disk in half of all
+systems would be the same unmotivated physics exception the fixed-station
+reversal below removed. **Corrected: the station orbits**, keeping the game's world
 feel consistent — every other board feature orbits or coasts; a fixed
 station would be the one physics exception with no mechanical reason to
 be one. Burn-intercept math against an orbiting station rides the same
@@ -1107,9 +1114,11 @@ Travis's confirmation — not silently resolved by fiat.)*
   This is now a pure world-feel call, not an engineering-cost trade-off:
   everything else on a board orbits or coasts; a fixed station would be
   the one physics exception. Flagged explicitly so Travis sees this as a
-  reversal of a prior answer, not a silent implementation detail —
-  confirm orbiting is the right call, or restate a reason to keep it
-  fixed that isn't the (now-disproven) computation-cost one.
+  reversal of a prior answer, not a silent implementation detail.
+  **Resolved 2026-08-24: Travis confirmed orbiting, and further tied the
+  station's direction to the system's dominant orbital direction** (the
+  prograde convention `system-interior`'s "Coherent Orbital Direction"
+  establishes) — the station rides the disk like every other feature.
 - **The dynamic per-request-quantity disclosure channel** (Decision 6,
   second half) — exact live request quantities let any `rumored`-tier
   observer read a rival's throughput/activity for free, distinct from the

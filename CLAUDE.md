@@ -46,7 +46,9 @@ conventions for that codebase. **Read the relevant one before working there.**
   `test:*`, `firebase:*`, `install:all`). Run `npm install` at the root once
   to get `concurrently` + `firebase-tools`. `.run/` holds JetBrains run
   configurations for these scripts; `scripts/dev/with-test-emulators.sh`
-  auto-starts/reuses the test emulators around e2e/integration runs.
+  auto-starts/reuses the test emulators around e2e/integration runs;
+  `scripts/dev/admin/` grants the `admin: true` Firebase custom claim (see
+  its README).
 - `backend/` — Go service. See `backend/CLAUDE.md` (domain package shape,
   handler→service→DAO layering, events, sentinel errors, emulator testing).
 - `frontend/` — Next.js app. See `frontend/CLAUDE.md` (component→hook→service→

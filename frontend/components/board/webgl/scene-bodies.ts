@@ -50,7 +50,16 @@ export function writeBodyInstance(buffers: BodyBuffers, i: number, packed: Packe
 export interface Bodies {
   mesh: THREE.Mesh
   // offsets: xy per body in GL world space, in the packed instance order.
-  update(offsets: Float32Array, fxTime: number, worldPerPixel: number): void
+  // bodyScale is the tuning panel's live size multiplier (planets, moons,
+  // belt chunks alike); starTint overrides the rim-light colour so the
+  // planets' atmospheres track a tuned star (null = the built-in warm white).
+  update(
+    offsets: Float32Array,
+    fxTime: number,
+    worldPerPixel: number,
+    bodyScale?: number,
+    starTint?: Rgb | null,
+  ): void
   dispose(): void
 }
 
@@ -90,6 +99,7 @@ export function createBodies(packed: PackedBody[]): Bodies {
     uniforms: {
       uTime: { value: 0 },
       uQuad: { value: QUAD },
+      uBodyScale: { value: 1 },
       uWorldPerPixel: { value: 1 },
       uStarTint: { value: new THREE.Color('#fff0cf') },
     },
@@ -102,6 +112,7 @@ export function createBodies(packed: PackedBody[]): Bodies {
       attribute vec4 aFog;
 
       uniform float uQuad;
+      uniform float uBodyScale;
 
       varying vec2 vUv;
       varying vec3 vColor;
@@ -127,7 +138,7 @@ export function createBodies(packed: PackedBody[]): Bodies {
         vec3 starView = (modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
         vLight = normalize(starView - center.xyz + vec3(0.0, 0.0, 1e-4));
 
-        vec4 mv = center + vec4(position.xy * aRadius * uQuad, 0.0, 0.0);
+        vec4 mv = center + vec4(position.xy * aRadius * uQuad * uBodyScale, 0.0, 0.0);
         gl_Position = projectionMatrix * mv;
       }
     `,
@@ -235,13 +246,21 @@ export function createBodies(packed: PackedBody[]): Bodies {
   mesh.frustumCulled = false
   mesh.renderOrder = RENDER_ORDER.bodies
 
+  // The built-in warm-white rim light — restored whenever no tint override
+  // rides the settings.
+  const baseStarTint = new THREE.Color('#fff0cf')
+
   return {
     mesh,
-    update(next, fxTime, worldPerPixel) {
+    update(next, fxTime, worldPerPixel, bodyScale = 1, starTint = null) {
       offsets.set(next.subarray(0, offsets.length))
       offsetAttr.needsUpdate = true
       mat.uniforms.uTime!.value = fxTime
       mat.uniforms.uWorldPerPixel!.value = worldPerPixel
+      mat.uniforms.uBodyScale!.value = bodyScale
+      const tintUniform = mat.uniforms.uStarTint!.value as THREE.Color
+      if (starTint) tintUniform.setRGB(starTint[0], starTint[1], starTint[2])
+      else tintUniform.copy(baseStarTint)
     },
     dispose() {
       geo.dispose()
@@ -254,7 +273,9 @@ export function createBodies(packed: PackedBody[]): Bodies {
 
 export interface Star {
   mesh: THREE.Mesh
-  update(fxTime: number, worldPerPixel: number): void
+  // scale multiplies the packed radius; tint overrides the starClass colour
+  // (null = the packed tint). Both are live tuning-panel knobs.
+  update(fxTime: number, worldPerPixel: number, scale?: number, tint?: Rgb | null): void
   dispose(): void
 }
 
@@ -337,11 +358,17 @@ export function createStar(radius: number, tint: Rgb): Star {
   mesh.frustumCulled = false
   mesh.renderOrder = RENDER_ORDER.surfaceFx
 
+  const baseTint = new THREE.Color(tint[0], tint[1], tint[2])
+
   return {
     mesh,
-    update(fxTime, worldPerPixel) {
+    update(fxTime, worldPerPixel, scale = 1, tintOverride = null) {
       mat.uniforms.uTime!.value = fxTime
       mat.uniforms.uWorldPerPixel!.value = worldPerPixel
+      mesh.scale.setScalar(radius * 4 * scale)
+      const tintUniform = mat.uniforms.uTint!.value as THREE.Color
+      if (tintOverride) tintUniform.setRGB(tintOverride[0], tintOverride[1], tintOverride[2])
+      else tintUniform.copy(baseTint)
     },
     dispose() {
       geo.dispose()

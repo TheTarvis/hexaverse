@@ -28,6 +28,7 @@ import { BoardOverlay, type ScanFxInput } from './BoardOverlay'
 import { createFramePacker } from './board-frame'
 import { createPackedScene, packFleetInstance } from './board-pack'
 import { useBoardProjection } from './use-board-projection'
+import type { WebGLBoardSettings } from './webgl/WebGLBoard'
 import type { MovePlan } from './move-preview'
 import type { ScanPlan } from './scan-preview'
 
@@ -59,6 +60,10 @@ export interface BoardStageProps {
   // Fires once the canvas has produced its first rendered frame — the
   // loading-state gate (task 6.1a).
   onFirstFrame?: () => void
+  // Dev-only look overrides (BoardTuning): renderer settings + camera tilt.
+  // Omitted in production — the renderer falls back to its tuned constants.
+  settings?: Partial<WebGLBoardSettings>
+  tiltDeg?: number
 }
 
 // useReducedMotion — the system reduced-motion preference, live.
@@ -92,11 +97,13 @@ export function BoardStage({
   scanFx,
   onAvailabilityChange,
   onFirstFrame,
+  settings,
+  tiltDeg,
 }: BoardStageProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState(true)
   const [hoverHex, setHoverHex] = useState<Hex | null>(null)
-  const projection = useBoardProjection(host, board.radius)
+  const projection = useBoardProjection(host, board.radius, tiltDeg !== undefined ? { tiltDeg } : undefined)
   const reducedMotion = useReducedMotion()
 
   // The packed scene — every decision resolved once per board read (band off
@@ -206,6 +213,7 @@ export function BoardStage({
               camera={projection.camera}
               getFrame={getFrame}
               onFirstFrame={onFirstFrame}
+              {...(settings ? { settings } : {})}
             />
           ) : null
         }

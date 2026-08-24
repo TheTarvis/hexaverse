@@ -79,11 +79,17 @@
       design.md Decision 4). `Orbit` carries ring/angle0/period/direction,
       the same shape `board.Orbit` already models for any orbiting feature.
 - [ ] 2.2 Deterministic, non-core, off-gate-ring **orbit** derivation from
-      `systemId` alone (hash-based, in the style of
-      `corporations.Service.rimHex`'s account-seeded pick): pick a ring
-      strictly between the core and the lane-gate ring, and derive
-      angle0/period/direction identically on every re-derivation. The
-      station orbits — it is not fixed (design.md Decision 4, reversed from
+      `systemId` + the live galaxy's seed and nothing volatile (hash-based
+      for ring/angle0, in the style of `corporations.Service.rimHex`'s
+      account-seeded pick): pick a ring strictly between the core and the
+      lane-gate ring, and derive angle0/period/direction identically on
+      every re-derivation. The **direction is not hashed**: it equals the
+      system's dominant orbital direction (`system-interior`'s "Coherent
+      Orbital Direction") — expose a small pure helper from `system` that
+      the interior generator itself uses for its dominant-direction roll
+      and reuse it here (single source of truth, so a generator draw-order
+      change can never silently diverge station vs. disk). The station
+      orbits — it is not fixed (design.md Decision 4, reversed from
       an earlier draft).
 - [ ] 2.3 Provisioning entry point callable from `corporations`' asset
       healing (task 3.x) — idempotent per system id, converges under
@@ -111,7 +117,8 @@
 - [ ] 2.8 Unit/integration tests: idempotent provisioning (fresh, repeat,
       healed-partial, two-corps-one-system); deterministic re-derivation of
       the full orbit (ring/angle0/period/direction), not just a hex; never
-      core, never on the gate ring; burn-to-station resolves docked, riding
+      core, never on the gate ring; direction equals the system's dominant
+      orbital direction; burn-to-station resolves docked, riding
       the station's live orbital position at read time; mine-at-station
       rejected; station spliced into the interior read only at/above the
       configured tier, omitted below it, with no scan involved; a

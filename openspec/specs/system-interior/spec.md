@@ -44,6 +44,35 @@ whose counts and resource richness are dialed by the region's character.
   live galaxy
 - **THEN** the call fails with `ErrNotFound`
 
+### Requirement: Coherent Orbital Direction
+The system SHALL roll one dominant orbital direction per system from the
+per-system seed (so both directions occur across the galaxy's systems) and
+SHALL assign it to every disk-born orbiting feature — skeleton-derived
+bodies, belts, and hazards. Capture-plausible detail features (extra small
+bodies, anomalies, ruins) SHALL each orbit retrograde (against the dominant
+direction) with the tuned `RetrogradeChance` probability and prograde
+otherwise, so a retrograde body reads as a rare captured object rather than
+generator noise.
+
+#### Scenario: Disk-born features share the dominant direction
+- **WHEN** an interior is generated
+- **THEN** every skeleton-derived body, belt, and hazard has the same
+  orbital direction
+
+#### Scenario: The dominant direction varies across systems
+- **WHEN** interiors are generated across many system seeds
+- **THEN** both orbital directions occur as the dominant direction
+
+#### Scenario: Zero retrograde chance yields a fully prograde system
+- **WHEN** an interior is generated with `RetrogradeChance` 0
+- **THEN** every orbiting feature shares the system's dominant direction
+
+#### Scenario: Certain retrograde chance inverts every capture-plausible feature
+- **WHEN** an interior is generated with `RetrogradeChance` 1
+- **THEN** every extra small body, anomaly, and ruin orbits against the
+  dominant direction, while skeleton bodies, belts, and hazards still orbit
+  in it
+
 ### Requirement: Concurrent First-Explore Resolves to One Interior
 The system SHALL claim interior materialization with an atomic
 create-if-absent write, so that two concurrent first requests for the same

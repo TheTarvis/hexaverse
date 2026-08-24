@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAccountContext } from '@/components/account-provider'
 import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import { toast } from '@/lib/toast'
@@ -23,6 +24,8 @@ import type { Hex, Target } from '@/lib/hex'
 import type { Fleet } from '@/lib/types/fleet'
 import { FleetRoster } from '@/components/fleet/FleetRoster'
 import { BoardStage } from './BoardStage'
+import { hexToRgb } from './board-pack'
+import { BoardTuning, type BoardLook } from './BoardTuning'
 import type { ScanFxInput } from './BoardOverlay'
 import { FactsPanel, type BoardSelection } from './FactsPanel'
 import {
@@ -53,6 +56,10 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const { data: fleets } = useFleetsInSystem(systemId)
   const worldTime = useWorldTime(board?.worldTime)
   const router = useRouter()
+  // The admin custom claim (set via scripts/dev/admin/set-admin-claims.js;
+  // requires a fresh sign-in to appear in the token) — unlocks the tuning
+  // panel in ANY environment. Dev builds get it unconditionally.
+  const { isAdmin } = useAccountContext()
 
   const [selection, setSelection] = useState<BoardSelection>(null)
   const [activeFleetId, setActiveFleetId] = useState<string | null>(null)
@@ -79,6 +86,31 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       window.localStorage.setItem(SCAN_FX_KEY, next)
       return next
     })
+
+  // The dev tuning panel's look override (null = the tuned constants). The
+  // panel itself mounts only in development builds; in production this stays
+  // null and BoardStage receives no override props at all.
+  const [look, setLook] = useState<BoardLook | null>(null)
+  const lookProps = useMemo(
+    () =>
+      look
+        ? {
+            settings: {
+              bloom: look.bloom,
+              instrument: look.instrument,
+              starfield: look.starfield,
+              starScale: look.starScale,
+              // The panel stores an sRGB hex; the GL contract speaks linear
+              // triples — hexToRgb is the same linearisation every packed
+              // colour goes through.
+              starTint: look.starTint ? hexToRgb(look.starTint) : null,
+              bodyScale: look.bodyScale,
+            },
+            tiltDeg: look.tiltDeg,
+          }
+        : {},
+    [look],
+  )
 
   const { order, cancel } = useFleetOrders(systemId)
   const scan = useScan(systemId)
@@ -397,6 +429,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
         scanFx={scanFxInput}
         onAvailabilityChange={setBoardAvailable}
         onFirstFrame={() => setFirstFrame(true)}
+        {...lookProps}
       />
 
       {/* Loading persists through the first rendered frame (task 6.1a) — but
@@ -448,6 +481,16 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           onDepart={commitDepart}
         />
       </div>
+
+      {/* Look tuning (the bench's knobs on live content) — always on in dev
+          builds, admin-claim-gated everywhere else. The claim is a Firebase
+          custom claim; the gate is cosmetic-only (no privileged reads ride
+          it), so client-side gating is enough. */}
+      {(isAdmin || process.env.NODE_ENV === 'development') && (
+        <div className="pointer-events-none absolute bottom-4 right-4">
+          <BoardTuning onChange={setLook} />
+        </div>
+      )}
     </div>
   )
 }
