@@ -64,6 +64,13 @@ variables:
 # folded into .backend-changes/.frontend-changes: those anchors are reused by
 # build-backend and deploy-backend-dev, so widening them would make a
 # fixture-only commit build and deploy the backend.
+#
+# The path filter is family-agnostic by design: it covers fixtures/board/**
+# (backend/board <-> frontend/lib/hex; openspec cross-stack-determinism) AND
+# fixtures/polar/** (backend/polar <-> frontend/lib/polar; openspec
+# polar-lattice-math — its Go and TS fixture suites run inside these same two
+# jobs, so no polar-specific anchor is needed and none should be added: a
+# second anchor with identical rules on identical jobs would be dead YAML).
 .fixtures-changes: &fixtures-changes
   changes:
     - fixtures/**/*

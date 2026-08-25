@@ -25,11 +25,16 @@
 # open defect. Never pragma a defect site — file it and register it.
 #
 # Scope: non-test .go files under the rule-bearing backend packages
-# (board, fleet, mine, galaxy, system, corporations, market — the packages
-# whose outputs are persisted values, solve results, ETAs, or disclosure
-# decisions) and non-test .ts files under frontend/lib/hex/. Test files are
-# skipped (they assert against fixtures and hold no rule logic). Comment-only
-# lines are skipped (prose naming Math.round is not a call site).
+# (board, polar, fleet, mine, galaxy, system, corporations, market — the
+# packages whose outputs are persisted values, solve results, ETAs, or
+# disclosure decisions) and non-test .ts files under frontend/lib/hex/ and
+# frontend/lib/polar/ (the two board-math mirrors; openspec
+# polar-lattice-math bars trig AND sqrt outright from the polar pair's
+# rule-bearing surface — stricter than the hex pair's pinned-sqrt allowance —
+# so the shared pattern below is a floor for it, not the full rule). Test
+# files are skipped (they assert against fixtures and hold no rule logic).
+# Comment-only lines are skipped (prose naming Math.round is not a call
+# site).
 #
 # NOTE: this lint is textual and SECONDARY — it cannot see FMA contraction
 # (a + b*c), the majority hazard class. The primary mechanisms are the
@@ -56,10 +61,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REGISTER="$REPO_ROOT/fixtures/determinism-register.json"
 
 # Scope: rule-bearing Go packages + the TS board-math mirror, production files only.
-if [[ "$FILE_PATH" =~ backend/(board|fleet|mine|galaxy|system|corporations|market)/.*\.go$ && ! "$FILE_PATH" =~ _test\.go$ ]]; then
+if [[ "$FILE_PATH" =~ backend/(board|polar|fleet|mine|galaxy|system|corporations|market)/.*\.go$ && ! "$FILE_PATH" =~ _test\.go$ ]]; then
     PATTERN='math\.(Sin|Cos|Tan|Asin|Acos|Atan|Atan2|Sinh|Cosh|Tanh|Asinh|Acosh|Atanh|Log|Log2|Log10|Log1p|Exp|Exp2|Expm1|Pow|Sqrt|Round)\('
     COMMENT_RE='^[0-9]+:[[:space:]]*(//)'
-elif [[ "$FILE_PATH" =~ frontend/lib/hex/.*\.ts$ && ! "$FILE_PATH" =~ \.test\.ts$ ]]; then
+elif [[ "$FILE_PATH" =~ frontend/lib/(hex|polar)/.*\.ts$ && ! "$FILE_PATH" =~ \.test\.ts$ ]]; then
     PATTERN='Math\.(sin|cos|tan|asin|acos|atan|atan2|sinh|cosh|tanh|asinh|acosh|atanh|log|log2|log10|log1p|exp|expm1|pow|sqrt|round)\('
     COMMENT_RE='^[0-9]+:[[:space:]]*(//|\*|/\*)'
 else

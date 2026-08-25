@@ -234,6 +234,20 @@ that finest-ring sampling under the realization actually specified here
 may cost nothing relative to mean-ring, contrary to the 27.3°-vs-16.5°
 comparison the row below shows. See the re-bench task (tasks.md 5.2) before
 this table's smoothness/length columns are relied on for Decision 3.**
+
+**Re-bench result (2026-08-25, tasks.md 5.2 — CONFIRMS the adversarial
+figure exactly).** The implemented production realization
+(`frontend/lib/polar` `arcPath`; Go parity fixture-pinned), scored on the
+bench's own quantized endpoints (`pointToCell` → `13:12 → 3:14`),
+projection, Chaikin ×3 smoothing, and `maxTurnDeg`: **32 cells, 12.63°
+smoothed max turn, 28.23 length** — against the spike's mean-ring float
+quantizer's 22 cells, 16.49°, 27.48 on the same endpoints. Finest-ring
+sampling under the specified realization costs NOTHING on this case
+relative to mean-ring — it measures 3.9° BETTER — so the 27.3°-vs-16.5°
+comparison in the table below is confirmed to describe only the spike's
+float quantizer, and the escalation framing ("answering Decision 3 might
+recover 16.5°") is withdrawn: Decision 3 is not urgent for that reason.
+
 The non-adjacent-paths column is unaffected by this caveat: round-2 of the
 adversarial review independently confirmed finest-ring sampling's zero
 non-adjacent pairs against the spec's own (not the spike's) adjacency
@@ -457,7 +471,13 @@ and leaves the value or algorithm open.
   might recover 16.5°" framing until the re-bench task (tasks.md 5.2)
   confirms or corrects it. If the re-bench confirms near-zero cost,
   answering this Decision may no longer be urgent for the reason
-  originally given.
+  originally given. **Re-benched 2026-08-25 (tasks.md 5.2): CONFIRMED —
+  the implemented production realization measures 12.63° smoothed max turn
+  on the bench's inbound-transfer case, 3.9° better than the spike's
+  mean-ring 16.49° on the same endpoints (see the re-bench result under
+  the per-cell-sample-count Decision). Answering this Decision is NOT
+  urgent for the originally given reason; it remains open on its own
+  merits only.**
 - **The adjacency predicate's doubling-boundary looseness (MAJOR-4 fork
   from round-2 review) — Travis's call, not resolved here.** The integer
   adjacency predicate `g × min(Sa, Sb) ≤ D` (Lattice Adjacency Is an

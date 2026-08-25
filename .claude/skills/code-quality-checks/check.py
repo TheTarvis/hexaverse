@@ -1048,7 +1048,10 @@ def run_determinism_cross_target() -> dict:
     """Cross-build-target determinism checks (openspec cross-stack-determinism).
 
     Three legs, in the enforcement order the capability's design.md ranks them:
-    1. The differential board-test run — the golden fixture must reproduce on
+    1. The differential fixture-suite run — the golden fixtures (board AND
+       polar; the polar suite's sweep digests re-enumerate the full bounded
+       domain, so this leg is an exhaustive cross-target diff for that
+       package, per openspec polar-lattice-math) must reproduce on
        GOARCH=amd64 GOAMD64=v1 (the non-contracting target; Rosetta locally,
        native on CI) alongside the native arch. GOAMD64 is pinned explicitly
        because v3+ emits FMA on amd64 too.
@@ -1067,25 +1070,25 @@ def run_determinism_cross_target() -> dict:
 
     reasons = []
 
-    print_info("Board fixture suite, native arch...")
-    native = run_command("go test ./board/ -short -count=1", cwd=backend_dir, check=False)
+    print_info("Board + polar fixture suites, native arch...")
+    native = run_command("go test ./board/ ./polar/ -short -count=1", cwd=backend_dir, check=False)
     if native.returncode == 0:
-        print_success("native arch board tests passed")
+        print_success("native arch board/polar tests passed")
     else:
-        print_error("native arch board tests failed")
-        reasons.append("native-arch board tests failed:\n" + native.stdout + native.stderr)
+        print_error("native arch board/polar tests failed")
+        reasons.append("native-arch board/polar tests failed:\n" + native.stdout + native.stderr)
 
-    print_info("Board fixture suite, GOARCH=amd64 GOAMD64=v1 (non-contracting target)...")
+    print_info("Board + polar fixture suites, GOARCH=amd64 GOAMD64=v1 (non-contracting target)...")
     amd64 = run_command(
-        "GOARCH=amd64 GOAMD64=v1 go test ./board/ -short -count=1",
+        "GOARCH=amd64 GOAMD64=v1 go test ./board/ ./polar/ -short -count=1",
         cwd=backend_dir, check=False
     )
     if amd64.returncode == 0:
-        print_success("amd64/GOAMD64=v1 board tests passed")
+        print_success("amd64/GOAMD64=v1 board/polar tests passed")
     else:
-        print_error("amd64/GOAMD64=v1 board tests failed")
+        print_error("amd64/GOAMD64=v1 board/polar tests failed")
         reasons.append(
-            "amd64/GOAMD64=v1 board tests failed (on Apple Silicon this leg needs "
+            "amd64/GOAMD64=v1 board/polar tests failed (on Apple Silicon this leg needs "
             "Rosetta 2 — `softwareupdate --install-rosetta`):\n" + amd64.stdout + amd64.stderr)
 
     print_info("Compiled-output FMA-contraction inspection (backend module, arm64 vs amd64/v1)...")
