@@ -1,4 +1,10 @@
 {
+  "_meta": {
+    "generatedOn": {
+      "goarch": "arm64"
+    },
+    "note": "_meta and layoutConstants were HAND-AUTHORED 2026-08-25 (no UPDATE_FIXTURES run \u2014 regenerating on arm64 while the line FMA defect is open would bake the contracting target's answers into the contract; see docs/defects/2026-08-25-line-fma-arch-divergence.md). layoutConstants IS machine-verified: both suites recompute and assert it. This stamp is not (excluded from comparison by design); the next legitimate regeneration rewrites _meta and this note disappears with it."
+  },
   "line": [
     {
       "from": {
@@ -1854,6 +1860,12 @@
           "r": -1
         }
       ]
+    }
+  ],
+  "layoutConstants": [
+    {
+      "name": "sqrt3",
+      "value": 1.7320508075688772
     }
   ]
 }

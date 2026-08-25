@@ -1,0 +1,199 @@
+{
+  "$comment": [
+    "The cross-stack-determinism capability's deviation register (openspec: cross-stack-determinism,",
+    "requirement 'The Capability's Deviation Register Bridges Known Violations Across Its Checks').",
+    "ONE register for the whole capability — no check maintains its own. Each entry admits a KNOWN,",
+    "FILED, not-yet-fixed violation past exactly the check(s) and site(s) it names, and nothing else.",
+    "",
+    "An entry is valid only while its referenced defect doc under docs/defects/ carries a",
+    "'**Status:** open' line. The change that fixes a defect flips that line to",
+    "'**Status:** fixed (<change-id>)' and REMOVES the entry here in the same commit — a stale entry",
+    "fails every check that consults it. Checks print this register's contents on every run.",
+    "",
+    "Entry shape: 'file' is repo-relative; 'checks' maps a check slug (see 'checks' legend) to the",
+    "line numbers it suppresses in that file ([] = suppression keyed on the named family/function,",
+    "not lines). 'magnitude' is 'unmeasured' or 'measured (<basis>)' — never a bare 'measured'.",
+    "Line numbers are load-bearing: if a site drifts, the consulting check fails until the entry is",
+    "updated, which keeps every suppression a reviewable diff."
+  ],
+  "capability": "cross-stack-determinism",
+  "checks": {
+    "cross-target": "Rule-Bearing Values Are Reproducible Across Build Targets of the Same Language — enforced by .claude/scripts/check-fma-contraction.sh (compiled-output FMADDD/FMSUBD inspection, arm64 vs amd64/GOAMD64=v1) and the amd64 differential board-test leg in /check",
+    "golden-fixture-sweep": "Shared Board Math Is Pinned By a Cross-Language Golden Fixture — the exhaustive-sweep clause; a listed family's sweep case is BLOCKED until its defect is fixed (recording it now would freeze one architecture's answers)",
+    "transcendental-drift": "Rule-Bearing Values Cross the Seam By Exact Arithmetic or By Discretization — enforced by .claude/scripts/check-transcendental.sh (textual lint: transcendentals, sqrt, bare Round)",
+    "sqrt-pinning": "Square Roots In Rules Are Pinned, Not Assumed — a runtime sqrt reaching a rule-bearing value with no fixture family pinning it",
+    "discretized-choice": "Inexact Arithmetic Is Rule-Bearing Only Through a Discretized, Tie-Broken Choice"
+  },
+  "entries": [
+    {
+      "site": "board.Line via lerp (hex.go:73) and roundf (hex.go:93,95)",
+      "file": "backend/board/hex.go",
+      "family": "line",
+      "checks": { "cross-target": [73, 93, 95], "golden-fixture-sweep": [] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-line-fma-arch-divergence.md",
+      "magnitude": "measured (exhaustive: 2,160/109,561 radius-10 ordered hex pairs diverge, Go/arm64 vs Go/amd64; amd64 matches the TypeScript mirror)"
+    },
+    {
+      "site": "board.RouteAround (calls Line)",
+      "file": "backend/board/route.go",
+      "family": "routeAround",
+      "checks": { "golden-fixture-sweep": [] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-line-fma-arch-divergence.md",
+      "magnitude": "unmeasured (inherits Line's divergence transitively; not separately swept)"
+    },
+    {
+      "site": "board.BeamHexes (Line spine)",
+      "file": "backend/board/visibility.go",
+      "family": "beam",
+      "checks": { "golden-fixture-sweep": [] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-line-fma-arch-divergence.md",
+      "magnitude": "unmeasured (inherits Line)"
+    },
+    {
+      "site": "board.LineOfSight (Line spine; decides disclosure)",
+      "file": "backend/board/visibility.go",
+      "family": "lineOfSight",
+      "checks": { "golden-fixture-sweep": [] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-line-fma-arch-divergence.md",
+      "magnitude": "unmeasured (inherits Line)",
+      "note": "Also decides what a client may see — add the discretized-choice check to this entry if the post-fix sweep confirms a divergence (task 6.1)."
+    },
+    {
+      "site": "board.SolveHex (inherits Line via RouteAround)",
+      "file": "backend/board/intercept.go",
+      "family": "solveHex",
+      "checks": {},
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-line-fma-arch-divergence.md",
+      "magnitude": "unmeasured (inherits Line; own domain has unbounded time axes, so not sweep-eligible — no automated check to bridge today; recorded because the spec counts it as under an open cross-target divergence defect)"
+    },
+    {
+      "site": "board.SolveIntercept (inherits Line via RouteAround)",
+      "file": "backend/board/intercept.go",
+      "family": "solveIntercept",
+      "checks": {},
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-line-fma-arch-divergence.md",
+      "magnitude": "unmeasured (inherits Line; not sweep-eligible — see the SolveHex entry)"
+    },
+    {
+      "site": "board.hexDirection (gate.go:54) — FMA contraction in the scale expression",
+      "file": "backend/board/gate.go",
+      "checks": { "cross-target": [54] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-line-fma-arch-divergence.md",
+      "magnitude": "unmeasured",
+      "note": "The textual math.Sqrt(3) on the same line is a sanctioned discretized-choice input and carries a determinism:allow pragma — the pragma covers the lint; this entry covers the compiled FMA."
+    },
+    {
+      "site": "fleet.legMs (routing.go:187) / fleet.laneLength (routing.go:196) — persisted lane-leg ETAs",
+      "file": "backend/fleet/routing.go",
+      "checks": { "cross-target": [196], "sqrt-pinning": [196], "transcendental-drift": [187, 196] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-lane-eta-arch-divergence.md",
+      "magnitude": "unmeasured (no sweep of real galaxy coordinates across both architectures has been run)",
+      "note": "One site, three checks bridged (defect doc §1–3): FMA contraction in laneLength; runtime math.Sqrt with no fixture family (Go-only mirror — Go-side fixture obligation per design.md); bare math.Round into the persisted ETA."
+    },
+    {
+      "site": "galaxy.Generate coordinate/acceptance math (generator.go) — persisted galaxy coordinates",
+      "file": "backend/galaxy/generator.go",
+      "checks": { "cross-target": [83, 136, 224], "transcendental-drift": [131, 134, 135, 224] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-galaxy-generation-arch-divergence.md",
+      "magnitude": "measured (60-seed arm64-vs-amd64 sample: system ids, regions, lane counts and lane topology identical 60/60; only coordinates differ, in the low bits — 18/960 at three sampled seeds, one ULP each; a sample is an observation, not a proof, and structural stability is unproven)",
+      "note": "Compounds with the fleet.legMs entry via laneLength. cross-target lines are the compiled FMA sites; transcendental-drift lines are the textual trig/sqrt call sites — different lines by nature."
+    },
+    {
+      "site": "system interior anomaly-special richness (generator.go:88)",
+      "file": "backend/system/generator.go",
+      "checks": { "cross-target": [88] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "system interior ruin-special richness (generator.go:90)",
+      "file": "backend/system/generator.go",
+      "checks": { "cross-target": [90] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "system interior belt richness — the primary mineable lode (generator.go:186)",
+      "file": "backend/system/generator.go",
+      "checks": { "cross-target": [186] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "system interior shared rich() helper (generator.go:238)",
+      "file": "backend/system/generator.go",
+      "checks": { "cross-target": [238] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "corporation spawn site-scoring (siteselection.go:54)",
+      "file": "backend/corporations/siteselection.go",
+      "checks": { "cross-target": [54] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "corporation spawn site-scoring (siteselection.go:159)",
+      "file": "backend/corporations/siteselection.go",
+      "checks": { "cross-target": [159] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "NPC market demand provisioning price math (provisioning.go:35)",
+      "file": "backend/market/provisioning.go",
+      "checks": { "cross-target": [35] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "NPC market demand provisioning price math (provisioning.go:38)",
+      "file": "backend/market/provisioning.go",
+      "checks": { "cross-target": [38] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "mine remainingAtNow fold — across-statement FMA fusion (service.go:187)",
+      "file": "backend/mine/service.go",
+      "checks": { "cross-target": [187] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "mine run ETA — bare math.Round (service.go:224)",
+      "file": "backend/mine/service.go",
+      "checks": { "transcendental-drift": [224] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    },
+    {
+      "site": "fleet per-tile pace — bare math.Round (service.go:117)",
+      "file": "backend/fleet/service.go",
+      "checks": { "transcendental-drift": [117] },
+      "filed": "2026-08-25",
+      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
+      "magnitude": "unmeasured"
+    }
+  ]
+}

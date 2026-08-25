@@ -57,6 +57,17 @@ variables:
     - claude-agent/**/*
     - .gitlab-ci.yml
 
+# Fixture-contract changes: the cross-language golden files and their
+# governance artifacts (openspec cross-stack-determinism — a fixture-only
+# commit must still run BOTH language fixture suites). This anchor gates ONLY
+# the two fixture-suite jobs (test-backend, test-frontend). Deliberately NOT
+# folded into .backend-changes/.frontend-changes: those anchors are reused by
+# build-backend and deploy-backend-dev, so widening them would make a
+# fixture-only commit build and deploy the backend.
+.fixtures-changes: &fixtures-changes
+  changes:
+    - fixtures/**/*
+
 # =============================================================================
 # Environment Configuration (YAML Anchors)
 # =============================================================================
@@ -192,6 +203,11 @@ test-frontend:
       <<: *frontend-changes
     - if: '$CI_COMMIT_BRANCH == "main"'
       <<: *frontend-changes
+    # Fixture-suite job: also runs on fixture-only commits (see .fixtures-changes)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *fixtures-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *fixtures-changes
   cache:
     key: ${CI_COMMIT_REF_SLUG}-frontend
     paths:
@@ -200,6 +216,10 @@ test-frontend:
     - cd frontend
     - npm ci --cache .npm --prefer-offline
     - npm run test:run -- --reporter=basic --silent
+    # Golden fixtures are re-recorded only as a reviewable diff in a change's
+    # own commits — never as an uncommitted or pipeline-generated side effect
+    # (openspec cross-stack-determinism).
+    - cd "$CI_PROJECT_DIR" && git diff --exit-code -- fixtures/
   # coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
   artifacts:
     when: always
@@ -224,6 +244,11 @@ test-backend:
       <<: *backend-changes
     - if: '$CI_COMMIT_BRANCH == "main"'
       <<: *backend-changes
+    # Fixture-suite job: also runs on fixture-only commits (see .fixtures-changes)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      <<: *fixtures-changes
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      <<: *fixtures-changes
   cache:
     - key: firebase-emulators
       paths:
@@ -302,10 +327,35 @@ test-backend:
     
     - go test ./... -count=1 -parallel 5 -timeout 70s
 
+    # Cross-target determinism matrix (openspec cross-stack-determinism, "The
+    # Golden Fixture Reproduces On Every Build Target"). This runner is amd64
+    # (pinned by tags below/above); GOAMD64=v1 is pinned EXPLICITLY because
+    # v3+ emits fused multiply-add on amd64, silently making this the
+    # contracting target the check exists to catch.
+    - GOAMD64=v1 go test ./board/ -short -count=1
+    # arm64 leg: runs under qemu-user when TEST_RUNNER_IMAGE provides it
+    # (infra/docker/test-runner.Dockerfile installs qemu-user-static; rebuild
+    # via infra/docker/build-test-runner.sh). Until that image is live, this
+    # leg is asserted only by the local /check gate — a deliberate, STATED
+    # downgrade printed here, per the spec's explicit downgrade of this leg.
+    - |
+      QEMU=$(command -v qemu-aarch64-static || command -v qemu-aarch64 || true)
+      if [ -n "$QEMU" ]; then
+        CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/board-arm64.test ./board/
+        (cd board && "$QEMU" /tmp/board-arm64.test -test.short -test.count=1)
+      else
+        echo "arm64 fixture leg SKIPPED: TEST_RUNNER_IMAGE lacks qemu-user (rebuild it per infra/docker) — leg asserted by the local /check gate only"
+      fi
+
     # Dependency vulnerability scan (govulncheck baked into test-runner image).
     # Fails only on vulnerabilities that are actually reachable from application
     # code paths — not on unreachable imports. Satisfies CASA T3 / ASVS V14.2.
     - govulncheck ./...
+
+    # Golden fixtures are re-recorded only as a reviewable diff in a change's
+    # own commits — never as an uncommitted or pipeline-generated side effect
+    # (openspec cross-stack-determinism).
+    - cd "$CI_PROJECT_DIR" && git diff --exit-code -- fixtures/
   after_script:
     # Clean up emulators
     - kill $EMULATOR_PID || true

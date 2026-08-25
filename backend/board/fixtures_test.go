@@ -2,9 +2,11 @@ package board
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"hexaverse/common"
@@ -75,16 +77,42 @@ type beamCase struct {
 	Hexes  []Hex      `json:"hexes"`
 }
 
+// layoutConstCase pins a raw layout constant as the identical 64-bit float on
+// both sides of the seam — sqrt(3) is asserted, not assumed, because ECMAScript
+// specifies Math.sqrt as implementation-approximated, so equality with Go's
+// correctly-rounded math.Sqrt is an observation about today's engines, not a
+// guarantee (openspec cross-stack-determinism, sqrt-pinning requirement).
+type layoutConstCase struct {
+	Name  string  `json:"name"`
+	Value float64 `json:"value"`
+}
+
+// fixtureMeta records the build target the fixture file was generated on
+// (openspec cross-stack-determinism: "The fixture records its recording
+// provenance"). Excluded from the golden comparison below — the recorded
+// CASES must reproduce on every target; the stamp says where they were
+// recorded, which by design differs from where they are asserted.
+type fixtureMeta struct {
+	GeneratedOn generatedOn `json:"generatedOn"`
+}
+
+type generatedOn struct {
+	GOARCH  string `json:"goarch"`
+	GOAMD64 string `json:"goamd64,omitempty"`
+}
+
 type fixtures struct {
-	Line           []lineCase    `json:"line"`
-	RouteAround    []routeCase   `json:"routeAround"`
-	OrbState       []orbCase     `json:"orbState"`
-	SolveHex       []solveCase   `json:"solveHex"`
-	SolveIntercept []solveCase   `json:"solveIntercept"`
-	LaneGate       []gateCase    `json:"laneGate"`
-	StateAt        []stateAtCase `json:"stateAt"`
-	LineOfSight    []losCase     `json:"lineOfSight"`
-	Beam           []beamCase    `json:"beam"`
+	Meta            *fixtureMeta      `json:"_meta,omitempty"`
+	Line            []lineCase        `json:"line"`
+	RouteAround     []routeCase       `json:"routeAround"`
+	OrbState        []orbCase         `json:"orbState"`
+	SolveHex        []solveCase       `json:"solveHex"`
+	SolveIntercept  []solveCase       `json:"solveIntercept"`
+	LaneGate        []gateCase        `json:"laneGate"`
+	StateAt         []stateAtCase     `json:"stateAt"`
+	LineOfSight     []losCase         `json:"lineOfSight"`
+	Beam            []beamCase        `json:"beam"`
+	LayoutConstants []layoutConstCase `json:"layoutConstants"`
 }
 
 // computeFixtures builds the golden cases from the current board implementation.
@@ -271,6 +299,12 @@ func computeFixtures() fixtures {
 		})
 	}
 
+	// The pointy-top layout's root-three constant (hexDirection's scale, the
+	// lane-gate bearing basis) — recorded raw because hexDirection is unexported
+	// on both sides. math.Sqrt is correctly rounded (arch-independent in Go);
+	// the TS suite asserts Math.sqrt(3) reproduces the identical float.
+	f.LayoutConstants = []layoutConstCase{{Name: "sqrt3", Value: math.Sqrt(3)}}
+
 	return f
 }
 
@@ -281,6 +315,13 @@ func TestFixtures_MatchGolden(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(fixturesPath), 0o755); err != nil {
 			t.Fatal(err)
 		}
+		// Provenance stamp: the build target this regeneration ran on. NEVER
+		// regenerate on a contracting target (arm64) while the line FMA defect
+		// is open — see docs/defects/2026-08-25-line-fma-arch-divergence.md.
+		computed.Meta = &fixtureMeta{GeneratedOn: generatedOn{
+			GOARCH:  runtime.GOARCH,
+			GOAMD64: os.Getenv("GOAMD64"),
+		}}
 		data, _ := json.MarshalIndent(computed, "", "  ")
 		if err := os.WriteFile(fixturesPath, append(data, '\n'), 0o644); err != nil {
 			t.Fatal(err)
@@ -297,6 +338,10 @@ func TestFixtures_MatchGolden(t *testing.T) {
 	if err := json.Unmarshal(raw, &golden); err != nil {
 		t.Fatalf("unmarshal golden: %v", err)
 	}
+	// The provenance stamp is where the file was RECORDED; this assert runs on
+	// every target in the build matrix, so the stamp must not participate in
+	// the comparison or every cross-arch run would fail on the stamp itself.
+	golden.Meta = nil
 	if !reflect.DeepEqual(golden, computed) {
 		t.Fatal("board output drifted from committed /fixtures/board/cases.json — " +
 			"if intentional, regenerate with UPDATE_FIXTURES=1 (and update the TS side)")

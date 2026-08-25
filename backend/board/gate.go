@@ -32,12 +32,12 @@ func LaneGateHex(selfX, selfY, neighborX, neighborY float64, radius int) Hex {
 	if radius <= 0 {
 		return Hex{0, 0}
 	}
-	bearing := math.Atan2(neighborY-selfY, neighborX-selfX)
+	bearing := math.Atan2(neighborY-selfY, neighborX-selfX) // determinism:allow(discretized)
 	best := Hex{}
 	bestDelta := math.MaxFloat64
 	for _, h := range RingHexes(GateRing(radius)) {
 		hx, hy := hexDirection(h)
-		delta := angleDelta(math.Atan2(hy, hx), bearing)
+		delta := angleDelta(math.Atan2(hy, hx), bearing) // determinism:allow(discretized)
 		if delta < bestDelta {
 			bestDelta = delta
 			best = h
@@ -51,7 +51,7 @@ func LaneGateHex(selfX, selfY, neighborX, neighborY float64, radius int) Hex {
 // the screen-down y negated so galactic-north maps to the top of the board. Only
 // the direction matters, so the render scale (HEX_SIZE) is dropped.
 func hexDirection(h Hex) (x, y float64) {
-	return math.Sqrt(3) * (float64(h.Q) + float64(h.R)/2), -1.5 * float64(h.R)
+	return math.Sqrt(3) * (float64(h.Q) + float64(h.R)/2), -1.5 * float64(h.R) // determinism:allow(discretized)
 }
 
 // angleDelta is the absolute smallest angle between two bearings, in [0, π].

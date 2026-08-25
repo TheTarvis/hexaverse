@@ -212,6 +212,80 @@ def run_raw_fetch_check(file_path: str) -> Optional[dict]:
     return run_check_script("check-raw-fetch.sh", file_path)
 
 
+def run_transcendental_check(file_path: str) -> Optional[dict]:
+    """Run the cross-stack determinism transcendental lint on a single file."""
+    return run_check_script("check-transcendental.sh", file_path)
+
+
+# The Go packages whose outputs are rule-bearing (persisted values, solve
+# results, ETAs, disclosure decisions) — the transcendental lint's scope gate.
+# Must match check-transcendental.sh's own gate.
+DETERMINISM_GO_PACKAGES = ("board", "fleet", "mine", "galaxy", "system", "corporations", "market")
+
+
+def print_deviation_register():
+    """Print the capability's deviation register (openspec cross-stack-
+    determinism): every check that consults it prints it, so a suppressed
+    violation is visible in the check's own output."""
+    register_path = Path.cwd() / "fixtures" / "determinism-register.json"
+    if not register_path.exists():
+        print_warning("Deviation register not found (fixtures/determinism-register.json)")
+        return
+    try:
+        register = json.loads(register_path.read_text())
+    except json.JSONDecodeError as e:
+        print_error(f"Deviation register is not valid JSON: {e}")
+        return
+    entries = register.get("entries", [])
+    print_info(f"Deviation register: {len(entries)} open-defect entrie(s) (fixtures/determinism-register.json)")
+    for e in entries:
+        checks = ",".join(sorted(e.get("checks", {}).keys())) or "-"
+        print(f"    [{checks}] {e.get('site')}")
+        print(f"        defect: {e.get('defect')}  filed: {e.get('filed')}  magnitude: {e.get('magnitude')}")
+
+
+def check_transcendental(files: List[str]) -> dict:
+    """Cross-stack determinism lint (secondary, textual): transcendental /
+    sqrt / bare-Round calls in the rule-bearing Go packages and the TS
+    board-math mirror must carry a reviewed determinism:allow pragma or be
+    named in the deviation register. See openspec cross-stack-determinism."""
+    print_header("Checking Determinism Seam (transcendental lint)")
+
+    seam_files = [
+        f for f in files
+        if (any(f.startswith(str(Path.cwd() / "backend" / pkg) + os.sep) for pkg in DETERMINISM_GO_PACKAGES)
+            and f.endswith(".go"))
+        or (f.startswith(str(Path.cwd() / "frontend" / "lib" / "hex") + os.sep) and f.endswith(".ts"))
+    ]
+
+    if not seam_files:
+        print_info("No determinism-governed files to check")
+        return {"total": 0, "passed": 0, "failed": 0, "failures": []}
+
+    print_deviation_register()
+    print_info(f"Checking {len(seam_files)} file(s)...")
+
+    results = {
+        "total": len(seam_files),
+        "passed": 0,
+        "failed": 0,
+        "failures": []
+    }
+
+    for file in seam_files:
+        result = run_transcendental_check(file)
+        if result:
+            if result["passed"]:
+                results["passed"] += 1
+                print_success(f"{Path(file).relative_to(Path.cwd())}")
+            else:
+                results["failed"] += 1
+                results["failures"].append(result)
+                print_error(f"{Path(file).relative_to(Path.cwd())}")
+
+    return results
+
+
 def check_datatestid(files: List[str]) -> dict:
     """Run data-testid checks on the provided files."""
     print_header("Checking for data-testid Attributes")
@@ -970,6 +1044,105 @@ def check_color_compliance(files: List[str], semantic: bool = False) -> dict:
         return {"total": len(frontend_files), "passed": 0, "failed": 0, "failures": []}
 
 
+def run_determinism_cross_target() -> dict:
+    """Cross-build-target determinism checks (openspec cross-stack-determinism).
+
+    Three legs, in the enforcement order the capability's design.md ranks them:
+    1. The differential board-test run — the golden fixture must reproduce on
+       GOARCH=amd64 GOAMD64=v1 (the non-contracting target; Rosetta locally,
+       native on CI) alongside the native arch. GOAMD64 is pinned explicitly
+       because v3+ emits FMA on amd64 too.
+    2. Compiled-output FMA inspection over the whole backend module
+       (check-fma-contraction.sh) — the primary mechanism; consults and
+       prints the deviation register.
+    3. The deployed-build pin check: backend/Dockerfile must pin GOARCH and an
+       explicit, non-contracting GOAMD64 level. Fails when the pin is absent.
+    """
+    print_header("Determinism Cross-Target (build-target matrix)")
+
+    backend_dir = Path.cwd() / "backend"
+    if not backend_dir.exists():
+        print_warning("Backend directory not found, skipping")
+        return {"passed": True, "skipped": True}
+
+    reasons = []
+
+    print_info("Board fixture suite, native arch...")
+    native = run_command("go test ./board/ -short -count=1", cwd=backend_dir, check=False)
+    if native.returncode == 0:
+        print_success("native arch board tests passed")
+    else:
+        print_error("native arch board tests failed")
+        reasons.append("native-arch board tests failed:\n" + native.stdout + native.stderr)
+
+    print_info("Board fixture suite, GOARCH=amd64 GOAMD64=v1 (non-contracting target)...")
+    amd64 = run_command(
+        "GOARCH=amd64 GOAMD64=v1 go test ./board/ -short -count=1",
+        cwd=backend_dir, check=False
+    )
+    if amd64.returncode == 0:
+        print_success("amd64/GOAMD64=v1 board tests passed")
+    else:
+        print_error("amd64/GOAMD64=v1 board tests failed")
+        reasons.append(
+            "amd64/GOAMD64=v1 board tests failed (on Apple Silicon this leg needs "
+            "Rosetta 2 — `softwareupdate --install-rosetta`):\n" + amd64.stdout + amd64.stderr)
+
+    print_info("Compiled-output FMA-contraction inspection (backend module, arm64 vs amd64/v1)...")
+    fma = run_command("bash .claude/scripts/check-fma-contraction.sh", check=False)
+    print(fma.stdout, end="")
+    if fma.returncode == 0:
+        print_success("FMA-contraction check passed")
+    else:
+        print_error("FMA-contraction check failed")
+        reasons.append("FMA-contraction check failed (see output above)")
+
+    print_info("Deployed-build target pin (backend/Dockerfile)...")
+    dockerfile = backend_dir / "Dockerfile"
+    if not dockerfile.exists():
+        print_error("backend/Dockerfile not found — the deployed build target is unpinned")
+        reasons.append(
+            "backend/Dockerfile is missing: the deployed backend's GOARCH/GOAMD64 is whatever "
+            "the build image defaults to. Pin GOARCH and an explicit non-contracting GOAMD64 "
+            "(v1) in the Dockerfile (openspec cross-stack-determinism: an unpinned GOAMD64 "
+            "build target is out of compliance).")
+    else:
+        content = dockerfile.read_text()
+        import re
+        if not re.search(r'GOAMD64=v\d', content):
+            print_error("backend/Dockerfile has no explicit GOAMD64 pin")
+            reasons.append(
+                "backend/Dockerfile does not pin GOAMD64: GOAMD64=v3+ emits FMA on amd64 too, "
+                "silently turning production into a contracting target while every stated check "
+                "still passes. Pin GOAMD64=v1 (or another level verified non-contracting via "
+                "-gcflags=-S) in the build stage.")
+        elif not re.search(r'GOARCH=\w+', content):
+            print_error("backend/Dockerfile has no explicit GOARCH pin")
+            reasons.append("backend/Dockerfile does not pin GOARCH — the deployed architecture "
+                           "must be a committed, reviewable value.")
+        else:
+            print_success("backend/Dockerfile pins GOARCH and GOAMD64 explicitly")
+
+    if reasons:
+        return {"passed": False, "reason": "\n\n".join(reasons)}
+    return {"passed": True}
+
+
+def run_mirror_map_check() -> dict:
+    """Mirror-map coverage check (openspec cross-stack-determinism): every
+    function defined in both backend/board and frontend/lib/hex must be named
+    in fixtures/board/mirror-map.json and be fixture-covered or inventoried."""
+    print_header("Checking Determinism Mirror Map Coverage")
+
+    result = run_command("bash .claude/scripts/check-mirror-map.sh", check=False)
+    print(result.stdout, end="")
+    if result.returncode == 0:
+        print_success("Mirror map coverage check passed")
+        return {"passed": True}
+    print_error("Mirror map coverage check failed")
+    return {"passed": False, "reason": "Mirror map coverage check failed (see output above)"}
+
+
 def print_summary(results: dict):
     """Print summary of check results."""
     print_header("Check Summary")
@@ -982,7 +1155,8 @@ def print_summary(results: dict):
         "frontend_tests_coverage": "Frontend Test Coverage",
         "raw_fetch": "Raw fetch() in Services",
         "python_tests": "Python Test Coverage",
-        "color_compliance": "Color Compliance"
+        "color_compliance": "Color Compliance",
+        "transcendental": "Determinism Seam (transcendental)"
     }
 
     # Suite-based checks (lint, tests)
@@ -993,6 +1167,8 @@ def print_summary(results: dict):
         "frontend_tests": "Frontend Tests",
         "frontend_e2e": "Frontend E2E Tests",
         "backend_tests_suite": "Backend Tests",
+        "determinism_cross_target": "Determinism Cross-Target (build matrix)",
+        "mirror_map": "Determinism Mirror Map",
         "agent_lint": "Agent Lint",
         "agent_tests": "Agent Tests"
     }
@@ -1182,6 +1358,7 @@ def main():
     # Determine which files to check (for file-based checks)
     run_file_checks = args.files_only or run_all_checks or not (args.lint or args.frontend_tests or args.backend_tests or args.e2e)
 
+    files: List[str] = []
     if run_file_checks:
         if args.all:
             print_info(f"Checking all files in: {args.all}")
@@ -1213,6 +1390,9 @@ def main():
 
             # Check 7: Color palette compliance
             results["color_compliance"] = check_color_compliance(files, semantic=args.semantic)
+
+            # Check 8: Cross-stack determinism (transcendental lint)
+            results["transcendental"] = check_transcendental(files)
         elif not (args.lint or args.frontend_tests or args.backend_tests or args.run_all):
             print_warning("No files to check")
             return
@@ -1232,6 +1412,28 @@ def main():
 
     if args.backend_tests or run_all_checks:
         results["backend_tests_suite"] = run_backend_tests_suite()
+
+    # Determinism cross-target matrix: runs alongside the native-arch board
+    # tests (not an opt-in extra step — openspec cross-stack-determinism).
+    # Also triggered in file-based-only runs when the change touches
+    # backend/board or fixtures/, which is the surface the matrix pins.
+    determinism_trigger = args.backend_tests or run_all_checks or any(
+        f.startswith(str(Path.cwd() / "backend" / "board") + os.sep)
+        or f.startswith(str(Path.cwd() / "fixtures") + os.sep)
+        for f in files
+    )
+    if determinism_trigger:
+        results["determinism_cross_target"] = run_determinism_cross_target()
+
+    # Mirror-map coverage: any change touching either mirror or the fixtures.
+    mirror_trigger = run_all_checks or any(
+        f.startswith(str(Path.cwd() / "backend" / "board") + os.sep)
+        or f.startswith(str(Path.cwd() / "frontend" / "lib" / "hex") + os.sep)
+        or f.startswith(str(Path.cwd() / "fixtures") + os.sep)
+        for f in files
+    )
+    if mirror_trigger:
+        results["mirror_map"] = run_mirror_map_check()
 
     # E2E runs in --run-all/default too, but best-effort: it needs the local dev
     # stack and takes minutes, so when the stack is down it's skipped (not failed)

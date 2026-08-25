@@ -29,12 +29,12 @@ export function laneGateHex(
   radius: number,
 ): Hex {
   if (radius <= 0) return { q: 0, r: 0 }
-  const bearing = Math.atan2(neighborY - selfY, neighborX - selfX)
+  const bearing = Math.atan2(neighborY - selfY, neighborX - selfX) // determinism:allow(discretized)
   let best: Hex = { q: 0, r: 0 }
   let bestDelta = Number.MAX_VALUE
   for (const h of ringHexes(gateRing(radius))) {
     const [hx, hy] = hexDirection(h)
-    const delta = angleDelta(Math.atan2(hy, hx), bearing)
+    const delta = angleDelta(Math.atan2(hy, hx), bearing) // determinism:allow(discretized)
     if (delta < bestDelta) {
       bestDelta = delta
       best = h
@@ -47,7 +47,7 @@ export function laneGateHex(
 // (matching pixel.ts hexToPixel), screen-down y negated so galactic-north maps
 // to the top of the board. Scale-free — only the direction matters.
 function hexDirection(h: Hex): [number, number] {
-  return [Math.sqrt(3) * (h.q + h.r / 2), -1.5 * h.r]
+  return [Math.sqrt(3) * (h.q + h.r / 2), -1.5 * h.r] // determinism:allow(discretized)
 }
 
 // angleDelta is the absolute smallest angle between two bearings, in [0, π].

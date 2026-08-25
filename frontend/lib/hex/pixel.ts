@@ -25,7 +25,7 @@ export interface ViewBox {
 
 // Pointy-top axial → pixel centre (redblobgames layout).
 export function hexToPixel(q: number, r: number): Point {
-  return { x: HEX_SIZE * Math.sqrt(3) * (q + r / 2), y: HEX_SIZE * (3 / 2) * r }
+  return { x: HEX_SIZE * Math.sqrt(3) * (q + r / 2), y: HEX_SIZE * (3 / 2) * r } // determinism:allow(projection)
 }
 
 // The six vertices of a pointy-top hexagon as an SVG polygon `points` string.
@@ -33,24 +33,28 @@ export function hexPolygonPoints(center: Point, size: number = HEX_SIZE - 1): st
   const pts: string[] = []
   for (let i = 0; i < 6; i++) {
     const angle = (Math.PI / 180) * (60 * i - 30)
-    pts.push(`${(center.x + size * Math.cos(angle)).toFixed(2)},${(center.y + size * Math.sin(angle)).toFixed(2)}`)
+    pts.push(`${(center.x + size * Math.cos(angle)).toFixed(2)},${(center.y + size * Math.sin(angle)).toFixed(2)}`) // determinism:allow(projection)
   }
   return pts.join(' ')
 }
 
 // pixelToHex — the inverse of hexToPixel: the hex whose cell contains a board
-// pixel point (pointy-top axial, cube-rounded). A RENDER-side picking concern
-// (canvas click → unproject → containing hex), not part of the Go determinism
-// seam: no game rule ever feeds through it.
+// pixel point (pointy-top axial, cube-rounded). A picking concern (canvas
+// click → unproject → containing hex), but NOT mere projection: the picked hex
+// is transmitted as an input to a mutation, so the cube round below is the
+// discretized-choice step the determinism spec requires — the float unproject
+// is reduced to one integer hex right here, and only that hex travels. There
+// is no Go twin recomputing this from the same pixel, so the rounds cannot
+// disagree across the seam; they are pragma'd as the discretization itself.
 export function pixelToHex(p: Point): Hex {
-  const qf = ((Math.sqrt(3) / 3) * p.x - (1 / 3) * p.y) / HEX_SIZE
+  const qf = ((Math.sqrt(3) / 3) * p.x - (1 / 3) * p.y) / HEX_SIZE // determinism:allow(discretized)
   const rf = ((2 / 3) * p.y) / HEX_SIZE
   // Cube round: round each axis, then repair the axis with the largest error so
   // q + r + s stays 0.
   const sf = -qf - rf
-  let q = Math.round(qf)
-  let r = Math.round(rf)
-  const s = Math.round(sf)
+  let q = Math.round(qf) // determinism:allow(discretized)
+  let r = Math.round(rf) // determinism:allow(discretized)
+  const s = Math.round(sf) // determinism:allow(discretized)
   const dq = Math.abs(q - qf)
   const dr = Math.abs(r - rf)
   const ds = Math.abs(s - sf)

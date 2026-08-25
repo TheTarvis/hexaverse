@@ -78,7 +78,16 @@ interface BeamCase {
   hexes: Hex[]
 }
 
+interface LayoutConstCase {
+  name: string
+  value: number
+}
+
 interface Fixtures {
+  // Recording provenance (GOARCH/GOAMD64 the file was generated on) — written
+  // by the Go regeneration path, deliberately NOT asserted: the cases must
+  // reproduce on every target, the stamp says where they were recorded.
+  _meta?: { generatedOn: { goarch: string; goamd64?: string }; note?: string }
   line: LineCase[]
   routeAround: RouteCase[]
   orbState: OrbCase[]
@@ -88,6 +97,7 @@ interface Fixtures {
   stateAt: StateAtCase[]
   lineOfSight: LosCase[]
   beam: BeamCase[]
+  layoutConstants: LayoutConstCase[]
 }
 
 // Walk up from the working directory to the repo-root golden. Anchoring on cwd
@@ -156,6 +166,17 @@ describe('board fixtures — Go↔TS determinism seam', () => {
     expect(beamHexes(c.origin, c.aim, c.params)).toEqual(c.hexes)
   })
 
+  // Layout constants are asserted, not assumed: ECMAScript specifies Math.sqrt
+  // as implementation-approximated (not correctly-rounded like Go's math.Sqrt),
+  // so sqrt(3) equality across the seam is an observation about today's engines
+  // that this pin turns into a tested contract — the lane-gate bearing depends
+  // on it (openspec cross-stack-determinism, sqrt-pinning requirement).
+  it.each(fixtures.layoutConstants)('layoutConstants[%#] $name', (c) => {
+    const computed: Record<string, number> = { sqrt3: Math.sqrt(3) }
+    expect(computed[c.name]).toBeDefined()
+    expect(computed[c.name]).toBe(c.value)
+  })
+
   it('covers every recorded case group (guards a truncated golden)', () => {
     expect(fixtures.line.length).toBeGreaterThan(0)
     expect(fixtures.routeAround.length).toBeGreaterThan(0)
@@ -166,5 +187,6 @@ describe('board fixtures — Go↔TS determinism seam', () => {
     expect(fixtures.stateAt.length).toBeGreaterThan(0)
     expect(fixtures.lineOfSight.length).toBeGreaterThan(0)
     expect(fixtures.beam.length).toBeGreaterThan(0)
+    expect(fixtures.layoutConstants.length).toBeGreaterThan(0)
   })
 })
