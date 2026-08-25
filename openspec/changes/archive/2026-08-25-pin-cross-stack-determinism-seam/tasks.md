@@ -135,12 +135,12 @@
 
 ## 3. Documentation pointer
 
-- [ ] 3.1 At archive time, replace the `## Notes for future maintainers`
+- [x] 3.1 At archive time, replace the `## Notes for future maintainers`
       determinism bullet in `openspec/specs/board-tactical-math/spec.md`
       with a pointer to the `cross-stack-determinism` capability. NOT done by
       this change — `openspec/specs/` changes only on archive. Reverted once
       already (2026-08-25); do not re-apply pre-archive.
-- [ ] 3.2 After archive, replace the generated `## Purpose` placeholder in
+- [x] 3.2 After archive, replace the generated `## Purpose` placeholder in
       `openspec/specs/cross-stack-determinism/spec.md` with: "The Go
       backend and the TypeScript frontend independently compute the same
       board geometry, and the game is only coherent while they agree — as

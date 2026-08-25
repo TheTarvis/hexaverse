@@ -295,11 +295,13 @@ fraction 1 after the transit's overall arrival time.
 
 ## Notes for future maintainers
 
-- The Go↔TypeScript determinism contract is `/fixtures/board/cases.json`
-  (regenerated with `UPDATE_FIXTURES=1`); both `backend/board` and the
-  frontend's `lib/hex` assert their implementations reproduce it byte-for-
-  byte. Any change to this package's math must stay reproducible from that
-  fixture or update it deliberately.
+- Cross-language and cross-build-target determinism — the golden-fixture
+  discipline around `/fixtures/board/cases.json`, which arithmetic may
+  produce a rule-bearing value, re-recording rules, and the deviation
+  register for known divergences — is governed by the
+  `cross-stack-determinism` capability
+  (`openspec/specs/cross-stack-determinism/spec.md`). Any change to this
+  package's math must satisfy that capability's requirements.
 - `StateAt`/`ShipPos` are the only sanctioned way to read "where is this
   fleet" from a stored `MovementState`; only resolvers and the settle path
   are meant to read raw stored state (enforced by convention, not the type
