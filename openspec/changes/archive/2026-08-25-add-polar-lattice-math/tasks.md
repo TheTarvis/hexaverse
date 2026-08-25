@@ -243,7 +243,7 @@
 
 ## 7. Archive follow-up
 
-- [ ] 7.1 At archive time, write the `polar-lattice-math` capability's
+- [x] 7.1 At archive time, write the `polar-lattice-math` capability's
       `## Purpose` (the generated placeholder otherwise ships stale — see
       `openspec/specs/mine-extraction/spec.md` for the precedent this
       pre-empts): state explicitly that the capability has **zero
