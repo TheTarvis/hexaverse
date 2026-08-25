@@ -14,9 +14,16 @@ server hasn't confirmed.
 ### Requirement: System Board Route and Data Fan-In
 The system SHALL render `/systems/:systemId` by reading the system's fogged
 interior and the fogged fleets in that system, disabled until a non-empty
-system id is known, and SHALL show a loading state while either read is in
-flight and an error state (with the underlying error message when
-available) if the interior read fails.
+system id is known; SHALL show a loading state while either read is in
+flight, or, while the board's rendering context is available and
+uninterrupted, until it has produced its first rendered frame; and SHALL
+show an error state (with the underlying error message when available) if
+the interior read fails. The unsupported and interrupted states defined by
+`### Requirement: Renderer Unavailability Is an Explicit State` and
+`### Requirement: Lost Rendering Context Recovers Without Navigation` (both
+`add-renderer-availability-states`) take precedence over this loading
+state: once either fires, the board shows that state, not the loading
+placeholder, regardless of whether a first frame has ever been produced.
 
 #### Scenario: Loading state before data arrives
 - **WHEN** the system board route is opened and its data has not yet
@@ -26,6 +33,19 @@ available) if the interior read fails.
 #### Scenario: Error state on a failed interior read
 - **WHEN** the interior read fails
 - **THEN** an error panel is shown instead of the board
+
+#### Scenario: Loading persists through first frame after data arrives
+- **WHEN** the interior and fleet reads have completed and the board's
+  rendering context is available and uninterrupted, but it has not yet
+  produced its first frame
+- **THEN** the loading placeholder remains shown rather than an empty or
+  black canvas
+
+#### Scenario: An unsupported rendering context takes precedence over the loading placeholder
+- **WHEN** the interior and fleet reads have completed but the board's
+  rendering context cannot be created
+- **THEN** the board's canvas region shows the unsupported state, not the
+  loading placeholder
 
 ### Requirement: Toggle-to-Deselect Single Selection
 The system SHALL maintain exactly one selection at a time, among a
@@ -42,6 +62,11 @@ current selection.
 - **WHEN** a feature is selected and a bare hex is then clicked
 - **THEN** the selection becomes that hex, and the feature is no longer
   selected
+
+#### Scenario: Clicking board background clears the selection
+- **WHEN** a feature is selected and a point on the board outside the hex
+  lattice is clicked
+- **THEN** the selection becomes empty
 
 ### Requirement: Move Preview From the Acting Fleet's Live Position
 The system SHALL compute a live move preview from the acting fleet's
@@ -332,3 +357,638 @@ rules), without requiring navigation.
   updated fleet read
 - **THEN** the hold readout shows the credited cargo without a page
   navigation
+
+### Requirement: Renderer Unavailability Is an Explicit State
+IF a rendering context for the board cannot be created, THEN the system
+SHALL show an explicit unsupported state in place of the board's canvas
+region, naming the failure as a browser- or graphics-hardware-capability
+problem — never raw diagnostic text, a stack trace, or a GPU vendor/model
+string — rather than an empty stage or an uncaught error, and SHALL offer a
+retry affordance that attempts to re-establish the context.
+
+The facts panel and the fleet roster SHALL remain mounted and usable while
+the unsupported state is shown: a verb anchored to the acting fleet's own
+state (docked, burning, or a running action) rather than to a board
+selection SHALL remain invokable through the facts panel without requiring
+a board selection — today: scan, mine, cancel-burn, cancel-mine. A control
+in the surrounding panels whose only effect is on the unavailable canvas
+SHALL be disabled or hidden while the unsupported or interrupted state is
+shown, rather than presented as operable. The facts panel's selection
+prompt SHALL NOT instruct the player to select a body, tile, or gate while
+no canvas exists to select one on.
+
+An error thrown while constructing, listening to, or retrying the board's
+rendering context SHALL be contained to the board's canvas region: caught by a
+boundary scoped to that region when the error is thrown during render or
+commit, and by a local handler when the error is thrown inside a context-
+loss/restore listener or an animation-frame callback (neither is reachable
+by a React error boundary at any placement) — leaving the facts panel, the
+fleet roster, and the system board view container mounted and usable.
+
+The unsupported and interrupted states SHALL take precedence over the
+board's data-loading and first-frame-pending states: once a rendering
+context cannot be created, a loading placeholder SHALL NOT continue to be
+shown in the board's canvas region. This state is triggered by a client
+rendering-capability failure, never by a failure of the interior or fleet
+data reads.
+
+#### Scenario: Context creation failure shows a named unsupported state
+- **WHEN** a rendering context for the board cannot be created
+- **THEN** the board's canvas region shows an explicit unsupported state
+  naming WebGL or GPU unavailability as the cause
+- **AND** no uncaught error is thrown
+
+#### Scenario: Surrounding board affordances remain usable
+- **WHEN** the board's canvas region shows the unsupported or interrupted state
+- **THEN** the facts panel and the fleet roster remain mounted and interactive
+- **AND** a verb anchored to the acting fleet's own state rather than to a
+  board selection remains invokable through the facts panel without
+  requiring a board selection — today: scan, mine, cancel-burn, cancel-mine
+
+#### Scenario: A canvas-only control is disabled while the canvas is unavailable
+- **WHEN** the board's canvas region shows the unsupported or interrupted
+  state
+- **THEN** a control whose only effect is on the board canvas is disabled
+  or hidden, not presented as operable
+
+#### Scenario: Move and departure verbs are unreachable without the canvas
+- **WHEN** the board's canvas region shows the unsupported or interrupted
+  state AND no target is already selected
+- **THEN** the facts panel's selection prompt SHALL NOT instruct the player
+  to select a body, tile, or gate
+- **AND** the facts panel indicates that choosing a move or departure target
+  requires the board to be available
+
+#### Scenario: The unsupported state is independent of the interior data read
+- **WHEN** the system interior and fleet reads succeed but the rendering
+  context cannot be created
+- **THEN** the board's canvas region shows the unsupported state, not the
+  interior-read error state
+
+#### Scenario: A failed data read takes precedence over the unsupported state
+- **WHEN** the interior or fleet read fails and the rendering context also
+  cannot be created
+- **THEN** the interior-read error panel is shown with its underlying
+  message
+- **AND** no unsupported state is shown
+
+#### Scenario: The system board view container remains present
+- **WHEN** the unsupported state is shown
+- **THEN** the system board view container is still rendered, with the
+  unsupported state occupying only the canvas region within it
+
+#### Scenario: The unsupported state offers a retry affordance
+- **WHEN** the board's canvas region shows the unsupported state
+- **THEN** a retry affordance is offered
+- **AND** invoking it attempts to create a new rendering context
+- **AND** a successful attempt resumes rendering the live board
+- **AND** a failed attempt keeps the unsupported state, retriable again
+
+#### Scenario: The displayed cause is a user-actionable category, not raw diagnostic text
+- **WHEN** the unsupported or interrupted state names the cause to the player
+- **THEN** the text identifies the failure as a browser or graphics-hardware
+  capability problem
+- **AND** it does not display raw exception text, stack traces, or GPU
+  vendor/model strings
+
+#### Scenario: An unexpected rendering error is contained to the canvas region
+- **WHEN** an error is thrown while constructing, listening to, or retrying
+  the board's rendering context — including an error not otherwise named by
+  this requirement
+- **THEN** the error is contained to the board's canvas region — caught by
+  the region's error boundary when it is thrown during render or commit,
+  and by a local handler when it is thrown inside a context-loss/restore
+  listener or an animation-frame callback
+- **AND** the facts panel, the fleet roster, and the system board view
+  container remain mounted and usable
+
+### Requirement: Lost Rendering Context Recovers Without Navigation
+WHEN the board's rendering context is lost at runtime, the system SHALL show
+an interrupted state in the board's canvas region without an uncaught error;
+WHEN the lost context is restored, the system SHALL resume rendering the
+live board — reflecting current world time and feature/fleet state, never a
+stale pre-loss frame — without a page navigation; and IF the context is not
+restored, the interrupted state SHALL persist and SHALL offer a retry
+affordance that attempts to re-establish the rendering context. Restore
+failure means an error thrown while re-establishing rendering after
+`webglcontextrestored` fires; a context that simply never restores is not
+itself a recordable failure event. Retrying SHALL release the prior
+attempt's renderer resources and event listeners before creating a new
+context, and SHALL hold no more than one live rendering context for the
+board's canvas at any time. Once invoked, the retry affordance SHALL be
+disabled and show an in-progress indication until the attempt resolves; any
+invocation while disabled SHALL start no further attempt. A second context
+loss arriving while the interrupted state is already shown SHALL leave the
+board in the interrupted state without duplicating listener registration or
+starting a second in-flight creation attempt. A board selection or a typed
+mine tonnage value active at the moment of context loss SHALL remain shown
+in the facts panel throughout the interrupted state and SHALL still be
+active once the board resumes. Each context-creation failure, context loss,
+and restore failure SHALL be recorded distinguishably by cause: a
+diagnostic entry emitted to the client error log naming which of the three
+occurred and, when available, the browser-reported diagnostic message.
+
+#### Scenario: Context loss shows an interrupted state without an uncaught error
+- **WHEN** the board's rendering context is lost at runtime
+- **THEN** the board's canvas region shows an interrupted state
+- **AND** no uncaught error is thrown
+
+#### Scenario: A restored context resumes without navigation
+- **WHEN** a lost rendering context is restored
+- **THEN** the board resumes rendering the live board
+- **AND** no page navigation occurs
+
+#### Scenario: A restored context's first frame reflects live state, not a stale one
+- **WHEN** a lost rendering context is restored
+- **THEN** the board's redraw is invoked with the post-restore world time
+  and the latest feature/fleet read
+- **AND** no pre-loss image is retained
+
+#### Scenario: A context that never restores keeps the interrupted state with a retry affordance
+- **WHEN** a rendering context is lost and is not restored
+- **THEN** the interrupted state persists
+- **AND** a retry affordance is offered
+
+#### Scenario: Invoking the retry affordance attempts to re-establish the context
+- **WHEN** the retry affordance is invoked while the interrupted state is
+  shown
+- **THEN** the system attempts to create a new rendering context for the
+  board
+
+#### Scenario: Retrying releases the prior attempt's resources first
+- **WHEN** the retry affordance is invoked
+- **THEN** any renderer resources and event listeners from the previous
+  failed or lost context are released before a new context is created
+- **AND** no more than one live rendering context is held for the board's
+  canvas at any time
+
+#### Scenario: A successful retry resumes the live board
+- **WHEN** the retry affordance is invoked
+- **AND** the resulting context creation succeeds
+- **THEN** the board resumes rendering the live board
+- **AND** no page navigation occurs
+
+#### Scenario: A retry that fails again keeps the interrupted state retriable
+- **WHEN** the retry affordance is invoked
+- **AND** the resulting context creation fails
+- **THEN** the interrupted state persists
+- **AND** the retry affordance remains available for another attempt
+
+#### Scenario: The retry affordance prevents duplicate concurrent attempts
+- **WHEN** the retry affordance is invoked
+- **THEN** it is disabled and shows an in-progress indication until the
+  attempt resolves
+- **AND** any invocation while disabled starts no further attempt
+
+#### Scenario: A second context loss while already interrupted is a no-op state change
+- **WHEN** the board's rendering context is lost again while the interrupted
+  state is already shown
+- **THEN** the board remains in the interrupted state
+- **AND** no duplicate listener registration or in-flight context-creation
+  attempt is started
+
+#### Scenario: In-flight selection and typed input survive a context loss
+- **WHEN** the board's rendering context is lost at runtime while a board
+  selection is active or a mine tonnage value has been typed
+- **THEN** the selection and the typed value remain shown in the facts panel
+  once the interrupted state is displayed
+- **AND** a subsequent restore resumes the board with that same selection
+  still active
+
+#### Scenario: Renderer failures are recorded distinguishably by cause
+- **WHEN** a rendering context fails to be created, is lost, or fails to
+  restore
+- **THEN** a diagnostic entry is emitted to the client error log naming
+  which of the three occurred and, when available, the browser-reported
+  diagnostic message (e.g. `webglcontextcreationerror`'s `statusMessage`)
+- **AND** the recording does not itself throw or block the unsupported/
+  interrupted state from rendering
+
+### Requirement: Renderer Unavailability States Are Accessible
+WHEN the board's canvas region shows the unsupported or interrupted state,
+the system SHALL convey the change to assistive technology through a live
+region naming the state and its cause, SHALL make any retry affordance
+reachable via Tab and activatable via Enter or Space, and SHALL move focus
+to the retry affordance (or, when none is shown, to the state's explanatory
+text) if focus was within the canvas region at the moment the state
+appeared. That focus-preservation clause applies only while the canvas
+region contains a focusable element to lose focus from at the moment of
+transition.
+
+#### Scenario: The state change is announced to assistive technology
+- **WHEN** the board's canvas region transitions into the unsupported or
+  interrupted state
+- **THEN** a live region conveys the state change and its named cause
+  without requiring the player to navigate to it
+
+#### Scenario: The retry affordance is keyboard-operable
+- **WHEN** the interrupted or unsupported state offers a retry affordance
+- **THEN** a keyboard-only player can reach it via Tab
+- **AND** activate it via Enter or Space
+
+#### Scenario: Focus does not get lost when the canvas region changes under the player
+- **GIVEN** the board's canvas region contains a focusable element at the
+  moment the unsupported or interrupted state replaces it
+- **WHEN** focus is within that element
+- **THEN** focus moves to the retry affordance, or to the state's
+  explanatory text if no retry affordance is shown
+- **AND** focus is never silently dropped to the document body
+
+### Requirement: Fog Band Determines a Feature's Board Treatment
+This requirement governs only features carrying the three-band fog
+projection defined by `system-interior`'s *Three-Band Fog Projection of
+Features* (`visible`/`remembered`/`astronomical`); a board entity explicitly
+exempt from that projection — for example, a system's trading station,
+whose board visibility is governed by its own graph-tier rule — is out of
+this requirement's scope and needs its own treatment rule.
+
+The system SHALL determine each such feature's rendered treatment from the
+fog band the server assigned it, and from no other input: a feature in the
+`astronomical` band SHALL be drawn as an outline of its predicted geometry
+only, with no lit surface and no `data-mineable` affordance; a feature in
+the `remembered` band SHALL be drawn with a treatment visibly distinct from
+`visible` (dimmed, and marked as a past observation), and SHALL keep its
+stored resource detail available to the board's selection affordances — its
+hit shape's `data-mineable` attribute, and the facts panel's `asOf` readout
+once that feature is selected; a feature in the `visible` band SHALL be
+drawn at full live strength, with its hit shape's `data-mineable` attribute
+reflecting its current resources. The board SHALL NOT infer, randomise, or
+otherwise derive a fog band client-side — a feature's band is read from the
+data the server sent and never assigned or seeded locally. A feature whose
+band is absent or is not one of `visible`, `remembered`, `astronomical`
+SHALL receive the `astronomical` treatment. The band → treatment mapping
+SHALL be a function of the fogged feature alone, evaluable and assertable
+without a rendering context, and the renderer SHALL consume its output
+without re-deriving any part of the mapping. The board SHALL treat the
+server's fog projection as the sole source of a feature's detail, and SHALL
+NOT hold, cache, or derive resource, activity, or composition detail that
+the projection omitted for that requester.
+
+#### Scenario: A visible-band feature is drawn at full live strength
+- **WHEN** the interior read returns a feature with band `visible` and
+  resources
+- **THEN** the feature is drawn at full strength and its hit shape carries
+  `data-mineable`
+
+#### Scenario: An astronomical-band feature yields outline-only treatment
+- **WHEN** the interior read returns a feature with band `astronomical`
+- **THEN** the feature is drawn as an unfilled outline of its predicted
+  geometry, with no lit surface and no `data-mineable` attribute on its hit
+  shape
+
+#### Scenario: A remembered-band feature carries its frozen detail
+- **WHEN** the interior read returns a feature with band `remembered` and
+  stored resources
+- **THEN** the feature's treatment is visibly distinct from `visible`, its
+  hit shape still carries `data-mineable`, and selecting it shows the
+  observation's `asOf` in the facts panel's readout
+
+#### Scenario: Band treatment is deterministic, not client-derived
+- **WHEN** the same feature is rendered twice in the same session, and
+  again in a new session, with an unchanged server-assigned band
+- **THEN** its rendered treatment is identical each time — no seeded or
+  randomised client-side band assignment influences it
+
+#### Scenario: An unrecognised band falls back to the most restrictive treatment
+- **WHEN** the interior read returns a feature whose `band` is absent or is
+  not one of `visible`, `remembered`, `astronomical`
+- **THEN** the feature is drawn with the `astronomical` treatment — outline
+  only, no `data-mineable` attribute — and the board continues to render
+  without error
+
+#### Scenario: Band treatment is assertable without a rendering context
+- **WHEN** a fogged feature is passed to the board's band → treatment
+  mapping outside any renderer
+- **THEN** the mapping returns that band's complete treatment values —
+  including whether a lit surface is emitted at all — and those values are
+  what the renderer draws, with no part of the band decision made inside
+  the rendering backend
+
+#### Scenario: An astronomical feature carries no detail to withhold
+- **WHEN** the interior read returns a feature with band `astronomical`
+- **THEN** that feature arrives with no `resources`, no `effects`, and no
+  `asOf`, and the board's treatment mapping is given no such fields —
+  the absence of detail is what the server sent, not what the renderer
+  declined to draw
+
+### Requirement: Board Picking Resolves to the Entity Under the Pointer
+The system SHALL resolve a click on the board to the entity drawn under the
+pointer: a click within a fleet, feature, or lane-gate mark SHALL select
+that entity; a click elsewhere within the hex lattice SHALL select the hex
+containing that point, and that hex SHALL be visibly marked as selected on
+the board; and a click outside the lattice SHALL clear the selection. Hit
+targets SHALL be positioned at the marks actually drawn, and a feature's
+hit-target size SHALL be independent of its fog-band visual treatment — an
+outline-only astronomical feature SHALL NOT be harder to select than a
+filled feature of the same type. WHEN two or more marks' hit targets
+contain the clicked point, the topmost drawn mark SHALL win, using the
+board's documented draw order (fleets above features above lane gates; a
+child feature above its parent).
+
+#### Scenario: Clicking a fleet mark selects that fleet
+- **WHEN** the pointer clicks within a fleet's drawn mark
+- **THEN** that fleet becomes the selection
+
+#### Scenario: Clicking the lattice away from any mark selects the hex
+- **WHEN** the pointer clicks a point within the hex lattice that is not
+  over a fleet, feature, or lane-gate mark
+- **THEN** the hex containing that point becomes the selection
+
+#### Scenario: A selected bare hex is visibly marked on the board
+- **WHEN** a bare hex (not a fleet, feature, or lane-gate mark) becomes the
+  selection
+- **THEN** that hex is visibly marked as selected on the board
+
+#### Scenario: An overlapping child mark wins over its parent
+- **WHEN** the pointer clicks a point where a moon's hit target and its
+  parent feature's hit target overlap
+- **THEN** the moon (the child, drawn on top) becomes the selection, not
+  its parent
+
+#### Scenario: Clicking outside the lattice clears the selection
+- **WHEN** the pointer clicks a point outside the hex lattice
+- **THEN** the selection becomes empty
+
+#### Scenario: A docked fleet's shrunk hit target falls through to its host body
+- **WHEN** a fleet's effective state is `docked` to a feature and the
+  pointer clicks just outside the fleet's hull but still over the feature's
+  mark
+- **THEN** the feature is selected, not the fleet
+
+#### Scenario: An outline-only astronomical feature keeps a full-size hit target
+- **WHEN** a feature in the `astronomical` band is drawn as an unfilled outline
+- **THEN** its hit target is the same size used for a filled feature of the
+  same type, not reduced to the outline's stroke width
+
+### Requirement: Foreign Fleets Render as Contact Marks Only
+The system SHALL render a fleet the requester does not own as a contact
+mark carrying only its position — no ship count, no class composition, and
+no movement-mode accent — and SHALL render an owned fleet from its
+owner-only roster and effective movement state, including a mode accent and
+heading. A foreign fleet's mark SHALL be derived from its position alone:
+its size, hull-instance count, and formation SHALL be constant across all
+foreign fleets and SHALL NOT vary with any field of that fleet's read.
+
+#### Scenario: An own fleet shows its movement-mode accent and heading
+- **WHEN** the board renders a fleet the requester owns
+- **THEN** the fleet's mark carries a movement-mode accent and is oriented
+  along its heading
+
+#### Scenario: A foreign fleet renders as a generic contact mark
+- **WHEN** the board renders a fleet read with `own: false`
+- **THEN** the fleet's mark carries no ship count, no class composition,
+  and no movement-mode accent
+
+#### Scenario: A foreign fleet read with no roster renders without error
+- **WHEN** a fleet read arrives with its `roster` field absent (audience
+  fog on a foreign fleet)
+- **THEN** the fleet renders as a contact mark and no error occurs
+
+#### Scenario: Two foreign fleets of different composition render identically
+- **WHEN** two fleets the requester does not own are visible in the same
+  system and their owners' rosters differ in ship count
+- **THEN** both marks are drawn with identical geometry — same size, same
+  instance count, same formation — so the mark discloses nothing about
+  either fleet's composition
+
+#### Scenario: The own/foreign fork is decided outside the renderer
+- **WHEN** a fleet read is passed to the board's fleet-mark mapping
+  outside any renderer
+- **THEN** the mapping returns the foreign contact mark's values for a
+  fleet with `own: false`, and the owned composition values for a fleet
+  with `own: true`, so the fork is assertable without a rendering context
+
+#### Scenario: A fleet absent from the latest read is removed from the board
+- **WHEN** a fleet that was drawn on the board is absent from the next
+  fleet read (a foreign fleet that left the requester's live sensor
+  coverage, or an own fleet that left the system)
+- **THEN** its mark and its hit target are removed from the board on that
+  read, leaving no stale contact at its last drawn position
+
+### Requirement: Board Glyph Selection Is Keyboard-Operable
+The system SHALL make every fleet, feature, and lane-gate hit target on the
+board reachable via keyboard, in a consistent tab order — features, then
+fleets, then lane gates, each group in stable id order; activating a
+focused hit target with Enter or Space SHALL select it identically to a
+pointer click; the currently focused hit target SHALL be distinguishable
+from unfocused ones by a visible focus indicator; and a hit target that
+currently holds keyboard focus SHALL retain that focus as the board's
+per-frame world-time update re-renders — the overlay's animation loop SHALL
+NOT itself unfocus the element the player is on.
+
+#### Scenario: Tab reaches board glyphs in the defined order
+- **WHEN** a user tabs through the board's interactive surface
+- **THEN** focus moves through the board's feature hit targets first, then
+  its fleet hit targets, then its lane-gate hit targets, each group in
+  stable id order
+
+#### Scenario: Focus survives the board's animation frames
+- **WHEN** a glyph hit target has keyboard focus and world time advances
+  several frames
+- **THEN** focus remains on that same hit target
+
+#### Scenario: A focused glyph shows a focus indicator
+- **WHEN** a fleet, feature, or lane-gate hit target has keyboard focus
+- **THEN** a focus indicator distinguishes it from unfocused targets
+
+#### Scenario: Enter/Space selects the focused glyph
+- **WHEN** Enter or Space is pressed while a fleet, feature, or lane-gate hit
+  target has focus
+- **THEN** that entity becomes the selection, identically to a pointer click
+
+### Requirement: Board Respects Reduced-Motion Preference
+WHILE the user's system indicates a reduced-motion preference, the system
+SHALL hold the starfield, nebula, film-grain, body-surface, and fleet-plume
+animation static (their time input frozen), while feature and fleet
+positions continue to advance with world time, and selection and fog-band
+state continue to render accurately.
+
+#### Scenario: Reduced motion freezes decorative animation while positions keep advancing
+- **WHEN** the user's system has a reduced-motion preference set and the
+  board renders across several frames
+- **THEN** the starfield, nebula, film-grain, body-surface, and fleet-plume
+  animation hold static (their time input frozen)
+- **AND** feature and fleet positions continue to advance with world time
+
+### Requirement: Sell Offer on the Docked Fleet
+The system SHALL offer the sell verb on the acting fleet's panel section
+whenever the acting fleet's effective state is `docked` to a station and
+the fleet's cargo pool holds at least one kind of tonnage — anchored to the
+fleet's docked state, requiring no board selection, mirroring `### Requirement:
+Mine Offer on the Docked Fleet`'s anchoring rationale (a fleet can only
+sell what it is docked to and currently holds). The offer SHALL present a
+resource-kind picker limited to kinds the fleet currently holds AND that
+the station is configured to buy (excluding a kind with no configured floor
+for the station's region, so the picker never offers a guaranteed-fail
+selection), defaulting to the kind with the greatest held tonnage among
+those eligible, and a tonnage input defaulting to the fleet's full held
+tonnage of the selected kind, constrained to a positive value no greater
+than that held tonnage, alongside a live proceeds preview computed by
+folding the selected tonnage across the station's demand entries for the
+selected kind (per `goods-sale`'s "Settlement Folds Tonnage Across a
+Venue's Ordered Demand Entries" and per-portion rounding rule), pinned to
+the exact same fold and rounding the server settlement uses via the shared
+`fixtures/market/cases.json` golden (design.md Decision 22) — so a player
+is never shown a split or a total the settlement won't honor.
+
+#### Scenario: Sell is offered while docked at a station with cargo aboard
+- **WHEN** the acting fleet's effective state is `docked` to a station and
+  its cargo pool holds at least one kind of tonnage
+- **THEN** the fleet panel offers the sell verb with a kind picker and a
+  tonnage input, with no board selection required
+
+#### Scenario: Sell is not offered when merely co-located, not docked
+- **WHEN** the acting fleet occupies the same hex as a station but its
+  effective state is not `docked`
+- **THEN** the sell verb is not offered
+
+#### Scenario: Sell is not offered when the cargo pool is empty
+- **WHEN** the acting fleet is docked to a station but its cargo pool holds
+  no tonnage of any kind
+- **THEN** the sell verb is not offered
+
+#### Scenario: Tonnage input clamps to held tonnage of the selected kind
+- **WHEN** a tonnage greater than the fleet's held tonnage of the selected
+  kind is entered
+- **THEN** the input clamps the value to that held tonnage
+
+#### Scenario: The proceeds preview reflects the served quote
+- **WHEN** the tonnage or kind selection changes while the sell offer is
+  shown
+- **THEN** the previewed proceeds update to reflect the served quote for
+  the newly selected kind and tonnage
+
+#### Scenario: A kind with no configured floor at this station is excluded from the picker
+- **WHEN** the acting fleet holds a kind for which the docked station's
+  region has no configured floor price
+- **THEN** that kind does not appear in the sell offer's kind picker, even
+  though the fleet holds tonnage of it
+
+#### Scenario: A split-fill preview matches the settlement fold exactly
+- **WHEN** the selected tonnage exceeds the station's highest-priority open
+  demand entry's remaining quantity for the selected kind
+- **THEN** the preview's reported per-entry portions and total proceeds are
+  the exact values the shared fixture (`fixtures/market/cases.json`) pins
+  for that case, identical to what the server's settlement would apply
+
+### Requirement: Sell Commit
+The system SHALL, when the sell command is invoked with a chosen kind and
+tonnage, submit the sale against the acting fleet's docked station; on
+success it SHALL show a success toast and refresh the fleet's hold and the
+requester's credit balance without requiring navigation; on failure it
+SHALL show an error toast carrying player-facing copy mapped from the
+server's distinguishable rejection reason and leave the offer's state
+unchanged — except for a "price changed" (slippage guard) rejection, which
+SHALL instead refresh the offer to the server's current applicable price(s)
+and proceeds total, showing that refreshed figure alongside the one the
+player originally expected, so the player can accept or abandon the new
+price from inside the flow without re-navigating; re-committing after such
+a refresh SHALL use a newly generated operation key (a re-priced sale is a
+new intent, never a retry of the old one).
+
+#### Scenario: A successful sale refreshes hold and balance
+- **WHEN** the sell command succeeds
+- **THEN** a success toast is shown, and the fleet's hold readout and the
+  requester's credit balance both reflect the sale's effect without a page
+  navigation
+
+#### Scenario: A failed sale toasts player-facing copy, not raw server text
+- **WHEN** the sell command fails (for example: over-held tonnage, no
+  configured floor for the kind, or a budget/absorption limit)
+- **THEN** an error toast surfaces player-facing, actionable copy mapped
+  from the server's distinguishable rejection reason (never the raw
+  sentinel-error string verbatim), and the offer remains available for
+  retry
+
+#### Scenario: A price-changed rejection refreshes the offer instead of freezing it
+- **WHEN** the sell command fails with the "price changed" slippage
+  rejection
+- **THEN** the offer refreshes to the server's current applicable price(s)
+  and total proceeds, displaying that figure alongside the player's
+  originally expected one, rather than leaving the stale pre-rejection
+  offer on screen
+
+#### Scenario: Re-committing a re-priced sale uses a new operation key
+- **WHEN** a player re-commits a sale after a price-changed refresh
+- **THEN** the re-commit is submitted with a newly generated operation key,
+  distinct from the original attempt's key
+
+### Requirement: Rejection Reasons Map to Player-Facing Copy, Not Raw Server Text
+Every server-distinguishable rejection reason the sell endpoint can return
+— including this capability's own `400`/`404`/`409` reasons, the
+contention-retry "busy, try again" rejection, AND the per-corporation
+write-quota's `429` (`request-authorization`'s "Per-Corporation Write
+Quota on Player-Initiated Trade Routes") — SHALL be mapped to player-facing,
+actionable copy before display; the server's raw reason string SHALL be
+treated as an internal contract for distinguishing outcomes, never
+displayed to the player verbatim. This corrects the current, observable
+pattern (`SystemBoardView.tsx`'s `toast.error(e.message || 'Order
+failed')`, used in five places today) of surfacing a raw Go sentinel-error
+string (e.g. `"mine: requester does not own this fleet"`) directly to the
+player.
+
+#### Scenario: A distinguishable server reason renders as player-facing copy
+- **WHEN** a market mutation fails with any of this capability's
+  distinguishable server reasons
+- **THEN** the displayed error text is mapped, player-facing copy, never
+  the raw server reason string rendered verbatim
+
+#### Scenario: An unmapped reason still renders safely
+- **WHEN** a server rejection reason has no specific mapped copy (e.g. a
+  reason added later without an accompanying copy update)
+- **THEN** a generic, non-technical fallback message is shown rather than
+  the raw server string
+
+### Requirement: Sell Control Guards Against Double-Submit
+The sell control SHALL be disabled from the moment of commit until the
+request settles or fails, so a double-click or repeated-Enter cannot
+submit two sales. Exactly one operation key SHALL be generated per
+user-initiated sell attempt; that same key SHALL be reused across
+transport-level retries of that one attempt (so a network retry dedups
+against the original), while a freshly initiated or re-priced sell attempt
+SHALL always generate a new key.
+
+#### Scenario: A double-click yields exactly one sale
+- **WHEN** the sell control is double-clicked in rapid succession
+- **THEN** exactly one sale request is submitted, using one operation key
+
+#### Scenario: A transport-level retry of the same attempt yields exactly one sale
+- **WHEN** the sell command's request is retried at the transport layer
+  after a lost response, without the player initiating a new attempt
+- **THEN** the retry reuses the same operation key as the original attempt,
+  and the settlement remains a single sale
+
+#### Scenario: A fresh attempt after a completed sale is a second, independent sale
+- **WHEN** a player completes one sale and then initiates a new sell
+  command
+- **THEN** the new attempt generates a new operation key, distinct from the
+  completed sale's key
+
+### Requirement: Credit Balance Readout
+The system SHALL show, for the requester's own corporation, a credit
+balance readout on the board, sourced from the corporation's own session
+data (see `corporation-spawn`'s balance-bearing session bootstrap),
+reflecting the post-settlement balance after a sale resolves via the
+board's own sale-commit response, without requiring navigation, and
+SHALL announce a balance change to assistive technology (an `aria-live`
+region or equivalent) at the moment it updates, not solely as a visual
+change.
+
+#### Scenario: The board shows the current credit balance
+- **WHEN** the board renders for an authenticated, spawned requester
+- **THEN** the requester's current credit balance is shown
+
+#### Scenario: The balance visibly updates when a sale resolves
+- **WHEN** a sale settles from the board's sell commit
+- **THEN** the displayed credit balance updates to reflect the sale's
+  proceeds, with no page navigation
+
+#### Scenario: A balance change is announced to assistive technology
+- **WHEN** a sale settles and the credit balance readout updates
+- **THEN** the updated balance is announced via an accessible live region,
+  not conveyed by a purely visual change
+
+#### Scenario: A failed sale's error is announced to assistive technology
+- **WHEN** a sell command fails and an error toast is shown
+- **THEN** the error's player-facing copy is announced via an accessible
+  live region, not conveyed by a purely visual toast

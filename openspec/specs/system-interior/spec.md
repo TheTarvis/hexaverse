@@ -16,7 +16,14 @@ graph-tier region (as its character dial), and its galaxy-tier skeleton: a
 fixed star feature at the centre, one orbiting feature per skeleton body
 (extending, never contradicting, the skeleton), and additional detail
 (extra small bodies, belts, moons on gas giants, anomalies/ruins, hazards)
-whose counts and resource richness are dialed by the region's character.
+whose counts and resource richness are dialed by the region's character. A
+system's trading station, when one exists, is NOT part of this
+deterministic generation: it is provisioned independently by the
+`trading-station` capability (as a spawn asset-healing step, not interior
+materialization), so this requirement's determinism and create-if-absent
+guarantees make no claim about a station's presence, position, or timing —
+a system may materialize its interior with no station, gain one later at
+spawn, or (for a non-home system) never carry one.
 
 #### Scenario: First read materializes the interior
 - **WHEN** `GetOrCreateInterior` is called for a system with no stored
@@ -164,7 +171,14 @@ unremembered star or major skeleton body — geometry and type ship, no
 resources or effects). A detail feature (belt, moon, hazard, anomaly, ruin)
 that is neither visible nor remembered SHALL be omitted entirely.
 Composition/threat data SHALL only ever come from a scanned observation's
-stored detail, never from ambient presence alone.
+stored detail, never from ambient presence alone. This three-band rule
+governs `system.Feature` entries produced by this capability's interior
+generator only; a system's trading station is not one of these entries and
+is never subject to this band assignment or its detail-feature omission
+clause — its inclusion in a board read is governed entirely by
+`trading-station`'s own graph-tier visibility rule (see "Home Station
+Visible On First Board Read, No Scan Required"), independent of sensor
+coverage or stored feature memory.
 
 #### Scenario: A feature inside live sensor coverage is visible
 - **WHEN** a requester's sensor coverage currently covers a feature's

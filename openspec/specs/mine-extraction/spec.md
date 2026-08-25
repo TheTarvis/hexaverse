@@ -283,16 +283,25 @@ The three `outcome` text forms (full yield, lode-dry clamp, hold-full
 clamp) SHALL be reliably distinguishable by a caller inspecting the string
 (e.g. via a stable substring or prefix per reason code), not merely equal
 in narrative intent, so a later UI can safely branch on which constraint
-bound. The `holdFull` branch is defensive in this change: mine is the only
-writer of `fleet.cargo` and holds the fleet's movement slot for the run's
-whole duration, so no other action can mutate cargo (or the roster, hence
-capacity) between this run's commit and resolve, and `freeHoldAtResolve`
-therefore always equals `freeHoldAtCommit` — the clamp cannot bind through
-any verb this change ships. It stays specified (the reason code and clamp
-math cost nothing extra and are exercised directly, not through a second
-writer) because a future cargo-mutating verb (e.g. a second concurrent mine
-run once ships can split, or jettison/transfer) will make it reachable, and
-resolve must already floor and report correctly when it is.
+bound. The `holdFull` branch remains structurally unreachable in this
+version, but for a different reason than when it was first specified:
+`goods-sale` is now a second writer of `fleet.cargo` (a sale debits it
+instantly, outside the action spine — see `goods-sale`'s "Instant, Not an
+Action"), so mine is no longer the cargo field's only writer. What still
+prevents a concurrent sale from mutating `freeHoldAtResolve` mid-run is
+`fleet-movement`'s single-movement-state invariant: a mine run holds the
+fleet `docked` to the mined feature for the run's whole duration, and
+`goods-sale`'s "Sale Requires the Fleet Docked To the Buying Station"
+rejects a sale unless the fleet is currently docked to a station — a fleet
+cannot be simultaneously docked to a lode (mining) and docked to a station
+(selling), so no sale can land between this run's commit and its resolve,
+and `freeHoldAtResolve` therefore still always equals `freeHoldAtCommit`.
+It stays specified (the reason code and clamp math cost nothing extra and
+are exercised directly, not through a second writer) because a future verb
+that can mutate cargo while a fleet is docked to a mined feature (e.g., a
+transfer between two docked fleets, or a same-feature multi-run future)
+will make it reachable, and resolve must already floor and report
+correctly when it is.
 
 #### Scenario: A clean run takes the full target
 - **WHEN** neither the lode's remaining tonnage nor the fleet's free hold
@@ -438,4 +447,3 @@ state of its own to settle on cancel).
   `POST /v1/actions/:actionId/cancel` still releases the slot with no
   delta or cargo credit — the fleet is recoverable without data loss,
   never permanently stuck
-
