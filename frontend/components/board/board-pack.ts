@@ -52,6 +52,7 @@ export const DRAW_RADIUS: Record<BoardFeature['type'], number> = {
   gravity_well: 12,
   debris: 3.5,
   radiation: 12,
+  station: 8,
 }
 
 // srgbToLinear — one sRGB channel (0..1) → linear light. The GL pipeline works

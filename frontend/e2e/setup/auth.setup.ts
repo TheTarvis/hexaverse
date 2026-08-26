@@ -35,9 +35,16 @@ setup('authenticate', async ({ page }) => {
   // flow gates the whole app; drive it once here so the saved session is a woken
   // player — the corp persists server-side, so every dependent spec that restores
   // this session already has a corp and reaches the galaxy/board. (If a prior run
-  // already woke this account, the galaxy shows straight away and we skip it.)
+  // already woke this account, the app chrome shows straight away and we skip it.)
+  //
+  // The woken marker must be floating-nav, NOT galaxy-view: the home route
+  // renders the galaxy bare while the account bootstrap (auto-create) is still
+  // in flight, so galaxy-view is visible for a corpless session in that window
+  // and matching it here would skip the wake and save a corpless storageState
+  // (which strands every dependent spec on the wake gate). floating-nav mounts
+  // only in the layout gate's woken branch, so it can't be matched early.
   await expect(
-    page.getByTestId('wake-up-flow').or(page.getByTestId('galaxy-view')),
+    page.getByTestId('wake-up-flow').or(page.getByTestId('floating-nav')),
   ).toBeVisible({ timeout: 30_000 })
   if (await page.getByTestId('wake-up-flow').isVisible()) {
     await page.getByTestId('wake-name-input').fill('E2E Lineage')

@@ -525,27 +525,33 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
         {/* The roster is the same panel the galaxy shows — where every fleet is,
             whichever canvas you're standing on. A fleet on this board becomes the
             one you're commanding; one elsewhere drills into its system. */}
-        <FleetRoster
-          worldTime={worldTime}
-          activeFleetId={activeFleet?.id ?? null}
-          currentSystemId={systemId}
-          onSelect={showFleet}
-        />
-        {/* The market board's second mount point (the first is the galaxy view).
-            The SAME shared panel: it ranks and presents, and this view decides
-            what a row selection means — here, drilling into that system's board.
-            Shown only where there is a station to trade at. */}
-        {station && (
-          <div className={PANEL}>
-            <MarketBoardPanel
-              board={boardQuery.data}
-              isLoading={boardQuery.isLoading}
-              isError={boardQuery.isError}
-              homeSystemId={systemId}
-              onSelectSystem={(id) => router.push(`/systems/${encodeURIComponent(id)}`)}
-            />
-          </div>
-        )}
+        {/* Left column, mirroring GalaxyView's overlay: panels stack at the
+            edge so the board's centre stays clickable — a loose third flex
+            child under justify-between would float over the middle of an
+            unpannable board and swallow glyph clicks (pointer-events-auto). */}
+        <div className="flex flex-col gap-4 self-start">
+          <FleetRoster
+            worldTime={worldTime}
+            activeFleetId={activeFleet?.id ?? null}
+            currentSystemId={systemId}
+            onSelect={showFleet}
+          />
+          {/* The market board's second mount point (the first is the galaxy view).
+              The SAME shared panel: it ranks and presents, and this view decides
+              what a row selection means — here, drilling into that system's board.
+              Shown only where there is a station to trade at. */}
+          {station && (
+            <div className={PANEL}>
+              <MarketBoardPanel
+                board={boardQuery.data}
+                isLoading={boardQuery.isLoading}
+                isError={boardQuery.isError}
+                homeSystemId={systemId}
+                onSelectSystem={(id) => router.push(`/systems/${encodeURIComponent(id)}`)}
+              />
+            </div>
+          )}
+        </div>
         <FactsPanel
           starClass={board.starClass}
           character={board.character}

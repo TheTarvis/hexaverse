@@ -90,6 +90,7 @@ export const FEATURE_STYLE: Record<FeatureType, FeatureStyle> = {
   gravity_well: { color: '#b07de6', shape: 'diamond' },
   debris: { color: '#9aa7b4', shape: 'belt' },
   radiation: { color: '#e6d27d', shape: 'diamond' },
+  station: { color: '#8be6c8', shape: 'square' },
 }
 
 // How each fog band paints its glyph (#0006's three bands) — ONE record, both

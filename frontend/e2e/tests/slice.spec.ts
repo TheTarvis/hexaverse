@@ -32,16 +32,20 @@ const cfg = resolveE2EConfig()
 // Fresh account — do not restore the shared logged-in session.
 test.use({ storageState: { cookies: [], origins: [] } })
 
-// The journey rides real world-time etas (scan 15s + burn + two mine runs).
-test.setTimeout(240_000)
+// The journey rides real world-time etas (scan 15s + burn + two mine runs +
+// the leg-0 burn to a departure gate, which from a far rim gate can run
+// 60-80s on its own before the galaxy hand-off fires at gate passage).
+test.setTimeout(420_000)
 
-// Clicks a board glyph via raw mouse coordinates at its centre — orbiting
-// glyphs animate every frame, so Playwright's stability check never passes
-// and locator.click() would spin forever.
+// Clicks a board glyph by dispatching the click event straight to its button.
+// Orbiting glyphs animate every frame, so Playwright's stability check never
+// passes and locator.click() would spin forever; raw mouse coordinates are no
+// better, because moons draw ABOVE their parent body with a small offset, so
+// a coordinate click at a planet's centre can land on the moon riding it.
+// dispatchEvent needs neither stability nor hit-testing and always reaches
+// the intended glyph.
 async function clickGlyph(page: Page, testId: string): Promise<void> {
-  const box = (await page.getByTestId(testId).boundingBox())!
-  expect(box, `glyph ${testId} should be on screen`).toBeTruthy()
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await page.getByTestId(testId).dispatchEvent('click')
 }
 
 // Reads the used-tons figure off the hold readout ("12 / 200t" → 12).
@@ -87,6 +91,13 @@ test.describe('the vertical slice', () => {
     // 3. MOVE: intercept + dock at the nearest revealed lode (nearest by
     //    screen distance from the fleet glyph — burn cost is 2.5s/hex, so
     //    nearest keeps this the longest single wait of the journey).
+    //
+    //    Moons are excluded: the generator marks them mineable (they carry
+    //    resources) but gives them no orbit and a core-hex footprint, so BOTH
+    //    the server solve (ErrCoreDestination) and the client preview reject
+    //    them as targets — a moon can't be docked or mined today. Known
+    //    product gap (2026-08-25), surfaced to Travis; when moon targeting
+    //    lands (e.g. solve against the parent's orbit), drop this filter.
     const fleetBox = (await page
       .locator('[data-testid^="fleet-glyph-"]')
       .first()
@@ -94,15 +105,17 @@ test.describe('the vertical slice', () => {
     let lodeId = ''
     let best = Number.POSITIVE_INFINITY
     for (const glyph of await lodes.all()) {
+      const id = (await glyph.getAttribute('data-testid'))!.replace('feature-glyph-', '')
+      if (id.startsWith('feat-moon-')) continue
       const box = await glyph.boundingBox()
       if (!box) continue
       const d = Math.hypot(box.x - fleetBox.x, box.y - fleetBox.y)
       if (d < best) {
         best = d
-        lodeId = (await glyph.getAttribute('data-testid'))!.replace('feature-glyph-', '')
+        lodeId = id
       }
     }
-    expect(lodeId, 'a nearest lode should have been picked').not.toBe('')
+    expect(lodeId, 'a nearest non-moon lode should have been picked').not.toBe('')
 
     await clickGlyph(page, `feature-glyph-${lodeId}`)
     await page.getByTestId('move-button').click()
@@ -140,14 +153,34 @@ test.describe('the vertical slice', () => {
     //    board hands off to the galaxy view and the roster reads the trip.
     //    The lane leg itself is 104s+ at scale 1, so the arrival is not
     //    awaited — commitment and hand-off are the slice beat.
-    const gate = page.locator('[data-testid^="gate-glyph-"]').first()
-    await expect(gate).toBeVisible({ timeout: 15_000 })
-    const gateId = (await gate.getAttribute('data-testid'))!
-    await clickGlyph(page, gateId)
-    await expect(page.getByTestId('depart-button')).toBeVisible({ timeout: 15_000 })
+    //    Gates are fixed rim glyphs (no orbit animation), so the standard
+    //    locator.click() is safe here AND its actionability check detects a
+    //    gate hidden under a floating overlay panel (roster/market stack) —
+    //    the board can't pan yet, so an occluded glyph is genuinely
+    //    unclickable. Try each gate and depart through the first clickable one.
+    const gates = page.locator('[data-testid^="gate-glyph-"]')
+    await expect(gates.first()).toBeVisible({ timeout: 15_000 })
+    let departed = false
+    for (const g of await gates.all()) {
+      try {
+        await g.click({ timeout: 5_000 })
+        await expect(page.getByTestId('depart-button')).toBeVisible({ timeout: 5_000 })
+        departed = true
+        break
+      } catch {
+        // Occluded by an overlay panel, or no charted route — try the next gate.
+      }
+    }
+    expect(departed, 'at least one gate should be clickable with a charted route').toBe(true)
     await page.getByTestId('depart-button').click()
-    await page.waitForURL((url) => new URL(url).pathname === '/', { timeout: 90_000 })
+    // Commitment first: the roster reads the trip as soon as the commit lands,
+    // while leg 0 (the burn to the gate) is still riding on this board.
     const roster = page.getByTestId('fleet-roster')
+    await expect(roster).toContainText(/Departing|In transit/, { timeout: 30_000 })
+    // The galaxy hand-off fires when the fleet passes its gate — the end of the
+    // leg-0 burn, which from a far rim gate runs 60-80s at 2.5s/hex. 180s
+    // bounds a rim-to-rim leg with refetch slack.
+    await page.waitForURL((url) => new URL(url).pathname === '/', { timeout: 180_000 })
     await expect(roster).toBeVisible({ timeout: 15_000 })
     await expect(roster).toContainText(/Departing|In transit/, { timeout: 30_000 })
   })

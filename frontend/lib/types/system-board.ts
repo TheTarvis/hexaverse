@@ -28,6 +28,11 @@ export type FeatureType =
   | 'gravity_well'
   | 'debris'
   | 'radiation'
+  // The NPC/player trading station (#0011) — dockable, never mineable. It
+  // reaches the fogged features read like any body once the live sensor
+  // union covers its hex, so the renderer's FeatureType-keyed maps MUST
+  // carry it (missing entries crashed the board packer at first coverage).
+  | 'station'
 
 export type ResourceKind = 'metals' | 'volatiles' | 'water' | 'organics' | 'research' | 'exotic'
 
