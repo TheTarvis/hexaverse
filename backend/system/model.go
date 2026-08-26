@@ -1,6 +1,9 @@
 package system
 
-import "hexaverse/common"
+import (
+	"hexaverse/board"
+	"hexaverse/common"
+)
 
 // Band is a tile's orbital band, derived from its ring (a pure function of
 // radius — never stored per tile).
@@ -94,18 +97,18 @@ func PeriodFor(ring int) common.WorldMillis {
 // Feature is one stored object on the board. Position is exactly one of:
 // Orbit (orbits the star), ParentId (rides another feature — moons, a planet's
 // gravity well), or Fixed (the star at centre). Footprint is the feature's
-// epoch tile(s): a single anchor hex for point bodies, a tile-set for fields
-// (belt arcs, nebulae). Live hex(es) are computed, never stored per tick.
+// epoch cell(s): a single anchor cell for point bodies, a cell-set for fields
+// (belt arcs, nebulae). Live cell(s) are computed, never stored per tick.
 type Feature struct {
-	Id        string      `json:"id" firestore:"id"`
-	Type      FeatureType `json:"type" firestore:"type"`
-	Name      string      `json:"name,omitempty" firestore:"name,omitempty"`
-	Orbit     *Orbit      `json:"orbit,omitempty" firestore:"orbit,omitempty"`
-	ParentId  string      `json:"parentId,omitempty" firestore:"parentId,omitempty"`
-	Fixed     bool        `json:"fixed,omitempty" firestore:"fixed,omitempty"`
-	Footprint []Hex       `json:"footprint" firestore:"footprint"`
-	Resources []Resource  `json:"resources,omitempty" firestore:"resources,omitempty"`
-	Effects   *Effects    `json:"effects,omitempty" firestore:"effects,omitempty"`
+	Id        string       `json:"id" firestore:"id"`
+	Type      FeatureType  `json:"type" firestore:"type"`
+	Name      string       `json:"name,omitempty" firestore:"name,omitempty"`
+	Orbit     *Orbit       `json:"orbit,omitempty" firestore:"orbit,omitempty"`
+	ParentId  string       `json:"parentId,omitempty" firestore:"parentId,omitempty"`
+	Fixed     bool         `json:"fixed,omitempty" firestore:"fixed,omitempty"`
+	Footprint []board.Cell `json:"footprint" firestore:"footprint"`
+	Resources []Resource   `json:"resources,omitempty" firestore:"resources,omitempty"`
+	Effects   *Effects     `json:"effects,omitempty" firestore:"effects,omitempty"`
 	// OwnerCorpId is DTO-only (`firestore:"-"` — never persisted, no schema
 	// change): it is populated solely on the station feature spliced into a read
 	// from the station store, which is the one feature family that has an owner.

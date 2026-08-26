@@ -92,6 +92,9 @@ func (s *Service) Commit(ctx context.Context, spec CommitSpec) (*Action, error) 
 	if !ok {
 		return nil, ErrUnknownType
 	}
+	if err := validateParams(spec.Params); err != nil {
+		return nil, err
+	}
 	now := s.clock.Now()
 	a := Action{
 		Id:              "action_" + uuid.NewString(),

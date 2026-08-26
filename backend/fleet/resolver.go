@@ -13,7 +13,7 @@ import (
 // resolved move mints per-feature presence memory for what its sensor bubble
 // swept — path-swept ambient (#0006 Decision #14). Nil disables ambient reveal.
 type AmbientRecorder interface {
-	AmbientWrites(ctx context.Context, cid, systemID string, path []board.Hex, at common.WorldMillis) ([]action.DocWrite, error)
+	AmbientWrites(ctx context.Context, cid, systemID string, path []board.Cell, at common.WorldMillis) ([]action.DocWrite, error)
 }
 
 // RegisterResolvers wires fleet's per-type action resolvers onto the shared
@@ -35,7 +35,7 @@ func RegisterResolversWithAmbient(a *action.Service, ambient AmbientRecorder) {
 // BurnResolver is the fleet's kinematic resolver, registered with the action
 // service for type "burn". When a burn's eta passes, resolution settles the
 // fleet's motion state — dock onto the intercepted body, or coast at the meet
-// hex — the exact transition #0004 reads already compute (#0005 kinematic
+// cell — the exact transition #0004 reads already compute (#0005 kinematic
 // resolve). It reads the live burn off the actor doc (motion state is owned by
 // the fleet, not duplicated into the action's params) and returns the settled
 // state for action to write atomically with the status flip and slot release.
@@ -54,7 +54,7 @@ func BurnResolver(params MovementParams) action.ResolveFunc {
 		// the burn's arriveTime — so StateAt folds the burn into exactly the state
 		// every read has been answering with since the ship arrived. The write adds
 		// nothing new; it caches the fold and rides the slot release.
-		settled := board.StateAt(f.State, r.At)
+		settled := board.StateAt(f.State, r.At, board.ProductionSchedule())
 		outcome := "arrived"
 		if settled.Mode == board.ModeDocked {
 			outcome = "docked at " + settled.Docked.ParentId

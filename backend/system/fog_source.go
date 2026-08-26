@@ -30,31 +30,36 @@ func (s *Service) Features(ctx context.Context, systemID string) ([]observation.
 			continue
 		}
 		g := observation.FeatureGeom{
-			Id:           f.Id,
-			Astronomical: isAstronomical(f.Id),
-			Occludes:     occludes(f.Type),
-			Detail:       featureDetail(f),
+			Id:               f.Id,
+			Astronomical:     isAstronomical(f.Id),
+			OcclusionRadius2: occlusionRadius2(f.Type),
+			Detail:           featureDetail(f),
 		}
 		if f.Orbit != nil {
 			g.Elements = &board.Orbit{Ring: f.Orbit.Ring, Angle0: f.Orbit.Angle0, Period: f.Orbit.Period, Dir: f.Orbit.Dir}
 		}
 		if len(f.Footprint) > 0 {
-			g.Anchor = board.Hex{Q: f.Footprint[0].Q, R: f.Footprint[0].R}
+			g.Anchor = f.Footprint[0]
 		}
 		out = append(out, g)
 	}
 	return out, nil
 }
 
-// occludes marks the large bodies that shadow the lightspeed channel (#0006
-// Decision #16): the star and planets block line of sight; belts, moons, and
-// hazards don't (murk-as-attenuator is a follow-on).
-func occludes(t FeatureType) bool {
+// occlusionRadius2 maps a feature type to its pinned squared occlusion radius
+// (design.md Decision 1): the star and planets shadow the lightspeed channel
+// with a real radius now, not a boolean; belts, moons, hazards, and the
+// station (never generated here — it's excluded above) don't occlude at all.
+// Which feature types qualify, and their radius, is this domain's rule;
+// observation stays purely geometric and never learns what a gas giant is.
+func occlusionRadius2(t FeatureType) int64 {
 	switch t {
-	case FeatureStar, FeatureRocky, FeatureGasGiant, FeatureIce:
-		return true
+	case FeatureStar:
+		return board.StarOcclusionRadius2
+	case FeatureRocky, FeatureGasGiant, FeatureIce:
+		return board.PlanetOcclusionRadius2
 	default:
-		return false
+		return 0
 	}
 }
 

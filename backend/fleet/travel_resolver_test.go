@@ -30,7 +30,7 @@ func (f *fakeArrivals) ArrivalWrites(_ string, dest string, traveledLaneIds []st
 // Spec: 0008/S3
 // Spec: 0006/S7
 func TestTravelResolver_LandsAtEntryGateAndReveals(t *testing.T) {
-	entry := board.Hex{Q: 16, R: -2}
+	entry := board.Cell{Ring: 16, Slot: 2}
 	lt := &board.LaneTransit{
 		Route:      []string{"A", "B", "C"},
 		LegEtas:    []common.WorldMillis{100, 700, 1300},
@@ -58,7 +58,7 @@ func TestTravelResolver_LandsAtEntryGateAndReveals(t *testing.T) {
 		t.Fatalf("expected coast state, got %+v", res.ActorState["state"])
 	}
 	// Coasting exactly at the entry gate ring/position.
-	if board.OrbState(*st.Coast, 1300) != entry {
+	if board.OrbState(*st.Coast, 1300, testSched()) != entry {
 		t.Fatalf("coast not at entry gate")
 	}
 	// The reveal call carries the destination and exactly the crossed lanes —

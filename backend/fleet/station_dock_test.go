@@ -13,6 +13,10 @@ import (
 // system.Service.GetOrCreateInterior actually returns once the station store is
 // wired. The station ORBITS at a real pace (not the effectively-static period
 // the other fixtures use), so a test can prove the position tracks world time.
+//
+// tasks.md 6.2 (this file lives in fleet's package, task 6.2's note): the
+// station's cell is re-derived from the live schedule's slot count on ring
+// stationRing, not merely re-typed from the retired 6×ring assumption.
 type stationSystem struct{}
 
 const (
@@ -23,13 +27,13 @@ const (
 
 func (f *stationSystem) GetOrCreateInterior(context.Context, string) (*system.GeneratedInterior, error) {
 	orb := &system.Orbit{Ring: stationRing, Angle0: stationAngle0, Period: stationPeriod, Dir: 1}
-	anchor := board.OrbState(board.Orbit{Ring: stationRing, Angle0: stationAngle0, Period: stationPeriod, Dir: 1}, 0)
+	anchor := board.OrbState(board.Orbit{Ring: stationRing, Angle0: stationAngle0, Period: stationPeriod, Dir: 1}, 0, testSched())
 	return &system.GeneratedInterior{
 		Interior: system.SystemInterior{SystemId: "sys-0", Radius: 16},
 		Features: []system.Feature{
-			{Id: "feat-star", Type: system.FeatureStar, Fixed: true, Footprint: []system.Hex{{Q: 0, R: 0}}},
+			{Id: "feat-star", Type: system.FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
 			{Id: "feat-station", Type: system.FeatureStation, Orbit: orb,
-				Footprint: []system.Hex{{Q: anchor.Q, R: anchor.R}}},
+				Footprint: []board.Cell{anchor}},
 		},
 	}, nil
 }
@@ -61,12 +65,12 @@ func TestPosition_DockedToStationRidesItsLiveOrbit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Position: %v", err)
 	}
-	want := board.OrbState(board.Orbit{Ring: stationRing, Angle0: stationAngle0, Period: stationPeriod, Dir: 1}, clk.Now())
+	want := board.OrbState(board.Orbit{Ring: stationRing, Angle0: stationAngle0, Period: stationPeriod, Dir: 1}, clk.Now(), testSched())
 	if got != want {
-		t.Errorf("docked-to-station position = %+v, want the station's live orbital hex %+v", got, want)
+		t.Errorf("docked-to-station position = %+v, want the station's live orbital cell %+v", got, want)
 	}
 	// A docked fleet must not be parked at the core.
-	if got == (board.Hex{Q: 0, R: 0}) {
+	if got == (board.Cell{Ring: 0, Slot: 0}) {
 		t.Error("docked fleet resolved to the core rather than the station's ring")
 	}
 }

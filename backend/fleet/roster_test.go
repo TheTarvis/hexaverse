@@ -31,7 +31,7 @@ func TestSeedFleet_Scenario_CarriesDefaultRoster(t *testing.T) {
 		return nil
 	})
 
-	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", board.Hex{Q: 3, R: 0}); err != nil {
+	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", board.Cell{Ring: 3, Slot: 0}); err != nil {
 		t.Fatal(err)
 	}
 	if len(saved.Ships) < 1 {
@@ -85,7 +85,7 @@ func TestSeedFleet_Scenario_FreshCargoPoolIsEmpty(t *testing.T) {
 		saved = f
 		return nil
 	})
-	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", board.Hex{Q: 3, R: 0}); err != nil {
+	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", board.Cell{Ring: 3, Slot: 0}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -181,8 +181,8 @@ func TestOrderTo_RegressionGuard_BurnEtaMatchesMsPerTile(t *testing.T) {
 	defer ctrl.Finish()
 	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
 
-	dest := board.Hex{Q: 4, R: 0}
-	f, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{Hex: &dest}})
+	dest := board.Cell{Ring: 4, Slot: 0}
+	f, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{Cell: &dest}})
 	if err != nil {
 		t.Fatal(err)
 	}

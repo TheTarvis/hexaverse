@@ -6,18 +6,23 @@ import (
 
 	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/polar"
 
 	"github.com/google/uuid"
 )
 
-// fakeInteriors is a hand fake of InteriorSource returning fixed geometry on
-// an 8-ring board.
+// testSched is the schedule observation tests thread through every board
+// call — observation holds no per-system interior of its own (no Radius
+// field on Service), so per design.md Decision 3 it defaults to
+// board.ProductionSchedule().
+func testSched() polar.Schedule { return board.ProductionSchedule() }
+
+// fakeInteriors is a hand fake of InteriorSource returning fixed geometry.
 type fakeInteriors struct{ feats map[string][]FeatureGeom }
 
 func (f fakeInteriors) Features(_ context.Context, systemID string) ([]FeatureGeom, error) {
 	return f.feats[systemID], nil
 }
-
 
 // fakeFleets is a hand fake of FleetSource returning each corp's units.
 type fakeFleets struct{ byCorp map[string][]FleetPos }
@@ -31,7 +36,7 @@ func (f fakeFleets) FleetsForCorp(_ context.Context, cid string, _ common.WorldM
 func sampleInterior(systemID string) fakeInteriors {
 	return fakeInteriors{feats: map[string][]FeatureGeom{
 		systemID: {
-			{Id: "feat-star", Anchor: board.Hex{Q: 0, R: 0}, Astronomical: true,
+			{Id: "feat-star", Anchor: board.Cell{Ring: 0, Slot: 0}, Astronomical: true,
 				Detail: &FeatureDetail{FeatureType: "star"}},
 			{Id: "feat-body-0", Elements: &board.Orbit{Ring: 3, Angle0: 0, Period: 0, Dir: 1}, Astronomical: true,
 				Detail: &FeatureDetail{FeatureType: "rocky", Resources: []ResourceReading{{Kind: "metals", Richness: 0.7}}}},
@@ -57,12 +62,12 @@ func TestFogIsolation_OneScans_OtherUnchanged(t *testing.T) {
 	interiors := sampleInterior(sys)
 	// Corp A has a fleet sitting at the star; corp B has none in this system.
 	fleets := fakeFleets{byCorp: map[string][]FleetPos{
-		corpA: {{Id: "fa", CorporationId: corpA, SystemId: sys, Hex: board.Hex{Q: 0, R: 0}}},
+		corpA: {{Id: "fa", CorporationId: corpA, SystemId: sys, Cell: board.Cell{Ring: 0, Slot: 0}}},
 	}}
 	svc := NewServiceWith(NewDaoWithClient(service), fleets, interiors, beamLanes{}, common.WorldClock())
 
 	at := common.WorldMillis(1_000)
-	if err := svc.MintScan(ctx, corpA, sys, board.Hex{Q: 0, R: 0}, at); err != nil {
+	if err := svc.MintScan(ctx, corpA, sys, board.Cell{Ring: 0, Slot: 0}, at); err != nil {
 		t.Fatalf("corp A scan: %v", err)
 	}
 
@@ -99,13 +104,13 @@ func TestFogIsolation_OneScans_OtherUnchanged(t *testing.T) {
 		t.Errorf("corp B leaked %d remembered features from corp A's scan", len(remB))
 	}
 
-	// Coverage is per-corp: A covers its fleet's hex; B covers nothing here.
+	// Coverage is per-corp: A covers its fleet's cell; B covers nothing here.
 	covA, err := svc.Coverage(ctx, corpA, sys, at)
 	if err != nil {
 		t.Fatalf("coverage A: %v", err)
 	}
-	if !covA.Covers(board.Hex{Q: 0, R: 0}) {
-		t.Errorf("corp A should cover its own fleet's hex")
+	if !covA.Covers(board.Cell{Ring: 0, Slot: 0}) {
+		t.Errorf("corp A should cover its own fleet's cell")
 	}
 	covB, err := svc.Coverage(ctx, corpB, sys, at)
 	if err != nil {
@@ -116,7 +121,7 @@ func TestFogIsolation_OneScans_OtherUnchanged(t *testing.T) {
 	}
 
 	// Own-perception is never fogged; a foreign fleet outside your coverage is.
-	aFleet := FleetPos{Id: "fa", CorporationId: corpA, SystemId: sys, Hex: board.Hex{Q: 0, R: 0}}
+	aFleet := FleetPos{Id: "fa", CorporationId: corpA, SystemId: sys, Cell: board.Cell{Ring: 0, Slot: 0}}
 	if vis, _ := svc.FleetVisibleTo(ctx, corpA, aFleet, at); !vis {
 		t.Errorf("a corp must always see its own fleet")
 	}
@@ -128,6 +133,9 @@ func TestFogIsolation_OneScans_OtherUnchanged(t *testing.T) {
 // TestRememberedKeepsOrbiting proves a remembered feature stores its orbital
 // elements, so a consumer draws it at its CURRENT computed position while its
 // activity/detail stay frozen at asOf (geometry lives, activity freezes).
+//
+// Ring 5 (48 slots under the pinned schedule, not 6×5=30 — tasks.md 7.5's
+// observation/service_test.go:140 site) is a deliberate non-coincidence ring.
 func TestRememberedKeepsOrbiting(t *testing.T) {
 	service, client := common.SetupFirestoreTestDAO(t)
 	defer common.CleanupFirestoreTestData(t, client, corporationsCollection)
@@ -137,11 +145,11 @@ func TestRememberedKeepsOrbiting(t *testing.T) {
 	const sys = "sys-1"
 	// A planet with a real period, so its position advances over time.
 	interiors := fakeInteriors{feats: map[string][]FeatureGeom{
-		sys: {{Id: "feat-body-0", Elements: &board.Orbit{Ring: 4, Angle0: 0, Period: 24_000, Dir: 1}}},
+		sys: {{Id: "feat-body-0", Elements: &board.Orbit{Ring: 5, Angle0: 0, Period: 24_000, Dir: 1}}},
 	}}
 	svc := NewServiceWith(NewDaoWithClient(service), fakeFleets{}, interiors, beamLanes{}, common.WorldClock())
 
-	if err := svc.MintScan(ctx, corp, sys, board.Hex{Q: 0, R: 0}, 1_000); err != nil {
+	if err := svc.MintScan(ctx, corp, sys, board.Cell{Ring: 0, Slot: 0}, 1_000); err != nil {
 		t.Fatalf("scan: %v", err)
 	}
 	rem, err := svc.RememberedFeatures(ctx, corp, sys)
@@ -152,10 +160,10 @@ func TestRememberedKeepsOrbiting(t *testing.T) {
 	if !ok || mem.Elements == nil {
 		t.Fatalf("remembered feature lost its orbital elements")
 	}
-	// The stored elements evaluate to different hexes at different times — the
+	// The stored elements evaluate to different cells at different times — the
 	// clockwork keeps ticking in memory.
-	early := board.OrbState(*mem.Elements, 1_000)
-	late := board.OrbState(*mem.Elements, 7_000)
+	early := board.OrbState(*mem.Elements, 1_000, testSched())
+	late := board.OrbState(*mem.Elements, 7_000, testSched())
 	if early == late {
 		t.Errorf("remembered feature is frozen in place; it should keep orbiting (early=%v late=%v)", early, late)
 	}

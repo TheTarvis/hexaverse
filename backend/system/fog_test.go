@@ -11,28 +11,37 @@ import (
 // TestProjectFogged_ThreeBands proves the board fog places each feature in the
 // right band: covered → Visible (live detail), scanned-but-uncovered →
 // Remembered (frozen at asOf), an uncovered major body → the free Astronomical
-// layer (no worth), and an uncovered/unremembered detail feature → Unseen (dropped).
+// layer (no worth), and an uncovered/unremembered detail feature → Unseen
+// (dropped).
+//
+// SDET NOTE: projectFogged is unexported and gains a threaded polar.Schedule
+// parameter under this migration (design.md Decision 3 — system's fog
+// projection sources its schedule from SystemInterior.Radius, never a
+// literal). No other artifact pins this private signature, so this test
+// specifies it: `projectFogged(gen, cov, remembered, now, sched)`.
 func TestProjectFogged_ThreeBands(t *testing.T) {
+	const radius = 16
+	sched := board.Schedule(radius)
 	gen := &GeneratedInterior{
-		Interior: SystemInterior{SystemId: "s"},
+		Interior: SystemInterior{SystemId: "s", Radius: radius},
 		Features: []Feature{
 			// At the centre — inside coverage → Visible.
-			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []Hex{{Q: 0, R: 0}}},
+			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
 			// A major body far out, uncovered, unremembered → free Astronomical layer.
 			{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Period: 0, Dir: 1},
-				Footprint: []Hex{{Q: 3, R: 0}}, Resources: []Resource{{Kind: ResourceMetals, Richness: 0.5}}},
+				Footprint: []board.Cell{{Ring: 3, Slot: 0}}, Resources: []Resource{{Kind: ResourceMetals, Richness: 0.5}}},
 			// A belt scanned earlier, now uncovered → Remembered WITH composition.
 			{Id: "feat-belt-0", Type: FeatureBelt, Orbit: &Orbit{Ring: 5, Angle0: 0, Period: 0, Dir: 1},
-				Footprint: []Hex{{Q: 5, R: 0}}, Resources: []Resource{{Kind: ResourceVolatiles, Richness: 0.9}}},
+				Footprint: []board.Cell{{Ring: 5, Slot: 0}}, Resources: []Resource{{Kind: ResourceVolatiles, Richness: 0.9}}},
 			// A belt only ever passed (ambient) → Remembered but presence-only.
 			{Id: "feat-belt-1", Type: FeatureBelt, Orbit: &Orbit{Ring: 8, Angle0: 3, Period: 0, Dir: 1},
-				Footprint: []Hex{{Q: 8, R: 0}}, Resources: []Resource{{Kind: ResourceMetals, Richness: 0.4}}},
+				Footprint: []board.Cell{{Ring: 8, Slot: 0}}, Resources: []Resource{{Kind: ResourceMetals, Richness: 0.4}}},
 			// A belt never seen → Unseen, dropped.
 			{Id: "feat-belt-2", Type: FeatureBelt, Orbit: &Orbit{Ring: 10, Angle0: 1, Period: 0, Dir: 1},
-				Footprint: []Hex{{Q: 10, R: 0}}},
+				Footprint: []board.Cell{{Ring: 10, Slot: 0}}},
 		},
 	}
-	cov := observation.NewCoverage(1, board.Hex{Q: 0, R: 0}) // covers the star only
+	cov := observation.NewCoverage(1, sched, board.Cell{Ring: 0, Slot: 0}) // covers the star only
 	remembered := map[string]observation.FeatureMemory{
 		// Scanned: composition earned.
 		"feat-belt-0": {AsOf: 500, Detail: &observation.FeatureDetail{
@@ -41,7 +50,7 @@ func TestProjectFogged_ThreeBands(t *testing.T) {
 		"feat-belt-1": {AsOf: 700},
 	}
 
-	out := projectFogged(gen, cov, remembered, common.WorldMillis(0))
+	out := projectFogged(gen, cov, remembered, common.WorldMillis(0), sched)
 
 	byID := map[string]fogFeatureDTO{}
 	for _, f := range out {

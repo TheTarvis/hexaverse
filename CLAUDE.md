@@ -204,15 +204,36 @@ The richest design source is the archived gameplay doc —
   dialed by region character. Create-if-absent under
   `galaxies/{gid}/systems/{sid}/interior` + `features/`. `GET /v1/systems/:id`
   materializes on first read (dev trigger; TODO #0008 arrival). Unfogged (M6).
-- **`board/`** — pure shared tactical math (no Firestore/clock): axial/cube hex,
-  hex-line paths, `OrbState`, `ShipPos`, `SolveIntercept`, **`StateAt`** —
-  the effective-state fold (a burn past its `arriveTime` IS its settled
-  coast/dock; lane transit never folds — arrival is effectful) — and
-  **`LineOfSight`/`BeamHexes`** (the #0006 occluded scan beam). Everything that
-  answers "where/what is this fleet" reads through `StateAt`/`ShipPos`; only
-  resolvers and the settle path read stored state raw (0004/S1–S2 pin this).
-  Go↔TS contract is `/fixtures/board/cases.json` (golden test); M7's `lib/hex`
-  asserts the same (`stateAt` there also pins the orbital-law period).
+- **`board/`** — pure shared tactical math (no Firestore/clock), on the polar
+  ring-and-slot lattice since the 2026-08-25 rewrite (`backend/polar` owns
+  the lattice core — adjacency, arc paths, orbital advance; `board` owns the
+  pinned production slot schedule, the lattice-hop metric, movement state and
+  solves, lane gates, and visibility on the pinned coordinate table). A
+  `board.Cell{Ring, Slot}` is a position — ring 0 is the single core cell
+  (the star); every consumer resolves its schedule through
+  `board.ProductionSchedule()` (the process-wide default, memoized on
+  `common.Tuning().BoardRadius`) or `board.Schedule(radius)` where a
+  per-system radius is authoritative (system generation, its fog projection),
+  never a literal. `OrbState`, `ShipPos`, `SolveCell`/`SolveIntercept`,
+  **`StateAt`** — the effective-state fold (a burn past its `arriveTime` IS
+  its settled coast/dock; lane transit never folds — arrival is effectful) —
+  **`LineOfSight`** (the #0006 occluded scan beam; `BeamCells` is a
+  fixture-pinned, currently-unconsumed capability awaiting the directional-
+  scan variant) and **`Within`** (a materialized bounded-radius disc — the
+  `Distance`-derived set form `observation.Coverage` uses so a fog read
+  never pays for an unbounded BFS) round out the geometry. `board/params.go`
+  is the Firestore-native coordinate codec (`EncodeCell`/`DecodeCell`/
+  `EncodeTarget`/`DecodeTarget`) every `action.Params` coordinate must go
+  through — `action.Commit`'s validator (`action.ErrNonPrimitiveParam`)
+  rejects a bare `board.Cell`/`board.Target` in `Params` outright, closing
+  the class of bug where an in-memory unit test and a Firestore round-trip
+  silently disagreed on shape. Everything that answers "where/what is this
+  fleet" reads through `StateAt`/`ShipPos`; only resolvers and the settle
+  path read stored state raw (0004/S1–S2 pin this). Go↔TS contract is
+  `/fixtures/board/cases.json` (golden test) plus `/fixtures/polar/cases.json`
+  for the lattice core; the client mirror lives at `frontend/lib/board/` /
+  `frontend/lib/polar/` (the `lib/hex` renderer predates the rewrite and is
+  mid-migration — see the `add-board-camera-controls`-adjacent frontend work).
 - **`fleet/`** (#0004, *implemented*) — the map-mover. One movement state
   (`coast|burn|docked`), `corporationId` from day one (dev-seeded through M8;
   **ownership real since M9** — spawn is the only fleet-minter now).

@@ -3,17 +3,28 @@ package fleet
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 
 	"hexaverse/action"
 	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/observation"
+	"hexaverse/polar"
 	"hexaverse/system"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
+
+// ErrRingOutOfRange is the stored-coordinate guard's sentinel (design.md
+// Decision 3's risk; tasks.md 3.11): a fleet's stored motion state carries a
+// ring beyond the live board schedule's maximum (a tuning.go radius
+// reduction, a migration mismatch, or corruption). polar.Schedule.Slots
+// panics above MaxRing, and board.Canon calls it — so this guard is what
+// keeps a fleet read (and mine/sell, which inherit it through
+// FleetSource.Get) failing closed instead of crashing.
+var ErrRingOutOfRange = errors.New("fleet: stored position ring exceeds the live board schedule")
 
 // burnType is the action dispatch key for a fleet's map-move. The burn is a thin
 // lifecycle wrapper (ETA, status, inbox, single slot) around the order that lives
@@ -56,10 +67,10 @@ type ServiceInterface interface {
 	PreviewRoute(ctx context.Context, id, destSystemID string) (*RoutePreview, error)
 	Cancel(ctx context.Context, id string) (*Fleet, error)
 	Scan(ctx context.Context, id string) (*Fleet, error)
-	SeedFleet(ctx context.Context, systemID, corporationID string, at board.Hex) (*Fleet, error)
-	// Position resolves a fleet's live hex at the current world time (docked
+	SeedFleet(ctx context.Context, systemID, corporationID string, at board.Cell) (*Fleet, error)
+	// Position resolves a fleet's live cell at the current world time (docked
 	// fleets need the interior, so this lives on the service, not board).
-	Position(ctx context.Context, f *Fleet) (board.Hex, error)
+	Position(ctx context.Context, f *Fleet) (board.Cell, error)
 }
 
 type Service struct {
@@ -150,6 +161,10 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 	if err != nil {
 		return nil, err
 	}
+	sched := board.ProductionSchedule()
+	if err := validateFleetRing(ctx, f, sched); err != nil {
+		return nil, err
+	}
 	now := s.clock.Now()
 	// A running scan resolves on read too (ResolveActive no-ops before its eta) —
 	// the sensor channel has no arrival to trigger on, so the claim itself is the
@@ -167,7 +182,7 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 	// directly; there's no slot to free and no effects to mint. A due lane
 	// transit folds nowhere locally (only its resolve may move systems), so an
 	// unchanged fold writes nothing.
-	eff := board.StateAt(f.State, now)
+	eff := board.StateAt(f.State, now, sched)
 	if eff.Mode == f.State.Mode {
 		return f, nil
 	}
@@ -177,6 +192,72 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 		return nil, err
 	}
 	return f, nil
+}
+
+// validateFleetRing is the stored-coordinate guard (design.md Decision 3's
+// risk; tasks.md 3.11): reject, before any lattice computation, a fleet
+// whose stored motion state carries a ring beyond the live schedule's
+// maximum — polar.Schedule.Slots panics above MaxRing, and board.Canon calls
+// it, so this is what keeps a radius reduction (or corrupt/stale data) a
+// failed read rather than a panicked one. mine and market inherit this
+// automatically through FleetSource.Get (fleet.Service.Get IS both
+// interfaces' FleetSource.Get — verified by reading their declarations), so
+// neither package needs a guard of its own.
+//
+// This is a fleet-READ rejection, never an action-parameter decode, so per
+// the shared structured-log vocabulary (tasks.md 3.11/4.5) it carries `cause`
+// and `ring` but never `actionType`/an action id.
+func validateFleetRing(ctx context.Context, f *Fleet, sched polar.Schedule) error {
+	ring, has := maxStateRing(f.State)
+	if !has || (ring >= 0 && ring <= sched.MaxRing) {
+		return nil
+	}
+	log.Warn().Ctx(ctx).Str("fleetId", f.Id).Str("cause", "ring-out-of-range").
+		Int("ring", ring).Int("maxRing", sched.MaxRing).
+		Msg("Fleet stored position ring exceeds the live board schedule")
+	return fmt.Errorf("%w: fleet %s ring %d exceeds max %d", ErrRingOutOfRange, f.Id, ring, sched.MaxRing)
+}
+
+// maxStateRing returns the highest ring embedded anywhere in a fleet's stored
+// motion state (whichever shape is populated), so the guard can catch a
+// corrupt ring wherever it hides — a coast orbit, a burn's path/target, or a
+// lane transit's board leg/entry gate. has is false for a mode carrying no
+// ring at all (docked, lane-hold).
+func maxStateRing(st board.MovementState) (ring int, has bool) {
+	max := -1
+	consider := func(r int) {
+		if r > max {
+			max = r
+		}
+	}
+	switch st.Mode {
+	case board.ModeCoast:
+		if st.Coast != nil {
+			consider(st.Coast.Ring)
+		}
+	case board.ModeBurn:
+		if st.Burn != nil {
+			for _, c := range st.Burn.Path {
+				consider(c.Ring)
+			}
+			if st.Burn.Target.Cell != nil {
+				consider(st.Burn.Target.Cell.Ring)
+			}
+		}
+	case board.ModeLaneTransit:
+		if st.LaneTransit != nil {
+			consider(st.LaneTransit.EntryGate.Ring)
+			if st.LaneTransit.BoardLeg != nil {
+				for _, c := range st.LaneTransit.BoardLeg.Path {
+					consider(c.Ring)
+				}
+			}
+		}
+	}
+	if max < 0 {
+		return 0, false
+	}
+	return max, true
 }
 
 // resolveDue runs the authoritative settle for a fleet whose active action has
@@ -216,9 +297,10 @@ func (s *Service) ListInSystem(ctx context.Context, systemID string) ([]Fleet, e
 	if err != nil {
 		return nil, err
 	}
+	sched := board.ProductionSchedule()
 	now := s.clock.Now()
 	for i := range fleets {
-		fleets[i].State = board.StateAt(fleets[i].State, now)
+		fleets[i].State = board.StateAt(fleets[i].State, now, sched)
 	}
 	return fleets, nil
 }
@@ -231,9 +313,10 @@ func (s *Service) ListForCorp(ctx context.Context, corporationID string) ([]Flee
 	if err != nil {
 		return nil, err
 	}
+	sched := board.ProductionSchedule()
 	now := s.clock.Now()
 	for i := range fleets {
-		fleets[i].State = board.StateAt(fleets[i].State, now)
+		fleets[i].State = board.StateAt(fleets[i].State, now, sched)
 	}
 	return fleets, nil
 }
@@ -271,6 +354,7 @@ func (s *Service) orderBurn(ctx context.Context, id string, req OrderRequest) (*
 		return nil, err
 	}
 
+	sched := board.ProductionSchedule()
 	msPerTile := s.msPerTileFor(f)
 	var sol board.Solution
 	var dockOnArrive string
@@ -282,21 +366,26 @@ func (s *Service) orderBurn(ctx context.Context, id string, req OrderRequest) (*
 		}
 		dockOnArrive = feat.Id
 		if orb := featureOrbit(feat); orb != nil {
-			sol = board.SolveIntercept(from, *orb, now, msPerTile, s.params.InterceptHorizon)
+			sol = board.SolveIntercept(from, *orb, now, msPerTile, s.params.InterceptHorizon, sched)
 		} else {
-			// Fixed feature (e.g. the star) — a static hex, no lead-solve.
-			sol = board.SolveHex(from, featureAnchor(feat), now, msPerTile)
+			// Fixed feature (e.g. the star) — a static cell, no lead-solve.
+			sol = board.SolveCell(from, featureAnchor(feat), now, msPerTile, sched)
 		}
-	case req.Target.Hex != nil:
-		sol = board.SolveHex(from, *req.Target.Hex, now, msPerTile)
+	case req.Target.Cell != nil:
+		sol = board.SolveCell(from, *req.Target.Cell, now, msPerTile, sched)
 	default:
-		return nil, errors.New("order target must be a hex or a featureId")
+		return nil, errors.New("order target must be a cell or a featureId")
 	}
 
-	// The star occupies the core (0,0). It is a body, not a destination: you can
-	// neither fly a fleet onto it nor dock it. Burns already route AROUND the core
-	// (board.RouteAround); this rejects the core as an endpoint.
-	if sol.MeetHex == (board.Hex{}) {
+	// The star occupies the core {ring:0, slot:0}. It is a body, not a
+	// destination: you can neither fly a fleet onto it nor dock it. A polar
+	// path structurally cannot cross the core unless an endpoint IS the core
+	// (board-tactical-math, "A Path Reaches the Core Only If an Endpoint Is
+	// the Core"), so rejecting the core as an endpoint here is sufficient on
+	// its own — there is no routing step to route around it with; the retired
+	// board.RouteAround has no successor because there is nothing left for one
+	// to do.
+	if sol.MeetCell == (board.Cell{}) {
 		return nil, ErrCoreDestination
 	}
 
@@ -328,9 +417,13 @@ func (s *Service) orderBurn(ctx context.Context, id string, req OrderRequest) (*
 		Actor:           id,
 		ActorCollection: actorCollection,
 		Scope:           f.SystemId,
-		Params:          map[string]interface{}{"target": req.Target, "dockOnArrive": dockOnArrive},
-		Eta:             sol.ArriveTime,
-		ActorState:      map[string]interface{}{"state": burnState, "updatedAt": int64(now)},
+		// The burn param carries board.EncodeTarget's Firestore-native map, not
+		// the domain struct req.Target directly — action.Commit's validator
+		// (design.md Decision 4) rejects a bare board.Target as a
+		// non-primitive Params value.
+		Params:     map[string]interface{}{"target": board.EncodeTarget(req.Target), "dockOnArrive": dockOnArrive},
+		Eta:        sol.ArriveTime,
+		ActorState: map[string]interface{}{"state": burnState, "updatedAt": int64(now)},
 	})
 	if err != nil {
 		return nil, err
@@ -387,16 +480,17 @@ func (s *Service) Cancel(ctx context.Context, id string) (*Fleet, error) {
 	return f, nil
 }
 
-// haltState computes where a cancel leaves a fleet: coast at its current board hex
-// for an in-system move or a trip's board leg, or a lane-hold at the frozen
-// fraction once it's out on a lane (#0008).
+// haltState computes where a cancel leaves a fleet: coast at its current board
+// cell for an in-system move or a trip's board leg, or a lane-hold at the
+// frozen fraction once it's out on a lane (#0008).
 func (s *Service) haltState(ctx context.Context, f *Fleet, now common.WorldMillis) (board.MovementState, error) {
+	sched := board.ProductionSchedule()
 	if f.State.Mode == board.ModeLaneTransit && f.State.LaneTransit != nil {
 		lt := f.State.LaneTransit
 		// Still on the origin board burning to the gate — stop-burn to coast.
 		if lt.BoardLeg != nil && now < lt.BoardLeg.GateEta {
-			pos, _ := board.ShipPos(f.State, now)
-			return board.CoastAt(pos, now), nil
+			pos, _ := board.ShipPos(f.State, now, sched)
+			return board.CoastAt(pos, now, sched), nil
 		}
 		// Out on a lane — hold at the current fraction between two systems.
 		if fromIdx, toIdx, frac, ok := board.LaneFraction(*lt, now); ok {
@@ -420,16 +514,16 @@ func (s *Service) haltState(ctx context.Context, f *Fleet, now common.WorldMilli
 	if err != nil {
 		return board.MovementState{}, err
 	}
-	return board.CoastAt(cur, now), nil
+	return board.CoastAt(cur, now, sched), nil
 }
 
-// SeedFleet drops a fleet into a system, coasting at a hex — the dev stand-in
+// SeedFleet drops a fleet into a system, coasting at a cell — the dev stand-in
 // for spawn (#0009 replaces it). corporationId is set now so ownership is not a
 // retrofit.
-func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string, at board.Hex) (*Fleet, error) {
-	// Nothing rests on the star: a fleet can't be seeded onto the core (0,0), same
-	// rule that forbids moving there.
-	if at == (board.Hex{}) {
+func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string, at board.Cell) (*Fleet, error) {
+	// Nothing rests on the star: a fleet can't be seeded onto the core
+	// {ring:0, slot:0}, same rule that forbids moving there.
+	if at == (board.Cell{}) {
 		return nil, ErrCoreDestination
 	}
 	now := s.clock.Now()
@@ -437,7 +531,7 @@ func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string,
 		Id:            "fleet_" + uuid.NewString(),
 		CorporationId: corporationID,
 		SystemId:      systemID,
-		State:         board.CoastAt(at, now),
+		State:         board.CoastAt(at, now, board.ProductionSchedule()),
 		// A newly seeded fleet carries a default roster — never empty (#0010
 		// "Fleet Ship Composition") — and an empty cargo pool ("Fleet Cargo
 		// Pool"'s "a fresh fleet's cargo pool is empty").
@@ -481,13 +575,13 @@ func (s *Service) Scan(ctx context.Context, id string) (*Fleet, error) {
 	now := s.clock.Now()
 
 	// A fleet out on a lane (or holding mid-lane) has no system around it.
-	eff := board.StateAt(f.State, now)
+	eff := board.StateAt(f.State, now, board.ProductionSchedule())
 	if eff.Mode == board.ModeLaneHold ||
 		(eff.Mode == board.ModeLaneTransit && (eff.LaneTransit == nil || eff.LaneTransit.BoardLeg == nil || now >= eff.LaneTransit.BoardLeg.GateEta)) {
 		return nil, ErrNotOnBoard
 	}
 
-	// The emission hex, pinned at commit (#0006 Decision #26): the live front
+	// The emission cell, pinned at commit (#0006 Decision #26): the live front
 	// and the resolve-time mint both grow from where the pulse was fired.
 	origin, err := s.Position(ctx, f)
 	if err != nil {
@@ -501,8 +595,10 @@ func (s *Service) Scan(ctx context.Context, id string) (*Fleet, error) {
 		ActorCollection: actorCollection,
 		Scope:           f.SystemId,
 		Slot:            action.SlotSensor,
-		Params:          map[string]interface{}{"systemId": f.SystemId, "origin": origin},
-		Eta:             now.Add(scanParams.Duration),
+		// board.EncodeCell, not the bare board.Cell — action.Commit's validator
+		// (design.md Decision 4) rejects a domain struct in Params.
+		Params: map[string]interface{}{"systemId": f.SystemId, "origin": board.EncodeCell(origin)},
+		Eta:    now.Add(scanParams.Duration),
 	})
 	if err != nil {
 		return nil, err
@@ -515,7 +611,7 @@ func (s *Service) Scan(ctx context.Context, id string) (*Fleet, error) {
 }
 
 // FleetsForCorp implements observation.FleetSource: every unit a corporation
-// owns, with its live hex resolved, so the fog domain can compute the corp's
+// owns, with its live cell resolved, so the fog domain can compute the corp's
 // sensor union. Passive sensors ride any moving unit, so all fleets contribute
 // regardless of movement mode.
 func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ common.WorldMillis) ([]observation.FleetPos, error) {
@@ -540,10 +636,10 @@ func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ com
 		}
 		// Position answers from effective state, so a ship that docked onto an
 		// orbiting body since its last write lends its sensor bubble from the
-		// body's LIVE hex — not the hex the burn ended on, which the body has
+		// body's LIVE cell — not the cell the burn ended on, which the body has
 		// since orbited away from (the ship would stop seeing the very thing
 		// it's holding onto).
-		hex, err := s.Position(ctx, f)
+		cell, err := s.Position(ctx, f)
 		if err != nil {
 			return nil, err
 		}
@@ -551,36 +647,48 @@ func (s *Service) FleetsForCorp(ctx context.Context, corporationID string, _ com
 			Id:            f.Id,
 			CorporationId: f.CorporationId,
 			SystemId:      f.SystemId,
-			Hex:           hex,
+			Cell:          cell,
 			ActiveScanId:  f.ActiveScanId,
 		})
 	}
 	return out, nil
 }
 
-// Position resolves the fleet's live hex at the current world time. It answers
-// from the EFFECTIVE state (board.StateAt): a burn whose arrival has passed is
-// the coast — or the dock — it settled into, so a ship that docked onto an
-// ORBITING body rides that body from the instant it arrives, whether or not the
-// authoritative settle has written yet. (That also keeps the corp's own sensor
-// bubble on the body a fleet is holding onto — see FleetsForCorp.)
-func (s *Service) Position(ctx context.Context, f *Fleet) (board.Hex, error) {
+// Position resolves the fleet's live cell at the current world time. It
+// answers from the EFFECTIVE state (board.StateAt): a burn whose arrival has
+// passed is the coast — or the dock — it settled into, so a ship that docked
+// onto an ORBITING body rides that body from the instant it arrives, whether
+// or not the authoritative settle has written yet. (That also keeps the
+// corp's own sensor bubble on the body a fleet is holding onto — see
+// FleetsForCorp.)
+//
+// A docked fleet whose parent feature cannot be resolved (e.g. an interior
+// splice guard omitted it — trading-station's degrade-to-no-station rule, or
+// system's own stored-ring guard) returns ErrFeatureAbsent, the ordinary
+// missing-feature outcome, NEVER a silent zero-value Cell (the core) with a
+// nil error — that would read as "docked at the star", which the fleet never
+// is. Every caller must check the error before trusting the returned cell.
+func (s *Service) Position(ctx context.Context, f *Fleet) (board.Cell, error) {
+	sched := board.ProductionSchedule()
+	if err := validateFleetRing(ctx, f, sched); err != nil {
+		return board.Cell{}, err
+	}
 	now := s.clock.Now()
-	eff := board.StateAt(f.State, now)
+	eff := board.StateAt(f.State, now, sched)
 	if eff.Mode == board.ModeDocked {
 		if eff.Docked == nil {
-			return board.Hex{}, nil
+			return board.Cell{}, nil
 		}
 		feat, err := s.resolveFeature(ctx, f.SystemId, eff.Docked.ParentId)
 		if err != nil {
-			return board.Hex{}, err
+			return board.Cell{}, err
 		}
 		if orb := featureOrbit(feat); orb != nil {
-			return board.OrbState(*orb, now), nil
+			return board.OrbState(*orb, now, sched), nil
 		}
 		return featureAnchor(feat), nil
 	}
-	pos, _ := board.ShipPos(eff, now)
+	pos, _ := board.ShipPos(eff, now, sched)
 	return pos, nil
 }
 
@@ -617,9 +725,12 @@ func featureOrbit(f *system.Feature) *board.Orbit {
 	return &board.Orbit{Ring: f.Orbit.Ring, Angle0: f.Orbit.Angle0, Period: f.Orbit.Period, Dir: f.Orbit.Dir}
 }
 
-func featureAnchor(f *system.Feature) board.Hex {
+// featureAnchor is a fixed feature's board cell — now a direct index, since
+// system.Feature.Footprint is []board.Cell, the same type this package
+// speaks (design.md Decision 2: no more per-boundary Hex↔Cell conversion).
+func featureAnchor(f *system.Feature) board.Cell {
 	if len(f.Footprint) == 0 {
-		return board.Hex{}
+		return board.Cell{}
 	}
-	return board.Hex{Q: f.Footprint[0].Q, R: f.Footprint[0].R}
+	return f.Footprint[0]
 }

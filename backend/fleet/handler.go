@@ -59,12 +59,22 @@ func (h *Handler) Get(c *gin.Context) {
 		h.respond(c, nil, err)
 		return
 	}
+	// Resolve position ONCE, propagating its error rather than discarding it —
+	// serving the zero-value Cell (the core) with a 200 would misreport a
+	// fleet docked to an unresolvable feature (e.g. an omitted station) as
+	// "docked at the star" (trading-station's "never a position at the core,
+	// and never a panic").
+	pos, posErr := h.svc.Position(c.Request.Context(), f)
 	// Audience fog: own fleets are never fogged; a foreign fleet the requester
 	// can't currently sense reads as not-found (server-authoritative filtering).
 	if h.fog != nil {
-		pos, _ := h.svc.Position(c.Request.Context(), f)
+		if posErr != nil {
+			log.Error().Ctx(c).Err(posErr).Str("fleetId", f.Id).Msg("could not resolve fleet position for audience check")
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
 		vis, err := h.fog.FleetVisibleTo(c.Request.Context(), common.ActorCorp(c),
-			observation.FleetPos{Id: f.Id, CorporationId: f.CorporationId, SystemId: f.SystemId, Hex: pos}, h.clock.Now())
+			observation.FleetPos{Id: f.Id, CorporationId: f.CorporationId, SystemId: f.SystemId, Cell: pos}, h.clock.Now())
 		if err != nil {
 			log.Error().Ctx(c).Err(err).Str("fleetId", f.Id).Msg("fleet audience check failed")
 			c.AbortWithStatus(http.StatusInternalServerError)
@@ -75,7 +85,12 @@ func (h *Handler) Get(c *gin.Context) {
 			return
 		}
 	}
-	c.JSON(http.StatusOK, h.toDTO(c, f))
+	if posErr != nil {
+		log.Error().Ctx(c).Err(posErr).Str("fleetId", f.Id).Msg("could not resolve fleet position")
+		h.respond(c, nil, posErr)
+		return
+	}
+	c.JSON(http.StatusOK, h.dtoFor(f, pos, common.ActorCorp(c)))
 }
 
 // List returns every fleet the requester may see in a system: their own units
@@ -115,13 +130,19 @@ func (h *Handler) List(c *gin.Context) {
 		f := &fleets[i]
 		pos, err := h.svc.Position(c.Request.Context(), f)
 		if err != nil {
-			log.Warn().Ctx(c).Err(err).Str("fleetId", f.Id).Msg("could not resolve fleet position")
+			// Never serve this fleet's position as the zero-value Cell (the
+			// core) — omit it from the list entirely rather than risk a
+			// client reading "docked at the star" for a fleet whose real
+			// position could not be resolved (trading-station's "never a
+			// position at the core, and never a panic").
+			log.Error().Ctx(c).Err(err).Str("fleetId", f.Id).Msg("could not resolve fleet position; omitting from list")
+			continue
 		}
 		// Own units are never fogged; only foreign fleets face the audience check
 		// (which also spares a per-own-unit coverage computation).
 		if h.fog != nil && f.CorporationId != requesterCid {
 			vis, err := h.fog.FleetVisibleTo(c.Request.Context(), requesterCid,
-				observation.FleetPos{Id: f.Id, CorporationId: f.CorporationId, SystemId: f.SystemId, Hex: pos}, h.clock.Now())
+				observation.FleetPos{Id: f.Id, CorporationId: f.CorporationId, SystemId: f.SystemId, Cell: pos}, h.clock.Now())
 			if err != nil {
 				log.Error().Ctx(c).Err(err).Str("fleetId", f.Id).Msg("fleet audience check failed")
 				c.AbortWithStatus(http.StatusInternalServerError)
@@ -183,11 +204,11 @@ func (h *Handler) Order(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	// A trip target is a systemId (#0008); a board target is a hex or feature
+	// A trip target is a systemId (#0008); a board target is a cell or feature
 	// (#0004). Exactly one must be present.
-	hasBoardTarget := req.Target.Hex != nil || req.Target.FeatureId != ""
+	hasBoardTarget := req.Target.Cell != nil || req.Target.FeatureId != ""
 	if req.SystemId == "" && !hasBoardTarget {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "target must be a hex, featureId, or systemId"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "target must be a cell, featureId, or systemId"})
 		return
 	}
 	if req.SystemId != "" && hasBoardTarget {
@@ -221,7 +242,15 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		log.Error().Ctx(c).Err(err).Msg("fleet operation failed")
 		c.AbortWithStatus(http.StatusInternalServerError)
 	default:
-		c.JSON(http.StatusOK, h.toDTO(c, f))
+		dto, posErr := h.toDTO(c, f)
+		if posErr != nil {
+			// Never fall through to serving the zero-value Cell (the core) as
+			// this fleet's position — propagate the same way Position's other
+			// callers do (trading-station's "never a position at the core").
+			h.respond(c, nil, posErr)
+			return
+		}
+		c.JSON(http.StatusOK, dto)
 	}
 }
 
@@ -235,7 +264,7 @@ type fleetDTO struct {
 	CorporationId string              `json:"corporationId"`
 	SystemId      string              `json:"systemId"`
 	State         board.MovementState `json:"state"`
-	Position      board.Hex           `json:"position"`
+	Position      board.Cell          `json:"position"`
 	Own           bool                `json:"own"`
 	WorldTime     common.WorldMillis  `json:"worldTime"`
 	// Roster is the owner-only ships/cargo/derived-capacity surface (#0010
@@ -278,15 +307,19 @@ func rosterFieldsFor(f *Fleet, own bool) *rosterDTO {
 	}
 }
 
-func (h *Handler) toDTO(c *gin.Context, f *Fleet) fleetDTO {
+// toDTO resolves the fleet's position and shapes the read DTO. It propagates
+// a Position error rather than swallowing it — the caller must not serve the
+// zero-value Cell (the core) as a 200 (trading-station's "never a position
+// at the core, and never a panic").
+func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 	pos, err := h.svc.Position(c.Request.Context(), f)
 	if err != nil {
-		log.Warn().Ctx(c).Err(err).Str("fleetId", f.Id).Msg("could not resolve fleet position")
+		return fleetDTO{}, err
 	}
-	return h.dtoFor(f, pos, common.ActorCorp(c))
+	return h.dtoFor(f, pos, common.ActorCorp(c)), nil
 }
 
-func (h *Handler) dtoFor(f *Fleet, pos board.Hex, requesterCid string) fleetDTO {
+func (h *Handler) dtoFor(f *Fleet, pos board.Cell, requesterCid string) fleetDTO {
 	own := requesterCid != "" && f.CorporationId == requesterCid
 	state := f.State
 	if !own {

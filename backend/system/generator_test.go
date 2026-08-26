@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"hexaverse/board"
 	"hexaverse/galaxy"
 )
 
@@ -33,7 +34,7 @@ func TestGenerate_StarAtCentreFixed(t *testing.T) {
 	if star.Type != FeatureStar || !star.Fixed {
 		t.Fatalf("expected fixed star first, got %+v", star)
 	}
-	if len(star.Footprint) != 1 || star.Footprint[0] != (Hex{0, 0}) {
+	if len(star.Footprint) != 1 || star.Footprint[0] != (board.Cell{Ring: 0, Slot: 0}) {
 		t.Fatalf("star not at centre: %+v", star.Footprint)
 	}
 }
@@ -78,7 +79,7 @@ func TestGenerate_HasBeltAndMoonRidesGiant(t *testing.T) {
 		case FeatureBelt:
 			belts++
 			if len(f.Footprint) < 2 {
-				t.Fatalf("belt %s should be a multi-hex arc, got %d hexes", f.Id, len(f.Footprint))
+				t.Fatalf("belt %s should be a multi-cell arc, got %d cells", f.Id, len(f.Footprint))
 			}
 		case FeatureGasGiant:
 			giantIDs[f.Id] = true

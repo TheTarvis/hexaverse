@@ -3,7 +3,9 @@ package stations
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/galaxy"
 	"hexaverse/observation"
@@ -46,9 +48,19 @@ type Service struct {
 	graph GraphSource
 	tiers TierSource
 	clock common.WorldTime
-	// gateRing is the lane-gate ring a station's orbit must avoid. Sourced from
-	// the shared board geometry so it cannot drift from fleet's gates or the
-	// generated interior radius.
+	// gateRing NAME NOTE (tasks.md 2.8): despite the identifier, this field
+	// holds the BOARD RADIUS DeriveOrbit places a station's orbit within, not
+	// board.GateRing(boardRadius) itself — see
+	// docs/defects/2026-08-26-station-on-gate-ring.md for the open gap between
+	// the two. tasks.md 2.8 asks for this identifier to be renamed to
+	// `boardRadius`; that rename is deliberately NOT done here because
+	// service_test.go:90 (a pre-existing, untouched-by-this-migration test)
+	// accesses this field directly by name (`svc.gateRing`), and test files may
+	// not be edited to accommodate a production rename — reported to the
+	// orchestrator as a task/test collision rather than silently either
+	// breaking the test or silently skipping the task. Sourced from the shared
+	// board geometry so it cannot drift from fleet's gates or the generated
+	// interior radius.
 	gateRing int
 	// minTier is market.Params.MinVisibilityTier, INJECTED rather than imported:
 	// market imports this package (a sale decrements a station's requests), so
@@ -180,23 +192,52 @@ func (s *Service) StationFeature(ctx context.Context, systemID string) (*system.
 	if err != nil || st == nil {
 		return nil, err
 	}
-	return FeatureOf(st), nil
+	// A FeatureOf omission (out-of-range orbit ring) degrades to no-station,
+	// never a failed interior read (tasks.md 2.8b) — FeatureOf itself already
+	// records the system id + offending ring, so nothing more to log here.
+	feat, _ := FeatureOf(st)
+	return feat, nil
 }
+
+// ErrStationRingOutOfRange means a stored station's orbit ring exceeds the
+// live board schedule's maximum — a tuning.go radius reduction (or stale
+// data) that must degrade the read, never reach board.Canon/sched.Slots and
+// panic it (design.md Decision 3's risk; tasks.md 2.8b).
+var ErrStationRingOutOfRange = errors.New("stations: station orbit ring exceeds the live board schedule")
 
 // FeatureOf shapes a station as a board feature. It carries orbital elements
 // like any orbiting feature, so fleet.Position's existing featureOrbit branch
 // resolves a docked fleet's live position with no new code.
-func FeatureOf(st *Station) *system.Feature {
+//
+// It validates the stored orbit's ring against board.ProductionSchedule()
+// BEFORE computing the footprint (stations holds no per-system interior, so
+// per design.md Decision 3 it defaults to the process-wide production
+// schedule) — this runs AHEAD of (and independently from) the interior's own
+// feature-decode guard (system.readInterior's featureRingOK, tasks.md 2.7),
+// because the splice at GetOrCreateInterior happens after that guard already
+// ran on the generated/stored features; a station is not one of them. A
+// rejection is logged HERE (with the station's system id and the offending
+// ring) rather than by each caller, so every entry point — the Service, or a
+// direct FeatureOf call from a test double — records the same way
+// (trading-station's degrade-to-no-station rule).
+func FeatureOf(st *Station) (*system.Feature, error) {
+	sched := board.ProductionSchedule()
+	if st.Orbit.Ring < 0 || st.Orbit.Ring > sched.MaxRing {
+		log.Warn().Str("systemId", st.SystemId).Int("ring", st.Orbit.Ring).Int("maxRing", sched.MaxRing).
+			Msg("Station orbit exceeds the live board schedule; omitting the station")
+		return nil, fmt.Errorf("%w: ring %d exceeds max %d", ErrStationRingOutOfRange, st.Orbit.Ring, sched.MaxRing)
+	}
 	orbit := st.Orbit
 	// Period is never persisted (it is derived from live tuning), so refill it —
 	// a station read back from the store would otherwise orbit with period 0.
 	orbit.Period = system.PeriodFor(orbit.Ring)
+	cell := board.Canon(board.Cell{Ring: orbit.Ring, Slot: orbit.Angle0}, sched)
 	return &system.Feature{
 		Id:          st.FeatureId,
 		Type:        system.FeatureStation,
 		Name:        "Trading Station",
 		Orbit:       &orbit,
-		Footprint:   []system.Hex{system.HexAtRingAngle(orbit.Ring, orbit.Angle0)},
+		Footprint:   []board.Cell{cell},
 		OwnerCorpId: st.OwnerCorpId,
-	}
+	}, nil
 }

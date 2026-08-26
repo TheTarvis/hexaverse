@@ -43,7 +43,7 @@
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-lane-eta-arch-divergence.md",
       "magnitude": "unmeasured (no sweep of real galaxy coordinates across both architectures has been run)",
-      "note": "One site, three checks bridged (defect doc §1–3): FMA contraction in laneLength; runtime math.Sqrt with no fixture family (Go-only mirror — Go-side fixture obligation per design.md); bare math.Round into the persisted ETA."
+      "note": "One site, three checks bridged (defect doc §1–3): FMA contraction in laneLength; runtime math.Sqrt with no fixture family (Go-only mirror — Go-side fixture obligation per design.md); bare math.Round into the persisted ETA. Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): fleet/routing.go is not touched by the polar migration (it operates on galaxy-tier coords, not board cells); lines re-confirmed, not assumed."
     },
     {
       "site": "galaxy.Generate coordinate/acceptance math (generator.go) — persisted galaxy coordinates",
@@ -64,58 +64,62 @@
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-galaxy-generation-arch-divergence.md",
       "magnitude": "measured (60-seed arm64-vs-amd64 sample: system ids, regions, lane counts and lane topology identical 60/60; only coordinates differ, in the low bits — 18/960 at three sampled seeds, one ULP each; a sample is an observation, not a proof, and structural stability is unproven)",
-      "note": "Compounds with the fleet.legMs entry via laneLength. cross-target lines are the compiled FMA sites; transcendental-drift lines are the textual trig/sqrt call sites — different lines by nature."
+      "note": "Compounds with the fleet.legMs entry via laneLength. cross-target lines are the compiled FMA sites; transcendental-drift lines are the textual trig/sqrt call sites — different lines by nature. Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): this is the one entry the migration does not otherwise touch (galaxy-tier generation, not board cells); all six line numbers re-confirmed by direct read, not assumed."
     },
     {
-      "site": "system interior anomaly-special richness (generator.go:88)",
+      "site": "system.Generate anomaly-special richness, the FeatureAnomaly branch (generator.go:97)",
       "file": "backend/system/generator.go",
       "checks": {
         "cross-target": [
-          88
+          97
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 88; the polar migration's schedule-threading through orbitFeature/orbitFor shifted this site down by 9 lines, no expression change."
     },
     {
-      "site": "system interior ruin-special richness (generator.go:90)",
+      "site": "system.Generate ruin-special richness, the FeatureRuin branch (generator.go:99)",
       "file": "backend/system/generator.go",
       "checks": {
         "cross-target": [
-          90
+          99
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 90; same shift as the anomaly-special site above, no expression change."
     },
     {
-      "site": "system interior belt richness — the primary mineable lode (generator.go:186)",
+      "site": "system.beltFeature richness — the primary mineable lode (generator.go:197)",
       "file": "backend/system/generator.go",
       "checks": {
         "cross-target": [
-          186
+          197
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 186; beltFeature now enumerates board.RingCells(ring, sched) instead of the retired ringHexes(ring), shifting this line, no expression change."
     },
     {
-      "site": "system interior shared rich() helper (generator.go:238)",
+      "site": "system.rich() shared richness helper (generator.go:249)",
       "file": "backend/system/generator.go",
       "checks": {
         "cross-target": [
-          238
+          249
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 238; shifted by the same schedule-threading changes earlier in the file, no expression change."
     },
     {
-      "site": "corporation spawn site-scoring (siteselection.go:54)",
+      "site": "corporations.selectSpawnSite — periphery-weighted candidate score `weight := 1 + params.PeripheryWeight*float64(periphery[s.Id])` (siteselection.go:54)",
       "file": "backend/corporations/siteselection.go",
       "checks": {
         "cross-target": [
@@ -124,10 +128,11 @@
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): this file is not touched by the polar migration; line re-confirmed, not assumed."
     },
     {
-      "site": "corporation spawn site-scoring (siteselection.go:159)",
+      "site": "corporations.centralSystemID — squared-distance-to-centroid `d := (c.X-cx)*(c.X-cx) + ...` (siteselection.go:159)",
       "file": "backend/corporations/siteselection.go",
       "checks": {
         "cross-target": [
@@ -136,10 +141,11 @@
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): this file is not touched by the polar migration; line re-confirmed, not assumed."
     },
     {
-      "site": "NPC market demand provisioning price math (provisioning.go:35)",
+      "site": "market.Params.ProvisionRequests — premium-band FMA `premium := p.PremiumBandLow + unitFloat(h)*(...)` (provisioning.go:35)",
       "file": "backend/market/provisioning.go",
       "checks": {
         "cross-target": [
@@ -148,10 +154,11 @@
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): this file is not touched by the polar migration (Decision 12 — mine/market are one-line changes); line re-confirmed, not assumed."
     },
     {
-      "site": "NPC market demand provisioning price math (provisioning.go:38)",
+      "site": "market.Params.ProvisionRequests — quantity-band FMA `quantity := p.QuantityBandLow + unitFloat(h)*(...)` (provisioning.go:38)",
       "file": "backend/market/provisioning.go",
       "checks": {
         "cross-target": [
@@ -160,10 +167,11 @@
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): this file is not touched by the polar migration (Decision 12); line re-confirmed, not assumed."
     },
     {
-      "site": "mine remainingAtNow fold — across-statement FMA fusion (service.go:187)",
+      "site": "mine.Service.Commit — remainingAtNow fold `remainingAtNow := startTons + fold`, across-statement FMA fusion (service.go:187)",
       "file": "backend/mine/service.go",
       "checks": {
         "cross-target": [
@@ -172,10 +180,11 @@
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): the migration's only mine/service.go edit is threading board.ProductionSchedule() into the board.StateAt call at line 152 (Decision 12); line re-confirmed, not assumed."
     },
     {
-      "site": "mine run ETA — bare math.Round (service.go:224)",
+      "site": "mine.Service.Commit — run ETA `eta := now.Add(common.WorldMillis(math.Round(req.Tons / fleetRate)))` (service.go:224)",
       "file": "backend/mine/service.go",
       "checks": {
         "transcendental-drift": [
@@ -184,19 +193,21 @@
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): see the note on the sibling entry above."
     },
     {
-      "site": "fleet per-tile pace — bare math.Round (service.go:117)",
+      "site": "fleet.msPerTileFor — bare math.Round of the derived per-tile pace (service.go:128)",
       "file": "backend/fleet/service.go",
       "checks": {
         "transcendental-drift": [
-          117
+          128
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured"
+      "magnitude": "unmeasured",
+      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 117; the stored-coordinate guard (ErrRingOutOfRange, validateFleetRing, maxStateRing) added ahead of it in the file shifted this line, no expression change."
     }
   ]
 }

@@ -59,7 +59,7 @@ import "sync"
 type GameTuning struct {
 	// ——— Movement (fleet) ———
 
-	// MsPerTile is the world-ms cost to burn across one hex of a system board.
+	// MsPerTile is the world-ms cost to burn across one cell of a system board.
 	// This is the single biggest lever on how fast the game FEELS in-system.
 	MsPerTile WorldMillis
 	// LaneMsPerDistance is the world-ms to cross one unit of 3D lane length
@@ -87,12 +87,13 @@ type GameTuning struct {
 	// the visual too — no mirrored constant (frontend: board/scan-sweep.ts,
 	// SWEEP_TUNING, which holds the theater-only dials).
 	ScanDuration WorldMillis
-	// AmbientRadius is the passive sensor bubble, in hexes, that rides any unit.
+	// AmbientRadius is the passive sensor bubble, in lattice hops (the polar
+	// board's hop metric — board.Distance/board.Within), that rides any unit.
 	AmbientRadius int
 
 	// ——— Board geometry (structural invariant, not pacing) ———
 
-	// BoardRadius is the hex radius of every system board — the ring the lane
+	// BoardRadius is the cell/ring radius of every system board — the ring the lane
 	// gates sit on. It is a CROSS-DOMAIN INVARIANT: system generation, fleet gate
 	// placement, and the spawn rim ring must all agree, and before this struct
 	// existed the value 16 was written in three places with "must match" comments.
@@ -102,26 +103,28 @@ type GameTuning struct {
 
 // DefaultTuning is the playtest baseline.
 //
-// Retuned 2026-07-13 for pace: a hex of burn was one world-MINUTE (60s of real
+// Retuned 2026-07-13 for pace: a cell of burn was one world-MINUTE (60s of real
 // time at scale 1), which made the slice feel sluggish to play. It is now 5s.
 // Scan came down from a world-hour to 30s for the same reason. The RELATIVE cost
-// of a hex vs a lane vs a scan is preserved — this is a uniform speed-up, not a
+// of a cell vs a lane vs a scan is preserved — this is a uniform speed-up, not a
 // rebalance.
 func DefaultTuning() GameTuning {
 	return GameTuning{
 		// Movement
-		MsPerTile:         2_500,      // 5s per hex   (was 60_000 — one world-minute)
+		MsPerTile:         2_500,      // 5s per cell  (was 60_000 — one world-minute)
 		LaneMsPerDistance: 2_500,      // 5s per unit of lane length (was 60_000)
 		InterceptHorizon:  86_400_000, // one world-day of lead search
 
-		// Orbits — one revolution at ring 1; a hex is crossed every value/6, on
-		// every ring. 3_600_000 = a hex per 10 real minutes (imperceptible);
-		// 60_000 = a hex per 10s; 600 = a hex per 100ms (a spinning demo).
+		// Orbits — one revolution at ring 1. Under the pinned banded slot
+		// schedule the per-cell cadence is NOT a uniform OrbitBasePeriod/6
+		// everywhere (see OrbitPeriod's doc comment) — it varies by ring band,
+		// fastest on the sparsest inner rings and slowest where a band has
+		// just doubled its slot count.
 		OrbitBasePeriod: 36000,
 
 		// Sensing
 		ScanDuration:  15_000, // 15s — one faster origin-pinned ring (#0006 Decision #26; was 30s)
-		AmbientRadius: 3,      // hexes
+		AmbientRadius: 3,      // lattice hops
 
 		// Geometry
 		BoardRadius: 16,
@@ -133,22 +136,34 @@ func DefaultTuning() GameTuning {
 // round. It applies to EVERYTHING resting on a board — a planet and a coasting
 // fleet on the same ring keep the same period, because they're the same physics.
 // (There used to be a separate CoastPeriod for fleets, flat and un-scaled by ring,
-// which quietly meant a fleet at the rim crossed hexes faster than one near the
+// which quietly meant a fleet at the rim crossed cells faster than one near the
 // star. It read as a second knob; it was really the same knob with a bug in it.)
 //
 // Two consequences worth knowing before you retune:
 //
-//   - A ring has 6 × N cells, so the ring factor cancels and the rate you actually
-//     SEE is uniform: one hex crossed every OrbitBasePeriod / 6. At the 3_600_000
-//     baseline that's a hex every 10 real minutes — motion is on, but far below
-//     the threshold of noticing. 60_000 gives a hex every 10s.
+//   - The PERIOD law is linear in ring (OrbitBasePeriod × N) — that part is
+//     exactly what it looks like. But under the pinned banded slot schedule
+//     (board.Schedule; board-tactical-math, "The Production Slot Schedule Is
+//     Pinned to Isotropic") a ring's slot count is NOT 6 × N — it is constant
+//     within a band and only doubles at a handful of ring boundaries (2, 3, 5,
+//     9, 17). So the PER-SLOT cadence, period / Slots(ring), is uniform only
+//     WITHIN a band and drops by half at every doubling boundary: two rings
+//     with the same period (impossible here, since period scales with ring
+//     too) or, more to the point, two DIFFERENT rings can have wildly
+//     different per-cell rates once their slot counts diverge — a ring just
+//     past a doubling boundary advances its cells twice as slowly, cell for
+//     cell, as the ring just before it, even though both take longer overall
+//     to complete a full revolution than any inner ring. The old hex-era
+//     shortcut ("a ring has 6×N cells, so the ring factor cancels and the
+//     rate you see is uniform everywhere") is FALSE under this schedule and
+//     must not be re-derived from this comment.
 //   - A coasting fleet therefore DRIFTS. Parking beside a body no longer holds
 //     station beside it (bodies orbit either way; coast is always prograde) —
 //     docking is what holds station. That is the intended shape: coast = a free
 //     orbit at your radius, dock = attached to a body, riding it.
 //
 // Ring 0 (the star) has no orbit; the period there is meaningless and the callers
-// return the centre hex without consulting it.
+// return the centre cell without consulting it.
 func (t GameTuning) OrbitPeriod(ring int) WorldMillis {
 	if ring <= 0 {
 		return 0

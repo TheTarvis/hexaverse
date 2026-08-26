@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"math/rand"
 
+	"hexaverse/board"
 	"hexaverse/galaxy"
+	"hexaverse/polar"
 )
 
 func newRand(seed int64) *rand.Rand { return rand.New(rand.NewSource(seed)) }
@@ -14,9 +16,16 @@ func newRand(seed int64) *rand.Rand { return rand.New(rand.NewSource(seed)) }
 // skeleton rolled in #0001. It extends that skeleton with the paid detail —
 // small bodies, belts, moons, anomalies/ruins, hazards — never contradicting it
 // (same seed derivation, skeleton bodies present in the interior).
+//
+// Placement is onto the pinned production slot schedule at this system's own
+// radius (design.md Decision 3: system.Generate is one of the two callers that
+// hold a per-system radius rather than defaulting to
+// board.ProductionSchedule()) — board.Schedule(params.Radius), resolved once
+// here and threaded to every placement helper.
 func Generate(seed int64, region string, skeleton galaxy.Skeleton, params GenerationParams) GeneratedInterior {
 	r := newRand(seed)
 	dial := params.dialFor(region)
+	sched := board.Schedule(params.Radius)
 
 	// The disk's dominant spin: every disk-born body (skeleton majors, belts,
 	// hazards) orbits prograde in it; only capture-plausible detail may rarely run
@@ -28,7 +37,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 	// Star at the centre — fixed, no orbit.
 	features = append(features, Feature{
 		Id: "feat-star", Type: FeatureStar, Name: "Star (" + skeleton.StarClass + ")",
-		Fixed: true, Footprint: []Hex{{Q: 0, R: 0}},
+		Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}},
 	})
 
 	// Skeleton major bodies → orbit features at their rings (extends #0001).
@@ -37,7 +46,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		ring := clampRing(b.Ring, params.Radius)
 		ft := featureTypeForBody(b.Type)
 		id := fmt.Sprintf("feat-body-%d", i)
-		f := orbitFeature(id, ft, ring, sysDir, r)
+		f := orbitFeature(id, ft, ring, sysDir, r, sched)
 		f.Resources = resourcesFor(bandForRing(ring, params), ft, dial.RichnessMult, r)
 		features = append(features, f)
 		if ft == FeatureGasGiant {
@@ -55,7 +64,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 			ft = FeatureIce
 		}
 		id := fmt.Sprintf("feat-extra-%d", i)
-		f := orbitFeature(id, ft, ring, diskOrCaptured(sysDir, params.RetrogradeChance, r), r)
+		f := orbitFeature(id, ft, ring, diskOrCaptured(sysDir, params.RetrogradeChance, r), r, sched)
 		f.Resources = resourcesFor(bandForRing(ring, params), ft, dial.RichnessMult, r)
 		features = append(features, f)
 	}
@@ -63,14 +72,14 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 	// Belts as ring arcs (metals inner, ice outer).
 	for i := 0; i < dial.Belts; i++ {
 		ring := 2 + r.Intn(params.Radius-2)
-		features = append(features, beltFeature(fmt.Sprintf("feat-belt-%d", i), ring, sysDir, r, params, dial))
+		features = append(features, beltFeature(fmt.Sprintf("feat-belt-%d", i), ring, sysDir, r, params, dial, sched))
 	}
 
 	// Moons riding gas giants.
 	for i, gid := range giantIDs {
 		features = append(features, Feature{
 			Id: fmt.Sprintf("feat-moon-%d", i), Type: FeatureMoon, ParentId: gid,
-			Footprint: []Hex{{Q: 0, R: 0}}, // computed relative to parent at render time
+			Footprint: []board.Cell{{Ring: 0, Slot: 0}}, // computed relative to parent at render time
 			Resources: resourcesFor(BandOuter, FeatureMoon, dial.RichnessMult, r),
 		})
 	}
@@ -83,7 +92,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		if r.Float64() < 0.5 {
 			ft = FeatureRuin
 		}
-		f := orbitFeature(fmt.Sprintf("feat-special-%d", i), ft, ring, diskOrCaptured(sysDir, params.RetrogradeChance, r), r)
+		f := orbitFeature(fmt.Sprintf("feat-special-%d", i), ft, ring, diskOrCaptured(sysDir, params.RetrogradeChance, r), r, sched)
 		if ft == FeatureAnomaly {
 			f.Resources = []Resource{{Kind: ResourceExotic, Richness: 0.4 + 0.6*r.Float64()*dial.RichnessMult}}
 		} else {
@@ -94,7 +103,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 
 	// Hazards (features with effects payloads).
 	for i := 0; i < dial.Hazards; i++ {
-		features = append(features, hazardFeature(fmt.Sprintf("feat-hazard-%d", i), sysDir, r, params))
+		features = append(features, hazardFeature(fmt.Sprintf("feat-hazard-%d", i), sysDir, r, params, sched))
 	}
 
 	return GeneratedInterior{
@@ -111,11 +120,11 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 
 // --- Feature builders ------------------------------------------------------
 
-func orbitFeature(id string, ft FeatureType, ring, dir int, r *rand.Rand) Feature {
-	orb := orbitFor(ring, dir, r)
+func orbitFeature(id string, ft FeatureType, ring, dir int, r *rand.Rand, sched polar.Schedule) Feature {
+	orb := orbitFor(ring, dir, r, sched)
 	return Feature{
 		Id: id, Type: ft, Orbit: &orb,
-		Footprint: []Hex{hexAtRingAngle(ring, orb.Angle0)},
+		Footprint: []board.Cell{board.Canon(board.Cell{Ring: ring, Slot: orb.Angle0}, sched)},
 	}
 }
 
@@ -123,11 +132,13 @@ func orbitFeature(id string, ft FeatureType, ring, dir int, r *rand.Rand) Featur
 // persisted; Period is filled from live tuning here only so an in-memory interior
 // (the just-generated one) matches a re-read one — see PeriodFor. Dir is not a
 // per-body coin flip: the caller resolves it from the system's dominant
-// direction (plus, for capture-plausible detail, diskOrCaptured).
-func orbitFor(ring, dir int, r *rand.Rand) Orbit {
+// direction (plus, for capture-plausible detail, diskOrCaptured). Angle0 draws
+// from the LIVE schedule's slot count for the ring (never a fixed 6×ring — see
+// design.md Decision 2's hazard).
+func orbitFor(ring, dir int, r *rand.Rand, sched polar.Schedule) Orbit {
 	return Orbit{
 		Ring:   ring,
-		Angle0: r.Intn(maxInt(1, 6*ring)),
+		Angle0: r.Intn(sched.Slots(ring)),
 		Period: PeriodFor(ring),
 		Dir:    dir,
 	}
@@ -167,12 +178,12 @@ func diskOrCaptured(sysDir int, retrogradeChance float64, r *rand.Rand) int {
 	return sysDir
 }
 
-func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams, dial CharacterDial) Feature {
-	all := ringHexes(ring)
+func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams, dial CharacterDial, sched polar.Schedule) Feature {
+	all := board.RingCells(ring, sched)
 	// An arc: a contiguous run covering ~40–70% of the ring.
 	arcLen := maxInt(1, len(all)*(4+r.Intn(4))/10)
 	start := r.Intn(len(all))
-	arc := make([]Hex, 0, arcLen)
+	arc := make([]board.Cell, 0, arcLen)
 	for i := 0; i < arcLen; i++ {
 		arc = append(arc, all[(start+i)%len(all)])
 	}
@@ -180,14 +191,14 @@ func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams
 	if bandForRing(ring, params) == BandOuter {
 		kind = ResourceWater
 	}
-	orb := orbitFor(ring, dir, r)
+	orb := orbitFor(ring, dir, r, sched)
 	return Feature{
 		Id: id, Type: FeatureBelt, Orbit: &orb, Footprint: arc,
 		Resources: []Resource{{Kind: kind, Richness: 0.3 + 0.5*r.Float64()*dial.RichnessMult}},
 	}
 }
 
-func hazardFeature(id string, dir int, r *rand.Rand, params GenerationParams) Feature {
+func hazardFeature(id string, dir int, r *rand.Rand, params GenerationParams, sched polar.Schedule) Feature {
 	ring := 1 + r.Intn(params.Radius)
 	band := bandForRing(ring, params)
 	var ft FeatureType
@@ -202,10 +213,10 @@ func hazardFeature(id string, dir int, r *rand.Rand, params GenerationParams) Fe
 	default:
 		ft, eff = FeatureDebris, Effects{MoveMod: 0.7}
 	}
-	orb := orbitFor(ring, dir, r)
+	orb := orbitFor(ring, dir, r, sched)
 	return Feature{
 		Id: id, Type: ft, Orbit: &orb,
-		Footprint: []Hex{hexAtRingAngle(ring, orb.Angle0)},
+		Footprint: []board.Cell{board.Canon(board.Cell{Ring: ring, Slot: orb.Angle0}, sched)},
 		Effects:   &eff,
 	}
 }

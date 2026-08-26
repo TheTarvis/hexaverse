@@ -104,9 +104,9 @@ type FeatureObservation struct {
 	// renders at its CURRENT computed position (board.OrbState) from these — the
 	// clockwork keeps ticking (#0006 Decision #9). Nil for fixed/anchored bodies.
 	Elements *board.Orbit `json:"elements,omitempty" firestore:"elements,omitempty"`
-	// Anchor is the epoch hex for fixed/footprint bodies (the star, belts) that
+	// Anchor is the epoch cell for fixed/footprint bodies (the star, belts) that
 	// don't orbit.
-	Anchor *board.Hex `json:"anchor,omitempty" firestore:"anchor,omitempty"`
+	Anchor *board.Cell `json:"anchor,omitempty" firestore:"anchor,omitempty"`
 	// Detail is the last-scanned composition/threat report (mints the intel).
 	Detail *FeatureDetail `json:"detail,omitempty" firestore:"detail,omitempty"`
 	// Activity is the last-seen activity (mining, fleets) — frozen at AsOf. Empty
@@ -152,7 +152,7 @@ const (
 // elements (to compute the current position) plus the frozen detail/activity.
 type FeatureMemory struct {
 	Elements *board.Orbit
-	Anchor   *board.Hex
+	Anchor   *board.Cell
 	Detail   *FeatureDetail
 	Activity *FeatureActivity
 	AsOf     common.WorldMillis
@@ -166,7 +166,7 @@ type FleetPos struct {
 	Id            string
 	CorporationId string
 	SystemId      string
-	Hex           board.Hex
+	Cell          board.Cell
 	// ActiveScanId is the unit's running scan, if any — the radial-echo
 	// revision reads it to grow the live echo disc during the scan.
 	ActiveScanId string
@@ -179,13 +179,16 @@ type FleetPos struct {
 type FeatureGeom struct {
 	Id           string
 	Elements     *board.Orbit
-	Anchor       board.Hex
+	Anchor       board.Cell
 	Astronomical bool
-	// Occludes marks a large body (the star, planets) that shadows everything
-	// behind it from both sensing modes (#0006 Decision #16). Which feature
-	// types qualify is the system domain's rule.
-	Occludes bool
-	Detail   *FeatureDetail
+	// OcclusionRadius2 is the squared radial-unit radius (in board.LineOfSight
+	// units) within which this feature's chord blocks sight from both sensing
+	// modes (#0006 Decision #16) — zero means "does not occlude". The
+	// kind→radius table (StarOcclusionRadius2, PlanetOcclusionRadius2) is the
+	// system domain's rule (design.md Decision 1); observation stays purely
+	// geometric and never learns what a gas giant is.
+	OcclusionRadius2 int64
+	Detail           *FeatureDetail
 }
 
 // FleetSource is the fleet-domain dependency (fleet.Service implements it). It

@@ -75,7 +75,7 @@ func TestIntegration_TravelArriveReveals(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	seeded, err := fsvc.SeedFleet(ctx, "sys-0", corp, board.Hex{Q: 1, R: 0})
+	seeded, err := fsvc.SeedFleet(ctx, "sys-0", corp, board.Cell{Ring: 1, Slot: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,8 +117,8 @@ func TestIntegration_TravelArriveReveals(t *testing.T) {
 	// Landed coasting on the destination's gate ring (the lane-mouth tile —
 	// three rings in from the rim, board.GateRing).
 	wantRing := board.GateRing(DefaultMovementParams().BoardRadius)
-	if pos := board.OrbState(*arrived.State.Coast, clk.now); board.Ring(pos) != wantRing {
-		t.Fatalf("expected coast on the gate ring %d, got ring %d", wantRing, board.Ring(pos))
+	if pos := board.OrbState(*arrived.State.Coast, clk.now, testSched()); pos.Ring != wantRing {
+		t.Fatalf("expected coast on the gate ring %d, got ring %d", wantRing, pos.Ring)
 	}
 
 	// The destination flipped to Explored (the arrival reveal).

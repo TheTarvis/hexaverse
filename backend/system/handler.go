@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"hexaverse/action"
+	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/galaxy"
 	"hexaverse/observation"
@@ -123,7 +124,7 @@ func (h *Handler) GetInterior(c *gin.Context) {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
-			features = projectFogged(gen, cov, remembered, now)
+			features = projectFogged(gen, cov, remembered, now, board.Schedule(gen.Interior.Radius))
 			gates = chartedGates(gates, tiers)
 		}
 	}

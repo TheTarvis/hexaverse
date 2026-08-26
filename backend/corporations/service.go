@@ -10,6 +10,7 @@ import (
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
 	"hexaverse/observation"
+	"hexaverse/polar"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -32,7 +33,7 @@ type GraphSource interface {
 // FleetSource places the starting hull and answers the death invariant's
 // fleet-count question. Cross-domain through the service, never the DAO.
 type FleetSource interface {
-	SeedFleet(ctx context.Context, systemID, corporationID string, at board.Hex) (*fleet.Fleet, error)
+	SeedFleet(ctx context.Context, systemID, corporationID string, at board.Cell) (*fleet.Fleet, error)
 	ListForCorp(ctx context.Context, corporationID string) ([]fleet.Fleet, error)
 }
 
@@ -229,7 +230,7 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation, site
 			}
 		}
 		home = site.Id
-		hull, err = s.fleets.SeedFleet(ctx, home, corp.Id, s.rimHex(corp.AccountId))
+		hull, err = s.fleets.SeedFleet(ctx, home, corp.Id, s.rimCell(corp.AccountId, board.ProductionSchedule()))
 		if err != nil {
 			return nil, err
 		}
@@ -468,11 +469,17 @@ func (s *Service) claimedSpace(ctx context.Context, exceptCorpID string) (map[st
 	return claimed, nil
 }
 
-// rimHex is the starting hull's coast position: a deterministic hex on the rim
-// ring (one inside the lane-gate ring), account-seeded so a heal re-places it in
-// the same spot. Rim hexes are never the core, satisfying SeedFleet's guard.
-func (s *Service) rimHex(accountId string) board.Hex {
-	ring := board.RingHexes(s.params.RimRing)
-	idx := int(uint64(seedFromAccount(accountId)) % uint64(len(ring)))
-	return ring[idx]
+// rimCell is the starting hull's coast position: a deterministic cell on the
+// rim ring (one inside the lane-gate ring), account-seeded so a heal
+// re-places it in the same spot. Rim cells are never the core, satisfying
+// SeedFleet's guard.
+//
+// design.md Decision 5: no board.RingCells enumeration — asking the live
+// schedule's slot count for RimRing and taking the account-seeded modulus is
+// the same discretized choice with no allocation, and it draws from the
+// SCHEDULE's real slot count rather than a fixed per-ring assumption.
+func (s *Service) rimCell(accountId string, sched polar.Schedule) board.Cell {
+	slots := sched.Slots(s.params.RimRing)
+	slot := int(uint64(seedFromAccount(accountId)) % uint64(slots))
+	return board.Cell{Ring: s.params.RimRing, Slot: slot}
 }

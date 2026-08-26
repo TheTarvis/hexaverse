@@ -54,7 +54,7 @@ func beltFeature(id string, kinds ...system.ResourceKind) system.Feature {
 	for i, k := range kinds {
 		res[i] = system.Resource{Kind: k, Richness: 0.5}
 	}
-	return system.Feature{Id: id, Type: system.FeatureBelt, Footprint: []system.Hex{{Q: 3, R: 0}}, Resources: res}
+	return system.Feature{Id: id, Type: system.FeatureBelt, Footprint: []board.Cell{{Ring: 3, Slot: 0}}, Resources: res}
 }
 
 // mineTestStack wires a real fleet.Service + action.Service against the

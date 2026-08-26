@@ -494,7 +494,7 @@ func (s *Service) settle(ctx context.Context, in settleInput) (*SellResult, erro
 // Effective, not stored: a burn past its arrival time already IS its settled
 // dock, and board.StateAt is what folds that.
 func dockedTo(f *fleet.Fleet, featureID string, now common.WorldMillis) bool {
-	eff := board.StateAt(f.State, now)
+	eff := board.StateAt(f.State, now, board.ProductionSchedule())
 	return eff.Mode == board.ModeDocked && eff.Docked != nil && eff.Docked.ParentId == featureID
 }
 

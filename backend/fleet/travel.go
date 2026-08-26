@@ -123,15 +123,16 @@ func (s *Service) buildTrip(ctx context.Context, f *Fleet, plan *routePlan, now 
 	route := plan.route
 	n := len(route)
 
+	sched := board.ProductionSchedule()
 	origin := plan.systems[route[0]]
 	next := plan.systems[route[1]]
-	departGate := board.LaneGateHex(origin.Coords.X, origin.Coords.Y, next.Coords.X, next.Coords.Y, s.params.BoardRadius)
+	departGate := board.LaneGateCell(origin.Coords.X, origin.Coords.Y, next.Coords.X, next.Coords.Y, s.params.BoardRadius)
 
 	from, err := s.Position(ctx, f)
 	if err != nil {
 		return nil, err
 	}
-	boardSol := board.SolveHex(from, departGate, now, s.msPerTileFor(f))
+	boardSol := board.SolveCell(from, departGate, now, s.msPerTileFor(f), sched)
 	boardLeg := &board.BoardLeg{Path: boardSol.Path, StartTime: now, GateEta: boardSol.ArriveTime}
 
 	// LegEtas[0] is the gate ETA (when the fleet enters the first lane); each lane
@@ -144,7 +145,7 @@ func (s *Service) buildTrip(ctx context.Context, f *Fleet, plan *routePlan, now 
 
 	dest := plan.systems[route[n-1]]
 	prev := plan.systems[route[n-2]]
-	entryGate := board.LaneGateHex(dest.Coords.X, dest.Coords.Y, prev.Coords.X, prev.Coords.Y, s.params.BoardRadius)
+	entryGate := board.LaneGateCell(dest.Coords.X, dest.Coords.Y, prev.Coords.X, prev.Coords.Y, s.params.BoardRadius)
 
 	return &board.LaneTransit{
 		BoardLeg:   boardLeg,

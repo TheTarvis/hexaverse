@@ -23,6 +23,12 @@ type fakeFleetSvc struct {
 	scanErr    error
 	getErr     error
 	previewErr error
+	// pos/posErr let a test script Position's return independently of fleet —
+	// added for the trading-station "omitted station" scenario
+	// (station_omission_test.go), where Position must be able to fail even
+	// though Get succeeds.
+	pos    board.Cell
+	posErr error
 }
 
 func (f *fakeFleetSvc) Get(context.Context, string) (*Fleet, error) { return f.fleet, f.getErr }
@@ -40,11 +46,11 @@ func (f *fakeFleetSvc) PreviewRoute(context.Context, string, string) (*RoutePrev
 }
 func (f *fakeFleetSvc) Cancel(context.Context, string) (*Fleet, error) { return f.fleet, nil }
 func (f *fakeFleetSvc) Scan(context.Context, string) (*Fleet, error)   { return f.fleet, f.scanErr }
-func (f *fakeFleetSvc) SeedFleet(context.Context, string, string, board.Hex) (*Fleet, error) {
+func (f *fakeFleetSvc) SeedFleet(context.Context, string, string, board.Cell) (*Fleet, error) {
 	return f.fleet, nil
 }
-func (f *fakeFleetSvc) Position(context.Context, *Fleet) (board.Hex, error) {
-	return board.Hex{}, nil
+func (f *fakeFleetSvc) Position(context.Context, *Fleet) (board.Cell, error) {
+	return f.pos, f.posErr
 }
 
 type fakeAudience struct{ visible bool }

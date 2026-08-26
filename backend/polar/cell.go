@@ -20,8 +20,8 @@ package polar
 // pair. Ring 0 is the single core cell and carries no angular index — its
 // canonical form is always {0, 0}.
 type Cell struct {
-	Ring int `json:"ring"`
-	Slot int `json:"slot"`
+	Ring int `json:"ring" firestore:"ring"`
+	Slot int `json:"slot" firestore:"slot"`
 }
 
 // NormalizeSlot wraps a raw slot index into [0, slots), in both directions

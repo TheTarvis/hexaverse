@@ -16,6 +16,9 @@
 package board
 
 import (
+	"sync"
+
+	"hexaverse/common"
 	"hexaverse/polar"
 )
 
@@ -44,6 +47,69 @@ func DoubleAt() []int { return []int{2, 3, 5, 9, 17} }
 // wherever they overlap.
 func Schedule(maxRing int) polar.Schedule {
 	return polar.NewBandedSchedule(InnerSlots, DoubleAt(), maxRing)
+}
+
+var (
+	productionScheduleMu     sync.RWMutex
+	productionScheduleRadius = -1 // sentinel: never a valid BoardRadius
+	productionSchedule       polar.Schedule
+)
+
+// ProductionSchedule returns Schedule(common.Tuning().BoardRadius) — the
+// default schedule source for every caller that does not hold a per-system
+// radius (fleet, corporations, stations, mine, market, every action.Params
+// decode; design.md Decision 3). Memoized on the RADIUS VALUE, not called
+// once and cached forever: a live retune of common.Tuning().BoardRadius is
+// observed on the next call.
+func ProductionSchedule() polar.Schedule {
+	radius := common.Tuning().BoardRadius
+
+	productionScheduleMu.RLock()
+	if productionScheduleRadius == radius {
+		s := productionSchedule
+		productionScheduleMu.RUnlock()
+		return s
+	}
+	productionScheduleMu.RUnlock()
+
+	productionScheduleMu.Lock()
+	defer productionScheduleMu.Unlock()
+	if productionScheduleRadius != radius {
+		productionSchedule = Schedule(radius)
+		productionScheduleRadius = radius
+	}
+	return productionSchedule
+}
+
+// Within returns every cell at most radius hops from center under the
+// lattice hop metric — the set form of Distance's "within N" rule. It is the
+// bounded form of the BFS Distance already runs (same neighbors enumeration,
+// same polar.IsAdjacent predicate), stopping the frontier expansion at
+// radius instead of walking until a single target is found. Go-only: fog
+// coverage is server-side only, so there is no TS mirror and no fixture
+// family (design.md Decision 6; fixtures/board/mirror-map.json's goOnly
+// list).
+func Within(center Cell, radius int, s polar.Schedule) map[Cell]bool {
+	center = Canon(center, s)
+	out := map[Cell]bool{center: true}
+	if radius <= 0 {
+		return out
+	}
+	frontier := []Cell{center}
+	for hop := 0; hop < radius && len(frontier) > 0; hop++ {
+		var next []Cell
+		for _, c := range frontier {
+			for _, nb := range neighbors(c, s) {
+				if out[nb] {
+					continue
+				}
+				out[nb] = true
+				next = append(next, nb)
+			}
+		}
+		frontier = next
+	}
+	return out
 }
 
 // RingCells returns the cells on a ring in slot order — the fixed enumeration

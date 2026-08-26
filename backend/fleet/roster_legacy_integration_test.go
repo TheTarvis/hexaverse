@@ -36,7 +36,7 @@ func TestFleetDao_Scenario_PreExistingFleetNoStoredRosterDecodesToOneSeedHullThr
 		Id:            "fleet-legacy-roster",
 		CorporationId: "corp-legacy",
 		SystemId:      "sys-legacy",
-		State:         board.CoastAt(board.Hex{Q: 1, R: 0}, 0),
+		State:         board.CoastAt(board.Cell{Ring: 1, Slot: 0}, 0, testSched()),
 	}
 	if err := dao.Save(ctx, legacy); err != nil {
 		t.Fatalf("seed legacy fleet: %v", err)

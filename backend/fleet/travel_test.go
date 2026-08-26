@@ -47,10 +47,10 @@ func TestOrderTravel_FreezesTripAndCommits(t *testing.T) {
 		t.Fatalf("arriveTime %d != last legEta %d", lt.ArriveTime, lt.LegEtas[2])
 	}
 	gateRing := board.GateRing(svc.params.BoardRadius)
-	if lt.BoardLeg == nil || board.Ring(lt.BoardLeg.Path[len(lt.BoardLeg.Path)-1]) != gateRing {
+	if lt.BoardLeg == nil || lt.BoardLeg.Path[len(lt.BoardLeg.Path)-1].Ring != gateRing {
 		t.Fatalf("board leg should burn to a gate on the gate ring (%d): %+v", gateRing, lt.BoardLeg)
 	}
-	if board.Ring(lt.EntryGate) != gateRing {
+	if lt.EntryGate.Ring != gateRing {
 		t.Fatalf("entry gate should sit on the gate ring (%d): %v", gateRing, lt.EntryGate)
 	}
 	if fa.committed == nil || fa.committed.Type != travelType || fa.committed.Scope != "C" {
@@ -80,7 +80,7 @@ func TestCancel_MidLaneHolds(t *testing.T) {
 	clk := &fakeClock{now: 400} // between B (300) and C (500) on the second lane
 	svc, dao, _ := travelSvc(t, clk, map[string]observation.Tier{"A": observation.TierExplored})
 	lt := &board.LaneTransit{
-		BoardLeg:   &board.BoardLeg{Path: []board.Hex{{Q: 0, R: 0}}, StartTime: 0, GateEta: 100},
+		BoardLeg:   &board.BoardLeg{Path: []board.Cell{{Ring: 0, Slot: 0}}, StartTime: 0, GateEta: 100},
 		Route:      []string{"A", "B", "C"},
 		LegEtas:    []common.WorldMillis{100, 300, 500},
 		ArriveTime: 500,

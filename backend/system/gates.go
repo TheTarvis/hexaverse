@@ -9,16 +9,17 @@ import (
 	"hexaverse/observation"
 )
 
-// LaneGate is a charted lane's fixed gate tile on this system's board — the tile
-// where the lane toward DestSystemId meets the gate ring, the inner edge of the
-// outer band (#0008 Decision #10; radial placement refined 2026-07-14). The
-// bearing is projected deterministically (board.LaneGateHex), so the server and
-// every client agree on it, and it is the SAME projection the fleet uses to
-// compute a departure gate (fleet/travel.go), so the rendered glyph and the tile
-// a fleet actually burns to are one hex.
+// LaneGate is a charted lane's fixed gate cell on this system's board — the
+// cell where the lane toward DestSystemId meets the gate ring, the inner edge
+// of the outer band (#0008 Decision #10; radial placement refined
+// 2026-07-14). The bearing is projected deterministically
+// (board.LaneGateCell), so the server and every client agree on it, and it is
+// the SAME projection the fleet uses to compute a departure gate
+// (fleet/travel.go), so the rendered glyph and the cell a fleet actually
+// burns to are one cell.
 type LaneGate struct {
-	DestSystemId string    `json:"destSystemId"`
-	Hex          board.Hex `json:"hex"`
+	DestSystemId string     `json:"destSystemId"`
+	Cell         board.Cell `json:"cell"`
 }
 
 // LaneGates returns every lane gate on the given system's board: for each lane
@@ -61,7 +62,7 @@ func (s *Service) LaneGates(ctx context.Context, systemID string, radius int) ([
 		}
 		gates = append(gates, LaneGate{
 			DestSystemId: nb,
-			Hex:          board.LaneGateHex(self.Coords.X, self.Coords.Y, nc.X, nc.Y, radius),
+			Cell:         board.LaneGateCell(self.Coords.X, self.Coords.Y, nc.X, nc.Y, radius),
 		})
 	}
 	// Deterministic order so the read is stable across requests.

@@ -44,7 +44,7 @@ func TravelResolver(params MovementParams, arrivals ArrivalRecorder) action.Reso
 			return action.ResolveResult{Outcome: "trip already settled"}, nil
 		}
 		dest := lt.Route[len(lt.Route)-1]
-		coast := board.CoastAt(lt.EntryGate, r.At)
+		coast := board.CoastAt(lt.EntryGate, r.At, board.ProductionSchedule())
 		actorState := map[string]interface{}{
 			"systemId":  dest,
 			"state":     coast,

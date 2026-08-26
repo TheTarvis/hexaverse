@@ -57,7 +57,17 @@
     { "pair": "LaneFraction/laneFraction", "ruleBearing": true, "expectedChange": "the consumer-migration change (rule-bearing: lane position/fraction reads; may not survive another board-modifying change uncovered)" },
     { "pair": "Arrived/arrived", "ruleBearing": false, "expectedChange": "unassigned (a stored-state threshold comparison; asserted by unit tests on both sides)" }
   ],
-  "goOnly": ["containsCell", "loadTable"],
+  "goOnly": [
+    "containsCell",
+    "loadTable",
+    "Within",
+    "EncodeCell",
+    "DecodeCell",
+    "EncodeTarget",
+    "DecodeTarget",
+    "ProductionSchedule",
+    "decodeInt"
+  ],
   "tsOnly": [
     "boardLegBurn",
     "cellKey",

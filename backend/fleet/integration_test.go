@@ -51,7 +51,7 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 	asvc.RegisterResolver(burnType, action.KindKinematic, BurnResolver(DefaultMovementParams()))
 	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, asvc, clk)
 	// Seed just off the core — the star at (0,0) is not a legal fleet position.
-	seeded, err := fsvc.SeedFleet(ctx, "sys-0", "dev-corp", board.Hex{Q: 1, R: 0})
+	seeded, err := fsvc.SeedFleet(ctx, "sys-0", "dev-corp", board.Cell{Ring: 1, Slot: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 		t.Fatalf("burn action status = %s, want done", act.Status)
 	}
 
-	// The docked position resolves to the parent body's live hex.
+	// The docked position resolves to the parent body's live cell.
 	pos, err := fsvc.Position(ctx, arrived)
 	if err != nil {
 		t.Fatal(err)

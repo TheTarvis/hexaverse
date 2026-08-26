@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"hexaverse/board"
 	"hexaverse/galaxy"
 	"hexaverse/system"
 )
@@ -27,6 +28,7 @@ func TestDeriveOrbit_IsDeterministic(t *testing.T) {
 func TestDeriveOrbit_NeverCoreNeverGateRing(t *testing.T) {
 	// The core holds the star; the gate ring holds the lane departures. A station
 	// on either would collide with something that is already there.
+	sched := board.Schedule(testGateRing)
 	for seed := int64(0); seed < 50; seed++ {
 		for i := 0; i < 20; i++ {
 			sysID := fmt.Sprintf("sys-%d-%d", seed, i)
@@ -37,10 +39,62 @@ func TestDeriveOrbit_NeverCoreNeverGateRing(t *testing.T) {
 			if orb.Ring >= testGateRing {
 				t.Fatalf("%s: ring %d is at or beyond the lane-gate ring %d", sysID, orb.Ring, testGateRing)
 			}
-			if orb.Angle0 < 0 || orb.Angle0 >= 6*orb.Ring {
-				t.Fatalf("%s: angle0 %d out of range for ring %d", sysID, orb.Angle0, orb.Ring)
+			if orb.Angle0 < 0 || orb.Angle0 >= sched.Slots(orb.Ring) {
+				t.Fatalf("%s: angle0 %d out of range for ring %d (schedule slots %d)", sysID, orb.Angle0, orb.Ring, sched.Slots(orb.Ring))
 			}
 		}
+	}
+}
+
+// tasks.md 7.5 stations/placement_test.go:40 site: the original upper-bound-only
+// assertion (`orb.Angle0 >= 6*orb.Ring` as a failure condition) would pass
+// even with the retired 6×ring draw still in place on every ring, since
+// 6×ring is always ≥ Slots(ring) is FALSE in general — the hazard here is
+// specifically that a one-sided check proves nothing on rings where
+// Slots(ring) > 6×ring. This test makes the assertion two-sided: across many
+// derivations, bucket the observed Angle0 by ring, and on a NON-coincidence
+// ring (3, 5, 9, or 15 — never 1, 2, 4, 8, 16, or 32), require some observed
+// Angle0 to land AT OR ABOVE 6×ring, proving the draw actually reaches the
+// schedule's full slot count.
+func TestDeriveOrbit_Scenario_AngleReachesEverySlotOnNonCoincidenceRings(t *testing.T) {
+	sched := board.Schedule(testGateRing)
+	nonCoincidenceRings := map[int]bool{}
+	for _, ring := range []int{3, 5, 9} { // 15 is excluded: testGateRing=16 caps DeriveOrbit's span at ring 15 inclusive, but each ring must be < testGateRing, and we want headroom
+		if ring < testGateRing && sched.Slots(ring) > 6*ring {
+			nonCoincidenceRings[ring] = true
+		}
+	}
+	if len(nonCoincidenceRings) == 0 {
+		t.Fatalf("fixture: expected at least one non-coincidence ring among 3/5/9 under gate ring %d", testGateRing)
+	}
+
+	atOrAbove := map[int]bool{}
+	const n = 20000
+	for i := 0; i < n; i++ {
+		sysID := fmt.Sprintf("sys-sweep-%d", i)
+		orb := DeriveOrbit(int64(i), sysID, testGateRing)
+		if !nonCoincidenceRings[orb.Ring] {
+			continue
+		}
+		if orb.Angle0 >= 6*orb.Ring {
+			atOrAbove[orb.Ring] = true
+		}
+		// Two-sided upper bound too: never beyond the schedule's real count.
+		if orb.Angle0 >= sched.Slots(orb.Ring) {
+			t.Fatalf("sys %s: angle0 %d >= schedule slots %d for ring %d", sysID, orb.Angle0, sched.Slots(orb.Ring), orb.Ring)
+		}
+	}
+
+	proven := false
+	for ring := range nonCoincidenceRings {
+		if atOrAbove[ring] {
+			proven = true
+		}
+	}
+	if !proven {
+		t.Fatalf("across %d derivations, no non-coincidence ring (%v) ever drew an angle0 at or above 6×ring — "+
+			"a derivation still drawing positions := 6*ring would pass this test's absence, exactly the bug this scenario guards against",
+			n, nonCoincidenceRings)
 	}
 }
 

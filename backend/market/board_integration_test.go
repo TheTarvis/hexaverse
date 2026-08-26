@@ -124,7 +124,14 @@ func TestGetBoard_DisclosesNoOwnershipOrFleetIdentity(t *testing.T) {
 // feature composition, so a request another corporation exhausted shows
 // exhausted immediately — with no travel and no scan by the reader.
 func TestGetBoard_ReflectsADrainedRequestOnTheVeryNextRead(t *testing.T) {
-	stack, cleanup := newSaleStack(t, map[string]float64{"metals": 400})
+	// Seed every RequestKind, not just metals: the kind sold below is
+	// firstRequestKind(...), which the station's epoch derives, so a
+	// metals-only hold made this test fail on any epoch that minted a
+	// non-metals premium request. Pre-existing fixture defect, unrelated to
+	// which cells anything sits on.
+	stack, cleanup := newSaleStack(t, map[string]float64{
+		"metals": 400, "volatiles": 400, "water": 400, "organics": 400,
+	})
 	defer cleanup()
 
 	before, err := stack.svc.GetBoard(stack.ctx, stack.corpID)

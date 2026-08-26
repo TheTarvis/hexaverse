@@ -64,16 +64,17 @@ func TestOrbitPeriod_ScalesWithRing(t *testing.T) {
 		t.Errorf("OrbitPeriod(12) = %d, want %d (base × ring)", got, want)
 	}
 
-	// The ring factor cancels against a ring's 6 × N cells, so the rate you SEE is
-	// uniform: one hex every OrbitBasePeriod / 6, on every ring. This is what makes
-	// the board turn rigidly instead of shearing, and what a flat period broke.
-	for _, ring := range []int{1, 4, 16} {
-		cells := 6 * ring
-		perCell := d.OrbitPeriod(ring) / WorldMillis(cells)
-		if want := d.OrbitBasePeriod / 6; perCell != want {
-			t.Errorf("ring %d: one hex every %d, want %d (uniform across rings)", ring, perCell, want)
-		}
-	}
+	// RETIRED 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 1.8): this
+	// used to assert "the ring factor cancels against a ring's 6 × N cells, so
+	// the rate you SEE is uniform" — true only under the retired hex lattice,
+	// where every ring had exactly 6 × ring cells. Under the pinned polar
+	// Isotropic schedule that cancellation does NOT hold (ring 3 has 24 slots,
+	// not 18; ring 5 has 48, not 30) — see system-interior's "Equal-Period
+	// Rings With Different Slot Counts Advance Slots At Different Rates". The
+	// replacement lives in tuning_schedule_test.go (package common_test, since
+	// board/polar both import common and an internal test here cannot import
+	// either). Cause: spec-superseding migration change, not a developer
+	// dispute — logged per the SDET protocol's "test change with cause".
 
 	// The star has no orbit; callers short-circuit on ring 0 and must not divide by
 	// a period we pretended was meaningful.

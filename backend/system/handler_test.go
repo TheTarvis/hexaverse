@@ -56,11 +56,11 @@ func (sysTestClock) Scale() float64                        { return 1 }
 // bodies), dropping unseen detail features — server-authoritative filtering.
 func TestGetInterior_FogsToAstronomicalLayer(t *testing.T) {
 	gen := &GeneratedInterior{
-		Interior: SystemInterior{SystemId: "s1"},
+		Interior: SystemInterior{SystemId: "s1", Radius: 16},
 		Features: []Feature{
-			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []Hex{{Q: 0, R: 0}}},
-			{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Period: 0, Dir: 1}, Footprint: []Hex{{Q: 3, R: 0}}},
-			{Id: "feat-belt-0", Type: FeatureBelt, Orbit: &Orbit{Ring: 5, Angle0: 0, Period: 0, Dir: 1}, Footprint: []Hex{{Q: 5, R: 0}}},
+			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
+			{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Period: 0, Dir: 1}, Footprint: []board.Cell{{Ring: 3, Slot: 0}}},
+			{Id: "feat-belt-0", Type: FeatureBelt, Orbit: &Orbit{Ring: 5, Angle0: 0, Period: 0, Dir: 1}, Footprint: []board.Cell{{Ring: 5, Slot: 0}}},
 		},
 	}
 
@@ -71,7 +71,7 @@ func TestGetInterior_FogsToAstronomicalLayer(t *testing.T) {
 		c.Set(common.CorpIdKey, "corp-user1") // #0009: ActorCorp now reads the resolved corp id
 	})
 	NewHandlerWith(&fakeSysSvc{gen: gen}, sysTestClock{}).
-		WithFog(fakeBoardFog{cov: observation.NewCoverage(0)}).
+		WithFog(fakeBoardFog{cov: observation.NewCoverage(0, board.ProductionSchedule())}).
 		RegisterRoutes(r.Group("/"))
 
 	w := httptest.NewRecorder()
@@ -110,8 +110,8 @@ func TestGetInterior_FogsToAstronomicalLayer(t *testing.T) {
 func TestGetInterior_LaneGatesFogFilterToCharted(t *testing.T) {
 	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1", Radius: 16}}
 	gates := []LaneGate{
-		{DestSystemId: "sys-known", Hex: board.Hex{Q: 16, R: 0}},
-		{DestSystemId: "sys-dark", Hex: board.Hex{Q: -16, R: 0}},
+		{DestSystemId: "sys-known", Cell: board.Cell{Ring: 16, Slot: 0}},
+		{DestSystemId: "sys-dark", Cell: board.Cell{Ring: 16, Slot: 48}},
 	}
 
 	gin.SetMode(gin.TestMode)
@@ -122,7 +122,7 @@ func TestGetInterior_LaneGatesFogFilterToCharted(t *testing.T) {
 	})
 	NewHandlerWith(&fakeSysSvc{gen: gen, gates: gates}, sysTestClock{}).
 		WithFog(fakeBoardFog{
-			cov:   observation.NewCoverage(0),
+			cov:   observation.NewCoverage(0, board.ProductionSchedule()),
 			tiers: map[string]observation.Tier{"sys-known": observation.TierRumored},
 		}).
 		RegisterRoutes(r.Group("/"))

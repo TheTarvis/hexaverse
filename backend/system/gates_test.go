@@ -42,19 +42,19 @@ func TestLaneGates_ProjectsEachLaneToItsRimTile(t *testing.T) {
 		t.Fatalf("unexpected order: %+v", gates)
 	}
 	// Each gate is the same projection the fleet uses to burn to the gate.
-	wantE := board.LaneGateHex(0, 0, 10, 0, 16)
-	wantN := board.LaneGateHex(0, 0, 0, 10, 16)
-	if gates[0].Hex != wantE {
-		t.Errorf("east gate = %+v, want %+v", gates[0].Hex, wantE)
+	wantE := board.LaneGateCell(0, 0, 10, 0, 16)
+	wantN := board.LaneGateCell(0, 0, 0, 10, 16)
+	if gates[0].Cell != wantE {
+		t.Errorf("east gate = %+v, want %+v", gates[0].Cell, wantE)
 	}
-	if gates[1].Hex != wantN {
-		t.Errorf("north gate = %+v, want %+v", gates[1].Hex, wantN)
+	if gates[1].Cell != wantN {
+		t.Errorf("north gate = %+v, want %+v", gates[1].Cell, wantN)
 	}
 	// Both gates sit on the gate ring — the inner edge of the outer band.
 	wantRing := board.GateRing(16)
 	for _, g := range gates {
-		if r := board.Ring(g.Hex); r != wantRing {
-			t.Errorf("gate %s at ring %d, want %d", g.DestSystemId, r, wantRing)
+		if g.Cell.Ring != wantRing {
+			t.Errorf("gate %s at ring %d, want %d", g.DestSystemId, g.Cell.Ring, wantRing)
 		}
 	}
 }
@@ -70,9 +70,9 @@ func TestLaneGates_UnknownSystemNotFound(t *testing.T) {
 
 func TestChartedGates_KeepsOnlyRumoredOrBetter(t *testing.T) {
 	gates := []LaneGate{
-		{DestSystemId: "sys-e", Hex: board.Hex{Q: 16, R: 0}},
-		{DestSystemId: "sys-n", Hex: board.Hex{Q: 0, R: 16}},
-		{DestSystemId: "sys-dark", Hex: board.Hex{Q: -16, R: 0}},
+		{DestSystemId: "sys-e", Cell: board.Cell{Ring: 16, Slot: 0}},
+		{DestSystemId: "sys-n", Cell: board.Cell{Ring: 16, Slot: 24}},
+		{DestSystemId: "sys-dark", Cell: board.Cell{Ring: 16, Slot: 48}},
 	}
 	tiers := map[string]observation.Tier{
 		"sys-e": observation.TierExplored, // charted (arrived)

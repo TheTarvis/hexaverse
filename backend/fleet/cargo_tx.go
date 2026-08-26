@@ -124,7 +124,7 @@ func (p *CargoDebitPlan) Cargo() map[string]float64 { return p.newCargo }
 // docked to featureID at `now`. Effective, not stored: a burn past its arrival
 // time already IS its settled dock, and board.StateAt is what folds that.
 func (p *CargoDebitPlan) DockedAt(featureID string, now common.WorldMillis) bool {
-	eff := board.StateAt(p.Fleet.State, now)
+	eff := board.StateAt(p.Fleet.State, now, board.ProductionSchedule())
 	return eff.Mode == board.ModeDocked && eff.Docked != nil && eff.Docked.ParentId == featureID
 }
 

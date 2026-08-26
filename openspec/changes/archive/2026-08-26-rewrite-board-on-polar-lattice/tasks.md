@@ -100,7 +100,7 @@ Fixture recording never runs on Apple Silicon while a float path remains
       stays); verify both scripts pass on the new tree
 - [x] 6.2 Verify no runtime trig/sqrt/bare-Round in `backend/board` or
       `frontend/lib/board` (transcendental check clean, no new pragmas)
-- [ ] 6.3 At archive/sync: apply the three deltas; delete
+- [x] 6.3 At archive/sync: apply the three deltas; delete
       `openspec/specs/polar-lattice-math/` (all requirements removed);
       refresh `board-tactical-math`'s Purpose paragraph (hex wording →
       polar, `lib/hex` → `lib/board`) — Purpose text is outside delta

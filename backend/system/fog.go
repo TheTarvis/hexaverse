@@ -4,6 +4,7 @@ import (
 	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/observation"
+	"hexaverse/polar"
 )
 
 // fogFeatureDTO is a feature already fogged for the requester (#0006 three
@@ -13,12 +14,12 @@ import (
 // AsOf). Unseen detail features are omitted entirely (empty space is never
 // remembered).
 type fogFeatureDTO struct {
-	Id        string      `json:"id"`
-	Type      FeatureType `json:"type"`
-	Orbit     *Orbit      `json:"orbit,omitempty"`
-	ParentId  string      `json:"parentId,omitempty"`
-	Fixed     bool        `json:"fixed,omitempty"`
-	Footprint []Hex       `json:"footprint"`
+	Id        string       `json:"id"`
+	Type      FeatureType  `json:"type"`
+	Orbit     *Orbit       `json:"orbit,omitempty"`
+	ParentId  string       `json:"parentId,omitempty"`
+	Fixed     bool         `json:"fixed,omitempty"`
+	Footprint []board.Cell `json:"footprint"`
 	// Band is the visibility state: visible | remembered | astronomical.
 	Band string `json:"band"`
 	// Live is true only for Visible features (live truth this instant).
@@ -46,7 +47,12 @@ const (
 //     scanned observation's stored Detail — never straight off the raw interior.
 //     Being present (or ambient-remembering) a body tells you it's there, not what
 //     it's worth (#0006: presence resolves the small/dark; scan mints composition).
-func projectFogged(gen *GeneratedInterior, cov observation.Coverage, remembered map[string]observation.FeatureMemory, now common.WorldMillis) []fogFeatureDTO {
+//
+// sched is threaded from the caller (design.md Decision 3: system's fog
+// projection sources its schedule from SystemInterior.Radius, the
+// per-system-authoritative board.Schedule, never board.ProductionSchedule()
+// and never a literal).
+func projectFogged(gen *GeneratedInterior, cov observation.Coverage, remembered map[string]observation.FeatureMemory, now common.WorldMillis, sched polar.Schedule) []fogFeatureDTO {
 	out := make([]fogFeatureDTO, 0, len(gen.Features))
 	for i := range gen.Features {
 		f := &gen.Features[i]
@@ -56,7 +62,7 @@ func projectFogged(gen *GeneratedInterior, cov observation.Coverage, remembered 
 		}
 		mem, hasMemory := remembered[f.Id]
 		switch {
-		case cov.Covers(featureHexAt(f, now)):
+		case cov.Covers(featureCellAt(f, now, sched)):
 			dto.Band = bandVisible
 			dto.Live = true
 			applyScannedDetail(&dto, mem, hasMemory)
@@ -107,14 +113,17 @@ func projectUnfogged(gen *GeneratedInterior) []fogFeatureDTO {
 	return out
 }
 
-// featureHexAt is a feature's hex at a world time: its orbital position if it
-// orbits, else its epoch anchor. Used to test sensor coverage.
-func featureHexAt(f *Feature, now common.WorldMillis) board.Hex {
+// featureCellAt is a feature's cell at a world time: its orbital position if
+// it orbits, else its epoch anchor (the footprint's first cell). Used to test
+// sensor coverage. Ring-out-of-range decode protection already ran at the
+// interior read boundary (readInterior's featureWithinSchedule guard), so a
+// feature reaching here is trusted to be within sched's MaxRing.
+func featureCellAt(f *Feature, now common.WorldMillis, sched polar.Schedule) board.Cell {
 	if f.Orbit != nil {
-		return board.OrbState(board.Orbit{Ring: f.Orbit.Ring, Angle0: f.Orbit.Angle0, Period: f.Orbit.Period, Dir: f.Orbit.Dir}, now)
+		return board.OrbState(board.Orbit{Ring: f.Orbit.Ring, Angle0: f.Orbit.Angle0, Period: f.Orbit.Period, Dir: f.Orbit.Dir}, now, sched)
 	}
 	if len(f.Footprint) > 0 {
-		return board.Hex{Q: f.Footprint[0].Q, R: f.Footprint[0].R}
+		return f.Footprint[0]
 	}
-	return board.Hex{}
+	return board.Cell{}
 }

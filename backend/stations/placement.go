@@ -1,6 +1,7 @@
 package stations
 
 import (
+	"hexaverse/board"
 	"hexaverse/galaxy"
 	"hexaverse/system"
 )
@@ -18,24 +19,38 @@ import (
 // Placement rules: never the core (a station at the star is nonsense and would
 // collide with the star feature), and never the lane-gate ring (a station
 // sitting on a departure gate would make "burn to the gate" and "burn to the
-// station" the same hex).
-func DeriveOrbit(galaxySeed int64, systemID string, gateRing int) system.Orbit {
+// station" the same cell).
+//
+// boardRadius names what this parameter actually is — the board radius, not
+// the lane-gate ring itself (board.GateRing(boardRadius) is a fixed −3 offset
+// from it). The misnomer is renamed here (tasks.md 2.8); the KNOWN, OPEN
+// defect this rename does NOT fix — boardRadius still isn't board.GateRing,
+// so rings 13–15 under a radius-16 board can still receive a station on the
+// real lane-gate ring — is filed at
+// docs/defects/2026-08-26-station-on-gate-ring.md. Do not "fix" the value
+// here; that is a behavior change outside this migration's stated impact.
+func DeriveOrbit(galaxySeed int64, systemID string, boardRadius int) system.Orbit {
 	seed := galaxy.SystemSeed(galaxySeed, systemID)
 	h := mix64(uint64(seed))
 
-	// Rings strictly between the core (0) and the gate ring: [1, gateRing-1].
-	// gateRing is common.Tuning().BoardRadius, so this is a cross-domain
+	// Rings strictly between the core (0) and boardRadius: [1, boardRadius-1].
+	// boardRadius is common.Tuning().BoardRadius, so this is a cross-domain
 	// invariant, not a local guess.
-	span := gateRing - 1
+	span := boardRadius - 1
 	if span < 1 {
 		// Degenerate board (radius ≤ 1) — the only legal non-core ring is 1.
 		span = 1
 	}
 	ring := 1 + int(h%uint64(span))
 
-	// Angle within the ring. A ring of N has 6N positions.
-	positions := 6 * ring
-	angle0 := int(mix64(h) % uint64(positions))
+	// Angle within the ring: the schedule's live slot count for it — never a
+	// fixed 6×ring (design.md Decision 2's hazard; a ring's slot count varies
+	// by band under the pinned Isotropic schedule). boardRadius is the caller's
+	// authoritative radius for this system's board (mirroring system.Generate's
+	// own board.Schedule(params.Radius) — design.md Decision 3), not the
+	// process-wide default.
+	sched := board.Schedule(boardRadius)
+	angle0 := int(mix64(h) % uint64(sched.Slots(ring)))
 
 	return system.Orbit{
 		Ring:   ring,

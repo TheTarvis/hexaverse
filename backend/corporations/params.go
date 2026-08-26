@@ -18,10 +18,16 @@ type SpawnParams struct {
 	// RequireMineable gates on the bootstrap guarantee: a candidate must carry ≥1
 	// Mineable body on its #0001 skeleton, so a new player can never softlock.
 	RequireMineable bool
-	// RimRing is the board ring the lone hull coasts on at spawn — one hex inside
-	// the lane-gate ring, so the mind wakes "rim-adjacent" with the gates in reach.
-	// Derived from common.Tuning().BoardRadius - 1 rather than restated, so it
-	// cannot drift from fleet's gate ring or system's generated radius.
+	// RimRing is the board ring the lone hull coasts on at spawn — one ring
+	// inside the rim, THREE rings outside the lane-gate ring
+	// (board.GateRing(BoardRadius) is a fixed −3 offset from the radius, so
+	// RimRing at BoardRadius-1 sits well outside it, not "one cell inside" it
+	// as an earlier comment here mistakenly claimed), so the mind wakes
+	// rim-adjacent with room to maneuver before reaching the gates. Derived
+	// from common.Tuning().BoardRadius - 1 rather than restated, so it cannot
+	// drift from fleet's gate ring or system's generated radius. The value is
+	// unchanged here — only the wording; see proposal.md's pre-existing-
+	// defects note.
 	RimRing int
 }
 
@@ -34,6 +40,6 @@ func DefaultSpawnParams() SpawnParams {
 		MinSpawnDistance: 3,
 		PeripheryWeight:  1.0,
 		RequireMineable:  true,
-		RimRing:          common.Tuning().BoardRadius - 1, // one hex inside the lane-gate ring
+		RimRing:          common.Tuning().BoardRadius - 1, // one ring inside the rim
 	}
 }

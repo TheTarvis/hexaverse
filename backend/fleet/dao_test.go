@@ -48,6 +48,11 @@ func TestListByCorporation(t *testing.T) {
 // Both reads (Get and the list query) must hydrate — the board view uses one, the
 // fleet roster the other, and a ship that moves on one screen and not the other is
 // worse than one that doesn't move at all.
+//
+// Ring 5 (48 slots under the pinned schedule, not 6×5=30) is a deliberate
+// non-coincidence ring — irrelevant to THIS assertion's math (it only checks
+// the period, not a per-cell rate), but kept off the coincidence set on
+// principle per tasks.md 7.5's sweep.
 func TestDao_CoastPeriod_RehydratedFromLiveTuning(t *testing.T) {
 	fs, client := common.SetupFirestoreTestDAO(t)
 	defer common.CleanupFirestoreTestData(t, client, firestoreCollection)
@@ -56,14 +61,14 @@ func TestDao_CoastPeriod_RehydratedFromLiveTuning(t *testing.T) {
 	dao := NewDaoWithClient(fs)
 
 	// A fleet that settled long ago, under a slow world.
-	const ring = 4
+	const ring = 5
 	slow := common.DefaultTuning()
 	slow.OrbitBasePeriod = 3_600_000_000 // the old "ships are static" pace
 	common.SetTuning(slow)
 
 	if err := dao.Save(ctx, Fleet{
 		Id: "f1", CorporationId: "corp-A", SystemId: "s1",
-		State: board.CoastAt(board.Hex{Q: ring, R: 0}, 0),
+		State: board.CoastAt(board.Cell{Ring: ring, Slot: 0}, 0, testSched()),
 	}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}

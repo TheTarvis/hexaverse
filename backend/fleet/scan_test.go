@@ -13,7 +13,7 @@ import (
 )
 
 // TestScan_CommitOnSensorChannel: the scan verb commits through the spine on
-// the SENSOR channel — origin system AND emission hex pinned in params
+// the SENSOR channel — origin system AND emission cell pinned in params
 // (#0006 Decision #26), eta = now + duration — and claims the fleet's scan
 // slot. No aim: the sweep is all-around (#0006 Decision #21).
 func TestScan_CommitOnSensorChannel(t *testing.T) {
@@ -36,8 +36,12 @@ func TestScan_CommitOnSensorChannel(t *testing.T) {
 	if fa.committed.Params["systemId"] != "sys-0" {
 		t.Fatalf("scan params must pin the origin system, got %v", fa.committed.Params)
 	}
-	if _, ok := fa.committed.Params["origin"].(board.Hex); !ok {
-		t.Fatalf("scan params must pin the emission hex (#0006 Decision #26), got %v", fa.committed.Params)
+	// The wire/action-dispatch shape: origin must be the ENCODED {ring,slot}
+	// map (board.EncodeCell), never a raw board.Cell struct — a raw struct in
+	// Params is exactly what action.Commit's allowlist now rejects
+	// (action-dispatch's Commit Rejects Non-Primitive Action Parameters).
+	if _, ok := board.DecodeCell(fa.committed.Params["origin"]); !ok {
+		t.Fatalf("scan params must pin the emission cell as an encoded {ring,slot} map (#0006 Decision #26), got %v (%T)", fa.committed.Params["origin"], fa.committed.Params["origin"])
 	}
 	if want := clk.now.Add(observation.DefaultScanParams().Duration); fa.committed.Eta != want {
 		t.Fatalf("eta = %d, want now + scan duration = %d", fa.committed.Eta, want)
@@ -64,7 +68,7 @@ func TestScan_WhileBurning(t *testing.T) {
 		Id: "fleet_1", CorporationId: "dev-corp", SystemId: "sys-0",
 		ActiveActionId: "action_burn",
 		State: board.MovementState{Mode: board.ModeBurn, Burn: &board.Burn{
-			Path:       board.Line(board.Hex{Q: -3, R: 0}, board.Hex{Q: 3, R: 0}),
+			Path:       arcPath(board.Cell{Ring: 3, Slot: 0}, board.Cell{Ring: 3, Slot: testSched().Slots(3) / 2}),
 			StartTime:  0,
 			ArriveTime: 60_000,
 		}},
@@ -84,11 +88,12 @@ func TestScan_WhileBurning(t *testing.T) {
 	if f.ActiveScanId != "action_test" {
 		t.Fatalf("expected the scan slot claimed, got %q", f.ActiveScanId)
 	}
-	// The emission hex is where the burn HAS the ship at commit — pinned there
+	// The emission cell is where the burn HAS the ship at commit — pinned there
 	// (#0006 Decision #26), not re-read at eta.
-	wantOrigin, _ := board.ShipPos(board.StateAt(burning.State, clk.now), clk.now)
-	if got, ok := fa.committed.Params["origin"].(board.Hex); !ok || got != wantOrigin {
-		t.Fatalf("scan origin = %v, want the mid-burn position at commit %v", fa.committed.Params["origin"], wantOrigin)
+	wantOrigin, _ := board.ShipPos(board.StateAt(burning.State, clk.now, testSched()), clk.now, testSched())
+	got, ok := board.DecodeCell(fa.committed.Params["origin"])
+	if !ok || got != wantOrigin {
+		t.Fatalf("scan origin (decoded) = %v ok=%v, want the mid-burn position at commit %v — encoded via board.EncodeCell, per action-dispatch's Params allowlist", got, ok, wantOrigin)
 	}
 }
 

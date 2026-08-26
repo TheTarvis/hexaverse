@@ -90,6 +90,6 @@ type RoutePreview struct {
 	Route      []string             `json:"route"`
 	LegEtas    []common.WorldMillis `json:"legEtas"`
 	TotalEta   common.WorldMillis   `json:"totalEta"`
-	DepartGate board.Hex            `json:"departGate"`
+	DepartGate board.Cell           `json:"departGate"`
 	WorldTime  common.WorldMillis   `json:"worldTime"`
 }

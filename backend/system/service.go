@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/galaxy"
+	"hexaverse/polar"
 
 	"github.com/rs/zerolog/log"
 )
@@ -146,6 +148,18 @@ func (s *Service) spliceStation(ctx context.Context, gen *GeneratedInterior) {
 
 // readInterior returns the stored interior (+ features), or nil if not yet
 // materialized.
+//
+// Every decoded feature is validated against the interior's OWN schedule
+// (board.Schedule(si.Radius)) before it can reach any lattice computation
+// (design.md Decision 3's risk: polar.Schedule.Slots panics above MaxRing,
+// and board.Canon calls it — so a tuning.go radius reduction that leaves a
+// stored feature's ring above the new live schedule would panic a read
+// handler, not answer wrong). A feature that fails is OMITTED and logged
+// with its id, the offending ring, and the system id — not just a log line,
+// so a downstream ErrFeatureAbsent (e.g. fleet.Position → resolveFeature on
+// a fleet docked to a now-guarded feature) is attributable to this guard
+// rather than read as a genuinely missing feature. One bad feature never
+// stops the loop over the rest (tasks.md 2.7).
 func (s *Service) readInterior(ctx context.Context, galaxyID, systemID string) (*GeneratedInterior, error) {
 	si, err := s.dao.GetInterior(ctx, galaxyID, systemID)
 	if err != nil {
@@ -158,5 +172,32 @@ func (s *Service) readInterior(ctx context.Context, galaxyID, systemID string) (
 	if err != nil {
 		return nil, err
 	}
-	return &GeneratedInterior{Interior: *si, Features: features}, nil
+	sched := board.Schedule(si.Radius)
+	kept := make([]Feature, 0, len(features))
+	for _, f := range features {
+		if ring, ok := featureRingOK(f, sched); !ok {
+			log.Warn().Ctx(ctx).Str("systemId", systemID).Str("featureId", f.Id).
+				Int("ring", ring).Int("maxRing", sched.MaxRing).
+				Msg("Decoded feature ring exceeds the live board schedule; omitting from the interior read")
+			continue
+		}
+		kept = append(kept, f)
+	}
+	return &GeneratedInterior{Interior: *si, Features: kept}, nil
+}
+
+// featureRingOK reports whether every ring a feature carries (its orbit, if
+// any, and every footprint cell) is within the schedule's live MaxRing. When
+// it is not, it also returns the first offending ring found, for the guard's
+// log line.
+func featureRingOK(f Feature, sched polar.Schedule) (offendingRing int, ok bool) {
+	if f.Orbit != nil && (f.Orbit.Ring < 0 || f.Orbit.Ring > sched.MaxRing) {
+		return f.Orbit.Ring, false
+	}
+	for _, c := range f.Footprint {
+		if c.Ring < 0 || c.Ring > sched.MaxRing {
+			return c.Ring, false
+		}
+	}
+	return 0, true
 }

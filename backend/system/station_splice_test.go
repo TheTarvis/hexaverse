@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"hexaverse/board"
 )
 
 // fakeStationSource stands in for the station store: it either yields a station
@@ -29,7 +31,7 @@ func stationFeatureFixture() *Feature {
 		Orbit: &Orbit{Ring: 6, Angle0: 3, Period: PeriodFor(6), Dir: 1},
 		// A station has an owner; every generated feature leaves this empty.
 		OwnerCorpId: "",
-		Footprint:   []Hex{HexAtRingAngle(6, 3)},
+		Footprint:   []board.Cell{{Ring: 6, Slot: 3}},
 	}
 }
 
@@ -37,9 +39,9 @@ func interiorFixture() *GeneratedInterior {
 	return &GeneratedInterior{
 		Interior: SystemInterior{SystemId: "sys-1", Radius: 16},
 		Features: []Feature{
-			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []Hex{{Q: 0, R: 0}}},
+			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
 			{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Dir: 1},
-				Footprint: []Hex{{Q: 3, R: 0}}},
+				Footprint: []board.Cell{{Ring: 3, Slot: 0}}},
 		},
 	}
 }
@@ -81,6 +83,10 @@ func TestSpliceStation_OmitsNothingWhenTheSystemHasNoStation(t *testing.T) {
 func TestSpliceStation_DegradesOnStoreFailureRatherThanFailingTheRead(t *testing.T) {
 	// The interior read has no market dependency today, and this splice must not
 	// introduce one: a station-store outage costs the station, never the system.
+	// This is also the general mechanism trading-station's "A Station Orbit
+	// Outside the Live Board Radius Is Omitted, Never Panicked" leans on: an
+	// out-of-range orbit is exactly one more StationFeature failure mode this
+	// same degrade path already absorbs.
 	src := &fakeStationSource{err: errors.New("station store unavailable")}
 	s := &Service{stations: src}
 	gen := interiorFixture()
@@ -133,7 +139,7 @@ func TestFogSource_ExcludesTheStationEntirely(t *testing.T) {
 		t.Errorf("projected %d features, want the 2 generated ones", len(projected))
 	}
 	// And it must never be treated as an occluder even if it somehow appeared.
-	if occludes(FeatureStation) {
+	if occlusionRadius2(FeatureStation) != 0 {
 		t.Error("FeatureStation occludes line of sight; it must not")
 	}
 }

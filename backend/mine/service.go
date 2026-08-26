@@ -149,7 +149,7 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 
 	// Docked to the named feature — the effective state (a burn past its
 	// arriveTime IS its settled dock; board.StateAt folds that).
-	eff := board.StateAt(f.State, now)
+	eff := board.StateAt(f.State, now, board.ProductionSchedule())
 	if eff.Mode != board.ModeDocked || eff.Docked == nil || eff.Docked.ParentId != req.FeatureId {
 		return nil, ErrNotDocked
 	}

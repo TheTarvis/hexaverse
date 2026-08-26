@@ -42,26 +42,26 @@ func testScanParams() ScanParams {
 
 // seedScanFleet writes the actor doc the scan resolver decodes: owner, system,
 // and the movement state (the legacy origin fallback; the sweep origin proper
-// is the emission hex commitScan pins — #0006 Decision #26).
-func seedScanFleet(t *testing.T, fs common.FirestoreService, id, corp, sys string, at board.Hex) {
+// is the emission cell commitScan pins — #0006 Decision #26).
+func seedScanFleet(t *testing.T, fs common.FirestoreService, id, corp, sys string, at board.Cell) {
 	t.Helper()
 	if err := fs.Set(context.Background(), "fleets", id, map[string]interface{}{
 		"id": id, "corporationId": corp, "systemId": sys,
-		"state": board.CoastAt(at, 0),
+		"state": board.CoastAt(at, 0, testSched()),
 	}); err != nil {
 		t.Fatalf("seed fleet %s: %v", id, err)
 	}
 }
 
 // commitScan commits a sweep through the spine exactly as fleet.Scan does:
-// sensor channel, origin system AND the emission hex pinned in params — no
+// sensor channel, origin system AND the emission cell pinned in params — no
 // aim (#0006 Decisions #21/#26).
-func commitScan(t *testing.T, svc *action.Service, fleetID, sys string, origin board.Hex, eta common.WorldMillis) *action.Action {
+func commitScan(t *testing.T, svc *action.Service, fleetID, sys string, origin board.Cell, eta common.WorldMillis) *action.Action {
 	t.Helper()
 	a, err := svc.Commit(context.Background(), action.CommitSpec{
 		Type: scanType, Actor: fleetID, ActorCollection: "fleets", Scope: sys,
 		Slot:   action.SlotSensor,
-		Params: map[string]interface{}{"systemId": sys, "origin": origin},
+		Params: map[string]interface{}{"systemId": sys, "origin": board.EncodeCell(origin)},
 		Eta:    eta,
 	})
 	if err != nil {
@@ -88,15 +88,23 @@ func TestScanResolver_SweepRevealsAndShadows(t *testing.T) {
 
 	corp := "corp-" + uuid.NewString()
 	const sys = "sys-1"
+	sched := testSched()
+	// Fleet fires from ring 4, slot 0; the star occludes the antipodal cell on
+	// the same ring (the chord between two antipodal points passes through the
+	// core). "Ahead" and "side" cells sit at open angles.
+	fleetAt := board.Cell{Ring: 4, Slot: 0}
+	hiddenAt := board.Cell{Ring: 4, Slot: sched.Slots(4) / 2}
+	aheadAt := board.Cell{Ring: 2, Slot: 0}
+	sideAt := board.Cell{Ring: 4, Slot: sched.Slots(4) / 4}
 	interiors := beamInteriors{feats: map[string][]FeatureGeom{
 		sys: {
-			{Id: "feat-star", Anchor: board.Hex{Q: 0, R: 0}, Astronomical: true, Occludes: true,
+			{Id: "feat-star", Anchor: board.Cell{Ring: 0, Slot: 0}, Astronomical: true, OcclusionRadius2: board.StarOcclusionRadius2,
 				Detail: &FeatureDetail{FeatureType: "star"}},
-			{Id: "feat-mid", Anchor: board.Hex{Q: -2, R: 0},
+			{Id: "feat-mid", Anchor: aheadAt,
 				Detail: &FeatureDetail{FeatureType: "belt"}},
-			{Id: "feat-hidden", Anchor: board.Hex{Q: 4, R: 0},
+			{Id: "feat-hidden", Anchor: hiddenAt,
 				Detail: &FeatureDetail{FeatureType: "belt"}},
-			{Id: "feat-side", Anchor: board.Hex{Q: 0, R: 5},
+			{Id: "feat-side", Anchor: sideAt,
 				Detail: &FeatureDetail{FeatureType: "belt"}},
 		},
 	}}
@@ -104,11 +112,11 @@ func TestScanResolver_SweepRevealsAndShadows(t *testing.T) {
 		WithParams(DefaultSensorParams(), testScanParams())
 	fog.RegisterResolvers(actionSvc)
 
-	// First sweep from (-4,0): the star at (0,0) shadows (4,0); everything at a
-	// clear angle — ahead, beside, anywhere around — is revealed.
-	seedScanFleet(t, fs, "fleet-1", corp, sys, board.Hex{Q: -4, R: 0})
+	// First sweep from fleetAt: the star shadows the antipodal cell; everything
+	// at a clear angle — ahead, beside, anywhere around — is revealed.
+	seedScanFleet(t, fs, "fleet-1", corp, sys, fleetAt)
 	clk.now = 0
-	commitScan(t, actionSvc, "fleet-1", sys, board.Hex{Q: -4, R: 0}, 1_000)
+	commitScan(t, actionSvc, "fleet-1", sys, fleetAt, 1_000)
 	clk.now = 1_000
 	if _, err := actionSvc.ResolveActive(ctx, "fleet-1"); err != nil {
 		t.Fatalf("resolve first scan: %v", err)
@@ -141,10 +149,12 @@ func TestScanResolver_SweepRevealsAndShadows(t *testing.T) {
 		}
 	}
 
-	// Second sweep from (0,-4): the line to (4,0) misses the star — the hidden
-	// feature is revealed from the clear position.
-	seedScanFleet(t, fs, "fleet-2", corp, sys, board.Hex{Q: 0, R: -4})
-	commitScan(t, actionSvc, "fleet-2", sys, board.Hex{Q: 0, R: -4}, 2_000)
+	// Second sweep from a position with a clear line to hiddenAt (perpendicular
+	// to the first fleet's ray): the hidden feature is revealed from the clear
+	// position.
+	clearAt := board.Cell{Ring: 4, Slot: sched.Slots(4) / 4}
+	seedScanFleet(t, fs, "fleet-2", corp, sys, clearAt)
+	commitScan(t, actionSvc, "fleet-2", sys, clearAt, 2_000)
 	clk.now = 2_000
 	if _, err := actionSvc.ResolveActive(ctx, "fleet-2"); err != nil {
 		t.Fatalf("resolve second scan: %v", err)
@@ -194,9 +204,10 @@ func TestScanResolver_ChartsLanesAndRumorsNeighbors(t *testing.T) {
 		t.Fatalf("seed explored neighbour: %v", err)
 	}
 
-	seedScanFleet(t, fs, "fleet-L", corp, sys, board.Hex{Q: 1, R: 0})
+	origin := board.Cell{Ring: 1, Slot: 0}
+	seedScanFleet(t, fs, "fleet-L", corp, sys, origin)
 	clk.now = 0
-	commitScan(t, actionSvc, "fleet-L", sys, board.Hex{Q: 1, R: 0}, 1_000)
+	commitScan(t, actionSvc, "fleet-L", sys, origin, 1_000)
 	clk.now = 1_000
 	if _, err := actionSvc.ResolveActive(ctx, "fleet-L"); err != nil {
 		t.Fatalf("resolve: %v", err)
@@ -249,15 +260,16 @@ func TestScanResolver_FizzlesAfterDeparture(t *testing.T) {
 		sys: {{LaneId: "lane-f", OtherSystemId: "sys-far"}},
 	}}
 	interiors := beamInteriors{feats: map[string][]FeatureGeom{
-		sys: {{Id: "feat-f", Anchor: board.Hex{Q: 2, R: 0}, Detail: &FeatureDetail{FeatureType: "belt"}}},
+		sys: {{Id: "feat-f", Anchor: board.Cell{Ring: 2, Slot: 0}, Detail: &FeatureDetail{FeatureType: "belt"}}},
 	}}
 	fog := NewServiceWith(NewDaoWithClient(fs), fakeFleets{}, interiors, lanes, clk).
 		WithParams(DefaultSensorParams(), testScanParams())
 	fog.RegisterResolvers(actionSvc)
 
-	seedScanFleet(t, fs, "fleet-F", corp, sys, board.Hex{Q: 0, R: 1})
+	origin := board.Cell{Ring: 1, Slot: 1}
+	seedScanFleet(t, fs, "fleet-F", corp, sys, origin)
 	clk.now = 0
-	a := commitScan(t, actionSvc, "fleet-F", sys, board.Hex{Q: 0, R: 1}, 1_000)
+	a := commitScan(t, actionSvc, "fleet-F", sys, origin, 1_000)
 
 	// The fleet departs: by eta it belongs to another system.
 	if err := fs.Set(ctx, "fleets", "fleet-F", map[string]interface{}{"systemId": "sys-elsewhere"}); err != nil {
@@ -310,29 +322,39 @@ func TestScan_LateResolveEvaluatesAtEta(t *testing.T) {
 	ctx := context.Background()
 	clk := &settableClock{}
 	actionSvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
+	sched := testSched()
 
 	corp := "corp-" + uuid.NewString()
 	const sys = "sys-T"
 	const eta = common.WorldMillis(1_000)
 	const lateBy = common.WorldMillis(9_999_999)
 
-	// The occluder orbits; the shadowed feature sits at the core-side hex so
-	// that AT ETA the occluder lies exactly between it and the fleet: the fleet
-	// is seeded at 2×(occluder@eta), making the occluder the line's midpoint.
-	orbit := board.Orbit{Ring: 3, Angle0: 0, Period: 24_000, Dir: 1}
-	occAtEta := board.OrbState(orbit, eta)
-	origin := board.Hex{Q: 2 * occAtEta.Q, R: 2 * occAtEta.R}
-	if late := board.OrbState(orbit, eta+lateBy); late == occAtEta {
+	// The occluder orbits on ring 4; the shadowed feature sits at the CORE, and
+	// the fleet fires from ring 8 on the SAME slot the occluder sits on at eta
+	// — collinear through the core (CellCenter scales linearly with ring at a
+	// fixed slot), so the occluder is exactly the chord's midpoint.
+	orbit := board.Orbit{Ring: 4, Angle0: 0, Period: 24_000, Dir: 1}
+	occAtEta := board.OrbState(orbit, eta, sched)
+	shadowed := board.Cell{Ring: 0, Slot: 0}
+	// Ring 8's slot count is an exact integer multiple of ring 4's (the
+	// schedule's adjacent-ring ratio is always 1 or 2, so any outer/inner
+	// ratio is an integer power of 2) — scale the slot index by that ratio so
+	// `origin` sits at the SAME angle as occAtEta, twice as far out, keeping
+	// the two collinear with the core.
+	outerRing := 2 * occAtEta.Ring
+	ratio := sched.Slots(outerRing) / sched.Slots(occAtEta.Ring)
+	origin := board.Cell{Ring: outerRing, Slot: occAtEta.Slot * ratio}
+	if late := board.OrbState(orbit, eta+lateBy, sched); late == occAtEta {
 		t.Fatalf("test setup: the occluder must be elsewhere at resolve time for this to prove anything")
-	} else if !board.LineOfSight(origin, board.Hex{Q: 0, R: 0}, map[board.Hex]bool{late: true}) {
+	} else if !board.LineOfSight(origin, shadowed, []board.Occluder{{Cell: late, Radius2: board.PlanetOcclusionRadius2}}, sched) {
 		t.Fatalf("test setup: the late occluder position must leave the line clear")
 	}
 
 	interiors := beamInteriors{feats: map[string][]FeatureGeom{
 		sys: {
-			{Id: "feat-planet", Elements: &orbit, Occludes: true,
+			{Id: "feat-planet", Elements: &orbit, OcclusionRadius2: board.PlanetOcclusionRadius2,
 				Detail: &FeatureDetail{FeatureType: "rocky"}},
-			{Id: "feat-shadowed", Anchor: board.Hex{Q: 0, R: 0},
+			{Id: "feat-shadowed", Anchor: shadowed,
 				Detail: &FeatureDetail{FeatureType: "belt"}},
 		},
 	}}
