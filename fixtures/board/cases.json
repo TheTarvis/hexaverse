@@ -2,339 +2,210 @@
   "_meta": {
     "generatedOn": {
       "goarch": "arm64"
-    },
-    "note": "_meta and layoutConstants were HAND-AUTHORED 2026-08-25 (no UPDATE_FIXTURES run \u2014 regenerating on arm64 while the line FMA defect is open would bake the contracting target's answers into the contract; see docs/defects/2026-08-25-line-fma-arch-divergence.md). layoutConstants IS machine-verified: both suites recompute and assert it. This stamp is not (excluded from comparison by design); the next legitimate regeneration rewrites _meta and this note disappears with it."
+    }
   },
-  "line": [
-    {
-      "from": {
-        "q": 0,
-        "r": 0
-      },
-      "to": {
-        "q": 3,
-        "r": -1
-      },
-      "path": [
-        {
-          "q": 0,
-          "r": 0
-        },
-        {
-          "q": 1,
-          "r": 0
-        },
-        {
-          "q": 2,
-          "r": -1
-        },
-        {
-          "q": 3,
-          "r": -1
-        }
+  "schedules": {
+    "isotropic10": {
+      "innerSlots": 6,
+      "doubleAt": [
+        2,
+        3,
+        5,
+        9,
+        17
+      ],
+      "maxRing": 10,
+      "counts": [
+        1,
+        6,
+        12,
+        24,
+        24,
+        48,
+        48,
+        48,
+        48,
+        96,
+        96
       ]
     },
-    {
-      "from": {
-        "q": 0,
-        "r": 0
-      },
-      "to": {
-        "q": -2,
-        "r": 5
-      },
-      "path": [
-        {
-          "q": 0,
-          "r": 0
-        },
-        {
-          "q": 0,
-          "r": 1
-        },
-        {
-          "q": -1,
-          "r": 2
-        },
-        {
-          "q": -1,
-          "r": 3
-        },
-        {
-          "q": -2,
-          "r": 4
-        },
-        {
-          "q": -2,
-          "r": 5
-        }
-      ]
-    },
-    {
-      "from": {
-        "q": 2,
-        "r": -4
-      },
-      "to": {
-        "q": 5,
-        "r": 1
-      },
-      "path": [
-        {
-          "q": 2,
-          "r": -4
-        },
-        {
-          "q": 2,
-          "r": -3
-        },
-        {
-          "q": 3,
-          "r": -3
-        },
-        {
-          "q": 3,
-          "r": -2
-        },
-        {
-          "q": 4,
-          "r": -2
-        },
-        {
-          "q": 4,
-          "r": -1
-        },
-        {
-          "q": 4,
-          "r": 0
-        },
-        {
-          "q": 5,
-          "r": 0
-        },
-        {
-          "q": 5,
-          "r": 1
-        }
+    "isotropic16": {
+      "innerSlots": 6,
+      "doubleAt": [
+        2,
+        3,
+        5,
+        9,
+        17
+      ],
+      "maxRing": 16,
+      "counts": [
+        1,
+        6,
+        12,
+        24,
+        24,
+        48,
+        48,
+        48,
+        48,
+        96,
+        96,
+        96,
+        96,
+        96,
+        96,
+        96,
+        96
       ]
     }
-  ],
-  "routeAround": [
+  },
+  "coordinateTable": {
+    "scale": 65536,
+    "slotCounts": [
+      1,
+      6,
+      12,
+      24,
+      48,
+      96,
+      192
+    ],
+    "digest": "c71d0fd31bbc2485b8731037b0ddb435f9502a49737940027b74abe7ce070230"
+  },
+  "distance": [
     {
-      "from": {
-        "q": 1,
-        "r": 0
+      "schedule": "isotropic10",
+      "a": {
+        "ring": 5,
+        "slot": 3
       },
-      "to": {
-        "q": -1,
-        "r": 0
+      "b": {
+        "ring": 5,
+        "slot": 3
       },
-      "path": [
-        {
-          "q": 1,
-          "r": 0
-        },
-        {
-          "q": 0,
-          "r": 1
-        },
-        {
-          "q": -1,
-          "r": 1
-        },
-        {
-          "q": -1,
-          "r": 0
-        }
-      ]
+      "distance": 0
     },
     {
-      "from": {
-        "q": 3,
-        "r": -2
+      "schedule": "isotropic10",
+      "a": {
+        "ring": 5,
+        "slot": 3
       },
-      "to": {
-        "q": -3,
-        "r": 2
+      "b": {
+        "ring": 5,
+        "slot": 4
       },
-      "path": [
-        {
-          "q": 3,
-          "r": -2
-        },
-        {
-          "q": 2,
-          "r": -1
-        },
-        {
-          "q": 1,
-          "r": 0
-        },
-        {
-          "q": 0,
-          "r": 1
-        },
-        {
-          "q": -1,
-          "r": 1
-        },
-        {
-          "q": -2,
-          "r": 2
-        },
-        {
-          "q": -3,
-          "r": 2
-        }
-      ]
+      "distance": 1
     },
     {
-      "from": {
-        "q": 2,
-        "r": -1
+      "schedule": "isotropic10",
+      "a": {
+        "ring": 4,
+        "slot": 0
       },
-      "to": {
-        "q": -2,
-        "r": 1
+      "b": {
+        "ring": 5,
+        "slot": 2
       },
-      "path": [
-        {
-          "q": 2,
-          "r": -1
-        },
-        {
-          "q": 1,
-          "r": 0
-        },
-        {
-          "q": 0,
-          "r": 1
-        },
-        {
-          "q": -1,
-          "r": 1
-        },
-        {
-          "q": -2,
-          "r": 1
-        }
-      ]
+      "distance": 2
     },
     {
-      "from": {
-        "q": 3,
-        "r": -1
+      "schedule": "isotropic10",
+      "a": {
+        "ring": 0,
+        "slot": 0
       },
-      "to": {
-        "q": 5,
-        "r": -2
+      "b": {
+        "ring": 2,
+        "slot": 0
       },
-      "path": [
-        {
-          "q": 3,
-          "r": -1
-        },
-        {
-          "q": 4,
-          "r": -1
-        },
-        {
-          "q": 5,
-          "r": -2
-        }
-      ]
+      "distance": 2
     },
     {
-      "from": {
-        "q": 0,
-        "r": 0
+      "schedule": "isotropic10",
+      "a": {
+        "ring": 1,
+        "slot": 0
       },
-      "to": {
-        "q": 5,
-        "r": 0
+      "b": {
+        "ring": 1,
+        "slot": 3
       },
-      "path": [
-        {
-          "q": 0,
-          "r": 0
-        },
-        {
-          "q": 1,
-          "r": 0
-        },
-        {
-          "q": 2,
-          "r": 0
-        },
-        {
-          "q": 3,
-          "r": 0
-        },
-        {
-          "q": 4,
-          "r": 0
-        },
-        {
-          "q": 5,
-          "r": 0
-        }
-      ]
+      "distance": 2
+    },
+    {
+      "schedule": "isotropic10",
+      "a": {
+        "ring": 10,
+        "slot": 90
+      },
+      "b": {
+        "ring": 2,
+        "slot": 3
+      },
+      "distance": 10
     }
   ],
   "orbState": [
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 3,
         "angle0": 2,
-        "period": 1152921504606846976,
+        "period": 1000000000000000,
         "dir": 1
       },
       "t": 0,
-      "hex": {
-        "q": -1,
-        "r": 3
+      "cell": {
+        "ring": 3,
+        "slot": 2
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 3,
         "angle0": 2,
-        "period": 1152921504606846976,
+        "period": 1000000000000000,
         "dir": 1
       },
       "t": 3000,
-      "hex": {
-        "q": -1,
-        "r": 3
+      "cell": {
+        "ring": 3,
+        "slot": 2
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 3,
         "angle0": 2,
-        "period": 1152921504606846976,
+        "period": 1000000000000000,
         "dir": 1
       },
       "t": 6000,
-      "hex": {
-        "q": -1,
-        "r": 3
+      "cell": {
+        "ring": 3,
+        "slot": 2
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 3,
         "angle0": 2,
-        "period": 1152921504606846976,
+        "period": 1000000000000000,
         "dir": 1
       },
       "t": 24000,
-      "hex": {
-        "q": -1,
-        "r": 3
+      "cell": {
+        "ring": 3,
+        "slot": 2
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 2,
         "angle0": 0,
@@ -342,12 +213,13 @@
         "dir": 1
       },
       "t": 0,
-      "hex": {
-        "q": -2,
-        "r": 2
+      "cell": {
+        "ring": 2,
+        "slot": 0
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 2,
         "angle0": 0,
@@ -355,12 +227,13 @@
         "dir": 1
       },
       "t": 3000,
-      "hex": {
-        "q": 1,
-        "r": 1
+      "cell": {
+        "ring": 2,
+        "slot": 3
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 2,
         "angle0": 0,
@@ -368,12 +241,13 @@
         "dir": 1
       },
       "t": 6000,
-      "hex": {
-        "q": 2,
-        "r": -2
+      "cell": {
+        "ring": 2,
+        "slot": 6
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 2,
         "angle0": 0,
@@ -381,12 +255,13 @@
         "dir": 1
       },
       "t": 24000,
-      "hex": {
-        "q": -2,
-        "r": 2
+      "cell": {
+        "ring": 2,
+        "slot": 0
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 4,
         "angle0": 7,
@@ -394,12 +269,13 @@
         "dir": -1
       },
       "t": 0,
-      "hex": {
-        "q": 3,
-        "r": 1
+      "cell": {
+        "ring": 4,
+        "slot": 7
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 4,
         "angle0": 7,
@@ -407,12 +283,13 @@
         "dir": -1
       },
       "t": 3000,
-      "hex": {
-        "q": 2,
-        "r": 2
+      "cell": {
+        "ring": 4,
+        "slot": 6
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 4,
         "angle0": 7,
@@ -420,12 +297,13 @@
         "dir": -1
       },
       "t": 6000,
-      "hex": {
-        "q": 0,
-        "r": 4
+      "cell": {
+        "ring": 4,
+        "slot": 4
       }
     },
     {
+      "schedule": "isotropic10",
       "orbit": {
         "ring": 4,
         "angle0": 7,
@@ -433,110 +311,323 @@
         "dir": -1
       },
       "t": 24000,
-      "hex": {
-        "q": -3,
-        "r": -1
+      "cell": {
+        "ring": 4,
+        "slot": 19
       }
     }
   ],
-  "solveHex": [
+  "orbitThrough": [
     {
+      "schedule": "isotropic10",
+      "cell": {
+        "ring": 4,
+        "slot": 7
+      },
+      "at": 123456,
+      "period": 48000,
+      "dir": -1,
+      "angle0": 20
+    },
+    {
+      "schedule": "isotropic10",
+      "cell": {
+        "ring": 2,
+        "slot": 5
+      },
+      "at": 10,
+      "period": 7,
+      "dir": 1,
+      "angle0": 0
+    },
+    {
+      "schedule": "isotropic10",
+      "cell": {
+        "ring": 0,
+        "slot": 0
+      },
+      "at": 987654,
+      "period": 12000,
+      "dir": 1,
+      "angle0": 0
+    },
+    {
+      "schedule": "isotropic10",
+      "cell": {
+        "ring": 9,
+        "slot": 42
+      },
+      "at": 2600000000000000,
+      "period": 1000000000000000,
+      "dir": 1,
+      "angle0": 81
+    }
+  ],
+  "solveCell": [
+    {
+      "schedule": "isotropic10",
       "from": {
-        "q": 0,
-        "r": 0
+        "ring": 0,
+        "slot": 0
       },
       "dest": {
-        "q": 5,
-        "r": 0
+        "ring": 5,
+        "slot": 0
       },
       "now": 0,
       "msPerTile": 1000,
       "path": [
         {
-          "q": 0,
-          "r": 0
+          "ring": 0,
+          "slot": 0
         },
         {
-          "q": 1,
-          "r": 0
+          "ring": 1,
+          "slot": 0
         },
         {
-          "q": 2,
-          "r": 0
+          "ring": 2,
+          "slot": 0
         },
         {
-          "q": 3,
-          "r": 0
+          "ring": 3,
+          "slot": 0
         },
         {
-          "q": 4,
-          "r": 0
+          "ring": 4,
+          "slot": 0
         },
         {
-          "q": 5,
-          "r": 0
+          "ring": 5,
+          "slot": 0
         }
       ],
-      "meetHex": {
-        "q": 5,
-        "r": 0
+      "meetCell": {
+        "ring": 5,
+        "slot": 0
       },
       "arriveTime": 5000
     },
     {
+      "schedule": "isotropic10",
       "from": {
-        "q": 1,
-        "r": -1
+        "ring": 2,
+        "slot": 0
       },
       "dest": {
-        "q": -3,
-        "r": 4
+        "ring": 7,
+        "slot": 10
       },
       "now": 10000,
       "msPerTile": 500,
       "path": [
         {
-          "q": 1,
-          "r": -1
+          "ring": 2,
+          "slot": 0
         },
         {
-          "q": 1,
-          "r": 0
+          "ring": 3,
+          "slot": 1
         },
         {
-          "q": 0,
-          "r": 1
+          "ring": 4,
+          "slot": 2
         },
         {
-          "q": -1,
-          "r": 2
+          "ring": 5,
+          "slot": 5
         },
         {
-          "q": -2,
-          "r": 3
+          "ring": 5,
+          "slot": 6
         },
         {
-          "q": -3,
-          "r": 4
+          "ring": 6,
+          "slot": 7
+        },
+        {
+          "ring": 6,
+          "slot": 8
+        },
+        {
+          "ring": 7,
+          "slot": 9
+        },
+        {
+          "ring": 7,
+          "slot": 10
         }
       ],
-      "meetHex": {
-        "q": -3,
-        "r": 4
+      "meetCell": {
+        "ring": 7,
+        "slot": 10
       },
-      "arriveTime": 12500
+      "arriveTime": 14000
+    },
+    {
+      "schedule": "isotropic10",
+      "from": {
+        "ring": 5,
+        "slot": 1
+      },
+      "dest": {
+        "ring": 5,
+        "slot": 25
+      },
+      "now": 0,
+      "msPerTile": 2500,
+      "path": [
+        {
+          "ring": 5,
+          "slot": 1
+        },
+        {
+          "ring": 5,
+          "slot": 2
+        },
+        {
+          "ring": 5,
+          "slot": 3
+        },
+        {
+          "ring": 5,
+          "slot": 4
+        },
+        {
+          "ring": 5,
+          "slot": 5
+        },
+        {
+          "ring": 5,
+          "slot": 6
+        },
+        {
+          "ring": 5,
+          "slot": 7
+        },
+        {
+          "ring": 5,
+          "slot": 8
+        },
+        {
+          "ring": 5,
+          "slot": 9
+        },
+        {
+          "ring": 5,
+          "slot": 10
+        },
+        {
+          "ring": 5,
+          "slot": 11
+        },
+        {
+          "ring": 5,
+          "slot": 12
+        },
+        {
+          "ring": 5,
+          "slot": 13
+        },
+        {
+          "ring": 5,
+          "slot": 14
+        },
+        {
+          "ring": 5,
+          "slot": 15
+        },
+        {
+          "ring": 5,
+          "slot": 16
+        },
+        {
+          "ring": 5,
+          "slot": 17
+        },
+        {
+          "ring": 5,
+          "slot": 18
+        },
+        {
+          "ring": 5,
+          "slot": 19
+        },
+        {
+          "ring": 5,
+          "slot": 20
+        },
+        {
+          "ring": 5,
+          "slot": 21
+        },
+        {
+          "ring": 5,
+          "slot": 22
+        },
+        {
+          "ring": 5,
+          "slot": 23
+        },
+        {
+          "ring": 5,
+          "slot": 24
+        },
+        {
+          "ring": 5,
+          "slot": 25
+        }
+      ],
+      "meetCell": {
+        "ring": 5,
+        "slot": 25
+      },
+      "arriveTime": 60000
+    },
+    {
+      "schedule": "isotropic10",
+      "from": {
+        "ring": 2,
+        "slot": 0
+      },
+      "dest": {
+        "ring": 1,
+        "slot": 1
+      },
+      "now": 5000,
+      "msPerTile": 2500,
+      "path": [
+        {
+          "ring": 2,
+          "slot": 0
+        },
+        {
+          "ring": 2,
+          "slot": 1
+        },
+        {
+          "ring": 1,
+          "slot": 1
+        }
+      ],
+      "meetCell": {
+        "ring": 1,
+        "slot": 1
+      },
+      "arriveTime": 10000
     }
   ],
   "solveIntercept": [
     {
+      "schedule": "isotropic10",
       "from": {
-        "q": 0,
-        "r": 0
+        "ring": 0,
+        "slot": 0
       },
       "orbit": {
         "ring": 5,
         "angle0": 3,
-        "period": 1152921504606846976,
+        "period": 1000000000000000,
         "dir": 1
       },
       "now": 0,
@@ -544,40 +635,41 @@
       "horizon": 10000000,
       "path": [
         {
-          "q": 0,
-          "r": 0
+          "ring": 0,
+          "slot": 0
         },
         {
-          "q": 0,
-          "r": 1
+          "ring": 1,
+          "slot": 0
         },
         {
-          "q": -1,
-          "r": 2
+          "ring": 2,
+          "slot": 1
         },
         {
-          "q": -1,
-          "r": 3
+          "ring": 3,
+          "slot": 2
         },
         {
-          "q": -2,
-          "r": 4
+          "ring": 4,
+          "slot": 2
         },
         {
-          "q": -2,
-          "r": 5
+          "ring": 5,
+          "slot": 3
         }
       ],
-      "meetHex": {
-        "q": -2,
-        "r": 5
+      "meetCell": {
+        "ring": 5,
+        "slot": 3
       },
       "arriveTime": 5000
     },
     {
+      "schedule": "isotropic10",
       "from": {
-        "q": 0,
-        "r": 0
+        "ring": 0,
+        "slot": 0
       },
       "orbit": {
         "ring": 6,
@@ -590,44 +682,45 @@
       "horizon": 5000000,
       "path": [
         {
-          "q": 0,
-          "r": 0
+          "ring": 0,
+          "slot": 0
         },
         {
-          "q": -1,
-          "r": 1
+          "ring": 1,
+          "slot": 0
         },
         {
-          "q": -2,
-          "r": 2
+          "ring": 2,
+          "slot": 0
         },
         {
-          "q": -3,
-          "r": 3
+          "ring": 3,
+          "slot": 1
         },
         {
-          "q": -3,
-          "r": 4
+          "ring": 4,
+          "slot": 1
         },
         {
-          "q": -4,
-          "r": 5
+          "ring": 5,
+          "slot": 1
         },
         {
-          "q": -5,
-          "r": 6
+          "ring": 6,
+          "slot": 1
         }
       ],
-      "meetHex": {
-        "q": -5,
-        "r": 6
+      "meetCell": {
+        "ring": 6,
+        "slot": 1
       },
-      "arriveTime": 16667
+      "arriveTime": 12500
     },
     {
+      "schedule": "isotropic10",
       "from": {
-        "q": 6,
-        "r": -3
+        "ring": 6,
+        "slot": 30
       },
       "orbit": {
         "ring": 2,
@@ -640,40 +733,61 @@
       "horizon": 60000,
       "path": [
         {
-          "q": 6,
-          "r": -3
+          "ring": 6,
+          "slot": 30
         },
         {
-          "q": 5,
-          "r": -2
+          "ring": 6,
+          "slot": 29
         },
         {
-          "q": 4,
-          "r": -1
+          "ring": 5,
+          "slot": 28
         },
         {
-          "q": 3,
-          "r": -1
+          "ring": 5,
+          "slot": 27
         },
         {
-          "q": 2,
-          "r": 0
+          "ring": 5,
+          "slot": 26
         },
         {
-          "q": 1,
-          "r": 1
+          "ring": 5,
+          "slot": 25
+        },
+        {
+          "ring": 4,
+          "slot": 12
+        },
+        {
+          "ring": 4,
+          "slot": 11
+        },
+        {
+          "ring": 3,
+          "slot": 10
+        },
+        {
+          "ring": 3,
+          "slot": 9
+        },
+        {
+          "ring": 2,
+          "slot": 4
         }
       ],
-      "meetHex": {
-        "q": 1,
-        "r": 1
+      "meetCell": {
+        "ring": 2,
+        "slot": 4
       },
-      "arriveTime": 3000
+      "arriveTime": 4000
     },
     {
+      "schedule": "isotropic10",
       "from": {
-        "q": 5,
-        "r": 0
+        "ring": 5,
+        "slot": 0
       },
       "orbit": {
         "ring": 4,
@@ -686,182 +800,201 @@
       "horizon": 300000,
       "path": [
         {
-          "q": 5,
-          "r": 0
+          "ring": 5,
+          "slot": 0
         },
         {
-          "q": 4,
-          "r": 1
+          "ring": 5,
+          "slot": 1
         },
         {
-          "q": 3,
-          "r": 2
+          "ring": 5,
+          "slot": 2
         },
         {
-          "q": 2,
-          "r": 2
+          "ring": 5,
+          "slot": 3
         },
         {
-          "q": 1,
-          "r": 3
+          "ring": 4,
+          "slot": 2
+        },
+        {
+          "ring": 4,
+          "slot": 3
+        },
+        {
+          "ring": 4,
+          "slot": 4
         }
       ],
-      "meetHex": {
-        "q": 1,
-        "r": 3
+      "meetCell": {
+        "ring": 4,
+        "slot": 4
       },
-      "arriveTime": 4167
+      "arriveTime": 6250
     }
   ],
   "laneGate": [
     {
+      "schedule": "isotropic16",
       "selfX": 0,
       "selfY": 0,
       "neighborX": 100,
       "neighborY": 8.7,
       "radius": 16,
       "gate": {
-        "q": 13,
-        "r": -1
+        "ring": 13,
+        "slot": 1
       }
     },
     {
+      "schedule": "isotropic16",
       "selfX": 0,
       "selfY": 0,
       "neighborX": 64,
       "neighborY": 76,
       "radius": 16,
       "gate": {
-        "q": 13,
-        "r": -11
+        "ring": 13,
+        "slot": 13
       }
     },
     {
+      "schedule": "isotropic16",
       "selfX": 0,
       "selfY": 0,
       "neighborX": -8.7,
       "neighborY": 100,
       "radius": 16,
       "gate": {
-        "q": 6,
-        "r": -13
+        "ring": 13,
+        "slot": 25
       }
     },
     {
+      "schedule": "isotropic16",
       "selfX": 0,
       "selfY": 0,
       "neighborX": -77,
       "neighborY": 64,
       "radius": 16,
       "gate": {
-        "q": -5,
-        "r": -8
+        "ring": 13,
+        "slot": 37
       }
     },
     {
+      "schedule": "isotropic16",
       "selfX": 0,
       "selfY": 0,
       "neighborX": -100,
       "neighborY": -8.7,
       "radius": 16,
       "gate": {
-        "q": -13,
-        "r": 1
+        "ring": 13,
+        "slot": 49
       }
     },
     {
+      "schedule": "isotropic16",
       "selfX": 0,
       "selfY": 0,
       "neighborX": -64,
       "neighborY": -76,
       "radius": 16,
       "gate": {
-        "q": -13,
-        "r": 11
+        "ring": 13,
+        "slot": 61
       }
     },
     {
+      "schedule": "isotropic16",
       "selfX": 0,
       "selfY": 0,
       "neighborX": 8.7,
       "neighborY": -100,
       "radius": 16,
       "gate": {
-        "q": -6,
-        "r": 13
+        "ring": 13,
+        "slot": 73
       }
     },
     {
+      "schedule": "isotropic16",
       "selfX": 0,
       "selfY": 0,
       "neighborX": 77,
       "neighborY": -64,
       "radius": 16,
       "gate": {
-        "q": 5,
-        "r": 8
+        "ring": 13,
+        "slot": 85
       }
     },
     {
+      "schedule": "isotropic16",
       "selfX": 10,
       "selfY": -20,
       "neighborX": 110,
       "neighborY": -12,
       "radius": 16,
       "gate": {
-        "q": 13,
-        "r": -1
+        "ring": 13,
+        "slot": 1
       }
     },
     {
+      "schedule": "isotropic16",
       "selfX": 5,
       "selfY": 5,
       "neighborX": 30,
       "neighborY": 90,
       "radius": 6,
       "gate": {
-        "q": 2,
-        "r": -3
+        "ring": 3,
+        "slot": 5
       }
     }
   ],
   "stateAt": [
     {
+      "schedule": "isotropic10",
       "state": {
         "mode": "burn",
         "burn": {
           "path": [
             {
-              "q": 1,
-              "r": 0
+              "ring": 1,
+              "slot": 0
             },
             {
-              "q": 2,
-              "r": 0
+              "ring": 2,
+              "slot": 0
             },
             {
-              "q": 3,
-              "r": 0
+              "ring": 3,
+              "slot": 0
             },
             {
-              "q": 4,
-              "r": 0
+              "ring": 4,
+              "slot": 0
             },
             {
-              "q": 5,
-              "r": 0
+              "ring": 5,
+              "slot": 0
             },
             {
-              "q": 6,
-              "r": 0
+              "ring": 6,
+              "slot": 0
             }
           ],
           "startTime": 1000,
           "arriveTime": 13500,
           "target": {
-            "hex": {
-              "q": 6,
-              "r": 0
+            "cell": {
+              "ring": 6,
+              "slot": 0
             }
           }
         }
@@ -872,77 +1005,78 @@
         "burn": {
           "path": [
             {
-              "q": 1,
-              "r": 0
+              "ring": 1,
+              "slot": 0
             },
             {
-              "q": 2,
-              "r": 0
+              "ring": 2,
+              "slot": 0
             },
             {
-              "q": 3,
-              "r": 0
+              "ring": 3,
+              "slot": 0
             },
             {
-              "q": 4,
-              "r": 0
+              "ring": 4,
+              "slot": 0
             },
             {
-              "q": 5,
-              "r": 0
+              "ring": 5,
+              "slot": 0
             },
             {
-              "q": 6,
-              "r": 0
+              "ring": 6,
+              "slot": 0
             }
           ],
           "startTime": 1000,
           "arriveTime": 13500,
           "target": {
-            "hex": {
-              "q": 6,
-              "r": 0
+            "cell": {
+              "ring": 6,
+              "slot": 0
             }
           }
         }
       }
     },
     {
+      "schedule": "isotropic10",
       "state": {
         "mode": "burn",
         "burn": {
           "path": [
             {
-              "q": 1,
-              "r": 0
+              "ring": 1,
+              "slot": 0
             },
             {
-              "q": 2,
-              "r": 0
+              "ring": 2,
+              "slot": 0
             },
             {
-              "q": 3,
-              "r": 0
+              "ring": 3,
+              "slot": 0
             },
             {
-              "q": 4,
-              "r": 0
+              "ring": 4,
+              "slot": 0
             },
             {
-              "q": 5,
-              "r": 0
+              "ring": 5,
+              "slot": 0
             },
             {
-              "q": 6,
-              "r": 0
+              "ring": 6,
+              "slot": 0
             }
           ],
           "startTime": 1000,
           "arriveTime": 13500,
           "target": {
-            "hex": {
-              "q": 6,
-              "r": 0
+            "cell": {
+              "ring": 6,
+              "slot": 0
             }
           }
         }
@@ -952,48 +1086,49 @@
         "mode": "coast",
         "coast": {
           "ring": 6,
-          "angle0": 10,
+          "angle0": 45,
           "period": 216000,
           "dir": 1
         }
       }
     },
     {
+      "schedule": "isotropic10",
       "state": {
         "mode": "burn",
         "burn": {
           "path": [
             {
-              "q": 1,
-              "r": 0
+              "ring": 1,
+              "slot": 0
             },
             {
-              "q": 2,
-              "r": 0
+              "ring": 2,
+              "slot": 0
             },
             {
-              "q": 3,
-              "r": 0
+              "ring": 3,
+              "slot": 0
             },
             {
-              "q": 4,
-              "r": 0
+              "ring": 4,
+              "slot": 0
             },
             {
-              "q": 5,
-              "r": 0
+              "ring": 5,
+              "slot": 0
             },
             {
-              "q": 6,
-              "r": 0
+              "ring": 6,
+              "slot": 0
             }
           ],
           "startTime": 1000,
           "arriveTime": 13500,
           "target": {
-            "hex": {
-              "q": 6,
-              "r": 0
+            "cell": {
+              "ring": 6,
+              "slot": 0
             }
           }
         }
@@ -1003,91 +1138,101 @@
         "mode": "coast",
         "coast": {
           "ring": 6,
-          "angle0": 10,
+          "angle0": 45,
           "period": 216000,
           "dir": 1
         }
       }
     },
     {
+      "schedule": "isotropic10",
       "state": {
         "mode": "burn",
         "burn": {
           "path": [
             {
-              "q": 1,
-              "r": 0
+              "ring": 1,
+              "slot": 0
             },
             {
-              "q": 2,
-              "r": 0
+              "ring": 2,
+              "slot": 0
             },
             {
-              "q": 3,
-              "r": 0
+              "ring": 3,
+              "slot": 0
             },
             {
-              "q": 4,
-              "r": 0
+              "ring": 4,
+              "slot": 0
             },
             {
-              "q": 5,
-              "r": 0
+              "ring": 5,
+              "slot": 0
             },
             {
-              "q": 6,
-              "r": 0
+              "ring": 6,
+              "slot": 0
             }
           ],
           "startTime": 3000,
-          "arriveTime": 15500,
+          "arriveTime": 16000,
           "target": {
-            "hex": {
-              "q": 6,
-              "r": 0
+            "cell": {
+              "ring": 6,
+              "slot": 0
             }
           }
         }
       },
-      "t": 15500,
+      "t": 16000,
       "out": {
         "mode": "coast",
         "coast": {
           "ring": 6,
-          "angle0": 9,
+          "angle0": 44,
           "period": 216000,
           "dir": 1
         }
       }
     },
     {
+      "schedule": "isotropic10",
       "state": {
         "mode": "burn",
         "burn": {
           "path": [
             {
-              "q": 2,
-              "r": -1
+              "ring": 2,
+              "slot": 1
             },
             {
-              "q": 2,
-              "r": 0
+              "ring": 2,
+              "slot": 2
             },
             {
-              "q": 3,
-              "r": 0
+              "ring": 3,
+              "slot": 4
             },
             {
-              "q": 3,
-              "r": 1
+              "ring": 3,
+              "slot": 5
             },
             {
-              "q": 4,
-              "r": 1
+              "ring": 3,
+              "slot": 6
             },
             {
-              "q": 4,
-              "r": 2
+              "ring": 3,
+              "slot": 7
+            },
+            {
+              "ring": 4,
+              "slot": 8
+            },
+            {
+              "ring": 4,
+              "slot": 9
             }
           ],
           "startTime": 2000,
@@ -1107,6 +1252,7 @@
       }
     },
     {
+      "schedule": "isotropic10",
       "state": {
         "mode": "laneTransit",
         "laneTransit": {
@@ -1121,8 +1267,8 @@
           "departTime": 1000,
           "arriveTime": 30000,
           "entryGate": {
-            "q": 16,
-            "r": 0
+            "ring": 13,
+            "slot": 0
           }
         }
       },
@@ -1141,731 +1287,1181 @@
           "departTime": 1000,
           "arriveTime": 30000,
           "entryGate": {
-            "q": 16,
-            "r": 0
+            "ring": 13,
+            "slot": 0
           }
         }
       }
     }
   ],
+  "shipPos": [
+    {
+      "schedule": "isotropic10",
+      "state": {
+        "mode": "coast",
+        "coast": {
+          "ring": 4,
+          "angle0": 10,
+          "period": 144000,
+          "dir": 1
+        }
+      },
+      "t": 200000,
+      "cell": {
+        "ring": 4,
+        "slot": 19
+      },
+      "ok": true
+    },
+    {
+      "schedule": "isotropic10",
+      "state": {
+        "mode": "burn",
+        "burn": {
+          "path": [
+            {
+              "ring": 1,
+              "slot": 0
+            },
+            {
+              "ring": 2,
+              "slot": 0
+            },
+            {
+              "ring": 3,
+              "slot": 0
+            },
+            {
+              "ring": 4,
+              "slot": 0
+            },
+            {
+              "ring": 5,
+              "slot": 0
+            },
+            {
+              "ring": 6,
+              "slot": 0
+            }
+          ],
+          "startTime": 1000,
+          "arriveTime": 13500,
+          "target": {}
+        }
+      },
+      "t": 8500,
+      "cell": {
+        "ring": 4,
+        "slot": 0
+      },
+      "ok": true
+    },
+    {
+      "schedule": "isotropic10",
+      "state": {
+        "mode": "burn",
+        "burn": {
+          "path": [
+            {
+              "ring": 1,
+              "slot": 0
+            },
+            {
+              "ring": 2,
+              "slot": 0
+            },
+            {
+              "ring": 3,
+              "slot": 0
+            },
+            {
+              "ring": 4,
+              "slot": 0
+            },
+            {
+              "ring": 5,
+              "slot": 0
+            },
+            {
+              "ring": 6,
+              "slot": 0
+            }
+          ],
+          "startTime": 1000,
+          "arriveTime": 13500,
+          "target": {}
+        }
+      },
+      "t": 63500,
+      "cell": {
+        "ring": 6,
+        "slot": 11
+      },
+      "ok": true
+    },
+    {
+      "schedule": "isotropic10",
+      "state": {
+        "mode": "docked",
+        "docked": {
+          "parentId": "feat-9"
+        }
+      },
+      "t": 5000,
+      "cell": {
+        "ring": 0,
+        "slot": 0
+      },
+      "ok": false
+    },
+    {
+      "schedule": "isotropic10",
+      "state": {
+        "mode": "laneTransit",
+        "laneTransit": {
+          "boardLeg": {
+            "path": [
+              {
+                "ring": 1,
+                "slot": 0
+              },
+              {
+                "ring": 2,
+                "slot": 0
+              },
+              {
+                "ring": 3,
+                "slot": 0
+              },
+              {
+                "ring": 4,
+                "slot": 0
+              },
+              {
+                "ring": 5,
+                "slot": 0
+              },
+              {
+                "ring": 6,
+                "slot": 0
+              }
+            ],
+            "startTime": 0,
+            "gateEta": 10000
+          },
+          "route": [
+            "a",
+            "b"
+          ],
+          "legEtas": [
+            10000,
+            50000
+          ],
+          "departTime": 0,
+          "arriveTime": 50000,
+          "entryGate": {
+            "ring": 13,
+            "slot": 0
+          }
+        }
+      },
+      "t": 5000,
+      "cell": {
+        "ring": 4,
+        "slot": 0
+      },
+      "ok": true
+    },
+    {
+      "schedule": "isotropic10",
+      "state": {
+        "mode": "laneTransit",
+        "laneTransit": {
+          "boardLeg": {
+            "path": [
+              {
+                "ring": 1,
+                "slot": 0
+              },
+              {
+                "ring": 2,
+                "slot": 0
+              },
+              {
+                "ring": 3,
+                "slot": 0
+              },
+              {
+                "ring": 4,
+                "slot": 0
+              },
+              {
+                "ring": 5,
+                "slot": 0
+              },
+              {
+                "ring": 6,
+                "slot": 0
+              }
+            ],
+            "startTime": 0,
+            "gateEta": 10000
+          },
+          "route": [
+            "a",
+            "b"
+          ],
+          "legEtas": [
+            10000,
+            50000
+          ],
+          "departTime": 0,
+          "arriveTime": 50000,
+          "entryGate": {
+            "ring": 13,
+            "slot": 0
+          }
+        }
+      },
+      "t": 20000,
+      "cell": {
+        "ring": 0,
+        "slot": 0
+      },
+      "ok": false
+    },
+    {
+      "schedule": "isotropic10",
+      "state": {
+        "mode": "laneHold",
+        "laneHold": {
+          "from": "a",
+          "to": "b",
+          "fraction": 0.5
+        }
+      },
+      "t": 0,
+      "cell": {
+        "ring": 0,
+        "slot": 0
+      },
+      "ok": false
+    }
+  ],
   "lineOfSight": [
     {
+      "schedule": "isotropic10",
       "origin": {
-        "q": 0,
-        "r": 0
+        "ring": 6,
+        "slot": 0
       },
       "target": {
-        "q": 1,
-        "r": 0
+        "ring": 6,
+        "slot": 24
       },
       "occluders": [
         {
-          "q": 2,
-          "r": 0
+          "cell": {
+            "ring": 0,
+            "slot": 0
+          },
+          "radius2": 4294967296
+        }
+      ],
+      "visible": false
+    },
+    {
+      "schedule": "isotropic10",
+      "origin": {
+        "ring": 6,
+        "slot": 0
+      },
+      "target": {
+        "ring": 6,
+        "slot": 4
+      },
+      "occluders": [
+        {
+          "cell": {
+            "ring": 0,
+            "slot": 0
+          },
+          "radius2": 4294967296
         }
       ],
       "visible": true
     },
     {
+      "schedule": "isotropic10",
       "origin": {
-        "q": 0,
-        "r": 0
+        "ring": 1,
+        "slot": 0
       },
       "target": {
-        "q": 2,
-        "r": 0
+        "ring": 8,
+        "slot": 0
       },
       "occluders": [
         {
-          "q": 2,
-          "r": 0
+          "cell": {
+            "ring": 4,
+            "slot": 0
+          },
+          "radius2": 1073741824
+        }
+      ],
+      "visible": false
+    },
+    {
+      "schedule": "isotropic10",
+      "origin": {
+        "ring": 1,
+        "slot": 0
+      },
+      "target": {
+        "ring": 4,
+        "slot": 0
+      },
+      "occluders": [
+        {
+          "cell": {
+            "ring": 4,
+            "slot": 0
+          },
+          "radius2": 1073741824
         }
       ],
       "visible": true
     },
     {
+      "schedule": "isotropic10",
       "origin": {
-        "q": 0,
-        "r": 0
+        "ring": 1,
+        "slot": 0
       },
       "target": {
-        "q": 3,
-        "r": 0
+        "ring": 3,
+        "slot": 0
       },
       "occluders": [
         {
-          "q": 2,
-          "r": 0
-        }
-      ],
-      "visible": false
-    },
-    {
-      "origin": {
-        "q": 0,
-        "r": 0
-      },
-      "target": {
-        "q": 5,
-        "r": 0
-      },
-      "occluders": [
-        {
-          "q": 2,
-          "r": 0
-        }
-      ],
-      "visible": false
-    },
-    {
-      "origin": {
-        "q": 0,
-        "r": 0
-      },
-      "target": {
-        "q": 0,
-        "r": 3
-      },
-      "occluders": [
-        {
-          "q": 2,
-          "r": 0
+          "cell": {
+            "ring": 4,
+            "slot": 0
+          },
+          "radius2": 1073741824
         }
       ],
       "visible": true
     },
     {
+      "schedule": "isotropic10",
       "origin": {
-        "q": -3,
-        "r": 2
+        "ring": 1,
+        "slot": 0
       },
       "target": {
-        "q": 3,
-        "r": -2
+        "ring": 8,
+        "slot": 12
       },
       "occluders": [
         {
-          "q": 0,
-          "r": 0
+          "cell": {
+            "ring": 4,
+            "slot": 0
+          },
+          "radius2": 1073741824
         }
       ],
-      "visible": false
+      "visible": true
     },
     {
+      "schedule": "isotropic10",
       "origin": {
-        "q": -4,
-        "r": 0
+        "ring": 2,
+        "slot": 3
       },
       "target": {
-        "q": 4,
-        "r": 0
-      },
-      "occluders": [
-        {
-          "q": -2,
-          "r": 0
-        },
-        {
-          "q": 2,
-          "r": 0
-        }
-      ],
-      "visible": false
-    },
-    {
-      "origin": {
-        "q": 1,
-        "r": -1
-      },
-      "target": {
-        "q": -2,
-        "r": 3
+        "ring": 9,
+        "slot": 40
       },
       "occluders": null,
+      "visible": true
+    },
+    {
+      "schedule": "isotropic10",
+      "origin": {
+        "ring": 8,
+        "slot": 40
+      },
+      "target": {
+        "ring": 2,
+        "slot": 2
+      },
+      "occluders": [
+        {
+          "cell": {
+            "ring": 0,
+            "slot": 0
+          },
+          "radius2": 4294967296
+        },
+        {
+          "cell": {
+            "ring": 4,
+            "slot": 0
+          },
+          "radius2": 1073741824
+        }
+      ],
       "visible": true
     }
   ],
   "beam": [
     {
+      "schedule": "isotropic10",
       "origin": {
-        "q": 0,
-        "r": 0
+        "ring": 1,
+        "slot": 0
       },
       "aim": {
-        "q": 1,
-        "r": 0
+        "ring": 5,
+        "slot": 0
       },
       "params": {
-        "halfWidthBase": 0,
-        "spread": 0.34,
-        "rimRing": 6
-      },
-      "hexes": [
-        {
-          "q": 0,
-          "r": 0
-        },
-        {
-          "q": 1,
-          "r": 0
-        },
-        {
-          "q": 2,
-          "r": 0
-        },
-        {
-          "q": 2,
-          "r": 1
-        },
-        {
-          "q": 3,
-          "r": -1
-        },
-        {
-          "q": 3,
-          "r": 0
-        },
-        {
-          "q": 3,
-          "r": 1
-        },
-        {
-          "q": 4,
-          "r": -1
-        },
-        {
-          "q": 4,
-          "r": 0
-        },
-        {
-          "q": 4,
-          "r": 1
-        },
-        {
-          "q": 4,
-          "r": 2
-        },
-        {
-          "q": 5,
-          "r": -1
-        },
-        {
-          "q": 5,
-          "r": 0
-        },
-        {
-          "q": 5,
-          "r": 1
-        },
-        {
-          "q": 6,
-          "r": -2
-        },
-        {
-          "q": 6,
-          "r": -1
-        },
-        {
-          "q": 6,
-          "r": 0
-        }
-      ]
-    },
-    {
-      "origin": {
-        "q": -4,
-        "r": 0
-      },
-      "aim": {
-        "q": 0,
-        "r": 0
-      },
-      "params": {
-        "halfWidthBase": 0,
-        "spread": 0.25,
+        "halfWidthBase": 32768,
+        "spreadNum": 1,
+        "spreadDen": 4,
         "rimRing": 8
       },
-      "hexes": [
+      "cells": [
         {
-          "q": -4,
-          "r": 0
+          "ring": 1,
+          "slot": 0
         },
         {
-          "q": -3,
-          "r": 0
+          "ring": 2,
+          "slot": 0
         },
         {
-          "q": -2,
-          "r": 0
+          "ring": 3,
+          "slot": 0
         },
         {
-          "q": -1,
-          "r": 0
+          "ring": 3,
+          "slot": 1
         },
         {
-          "q": -1,
-          "r": 1
+          "ring": 3,
+          "slot": 23
         },
         {
-          "q": 0,
-          "r": -1
+          "ring": 4,
+          "slot": 0
         },
         {
-          "q": 0,
-          "r": 0
+          "ring": 4,
+          "slot": 1
         },
         {
-          "q": 0,
-          "r": 1
+          "ring": 4,
+          "slot": 23
         },
         {
-          "q": 1,
-          "r": -1
+          "ring": 5,
+          "slot": 0
         },
         {
-          "q": 1,
-          "r": 0
+          "ring": 5,
+          "slot": 1
         },
         {
-          "q": 1,
-          "r": 1
+          "ring": 5,
+          "slot": 2
         },
         {
-          "q": 2,
-          "r": -1
+          "ring": 5,
+          "slot": 46
         },
         {
-          "q": 2,
-          "r": 0
+          "ring": 5,
+          "slot": 47
         },
         {
-          "q": 2,
-          "r": 1
+          "ring": 6,
+          "slot": 0
         },
         {
-          "q": 2,
-          "r": 2
+          "ring": 6,
+          "slot": 1
         },
         {
-          "q": 3,
-          "r": -1
+          "ring": 6,
+          "slot": 2
         },
         {
-          "q": 3,
-          "r": 0
+          "ring": 6,
+          "slot": 46
         },
         {
-          "q": 3,
-          "r": 1
+          "ring": 6,
+          "slot": 47
         },
         {
-          "q": 3,
-          "r": 2
+          "ring": 7,
+          "slot": 0
         },
         {
-          "q": 4,
-          "r": -2
+          "ring": 7,
+          "slot": 1
         },
         {
-          "q": 4,
-          "r": -1
+          "ring": 7,
+          "slot": 2
         },
         {
-          "q": 4,
-          "r": 0
+          "ring": 7,
+          "slot": 46
         },
         {
-          "q": 4,
-          "r": 1
+          "ring": 7,
+          "slot": 47
         },
         {
-          "q": 4,
-          "r": 2
+          "ring": 8,
+          "slot": 0
         },
         {
-          "q": 5,
-          "r": -2
+          "ring": 8,
+          "slot": 1
         },
         {
-          "q": 5,
-          "r": -1
+          "ring": 8,
+          "slot": 2
         },
         {
-          "q": 5,
-          "r": 0
+          "ring": 8,
+          "slot": 46
         },
         {
-          "q": 5,
-          "r": 1
-        },
-        {
-          "q": 5,
-          "r": 2
-        },
-        {
-          "q": 5,
-          "r": 3
-        },
-        {
-          "q": 6,
-          "r": -2
-        },
-        {
-          "q": 6,
-          "r": -1
-        },
-        {
-          "q": 6,
-          "r": 0
-        },
-        {
-          "q": 6,
-          "r": 1
-        },
-        {
-          "q": 6,
-          "r": 2
-        },
-        {
-          "q": 7,
-          "r": -2
-        },
-        {
-          "q": 7,
-          "r": -1
-        },
-        {
-          "q": 7,
-          "r": 0
-        },
-        {
-          "q": 7,
-          "r": 1
-        },
-        {
-          "q": 8,
-          "r": -3
-        },
-        {
-          "q": 8,
-          "r": -2
-        },
-        {
-          "q": 8,
-          "r": -1
-        },
-        {
-          "q": 8,
-          "r": 0
+          "ring": 8,
+          "slot": 47
         }
       ]
     },
     {
+      "schedule": "isotropic10",
       "origin": {
-        "q": 2,
-        "r": -3
+        "ring": 4,
+        "slot": 20
       },
       "aim": {
-        "q": -1,
-        "r": 1
+        "ring": 0,
+        "slot": 0
       },
       "params": {
-        "halfWidthBase": 1,
-        "spread": 0.5,
-        "rimRing": 6
+        "halfWidthBase": 32768,
+        "spreadNum": 1,
+        "spreadDen": 4,
+        "rimRing": 8
       },
-      "hexes": [
+      "cells": [
         {
-          "q": -6,
-          "r": 2
+          "ring": 0,
+          "slot": 0
         },
         {
-          "q": -6,
-          "r": 3
+          "ring": 1,
+          "slot": 0
         },
         {
-          "q": -6,
-          "r": 4
+          "ring": 1,
+          "slot": 1
         },
         {
-          "q": -6,
-          "r": 5
+          "ring": 1,
+          "slot": 2
         },
         {
-          "q": -6,
-          "r": 6
+          "ring": 1,
+          "slot": 3
         },
         {
-          "q": -5,
-          "r": 1
+          "ring": 1,
+          "slot": 4
         },
         {
-          "q": -5,
-          "r": 2
+          "ring": 1,
+          "slot": 5
         },
         {
-          "q": -5,
-          "r": 3
+          "ring": 2,
+          "slot": 2
         },
         {
-          "q": -5,
-          "r": 4
+          "ring": 2,
+          "slot": 3
         },
         {
-          "q": -5,
-          "r": 5
+          "ring": 2,
+          "slot": 4
         },
         {
-          "q": -5,
-          "r": 6
+          "ring": 2,
+          "slot": 5
         },
         {
-          "q": -4,
-          "r": 0
+          "ring": 2,
+          "slot": 6
         },
         {
-          "q": -4,
-          "r": 1
+          "ring": 2,
+          "slot": 9
         },
         {
-          "q": -4,
-          "r": 2
+          "ring": 2,
+          "slot": 10
         },
         {
-          "q": -4,
-          "r": 3
+          "ring": 2,
+          "slot": 11
         },
         {
-          "q": -4,
-          "r": 4
+          "ring": 3,
+          "slot": 6
         },
         {
-          "q": -4,
-          "r": 5
+          "ring": 3,
+          "slot": 7
         },
         {
-          "q": -4,
-          "r": 6
+          "ring": 3,
+          "slot": 8
         },
         {
-          "q": -3,
-          "r": -1
+          "ring": 3,
+          "slot": 9
         },
         {
-          "q": -3,
-          "r": 0
+          "ring": 3,
+          "slot": 10
         },
         {
-          "q": -3,
-          "r": 1
+          "ring": 3,
+          "slot": 20
         },
         {
-          "q": -3,
-          "r": 2
+          "ring": 4,
+          "slot": 6
         },
         {
-          "q": -3,
-          "r": 3
+          "ring": 4,
+          "slot": 7
         },
         {
-          "q": -3,
-          "r": 4
+          "ring": 4,
+          "slot": 8
         },
         {
-          "q": -3,
-          "r": 5
+          "ring": 4,
+          "slot": 9
         },
         {
-          "q": -3,
-          "r": 6
+          "ring": 4,
+          "slot": 10
         },
         {
-          "q": -2,
-          "r": -1
+          "ring": 4,
+          "slot": 20
         },
         {
-          "q": -2,
-          "r": 0
+          "ring": 5,
+          "slot": 12
         },
         {
-          "q": -2,
-          "r": 1
+          "ring": 5,
+          "slot": 13
         },
         {
-          "q": -2,
-          "r": 2
+          "ring": 5,
+          "slot": 14
         },
         {
-          "q": -2,
-          "r": 3
+          "ring": 5,
+          "slot": 15
         },
         {
-          "q": -2,
-          "r": 4
+          "ring": 5,
+          "slot": 16
         },
         {
-          "q": -2,
-          "r": 5
+          "ring": 5,
+          "slot": 17
         },
         {
-          "q": -2,
-          "r": 6
+          "ring": 5,
+          "slot": 18
         },
         {
-          "q": -1,
-          "r": -2
+          "ring": 5,
+          "slot": 19
         },
         {
-          "q": -1,
-          "r": -1
+          "ring": 5,
+          "slot": 20
         },
         {
-          "q": -1,
-          "r": 0
+          "ring": 6,
+          "slot": 13
         },
         {
-          "q": -1,
-          "r": 1
+          "ring": 6,
+          "slot": 14
         },
         {
-          "q": -1,
-          "r": 2
+          "ring": 6,
+          "slot": 15
         },
         {
-          "q": -1,
-          "r": 3
+          "ring": 6,
+          "slot": 16
         },
         {
-          "q": -1,
-          "r": 4
+          "ring": 6,
+          "slot": 17
         },
         {
-          "q": -1,
-          "r": 5
+          "ring": 6,
+          "slot": 18
         },
         {
-          "q": -1,
-          "r": 6
+          "ring": 6,
+          "slot": 19
         },
         {
-          "q": 0,
-          "r": -2
+          "ring": 7,
+          "slot": 13
         },
         {
-          "q": 0,
-          "r": -1
+          "ring": 7,
+          "slot": 14
         },
         {
-          "q": 0,
-          "r": 0
+          "ring": 7,
+          "slot": 15
         },
         {
-          "q": 0,
-          "r": 1
+          "ring": 7,
+          "slot": 16
         },
         {
-          "q": 0,
-          "r": 2
+          "ring": 7,
+          "slot": 17
         },
         {
-          "q": 0,
-          "r": 3
+          "ring": 7,
+          "slot": 18
         },
         {
-          "q": 0,
-          "r": 4
+          "ring": 7,
+          "slot": 19
         },
         {
-          "q": 0,
-          "r": 5
+          "ring": 8,
+          "slot": 13
         },
         {
-          "q": 0,
-          "r": 6
+          "ring": 8,
+          "slot": 14
         },
         {
-          "q": 1,
-          "r": -3
+          "ring": 8,
+          "slot": 15
         },
         {
-          "q": 1,
-          "r": -2
+          "ring": 8,
+          "slot": 16
         },
         {
-          "q": 1,
-          "r": -1
+          "ring": 8,
+          "slot": 17
         },
         {
-          "q": 1,
-          "r": 0
+          "ring": 8,
+          "slot": 18
         },
         {
-          "q": 1,
-          "r": 1
+          "ring": 8,
+          "slot": 19
+        }
+      ]
+    },
+    {
+      "schedule": "isotropic10",
+      "origin": {
+        "ring": 2,
+        "slot": 3
+      },
+      "aim": {
+        "ring": 7,
+        "slot": 40
+      },
+      "params": {
+        "halfWidthBase": 0,
+        "spreadNum": 1,
+        "spreadDen": 3,
+        "rimRing": 10
+      },
+      "cells": [
+        {
+          "ring": 1,
+          "slot": 0
+        },
+        {
+          "ring": 1,
+          "slot": 1
+        },
+        {
+          "ring": 1,
+          "slot": 5
+        },
+        {
+          "ring": 2,
+          "slot": 3
+        },
+        {
+          "ring": 2,
+          "slot": 10
+        },
+        {
+          "ring": 2,
+          "slot": 11
+        },
+        {
+          "ring": 3,
+          "slot": 19
+        },
+        {
+          "ring": 3,
+          "slot": 20
+        },
+        {
+          "ring": 3,
+          "slot": 21
+        },
+        {
+          "ring": 3,
+          "slot": 22
+        },
+        {
+          "ring": 4,
+          "slot": 19
+        },
+        {
+          "ring": 4,
+          "slot": 20
+        },
+        {
+          "ring": 4,
+          "slot": 21
+        },
+        {
+          "ring": 4,
+          "slot": 22
+        },
+        {
+          "ring": 5,
+          "slot": 37
+        },
+        {
+          "ring": 5,
+          "slot": 38
+        },
+        {
+          "ring": 5,
+          "slot": 39
+        },
+        {
+          "ring": 5,
+          "slot": 40
+        },
+        {
+          "ring": 5,
+          "slot": 41
+        },
+        {
+          "ring": 5,
+          "slot": 42
+        },
+        {
+          "ring": 5,
+          "slot": 43
+        },
+        {
+          "ring": 6,
+          "slot": 37
+        },
+        {
+          "ring": 6,
+          "slot": 38
+        },
+        {
+          "ring": 6,
+          "slot": 39
+        },
+        {
+          "ring": 6,
+          "slot": 40
+        },
+        {
+          "ring": 6,
+          "slot": 41
+        },
+        {
+          "ring": 6,
+          "slot": 42
+        },
+        {
+          "ring": 6,
+          "slot": 43
+        },
+        {
+          "ring": 7,
+          "slot": 37
+        },
+        {
+          "ring": 7,
+          "slot": 38
+        },
+        {
+          "ring": 7,
+          "slot": 39
+        },
+        {
+          "ring": 7,
+          "slot": 40
+        },
+        {
+          "ring": 7,
+          "slot": 41
+        },
+        {
+          "ring": 7,
+          "slot": 42
+        },
+        {
+          "ring": 7,
+          "slot": 43
+        },
+        {
+          "ring": 8,
+          "slot": 37
+        },
+        {
+          "ring": 8,
+          "slot": 38
+        },
+        {
+          "ring": 8,
+          "slot": 39
+        },
+        {
+          "ring": 8,
+          "slot": 40
+        },
+        {
+          "ring": 8,
+          "slot": 41
+        },
+        {
+          "ring": 8,
+          "slot": 42
+        },
+        {
+          "ring": 9,
+          "slot": 74
+        },
+        {
+          "ring": 9,
+          "slot": 75
+        },
+        {
+          "ring": 9,
+          "slot": 76
+        },
+        {
+          "ring": 9,
+          "slot": 77
+        },
+        {
+          "ring": 9,
+          "slot": 78
+        },
+        {
+          "ring": 9,
+          "slot": 79
+        },
+        {
+          "ring": 9,
+          "slot": 80
+        },
+        {
+          "ring": 9,
+          "slot": 81
+        },
+        {
+          "ring": 9,
+          "slot": 82
+        },
+        {
+          "ring": 9,
+          "slot": 83
         },
         {
-          "q": 1,
-          "r": 2
+          "ring": 9,
+          "slot": 84
         },
         {
-          "q": 1,
-          "r": 3
+          "ring": 9,
+          "slot": 85
         },
         {
-          "q": 1,
-          "r": 4
+          "ring": 10,
+          "slot": 74
         },
         {
-          "q": 1,
-          "r": 5
+          "ring": 10,
+          "slot": 75
         },
         {
-          "q": 2,
-          "r": -4
+          "ring": 10,
+          "slot": 76
         },
         {
-          "q": 2,
-          "r": -3
+          "ring": 10,
+          "slot": 77
         },
         {
-          "q": 2,
-          "r": -2
+          "ring": 10,
+          "slot": 78
         },
         {
-          "q": 2,
-          "r": -1
+          "ring": 10,
+          "slot": 79
         },
         {
-          "q": 2,
-          "r": 0
+          "ring": 10,
+          "slot": 80
         },
         {
-          "q": 2,
-          "r": 1
+          "ring": 10,
+          "slot": 81
         },
         {
-          "q": 3,
-          "r": -4
+          "ring": 10,
+          "slot": 82
         },
         {
-          "q": 3,
-          "r": -3
+          "ring": 10,
+          "slot": 83
         },
         {
-          "q": 3,
-          "r": -2
+          "ring": 10,
+          "slot": 84
         },
         {
-          "q": 3,
-          "r": -1
+          "ring": 10,
+          "slot": 85
         }
       ]
     }
   ],
-  "layoutConstants": [
+  "distanceSweep": [
     {
-      "name": "sqrt3",
-      "value": 1.7320508075688772
+      "schedule": "isotropic10",
+      "maxRing": 5,
+      "lines": 13225,
+      "digest": "caed4d0a02adf9f61f3d7174f7828c5ac1e8c34ff3feb64f20a2a4efbacf4c2c"
+    }
+  ],
+  "orbStateSweep": [
+    {
+      "schedule": "isotropic10",
+      "maxRing": 10,
+      "periods": [
+        1,
+        7,
+        12,
+        5000,
+        1000000000000000
+      ],
+      "offsets": "floor(period*k/4) for k in 0..4",
+      "lines": 22550,
+      "digest": "17c1ec2f5c4217ed97e646bfd4af8ab7a91a68a502d5d43f292cbd83bf825458"
+    }
+  ],
+  "orbitThroughSweep": [
+    {
+      "schedule": "isotropic10",
+      "maxRing": 10,
+      "periods": [
+        1,
+        7,
+        12,
+        5000,
+        1000000000000000
+      ],
+      "offsets": "floor(period*k/4) for k in 0..4",
+      "lines": 22550,
+      "digest": "95643ee3f92486d2aa2e7af342ab4b46dde410fc3c0b205d56ea58394c63c722"
+    }
+  ],
+  "solveCellSweep": [
+    {
+      "schedule": "isotropic10",
+      "maxRing": 10,
+      "now": 1000,
+      "msPerTile": 2500,
+      "lines": 203401,
+      "digest": "91e578bcc138a8aff52f48baaac468dccf62739eae71a19c3254fad2e7947c53"
+    }
+  ],
+  "lineOfSightSweep": [
+    {
+      "schedule": "isotropic10",
+      "maxRing": 8,
+      "occluders": [
+        {
+          "cell": {
+            "ring": 0,
+            "slot": 0
+          },
+          "radius2": 4294967296
+        },
+        {
+          "cell": {
+            "ring": 4,
+            "slot": 0
+          },
+          "radius2": 1073741824
+        }
+      ],
+      "lines": 67081,
+      "digest": "394803f5b0deae280bcdd2d16d8fd6523c37e31faadcbdb9747a1dc118fee513"
+    }
+  ],
+  "beamSweep": [
+    {
+      "schedule": "isotropic10",
+      "maxRing": 4,
+      "params": {
+        "halfWidthBase": 32768,
+        "spreadNum": 1,
+        "spreadDen": 4,
+        "rimRing": 4
+      },
+      "lines": 4489,
+      "digest": "b973a2bb5d35e2b60c94c8d77053eaee9d87e670ee91f700620bf7033c4b11cf"
     }
   ]
 }

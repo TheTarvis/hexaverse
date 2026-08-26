@@ -2,7 +2,7 @@
 #
 # Mirror-map coverage check, over every cross-language mirror pair:
 #
-#   - backend/board  <-> frontend/lib/hex    (openspec: cross-stack-determinism,
+#   - backend/board  <-> frontend/lib/board    (openspec: cross-stack-determinism,
 #     requirement "Shared Board Math Is Pinned By a Cross-Language Golden
 #     Fixture", scenario "An uncovered mirrored function is caught by the
 #     coverage inventory check") — fixtures/board/mirror-map.json
@@ -120,11 +120,11 @@ check_mirror() {
     echo "$LABEL: $NPAIRS mirrored pair(s) checked ($NGAPS coverage gap(s) tracked with expected changes)."
 }
 
-check_mirror "board/hex" \
+check_mirror "board" \
     "$REPO_ROOT/fixtures/board/mirror-map.json" \
     "$REPO_ROOT/fixtures/board/cases.json" \
     "$REPO_ROOT/backend/board" \
-    "$REPO_ROOT/frontend/lib/hex"
+    "$REPO_ROOT/frontend/lib/board"
 
 check_mirror "polar" \
     "$REPO_ROOT/fixtures/polar/mirror-map.json" \

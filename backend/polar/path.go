@@ -1,7 +1,9 @@
 package polar
 
+import "slices"
+
 // ArcPath is the lattice's straight line, which is an arc (openspec
-// polar-lattice-math, "A Straight Path Is an Arc"). It is the spike's
+// board-tactical-math, "A Straight Path Is an Arc"). It is the spike's
 // arcPath rebuilt on the exact-rational basis: linearly interpolate ring and
 // angle between the endpoints, resolve the RING at each sample first, then
 // pick the angularly nearest slot on that rounded ring — with every
@@ -45,7 +47,36 @@ package polar
 // below min(from.Ring, to.Ring), so a path only reaches the core when an
 // endpoint IS the core — routeAround has nothing to do here, and no cell is
 // ever inserted or altered to avoid the core.
+//
+// The stitch pass (2026-08-25, rides the adjacency tightening): under true
+// corner contact the sampler's diagonal doubling-boundary skips past the
+// half-fine-cell gap (doubled-index separation exactly 2) are no longer
+// adjacent steps. After duplicate collapse, any consecutive pair failing the
+// tight predicate gets the unique bridging cell inserted: the cell on the
+// FINER of the two rings, one slot from the pair's finer-ring cell toward
+// the coarse cell's doubled slot position — adjacent to both ends by
+// construction. Always the finer ring (a coarse bridging cell also exists
+// and is deliberately not chosen), so the stitch is a fixed rule with no
+// tie to break. It restores contiguity only; it never routes around
+// anything.
 func ArcPath(from, to Cell, s Schedule) []Cell {
+	out := sampleArc(from, to, s)
+	// Stitch pass: repair the doubling-boundary skips the tight adjacency
+	// predicate rejects. Runs over every consecutive pair through the tail,
+	// so a skip landing on the final (destination) pair is repaired too.
+	for i := 1; i < len(out); i++ {
+		if !IsAdjacent(out[i-1], out[i], s) {
+			out = slices.Insert(out, i, bridgeCell(out[i-1], out[i], s))
+			i++ // the bridge is adjacent to both ends; resume at the pair after it
+		}
+	}
+	return out
+}
+
+// sampleArc is the interpolate-and-round sampler: the raw arc before the
+// stitch pass, duplicate-collapsed. Split out so tests can target the
+// stitch seam directly.
+func sampleArc(from, to Cell, s Schedule) []Cell {
 	from = canon(from, s)
 	to = canon(to, s)
 	if from == to {
@@ -148,6 +179,29 @@ func ArcPath(from, to Cell, s Schedule) []Cell {
 		}
 	}
 	return out
+}
+
+// bridgeCell is the stitch's unique bridging cell for a non-adjacent
+// consecutive pair: on the finer of the two rings, one slot from the pair's
+// finer-ring cell toward the coarse cell's doubled slot position (the
+// shorter way around).
+func bridgeCell(a, b Cell, s Schedule) Cell {
+	sa, sb := int64(s.Slots(a.Ring)), int64(s.Slots(b.Ring))
+	fine, sf := a, sa
+	coarse, sc := b, sb
+	if sb > sa {
+		fine, sf = b, sb
+		coarse, sc = a, sa
+	}
+	// The coarse cell's doubled position on the finer ring's grid, and the
+	// wrapped step direction from the fine cell toward it.
+	pc := int64(coarse.Slot) * (sf / sc)
+	diff := normalizeSlot64(pc-int64(fine.Slot), sf)
+	step := int64(1)
+	if diff > sf-diff {
+		step = -1
+	}
+	return Cell{Ring: fine.Ring, Slot: int(normalizeSlot64(int64(fine.Slot)+step, sf))}
 }
 
 // floorDiv returns ⌊a/b⌋ for b > 0 (Go's / truncates toward zero, which

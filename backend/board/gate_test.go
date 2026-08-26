@@ -1,49 +1,63 @@
 package board
 
-import "testing"
+import (
+	"testing"
+)
 
-// Determinism against the TS mirror is covered by the golden fixtures
-// (fixtures_test.go / lib/hex fixtures.test.ts). These are focused shape checks.
-
-func TestLaneGateHex_SitsOnTheGateRing(t *testing.T) {
-	want := GateRing(16) // inner edge of the outer band, 3 rings in from the rim
-	if want != 13 {
-		t.Fatalf("GateRing(16) = %d, want 13", want)
+func TestGateRing(t *testing.T) {
+	cases := []struct{ radius, want int }{
+		{16, 13}, {6, 3}, {4, 1}, {3, 1}, {1, 1}, {0, 1},
 	}
-	for _, nb := range [][2]float64{{100, 0}, {0, 100}, {-100, 0}, {0, -100}, {70, 70}} {
-		gate := LaneGateHex(0, 0, nb[0], nb[1], 16)
-		if Ring(gate) != want {
-			t.Fatalf("neighbour %v: gate %v not on gate ring %d (ring %d)", nb, gate, want, Ring(gate))
+	for _, c := range cases {
+		if got := GateRing(c.radius); got != c.want {
+			t.Errorf("GateRing(%d) = %d, want %d", c.radius, got, c.want)
 		}
 	}
 }
 
-func TestGateRing_ClampsSmallBoards(t *testing.T) {
-	for _, tc := range []struct{ radius, want int }{{16, 13}, {6, 3}, {4, 1}, {3, 1}, {1, 1}} {
-		if got := GateRing(tc.radius); got != tc.want {
-			t.Fatalf("GateRing(%d) = %d, want %d", tc.radius, got, tc.want)
+func TestLaneGateCell(t *testing.T) {
+	// A non-positive radius degenerates to the core.
+	if got := LaneGateCell(0, 0, 10, 10, 0); got != (Cell{Ring: 0, Slot: 0}) {
+		t.Errorf("radius 0: %v, want core", got)
+	}
+
+	// The gate lies on the gate ring for any bearing.
+	for _, c := range []struct{ nbX, nbY float64 }{{100, 8.7}, {-8.7, 100}, {-77, -64}, {8.7, -100}} {
+		got := LaneGateCell(0, 0, c.nbX, c.nbY, 16)
+		if got.Ring != GateRing(16) {
+			t.Errorf("gate for bearing (%v,%v) on ring %d, want %d", c.nbX, c.nbY, got.Ring, GateRing(16))
 		}
 	}
-}
 
-func TestLaneGateHex_EastNeighbourFavoursPositiveQ(t *testing.T) {
-	gate := LaneGateHex(0, 0, 100, 0, 16)
-	if gate.Q <= 0 || abs(gate.Q) < abs(gate.R) {
-		t.Fatalf("due-east neighbour should map to a +q-dominant gate tile, got %v", gate)
+	// Due-east bearing lands exactly on slot 0 (table angle 0); due "north"
+	// (positive y) lands a quarter of the ring around.
+	s := Schedule(16)
+	slots := s.Slots(GateRing(16))
+	if got := LaneGateCell(0, 0, 100, 0, 16); got.Slot != 0 {
+		t.Errorf("due-east gate slot %d, want 0", got.Slot)
 	}
-}
+	if got := LaneGateCell(0, 0, 0, 100, 16); got.Slot != slots/4 {
+		t.Errorf("positive-y gate slot %d, want %d (a quarter around)", got.Slot, slots/4)
+	}
 
-func TestLaneGateHex_TranslationInvariant(t *testing.T) {
-	// Same relative bearing from two different origins → same gate.
-	a := LaneGateHex(0, 0, 50, 20, 16)
-	b := LaneGateHex(10, -5, 60, 15, 16)
+	// The choice follows the RELATIVE bearing: offsetting self and neighbor
+	// together leaves the gate unchanged.
+	a := LaneGateCell(0, 0, 100, 8.7, 16)
+	b := LaneGateCell(10, -20, 110, -11.3, 16)
 	if a != b {
-		t.Fatalf("expected translation invariance, got %v vs %v", a, b)
+		t.Errorf("translated bearing changed the gate: %v vs %v", a, b)
 	}
-}
 
-func TestLaneGateHex_DegenerateRadius(t *testing.T) {
-	if got := LaneGateHex(0, 0, 100, 0, 0); got != (Hex{0, 0}) {
-		t.Fatalf("radius 0 should degenerate to the core, got %v", got)
+	// An exact dot-product tie resolves to the LOWER slot index. On a
+	// radius-4 board the gate ring is ring 1 (6 slots), whose pinned entries
+	// for slots 1 and 2 are exact mirrors (±32768, 56756): a straight-up
+	// bearing (0, 100) gives both the identical maximal dot product, and the
+	// argmax must keep slot 1.
+	pts := tablePoints(Schedule(4).Slots(GateRing(4)))
+	if pts[1][1] != pts[2][1] || pts[1][0] != -pts[2][0] {
+		t.Fatalf("ring-1 table entries lost their mirror symmetry: %v vs %v — pick a new tie case", pts[1], pts[2])
+	}
+	if got := LaneGateCell(0, 0, 0, 100, 4); got != (Cell{Ring: 1, Slot: 1}) {
+		t.Errorf("tied bearing gate %v, want the lower slot {1 1}", got)
 	}
 }

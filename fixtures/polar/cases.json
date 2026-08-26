@@ -367,7 +367,7 @@
         "ring": 5,
         "slot": 2
       },
-      "adjacent": true
+      "adjacent": false
     },
     {
       "schedule": "tight6",
@@ -903,6 +903,154 @@
           "slot": 2
         }
       ]
+    },
+    {
+      "schedule": "tight6",
+      "from": {
+        "ring": 2,
+        "slot": 0
+      },
+      "to": {
+        "ring": 1,
+        "slot": 1
+      },
+      "path": [
+        {
+          "ring": 2,
+          "slot": 0
+        },
+        {
+          "ring": 2,
+          "slot": 1
+        },
+        {
+          "ring": 1,
+          "slot": 1
+        }
+      ]
+    },
+    {
+      "schedule": "tight6",
+      "from": {
+        "ring": 2,
+        "slot": 0
+      },
+      "to": {
+        "ring": 1,
+        "slot": 3
+      },
+      "path": [
+        {
+          "ring": 2,
+          "slot": 0
+        },
+        {
+          "ring": 2,
+          "slot": 1
+        },
+        {
+          "ring": 2,
+          "slot": 2
+        },
+        {
+          "ring": 2,
+          "slot": 3
+        },
+        {
+          "ring": 1,
+          "slot": 2
+        },
+        {
+          "ring": 1,
+          "slot": 3
+        }
+      ]
+    },
+    {
+      "schedule": "tight6",
+      "from": {
+        "ring": 2,
+        "slot": 0
+      },
+      "to": {
+        "ring": 1,
+        "slot": 5
+      },
+      "path": [
+        {
+          "ring": 2,
+          "slot": 0
+        },
+        {
+          "ring": 2,
+          "slot": 11
+        },
+        {
+          "ring": 1,
+          "slot": 5
+        }
+      ]
+    },
+    {
+      "schedule": "tight6",
+      "from": {
+        "ring": 1,
+        "slot": 0
+      },
+      "to": {
+        "ring": 11,
+        "slot": 7
+      },
+      "path": [
+        {
+          "ring": 1,
+          "slot": 0
+        },
+        {
+          "ring": 2,
+          "slot": 0
+        },
+        {
+          "ring": 3,
+          "slot": 0
+        },
+        {
+          "ring": 4,
+          "slot": 1
+        },
+        {
+          "ring": 5,
+          "slot": 1
+        },
+        {
+          "ring": 6,
+          "slot": 2
+        },
+        {
+          "ring": 7,
+          "slot": 2
+        },
+        {
+          "ring": 8,
+          "slot": 2
+        },
+        {
+          "ring": 9,
+          "slot": 5
+        },
+        {
+          "ring": 9,
+          "slot": 6
+        },
+        {
+          "ring": 10,
+          "slot": 6
+        },
+        {
+          "ring": 11,
+          "slot": 7
+        }
+      ]
     }
   ],
   "orbitAdvance": [
@@ -1084,7 +1232,7 @@
       "schedule": "tight6",
       "maxRing": 10,
       "lines": 203401,
-      "digest": "82030507d03c7cdd14075364ede8b50fbfdea08bf2c61d61d496d27554d4e64c"
+      "digest": "fff1c4971d122da489d7307c8b7f71394cdca2f3338718b427ee3ba7bb5617d6"
     }
   ],
   "adjacencySweep": [
@@ -1092,7 +1240,7 @@
       "schedule": "tight6",
       "maxRing": 10,
       "lines": 203401,
-      "digest": "03cb1be250dd6897448a96c53d027ce53b097e69a300e07a7fb95278d30eb421"
+      "digest": "9226d3418a266ca297249a8b5f475b61d33f45cbdb468bcec1bd7cf06c9164d6"
     }
   ],
   "orbitAdvanceSweep": [

@@ -23,6 +23,8 @@
     { "go": "Slots", "ts": "slotsForRing", "coverage": "family:arcPath", "note": "indirect (the schedule applied — under every family, and the sweeps enumerate every ring's slot range through it)" },
     { "go": "canon", "ts": "canonCell", "coverage": "family:arcPath", "note": "indirect (endpoint canonicalization; unexported in spirit — exported in TS for the mirror's tests)" },
     { "go": "ArcPath", "ts": "arcPath", "coverage": "family:arcPath" },
+    { "go": "sampleArc", "ts": "sampleArc", "coverage": "family:arcPath", "note": "indirect (the raw interpolate-and-round sampler ArcPath stitches; split out so tests target the stitch seam)" },
+    { "go": "bridgeCell", "ts": "bridgeCell", "coverage": "family:arcPath", "note": "indirect (the stitch's unique finer-ring bridging cell — the recorded stitch cases and the sweep digests pin it)" },
     { "go": "floorDiv", "ts": "floorDiv", "coverage": "family:arcPath", "note": "indirect (the quantizer's floor; TS deliberately avoids Math.floor(a/b) at near-integer ratios)" },
     { "go": "IsAdjacent", "ts": "isAdjacent", "coverage": "family:adjacency" },
     { "go": "CellAt", "ts": "cellAt", "coverage": "family:orbitAdvance" },

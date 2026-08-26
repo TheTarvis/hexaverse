@@ -87,6 +87,128 @@ func TestArcPath_HandCases(t *testing.T) {
 	}
 }
 
+// The stitch pass (rewrite-board-on-polar-lattice): under true corner
+// contact the raw sampler's doubling-boundary diagonal skips (doubled-index
+// separation exactly 2) are illegal steps; the stitch inserts the unique
+// finer-ring bridging cell. These hand cases pin exact stitched paths for
+// both boundary directions and the appended-destination tail.
+func TestArcPath_Stitch(t *testing.T) {
+	s := tight6(t)
+	cases := []struct {
+		name     string
+		from, to Cell
+		want     []Cell
+	}{
+		{
+			// Raw sampling emits {2,0} → {1,1} directly — a diagonal skip
+			// inward across the ring-1/2 doubling boundary, on the path's
+			// final pair (the appended-destination tail). The bridge is the
+			// finer-ring cell {2,1}, one slot from {2,0} toward {1,1}'s
+			// doubled position (2).
+			"out→in skip on the tail is bridged on the finer ring",
+			Cell{2, 0}, Cell{1, 1},
+			[]Cell{{2, 0}, {2, 1}, {1, 1}},
+		},
+		{
+			// Same boundary, skip mid-path: raw {2,2} → {1,2} at doubled
+			// separation 2 gets {2,3} inserted between them.
+			"out→in skip mid-path is bridged",
+			Cell{2, 0}, Cell{1, 3},
+			[]Cell{{2, 0}, {2, 1}, {2, 2}, {2, 3}, {1, 2}, {1, 3}},
+		},
+		{
+			// The bridge direction wraps: from {2,0} toward {1,5}'s doubled
+			// position (10) the shorter way is decreasing, through the wrap
+			// to slot 11.
+			"out→in bridge steps through the slot wrap",
+			Cell{2, 0}, Cell{1, 5},
+			[]Cell{{2, 0}, {2, 11}, {1, 5}},
+		},
+		{
+			// Traveling OUTWARD: raw {8,2} → {9,6} skips (doubled position
+			// of {8,2} on ring 9 is 4; separation 2); the bridge {9,5} sits
+			// on the finer (outer) ring one slot from {9,6} toward 4.
+			"in→out skip is bridged on the finer ring",
+			Cell{1, 0}, Cell{11, 7},
+			[]Cell{{1, 0}, {2, 0}, {3, 0}, {4, 1}, {5, 1}, {6, 2}, {7, 2}, {8, 2}, {9, 5}, {9, 6}, {10, 6}, {11, 7}},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := ArcPath(c.from, c.to, s)
+			if !reflect.DeepEqual(got, c.want) {
+				t.Errorf("ArcPath(%v, %v) = %v, want %v", c.from, c.to, got, c.want)
+			}
+			for i := 1; i < len(got); i++ {
+				if !IsAdjacent(got[i-1], got[i], s) {
+					t.Errorf("stitched path still has non-adjacent step %v → %v", got[i-1], got[i])
+				}
+			}
+		})
+	}
+}
+
+// Every raw-sampler skip is repaired by exactly one inserted finer-ring
+// bridge — and the stitch never touches an already-adjacent pair: the
+// stitched path with its bridges removed is the raw sample sequence.
+func TestArcPath_StitchInsertsOnlyBridges(t *testing.T) {
+	s := tight6(t)
+	const maxRing = 8
+	stitched := 0
+	for fr := 0; fr <= maxRing; fr++ {
+		for fs := range s.Slots(fr) {
+			for tr := 0; tr <= maxRing; tr++ {
+				for ts := range s.Slots(tr) {
+					from, to := Cell{fr, fs}, Cell{tr, ts}
+					raw := sampleArc(from, to, s)
+					got := ArcPath(from, to, s)
+					if len(got) == len(raw) {
+						if !reflect.DeepEqual(got, raw) {
+							t.Fatalf("ArcPath(%v, %v) altered cells without inserting: raw %v, got %v", from, to, raw, got)
+						}
+						continue
+					}
+					stitched++
+					// walk both: every extra cell in got must bridge a raw skip
+					j := 0
+					for i := 0; i < len(got); i++ {
+						if j < len(raw) && got[i] == raw[j] {
+							j++
+							continue
+						}
+						// inserted bridge: on the finer ring of its neighbors,
+						// adjacent to both, repairing a non-adjacent raw pair
+						if i == 0 || i == len(got)-1 {
+							t.Fatalf("ArcPath(%v, %v) inserted at an endpoint: %v", from, to, got)
+						}
+						prev, next := got[i-1], got[i+1]
+						if IsAdjacent(prev, next, s) {
+							t.Fatalf("ArcPath(%v, %v) inserted %v between an adjacent pair %v, %v", from, to, got[i], prev, next)
+						}
+						fineRing := prev.Ring
+						if s.Slots(next.Ring) > s.Slots(prev.Ring) {
+							fineRing = next.Ring
+						}
+						if got[i].Ring != fineRing {
+							t.Fatalf("ArcPath(%v, %v) bridge %v not on the finer ring %d", from, to, got[i], fineRing)
+						}
+						if !IsAdjacent(prev, got[i], s) || !IsAdjacent(got[i], next, s) {
+							t.Fatalf("ArcPath(%v, %v) bridge %v not adjacent to both ends", from, to, got[i])
+						}
+					}
+					if j != len(raw) {
+						t.Fatalf("ArcPath(%v, %v) dropped raw cells: raw %v, got %v", from, to, raw, got)
+					}
+				}
+			}
+		}
+	}
+	if stitched == 0 {
+		t.Fatal("sweep exercised no stitched paths")
+	}
+	t.Logf("%d stitched paths verified (rings ≤ %d)", stitched, maxRing)
+}
+
 // The exhaustive property sweep: over every ordered pair of cells with rings
 // in [0, 10] under two schedules, every emitted path is endpoint-inclusive,
 // every consecutive pair is adjacent (the finest-ring sampling clause's whole

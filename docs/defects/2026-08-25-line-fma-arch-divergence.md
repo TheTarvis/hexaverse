@@ -3,7 +3,18 @@
 **Filed:** 2026-08-25. Originally found by the `pin-cross-stack-determinism-seam`
 panel; that agent died to a rate limit before writing it down, so this doc is a
 clean-room re-derivation that reproduces its numbers exactly.
-**Status:** open
+**Status:** fixed (rewrite-board-on-polar-lattice)
+
+**Resolution (2026-08-25):** the divergent code is deleted, not patched. The
+polar board rewrite removed `Line`, `lerp`, `roundf`, `cubeRound`,
+`RouteAround`, and `hexDirection` outright; the successor path function
+(`polar.ArcPath`) is exact-integer end to end (no float exists to contract),
+visibility geometry runs on the pinned coordinate table in exact integer
+arithmetic, and the lane-gate dot product carries the explicit `float64(...)`
+conversions this doc's Recommended fix specifies. `fixtures/board/cases.json`
+was re-recorded on the polar semantics with the arm64 and amd64/GOAMD64=v1
+suites both green, and the recording-on-Apple-Silicon prohibition lifts with
+this fix (the fixture suite header records the rationale).
 **Against:** `board-tactical-math` (`backend/board/hex.go` — `Line`/`lerp`/`roundf`),
 the `cross-stack-determinism` capability, and — added 2026-08-25 — **two
 already-shipped capabilities this falsifies**:

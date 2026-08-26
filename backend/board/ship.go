@@ -1,6 +1,9 @@
 package board
 
-import "hexaverse/common"
+import (
+	"hexaverse/common"
+	"hexaverse/polar"
+)
 
 // Mode is the fleet's movement state discriminator. Exactly one of the state's
 // shapes is populated (#0004: one field, three shapes).
@@ -19,32 +22,32 @@ const (
 	ModeLaneHold Mode = "laneHold"
 )
 
-// Target is a burn destination — a hex OR a feature to intercept (exactly one).
+// Target is a burn destination — a cell OR a feature to intercept (exactly one).
 type Target struct {
-	Hex       *Hex   `json:"hex,omitempty" firestore:"hex,omitempty"`
+	Cell      *Cell  `json:"cell,omitempty" firestore:"cell,omitempty"`
 	FeatureId string `json:"featureId,omitempty" firestore:"featureId,omitempty"`
 }
 
-// Burn is the volatile state: a straight hex-line path traversed over real time.
+// Burn is the volatile state: an arc path traversed over real time.
 type Burn struct {
-	Path         []Hex              `json:"path" firestore:"path"`
+	Path         []Cell             `json:"path" firestore:"path"`
 	StartTime    common.WorldMillis `json:"startTime" firestore:"startTime"`
 	ArriveTime   common.WorldMillis `json:"arriveTime" firestore:"arriveTime"`
 	Target       Target             `json:"target" firestore:"target"`
 	DockOnArrive string             `json:"dockOnArrive,omitempty" firestore:"dockOnArrive,omitempty"`
 }
 
-// Docked rides a parent feature (a moon-style parentId ride). Its live hex is
+// Docked rides a parent feature (a moon-style parentId ride). Its live cell is
 // the parent's — resolved by the caller, which holds the interior.
 type Docked struct {
 	ParentId string `json:"parentId" firestore:"parentId"`
 }
 
 // BoardLeg is leg 0 of a trip (#0008): the #0004 burn from the fleet's current
-// position across the origin board to the departure gate tile, inside the one
+// position across the origin board to the departure gate cell, inside the one
 // trip action. Zero-length when the fleet already sits on the gate.
 type BoardLeg struct {
-	Path      []Hex              `json:"path" firestore:"path"`
+	Path      []Cell             `json:"path" firestore:"path"`
 	StartTime common.WorldMillis `json:"startTime" firestore:"startTime"`
 	GateEta   common.WorldMillis `json:"gateEta" firestore:"gateEta"`
 }
@@ -53,14 +56,14 @@ type BoardLeg struct {
 // route of systemIds with cumulative arrival stamps. Route[0] is the origin;
 // LegEtas[i] is the world time the fleet reaches Route[i] (LegEtas[0] == the gate
 // ETA — when it enters the first lane). Position is computed piecewise; nothing
-// is stored per tick. EntryGate is the arriving lane's gate tile on the dest board.
+// is stored per tick. EntryGate is the arriving lane's gate cell on the dest board.
 type LaneTransit struct {
 	BoardLeg   *BoardLeg            `json:"boardLeg,omitempty" firestore:"boardLeg,omitempty"`
 	Route      []string             `json:"route" firestore:"route"`
 	LegEtas    []common.WorldMillis `json:"legEtas" firestore:"legEtas"`
 	DepartTime common.WorldMillis   `json:"departTime" firestore:"departTime"`
 	ArriveTime common.WorldMillis   `json:"arriveTime" firestore:"arriveTime"`
-	EntryGate  Hex                  `json:"entryGate" firestore:"entryGate"`
+	EntryGate  Cell                 `json:"entryGate" firestore:"entryGate"`
 	// LaneIds are the lanes the route crosses (Route[i]→Route[i+1]), frozen at
 	// commit so the arrival resolver charts them `via: traveled` without a
 	// galaxy read inside the resolve transaction (#0006 Decision #17 — arrival
@@ -77,7 +80,7 @@ type LaneHold struct {
 }
 
 // MovementState is the fleet's single movement field, one shape at a time. No
-// per-tick position is stored — the live hex/graph position is computed from
+// per-tick position is stored — the live cell/graph position is computed from
 // (state, worldTime).
 type MovementState struct {
 	Mode        Mode         `json:"mode" firestore:"mode"`
@@ -112,13 +115,17 @@ func LaneFraction(lt LaneTransit, t common.WorldMillis) (from, to int, frac floa
 	return n - 2, n - 1, 1, true
 }
 
-// BurnPos returns the fleet's quantized hex along its burn path at time t. The
-// logical hex is the nearest path cell (the pixel glides between; that's a
-// render concern). Clamped to the endpoints outside the burn window.
-func BurnPos(b Burn, t common.WorldMillis) Hex {
+// BurnPos returns the fleet's quantized cell along its burn path at time t. The
+// logical cell is the nearest path index (the pixel glides between; that's a
+// render concern), computed from elapsed and total burn time in exact integer
+// arithmetic (openspec board-tactical-math, "Computed Ship Board Position"):
+// idx = round(elapsed × (len−1) / total), round-half-up — no float, so the
+// index is identical across the seam and across build targets. Clamped to the
+// endpoints outside the burn window.
+func BurnPos(b Burn, t common.WorldMillis) Cell {
 	n := len(b.Path)
 	if n == 0 {
-		return Hex{0, 0}
+		return Cell{Ring: 0, Slot: 0}
 	}
 	if t <= b.StartTime || b.ArriveTime <= b.StartTime {
 		return b.Path[0]
@@ -126,47 +133,51 @@ func BurnPos(b Burn, t common.WorldMillis) Hex {
 	if t >= b.ArriveTime {
 		return b.Path[n-1]
 	}
-	frac := float64(t-b.StartTime) / float64(b.ArriveTime-b.StartTime)
-	idx := roundf(frac * float64(n-1))
+	elapsed := int64(t - b.StartTime)
+	total := int64(b.ArriveTime - b.StartTime)
+	// round-half-up in pure integers: ⌊(2·elapsed·(n−1) + total) / (2·total)⌋.
+	idx := (2*elapsed*int64(n-1) + total) / (2 * total)
 	if idx < 0 {
 		idx = 0
 	}
-	if idx > n-1 {
-		idx = n - 1
+	if idx > int64(n-1) {
+		idx = int64(n - 1)
 	}
 	return b.Path[idx]
 }
 
-// CoastAt returns the resting state a fleet settles into on hex h at world time
-// `at`: a free prograde orbit on h's ring, back-solved to pass through h
+// CoastAt returns the resting state a fleet settles into on cell c at world time
+// `at`: a free prograde orbit on c's ring, back-solved to pass through c
 // (OrbitThrough), paced by the world's one orbital law. `at` is load-bearing —
 // an orbit anchored at the wrong instant puts the ship somewhere it never was.
 // Pass the arrival/settle time, never a bare zero.
 //
 // The anchor is snapped to the NEAREST ring-cell window boundary, not to `at`
 // itself. Every orbit advances cells at the same absolute instants (multiples of
-// period/6ring — angle0 shifts which cell, never when), and the renderer glides
+// period/slots — angle0 shifts which cell, never when), and the renderer glides
 // by that absolute window fraction. Anchoring mid-window therefore draws a
-// freshly settled ship up to a full cell prograde of its halt hex — cancel a
-// burn and the ship visibly lands one tile "ahead" on the ring. Snapping bounds
-// the discontinuity to half a cell either side; the quantized hex may read one
-// cell shy of h for the tail of the settle window (it eases INTO h at the
+// freshly settled ship up to a full cell prograde of its halt cell — cancel a
+// burn and the ship visibly lands one cell "ahead" on the ring. Snapping bounds
+// the discontinuity to half a cell either side; the quantized cell may read one
+// cell shy of c for the tail of the settle window (it eases INTO c at the
 // boundary), which the settle rule tolerates — the anti-teleport guarantee is
 // "where you stopped, give or take the cell you're crossing", not exactness.
-func CoastAt(h Hex, at common.WorldMillis) MovementState {
-	ring := Ring(h)
-	period := common.Tuning().OrbitPeriod(ring)
-	orbit := OrbitThrough(h, snapToCellBoundary(at, period, ring), period, 1)
+func CoastAt(c Cell, at common.WorldMillis, s polar.Schedule) MovementState {
+	c = Canon(c, s)
+	period := common.Tuning().OrbitPeriod(c.Ring)
+	slots := s.Slots(c.Ring)
+	orbit := OrbitThrough(c, snapToCellBoundary(at, period, slots), period, 1, s)
 	return MovementState{Mode: ModeCoast, Coast: &orbit}
 }
 
 // snapToCellBoundary rounds `at` to the nearest absolute ring-cell window
-// boundary (see CoastAt). Integer math, mirrored exactly in lib/hex.
-func snapToCellBoundary(at, period common.WorldMillis, ring int) common.WorldMillis {
-	if ring <= 0 || period <= 0 {
+// boundary (see CoastAt), where the ring advances a cell every period/slots.
+// Integer math, mirrored exactly in lib/board.
+func snapToCellBoundary(at, period common.WorldMillis, slots int) common.WorldMillis {
+	if slots <= 1 || period <= 0 {
 		return at
 	}
-	oneStep := period / common.WorldMillis(6*ring)
+	oneStep := period / common.WorldMillis(slots)
 	if oneStep <= 0 {
 		return at
 	}
@@ -188,53 +199,53 @@ func snapToCellBoundary(at, period common.WorldMillis, ring int) common.WorldMil
 // another system and reveals what's there — facts beyond MovementState that only
 // the resolve may establish. A due transit reads unchanged (positioned at its
 // lane endpoint) until the authoritative resolve lands.
-func StateAt(s MovementState, t common.WorldMillis) MovementState {
-	if s.Mode != ModeBurn || s.Burn == nil || len(s.Burn.Path) == 0 || t < s.Burn.ArriveTime {
-		return s
+func StateAt(st MovementState, t common.WorldMillis, s polar.Schedule) MovementState {
+	if st.Mode != ModeBurn || st.Burn == nil || len(st.Burn.Path) == 0 || t < st.Burn.ArriveTime {
+		return st
 	}
-	b := s.Burn
+	b := st.Burn
 	if b.DockOnArrive != "" {
 		return MovementState{Mode: ModeDocked, Docked: &Docked{ParentId: b.DockOnArrive}}
 	}
-	return CoastAt(b.Path[len(b.Path)-1], b.ArriveTime)
+	return CoastAt(b.Path[len(b.Path)-1], b.ArriveTime, s)
 }
 
-// ShipPos returns the fleet's computed board hex. It reports ok=false whenever
-// the fleet has no hex on the current system's board: docked (its hex is the
+// ShipPos returns the fleet's computed board cell. It reports ok=false whenever
+// the fleet has no cell on the current system's board: docked (its cell is the
 // parent's, resolved from the interior), parked mid-lane (lane-hold), or already
 // out on a lane past the departure gate. During a trip's board leg the fleet is
-// still on the origin board burning to the gate, so ShipPos returns that hex.
+// still on the origin board burning to the gate, so ShipPos returns that cell.
 //
 // It evaluates the EFFECTIVE state (StateAt), so a stored burn whose arrival has
 // passed answers as the coast it settled into — a reader that forgets to project
 // still gets the right position — and a due dock-on-arrive answers ok=false (its
-// hex is the parent's, which has moved on since the burn ended).
-func ShipPos(s MovementState, t common.WorldMillis) (Hex, bool) {
-	s = StateAt(s, t)
-	switch s.Mode {
+// cell is the parent's, which has moved on since the burn ended).
+func ShipPos(st MovementState, t common.WorldMillis, s polar.Schedule) (Cell, bool) {
+	st = StateAt(st, t, s)
+	switch st.Mode {
 	case ModeCoast:
-		if s.Coast == nil {
-			return Hex{0, 0}, true
+		if st.Coast == nil {
+			return Cell{Ring: 0, Slot: 0}, true
 		}
-		return OrbState(*s.Coast, t), true
+		return OrbState(*st.Coast, t, s), true
 	case ModeBurn:
-		if s.Burn == nil {
-			return Hex{0, 0}, false
+		if st.Burn == nil {
+			return Cell{Ring: 0, Slot: 0}, false
 		}
-		return BurnPos(*s.Burn, t), true
+		return BurnPos(*st.Burn, t), true
 	case ModeLaneTransit:
-		lt := s.LaneTransit
+		lt := st.LaneTransit
 		if lt == nil || lt.BoardLeg == nil || len(lt.BoardLeg.Path) == 0 {
-			return Hex{0, 0}, false
+			return Cell{Ring: 0, Slot: 0}, false
 		}
 		// On the origin board only while burning to the gate; once past the gate
-		// the fleet is out on the lane (no board hex — the galaxy view shows it).
+		// the fleet is out on the lane (no board cell — the galaxy view shows it).
 		if t < lt.BoardLeg.GateEta {
 			return BurnPos(Burn{Path: lt.BoardLeg.Path, StartTime: lt.BoardLeg.StartTime, ArriveTime: lt.BoardLeg.GateEta}, t), true
 		}
-		return Hex{0, 0}, false
-	default: // docked / lane-hold — no board hex on the current system
-		return Hex{0, 0}, false
+		return Cell{Ring: 0, Slot: 0}, false
+	default: // docked / lane-hold — no board cell on the current system
+		return Cell{Ring: 0, Slot: 0}, false
 	}
 }
 

@@ -353,6 +353,10 @@ func computeFixtures(t testing.TB) fixtures {
 		{"tight6", Cell{5, 1}, Cell{5, 25}},     // across the star: near-half-turn, never touches the core
 		{"tight6", Cell{10, 90}, Cell{2, 3}},    // long mixed inbound
 		{"balanced12", Cell{1, 11}, Cell{3, 2}}, // second schedule, wrap + band step
+		{"tight6", Cell{2, 0}, Cell{1, 1}},      // stitch: out→in skip on the destination tail
+		{"tight6", Cell{2, 0}, Cell{1, 3}},      // stitch: out→in skip mid-path
+		{"tight6", Cell{2, 0}, Cell{1, 5}},      // stitch: bridge steps through the slot wrap
+		{"tight6", Cell{1, 0}, Cell{11, 7}},     // stitch: in→out skip at the ring-8/9 boundary
 	}
 	for _, c := range pathInputs {
 		s := scheduleByName(t, c.sched)

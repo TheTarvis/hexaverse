@@ -1,6 +1,6 @@
 // arcPath — the lattice's straight line, which is an arc. The TypeScript
 // mirror of backend/polar's ArcPath; see that file's header for the full
-// derivation. Summary of the contract (openspec polar-lattice-math, "A
+// derivation. Summary of the contract (openspec board-tactical-math, "A
 // Straight Path Is an Arc"):
 //
 //  - interpolate ring and angle between the endpoints in exact integer
@@ -19,7 +19,15 @@
 //    exact half-turn → always the increasing-slot-index direction;
 //  - a core endpoint sweeps no angle (inherits the other end's bearing);
 //    the interpolated ring never rounds below the inner endpoint's ring, so
-//    a path only reaches the core if an endpoint IS the core.
+//    a path only reaches the core if an endpoint IS the core;
+//  - the stitch pass (2026-08-25, rides the adjacency tightening): any
+//    consecutive pair failing true corner contact — the sampler's diagonal
+//    doubling-boundary skip past the half-fine-cell gap — gets the unique
+//    bridging cell inserted: the cell on the FINER of the two rings, one
+//    slot from the pair's finer-ring cell toward the coarse cell's doubled
+//    slot position. Always the finer ring (never the coarse alternative),
+//    so the stitch is a fixed rule with no tie to break; it restores
+//    contiguity only and never routes around anything.
 //
 // Number (not BigInt) arithmetic: every intermediate here is an integer
 // bounded by n·L·slots ≲ counts³ — exact in an IEEE double for any remotely
@@ -27,6 +35,7 @@
 // approach 2^53). Orbit advance is different (world times reach 2^53) and
 // uses BigInt — see orbit.ts.
 
+import { isAdjacent } from './adjacency'
 import { type PolarCell, type Schedule, canonCell, normalizeSlot, slotsForRing } from './schedule'
 
 // floorDiv is ⌊a/b⌋ for integers with b > 0, computed exactly: % on safe
@@ -39,6 +48,48 @@ export function floorDiv(a: number, b: number): number {
 }
 
 export function arcPath(fromRaw: PolarCell, toRaw: PolarCell, s: Schedule): PolarCell[] {
+  const out = sampleArc(fromRaw, toRaw, s)
+  // Stitch pass: repair the doubling-boundary skips the tight adjacency
+  // predicate rejects. Runs over every consecutive pair through the tail,
+  // so a skip landing on the final (destination) pair is repaired too.
+  for (let i = 1; i < out.length; i++) {
+    if (!isAdjacent(out[i - 1], out[i], s)) {
+      out.splice(i, 0, bridgeCell(out[i - 1], out[i], s))
+      i++ // the bridge is adjacent to both ends; resume at the pair after it
+    }
+  }
+  return out
+}
+
+// bridgeCell is the stitch's unique bridging cell for a non-adjacent
+// consecutive pair: on the finer of the two rings, one slot from the pair's
+// finer-ring cell toward the coarse cell's doubled slot position (the
+// shorter way around).
+function bridgeCell(a: PolarCell, b: PolarCell, s: Schedule): PolarCell {
+  const sa = slotsForRing(a.ring, s)
+  const sb = slotsForRing(b.ring, s)
+  let fine = a
+  let sf = sa
+  let coarse = b
+  let sc = sb
+  if (sb > sa) {
+    fine = b
+    sf = sb
+    coarse = a
+    sc = sa
+  }
+  // The coarse cell's doubled position on the finer ring's grid, and the
+  // wrapped step direction from the fine cell toward it.
+  const pc = coarse.slot * (sf / sc)
+  const diff = normalizeSlot(pc - fine.slot, sf)
+  const step = diff > sf - diff ? -1 : 1
+  return { ring: fine.ring, slot: normalizeSlot(fine.slot + step, sf) }
+}
+
+// sampleArc is the interpolate-and-round sampler: the raw arc before the
+// stitch pass, duplicate-collapsed. Split out so tests can target the
+// stitch seam directly.
+export function sampleArc(fromRaw: PolarCell, toRaw: PolarCell, s: Schedule): PolarCell[] {
   const from = canonCell(fromRaw, s)
   const to = canonCell(toRaw, s)
   if (from.ring === to.ring && from.slot === to.slot) return [from]

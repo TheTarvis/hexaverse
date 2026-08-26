@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isAdjacent } from './adjacency'
-import { arcPath, floorDiv } from './path'
+import { arcPath, floorDiv, sampleArc } from './path'
 import { canonCell, slotsForRing } from './schedule'
 import { tight6 } from './schedule.test'
 
@@ -17,6 +17,59 @@ describe('arcPath', () => {
     ['coincident endpoints yield the single cell', { ring: 4, slot: 7 }, { ring: 4, slot: 7 }, [{ ring: 4, slot: 7 }]],
   ])('%s', (_name, from, to, want) => {
     expect(arcPath(from, to, tight6)).toEqual(want)
+  })
+
+  // The stitch pass: raw doubling-boundary diagonal skips (doubled-index
+  // separation exactly 2, illegal under true corner contact) get the unique
+  // finer-ring bridging cell inserted — both boundary directions and the
+  // appended-destination tail. Mirrors backend/polar/path_test.go.
+  it.each([
+    ['out→in skip on the tail is bridged on the finer ring', { ring: 2, slot: 0 }, { ring: 1, slot: 1 }, [{ ring: 2, slot: 0 }, { ring: 2, slot: 1 }, { ring: 1, slot: 1 }]],
+    ['out→in skip mid-path is bridged', { ring: 2, slot: 0 }, { ring: 1, slot: 3 }, [{ ring: 2, slot: 0 }, { ring: 2, slot: 1 }, { ring: 2, slot: 2 }, { ring: 2, slot: 3 }, { ring: 1, slot: 2 }, { ring: 1, slot: 3 }]],
+    ['out→in bridge steps through the slot wrap', { ring: 2, slot: 0 }, { ring: 1, slot: 5 }, [{ ring: 2, slot: 0 }, { ring: 2, slot: 11 }, { ring: 1, slot: 5 }]],
+    ['in→out skip is bridged on the finer ring', { ring: 1, slot: 0 }, { ring: 11, slot: 7 }, [{ ring: 1, slot: 0 }, { ring: 2, slot: 0 }, { ring: 3, slot: 0 }, { ring: 4, slot: 1 }, { ring: 5, slot: 1 }, { ring: 6, slot: 2 }, { ring: 7, slot: 2 }, { ring: 8, slot: 2 }, { ring: 9, slot: 5 }, { ring: 9, slot: 6 }, { ring: 10, slot: 6 }, { ring: 11, slot: 7 }]],
+  ])('%s', (_name, from, to, want) => {
+    const got = arcPath(from, to, tight6)
+    expect(got).toEqual(want)
+    for (let i = 1; i < got.length; i++) {
+      expect(isAdjacent(got[i - 1], got[i], tight6)).toBe(true)
+    }
+  })
+
+  it('the stitch inserts only bridges: removing them recovers the raw sample sequence (rings ≤ 6)', () => {
+    const maxRing = 6
+    let stitched = 0
+    for (let fr = 0; fr <= maxRing; fr++) {
+      for (let fs = 0; fs < slotsForRing(fr, tight6); fs++) {
+        for (let tr = 0; tr <= maxRing; tr++) {
+          for (let ts = 0; ts < slotsForRing(tr, tight6); ts++) {
+            const raw = sampleArc({ ring: fr, slot: fs }, { ring: tr, slot: ts }, tight6)
+            const got = arcPath({ ring: fr, slot: fs }, { ring: tr, slot: ts }, tight6)
+            if (got.length === raw.length) {
+              expect(got).toEqual(raw)
+              continue
+            }
+            stitched++
+            let j = 0
+            for (let i = 0; i < got.length; i++) {
+              if (j < raw.length && got[i].ring === raw[j].ring && got[i].slot === raw[j].slot) {
+                j++
+                continue
+              }
+              const prev = got[i - 1]
+              const next = got[i + 1]
+              expect(isAdjacent(prev, next, tight6)).toBe(false)
+              expect(isAdjacent(prev, got[i], tight6)).toBe(true)
+              expect(isAdjacent(got[i], next, tight6)).toBe(true)
+              const fineRing = slotsForRing(next.ring, tight6) > slotsForRing(prev.ring, tight6) ? next.ring : prev.ring
+              expect(got[i].ring).toBe(fineRing)
+            }
+            expect(j).toBe(raw.length)
+          }
+        }
+      }
+    }
+    expect(stitched).toBeGreaterThan(0)
   })
 
   it('floorDiv floors negative numerators exactly', () => {

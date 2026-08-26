@@ -1133,7 +1133,7 @@ def run_determinism_cross_target() -> dict:
 
 def run_mirror_map_check() -> dict:
     """Mirror-map coverage check (openspec cross-stack-determinism): every
-    function defined in both backend/board and frontend/lib/hex must be named
+    function defined in both backend/board and frontend/lib/board must be named
     in fixtures/board/mirror-map.json and be fixture-covered or inventoried."""
     print_header("Checking Determinism Mirror Map Coverage")
 

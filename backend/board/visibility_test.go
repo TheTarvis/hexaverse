@@ -1,87 +1,120 @@
 package board
 
-import "testing"
+import (
+	"testing"
+)
 
-// Spec: 0006/S2 — the geometry half of the shadow rule: a large body on the
-// hex line between origin and target blocks everything strictly behind it,
-// while the occluder's own hex stays visible (you see the planet, not past it).
-func TestLineOfSight_OccluderShadowsBehind(t *testing.T) {
-	origin := Hex{Q: 0, R: 0}
-	occ := map[Hex]bool{{Q: 2, R: 0}: true}
+// Line of sight (#0006 Decision #16, polar form): an occluder shadows what
+// lies strictly behind it along the chord — never itself, never what's in
+// front — and the core star occludes the far side of the board.
+func TestLineOfSight(t *testing.T) {
+	s := sched(t, 10)
+	star := Occluder{Cell: Cell{Ring: 0, Slot: 0}, Radius2: StarOcclusionRadius2}
+	planet := Occluder{Cell: Cell{Ring: 4, Slot: 0}, Radius2: PlanetOcclusionRadius2}
 
-	if !LineOfSight(origin, Hex{Q: 1, R: 0}, occ) {
-		t.Errorf("hex in front of the occluder must be visible")
+	// No occluders → unconditional visibility.
+	if !LineOfSight(Cell{Ring: 2, Slot: 3}, Cell{Ring: 9, Slot: 40}, nil, s) {
+		t.Error("empty occluder set must always be visible")
 	}
-	if !LineOfSight(origin, Hex{Q: 2, R: 0}, occ) {
-		t.Errorf("the occluder itself must be visible (first body on the line is seen)")
+
+	// Across the core: two cells on opposite sides of the star, chord through
+	// the middle — occluded by the star.
+	if LineOfSight(Cell{Ring: 6, Slot: 0}, Cell{Ring: 6, Slot: 24}, []Occluder{star}, s) {
+		t.Error("the star must occlude the diametrically opposite cell")
 	}
-	if LineOfSight(origin, Hex{Q: 3, R: 0}, occ) {
-		t.Errorf("hex directly behind the occluder must be shadowed")
+	// Same two cells without the star registered → visible.
+	if !LineOfSight(Cell{Ring: 6, Slot: 0}, Cell{Ring: 6, Slot: 24}, nil, s) {
+		t.Error("no occluders — the chord across the core is clear")
 	}
-	if LineOfSight(origin, Hex{Q: 5, R: 0}, occ) {
-		t.Errorf("hex far behind the occluder must be shadowed")
+	// A chord that passes well clear of the core is not blocked by the star.
+	if !LineOfSight(Cell{Ring: 6, Slot: 0}, Cell{Ring: 6, Slot: 4}, []Occluder{star}, s) {
+		t.Error("a short same-side chord must not be star-occluded")
 	}
-	if !LineOfSight(origin, Hex{Q: 0, R: 3}, occ) {
-		t.Errorf("hex off the occluded axis must be visible")
+
+	// A planet on ring 4 slot 0: the cell radially behind it (ring 8, same
+	// bearing — slot 0 on ring 8 has the same table angle) is shadowed...
+	if LineOfSight(Cell{Ring: 1, Slot: 0}, Cell{Ring: 8, Slot: 0}, []Occluder{planet}, s) {
+		t.Error("the cell radially behind the planet must be shadowed")
 	}
-	if !LineOfSight(origin, origin, occ) {
-		t.Errorf("a hex always sees itself")
+	// ...the planet's own cell stays visible (never shadows itself)...
+	if !LineOfSight(Cell{Ring: 1, Slot: 0}, Cell{Ring: 4, Slot: 0}, []Occluder{planet}, s) {
+		t.Error("the occluder's own cell must stay visible")
+	}
+	// ...and cells in FRONT of it stay visible.
+	if !LineOfSight(Cell{Ring: 1, Slot: 0}, Cell{Ring: 3, Slot: 0}, []Occluder{planet}, s) {
+		t.Error("a cell in front of the occluder must stay visible")
+	}
+	// Looking the other way (from behind), the same geometry holds: the
+	// origin's side is clear, the far side is shadowed.
+	if LineOfSight(Cell{Ring: 8, Slot: 0}, Cell{Ring: 1, Slot: 0}, []Occluder{planet}, s) {
+		t.Error("occlusion is symmetric in origin/target")
+	}
+	// Off-axis: a target well off the chord is unaffected.
+	if !LineOfSight(Cell{Ring: 1, Slot: 0}, Cell{Ring: 8, Slot: 12}, []Occluder{planet}, s) {
+		t.Error("an off-axis target must not be shadowed")
 	}
 }
 
-func TestLineOfSight_NoOccludersIsAlwaysClear(t *testing.T) {
-	if !LineOfSight(Hex{Q: -3, R: 1}, Hex{Q: 4, R: -2}, nil) {
-		t.Errorf("empty occluder set must never block")
-	}
-}
+func TestBeamCells(t *testing.T) {
+	s := sched(t, 10)
+	p := BeamParams{HalfWidthBase: TableScale / 2, SpreadNum: 1, SpreadDen: 4, RimRing: 8}
 
-// The beam is a straightish corridor: a hex-line spine from the origin through
-// the aim, extended to the rim, widened by w(i) = base + floor(spread·i) hexes
-// at spine index i (#0006 Decision #15). Pure membership here — occlusion is
-// LineOfSight's job, composed by the caller.
-func TestBeamHexes_CorridorWidensAndClipsAtRim(t *testing.T) {
-	origin := Hex{Q: 0, R: 0}
-	aim := Hex{Q: 1, R: 0}
-	p := BeamParams{HalfWidthBase: 0, Spread: 0.34, RimRing: 6}
-
-	beam := BeamHexes(origin, aim, p)
-	set := make(map[Hex]bool, len(beam))
-	for _, h := range beam {
-		set[h] = true
+	// An aim on the origin yields no beam.
+	if got := BeamCells(Cell{Ring: 3, Slot: 0}, Cell{Ring: 3, Slot: 0}, p, s); got != nil {
+		t.Errorf("aim==origin must be empty, got %v", got)
 	}
 
-	// The spine reaches the rim even though the aim hex is adjacent.
-	for q := 0; q <= 6; q++ {
-		if !set[Hex{Q: q, R: 0}] {
-			t.Errorf("spine hex (%d,0) missing from beam", q)
+	origin := Cell{Ring: 1, Slot: 0}
+	aim := Cell{Ring: 5, Slot: 0}
+	beam := BeamCells(origin, aim, p, s)
+	if len(beam) == 0 {
+		t.Fatal("beam is empty")
+	}
+	seen := map[Cell]bool{}
+	for _, c := range beam {
+		seen[c] = true
+		if c.Ring > p.RimRing {
+			t.Errorf("beam cell %v beyond the rim %d", c, p.RimRing)
 		}
 	}
-	// Near the origin the corridor is a bare line (w=0)…
-	if set[Hex{Q: 1, R: 1}] || set[Hex{Q: 1, R: -1}] {
-		t.Errorf("corridor should not have widened yet at spine index 1")
+	// The origin and the aim are inside the corridor.
+	if !seen[origin] || !seen[aim] {
+		t.Errorf("beam must contain origin %v and aim %v", origin, aim)
 	}
-	// …and widens with distance (w(3)=1 at spread 0.34).
-	if !set[Hex{Q: 3, R: -1}] || !set[Hex{Q: 3, R: 1}] {
-		t.Errorf("corridor should be ±1 hex wide at spine index 3")
+	// The ray continues past the aim to the rim.
+	if !seen[(Cell{Ring: 8, Slot: 0})] {
+		t.Error("beam must reach the rim cell on the aim bearing")
 	}
-	// Perpendicular hexes never join.
-	if set[Hex{Q: 0, R: 3}] {
-		t.Errorf("hex far off the beam axis must not be in the corridor")
+	// Nothing behind the origin: the diametrically opposite rim cell is out.
+	if seen[(Cell{Ring: 8, Slot: 24})] {
+		t.Error("beam must not extend behind the origin")
 	}
-	// Nothing ships beyond the rim.
-	for _, h := range beam {
-		if Ring(h) > p.RimRing {
-			t.Errorf("beam hex %v lies beyond the rim ring %d", h, p.RimRing)
+
+	// The corridor widens with distance: count member slots per ring along
+	// the beam — the rim ring must admit at least as wide an angular span as
+	// an inner ring (in angle, not raw slot count — compare via slot fraction).
+	perRing := map[int]int{}
+	for _, c := range beam {
+		perRing[c.Ring]++
+	}
+	nearFrac := float64(perRing[2]) / float64(s.Slots(2))
+	farFrac := float64(perRing[8]) / float64(s.Slots(8))
+	if farFrac < nearFrac/2 { // generous: the absolute width grows; angular width shrinks at most ∝ 1/ring + spread
+		t.Errorf("corridor did not widen plausibly: ring2 %d/%d vs ring8 %d/%d members",
+			perRing[2], s.Slots(2), perRing[8], s.Slots(8))
+	}
+
+	// Output is in (ring, slot) order.
+	for i := 1; i < len(beam); i++ {
+		a, b := beam[i-1], beam[i]
+		if a.Ring > b.Ring || (a.Ring == b.Ring && a.Slot >= b.Slot) {
+			t.Fatalf("beam output out of (ring, slot) order at %d: %v then %v", i, a, b)
 		}
 	}
-	// The origin is always covered (index 0).
-	if !set[origin] {
-		t.Errorf("beam must include its origin")
-	}
-}
 
-func TestBeamHexes_AimOnOriginIsEmpty(t *testing.T) {
-	if got := BeamHexes(Hex{Q: 2, R: 2}, Hex{Q: 2, R: 2}, BeamParams{RimRing: 6}); len(got) != 0 {
-		t.Errorf("a beam with no direction must be empty, got %d hexes", len(got))
+	// Zero spread: a parallel corridor — absolute half-width constant.
+	flat := BeamCells(origin, aim, BeamParams{HalfWidthBase: TableScale / 2, SpreadNum: 0, SpreadDen: 1, RimRing: 8}, s)
+	if len(flat) == 0 || len(flat) > len(beam) {
+		t.Errorf("zero-spread corridor should be non-empty and no wider than the spread one (%d vs %d)", len(flat), len(beam))
 	}
 }

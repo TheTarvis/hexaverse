@@ -1,96 +1,167 @@
 package board
 
-import "sort"
+import (
+	"math/big"
+
+	"hexaverse/polar"
+)
 
 // Visibility — the line-of-sight law both sensing modes obey (#0006 Decisions
-// #15/#16): large bodies shadow everything strictly behind them on the hex
-// line, for the aimed scan beam and the passive ambient bubble alike. Pure
-// geometry; which features occlude (star, planets) is the caller's rule.
+// #15/#16): large bodies shadow everything strictly behind them along the
+// straight chord between cell centers, for the aimed scan beam and the
+// passive ambient bubble alike. Sight is a CHORD, not an arc — "behind the
+// star" is a Euclidean statement — so this file computes real geometry, on
+// the pinned coordinate table in exact integer arithmetic (openspec
+// board-tactical-math, "A Pinned Coordinate Table Grounds Board Geometry"):
+// squared distances, cross products, and cross-multiplied comparisons carried
+// in big.Int where products of squares exceed int64 — no runtime trig, no
+// runtime sqrt, no floats. Which features occlude (star, planets) is the
+// caller's rule; their pinned radii live here.
 
-// LineOfSight reports whether target is visible from origin given the set of
-// occluding hexes. Blocked iff an occluder sits STRICTLY between the two on
-// the hex line — the endpoints never block themselves, so the first body on a
-// line is itself seen (you see the planet, not past it).
-func LineOfSight(origin, target Hex, occluders map[Hex]bool) bool {
+// Pinned occlusion radii, SQUARED, in squared table units (TableScale = 2^16
+// per radial unit). Tuning-owned gameplay constants: the star blots out a
+// full radial unit around the core; a planet shadows half a unit around its
+// center. Changing one is a rebalance, and a fixture re-record, not a formula
+// change.
+const (
+	// StarOcclusionRadius2 = (1.0 radial unit)² — the core star.
+	StarOcclusionRadius2 int64 = TableScale * TableScale
+	// PlanetOcclusionRadius2 = (0.5 radial unit)² — a planet-sized body.
+	PlanetOcclusionRadius2 int64 = (TableScale / 2) * (TableScale / 2)
+)
+
+// Occluder is a shadow-casting body: its cell and its pinned SQUARED
+// occlusion radius (one of the constants above — the caller maps feature
+// kind → radius).
+type Occluder struct {
+	Cell    Cell  `json:"cell"`
+	Radius2 int64 `json:"radius2"`
+}
+
+// LineOfSight reports whether target is visible from origin given the
+// occluding bodies (openspec board-tactical-math, "Occlusion-Aware Line of
+// Sight"). Blocked iff some occluder's center lies STRICTLY between origin
+// and target along the chord (projection parameter strictly inside (0,1))
+// AND the chord passes within that occluder's pinned squared radius. An
+// occluder's own cell, and everything in front of it, stays visible — only
+// positions strictly behind it are shadowed; the endpoints never block
+// themselves.
+func LineOfSight(origin, target Cell, occluders []Occluder, s polar.Schedule) bool {
 	if len(occluders) == 0 {
 		return true
 	}
-	line := Line(origin, target)
-	for i := 1; i < len(line)-1; i++ {
-		if occluders[line[i]] {
+	origin = Canon(origin, s)
+	target = Canon(target, s)
+	ox, oy := CellCenter(origin, s.Slots(origin.Ring))
+	tx, ty := CellCenter(target, s.Slots(target.Ring))
+	dx, dy := tx-ox, ty-oy
+	d2 := dx*dx + dy*dy // ≤ (2·ring·2^16)² — safely inside int64 for any real board
+	if d2 == 0 {
+		return true // coincident centers — nothing can lie strictly between
+	}
+	for _, oc := range occluders {
+		c := Canon(oc.Cell, s)
+		cx, cy := CellCenter(c, s.Slots(c.Ring))
+		px, py := cx-ox, cy-oy
+		// Projection parameter t = (p·d)/d² strictly inside (0,1):
+		dotPD := px*dx + py*dy
+		if dotPD <= 0 || dotPD >= d2 {
+			continue // at or before the origin, or at or beyond the target
+		}
+		// Chord passes within the occluder's radius: perpendicular distance²
+		// ≤ r² ⟺ cross(p,d)² ≤ r²·d², cross-multiplied. cross and the products
+		// exceed int64 (cross² ~ 10^26), so the comparison is big.Int — still
+		// exact integers, still no sqrt (the comparison stays squared).
+		cross := new(big.Int).Sub(
+			new(big.Int).Mul(big.NewInt(px), big.NewInt(dy)),
+			new(big.Int).Mul(big.NewInt(py), big.NewInt(dx)),
+		)
+		cross.Mul(cross, cross)
+		bound := new(big.Int).Mul(big.NewInt(oc.Radius2), big.NewInt(d2))
+		if cross.Cmp(bound) <= 0 {
 			return false
 		}
 	}
 	return true
 }
 
-// BeamParams tunes the scan beam's corridor (#0006 Decision #15): a hex-line
-// spine from the origin through the aim, extended to the rim, widened by
-// w(i) = HalfWidthBase + floor(Spread·i) hexes at spine index i — a narrow
-// cone that grows gently with distance.
+// BeamParams tunes the scan beam's corridor (#0006 Decision #15): a widening
+// corridor around the ray origin→aim, half-width at a cell =
+// HalfWidthBase + Spread × (the cell's along-ray distance from the origin),
+// clipped at the rim ring. All values are exact: the half-width base is in
+// table units, the spread a rational — no float knob survives the polar
+// rewrite (the retired hex beam's float Spread is why).
 type BeamParams struct {
-	HalfWidthBase int     `json:"halfWidthBase"`
-	Spread        float64 `json:"spread"`
-	RimRing       int     `json:"rimRing"`
+	// HalfWidthBase is the corridor's half-width at the origin, in table
+	// units (TableScale = 2^16 per radial unit).
+	HalfWidthBase int64 `json:"halfWidthBase"`
+	// SpreadNum/SpreadDen is the dimensionless widening per unit of along-ray
+	// distance. SpreadDen must be positive.
+	SpreadNum int64 `json:"spreadNum"`
+	SpreadDen int64 `json:"spreadDen"`
+	// RimRing clips the corridor at the board's rim.
+	RimRing int `json:"rimRing"`
 }
 
-// BeamHexes returns the beam corridor's hex set, sorted (Q, then R) so the
-// Go↔TS golden fixtures compare byte-stable. The spine is the hex line from
-// origin through aim, extended until it leaves the rim; membership is pure
-// geometry — occlusion is LineOfSight's job, composed by the caller. An aim
-// on the origin has no direction and yields an empty beam.
-func BeamHexes(origin, aim Hex, p BeamParams) []Hex {
-	if origin == aim {
+// BeamCells returns the scan beam's cell set (openspec board-tactical-math,
+// "Widening Scan Beam Corridor"): the cells at or within RimRing whose
+// centers lie within the widening corridor around the ray from the origin
+// cell's center through the aim cell's center, forward of the origin. An aim
+// equal to the origin has no direction and yields an empty beam. Output in
+// (ring, slot) order — the fixed enumeration both languages reproduce.
+//
+// The membership test is exact integer geometry on pinned centers. With
+// p = cell − origin, d = aim − origin, membership is
+// |cross(p,d)|/|d| ≤ base + spread × (p·d)/|d|, i.e. (× sd·|d|)
+// A := sd·|cross(p,d)| − sn·(p·d) ≤ sd·base·|d|. The right side carries a
+// lone |d| — an irrational square root — so the comparison is decided as an
+// integer comparison against the quadratic surd rather than by computing any
+// root: A ≤ 0 is membership outright (the bound is non-negative), and A > 0
+// is membership iff A² ≤ sd²·base²·d². Exact at every input — a borderline
+// cell is in or out identically in Go and TS and on every build target, by
+// construction. cross and dot fit int64 on any real board; only the final
+// squares need big.Int.
+func BeamCells(origin, aim Cell, p BeamParams, s polar.Schedule) []Cell {
+	origin = Canon(origin, s)
+	aim = Canon(aim, s)
+	if origin == aim || p.SpreadDen <= 0 {
 		return nil
 	}
-	// Extend the aim direction far past the rim, then walk the spine outward.
-	// Ring-along-a-line is convex (max of |linear| coords), so once the spine
-	// leaves the rim it never re-enters — safe to stop there.
-	oc, ac := origin.toCube(), aim.toCube()
-	k := 4*p.RimRing + 1
-	far := cube{
-		x: oc.x + (ac.x-oc.x)*k,
-		y: oc.y + (ac.y-oc.y)*k,
-		z: oc.z + (ac.z-oc.z)*k,
-	}
-	set := map[Hex]bool{}
-	for i, s := range Line(origin, far.toHex()) {
-		if Ring(s) > p.RimRing {
-			break
-		}
-		w := p.HalfWidthBase + int(p.Spread*float64(i))
-		for _, h := range Neighborhood(s, w) {
-			if Ring(h) <= p.RimRing {
-				set[h] = true
-			}
-		}
-	}
-	out := make([]Hex, 0, len(set))
-	for h := range set {
-		out = append(out, h)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Q != out[j].Q {
-			return out[i].Q < out[j].Q
-		}
-		return out[i].R < out[j].R
-	})
-	return out
-}
+	ox, oy := CellCenter(origin, s.Slots(origin.Ring))
+	ax, ay := CellCenter(aim, s.Slots(aim.Ring))
+	dx, dy := ax-ox, ay-oy
+	// sd²·base²·d² — the squared bound A² is compared against.
+	bound := new(big.Int).Mul(big.NewInt(p.SpreadDen*p.HalfWidthBase), big.NewInt(p.SpreadDen*p.HalfWidthBase))
+	bound.Mul(bound, big.NewInt(dx*dx+dy*dy))
 
-// Neighborhood returns every hex within the given radius of center (radius 0
-// is just the center) — the filled disc, walked ring by ring in RingHexes'
-// stable order.
-func Neighborhood(center Hex, radius int) []Hex {
-	if radius <= 0 {
-		return []Hex{center}
+	rim := p.RimRing
+	if rim > s.MaxRing {
+		rim = s.MaxRing
 	}
-	cc := center.toCube()
-	out := make([]Hex, 0, 1+3*radius*(radius+1))
-	out = append(out, center)
-	for ring := 1; ring <= radius; ring++ {
-		for _, h := range RingHexes(ring) {
-			out = append(out, cubeAdd(cc, h.toCube()).toHex())
+	var out []Cell
+	for ring := 0; ring <= rim; ring++ {
+		slots := s.Slots(ring)
+		for slot := 0; slot < slots; slot++ {
+			c := Cell{Ring: ring, Slot: slot}
+			cx, cy := CellCenter(c, slots)
+			px, py := cx-ox, cy-oy
+			dotPD := px*dx + py*dy
+			if dotPD < 0 {
+				continue // behind the origin — the corridor is forward-only
+			}
+			cross := px*dy - py*dx
+			if cross < 0 {
+				cross = -cross
+			}
+			a := p.SpreadDen*cross - p.SpreadNum*dotPD
+			if a <= 0 {
+				out = append(out, c)
+				continue
+			}
+			a2 := new(big.Int).Mul(big.NewInt(a), big.NewInt(a))
+			if a2.Cmp(bound) <= 0 {
+				out = append(out, c)
+			}
 		}
 	}
 	return out

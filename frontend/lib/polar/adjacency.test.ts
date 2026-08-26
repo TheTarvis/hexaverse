@@ -11,7 +11,8 @@ describe('isAdjacent', () => {
     ['the core and a ring-2 cell', { ring: 0, slot: 0 }, { ring: 2, slot: 0 }, false],
     ['corner contact within a band', { ring: 6, slot: 0 }, { ring: 7, slot: 1 }, true],
     ['doubling boundary, faced fine cell', { ring: 4, slot: 0 }, { ring: 5, slot: 0 }, true],
-    ['doubling boundary, loose-only pair (open fork, recorded loose)', { ring: 4, slot: 0 }, { ring: 5, slot: 2 }, true],
+    ['doubling boundary, adjacent under loose and true corner contact', { ring: 4, slot: 0 }, { ring: 5, slot: 1 }, true],
+    ['doubling boundary, phantom neighbor rejected under true corner contact', { ring: 4, slot: 0 }, { ring: 5, slot: 2 }, false],
     ['doubling boundary, beyond one coarse cell width', { ring: 4, slot: 0 }, { ring: 5, slot: 3 }, false],
   ])('%s', (_name, a, b, want) => {
     expect(isAdjacent(a, b, tight6)).toBe(want)

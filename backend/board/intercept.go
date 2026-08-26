@@ -1,52 +1,64 @@
 package board
 
-import "hexaverse/common"
+import (
+	"hexaverse/common"
+	"hexaverse/polar"
+)
 
 // Solution is the canonical output of a movement solve: the path the fleet
-// traverses, the hex it meets/settles on, and the world time it arrives. The
+// traverses, the cell it meets/settles on, and the world time it arrives. The
 // server persists this at commit; determinism makes "arrives at T" truth, not
 // estimate (#0004).
 type Solution struct {
-	Path       []Hex
-	MeetHex    Hex
+	Path       []Cell
+	MeetCell   Cell
 	ArriveTime common.WorldMillis
 }
 
-// SolveHex plots a burn to a fixed hex: a contiguous path that routes around the
-// star (RouteAround) and an arrival time of now + pathLength × msPerTile — the
-// ETA follows the detour, not the straight-line distance.
-func SolveHex(from, dest Hex, now, msPerTile common.WorldMillis) Solution {
-	path := RouteAround(from, dest)
+// SolveCell plots a burn to a fixed cell: the arc path (stitch included) and
+// an arrival time of now + (pathLength−1) × msPerTile — the ETA follows the
+// emitted path's cell-step count (openspec board-tactical-math,
+// "Deterministic Movement Solve to a Fixed Cell"). No routing or avoidance
+// applies: the path IS the arc — a polar path reaches the core only if an
+// endpoint is the core, so the retired RouteAround has no successor.
+func SolveCell(from, dest Cell, now, msPerTile common.WorldMillis, s polar.Schedule) Solution {
+	path := polar.ArcPath(from, dest, s)
 	arrive := now + common.WorldMillis(len(path)-1)*msPerTile
-	return Solution{Path: path, MeetHex: dest, ArriveTime: arrive}
+	return Solution{Path: path, MeetCell: Canon(dest, s), ArriveTime: arrive}
 }
 
 // SolveIntercept is the deterministic lead-solve against a coasting body: the
-// earliest future world time at which the fleet (from its current hex, at
+// earliest future world time at which the fleet (from its current cell, at
 // msPerTile) can be where the body WILL be. The game leads the target; the
 // player never eyeballs the lead (#0004). With motion off/slow the body's
-// position is constant and this collapses to SolveHex against its current hex —
-// the motion-agnostic property, no special-case.
+// position is constant and this collapses to SolveCell against its current
+// cell — the motion-agnostic property, no special-case.
 //
-// Arrival is always a cell-ENTRY instant of the target's orbit, not just any
+// The target's orbit is an ARGUMENT, never a feature lookup — that seam is
+// where a future moon target passes a parent-composed orbit without this
+// solve changing (rewrite design: "the intercept seam anticipates moons").
+//
+// Arrival is always a slot-ENTRY instant of the target's orbit, not just any
 // feasible moment. The renderer glides an orbiting glyph toward its next cell
-// by the absolute window fraction, so the glyph sits on its logical hex centre
-// only as it enters the cell; a burn glide ends on the meet-hex centre exactly.
-// Meeting mid-window drew the ship a fraction of a tile behind the body and the
-// dock fold then snapped it forward onto the parent glyph. Arriving on the
-// entry instant makes ship and body glyphs kiss — the ETA reads slightly
-// stretched (the ship paces itself to the window) rather than the burn lying.
-func SolveIntercept(from Hex, target Orbit, now, msPerTile, horizon common.WorldMillis) Solution {
-	// Already co-occupying the target's hex → dock in place, no burn to pace.
+// by the absolute window fraction, so the glyph sits on its logical cell
+// centre only as it enters the cell; a burn glide ends on the meet-cell
+// centre exactly. Meeting mid-window drew the ship a fraction of a cell
+// behind the body and the dock fold then snapped it forward onto the parent
+// glyph. Arriving on the entry instant makes ship and body glyphs kiss — the
+// ETA reads slightly stretched (the ship paces itself to the window) rather
+// than the burn lying.
+func SolveIntercept(from Cell, target Orbit, now, msPerTile, horizon common.WorldMillis, s polar.Schedule) Solution {
+	// Already co-occupying the target's cell → dock in place, no burn to pace.
 	// The glide fraction is absolute per ring, so the glyphs already coincide.
-	nowPos := OrbState(target, now)
+	from = Canon(from, s)
+	nowPos := OrbState(target, now, s)
 	if nowPos == from {
-		return Solution{Path: []Hex{from}, MeetHex: from, ArriveTime: now}
+		return Solution{Path: []Cell{from}, MeetCell: from, ArriveTime: now}
 	}
 	if target.Ring > 0 && target.Period > 0 {
-		steps := int64(6 * target.Ring)
-		// k counts the body's cell advances since the epoch (OrbState's trunc
-		// division); its k-th cell entry is the first world-ms where the
+		steps := int64(s.Slots(target.Ring))
+		// k counts the body's slot advances since the epoch (OrbState's trunc
+		// division); its k-th slot entry is the first world-ms where the
 		// advance reaches k. Walk entries after `now` until one is reachable.
 		k := int64(now) * steps / int64(target.Period)
 		for {
@@ -55,21 +67,21 @@ func SolveIntercept(from Hex, target Orbit, now, msPerTile, horizon common.World
 			if tk > now+horizon {
 				break
 			}
-			pos := OrbState(target, tk)
-			path := RouteAround(from, pos)
+			pos := OrbState(target, tk, s)
+			path := polar.ArcPath(from, pos, s)
 			travel := common.WorldMillis(len(path)-1) * msPerTile
 			if now+travel <= tk {
-				return Solution{Path: path, MeetHex: pos, ArriveTime: tk}
+				return Solution{Path: path, MeetCell: pos, ArriveTime: tk}
 			}
 		}
 	}
-	// No cell entry within the horizon — an effectively static body (motion
+	// No slot entry within the horizon — an effectively static body (motion
 	// off/slow, drawn snapped to its cell centre) — or none reachable: aim at
 	// the body's current position, plain-burn ETA.
-	path := RouteAround(from, nowPos)
+	path := polar.ArcPath(from, nowPos, s)
 	return Solution{
 		Path:       path,
-		MeetHex:    nowPos,
+		MeetCell:   nowPos,
 		ArriveTime: now + common.WorldMillis(len(path)-1)*msPerTile,
 	}
 }

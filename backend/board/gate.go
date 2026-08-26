@@ -1,12 +1,10 @@
 package board
 
-import "math"
-
 // Lane-gate geometry (#0008 Decision #10): each charted lane meets a system's
-// board at ONE fixed tile, so known choke points are stable geography. The tile
+// board at ONE fixed cell, so known choke points are stable geography. The cell
 // is the lane's galaxy-tier bearing projected onto the gate ring — deterministic,
-// so the server and every client agree. Mirrored in lib/hex, pinned by
-// /fixtures/board/cases.json. The server is authoritative (it stamps gate tiles
+// so the server and every client agree. Mirrored in lib/board, pinned by
+// /fixtures/board/cases.json. The server is authoritative (it stamps gate cells
 // into system reads and arrival); the client mirror drives previews only.
 
 // GateRing is the ring a lane mouth sits on: the inner edge of the outer band,
@@ -22,46 +20,47 @@ func GateRing(radius int) int {
 	return 1
 }
 
-// LaneGateHex returns the tile on the gate ring (GateRing(radius)) where the lane
-// from `self` toward `neighbor` meets self's board. The bearing is the lane's
-// azimuth in the galaxy's flattened XY-disk (#0001 coords, z ignored — the disk is
-// thin in z); the gate is the gate-ring hex whose board direction is angularly
-// closest to it. Ties resolve to the earliest hex in RingHexes order (the
-// RouteAround convention). radius <= 0 degenerates to the core.
-func LaneGateHex(selfX, selfY, neighborX, neighborY float64, radius int) Hex {
+// LaneGateCell returns the cell on the gate ring (GateRing(radius)) where the
+// lane from `self` toward `neighbor` meets self's board. The bearing is the
+// lane's azimuth in the galaxy's flattened XY-disk (#0001 coords, z ignored —
+// the disk is thin in z); the gate is the gate-ring slot whose pinned-table
+// direction has the maximum dot product with that bearing vector, ties
+// resolved to the lower slot index (openspec board-tactical-math,
+// "Deterministic Lane Gate Projection"). radius <= 0 degenerates to the core.
+//
+// The bearing inputs remain floats from the galaxy generator: they are
+// rule-bearing only through this discretized, tie-broken argmax — the same
+// hazard class as the retired LaneGateHex, governed by cross-stack-determinism's
+// discretized-choice requirement and its near-tie deviation-register entry
+// (docs/defects/2026-08-25-lanegate-near-tie-divergence.md). The float64(...)
+// conversions around each product force the intermediate rounding the Go spec
+// otherwise lets arm64 fuse (FMA), keeping the dot values identical across
+// build targets for all but true near-ties.
+func LaneGateCell(selfX, selfY, neighborX, neighborY float64, radius int) Cell {
 	if radius <= 0 {
-		return Hex{0, 0}
+		return Cell{Ring: 0, Slot: 0}
 	}
-	bearing := math.Atan2(neighborY-selfY, neighborX-selfX) // determinism:allow(discretized)
-	best := Hex{}
-	bestDelta := math.MaxFloat64
-	for _, h := range RingHexes(GateRing(radius)) {
-		hx, hy := hexDirection(h)
-		delta := angleDelta(math.Atan2(hy, hx), bearing) // determinism:allow(discretized)
-		if delta < bestDelta {
-			bestDelta = delta
-			best = h
+	ring := GateRing(radius)
+	slots := Schedule(radius).Slots(ring)
+	points := tablePoints(slots)
+	bx := neighborX - selfX
+	by := neighborY - selfY
+	best := 0
+	bestDot := dot(points[0], bx, by) // determinism:allow(discretized)
+	for slot := 1; slot < slots; slot++ {
+		if d := dot(points[slot], bx, by); d > bestDot { // determinism:allow(discretized)
+			bestDot = d
+			best = slot
 		}
 	}
-	return best
+	return Cell{Ring: ring, Slot: best}
 }
 
-// hexDirection is a hex's cartesian direction from the centre in the board's
-// pointy-top layout (redblobgames, matching lib/hex/pixel.ts's hexToPixel), with
-// the screen-down y negated so galactic-north maps to the top of the board. Only
-// the direction matters, so the render scale (HEX_SIZE) is dropped.
-func hexDirection(h Hex) (x, y float64) {
-	return math.Sqrt(3) * (float64(h.Q) + float64(h.R)/2), -1.5 * float64(h.R) // determinism:allow(discretized)
-}
-
-// angleDelta is the absolute smallest angle between two bearings, in [0, π].
-func angleDelta(a, b float64) float64 {
-	d := math.Mod(a-b, 2*math.Pi)
-	if d < 0 {
-		d += 2 * math.Pi
-	}
-	if d > math.Pi {
-		d = 2*math.Pi - d
-	}
-	return d
+// dot is the pinned-table direction's dot product with a bearing vector. The
+// explicit float64 conversions around each product are load-bearing: they
+// force the products to round before the add (the Go spec permits fusing
+// a*b + c*d into FMA on arm64 otherwise — cross-stack-determinism's
+// contraction clause).
+func dot(p [2]int64, bx, by float64) float64 {
+	return float64(float64(p[0])*bx) + float64(float64(p[1])*by) // determinism:allow(discretized)
 }
