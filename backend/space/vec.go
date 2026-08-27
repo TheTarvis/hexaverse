@@ -39,9 +39,33 @@ func (v Vec3) Scale(s float64) Vec3 {
 	return Vec3{X: float64(v.X * s), Y: float64(v.Y * s), Z: float64(v.Z * s)}
 }
 
-// Dot returns the dot product, each product guarded per Decision 5.
+// Dot returns the dot product, each product guarded per Decision 5. For a
+// squared distance between two points, use DistSq rather than composing
+// Sub and Dot at the call site.
 func (v Vec3) Dot(o Vec3) float64 {
 	return float64(v.X*o.X) + float64(v.Y*o.Y) + float64(v.Z*o.Z)
+}
+
+// DistSq returns the squared Euclidean distance between v and o, each
+// product guarded per Decision 5 and with no math.Sqrt anywhere in it.
+//
+// This is the operation every proximity comparison is required to run on
+// (openspec proximity-disclosure: "Proximity Comparisons Are Squared, Never
+// Rooted"): only the ORDERING of a distance against a range is ever
+// consumed, so the square root is pure cost, and dropping it keeps the
+// comparison inside this file's guarded-product set. It lives here rather
+// than at each caller so that no caller hand-rolls `d := b.Sub(a);
+// d.Dot(d)` — an inlined rewrite of that shape is exactly where an
+// unguarded multiply-add reappears.
+//
+// Not bit-equal to Length() squared: Length rounds once at the sqrt and
+// again at the squaring, so the two agree only to within a few ULP
+// (vec_test.go pins the tolerance). DistSq is the exact one.
+func (v Vec3) DistSq(o Vec3) float64 {
+	dx := v.X - o.X
+	dy := v.Y - o.Y
+	dz := v.Z - o.Z
+	return float64(dx*dx) + float64(dy*dy) + float64(dz*dz)
 }
 
 // Cross returns the cross product v x o, each product guarded per Decision 5.

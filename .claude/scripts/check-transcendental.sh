@@ -30,13 +30,18 @@
 # A pragma marks a reviewed, sanctioned exception; a register entry marks an
 # open defect. Never pragma a defect site — file it and register it.
 #
-# Scope: non-test .go files under the rule-bearing backend packages
-# (board, polar, space, fleet, mine, galaxy, system, corporations, market —
-# the packages whose outputs are persisted values, solve results, ETAs, or
-# disclosure decisions — space added by add-space-kinematics: a Go-only
-# rule-bearing package with no TypeScript mirror would otherwise pass this
-# check merely by not being scoped into it) and non-test .ts files under
-# frontend/lib/board/ and
+# Scope: non-test .go files under the rule-bearing backend packages listed
+# in RULE_BEARING_GO_PACKAGES below — the packages whose outputs are
+# persisted values, solve results, ETAs, or disclosure decisions. That list
+# is a single parameter rather than a literal buried in the match, because
+# widening it is a recurring act: add-space-kinematics had to widen it for
+# `space` (a Go-only rule-bearing package with no TypeScript mirror would
+# otherwise pass this check merely by not being scoped into it), and
+# add-proximity-disclosure had to widen it again for `disclosure`. Its
+# finding D-4 was exactly this class of gap — a new rule-bearing package
+# passing by omission — so the list is named once and referenced once.
+#
+# The lint also governs non-test .ts files under frontend/lib/board/ and
 # frontend/lib/polar/ (the two board-math mirrors; openspec
 # board-tactical-math bars runtime trig AND sqrt outright from both pairs'
 # rule-bearing surfaces — geometry runs on the pinned coordinate table, whose
@@ -71,8 +76,13 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REGISTER="$REPO_ROOT/fixtures/determinism-register.json"
 
-# Scope: rule-bearing Go packages + the TS board-math mirror, production files only.
-if [[ "$FILE_PATH" =~ backend/(board|polar|space|fleet|mine|galaxy|system|corporations|market)/.*\.go$ && ! "$FILE_PATH" =~ _test\.go$ ]]; then
+# The rule-bearing Go packages this lint governs. Adding a package that
+# produces persisted values, solve results, ETAs, or disclosure decisions is
+# a one-word edit here — the alternation below is built from it.
+RULE_BEARING_GO_PACKAGES=(board polar space disclosure fleet mine galaxy system corporations market)
+GO_PACKAGE_ALTERNATION=$(IFS='|'; echo "${RULE_BEARING_GO_PACKAGES[*]}")
+
+if [[ "$FILE_PATH" =~ backend/($GO_PACKAGE_ALTERNATION)/.*\.go$ && ! "$FILE_PATH" =~ _test\.go$ ]]; then
     PATTERN='math\.(Sin|Cos|Tan|Asin|Acos|Atan|Atan2|Sinh|Cosh|Tanh|Asinh|Acosh|Atanh|Log|Log2|Log10|Log1p|Exp|Exp2|Expm1|Pow|Sqrt|Round)\('
     COMMENT_RE='^[0-9]+:[[:space:]]*(//)'
 elif [[ "$FILE_PATH" =~ frontend/lib/(board|polar)/.*\.ts$ && ! "$FILE_PATH" =~ \.test\.ts$ ]]; then

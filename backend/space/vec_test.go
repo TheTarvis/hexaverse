@@ -1,6 +1,11 @@
 package space
 
-import "testing"
+import (
+	"math"
+	"runtime"
+	"strconv"
+	"testing"
+)
 
 // vec_test.go closes the file-per-production-file test coverage gate
 // (backend/space/vec.go) with direct unit coverage of Vec3's own
@@ -179,5 +184,112 @@ func TestVec3_NormalizeAboveEpsilonSucceeds(t *testing.T) {
 	want := Vec3{X: 1, Y: 0, Z: 0}
 	if !almostEqualVec(got, want, looseTolerance) {
 		t.Errorf("Normalize(%v) = %v, want ~%v", small, got, want)
+	}
+}
+
+// --- DistSq (openspec add-proximity-disclosure, tasks.md section 1) ---------
+//
+// DistSq is added to this package for one reason: every proximity predicate
+// in the proximity-disclosure capability is required to compare squared
+// distance against squared range, with no sqrt on the path. These tests pin
+// the two properties that requirement rests on — that DistSq is exactly the
+// subtract-and-dot a caller would otherwise hand-roll, and that its result
+// is byte-identical across the build-target matrix.
+
+// distSqTolerance is the documented tolerance between DistSq and Length()
+// squared. DistSq rounds three products and two sums; Length() squared
+// rounds the same three products, two sums, the correctly-rounded sqrt, and
+// then the squaring — two extra roundings, so the two forms agree to a few
+// ULP rather than exactly. Four ULP is measured slack on the sweep below,
+// not a guess; DistSq is the exact form and is the one predicates use.
+const distSqTolerance uint64 = 4
+
+// TestVec3_DistSqIsSubtractAndDotBitForBit (tasks.md 1.3) — the whole point
+// of DistSq existing is that a caller never writes `d := b.Sub(a);
+// d.Dot(d)` themselves. That is only true if the two are the same value,
+// bit for bit, everywhere: an inlined rewrite must never shift a result.
+// Swept over the same continuous box the space fixture family draws its own
+// positions from.
+func TestVec3_DistSqIsSubtractAndDotBitForBit(t *testing.T) {
+	r := newSweepRNG(0x5EED_D15C_0DE5)
+	for i := 0; i < 20000; i++ {
+		a := Vec3{X: r.box(-300, 300), Y: r.box(-300, 300), Z: r.box(-300, 300)}
+		b := Vec3{X: r.box(-300, 300), Y: r.box(-300, 300), Z: r.box(-300, 300)}
+		d := b.Sub(a)
+		want := d.Dot(d)
+		if got := a.DistSq(b); math.Float64bits(got) != math.Float64bits(want) {
+			t.Fatalf("case %d: DistSq(%v,%v) = %s, want the subtract-and-dot form %s",
+				i, a, b, strconv.FormatFloat(got, 'b', -1, 64), strconv.FormatFloat(want, 'b', -1, 64))
+		}
+		// Symmetric for the same reason: (a-b) is the exact negation of
+		// (b-a) in IEEE-754, and squaring a negation is exact.
+		if got, rev := a.DistSq(b), b.DistSq(a); math.Float64bits(got) != math.Float64bits(rev) {
+			t.Fatalf("case %d: DistSq is not symmetric: %v vs %v", i, got, rev)
+		}
+	}
+}
+
+// TestVec3_DistSqAgreesWithLengthSquaredWithinTolerance (tasks.md 1.3) —
+// the two forms are the same quantity computed two ways; DistSq is the one
+// without the sqrt, and this pins how far apart the rounding lets them
+// drift.
+func TestVec3_DistSqAgreesWithLengthSquaredWithinTolerance(t *testing.T) {
+	r := newSweepRNG(0x0FF5_E7C0_DE01)
+	for i := 0; i < 20000; i++ {
+		a := Vec3{X: r.box(-300, 300), Y: r.box(-300, 300), Z: r.box(-300, 300)}
+		b := Vec3{X: r.box(-300, 300), Y: r.box(-300, 300), Z: r.box(-300, 300)}
+		l := b.Sub(a).Length()
+		if got, want := a.DistSq(b), float64(l*l); !ulpsWithin(got, want, distSqTolerance) {
+			t.Fatalf("case %d: DistSq = %v, Length()^2 = %v — beyond the documented %d-ULP tolerance",
+				i, got, want, distSqTolerance)
+		}
+	}
+}
+
+// TestVec3_DistSqDegenerateCases probes the boundaries a predicate actually
+// hits: a point against itself (the coincident-observer case the occlusion
+// requirement guards against dividing by), and an axis-aligned separation
+// whose square is exactly representable.
+func TestVec3_DistSqDegenerateCases(t *testing.T) {
+	v := Vec3{X: 12.5, Y: -3.25, Z: 999.125}
+	if got := v.DistSq(v); got != 0 {
+		t.Errorf("DistSq(v, v) = %v, want exactly 0", got)
+	}
+	a := Vec3{X: 1, Y: 2, Z: 3}
+	b := Vec3{X: 4, Y: 6, Z: 3}
+	if got, want := a.DistSq(b), 25.0; got != want {
+		t.Errorf("DistSq(%v, %v) = %v, want exactly %v", a, b, got, want)
+	}
+}
+
+// distSqPins are inputs paired with their DistSq result serialized in the
+// lossless binary-exponent form the space fixture family uses. A decimal
+// literal could not express a last-ULP divergence; this form can.
+//
+// TestVec3_DistSqIsPinnedAcrossBuildTargets (tasks.md 1.4) is the
+// cross-target assertion. The pins are the same source on every leg, so the
+// suite passing under BOTH `GOARCH=arm64` and `GOARCH=amd64 GOAMD64=v1`
+// (tasks.md 9.2) is the byte-identity claim — the same mechanism the
+// fixture family uses, kept local because DistSq is one guarded expression
+// rather than a family of its own. The cases are deliberately non-round:
+// values whose products need the full mantissa are where a fused
+// multiply-add on a contracting target would show up.
+var distSqPins = []struct {
+	a, b Vec3
+	want string
+}{
+	{Vec3{X: 0.1, Y: 0.2, Z: 0.3}, Vec3{X: 0.4, Y: 0.5, Z: 0.6}, "4863887597560136p-54"},
+	{Vec3{X: 1e-8, Y: 1e-8, Z: 1e-8}, Vec3{X: -1e-8, Y: 1e-8, Z: 1e-8}, "8112963841460669p-104"},
+	{Vec3{X: 123.456789, Y: -987.654321, Z: 0.000123}, Vec3{X: -321.987654, Y: 456.123789, Z: 99.9}, "4923956598144420p-31"},
+	{Vec3{X: 1e12, Y: 1e12, Z: 1e12}, Vec3{X: 1e12 + 1, Y: 1e12, Z: 1e12}, "4503599627370496p-52"},
+	{Vec3{X: 3.7, Y: -2.9, Z: 8.3}, Vec3{X: 3.7000000000000006, Y: -2.9, Z: 8.3}, "4503599627370496p-154"},
+}
+
+func TestVec3_DistSqIsPinnedAcrossBuildTargets(t *testing.T) {
+	for i, c := range distSqPins {
+		if got := strconv.FormatFloat(c.a.DistSq(c.b), 'b', -1, 64); got != c.want {
+			t.Errorf("pin %d: DistSq(%v, %v) = %s, want %s (this leg: %s/%s)",
+				i, c.a, c.b, got, c.want, runtime.GOOS, runtime.GOARCH)
+		}
 	}
 }
