@@ -13,7 +13,7 @@ import { resolveE2EConfig } from '../config/env'
  *
  * Wall-clock note (design.md Risks): the test stack runs the world at scale 1
  * (no WORLD_TIME_SCALE in .env.test — the client's useWorldTime assumes 1), so
- * every eta here is real seconds: scan 15s, burn 2.5s/hex, mining 1s/ton. The
+ * every eta here is real seconds: scan 15s, burn 2.5s/cell, mining 1s/ton. The
  * journey stays bounded by picking the NEAREST revealed lode and minimum-size
  * runs. The full return trip is NOT ridden: a single lane leg is 104-300s at
  * this scale, so persistence is proven by the reload instead (the same fresh
@@ -71,7 +71,7 @@ test.describe('the vertical slice', () => {
     await page.getByTestId('wake-name-input').fill('E2E Prospector')
     await page.getByTestId('wake-submit').click()
     await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 20_000 })
-    await expect(page.getByTestId('hex-board')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('board-overlay')).toBeVisible({ timeout: 15_000 })
 
     // The hull carries an empty hold from spawn (the roster block on the read).
     await expect(page.getByTestId('hold-readout')).toBeVisible({ timeout: 15_000 })
@@ -89,11 +89,11 @@ test.describe('the vertical slice', () => {
     ).toBeVisible({ timeout: 60_000 })
 
     // 3. MOVE: intercept + dock at the nearest revealed lode (nearest by
-    //    screen distance from the fleet glyph — burn cost is 2.5s/hex, so
+    //    screen distance from the fleet glyph — burn cost is 2.5s/cell, so
     //    nearest keeps this the longest single wait of the journey).
     //
     //    Moons are excluded: the generator marks them mineable (they carry
-    //    resources) but gives them no orbit and a core-hex footprint, so BOTH
+    //    resources) but gives them no orbit and a core-cell footprint, so BOTH
     //    the server solve (ErrCoreDestination) and the client preview reject
     //    them as targets — a moon can't be docked or mined today. Known
     //    product gap (2026-08-25), surfaced to Travis; when moon targeting
@@ -178,7 +178,7 @@ test.describe('the vertical slice', () => {
     const roster = page.getByTestId('fleet-roster')
     await expect(roster).toContainText(/Departing|In transit/, { timeout: 30_000 })
     // The galaxy hand-off fires when the fleet passes its gate — the end of the
-    // leg-0 burn, which from a far rim gate runs 60-80s at 2.5s/hex. 180s
+    // leg-0 burn, which from a far rim gate runs 60-80s at 2.5s/cell. 180s
     // bounds a rim-to-rim leg with refetch slack.
     await page.waitForURL((url) => new URL(url).pathname === '/', { timeout: 180_000 })
     await expect(roster).toBeVisible({ timeout: 15_000 })

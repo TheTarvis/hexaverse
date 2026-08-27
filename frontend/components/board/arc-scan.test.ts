@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { hexKey } from '@/lib/hex'
+import { cellKey, productionSchedule } from '@/lib/board'
+import type { TrailCell } from './arc-scan'
+
+const S = productionSchedule()
 import { angularLagDeg, sweepHeadingDeg, sweepTrail, ARC_TUNING } from './arc-scan'
 
 // A window at the tuned 30s ScanDuration.
@@ -40,37 +43,40 @@ describe('angularLagDeg', () => {
 })
 
 describe('sweepTrail', () => {
-  const origin = { q: 0, r: 0 }
+  const origin = { ring: 0, slot: 0 }
+  // Ring 1 carries 6 slots, so its slots sit every 60°: slot 0 due +x (0°),
+  // slot 1 at 60°, slot 3 at 180°, slot 5 at 300°.
+  const at = (ring: number, slot: number) => (t: TrailCell) =>
+    t.cell.ring === ring && t.cell.slot === slot
 
   it('glows the cell at the beam head fully and fades with lag', () => {
-    // Heading 0 = +x; the cell (1,0) sits due +x of the origin.
-    const trail = sweepTrail(origin, 2, 0, new Set())
-    const atHead = trail.find((t) => t.hex.q === 1 && t.hex.r === 0)
+    const trail = sweepTrail(origin, 2, 0, new Set(), S)
+    const atHead = trail.find(at(1, 0))
     expect(atHead).toBeDefined()
     expect(atHead!.glow).toBeCloseTo(1)
 
-    // (1,-1) sits at −60° (i.e. 300°): swept 60° ago, glow decayed linearly.
-    const behind = trail.find((t) => t.hex.q === 1 && t.hex.r === -1)
+    // Ring 1 slot 5 sits at 300°: swept 60° ago, so its glow decayed linearly.
+    const behind = trail.find(at(1, 5))
     expect(behind).toBeDefined()
     expect(behind!.glow).toBeCloseTo(1 - 60 / ARC_TUNING.trailDeg)
   })
 
   it('leaves cells outside the trailing window dark', () => {
-    const trail = sweepTrail(origin, 2, 0, new Set())
-    // (-1,0) sits at 180° — half a turn behind, far outside the window.
-    expect(trail.find((t) => t.hex.q === -1 && t.hex.r === 0)).toBeUndefined()
+    const trail = sweepTrail(origin, 2, 0, new Set(), S)
+    // Ring 1 slot 3 sits at 180° — half a turn behind, far outside the window.
+    expect(trail.find(at(1, 3))).toBeUndefined()
   })
 
   it('never reads beyond the reach clamp', () => {
-    const trail = sweepTrail(origin, 3, 0, new Set(), 1)
-    expect(trail.find((t) => t.hex.q === 1 && t.hex.r === 0)).toBeDefined()
-    expect(trail.find((t) => t.hex.q === 2 && t.hex.r === 0)).toBeUndefined()
+    const trail = sweepTrail(origin, 3, 0, new Set(), S, 1)
+    expect(trail.find(at(1, 0))).toBeDefined()
+    expect(trail.find(at(2, 0))).toBeUndefined()
   })
 
   it('never lights a shadowed cell or the antenna cell itself', () => {
-    const shadowed = new Set([hexKey({ q: 1, r: 0 })])
-    const trail = sweepTrail(origin, 2, 0, shadowed)
-    expect(trail.find((t) => t.hex.q === 1 && t.hex.r === 0)).toBeUndefined()
-    expect(trail.find((t) => t.hex.q === 0 && t.hex.r === 0)).toBeUndefined()
+    const shadowed = new Set([cellKey({ ring: 1, slot: 0 })])
+    const trail = sweepTrail(origin, 2, 0, shadowed, S)
+    expect(trail.find(at(1, 0))).toBeUndefined()
+    expect(trail.find(at(0, 0))).toBeUndefined()
   })
 })

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { RADIAL_UNIT } from '@/lib/board'
 import type { BoardFeature, FogBand } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 import {
@@ -17,7 +18,7 @@ import {
 function feature(overrides: Partial<BoardFeature> & { id: string }): BoardFeature {
   return {
     type: 'rocky',
-    footprint: [{ q: 2, r: -1 }],
+    footprint: [{ ring: 2, slot: 1 }],
     band: 'visible',
     live: true,
     orbit: { ring: 3, angle0: 0, period: 60_000, dir: 1 },
@@ -30,7 +31,7 @@ function fleet(overrides: Partial<Fleet> & { id: string; own: boolean }): Fleet 
     corporationId: 'corp',
     systemId: 'sys',
     state: { mode: 'coast', coast: { ring: 2, angle0: 0, period: 60_000, dir: 1 } },
-    position: { q: 2, r: 0 },
+    position: { ring: 2, slot: 0 },
     worldTime: 0,
     ...overrides,
   }
@@ -166,7 +167,7 @@ describe('createPackedScene', () => {
     character: 'normal',
     starClass: 'G',
     features: [
-      feature({ id: 'star', type: 'star', fixed: true, orbit: undefined, footprint: [{ q: 0, r: 0 }] }),
+      feature({ id: 'star', type: 'star', fixed: true, orbit: undefined, footprint: [{ ring: 0, slot: 0 }] }),
       feature({ id: 'p1', orbit: { ring: 2, angle0: 0, period: 60_000, dir: 1 } }),
       feature({ id: 'p2', band: 'astronomical', orbit: { ring: 3, angle0: 4, period: 90_000, dir: -1 } }),
     ],
@@ -181,15 +182,44 @@ describe('createPackedScene', () => {
     expect(scene.bodies.map((b) => b.id)).toEqual(['p1', 'p2'])
   })
 
-  it('packs one lattice tile per hex with a resolved tint', () => {
+  it('packs one lattice tile per cell with a resolved tint', () => {
     const scene = createPackedScene(board)
-    expect(scene.latticeTiles).toHaveLength(1 + 3 * 4 * 5) // centred hexagonal number, R=4
+    // The banded schedule at radius 4: ring 0 carries 1 slot, then 6, 12, 24, 24.
+    expect(scene.latticeTiles).toHaveLength(1 + 6 + 12 + 24 + 24)
     expect(scene.latticeTiles.every((t) => t.tint.length === 3)).toBe(true)
   })
 
+  it('carries the annular-sector bounds the shader carves each tile with', () => {
+    // The wedge's BOUNDS are packer output — which cells exist, how many slots
+    // a ring carries, where a ring sits radially are all schedule decisions,
+    // and the decision rule keeps them outside webgl/. The shader gets four
+    // numbers and an SDF.
+    const scene = createPackedScene(board)
+    const core = scene.latticeTiles[0]!
+    expect(core.rInner).toBe(0)
+    expect(core.angHalf).toBe(Math.PI)
+
+    const rim = scene.latticeTiles[scene.latticeTiles.length - 1]!
+    expect(rim.rOuter - rim.rInner).toBeCloseTo(RADIAL_UNIT, 9)
+    expect(rim.angHalf).toBeGreaterThan(0)
+    expect(rim.angHalf).toBeLessThan(Math.PI)
+    // The instance quad must bound the wedge in both axes — the arc is wider
+    // at high rings than the hex lattice's one shared size ever was.
+    expect(rim.half).toBeGreaterThanOrEqual(RADIAL_UNIT / 2)
+    expect(rim.half).toBeGreaterThanOrEqual(rim.rOuter * Math.sin(rim.angHalf))
+  })
+
+  it('emits tile angles in GL world space, matching the flipped centre', () => {
+    const scene = createPackedScene(board)
+    for (const t of scene.latticeTiles.filter((x) => x.rInner > 0)) {
+      expect(Math.atan2(t.y, t.x)).toBeCloseTo(t.angCenter, 9)
+    }
+  })
+
   it('packs occupied orbit rings as closed GL polylines', () => {
-    const rings = packRings(board.features)
+    const rings = packRings(board.features, board.radius)
     expect(rings.map((r) => r.ring)).toEqual([2, 3])
-    expect(rings[0]!.points).toHaveLength(6 * 2 * 2) // 12 hexes on ring 2, xy each
+    // Ring 2 carries 12 slots under the banded schedule; xy per cell.
+    expect(rings[0]!.points).toHaveLength(12 * 2)
   })
 })

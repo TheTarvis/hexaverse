@@ -18,7 +18,7 @@ const runningScan: GameAction = {
   type: 'scan',
   actor: 'fleet_1',
   scope: 'sys-7',
-  params: { systemId: 'sys-7', target: { q: 2, r: 0 } },
+  params: { systemId: 'sys-7', target: { cell: { ring: 2, slot: 0 } } },
   committedAt: 0,
   eta: 30_000,
   status: 'running',

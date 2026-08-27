@@ -4,6 +4,7 @@ import type { Fleet } from '@/lib/types/fleet'
 import { projectWorldTime } from '@/hooks/use-world-time'
 import { createFramePacker } from './board-frame'
 import { featureGlidePixel } from './glyph-geometry'
+import { productionSchedule } from '@/lib/board'
 import { boardToWorld } from './use-board-projection'
 import { hexToRgb } from './board-pack'
 import { FLEET_ACCENT, FLEET_FOREIGN } from './board-palette'
@@ -12,7 +13,7 @@ const orbiter: BoardFeature = {
   id: 'p1',
   type: 'rocky',
   orbit: { ring: 3, angle0: 0, period: 60_000, dir: 1 },
-  footprint: [{ q: 3, r: 0 }],
+  footprint: [{ ring: 3, slot: 0 }],
   band: 'visible',
   live: true,
 }
@@ -26,16 +27,16 @@ function ownBurner(): Fleet {
       mode: 'burn',
       burn: {
         path: [
-          { q: 4, r: 0 },
-          { q: 3, r: 0 },
-          { q: 2, r: 0 },
+          { ring: 4, slot: 0 },
+          { ring: 3, slot: 0 },
+          { ring: 2, slot: 0 },
         ],
         startTime: 0,
         arriveTime: 1_000_000,
-        target: { hex: { q: 2, r: 0 } },
+        target: { cell: { ring: 2, slot: 0 } },
       },
     },
-    position: { q: 4, r: 0 },
+    position: { ring: 4, slot: 0 },
     own: true,
     worldTime: 0,
   }
@@ -65,7 +66,7 @@ describe('createFramePacker — the world clock (task 3.2a)', () => {
     for (const wall of [ANCHOR.wall, ANCHOR.wall + 12_345, ANCHOR.wall + 3_600_000]) {
       const frame = pack(wall)
       const worldTime = projectWorldTime(ANCHOR, wall, 1)
-      const expected = boardToWorld(featureGlidePixel(orbiter, worldTime))
+      const expected = boardToWorld(featureGlidePixel(orbiter, worldTime, productionSchedule()))
       expect(frame.bodyOffsets[0]).toBeCloseTo(expected.x, 3)
       expect(frame.bodyOffsets[1]).toBeCloseTo(expected.y, 3)
     }
@@ -78,7 +79,7 @@ describe('createFramePacker — the world clock (task 3.2a)', () => {
     const a = packerWith()(wall)
     const rebased = { world: 913_000, wall }
     const b = packerWith({ anchor: rebased })(wall)
-    const expected = boardToWorld(featureGlidePixel(orbiter, 913_000))
+    const expected = boardToWorld(featureGlidePixel(orbiter, 913_000, productionSchedule()))
     expect(b.bodyOffsets[0]).toBeCloseTo(expected.x, 3)
     // And the two anchors genuinely disagree, so this asserts something.
     expect(a.bodyOffsets[0]).not.toBeCloseTo(expected.x, 3)
@@ -89,12 +90,16 @@ describe('createFramePacker — reduced motion (task 4.12)', () => {
   it('freezes the decorative clock while positions keep advancing with world time', () => {
     const pack = packerWith({ reducedMotion: true })
     const f1 = pack(ANCHOR.wall)
-    const x1 = f1.bodyOffsets[0]!
+    const p1 = [f1.bodyOffsets[0]!, f1.bodyOffsets[1]!]
     const t1 = f1.fxTime
     const f2 = pack(ANCHOR.wall + 20_000)
     expect(f2.fxTime).toBe(t1) // frozen static state, not a paused sample
     expect(t1).toBe(0)
-    expect(f2.bodyOffsets[0]).not.toBeCloseTo(x1, 4) // the world still turns
+    // The world still turns. Compare the POINT, not one axis: two slots on the
+    // same ring can share an x (120° and 240° do) while sitting nowhere near
+    // each other, so an x-only assertion passes and fails by coincidence.
+    const p2 = [f2.bodyOffsets[0]!, f2.bodyOffsets[1]!]
+    expect(Math.hypot(p2[0]! - p1[0]!, p2[1]! - p1[1]!)).toBeGreaterThan(1)
   })
 
   it('runs the decorative clock from the fx epoch otherwise', () => {

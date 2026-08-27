@@ -200,8 +200,12 @@ export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, 
 
       // Place the camera from the hook-owned parameters — below the target,
       // looking up the tilt at the board plane.
-      cam.position.set(0, -Math.sin(c.tiltRad) * c.dist, Math.cos(c.tiltRad) * c.dist)
-      cam.lookAt(0, 0, 0)
+      cam.position.set(
+        c.target.x,
+        c.target.y - Math.sin(c.tiltRad) * c.dist,
+        Math.cos(c.tiltRad) * c.dist,
+      )
+      cam.lookAt(c.target.x, c.target.y, 0)
 
       renderer.info.reset()
       composer.render()

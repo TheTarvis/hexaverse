@@ -9,7 +9,7 @@
 // picture"). Period rises with ring so the inner system visibly turns while
 // the rim sits nearly still.
 
-import { ringHexes, ringOf, type Hex } from '@/lib/hex'
+import { ringCells, schedule as boardSchedule, type Cell } from '@/lib/board'
 import type { BoardFeature, SystemBoard } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 import { generateMockSystem, type Character } from '../hex-board/mock-system'
@@ -37,14 +37,19 @@ function mulberry32(seed: number) {
   }
 }
 
-// Axial hex distance (the cube-distance identity) — local so the fixture
-// stays free of the production board's imports beyond pure geometry.
-export function axialDistance(a: { q: number; r: number }, b: { q: number; r: number }): number {
-  return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.q + a.r - b.q - b.r)) / 2
-}
+// Ring distance on the polar lattice — the bench only needs "how far out from
+// the fleet's ring", which is what decides its fog band below. Kept local so
+// the fixture stays free of the production board beyond pure geometry.
+// The demo sensor bubble's reach, in RINGS. Two, not the hex era's four: the
+// band now measures radial separation, and a four-ring bubble swallowed nine of
+// the sixteen rings, leaving nothing on the remembered/astronomical bands —
+// the opposite of what the bench exists to show. Exported so the test asserts
+// against the same number the fixture uses.
+export const DEMO_SENSOR_RINGS = 2
 
-// The ring a hex sits on — re-exported so the fixture agrees with lib/hex.
-export { ringOf }
+export function ringDistance(a: Cell, b: Cell): number {
+  return Math.abs(a.ring - b.ring)
+}
 
 export interface MockSystemFixture {
   board: SystemBoard
@@ -64,8 +69,12 @@ export function buildMockSystemBoard(
   const sys = generateMockSystem(seed, character, radius)
   const rng = mulberry32(seed ^ 0x9e3779b9)
 
-  const fleetHex: Hex = { q: sys.entry.q, r: sys.entry.r }
-  const sensorRadius = 4
+  const sched = boardSchedule(radius)
+  // The mock system generator still speaks its own (q,r) grid; the bench maps
+  // each generated tile onto the polar ring it was generated for, at a slot
+  // derived from its index around that ring.
+  const fleetCell: Cell = { ring: Math.min(radius, 6), slot: 0 }
+  const sensorRadius = DEMO_SENSOR_RINGS
 
   const features: BoardFeature[] = []
   for (const tile of sys.tiles) {
@@ -77,18 +86,18 @@ export function buildMockSystemBoard(
         id: tile.body.id,
         type: 'star',
         fixed: true,
-        footprint: [{ q: 0, r: 0 }],
+        footprint: [{ ring: 0, slot: 0 }],
         band: 'visible',
         live: true,
       })
       continue
     }
-    const ringSet = ringHexes(ring)
-    const angle0 = Math.max(
-      0,
-      ringSet.findIndex((h) => h.q === tile.q && h.r === tile.r),
-    )
-    const d = axialDistance(tile, fleetHex)
+    const ringSet = ringCells(ring, sched)
+    // The generated tile's position around its ring, folded into the polar
+    // ring's slot count.
+    const angle0 = ringSet.length > 0 ? Math.abs(tile.q * 7 + tile.r * 13) % ringSet.length : 0
+    const cell: Cell = { ring, slot: angle0 }
+    const d = ringDistance(cell, fleetCell)
     let band: FogBand
     if (d <= sensorRadius) band = 'visible'
     else if (rng() < 0.45) band = 'remembered'
@@ -100,7 +109,7 @@ export function buildMockSystemBoard(
       id: tile.body.id,
       type: tile.body.type,
       orbit: { ring, angle0, period: periodForRing(ring), dir: rng() < 0.5 ? -1 : 1 },
-      footprint: [{ q: tile.q, r: tile.r }],
+      footprint: [cell],
       band,
       live: band === 'visible',
       ...(mineable ? { resources: [{ kind: 'metals', richness: 1 + Math.floor(rng() * 4) }] } : {}),
@@ -108,7 +117,7 @@ export function buildMockSystemBoard(
     })
   }
 
-  const rim = ringHexes(radius)
+  const rim = ringCells(radius, sched)
   const board: SystemBoard = {
     systemId: 'mock-system',
     radius,
@@ -116,16 +125,21 @@ export function buildMockSystemBoard(
     starClass: sys.starClass,
     features,
     laneGates: [
-      { destSystemId: 'mock-neighbour-a', hex: rim[0]! },
-      { destSystemId: 'mock-neighbour-b', hex: rim[Math.floor(rim.length / 2)]! },
+      { destSystemId: 'mock-neighbour-a', cell: rim[0]! },
+      { destSystemId: 'mock-neighbour-b', cell: rim[Math.floor(rim.length / 2)]! },
     ],
     worldTime: 0,
   }
 
-  // A straight westward burn path from the entry hex — long enough that the
-  // bench shows the plume/trail for minutes at 1×.
-  const burnPath: Hex[] = []
-  for (let i = 0; i <= 12; i++) burnPath.push({ q: fleetHex.q - i, r: fleetHex.r })
+  // An inward spiral from the entry cell — long enough that the bench shows
+  // the plume/trail for minutes at 1×, and it exercises the arc path the polar
+  // lattice actually flies (a straight westward run no longer exists).
+  const burnPath: Cell[] = []
+  for (let i = 0; i <= 12; i++) {
+    const ring = Math.max(1, fleetCell.ring - Math.floor(i / 3))
+    const slots = ringCells(ring, sched).length
+    burnPath.push({ ring, slot: (fleetCell.slot + i) % slots })
+  }
 
   const roster = (ships: number) => ({
     ships: Array.from({ length: ships }, () => ({ class: 'corvette' })),
@@ -146,10 +160,10 @@ export function buildMockSystemBoard(
           path: burnPath,
           startTime: 0,
           arriveTime: burnPath.length * 60_000,
-          target: { hex: burnPath[burnPath.length - 1]! },
+          target: { cell: burnPath[burnPath.length - 1]! },
         },
       },
-      position: fleetHex,
+      position: fleetCell,
       own: true,
       roster: roster(2),
       worldTime: 0,
@@ -162,7 +176,7 @@ export function buildMockSystemBoard(
         mode: 'coast',
         coast: { ring: Math.max(3, Math.floor(radius / 3)), angle0: 2, period: 240_000, dir: 1 },
       },
-      position: fleetHex,
+      position: fleetCell,
       own: true,
       roster: roster(4),
       worldTime: 0,
@@ -175,7 +189,7 @@ export function buildMockSystemBoard(
         mode: 'coast',
         coast: { ring: Math.max(5, Math.floor(radius / 2)), angle0: 9, period: 300_000, dir: -1 },
       },
-      position: fleetHex,
+      position: fleetCell,
       own: false,
       worldTime: 0,
     },

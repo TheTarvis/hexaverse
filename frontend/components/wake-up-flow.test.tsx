@@ -27,7 +27,7 @@ const spawnResult = {
     corporationId: 'corp_1',
     systemId: 'sys-9',
     state: { mode: 'coast' as const },
-    position: { q: 15, r: 0 },
+    position: { ring: 15, slot: 0 },
     own: true,
     worldTime: 1000,
   },

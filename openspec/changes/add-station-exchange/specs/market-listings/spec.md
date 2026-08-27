@@ -415,7 +415,7 @@ ledger reads are owner-only rather than fog-gated. This is the read a
 client uses to know which listings are its own (never a marker embedded in
 the general, fog-gated book read, which discloses no ownership at all) and
 to learn that an open listing has since expired or filled — the surface
-`market-board-panel`'s and `hex-board-view`'s terminal-status UI consume.
+`market-board-panel`'s and `board-view`'s terminal-status UI consume.
 
 #### Scenario: An owner sees its own open listings regardless of fog
 - **WHEN** a corporation reads its own listings

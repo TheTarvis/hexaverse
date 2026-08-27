@@ -9,7 +9,7 @@ const fleet = (state: Fleet['state'], systemId = 'sys-0'): Fleet => ({
   corporationId: 'corp',
   systemId,
   state,
-  position: { q: 0, r: 0 },
+  position: { ring: 0, slot: 0 },
   own: true,
   worldTime: 0,
 })
@@ -54,7 +54,7 @@ describe('fleetStatus', () => {
     const s = fleetStatus(
       fleet({
         mode: 'burn',
-        burn: { path: [{ q: 0, r: 0 }], startTime: 0, arriveTime: 30_000, target: {} },
+        burn: { path: [{ ring: 0, slot: 0 }], startTime: 0, arriveTime: 30_000, target: {} },
       }),
       10_000,
       nameOf,
@@ -67,7 +67,7 @@ describe('fleetStatus', () => {
     const s = fleetStatus(
       fleet({
         mode: 'burn',
-        burn: { path: [{ q: 0, r: 0 }], startTime: 0, arriveTime: 30_000, target: {} },
+        burn: { path: [{ ring: 0, slot: 0 }], startTime: 0, arriveTime: 30_000, target: {} },
       }),
       10_000,
       nameOf,
@@ -81,12 +81,12 @@ describe('fleetStatus', () => {
       fleet({
         mode: 'laneTransit',
         laneTransit: {
-          boardLeg: { path: [{ q: 0, r: 0 }], startTime: 0, gateEta: 60_000 },
+          boardLeg: { path: [{ ring: 0, slot: 0 }], startTime: 0, gateEta: 60_000 },
           route: ['sys-0', 'sys-1'],
           legEtas: [60_000, 600_000],
           departTime: 0,
           arriveTime: 600_000,
-          entryGate: { q: 0, r: 0 },
+          entryGate: { ring: 0, slot: 0 },
         },
       }),
       30_000,
@@ -109,12 +109,12 @@ describe('fleetStatus', () => {
       fleet({
         mode: 'laneTransit',
         laneTransit: {
-          boardLeg: { path: [{ q: 0, r: 0 }], startTime: 0, gateEta: 60_000 },
+          boardLeg: { path: [{ ring: 0, slot: 0 }], startTime: 0, gateEta: 60_000 },
           route: ['sys-0', 'sys-1'],
           legEtas: [60_000, 600_000],
           departTime: 0,
           arriveTime: 600_000,
-          entryGate: { q: 0, r: 0 },
+          entryGate: { ring: 0, slot: 0 },
         },
       }),
       100_000,

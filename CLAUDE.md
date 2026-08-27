@@ -232,8 +232,18 @@ The richest design source is the archived gameplay doc —
   path read stored state raw (0004/S1–S2 pin this). Go↔TS contract is
   `/fixtures/board/cases.json` (golden test) plus `/fixtures/polar/cases.json`
   for the lattice core; the client mirror lives at `frontend/lib/board/` /
-  `frontend/lib/polar/` (the `lib/hex` renderer predates the rewrite and is
-  mid-migration — see the `add-board-camera-controls`-adjacent frontend work).
+  `frontend/lib/polar/`. **The renderer migration is done** (step 7,
+  `migrate-renderer-to-polar-board`, archived 2026-08-27): `lib/hex` is gone,
+  every frontend consumer reads ring/slot, the tile draws as an annular sector
+  (`cellWedge`/`wedgePath` in `lib/board/pixel.ts`, and a matching wedge SDF in
+  `webgl/scene-lattice.ts`), and the board camera pans/zooms — pointer, wheel,
+  pinch, and keyboard, all through the pure `components/board/board-camera.ts`.
+  Two mirror rules worth knowing before touching board math: the schedule is
+  threaded explicitly (`schedule(board.radius)`), with `productionSchedule()`
+  as a memoized default that is safe ONLY for `slotsForRing` reads — never for
+  `ringCells` or `pointToCell`, which depend on `maxRing`; and every function
+  added to `lib/board` must be registered in `fixtures/board/mirror-map.json`
+  (`bash .claude/scripts/check-mirror-map.sh`).
 - **`fleet/`** (#0004, *implemented*) — the map-mover. One movement state
   (`coast|burn|docked`), `corporationId` from day one (dev-seeded through M8;
   **ownership real since M9** — spawn is the only fleet-minter now).

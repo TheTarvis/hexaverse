@@ -7,22 +7,24 @@
 // worldTime. Purely presentational — the plan is computed by move-preview.
 
 import type { MovePlan } from './move-preview'
-import { hexToPixel } from '@/lib/hex/pixel'
+import { cellToPoint, type Schedule } from '@/lib/board'
 import { PREVIEW_MEET, PREVIEW_ROUTE } from './board-palette'
 
 export interface SelectionPreviewProps {
   plan: MovePlan | null
+  // The board's slot schedule — what projects each path cell to a point.
+  schedule: Schedule
 }
 
-export function SelectionPreview({ plan }: SelectionPreviewProps) {
+export function SelectionPreview({ plan, schedule }: SelectionPreviewProps) {
   if (!plan || plan.path.length === 0) return null
   const points = plan.path
-    .map((h) => {
-      const p = hexToPixel(h.q, h.r)
+    .map((c) => {
+      const p = cellToPoint(c, schedule)
       return `${p.x.toFixed(2)},${p.y.toFixed(2)}`
     })
     .join(' ')
-  const meet = hexToPixel(plan.meetHex.q, plan.meetHex.r)
+  const meet = cellToPoint(plan.meetCell, schedule)
   return (
     <g data-testid="selection-preview" pointerEvents="none">
       <polyline

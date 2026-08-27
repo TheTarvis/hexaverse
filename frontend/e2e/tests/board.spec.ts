@@ -3,7 +3,7 @@ import {
   createBoardProjection,
   BOARD_TILT_DEG,
 } from '../../components/board/use-board-projection'
-import { fitViewBox, hexesWithinRadius } from '../../lib/hex/pixel'
+import { fitViewBox, RADIAL_UNIT } from '../../lib/board'
 
 /**
  * Board view (spec #0007) — drilling into a system renders its fogged interior
@@ -35,8 +35,8 @@ test.describe('system board', () => {
     // The container mounts, then the board renders from the seeded interior
     // read (past the "Charting the system…" state).
     await expect(page.getByTestId('system-board-view')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('hex-board')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('hex-lattice')).toBeVisible()
+    await expect(page.getByTestId('board-overlay')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('board-lattice')).toBeVisible()
 
     // Render health (independent of picking/overlay math): the canvas
     // actually drew something. Every other assertion resolves through
@@ -52,23 +52,25 @@ test.describe('system board', () => {
     }, { timeout: 15_000 })
     await expect(page.getByText(/charting the system/i)).toBeHidden()
 
-    // Tile click via the canvas: no per-tile DOM node exists, so compute a
+    // Cell click via the canvas: no per-cell DOM node exists, so compute a
     // screen point through the SAME pinned camera the board renders with
     // (createBoardProjection is the pure seam) and click the canvas there.
-    // The point is a hex-corner neighbourhood of the core cell: inside the
-    // lattice, but ≥ a full glyph hit radius from every hex centre, so no
-    // feature hit shape can swallow the click.
-    const viewBoxAttr = await page.getByTestId('hex-board').getAttribute('viewBox')
-    const vb = fitViewBox(hexesWithinRadius(BOARD_RADIUS))
-    expect(viewBoxAttr).toBe(`${vb.x} ${vb.y} ${vb.w} ${vb.h}`)
+    // The point sits between two ring-1 slot centres: inside the lattice, but
+    // ≥ a full glyph hit radius from every cell centre, so no feature hit shape
+    // can swallow the click.
+    const viewBoxAttr = await page.getByTestId('board-overlay').getAttribute('viewBox')
+    expect(viewBoxAttr).toBe(fitViewBox(BOARD_RADIUS))
 
     const stageBox = await page.getByTestId('board-stage').boundingBox()
     expect(stageBox).not.toBeNull()
     const projection = createBoardProjection(BOARD_RADIUS, stageBox!.width, stageBox!.height, BOARD_TILT_DEG)
-    const cornerOfCore = { x: 28.6, y: -16.5 } // near a vertex of hex (0,0)
-    const screenPt = projection.project(cornerOfCore)
+    // Ring 1 carries 6 slots (every 60°); 30° is the seam between slot 0 and
+    // slot 1, one radial unit out — a bare-cell point that is no body's centre.
+    const seam = (30 * Math.PI) / 180
+    const bareCell = { x: Math.cos(seam) * RADIAL_UNIT, y: Math.sin(seam) * RADIAL_UNIT }
+    const screenPt = projection.project(bareCell)
     await page.mouse.click(stageBox!.x + screenPt.x, stageBox!.y + screenPt.y)
-    await expect(page.getByTestId('selection')).toContainText('Tile')
+    await expect(page.getByTestId('selection')).toContainText('Ring')
 
     // The facts panel reflects the read (star class + radius/body facts).
     await expect(page.getByTestId('facts-panel')).toContainText('system')

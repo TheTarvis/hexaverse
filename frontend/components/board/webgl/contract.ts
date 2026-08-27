@@ -28,11 +28,25 @@ export interface PackedBody {
 }
 
 // One lattice tile: centre in GL world coordinates (y already flipped by the
-// projection module's boardToWorld — no flip happens under webgl/).
+// projection module's boardToWorld — no flip happens under webgl/), plus the
+// annular-sector bounds the fragment shader carves the tile out of its quad
+// with. A polar cell is a wedge, not a hexagon: the bounds vary per ring (and
+// per ring's slot count), so they are per-instance data rather than the two
+// constants the hex lattice needed.
+//
+// Angles are GL world angles (already negated out of board space by the
+// packer). `half` is the half-extent of the instance's bounding quad in world
+// units — the wedge's arc is wider at high rings than at low ones, so the quad
+// cannot be one shared size either.
 export interface PackedLatticeTile {
   x: number
   y: number
   tint: Rgb
+  rInner: number
+  rOuter: number
+  angCenter: number
+  angHalf: number
+  half: number
 }
 
 // One orbit ring: a closed polyline in GL world coordinates, plus its ring
@@ -109,8 +123,15 @@ export interface FrameData {
 
 // The camera parameters the canvas consumes each frame — owned by
 // useBoardProjection (React-side state); the canvas never writes them back.
+// `dist` already carries zoom (dist = fitDist / zoom) and `worldPerPixel` is
+// re-derived with it, so pan/zoom reach every shader through values the
+// canvas already reads per frame — no new plumbing, provided the uniform is
+// written per frame rather than once at scene construction.
 export interface BoardCameraState {
   dist: number
   tiltRad: number
   worldPerPixel: number
+  // The point the camera is centred on, in GL world coordinates (y already
+  // flipped by the projection module's boardToWorld — no flip happens here).
+  target: { x: number; y: number }
 }

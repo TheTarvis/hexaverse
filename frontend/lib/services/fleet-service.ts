@@ -10,7 +10,7 @@
 
 import { apiClient } from '../api-client'
 import type { Fleet, FleetList, MineCommit, MineRequest, RoutePreview } from '../types/fleet'
-import type { Target } from '@/lib/hex'
+import type { Target } from '@/lib/board'
 
 class FleetService {
   // GET /v1/fleets?systemId= — the requester's fogged fleet layer for one system.
@@ -50,7 +50,7 @@ class FleetService {
     return response.data
   }
 
-  // POST /v1/fleets/:id/orders — commit a burn to a hex or a feature (led
+  // POST /v1/fleets/:id/orders — commit a burn to a cell or a feature (led
   // intercept). The server solves; the response is the fleet now burning.
   async order(fleetId: string, target: Target): Promise<Fleet> {
     const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/orders`, { target })

@@ -67,7 +67,7 @@ before archiving.
   a self-match); `market-board-panel` (the ranked quote list now shows
   player listing rows alongside request and floor rows, plus new
   post-buy-listing and cancel-any-own-listing UI — buy listings and cancels
-  need no fleet present, since credits are bytes); `hex-board-view`
+  need no fleet present, since credits are bytes); `board-view`
   (ADDED-only: post-sell-listing and cancel-own-listing on the docked
   fleet's panel, mirroring `Sell Offer`/`Sell Commit`'s shape); `fleet-movement`
   ("Fleet Cargo Pool" is unchanged in M11's landed revision from what this
@@ -107,7 +107,7 @@ own with no request in flight.
   By Kind" MODIFIED, plus new listing/cancel UI requirements ADDED),
   `fleet-movement` ("Fleet Cargo Pool"), `npc-market-demand` (new
   requirements, additive), `market-price-board` (new requirements,
-  additive), `hex-board-view` (ADDED-only new requirements),
+  additive), `board-view` (ADDED-only new requirements),
   `request-authorization` (ADDED-only: one requirement extending M11's new
   per-corporation write quota to `market-listings`' cancel route, which
   appends no ledger entry and so falls outside that quota's own literal

@@ -6,12 +6,12 @@
 // content inside their sensor union — already fogged server-side (#0006).
 //
 // Unlike the galaxy read there is no wire→renderer flattening: the board glyph
-// layers consume `Hex`/`Orbit` straight from `lib/hex` (the same math the
+// layers consume `Cell`/`Orbit` straight from `lib/board` (the same math the
 // backend evaluates authoritatively), so the wire shape IS the renderer shape.
 // `lib/services/system-service.ts` is the seam where the requester's fleets
 // (a separate fleet-domain read) will fan in on a later slice.
 
-import type { Hex, Orbit } from '@/lib/hex'
+import type { Cell, Orbit } from '@/lib/board'
 
 // The unified feature family (backend system.FeatureType) — physical/minable
 // bodies and hazards alike; hazards just carry an `effects` payload.
@@ -30,7 +30,7 @@ export type FeatureType =
   | 'radiation'
   // The NPC/player trading station (#0011) — dockable, never mineable. It
   // reaches the fogged features read like any body once the live sensor
-  // union covers its hex, so the renderer's FeatureType-keyed maps MUST
+  // union covers its cell, so the renderer's FeatureType-keyed maps MUST
   // carry it (missing entries crashed the board packer at first coverage).
   | 'station'
 
@@ -64,7 +64,7 @@ export interface BoardFeature {
   orbit?: Orbit
   parentId?: string
   fixed?: boolean
-  footprint: Hex[]
+  footprint: Cell[]
   band: FogBand
   live: boolean
   resources?: Resource[]
@@ -74,14 +74,15 @@ export interface BoardFeature {
   asOf?: number
 }
 
-// A charted lane's fixed rim tile on this board (#0008 Decision #10) — where the
+// A charted lane's fixed rim cell on this board (#0008 Decision #10) — where the
 // lane toward `destSystemId` departs. Bearing-projected and deterministic
-// (backend board.LaneGateHex; mirrored in lib/hex/gate.ts), so the glyph sits on
-// the exact tile a departing fleet burns to. Fog-filtered server-side: only lanes
-// the requester has charted ship, so an uncharted neighbour never leaks here.
+// (backend board.LaneGateCell; mirrored in lib/board/gate.ts), so the glyph sits
+// on the exact cell a departing fleet burns to. Fog-filtered server-side: only
+// lanes the requester has charted ship, so an uncharted neighbour never leaks
+// here.
 export interface LaneGate {
   destSystemId: string
-  hex: Hex
+  cell: Cell
 }
 
 // The fogged system interior — exactly what `GET /v1/systems/:id` returns.
@@ -91,7 +92,7 @@ export interface SystemBoard {
   character: string
   starClass: string
   features: BoardFeature[]
-  // The charted lane gates on the rim — the departure tiles for inter-system
+  // The charted lane gates on the rim — the departure cells for inter-system
   // travel (#0008), already filtered to the requester's charted lanes.
   laneGates: LaneGate[]
   // Server world time at read (world-milliseconds) — the offset source that

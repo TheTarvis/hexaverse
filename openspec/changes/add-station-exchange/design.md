@@ -503,7 +503,7 @@ tuning decision, not a design one. **The gap the adversary correctly named
 as still-open — no player-facing surface told a player their listing had
 expired — is closed** by `market-listings`'s "Owner's Own-Listings Read,
 Including Recently Terminal" and `market-board-panel`'s "Terminal Listing
-Status Surfaced To Its Owner" / `hex-board-view`'s "Cancel Own Listing From
+Status Surfaced To Its Owner" / `board-view`'s "Cancel Own Listing From
 the Board" (both now sourced from that read): a player who posted a listing
 that later expired sees it, marked `expired`, with copy explaining the fee
 was spent and the reservation released — not silence.

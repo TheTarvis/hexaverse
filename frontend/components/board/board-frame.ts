@@ -10,7 +10,7 @@
 // clock is a closed-form projection of the server reading, so a paused rAF
 // loop costs nothing (task 3.2a pins this).
 
-import { ringOf, stateAt } from '@/lib/hex'
+import { productionSchedule, stateAt } from '@/lib/board'
 import type { BoardFeature } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 import { projectWorldTime, type WorldAnchor } from '@/hooks/use-world-time'
@@ -28,6 +28,11 @@ import type { FleetFrame, FrameData, Rgb } from './webgl/contract'
 // A small worldTime step used only to sample a fleet's heading (visual, not
 // logic) — the same constant the SVG scene used.
 const HEADING_DT = 2_000
+
+// The frame packer folds movement state and projects positions but never
+// enumerates cells or clamps to the rim, so the process-wide schedule is exact
+// here (design.md, schedule-threading Decision).
+const SCHEDULE = productionSchedule()
 
 const ACCENT_RGB: Record<string, Rgb> = Object.fromEntries(
   Object.entries(FLEET_ACCENT).map(([mode, hex]) => [mode, hexToRgb(hex)]),
@@ -68,7 +73,7 @@ export function createFramePacker(input: FramePackerInput): FramePacker {
     const worldTime = projectWorldTime(input.anchor, wallNowMs, scale)
     const fxTime = input.reducedMotion ? 0 : (wallNowMs - input.fxEpochWall) / 1000
 
-    const { pixelById, hexById } = featureMaps(input.features, worldTime)
+    const { pixelById, cellById } = featureMaps(input.features, worldTime, SCHEDULE)
     for (let i = 0; i < order.length; i++) {
       const p = pixelById.get(order[i]!.id)
       const w = p ? boardToWorld(p) : { x: 0, y: 0 }
@@ -78,17 +83,17 @@ export function createFramePacker(input: FramePackerInput): FramePacker {
 
     fleets.length = 0
     for (const fleet of input.fleets) {
-      if (!fleetOnBoard(fleet, worldTime)) continue
-      const parentId = fleetDockedParentId(fleet, worldTime)
+      if (!fleetOnBoard(fleet, worldTime, SCHEDULE)) continue
+      const parentId = fleetDockedParentId(fleet, worldTime, SCHEDULE)
       const parentPixel = parentId ? pixelById.get(parentId) : undefined
-      const p = boardToWorld(fleetGlidePixel(fleet, worldTime, parentPixel))
-      const ahead = boardToWorld(fleetGlidePixel(fleet, worldTime + HEADING_DT, parentPixel))
+      const p = boardToWorld(fleetGlidePixel(fleet, worldTime, SCHEDULE, parentPixel))
+      const ahead = boardToWorld(fleetGlidePixel(fleet, worldTime + HEADING_DT, SCHEDULE, parentPixel))
       // Hull models point along local +y; heading 0 = "up-board". atan2 of the
       // GL-space velocity, offset so +y is zero.
       const dx = ahead.x - p.x
       const dy = ahead.y - p.y
       const headingRad = dx === 0 && dy === 0 ? 0 : Math.atan2(-dx, dy)
-      const mode = stateAt(fleet.state, worldTime).mode
+      const mode = stateAt(fleet.state, worldTime, SCHEDULE).mode
       fleets.push({
         id: fleet.id,
         x: p.x,
@@ -101,8 +106,8 @@ export function createFramePacker(input: FramePackerInput): FramePacker {
     }
 
     const selectedId = input.getSelectedId()
-    const selectedHex = selectedId ? hexById.get(selectedId) : undefined
-    const selectedRing = selectedHex ? ringOf(selectedHex) : -1
+    const selectedCell = selectedId ? cellById.get(selectedId) : undefined
+    const selectedRing = selectedCell ? selectedCell.ring : -1
 
     return {
       fxTime,

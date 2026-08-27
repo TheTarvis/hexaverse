@@ -111,7 +111,7 @@
       own-listing UI to the panel, with fee/escrow preview — covers the
       three ADDED `market-board-panel` requirements
 
-## 7. Board UI (`hex-board-view`)
+## 7. Board UI (`board-view`)
 
 - [ ] 7.1 Add the post-sell-listing offer and commit on the docked fleet's
       panel, mirroring `Sell Offer`/`Sell Commit` — covers "List Offer on

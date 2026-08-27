@@ -17,7 +17,7 @@ const fleet: Fleet = {
   corporationId: 'corp-user1',
   systemId: 'sys-7',
   state: { mode: 'coast', coast: { ring: 3, angle0: 0, period: 1 << 30, dir: 1 } },
-  position: { q: 3, r: 0 },
+  position: { ring: 3, slot: 0 },
   own: true,
   worldTime: 123456,
 }
@@ -45,10 +45,10 @@ describe('fleetService', () => {
   it('orders a burn to a target through POST /orders', async () => {
     mockPost.mockResolvedValue(ok(fleet))
 
-    await fleetService.order('fleet_1', { hex: { q: 5, r: -2 } })
+    await fleetService.order('fleet_1', { cell: { ring: 5, slot: 2 } })
 
     expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/orders', {
-      target: { hex: { q: 5, r: -2 } },
+      target: { cell: { ring: 5, slot: 2 } },
     })
   })
 

@@ -14,7 +14,7 @@ import { Badge } from '@/components/catalyst/badge'
 import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import { Input } from '@/components/catalyst/input'
-import { stateAt, type Hex } from '@/lib/hex'
+import { productionSchedule, stateAt, type Cell } from '@/lib/board'
 import type { BoardFeature, LaneGate, ResourceKind } from '@/lib/types/system-board'
 import type { Fleet, FleetRoster, RoutePreview } from '@/lib/types/fleet'
 import type { Quote } from '@/lib/types/market'
@@ -25,7 +25,7 @@ import { BalanceReadout } from './BalanceReadout'
 
 export type BoardSelection =
   | { kind: 'feature'; feature: BoardFeature }
-  | { kind: 'hex'; hex: Hex }
+  | { kind: 'cell'; cell: Cell }
   | { kind: 'fleet'; fleet: Fleet }
   | { kind: 'gate'; gate: LaneGate }
   | null
@@ -142,10 +142,15 @@ export function FactsPanel({
 }: FactsPanelProps) {
   // Mode reads off the EFFECTIVE state (stateAt): a burn whose arrival passed is
   // already docked/coasting, so the badge and verb gates don't lag the picture.
-  const effectiveState = activeFleet ? stateAt(activeFleet.state, worldTime) : null
+  // A readout panel: it folds movement state but never enumerates cells or
+  // clamps to the rim, so the process-wide schedule is exact here (design.md,
+  // schedule-threading Decision).
+  const effectiveState = activeFleet
+    ? stateAt(activeFleet.state, worldTime, productionSchedule())
+    : null
   const activeMode = effectiveState?.mode
   const burning = activeMode === 'burn'
-  const canMoveToSelection = !!activeFleet && (selection?.kind === 'feature' || selection?.kind === 'hex')
+  const canMoveToSelection = !!activeFleet && (selection?.kind === 'feature' || selection?.kind === 'cell')
   // The scan is a 360° sweep (#0006 Decision #21) — one manual trigger, no
   // aim. Burning does NOT gate it: movement and sensing are separate channels
   // (#0006 Decision #19). One scan at a time, though — a running scan holds
@@ -275,15 +280,15 @@ export function FactsPanel({
         {selection?.kind === 'feature' && (
           <FeatureFacts feature={selection.feature} worldTime={worldTime} />
         )}
-        {selection?.kind === 'hex' && (
+        {selection?.kind === 'cell' && (
           <Text className="!text-zinc-300">
-            Tile {selection.hex.q}, {selection.hex.r}
+            Ring {selection.cell.ring}, slot {selection.cell.slot}
           </Text>
         )}
         {selection?.kind === 'fleet' && (
           <Text className="!text-zinc-300">
             {selection.fleet.own ? 'Your fleet' : 'Foreign contact'} —{' '}
-            {stateAt(selection.fleet.state, worldTime).mode}
+            {stateAt(selection.fleet.state, worldTime, productionSchedule()).mode}
           </Text>
         )}
         {selection?.kind === 'gate' && (
@@ -313,7 +318,7 @@ export function FactsPanel({
               {selection?.kind === 'feature' ? 'Intercept' : 'Move here'}
             </Button>
             <span data-testid="move-eta" className="font-mono text-xs text-zinc-400">
-              {plan.tiles} hex · ETA {etaLabel(plan.etaMs)}
+              {plan.tiles} cells · ETA {etaLabel(plan.etaMs)}
             </span>
           </div>
         )}

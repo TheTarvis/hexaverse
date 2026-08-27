@@ -47,6 +47,34 @@ export function schedule(maxRing: number): Schedule {
   return bandedSchedule(INNER_SLOTS, doubleAt(), maxRing)
 }
 
+// DEFAULT_BOARD_RADIUS mirrors GameTuning.BoardRadius — the radius every
+// production system currently generates at. It exists ONLY to key
+// productionSchedule() below; anything that has a real system's radius in hand
+// must use that, not this.
+export const DEFAULT_BOARD_RADIUS = 16
+
+let productionScheduleMemo: Schedule | null = null
+
+// productionSchedule is the process-wide default schedule — the client mirror
+// of Go's board.ProductionSchedule(), memoized on DEFAULT_BOARD_RADIUS.
+//
+// It exists for the graph-tier consumers that must fold movement state
+// (stateAt/shipPos) while holding a fleet list with no SystemBoard, and so no
+// per-system radius, in scope.
+//
+// THE BOUND, and it is narrow: a schedule is safe to substitute across radii
+// only for operations that consult `slotsForRing(cell.ring, …)` — projection
+// and every movement fold — because the slot count of a given ring is the same
+// under every maxRing (see `schedule` above). Two operations genuinely depend
+// on maxRing and MUST take the per-system schedule instead:
+//   - cell ENUMERATION (`ringCells`) — which rings exist at all;
+//   - rim CLAMPING (`pointToCell`) — where the outermost ring sits.
+// Reaching for this to avoid threading a radius you actually have is a bug.
+export function productionSchedule(): Schedule {
+  if (!productionScheduleMemo) productionScheduleMemo = schedule(DEFAULT_BOARD_RADIUS)
+  return productionScheduleMemo
+}
+
 // ringCells returns the cells on a ring in slot order — the fixed
 // enumeration a stored slot index refers to on both sides of the seam.
 export function ringCells(ring: number, s: Schedule): Cell[] {

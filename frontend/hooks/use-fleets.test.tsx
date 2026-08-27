@@ -23,7 +23,7 @@ const fleet: Fleet = {
   corporationId: 'corp-user1',
   systemId: 'sys-7',
   state: { mode: 'coast' },
-  position: { q: 3, r: 0 },
+  position: { ring: 3, slot: 0 },
   own: true,
   worldTime: 0,
 }
@@ -85,10 +85,10 @@ describe('useFleetOrders / useScan', () => {
     const { result } = renderHook(() => useFleetOrders('sys-7'), { wrapper: Wrapper })
 
     await act(async () => {
-      await result.current.order.mutateAsync({ fleetId: 'fleet_1', target: { hex: { q: 2, r: 0 } } })
+      await result.current.order.mutateAsync({ fleetId: 'fleet_1', target: { cell: { ring: 2, slot: 0 } } })
     })
 
-    expect(mockService.order).toHaveBeenCalledWith('fleet_1', { hex: { q: 2, r: 0 } })
+    expect(mockService.order).toHaveBeenCalledWith('fleet_1', { cell: { ring: 2, slot: 0 } })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.fleets.inSystem('sys-7') })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.systemBoard.detail('sys-7') })
   })

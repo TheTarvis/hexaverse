@@ -28,7 +28,7 @@ import type { Quote } from '@/lib/types/market'
 import { useWorldTime } from '@/hooks/use-world-time'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
-import { stateAt } from '@/lib/hex'
+import { productionSchedule, stateAt } from '@/lib/board'
 import { toast } from '@/lib/toast'
 import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 import type { Galaxy, GalaxyNode, Region } from '@/lib/types/galaxy'
@@ -51,7 +51,8 @@ import type { GalaxyGraphController } from './GalaxyGraph'
 // EFFECTIVE state (stateAt): a burn whose arrival has passed is already
 // coasting/docked — idle — even before a refetch delivers the settled doc.
 function isIdle(f: Fleet, worldTime: number): boolean {
-  const mode = stateAt(f.state, worldTime).mode
+  // Graph tier — see fleet-status.ts: the fold needs no per-system radius.
+  const mode = stateAt(f.state, worldTime, productionSchedule()).mode
   return mode === 'coast' || mode === 'docked'
 }
 
@@ -755,7 +756,7 @@ function Inspector({
         </div>
       </dl>
 
-      {/* Drill-in to the #0007 hex board (#0002 Follow-ups 2026-07-11 —
+      {/* Drill-in to the #0007 tactical board (#0002 Follow-ups 2026-07-11 —
           un-defers Decision #4). Board detail is arrival-gated (#0003/#0006);
           an unvisited system shows only its free skeleton. */}
       {onEnter && (
@@ -950,7 +951,9 @@ function FleetCard({
             route: lt.route,
             legEtas: lt.legEtas,
             totalEta: lt.arriveTime,
-            departGate: { q: 0, r: 0 },
+            // Graph tier: RouteLegs renders lane ETAs only and never draws the
+            // gate, so the core cell stands in for the unused board coordinate.
+            departGate: { ring: 0, slot: 0 },
             worldTime,
           }}
           worldTime={worldTime}

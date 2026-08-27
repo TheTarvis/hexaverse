@@ -11,22 +11,23 @@
 //
 // It also owns PICKING: a click that no overlay hit shape claimed falls
 // through to this container, unprojects to the board plane, and resolves to
-// the containing hex (inside the lattice) or clears the selection (outside) —
-// the glyph-wins-else-hex-else-clear priority, with the glyph half carried by
+// the containing cell (inside the lattice) or clears the selection (outside) —
+// the glyph-wins-else-cell-else-clear priority, with the glyph half carried by
 // the overlay's DOM hit shapes. Pointer moves the same way, driving the tile
 // hover highlight and the pointer cursor.
 
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { ringOf, type Hex } from '@/lib/hex'
-import { pixelToHex } from '@/lib/hex/pixel'
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent as ReactFocusEvent, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { pointToCell, RADIAL_UNIT, schedule as boardSchedule, type Cell } from '@/lib/board'
 import type { SystemBoard } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 import { wallClock, type WorldAnchor } from '@/hooks/use-world-time'
+import { BoardCameraControls, CAMERA_CONTROL_COUNT } from './BoardCameraControls'
 import { BoardCanvas } from './BoardCanvas'
 import { BoardOverlay, type ScanFxInput } from './BoardOverlay'
 import { createFramePacker } from './board-frame'
 import { createPackedScene, packFleetInstance } from './board-pack'
+import { CAMERA_CONTROL_ATTR, useBoardGestures, type CameraLimit } from './use-board-gestures'
 import { useBoardProjection } from './use-board-projection'
 import type { WebGLBoardSettings } from './webgl/WebGLBoard'
 import type { MovePlan } from './move-preview'
@@ -39,16 +40,19 @@ const WebGLBoard = dynamic(() => import('./webgl/WebGLBoard').then((m) => m.WebG
 })
 
 export interface BoardStageProps {
+  // The route's system. The camera resets to the default framing when it
+  // changes — a new board is a new view — and nothing else resets it.
+  systemId?: string
   board: SystemBoard
   fleets: Fleet[]
   worldTime: number
   selectedId?: string | null
   selectedGateId?: string | null
-  selectedHex?: Hex | null
+  selectedCell?: Cell | null
   onSelectFeature?: (id: string) => void
   onSelectFleet?: (id: string) => void
   onSelectGate?: (destSystemId: string) => void
-  onSelectHex?: (hex: Hex) => void
+  onSelectCell?: (cell: Cell) => void
   onSelectEmpty?: () => void
   plan?: MovePlan | null
   activeSweep?: ScanPlan | null
@@ -66,6 +70,12 @@ export interface BoardStageProps {
   tiltDeg?: number
 }
 
+const CAMERA_LIMIT_MESSAGE: Record<CameraLimit, string> = {
+  pan: 'Board camera is at the edge of the lattice.',
+  'zoom-min': 'Board camera is fully zoomed out.',
+  'zoom-max': 'Board camera is fully zoomed in.',
+}
+
 // useReducedMotion — the system reduced-motion preference, live.
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false)
@@ -80,16 +90,17 @@ function useReducedMotion(): boolean {
 }
 
 export function BoardStage({
+  systemId,
   board,
   fleets,
   worldTime,
   selectedId,
   selectedGateId,
-  selectedHex,
+  selectedCell,
   onSelectFeature,
   onSelectFleet,
   onSelectGate,
-  onSelectHex,
+  onSelectCell,
   onSelectEmpty,
   plan,
   activeSweep,
@@ -102,8 +113,31 @@ export function BoardStage({
 }: BoardStageProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState(true)
-  const [hoverHex, setHoverHex] = useState<Hex | null>(null)
-  const projection = useBoardProjection(host, board.radius, tiltDeg !== undefined ? { tiltDeg } : undefined)
+  const [hoverCell, setHoverCell] = useState<Cell | null>(null)
+  // Which clamp the last keyboard camera input ran into, or null. Rendered on
+  // the stage and announced, so a keyboard-only player learns why a press did
+  // nothing rather than being left to guess.
+  const [atLimit, setAtLimit] = useState<CameraLimit | null>(null)
+
+  // The board's slot schedule for THIS system — the picking path clamps to the
+  // rim, so it needs the per-system radius, never the process-wide default.
+  const schedule = useMemo(() => boardSchedule(board.radius), [board.radius])
+  const projection = useBoardProjection(host, board.radius, {
+    ...(tiltDeg !== undefined ? { tiltDeg } : {}),
+    ...(systemId !== undefined ? { systemId } : {}),
+  })
+
+  // Pointer drag, wheel, and two-finger pinch — bound on THIS container in the
+  // capture phase so a gesture that begins over a mark still moves the camera.
+  useBoardGestures({
+    host,
+    enabled: available,
+    radius: board.radius,
+    worldPerPixel: projection.camera.worldPerPixel,
+    camera: projection.boardCamera,
+    setCamera: projection.setCamera,
+    onAtLimit: setAtLimit,
+  })
   const reducedMotion = useReducedMotion()
 
   // The packed scene — every decision resolved once per board read (band off
@@ -147,6 +181,34 @@ export function BoardStage({
   packerRef.current = packer
   const getFrame = useCallback((wallNowMs: number) => packerRef.current(wallNowMs), [])
 
+  // Task 13.2: the camera controls live in the STAGE, outside BoardCanvas's
+  // region, so the canvas-scoped focus handling `add-renderer-availability-
+  // states` ships cannot catch focus lost from one of them. If a camera
+  // control holds focus at the moment the board goes unavailable, focus moves
+  // to the notice's retry affordance (or its explanatory text) — never left to
+  // fall to document.body.
+  const cameraHadFocus = useRef(false)
+  const wasAvailable = useRef(true)
+  useEffect(() => {
+    const was = wasAvailable.current
+    wasAvailable.current = available
+    if (!was || available || !cameraHadFocus.current || !host) return
+    cameraHadFocus.current = false
+    const retry = host.querySelector<HTMLElement>('[data-testid="renderer-retry"]')
+    const text = host.querySelector<HTMLElement>(
+      '[data-testid="renderer-unsupported"] p, [data-testid="renderer-interrupted"] p',
+    )
+    ;(retry ?? text)?.focus()
+  }, [available, host])
+
+  // Focus bookkeeping for the rescue above. Cleared only when focus lands
+  // somewhere else — never by the unmount itself, which in most engines moves
+  // focus to nothing rather than firing a focusout at a readable moment.
+  const handleFocusIn = useCallback((e: ReactFocusEvent<HTMLDivElement>) => {
+    cameraHadFocus.current =
+      e.target instanceof Element && !!e.target.closest(`[${CAMERA_CONTROL_ATTR}]`)
+  }, [])
+
   const handleAvailability = useCallback(
     (a: boolean) => {
       setAvailable(a)
@@ -155,52 +217,69 @@ export function BoardStage({
     [onAvailabilityChange],
   )
 
-  const pickHex = useCallback(
-    (e: ReactMouseEvent | ReactPointerEvent): Hex | null => {
+  const pickCell = useCallback(
+    (e: ReactMouseEvent | ReactPointerEvent): Cell | null => {
       if (!host || !projection.ready) return null
       const rect = host.getBoundingClientRect()
       const boardPt = projection.unproject({ x: e.clientX - rect.left, y: e.clientY - rect.top })
-      const hex = pixelToHex(boardPt)
-      return ringOf(hex) <= board.radius ? hex : null
+      // pointToCell CLAMPS to the rim, so a point outside the lattice comes
+      // back as a rim cell rather than as "outside". Comparing the clamped
+      // cell's projected radius against the board's own extent is what
+      // distinguishes the two — the outside-the-lattice click must still clear
+      // the selection.
+      const cell = pointToCell(boardPt, schedule)
+      if (cell.ring > board.radius) return null
+      const rimOuter = (board.radius + 0.5) * RADIAL_UNIT
+      if (Math.hypot(boardPt.x, boardPt.y) > rimOuter) return null
+      return cell
     },
-    [host, projection, board.radius],
+    [host, projection, board.radius, schedule],
   )
 
-  // Tile clicks: canvas click → unproject → pixelToHex; outside the lattice
+  // Cell clicks: canvas click → unproject → pointToCell; outside the lattice
   // clears the selection. Glyph clicks never reach here (their hit shapes
   // stop propagation).
   const handleClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
       if (!available) return
-      const hex = pickHex(e)
-      if (hex) onSelectHex?.(hex)
+      const cell = pickCell(e)
+      if (cell) onSelectCell?.(cell)
       else onSelectEmpty?.()
     },
-    [available, pickHex, onSelectHex, onSelectEmpty],
+    [available, pickCell, onSelectCell, onSelectEmpty],
   )
 
   const handlePointerMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!available) return
-      setHoverHex((prev) => {
-        const hex = pickHex(e)
-        if (prev === hex) return prev
-        if (prev && hex && prev.q === hex.q && prev.r === hex.r) return prev
-        return hex
+      setHoverCell((prev: Cell | null) => {
+        const cell = pickCell(e)
+        if (prev === cell) return prev
+        if (prev && cell && prev.ring === cell.ring && prev.slot === cell.slot) return prev
+        return cell
       })
     },
-    [available, pickHex],
+    [available, pickCell],
   )
 
   return (
     <div
       ref={setHost}
       data-testid="board-stage"
+      // The at-limit state, DOM-observable: present only when the last
+      // keyboard camera input hit a clamp, absent when it moved the camera.
+      {...(atLimit ? { 'data-camera-at-limit': atLimit } : {})}
       className="absolute inset-0"
-      style={hoverHex ? { cursor: 'pointer' } : undefined}
+      // touch-action: none suppresses the browser's own pan/pinch across the
+      // board's full interactive surface — the overlay's hit shapes included,
+      // not just the canvas the spike set it on. It is what lets the pinch
+      // handler own the gesture WITHOUT a preventDefault() on touchstart,
+      // which would also kill the synthesized click a tap selects with.
+      style={{ touchAction: 'none', ...(hoverCell ? { cursor: 'pointer' } : {}) }}
       onClick={handleClick}
+      onFocus={handleFocusIn}
       onPointerMove={handlePointerMove}
-      onPointerLeave={() => setHoverHex(null)}
+      onPointerLeave={() => setHoverCell(null)}
     >
       <BoardCanvas
         onAvailabilityChange={handleAvailability}
@@ -218,12 +297,34 @@ export function BoardStage({
           ) : null
         }
       />
+      {/* The same at-limit fact, announced. A silent clamp is indistinguishable
+          from a broken key to anyone not watching the pixels. */}
+      <span className="sr-only" role="status" aria-live="polite" data-testid="camera-limit-status">
+        {atLimit ? CAMERA_LIMIT_MESSAGE[atLimit] : ''}
+      </span>
+
       {/* The overlay renders only over a live canvas — hit shapes floating
           over a "WebGL unavailable" notice would be selectable marks with
           nothing drawn under them. */}
+      {/* Camera controls render HERE, in the stage and outside BoardCanvas's
+          region, and only while the board is live: while it is not, they are
+          gone from the tab order entirely and the gesture listeners above
+          stand down with them. */}
+      {available && (
+        <BoardCameraControls
+          camera={projection.boardCamera}
+          setCamera={projection.setCamera}
+          resetCamera={projection.resetCamera}
+        />
+      )}
       {available && (
         <BoardOverlay
+          // The camera group holds the first tab stops; the overlay's glyph
+          // tab order starts after them, leaving the port's own
+          // features → fleets → gates sequence intact.
+          tabIndexBase={CAMERA_CONTROL_COUNT}
           viewBox={projection.viewBox}
+          extent={projection.extent}
           overlayStyle={projection.overlayStyle}
           radius={board.radius}
           worldTime={worldTime}
@@ -232,8 +333,8 @@ export function BoardStage({
           gates={board.laneGates}
           selectedId={selectedId ?? null}
           selectedGateId={selectedGateId ?? null}
-          selectedHex={selectedHex ?? null}
-          hoverHex={hoverHex}
+          selectedCell={selectedCell ?? null}
+          hoverCell={hoverCell}
           {...(onSelectFeature ? { onSelectFeature } : {})}
           {...(onSelectFleet ? { onSelectFleet } : {})}
           {...(onSelectGate ? { onSelectGate } : {})}

@@ -24,38 +24,181 @@
     "pairs below claim indirect coverage through the geometry families that read it."
   ],
   "pairs": [
-    { "go": "Schedule", "ts": "schedule", "coverage": "family:distance", "note": "indirect: every case names an isotropic schedule whose recorded counts are Schedule's expansion; both unit suites additionally pin the Isotropic values" },
-    { "go": "DoubleAt", "ts": "doubleAt", "coverage": "family:distance", "note": "indirect (Schedule's pinned boundaries); unit-pinned to [2,3,5,9,17] on both sides" },
-    { "go": "Canon", "ts": "canon", "coverage": "family:distance", "note": "indirect (every family canonicalizes through it)" },
-    { "go": "Distance", "ts": "distance", "coverage": "family:distance" },
-    { "go": "neighbors", "ts": "neighbors", "coverage": "family:distance", "note": "indirect (the BFS frontier under every distance case and sweep)" },
-    { "go": "OrbState", "ts": "orbState", "coverage": "family:orbState" },
-    { "go": "OrbitThrough", "ts": "orbitThrough", "coverage": "family:orbitThrough" },
-    { "go": "HydratePeriod", "ts": "orbitPeriod", "coverage": "family:stateAt", "note": "indirect (the folded coast's period pins the orbital law); names differ across the seam" },
-    { "go": "StateAt", "ts": "stateAt", "coverage": "family:stateAt" },
-    { "go": "ShipPos", "ts": "shipPos", "coverage": "family:shipPos" },
-    { "go": "BurnPos", "ts": "burnPos", "coverage": "family:shipPos", "note": "indirect (the mid-burn shipPos cases interpolate through it — the integer round-half-up index)" },
-    { "go": "CoastAt", "ts": "coastAt", "coverage": "family:stateAt", "note": "indirect (the burn→coast fold)" },
-    { "go": "snapToCellBoundary", "ts": "snapToCellBoundary", "coverage": "family:stateAt", "note": "indirect (the settled coast's boundary snap — the fixture pins both snap directions)" },
-    { "go": "SolveCell", "ts": "solveCell", "coverage": "family:solveCell" },
-    { "go": "SolveIntercept", "ts": "solveIntercept", "coverage": "family:solveIntercept" },
-    { "go": "GateRing", "ts": "gateRing", "coverage": "family:laneGate", "note": "indirect (every gate case asserts the returned cell's ring)" },
-    { "go": "LaneGateCell", "ts": "laneGateCell", "coverage": "family:laneGate" },
-    { "go": "dot", "ts": "dot", "coverage": "family:laneGate", "note": "indirect (the argmax's float dot product — the discretized-choice seam; Go inhibits FMA with explicit conversions, JS rounds each op separately)" },
-    { "go": "LineOfSight", "ts": "lineOfSight", "coverage": "family:lineOfSight" },
-    { "go": "BeamCells", "ts": "beamCells", "coverage": "family:beam" },
-    { "go": "CellCenter", "ts": "cellCenter", "coverage": "family:lineOfSight", "note": "indirect (every visibility/beam/gate computation reads pinned centers through it; the table itself is byte-identity-asserted by both suites)" },
-    { "go": "tablePoints", "ts": "tablePoints", "coverage": "family:laneGate", "note": "indirect (the pinned-table loader — loads committed data, never recomputes)" },
-    { "go": "RingCells", "ts": "ringCells", "coverage": "inventory" },
-    { "go": "AngleOf", "ts": "angleOf", "coverage": "inventory" },
-    { "go": "LaneFraction", "ts": "laneFraction", "coverage": "inventory" },
-    { "go": "Arrived", "ts": "arrived", "coverage": "inventory" }
+    {
+      "go": "Schedule",
+      "ts": "schedule",
+      "coverage": "family:distance",
+      "note": "indirect: every case names an isotropic schedule whose recorded counts are Schedule's expansion; both unit suites additionally pin the Isotropic values"
+    },
+    {
+      "go": "DoubleAt",
+      "ts": "doubleAt",
+      "coverage": "family:distance",
+      "note": "indirect (Schedule's pinned boundaries); unit-pinned to [2,3,5,9,17] on both sides"
+    },
+    {
+      "go": "Canon",
+      "ts": "canon",
+      "coverage": "family:distance",
+      "note": "indirect (every family canonicalizes through it)"
+    },
+    {
+      "go": "Distance",
+      "ts": "distance",
+      "coverage": "family:distance"
+    },
+    {
+      "go": "neighbors",
+      "ts": "neighbors",
+      "coverage": "family:distance",
+      "note": "indirect (the BFS frontier under every distance case and sweep)"
+    },
+    {
+      "go": "OrbState",
+      "ts": "orbState",
+      "coverage": "family:orbState"
+    },
+    {
+      "go": "OrbitThrough",
+      "ts": "orbitThrough",
+      "coverage": "family:orbitThrough"
+    },
+    {
+      "go": "HydratePeriod",
+      "ts": "orbitPeriod",
+      "coverage": "family:stateAt",
+      "note": "indirect (the folded coast's period pins the orbital law); names differ across the seam"
+    },
+    {
+      "go": "StateAt",
+      "ts": "stateAt",
+      "coverage": "family:stateAt"
+    },
+    {
+      "go": "ShipPos",
+      "ts": "shipPos",
+      "coverage": "family:shipPos"
+    },
+    {
+      "go": "BurnPos",
+      "ts": "burnPos",
+      "coverage": "family:shipPos",
+      "note": "indirect (the mid-burn shipPos cases interpolate through it — the integer round-half-up index)"
+    },
+    {
+      "go": "CoastAt",
+      "ts": "coastAt",
+      "coverage": "family:stateAt",
+      "note": "indirect (the burn→coast fold)"
+    },
+    {
+      "go": "snapToCellBoundary",
+      "ts": "snapToCellBoundary",
+      "coverage": "family:stateAt",
+      "note": "indirect (the settled coast's boundary snap — the fixture pins both snap directions)"
+    },
+    {
+      "go": "SolveCell",
+      "ts": "solveCell",
+      "coverage": "family:solveCell"
+    },
+    {
+      "go": "SolveIntercept",
+      "ts": "solveIntercept",
+      "coverage": "family:solveIntercept"
+    },
+    {
+      "go": "GateRing",
+      "ts": "gateRing",
+      "coverage": "family:laneGate",
+      "note": "indirect (every gate case asserts the returned cell's ring)"
+    },
+    {
+      "go": "LaneGateCell",
+      "ts": "laneGateCell",
+      "coverage": "family:laneGate"
+    },
+    {
+      "go": "dot",
+      "ts": "dot",
+      "coverage": "family:laneGate",
+      "note": "indirect (the argmax's float dot product — the discretized-choice seam; Go inhibits FMA with explicit conversions, JS rounds each op separately)"
+    },
+    {
+      "go": "LineOfSight",
+      "ts": "lineOfSight",
+      "coverage": "family:lineOfSight"
+    },
+    {
+      "go": "BeamCells",
+      "ts": "beamCells",
+      "coverage": "family:beam"
+    },
+    {
+      "go": "CellCenter",
+      "ts": "cellCenter",
+      "coverage": "family:lineOfSight",
+      "note": "indirect (every visibility/beam/gate computation reads pinned centers through it; the table itself is byte-identity-asserted by both suites)"
+    },
+    {
+      "go": "tablePoints",
+      "ts": "tablePoints",
+      "coverage": "family:laneGate",
+      "note": "indirect (the pinned-table loader — loads committed data, never recomputes)"
+    },
+    {
+      "go": "RingCells",
+      "ts": "ringCells",
+      "coverage": "inventory"
+    },
+    {
+      "go": "AngleOf",
+      "ts": "angleOf",
+      "coverage": "inventory"
+    },
+    {
+      "go": "LaneFraction",
+      "ts": "laneFraction",
+      "coverage": "inventory"
+    },
+    {
+      "go": "Arrived",
+      "ts": "arrived",
+      "coverage": "inventory"
+    },
+    {
+      "go": "ProductionSchedule",
+      "ts": "productionSchedule",
+      "coverage": "inventory",
+      "note": "the process-wide default schedule, memoized on the default board radius; not rule-bearing on its own — it only re-derives Schedule(BoardRadius), which IS fixture-covered"
+    }
   ],
   "inventory": [
-    { "pair": "RingCells/ringCells", "ruleBearing": false, "expectedChange": "unassigned (trivial slot-order enumeration; asserted by unit tests on both sides)" },
-    { "pair": "AngleOf/angleOf", "ruleBearing": false, "expectedChange": "unassigned (canonical (ring, slot) projection; asserted by unit tests on both sides)" },
-    { "pair": "LaneFraction/laneFraction", "ruleBearing": true, "expectedChange": "the consumer-migration change (rule-bearing: lane position/fraction reads; may not survive another board-modifying change uncovered)" },
-    { "pair": "Arrived/arrived", "ruleBearing": false, "expectedChange": "unassigned (a stored-state threshold comparison; asserted by unit tests on both sides)" }
+    {
+      "pair": "RingCells/ringCells",
+      "ruleBearing": false,
+      "expectedChange": "unassigned (trivial slot-order enumeration; asserted by unit tests on both sides)"
+    },
+    {
+      "pair": "AngleOf/angleOf",
+      "ruleBearing": false,
+      "expectedChange": "unassigned (canonical (ring, slot) projection; asserted by unit tests on both sides)"
+    },
+    {
+      "pair": "LaneFraction/laneFraction",
+      "ruleBearing": true,
+      "expectedChange": "the consumer-migration change (rule-bearing: lane position/fraction reads; may not survive another board-modifying change uncovered)"
+    },
+    {
+      "pair": "Arrived/arrived",
+      "ruleBearing": false,
+      "expectedChange": "unassigned (a stored-state threshold comparison; asserted by unit tests on both sides)"
+    },
+    {
+      "pair": "ProductionSchedule/productionSchedule",
+      "ruleBearing": false,
+      "expectedChange": "unassigned (a memoization of Schedule(BoardRadius), which the distance family already pins; the memo itself carries no rule. Safe ONLY for consumers that read slotsForRing(cell.ring, ...) — projection and the movement folds. Cell enumeration (ringCells) and rim clamping (pointToCell) genuinely depend on maxRing and MUST take the per-system schedule; both mirrors say so in their doc comments)"
+    }
   ],
   "goOnly": [
     "containsCell",
@@ -65,7 +208,6 @@
     "DecodeCell",
     "EncodeTarget",
     "DecodeTarget",
-    "ProductionSchedule",
     "decodeInt"
   ],
   "tsOnly": [
@@ -75,6 +217,9 @@
     "cellToPoint",
     "pointToCell",
     "lerpPoint",
-    "fitViewBox"
+    "fitViewBox",
+    "boardExtent",
+    "cellWedge",
+    "wedgePath"
   ]
 }

@@ -1,64 +1,90 @@
 // Glyph geometry — the render-side projection that turns a body's or fleet's
 // (elements, worldTime) into a smoothly-glided SVG point (#0007: "quantize the
-// simulation, interpolate the picture"). The LOGICAL hex is lib/hex's job (the
+// simulation, interpolate the picture"). The LOGICAL cell is lib/board's job (the
 // Go-pinned golden — orbState/shipPos); this module only interpolates the picture
 // between logical cells so motion reads smooth, including the ring wrap-around.
 // Pure and presentational: no clock, no fetch.
+//
+// Every function here takes the board's `Schedule` explicitly (design.md,
+// schedule-threading Decision): it is what resolves a ring's slot count, so
+// nothing that projects or folds can be computed without it.
 
-import { boardLegBurn, orbState, shipPos, stateAt, type Hex, type MovementState, type Orbit } from '@/lib/hex'
-import type { Burn } from '@/lib/hex'
-import { hexesWithinRadius, hexToPixel, lerpPixel, type Point } from '@/lib/hex/pixel'
+import {
+  boardLegBurn,
+  cellKey,
+  cellToPoint,
+  neighbors,
+  lerpPoint,
+  orbState,
+  ringCells,
+  shipPos,
+  stateAt,
+  type Burn,
+  type Cell,
+  type MovementState,
+  type Orbit,
+  type Point,
+  type Schedule,
+} from '@/lib/board'
 import type { BoardFeature } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
+
+// The single core cell — ring 0 carries exactly one slot (the star's).
+const CORE_CELL: Cell = { ring: 0, slot: 0 }
 
 // orbitGlidePixel — a body's glided screen point at worldTime: its logical ring
 // cell (orbState) slid toward the next cell in its direction of travel, so it
 // tracks the ring continuously. Consecutive ring cells are neighbours and the
 // last wraps to the first, so the wrap-around glides straight through with no
 // special case. A huge-period ("motion off") body sits still.
-export function orbitGlidePixel(orbit: Orbit, worldTime: number): Point {
-  const steps = 6 * Math.max(orbit.ring, 0)
-  const hex = orbState(orbit, worldTime)
-  if (steps === 0 || orbit.period <= 0) return hexToPixel(hex.q, hex.r)
+export function orbitGlidePixel(orbit: Orbit, worldTime: number, s: Schedule): Point {
+  // One step is one SLOT on this ring, not a fixed six-per-ring: under the
+  // banded schedule a ring's slot count varies, so the cell-crossing cadence is
+  // period/slots(ring) rather than period/(6·ring).
+  const cell = orbState(orbit, worldTime, s)
+  const steps = orbit.ring > 0 ? ringCells(orbit.ring, s).length : 0
+  if (steps === 0 || orbit.period <= 0) return cellToPoint(cell, s)
   const oneStep = orbit.period / steps // world-ms to cross one ring cell
-  const next = orbState(orbit, worldTime + oneStep)
+  const next = orbState(orbit, worldTime + oneStep, s)
   // No advance this step (e.g. a huge-period "motion off" body) → snap to the
   // cell centre exactly, no sub-pixel drift.
-  if (next.q === hex.q && next.r === hex.r) return hexToPixel(hex.q, hex.r)
+  if (next.ring === cell.ring && next.slot === cell.slot) return cellToPoint(cell, s)
   const prog = worldTime / oneStep
   const frac = ((prog % 1) + 1) % 1
-  return lerpPixel(hex, next, frac)
+  return lerpPoint(cellToPoint(cell, s), cellToPoint(next, s), frac)
 }
 
 // burnGlidePixel — a fleet's glided screen point along its burn path: linear
 // progress by elapsed-fraction of the burn window, interpolated between adjacent
 // path cells. Clamped to the endpoints outside the window.
-export function burnGlidePixel(burn: Burn, worldTime: number): Point {
+export function burnGlidePixel(burn: Burn, worldTime: number, s: Schedule): Point {
   const n = burn.path.length
   if (n === 0) return { x: 0, y: 0 }
   if (n === 1 || worldTime <= burn.startTime || burn.arriveTime <= burn.startTime) {
-    return hexToPixel(burn.path[0].q, burn.path[0].r)
+    return cellToPoint(burn.path[0], s)
   }
-  if (worldTime >= burn.arriveTime) return hexToPixel(burn.path[n - 1].q, burn.path[n - 1].r)
+  if (worldTime >= burn.arriveTime) return cellToPoint(burn.path[n - 1], s)
   const frac = (worldTime - burn.startTime) / (burn.arriveTime - burn.startTime)
   const cont = frac * (n - 1)
   const i0 = Math.floor(cont)
   const i1 = Math.min(i0 + 1, n - 1)
-  return lerpPixel(burn.path[i0], burn.path[i1], cont - i0)
+  return lerpPoint(cellToPoint(burn.path[i0], s), cellToPoint(burn.path[i1], s), cont - i0)
 }
 
-// featureLogicalHex — a feature's integer board hex at worldTime (selection,
-// readouts, targeting). Star/fixed → centre; orbiting → orbState; parented (moon)
-// → the parent's logical hex; otherwise its stored footprint tile.
-export function featureLogicalHex(
+// featureLogicalCell — a feature's integer board cell at worldTime (selection,
+// readouts, targeting). Star/fixed → the core cell; orbiting → orbState;
+// parented (moon) → the parent's logical cell; otherwise its stored footprint
+// cell.
+export function featureLogicalCell(
   f: BoardFeature,
   worldTime: number,
-  parentHex?: Hex,
-): Hex {
-  if (f.fixed) return { q: 0, r: 0 }
-  if (f.orbit) return orbState(f.orbit, worldTime)
-  if (f.parentId && parentHex) return parentHex
-  return f.footprint[0] ?? { q: 0, r: 0 }
+  s: Schedule,
+  parentCell?: Cell,
+): Cell {
+  if (f.fixed) return CORE_CELL
+  if (f.orbit) return orbState(f.orbit, worldTime, s)
+  if (f.parentId && parentCell) return parentCell
+  return f.footprint[0] ?? CORE_CELL
 }
 
 // featureGlidePixel — a feature's glided screen point. Moons ride their parent's
@@ -66,17 +92,17 @@ export function featureLogicalHex(
 export function featureGlidePixel(
   f: BoardFeature,
   worldTime: number,
+  s: Schedule,
   parentPixel?: Point,
   moonIndex = 0,
 ): Point {
-  if (f.fixed) return hexToPixel(0, 0)
-  if (f.orbit) return orbitGlidePixel(f.orbit, worldTime)
+  if (f.fixed) return cellToPoint(CORE_CELL, s)
+  if (f.orbit) return orbitGlidePixel(f.orbit, worldTime, s)
   if (f.parentId && parentPixel) {
     const angle = (Math.PI / 3) * moonIndex
     return { x: parentPixel.x + Math.cos(angle) * 14, y: parentPixel.y + Math.sin(angle) * 14 }
   }
-  const h = f.footprint[0] ?? { q: 0, r: 0 }
-  return hexToPixel(h.q, h.r)
+  return cellToPoint(f.footprint[0] ?? CORE_CELL, s)
 }
 
 // featureMaps — every feature's glided pixel and logical hex at worldTime,
@@ -87,23 +113,24 @@ export function featureGlidePixel(
 export function featureMaps(
   features: BoardFeature[],
   worldTime: number,
-): { pixelById: Map<string, Point>; hexById: Map<string, Hex> } {
+  s: Schedule,
+): { pixelById: Map<string, Point>; cellById: Map<string, Cell> } {
   const pixelById = new Map<string, Point>()
-  const hexById = new Map<string, Hex>()
+  const cellById = new Map<string, Cell>()
   const moonIndex = new Map<string, number>()
   for (const f of features) {
     if (f.parentId) continue
-    pixelById.set(f.id, featureGlidePixel(f, worldTime))
-    hexById.set(f.id, featureLogicalHex(f, worldTime))
+    pixelById.set(f.id, featureGlidePixel(f, worldTime, s))
+    cellById.set(f.id, featureLogicalCell(f, worldTime, s))
   }
   for (const f of features) {
     if (!f.parentId) continue
     const i = moonIndex.get(f.parentId) ?? 0
     moonIndex.set(f.parentId, i + 1)
-    pixelById.set(f.id, featureGlidePixel(f, worldTime, pixelById.get(f.parentId), i))
-    hexById.set(f.id, featureLogicalHex(f, worldTime, hexById.get(f.parentId)))
+    pixelById.set(f.id, featureGlidePixel(f, worldTime, s, pixelById.get(f.parentId), i))
+    cellById.set(f.id, featureLogicalCell(f, worldTime, s, cellById.get(f.parentId)))
   }
-  return { pixelById, hexById }
+  return { pixelById, cellById }
 }
 
 // Every fleet helper below positions from the EFFECTIVE state (stateAt): a
@@ -115,29 +142,28 @@ export function featureMaps(
 // fleetDockedParentId — the feature a fleet rides at worldTime, if any: its
 // stored dock, or the dock a finished dock-on-arrive burn has settled into.
 // Components resolve parent hex/pixel through this, never from raw state.
-export function fleetDockedParentId(fleet: Fleet, worldTime: number): string | undefined {
-  const s = stateAt(fleet.state, worldTime)
-  return s.mode === 'docked' ? s.docked?.parentId : undefined
+export function fleetDockedParentId(fleet: Fleet, worldTime: number, s: Schedule): string | undefined {
+  const eff = stateAt(fleet.state, worldTime, s)
+  return eff.mode === 'docked' ? eff.docked?.parentId : undefined
 }
 
-// fleetLogicalHex — a fleet's integer board hex at worldTime. Docked rides the
-// resolved parent hex; coast/burn come from shipPos (the golden).
-export function fleetLogicalHex(fleet: Fleet, worldTime: number, parentHex?: Hex): Hex {
-  const s = stateAt(fleet.state, worldTime)
-  if (s.mode === 'docked') return parentHex ?? fleet.position
-  const { hex } = shipPos(s, worldTime)
-  return hex
+// fleetLogicalCell — a fleet's integer board cell at worldTime. Docked rides the
+// resolved parent cell; coast/burn come from shipPos (the golden).
+export function fleetLogicalCell(fleet: Fleet, worldTime: number, s: Schedule, parentCell?: Cell): Cell {
+  const eff = stateAt(fleet.state, worldTime, s)
+  if (eff.mode === 'docked') return parentCell ?? fleet.position
+  return shipPos(eff, worldTime, s).cell
 }
 
-// fleetOnBoard reports whether a fleet has a hex on THIS system's board at
+// fleetOnBoard reports whether a fleet has a cell on THIS system's board at
 // worldTime — false once a trip passes its departure gate (it's out on a lane
 // now, the galaxy view's to draw). Callers must check it before positioning a
-// fleet: shipPos's off-board answer is (0,0), which would otherwise plant the
-// ship on the star.
-export function fleetOnBoard(fleet: Fleet, worldTime: number): boolean {
-  const s = stateAt(fleet.state, worldTime)
-  if (s.mode === 'docked') return true
-  return shipPos(s, worldTime).ok
+// fleet: shipPos's off-board answer is the core cell, which would otherwise
+// plant the ship on the star.
+export function fleetOnBoard(fleet: Fleet, worldTime: number, s: Schedule): boolean {
+  const eff = stateAt(fleet.state, worldTime, s)
+  if (eff.mode === 'docked') return true
+  return shipPos(eff, worldTime, s).ok
 }
 
 // fleetGlidePixel — a fleet's glided screen point. Coast glides on its orbit,
@@ -149,18 +175,18 @@ export function fleetOnBoard(fleet: Fleet, worldTime: number): boolean {
 export function fleetGlidePixel(
   fleet: Fleet,
   worldTime: number,
+  s: Schedule,
   parentPixel?: Point,
 ): Point {
-  const s: MovementState = stateAt(fleet.state, worldTime)
-  if (s.mode === 'docked') return parentPixel ?? hexToPixel(fleet.position.q, fleet.position.r)
-  if (s.mode === 'burn' && s.burn) return burnGlidePixel(s.burn, worldTime)
-  if (s.mode === 'coast' && s.coast) return orbitGlidePixel(s.coast, worldTime)
-  if (s.mode === 'laneTransit' && s.laneTransit) {
-    const leg = boardLegBurn(s.laneTransit)
-    if (leg) return burnGlidePixel(leg, worldTime)
+  const eff: MovementState = stateAt(fleet.state, worldTime, s)
+  if (eff.mode === 'docked') return parentPixel ?? cellToPoint(fleet.position, s)
+  if (eff.mode === 'burn' && eff.burn) return burnGlidePixel(eff.burn, worldTime, s)
+  if (eff.mode === 'coast' && eff.coast) return orbitGlidePixel(eff.coast, worldTime, s)
+  if (eff.mode === 'laneTransit' && eff.laneTransit) {
+    const leg = boardLegBurn(eff.laneTransit)
+    if (leg) return burnGlidePixel(leg, worldTime, s)
   }
-  const { hex } = shipPos(s, worldTime)
-  return hexToPixel(hex.q, hex.r)
+  return cellToPoint(shipPos(eff, worldTime, s).cell, s)
 }
 
 // fleetScenePixel — a fleet's glided screen point resolved against the full
@@ -169,40 +195,74 @@ export function fleetGlidePixel(
 // pivot exactly where the glyph draws. A moon parent rides ITS parent with the
 // same sibling offset BoardScene assigns (moon index = position among the
 // parent's children).
-export function fleetScenePixel(fleet: Fleet, features: BoardFeature[], worldTime: number): Point {
-  const parentId = fleetDockedParentId(fleet, worldTime)
+export function fleetScenePixel(
+  fleet: Fleet,
+  features: BoardFeature[],
+  worldTime: number,
+  s: Schedule,
+): Point {
+  const parentId = fleetDockedParentId(fleet, worldTime, s)
   const parent = parentId ? features.find((f) => f.id === parentId) : undefined
   let parentPixel: Point | undefined
   if (parent) {
     if (parent.parentId) {
       const grand = features.find((f) => f.id === parent.parentId)
-      const grandPixel = grand ? featureGlidePixel(grand, worldTime) : undefined
+      const grandPixel = grand ? featureGlidePixel(grand, worldTime, s) : undefined
       const moonIndex = features
         .filter((f) => f.parentId === parent.parentId)
         .findIndex((f) => f.id === parent.id)
-      parentPixel = featureGlidePixel(parent, worldTime, grandPixel, Math.max(moonIndex, 0))
+      parentPixel = featureGlidePixel(parent, worldTime, s, grandPixel, Math.max(moonIndex, 0))
     } else {
-      parentPixel = featureGlidePixel(parent, worldTime)
+      parentPixel = featureGlidePixel(parent, worldTime, s)
     }
   }
-  return fleetGlidePixel(fleet, worldTime, parentPixel)
+  return fleetGlidePixel(fleet, worldTime, s, parentPixel)
 }
 
-// sensorBubbleHexes — the deduped union of every hex within `radius` of any
-// centre: the live ambient-sensor footprint the board draws around own units
-// (#0006 AmbientRadius). Centres are the units' current logical hexes.
-export function sensorBubbleHexes(centers: Hex[], radius: number): Hex[] {
-  const disc = hexesWithinRadius(radius)
+// sensorBubbleCells — the deduped union of every cell within `radius` hops of
+// any centre: the live ambient-sensor footprint the board draws around own
+// units (#0006 AmbientRadius).
+//
+// On the hex lattice this was a translation — one precomputed disc offset to
+// each centre. A polar lattice admits no such translation (cells cannot be
+// added), so this is a bounded multi-source BFS: the `Within` form, matching
+// Go's board.Within.
+//
+// It must NOT be written as "scan the board, keep cells with distance <= r":
+// `distance` is itself an unbounded BFS with per-call Set and string-key
+// allocation, so that shape costs a full lattice traversal per cell per centre,
+// every frame. This runs in the size of the RESULT instead — a radius-3 disc is
+// a few dozen cells no matter how big the board is.
+export function sensorBubbleCells(
+  centers: Cell[],
+  radius: number,
+  maxRing: number,
+  s: Schedule,
+): Cell[] {
   const seen = new Set<string>()
-  const out: Hex[] = []
+  const out: Cell[] = []
+  let frontier: Cell[] = []
   for (const c of centers) {
-    for (const d of disc) {
-      const h = { q: c.q + d.q, r: c.r + d.r }
-      const key = `${h.q},${h.r}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      out.push(h)
+    if (c.ring > maxRing) continue
+    const k = cellKey(c)
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(c)
+    frontier.push(c)
+  }
+  for (let step = 0; step < radius; step++) {
+    const next: Cell[] = []
+    for (const c of frontier) {
+      for (const nb of neighbors(c, s)) {
+        if (nb.ring > maxRing) continue
+        const k = cellKey(nb)
+        if (seen.has(k)) continue
+        seen.add(k)
+        out.push(nb)
+        next.push(nb)
+      }
     }
+    frontier = next
   }
   return out
 }

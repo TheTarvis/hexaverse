@@ -11,7 +11,7 @@
 // cleanly when the clock does; rendering lives in ScanPing. The
 // rotating-beam flavor lives separately in arc-scan.ts / ArcScan.
 //
-import { distance, hexKey, type Hex } from '@/lib/hex'
+import { cellKey, distance, type Cell, type Schedule } from '@/lib/board'
 
 // PING_TUNING — the ping's theater-only dials, tuning.go-style. The real
 // pacing — when each body's echo lands — is GameTuning.ScanDuration
@@ -21,14 +21,14 @@ import { distance, hexKey, type Hex } from '@/lib/hex'
 export const PING_TUNING = {
   // How many hexes the front travels past a body before its echo-return
   // blip has fully faded.
-  returnFadeHexes: 3,
+  returnFadeCells: 3,
 }
 
-// echoFrontHexes — how far (in hexes, continuous) the returned-echo front has
+// echoFrontCells — how far (in cells, continuous) the returned-echo front has
 // travelled from the emission hex at worldTime. ScanDuration is the rim
 // round-trip (backend observation.echoDisc mirrors this exactly), so the
 // front is at rimRing × elapsed/duration, clamped to the board.
-export function echoFrontHexes(
+export function echoFrontCells(
   committedAt: number,
   eta: number,
   worldTime: number,
@@ -41,9 +41,9 @@ export function echoFrontHexes(
 }
 
 export interface EchoReturn {
-  hex: Hex
+  cell: Cell
   // 1 the instant the front hits the body, fading linearly to 0 as the front
-  // moves returnFadeHexes past it.
+  // moves returnFadeCells past it.
   strength: number
 }
 
@@ -52,19 +52,20 @@ export interface EchoReturn {
 // returns — the signal never reached it). The emission cell itself never
 // flashes.
 export function echoReturns(
-  origin: Hex,
-  targets: Hex[],
-  frontHexes: number,
+  origin: Cell,
+  targets: Cell[],
+  frontCells: number,
   shadowed: Set<string>,
+  s: Schedule,
 ): EchoReturn[] {
   const out: EchoReturn[] = []
   for (const h of targets) {
-    if (shadowed.has(hexKey(h))) continue
-    const d = distance(origin, h)
+    if (shadowed.has(cellKey(h))) continue
+    const d = distance(origin, h, s)
     if (d === 0) continue
-    const past = frontHexes - d
-    if (past < 0 || past >= PING_TUNING.returnFadeHexes) continue
-    out.push({ hex: h, strength: 1 - past / PING_TUNING.returnFadeHexes })
+    const past = frontCells - d
+    if (past < 0 || past >= PING_TUNING.returnFadeCells) continue
+    out.push({ cell: h, strength: 1 - past / PING_TUNING.returnFadeCells })
   }
   return out
 }

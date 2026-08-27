@@ -5,8 +5,15 @@
 // a future scan variant (arc-scan as its own verb, or the deferred
 // directional cone's picture). Pure math; rendering lives in ArcScan.
 
-import { distance, hexKey, type Hex } from '@/lib/hex'
-import { hexesWithinRadius, hexToPixel, type Point } from '@/lib/hex/pixel'
+import {
+  cellKey,
+  cellToPoint,
+  distance,
+  ringCells,
+  type Cell,
+  type Point,
+  type Schedule,
+} from '@/lib/board'
 
 // ARC_TUNING — the arc's theater-only dials, tuning.go-style.
 export const ARC_TUNING = {
@@ -16,7 +23,7 @@ export const ARC_TUNING = {
   // window are still lit, fading linearly to nothing at its trailing edge.
   trailDeg: 100,
   // The leading blade: the narrow filled wedge just behind the beam head that
-  // bridges the hex-granular trail into a continuous sweep, in degrees.
+  // bridges the cell-granular trail into a continuous sweep, in degrees.
   bladeDeg: 22,
 }
 
@@ -38,38 +45,42 @@ export function angularLagDeg(headingDeg: number, angleDeg: number): number {
 }
 
 export interface TrailCell {
-  hex: Hex
+  cell: Cell
   // 1 at the beam head, fading linearly to 0 at the window's trailing edge.
   glow: number
 }
 
-// sweepTrail — the cells currently glowing in the beam's wake: every hex
+// sweepTrail — the cells currently glowing in the beam's wake: every cell
 // within reach whose bearing from the antenna lags the head by less than the
 // trail window. Shadowed cells (no line of sight — scan-preview's planSweep)
 // never light. `originPx` is the drawn pivot (a gliding fleet's screen point)
-// so the trail's bearings match the beam exactly; it defaults to the hex
+// so the trail's bearings match the beam exactly; it defaults to the cell
 // centre.
 export function sweepTrail(
-  origin: Hex,
+  origin: Cell,
   rimRing: number,
   headingDeg: number,
   shadowed: Set<string>,
-  reachHexes: number = Infinity,
-  originPx: Point = hexToPixel(origin.q, origin.r),
+  s: Schedule,
+  reachCells: number = Infinity,
+  originPx?: Point,
 ): TrailCell[] {
+  const pivot = originPx ?? cellToPoint(origin, s)
   const out: TrailCell[] = []
-  for (const h of hexesWithinRadius(rimRing)) {
-    if (shadowed.has(hexKey(h))) continue
-    if (distance(origin, h) > reachHexes) continue
-    const c = hexToPixel(h.q, h.r)
-    const dx = c.x - originPx.x
-    const dy = c.y - originPx.y
-    // The cell under the antenna has no bearing.
-    if (dx === 0 && dy === 0) continue
-    const angle = (Math.atan2(dy, dx) * 180) / Math.PI
-    const lag = angularLagDeg(headingDeg, angle)
-    if (lag >= ARC_TUNING.trailDeg) continue
-    out.push({ hex: h, glow: 1 - lag / ARC_TUNING.trailDeg })
+  for (let ring = 0; ring <= rimRing; ring++) {
+    for (const cell of ringCells(ring, s)) {
+      if (shadowed.has(cellKey(cell))) continue
+      if (distance(origin, cell, s) > reachCells) continue
+      const c = cellToPoint(cell, s)
+      const dx = c.x - pivot.x
+      const dy = c.y - pivot.y
+      // The cell under the antenna has no bearing.
+      if (dx === 0 && dy === 0) continue
+      const angle = (Math.atan2(dy, dx) * 180) / Math.PI
+      const lag = angularLagDeg(headingDeg, angle)
+      if (lag >= ARC_TUNING.trailDeg) continue
+      out.push({ cell, glow: 1 - lag / ARC_TUNING.trailDeg })
+    }
   }
   return out
 }

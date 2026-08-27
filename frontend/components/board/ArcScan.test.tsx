@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { ArcScan } from './ArcScan'
-import { hexToPixel } from '@/lib/hex/pixel'
+import { cellToPoint } from '@/lib/board'
 import type { BoardFeature } from '@/lib/types/system-board'
+import { productionSchedule } from '@/lib/board'
+
+const S = productionSchedule()
 
 // SVG leaves render inside an <svg> root.
 function renderInSvg(ui: React.ReactElement) {
@@ -13,16 +16,16 @@ const star: BoardFeature = {
   id: 'f-star',
   type: 'star',
   fixed: true,
-  footprint: [{ q: 0, r: 0 }],
+  footprint: [{ ring: 0, slot: 0 }],
   band: 'visible',
   live: true,
 }
 
 function arcAt(worldTime: number, features: BoardFeature[] = []) {
   return renderInSvg(
-    <ArcScan
-      originHex={{ q: -2, r: 0 }}
-      originPixel={hexToPixel(-2, 0)}
+    <ArcScan schedule={S}
+      originCell={{ ring: 2, slot: 0 }}
+      originPixel={cellToPoint({ ring: 2, slot: 0 }, S)}
       features={features}
       rimRing={3}
       committedAt={0}
@@ -38,7 +41,7 @@ describe('ArcScan', () => {
     const g = container.querySelector('[data-testid="arc-scan"]')!
     expect(g).toBeTruthy()
     expect(g.querySelector('[data-testid="arc-scan-beam"]')).toBeTruthy()
-    expect(g.querySelectorAll('[data-testid="arc-scan-trail"] polygon').length).toBeGreaterThan(0)
+    expect(g.querySelectorAll('[data-testid="arc-scan-trail"] path').length).toBeGreaterThan(0)
   })
 
   it('turns with worldTime — the beam head moves between frames', () => {
@@ -52,15 +55,18 @@ describe('ArcScan', () => {
   })
 
   it('keeps occluded cells dark — a star between antenna and rim shrinks the trail', () => {
-    const open = arcAt(30_000)
+    // The beam turns twice over the 30s window, so t=7500 puts the head at
+    // 180° — pointing straight across the core, which is the only heading at
+    // which the star's shadow is inside the trail window at all.
+    const open = arcAt(7_500)
     const openCount = open.container.querySelectorAll(
-      '[data-testid="arc-scan-trail"] polygon',
+      '[data-testid="arc-scan-trail"] path',
     ).length
     open.unmount()
 
-    const occluded = arcAt(30_000, [star])
+    const occluded = arcAt(7_500, [star])
     const occludedCount = occluded.container.querySelectorAll(
-      '[data-testid="arc-scan-trail"] polygon',
+      '[data-testid="arc-scan-trail"] path',
     ).length
     expect(occludedCount).toBeLessThan(openCount)
   })

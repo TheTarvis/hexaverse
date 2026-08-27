@@ -11,7 +11,7 @@ import {
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
 import type { Fleet, MineCommit, MineRequest, RoutePreview } from '@/lib/types/fleet'
-import type { Target } from '@/lib/hex'
+import type { Target } from '@/lib/board'
 
 // useFleetsInSystem — the fogged fleet layer for one system (#0004/#0007), the
 // query backing the board's fleet glyphs. Own units always; foreign fleets only

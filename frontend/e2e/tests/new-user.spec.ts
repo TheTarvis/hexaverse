@@ -6,7 +6,7 @@ import { emulatorSignIn } from '../helpers/firebase-emulator'
  * New-user first activities (specs #0009 spawn, #0006 fog, #0007 board) — the
  * common "wake up and take your first steps" path:
  *
- *   sign up → name your lineage → wake DIRECTLY onto your home system's hex
+ *   sign up → name your lineage → wake DIRECTLY onto your home system's
  *   board, with your hull on station → and only home's lanes are charted.
  *
  * Spawn drops the player straight onto the #0007 board (the board is where you
@@ -47,12 +47,12 @@ test.describe('new user first activities', () => {
     await page.getByTestId('wake-name-input').fill('E2E Newcomer')
     await page.getByTestId('wake-submit').click()
 
-    // 3. Land DIRECTLY on the home system's hex board (#0009 → #0007) — no galaxy
+    // 3. Land DIRECTLY on the home system's board (#0009 → #0007) — no galaxy
     //    stop. Read home from the URL we land on (spawn is per-account random).
     await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 20_000 })
     const homeId = new URL(page.url()).pathname.split('/').pop()!
     await expect(page.getByTestId('system-board-view')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('hex-board')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('board-overlay')).toBeVisible({ timeout: 15_000 })
 
     // 4. The hull is on station in home (the "no fleet" fix): a fleet glyph draws.
     await expect(

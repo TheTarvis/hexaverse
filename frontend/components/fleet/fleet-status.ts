@@ -8,7 +8,7 @@
 // docked fleet's movement slot, and "Docked" would be a lie while extractors
 // run, so the caller may pass the fleet's running mine in.
 
-import { stateAt } from '@/lib/hex'
+import { productionSchedule, stateAt } from '@/lib/board'
 import type { Fleet } from '@/lib/types/fleet'
 import type { GameAction } from '@/lib/types/action'
 
@@ -42,7 +42,10 @@ export function fleetStatus(
   // Read the EFFECTIVE state (stateAt): a burn whose arrival has passed IS
   // docked/coasting, so an arrived fleet never reads "Under way" with a negative
   // countdown while it waits for the next refetch.
-  const s = stateAt(fleet.state, worldTime)
+  // Graph tier: no SystemBoard, so no per-system radius. stateAt only folds
+  // movement state — it never enumerates cells or clamps to the rim — so the
+  // process-wide schedule is exact (design.md, schedule-threading Decision).
+  const s = stateAt(fleet.state, worldTime, productionSchedule())
   const here = nameOf(fleet.systemId)
 
   // A running mine drives the label only while its eta is ahead by WORLD TIME —

@@ -17,28 +17,36 @@
 // (the eta-frozen shadow hatching) stays ScanOverlay's job. The
 // rotating-beam flavor is ArcScan — a separate, currently unwired effect.
 
-import { useId } from 'react'
-import type { Hex } from '@/lib/hex'
-import { hexKey } from '@/lib/hex'
-import { hexToPixel, HEX_SIZE, type Point } from '@/lib/hex/pixel'
+import { useId, useMemo } from 'react'
+import {
+  cellKey,
+  cellToPoint,
+  RADIAL_UNIT,
+  type Cell,
+  type Point,
+  type Schedule,
+} from '@/lib/board'
 import type { BoardFeature } from '@/lib/types/system-board'
-import { featureLogicalHex } from './glyph-geometry'
-import { planSweep } from './scan-preview'
-import { echoFrontHexes, echoReturns } from './scan-ping'
+import { featureLogicalCell } from './glyph-geometry'
+import { occluderKey, planSweepFrom, sweepOccluders } from './scan-preview'
+import { echoFrontCells, echoReturns } from './scan-ping'
 import { SCAN_ECHO_RETURN, SCAN_PING_PULSE, SCAN_SWEEP_BEAM } from './board-palette'
 
-// Pixel distance of one hex of range: the centre spacing between adjacent
-// columns (pointy-top layout) — the pulse ring's unit.
-const HEX_RANGE_PX = Math.sqrt(3) * HEX_SIZE
+// Pixel distance of one cell of range: on the polar lattice range is measured
+// in rings, and adjacent rings are one radial unit apart — the pulse ring's
+// unit.
+const CELL_RANGE_PX = RADIAL_UNIT
 
 export interface ScanPingProps {
-  // The emission point: the hex the pulse was fired from, PINNED at commit
-  // (#0006 Decision #26) — occlusion + distance math off the hex, drawing off
+  // The emission point: the cell the pulse was fired from, PINNED at commit
+  // (#0006 Decision #26) — occlusion + distance math off the cell, drawing off
   // the point. It does NOT ride the fleet.
-  originHex: Hex
+  originCell: Cell
   originPixel: Point
   features: BoardFeature[]
   rimRing: number
+  // The board's slot schedule — what projects cells and resolves distances.
+  schedule: Schedule
   // The scan's frozen window (#0005): the echoes land between these instants.
   committedAt: number
   eta: number
@@ -46,28 +54,39 @@ export interface ScanPingProps {
 }
 
 export function ScanPing({
-  originHex,
+  originCell,
   originPixel,
   features,
   rimRing,
+  schedule,
   committedAt,
   eta,
   worldTime,
 }: ScanPingProps) {
   const clipId = useId()
-  const front = echoFrontHexes(committedAt, eta, worldTime, rimRing)
-  const frontPx = front * HEX_RANGE_PX
+  const front = echoFrontCells(committedAt, eta, worldTime, rimRing)
+  const frontPx = front * CELL_RANGE_PX
   const frontT = rimRing > 0 ? front / rimRing : 1
-  const shadowed = new Set(planSweep(originHex, features, rimRing, worldTime).shadowed.map(hexKey))
+  // See ArcScan: memoized on the occluder set, not on worldTime, so the
+  // per-frame pulse does not re-solve an unchanged shadow.
+  const occluders = sweepOccluders(features, worldTime, schedule)
+  const key = occluderKey(originCell, occluders)
+  const shadowed = useMemo(
+    () => new Set(planSweepFrom(originCell, occluders, rimRing, schedule).shadowed.map(cellKey)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key, rimRing, schedule],
+  )
   const returns = echoReturns(
-    originHex,
-    features.map((f) => featureLogicalHex(f, worldTime)),
+    originCell,
+    features.map((f) => featureLogicalCell(f, worldTime, schedule)),
     front,
     shadowed,
+    schedule,
   )
 
-  // The board disc's outer edge — nothing draws past the rim.
-  const clipR = HEX_SIZE * (Math.sqrt(3) * rimRing + 1)
+  // The board disc's outer edge — the rim ring's outer radius; nothing draws
+  // past it.
+  const clipR = (rimRing + 0.5) * RADIAL_UNIT
 
   return (
     <g data-testid="scan-ping" pointerEvents="none">
@@ -76,7 +95,7 @@ export function ScanPing({
       </clipPath>
       <g clipPath={`url(#${clipId})`}>
         {/* THE pulse: one ring at the returned-echo front, pinned at the
-            emission hex — bright at the muzzle, thinning as it nears the rim
+            emission cell — bright at the muzzle, thinning as it nears the rim
             (far returns read as "still inbound"). */}
         <circle
           data-testid="scan-ping-pulse"
@@ -91,16 +110,16 @@ export function ScanPing({
         {/* The returns — the show: each body blips the instant its echo
             arrives, a bright bloom that dissipates outward as a ring. */}
         <g data-testid="scan-echo-returns">
-          {returns.map(({ hex, strength }) => {
-            const c = hexToPixel(hex.q, hex.r)
+          {returns.map(({ cell, strength }) => {
+            const c = cellToPoint(cell, schedule)
             const x = c.x.toFixed(2)
             const y = c.y.toFixed(2)
             return (
-              <g key={`r-${hex.q},${hex.r}`}>
+              <g key={`r-${cellKey(cell)}`}>
                 <circle
                   cx={x}
                   cy={y}
-                  r={HEX_SIZE * 0.3}
+                  r={RADIAL_UNIT * 0.3}
                   fill={SCAN_ECHO_RETURN}
                   stroke="none"
                   opacity={strength * strength}
@@ -108,7 +127,7 @@ export function ScanPing({
                 <circle
                   cx={x}
                   cy={y}
-                  r={HEX_SIZE * (0.4 + 0.6 * (1 - strength))}
+                  r={RADIAL_UNIT * (0.4 + 0.6 * (1 - strength))}
                   fill="none"
                   stroke={SCAN_ECHO_RETURN}
                   strokeWidth={1.5}
@@ -125,7 +144,7 @@ export function ScanPing({
       <circle
         cx={originPixel.x.toFixed(2)}
         cy={originPixel.y.toFixed(2)}
-        r={HEX_SIZE * 0.35}
+        r={RADIAL_UNIT * 0.35}
         fill="none"
         stroke={SCAN_SWEEP_BEAM}
         strokeWidth={1}

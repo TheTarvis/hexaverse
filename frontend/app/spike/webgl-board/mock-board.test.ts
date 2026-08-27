@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ringHexes, ringOf } from '@/lib/hex'
-import { axialDistance, buildMockSystemBoard } from './mock-board'
+import { buildMockSystemBoard, DEMO_SENSOR_RINGS, ringDistance } from './mock-board'
 
 describe('buildMockSystemBoard', () => {
   it('is deterministic for a seed', () => {
@@ -25,8 +24,7 @@ describe('buildMockSystemBoard', () => {
     let checked = 0
     for (const f of board.features) {
       if (!f.orbit) continue
-      const hex = ringHexes(f.orbit.ring)[f.orbit.angle0]!
-      if (axialDistance(hex, home) <= 4) {
+      if (ringDistance({ ring: f.orbit.ring, slot: f.orbit.angle0 }, home) <= DEMO_SENSOR_RINGS) {
         expect(f.band).toBe('visible')
         checked++
       }
@@ -68,21 +66,25 @@ describe('buildMockSystemBoard', () => {
   })
 })
 
-describe('axialDistance', () => {
-  it('agrees with lib/hex ringOf when measured from the centre', () => {
-    for (const h of [
-      { q: 0, r: 0 },
-      { q: 3, r: -1 },
-      { q: -2, r: 5 },
-      { q: 4, r: 4 },
+describe('ringDistance', () => {
+  it('is a cell\'s ring index when measured from the core', () => {
+    for (const c of [
+      { ring: 0, slot: 0 },
+      { ring: 3, slot: 1 },
+      { ring: 5, slot: 11 },
+      { ring: 8, slot: 0 },
     ]) {
-      expect(axialDistance(h, { q: 0, r: 0 })).toBe(ringOf(h))
+      expect(ringDistance(c, { ring: 0, slot: 0 })).toBe(c.ring)
     }
   })
 
   it('is symmetric', () => {
-    const a = { q: 2, r: -3 }
-    const b = { q: -1, r: 4 }
-    expect(axialDistance(a, b)).toBe(axialDistance(b, a))
+    const a = { ring: 2, slot: 3 }
+    const b = { ring: 7, slot: 1 }
+    expect(ringDistance(a, b)).toBe(ringDistance(b, a))
+  })
+
+  it('ignores the slot — it measures radial separation only', () => {
+    expect(ringDistance({ ring: 4, slot: 0 }, { ring: 4, slot: 9 })).toBe(0)
   })
 })

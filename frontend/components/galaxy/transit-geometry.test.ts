@@ -15,7 +15,7 @@ const fleet = (state: Fleet['state']): Fleet => ({
   corporationId: 'corp-1',
   systemId: 'a',
   state,
-  position: { q: 0, r: 0 },
+  position: { ring: 0, slot: 0 },
   own: true,
   worldTime: 0,
 })
@@ -24,12 +24,12 @@ const fleet = (state: Fleet['state']): Fleet => ({
 const twoHop = fleet({
   mode: 'laneTransit',
   laneTransit: {
-    boardLeg: { path: [{ q: 0, r: 0 }], startTime: 0, gateEta: 100 },
+    boardLeg: { path: [{ ring: 0, slot: 0 }], startTime: 0, gateEta: 100 },
     route: ['a', 'b', 'c'],
     legEtas: [100, 1100, 2100],
     departTime: 0,
     arriveTime: 2100,
-    entryGate: { q: -3, r: 0 },
+    entryGate: { ring: 3, slot: 0 },
   },
 })
 
@@ -72,7 +72,7 @@ describe('transitPoint', () => {
         legEtas: [0, 1000],
         departTime: 0,
         arriveTime: 1000,
-        entryGate: { q: 0, r: 0 },
+        entryGate: { ring: 0, slot: 0 },
       },
     })
     expect(transitPoint(offGalaxy, 500, nodes)).toBeNull()

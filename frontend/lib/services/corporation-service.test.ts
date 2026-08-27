@@ -49,7 +49,7 @@ describe('corporationService', () => {
         corporationId: 'corp_1',
         systemId: 'sys-9',
         state: { mode: 'coast', coast: { ring: 15, angle0: 0, period: 1 << 30, dir: 1 } },
-        position: { q: 15, r: 0 },
+        position: { ring: 15, slot: 0 },
         own: true,
         worldTime: 1000,
       },

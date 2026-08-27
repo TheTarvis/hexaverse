@@ -10,7 +10,7 @@
 // (raw hex is intentional in this module; see above.)
 
 import type { FeatureType, FogBand } from '@/lib/types/system-board'
-import type { Mode } from '@/lib/hex'
+import type { Mode } from '@/lib/board'
 
 // The four ring bands of a system interior (backend: system.Band).
 export type Band = 'core' | 'inner' | 'mid' | 'outer'

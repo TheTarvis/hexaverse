@@ -4,7 +4,7 @@
 // (#0006): a scan's params carry the frozen origin system and aim target, so
 // the board can draw the committed beam until the eta passes.
 
-import type { Hex } from '@/lib/hex'
+import type { Cell, Target } from '@/lib/board'
 
 export type ActionStatus = 'running' | 'done' | 'cancelled'
 
@@ -14,12 +14,16 @@ export interface GameAction {
   actor: string
   scope: string
   // Params are frozen at commit, per type. A scan pins {systemId, origin} —
-  // origin is the EMISSION HEX the pulse grows from and the resolve mints
+  // origin is the EMISSION CELL the pulse grows from and the resolve mints
   // from (#0006 Decision #26); it does not ride the fleet.
+  //
+  // `target` is a burn's `board.Target` ({cell} | {featureId}), NOT a bare
+  // coordinate — it was mistyped as a coordinate before the polar migration
+  // (fleet/service.go:331 has always put a Target here).
   params?: {
     systemId?: string
-    origin?: Hex
-    target?: Hex
+    origin?: Cell
+    target?: Target
   } & Record<string, unknown>
   committedAt: number
   eta: number

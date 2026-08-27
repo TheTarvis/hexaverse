@@ -9,12 +9,17 @@
 // function of the window and worldTime (arc-scan.ts holds the math and the
 // ARC_TUNING knobs), the pivot glides with the glyph, occlusion is live.
 
-import { useId } from 'react'
-import type { Hex } from '@/lib/hex'
-import { hexKey } from '@/lib/hex'
-import { hexPolygonPoints, hexToPixel, HEX_SIZE, type Point } from '@/lib/hex/pixel'
+import { useId, useMemo } from 'react'
+import {
+  cellKey,
+  RADIAL_UNIT,
+  wedgePath,
+  type Cell,
+  type Point,
+  type Schedule,
+} from '@/lib/board'
 import type { BoardFeature } from '@/lib/types/system-board'
-import { planSweep } from './scan-preview'
+import { occluderKey, planSweepFrom, sweepOccluders } from './scan-preview'
 import { sweepHeadingDeg, sweepTrail, ARC_TUNING } from './arc-scan'
 import {
   SCAN_SWEEP_BEAM,
@@ -24,44 +29,57 @@ import {
   sweepGlowStroke,
 } from './board-palette'
 
-// Pixel distance of one hex of range (pointy-top column spacing).
-const HEX_RANGE_PX = Math.sqrt(3) * HEX_SIZE
+// Pixel distance of one cell of range: on the polar lattice, range is measured
+// in rings, and adjacent rings are one radial unit apart.
+const CELL_RANGE_PX = RADIAL_UNIT
 
 export interface ArcScanProps {
-  // The antenna: live logical hex (occlusion + trail math) and glided screen
+  // The antenna: live logical cell (occlusion + trail math) and glided screen
   // point (drawing).
-  originHex: Hex
+  originCell: Cell
   originPixel: Point
   features: BoardFeature[]
   rimRing: number
+  // The board's slot schedule — what resolves each cell's wedge and bearing.
+  schedule: Schedule
   // The window the beam turns ARC_TUNING.revolutionsPerScan times over.
   committedAt: number
   eta: number
   worldTime: number
-  // Optional reach clamp, in hexes (e.g. a ping front the beam must not
+  // Optional reach clamp, in cells (e.g. a ping front the beam must not
   // outrun). Defaults to the full board.
-  reachHexes?: number
+  reachCells?: number
 }
 
 export function ArcScan({
-  originHex,
+  originCell,
   originPixel,
   features,
   rimRing,
+  schedule,
   committedAt,
   eta,
   worldTime,
-  reachHexes,
+  reachCells,
 }: ArcScanProps) {
   const clipId = useId()
-  const reach = reachHexes ?? rimRing
-  const reachPx = reach * HEX_RANGE_PX
+  const reach = reachCells ?? rimRing
+  const reachPx = reach * CELL_RANGE_PX
   const heading = sweepHeadingDeg(committedAt, eta, worldTime)
-  const shadowed = new Set(planSweep(originHex, features, rimRing, worldTime).shadowed.map(hexKey))
-  const trail = sweepTrail(originHex, rimRing, heading, shadowed, reach, originPixel)
+  // The shadow solve is O(cells × occluders); it re-runs only when an occluder
+  // actually crosses a cell, not on every animation frame.
+  const occluders = sweepOccluders(features, worldTime, schedule)
+  const key = occluderKey(originCell, occluders)
+  const shadowed = useMemo(
+    () => new Set(planSweepFrom(originCell, occluders, rimRing, schedule).shadowed.map(cellKey)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key, rimRing, schedule],
+  )
+  const trail = sweepTrail(originCell, rimRing, heading, shadowed, schedule, reach, originPixel)
 
-  // The board disc's outer edge — nothing draws past the rim.
-  const clipR = HEX_SIZE * (Math.sqrt(3) * rimRing + 1)
+  // The board disc's outer edge — the rim ring's outer radius; nothing draws
+  // past it.
+  const clipR = (rimRing + 0.5) * RADIAL_UNIT
   const head = rayPoint(originPixel, heading, reachPx)
   const bladeFrom = rayPoint(originPixel, heading - ARC_TUNING.bladeDeg, reachPx)
 
@@ -73,10 +91,10 @@ export function ArcScan({
       <g clipPath={`url(#${clipId})`}>
         {/* The wake: cells the beam just read, fading with angular lag. */}
         <g data-testid="arc-scan-trail">
-          {trail.map(({ hex, glow }) => (
-            <polygon
-              key={`t-${hex.q},${hex.r}`}
-              points={hexPolygonPoints(hexToPixel(hex.q, hex.r))}
+          {trail.map(({ cell, glow }) => (
+            <path
+              key={`t-${cellKey(cell)}`}
+              d={wedgePath(cell, schedule)}
               fill={sweepGlowFill(glow)}
               stroke={sweepGlowStroke(glow)}
               strokeWidth={0.75}

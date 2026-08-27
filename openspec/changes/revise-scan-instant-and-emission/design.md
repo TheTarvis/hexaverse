@@ -20,7 +20,7 @@ Current wiring that matters:
 - The only way a scan ever revealed a **foreign fleet** was the running
   echo disc counting as live coverage for the 15 seconds. Remove the disc
   naively and a ping can no longer detect ships at all — see Decision 4.
-- `hex-board-view` paces its sweep FX and poll tightening off the running
+- `board-view` paces its sweep FX and poll tightening off the running
   action's window; all of that wiring goes away.
 
 ## Goals / Non-Goals

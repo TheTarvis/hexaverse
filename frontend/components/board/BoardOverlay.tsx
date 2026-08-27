@@ -23,23 +23,27 @@
 // tabIndex: features → fleets → lane gates, each group in stable id order.
 
 import { useMemo, useState } from 'react'
-import { boardLegBurn, ringOf, stateAt, type Hex } from '@/lib/hex'
 import {
-  HEX_SIZE,
-  hexPolygonPoints,
-  hexToPixel,
+  boardLegBurn,
+  cellKey,
+  cellToPoint,
+  RADIAL_UNIT,
+  schedule as boardSchedule,
+  stateAt,
+  wedgePath,
+  type Cell,
   type Point,
-  type ViewBox,
-} from '@/lib/hex/pixel'
+  type Schedule,
+} from '@/lib/board'
 import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 import {
   featureMaps,
   fleetDockedParentId,
   fleetGlidePixel,
-  fleetLogicalHex,
+  fleetLogicalCell,
   fleetOnBoard,
-  sensorBubbleHexes,
+  sensorBubbleCells,
 } from './glyph-geometry'
 import { GATE_ACCENT, PREVIEW_BURN, SCAN_BUBBLE_FILL, SCAN_BUBBLE_STROKE, SELECTION_STROKE } from './board-palette'
 import { SelectionPreview } from './SelectionPreview'
@@ -49,15 +53,15 @@ import { ArcScan } from './ArcScan'
 import type { MovePlan } from './move-preview'
 import type { ScanPlan } from './scan-preview'
 
-// The ambient-sensor radius (hexes) the backend uses
+// The ambient-sensor radius (cells) the backend uses
 // (observation.DefaultSensorParams) — drawn live around own units.
 export const AMBIENT_RADIUS = 3
 
-// The running scan's effect inputs — pinned emission hex and frozen eta
-// (`Running Scan Renders From Its Pinned Emission Hex`); `fx` picks the
+// The running scan's effect inputs — pinned emission cell and frozen eta
+// (`Running Scan Renders From Its Pinned Emission Cell`); `fx` picks the
 // playtest effect variant.
 export interface ScanFxInput {
-  originHex: Hex
+  originCell: Cell
   features: BoardFeature[]
   rimRing: number
   committedAt: number
@@ -66,7 +70,15 @@ export interface ScanFxInput {
 }
 
 export interface BoardOverlayProps {
-  viewBox: ViewBox
+  // Where this overlay's glyph tab stops begin. The board's camera controls
+  // occupy the first stops (they must precede the glyphs), so the stage passes
+  // their count here; the port's own features → fleets → gates order inside
+  // the group is unchanged.
+  tabIndexBase?: number
+  viewBox: string
+  // The board square's half-width in board pixels — the numeric form of
+  // `viewBox`, for the lattice-bounds rect.
+  extent: number
   overlayStyle: { transform: string; transformOrigin: string }
   radius: number
   worldTime: number
@@ -75,8 +87,8 @@ export interface BoardOverlayProps {
   gates?: LaneGate[]
   selectedId?: string | null
   selectedGateId?: string | null
-  selectedHex?: Hex | null
-  hoverHex?: Hex | null
+  selectedCell?: Cell | null
+  hoverCell?: Cell | null
   onSelectFeature?: (id: string) => void
   onSelectFleet?: (id: string) => void
   onSelectGate?: (destSystemId: string) => void
@@ -88,10 +100,11 @@ export interface BoardOverlayProps {
   scanFx?: ScanFxInput | null
 }
 
-const GATE_R = HEX_SIZE * 0.4
+const GATE_R = RADIAL_UNIT * 0.4
 
 export function BoardOverlay({
   viewBox,
+  extent,
   overlayStyle,
   radius,
   worldTime,
@@ -100,8 +113,8 @@ export function BoardOverlay({
   gates = [],
   selectedId,
   selectedGateId,
-  selectedHex,
-  hoverHex,
+  selectedCell,
+  hoverCell,
   onSelectFeature,
   onSelectFleet,
   onSelectGate,
@@ -109,10 +122,20 @@ export function BoardOverlay({
   activeSweep,
   sweepPreview,
   scanFx,
+  tabIndexBase = 0,
 }: BoardOverlayProps) {
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
 
-  const { pixelById, hexById } = useMemo(() => featureMaps(features, worldTime), [features, worldTime])
+  // The board's slot schedule, resolved once from this system's radius and
+  // threaded into every projection below (design.md, schedule-threading
+  // Decision). The overlay ENUMERATES cells (the sensor bubble), so this must
+  // be the per-system schedule, never the process-wide default.
+  const schedule: Schedule = useMemo(() => boardSchedule(radius), [radius])
+
+  const { pixelById, cellById } = useMemo(
+    () => featureMaps(features, worldTime, schedule),
+    [features, worldTime, schedule],
+  )
 
   // Hit-priority DOM order within the feature group: parents before children,
   // so an overlapping moon (drawn above its parent on the canvas) also WINS
@@ -126,27 +149,50 @@ export function BoardOverlay({
 
   const featureTabIndex = useMemo(() => {
     const sorted = [...features].sort((a, b) => (a.id < b.id ? -1 : 1))
-    return new Map(sorted.map((f, i) => [f.id, i + 1]))
-  }, [features])
+    return new Map(sorted.map((f, i) => [f.id, tabIndexBase + i + 1]))
+  }, [features, tabIndexBase])
 
-  const onBoard = useMemo(() => fleets.filter((f) => fleetOnBoard(f, worldTime)), [fleets, worldTime])
+  const onBoard = useMemo(
+    () => fleets.filter((f) => fleetOnBoard(f, worldTime, schedule)),
+    [fleets, worldTime, schedule],
+  )
   const fleetsSorted = useMemo(() => [...onBoard].sort((a, b) => (a.id < b.id ? -1 : 1)), [onBoard])
-  const fleetTabBase = features.length
+  const fleetTabBase = tabIndexBase + features.length
   const gateTabBase = fleetTabBase + fleetsSorted.length
 
   const fleetPixel = (f: Fleet): Point => {
-    const parentId = fleetDockedParentId(f, worldTime)
+    const parentId = fleetDockedParentId(f, worldTime, schedule)
     const parentPixel = parentId ? pixelById.get(parentId) : undefined
-    return fleetGlidePixel(f, worldTime, parentPixel)
+    return fleetGlidePixel(f, worldTime, schedule, parentPixel)
   }
 
   // The live ambient sensor bubble around own units (task 5.1b).
+  // The bubble's centres are LOGICAL cells, so the union only changes when an
+  // own unit crosses a cell — not on every animation frame. Keying the memo on
+  // the centres themselves (rather than on worldTime) keeps both the BFS and
+  // the wedge-path DOM it feeds off the per-frame path.
+  const centerKeys = onBoard
+    .filter((f) => f.own)
+    .map((f) =>
+      cellKey(
+        fleetLogicalCell(
+          f,
+          worldTime,
+          schedule,
+          cellById.get(fleetDockedParentId(f, worldTime, schedule) ?? ''),
+        ),
+      ),
+    )
+    .join(',')
   const bubble = useMemo(() => {
-    const centers = onBoard
-      .filter((f) => f.own)
-      .map((f) => fleetLogicalHex(f, worldTime, hexById.get(fleetDockedParentId(f, worldTime) ?? '')))
-    return sensorBubbleHexes(centers, AMBIENT_RADIUS)
-  }, [onBoard, worldTime, hexById])
+    const centers = centerKeys
+      ? centerKeys.split(',').map((k) => {
+          const [ring, slot] = k.split(':')
+          return { ring: Number(ring), slot: Number(slot) }
+        })
+      : []
+    return sensorBubbleCells(centers, AMBIENT_RADIUS, radius, schedule)
+  }, [centerKeys, radius, schedule])
 
   // Committed paths of own fleets — a burn, or a trip's leg 0 (task 5.1a). A
   // burn that already arrived folds away via stateAt (no stale path).
@@ -154,10 +200,10 @@ export function BoardOverlay({
     () =>
       onBoard
         .filter((f) => f.own)
-        .map((f) => ({ id: f.id, path: committedPath(f, worldTime) }))
-        .filter((p): p is { id: string; path: Hex[] } => !!p.path)
-        .map((p) => ({ id: p.id, points: pathPolyline(p.path) })),
-    [onBoard, worldTime],
+        .map((f) => ({ id: f.id, path: committedPath(f, worldTime, schedule) }))
+        .filter((p): p is { id: string; path: Cell[] } => !!p.path)
+        .map((p) => ({ id: p.id, points: pathPolyline(p.path, schedule) })),
+    [onBoard, worldTime, schedule],
   )
 
   const keyActivate = (fn: () => void) => (e: React.KeyboardEvent) => {
@@ -170,9 +216,9 @@ export function BoardOverlay({
 
   return (
     <svg
-      data-testid="hex-board"
+      data-testid="board-overlay"
       className="absolute inset-0 h-full w-full"
-      viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
+      viewBox={viewBox}
       preserveAspectRatio="xMidYMid meet"
       style={{ ...overlayStyle, pointerEvents: 'none' }}
     >
@@ -180,36 +226,38 @@ export function BoardOverlay({
           visible to Playwright). Non-interactive by policy: an interactive
           full-extent rect would intercept every tile click. */}
       <rect
-        data-testid="hex-lattice"
-        x={viewBox.x}
-        y={viewBox.y}
-        width={viewBox.w}
-        height={viewBox.h}
+        data-testid="board-lattice"
+        x={-extent}
+        y={-extent}
+        width={extent * 2}
+        height={extent * 2}
         fill="none"
         pointerEvents="none"
       />
 
       {/* The committed sweep of a running scan (solid), or the hover preview
           of what a sweep from here would leave in shadow (faint). */}
-      <ScanOverlay plan={activeSweep ?? null} variant="active" hideOrigin />
-      {!activeSweep && <ScanOverlay plan={sweepPreview ?? null} variant="aim" />}
+      <ScanOverlay plan={activeSweep ?? null} variant="active" schedule={schedule} hideOrigin />
+      {!activeSweep && <ScanOverlay plan={sweepPreview ?? null} variant="aim" schedule={schedule} />}
       {activeSweep && scanFx && (
         scanFx.fx === 'arc' ? (
           <ArcScan
-            originHex={scanFx.originHex}
-            originPixel={hexToPixel(scanFx.originHex.q, scanFx.originHex.r)}
+            originCell={scanFx.originCell}
+            originPixel={cellToPoint(scanFx.originCell, schedule)}
             features={scanFx.features}
             rimRing={scanFx.rimRing}
+            schedule={schedule}
             committedAt={scanFx.committedAt}
             eta={scanFx.eta}
             worldTime={worldTime}
           />
         ) : (
           <ScanPing
-            originHex={scanFx.originHex}
-            originPixel={hexToPixel(scanFx.originHex.q, scanFx.originHex.r)}
+            originCell={scanFx.originCell}
+            originPixel={cellToPoint(scanFx.originCell, schedule)}
             features={scanFx.features}
             rimRing={scanFx.rimRing}
+            schedule={schedule}
             committedAt={scanFx.committedAt}
             eta={scanFx.eta}
             worldTime={worldTime}
@@ -224,26 +272,23 @@ export function BoardOverlay({
       </g>
 
       <g data-testid="scan-bubble" pointerEvents="none">
-        {bubble.map((h) => {
-          const c = hexToPixel(h.q, h.r)
-          return (
-            <polygon
-              key={`${h.q},${h.r}`}
-              points={hexPolygonPoints(c)}
-              fill={SCAN_BUBBLE_FILL}
-              stroke={SCAN_BUBBLE_STROKE}
-              strokeWidth={1}
-            />
-          )
-        })}
+        {bubble.map((c) => (
+          <path
+            key={cellKey(c)}
+            d={wedgePath(c, schedule)}
+            fill={SCAN_BUBBLE_FILL}
+            stroke={SCAN_BUBBLE_STROKE}
+            strokeWidth={1}
+          />
+        ))}
       </g>
 
-      {/* The selected bare hex, visibly marked (task 4.3a) — one dynamic
-          shape, not a per-tile node. */}
-      {selectedHex && ringOf(selectedHex) <= radius && (
-        <polygon
-          data-testid="selected-hex"
-          points={hexPolygonPoints(hexToPixel(selectedHex.q, selectedHex.r))}
+      {/* The selected bare cell, visibly marked (task 4.3a) — one dynamic
+          shape, not a per-cell node. */}
+      {selectedCell && selectedCell.ring <= radius && (
+        <path
+          data-testid="selected-cell"
+          d={wedgePath(selectedCell, schedule)}
           fill="none"
           stroke={SELECTION_STROKE}
           strokeWidth={2}
@@ -251,24 +296,24 @@ export function BoardOverlay({
         />
       )}
 
-      {/* Tile hover feedback (task 4.6a) — tracks the pointer's unprojected
-          hex, computed by BoardStage. */}
-      {hoverHex && ringOf(hoverHex) <= radius && (
-        <polygon
-          data-testid="hover-hex"
-          points={hexPolygonPoints(hexToPixel(hoverHex.q, hoverHex.r))}
+      {/* Cell hover feedback (task 4.6a) — tracks the pointer's unprojected
+          cell, computed by BoardStage. */}
+      {hoverCell && hoverCell.ring <= radius && (
+        <path
+          data-testid="hover-cell"
+          d={wedgePath(hoverCell, schedule)}
           fill="rgba(255, 255, 255, 0.1)"
           stroke="none"
           pointerEvents="none"
         />
       )}
 
-      <SelectionPreview plan={plan ?? null} />
+      <SelectionPreview plan={plan ?? null} schedule={schedule} />
 
       {/* Hit shapes, in hit-priority DOM order: gates lowest, fleets topmost. */}
       <g data-testid="lane-gates">
         {gates.map((g, gi) => {
-          const p = hexToPixel(g.hex.q, g.hex.r)
+          const p = cellToPoint(g.cell, schedule)
           const angleDeg = (Math.atan2(p.y, p.x) * 180) / Math.PI
           const selected = selectedGateId === g.destSystemId
           return (
@@ -305,7 +350,7 @@ export function BoardOverlay({
                   strokeLinejoin="round"
                 />
               </g>
-              <circle r={HEX_SIZE * 0.55} fill="transparent" />
+              <circle r={RADIAL_UNIT * 0.55} fill="transparent" />
             </g>
           )
         })}
@@ -318,7 +363,7 @@ export function BoardOverlay({
           // The hit-target size is INDEPENDENT of fog-band treatment: an
           // outline-only astronomical feature is no harder to select than a
           // filled one.
-          const hitR = HEX_SIZE * 0.5
+          const hitR = RADIAL_UNIT * 0.5
           const selected = selectedId === f.id
           return (
             <g
@@ -341,10 +386,10 @@ export function BoardOverlay({
               }}
             >
               {selected && (
-                <circle r={HEX_SIZE * 0.34 + 6} fill="none" stroke={SELECTION_STROKE} strokeWidth={1.5} data-testid="selection-ring" />
+                <circle r={RADIAL_UNIT * 0.34 + 6} fill="none" stroke={SELECTION_STROKE} strokeWidth={1.5} data-testid="selection-ring" />
               )}
               {focusedKey === `feature-${f.id}` && (
-                <circle r={HEX_SIZE * 0.34 + 9} fill="none" stroke={SELECTION_STROKE} strokeWidth={1.25} strokeDasharray="2 3" data-testid="glyph-focus-ring" />
+                <circle r={RADIAL_UNIT * 0.34 + 9} fill="none" stroke={SELECTION_STROKE} strokeWidth={1.25} strokeDasharray="2 3" data-testid="glyph-focus-ring" />
               )}
               <circle r={hitR} fill="transparent" />
             </g>
@@ -355,12 +400,12 @@ export function BoardOverlay({
       <g data-testid="fleet-glyphs">
         {fleetsSorted.map((f, fi) => {
           const p = fleetPixel(f)
-          const mode = stateAt(f.state, worldTime).mode
+          const mode = stateAt(f.state, worldTime, schedule).mode
           // The docked-fleet shrunk hit target: a docked fleet draws at
           // exactly its parent's pixel, so clicks around the hull must fall
           // through to the body underneath (the mine gesture).
-          const hitR = mode === 'docked' ? HEX_SIZE * 0.18 : HEX_SIZE * 0.5
-          const ring = HEX_SIZE * 0.42
+          const hitR = mode === 'docked' ? RADIAL_UNIT * 0.18 : RADIAL_UNIT * 0.5
+          const ring = RADIAL_UNIT * 0.42
           const selected = selectedId === f.id
           return (
             <g
@@ -396,21 +441,21 @@ export function BoardOverlay({
   )
 }
 
-// committedPath — the hex path a fleet is currently flying on this board: a
+// committedPath — the cell path a fleet is currently flying on this board: a
 // burn, or a trip's board leg. Null for a fleet that isn't flying one.
-function committedPath(f: Fleet, worldTime: number): Hex[] | null {
-  const s = stateAt(f.state, worldTime)
-  if (s.mode === 'burn' && s.burn) return s.burn.path
-  if (s.mode === 'laneTransit' && s.laneTransit) {
-    return boardLegBurn(s.laneTransit)?.path ?? null
+function committedPath(f: Fleet, worldTime: number, s: Schedule): Cell[] | null {
+  const eff = stateAt(f.state, worldTime, s)
+  if (eff.mode === 'burn' && eff.burn) return eff.burn.path
+  if (eff.mode === 'laneTransit' && eff.laneTransit) {
+    return boardLegBurn(eff.laneTransit)?.path ?? null
   }
   return null
 }
 
-function pathPolyline(path: Hex[]): string {
+function pathPolyline(path: Cell[], s: Schedule): string {
   return path
-    .map((h) => {
-      const p = hexToPixel(h.q, h.r)
+    .map((c) => {
+      const p = cellToPoint(c, s)
       return `${p.x.toFixed(2)},${p.y.toFixed(2)}`
     })
     .join(' ')

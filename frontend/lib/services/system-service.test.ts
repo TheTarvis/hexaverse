@@ -20,7 +20,7 @@ const board: SystemBoard = {
   worldTime: 123456,
   laneGates: [],
   features: [
-    { id: 'f-star', type: 'star', fixed: true, footprint: [{ q: 0, r: 0 }], band: 'visible', live: true },
+    { id: 'f-star', type: 'star', fixed: true, footprint: [{ ring: 0, slot: 0 }], band: 'visible', live: true },
   ],
 }
 

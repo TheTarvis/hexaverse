@@ -59,7 +59,7 @@ passive-listening, decided with Travis 2026-08-24).
 - `fleet-movement`: the Sensor Scan Order requirement is rewritten —
   synchronous verb, no sensor channel, no single-slot gating, ownership
   required; the two-channel requirement collapses to the movement channel.
-- `hex-board-view`: running-scan rendering (pinned sweep, countdown,
+- `board-view`: running-scan rendering (pinned sweep, countdown,
   scan-disabled-while-running, tightened polling) is replaced by the
   commit-time bloom and a refetch-on-response; contact markers render.
 

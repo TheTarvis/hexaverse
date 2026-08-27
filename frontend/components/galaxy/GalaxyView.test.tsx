@@ -161,7 +161,7 @@ function coastFleet(id: string, systemId: string): Fleet {
     corporationId: 'corp',
     systemId,
     state: { mode: 'coast', coast: { ring: 1, angle0: 0, period: 1, dir: 1 } },
-    position: { q: 1, r: 0 },
+    position: { ring: 1, slot: 0 },
     own: true,
     worldTime: 0,
   }
@@ -369,7 +369,7 @@ describe('GalaxyView', () => {
       route: ['sys-0', 'sys-1'],
       legEtas: [60_000, 660_000],
       totalEta: 660_000,
-      departGate: { q: 16, r: -2 },
+      departGate: { ring: 16, slot: 2 },
       worldTime: 0,
     }
     mockUseRoutePreview.mockReturnValue({
@@ -422,7 +422,7 @@ describe('GalaxyView', () => {
           legEtas: [60_000, 660_000],
           departTime: 0,
           arriveTime: 660_000,
-          entryGate: { q: 16, r: -2 },
+          entryGate: { ring: 16, slot: 2 },
         },
       },
     }
@@ -447,7 +447,7 @@ describe('GalaxyView', () => {
           legEtas: [60_000, 660_000],
           departTime: 0,
           arriveTime: 660_000,
-          entryGate: { q: 16, r: -2 },
+          entryGate: { ring: 16, slot: 2 },
         },
       },
     }
@@ -483,7 +483,7 @@ describe('GalaxyView', () => {
           legEtas: [0, 660_000],
           departTime: 0,
           arriveTime: 660_000,
-          entryGate: { q: 16, r: -2 },
+          entryGate: { ring: 16, slot: 2 },
         },
       },
     }
@@ -512,7 +512,7 @@ describe('GalaxyView', () => {
           legEtas: [60_000, 660_000],
           departTime: 0,
           arriveTime: 660_000,
-          entryGate: { q: 16, r: -2 },
+          entryGate: { ring: 16, slot: 2 },
         },
       },
     }
@@ -612,7 +612,7 @@ describe('GalaxyView', () => {
         route: ['sys-0', 'sys-1'],
         legEtas: [60_000, 660_000],
         totalEta: 660_000,
-        departGate: { q: 16, r: -2 },
+        departGate: { ring: 16, slot: 2 },
         worldTime: 0,
       }
       mockUseRoutePreview.mockReturnValue({

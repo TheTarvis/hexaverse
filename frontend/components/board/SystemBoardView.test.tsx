@@ -105,12 +105,12 @@ function boardFixture(): SystemBoard {
     worldTime: 0,
     laneGates: [],
     features: [
-      { id: 'f-star', type: 'star', fixed: true, footprint: [{ q: 0, r: 0 }], band: 'visible', live: true },
+      { id: 'f-star', type: 'star', fixed: true, footprint: [{ ring: 0, slot: 0 }], band: 'visible', live: true },
       {
         id: 'p-1',
         type: 'rocky',
         orbit: { ring: 2, angle0: 0, period: 2 ** 60, dir: 1 },
-        footprint: [{ q: 2, r: 0 }],
+        footprint: [{ ring: 2, slot: 0 }],
         band: 'astronomical',
         live: false,
       },
@@ -123,7 +123,7 @@ const ownFleet: Fleet = {
   corporationId: 'corp-user1',
   systemId: 'sys-7',
   state: { mode: 'coast', coast: { ring: 3, angle0: 0, period: 2 ** 60, dir: 1 } },
-  position: { q: 3, r: 0 },
+  position: { ring: 3, slot: 0 },
   own: true,
   worldTime: 0,
 }
@@ -156,8 +156,8 @@ function departingFleet(gateEta: number): Fleet {
       laneTransit: {
         boardLeg: {
           path: [
-            { q: 3, r: 0 },
-            { q: 2, r: 0 },
+            { ring: 3, slot: 0 },
+            { ring: 2, slot: 0 },
           ],
           startTime: 0,
           gateEta,
@@ -166,7 +166,7 @@ function departingFleet(gateEta: number): Fleet {
         legEtas: [gateEta, gateEta + 60_000],
         departTime: 0,
         arriveTime: gateEta + 60_000,
-        entryGate: { q: -3, r: 0 },
+        entryGate: { ring: 3, slot: 0 },
       },
     },
   }
@@ -204,7 +204,7 @@ describe('SystemBoardView', () => {
   it('shows a charting placeholder while loading', () => {
     boardState({ isLoading: true, isError: false, data: undefined })
     render(<SystemBoardView systemId="sys-7" />)
-    expect(screen.queryByTestId('hex-board')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('board-overlay')).not.toBeInTheDocument()
     expect(screen.getByText(/charting the system/i)).toBeInTheDocument()
   })
 
@@ -215,7 +215,7 @@ describe('SystemBoardView', () => {
     boardState({ isLoading: false, isError: false, data: boardFixture() })
     fleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
-    expect(screen.getByTestId('hex-board')).toBeInTheDocument()
+    expect(screen.getByTestId('board-overlay')).toBeInTheDocument()
     expect(screen.getByText(/charting the system/i)).toBeInTheDocument()
   })
 
@@ -230,7 +230,7 @@ describe('SystemBoardView', () => {
     // The overlay's hit shapes are gone with it; verbs needing a board
     // selection are unavailable, and the facts panel says why (task 7.10) —
     // not the default "select a body" copy.
-    expect(screen.queryByTestId('hex-board')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('board-overlay')).not.toBeInTheDocument()
     expect(screen.getByTestId('facts-panel')).toHaveTextContent(/board must be available/i)
   })
 
@@ -246,8 +246,8 @@ describe('SystemBoardView', () => {
     fleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
 
-    expect(screen.getByTestId('hex-board')).toBeInTheDocument()
-    expect(screen.getByTestId('hex-lattice')).toBeInTheDocument()
+    expect(screen.getByTestId('board-overlay')).toBeInTheDocument()
+    expect(screen.getByTestId('board-lattice')).toBeInTheDocument()
     expect(screen.getByTestId('feature-glyph-f-star')).toBeInTheDocument()
     expect(screen.getByTestId('fleet-glyph-mine')).toBeInTheDocument()
     const facts = screen.getByTestId('facts-panel')
@@ -386,7 +386,7 @@ describe('SystemBoardView', () => {
     const docked: Fleet = {
       ...ownFleet,
       state: { mode: 'docked', docked: { parentId: 'p-1' } },
-      position: { q: 2, r: 0 },
+      position: { ring: 2, slot: 0 },
       roster: { ships: [{ class: 'seed' }], cargo: {}, cargoCapacity: 200, freeHold: 200, miningRate: 0.001 },
     }
     boardState({ isLoading: false, isError: false, data: board })
@@ -468,7 +468,7 @@ describe('SystemBoardView', () => {
   })
 
   it('selects a lane gate, previews the route, and departs', () => {
-    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', hex: { q: 3, r: 0 } }] }
+    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }] }
     boardState({ isLoading: false, isError: false, data: withGate })
     fleetsState([ownFleet])
     mockRoutePreview.mockReturnValue({
@@ -476,7 +476,7 @@ describe('SystemBoardView', () => {
         route: ['sys-7', 'sys-9'],
         legEtas: [30_000, 90_000],
         totalEta: 90_000,
-        departGate: { q: 3, r: 0 },
+        departGate: { ring: 3, slot: 0 },
         worldTime: 0,
       },
       isLoading: false,

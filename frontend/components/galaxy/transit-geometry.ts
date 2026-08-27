@@ -7,7 +7,7 @@
 // keeps crawling its lane on a paused network, and a reload mid-trip re-derives
 // the same point.
 
-import { laneFraction } from '@/lib/hex'
+import { laneFraction } from '@/lib/board'
 import type { Fleet } from '@/lib/types/fleet'
 
 export interface Vec3 {
@@ -22,7 +22,7 @@ export type NodePositions = Map<string, Vec3>
 // a lane (it's in a system, and the star's own pip speaks for it). During leg 0
 // (the burn to the departure gate) the fleet is still in the origin system, so it
 // sits at the origin star until it enters the lane — which is what the board is
-// simultaneously drawing hex by hex.
+// simultaneously drawing cell by cell.
 export function transitPoint(
   fleet: Fleet,
   worldTime: number,

@@ -9,29 +9,31 @@
 // computes the plan.
 
 import type { ScanPlan } from './scan-preview'
-import { hexToPixel, hexPolygonPoints, HEX_SIZE } from '@/lib/hex/pixel'
+import { cellKey, cellToPoint, RADIAL_UNIT, wedgePath, type Schedule } from '@/lib/board'
 import { SCAN_BUBBLE_STROKE } from './board-palette'
 
 export interface ScanOverlayProps {
   plan: ScanPlan | null
   variant: 'aim' | 'active'
+  // The board's slot schedule — what resolves each shadowed cell's wedge.
+  schedule: Schedule
   // Suppress the static origin rings — for the active variant when ScanPing
   // is drawing the animated echo front on the live pivot instead.
   hideOrigin?: boolean
 }
 
-export function ScanOverlay({ plan, variant, hideOrigin = false }: ScanOverlayProps) {
+export function ScanOverlay({ plan, variant, schedule, hideOrigin = false }: ScanOverlayProps) {
   if (!plan) return null
   const active = variant === 'active'
-  const origin = hexToPixel(plan.origin.q, plan.origin.r)
+  const origin = cellToPoint(plan.origin, schedule)
   return (
     <g data-testid={`scan-overlay-${variant}`} pointerEvents="none" opacity={active ? 1 : 0.7}>
       {/* The sensor origin: concentric sweep rings around the scanning fleet. */}
       {!hideOrigin && (
         <g transform={`translate(${origin.x.toFixed(2)}, ${origin.y.toFixed(2)})`}>
-          <circle r={HEX_SIZE * 0.9} fill="none" stroke={SCAN_BUBBLE_STROKE} strokeWidth={1.5} />
+          <circle r={RADIAL_UNIT * 0.9} fill="none" stroke={SCAN_BUBBLE_STROKE} strokeWidth={1.5} />
           <circle
-            r={HEX_SIZE * 1.6}
+            r={RADIAL_UNIT * 1.6}
             fill="none"
             stroke={SCAN_BUBBLE_STROKE}
             strokeWidth={1}
@@ -41,10 +43,10 @@ export function ScanOverlay({ plan, variant, hideOrigin = false }: ScanOverlayPr
       )}
       {/* Shadow cells: inside the board, behind a large body — a sweep from
           here leaves these dark. */}
-      {plan.shadowed.map((h) => (
-        <polygon
-          key={`x-${h.q},${h.r}`}
-          points={hexPolygonPoints(hexToPixel(h.q, h.r))}
+      {plan.shadowed.map((c) => (
+        <path
+          key={`x-${cellKey(c)}`}
+          d={wedgePath(c, schedule)}
           fill="rgba(0, 0, 0, 0.35)"
           stroke={SCAN_BUBBLE_STROKE}
           strokeWidth={0.5}

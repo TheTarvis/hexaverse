@@ -27,10 +27,10 @@ function travelling(id: string, arriveTime = 1000): Fleet {
         legEtas: [0, arriveTime],
         departTime: 0,
         arriveTime,
-        entryGate: { q: 0, r: 0 },
+        entryGate: { ring: 0, slot: 0 },
       },
     },
-    position: { q: 0, r: 0 },
+    position: { ring: 0, slot: 0 },
     own: true,
     worldTime: 0,
   }

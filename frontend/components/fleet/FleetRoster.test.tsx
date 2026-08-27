@@ -26,7 +26,7 @@ const fleet = (id: string, systemId: string, state: Fleet['state']): Fleet => ({
   corporationId: 'corp',
   systemId,
   state,
-  position: { q: 0, r: 0 },
+  position: { ring: 0, slot: 0 },
   own: true,
   worldTime: 0,
 })
@@ -42,7 +42,7 @@ const travelling = fleet('fleet_2', 'sys-0', {
     legEtas: [0, 120_000],
     departTime: 0,
     arriveTime: 120_000,
-    entryGate: { q: 0, r: 0 },
+    entryGate: { ring: 0, slot: 0 },
   },
 })
 

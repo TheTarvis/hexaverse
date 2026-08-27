@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { hexToPixel } from '@/lib/hex/pixel'
+import { cellToPoint } from '@/lib/board'
 import type { SystemBoard } from '@/lib/types/system-board'
 import { BoardStage } from './BoardStage'
 import { createBoardProjection, BOARD_TILT_DEG } from './use-board-projection'
+import { productionSchedule } from '@/lib/board'
+
+const S = productionSchedule()
 
 // The stage's canvas region is mocked at its seam: the mock reports the
 // availability the test dictates and mounts the (also mocked) GL world so the
@@ -57,7 +60,7 @@ function boardFixture(): SystemBoard {
     worldTime: 0,
     laneGates: [],
     features: [
-      { id: 'f-star', type: 'star', fixed: true, footprint: [{ q: 0, r: 0 }], band: 'visible', live: true },
+      { id: 'f-star', type: 'star', fixed: true, footprint: [{ ring: 0, slot: 0 }], band: 'visible', live: true },
     ],
   }
 }
@@ -81,44 +84,44 @@ describe('BoardStage', () => {
     guard.available = true
   })
 
-  it('resolves a canvas click to the containing hex via unproject → pixelToHex', () => {
-    const onSelectHex = vi.fn()
+  it('resolves a canvas click to the containing hex via unproject → pointToCell', () => {
+    const onSelectCell = vi.fn()
     const onSelectEmpty = vi.fn()
     render(
-      <BoardStage board={boardFixture()} fleets={[]} worldTime={0} onSelectHex={onSelectHex} onSelectEmpty={onSelectEmpty} />,
+      <BoardStage board={boardFixture()} fleets={[]} worldTime={0} onSelectCell={onSelectCell} onSelectEmpty={onSelectEmpty} />,
     )
     const projection = createBoardProjection(3, W, H, BOARD_TILT_DEG)
-    const target = { q: 2, r: -1 }
-    const screenPt = projection.project(hexToPixel(target.q, target.r))
+    const target = { ring: 2, slot: 1 }
+    const screenPt = projection.project(cellToPoint(target, S))
     fireEvent.click(screen.getByTestId('board-stage'), { clientX: screenPt.x, clientY: screenPt.y })
-    expect(onSelectHex).toHaveBeenCalledWith(target)
+    expect(onSelectCell).toHaveBeenCalledWith(target)
     expect(onSelectEmpty).not.toHaveBeenCalled()
   })
 
   it('clears the selection when the click lands outside the lattice', () => {
-    const onSelectHex = vi.fn()
+    const onSelectCell = vi.fn()
     const onSelectEmpty = vi.fn()
     render(
-      <BoardStage board={boardFixture()} fleets={[]} worldTime={0} onSelectHex={onSelectHex} onSelectEmpty={onSelectEmpty} />,
+      <BoardStage board={boardFixture()} fleets={[]} worldTime={0} onSelectCell={onSelectCell} onSelectEmpty={onSelectEmpty} />,
     )
     fireEvent.click(screen.getByTestId('board-stage'), { clientX: 3, clientY: 3 })
     expect(onSelectEmpty).toHaveBeenCalled()
-    expect(onSelectHex).not.toHaveBeenCalled()
+    expect(onSelectCell).not.toHaveBeenCalled()
   })
 
   it('tracks the hovered tile for the overlay highlight', () => {
     render(<BoardStage board={boardFixture()} fleets={[]} worldTime={0} />)
     const projection = createBoardProjection(3, W, H, BOARD_TILT_DEG)
-    const screenPt = projection.project(hexToPixel(1, 1))
+    const screenPt = projection.project(cellToPoint({ ring: 1, slot: 1 }, S))
     // jsdom has no PointerEvent constructor; a MouseEvent with the pointermove
     // type carries the coordinates through to React's onPointerMove.
     fireEvent(
       screen.getByTestId('board-stage'),
       new MouseEvent('pointermove', { bubbles: true, clientX: screenPt.x, clientY: screenPt.y }),
     )
-    expect(screen.getByTestId('hover-hex')).toBeInTheDocument()
+    expect(screen.getByTestId('hover-cell')).toBeInTheDocument()
     fireEvent.pointerLeave(screen.getByTestId('board-stage'))
-    expect(screen.queryByTestId('hover-hex')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('hover-cell')).not.toBeInTheDocument()
   })
 
   it('reports the first rendered frame up through onFirstFrame', () => {
@@ -134,6 +137,6 @@ describe('BoardStage', () => {
       <BoardStage board={boardFixture()} fleets={[]} worldTime={0} onAvailabilityChange={onAvailabilityChange} />,
     )
     expect(onAvailabilityChange).toHaveBeenCalledWith(false)
-    expect(screen.queryByTestId('hex-board')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('board-overlay')).not.toBeInTheDocument()
   })
 })

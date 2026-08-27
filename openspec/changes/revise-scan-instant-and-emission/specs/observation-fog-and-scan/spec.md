@@ -102,7 +102,7 @@ bubbles only.
 **Migration**: The disc's two jobs are re-homed: foreign-fleet detection
 by a ping becomes stored `sighted` contacts (see ADDED "Ping Sightings of
 Foreign Fleets"); the visual front becomes the client-side commit-time
-bloom (`hex-board-view`).
+bloom (`board-view`).
 
 ### Requirement: Scan Resolution Mints the Reveal
 **Reason**: There is no resolution step — the scan left the action spine

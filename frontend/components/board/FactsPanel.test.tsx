@@ -1,16 +1,19 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FactsPanel, type BoardSelection } from './FactsPanel'
-import { planToHex } from './move-preview'
+import { planToCell } from './move-preview'
 import type { Fleet, RoutePreview } from '@/lib/types/fleet'
 import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
+import { productionSchedule } from '@/lib/board'
+
+const S = productionSchedule()
 
 const ownFleet: Fleet = {
   id: 'mine',
   corporationId: 'corp-user1',
   systemId: 's',
   state: { mode: 'coast' },
-  position: { q: 3, r: 0 },
+  position: { ring: 3, slot: 0 },
   own: true,
   worldTime: 0,
 }
@@ -32,7 +35,7 @@ const base = {
 }
 
 function feature(over: Partial<BoardFeature>): BoardFeature {
-  return { id: 'f', type: 'rocky', footprint: [{ q: 2, r: 0 }], band: 'visible', live: true, ...over }
+  return { id: 'f', type: 'rocky', footprint: [{ ring: 2, slot: 0 }], band: 'visible', live: true, ...over }
 }
 
 describe('FactsPanel', () => {
@@ -93,7 +96,7 @@ describe('FactsPanel', () => {
 
   it('shows a move commit + ETA for a selected body', () => {
     const selection: BoardSelection = { kind: 'feature', feature: feature({ id: 'p1' }) }
-    const plan = planToHex({ q: 3, r: 0 }, { q: 2, r: 0 }, 0)
+    const plan = planToCell({ ring: 3, slot: 0 }, { ring: 2, slot: 0 }, 0, S)
     render(<FactsPanel {...base} selection={selection} activeFleet={ownFleet} plan={plan} />)
     expect(screen.getByTestId('move-button')).toHaveTextContent('Intercept')
     expect(screen.getByTestId('move-eta')).toHaveTextContent('ETA')
@@ -121,7 +124,7 @@ describe('FactsPanel', () => {
     expect(screen.getByTestId('selection')).toHaveTextContent(/scan to reveal/i)
   })
 
-  const gate: LaneGate = { destSystemId: 'sys-neighbour', hex: { q: 16, r: 0 } }
+  const gate: LaneGate = { destSystemId: 'sys-neighbour', cell: { ring: 16, slot: 0 } }
   const gateSelection: BoardSelection = { kind: 'gate', gate }
 
   it('previews the route and departs through a selected gate', () => {
@@ -129,7 +132,7 @@ describe('FactsPanel', () => {
       route: ['sys-here', 'sys-neighbour'],
       legEtas: [1_030_000, 1_120_000], // gate ETA, then arrival
       totalEta: 1_120_000,
-      departGate: { q: 16, r: 0 },
+      departGate: { ring: 16, slot: 0 },
       worldTime: 1_000_000,
     }
     render(
@@ -279,10 +282,10 @@ describe('FactsPanel', () => {
     render(
       <FactsPanel
         {...base}
-        selection={{ kind: 'hex', hex: { q: 2, r: 0 } }}
+        selection={{ kind: 'cell', cell: { ring: 2, slot: 0 } }}
         activeFleet={dockedMiner}
         dockedFeature={lodeFeature}
-        plan={planToHex({ q: 3, r: 0 }, { q: 2, r: 0 }, 0)}
+        plan={planToCell({ ring: 3, slot: 0 }, { ring: 2, slot: 0 }, 0, S)}
         worldTime={5_000}
         mineEta={30_000}
       />,
@@ -300,10 +303,10 @@ describe('FactsPanel', () => {
     render(
       <FactsPanel
         {...base}
-        selection={{ kind: 'hex', hex: { q: 2, r: 0 } }}
+        selection={{ kind: 'cell', cell: { ring: 2, slot: 0 } }}
         activeFleet={dockedMiner}
         dockedFeature={lodeFeature}
-        plan={planToHex({ q: 3, r: 0 }, { q: 2, r: 0 }, 0)}
+        plan={planToCell({ ring: 3, slot: 0 }, { ring: 2, slot: 0 }, 0, S)}
         worldTime={31_000}
         mineEta={30_000}
       />,
@@ -330,10 +333,10 @@ describe('FactsPanel', () => {
       state: {
         mode: 'burn',
         burn: {
-          path: [{ q: 0, r: 0 }],
+          path: [{ ring: 0, slot: 0 }],
           startTime: 0,
           arriveTime: 2_000_000,
-          target: { hex: { q: 0, r: 0 } },
+          target: { cell: { ring: 0, slot: 0 } },
         },
       },
     }
@@ -375,10 +378,10 @@ describe('FactsPanel', () => {
       state: {
         mode: 'burn' as const,
         burn: {
-          path: [{ q: 0, r: 0 }],
+          path: [{ ring: 0, slot: 0 }],
           startTime: 0,
           arriveTime: 2_000_000,
-          target: { hex: { q: 0, r: 0 } },
+          target: { cell: { ring: 0, slot: 0 } },
         },
       },
     }

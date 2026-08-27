@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { ScanPing } from './ScanPing'
-import { hexToPixel } from '@/lib/hex/pixel'
+import { cellToPoint } from '@/lib/board'
 import type { BoardFeature } from '@/lib/types/system-board'
+import { productionSchedule } from '@/lib/board'
+
+const S = productionSchedule()
 
 // SVG leaves render inside an <svg> root.
 function renderInSvg(ui: React.ReactElement) {
@@ -13,7 +16,7 @@ const star: BoardFeature = {
   id: 'f-star',
   type: 'star',
   fixed: true,
-  footprint: [{ q: 0, r: 0 }],
+  footprint: [{ ring: 0, slot: 0 }],
   band: 'visible',
   live: true,
 }
@@ -22,16 +25,16 @@ const star: BoardFeature = {
 const nearBody: BoardFeature = {
   id: 'f-rock',
   type: 'rocky',
-  footprint: [{ q: -1, r: 0 }],
+  footprint: [{ ring: 1, slot: 0 }],
   band: 'astronomical',
   live: false,
 }
 
 function pingAt(worldTime: number, features: BoardFeature[] = []) {
   return renderInSvg(
-    <ScanPing
-      originHex={{ q: -2, r: 0 }}
-      originPixel={hexToPixel(-2, 0)}
+    <ScanPing schedule={S}
+      originCell={{ ring: 2, slot: 0 }}
+      originPixel={cellToPoint({ ring: 2, slot: 0 }, S)}
       features={features}
       rimRing={3}
       committedAt={0}
@@ -66,7 +69,7 @@ describe('ScanPing', () => {
     expect(pulse(15_000).r).toBeGreaterThan(0)
     expect(pulse(30_000).r).toBeCloseTo(pulse(15_000).r * 2, 1)
     // The centre never moves: it is the emission pixel, all window long.
-    const emission = hexToPixel(-2, 0)
+    const emission = cellToPoint({ ring: 2, slot: 0 }, S)
     for (const t of [0, 15_000, 30_000]) {
       expect(pulse(t).cx).toBeCloseTo(emission.x, 1)
       expect(pulse(t).cy).toBeCloseTo(emission.y, 1)
@@ -93,7 +96,7 @@ describe('ScanPing', () => {
     const hidden: BoardFeature = {
       id: 'f-hidden',
       type: 'rocky',
-      footprint: [{ q: 2, r: 0 }],
+      footprint: [{ ring: 2, slot: 0 }],
       band: 'astronomical',
       live: false,
     }

@@ -25,7 +25,7 @@ import { useCancelAction, useRunningMine, useRunningScan } from '@/hooks/use-act
 import type { ResourceKind } from '@/lib/types/system-board'
 import { useWorldTime } from '@/hooks/use-world-time'
 import { useBoardRealtime } from '@/hooks/use-board-realtime'
-import type { Hex, Target } from '@/lib/hex'
+import { schedule as boardSchedule, type Cell, type Target } from '@/lib/board'
 import type { Fleet } from '@/lib/types/fleet'
 import { FleetRoster } from '@/components/fleet/FleetRoster'
 import { BoardStage } from './BoardStage'
@@ -34,13 +34,13 @@ import { BoardTuning, type BoardLook } from './BoardTuning'
 import type { ScanFxInput } from './BoardOverlay'
 import { FactsPanel, type BoardSelection } from './FactsPanel'
 import {
-  featureLogicalHex,
+  featureLogicalCell,
   fleetDockedParentId,
-  fleetLogicalHex,
+  fleetLogicalCell,
   fleetOnBoard,
 } from './glyph-geometry'
-import { planToBody, planToHex, type MovePlan } from './move-preview'
-import { planSweep, type ScanPlan } from './scan-preview'
+import { planToBody, planToCell, type MovePlan } from './move-preview'
+import { occluderKey, planSweepFrom, sweepOccluders, type ScanPlan } from './scan-preview'
 
 const STAGE = 'relative h-dvh w-full overflow-hidden bg-[#05070d]'
 
@@ -67,6 +67,11 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const { isAdmin } = useAccountContext()
 
   const [selection, setSelection] = useState<BoardSelection>(null)
+
+  // The board's slot schedule for THIS system, resolved once and threaded into
+  // every solve and projection below (design.md, schedule-threading Decision).
+  // Per-system, not the process-wide default: the solves here route to the rim.
+  const schedule = useMemo(() => boardSchedule(board?.radius ?? 0), [board?.radius])
   const [activeFleetId, setActiveFleetId] = useState<string | null>(null)
   // The renderer's availability (BoardCanvas's guard) and first-frame signal —
   // together they decide how long the loading placeholder persists (the
@@ -161,31 +166,31 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const selectedGateDest = selection?.kind === 'gate' ? selection.gate.destSystemId : null
   const routeQuery = useRoutePreview(activeFleet?.id ?? null, selectedGateDest)
 
-  // The acting fleet's live hex — the origin of every previewed order. The
+  // The acting fleet's live cell — the origin of every previewed order. The
   // docked parent comes off the EFFECTIVE state (a finished dock-on-arrive burn
   // rides its body from the arrival instant, not from the next refetch).
-  const fromHex = useMemo<Hex | null>(() => {
+  const fromCell = useMemo<Cell | null>(() => {
     if (!activeFleet || !board) return null
-    const parentId = fleetDockedParentId(activeFleet, worldTime)
+    const parentId = fleetDockedParentId(activeFleet, worldTime, schedule)
     const parent = parentId ? board.features.find((f) => f.id === parentId) : undefined
-    const parentHex = parent ? featureLogicalHex(parent, worldTime) : undefined
-    return fleetLogicalHex(activeFleet, worldTime, parentHex)
-  }, [activeFleet, board, worldTime])
+    const parentCell = parent ? featureLogicalCell(parent, worldTime, schedule) : undefined
+    return fleetLogicalCell(activeFleet, worldTime, schedule, parentCell)
+  }, [activeFleet, board, worldTime, schedule])
 
   // The feature the acting fleet is docked to, if any — the mine offer's
   // anchor (add-mine-ui "Mine Offer on the Docked Fleet"): the verb needs no
   // selection, just the docked state and the body's visible resources.
   const dockedFeature = useMemo(() => {
     if (!activeFleet || !board) return null
-    const parentId = fleetDockedParentId(activeFleet, worldTime)
+    const parentId = fleetDockedParentId(activeFleet, worldTime, schedule)
     return parentId ? (board.features.find((f) => f.id === parentId) ?? null) : null
-  }, [activeFleet, board, worldTime])
+  }, [activeFleet, board, worldTime, schedule])
 
   // Docked at THIS system's station — the sell offer's anchor, the same
   // docked-state test the mine offer uses. A station is dockable but never
   // mineable, so the two offers are mutually exclusive by construction.
   const dockedAtStation = !!station && !!activeFleet &&
-    fleetDockedParentId(activeFleet, worldTime) === station.featureId
+    fleetDockedParentId(activeFleet, worldTime, schedule) === station.featureId
 
   // This station's live quotes, pulled out of the aggregate board read rather
   // than fetched separately — the board already carries every visible venue.
@@ -198,14 +203,23 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   // The sweep preview: what a scan from HERE would leave in shadow (#0006
   // Decision #21 — the sweep is 360°, so the shadow is the signal). Only
   // computed while the Scan verb is being considered (hover/focus).
+  // Memoized on the resolved occluder set rather than on worldTime: the solve
+  // is O(cells × occluders) and its answer only changes when an occluder
+  // crosses a cell, not on every animation frame.
+  const previewOccluders = useMemo(
+    () => (scanPreview && board ? sweepOccluders(board.features, worldTime, schedule) : []),
+    [scanPreview, board, worldTime, schedule],
+  )
+  const previewKey = fromCell ? occluderKey(fromCell, previewOccluders) : ''
   const sweepPreview = useMemo<ScanPlan | null>(() => {
-    if (!scanPreview || !board || !fromHex) return null
-    return planSweep(fromHex, board.features, board.radius, worldTime)
-  }, [scanPreview, board, fromHex, worldTime])
+    if (!scanPreview || !board || !fromCell) return null
+    return planSweepFrom(fromCell, previewOccluders, board.radius, schedule)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanPreview, board?.radius, previewKey, schedule])
 
-  // The RUNNING scan's committed sweep: the origin is the EMISSION HEX pinned
+  // The RUNNING scan's committed sweep: the origin is the EMISSION CELL pinned
   // in the action's params at commit (#0006 Decision #26 — the pulse stays
-  // where it was fired; the durable sweep mints from the same hex), occluders
+  // where it was fired; the durable sweep mints from the same cell), occluders
   // evaluated at the frozen eta — exactly what resolution will cover — drawn
   // until the eta passes and the reveal lands via the board refetch. A scan
   // committed before the origin was pinned falls back to the fleet at eta.
@@ -214,38 +228,51 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   // Its eta gates move/mine in the panel and joins the refetch candidates so
   // the resolved cargo + freed slot land without user action.
   const runningMine = useRunningMine(activeFleet?.id ?? null).data ?? null
+  // The committed sweep is evaluated at the FROZEN eta, so it does not change
+  // as world time advances — only whether it is still being drawn does. The
+  // running/expired test therefore sits outside the memo; leaving worldTime in
+  // its dependency list re-solved an identical shadow on every frame.
+  const scanRunning =
+    !!runningScan && runningScan.status === 'running' && worldTime < runningScan.eta
   const activeSweep = useMemo<ScanPlan | null>(() => {
     if (!board || !activeFleet || !runningScan) return null
-    if (runningScan.status !== 'running' || worldTime >= runningScan.eta) return null
+    if (runningScan.status !== 'running') return null
     const eta = runningScan.eta
     let origin = runningScan.params?.origin ?? null
     if (!origin) {
-      const parentId = fleetDockedParentId(activeFleet, eta)
+      const parentId = fleetDockedParentId(activeFleet, eta, schedule)
       const parent = parentId ? board.features.find((f) => f.id === parentId) : undefined
-      const parentHex = parent ? featureLogicalHex(parent, eta) : undefined
-      origin = fleetLogicalHex(activeFleet, eta, parentHex)
+      const parentCell = parent ? featureLogicalCell(parent, eta, schedule) : undefined
+      origin = fleetLogicalCell(activeFleet, eta, schedule, parentCell)
     }
     if (!origin) return null
-    return planSweep(origin, board.features, board.radius, eta)
-  }, [board, activeFleet, runningScan, worldTime])
+    return planSweepFrom(origin, sweepOccluders(board.features, eta, schedule), board.radius, schedule)
+  }, [board, activeFleet, runningScan, schedule])
+
+  // The drawn sweep: the frozen solve above, shown only while the scan is still
+  // running. Splitting the gate from the solve is what keeps the solve off the
+  // per-frame path.
+  const drawnSweep = scanRunning ? activeSweep : null
 
   // The live preview plan for the current selection — recomputed each frame so a
-  // led intercept tracks the moving target. The star at the core (0,0) is a body,
+  // led intercept tracks the moving target. The star at the core cell is a body,
   // not a destination (you can't fly onto it or dock it), so it yields no plan.
   const plan = useMemo<MovePlan | null>(() => {
-    if (!fromHex || !selection) return null
+    if (!fromCell || !selection) return null
     if (selection.kind === 'feature') {
       const f = selection.feature
-      if (f.fixed || isCore(featureLogicalHex(f, worldTime))) return null
-      if (f.orbit) return planToBody(fromHex, f.orbit, worldTime)
-      return planToHex(fromHex, featureLogicalHex(f, worldTime), worldTime)
+      if (f.fixed || isCore(featureLogicalCell(f, worldTime, schedule))) return null
+      if (f.orbit) return planToBody(fromCell, f.orbit, worldTime, schedule)
+      return planToCell(fromCell, featureLogicalCell(f, worldTime, schedule), worldTime, schedule)
     }
-    if (selection.kind === 'hex') return isCore(selection.hex) ? null : planToHex(fromHex, selection.hex, worldTime)
-    // A gate previews the in-system burn to its gate tile (leg 0 of the trip); the
+    if (selection.kind === 'cell') {
+      return isCore(selection.cell) ? null : planToCell(fromCell, selection.cell, worldTime, schedule)
+    }
+    // A gate previews the in-system burn to its gate cell (leg 0 of the trip); the
     // lanes past it are shown as ETAs in the facts panel, not on the board.
-    if (selection.kind === 'gate') return planToHex(fromHex, selection.gate.hex, worldTime)
+    if (selection.kind === 'gate') return planToCell(fromCell, selection.gate.cell, worldTime, schedule)
     return null
-  }, [fromHex, selection, worldTime])
+  }, [fromCell, selection, worldTime, schedule])
 
   // Own fleets' arrival ETAs feed the self-scheduled refetch (rule 1) — a burn's
   // arrival, a trip's gate ETA (the moment the fleet leaves this board), and a
@@ -263,7 +290,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     ],
     [ownFleets, runningScan, runningMine],
   )
-  useBoardRealtime({ systemId, worldTime, etaCandidates, scanning: !!activeSweep, enabled: !!board })
+  useBoardRealtime({ systemId, worldTime, etaCandidates, scanning: !!drawnSweep, enabled: !!board })
 
   // Departure hand-off (#0008): a fleet that transits its gate is out on a lane —
   // it has no hex on this board any more, and the crawl it's now doing is the
@@ -273,7 +300,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   useEffect(() => {
     const inTransit = ownFleets.filter((f) => f.state.mode === 'laneTransit')
     if (inTransit.length === 0) return
-    if (inTransit.some((f) => fleetOnBoard(f, worldTime))) {
+    if (inTransit.some((f) => fleetOnBoard(f, worldTime, schedule))) {
       watchedDeparture.current = true
       return
     }
@@ -281,7 +308,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       watchedDeparture.current = false
       router.push('/')
     }
-  }, [ownFleets, worldTime, router])
+  }, [ownFleets, worldTime, router, schedule])
 
   if (isLoading) {
     return (
@@ -320,9 +347,11 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     if (f.own) setActiveFleetId(id)
     setSelection((prev) => (prev?.kind === 'fleet' && prev.fleet.id === id ? null : { kind: 'fleet', fleet: f }))
   }
-  const selectHex = (hex: Hex) =>
+  const selectCell = (cell: Cell) =>
     setSelection((prev) =>
-      prev?.kind === 'hex' && prev.hex.q === hex.q && prev.hex.r === hex.r ? null : { kind: 'hex', hex },
+      prev?.kind === 'cell' && prev.cell.ring === cell.ring && prev.cell.slot === cell.slot
+        ? null
+        : { kind: 'cell', cell },
     )
   const selectGate = (destSystemId: string) => {
     const gate = board.laneGates.find((g) => g.destSystemId === destSystemId)
@@ -337,7 +366,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   // no board at all — the galaxy is where it's visible.
   const showFleet = (f: Fleet) => {
     if (f.state.mode === 'laneTransit' || f.state.mode === 'laneHold') {
-      if (!fleetOnBoard(f, worldTime)) {
+      if (!fleetOnBoard(f, worldTime, schedule)) {
         router.push('/')
         return
       }
@@ -355,7 +384,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     if (!activeFleet || !selection) return
     let target: Target | null = null
     if (selection.kind === 'feature') target = { featureId: selection.feature.id }
-    else if (selection.kind === 'hex') target = { hex: selection.hex }
+    else if (selection.kind === 'cell') target = { cell: selection.cell }
     if (!target) return
     order.mutate(
       { fleetId: activeFleet.id, target },
@@ -478,9 +507,9 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   // — the pulse stays where it was fired; the ship moves on). The FX toggle
   // (playtest) swaps in the arc-scan look. Prop-driven onto the overlay.
   const scanFxInput: ScanFxInput | null =
-    activeSweep && runningScan && activeFleet
+    drawnSweep && runningScan && activeFleet
       ? {
-          originHex: activeSweep.origin,
+          originCell: drawnSweep.origin,
           features: board.features,
           rimRing: board.radius,
           committedAt: runningScan.committedAt,
@@ -492,19 +521,20 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   return (
     <div data-testid="system-board-view" className={STAGE}>
       <BoardStage
+        systemId={systemId}
         board={board}
         fleets={allFleets}
         worldTime={worldTime}
         selectedId={selectedId}
         selectedGateId={selectedGateId}
-        selectedHex={selection?.kind === 'hex' ? selection.hex : null}
+        selectedCell={selection?.kind === 'cell' ? selection.cell : null}
         onSelectFeature={selectFeature}
         onSelectFleet={selectFleet}
         onSelectGate={selectGate}
-        onSelectHex={selectHex}
+        onSelectCell={selectCell}
         onSelectEmpty={() => setSelection(null)}
         plan={selection?.kind === 'fleet' ? null : plan}
-        activeSweep={activeSweep}
+        activeSweep={drawnSweep}
         sweepPreview={sweepPreview}
         scanFx={scanFxInput}
         onAvailabilityChange={setBoardAvailable}
@@ -602,10 +632,10 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   )
 }
 
-// isCore reports whether a hex is the star's core cell (0,0) — never a valid
+// isCore reports whether a cell is the star's core cell — never a valid
 // move destination.
-function isCore(h: Hex): boolean {
-  return h.q === 0 && h.r === 0
+function isCore(c: Cell): boolean {
+  return c.ring === 0
 }
 
 export default SystemBoardView

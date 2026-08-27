@@ -6,8 +6,13 @@
 // modules consume the named records these functions return and re-derive
 // nothing.
 
-import { ringHexes, ringOf } from '@/lib/hex'
-import { hexToPixel, hexesWithinRadius, HEX_SIZE } from '@/lib/hex/pixel'
+import {
+  cellToPoint,
+  cellWedge,
+  RADIAL_UNIT,
+  ringCells,
+  schedule as boardSchedule,
+} from '@/lib/board'
 import type { BoardFeature, FogBand, SystemBoard } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
 import {
@@ -35,8 +40,8 @@ import type {
   Rgb,
 } from './webgl/contract'
 
-// How big each body family draws, in board units (HEX_SIZE = 34): a rocky
-// planet sits comfortably inside its hex, a gas giant overflows it slightly —
+// How big each body family draws, in board units (RADIAL_UNIT = 34): a rocky
+// planet sits comfortably inside its cell, a gas giant overflows it slightly —
 // bodies are objects in space, not tile contents. Typed Record<FeatureType, …>
 // so a new feature type is a compile error here, never an `undefined` render.
 export const DRAW_RADIUS: Record<BoardFeature['type'], number> = {
@@ -122,31 +127,62 @@ export function sortFeaturesForDraw(features: BoardFeature[]): BoardFeature[] {
   return [...parents.sort(byId), ...children.sort(byId)]
 }
 
-// packLatticeTiles — every tile's centre (GL space) and ring-band tint.
+// packLatticeTiles — every cell's centre (GL space), ring-band tint, and the
+// annular-sector bounds the shader carves it out of its quad with.
+//
+// The wedge bounds are resolved HERE, not in the shader: which cells exist,
+// how many slots a ring carries, and where a ring sits radially are all
+// schedule decisions, and the decision rule keeps them outside webgl/. The
+// shader receives four numbers and an SDF to evaluate.
 export function packLatticeTiles(radius: number, bounds?: BandBounds): PackedLatticeTile[] {
-  return hexesWithinRadius(radius).map((h) => {
-    const p = boardToWorld(hexToPixel(h.q, h.r))
-    return { x: p.x, y: p.y, tint: hexToRgb(BAND_STYLE[bandForRing(ringOf(h), bounds)].tint) }
-  })
+  const s = boardSchedule(radius)
+  const out: PackedLatticeTile[] = []
+  for (let ring = 0; ring <= radius; ring++) {
+    for (const c of ringCells(ring, s)) {
+      const p = boardToWorld(cellToPoint(c, s))
+      const w = cellWedge(c, s)
+      // Board angles run with screen-down y; world angles run with y up. The
+      // centre point is already flipped, so its own world angle IS the flipped
+      // angCenter — taking it from the point avoids reasoning about the sign.
+      const angCenter = ring <= 0 ? 0 : Math.atan2(p.y, p.x)
+      // The quad must bound the wedge in both axes. Radially it spans one unit;
+      // angularly it spans a chord of 2·rOuter·sin(angHalf), which grows with
+      // ring where the hex's fixed apothem did not.
+      const arcHalf = w.rOuter * Math.sin(Math.min(w.angHalf, Math.PI / 2))
+      const half = Math.max(RADIAL_UNIT / 2, arcHalf) + RADIAL_UNIT * 0.15
+      out.push({
+        x: p.x,
+        y: p.y,
+        tint: hexToRgb(BAND_STYLE[bandForRing(ring, bounds)].tint),
+        rInner: w.rInner,
+        rOuter: w.rOuter,
+        angCenter,
+        angHalf: w.angHalf,
+        half,
+      })
+    }
+  }
+  return out
 }
 
 // packRings — the occupied orbit rings as closed GL-space polylines. Occupancy
 // comes from each feature's own ring (orbit ring, or its footprint's), which is
 // constant for the life of the board read.
-export function packRings(features: BoardFeature[]): PackedRing[] {
+export function packRings(features: BoardFeature[], radius: number): PackedRing[] {
   const occupied = new Set<number>()
   for (const f of features) {
     if (f.type === 'star' || f.fixed) continue
     if (f.orbit) occupied.add(f.orbit.ring)
-    else if (f.footprint[0]) occupied.add(ringOf(f.footprint[0]))
+    else if (f.footprint[0]) occupied.add(f.footprint[0].ring)
   }
+  const s = boardSchedule(radius)
   return [...occupied]
-    .filter((r) => r > 0)
+    .filter((r) => r > 0 && r <= radius)
     .sort((a, b) => a - b)
     .map((ring) => {
       const points: number[] = []
-      for (const h of ringHexes(ring)) {
-        const p = boardToWorld(hexToPixel(h.q, h.r))
+      for (const c of ringCells(ring, s)) {
+        const p = boardToWorld(cellToPoint(c, s))
         points.push(p.x, p.y)
       }
       return { ring, points }
@@ -191,7 +227,7 @@ export function createPackedScene(board: SystemBoard): PackedScene {
     latticeTiles: packLatticeTiles(board.radius),
     bodies: sortFeaturesForDraw(board.features).map(packBodyInstance),
     star: star ? { radius: DRAW_RADIUS.star, tint: hexToRgb(starTint(board.starClass)) } : null,
-    rings: packRings(board.features),
+    rings: packRings(board.features, board.radius),
     theme: packBoardTheme(),
   }
 }
@@ -209,7 +245,7 @@ export function formationOffsets(count: number): { dx: number; dy: number }[] {
     }
     const pair = Math.ceil(i / 2)
     const side = i % 2 === 1 ? -1 : 1
-    out.push({ dx: side * pair * (HEX_SIZE * 0.28), dy: -pair * (HEX_SIZE * 0.32) })
+    out.push({ dx: side * pair * (RADIAL_UNIT * 0.28), dy: -pair * (RADIAL_UNIT * 0.32) })
   }
   return out
 }
