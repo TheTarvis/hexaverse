@@ -15,6 +15,12 @@
 #       choice among a finite, tie-broken candidate set (e.g. LaneGateHex)
 #   determinism:allow(projection)  — render-only pixel math, never persisted,
 #       never a solve result, never an ETA input, never a mutation input
+#   determinism:allow(pinned)      — cross-target identity is established by
+#       a Go-side fixture family recorded and asserted across the Go
+#       build-target matrix (GOARCH=arm64 vs GOARCH=amd64/GOAMD64=v1), rather
+#       than by discretization or projection — e.g. a correctly-rounded
+#       math.Sqrt or math.Ceil under backend/space's fixtures/space/cases.json
+#       (openspec cross-stack-determinism, the Go-only-package branch)
 #
 #   fixtures/determinism-register.json — a KNOWN, FILED, not-yet-fixed
 #       violation (open defect under docs/defects/). Register entries naming
@@ -25,9 +31,12 @@
 # open defect. Never pragma a defect site — file it and register it.
 #
 # Scope: non-test .go files under the rule-bearing backend packages
-# (board, polar, fleet, mine, galaxy, system, corporations, market — the
-# packages whose outputs are persisted values, solve results, ETAs, or
-# disclosure decisions) and non-test .ts files under frontend/lib/board/ and
+# (board, polar, space, fleet, mine, galaxy, system, corporations, market —
+# the packages whose outputs are persisted values, solve results, ETAs, or
+# disclosure decisions — space added by add-space-kinematics: a Go-only
+# rule-bearing package with no TypeScript mirror would otherwise pass this
+# check merely by not being scoped into it) and non-test .ts files under
+# frontend/lib/board/ and
 # frontend/lib/polar/ (the two board-math mirrors; openspec
 # board-tactical-math bars runtime trig AND sqrt outright from both pairs'
 # rule-bearing surfaces — geometry runs on the pinned coordinate table, whose
@@ -63,7 +72,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REGISTER="$REPO_ROOT/fixtures/determinism-register.json"
 
 # Scope: rule-bearing Go packages + the TS board-math mirror, production files only.
-if [[ "$FILE_PATH" =~ backend/(board|polar|fleet|mine|galaxy|system|corporations|market)/.*\.go$ && ! "$FILE_PATH" =~ _test\.go$ ]]; then
+if [[ "$FILE_PATH" =~ backend/(board|polar|space|fleet|mine|galaxy|system|corporations|market)/.*\.go$ && ! "$FILE_PATH" =~ _test\.go$ ]]; then
     PATTERN='math\.(Sin|Cos|Tan|Asin|Acos|Atan|Atan2|Sinh|Cosh|Tanh|Asinh|Acosh|Atanh|Log|Log2|Log10|Log1p|Exp|Exp2|Expm1|Pow|Sqrt|Round)\('
     COMMENT_RE='^[0-9]+:[[:space:]]*(//)'
 elif [[ "$FILE_PATH" =~ frontend/lib/(board|polar)/.*\.ts$ && ! "$FILE_PATH" =~ \.test\.ts$ ]]; then

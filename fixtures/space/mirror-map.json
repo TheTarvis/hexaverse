@@ -1,0 +1,138 @@
+{
+  "$comment": [
+    "ANTI-mirror map for backend/space <-> frontend/lib/space (openspec:",
+    "add-space-kinematics, design.md Decision 1 — Go is the SOLE authority for",
+    "continuous-space kinematics and there is no TypeScript mirror, now or later;",
+    "cross-stack-determinism › 'A Go-sole-authority capability's mirror map runs in",
+    "anti-mirror mode').",
+    "",
+    "This file is the INVERSE of fixtures/board/mirror-map.json and",
+    "fixtures/polar/mirror-map.json. Those assert a mirror EXISTS and is covered.",
+    "This one asserts a mirror does NOT exist: .claude/scripts/check-mirror-map.sh's",
+    "anti_mirror_space pass fails if any function name is declared in BOTH",
+    "backend/space and frontend/lib/space unless it is listed in 'sharedNames'.",
+    "There is deliberately no 'pairs' array — a pairs entry would assert the very",
+    "mirror this capability exists to forbid.",
+    "",
+    "'sharedNames' is empty BY DEFAULT and should stay that way. Adding a name here",
+    "is a claim that a render-side function may legitimately share a name with an",
+    "authoritative Go one; it needs the same scrutiny as a spec change.",
+    "",
+    "frontend/lib/space does not exist as of this change (tasks.md 2.2 records that",
+    "omission as deliberate: the Go package has zero consumers, so there is no render",
+    "surface yet to draw). frontend/app/spike/space-3d is NEVER scanned — it is the",
+    "exempt, non-shipping feel bench named in space-kinematics › 'Every Rule-Bearing",
+    "Value of This Capability Is Computed Only in the Authoritative Implementation'.",
+    "",
+    "'coverage' below is this capability's COVERAGE INVENTORY (tasks.md 3.9): every",
+    "function declared in backend/space, reconciled against the fixture families in",
+    "fixtures/space/cases.json. Values: 'family:<name>' — asserted by that family,",
+    "directly or indirectly as a callee of the family's function; 'inventory' — no",
+    "family exercises it, tracked as a gap in 'inventory' below."
+  ],
+
+  "sharedNames": [],
+
+  "coverage": [
+    { "go": "Vec3.Add", "coverage": "family:orbitPosition", "note": "indirect: every composed position sums through it" },
+    { "go": "Vec3.Sub", "coverage": "family:arcTable", "note": "indirect: the cumulative chord sums" },
+    { "go": "Vec3.Scale", "coverage": "family:buildCurve", "note": "indirect: Hermite control points and the avoidance push" },
+    { "go": "Vec3.Dot", "coverage": "family:buildCurve", "note": "indirect: avoidStar's side-of-chord sign" },
+    { "go": "Vec3.Cross", "coverage": "family:buildCurve", "note": "indirect: perpendicularToChord" },
+    { "go": "Vec3.Length", "coverage": "family:arcTable", "note": "indirect: the family that pins this capability's sqrt" },
+    { "go": "Vec3.Normalize", "coverage": "family:burnTangent", "note": "indirect: the unit tangent" },
+
+    { "go": "SubTurn/wrapSubTurn", "coverage": "family:turnTable", "note": "indirect: CosSin reduces every index through it; the exhaustive sweep covers all 2^20" },
+    { "go": "floorMod", "coverage": "family:orbitPosition", "note": "indirect: the sweep's time box straddles the epoch, so the negative-elapsed branch is drawn" },
+    { "go": "octantOf", "coverage": "family:phaseIndexOf", "note": "indirect: the first three of the twenty comparisons" },
+    { "go": "crossAtOrBefore", "coverage": "family:phaseIndexOf", "note": "indirect: the bracketing comparison" },
+    { "go": "PhaseIndexOf", "coverage": "family:phaseIndexOf" },
+
+    { "go": "CosSin", "coverage": "family:turnTable" },
+    { "go": "loadTurnTable", "coverage": "family:turnTable", "note": "indirect: the sweep's first lookup loads the embedded table" },
+
+    { "go": "Orbit.PhaseAt", "coverage": "family:orbitPosition", "note": "indirect: both orbit families advance through it" },
+    { "go": "rotateInclinationNode", "coverage": "family:orbitPosition", "note": "indirect: inclination and node are swept axes" },
+    { "go": "Orbit.LocalPosition", "coverage": "family:orbitPosition" },
+    { "go": "angularRateScale", "coverage": "family:orbitVelocity", "note": "indirect" },
+    { "go": "Orbit.LocalVelocity", "coverage": "family:orbitVelocity" },
+
+    { "go": "Position", "coverage": "family:bodyPosition" },
+    { "go": "resolvePosition", "coverage": "family:bodyPosition", "note": "indirect: the hand cases draw the unknown-parent and cycle sentinels" },
+    { "go": "Velocity", "coverage": "family:bodyVelocity" },
+    { "go": "resolveVelocity", "coverage": "family:bodyVelocity", "note": "indirect" },
+
+    { "go": "elevateCubicToQuintic", "coverage": "family:buildCurve", "note": "indirect: every built transfer curve is a degree-elevated Hermite cubic (design.md Decision 11), so every buildCurve and solveBurn case exercises it" },
+    { "go": "bernsteinPoint", "coverage": "family:curvePoint", "note": "indirect: the FMA-hazard site D-2 measured" },
+    { "go": "Curve.Point", "coverage": "family:curvePoint" },
+    { "go": "bernsteinDerivative", "coverage": "family:curveDerivative", "note": "indirect" },
+    { "go": "Curve.Derivative", "coverage": "family:curveDerivative" },
+    { "go": "Curve.ArcTable", "coverage": "family:arcTable" },
+    { "go": "Curve.Length", "coverage": "family:arcTable", "note": "indirect: it is the table's 65th entry, recorded in full" },
+    { "go": "Curve.ArcParam", "coverage": "family:arcParam" },
+
+    { "go": "FlightSeconds", "coverage": "family:travelTime", "note": "the family that discharges the sqrt-pinning obligation" },
+    { "go": "QuantizeArrival", "coverage": "family:travelTime" },
+
+    { "go": "TargetPosition", "coverage": "family:buildCurve", "note": "indirect: both target forms are swept" },
+    { "go": "BuildCurve", "coverage": "family:buildCurve" },
+    { "go": "minDistanceFromOriginOf", "coverage": "inventory", "note": "unreferenced outside its own package; see the inventory entry" },
+    { "go": "minDistanceAndParamOf", "coverage": "family:buildCurve", "note": "indirect: the fixed 33-sample closest-approach scan" },
+    { "go": "perpendicularToChord", "coverage": "family:buildCurve", "note": "indirect: the chord-parallel grazing regression case" },
+    { "go": "avoidStar", "coverage": "family:buildCurve", "note": "indirect: the swept star-clearance axis" },
+    { "go": "SolveBurn", "coverage": "family:solveBurn" },
+
+    { "go": "Burn.Position", "coverage": "family:burnPosition" },
+    { "go": "Burn.Tangent", "coverage": "family:burnTangent" },
+    { "go": "Burn.Speed", "coverage": "family:burnSpeed" },
+    { "go": "Burn.Progress", "coverage": "family:burnSpeed" },
+    { "go": "Burn.BeforeFlip", "coverage": "family:burnSpeed" },
+    { "go": "Burn.DeltaV", "coverage": "family:burnSpeed" },
+    { "go": "Burn.flightSeconds", "coverage": "family:burnSpeed", "note": "indirect" },
+    { "go": "Burn.coveredLength", "coverage": "family:burnPosition", "note": "indirect: the accelerate-flip-decelerate integral" },
+
+    { "go": "Park.PhaseAt", "coverage": "family:parkPosition", "note": "indirect: the swept time box straddles the park's own epoch" },
+    { "go": "Park.Position", "coverage": "family:parkPosition" },
+    { "go": "Park.Velocity", "coverage": "family:parkPosition", "note": "recorded as the second component of every parkPosition sweep line" },
+    { "go": "InsertionStandoff", "coverage": "family:solveBurn", "note": "indirect: the intercept's standoff" },
+    { "go": "InsertionPeriod", "coverage": "family:solveBurn", "note": "indirect: the settled park's period" },
+    { "go": "StarClearanceRadius", "coverage": "family:buildCurve", "note": "indirect: the hand cases resolve their clearance through it" },
+    { "go": "ReleaseStationkeep", "coverage": "family:parkPosition", "note": "hand cases only: three released holds are recorded as parkPosition inputs, but no sweep draws a release" },
+    { "go": "StationKeepRate", "coverage": "inventory" },
+    { "go": "StationKeepUpkeep", "coverage": "inventory" },
+
+    { "go": "StateAt", "coverage": "family:stateAt" },
+    { "go": "StatePosition", "coverage": "family:stateAt", "note": "recorded as the last component of every stateAt sweep line" },
+
+    { "go": "EncodeVec", "coverage": "inventory" },
+    { "go": "DecodeVec", "coverage": "inventory" },
+    { "go": "decodeNumericSlice", "coverage": "inventory" },
+    { "go": "decodeNumber", "coverage": "inventory" },
+    { "go": "checkedCoordinate", "coverage": "inventory" },
+    { "go": "EncodeSubTurns", "coverage": "inventory" },
+    { "go": "DecodeSubTurns", "coverage": "inventory" }
+  ],
+
+  "inventory": [
+    {
+      "pair": "EncodeVec/DecodeVec/EncodeSubTurns/DecodeSubTurns (+ decodeNumericSlice, decodeNumber, checkedCoordinate)",
+      "why": "The Firestore/action.Params codec is a persistence boundary, not a geometry function: its outputs are storage-native primitives and its failures are named sentinels, neither of which a byte-for-byte float family adds anything to. It is covered by backend/space/params_test.go across the accepted int/int64/float64 arrival shapes and the non-finite / out-of-extent rejections.",
+      "expectedChange": "the first change that gives backend/space a consumer — at which point a stored round trip crosses a real Firestore document and a fixture family earns its keep"
+    },
+    {
+      "pair": "StationKeepRate/StationKeepUpkeep",
+      "why": "Upkeep is a closed-form product of a body-derived rate and elapsed world time, unit-tested in park_test.go (the floor, the ordering of an inner vs an outer body, and read-count independence over 500 sub-intervals). No family sweeps it because nothing consumes a station-keep charge yet.",
+      "expectedChange": "the change that introduces a delta-v or credit consumer for station-keeping — the first point at which the rate becomes a rule-bearing stored value rather than a computable one"
+    },
+    {
+      "pair": "ReleaseStationkeep",
+      "why": "Covered by three hand-selected parkPosition cases (the (3,2,4) planar re-circularization, the directly-above minimum-radius case, and the released park evaluated later) but by no randomized sweep, so an offset distribution it mishandles could still hide.",
+      "expectedChange": "the change that first lets a player release a station-keep hold"
+    },
+    {
+      "pair": "minDistanceFromOriginOf",
+      "why": "A thin wrapper over minDistanceAndParamOf, retained for readability and currently called only by tests. Its companion IS swept via buildCurve's star-clearance axis.",
+      "expectedChange": "delete it, or give it a caller, in the change that first migrates a consumer onto backend/space"
+    }
+  ]
+}

@@ -1054,7 +1054,11 @@ def run_determinism_cross_target() -> dict:
        package, per openspec polar-lattice-math) must reproduce on
        GOARCH=amd64 GOAMD64=v1 (the non-contracting target; Rosetta locally,
        native on CI) alongside the native arch. GOAMD64 is pinned explicitly
-       because v3+ emits FMA on amd64 too.
+       because v3+ emits FMA on amd64 too. backend/space (openspec
+       add-space-kinematics) rides the same leg: it is a Go-only rule-bearing
+       package with no JavaScript-runtime leg by design (Decision 1 — no
+       TypeScript mirror), so this compiled-output cross-target run is its
+       whole determinism story, not merely a fixture-file diff.
     2. Compiled-output FMA inspection over the whole backend module
        (check-fma-contraction.sh) — the primary mechanism; consults and
        prints the deviation register.
@@ -1070,25 +1074,25 @@ def run_determinism_cross_target() -> dict:
 
     reasons = []
 
-    print_info("Board + polar fixture suites, native arch...")
-    native = run_command("go test ./board/ ./polar/ -short -count=1", cwd=backend_dir, check=False)
+    print_info("Board + polar + space fixture suites, native arch...")
+    native = run_command("go test ./board/ ./polar/ ./space/ -short -count=1", cwd=backend_dir, check=False)
     if native.returncode == 0:
-        print_success("native arch board/polar tests passed")
+        print_success("native arch board/polar/space tests passed")
     else:
-        print_error("native arch board/polar tests failed")
-        reasons.append("native-arch board/polar tests failed:\n" + native.stdout + native.stderr)
+        print_error("native arch board/polar/space tests failed")
+        reasons.append("native-arch board/polar/space tests failed:\n" + native.stdout + native.stderr)
 
-    print_info("Board + polar fixture suites, GOARCH=amd64 GOAMD64=v1 (non-contracting target)...")
+    print_info("Board + polar + space fixture suites, GOARCH=amd64 GOAMD64=v1 (non-contracting target)...")
     amd64 = run_command(
-        "GOARCH=amd64 GOAMD64=v1 go test ./board/ ./polar/ -short -count=1",
+        "GOARCH=amd64 GOAMD64=v1 go test ./board/ ./polar/ ./space/ -short -count=1",
         cwd=backend_dir, check=False
     )
     if amd64.returncode == 0:
-        print_success("amd64/GOAMD64=v1 board/polar tests passed")
+        print_success("amd64/GOAMD64=v1 board/polar/space tests passed")
     else:
-        print_error("amd64/GOAMD64=v1 board/polar tests failed")
+        print_error("amd64/GOAMD64=v1 board/polar/space tests failed")
         reasons.append(
-            "amd64/GOAMD64=v1 board/polar tests failed (on Apple Silicon this leg needs "
+            "amd64/GOAMD64=v1 board/polar/space tests failed (on Apple Silicon this leg needs "
             "Rosetta 2 — `softwareupdate --install-rosetta`):\n" + amd64.stdout + amd64.stderr)
 
     print_info("Compiled-output FMA-contraction inspection (backend module, arm64 vs amd64/v1)...")

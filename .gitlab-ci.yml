@@ -340,6 +340,16 @@ test-backend:
     # v3+ emits fused multiply-add on amd64, silently making this the
     # contracting target the check exists to catch.
     - GOAMD64=v1 go test ./board/ -short -count=1
+    # backend/space (openspec add-space-kinematics) rides the same
+    # cross-target leg board does: a Go-only rule-bearing package with no
+    # JavaScript-runtime leg by design (Decision 1 — no TypeScript mirror),
+    # so this compiled-output cross-target run is its whole determinism
+    # story. The three scenario tests that were disputed during this change's
+    # TDD run were adjudicated as test defects and fixed by the SDET; the
+    # package's suite is green (81 pass, 2 documented skips — the
+    # fixture-blocked round-count case and the UPDATE_FIXTURES-gated table
+    # recording flow).
+    - GOAMD64=v1 go test ./space/ -short -count=1
     # arm64 leg: runs under qemu-user when TEST_RUNNER_IMAGE provides it
     # (infra/docker/test-runner.Dockerfile installs qemu-user-static; rebuild
     # via infra/docker/build-test-runner.sh). Until that image is live, this
@@ -350,6 +360,8 @@ test-backend:
       if [ -n "$QEMU" ]; then
         CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/board-arm64.test ./board/
         (cd board && "$QEMU" /tmp/board-arm64.test -test.short -test.count=1)
+        CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/space-arm64.test ./space/
+        (cd space && "$QEMU" /tmp/space-arm64.test -test.short -test.count=1)
       else
         echo "arm64 fixture leg SKIPPED: TEST_RUNNER_IMAGE lacks qemu-user (rebuild it per infra/docker) — leg asserted by the local /check gate only"
       fi

@@ -1,0 +1,7827 @@
+{
+  "_meta": {
+    "generatedOn": {
+      "goarch": "arm64"
+    },
+    "buildTargetMatrix": "GOARCH=arm64 and GOARCH=amd64 with GOAMD64=v1",
+    "jsRuntimeLeg": "none — backend/space is Go-sole-authority with no TypeScript mirror by design (design.md Decision 1); this table is asserted only across the Go build-target matrix",
+    "serialization": "every recorded output value is strconv.FormatFloat(v, 'b', -1, 64); inputs are plain JSON numbers"
+  },
+  "measured": {
+    "note": "measured over solveBurnSweep's own drawn cases (openspec add-space-kinematics tasks.md 3.4-3.6). A later loosening of any of these fails this family rather than passing silently.",
+    "solveRounds": 8,
+    "solveRoundResidualP99Ms": 1264,
+    "solveRoundResidualMaxMs": 26685,
+    "solveRoundResidualP99BoundMs": 2000,
+    "solveRoundResidualMaxBoundMs": 30000,
+    "solveSweepSolvedCases": 4853,
+    "solveSweepTangentCases": 4035,
+    "arrivalTangentWorstDot": "9007199254740988p-53",
+    "arrivalTangentThreshold": "9007199254740988p-53",
+    "arrivalTangentDisplacedCases": 388,
+    "arrivalTangentWorstDotUndisplaced": "9007199254740988p-53",
+    "arrivalPositionalGaps": 0,
+    "starClearanceCases": 4853,
+    "starClearanceViolations": 0,
+    "realisticTraffic": {
+      "note": "the traffic play would actually generate, as a counterweight to the randomized sweep's adversarial box: every ordered pair of the fixture system's targetable bodies, departing from the source body's own insertion standoff, at the star's real clearance radius. Enumerable and pinned, so it records no PRNG.",
+      "burns": 725,
+      "departureLadder": "40 departures at 4000 ms intervals from world time 0",
+      "roundResidualNonzeroCases": 132,
+      "roundResidualP99Ms": 101,
+      "roundResidualMaxMs": 767,
+      "medianFlightMs": 5326,
+      "starClearanceViolations": 0,
+      "arrivalTangentBelowFloorCases": 0
+    },
+    "minArcLength": "4503599627370496p-51",
+    "minArcNominalAccel": "4503599627370496p-49",
+    "minArcFlightSecondsAtNominalAccel": "4503599627370496p-52"
+  },
+  "systems": {
+    "cyclic": [
+      {
+        "id": "a",
+        "size": 1,
+        "orbit": {
+          "parentId": "b",
+          "radius": 10,
+          "periodMs": 1000,
+          "phase": 0,
+          "inclination": 0,
+          "node": 0
+        }
+      },
+      {
+        "id": "b",
+        "size": 1,
+        "orbit": {
+          "parentId": "a",
+          "radius": 10,
+          "periodMs": 1000,
+          "phase": 0,
+          "inclination": 0,
+          "node": 0
+        }
+      }
+    ],
+    "fixture": [
+      {
+        "id": "star",
+        "size": 6
+      },
+      {
+        "id": "planet1",
+        "size": 2.4,
+        "orbit": {
+          "parentId": "star",
+          "radius": 50,
+          "periodMs": 100000,
+          "phase": 0,
+          "inclination": 0,
+          "node": 0
+        }
+      },
+      {
+        "id": "planet2",
+        "size": 3.1,
+        "orbit": {
+          "parentId": "star",
+          "radius": 80,
+          "periodMs": 160000,
+          "phase": 0,
+          "inclination": 43690,
+          "node": 0
+        }
+      },
+      {
+        "id": "moon1",
+        "size": 0.6,
+        "orbit": {
+          "parentId": "planet1",
+          "radius": 6,
+          "periodMs": 9000,
+          "phase": 131072,
+          "inclination": 0,
+          "node": 0
+        }
+      },
+      {
+        "id": "outpost",
+        "size": 0.2,
+        "orbit": {
+          "parentId": "moon1",
+          "radius": 1.5,
+          "periodMs": 3000,
+          "phase": 0,
+          "inclination": 0,
+          "node": 149796
+        }
+      },
+      {
+        "id": "frozen",
+        "size": 1.1,
+        "orbit": {
+          "parentId": "star",
+          "radius": 33,
+          "periodMs": 0,
+          "phase": 349525,
+          "inclination": 0,
+          "node": 0
+        }
+      }
+    ]
+  },
+  "turnTable": [
+    {
+      "note": "zero — the +X axis direction",
+      "idx": 0,
+      "cos": "4503599627370496p-52",
+      "sin": "0p-1074"
+    },
+    {
+      "note": "one fine step",
+      "idx": 1,
+      "cos": "9007199254579288p-53",
+      "sin": "7074237751986106p-70"
+    },
+    {
+      "note": "the last fine index before the first coarse step",
+      "idx": 1023,
+      "cos": "9007030027765658p-53",
+      "sin": "7067285056414901p-60"
+    },
+    {
+      "note": "the first coarse step",
+      "idx": 1024,
+      "cos": "9007029696760466p-53",
+      "sin": "7074193361797233p-60"
+    },
+    {
+      "note": "quarter turn",
+      "idx": 262144,
+      "cos": "4967757600021504p-106",
+      "sin": "4503599627370496p-52"
+    },
+    {
+      "note": "half turn",
+      "idx": 524288,
+      "cos": "-4503599627370496p-52",
+      "sin": "4967757600021504p-105"
+    },
+    {
+      "note": "three-quarter turn",
+      "idx": 786432,
+      "cos": "-7451636400032256p-105",
+      "sin": "-4503599627370496p-52"
+    },
+    {
+      "note": "a full turn wraps to zero",
+      "idx": 1048576,
+      "cos": "4503599627370496p-52",
+      "sin": "0p-1074"
+    },
+    {
+      "note": "minus one wraps to the last index (a bare '%' would index the table negatively)",
+      "idx": -1,
+      "cos": "9007199254579289p-53",
+      "sin": "-7074237751988224p-70"
+    },
+    {
+      "note": "a full turn below zero wraps to zero",
+      "idx": -1048576,
+      "cos": "4503599627370496p-52",
+      "sin": "0p-1074"
+    },
+    {
+      "note": "the inclination the fixture system's second planet carries",
+      "idx": 43690,
+      "cos": "8700295695296911p-53",
+      "sin": "4662399909490698p-54"
+    },
+    {
+      "note": "an arbitrary interior index using both table levels",
+      "idx": 654321,
+      "cos": "-6408580455205877p-53",
+      "sin": "-6329276022086563p-53"
+    }
+  ],
+  "turnTableFile": [
+    {
+      "note": "the pinned two-level sub-turn table, asserted as DATA: SHA-256 of the committed file's bytes. backend/space embeds a byte-identical copy (turn_table_record_test.go asserts that), and never recomputes an entry at runtime.",
+      "path": "fixtures/space/turn-table.json",
+      "digest": "4045d4a7b7bf654aa2e1ea20db1905905270dfa7610951f8fb7bd528e4a84935"
+    }
+  ],
+  "turnTableSweep": [
+    {
+      "note": "EXHAUSTIVE, not randomized: CosSin's domain is every sub-turn index, and 2^20 of them is enumerable — recorded in the stronger form rather than sampled down.",
+      "domain": "every idx in [0, SubTurn) ascending, SubTurn = 2^20",
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 1048576,
+      "digest": "63791135c0482be1344f1864c1aeea50b024fc5d0e232a0fc7f48fcfb39c7d95"
+    }
+  ],
+  "phaseIndexOf": [
+    {
+      "note": "the +X axis",
+      "offset": [
+        1,
+        0,
+        0
+      ],
+      "index": 0,
+      "steps": 20
+    },
+    {
+      "note": "the +Z axis (a quarter turn)",
+      "offset": [
+        0,
+        0,
+        1
+      ],
+      "index": 262143,
+      "steps": 20
+    },
+    {
+      "note": "the -X axis (a half turn)",
+      "offset": [
+        -1,
+        0,
+        0
+      ],
+      "index": 524287,
+      "steps": 20
+    },
+    {
+      "note": "the -Z axis (three quarters)",
+      "offset": [
+        0,
+        0,
+        -1
+      ],
+      "index": 786432,
+      "steps": 20
+    },
+    {
+      "note": "the vertical component is ignored — only the X/Z plane resolves",
+      "offset": [
+        1,
+        900,
+        0
+      ],
+      "index": 0,
+      "steps": 20
+    },
+    {
+      "note": "an exact octant diagonal",
+      "offset": [
+        1,
+        0,
+        1
+      ],
+      "index": 131071,
+      "steps": 20
+    },
+    {
+      "note": "exactly on table entry 12345's direction — resolves to that entry's own index",
+      "offset": [
+        0.9972652725020368,
+        0,
+        0.07390518426631669
+      ],
+      "index": 12345,
+      "steps": 20
+    },
+    {
+      "note": "the sum of adjacent entries 500 and 501 — the documented tie, resolving to the LOWER index",
+      "offset": [
+        1.9999910056831716,
+        0,
+        0.00599809557363485
+      ],
+      "index": 500,
+      "steps": 20
+    },
+    {
+      "note": "a large arbitrary offset",
+      "offset": [
+        -713.25,
+        12,
+        411.5
+      ],
+      "index": 436958,
+      "steps": 20
+    },
+    {
+      "note": "a tiny arbitrary offset — scale-invariant",
+      "offset": [
+        -7.1325e-9,
+        0,
+        4.115e-9
+      ],
+      "index": 436958,
+      "steps": 20
+    },
+    {
+      "note": "the round trip: an offset built from a planar orbit's own position at a quarter period",
+      "offset": [
+        3.0616169978683787e-15,
+        -0,
+        50
+      ],
+      "index": 262143,
+      "steps": 20
+    }
+  ],
+  "phaseIndexOfSweep": [
+    {
+      "note": "a Cartesian offset drawn from a box straddling the origin in all three axes; the recorded output is the resolved index and the (always twenty) step count",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "offset.x",
+          "kind": "float",
+          "lo": -1000,
+          "hi": 1000
+        },
+        {
+          "name": "offset.y",
+          "kind": "float",
+          "lo": -1000,
+          "hi": 1000
+        },
+        {
+          "name": "offset.z",
+          "kind": "float",
+          "lo": -1000,
+          "hi": 1000
+        }
+      ],
+      "count": 100000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "d35fb64ea36ef412e707521680e8171c2f1aba296331b2b682abaf54228984bb"
+    }
+  ],
+  "orbitPosition": [
+    {
+      "note": "planar orbit at the world epoch",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 0,
+      "out": [
+        "7036874417766400p-47",
+        "-0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "planar orbit a quarter period on",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 25000,
+      "out": [
+        "7762121250033600p-101",
+        "-0p-1074",
+        "7036874417766400p-47"
+      ]
+    },
+    {
+      "note": "planar orbit at exactly one full period — identical to the epoch",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 100000,
+      "out": [
+        "7036874417766400p-47",
+        "-0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "planar orbit one full period BEFORE the epoch — identical to the epoch, no negative table index",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": -100000,
+      "out": [
+        "7036874417766400p-47",
+        "-0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "planar orbit at a time strictly before the epoch, mid-period",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": -37500,
+      "out": [
+        "-4975821619160761p-47",
+        "0p-1074",
+        "-4975821619160759p-47"
+      ]
+    },
+    {
+      "note": "inclined orbit a quarter turn past its ascending node — the out-of-plane component peaks",
+      "orbit": {
+        "parentId": "star",
+        "radius": 80,
+        "periodMs": 160000,
+        "phase": 0,
+        "inclination": 43690,
+        "node": 0
+      },
+      "t": 40000,
+      "out": [
+        "6209697000026880p-100",
+        "-5827999886863372p-48",
+        "5437684809560569p-46"
+      ]
+    },
+    {
+      "note": "inclined orbit at its ascending node — zero out-of-plane component",
+      "orbit": {
+        "parentId": "star",
+        "radius": 80,
+        "periodMs": 160000,
+        "phase": 0,
+        "inclination": 43690,
+        "node": 0
+      },
+      "t": 0,
+      "out": [
+        "5629499534213120p-46",
+        "-0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "node-rotated orbit at an arbitrary time",
+      "orbit": {
+        "parentId": "star",
+        "radius": 20,
+        "periodMs": 40000,
+        "phase": 349525,
+        "inclination": 0,
+        "node": 149796
+      },
+      "t": 12345,
+      "out": [
+        "4886446922222318p-50",
+        "0p-1074",
+        "-5495355292014770p-48"
+      ]
+    },
+    {
+      "note": "zero-period orbit — motionless at its stored phase, no division",
+      "orbit": {
+        "parentId": "star",
+        "radius": 33,
+        "periodMs": 0,
+        "phase": 349525,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 999999,
+      "out": [
+        "-4644321048410596p-48",
+        "-0p-1074",
+        "8044237128362402p-48"
+      ]
+    },
+    {
+      "note": "negative-period orbit — motionless, no division",
+      "orbit": {
+        "parentId": "star",
+        "radius": 12,
+        "periodMs": -5,
+        "phase": 174762,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 4242,
+      "out": [
+        "6755446182255549p-50",
+        "-0p-1074",
+        "5850334035581086p-49"
+      ]
+    }
+  ],
+  "orbitPositionSweep": [
+    {
+      "note": "orbital elements and a world time drawn independently; the time box straddles the orbit's own epoch (world time 0 for a bare Orbit), so the before-epoch wrap branch is drawn",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "orbit.radius",
+          "kind": "float",
+          "lo": 0.1,
+          "hi": 500
+        },
+        {
+          "name": "orbit.periodMs",
+          "kind": "int",
+          "lo": -50000,
+          "hi": 500000
+        },
+        {
+          "name": "orbit.phase",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "orbit.inclination",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "orbit.node",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "t",
+          "kind": "int",
+          "lo": -2000000,
+          "hi": 2000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "10b8acd2c8996ee725a7707872c59fd6396c2839d4ba4a57e6693405108f80e6"
+    }
+  ],
+  "orbitVelocity": [
+    {
+      "note": "planar orbit at the world epoch",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 0,
+      "out": [
+        "-0p-1074",
+        "-0p-1074",
+        "7074237752028440p-51"
+      ]
+    },
+    {
+      "note": "planar orbit a quarter period on",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 25000,
+      "out": [
+        "-7074237752028440p-51",
+        "-0p-1074",
+        "7803335390521209p-105"
+      ]
+    },
+    {
+      "note": "planar orbit at exactly one full period — identical to the epoch",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 100000,
+      "out": [
+        "-0p-1074",
+        "-0p-1074",
+        "7074237752028440p-51"
+      ]
+    },
+    {
+      "note": "planar orbit one full period BEFORE the epoch — identical to the epoch, no negative table index",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": -100000,
+      "out": [
+        "-0p-1074",
+        "-0p-1074",
+        "7074237752028440p-51"
+      ]
+    },
+    {
+      "note": "planar orbit at a time strictly before the epoch, mid-period",
+      "orbit": {
+        "parentId": "star",
+        "radius": 50,
+        "periodMs": 100000,
+        "phase": 0,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": -37500,
+      "out": [
+        "5002241486185188p-51",
+        "0p-1074",
+        "-5002241486185189p-51"
+      ]
+    },
+    {
+      "note": "inclined orbit a quarter turn past its ascending node — the out-of-plane component peaks",
+      "orbit": {
+        "parentId": "star",
+        "radius": 80,
+        "periodMs": 160000,
+        "phase": 0,
+        "inclination": 43690,
+        "node": 0
+      },
+      "t": 40000,
+      "out": [
+        "-7074237752028440p-51",
+        "-8078486816940710p-107",
+        "7537451252826978p-105"
+      ]
+    },
+    {
+      "note": "inclined orbit at its ascending node — zero out-of-plane component",
+      "orbit": {
+        "parentId": "star",
+        "radius": 80,
+        "periodMs": 160000,
+        "phase": 0,
+        "inclination": 43690,
+        "node": 0
+      },
+      "t": 0,
+      "out": [
+        "-0p-1074",
+        "-7323680651876847p-53",
+        "6833196260100919p-51"
+      ]
+    },
+    {
+      "note": "node-rotated orbit at an arbitrary time",
+      "orbit": {
+        "parentId": "star",
+        "radius": 20,
+        "periodMs": 40000,
+        "phase": 349525,
+        "inclination": 0,
+        "node": 149796
+      },
+      "t": 12345,
+      "out": [
+        "6905667125703757p-51",
+        "0p-1074",
+        "6140490301204036p-53"
+      ]
+    },
+    {
+      "note": "zero-period orbit — motionless at its stored phase, no division",
+      "orbit": {
+        "parentId": "star",
+        "radius": 33,
+        "periodMs": 0,
+        "phase": 349525,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 999999,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "negative-period orbit — motionless, no division",
+      "orbit": {
+        "parentId": "star",
+        "radius": 12,
+        "periodMs": -5,
+        "phase": 174762,
+        "inclination": 0,
+        "node": 0
+      },
+      "t": 4242,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    }
+  ],
+  "orbitVelocitySweep": [
+    {
+      "note": "the same draw stream as orbitPositionSweep, evaluated for analytic local velocity",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "orbit.radius",
+          "kind": "float",
+          "lo": 0.1,
+          "hi": 500
+        },
+        {
+          "name": "orbit.periodMs",
+          "kind": "int",
+          "lo": -50000,
+          "hi": 500000
+        },
+        {
+          "name": "orbit.phase",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "orbit.inclination",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "orbit.node",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "t",
+          "kind": "int",
+          "lo": -2000000,
+          "hi": 2000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "58e522a20326afe116dbc12ec9e1be07b42b6bd4c7e41262f875ff24fd818232"
+    }
+  ],
+  "bodyPosition": [
+    {
+      "note": "a parentless body sits at the origin at every time",
+      "system": "fixture",
+      "body": "star",
+      "t": 0,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "a parentless body sits at the origin at every time (again, much later)",
+      "system": "fixture",
+      "body": "star",
+      "t": 987654321,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "a planet, one level down",
+      "system": "fixture",
+      "body": "planet1",
+      "t": 33333,
+      "out": [
+        "-7036557938155586p-48",
+        "0p-1074",
+        "6094203366081584p-47"
+      ]
+    },
+    {
+      "note": "an inclined planet leaves the plane",
+      "system": "fixture",
+      "body": "planet2",
+      "t": 40000,
+      "out": [
+        "6209697000026880p-100",
+        "-5827999886863372p-48",
+        "5437684809560569p-46"
+      ]
+    },
+    {
+      "note": "a moon composes its parent's position with its own offset",
+      "system": "fixture",
+      "body": "moon1",
+      "t": 33333,
+      "out": [
+        "-6235383841023694p-48",
+        "0p-1074",
+        "5350843776683826p-47"
+      ]
+    },
+    {
+      "note": "an outpost four levels deep — the chain's depth bound",
+      "system": "fixture",
+      "body": "outpost",
+      "t": 33333,
+      "out": [
+        "-6245611406416154p-48",
+        "0p-1074",
+        "5561888062654353p-47"
+      ]
+    },
+    {
+      "note": "a zero-period body is motionless",
+      "system": "fixture",
+      "body": "frozen",
+      "t": 5000000,
+      "out": [
+        "-4644321048410596p-48",
+        "0p-1074",
+        "8044237128362402p-48"
+      ]
+    },
+    {
+      "note": "a body at a time strictly before the world epoch",
+      "system": "fixture",
+      "body": "moon1",
+      "t": -33333,
+      "out": [
+        "-8523345350376573p-48",
+        "0p-1074",
+        "-5693590781195945p-47"
+      ]
+    },
+    {
+      "note": "an unknown body identity fails with a named sentinel, never a panic",
+      "system": "fixture",
+      "body": "nosuchbody",
+      "t": 0,
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "ErrUnknownBody"
+    },
+    {
+      "note": "a cyclic parent chain fails with a named sentinel at a bounded depth",
+      "system": "cyclic",
+      "body": "a",
+      "t": 1000,
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "ErrBodyCycle"
+    }
+  ],
+  "bodyPositionSweep": [
+    {
+      "note": "a three-level chain (parentless a -\u003e b -\u003e c) with independently drawn elements, evaluated at c so hierarchical composition is what is swept",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "b.radius",
+          "kind": "float",
+          "lo": 0.1,
+          "hi": 300
+        },
+        {
+          "name": "b.periodMs",
+          "kind": "int",
+          "lo": -20000,
+          "hi": 400000
+        },
+        {
+          "name": "b.phase",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "b.inclination",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "b.node",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "c.radius",
+          "kind": "float",
+          "lo": 0.1,
+          "hi": 300
+        },
+        {
+          "name": "c.periodMs",
+          "kind": "int",
+          "lo": -20000,
+          "hi": 400000
+        },
+        {
+          "name": "c.phase",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "c.inclination",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "c.node",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "t",
+          "kind": "int",
+          "lo": -2000000,
+          "hi": 2000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "c128979b81258810f96d132c4d868ee25f81952ba76a767313883e20236755e2"
+    }
+  ],
+  "bodyVelocity": [
+    {
+      "note": "a parentless body sits at the origin at every time",
+      "system": "fixture",
+      "body": "star",
+      "t": 0,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "a parentless body sits at the origin at every time (again, much later)",
+      "system": "fixture",
+      "body": "star",
+      "t": 987654321,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "a planet, one level down",
+      "system": "fixture",
+      "body": "planet1",
+      "t": 33333,
+      "out": [
+        "-6126561447796509p-51",
+        "0p-1074",
+        "-7073919592021930p-52"
+      ]
+    },
+    {
+      "note": "an inclined planet leaves the plane",
+      "system": "fixture",
+      "body": "planet2",
+      "t": 40000,
+      "out": [
+        "-7074237752028440p-51",
+        "-8078486816940710p-107",
+        "7537451252826978p-105"
+      ]
+    },
+    {
+      "note": "a moon composes its parent's position with its own offset",
+      "system": "fixture",
+      "body": "moon1",
+      "t": 33333,
+      "out": [
+        "8707379453649824p-53",
+        "0p-1074",
+        "7501123876121884p-54"
+      ]
+    },
+    {
+      "note": "an outpost four levels deep — the chain's depth bound",
+      "system": "fixture",
+      "body": "outpost",
+      "t": 33333,
+      "out": [
+        "-4895317039383384p-51",
+        "0p-1074",
+        "6130207852609944p-54"
+      ]
+    },
+    {
+      "note": "a zero-period body is motionless",
+      "system": "fixture",
+      "body": "frozen",
+      "t": 5000000,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "a body at a time strictly before the world epoch",
+      "system": "fixture",
+      "body": "moon1",
+      "t": -33333,
+      "out": [
+        "6607560873741816p-53",
+        "0p-1074",
+        "-5920188002872226p-50"
+      ]
+    },
+    {
+      "note": "an unknown body identity fails with a named sentinel, never a panic",
+      "system": "fixture",
+      "body": "nosuchbody",
+      "t": 0,
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "ErrUnknownBody"
+    },
+    {
+      "note": "a cyclic parent chain fails with a named sentinel at a bounded depth",
+      "system": "cyclic",
+      "body": "a",
+      "t": 1000,
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "ErrBodyCycle"
+    }
+  ],
+  "bodyVelocitySweep": [
+    {
+      "note": "the same draw stream as bodyPositionSweep, evaluated for analytic velocity",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "b.radius",
+          "kind": "float",
+          "lo": 0.1,
+          "hi": 300
+        },
+        {
+          "name": "b.periodMs",
+          "kind": "int",
+          "lo": -20000,
+          "hi": 400000
+        },
+        {
+          "name": "b.phase",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "b.inclination",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "b.node",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "c.radius",
+          "kind": "float",
+          "lo": 0.1,
+          "hi": 300
+        },
+        {
+          "name": "c.periodMs",
+          "kind": "int",
+          "lo": -20000,
+          "hi": 400000
+        },
+        {
+          "name": "c.phase",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "c.inclination",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "c.node",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "t",
+          "kind": "int",
+          "lo": -2000000,
+          "hi": 2000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "a0a508d834d6f9dea8ecc405d8366d0e479d2aa4b52c2abd9a25891944a46fd8"
+    }
+  ],
+  "curvePoint": [
+    {
+      "note": "u=0 is exactly P0 (position) / 3*(C1-P0) (derivative)",
+      "curve": {
+        "p0": [
+          -50,
+          10,
+          20
+        ],
+        "c1": [
+          -20,
+          28,
+          2
+        ],
+        "c2": [
+          7,
+          19,
+          5
+        ],
+        "c3": [
+          31,
+          0.5,
+          12.5
+        ],
+        "c4": [
+          52,
+          -10,
+          8
+        ],
+        "p5": [
+          70,
+          5,
+          -25
+        ]
+      },
+      "u": 0,
+      "out": [
+        "-7036874417766400p-47",
+        "5629499534213120p-49",
+        "5629499534213120p-48"
+      ]
+    },
+    {
+      "note": "u=1 is exactly P3 (position) / 3*(P3-C2) (derivative)",
+      "curve": {
+        "p0": [
+          -50,
+          10,
+          20
+        ],
+        "c1": [
+          -20,
+          28,
+          2
+        ],
+        "c2": [
+          7,
+          19,
+          5
+        ],
+        "c3": [
+          31,
+          0.5,
+          12.5
+        ],
+        "c4": [
+          52,
+          -10,
+          8
+        ],
+        "p5": [
+          70,
+          5,
+          -25
+        ]
+      },
+      "u": 1,
+      "out": [
+        "4925812092436480p-46",
+        "5629499534213120p-50",
+        "-7036874417766400p-48"
+      ]
+    },
+    {
+      "note": "the parameter midpoint of a fully three-dimensional curve",
+      "curve": {
+        "p0": [
+          -50,
+          10,
+          20
+        ],
+        "c1": [
+          -20,
+          28,
+          2
+        ],
+        "c2": [
+          7,
+          19,
+          5
+        ],
+        "c3": [
+          31,
+          0.5,
+          12.5
+        ],
+        "c4": [
+          52,
+          -10,
+          8
+        ],
+        "p5": [
+          70,
+          5,
+          -25
+        ]
+      },
+      "u": 0.5,
+      "out": [
+        "4925812092436480p-48",
+        "5277655813324800p-49",
+        "7740561859543040p-50"
+      ]
+    },
+    {
+      "note": "an interior parameter of a fully three-dimensional curve",
+      "curve": {
+        "p0": [
+          -50,
+          10,
+          20
+        ],
+        "c1": [
+          -20,
+          28,
+          2
+        ],
+        "c2": [
+          7,
+          19,
+          5
+        ],
+        "c3": [
+          31,
+          0.5,
+          12.5
+        ],
+        "c4": [
+          52,
+          -10,
+          8
+        ],
+        "p5": [
+          70,
+          5,
+          -25
+        ]
+      },
+      "u": 0.3125,
+      "out": [
+        "-6816972092211200p-50",
+        "4812768553205760p-48",
+        "8272450609479680p-50"
+      ]
+    },
+    {
+      "note": "a straight, evenly-spaced curve at its parameter midpoint",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          6,
+          0,
+          0
+        ],
+        "c2": [
+          12,
+          0,
+          0
+        ],
+        "c3": [
+          18,
+          0,
+          0
+        ],
+        "c4": [
+          24,
+          0,
+          0
+        ],
+        "p5": [
+          30,
+          0,
+          0
+        ]
+      },
+      "u": 0.5,
+      "out": [
+        "8444249301319680p-49",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "an S-curve, whose arc-length midpoint is nowhere near its parameter midpoint",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "u": 0.5,
+      "out": [
+        "8444249301319680p-48",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "a degenerate zero-length curve",
+      "curve": {
+        "p0": [
+          7,
+          7,
+          7
+        ],
+        "c1": [
+          7.000000000000001,
+          7.000000000000001,
+          7.000000000000001
+        ],
+        "c2": [
+          7,
+          7,
+          7
+        ],
+        "c3": [
+          7,
+          7,
+          7
+        ],
+        "c4": [
+          7,
+          7,
+          7
+        ],
+        "p5": [
+          7,
+          7,
+          7
+        ]
+      },
+      "u": 0.5,
+      "out": [
+        "7881299347898368p-50",
+        "7881299347898368p-50",
+        "7881299347898368p-50"
+      ]
+    }
+  ],
+  "curvePointSweep": [
+    {
+      "note": "four independently drawn control points and a parameter in [0,1]",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "p0.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p0.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p0.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "u",
+          "kind": "float",
+          "lo": 0,
+          "hi": 1
+        }
+      ],
+      "count": 100000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "e3bfef901909e5f541925c661db177ae5f35e9e1a7077ec3e189c514d1ee709d"
+    }
+  ],
+  "curveDerivative": [
+    {
+      "note": "u=0 is exactly P0 (position) / 3*(C1-P0) (derivative)",
+      "curve": {
+        "p0": [
+          -50,
+          10,
+          20
+        ],
+        "c1": [
+          -20,
+          28,
+          2
+        ],
+        "c2": [
+          7,
+          19,
+          5
+        ],
+        "c3": [
+          31,
+          0.5,
+          12.5
+        ],
+        "c4": [
+          52,
+          -10,
+          8
+        ],
+        "p5": [
+          70,
+          5,
+          -25
+        ]
+      },
+      "u": 0,
+      "out": [
+        "5277655813324800p-45",
+        "6333186975989760p-46",
+        "-6333186975989760p-46"
+      ]
+    },
+    {
+      "note": "u=1 is exactly P3 (position) / 3*(P3-C2) (derivative)",
+      "curve": {
+        "p0": [
+          -50,
+          10,
+          20
+        ],
+        "c1": [
+          -20,
+          28,
+          2
+        ],
+        "c2": [
+          7,
+          19,
+          5
+        ],
+        "c3": [
+          31,
+          0.5,
+          12.5
+        ],
+        "c4": [
+          52,
+          -10,
+          8
+        ],
+        "p5": [
+          70,
+          5,
+          -25
+        ]
+      },
+      "u": 1,
+      "out": [
+        "6333186975989760p-46",
+        "5277655813324800p-46",
+        "-5805421394657280p-45"
+      ]
+    },
+    {
+      "note": "the parameter midpoint of a fully three-dimensional curve",
+      "curve": {
+        "p0": [
+          -50,
+          10,
+          20
+        ],
+        "c1": [
+          -20,
+          28,
+          2
+        ],
+        "c2": [
+          7,
+          19,
+          5
+        ],
+        "c3": [
+          31,
+          0.5,
+          12.5
+        ],
+        "c4": [
+          52,
+          -10,
+          8
+        ],
+        "p5": [
+          70,
+          5,
+          -25
+        ]
+      },
+      "u": 0.5,
+      "out": [
+        "8444249301319680p-46",
+        "-6860952557322240p-47",
+        "-8444249301319680p-51"
+      ]
+    },
+    {
+      "note": "an interior parameter of a fully three-dimensional curve",
+      "curve": {
+        "p0": [
+          -50,
+          10,
+          20
+        ],
+        "c1": [
+          -20,
+          28,
+          2
+        ],
+        "c2": [
+          7,
+          19,
+          5
+        ],
+        "c3": [
+          31,
+          0.5,
+          12.5
+        ],
+        "c4": [
+          52,
+          -10,
+          8
+        ],
+        "p5": [
+          70,
+          5,
+          -25
+        ]
+      },
+      "u": 0.3125,
+      "out": [
+        "4617948836659200p-45",
+        "-7735064301404160p-48",
+        "-7982454417653760p-50"
+      ]
+    },
+    {
+      "note": "a straight, evenly-spaced curve at its parameter midpoint",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          6,
+          0,
+          0
+        ],
+        "c2": [
+          12,
+          0,
+          0
+        ],
+        "c3": [
+          18,
+          0,
+          0
+        ],
+        "c4": [
+          24,
+          0,
+          0
+        ],
+        "p5": [
+          30,
+          0,
+          0
+        ]
+      },
+      "u": 0.5,
+      "out": [
+        "8444249301319680p-48",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "an S-curve, whose arc-length midpoint is nowhere near its parameter midpoint",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "u": 0.5,
+      "out": [
+        "6333186975989760p-46",
+        "0p-1074",
+        "-8444249301319680p-47"
+      ]
+    },
+    {
+      "note": "a degenerate zero-length curve",
+      "curve": {
+        "p0": [
+          7,
+          7,
+          7
+        ],
+        "c1": [
+          7.000000000000001,
+          7.000000000000001,
+          7.000000000000001
+        ],
+        "c2": [
+          7,
+          7,
+          7
+        ],
+        "c3": [
+          7,
+          7,
+          7
+        ],
+        "c4": [
+          7,
+          7,
+          7
+        ],
+        "p5": [
+          7,
+          7,
+          7
+        ]
+      },
+      "u": 0.5,
+      "out": [
+        "-8444249301319680p-103",
+        "-8444249301319680p-103",
+        "-8444249301319680p-103"
+      ]
+    }
+  ],
+  "curveDerivativeSweep": [
+    {
+      "note": "the same draw stream as curvePointSweep, evaluated for the analytic derivative",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "p0.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p0.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p0.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "u",
+          "kind": "float",
+          "lo": 0,
+          "hi": 1
+        }
+      ],
+      "count": 100000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "ea4f866ea57acb3b24ec831f20342272379ff42a0bea33fb8220f8e3465384b3"
+    }
+  ],
+  "arcTable": [
+    {
+      "note": "a straight, evenly-spaced curve — the cumulative chord sums are linear",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          6,
+          0,
+          0
+        ],
+        "c2": [
+          12,
+          0,
+          0
+        ],
+        "c3": [
+          18,
+          0,
+          0
+        ],
+        "c4": [
+          24,
+          0,
+          0
+        ],
+        "p5": [
+          30,
+          0,
+          0
+        ]
+      },
+      "table": [
+        "0p-1074",
+        "8444249301319680p-54",
+        "8444249301319680p-53",
+        "6333186975989760p-52",
+        "8444249301319680p-52",
+        "5277655813324800p-51",
+        "6333186975989760p-51",
+        "7388718138654720p-51",
+        "8444249301319680p-51",
+        "4749890231992320p-50",
+        "5277655813324800p-50",
+        "5805421394657280p-50",
+        "6333186975989760p-50",
+        "6860952557322240p-50",
+        "7388718138654720p-50",
+        "7916483719987200p-50",
+        "8444249301319680p-50",
+        "8972014882652160p-50",
+        "4749890231992320p-49",
+        "5013773022658560p-49",
+        "5277655813324800p-49",
+        "5541538603991040p-49",
+        "5805421394657280p-49",
+        "6069304185323520p-49",
+        "6333186975989760p-49",
+        "6597069766656000p-49",
+        "6860952557322240p-49",
+        "7124835347988480p-49",
+        "7388718138654720p-49",
+        "7652600929320960p-49",
+        "7916483719987200p-49",
+        "8180366510653440p-49",
+        "8444249301319680p-49",
+        "8708132091985920p-49",
+        "8972014882652160p-49",
+        "4617948836659200p-48",
+        "4749890231992320p-48",
+        "4881831627325440p-48",
+        "5013773022658560p-48",
+        "5145714417991680p-48",
+        "5277655813324800p-48",
+        "5409597208657920p-48",
+        "5541538603991040p-48",
+        "5673479999324160p-48",
+        "5805421394657280p-48",
+        "5937362789990400p-48",
+        "6069304185323520p-48",
+        "6201245580656640p-48",
+        "6333186975989760p-48",
+        "6465128371322880p-48",
+        "6597069766656000p-48",
+        "6729011161989120p-48",
+        "6860952557322240p-48",
+        "6992893952655360p-48",
+        "7124835347988480p-48",
+        "7256776743321600p-48",
+        "7388718138654720p-48",
+        "7520659533987840p-48",
+        "7652600929320960p-48",
+        "7784542324654080p-48",
+        "7916483719987200p-48",
+        "8048425115320320p-48",
+        "8180366510653440p-48",
+        "8312307905986560p-48",
+        "8444249301319680p-48"
+      ]
+    },
+    {
+      "note": "an S-curve — table[64] is the length that both prices the flight and places the ship",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "table": [
+        "0p-1074",
+        "8054929626427049p-52",
+        "7681781747547004p-51",
+        "5493922611823236p-50",
+        "6986748549796273p-50",
+        "8335167808500319p-50",
+        "4778647900507720p-49",
+        "5336964660509774p-49",
+        "5854312774236752p-49",
+        "6343598562740064p-49",
+        "6818204544665622p-49",
+        "7291015558580760p-49",
+        "7773427180051504p-49",
+        "8274682455605892p-49",
+        "8801677211066998p-49",
+        "4679567029671150p-48",
+        "4974977705912895p-48",
+        "5287803302240695p-48",
+        "5618226983140143p-48",
+        "5966017695570621p-48",
+        "6330633305063367p-48",
+        "6711297467993930p-48",
+        "7107056490116740p-48",
+        "7516821430117785p-48",
+        "7939399482049734p-48",
+        "8373517603344008p-48",
+        "8817840530905200p-48",
+        "4635492362415884p-47",
+        "4865764674810941p-47",
+        "5099012550246854p-47",
+        "5334500735737979p-47",
+        "5571486457904827p-47",
+        "5809222124755360p-47",
+        "6046957791605893p-47",
+        "6283943513772741p-47",
+        "6519431699263866p-47",
+        "6752679574699779p-47",
+        "6982951887094836p-47",
+        "7209523984058120p-47",
+        "7431685447838716p-47",
+        "7648744508485853p-47",
+        "7860033534451827p-47",
+        "8064916004452349p-47",
+        "8262795515513754p-47",
+        "8453127596979036p-47",
+        "8635435401725409p-47",
+        "8809330757940648p-47",
+        "8974542598390372p-47",
+        "4565477698277136p-46",
+        "4639330367337572p-46",
+        "4709012473371985p-46",
+        "4774886817804623p-46",
+        "4837543727248922p-46",
+        "4897845179932765p-46",
+        "4956946556672157p-46",
+        "5016272304412852p-46",
+        "5077433027975766p-46",
+        "5142101542191638p-46",
+        "5211891137191895p-46",
+        "5288274136724090p-46",
+        "5372550340393093p-46",
+        "5465851961516408p-46",
+        "5569166445144516p-46",
+        "5683363849342437p-46",
+        "5809222124755360p-46"
+      ]
+    },
+    {
+      "note": "a fully three-dimensional curve",
+      "curve": {
+        "p0": [
+          -50,
+          10,
+          20
+        ],
+        "c1": [
+          -20,
+          28,
+          2
+        ],
+        "c2": [
+          7,
+          19,
+          5
+        ],
+        "c3": [
+          31,
+          0.5,
+          12.5
+        ],
+        "c4": [
+          52,
+          -10,
+          8
+        ],
+        "p5": [
+          70,
+          5,
+          -25
+        ]
+      },
+      "table": [
+        "0p-1074",
+        "6790900937858273p-51",
+        "6666784498162030p-50",
+        "4911604762999864p-49",
+        "6436953989995260p-49",
+        "7913993463910785p-49",
+        "4673605210080937p-48",
+        "5370497180473445p-48",
+        "6049801866117886p-48",
+        "6713565951937606p-48",
+        "7363736914054606p-48",
+        "8002147410505304p-48",
+        "8630501423014690p-48",
+        "4625181370291882p-47",
+        "4931573111463832p-47",
+        "5235056048149474p-47",
+        "5536181670536351p-47",
+        "5835423026745478p-47",
+        "6133176260660209p-47",
+        "6429763327497484p-47",
+        "6725435682034708p-47",
+        "7020378729472422p-47",
+        "7314716840608626p-47",
+        "7608518756232970p-47",
+        "7901803235529181p-47",
+        "8194544835725585p-47",
+        "8486679742247045p-47",
+        "8778111598246102p-47",
+        "4534358654284306p-46",
+        "4679176407772109p-46",
+        "4823429431257901p-46",
+        "4967033387992401p-46",
+        "5109902154475274p-46",
+        "5251950798338258p-46",
+        "5393098640874099p-46",
+        "5533272433819255p-46",
+        "5672409679225278p-46",
+        "5810462118010561p-46",
+        "5947399406314653p-46",
+        "6083212988094493p-46",
+        "6217920156340890p-46",
+        "6351568272651058p-46",
+        "6484239084699217p-46",
+        "6616053043115573p-46",
+        "6747173474457841p-46",
+        "6877810418500801p-46",
+        "7008223892000088p-46",
+        "7138726306607287p-46",
+        "7269683757465818p-46",
+        "7401515923366969p-46",
+        "7534694388062004p-46",
+        "7669739306378083p-46",
+        "7807214487531219p-46",
+        "7947721128744940p-46",
+        "8091890574531666p-46",
+        "8240376571228541p-46",
+        "8393847513559579p-46",
+        "8552979137824020p-46",
+        "8718448019155144p-46",
+        "8890926103146629p-46",
+        "4535538185937224p-45",
+        "4629774816108707p-45",
+        "4728491166153152p-45",
+        "4831997631299095p-45",
+        "4940596488778345p-45"
+      ]
+    },
+    {
+      "note": "a degenerate zero-length curve — every entry is zero",
+      "curve": {
+        "p0": [
+          7,
+          7,
+          7
+        ],
+        "c1": [
+          7.000000000000001,
+          7.000000000000001,
+          7.000000000000001
+        ],
+        "c2": [
+          7,
+          7,
+          7
+        ],
+        "c3": [
+          7,
+          7,
+          7
+        ],
+        "c4": [
+          7,
+          7,
+          7
+        ],
+        "p5": [
+          7,
+          7,
+          7
+        ]
+      },
+      "table": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    }
+  ],
+  "arcTableSweep": [
+    {
+      "note": "four independently drawn control points; the recorded output is all 65 cumulative chord sums",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "p0.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p0.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p0.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        }
+      ],
+      "count": 20000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 20000,
+      "digest": "2a61d28430778139101ace9c1432ef8a541b884008b3af4d2d868a5f5b80fe9e"
+    }
+  ],
+  "arcParam": [
+    {
+      "note": "the start of the curve",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "frac": 0,
+      "u": "0p-1074",
+      "steps": 6
+    },
+    {
+      "note": "the arc-length midpoint of an S-curve — NOT the parameter midpoint",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "frac": 0.5,
+      "u": "4503599627370496p-53",
+      "steps": 6
+    },
+    {
+      "note": "the end of the curve",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "frac": 1,
+      "u": "4503599627370496p-52",
+      "steps": 6
+    },
+    {
+      "note": "a quarter of the arc length",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "frac": 0.25,
+      "u": "5221126316502478p-54",
+      "steps": 6
+    },
+    {
+      "note": "near the end — the search still runs exactly six steps",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "frac": 0.984375,
+      "u": "8905699257962135p-53",
+      "steps": 6
+    },
+    {
+      "note": "below zero clamps to the start, still six steps",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "frac": -0.3,
+      "u": "0p-1074",
+      "steps": 6
+    },
+    {
+      "note": "above one clamps to the end, still six steps",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          0,
+          0,
+          24
+        ],
+        "c2": [
+          18,
+          0,
+          12
+        ],
+        "c3": [
+          42,
+          0,
+          -12
+        ],
+        "c4": [
+          60,
+          0,
+          -24
+        ],
+        "p5": [
+          60,
+          0,
+          0
+        ]
+      },
+      "frac": 1.4,
+      "u": "4503599627370496p-52",
+      "steps": 6
+    },
+    {
+      "note": "a straight curve, where arc length and parameter agree",
+      "curve": {
+        "p0": [
+          0,
+          0,
+          0
+        ],
+        "c1": [
+          6,
+          0,
+          0
+        ],
+        "c2": [
+          12,
+          0,
+          0
+        ],
+        "c3": [
+          18,
+          0,
+          0
+        ],
+        "c4": [
+          24,
+          0,
+          0
+        ],
+        "p5": [
+          30,
+          0,
+          0
+        ]
+      },
+      "frac": 0.5,
+      "u": "4503599627370496p-53",
+      "steps": 6
+    },
+    {
+      "note": "a degenerate zero-length curve — the segment length is zero",
+      "curve": {
+        "p0": [
+          7,
+          7,
+          7
+        ],
+        "c1": [
+          7.000000000000001,
+          7.000000000000001,
+          7.000000000000001
+        ],
+        "c2": [
+          7,
+          7,
+          7
+        ],
+        "c3": [
+          7,
+          7,
+          7
+        ],
+        "c4": [
+          7,
+          7,
+          7
+        ],
+        "p5": [
+          7,
+          7,
+          7
+        ]
+      },
+      "frac": 0.5,
+      "u": "8866461766385664p-53",
+      "steps": 6
+    }
+  ],
+  "arcParamSweep": [
+    {
+      "note": "four control points and an arc-length fraction drawn from a box that overhangs [0,1] at both ends, so the clamps are drawn; the output is the parameter and the (always six) step count",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "p0.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p0.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p0.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c1.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c2.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c3.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "c4.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.x",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.y",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "p5.z",
+          "kind": "float",
+          "lo": -400,
+          "hi": 400
+        },
+        {
+          "name": "frac",
+          "kind": "float",
+          "lo": -0.25,
+          "hi": 1.25
+        }
+      ],
+      "count": 20000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 20000,
+      "digest": "f4d12ab705671156f25bb41cf14383b586b7a22afc1140fe20f6c72a0497923b"
+    }
+  ],
+  "travelTime": [
+    {
+      "note": "the requirement's worked example: 200 units at 8 u/s^2 is 10 seconds",
+      "curveLength": 200,
+      "accel": 8,
+      "departMs": 0,
+      "flightSeconds": "5629499534213120p-49",
+      "arriveMs": 10000
+    },
+    {
+      "note": "the same 200-unit path at 2 u/s^2 — quartered acceleration doubles the time",
+      "curveLength": 200,
+      "accel": 2,
+      "departMs": 0,
+      "flightSeconds": "5629499534213120p-48",
+      "arriveMs": 20000
+    },
+    {
+      "note": "an exact integer-millisecond flight time is not over-rounded",
+      "curveLength": 200,
+      "accel": 8,
+      "departMs": 12345,
+      "flightSeconds": "5629499534213120p-49",
+      "arriveMs": 22345
+    },
+    {
+      "note": "a fractional flight time quantizes UP, never down",
+      "curveLength": 3.920560002,
+      "accel": 8,
+      "departMs": 1000,
+      "flightSeconds": "6305489823806610p-52",
+      "arriveMs": 2401
+    },
+    {
+      "note": "the configured minimum arc length at the nominal acceleration",
+      "curveLength": 2,
+      "accel": 8,
+      "departMs": 0,
+      "flightSeconds": "4503599627370496p-52",
+      "arriveMs": 1000
+    },
+    {
+      "note": "a very short path",
+      "curveLength": 0.001,
+      "accel": 40,
+      "departMs": 500,
+      "flightSeconds": "5764607523034235p-59",
+      "arriveMs": 510
+    },
+    {
+      "note": "a very long path at a low acceleration",
+      "curveLength": 1000000,
+      "accel": 0.01,
+      "departMs": 7,
+      "flightSeconds": "5497558138880000p-38",
+      "arriveMs": 20000007
+    }
+  ],
+  "travelTimeSweep": [
+    {
+      "note": "a curve length, an acceleration and a departure millisecond; the output is the brachistochrone flight time and its ceiling-quantized integer arrival — the family that discharges this capability's sqrt-pinning obligation",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "curveLength",
+          "kind": "float",
+          "lo": 0.001,
+          "hi": 1000000
+        },
+        {
+          "name": "accel",
+          "kind": "float",
+          "lo": 0.01,
+          "hi": 100
+        },
+        {
+          "name": "departMs",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1000000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "08eab34034f89fba04eb5466628d763bb4948741addc0984a4e617737984c8e5"
+    }
+  ],
+  "buildCurve": [
+    {
+      "note": "a point target with no departure tangent and no star clearance — departs along the chord",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        0
+      ],
+      "target": {
+        "point": [
+          0,
+          0,
+          200
+        ]
+      },
+      "arriveMs": 50000,
+      "starClearance": 0,
+      "curve": [
+        [
+          "7036874417766400p-45",
+          "0p-1074",
+          "0p-1074"
+        ],
+        [
+          "5629499534213120p-45",
+          "0p-1074",
+          "5629499534213120p-47"
+        ],
+        [
+          "8444249301319680p-46",
+          "0p-1074",
+          "5629499534213120p-46"
+        ],
+        [
+          "5629499534213120p-46",
+          "0p-1074",
+          "8444249301319680p-46"
+        ],
+        [
+          "5629499534213120p-47",
+          "0p-1074",
+          "5629499534213120p-45"
+        ],
+        [
+          "0p-1074",
+          "0p-1074",
+          "7036874417766400p-45"
+        ]
+      ],
+      "intercept": [
+        "0p-1074",
+        "0p-1074",
+        "7036874417766400p-45"
+      ],
+      "insertionPhase": 0
+    },
+    {
+      "note": "the same transfer with a crosswise departure tangent — the path bends off the chord",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        0
+      ],
+      "target": {
+        "point": [
+          0,
+          0,
+          200
+        ]
+      },
+      "arriveMs": 50000,
+      "departDir": [
+        0,
+        0,
+        1
+      ],
+      "starClearance": 0,
+      "curve": [
+        [
+          "7036874417766400p-45",
+          "0p-1074",
+          "0p-1074"
+        ],
+        [
+          "7036874417766400p-45",
+          "0p-1074",
+          "7961314590657216p-47"
+        ],
+        [
+          "5629499534213120p-45",
+          "0p-1074",
+          "6795407062435167p-46"
+        ],
+        [
+          "7036874417766400p-46",
+          "0p-1074",
+          "4513601532715352p-45"
+        ],
+        [
+          "5629499534213120p-47",
+          "0p-1074",
+          "5629499534213120p-45"
+        ],
+        [
+          "0p-1074",
+          "0p-1074",
+          "7036874417766400p-45"
+        ]
+      ],
+      "intercept": [
+        "0p-1074",
+        "0p-1074",
+        "7036874417766400p-45"
+      ],
+      "insertionPhase": 0
+    },
+    {
+      "note": "a body target: the intercept IS the settled park's own position at the arrival millisecond",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        30
+      ],
+      "target": {
+        "bodyId": "planet1"
+      },
+      "arriveMs": 60000,
+      "starClearance": 0,
+      "curve": [
+        [
+          "7036874417766400p-45",
+          "0p-1074",
+          "8444249301319680p-48"
+        ],
+        [
+          "5386523915853730p-45",
+          "0p-1074",
+          "5183280228328180p-48"
+        ],
+        [
+          "4641451194181668p-46",
+          "0p-1074",
+          "-4600820860730952p-48"
+        ],
+        [
+          "-5960581773376496p-48",
+          "0p-1074",
+          "-7192460974895042p-47"
+        ],
+        [
+          "-4790846447169466p-46",
+          "0p-1074",
+          "-8822945511390792p-47"
+        ],
+        [
+          "-4859512367187818p-47",
+          "0p-1074",
+          "-7860596063637822p-48"
+        ]
+      ],
+      "intercept": [
+        "-4859512367187818p-47",
+        "0p-1074",
+        "-7860596063637822p-48"
+      ],
+      "insertionPhase": 40410
+    },
+    {
+      "note": "a body target four levels deep",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        30
+      ],
+      "target": {
+        "bodyId": "outpost"
+      },
+      "arriveMs": 60000,
+      "starClearance": 0,
+      "curve": [
+        [
+          "7036874417766400p-45",
+          "0p-1074",
+          "8444249301319680p-48"
+        ],
+        [
+          "5381386774652830p-45",
+          "0p-1074",
+          "4881643358414625p-48"
+        ],
+        [
+          "4569371844710873p-46",
+          "0p-1074",
+          "-5251546246044704p-48"
+        ],
+        [
+          "-6496119439535664p-48",
+          "0p-1074",
+          "-7692367925252016p-47"
+        ],
+        [
+          "-4935005146111055p-46",
+          "0p-1074",
+          "-4736835448352272p-46"
+        ],
+        [
+          "-4962255191205790p-47",
+          "0p-1074",
+          "-4684390206602797p-47"
+        ]
+      ],
+      "intercept": [
+        "-4962255191205790p-47",
+        "0p-1074",
+        "-4684390206602797p-47"
+      ],
+      "insertionPhase": 43854
+    },
+    {
+      "note": "a motionless (zero-period) body target",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        30
+      ],
+      "target": {
+        "bodyId": "frozen"
+      },
+      "arriveMs": 60000,
+      "starClearance": 0,
+      "curve": [
+        [
+          "7036874417766400p-45",
+          "0p-1074",
+          "8444249301319680p-48"
+        ],
+        [
+          "5542593908221944p-45",
+          "0p-1074",
+          "8365779749144077p-48"
+        ],
+        [
+          "6612150945736116p-46",
+          "0p-1074",
+          "4541906553500700p-49"
+        ],
+        [
+          "8556456300113381p-48",
+          "0p-1074",
+          "-7647746391286754p-49"
+        ],
+        [
+          "-6795575552484525p-49",
+          "0p-1074",
+          "-7804685495637960p-49"
+        ],
+        [
+          "-6952450079294040p-49",
+          "0p-1074",
+          "8051901540441667p-48"
+        ]
+      ],
+      "intercept": [
+        "-6952450079294040p-49",
+        "0p-1074",
+        "8051901540441667p-48"
+      ],
+      "insertionPhase": 1095
+    },
+    {
+      "note": "a chord passing near the star — the curve bulges clear of the clearance radius",
+      "system": "fixture",
+      "from": [
+        100,
+        0,
+        5
+      ],
+      "target": {
+        "point": [
+          -100,
+          0,
+          -5
+        ]
+      },
+      "arriveMs": 50000,
+      "starClearance": 15,
+      "curve": [
+        [
+          "7036874417766400p-46",
+          "0p-1074",
+          "5629499534213120p-50"
+        ],
+        [
+          "8444249301319681p-47",
+          "0p-1074",
+          "6755399441055744p-51"
+        ],
+        [
+          "6044452342090567p-48",
+          "0p-1074",
+          "-8017581180838263p-48"
+        ],
+        [
+          "-5214546726335675p-48",
+          "0p-1074",
+          "-8580531134259575p-48"
+        ],
+        [
+          "-8444249301319680p-47",
+          "0p-1074",
+          "-6755399441055744p-51"
+        ],
+        [
+          "-7036874417766400p-46",
+          "0p-1074",
+          "-5629499534213120p-50"
+        ]
+      ],
+      "intercept": [
+        "-7036874417766400p-46",
+        "0p-1074",
+        "-5629499534213120p-50"
+      ],
+      "insertionPhase": 0
+    },
+    {
+      "note": "the chord-parallel grazing regression: the closest approach's radial direction is nearly parallel to the chord, and the displacement is still exactly perpendicular to it",
+      "system": "fixture",
+      "from": [
+        16,
+        0,
+        0
+      ],
+      "target": {
+        "point": [
+          -300,
+          0,
+          0
+        ]
+      },
+      "arriveMs": 50000,
+      "starClearance": 15,
+      "curve": [
+        [
+          "4503599627370496p-48",
+          "0p-1074",
+          "0p-1074"
+        ],
+        [
+          "-6642809450371482p-47",
+          "0p-1074",
+          "0p-1074"
+        ],
+        [
+          "-7768709357214106p-46",
+          "0p-1074",
+          "-7046466417191718p-42"
+        ],
+        [
+          "-6108006994621236p-45",
+          "0p-1074",
+          "-7046466417191718p-42"
+        ],
+        [
+          "-8331659310635418p-45",
+          "0p-1074",
+          "0p-1074"
+        ],
+        [
+          "-5277655813324800p-44",
+          "0p-1074",
+          "0p-1074"
+        ]
+      ],
+      "intercept": [
+        "-5277655813324800p-44",
+        "0p-1074",
+        "0p-1074"
+      ],
+      "insertionPhase": 0
+    },
+    {
+      "note": "a transfer nowhere near the star — control points left unmodified",
+      "system": "fixture",
+      "from": [
+        100,
+        0,
+        100
+      ],
+      "target": {
+        "point": [
+          150,
+          0,
+          120
+        ]
+      },
+      "arriveMs": 50000,
+      "starClearance": 15,
+      "curve": [
+        [
+          "7036874417766400p-46",
+          "0p-1074",
+          "7036874417766400p-46"
+        ],
+        [
+          "7740561859543040p-46",
+          "0p-1074",
+          "7318349394477056p-46"
+        ],
+        [
+          "8444249301319680p-46",
+          "0p-1074",
+          "7599824371187712p-46"
+        ],
+        [
+          "4573968371548160p-45",
+          "0p-1074",
+          "7881299347898368p-46"
+        ],
+        [
+          "4925812092436480p-45",
+          "0p-1074",
+          "8162774324609024p-46"
+        ],
+        [
+          "5277655813324800p-45",
+          "0p-1074",
+          "8444249301319680p-46"
+        ]
+      ],
+      "intercept": [
+        "5277655813324800p-45",
+        "0p-1074",
+        "8444249301319680p-46"
+      ],
+      "insertionPhase": 0
+    },
+    {
+      "note": "an origin already inside the clearance radius is rejected by name",
+      "system": "fixture",
+      "from": [
+        10,
+        0,
+        0
+      ],
+      "target": {
+        "point": [
+          150,
+          0,
+          120
+        ]
+      },
+      "arriveMs": 50000,
+      "starClearance": 15,
+      "insertionPhase": 0,
+      "err": "ErrEndpointInsideClearance"
+    },
+    {
+      "note": "an unknown body target fails by name",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        0
+      ],
+      "target": {
+        "bodyId": "nosuchbody"
+      },
+      "arriveMs": 50000,
+      "starClearance": 0,
+      "insertionPhase": 0,
+      "err": "ErrUnknownBody"
+    }
+  ],
+  "buildCurveSweep": [
+    {
+      "note": "an origin, a target (a drawn point or one of the `fixture` system's bodies), an arrival millisecond, an optional departure tangent and a star-clearance radius; the output is the four control points, the intercept and the insertion phase index",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "from.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "from.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "from.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "targetSel",
+          "kind": "int",
+          "lo": 0,
+          "hi": 5
+        },
+        {
+          "name": "targetPoint.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "targetPoint.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "targetPoint.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "arriveMs",
+          "kind": "int",
+          "lo": 0,
+          "hi": 2000000
+        },
+        {
+          "name": "useDepartDir",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1
+        },
+        {
+          "name": "departDir.x",
+          "kind": "float",
+          "lo": -1,
+          "hi": 1
+        },
+        {
+          "name": "departDir.y",
+          "kind": "float",
+          "lo": -1,
+          "hi": 1
+        },
+        {
+          "name": "departDir.z",
+          "kind": "float",
+          "lo": -1,
+          "hi": 1
+        },
+        {
+          "name": "starClearance",
+          "kind": "float",
+          "lo": 0,
+          "hi": 40
+        }
+      ],
+      "count": 5000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 5000,
+      "digest": "83ff7bab99d0918424a71be279fac4cddee69b7927d6c11252baf4c6f1a0c7e5"
+    }
+  ],
+  "solveBurn": [
+    {
+      "note": "a point target — the arrival is the ceiling-quantized brachistochrone of the solved curve's own length",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        0
+      ],
+      "target": {
+        "point": [
+          0,
+          0,
+          200
+        ]
+      },
+      "departMs": 0,
+      "accel": 8,
+      "starClearance": 0,
+      "rounds": 8,
+      "burn": {
+        "origin": [
+          "7036874417766400p-45",
+          "0p-1074",
+          "0p-1074"
+        ],
+        "target": "point:0p-1074,0p-1074,7036874417766400p-45",
+        "intercept": [
+          "0p-1074",
+          "0p-1074",
+          "7036874417766400p-45"
+        ],
+        "curve": [
+          [
+            "7036874417766400p-45",
+            "0p-1074",
+            "0p-1074"
+          ],
+          [
+            "5629499534213120p-45",
+            "0p-1074",
+            "5629499534213120p-47"
+          ],
+          [
+            "8444249301319680p-46",
+            "0p-1074",
+            "5629499534213120p-46"
+          ],
+          [
+            "5629499534213120p-46",
+            "0p-1074",
+            "8444249301319680p-46"
+          ],
+          [
+            "5629499534213120p-47",
+            "0p-1074",
+            "5629499534213120p-45"
+          ],
+          [
+            "0p-1074",
+            "0p-1074",
+            "7036874417766400p-45"
+          ]
+        ],
+        "length": "4975821619160766p-44",
+        "departMs": 0,
+        "arriveMs": 11893,
+        "accel": "4503599627370496p-49",
+        "insertionPhase": 0
+      }
+    },
+    {
+      "note": "the same path at a quartered acceleration — twice the flight time, half the delta-v price",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        0
+      ],
+      "target": {
+        "point": [
+          0,
+          0,
+          200
+        ]
+      },
+      "departMs": 0,
+      "accel": 2,
+      "starClearance": 0,
+      "rounds": 8,
+      "burn": {
+        "origin": [
+          "7036874417766400p-45",
+          "0p-1074",
+          "0p-1074"
+        ],
+        "target": "point:0p-1074,0p-1074,7036874417766400p-45",
+        "intercept": [
+          "0p-1074",
+          "0p-1074",
+          "7036874417766400p-45"
+        ],
+        "curve": [
+          [
+            "7036874417766400p-45",
+            "0p-1074",
+            "0p-1074"
+          ],
+          [
+            "5629499534213120p-45",
+            "0p-1074",
+            "5629499534213120p-47"
+          ],
+          [
+            "8444249301319680p-46",
+            "0p-1074",
+            "5629499534213120p-46"
+          ],
+          [
+            "5629499534213120p-46",
+            "0p-1074",
+            "8444249301319680p-46"
+          ],
+          [
+            "5629499534213120p-47",
+            "0p-1074",
+            "5629499534213120p-45"
+          ],
+          [
+            "0p-1074",
+            "0p-1074",
+            "7036874417766400p-45"
+          ]
+        ],
+        "length": "4975821619160766p-44",
+        "departMs": 0,
+        "arriveMs": 23785,
+        "accel": "4503599627370496p-51",
+        "insertionPhase": 0
+      }
+    },
+    {
+      "note": "a crosswise departure tangent lengthens the solved curve",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        0
+      ],
+      "target": {
+        "point": [
+          0,
+          0,
+          200
+        ]
+      },
+      "departMs": 0,
+      "accel": 8,
+      "departDir": [
+        0,
+        0,
+        1
+      ],
+      "starClearance": 0,
+      "rounds": 8,
+      "burn": {
+        "origin": [
+          "7036874417766400p-45",
+          "0p-1074",
+          "0p-1074"
+        ],
+        "target": "point:0p-1074,0p-1074,7036874417766400p-45",
+        "intercept": [
+          "0p-1074",
+          "0p-1074",
+          "7036874417766400p-45"
+        ],
+        "curve": [
+          [
+            "7036874417766400p-45",
+            "0p-1074",
+            "0p-1074"
+          ],
+          [
+            "7036874417766400p-45",
+            "0p-1074",
+            "7961314590657216p-47"
+          ],
+          [
+            "5629499534213120p-45",
+            "0p-1074",
+            "6795407062435167p-46"
+          ],
+          [
+            "7036874417766400p-46",
+            "0p-1074",
+            "4513601532715352p-45"
+          ],
+          [
+            "5629499534213120p-47",
+            "0p-1074",
+            "5629499534213120p-45"
+          ],
+          [
+            "0p-1074",
+            "0p-1074",
+            "7036874417766400p-45"
+          ]
+        ],
+        "length": "5154961482081527p-44",
+        "departMs": 0,
+        "arriveMs": 12105,
+        "accel": "4503599627370496p-49",
+        "insertionPhase": 0
+      }
+    },
+    {
+      "note": "a moving body target",
+      "system": "fixture",
+      "from": [
+        90,
+        0,
+        90
+      ],
+      "target": {
+        "bodyId": "planet1"
+      },
+      "departMs": 0,
+      "accel": 8,
+      "starClearance": 0,
+      "rounds": 8,
+      "burn": {
+        "origin": [
+          "6333186975989760p-46",
+          "0p-1074",
+          "6333186975989760p-46"
+        ],
+        "target": "body:planet1",
+        "intercept": [
+          "6907031710158646p-47",
+          "0p-1074",
+          "7084262879352228p-48"
+        ],
+        "curve": [
+          [
+            "6333186975989760p-46",
+            "0p-1074",
+            "6333186975989760p-46"
+          ],
+          [
+            "5757252751807673p-46",
+            "0p-1074",
+            "5420762724759420p-46"
+          ],
+          [
+            "5254280083676812p-46",
+            "0p-1074",
+            "7302292453128930p-47"
+          ],
+          [
+            "4751307415545950p-46",
+            "0p-1074",
+            "7526118913478040p-48"
+          ],
+          [
+            "8350746382727726p-47",
+            "0p-1074",
+            "7752843817113352p-49"
+          ],
+          [
+            "6907031710158646p-47",
+            "0p-1074",
+            "7084262879352228p-48"
+          ]
+        ],
+        "length": "6042475151753914p-46",
+        "departMs": 0,
+        "arriveMs": 6553,
+        "accel": "4503599627370496p-49",
+        "insertionPhase": 168177
+      }
+    },
+    {
+      "note": "the same moving body target departing later — a different intercept, the same stored target identity",
+      "system": "fixture",
+      "from": [
+        90,
+        0,
+        90
+      ],
+      "target": {
+        "bodyId": "planet1"
+      },
+      "departMs": 40000,
+      "accel": 8,
+      "starClearance": 0,
+      "rounds": 8,
+      "burn": {
+        "origin": [
+          "6333186975989760p-46",
+          "0p-1074",
+          "6333186975989760p-46"
+        ],
+        "target": "body:planet1",
+        "intercept": [
+          "-6293102424559207p-47",
+          "0p-1074",
+          "7209351188794080p-50"
+        ],
+        "curve": [
+          [
+            "6333186975989760p-46",
+            "0p-1074",
+            "6333186975989760p-46"
+          ],
+          [
+            "8874478676671775p-47",
+            "0p-1074",
+            "5156666470651734p-46"
+          ],
+          [
+            "5417730490843898p-47",
+            "0p-1074",
+            "6815931381168720p-47"
+          ],
+          [
+            "7843929220064083p-49",
+            "0p-1074",
+            "6637059642067942p-48"
+          ],
+          [
+            "-7323651881166896p-49",
+            "0p-1074",
+            "7723910482863348p-50"
+          ],
+          [
+            "-6293102424559207p-47",
+            "0p-1074",
+            "7209351188794080p-50"
+          ]
+        ],
+        "length": "5680294434930547p-45",
+        "departMs": 40000,
+        "arriveMs": 48985,
+        "accel": "4503599627370496p-49",
+        "insertionPhase": 92686
+      }
+    },
+    {
+      "note": "an inclined body target",
+      "system": "fixture",
+      "from": [
+        90,
+        0,
+        90
+      ],
+      "target": {
+        "bodyId": "planet2"
+      },
+      "departMs": 0,
+      "accel": 8,
+      "starClearance": 0,
+      "rounds": 8,
+      "burn": {
+        "origin": [
+          "6333186975989760p-46",
+          "0p-1074",
+          "6333186975989760p-46"
+        ],
+        "target": "body:planet2",
+        "intercept": [
+          "5553979193194489p-46",
+          "-5526579849765905p-50",
+          "7140095668853060p-48"
+        ],
+        "curve": [
+          [
+            "6333186975989760p-46",
+            "0p-1074",
+            "6333186975989760p-46"
+          ],
+          [
+            "6177345419430706p-46",
+            "-8842527759625447p-53",
+            "5423554364234461p-46"
+          ],
+          [
+            "6304795759186748p-46",
+            "-7098073379994977p-52",
+            "7553130395271211p-47"
+          ],
+          [
+            "6432246098942790p-46",
+            "-4887441440088615p-51",
+            "8518304124146999p-48"
+          ],
+          [
+            "6276404542383736p-46",
+            "-7098073379994976p-51",
+            "4879773677125802p-48"
+          ],
+          [
+            "5553979193194489p-46",
+            "-5526579849765905p-50",
+            "7140095668853060p-48"
+          ]
+        ],
+        "length": "5228192852263207p-46",
+        "departMs": 0,
+        "arriveMs": 6095,
+        "accel": "4503599627370496p-49",
+        "insertionPhase": 233827
+      }
+    },
+    {
+      "note": "a motionless body target — the estimate stabilises after one round, and the solve still runs every round",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        0
+      ],
+      "target": {
+        "bodyId": "frozen"
+      },
+      "departMs": 0,
+      "accel": 8,
+      "starClearance": 0,
+      "rounds": 8,
+      "burn": {
+        "origin": [
+          "7036874417766400p-45",
+          "0p-1074",
+          "0p-1074"
+        ],
+        "target": "body:frozen",
+        "intercept": [
+          "-6972494008097176p-49",
+          "0p-1074",
+          "7891359606545297p-48"
+        ],
+        "curve": [
+          [
+            "7036874417766400p-45",
+            "0p-1074",
+            "0p-1074"
+          ],
+          [
+            "5542343359111905p-45",
+            "0p-1074",
+            "6313087685236240p-50"
+          ],
+          [
+            "6403800440190068p-46",
+            "0p-1074",
+            "-8129758480007744p-50"
+          ],
+          [
+            "6891656648625302p-48",
+            "0p-1074",
+            "-5643151161312932p-48"
+          ],
+          [
+            "-5064591820610653p-48",
+            "0p-1074",
+            "-8129758480007748p-49"
+          ],
+          [
+            "-6972494008097176p-49",
+            "0p-1074",
+            "7891359606545297p-48"
+          ]
+        ],
+        "length": "8306014349639668p-45",
+        "departMs": 0,
+        "arriveMs": 10865,
+        "accel": "4503599627370496p-49",
+        "insertionPhase": 1026672
+      }
+    },
+    {
+      "note": "a body target four levels deep, whose position changes fastest",
+      "system": "fixture",
+      "from": [
+        200,
+        0,
+        0
+      ],
+      "target": {
+        "bodyId": "outpost"
+      },
+      "departMs": 0,
+      "accel": 8,
+      "starClearance": 0,
+      "rounds": 8,
+      "burn": {
+        "origin": [
+          "7036874417766400p-45",
+          "0p-1074",
+          "0p-1074"
+        ],
+        "target": "body:outpost",
+        "intercept": [
+          "7144915375083640p-47",
+          "0p-1074",
+          "8698756011660713p-48"
+        ],
+        "curve": [
+          [
+            "7036874417766400p-45",
+            "0p-1074",
+            "0p-1074"
+          ],
+          [
+            "5986745302967303p-45",
+            "0p-1074",
+            "6959004809328572p-50"
+          ],
+          [
+            "4677200710019678p-45",
+            "0p-1074",
+            "4985411257379082p-51"
+          ],
+          [
+            "6735312234144104p-46",
+            "0p-1074",
+            "-7894374207797962p-52"
+          ],
+          [
+            "4635054004545908p-46",
+            "0p-1074",
+            "4985411257379078p-50"
+          ],
+          [
+            "7144915375083640p-47",
+            "0p-1074",
+            "8698756011660713p-48"
+          ]
+        ],
+        "length": "5582587685967525p-45",
+        "departMs": 0,
+        "arriveMs": 8907,
+        "accel": "4503599627370496p-49",
+        "insertionPhase": 1014497
+      }
+    },
+    {
+      "note": "a solve through the star's clearance radius",
+      "system": "fixture",
+      "from": [
+        100,
+        0,
+        5
+      ],
+      "target": {
+        "point": [
+          -100,
+          0,
+          -5
+        ]
+      },
+      "departMs": 0,
+      "accel": 8,
+      "starClearance": 15,
+      "rounds": 8,
+      "burn": {
+        "origin": [
+          "7036874417766400p-46",
+          "0p-1074",
+          "5629499534213120p-50"
+        ],
+        "target": "point:-7036874417766400p-46,0p-1074,-5629499534213120p-50",
+        "intercept": [
+          "-7036874417766400p-46",
+          "0p-1074",
+          "-5629499534213120p-50"
+        ],
+        "curve": [
+          [
+            "7036874417766400p-46",
+            "0p-1074",
+            "5629499534213120p-50"
+          ],
+          [
+            "8444249301319681p-47",
+            "0p-1074",
+            "6755399441055744p-51"
+          ],
+          [
+            "6044452342090567p-48",
+            "0p-1074",
+            "-8017581180838263p-48"
+          ],
+          [
+            "-5214546726335675p-48",
+            "0p-1074",
+            "-8580531134259575p-48"
+          ],
+          [
+            "-8444249301319680p-47",
+            "0p-1074",
+            "-6755399441055744p-51"
+          ],
+          [
+            "-7036874417766400p-46",
+            "0p-1074",
+            "-5629499534213120p-50"
+          ]
+        ],
+        "length": "7189230219633243p-45",
+        "departMs": 0,
+        "arriveMs": 10108,
+        "accel": "4503599627370496p-49",
+        "insertionPhase": 0
+      }
+    },
+    {
+      "note": "a solved curve below the configured minimum arc length is rejected by its own name",
+      "system": "fixture",
+      "from": [
+        100,
+        0,
+        0
+      ],
+      "target": {
+        "point": [
+          100.5,
+          0,
+          0
+        ]
+      },
+      "departMs": 0,
+      "accel": 8,
+      "starClearance": 0,
+      "rounds": 8,
+      "err": "ErrArcTooShort"
+    }
+  ],
+  "solveBurnSweep": [
+    {
+      "note": "the buildCurve draw stream with the arrival replaced by a departure and an acceleration appended; the output is the solved curve, intercept, length, quantized arrival, insertion phase and executed round count",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "from.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "from.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "from.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "targetSel",
+          "kind": "int",
+          "lo": 0,
+          "hi": 5
+        },
+        {
+          "name": "targetPoint.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "targetPoint.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "targetPoint.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "departMs",
+          "kind": "int",
+          "lo": 0,
+          "hi": 2000000
+        },
+        {
+          "name": "useDepartDir",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1
+        },
+        {
+          "name": "departDir.x",
+          "kind": "float",
+          "lo": -1,
+          "hi": 1
+        },
+        {
+          "name": "departDir.y",
+          "kind": "float",
+          "lo": -1,
+          "hi": 1
+        },
+        {
+          "name": "departDir.z",
+          "kind": "float",
+          "lo": -1,
+          "hi": 1
+        },
+        {
+          "name": "starClearance",
+          "kind": "float",
+          "lo": 0,
+          "hi": 40
+        },
+        {
+          "name": "accel",
+          "kind": "float",
+          "lo": 0.5,
+          "hi": 40
+        }
+      ],
+      "count": 5000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 5000,
+      "digest": "111270b2df19eae54b4d19e05c10a0913012526b5c24b011acf916e0eba0acad"
+    }
+  ],
+  "burnPosition": [
+    {
+      "note": "before depart — clamped to the origin, never extrapolated behind it",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 5000,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "exactly at depart",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 10000,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "one millisecond after depart",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 10001,
+      "out": [
+        "8707192898054251p-95",
+        "0p-1074",
+        "4950612549400358p-70"
+      ]
+    },
+    {
+      "note": "one millisecond before the arc-length midpoint",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 13211,
+      "out": [
+        "8436066264869198p-48",
+        "0p-1074",
+        "5586284662485248p-58"
+      ]
+    },
+    {
+      "note": "the arc-length midpoint — half the flight duration is half the ARC LENGTH",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 13212,
+      "out": [
+        "8442086529940590p-48",
+        "0p-1074",
+        "5905807597713408p-60"
+      ]
+    },
+    {
+      "note": "one millisecond after the arc-length midpoint",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 13213,
+      "out": [
+        "8446412072698776p-48",
+        "0p-1074",
+        "-5905807597729792p-60"
+      ]
+    },
+    {
+      "note": "one millisecond before arrive",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 16424,
+      "out": [
+        "8444249301319649p-47",
+        "0p-1074",
+        "-4950612561156777p-70"
+      ]
+    },
+    {
+      "note": "exactly at arrive",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 16425,
+      "out": [
+        "8444249301319680p-47",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "after arrive — clamped to the intercept",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 21425,
+      "out": [
+        "8444249301319680p-47",
+        "0p-1074",
+        "0p-1074"
+      ]
+    }
+  ],
+  "burnPositionSweep": [
+    {
+      "note": "a burn stated directly (drawn control points, the curve's own arc length, the ceiling-quantized brachistochrone arrival) and a time drawn from a box overhanging both ends of the stored window, so both clamps are drawn",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "origin.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "origin.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "origin.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "accel",
+          "kind": "float",
+          "lo": 0.5,
+          "hi": 40
+        },
+        {
+          "name": "departMs",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1000000
+        },
+        {
+          "name": "tFrac",
+          "kind": "float",
+          "lo": -0.25,
+          "hi": 1.25
+        }
+      ],
+      "count": 20000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 20000,
+      "digest": "6906722557bf49d2bb59df3cbe611f3f8e764e3806f042de9a789eba3efc5078"
+    }
+  ],
+  "burnTangent": [
+    {
+      "note": "before depart — clamped to the origin, never extrapolated behind it",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 5000,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "4503599627370496p-52"
+      ]
+    },
+    {
+      "note": "exactly at depart",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 10000,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "4503599627370496p-52"
+      ]
+    },
+    {
+      "note": "one millisecond after depart",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 10001,
+      "out": [
+        "7920982293394456p-76",
+        "0p-1074",
+        "9007199254740943p-53"
+      ]
+    },
+    {
+      "note": "one millisecond before the arc-length midpoint",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 13211,
+      "out": [
+        "7494444715977748p-53",
+        "0p-1074",
+        "-4996292306677011p-53"
+      ]
+    },
+    {
+      "note": "the arc-length midpoint — half the flight duration is half the ARC LENGTH",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 13212,
+      "out": [
+        "7494442925529793p-53",
+        "0p-1074",
+        "-4996294992350142p-53"
+      ]
+    },
+    {
+      "note": "one millisecond after the arc-length midpoint",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 13213,
+      "out": [
+        "7494442925529795p-53",
+        "0p-1074",
+        "-4996294992350142p-53"
+      ]
+    },
+    {
+      "note": "one millisecond before arrive",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 16424,
+      "out": [
+        "7920982312204738p-76",
+        "0p-1074",
+        "9007199254740943p-53"
+      ]
+    },
+    {
+      "note": "exactly at arrive",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 16425,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "4503599627370496p-52"
+      ]
+    },
+    {
+      "note": "after arrive — clamped to the intercept",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 21425,
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "4503599627370496p-52"
+      ]
+    }
+  ],
+  "burnTangentSweep": [
+    {
+      "note": "the same draw stream as burnPositionSweep, evaluated for the unit tangent",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "origin.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "origin.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "origin.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "accel",
+          "kind": "float",
+          "lo": 0.5,
+          "hi": 40
+        },
+        {
+          "name": "departMs",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1000000
+        },
+        {
+          "name": "tFrac",
+          "kind": "float",
+          "lo": -0.25,
+          "hi": 1.25
+        }
+      ],
+      "count": 20000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 20000,
+      "digest": "63716eaf4c762f6d730784eafcc83dde6a13961f40778035a42eb9a6808bff11"
+    }
+  ],
+  "burnSpeed": [
+    {
+      "note": "before depart — clamped to the origin, never extrapolated behind it",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 5000,
+      "speed": "0p-1074",
+      "beforeFlip": true,
+      "progress": "0p-1074",
+      "deltaV": "7233906901463859p-47"
+    },
+    {
+      "note": "exactly at depart",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 10000,
+      "speed": "0p-1074",
+      "beforeFlip": true,
+      "progress": "0p-1074",
+      "deltaV": "7233906901463859p-47"
+    },
+    {
+      "note": "one millisecond after depart",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 10001,
+      "speed": "4611686018427388p-59",
+      "beforeFlip": true,
+      "progress": "7322029516457604p-77",
+      "deltaV": "7233906901463859p-47"
+    },
+    {
+      "note": "one millisecond before the arc-length midpoint",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 13211,
+      "speed": "7230529201743331p-48",
+      "beforeFlip": true,
+      "progress": "8999578844553945p-54",
+      "deltaV": "7233906901463859p-47"
+    },
+    {
+      "note": "the arc-length midpoint — half the flight duration is half the ARC LENGTH",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 13212,
+      "speed": "7232781001557017p-48",
+      "beforeFlip": true,
+      "progress": "9005185185389542p-54",
+      "deltaV": "7233906901463859p-47"
+    },
+    {
+      "note": "one millisecond after the arc-length midpoint",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 13213,
+      "speed": "7232781001557016p-48",
+      "beforeFlip": false,
+      "progress": "4504606662046223p-53",
+      "deltaV": "7233906901463859p-47"
+    },
+    {
+      "note": "one millisecond before arrive",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 16424,
+      "speed": "4611686018424832p-59",
+      "beforeFlip": false,
+      "progress": "9007198818314023p-53",
+      "deltaV": "7233906901463859p-47"
+    },
+    {
+      "note": "exactly at arrive",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 16425,
+      "speed": "0p-1074",
+      "beforeFlip": false,
+      "progress": "4503599627370496p-52",
+      "deltaV": "7233906901463859p-47"
+    },
+    {
+      "note": "after arrive — clamped to the intercept",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 21425,
+      "speed": "0p-1074",
+      "beforeFlip": false,
+      "progress": "4503599627370496p-52",
+      "deltaV": "7233906901463859p-47"
+    }
+  ],
+  "burnSpeedSweep": [
+    {
+      "note": "the same draw stream as burnPositionSweep; the output is speed, the flip indicator, progress and the delta-v price",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "origin.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "origin.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "origin.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "accel",
+          "kind": "float",
+          "lo": 0.5,
+          "hi": 40
+        },
+        {
+          "name": "departMs",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1000000
+        },
+        {
+          "name": "tFrac",
+          "kind": "float",
+          "lo": -0.25,
+          "hi": 1.25
+        }
+      ],
+      "count": 20000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 20000,
+      "digest": "293bf93dbd6f910abf8c85df3e8580942c3cc47fd9454653fb58c3d510359321"
+    }
+  ],
+  "parkPosition": [
+    {
+      "note": "an orbit park at the world epoch",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 10,
+        "periodMs": 20000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 0,
+      "position": [
+        "8444249301319680p-47",
+        "0p-1074",
+        "0p-1074"
+      ],
+      "velocity": [
+        "0p-1074",
+        "0p-1074",
+        "7074237752028440p-50"
+      ]
+    },
+    {
+      "note": "the same orbit park a quarter period on — still exactly its radius from the body",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 10,
+        "periodMs": 20000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 5000,
+      "position": [
+        "6692475693235396p-47",
+        "0p-1074",
+        "7163713168593685p-48"
+      ],
+      "velocity": [
+        "-4630132593841646p-50",
+        "0p-1074",
+        "6728010391102905p-51"
+      ]
+    },
+    {
+      "note": "the same orbit park at exactly one full period",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 10,
+        "periodMs": 20000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 20000,
+      "position": [
+        "7163793372649492p-48",
+        "0p-1074",
+        "6692462663376371p-47"
+      ],
+      "velocity": [
+        "-6727997292059900p-51",
+        "0p-1074",
+        "4630152751319447p-50"
+      ]
+    },
+    {
+      "note": "an orbit park evaluated BEFORE its own epoch — the phase wraps backward, no negative table index",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 10,
+        "periodMs": 90000,
+        "epochMs": 50000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 10000,
+      "position": [
+        "8740930856298594p-48",
+        "0p-1074",
+        "7309603477837215p-48"
+      ],
+      "velocity": [
+        "-7240880554030244p-52",
+        "0p-1074",
+        "8491892699709466p-52"
+      ]
+    },
+    {
+      "note": "an orbit park one full period before its own epoch — identical to the epoch",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 10,
+        "periodMs": 90000,
+        "epochMs": 50000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": -40000,
+      "position": [
+        "-8571181956612658p-48",
+        "0p-1074",
+        "-8272301074578050p-48"
+      ],
+      "velocity": [
+        "8316224090936753p-52",
+        "0p-1074",
+        "-8302281358835408p-52"
+      ]
+    },
+    {
+      "note": "a zero-period orbit park is motionless relative to its body",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 10,
+        "phase": 209715,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 777777,
+      "position": [
+        "6625865750359903p-49",
+        "0p-1074",
+        "-5591542652182266p-47"
+      ],
+      "velocity": [
+        "6966831240277514p-51",
+        "0p-1074",
+        "4912192572312562p-53"
+      ]
+    },
+    {
+      "note": "a station-keep park holds its exact stored offset in the body's frame",
+      "system": "fixture",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          3,
+          2,
+          4
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 12000,
+      "position": [
+        "5551876614453142p-47",
+        "4503599627370496p-51",
+        "5380018282385242p-47"
+      ],
+      "velocity": [
+        "-4842645271716206p-51",
+        "0p-1074",
+        "5156900866271242p-51"
+      ]
+    },
+    {
+      "note": "the same station-keep park much later — the same exact offset, a moved body",
+      "system": "fixture",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          3,
+          2,
+          4
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 88000,
+      "position": [
+        "5551847749945928p-47",
+        "4503599627370496p-51",
+        "-8508298225961136p-48"
+      ],
+      "velocity": [
+        "4842676172359167p-51",
+        "0p-1074",
+        "5156871848503621p-51"
+      ]
+    },
+    {
+      "note": "a point park never moves",
+      "system": "fixture",
+      "park": {
+        "kind": "point",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          -12,
+          3,
+          44
+        ]
+      },
+      "t": 0,
+      "position": [
+        "-6755399441055744p-49",
+        "6755399441055744p-51",
+        "6192449487634432p-47"
+      ],
+      "velocity": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "a point park never moves (again, much later)",
+      "system": "fixture",
+      "park": {
+        "kind": "point",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          -12,
+          3,
+          44
+        ]
+      },
+      "t": 9000000,
+      "position": [
+        "-6755399441055744p-49",
+        "6755399441055744p-51",
+        "6192449487634432p-47"
+      ],
+      "velocity": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "a released station-keep hold at offset (3,2,4): radius 5 (the planar magnitude, vertical dropped), epoch 50",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 5,
+        "periodMs": 9500,
+        "phase": 154752,
+        "epochMs": 50,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 50,
+      "position": [
+        "7459054352483873p-47",
+        "0p-1074",
+        "4680345188414010p-50"
+      ],
+      "velocity": [
+        "-5979447852496073p-51",
+        "0p-1074",
+        "5771082669908073p-50"
+      ]
+    },
+    {
+      "note": "the same released hold a while later",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 5,
+        "periodMs": 9500,
+        "phase": 154752,
+        "epochMs": 50,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 5050,
+      "position": [
+        "6361803667408002p-47",
+        "0p-1074",
+        "6283039995189902p-49"
+      ],
+      "velocity": [
+        "8808410252551241p-52",
+        "0p-1074",
+        "6589199009459493p-52"
+      ]
+    },
+    {
+      "note": "a released hold directly above the body re-circularizes at the configured minimum radius and the default phase",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 3,
+        "periodMs": 7700,
+        "epochMs": 50,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 50,
+      "position": [
+        "7459052195417707p-47",
+        "0p-1074",
+        "5656272111749339p-55"
+      ],
+      "velocity": [
+        "-5686304932152496p-59",
+        "0p-1074",
+        "6293297966982208p-50"
+      ]
+    },
+    {
+      "note": "a park on an unknown body fails by name",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "nosuchbody",
+        "radius": 10,
+        "periodMs": 20000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 0,
+      "err": "ErrUnknownBody"
+    }
+  ],
+  "parkPositionSweep": [
+    {
+      "note": "all three park kinds over the `fixture` system's bodies plus one unknown id, with a time box straddling the drawn epoch; the output is position and velocity",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "kindSel",
+          "kind": "int",
+          "lo": 0,
+          "hi": 2
+        },
+        {
+          "name": "bodySel",
+          "kind": "int",
+          "lo": 0,
+          "hi": 6
+        },
+        {
+          "name": "radius",
+          "kind": "float",
+          "lo": 0.1,
+          "hi": 200
+        },
+        {
+          "name": "periodMs",
+          "kind": "int",
+          "lo": -20000,
+          "hi": 400000
+        },
+        {
+          "name": "phase",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1048575
+        },
+        {
+          "name": "epochMs",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1000000
+        },
+        {
+          "name": "offset.x",
+          "kind": "float",
+          "lo": -100,
+          "hi": 100
+        },
+        {
+          "name": "offset.y",
+          "kind": "float",
+          "lo": -100,
+          "hi": 100
+        },
+        {
+          "name": "offset.z",
+          "kind": "float",
+          "lo": -100,
+          "hi": 100
+        },
+        {
+          "name": "point.x",
+          "kind": "float",
+          "lo": -500,
+          "hi": 500
+        },
+        {
+          "name": "point.y",
+          "kind": "float",
+          "lo": -500,
+          "hi": 500
+        },
+        {
+          "name": "point.z",
+          "kind": "float",
+          "lo": -500,
+          "hi": 500
+        },
+        {
+          "name": "t",
+          "kind": "int",
+          "lo": -1000000,
+          "hi": 2000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "d23751e194f49e9ddaf499ed73fa608821074c3d5b4fbb8eea0133c1d7bbc25a"
+    }
+  ],
+  "stateAt": [
+    {
+      "note": "one millisecond before arrival — still burning",
+      "system": "fixture",
+      "burn": {
+        "origin": [
+          90,
+          0,
+          90
+        ],
+        "target": {
+          "bodyId": "planet1"
+        },
+        "intercept": [
+          49.07741207317888,
+          0,
+          25.168357635693283
+        ],
+        "curve": {
+          "p0": [
+            90,
+            0,
+            90
+          ],
+          "c1": [
+            81.81548241463578,
+            0,
+            77.03367152713867
+          ],
+          "c2": [
+            74.6678109021106,
+            0,
+            51.88590856966563
+          ],
+          "c3": [
+            67.52013938958541,
+            0,
+            26.738145612192596
+          ],
+          "c4": [
+            59.33562180422119,
+            0,
+            13.771817139331247
+          ],
+          "p5": [
+            49.07741207317888,
+            0,
+            25.168357635693283
+          ]
+        },
+        "length": 85.86873650179305,
+        "departMs": 0,
+        "arriveMs": 6553,
+        "accel": 8,
+        "insertionPhase": 168177
+      },
+      "t": 6552,
+      "mode": "burn",
+      "position": [
+        "6907032102046247p-47",
+        "0p-1074",
+        "7084262008603415p-48"
+      ]
+    },
+    {
+      "note": "exactly at arrival — settled, on an exact integer comparison with no epsilon",
+      "system": "fixture",
+      "burn": {
+        "origin": [
+          90,
+          0,
+          90
+        ],
+        "target": {
+          "bodyId": "planet1"
+        },
+        "intercept": [
+          49.07741207317888,
+          0,
+          25.168357635693283
+        ],
+        "curve": {
+          "p0": [
+            90,
+            0,
+            90
+          ],
+          "c1": [
+            81.81548241463578,
+            0,
+            77.03367152713867
+          ],
+          "c2": [
+            74.6678109021106,
+            0,
+            51.88590856966563
+          ],
+          "c3": [
+            67.52013938958541,
+            0,
+            26.738145612192596
+          ],
+          "c4": [
+            59.33562180422119,
+            0,
+            13.771817139331247
+          ],
+          "p5": [
+            49.07741207317888,
+            0,
+            25.168357635693283
+          ]
+        },
+        "length": 85.86873650179305,
+        "departMs": 0,
+        "arriveMs": 6553,
+        "accel": 8,
+        "insertionPhase": 168177
+      },
+      "t": 6553,
+      "mode": "parked",
+      "settledPark": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 6.1,
+        "periodMs": 10490,
+        "phase": 168177,
+        "epochMs": 6553,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "6907031710158646p-47",
+        "0p-1074",
+        "7084262879352228p-48"
+      ]
+    },
+    {
+      "note": "one millisecond after arrival — settled",
+      "system": "fixture",
+      "burn": {
+        "origin": [
+          90,
+          0,
+          90
+        ],
+        "target": {
+          "bodyId": "planet1"
+        },
+        "intercept": [
+          49.07741207317888,
+          0,
+          25.168357635693283
+        ],
+        "curve": {
+          "p0": [
+            90,
+            0,
+            90
+          ],
+          "c1": [
+            81.81548241463578,
+            0,
+            77.03367152713867
+          ],
+          "c2": [
+            74.6678109021106,
+            0,
+            51.88590856966563
+          ],
+          "c3": [
+            67.52013938958541,
+            0,
+            26.738145612192596
+          ],
+          "c4": [
+            59.33562180422119,
+            0,
+            13.771817139331247
+          ],
+          "p5": [
+            49.07741207317888,
+            0,
+            25.168357635693283
+          ]
+        },
+        "length": 85.86873650179305,
+        "departMs": 0,
+        "arriveMs": 6553,
+        "accel": 8,
+        "insertionPhase": 168177
+      },
+      "t": 6554,
+      "mode": "parked",
+      "settledPark": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 6.1,
+        "periodMs": 10490,
+        "phase": 168177,
+        "epochMs": 6553,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "6906432212092386p-47",
+        "0p-1074",
+        "7085579132221541p-48"
+      ]
+    },
+    {
+      "note": "long after arrival — the settled park, never a frozen burn",
+      "system": "fixture",
+      "burn": {
+        "origin": [
+          90,
+          0,
+          90
+        ],
+        "target": {
+          "bodyId": "planet1"
+        },
+        "intercept": [
+          49.07741207317888,
+          0,
+          25.168357635693283
+        ],
+        "curve": {
+          "p0": [
+            90,
+            0,
+            90
+          ],
+          "c1": [
+            81.81548241463578,
+            0,
+            77.03367152713867
+          ],
+          "c2": [
+            74.6678109021106,
+            0,
+            51.88590856966563
+          ],
+          "c3": [
+            67.52013938958541,
+            0,
+            26.738145612192596
+          ],
+          "c4": [
+            59.33562180422119,
+            0,
+            13.771817139331247
+          ],
+          "p5": [
+            49.07741207317888,
+            0,
+            25.168357635693283
+          ]
+        },
+        "length": 85.86873650179305,
+        "departMs": 0,
+        "arriveMs": 6553,
+        "accel": 8,
+        "insertionPhase": 168177
+      },
+      "t": 5006553,
+      "mode": "parked",
+      "settledPark": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 6.1,
+        "periodMs": 10490,
+        "phase": 168177,
+        "epochMs": 6553,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "6738619388157994p-47",
+        "0p-1074",
+        "8032277011158758p-49"
+      ]
+    },
+    {
+      "note": "a point-targeted burn settles into a point park at its intercept",
+      "system": "fixture",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 16426,
+      "mode": "parked",
+      "settledPark": {
+        "kind": "point",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          60,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "8444249301319680p-47",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "a point-targeted burn mid-flight",
+      "system": "fixture",
+      "burn": {
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "target": {
+          "point": [
+            60,
+            0,
+            0
+          ]
+        },
+        "intercept": [
+          60,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            0,
+            0,
+            24
+          ],
+          "c2": [
+            18,
+            0,
+            12
+          ],
+          "c3": [
+            42,
+            0,
+            -12
+          ],
+          "c4": [
+            60,
+            0,
+            -24
+          ],
+          "p5": [
+            60,
+            0,
+            0
+          ]
+        },
+        "length": 82.55401162323551,
+        "departMs": 10000,
+        "arriveMs": 16425,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 10001,
+      "mode": "burn",
+      "position": [
+        "8707192898054251p-95",
+        "0p-1074",
+        "4950612549400358p-70"
+      ]
+    },
+    {
+      "note": "an already-parked state folds to itself, unchanged",
+      "system": "fixture",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 10,
+        "periodMs": 20000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "t": 33000,
+      "mode": "parked",
+      "settledPark": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 10,
+        "periodMs": 20000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "-8434548157924906p-48",
+        "0p-1074",
+        "5027873468502231p-47"
+      ]
+    },
+    {
+      "note": "a settled burn whose target body no longer resolves fails by name",
+      "system": "fixture",
+      "burn": {
+        "origin": [
+          10,
+          0,
+          0
+        ],
+        "target": {
+          "bodyId": "nosuchbody"
+        },
+        "intercept": [
+          20,
+          0,
+          0
+        ],
+        "curve": {
+          "p0": [
+            0,
+            0,
+            0
+          ],
+          "c1": [
+            6,
+            0,
+            0
+          ],
+          "c2": [
+            12,
+            0,
+            0
+          ],
+          "c3": [
+            18,
+            0,
+            0
+          ],
+          "c4": [
+            24,
+            0,
+            0
+          ],
+          "p5": [
+            30,
+            0,
+            0
+          ]
+        },
+        "length": 30,
+        "departMs": 0,
+        "arriveMs": 1000,
+        "accel": 8,
+        "insertionPhase": 0
+      },
+      "t": 2000,
+      "mode": "error",
+      "err": "ErrUnknownBody"
+    }
+  ],
+  "stateAtSweep": [
+    {
+      "note": "the burnPosition draw stream with a target selection appended and a time straddling arrival; the output is the folded mode, the settled park's stored fields and the folded position",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "origin.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "origin.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "origin.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c1.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c2.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c3.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "c4.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.x",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.y",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "intercept.z",
+          "kind": "float",
+          "lo": -300,
+          "hi": 300
+        },
+        {
+          "name": "accel",
+          "kind": "float",
+          "lo": 0.5,
+          "hi": 40
+        },
+        {
+          "name": "departMs",
+          "kind": "int",
+          "lo": 0,
+          "hi": 1000000
+        },
+        {
+          "name": "tFrac",
+          "kind": "float",
+          "lo": -0.25,
+          "hi": 1.25
+        },
+        {
+          "name": "targetSel",
+          "kind": "int",
+          "lo": 0,
+          "hi": 5
+        }
+      ],
+      "count": 20000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 20000,
+      "digest": "3d6ec11cdd55db4716d670761b95423a637c2d29db7b46f9311a0de6f60d421c"
+    }
+  ]
+}
