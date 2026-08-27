@@ -20,17 +20,21 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 	clk := &fakeClock{now: 0}
 
 	gsvc := galaxy.NewServiceWith(galaxy.NewDaoWithClient(fs), clk)
-	gen, err := gsvc.Generate(ctx, 1, galaxy.DefaultParams())
+	meta, err := gsvc.Seed(ctx, 1, galaxy.DefaultParams())
 	if err != nil {
 		t.Fatal(err)
 	}
-	gid := gen.Galaxy.Id
-	defer common.CleanupFirestoreTestData(t, client, "galaxies", "galaxy_pointers", "fleets", "actions",
-		"galaxies/"+gid+"/systems", "galaxies/"+gid+"/lanes",
-		"galaxies/"+gid+"/systems/sys-0/interior", "galaxies/"+gid+"/systems/sys-0/features")
+	gid := meta.Id
+	// The world is an infinite field materialized lazily, so there is no "sys-0"
+	// any more: the galaxy records its origin system, and that is the anchor
+	// every test that needs "a real system" starts from.
+	home := meta.OriginSystemId
+	defer common.CleanupFirestoreTestData(t, client, append(
+		[]string{"galaxies", "galaxy_pointers", "fleets", "actions"},
+		galaxy.SubcollectionPaths(gid, home)...)...)
 
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
-	interior, err := ssvc.GetOrCreateInterior(ctx, "sys-0")
+	interior, err := ssvc.GetOrCreateInterior(ctx, home)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +55,7 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 	asvc.RegisterResolver(burnType, action.KindKinematic, BurnResolver(DefaultMovementParams()))
 	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, asvc, clk)
 	// Seed just off the core — the star at (0,0) is not a legal fleet position.
-	seeded, err := fsvc.SeedFleet(ctx, "sys-0", "dev-corp", board.Cell{Ring: 1, Slot: 0})
+	seeded, err := fsvc.SeedFleet(ctx, home, "dev-corp", board.Cell{Ring: 1, Slot: 0})
 	if err != nil {
 		t.Fatal(err)
 	}

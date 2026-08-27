@@ -1,23 +1,35 @@
 package corporations
 
-import "hexaverse/common"
+import (
+	"fmt"
 
-// SpawnParams are the spawn-placement knobs (#0009). The slice ships placeholder
-// constants: all three site criteria are trivially satisfiable while the world is
-// near-empty, so the numbers wait for whole-graph tuning (spec Open question:
-// spacing formula). The SHAPE — a filtered, weighted pick over the graph — is what
-// survives that tuning.
+	"hexaverse/common"
+)
+
+// SpawnParams are the spawn-placement knobs (#0009). The numbers still wait for
+// whole-graph tuning; the SHAPE — an outward lane-graph walk that materializes
+// as it goes, filtered by the three criteria, drawn uniformly within the first
+// qualifying ring — is what survives that tuning. Frontier weighting retired
+// with the finite galaxy: the nearest-qualifying-ring rule already lands new
+// corporations just beyond the settled fringe.
 type SpawnParams struct {
 	// MinSpawnDistance is the minimum graph distance (lane hops) a candidate must
 	// keep from every OTHER living corporation's explored set — "unclaimed" space.
 	MinSpawnDistance int
-	// PeripheryWeight biases the weighted pick toward the frontier: a qualifier's
-	// selection weight is (1 + PeripheryWeight)^(graph eccentricity rank). 0 ⇒
-	// uniform among qualifiers; higher ⇒ new minds wake nearer the fresh edge.
-	PeripheryWeight float64
 	// RequireMineable gates on the bootstrap guarantee: a candidate must carry ≥1
 	// Mineable body on its #0001 skeleton, so a new player can never softlock.
 	RequireMineable bool
+	// MaxSpawnWalkBlocks is the walk's DEFENSIVE expansion-depth cap: the maximum
+	// block-hop (Chebyshev) distance from the block set where the walk began.
+	// Deliberately NOT a count of blocks touched (which would grow with the
+	// frontier's width and make the cap population-dependent) and NOT a distance
+	// from the field origin (which would be a world boundary — the very thing
+	// this change deletes). Exceeding it means misconfiguration or field
+	// degeneracy, never accumulating players.
+	MaxSpawnWalkBlocks int
+	// MaxSpawnRepicks bounds how many times a spawn losing the create-if-absent
+	// reservation race re-runs selection against the now-visible reservation.
+	MaxSpawnRepicks int
 	// RimRing is the board ring the lone hull coasts on at spawn — one ring
 	// inside the rim, THREE rings outside the lane-gate ring
 	// (board.GateRing(BoardRadius) is a fixed −3 offset from the radius, so
@@ -37,9 +49,24 @@ type SpawnParams struct {
 // geometry in common.Tuning(), so it can't drift out of sync with the gate ring.
 func DefaultSpawnParams() SpawnParams {
 	return SpawnParams{
-		MinSpawnDistance: 3,
-		PeripheryWeight:  1.0,
-		RequireMineable:  true,
-		RimRing:          common.Tuning().BoardRadius - 1, // one ring inside the rim
+		MinSpawnDistance:   3,
+		RequireMineable:    true,
+		MaxSpawnWalkBlocks: 64,
+		MaxSpawnRepicks:    4,
+		RimRing:            common.Tuning().BoardRadius - 1, // one ring inside the rim
 	}
+}
+
+// Validate rejects placement knobs that would make the walk unusable. Both caps
+// must be positive: a non-positive walk depth fences the search into its own
+// starting blocks, and a non-positive re-pick budget makes any reservation race
+// unrecoverable.
+func (p SpawnParams) Validate() error {
+	if p.MaxSpawnWalkBlocks < 1 {
+		return fmt.Errorf("%w: maxSpawnWalkBlocks must be positive, got %d", ErrInvalidSpawnParams, p.MaxSpawnWalkBlocks)
+	}
+	if p.MaxSpawnRepicks < 1 {
+		return fmt.Errorf("%w: maxSpawnRepicks must be positive, got %d", ErrInvalidSpawnParams, p.MaxSpawnRepicks)
+	}
+	return nil
 }

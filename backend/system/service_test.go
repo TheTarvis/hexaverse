@@ -24,7 +24,7 @@ type fakeGalaxy struct {
 	live   *galaxy.GeneratedGalaxy
 }
 
-func (f *fakeGalaxy) Generate(context.Context, int64, galaxy.GenerationParams) (*galaxy.GeneratedGalaxy, error) {
+func (f *fakeGalaxy) Seed(context.Context, int64, galaxy.GenerationParams) (*galaxy.Galaxy, error) {
 	return nil, errors.New("unused")
 }
 func (f *fakeGalaxy) GetLive(context.Context) (*galaxy.GeneratedGalaxy, error) {
@@ -38,6 +38,20 @@ func (f *fakeGalaxy) GetLiveSystem(context.Context, string) (*galaxy.System, err
 }
 func (f *fakeGalaxy) LiveGalaxyMeta(context.Context) (*galaxy.Galaxy, error) {
 	return f.meta, nil
+}
+func (f *fakeGalaxy) EnsureLaneHorizon(context.Context, string) error { return nil }
+func (f *fakeGalaxy) LaneHorizonBlocks(context.Context, []string) ([]galaxy.Block, error) {
+	return nil, nil
+}
+func (f *fakeGalaxy) EnsureBlocks(context.Context, ...galaxy.Block) error { return nil }
+func (f *fakeGalaxy) NeighborsOf(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+func (f *fakeGalaxy) NeighborsOfMany(context.Context, []string) (map[string][]string, error) {
+	return nil, nil
+}
+func (f *fakeGalaxy) GetLiveSystems(context.Context, []string) ([]galaxy.System, error) {
+	return nil, nil
 }
 
 func testGalaxy() *fakeGalaxy {

@@ -52,7 +52,7 @@ const nodeB: GalaxyNode = {
 const galaxy: Galaxy = {
   id: 'g', seed: 1, bounds: { x: [0, 1], y: [0, 1], z: [0, 1] }, worldTime: 0,
   nodes: [nodeA, nodeB],
-  links: [{ id: 'l', source: 'a', target: 'b' }],
+  links: [{ id: 'l', source: 'a', target: 'b', bridge: false }],
 }
 
 describe('GalaxyGraph', () => {

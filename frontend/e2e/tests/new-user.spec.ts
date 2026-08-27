@@ -17,7 +17,8 @@ import { emulatorSignIn } from '../helpers/firebase-emulator'
  * home system is chosen by an account-seeded RNG on a per-signup-random Firebase
  * UID, so we never hard-code a system: we read home from the URL we land on and
  * assert relative to it. (The galaxy itself is deterministic — StartAreaSeed,
- * ids sys-0…sys-N — but which one is *home* is not.)
+ * with ids that are field coordinates, sys_<cx>_<cy> — but which one is *home*
+ * is not, and the world grows as players wake.)
  *
  * Local-only: it exercises the auth emulator's signup REST path. dev/prod runs
  * use the shared pre-provisioned account and skip this.

@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { createBoardProjection, BOARD_TILT_DEG } from '../../components/board/use-board-projection'
 import { DRAG_THRESHOLD_PX, WHEEL_NOTCH_DELTA_Y, WHEEL_ZOOM_BASE } from '../../components/board/board-camera'
 import { RADIAL_UNIT } from '../../lib/board'
+import { seededSystemId } from '../helpers/seeded-world'
 
 /**
  * Board camera (migrate-renderer-to-polar-board, `### Requirement: Board
@@ -30,7 +31,7 @@ const PANNED = {
 }
 
 async function openBoard(page: Page) {
-  await page.goto('/systems/sys-0')
+  await page.goto(`/systems/${seededSystemId(0)}`)
   await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 })
   await expect(page.getByTestId('board-overlay')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText(/charting the system/i)).toBeHidden({ timeout: 15_000 })
@@ -300,7 +301,7 @@ test.describe('board camera', () => {
     // every system-to-system move) is gated in
     // components/board/use-board-gestures.test.tsx, which rerenders the SAME
     // BoardStage instance with a new systemId.
-    await page.goto('/systems/sys-1')
+    await page.goto(`/systems/${seededSystemId(1)}`)
     await expect(page.getByTestId('board-overlay')).toBeVisible({ timeout: 15_000 })
     expect(await readCamera(page)).toEqual({ zoom: 1, tx: 0, ty: 0 })
   })

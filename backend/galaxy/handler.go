@@ -48,9 +48,15 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	authorized.GET("/galaxy", h.GetGalaxy)
 }
 
-// GetGalaxy serves the live galaxy in the pinned #0002 read contract. Every
-// system's star layer (position, region, skeleton) ships to everyone; the
-// per-requester subspace tier decorates it (#0006 — the discovered stub is gone).
+// GetGalaxy serves the live galaxy's MATERIALIZED subset in the pinned #0002
+// read contract — what collective observation has caused to exist, not "the
+// galaxy" (the field is unbounded). It grows between calls as scans and spawns
+// materialize new blocks, and its bounds track that extent. Every materialized
+// system's star layer (position, region, skeleton) ships to everyone — newly
+// materialized systems included, a deliberate decision: the field is public
+// astronomy, and only activity LOCATION leaks, never actor identity, lanes, or
+// tiers. The per-requester subspace tier decorates it (#0006). The read itself
+// creates nothing.
 func (h *Handler) GetGalaxy(c *gin.Context) {
 	gen, err := h.svc.GetLive(c.Request.Context())
 	switch {
@@ -115,12 +121,16 @@ type laneDTO struct {
 	Id  string `json:"id"`
 	AId string `json:"aId"`
 	BId string `json:"bId"`
+	// Bridge marks a deterministic void-crossing stitch. The view renders it
+	// distinctly (faint), but it behaves as an ordinary lane for every
+	// interaction.
+	Bridge bool `json:"bridge,omitempty"`
 }
 
 type galaxyDTO struct {
-	Id     string     `json:"id"`
-	Seed   int64      `json:"seed"`
-	Bounds Bounds     `json:"bounds"`
+	Id      string      `json:"id"`
+	Seed    int64       `json:"seed"`
+	Bounds  Bounds      `json:"bounds"`
 	Systems []systemDTO `json:"systems"`
 	Lanes   []laneDTO   `json:"lanes"`
 	// WorldTime satisfies the cross-cutting rule that every read returns it.
@@ -157,7 +167,7 @@ func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]observ
 		if !laneCharted(l, charted) {
 			continue
 		}
-		lanes = append(lanes, laneDTO{Id: l.Id, AId: l.AId, BId: l.BId})
+		lanes = append(lanes, laneDTO{Id: l.Id, AId: l.AId, BId: l.BId, Bridge: l.Bridge})
 	}
 	return galaxyDTO{
 		Id:        gen.Galaxy.Id,

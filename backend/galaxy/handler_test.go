@@ -18,10 +18,27 @@ type fakeService struct {
 	err error
 }
 
-func (f *fakeService) Generate(context.Context, int64, GenerationParams) (*GeneratedGalaxy, error) {
-	return f.gen, f.err
+func (f *fakeService) Seed(context.Context, int64, GenerationParams) (*Galaxy, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &f.gen.Galaxy, nil
 }
 func (f *fakeService) GetLive(context.Context) (*GeneratedGalaxy, error) { return f.gen, f.err }
+func (f *fakeService) EnsureLaneHorizon(context.Context, string) error   { return f.err }
+func (f *fakeService) LaneHorizonBlocks(context.Context, []string) ([]Block, error) {
+	return nil, f.err
+}
+func (f *fakeService) EnsureBlocks(context.Context, ...Block) error { return f.err }
+func (f *fakeService) NeighborsOf(context.Context, string) ([]string, error) {
+	return nil, f.err
+}
+func (f *fakeService) NeighborsOfMany(context.Context, []string) (map[string][]string, error) {
+	return nil, f.err
+}
+func (f *fakeService) GetLiveSystems(context.Context, []string) ([]System, error) {
+	return nil, f.err
+}
 func (f *fakeService) GetLiveSystem(context.Context, string) (*System, error) {
 	if f.err != nil {
 		return nil, f.err
@@ -46,7 +63,7 @@ func newTestRouter(svc ServiceInterface) *gin.Engine {
 }
 
 func TestHandler_GetGalaxy_PinnedShape(t *testing.T) {
-	gen := Generate(3, smallParams())
+	gen := GenerateStartArea(3, testParams())
 	gen.Galaxy.Id = "gal_h"
 	r := newTestRouter(&fakeService{gen: &gen})
 

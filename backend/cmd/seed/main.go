@@ -53,12 +53,14 @@ func main() {
 func seedLive(seed int64) error {
 	ctx := context.Background()
 	svc := galaxy.NewService()
-	gen, err := svc.Generate(ctx, seed, galaxy.DefaultParams())
+	params := galaxy.DefaultParams()
+	meta, err := svc.Seed(ctx, seed, params)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Seeded live galaxy %s: %d systems, %d lanes (seed %d)\n",
-		gen.Galaxy.Id, len(gen.Systems), len(gen.Lanes), seed)
+	fmt.Printf("Seeded live galaxy %s: %d start-area blocks materialized, origin %s (seed %d)\n",
+		meta.Id, len(galaxy.StartAreaBlocks(params)), meta.OriginSystemId, seed)
+	fmt.Println("The world is endless — it grows from here as players scan and spawn.")
 	return nil
 }
 
@@ -66,7 +68,7 @@ func seedLive(seed int64) error {
 // same pinned wire shape the frontend consumes — frozen, committed, never
 // regenerated at request time.
 func writeStartArea(out string) error {
-	gen := galaxy.Generate(galaxy.StartAreaSeed, galaxy.StartAreaParams())
+	gen := galaxy.GenerateStartArea(galaxy.StartAreaSeed, galaxy.StartAreaParams())
 	gen.Galaxy.Id = "gal_start_area"
 	gen.Galaxy.CreatedAt = 0 // frozen
 

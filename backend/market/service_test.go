@@ -44,12 +44,12 @@ func newSaleStack(t *testing.T, startingCargo map[string]float64) (*saleStack, f
 	clk := common.WorldClock()
 
 	gsvc := galaxy.NewServiceWith(galaxy.NewDaoWithClient(fs), clk)
-	gen, err := gsvc.Generate(ctx, 4242, galaxy.DefaultParams())
+	meta, err := gsvc.Seed(ctx, 4242, galaxy.DefaultParams())
 	if err != nil {
-		t.Fatalf("generating galaxy: %v", err)
+		t.Fatalf("seeding galaxy: %v", err)
 	}
-	gid := gen.Galaxy.Id
-	systemID := gen.Systems[0].Id
+	gid := meta.Id
+	systemID := meta.OriginSystemId
 
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
@@ -112,8 +112,8 @@ func newSaleStack(t *testing.T, startingCargo map[string]float64) (*saleStack, f
 			fmt.Sprintf("corporations/%s/reconciliation", corpID),
 			fmt.Sprintf("galaxies/%s/systems/%s/station", gid, systemID),
 			fmt.Sprintf("corporations/%s/observations", corpID),
-			"galaxies/"+gid+"/systems", "galaxies/"+gid+"/lanes",
-			"fleets", "corporations", "galaxies", "galaxy_pointers", "actions")
+			"galaxies/"+gid+"/systems", "galaxies/"+gid+"/lanes", "galaxies/"+gid+"/blocks",
+			"fleets", "corporations", "corpByAccount", "spawnClaims", "galaxies", "galaxy_pointers", "actions")
 	}
 	return s, cleanup
 }

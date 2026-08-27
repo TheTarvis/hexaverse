@@ -33,6 +33,13 @@ func SetupFirestoreTestClient(t *testing.T) *firestore.Client {
 
 // CleanupFirestoreTestData removes all test data from specified collections
 // Pass specific collections to clean to avoid race conditions in parallel tests
+//
+// Firestore does not cascade: deleting a document ORPHANS its subcollections,
+// which then leak into the next test. Every nested path must therefore be named
+// explicitly — for a galaxy, ask the galaxy package for them
+// (`galaxy.SubcollectionPaths`) rather than spelling them out, so a domain that
+// adds a subcollection (as the endless galaxy added `blocks`) updates every
+// caller at once.
 func CleanupFirestoreTestData(t *testing.T, client *firestore.Client, collections ...string) {
 	// Manual cleanup fallback
 	ctx := context.Background()

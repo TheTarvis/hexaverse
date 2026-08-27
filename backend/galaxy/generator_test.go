@@ -5,121 +5,89 @@ import (
 	"testing"
 )
 
-// smallParams keeps generation fast for unit tests while preserving structure.
-func smallParams() GenerationParams {
-	p := DefaultParams()
-	p.TargetCount = 120
-	p.RadiusXY = 300
-	return p
-}
+func TestGenerateStartArea_DeterministicAndWellFormed(t *testing.T) {
+	a := GenerateStartArea(StartAreaSeed, StartAreaParams())
+	b := GenerateStartArea(StartAreaSeed, StartAreaParams())
 
-func TestGenerate_Deterministic(t *testing.T) {
-	a := Generate(7, smallParams())
-	b := Generate(7, smallParams())
-
-	if !reflect.DeepEqual(a.Systems, b.Systems) {
-		t.Fatal("same seed produced different systems")
+	if !reflect.DeepEqual(a, b) {
+		t.Fatal("the same seed produced a different start area")
 	}
-	if !reflect.DeepEqual(a.Lanes, b.Lanes) {
-		t.Fatal("same seed produced different lanes")
+	if len(a.Systems) == 0 || len(a.Lanes) == 0 {
+		t.Fatalf("empty start area: %d systems, %d lanes", len(a.Systems), len(a.Lanes))
 	}
-	if !reflect.DeepEqual(a.Galaxy.Bounds, b.Galaxy.Bounds) {
-		t.Fatal("same seed produced different bounds")
-	}
-}
-
-func TestGenerate_DifferentSeedsDiffer(t *testing.T) {
-	a := Generate(1, smallParams())
-	b := Generate(2, smallParams())
-	if reflect.DeepEqual(a.Systems, b.Systems) {
-		t.Fatal("different seeds produced identical systems")
-	}
-}
-
-func TestGenerate_Connectivity(t *testing.T) {
-	g := Generate(42, smallParams())
-	if len(g.Systems) < 2 {
-		t.Fatalf("too few systems to test connectivity: %d", len(g.Systems))
+	if a.Galaxy.OriginSystemId == "" {
+		t.Fatal("start area has no origin system")
 	}
 
-	// Build adjacency from lanes and BFS from node 0.
-	adj := map[string][]string{}
-	for _, l := range g.Lanes {
-		adj[l.AId] = append(adj[l.AId], l.BId)
-		adj[l.BId] = append(adj[l.BId], l.AId)
+	// The asset must never draw a lane to a node it does not carry.
+	present := map[string]bool{}
+	for _, s := range a.Systems {
+		present[s.Id] = true
 	}
-
-	seen := map[string]bool{g.Systems[0].Id: true}
-	queue := []string{g.Systems[0].Id}
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		for _, nb := range adj[cur] {
-			if !seen[nb] {
-				seen[nb] = true
-				queue = append(queue, nb)
-			}
+	for _, l := range a.Lanes {
+		if !present[l.AId] || !present[l.BId] {
+			t.Fatalf("lane %s reaches outside the start area (%s/%s)", l.Id, l.AId, l.BId)
 		}
-	}
-
-	if len(seen) != len(g.Systems) {
-		t.Fatalf("graph not connected: BFS reached %d of %d systems", len(seen), len(g.Systems))
-	}
-}
-
-func TestGenerate_MinimumSpacingRespected(t *testing.T) {
-	params := smallParams()
-	g := Generate(9, params)
-	for i := 0; i < len(g.Systems); i++ {
-		for j := i + 1; j < len(g.Systems); j++ {
-			d := dist(g.Systems[i].Coords, g.Systems[j].Coords)
-			// The smallest legal separation is the tightest region gap.
-			minGap := params.MinGapByRegion[string(RegionStarRich)]
-			if d < minGap*0.999 {
-				t.Fatalf("systems %d and %d are %.2f apart, below min gap %.2f", i, j, d, minGap)
-			}
+		if l.AId == l.BId {
+			t.Fatalf("lane %s is a self-loop", l.Id)
 		}
 	}
 }
 
-func TestGenerate_RegionDistribution_StarRichDenserThanDead(t *testing.T) {
-	// Over the same volume, star-rich's tight gap must pack more systems per
-	// unit volume than dead's sparse gap. Measure as count normalized by the
-	// region's own cell volume expectation — simplest robust proxy: star-rich
-	// count should exceed dead count materially at these thresholds.
-	g := Generate(3, DefaultParams())
-	counts := map[Region]int{}
-	for _, s := range g.Systems {
-		counts[s.Region]++
-	}
-	if counts[RegionStarRich] == 0 {
-		t.Fatal("no star-rich systems generated")
-	}
-	// Density contrast: star-rich packs tighter, so in a noise field with
-	// symmetric thresholds it should not be rarer than dead.
-	if counts[RegionStarRich] < counts[RegionDead] {
-		t.Fatalf("expected star-rich (%d) to be denser than dead (%d)",
-			counts[RegionStarRich], counts[RegionDead])
-	}
-}
-
-func TestGenerate_BarrierSeamsAreSparse(t *testing.T) {
-	g := Generate(3, DefaultParams())
-	counts := map[Region]int{}
-	for _, s := range g.Systems {
-		counts[s.Region]++
-	}
-	// Barriers are a thin zero-crossing band — they must be the rarest region.
-	for _, r := range []Region{RegionStarRich, RegionNormal, RegionDead} {
-		if counts[RegionBarrier] > counts[r] {
-			t.Fatalf("barrier (%d) not sparse vs %s (%d)", counts[RegionBarrier], r, counts[r])
+// The origin system is the world's anchor: it must be a real materialized
+// system near the field origin, and stable across runs.
+func TestGenerateStartArea_OriginIsNearestSurvivor(t *testing.T) {
+	gen := GenerateStartArea(StartAreaSeed, StartAreaParams())
+	var origin *System
+	best := -1.0
+	for i := range gen.Systems {
+		s := &gen.Systems[i]
+		d := s.Coords.X*s.Coords.X + s.Coords.Y*s.Coords.Y + s.Coords.Z*s.Coords.Z
+		if best < 0 || d < best {
+			best, origin = d, s
 		}
 	}
+	if origin == nil || gen.Galaxy.OriginSystemId != origin.Id {
+		t.Fatalf("origin = %q, want the nearest survivor %v", gen.Galaxy.OriginSystemId, origin)
+	}
 }
 
-func TestGenerate_SkeletonDeterministicAndWellFormed(t *testing.T) {
-	g := Generate(11, smallParams())
-	for _, s := range g.Systems {
+func TestInspectStartArea_ReportsTheOriginComponent(t *testing.T) {
+	gen := GenerateStartArea(StartAreaSeed, StartAreaParams())
+	rep := InspectStartArea(gen)
+
+	if rep.OriginSystemId != gen.Galaxy.OriginSystemId {
+		t.Fatalf("report origin %q != galaxy origin %q", rep.OriginSystemId, gen.Galaxy.OriginSystemId)
+	}
+	if rep.ComponentSize < StartAreaParams().MinOriginComponentSystems {
+		t.Fatalf("the shipped start-area seed fails its own floor: component %d < %d",
+			rep.ComponentSize, StartAreaParams().MinOriginComponentSystems)
+	}
+	if !rep.ComponentHasOre {
+		t.Fatal("the shipped start-area seed has no mineable system in its origin component")
+	}
+	if rep.ComponentSize > len(gen.Systems) {
+		t.Fatalf("component %d exceeds the start area's %d systems", rep.ComponentSize, len(gen.Systems))
+	}
+}
+
+// A degenerate field (no lanes at all) must report a component of one, so
+// seed-time validation can reject it.
+func TestInspectStartArea_DegenerateField(t *testing.T) {
+	gen := GeneratedGalaxy{
+		Galaxy:  Galaxy{OriginSystemId: "sys_0_0"},
+		Systems: []System{{Id: "sys_0_0"}, {Id: "sys_5_5"}},
+	}
+	rep := InspectStartArea(gen)
+	if rep.ComponentSize != 1 || rep.ComponentHasOre {
+		t.Fatalf("unexpected report for a laneless field: %+v", rep)
+	}
+}
+
+func TestSkeleton_DeterministicAndWellFormed(t *testing.T) {
+	p := testParams()
+	gen := GenerateStartArea(11, p)
+	for _, s := range gen.Systems {
 		if s.Skeleton.StarClass == "" {
 			t.Fatalf("system %s has no star class", s.Id)
 		}
@@ -134,35 +102,11 @@ func TestGenerate_SkeletonDeterministicAndWellFormed(t *testing.T) {
 		}
 	}
 
-	// Re-derive one system's skeleton straight from the seed helper: identical.
-	sys := g.Systems[0]
-	again := rollSkeleton(SystemSeed(11, sys.Id), sys.Region, smallParams())
+	// The skeleton pipeline is unchanged by the move to field identity: it still
+	// re-derives straight from SystemSeed(galaxySeed, systemId).
+	sys := gen.Systems[0]
+	again := rollSkeleton(SystemSeed(11, sys.Id), sys.Region, p)
 	if !reflect.DeepEqual(sys.Skeleton, again) {
 		t.Fatal("skeleton not reproducible from SystemSeed")
-	}
-}
-
-func TestGenerate_ReachesTargetCount(t *testing.T) {
-	params := smallParams()
-	g := Generate(5, params)
-	// Poisson rejection may fall short, but should get most of the way there.
-	if len(g.Systems) < params.TargetCount*7/10 {
-		t.Fatalf("only placed %d of target %d systems", len(g.Systems), params.TargetCount)
-	}
-}
-
-func TestGenerate_LanesReferenceRealSystems(t *testing.T) {
-	g := Generate(8, smallParams())
-	ids := map[string]bool{}
-	for _, s := range g.Systems {
-		ids[s.Id] = true
-	}
-	for _, l := range g.Lanes {
-		if !ids[l.AId] || !ids[l.BId] {
-			t.Fatalf("lane %s references missing system(s): %s/%s", l.Id, l.AId, l.BId)
-		}
-		if l.AId == l.BId {
-			t.Fatalf("lane %s is a self-loop", l.Id)
-		}
 	}
 }

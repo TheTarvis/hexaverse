@@ -85,6 +85,21 @@ func (mr *MockDaoMockRecorder) GetSystem(ctx, galaxyID, systemID any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSystem", reflect.TypeOf((*MockDao)(nil).GetSystem), ctx, galaxyID, systemID)
 }
 
+// GetSystems mocks base method.
+func (m *MockDao) GetSystems(ctx context.Context, galaxyID string, systemIDs []string) ([]System, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSystems", ctx, galaxyID, systemIDs)
+	ret0, _ := ret[0].([]System)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSystems indicates an expected call of GetSystems.
+func (mr *MockDaoMockRecorder) GetSystems(ctx, galaxyID, systemIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSystems", reflect.TypeOf((*MockDao)(nil).GetSystems), ctx, galaxyID, systemIDs)
+}
+
 // ListLanes mocks base method.
 func (m *MockDao) ListLanes(ctx context.Context, galaxyID string) ([]Lane, error) {
 	m.ctrl.T.Helper()
@@ -98,6 +113,36 @@ func (m *MockDao) ListLanes(ctx context.Context, galaxyID string) ([]Lane, error
 func (mr *MockDaoMockRecorder) ListLanes(ctx, galaxyID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLanes", reflect.TypeOf((*MockDao)(nil).ListLanes), ctx, galaxyID)
+}
+
+// ListLanesForSystem mocks base method.
+func (m *MockDao) ListLanesForSystem(ctx context.Context, galaxyID, systemID string) ([]Lane, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListLanesForSystem", ctx, galaxyID, systemID)
+	ret0, _ := ret[0].([]Lane)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListLanesForSystem indicates an expected call of ListLanesForSystem.
+func (mr *MockDaoMockRecorder) ListLanesForSystem(ctx, galaxyID, systemID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLanesForSystem", reflect.TypeOf((*MockDao)(nil).ListLanesForSystem), ctx, galaxyID, systemID)
+}
+
+// ListLanesForSystems mocks base method.
+func (m *MockDao) ListLanesForSystems(ctx context.Context, galaxyID string, systemIDs []string) ([]Lane, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListLanesForSystems", ctx, galaxyID, systemIDs)
+	ret0, _ := ret[0].([]Lane)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListLanesForSystems indicates an expected call of ListLanesForSystems.
+func (mr *MockDaoMockRecorder) ListLanesForSystems(ctx, galaxyID, systemIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLanesForSystems", reflect.TypeOf((*MockDao)(nil).ListLanesForSystems), ctx, galaxyID, systemIDs)
 }
 
 // ListSystems mocks base method.
@@ -115,18 +160,62 @@ func (mr *MockDaoMockRecorder) ListSystems(ctx, galaxyID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSystems", reflect.TypeOf((*MockDao)(nil).ListSystems), ctx, galaxyID)
 }
 
-// SaveGalaxy mocks base method.
-func (m *MockDao) SaveGalaxy(ctx context.Context, g GeneratedGalaxy) error {
+// MaterializeBlock mocks base method.
+func (m_2 *MockDao) MaterializeBlock(ctx context.Context, galaxyID string, m BlockMaterialization) (bool, error) {
+	m_2.ctrl.T.Helper()
+	ret := m_2.ctrl.Call(m_2, "MaterializeBlock", ctx, galaxyID, m)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MaterializeBlock indicates an expected call of MaterializeBlock.
+func (mr *MockDaoMockRecorder) MaterializeBlock(ctx, galaxyID, m any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaterializeBlock", reflect.TypeOf((*MockDao)(nil).MaterializeBlock), ctx, galaxyID, m)
+}
+
+// MaterializedBlocks mocks base method.
+func (m *MockDao) MaterializedBlocks(ctx context.Context, galaxyID string, blocks []Block) (map[Block]bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveGalaxy", ctx, g)
+	ret := m.ctrl.Call(m, "MaterializedBlocks", ctx, galaxyID, blocks)
+	ret0, _ := ret[0].(map[Block]bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MaterializedBlocks indicates an expected call of MaterializedBlocks.
+func (mr *MockDaoMockRecorder) MaterializedBlocks(ctx, galaxyID, blocks any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaterializedBlocks", reflect.TypeOf((*MockDao)(nil).MaterializedBlocks), ctx, galaxyID, blocks)
+}
+
+// MergeExtent mocks base method.
+func (m *MockDao) MergeExtent(ctx context.Context, galaxyID string, b Bounds, blocksAdded int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MergeExtent", ctx, galaxyID, b, blocksAdded)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SaveGalaxy indicates an expected call of SaveGalaxy.
-func (mr *MockDaoMockRecorder) SaveGalaxy(ctx, g any) *gomock.Call {
+// MergeExtent indicates an expected call of MergeExtent.
+func (mr *MockDaoMockRecorder) MergeExtent(ctx, galaxyID, b, blocksAdded any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveGalaxy", reflect.TypeOf((*MockDao)(nil).SaveGalaxy), ctx, g)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MergeExtent", reflect.TypeOf((*MockDao)(nil).MergeExtent), ctx, galaxyID, b, blocksAdded)
+}
+
+// SaveGalaxyMeta mocks base method.
+func (m *MockDao) SaveGalaxyMeta(ctx context.Context, g Galaxy) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveGalaxyMeta", ctx, g)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveGalaxyMeta indicates an expected call of SaveGalaxyMeta.
+func (mr *MockDaoMockRecorder) SaveGalaxyMeta(ctx, g any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveGalaxyMeta", reflect.TypeOf((*MockDao)(nil).SaveGalaxyMeta), ctx, g)
 }
 
 // SetLivePointer mocks base method.

@@ -24,32 +24,36 @@ func TestIntegration_TravelArriveReveals(t *testing.T) {
 	clk := &fakeClock{now: 0}
 
 	gsvc := galaxy.NewServiceWith(galaxy.NewDaoWithClient(fs), clk)
-	gen, err := gsvc.Generate(ctx, 1, galaxy.DefaultParams())
+	meta, err := gsvc.Seed(ctx, 1, galaxy.DefaultParams())
 	if err != nil {
 		t.Fatal(err)
 	}
-	gid := gen.Galaxy.Id
+	gid := meta.Id
+	home := meta.OriginSystemId
 
-	// A neighbour of sys-0 to travel to, and the lane that reaches it.
+	// A neighbour of the origin to travel to, and the lane that reaches it.
+	live, err := gsvc.GetLive(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var neighbor, laneID string
-	for _, l := range gen.Lanes {
-		if l.AId == "sys-0" {
+	for _, l := range live.Lanes {
+		if l.AId == home {
 			neighbor, laneID = l.BId, l.Id
 			break
 		}
-		if l.BId == "sys-0" {
+		if l.BId == home {
 			neighbor, laneID = l.AId, l.Id
 			break
 		}
 	}
 	if neighbor == "" {
-		t.Skip("generated galaxy gave sys-0 no lane")
+		t.Skip("the seeded start area gave the origin system no lane")
 	}
 
-	defer common.CleanupFirestoreTestData(t, client, "galaxies", "galaxy_pointers", "fleets", "actions", "corporations",
-		"galaxies/"+gid+"/systems", "galaxies/"+gid+"/lanes",
-		"galaxies/"+gid+"/systems/sys-0/interior", "galaxies/"+gid+"/systems/sys-0/features",
-		"galaxies/"+gid+"/systems/"+neighbor+"/interior", "galaxies/"+gid+"/systems/"+neighbor+"/features")
+	defer common.CleanupFirestoreTestData(t, client, append(
+		[]string{"galaxies", "galaxy_pointers", "fleets", "actions", "corporations", "corpByAccount", "spawnClaims"},
+		galaxy.SubcollectionPaths(gid, home, neighbor)...)...)
 
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
 	odao := observation.NewDaoWithClient(fs)
@@ -75,7 +79,7 @@ func TestIntegration_TravelArriveReveals(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	seeded, err := fsvc.SeedFleet(ctx, "sys-0", corp, board.Cell{Ring: 1, Slot: 0})
+	seeded, err := fsvc.SeedFleet(ctx, home, corp, board.Cell{Ring: 1, Slot: 0})
 	if err != nil {
 		t.Fatal(err)
 	}

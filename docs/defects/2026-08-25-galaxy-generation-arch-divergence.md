@@ -2,9 +2,9 @@
 
 **Filed:** 2026-08-25, by the `pin-cross-stack-determinism-seam` adversarial
 review; reproduced in compiler output by the orchestrator.
-**Status:** open
-**Against:** `galaxy-generation` (`backend/galaxy/generator.go`) and the
-`cross-stack-determinism` capability.
+**Status:** open — **narrowed 2026-08-27**, see "Narrowed by add-endless-galaxy".
+**Against:** `galaxy-generation` (`backend/galaxy/field.go`, `generator.go`) and
+the `cross-stack-determinism` capability.
 **Severity:** **downgraded 2026-08-25 after measurement — see "Measured".**
 Originally filed as potentially the widest-blast-radius member of this family, on
 the theory that a flipped Poisson-disc acceptance would re-phase the whole galaxy.
@@ -132,3 +132,51 @@ tested. A dev galaxy and a prod galaxy from the same seed are the same galaxy.
 `scratchpad/galprobe/` (standalone module, `replace hexaverse => backend`).
 Hashes ids+regions+lanes separately from coordinates so the two failure modes
 can be told apart; build under both `GOARCH` values and diff.
+
+## Narrowed by add-endless-galaxy (2026-08-27)
+
+This doc's own warning — *"gets materially worse with `add-endless-galaxy`,
+whose whole design is lazy, idempotent block materialization … that change
+should not land before this is resolved or explicitly accepted"* — was taken
+literally. Both of the mechanisms above are now **gone from our code**, and what
+remains is named precisely.
+
+**Mechanism 1 (float contraction) — FIXED in our code.** Every FMA site in
+`backend/galaxy` was made contraction-independent while the generator was
+rewritten around the infinite field:
+
+- `dist` (`field.go`) — the squares are wrapped in explicit `float64(...)`, so
+  the sum cannot fuse. It still gates placement survival, the lane cap, the
+  relative-neighbourhood test, and bridge pair selection.
+- candidate X/Y jitter (`field.go`) — each product is materialized through a
+  conversion before it meets an add.
+- candidate Z (`field.go`) — **discretized**: the slab position is an exact
+  integer step count scaled once, so there is no float chain left to fuse. This
+  is the discretization discipline the capability prescribes, not a pinning.
+- the fractal-noise accumulate (`generator.go`) and the origin-system
+  squared-distance argmin (`generator.go`) — both wrapped.
+
+Verified: `GOOS=linux GOARCH=arm64 go build -gcflags=-S ./galaxy` now emits
+**zero** `FMADDD`/`FMSUBD` sites (was 12).
+
+**Mechanism 2 (trigonometry writing persisted coordinates) — GONE.** The
+`r·cos θ / r·sin θ` disc placement was deleted with rejection sampling itself.
+The field derives coordinates from a hash: integer mixing, one division, and one
+multiply per axis. No trigonometry writes a coordinate any more.
+
+### What remains open
+
+The residual is **third-party**: `github.com/ojrac/opensimplex-go` emits 273 FMA
+sites on arm64 and zero on amd64. Its `Eval3` output is compared against
+`StarRichThreshold` / `DeadThreshold` / `BarrierBand` to classify a candidate's
+region, and the region selects the minimum gap that decides survival. So a
+1-ULP noise difference at a classification threshold can still, in principle,
+change which systems exist.
+
+Under lazy materialization this is the exposure that matters: the same block
+materialized by an arm64 build and an amd64 build could disagree, and
+`Lazy, Idempotent Block Materialization` promises they cannot. It has **not**
+been measured. Candidate resolutions, cheapest first: pin the region classifier
+by quantizing the noise value before comparison (a discretized choice, the same
+move Z just took); vendor a contraction-free noise implementation; or restrict
+seeding and materialization to one build target and say so in the spec.

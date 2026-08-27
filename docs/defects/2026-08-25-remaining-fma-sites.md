@@ -20,10 +20,11 @@ $ cd backend && GOOS=linux GOARCH=arm64 go build -gcflags=-S ./... \
     | sort | uniq -c | sort -rn
 
   12 backend/galaxy/generator.go            -> 2026-08-25-galaxy-generation-arch-divergence.md
+                                              (FIXED 2026-08-27: now 0 — see that doc)
    8 backend/fleet/routing.go               -> 2026-08-25-lane-eta-arch-divergence.md
    6 backend/board/hex.go                   -> 2026-08-25-line-fma-arch-divergence.md
    4 backend/system/generator.go            -> THIS DOC
-   3 backend/corporations/siteselection.go  -> THIS DOC
+   3 backend/corporations/siteselection.go  -> THIS DOC (RESOLVED 2026-08-27, sites deleted)
    2 backend/market/provisioning.go         -> THIS DOC
    2 backend/board/gate.go                  -> 2026-08-25-line-fma-arch-divergence.md
                                               (its `hexDirection` FMA sites; the SEPARATE
@@ -53,7 +54,16 @@ f.Resources = []Resource{{Kind: ResourceExotic,
 on which machine materialized the interior.** Interiors are materialized lazily
 on first read, so dev and prod can disagree per system.
 
-### 2. `backend/corporations/siteselection.go:54,159` — the spawn home
+### 2. `backend/corporations/siteselection.go:54,159` — the spawn home — **RESOLVED 2026-08-27**
+
+**Both sites were deleted by `add-endless-galaxy`, not repaired.** Periphery
+weighting and `centralSystemID` retired with the finite galaxy: site selection is
+now a breadth-first walk over the lane graph that stops at the first qualifying
+hop-ring and draws uniformly within it, so there is no centroid distance and no
+weighted score left to contract. `backend/corporations` emits zero FMA sites on
+arm64, and the two register entries naming this defect were removed. The original
+description is kept below as the record of what was there.
+
 
 ```go
 d := (c.X-cx)*(c.X-cx) + (c.Y-cy)*(c.Y-cy) + (c.Z-cz)*(c.Z-cz)

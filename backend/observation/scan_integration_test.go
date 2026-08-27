@@ -30,10 +30,34 @@ func (f beamInteriors) Features(_ context.Context, systemID string) ([]FeatureGe
 }
 
 // beamLanes is a hand fake of LaneSource.
-type beamLanes struct{ bySystem map[string][]LaneEnd }
+type beamLanes struct {
+	bySystem map[string][]LaneEnd
+	// ensured records the systems whose lane horizon was materialized, so tests
+	// can pin that the endless-galaxy seam fired (and that a fizzled scan never
+	// fires it).
+	ensured *[]string
+	// materialize, when set, is what EnsureLaneHorizon does to bySystem —
+	// standing in for the field's onward roads appearing on first touch.
+	materialize func(systemID string, m map[string][]LaneEnd)
+	// ensureErr fails the horizon call.
+	ensureErr error
+}
 
 func (f beamLanes) LanesOf(_ context.Context, systemID string) ([]LaneEnd, error) {
 	return f.bySystem[systemID], nil
+}
+
+func (f beamLanes) EnsureLaneHorizon(_ context.Context, systemID string) error {
+	if f.ensureErr != nil {
+		return f.ensureErr
+	}
+	if f.ensured != nil {
+		*f.ensured = append(*f.ensured, systemID)
+	}
+	if f.materialize != nil {
+		f.materialize(systemID, f.bySystem)
+	}
+	return nil
 }
 
 func testScanParams() ScanParams {
@@ -389,5 +413,118 @@ func TestScan_LateResolveEvaluatesAtEta(t *testing.T) {
 	}
 	if _, ok := minted["feat-shadowed"]; ok {
 		t.Errorf("feature shadowed AT ETA must stay dark — occluders are evaluated at eta, not at resolve time")
+	}
+}
+
+// --- The endless-galaxy seam (#0006 × the infinite field) -------------------
+
+// A scan at the materialized frontier must discover the onward roads exactly as
+// if they had been persisted all along: the resolver ensures the scanned
+// system's full lane horizon FIRST, so what it charts is the field's truth, not
+// storage's edge.
+func TestScanResolver_FrontierScanDiscoversOnwardRoads(t *testing.T) {
+	fs, client := common.SetupFirestoreTestDAO(t)
+	defer common.CleanupFirestoreTestData(t, client, "actions", "fleets", corporationsCollection)
+
+	ctx := context.Background()
+	clk := &settableClock{}
+	actionSvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
+
+	corp := "corp-" + uuid.NewString()
+	const sys = "sys_2_0"
+	var ensured []string
+	// Storage starts with NO lanes for the frontier system; the horizon call is
+	// what makes them exist — including the cross-corner lane into a diagonally
+	// adjacent block (B2) and a bridge whose far endpoint skips empty blocks
+	// (R2-B1). All three must be charted.
+	lanes := beamLanes{
+		bySystem: map[string][]LaneEnd{},
+		ensured:  &ensured,
+		materialize: func(systemID string, m map[string][]LaneEnd) {
+			if systemID != sys {
+				return
+			}
+			m[sys] = []LaneEnd{
+				{LaneId: "lane_2_0_3_0", OtherSystemId: "sys_3_0"},   // ordinary, adjacent block
+				{LaneId: "lane_2_0_3_-1", OtherSystemId: "sys_3_-1"}, // cross-corner (diagonal block)
+				{LaneId: "lane_2_0_9_0", OtherSystemId: "sys_9_0"},   // bridge over empty blocks
+			}
+		},
+	}
+	fog := NewServiceWith(NewDaoWithClient(fs), fakeFleets{}, beamInteriors{}, lanes, clk).
+		WithParams(DefaultSensorParams(), testScanParams())
+	fog.RegisterResolvers(actionSvc)
+
+	origin := board.Cell{Ring: 1, Slot: 0}
+	seedScanFleet(t, fs, "fleet-frontier", corp, sys, origin)
+	clk.now = 0
+	commitScan(t, actionSvc, "fleet-frontier", sys, origin, 1_000)
+	clk.now = 1_000
+	if _, err := actionSvc.ResolveActive(ctx, "fleet-frontier"); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	if len(ensured) == 0 || ensured[0] != sys {
+		t.Fatalf("the scan did not materialize %s's lane horizon (ensured=%v)", sys, ensured)
+	}
+	charted, err := fog.ChartedLanes(ctx, corp)
+	if err != nil {
+		t.Fatalf("charted lanes: %v", err)
+	}
+	for _, want := range []string{"lane_2_0_3_0", "lane_2_0_3_-1", "lane_2_0_9_0"} {
+		if !charted[want] {
+			t.Errorf("lane %s not charted — the scan reported a false dead end (charted=%v)", want, charted)
+		}
+	}
+	tiers, err := fog.SystemTiers(ctx, corp)
+	if err != nil {
+		t.Fatalf("tiers: %v", err)
+	}
+	for _, want := range []string{"sys_3_0", "sys_3_-1", "sys_9_0"} {
+		if tiers[want] != TierRumored {
+			t.Errorf("far endpoint %s tier = %q, want rumored", want, tiers[want])
+		}
+	}
+}
+
+// A fizzled scan must materialize NOTHING: the fizzle test gates the trigger
+// (adversary R2-m1), so a scan that found nothing never grows the world.
+func TestScanResolver_FizzledScanMaterializesNothing(t *testing.T) {
+	fs, client := common.SetupFirestoreTestDAO(t)
+	defer common.CleanupFirestoreTestData(t, client, "actions", "fleets", corporationsCollection)
+
+	ctx := context.Background()
+	clk := &settableClock{}
+	actionSvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
+
+	corp := "corp-" + uuid.NewString()
+	const sys = "sys_4_4"
+	var ensured []string
+	lanes := beamLanes{bySystem: map[string][]LaneEnd{}, ensured: &ensured}
+	fog := NewServiceWith(NewDaoWithClient(fs), fakeFleets{}, beamInteriors{}, lanes, clk).
+		WithParams(DefaultSensorParams(), testScanParams())
+	fog.RegisterResolvers(actionSvc)
+
+	origin := board.Cell{Ring: 1, Slot: 0}
+	seedScanFleet(t, fs, "fleet-fizzle", corp, sys, origin)
+	clk.now = 0
+	a := commitScan(t, actionSvc, "fleet-fizzle", sys, origin, 1_000)
+	if err := fs.Set(ctx, "fleets", "fleet-fizzle", map[string]interface{}{"systemId": "sys_9_9"}); err != nil {
+		t.Fatalf("move fleet: %v", err)
+	}
+	clk.now = 1_000
+	if _, err := actionSvc.ResolveActive(ctx, "fleet-fizzle"); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	if len(ensured) != 0 {
+		t.Fatalf("a fizzled scan materialized %v — the fizzle test must gate the trigger", ensured)
+	}
+	done, err := actionSvc.Get(ctx, a.Id)
+	if err != nil {
+		t.Fatalf("get action: %v", err)
+	}
+	if !strings.Contains(done.Outcome, "interrupted") {
+		t.Fatalf("outcome = %q, want an interrupted scan", done.Outcome)
 	}
 }

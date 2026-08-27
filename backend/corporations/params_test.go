@@ -1,6 +1,7 @@
 package corporations
 
 import (
+	"errors"
 	"testing"
 
 	"hexaverse/common"
@@ -15,11 +16,13 @@ func TestDefaultSpawnParams(t *testing.T) {
 	if p.MinSpawnDistance < 0 {
 		t.Fatalf("MinSpawnDistance = %d, must be non-negative", p.MinSpawnDistance)
 	}
-	if p.PeripheryWeight < 0 {
-		t.Fatalf("PeripheryWeight = %f, must be non-negative", p.PeripheryWeight)
-	}
 	if !p.RequireMineable {
 		t.Fatal("RequireMineable should default true — the bootstrap guarantee is on")
+	}
+	// The walk's two defensive rails must be positive, or the search fences
+	// itself in (depth) or cannot recover from a reservation race (re-picks).
+	if err := p.Validate(); err != nil {
+		t.Fatalf("the shipped defaults must validate: %v", err)
 	}
 	// The starting hull coasts one ring inside the lane-gate ring.
 	if want := common.Tuning().BoardRadius - 1; p.RimRing != want {
@@ -65,5 +68,28 @@ func TestBoardRadiusInvariant_TracksTuning(t *testing.T) {
 	}
 	if got := DefaultSpawnParams().RimRing; got != 19 {
 		t.Errorf("spawn rim ring = %d, want 19 — it did not follow the central knob", got)
+	}
+}
+
+// The rails must be REJECTED when non-positive: a zero walk depth fences the
+// search into its own starting blocks, and a zero re-pick budget makes any
+// reservation race unrecoverable.
+func TestSpawnParams_ValidateRejectsDegenerateRails(t *testing.T) {
+	for name, mutate := range map[string]func(*SpawnParams){
+		"zero walk depth":     func(p *SpawnParams) { p.MaxSpawnWalkBlocks = 0 },
+		"negative walk depth": func(p *SpawnParams) { p.MaxSpawnWalkBlocks = -1 },
+		"zero re-picks":       func(p *SpawnParams) { p.MaxSpawnRepicks = 0 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := DefaultSpawnParams()
+			mutate(&p)
+			err := p.Validate()
+			if err == nil {
+				t.Fatal("expected a validation error")
+			}
+			if !errors.Is(err, ErrInvalidSpawnParams) {
+				t.Fatalf("error %v does not wrap ErrInvalidSpawnParams", err)
+			}
+		})
 	}
 }

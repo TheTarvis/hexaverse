@@ -12,7 +12,7 @@ func newDaoUnderTest(t *testing.T) (Dao, context.Context) {
 	t.Helper()
 	fs, client := common.SetupFirestoreTestDAO(t)
 	t.Cleanup(func() {
-		common.CleanupFirestoreTestData(t, client, corporationsCollection, accountPointerCollection)
+		common.CleanupFirestoreTestData(t, client, corporationsCollection, accountPointerCollection, spawnClaimsCollection)
 	})
 	return NewDaoWithClient(fs), context.Background()
 }
@@ -23,11 +23,11 @@ func newDaoUnderTest(t *testing.T) (Dao, context.Context) {
 func TestDao_CreateWithPointer_UniquePerAccount(t *testing.T) {
 	dao, ctx := newDaoUnderTest(t)
 
-	first := Corporation{Id: "corp_1", AccountId: "acct-1", Name: "One", CreatedAt: 1000}
+	first := Corporation{Id: "corp_1", AccountId: "acct-1", Name: "One", CreatedAt: 1000, HomeSystemId: "sys_1_0"}
 	if err := dao.CreateWithPointer(ctx, first); err != nil {
 		t.Fatalf("first create: %v", err)
 	}
-	second := Corporation{Id: "corp_2", AccountId: "acct-1", Name: "Two", CreatedAt: 2000}
+	second := Corporation{Id: "corp_2", AccountId: "acct-1", Name: "Two", CreatedAt: 2000, HomeSystemId: "sys_2_0"}
 	if err := dao.CreateWithPointer(ctx, second); !errors.Is(err, ErrAccountHasCorp) {
 		t.Fatalf("second create for same account: err = %v, want ErrAccountHasCorp", err)
 	}
@@ -63,8 +63,8 @@ func TestDao_CorpIdForAccount_Absent(t *testing.T) {
 func TestDao_ListLiving_ExcludesDead(t *testing.T) {
 	dao, ctx := newDaoUnderTest(t)
 
-	alive := Corporation{Id: "corp_alive", AccountId: "a", Name: "Alive", CreatedAt: 1}
-	dead := Corporation{Id: "corp_dead", AccountId: "b", Name: "Dead", CreatedAt: 1}
+	alive := Corporation{Id: "corp_alive", AccountId: "a", Name: "Alive", CreatedAt: 1, HomeSystemId: "sys_alive_0"}
+	dead := Corporation{Id: "corp_dead", AccountId: "b", Name: "Dead", CreatedAt: 1, HomeSystemId: "sys_dead_0"}
 	if err := dao.CreateWithPointer(ctx, alive); err != nil {
 		t.Fatal(err)
 	}

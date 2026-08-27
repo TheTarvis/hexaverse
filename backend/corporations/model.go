@@ -19,6 +19,12 @@ type Corporation struct {
 	AccountId string             `json:"accountId" firestore:"accountId"`
 	Name      string             `json:"name" firestore:"name"`
 	CreatedAt common.WorldMillis `json:"createdAt" firestore:"createdAt"`
+	// HomeSystemId is the home system of RECORD, written in the same transaction
+	// as the corp doc and its spawn reservation. It is what spawn and healing
+	// report as the home regardless of where the hull currently sits — and it is
+	// what makes healing reuse the corporation's own committed choice instead of
+	// re-running site selection (which would strand an orphaned reservation).
+	HomeSystemId string `json:"homeSystemId" firestore:"homeSystemId"`
 	// DiedAt is set when the corp's last fleet is destroyed; settable only at zero
 	// fleets (the death invariant). Zero ⇒ living. No slice code path reaches it —
 	// nothing destroys a fleet yet — but the rule ships so combat inherits it.

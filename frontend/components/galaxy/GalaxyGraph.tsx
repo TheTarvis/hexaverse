@@ -239,18 +239,26 @@ export function GalaxyGraph({
   }, [selectedId, fleetSet])
 
   const linkColor = useCallback(
-    (link: { source: GalaxyNode | string; target: GalaxyNode | string }) => {
+    (link: { source: GalaxyNode | string; target: GalaxyNode | string; bridge?: boolean }) => {
       const a = typeof link.source === 'object' ? link.source : nodeById.get(link.source)
       const b = typeof link.target === 'object' ? link.target : nodeById.get(link.target)
       const seam = a?.region === 'barrier' || b?.region === 'barrier'
-      // Every lane we receive renders at full strength: lane-reveal-by-presence
-      // is now enforced server-side (#0006) — the galaxy read only ships the
-      // requester's charted lanes, so there are no unknown lanes to dim here.
+      // A bridge is the deterministic stitch across a void the ordinary lane cap
+      // cannot span. It reads faint and cold so a long haul over empty space
+      // looks different from a local road — but it travels like any other lane.
+      if (link.bridge) return `rgba(150,185,230,0.16)`
+      // Every other lane we receive renders at full strength: lane-reveal-by-
+      // presence is enforced server-side (#0006) — the galaxy read only ships
+      // the requester's charted lanes, so there are no unknown lanes to dim here.
       if (seam) return `rgba(244,114,182,0.5)`
       return `rgba(150,185,230,0.42)`
     },
     [nodeById],
   )
+
+  // Bridges draw thinner as well as fainter — two channels, so the distinction
+  // survives a colour-blind viewer and a dark display.
+  const linkWidth = useCallback((link: { bridge?: boolean }) => (link.bridge ? 0.25 : 0.5), [])
 
   // ---- construct the camera rig once the graph has mounted on the client ----
   useEffect(() => {
@@ -467,7 +475,7 @@ export function GalaxyGraph({
           nodeThreeObject={makeNode}
           nodeLabel={(n: GalaxyNode) => n.name}
           linkColor={linkColor}
-          linkWidth={0.5}
+          linkWidth={linkWidth}
           linkOpacity={0.8}
           onNodeClick={handleNodeClick}
           onBackgroundClick={() => onSelect(null)}

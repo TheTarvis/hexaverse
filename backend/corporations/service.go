@@ -3,6 +3,7 @@ package corporations
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"hexaverse/board"
@@ -23,11 +24,30 @@ var (
 	ErrHasLivingFleet = errors.New("corporation still has a living fleet")
 )
 
-// GraphSource is the galaxy dependency: the live graph (site selection + onward
-// lanes) and a single system read (the home DTO the wake returns).
+// GraphSource is the galaxy dependency. Since the galaxy became an infinite
+// field materialized lazily, site selection can no longer load "the graph": it
+// WALKS, one system at a time, materializing each visited system's lane horizon
+// before expanding past it — so the world grows ahead of the search instead of
+// the search hitting the storage frontier and 503ing.
 type GraphSource interface {
-	GetLive(ctx context.Context) (*galaxy.GeneratedGalaxy, error)
+	// GetLiveSystem reads one materialized system (qualification + the home DTO
+	// the wake returns).
 	GetLiveSystem(ctx context.Context, systemID string) (*galaxy.System, error)
+	// LiveGalaxyMeta carries the recorded origin system (where a fresh world's
+	// first walk begins) and the block size the walk measures its depth in.
+	LiveGalaxyMeta(ctx context.Context) (*galaxy.Galaxy, error)
+	// GetLiveSystems reads a whole hop-ring's systems in one fan-out — the
+	// qualification step.
+	GetLiveSystems(ctx context.Context, systemIDs []string) ([]galaxy.System, error)
+	// LaneHorizonBlocks is the pure block set the given systems' incident lanes
+	// can reach; EnsureBlocks materializes them. Split, and batched over a whole
+	// ring, so the walk pays one ensure per new block rather than one per system
+	// (neighbouring systems' horizons overlap almost entirely).
+	LaneHorizonBlocks(ctx context.Context, systemIDs []string) ([]galaxy.Block, error)
+	EnsureBlocks(ctx context.Context, blocks ...galaxy.Block) error
+	// NeighborsOfMany is the walk's expansion step: one ring's adjacency over
+	// materialized lanes.
+	NeighborsOfMany(ctx context.Context, systemIDs []string) (map[string][]string, error)
 }
 
 // FleetSource places the starting hull and answers the death invariant's
@@ -98,15 +118,29 @@ type Service struct {
 // SAME instances router.go already constructed (fog + fleet share the action
 // spine), so spawn orchestrates through live singletons, not fresh copies.
 func NewService(graph GraphSource, fleets FleetSource, fog FogSource) *Service {
+	params := DefaultSpawnParams()
+	// The walk's caps are validated at construction, not at the first wake: a
+	// non-positive depth or re-pick budget is a boot-time misconfiguration, and
+	// the only thing worse than failing loudly here is 503ing a player later.
+	if err := params.Validate(); err != nil {
+		panic(err)
+	}
 	return &Service{
 		dao:     NewDao(),
 		graph:   graph,
 		fleets:  fleets,
 		fog:     fog,
 		clock:   common.WorldClock(),
-		params:  DefaultSpawnParams(),
+		params:  params,
 		credits: NewCreditStore(),
 	}
+}
+
+// WithSpawnParams overrides the placement knobs — the seam tests use to induce
+// the defensive rails (an artificially low walk cap or re-pick budget).
+func (s *Service) WithSpawnParams(p SpawnParams) *Service {
+	s.params = p
+	return s
 }
 
 // WithMarket wires the #0011 spawn assets: the home station's provisioner and
@@ -158,7 +192,7 @@ func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResu
 		if corp, err := s.dao.Get(ctx, corpID); err != nil {
 			return nil, err
 		} else if corp != nil {
-			return s.ensureSpawnAssets(ctx, corp, nil)
+			return s.ensureSpawnAssets(ctx, corp)
 		}
 		// Dangling pointer (corp doc gone) — fall through and mint a fresh one.
 	}
@@ -166,23 +200,35 @@ func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResu
 	// Fresh wake. Site selection runs BEFORE the corp commit: a wake that cannot
 	// place its hull must leave the account corpless and retryable — never a
 	// fleetless zombie corp that gates the player into the game with no ship.
-	site, err := s.pickSpawnSite(ctx, "", accountId)
-	if err != nil {
-		return nil, err
-	}
+	// A spawn that loses the create-if-absent reservation race to a DIFFERENT
+	// account re-runs selection, which now sees the winner's reservation and
+	// lands elsewhere — bounded by MaxSpawnRepicks.
+	for attempt := 0; attempt <= s.params.MaxSpawnRepicks; attempt++ {
+		site, err := s.pickSpawnSite(ctx, "", accountId)
+		if err != nil {
+			return nil, err
+		}
 
-	// The corp doc + account pointer commit in ONE transaction (the spawn
-	// anchor); the hull + fog follow through their services, healed on retry by
-	// the idempotent path above.
-	corp := Corporation{
-		Id:        "corp_" + uuid.NewString(),
-		AccountId: accountId,
-		Name:      name,
-		CreatedAt: s.clock.Now(),
-	}
-	if err := s.dao.CreateWithPointer(ctx, corp); err != nil {
-		if errors.Is(err, ErrAccountHasCorp) {
-			// Concurrent spawn won the pointer — return the winner's corp.
+		// The corp doc + account pointer + home reservation commit in ONE
+		// transaction (the spawn anchor); the hull + fog follow through their
+		// services, healed on retry by the idempotent path above.
+		corp := Corporation{
+			Id:           "corp_" + uuid.NewString(),
+			AccountId:    accountId,
+			Name:         name,
+			CreatedAt:    s.clock.Now(),
+			HomeSystemId: site.Id,
+		}
+		err = s.dao.CreateWithPointer(ctx, corp)
+		switch {
+		case err == nil:
+			log.Info().Ctx(ctx).Str("corpId", corp.Id).Str("accountId", accountId).
+				Str("homeSystem", corp.HomeSystemId).Msg("Corporation woke")
+			return s.ensureSpawnAssets(ctx, &corp)
+
+		case errors.Is(err, ErrAccountHasCorp):
+			// A concurrent spawn for the SAME account won the pointer — return the
+			// winner's corp. Never a re-pick: this account already has its home.
 			corpID, e := s.dao.CorpIdForAccount(ctx, accountId)
 			if e != nil {
 				return nil, e
@@ -194,22 +240,31 @@ func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResu
 			if existing == nil {
 				return nil, ErrNotFound
 			}
-			return s.ensureSpawnAssets(ctx, existing, nil)
+			return s.ensureSpawnAssets(ctx, existing)
+
+		case errors.Is(err, ErrSiteReserved):
+			log.Info().Ctx(ctx).Str("accountId", accountId).Str("site", site.Id).
+				Int("attempt", attempt).Msg("Spawn site reserved by another account — re-picking")
+			continue
+
+		default:
+			return nil, err
 		}
-		return nil, err
 	}
-	log.Info().Ctx(ctx).Str("corpId", corp.Id).Str("accountId", accountId).Msg("Corporation woke")
-	return s.ensureSpawnAssets(ctx, &corp, site)
+	return nil, fmt.Errorf("%w: %d re-picks all lost the reservation race", ErrNoSpawnSite, s.params.MaxSpawnRepicks)
 }
 
 // ensureSpawnAssets makes the corp's derived assets exist (idempotently): its one
 // hull in the home system, and the initial fog (home Explored — no lanes;
-// scanning home is the first taught verb, #0006 Decision #17). site is the
-// pre-picked home from the fresh-wake path; nil means re-pick (the heal path —
-// deterministic per account, so a retry lands the same system). Safe to re-run —
+// scanning home is the first taught verb, #0006 Decision #17). Safe to re-run —
 // an existing hull is reused, the fog upserts are monotonic — which is what
 // makes spawn idempotent per account.
-func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation, site *galaxy.System) (*SpawnResult, error) {
+//
+// The home is the one RECORDED ON THE CORP DOC in the same transaction as the
+// corp itself. Healing therefore reuses the corporation's own committed choice
+// instead of re-running selection — which would both drift (the world state has
+// moved on) and strand an orphaned reservation on the newly picked system.
+func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*SpawnResult, error) {
 	now := s.clock.Now()
 
 	fleets, err := s.fleets.ListForCorp(ctx, corp.Id)
@@ -217,19 +272,18 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation, site
 		return nil, err
 	}
 
+	home := corp.HomeSystemId
+	if home == "" && len(fleets) > 0 {
+		home = fleets[0].SystemId // defensive: a corp doc predating the recorded home
+	}
+	if home == "" {
+		return nil, fmt.Errorf("%w: corporation %s has no recorded home system", ErrNotFound, corp.Id)
+	}
+
 	var hull *fleet.Fleet
-	var home string
 	if len(fleets) > 0 {
 		hull = &fleets[0]
-		home = hull.SystemId
 	} else {
-		if site == nil {
-			site, err = s.pickSpawnSite(ctx, corp.Id, corp.AccountId)
-			if err != nil {
-				return nil, err
-			}
-		}
-		home = site.Id
 		hull, err = s.fleets.SeedFleet(ctx, home, corp.Id, s.rimCell(corp.AccountId, board.ProductionSchedule()))
 		if err != nil {
 			return nil, err
@@ -271,7 +325,7 @@ func (s *Service) healAssets(ctx context.Context, corp *Corporation) error {
 	if corp.AssetsCompleteAt != 0 {
 		return nil
 	}
-	if _, err := s.ensureSpawnAssets(ctx, corp, nil); err != nil {
+	if _, err := s.ensureSpawnAssets(ctx, corp); err != nil {
 		return err
 	}
 	return nil
@@ -426,20 +480,20 @@ func (s *Service) MarkDead(ctx context.Context, corpID string) error {
 	return s.dao.SetDiedAt(ctx, corpID, s.clock.Now())
 }
 
-// pickSpawnSite runs the #0009 site criteria over the live graph and returns the
-// wake-up system for accountId. exceptCorpID is excluded from the claimed-space
-// measurement so a heal-time re-pick doesn't fence itself out; "" excludes
+// pickSpawnSite walks outward from settled space, materializing as it goes, and
+// returns the wake-up system for accountId. exceptCorpID is excluded from the
+// claimed-space measurement so a re-pick doesn't fence itself out; "" excludes
 // nothing (the fresh-wake corp isn't living yet, so there's nothing to exclude).
 func (s *Service) pickSpawnSite(ctx context.Context, exceptCorpID, accountId string) (*galaxy.System, error) {
-	gal, err := s.graph.GetLive(ctx)
-	if err != nil {
-		return nil, err
-	}
 	claimed, err := s.claimedSpace(ctx, exceptCorpID)
 	if err != nil {
 		return nil, err
 	}
-	return selectSpawnSite(gal, claimed, s.params, accountId)
+	reserved, err := s.dao.ListSpawnClaims(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return selectSpawnSite(ctx, s.graph, s.params, claimed, reserved, accountId)
 }
 
 // claimedSpace is the union of every OTHER living corp's explored systems — the

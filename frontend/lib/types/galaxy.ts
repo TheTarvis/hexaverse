@@ -44,6 +44,11 @@ export interface WireLane {
   id: string
   aId: string
   bId: string
+  // A deterministic void-crossing stitch rather than an ordinary
+  // relative-neighbourhood road: it may be far longer than the lane cap, and it
+  // renders faint. Mechanically it behaves exactly like any other lane. Absent
+  // on ordinary lanes (the backend omits the field when false).
+  bridge?: boolean
 }
 
 export interface GalaxyBounds {
@@ -83,6 +88,9 @@ export interface GalaxyLink {
   id: string
   source: string
   target: string
+  // Carried through from the wire so the renderer can draw void-crossing
+  // bridges distinctly. Never affects interaction.
+  bridge: boolean
 }
 
 export interface Galaxy {

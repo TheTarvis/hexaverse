@@ -30,7 +30,7 @@ func TestSystemSeed(t *testing.T) {
 // auto-seed relies on: a usable seed and a params object that yields systems
 // with stable "sys-N" ids to drill into.
 func TestDevGalaxyDefinition(t *testing.T) {
-	if devGalaxy.Params.TargetCount <= 0 {
-		t.Fatalf("devGalaxy.Params.TargetCount must be positive, got %d", devGalaxy.Params.TargetCount)
+	if devGalaxy.Params.StartAreaBlockRadius < 0 {
+		t.Fatalf("devGalaxy.Params.StartAreaBlockRadius must be non-negative, got %d", devGalaxy.Params.StartAreaBlockRadius)
 	}
 }

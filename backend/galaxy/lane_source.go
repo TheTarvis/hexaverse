@@ -8,14 +8,25 @@ import (
 
 // LanesOf implements observation.LaneSource: the lanes incident to a system,
 // each with its far endpoint — what a scan charts and rumors (#0006 Decision
-// #17). Reads the live graph; the generated galaxy is immutable behind its
-// live pointer, so this is as cacheable as GetLive itself.
+// #17). Reads the MATERIALIZED graph with a per-system query, so a scan pays
+// for its own system's roads, not the whole world's.
+//
+// Callers that can look past the frontier must EnsureLaneHorizon first — after
+// that, this is the system's true field adjacency and a scan can never report a
+// false dead end.
 func (s *Service) LanesOf(ctx context.Context, systemID string) ([]observation.LaneEnd, error) {
-	gen, err := s.GetLive(ctx)
+	id, err := s.dao.GetLivePointer(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return lanesOf(gen.Lanes, systemID), nil
+	if id == "" {
+		return nil, ErrNoLiveGalaxy
+	}
+	lanes, err := s.dao.ListLanesForSystem(ctx, id, systemID)
+	if err != nil {
+		return nil, err
+	}
+	return lanesOf(lanes, systemID), nil
 }
 
 // lanesOf projects a lane list to the ends incident to one system.

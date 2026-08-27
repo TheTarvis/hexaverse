@@ -20,10 +20,11 @@ var (
 )
 
 // systemName builds a deterministic, pronounceable name from the galaxy seed and
-// the system index. Same seed → same name.
-func systemName(seed int64, index int) string {
-	mix := uint64(seed) ^ (uint64(index+1) * 0x9E3779B97F4A7C15)
-	r := newRand(int64(mix))
+// the system's STABLE FIELD IDENTITY — its cell coordinates, not a generation
+// index (D2). Same seed and cell → same name, whenever and in whatever order the
+// system materializes.
+func systemName(seed int64, cell Cell) string {
+	r := newRand(int64(mix(cellHash(seed, cell), 5)))
 	var b strings.Builder
 	b.WriteString(nameOnsets[r.Intn(len(nameOnsets))])
 	b.WriteString(nameNuclei[r.Intn(len(nameNuclei))])

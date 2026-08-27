@@ -375,6 +375,14 @@ func (s *Service) ScanResolver() action.ResolveFunc {
 		if actor.SystemId != originSys {
 			return fizzle("the fleet left " + originSys + " before completion"), nil
 		}
+		// The fizzle test gates materialization (adversary R2-m1): a scan that
+		// found nothing must not grow the world. Past it, the scanned system's
+		// full lane horizon is materialized from the deterministic field BEFORE
+		// charting, so the lanes charted below are the system's TRUE incident
+		// lanes and a frontier scan never reports a false dead end.
+		if err := s.lanes.EnsureLaneHorizon(ctx, originSys); err != nil {
+			return action.ResolveResult{}, fmt.Errorf("materializing the scanned system's lane horizon: %w", err)
+		}
 		feats, err := s.interiors.Features(ctx, originSys)
 		if err != nil {
 			return action.ResolveResult{}, err

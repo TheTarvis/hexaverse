@@ -38,6 +38,7 @@ export function adaptGalaxy(wire: WireGalaxy): Galaxy {
     id: l.id,
     source: l.aId,
     target: l.bId,
+    bridge: l.bridge === true,
   }))
 
   return {

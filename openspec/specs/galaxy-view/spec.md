@@ -133,6 +133,21 @@ SHALL show a simple "your fleet is here" note instead of a route preview.
 - **THEN** a "no charted route" message is shown and no travel commit is
   offered
 
+### Requirement: Bridge Lane Rendering
+The galaxy view SHALL render lanes carrying the `bridge` marker visually
+distinct from ordinary lanes (a fainter/differentiated style), so
+void-crossing routes read differently from local roads, while treating them
+identically for interaction (selection, route preview, travel commit).
+
+#### Scenario: A bridge lane renders distinctly
+- **WHEN** the galaxy view renders a charted lane whose `bridge` flag is set
+- **THEN** its visual style differs from ordinary charted lanes
+
+#### Scenario: A bridge lane behaves like any lane for travel
+- **WHEN** the user previews and commits a route that rides a bridge lane
+- **THEN** the gesture, preview, and commit behave exactly as over an
+  ordinary lane
+
 ### Requirement: Transit Fleet Selection and Card
 The system SHALL let a fleet currently in lane transit or lane-held be
 selected (via its lane marker on the graph or its roster row), showing a

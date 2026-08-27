@@ -32,7 +32,10 @@ const wire: WireGalaxy = {
       skeleton: { starClass: 'M', bodies: [] },
     },
   ],
-  lanes: [{ id: 'lane-0', aId: 'sys-0', bId: 'sys-12' }],
+  lanes: [
+    { id: 'lane-0', aId: 'sys-0', bId: 'sys-12' },
+    { id: 'lane-1', aId: 'sys-12', bId: 'sys-0', bridge: true },
+  ],
 }
 
 describe('adaptGalaxy', () => {
@@ -52,7 +55,7 @@ describe('adaptGalaxy', () => {
   it('maps lane aId/bId -> source/target', () => {
     const galaxy = adaptGalaxy(wire)
 
-    expect(galaxy.links).toHaveLength(1)
+    expect(galaxy.links).toHaveLength(2)
     expect(galaxy.links[0]).toMatchObject({
       id: 'lane-0',
       source: 'sys-0',
@@ -83,5 +86,21 @@ describe('adaptGalaxy', () => {
       worldTime: 12345,
       bounds: wire.bounds,
     })
+  })
+})
+
+// The endless galaxy stitches voids with `bridge` lanes; the flag must survive
+// the wire -> renderer adaptation, because that is the only thing telling the
+// view to draw a void crossing differently from a local road. An ordinary lane
+// omits the field entirely, so it must adapt to an explicit false rather than
+// undefined.
+describe('adaptGalaxy bridge lanes', () => {
+  it('carries the bridge flag through, defaulting an absent flag to false', () => {
+    const galaxy = adaptGalaxy(wire)
+    const ordinary = galaxy.links.find((l) => l.id === 'lane-0')
+    const bridge = galaxy.links.find((l) => l.id === 'lane-1')
+
+    expect(ordinary?.bridge).toBe(false)
+    expect(bridge?.bridge).toBe(true)
   })
 })

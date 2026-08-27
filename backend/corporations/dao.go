@@ -3,6 +3,7 @@ package corporations
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"hexaverse/common"
 
@@ -21,6 +22,13 @@ const (
 	// create-if-absent write here is the uniqueness anchor + the O(1) lookup the
 	// ActorCorp seam uses every request.
 	accountPointerCollection = "corpByAccount"
+	// spawnClaimsCollection reserves a home system, keyed by system id. The
+	// reservation is the AUTHORITATIVE concurrency signal for site selection,
+	// because a living corporation's explored set is written only after its
+	// commit transaction — so a spawn losing the race would otherwise re-derive
+	// the identical pick forever. Reservations are permanent and corp-owned: one
+	// outlives its corporation's death.
+	spawnClaimsCollection = "spawnClaims"
 )
 
 // ErrAccountHasCorp means the account already owns a living corporation — the
@@ -28,12 +36,25 @@ const (
 // treats it as "return the existing corp" (idempotent spawn).
 var ErrAccountHasCorp = errors.New("account already has a living corporation")
 
+// ErrSiteReserved means a DIFFERENT account's spawn already reserved the picked
+// home system. The service re-runs selection, which now sees the reservation.
+var ErrSiteReserved = errors.New("spawn site already reserved")
+
 //go:generate mockgen -destination=dao_mock.go -package=corporations -source=dao.go Dao
 
 // accountPointer is corpByAccount/{accountId} — a one-field doc pointing at the
 // account's current living corp.
 type accountPointer struct {
 	CorpId string `firestore:"corpId"`
+}
+
+// spawnClaim is spawnClaims/{systemId} — a permanent, corp-owned reservation on
+// a home system. Only its EXISTENCE is load-bearing; the fields are provenance.
+type spawnClaim struct {
+	SystemId  string `firestore:"systemId"`
+	CorpId    string `firestore:"corpId"`
+	AccountId string `firestore:"accountId"`
+	ClaimedAt int64  `firestore:"claimedAt"`
 }
 
 type Dao interface {
@@ -45,11 +66,17 @@ type Dao interface {
 	// CorpIdForAccount returns the account's living corp id, or "" if none. One
 	// cheap pointer read — the request-path lookup behind common.ActorCorp.
 	CorpIdForAccount(ctx context.Context, accountId string) (string, error)
-	// CreateWithPointer writes the corp doc AND the account pointer in ONE
-	// transaction (the spawn anchor, spec decision #1). The pointer is
-	// create-if-absent: if the account already has a living corp the whole
-	// transaction aborts with ErrAccountHasCorp and nothing is written.
+	// CreateWithPointer writes the corp doc, the account pointer, AND the home
+	// system's spawn reservation in ONE transaction (the spawn anchor, spec
+	// decision #1). Both the pointer and the reservation are create-if-absent:
+	// an account that already has a living corp aborts with ErrAccountHasCorp
+	// (checked FIRST — a same-account race returns the winner, never re-picks),
+	// and a home another account already reserved aborts with ErrSiteReserved.
+	// Either way nothing is written.
 	CreateWithPointer(ctx context.Context, corp Corporation) error
+	// ListSpawnClaims returns the reserved home systems — criterion (c) of site
+	// selection. One collection read per wake; wakes are rare.
+	ListSpawnClaims(ctx context.Context) (map[string]bool, error)
 	// SetDiedAt stamps the death time on a corp doc. No slice path calls it
 	// (nothing destroys a fleet); it exists so the death invariant is enforceable.
 	SetDiedAt(ctx context.Context, id string, at common.WorldMillis) error
@@ -133,11 +160,18 @@ func (dao *DaoImpl) CorpIdForAccount(ctx context.Context, accountId string) (str
 }
 
 func (dao *DaoImpl) CreateWithPointer(ctx context.Context, corp Corporation) error {
+	if corp.HomeSystemId == "" {
+		// The home of record and its reservation commit WITH the corp or not at
+		// all; a corp doc without one would be unhealable and unreserved.
+		return fmt.Errorf("%w: corporation %s has no home system to reserve", ErrNoSpawnSite, corp.Id)
+	}
 	corpRef := dao.corpDoc(corp.Id)
 	ptrRef := dao.pointerDoc(corp.AccountId)
+	claimRef := dao.db.Collection(spawnClaimsCollection).Doc(corp.HomeSystemId)
 	return dao.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-		// Create-if-absent on the pointer is the uniqueness guard: a living corp
-		// for this account means the whole spawn aborts, nothing written.
+		// Create-if-absent on the pointer is the uniqueness guard, and it is
+		// checked FIRST: a same-account race must return the winner's corp, not
+		// burn a re-pick on reservation contention it never caused.
 		snap, err := tx.Get(ptrRef)
 		if err != nil && status.Code(err) != codes.NotFound {
 			return err
@@ -145,11 +179,44 @@ func (dao *DaoImpl) CreateWithPointer(ctx context.Context, corp Corporation) err
 		if snap != nil && snap.Exists() {
 			return ErrAccountHasCorp
 		}
+		// Create-if-absent on the home reservation: a different account got there
+		// first, so this spawn re-picks against the now-visible claim.
+		claimSnap, err := tx.Get(claimRef)
+		if err != nil && status.Code(err) != codes.NotFound {
+			return err
+		}
+		if claimSnap != nil && claimSnap.Exists() {
+			return ErrSiteReserved
+		}
 		if err := tx.Set(corpRef, corp); err != nil {
 			return err
 		}
-		return tx.Set(ptrRef, accountPointer{CorpId: corp.Id})
+		if err := tx.Set(ptrRef, accountPointer{CorpId: corp.Id}); err != nil {
+			return err
+		}
+		return tx.Set(claimRef, spawnClaim{
+			SystemId: corp.HomeSystemId, CorpId: corp.Id, AccountId: corp.AccountId,
+			ClaimedAt: int64(corp.CreatedAt),
+		})
 	})
+}
+
+func (dao *DaoImpl) ListSpawnClaims(ctx context.Context) (map[string]bool, error) {
+	iter := dao.db.Collection(spawnClaimsCollection).Documents(ctx)
+	defer iter.Stop()
+
+	out := map[string]bool{}
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		out[doc.Ref.ID] = true
+	}
+	return out, nil
 }
 
 func (dao *DaoImpl) SetDiedAt(ctx context.Context, id string, at common.WorldMillis) error {

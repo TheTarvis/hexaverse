@@ -4,12 +4,15 @@ import {
   BOARD_TILT_DEG,
 } from '../../components/board/use-board-projection'
 import { fitViewBox, RADIAL_UNIT } from '../../lib/board'
+import { seededSystemId } from '../helpers/seeded-world'
 
 /**
  * Board view (spec #0007) — drilling into a system renders its fogged interior
  * on the WebGL board. Relies on the live galaxy the backend auto-seeds on boot
- * for emulator runs (galaxy.SeedDevGalaxy): `sys-0` always exists, so the
- * interior read materializes and the board renders.
+ * for emulator runs (galaxy.SeedDevGalaxy). Since the endless-galaxy change a
+ * system id IS its field coordinate, so the id is read from the committed
+ * start-area asset (same seed and params as the dev seed) rather than
+ * hard-coded — see e2e/helpers/seeded-world.ts.
  *
  * Renderer-agnostic rule: every assertion here is on observable behaviour —
  * selection state, FactsPanel readouts — never renderer node structure. The
@@ -27,7 +30,7 @@ const BOARD_RADIUS = 16
 
 test.describe('system board', () => {
   test('drilling into a system renders its board and tiles take a click', async ({ page }) => {
-    await page.goto('/systems/sys-0')
+    await page.goto(`/systems/${seededSystemId(0)}`)
 
     // Auth-gated route: the restored session should keep us off /login.
     await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 })

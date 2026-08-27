@@ -24,31 +24,44 @@ func (c *fakeClock) Scale() float64                        { return 1 }
 // galaxy + the fleet/fog/corporation services spawn orchestrates through. Returns
 // the corporation service under test plus the fog service (for asserting the
 // initial observations) and the live galaxy.
-func spawnStack(t *testing.T) (*Service, *observation.Service, *galaxy.GeneratedGalaxy, *fakeClock) {
+func spawnStack(t *testing.T) (*Service, *observation.Service, *galaxy.Service, *fakeClock) {
 	t.Helper()
 	fs, client := common.SetupFirestoreTestDAO(t)
 	ctx := context.Background()
 	clk := &fakeClock{now: 1000}
 
 	gsvc := galaxy.NewServiceWith(galaxy.NewDaoWithClient(fs), clk)
-	gen, err := gsvc.Generate(ctx, 42, galaxy.DefaultParams())
+	meta, err := gsvc.Seed(ctx, 42, spawnTestParams())
 	if err != nil {
 		t.Fatal(err)
 	}
-	gid := gen.Galaxy.Id
+	gid := meta.Id
 	t.Cleanup(func() {
-		common.CleanupFirestoreTestData(t, client,
+		common.CleanupFirestoreTestData(t, client, append([]string{
 			"galaxies", "galaxy_pointers", "fleets", "actions",
-			corporationsCollection, accountPointerCollection,
-			"galaxies/"+gid+"/systems", "galaxies/"+gid+"/lanes")
+			corporationsCollection, accountPointerCollection, spawnClaimsCollection,
+		}, galaxy.SubcollectionPaths(gid)...)...)
 	})
 
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
 	fsvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), ssvc, asvc, clk)
 	fogSvc := observation.NewServiceWith(observation.NewDaoWithClient(fs), fsvc, ssvc, gsvc, clk)
-	corpSvc := NewServiceWith(NewDaoWithClient(fs), gsvc, fsvc, fogSvc, clk)
-	return corpSvc, fogSvc, gen, clk
+	corpSvc := NewServiceWith(NewDaoWithClient(fs), gsvc, fsvc, fogSvc, clk).
+		WithSpawnParams(DefaultSpawnParams())
+	return corpSvc, fogSvc, gsvc, clk
+}
+
+// spawnTestParams seeds a SMALL start area — one origin block — so the walk has
+// to grow the world almost immediately. That is the point: the endless-galaxy
+// pin is that consecutive wakes keep succeeding by materializing outward, and a
+// generous start area would hide it.
+func spawnTestParams() galaxy.GenerationParams {
+	p := galaxy.DefaultParams()
+	p.BlockSize = 4 // 4·78 = 312 > 180, strictly
+	p.StartAreaBlockRadius = 0
+	p.MinOriginComponentSystems = 2
+	return p
 }
 
 // TestSpawn_CreatesCorpFleetAndFog covers acceptance #1 + the starting-package and
@@ -92,7 +105,7 @@ func TestSpawn_CreatesCorpFleetAndFog(t *testing.T) {
 	}
 
 	// Bootstrap guarantee: home has a mineable body on the skeleton.
-	if !hasMineableBody(res.HomeSystem) {
+	if !galaxy.HasMineableBody(res.HomeSystem) {
 		t.Fatalf("home %s has no mineable body — softlock risk", home)
 	}
 
@@ -179,15 +192,36 @@ func TestSpawn_TwoAccountsTwoCorps(t *testing.T) {
 	}
 }
 
-// exhaustedGraph is a GraphSource with no spawnable systems — the site-exhaustion
-// case (every mineable system fenced off by MinSpawnDistance, or an empty graph).
-type exhaustedGraph struct{}
+// pocketGraph is a GraphSource whose lane-reachable component is a single
+// non-mineable system — a deliberately POCKETED field (D4's residual risk made
+// concrete). The walk exhausts the reachable graph and fails; there is no
+// materialization that could rescue it.
+type pocketGraph struct{}
 
-func (exhaustedGraph) GetLive(context.Context) (*galaxy.GeneratedGalaxy, error) {
-	return &galaxy.GeneratedGalaxy{}, nil
+func (pocketGraph) GetLiveSystem(_ context.Context, id string) (*galaxy.System, error) {
+	if id != "sys_0_0" {
+		return nil, galaxy.ErrSystemNotFound
+	}
+	return &galaxy.System{Id: id}, nil // no mineable body — never qualifies
 }
-func (exhaustedGraph) GetLiveSystem(context.Context, string) (*galaxy.System, error) {
-	return nil, errors.New("unreachable: a failed site pick must bail before the home read")
+func (pocketGraph) LiveGalaxyMeta(context.Context) (*galaxy.Galaxy, error) {
+	return &galaxy.Galaxy{Id: "gal_pocket", OriginSystemId: "sys_0_0", Params: spawnTestParams()}, nil
+}
+func (g pocketGraph) GetLiveSystems(ctx context.Context, ids []string) ([]galaxy.System, error) {
+	var out []galaxy.System
+	for _, id := range ids {
+		if sys, err := g.GetLiveSystem(ctx, id); err == nil {
+			out = append(out, *sys)
+		}
+	}
+	return out, nil
+}
+func (pocketGraph) LaneHorizonBlocks(context.Context, []string) ([]galaxy.Block, error) {
+	return []galaxy.Block{{X: 0, Y: 0}}, nil
+}
+func (pocketGraph) EnsureBlocks(context.Context, ...galaxy.Block) error { return nil }
+func (pocketGraph) NeighborsOfMany(context.Context, []string) (map[string][]string, error) {
+	return nil, nil // a finite component: nowhere to expand
 }
 
 // TestSpawn_NoSpawnSite_LeavesAccountCorpless is the 2026-08-12 zombie-corp bug:
@@ -198,12 +232,12 @@ func TestSpawn_NoSpawnSite_LeavesAccountCorpless(t *testing.T) {
 	fs, client := common.SetupFirestoreTestDAO(t)
 	ctx := context.Background()
 	t.Cleanup(func() {
-		common.CleanupFirestoreTestData(t, client, corporationsCollection, accountPointerCollection)
+		common.CleanupFirestoreTestData(t, client, corporationsCollection, accountPointerCollection, spawnClaimsCollection)
 	})
 
 	// Fleet/fog services are nil on purpose: a failed site pick must bail before
 	// spawn touches either (or the corp DAO).
-	corpSvc := NewServiceWith(NewDaoWithClient(fs), exhaustedGraph{}, nil, nil, &fakeClock{now: 1000})
+	corpSvc := NewServiceWith(NewDaoWithClient(fs), pocketGraph{}, nil, nil, &fakeClock{now: 1000})
 
 	if _, err := corpSvc.Spawn(ctx, "account-1", "Bob"); !errors.Is(err, ErrNoSpawnSite) {
 		t.Fatalf("Spawn on an exhausted world: err = %v, want ErrNoSpawnSite", err)
@@ -235,7 +269,8 @@ func TestDeathInvariant(t *testing.T) {
 	}
 
 	// A corp with no fleet (minted directly) ⇒ death allowed and stamped.
-	fleetless := Corporation{Id: "corp_fleetless", AccountId: "account-z", Name: "Ghost", CreatedAt: clk.now}
+	fleetless := Corporation{Id: "corp_fleetless", AccountId: "account-z", Name: "Ghost", CreatedAt: clk.now,
+		HomeSystemId: "sys_99_99"}
 	if err := corpSvc.dao.CreateWithPointer(ctx, fleetless); err != nil {
 		t.Fatal(err)
 	}

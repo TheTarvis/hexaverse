@@ -206,7 +206,7 @@ const galaxy: Galaxy = {
       fz: -6,
     },
   ],
-  links: [{ id: 'lane-0', source: 'sys-0', target: 'sys-1' }],
+  links: [{ id: 'lane-0', source: 'sys-0', target: 'sys-1', bridge: false }],
 }
 
 function mockGalaxyState(overrides: Partial<ReturnType<typeof useGalaxy>> = {}) {

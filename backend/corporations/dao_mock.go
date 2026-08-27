@@ -100,6 +100,21 @@ func (mr *MockDaoMockRecorder) ListLiving(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLiving", reflect.TypeOf((*MockDao)(nil).ListLiving), ctx)
 }
 
+// ListSpawnClaims mocks base method.
+func (m *MockDao) ListSpawnClaims(ctx context.Context) (map[string]bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSpawnClaims", ctx)
+	ret0, _ := ret[0].(map[string]bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSpawnClaims indicates an expected call of ListSpawnClaims.
+func (mr *MockDaoMockRecorder) ListSpawnClaims(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSpawnClaims", reflect.TypeOf((*MockDao)(nil).ListSpawnClaims), ctx)
+}
+
 // SetAssetsCompleteAt mocks base method.
 func (m *MockDao) SetAssetsCompleteAt(ctx context.Context, id string, at common.WorldMillis) error {
 	m.ctrl.T.Helper()

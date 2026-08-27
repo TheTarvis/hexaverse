@@ -214,6 +214,13 @@ type LaneEnd struct {
 // listing the lanes incident to a system. Lanes are subspace apertures: their
 // detection is non-directional and never occluded, unlike everything physical
 // the same scan sees (#0006 Decision #16).
+//
+// EnsureLaneHorizon is the endless-galaxy seam: the galaxy is the materialized
+// subset of an infinite field, so a scan at the frontier must first make the
+// scanned system's onward neighbourhood exist (create-if-absent; a no-op once
+// persisted). Without it LanesOf would answer with the persisted graph's edge —
+// a false dead end where the field actually continues.
 type LaneSource interface {
 	LanesOf(ctx context.Context, systemID string) ([]LaneEnd, error)
+	EnsureLaneHorizon(ctx context.Context, systemID string) error
 }
