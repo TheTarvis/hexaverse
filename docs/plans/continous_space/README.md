@@ -317,7 +317,11 @@ the mirror-map check doesn't apply yet — it will when this graduates.
   bed would sell the flip dramatically (`frontend/app/spike/audio/` has the
   engine spike).
 
-## The full rewrite (deliberately NOT investigated yet)
+## The full rewrite
+
+> **Superseded in part (2026-08-27):** the rewrite is underway and sequenced.
+> `chain.md` (this directory) is the ordered set of changes; two of them have
+> landed. The inventory below survives as the scoping rationale behind it.
 
 When the PoC locks in, the rewrite touches everything that says "cell". The
 inventory below is a *scoping aid, not a plan* — each line needs real
