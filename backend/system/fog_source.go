@@ -11,6 +11,13 @@ import (
 // Features implements observation.InteriorSource: a system's features projected
 // to the minimal geometry + composition the fog domain needs to compute sensor
 // coverage and mint scan snapshots — so observation never imports system.
+//
+// This whole file, plus fog.go and backend/observation and its spec, dies at
+// link 5 of the continuous-space chain (replace-observation-with-sightings).
+// Nothing here reads the continuous element set (Feature.Space/Size) added
+// by openspec add-orbital-system-bodies, and nothing should: this is the
+// lattice fog projection, additive-coexisting beside the continuous bodies
+// BodyTable resolves, not consuming them.
 func (s *Service) Features(ctx context.Context, systemID string) ([]observation.FeatureGeom, error) {
 	gen, err := s.GetOrCreateInterior(ctx, systemID)
 	if err != nil {

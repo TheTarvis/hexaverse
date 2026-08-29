@@ -43,6 +43,15 @@ type GenerationParams struct {
 // one inside it), so it sources from common.Tuning().BoardRadius. The rest are
 // generation dials: they bake into an interior at generate time, so retuning them
 // only affects systems materialized afterwards.
+//
+// PROOF-BACKING (openspec add-orbital-system-bodies, design.md Decision 14):
+// Radius also backs `galaxy.DefaultParams().MaxRings - 1 <= Radius`
+// (TestCalibration_Scenario_NoSkeletonRingExceedsExtentIndex in
+// continuous_test.go) — a skeleton major's raw ring can never exceed the
+// orbital index SystemInterior.Extent is computed at, which is what keeps
+// Extent a genuine upper bound over every star-parented radius. Lowering
+// Radius below `galaxy.DefaultParams().MaxRings - 1` reopens that hole
+// silently.
 func DefaultParams() GenerationParams {
 	return GenerationParams{
 		Radius:           common.Tuning().BoardRadius,

@@ -45,8 +45,13 @@ const (
 // first arrival, and lives elsewhere.
 type Body struct {
 	Type BodyType `json:"type" firestore:"type"`
-	// Ring is the orbital index (0 = innermost). #0003's detail phase extends
-	// this into full orbital elements from the same per-system seed.
+	// Ring is an ORDINAL orbital position ascending outward (0 = innermost)
+	// — never itself a lattice ring or a distance (openspec
+	// add-orbital-system-bodies, galaxy-generation: "Per-System Body
+	// Skeleton"). It is the ordering input both the lattice board's clamped
+	// ring and a continuous orbital radius (system.ContinuousRadius) derive
+	// from as separate, independent downstream placements; #0003's detail
+	// phase and this change's continuous element set both extend it.
 	Ring int `json:"ring" firestore:"ring"`
 	// Mineable is a bootstrap-visibility hint (#0009 site selection). Cheap to
 	// carry now to avoid the M9 retrofit the build order flagged.

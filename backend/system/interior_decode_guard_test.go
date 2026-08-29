@@ -64,7 +64,14 @@ func TestGetOrCreateInterior_Scenario_StoredFeatureOutsideLiveRadiusIsRejectedAt
 
 	good := []Feature{
 		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-		{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Dir: 1}, Footprint: []board.Cell{{Ring: 3, Slot: 0}}},
+		// SpaceDoc added by openspec add-orbital-system-bodies: a non-star
+		// feature now needs a decodable continuous orbit to survive the
+		// interior read at all (system-interior: "An Interior Predating This
+		// Capability Fails Closed"); this fixture predates that capability,
+		// so it needs the field to keep testing the RING guard this file
+		// actually exercises, unrelated to decode validation. No assertion
+		// in this file changed.
+		{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Dir: 1}, Footprint: []board.Cell{{Ring: 3, Slot: 0}}, SpaceDoc: validSpaceDoc("feat-star", 40)},
 	}
 	bad := Feature{Id: "feat-corrupt", Type: FeatureRocky, Orbit: &Orbit{Ring: badRing, Angle0: 0, Dir: 1}, Footprint: []board.Cell{{Ring: badRing, Slot: 0}}}
 
@@ -131,7 +138,9 @@ func TestGetOrCreateInterior_Scenario_MultipleBadFeaturesAllOmittedIndependently
 	feats := []Feature{
 		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
 		{Id: "feat-bad-1", Type: FeatureRocky, Orbit: &Orbit{Ring: sched.MaxRing + 4, Dir: 1}},
-		{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 5, Dir: 1}, Footprint: []board.Cell{{Ring: 5, Slot: 0}}},
+		// SpaceDoc added by openspec add-orbital-system-bodies — see the
+		// sibling test's identical note above.
+		{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 5, Dir: 1}, Footprint: []board.Cell{{Ring: 5, Slot: 0}}, SpaceDoc: validSpaceDoc("feat-star", 40)},
 		{Id: "feat-bad-2", Type: FeatureBelt, Orbit: &Orbit{Ring: sched.MaxRing + 9, Dir: 1}},
 	}
 

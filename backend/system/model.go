@@ -3,6 +3,7 @@ package system
 import (
 	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/space"
 )
 
 // Band is a tile's orbital band, derived from its ring (a pure function of
@@ -99,6 +100,13 @@ func PeriodFor(ring int) common.WorldMillis {
 // gravity well), or Fixed (the star at centre). Footprint is the feature's
 // epoch cell(s): a single anchor cell for point bodies, a cell-set for fields
 // (belt arcs, nebulae). Live cell(s) are computed, never stored per tick.
+//
+// Orbit/ParentId/Fixed/Footprint are the LATTICE half of this feature's
+// position — the continuous half (Space/Size/Width below) coexists beside
+// them, additively, for the length of the nine-link continuous-space chain
+// (openspec add-orbital-system-bodies design.md, "Option A"). Nothing here
+// is deleted until link 9 (delete-the-lattice), which is where Orbit,
+// ParentId, Fixed, and Footprint themselves are removed from this struct.
 type Feature struct {
 	Id        string       `json:"id" firestore:"id"`
 	Type      FeatureType  `json:"type" firestore:"type"`
@@ -114,6 +122,33 @@ type Feature struct {
 	// from the station store, which is the one feature family that has an owner.
 	// Generated features leave it empty, and nothing in this package writes it.
 	OwnerCorpId string `json:"ownerCorpId,omitempty" firestore:"-"`
+
+	// --- continuous half (add-orbital-system-bodies) -----------------------
+	//
+	// Space is the in-memory, decoded orbital element set — the continuous
+	// analogue of Orbit/ParentId/Fixed above. `firestore:"-"`: the DAO never
+	// serializes this field directly; SpaceDoc is what crosses the
+	// persistence boundary (space.EncodeOrbit on write, space.DecodeOrbit on
+	// read — design.md Decision 12). Nil for the star (parentless, no
+	// element set) and for any non-star feature whose SpaceDoc failed to
+	// decode or was cascaded out (system-interior: "An Interior Predating
+	// This Capability Fails Closed" / "A Feature Omission Cascades to a
+	// Fixpoint").
+	Space *space.Orbit `json:"space,omitempty" firestore:"-"`
+	// SpaceDoc is Space's persisted, storage-native form. Nothing outside
+	// space.EncodeOrbit/space.DecodeOrbit and this package's own DAO/decode
+	// step constructs or reads it.
+	SpaceDoc map[string]any `json:"-" firestore:"spaceOrbit,omitempty"`
+	// Size is every feature's physical radius, drawn from the second
+	// (continuous) RNG stream over a per-FeatureType band (design.md
+	// Decision 4), or derived from the star's class. Every feature this
+	// generator emits carries a strictly positive Size.
+	Size float64 `json:"size,omitempty" firestore:"size,omitempty"`
+	// Width is a belt feature's full radial thickness (not a half-width),
+	// `= BeltWidthFraction * Space.Radius` at generation time, persisted
+	// rather than re-derived (design.md Decision 5). Strictly positive on a
+	// belt feature; zero/absent on every other feature type.
+	Width float64 `json:"width,omitempty" firestore:"width,omitempty"`
 }
 
 // SystemInterior is the interior metadata doc — tiles and features are derived
@@ -126,6 +161,12 @@ type SystemInterior struct {
 	StarClass string             `json:"starClass" firestore:"starClass"`
 	Version   int                `json:"version" firestore:"version"`
 	CreatedAt common.WorldMillis `json:"createdAt" firestore:"createdAt"`
+	// Extent is the continuous upper bound over every generated body's
+	// star-frame radius (`= ContinuousRadius(Radius)`), persisted at
+	// generation time (design.md Decision 2). It is what a gate anchors on
+	// (Decision 7) and what survives link 9, when the lattice-only `Radius`
+	// above is deleted.
+	Extent float64 `json:"extent,omitempty" firestore:"extent,omitempty"`
 }
 
 // GeneratedInterior is the full generation output held in memory before

@@ -3,6 +3,8 @@ package space
 import (
 	"errors"
 	"math"
+
+	"hexaverse/common"
 )
 
 // The Firestore / action.Params codec (design.md Decision 4) — the
@@ -112,6 +114,81 @@ func checkedCoordinate(n float64) (float64, error) {
 		return 0, ErrCoordinateOutOfExtent
 	}
 	return n, nil
+}
+
+// ErrInvalidOrbit is returned when a decoded value is not a well-formed
+// encoded space.Orbit map at all, or is missing/mistypes a required key
+// (design.md Decision 12: "failing by name on a missing or mistyped key").
+// A present-but-invalid radius fails with the more specific
+// ErrNonFiniteCoordinate/ErrCoordinateOutOfExtent instead.
+var ErrInvalidOrbit = errors.New("space: value is not a decodable orbit")
+
+// EncodeOrbit writes an Orbit as the Firestore-native primitive map
+// action.Params carries (design.md Decision 12, discharging
+// space-kinematics' "every position, control point, and orbital element
+// set" codec requirement): every value is a string, float64, or int64 —
+// already inside action.Commit's ErrNonPrimitiveParam allowlist, so the
+// action spine needs no change.
+func EncodeOrbit(o Orbit) map[string]any {
+	return map[string]any{
+		"parentId":    o.ParentId,
+		"radius":      o.Radius,
+		"periodMs":    int64(o.PeriodMs),
+		"phase":       int64(o.Phase),
+		"inclination": int64(o.Inclination),
+		"node":        int64(o.Node),
+	}
+}
+
+// DecodeOrbit is EncodeOrbit's exact inverse: it accepts the numeric shapes
+// an in-memory literal, a Firestore round trip, and a JSON body decode
+// disagree on (routing radius through the existing checkedCoordinate and
+// every angle through the existing DecodeSubTurns), and fails by name
+// (ErrInvalidOrbit) on a value that isn't a map at all, or is missing or
+// mistypes "parentId"/"radius"/"periodMs". DecodeSubTurns itself never
+// rejects an out-of-range angle (it wraps), so an angle-shaped failure here
+// is scoped to a missing key or a non-finite JSON number.
+func DecodeOrbit(v any) (Orbit, error) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return Orbit{}, ErrInvalidOrbit
+	}
+	parentId, ok := m["parentId"].(string)
+	if !ok {
+		return Orbit{}, ErrInvalidOrbit
+	}
+	radiusNum, ok := decodeNumber(m["radius"])
+	if !ok {
+		return Orbit{}, ErrInvalidOrbit
+	}
+	radius, err := checkedCoordinate(radiusNum)
+	if err != nil {
+		return Orbit{}, err
+	}
+	periodNum, ok := decodeNumber(m["periodMs"])
+	if !ok {
+		return Orbit{}, ErrInvalidOrbit
+	}
+	phase, err := DecodeSubTurns(m["phase"])
+	if err != nil {
+		return Orbit{}, err
+	}
+	inclination, err := DecodeSubTurns(m["inclination"])
+	if err != nil {
+		return Orbit{}, err
+	}
+	node, err := DecodeSubTurns(m["node"])
+	if err != nil {
+		return Orbit{}, err
+	}
+	return Orbit{
+		ParentId:    parentId,
+		Radius:      radius,
+		PeriodMs:    common.WorldMillis(int64(periodNum)),
+		Phase:       phase,
+		Inclination: inclination,
+		Node:        node,
+	}, nil
 }
 
 // EncodeSubTurns writes a SubTurns angle as the Firestore-native int64

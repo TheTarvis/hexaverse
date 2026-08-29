@@ -13,6 +13,15 @@ import (
 // the feature is Visible (live, inside the sensor union) or Remembered (frozen at
 // AsOf). Unseen detail features are omitted entirely (empty space is never
 // remembered).
+//
+// DELIBERATELY does not carry Space/Size (openspec add-orbital-system-bodies):
+// this struct is the one explicit allowlist deciding what each visibility
+// band may carry, and this change's deltas give it no band rule to decide a
+// continuous position/size with — shipping a body's live continuous position
+// to a band that hasn't earned it is an information leak. Wiring
+// Space/Size into a response is link 5's business (replace-observation-with-
+// sightings), once disclosure is actually wired. Do NOT "helpfully" add them
+// here because they look additive and harmless.
 type fogFeatureDTO struct {
 	Id        string       `json:"id"`
 	Type      FeatureType  `json:"type"`

@@ -59,56 +59,56 @@
       "note": "Rewritten for the endless galaxy: the finite disc's rejection sampling, its sin/cos placement and its FMA sites are gone. dist stays registered rather than pragma'd because it shares the open galaxy-generation architecture-divergence defect with the noise library. Exposure is HIGHER than before by design — blocks materialize lazily over a world's life, so 'same seed, same universe' now spans hosts and build targets, not one seed run — which is why the fixable sites were fixed here instead of deferred."
     },
     {
-      "site": "system.Generate anomaly-special richness, the FeatureAnomaly branch (generator.go:97)",
+      "site": "system.Generate anomaly-special richness, the FeatureAnomaly branch (generator.go:129)",
       "file": "backend/system/generator.go",
       "checks": {
         "cross-target": [
-          97
+          129
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
       "magnitude": "unmeasured",
-      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 88; the polar migration's schedule-threading through orbitFeature/orbitFor shifted this site down by 9 lines, no expression change."
+      "note": "Re-anchored 2026-08-27 (add-orbital-system-bodies): was line 97; the continuous-element generator emission (moons, continuousStarParented calls) inserted above this branch shifted this site down by 32 lines, no expression change. Previously re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 88."
     },
     {
-      "site": "system.Generate ruin-special richness, the FeatureRuin branch (generator.go:99)",
+      "site": "system.Generate ruin-special richness, the FeatureRuin branch (generator.go:131)",
       "file": "backend/system/generator.go",
       "checks": {
         "cross-target": [
-          99
+          131
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
       "magnitude": "unmeasured",
-      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 90; same shift as the anomaly-special site above, no expression change."
+      "note": "Re-anchored 2026-08-27 (add-orbital-system-bodies): was line 99; same shift as the anomaly-special site above, no expression change."
     },
     {
-      "site": "system.beltFeature richness — the primary mineable lode (generator.go:197)",
+      "site": "system.beltFeature richness — the primary mineable lode (generator.go:247)",
       "file": "backend/system/generator.go",
       "checks": {
         "cross-target": [
-          197
+          247
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
       "magnitude": "unmeasured",
-      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 186; beltFeature now enumerates board.RingCells(ring, sched) instead of the retired ringHexes(ring), shifting this line, no expression change."
+      "note": "Re-anchored 2026-08-27 (add-orbital-system-bodies): was line 197; beltFeature's continuous-element attachment (continuousStarParented, Width) inserted above this line, no expression change. Previously re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 186."
     },
     {
-      "site": "system.rich() shared richness helper (generator.go:249)",
+      "site": "system.rich() shared richness helper (generator.go:308)",
       "file": "backend/system/generator.go",
       "checks": {
         "cross-target": [
-          249
+          308
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
       "magnitude": "unmeasured",
-      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 238; shifted by the same schedule-threading changes earlier in the file, no expression change."
+      "note": "Re-anchored 2026-08-27 (add-orbital-system-bodies): was line 249; shifted by the continuous-element generator emission inserted earlier in the file, no expression change. Previously re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 238."
     },
     {
       "site": "market.Params.ProvisionRequests — premium-band FMA `premium := p.PremiumBandLow + unitFloat(h)*(...)` (provisioning.go:35)",

@@ -7,6 +7,7 @@ import (
 	"hexaverse/board"
 	"hexaverse/galaxy"
 	"hexaverse/polar"
+	"hexaverse/space"
 )
 
 func newRand(seed int64) *rand.Rand { return rand.New(rand.NewSource(seed)) }
@@ -24,6 +25,12 @@ func newRand(seed int64) *rand.Rand { return rand.New(rand.NewSource(seed)) }
 // here and threaded to every placement helper.
 func Generate(seed int64, region string, skeleton galaxy.Skeleton, params GenerationParams) GeneratedInterior {
 	r := newRand(seed)
+	// The second, independently-seeded stream every continuous element draw
+	// comes from (design.md Decision 11). Its own draws never touch r, and r's
+	// draw sequence is untouched by this stream's existence — the acceptance
+	// gate for that is TestGenerate_Scenario_AddingContinuousElementsLeavesLatticePlacementUnchanged
+	// (lattice_identity_test.go).
+	r2 := newRand(continuousSeed(seed))
 	dial := params.dialFor(region)
 	sched := board.Schedule(params.Radius)
 
@@ -34,13 +41,20 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 
 	features := make([]Feature, 0, 16)
 
-	// Star at the centre — fixed, no orbit.
+	// Star at the centre — fixed, no orbit, no continuous element set (it is
+	// the one parentless body); its size comes from its class alone, never
+	// drawn (design.md Decision 4).
 	features = append(features, Feature{
 		Id: "feat-star", Type: FeatureStar, Name: "Star (" + skeleton.StarClass + ")",
 		Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}},
+		Size: StarSize(skeleton.StarClass),
 	})
 
 	// Skeleton major bodies → orbit features at their rings (extends #0001).
+	// The continuous orbital index is the RAW, un-clamped skeleton ring
+	// (b.Ring), never the clamped lattice ring `ring` — design.md Decision 2's
+	// central finding: two skeleton bodies can clamp to the identical lattice
+	// ring while remaining distinct raw ordinals.
 	var giantIDs []string
 	for i, b := range skeleton.Bodies {
 		ring := clampRing(b.Ring, params.Radius)
@@ -48,6 +62,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		id := fmt.Sprintf("feat-body-%d", i)
 		f := orbitFeature(id, ft, ring, sysDir, r, sched)
 		f.Resources = resourcesFor(bandForRing(ring, params), ft, dial.RichnessMult, r)
+		continuousStarParented(&f, b.Ring, r2)
 		features = append(features, f)
 		if ft == FeatureGasGiant {
 			giantIDs = append(giantIDs, id)
@@ -66,22 +81,39 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		id := fmt.Sprintf("feat-extra-%d", i)
 		f := orbitFeature(id, ft, ring, diskOrCaptured(sysDir, params.RetrogradeChance, r), r, sched)
 		f.Resources = resourcesFor(bandForRing(ring, params), ft, dial.RichnessMult, r)
+		continuousStarParented(&f, ring, r2)
 		features = append(features, f)
 	}
 
 	// Belts as ring arcs (metals inner, ice outer).
 	for i := 0; i < dial.Belts; i++ {
 		ring := 2 + r.Intn(params.Radius-2)
-		features = append(features, beltFeature(fmt.Sprintf("feat-belt-%d", i), ring, sysDir, r, params, dial, sched))
+		features = append(features, beltFeature(fmt.Sprintf("feat-belt-%d", i), ring, sysDir, r, params, dial, sched, r2))
 	}
 
-	// Moons riding gas giants.
+	// Moons riding gas giants — body-parented, so ContinuousRadius never
+	// applies (design.md Decision 2); their local radius follows Decision
+	// 16's named band instead, anchored on the parent's own already-drawn
+	// continuous size.
 	for i, gid := range giantIDs {
-		features = append(features, Feature{
+		m := Feature{
 			Id: fmt.Sprintf("feat-moon-%d", i), Type: FeatureMoon, ParentId: gid,
 			Footprint: []board.Cell{{Ring: 0, Slot: 0}}, // computed relative to parent at render time
 			Resources: resourcesFor(BandOuter, FeatureMoon, dial.RichnessMult, r),
-		})
+		}
+		parentSize := featureSizeById(features, gid)
+		localRadius := MoonOrbitLocalRadius(space.Body{Id: gid, Size: parentSize}, r2.Float64())
+		period := space.InsertionPeriod(localRadius)
+		// Moons carry no lattice Dir at all — their side comes from the
+		// system's dominant direction directly (design.md Decision 17), the
+		// same source stations.DeriveOrbit already uses.
+		incl := inclinationFor(sysDir < 0, r2.Float64())
+		m.Space = &space.Orbit{
+			ParentId: gid, Radius: localRadius, PeriodMs: period,
+			Phase: wrapSubTurnFraction(r2.Float64()), Inclination: incl, Node: wrapSubTurnFraction(r2.Float64()),
+		}
+		m.Size = drawFeatureSize(FeatureMoon, r2)
+		features = append(features, m)
 	}
 
 	// Mid-band anomalies / ruins.
@@ -98,12 +130,13 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		} else {
 			f.Resources = []Resource{{Kind: ResourceResearch, Richness: 0.3 + 0.5*r.Float64()*dial.RichnessMult}}
 		}
+		continuousStarParented(&f, ring, r2)
 		features = append(features, f)
 	}
 
 	// Hazards (features with effects payloads).
 	for i := 0; i < dial.Hazards; i++ {
-		features = append(features, hazardFeature(fmt.Sprintf("feat-hazard-%d", i), sysDir, r, params, sched))
+		features = append(features, hazardFeature(fmt.Sprintf("feat-hazard-%d", i), sysDir, r, params, sched, r2))
 	}
 
 	return GeneratedInterior{
@@ -113,9 +146,26 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 			Character: region,
 			StarClass: skeleton.StarClass,
 			Version:   1,
+			// Extent is the continuous upper bound over every star-parented
+			// family's radius (design.md Decision 2) — persisted here, at
+			// generation time, since it is what a gate anchors on.
+			Extent: ContinuousRadius(params.Radius),
 		},
 		Features: features,
 	}
+}
+
+// featureSizeById returns the already-generated size of the feature with the
+// given id, scanning the slice built so far. Used only for a moon's parent
+// (skeleton major bodies are always generated before their moons in this
+// function), so the small linear scan costs nothing observable.
+func featureSizeById(features []Feature, id string) float64 {
+	for _, f := range features {
+		if f.Id == id {
+			return f.Size
+		}
+	}
+	return 0
 }
 
 // --- Feature builders ------------------------------------------------------
@@ -178,7 +228,7 @@ func diskOrCaptured(sysDir int, retrogradeChance float64, r *rand.Rand) int {
 	return sysDir
 }
 
-func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams, dial CharacterDial, sched polar.Schedule) Feature {
+func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams, dial CharacterDial, sched polar.Schedule, r2 *rand.Rand) Feature {
 	all := board.RingCells(ring, sched)
 	// An arc: a contiguous run covering ~40–70% of the ring.
 	arcLen := maxInt(1, len(all)*(4+r.Intn(4))/10)
@@ -192,13 +242,20 @@ func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams
 		kind = ResourceWater
 	}
 	orb := orbitFor(ring, dir, r, sched)
-	return Feature{
+	f := Feature{
 		Id: id, Type: FeatureBelt, Orbit: &orb, Footprint: arc,
 		Resources: []Resource{{Kind: kind, Richness: 0.3 + 0.5*r.Float64()*dial.RichnessMult}},
 	}
+	continuousStarParented(&f, ring, r2)
+	// Width is the belt's full radial thickness, persisted at generation
+	// time rather than re-derived on read (design.md Decision 5): a later
+	// retune of BeltWidthFraction must never retroactively move an
+	// already-materialized belt's members.
+	f.Width = float64(BeltWidthFraction * f.Space.Radius)
+	return f
 }
 
-func hazardFeature(id string, dir int, r *rand.Rand, params GenerationParams, sched polar.Schedule) Feature {
+func hazardFeature(id string, dir int, r *rand.Rand, params GenerationParams, sched polar.Schedule, r2 *rand.Rand) Feature {
 	ring := 1 + r.Intn(params.Radius)
 	band := bandForRing(ring, params)
 	var ft FeatureType
@@ -214,11 +271,13 @@ func hazardFeature(id string, dir int, r *rand.Rand, params GenerationParams, sc
 		ft, eff = FeatureDebris, Effects{MoveMod: 0.7}
 	}
 	orb := orbitFor(ring, dir, r, sched)
-	return Feature{
+	f := Feature{
 		Id: id, Type: ft, Orbit: &orb,
 		Footprint: []board.Cell{board.Canon(board.Cell{Ring: ring, Slot: orb.Angle0}, sched)},
 		Effects:   &eff,
 	}
+	continuousStarParented(&f, ring, r2)
+	return f
 }
 
 // --- Resource + type mapping ----------------------------------------------

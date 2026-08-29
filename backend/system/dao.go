@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"hexaverse/common"
+	"hexaverse/space"
 
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc/codes"
@@ -96,6 +97,37 @@ func (dao *DaoImpl) ListFeatures(ctx context.Context, galaxyID, systemID string)
 
 func (dao *DaoImpl) CreateInterior(ctx context.Context, galaxyID string, gen GeneratedInterior) error {
 	sid := gen.Interior.SystemId
+
+	// Features are written BEFORE the meta doc's create-if-absent claim —
+	// deliberately reordered from a write-meta-then-features shape, which
+	// left a window where a concurrent loser's ErrAlreadyExists sent it
+	// straight into a read that could observe the meta doc already claimed
+	// but the winner's feature batch not yet landed (a system with a star
+	// feature at generation but zero features on that read). Writing
+	// features first makes every RACER write the identical
+	// (deterministically-generated) batch redundantly — harmless, since
+	// every write is an idempotent overwrite by the same doc ids — so that
+	// by the time ANY caller observes the meta doc existing, this system's
+	// full feature set is unconditionally already there. This is what makes
+	// two concurrent first-builds converge on one persisted interior with
+	// both readers resolving the same bodies.
+	writes := make([]common.BatchWrite, len(gen.Features))
+	col := featuresPath(galaxyID, sid)
+	for i, f := range gen.Features {
+		// Space is `firestore:"-"` (in-memory only); SpaceDoc is the
+		// persisted, storage-native form the codec produces (design.md
+		// Decision 12). Every non-star feature this generator emits carries
+		// a Space, so this is the one place it crosses the persistence
+		// boundary on write.
+		if f.Space != nil {
+			f.SpaceDoc = space.EncodeOrbit(*f.Space)
+		}
+		writes[i] = common.BatchWrite{Collection: col, DocID: f.Id, Data: f}
+	}
+	if err := dao.db.BatchSet(ctx, writes); err != nil {
+		return fmt.Errorf("writing features: %w", err)
+	}
+
 	// Create fails if the meta doc already exists — this is the atomic claim
 	// that makes concurrent first-explores idempotent (deterministic generation
 	// means the loser's would-be output is identical anyway).
@@ -105,15 +137,6 @@ func (dao *DaoImpl) CreateInterior(ctx context.Context, galaxyID string, gen Gen
 			return ErrAlreadyExists
 		}
 		return fmt.Errorf("claiming interior: %w", err)
-	}
-
-	writes := make([]common.BatchWrite, len(gen.Features))
-	col := featuresPath(galaxyID, sid)
-	for i, f := range gen.Features {
-		writes[i] = common.BatchWrite{Collection: col, DocID: f.Id, Data: f}
-	}
-	if err := dao.db.BatchSet(ctx, writes); err != nil {
-		return fmt.Errorf("writing features: %w", err)
 	}
 
 	log.Info().Ctx(ctx).Str("galaxyId", galaxyID).Str("systemId", sid).

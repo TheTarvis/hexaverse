@@ -6,6 +6,15 @@ import (
 	"hexaverse/system"
 )
 
+// DeriveOrbit is the LATTICE derivation, sitting beside
+// DeriveContinuousOrbit (continuous_orbit.go) since openspec
+// add-orbital-system-bodies landed. Additive, not dual-write: the two are
+// independently derived from the same seed, neither consulted by the
+// other. This lattice form — and the docking/placement code that consumes
+// it — dies at link 6 of the continuous-space chain
+// (re-anchor-mine-market-stations), when docking itself moves off the
+// lattice; DeriveOrbit is not touched by this change.
+//
 // DeriveOrbit computes a station's orbital elements as a PURE function of its
 // system id and the live galaxy's seed — no volatile input, no store read, no
 // clock. Two consequences the change leans on:

@@ -9,6 +9,7 @@ import (
 	"hexaverse/common"
 	"hexaverse/galaxy"
 	"hexaverse/polar"
+	"hexaverse/space"
 
 	"github.com/rs/zerolog/log"
 )
@@ -79,6 +80,7 @@ func (s *Service) GetOrCreateInterior(ctx context.Context, systemID string) (*Ge
 		return nil, err
 	} else if gen != nil {
 		s.spliceStation(ctx, gen)
+		s.applyContinuousCascade(ctx, systemID, gen)
 		return gen, nil
 	}
 
@@ -119,6 +121,7 @@ func (s *Service) GetOrCreateInterior(ctx context.Context, systemID string) (*Ge
 	log.Info().Ctx(ctx).Str("systemId", systemID).Str("character", string(node.Region)).
 		Int("features", len(gen.Features)).Msg("Generated system interior")
 	s.spliceStation(ctx, &gen)
+	s.applyContinuousCascade(ctx, systemID, &gen)
 	return &gen, nil
 }
 
@@ -181,9 +184,108 @@ func (s *Service) readInterior(ctx context.Context, galaxyID, systemID string) (
 				Msg("Decoded feature ring exceeds the live board schedule; omitting from the interior read")
 			continue
 		}
+		// Every non-star feature must decode a continuous orbital element set
+		// (design.md Decision 12). A missing SpaceDoc key entirely is treated
+		// identically to a malformed one — never as a legitimate parentless
+		// body, a reading reserved for the star alone (system-interior: "An
+		// Interior Predating This Capability Fails Closed, Never Silently").
+		// One bad feature never stops the loop over the rest, mirroring
+		// featureRingOK's own guard.
+		if f.Type != FeatureStar {
+			o, err := space.DecodeOrbit(f.SpaceDoc)
+			if err != nil {
+				log.Warn().Ctx(ctx).Str("systemId", systemID).Str("featureId", f.Id).Err(err).
+					Msg("Feature's orbital element set failed to decode; omitting from the interior read")
+				continue
+			}
+			f.Space = &o
+		}
 		kept = append(kept, f)
 	}
 	return &GeneratedInterior{Interior: *si, Features: kept}, nil
+}
+
+// applyContinuousCascade runs after spliceStation (the station is a
+// candidate body in the cascade, not decoded alongside the DAO's own
+// features): it decodes the spliced station's SpaceDoc if it arrived
+// undecoded, then drops, to a fixpoint, any non-star candidate whose
+// continuous parent chain fails to resolve through space.Position — the one
+// check that covers a missing parent, a cyclic chain, and an over-deep
+// stored chain alike (design.md Decision 12). The termination argument is
+// space's own chain-depth bound (maxBodyDepth = 4), so this converges well
+// inside the fixed pass cap below. Each cascaded drop is logged with both
+// its own feature id and the id of the ancestor that (at the time of the
+// drop) it named as parent — distinguishable from a direct decode failure,
+// which names only the offending feature's own id.
+func (s *Service) applyContinuousCascade(ctx context.Context, systemID string, gen *GeneratedInterior) {
+	decoded := make([]Feature, 0, len(gen.Features))
+	for _, f := range gen.Features {
+		if f.Type == FeatureStar || f.Space != nil {
+			decoded = append(decoded, f)
+			continue
+		}
+		o, err := space.DecodeOrbit(f.SpaceDoc)
+		if err != nil {
+			log.Warn().Ctx(ctx).Str("systemId", systemID).Str("featureId", f.Id).Err(err).
+				Msg("Spliced feature's orbital element set failed to decode; omitting from the interior read")
+			continue
+		}
+		f.Space = &o
+		decoded = append(decoded, f)
+	}
+	gen.Features = decoded
+
+	const maxCascadePasses = 4
+	for pass := 0; pass < maxCascadePasses; pass++ {
+		bodies := cascadeBodySetFrom(gen.Features)
+		type dropped struct{ id, ancestor string }
+		var drops []dropped
+		for _, f := range gen.Features {
+			if f.Type == FeatureStar {
+				continue
+			}
+			if _, err := space.Position(bodies, f.Id, 0); err != nil {
+				ancestor := ""
+				if f.Space != nil {
+					ancestor = f.Space.ParentId
+				}
+				drops = append(drops, dropped{f.Id, ancestor})
+			}
+		}
+		if len(drops) == 0 {
+			return
+		}
+		dropSet := make(map[string]bool, len(drops))
+		for _, d := range drops {
+			dropSet[d.id] = true
+			log.Warn().Ctx(ctx).Str("systemId", systemID).Str("featureId", d.id).Str("ancestorId", d.ancestor).
+				Msg("Feature's continuous parent chain failed to resolve; omitting from the interior read (cascade)")
+		}
+		remaining := make([]Feature, 0, len(gen.Features))
+		for _, f := range gen.Features {
+			if !dropSet[f.Id] {
+				remaining = append(remaining, f)
+			}
+		}
+		gen.Features = remaining
+	}
+}
+
+// cascadeBodySet is a space.Bodies view over the current cascade candidate
+// set, keyed by feature id.
+type cascadeBodySet map[string]space.Body
+
+func (b cascadeBodySet) Body(id string) (space.Body, bool) {
+	v, ok := b[id]
+	return v, ok
+}
+
+func cascadeBodySetFrom(feats []Feature) cascadeBodySet {
+	out := make(cascadeBodySet, len(feats))
+	for _, f := range feats {
+		out[f.Id] = space.Body{Id: f.Id, Size: f.Size, Orbit: f.Space}
+	}
+	return out
 }
 
 // featureRingOK reports whether every ring a feature carries (its orbit, if
