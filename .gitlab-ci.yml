@@ -340,6 +340,11 @@ test-backend:
     # v3+ emits fused multiply-add on amd64, silently making this the
     # contracting target the check exists to catch.
     - GOAMD64=v1 go test ./board/ -short -count=1
+    # backend/polar (openspec polar-lattice-math) rides the same cross-target
+    # leg board does — already enforced locally by check.py but missing from
+    # CI until pin-system-generation-determinism closed the asymmetry
+    # (design.md Decision 3).
+    - GOAMD64=v1 go test ./polar/ -short -count=1
     # backend/space (openspec add-space-kinematics) rides the same
     # cross-target leg board does: a Go-only rule-bearing package with no
     # JavaScript-runtime leg by design (Decision 1 — no TypeScript mirror),
@@ -350,6 +355,10 @@ test-backend:
     # fixture-blocked round-count case and the UPDATE_FIXTURES-gated table
     # recording flow).
     - GOAMD64=v1 go test ./space/ -short -count=1
+    # backend/system (openspec pin-system-generation-determinism) rides the
+    # same cross-target leg: another Go-only rule-bearing package with no
+    # TypeScript mirror by design (design.md Decision 5).
+    - GOAMD64=v1 go test ./system/ -short -count=1
     # arm64 leg: runs under qemu-user when TEST_RUNNER_IMAGE provides it
     # (infra/docker/test-runner.Dockerfile installs qemu-user-static; rebuild
     # via infra/docker/build-test-runner.sh). Until that image is live, this
@@ -360,10 +369,14 @@ test-backend:
       if [ -n "$QEMU" ]; then
         CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/board-arm64.test ./board/
         (cd board && "$QEMU" /tmp/board-arm64.test -test.short -test.count=1)
+        CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/polar-arm64.test ./polar/
+        (cd polar && "$QEMU" /tmp/polar-arm64.test -test.short -test.count=1)
         CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/space-arm64.test ./space/
         (cd space && "$QEMU" /tmp/space-arm64.test -test.short -test.count=1)
+        CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/system-arm64.test ./system/
+        (cd system && "$QEMU" /tmp/system-arm64.test -test.short -test.count=1)
       else
-        echo "arm64 fixture leg SKIPPED: TEST_RUNNER_IMAGE lacks qemu-user (rebuild it per infra/docker) — leg asserted by the local /check gate only"
+        echo "DETERMINISM ARM64 LEG UNASSERTED: TEST_RUNNER_IMAGE lacks qemu-user, so the emulated-architecture leg cannot execute for ./board/ ./space/ ./system/ ./polar/ — rebuild the image via infra/docker/build-test-runner.sh to clear this. Until then these packages' cross-target claim is asserted by the local /check gate only, not by this CI leg."
       fi
 
     # Dependency vulnerability scan (govulncheck baked into test-runner image).

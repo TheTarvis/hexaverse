@@ -10,14 +10,21 @@
 #     requirement "A New Cross-Language Fixture Family Pins the Lattice",
 #     same scenario) — fixtures/polar/mirror-map.json
 #
-# A third invocation runs in ANTI-MIRROR mode over
-# backend/space <-> frontend/lib/space (openspec: add-space-kinematics
-# Decision 1 — Go is sole authority for continuous-space kinematics, no
-# TypeScript mirror exists, now or ever): rather than asserting a `pairs`
-# list (which would assert the mirror that decision forbids), it FAILS if
-# any function/method name is declared on BOTH sides, unless that name
-# appears in fixtures/space/mirror-map.json's `sharedNames` allowlist
-# (empty by default). See anti_mirror_space, below.
+# Two further invocations run in ANTI-MIRROR mode, over:
+#   - backend/space <-> frontend/lib/space (openspec: add-space-kinematics
+#     Decision 1 — Go is sole authority for continuous-space kinematics, no
+#     TypeScript mirror exists, now or ever)
+#   - backend/system <-> frontend/lib/system (openspec:
+#     pin-system-generation-determinism, design.md Decision 5 — `system` is
+#     likewise designated Go-sole-authority for interior generation)
+# Rather than asserting a `pairs` list (which would assert the mirror the
+# designation forbids), each FAILS if any function/method name is declared
+# on BOTH sides, unless that name appears in the pair's own mirror-map.json
+# `sharedNames` allowlist (empty by default). See anti_mirror, below —
+# generalized from the original space-only `anti_mirror_space` (openspec
+# pin-system-generation-determinism, tasks.md 5.6) so `system` (and any
+# future Go-sole-authority package) reuses the same body rather than a
+# second hand-copied function.
 #
 # Each mirror map names every function defined in BOTH sides of its pair
 # (exported or not). For each pair this check:
@@ -129,8 +136,14 @@ check_mirror() {
     echo "$LABEL: $NPAIRS mirrored pair(s) checked ($NGAPS coverage gap(s) tracked with expected changes)."
 }
 
-# anti_mirror_space checks backend/space <-> frontend/lib/space in
-# ANTI-MIRROR mode (see the header comment). Unlike check_mirror's Go
+# anti_mirror checks a Go-sole-authority package against its (non-existent
+# or deliberately mirror-free) TypeScript directory in ANTI-MIRROR mode (see
+# the header comment) — generalized from the original space-only
+# `anti_mirror_space` (openspec pin-system-generation-determinism, tasks.md
+# 5.6) so a second Go-sole-authority package (`system`) reuses this body
+# rather than a hand-copied duplicate. Takes LABEL, MAP, GO_DIR, TS_DIR;
+# behavior is otherwise unchanged from the original space-only function.
+# Unlike check_mirror's Go
 # `^func `/TS `^(export )?function` textual extractor, this recognizes every
 # declaration shape the PoC actually used for its rule-bearing functions —
 # a `function` declaration, a top-level arrow-function or function-expression
@@ -156,18 +169,16 @@ check_mirror() {
 # exempt, non-shipping feel bench (space-kinematics: "Every Rule-Bearing
 # Value of This Capability Is Computed Only in the Authoritative
 # Implementation").
-anti_mirror_space() {
-    local MAP="$REPO_ROOT/fixtures/space/mirror-map.json"
-    local GO_DIR="$REPO_ROOT/backend/space"
-    local TS_DIR="$REPO_ROOT/frontend/lib/space"
+anti_mirror() {
+    local LABEL="$1" MAP="$2" GO_DIR="$3" TS_DIR="$4"
 
     if [[ ! -d "$TS_DIR" ]]; then
-        echo "space (anti-mirror): frontend/lib/space does not exist — no TypeScript mirror to check against; passes trivially (openspec add-space-kinematics tasks.md 2.2)."
+        echo "$LABEL (anti-mirror): ${TS_DIR#"$REPO_ROOT"/} does not exist — no TypeScript mirror to check against; passes trivially."
         return
     fi
 
     if [[ ! -f "$MAP" ]]; then
-        echo "FAIL: space anti-mirror: map not found at ${MAP#"$REPO_ROOT"/}"
+        echo "FAIL: $LABEL anti-mirror: map not found at ${MAP#"$REPO_ROOT"/}"
         FAIL=1
         return
     fi
@@ -285,7 +296,7 @@ anti_mirror_space() {
     done
 
     if [[ -n "$UNRECOGNIZED" ]]; then
-        echo "FAIL: space anti-mirror: unrecognized top-level TypeScript declaration form(s) (extend the extractor before trusting this check):"
+        echo "FAIL: $LABEL anti-mirror: unrecognized top-level TypeScript declaration form(s) (extend the extractor before trusting this check):"
         echo "$UNRECOGNIZED" | grep -v '^$' | sed 's/^/        /'
         FAIL=1
         return
@@ -299,13 +310,13 @@ anti_mirror_space() {
     local UNALLOWED
     UNALLOWED=$(comm -23 <(echo "$COLLIDING" | grep -v '^$') <(echo "$SHARED"))
     if [[ -n "$UNALLOWED" ]]; then
-        echo "FAIL: space anti-mirror: function name(s) declared in BOTH backend/space and frontend/lib/space — a TypeScript mirror of an authoritative Go function, forbidden by design.md Decision 1 unless added to fixtures/space/mirror-map.json's sharedNames allowlist (it is not):"
+        echo "FAIL: $LABEL anti-mirror: function name(s) declared in BOTH ${GO_DIR#"$REPO_ROOT"/} and ${TS_DIR#"$REPO_ROOT"/} — a TypeScript mirror of an authoritative Go function, forbidden by design unless added to ${MAP#"$REPO_ROOT"/}'s sharedNames allowlist (it is not):"
         echo "$UNALLOWED" | sed 's/^/        /'
         FAIL=1
         return
     fi
 
-    echo "space (anti-mirror): no shared function names between backend/space and frontend/lib/space."
+    echo "$LABEL (anti-mirror): no shared function names between ${GO_DIR#"$REPO_ROOT"/} and ${TS_DIR#"$REPO_ROOT"/}."
 }
 
 check_mirror "board" \
@@ -320,11 +331,19 @@ check_mirror "polar" \
     "$REPO_ROOT/backend/polar" \
     "$REPO_ROOT/frontend/lib/polar"
 
-anti_mirror_space
+anti_mirror "space" \
+    "$REPO_ROOT/fixtures/space/mirror-map.json" \
+    "$REPO_ROOT/backend/space" \
+    "$REPO_ROOT/frontend/lib/space"
+
+anti_mirror "system" \
+    "$REPO_ROOT/fixtures/system/mirror-map.json" \
+    "$REPO_ROOT/backend/system" \
+    "$REPO_ROOT/frontend/lib/system"
 
 if [[ "$FAIL" -ne 0 ]]; then
     exit 2
 fi
 
-echo "PASS: all mirror maps complete — every mirrored pair fixture-covered or inventoried, and backend/space carries no TypeScript mirror."
+echo "PASS: all mirror maps complete — every mirrored pair fixture-covered or inventoried, and backend/space and backend/system carry no TypeScript mirror."
 exit 0

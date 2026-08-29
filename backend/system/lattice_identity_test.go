@@ -1,33 +1,31 @@
 package system
 
-// The single highest-value test in openspec change add-orbital-system-bodies
-// (design.md Decision 11: "This is an acceptance gate, not a hope"; tasks.md
-// 2.3: "STOP and do not proceed past this section until this test is
-// green").
+// Originally the home of the single highest-value test in openspec change
+// add-orbital-system-bodies (design.md Decision 11 / tasks.md 2.3): a
+// golden-master digest constant pinning Generate()'s lattice output across
+// the sweep below, to catch the second (continuous) RNG stream perturbing
+// the first (lattice) stream's draw order.
 //
-// system-interior › "Interiors Emit Continuous Orbital Elements For Every
-// Body" — Scenario: "Adding continuous elements leaves every lattice
-// placement unchanged".
+// That constant and its comparison were RETIRED by openspec change
+// pin-system-generation-determinism, task 3.6: design.md Decision 2 notes
+// the stream-non-crossing claim expired once there was no longer a
+// "before link 3" tree to have been perturbed, and the digest itself was
+// never cross-architecture-stable (see design.md Decision 1 — FMA
+// contraction), so a hand-copied hex constant in a _test.go file is exactly
+// the anti-pattern cross-stack-determinism's "Recorded Cross-Target Values
+// Live In Fixtures, Not Test Constants" scenario forbids. The equivalent
+// regression pinning now lives in fixtures/system/cases.json's
+// interiorElements family (see fixtures_test.go) and in
+// generate_streams_test.go's present-vs-absent assertion.
 //
-// UNLIKE every other test in this RED handoff, this one is a CHARACTERIZATION
-// / golden-master test and is EXPECTED TO BE GREEN FROM THE START, not red.
-// Its entire purpose is regression prevention: it pins Generate()'s lattice
-// output (ring, angle0, dir, footprint, resources, effects, ids, generation
-// order) as of TODAY — before the second RNG stream or any continuous draw
-// exists — and must stay bit-identical after the developer adds them. If it
-// goes red partway through implementation, the two RNG streams have crossed
-// and the developer must stop (per Decision 11 and tasks.md 2.3's own STOP
-// rule) rather than "fix" this test to match the new output.
-//
-// The pinned digest below was computed by actually running today's
-// (pre-change) Generate() over the swept fixture set this file defines. It
-// is intentionally NOT computed via a helper the developer could accidentally
-// change; latticeDigest is defined once, here, over Feature fields that
-// exist today.
+// projectLattice/latticeSnapshot/latCell/latticeIdentityFixtures below
+// SURVIVE this retirement: generate_streams_test.go's
+// TestInteriorElementsSweep_MatchesLatticeIdentitySweep still calls them
+// directly to prove its own duplicated sweep hasn't drifted from this
+// file's. TestClampRing_StaysMonotonicNonDecreasing, at the bottom of this
+// file, is unrelated to any of the above (design.md Decision 2's
+// monotonicity argument) and is untouched by this retirement.
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"testing"
 
 	"hexaverse/galaxy"
@@ -109,46 +107,6 @@ func latticeIdentityFixtures() []GeneratedInterior {
 		}
 	}
 	return out
-}
-
-// latticeDigest hashes the newline-joined canonical JSON projection of every
-// fixture case, in order.
-func latticeDigest(t *testing.T, cases []GeneratedInterior) string {
-	t.Helper()
-	h := sha256.New()
-	for i, gen := range cases {
-		proj := projectLattice(gen)
-		b, err := json.Marshal(proj)
-		if err != nil {
-			t.Fatalf("case %d: marshal projection: %v", i, err)
-		}
-		if i > 0 {
-			h.Write([]byte{'\n'})
-		}
-		h.Write(b)
-	}
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-// wantLatticeDigest was computed by running this exact test's fixture set
-// against TODAY's Generate() (before any continuous element / second RNG
-// stream exists) — see the file header. Do not update this value to make a
-// failing test pass; a mismatch means the lattice draw sequence moved,
-// which is precisely the regression Decision 11 exists to catch.
-const wantLatticeDigest = "141cffd85106b1f9eced53adfa9968c8bc2cc224beca1341803328fd1b932241"
-
-func TestGenerate_Scenario_AddingContinuousElementsLeavesLatticePlacementUnchanged(t *testing.T) {
-	cases := latticeIdentityFixtures()
-	if len(cases) == 0 {
-		t.Fatal("fixture: no cases generated")
-	}
-	got := latticeDigest(t, cases)
-	if got != wantLatticeDigest {
-		t.Fatalf("lattice-identity digest mismatch: got %s, want %s\n"+
-			"This means the second (continuous) RNG stream has perturbed the FIRST (lattice) stream's draw order — "+
-			"STOP per design.md Decision 11 / tasks.md 2.3. Do not edit this test to match; find and fix the stream leak.",
-			got, wantLatticeDigest)
-	}
 }
 
 // TestClampRing_StaysMonotonicNonDecreasing pins the ordering-coherence

@@ -86,6 +86,16 @@ prove itself against already exists.
 - **Touches:** `fleet-movement` (MODIFIED, wholesale), `space-kinematics`
   (ADDED: free drift), `action-dispatch` (the coordinate codec — float vectors
   through `space`'s named codec, same non-primitive-param discipline).
+- **Inherited obligation** (`pin-system-generation-determinism`, design.md
+  Decision 5 / Open Question 1): this link owns recording the three fixture
+  families link 3's Decision 13 declared but that change deferred —
+  `keplerPeriodMs` (full R¹ box), `gateOrbit`, and `stationOrbit`
+  (`StationContinuousOrbit`) — each currently an `inventory` entry in
+  `fixtures/system/mirror-map.json` naming this link as `expectedChange`.
+  The shipped rule that keeps them from evaporating: a rule-bearing shared
+  function SHALL NOT remain in the inventory across more than one change
+  that modifies its package — so this link must either record them or
+  re-file the deferral explicitly if it still cannot.
 
 ## Link 5 — `replace-observation-with-sightings`
 

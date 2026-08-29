@@ -23,14 +23,30 @@ func newRand(seed int64) *rand.Rand { return rand.New(rand.NewSource(seed)) }
 // hold a per-system radius rather than defaulting to
 // board.ProductionSchedule()) — board.Schedule(params.Radius), resolved once
 // here and threaded to every placement helper.
+//
+// Delegates to generateWithStreams (openspec pin-system-generation-
+// determinism, design.md Decision 2 / tasks.md 3.1) with both RNG streams
+// live — production always generates with continuous elements present.
 func Generate(seed int64, region string, skeleton galaxy.Skeleton, params GenerationParams) GeneratedInterior {
-	r := newRand(seed)
-	// The second, independently-seeded stream every continuous element draw
-	// comes from (design.md Decision 11). Its own draws never touch r, and r's
-	// draw sequence is untouched by this stream's existence — the acceptance
-	// gate for that is TestGenerate_Scenario_AddingContinuousElementsLeavesLatticePlacementUnchanged
-	// (lattice_identity_test.go).
-	r2 := newRand(continuousSeed(seed))
+	return generateWithStreams(seed, newRand(seed), newRand(continuousSeed(seed)), region, skeleton, params)
+}
+
+// generateWithStreams is Generate's extracted body, taking both RNG streams
+// as parameters rather than deriving them from seed internally (openspec
+// pin-system-generation-determinism, design.md Decision 2 / tasks.md 3.1).
+// Streams, not seeds, because both a nil-stream mode (below) and a counting
+// stream (generate_streams_test.go) need to *construct* a *rand.Rand, and
+// neither should require a test-only knob in production code. seed stays a
+// parameter because DominantOrbitDirection(seed) and Interior.Seed consume
+// it directly, independent of r/r2.
+//
+// r2 == nil means "generate no continuous elements" — the mode
+// TestGenerate_Scenario_LatticePlacementUnchangedWhetherContinuousDrawsPresentOrAbsent
+// (generate_streams_test.go) compares against a live-r2 run to prove the
+// lattice tier never depends on the continuous stream (system-interior:
+// "Lattice Placement Is Independent Of The Continuous Stream"). production
+// code (Generate, above) never passes nil.
+func generateWithStreams(seed int64, r, r2 *rand.Rand, region string, skeleton galaxy.Skeleton, params GenerationParams) GeneratedInterior {
 	dial := params.dialFor(region)
 	sched := board.Schedule(params.Radius)
 
@@ -101,18 +117,29 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 			Footprint: []board.Cell{{Ring: 0, Slot: 0}}, // computed relative to parent at render time
 			Resources: resourcesFor(BandOuter, FeatureMoon, dial.RichnessMult, r),
 		}
-		parentSize := featureSizeById(features, gid)
-		localRadius := MoonOrbitLocalRadius(space.Body{Id: gid, Size: parentSize}, r2.Float64())
-		period := space.InsertionPeriod(localRadius)
-		// Moons carry no lattice Dir at all — their side comes from the
-		// system's dominant direction directly (design.md Decision 17), the
-		// same source stations.DeriveOrbit already uses.
-		incl := inclinationFor(sysDir < 0, r2.Float64())
-		m.Space = &space.Orbit{
-			ParentId: gid, Radius: localRadius, PeriodMs: period,
-			Phase: wrapSubTurnFraction(r2.Float64()), Inclination: incl, Node: wrapSubTurnFraction(r2.Float64()),
+		// NIL-GUARD serving TestGenerate_Scenario_LatticePlacementUnchangedWhetherContinuousDrawsPresentOrAbsent
+		// (generate_streams_test.go / system-interior: "Lattice Placement Is
+		// Independent Of The Continuous Stream"). Only the Space/Size block
+		// below is skipped when r2 == nil — the resourcesFor draw above and
+		// the append below consume the LATTICE stream (r) and MUST run
+		// identically in both modes, or absent-mode would diverge from
+		// present-mode on the lattice tier itself (design.md Decision 2,
+		// point 2). Do not narrow this loop to skip moons entirely — that
+		// silently guts the primary assertion instead of fixing the skip.
+		if r2 != nil {
+			parentSize := featureSizeById(features, gid)
+			localRadius := MoonOrbitLocalRadius(space.Body{Id: gid, Size: parentSize}, r2.Float64())
+			period := space.InsertionPeriod(localRadius)
+			// Moons carry no lattice Dir at all — their side comes from the
+			// system's dominant direction directly (design.md Decision 17), the
+			// same source stations.DeriveOrbit already uses.
+			incl := inclinationFor(sysDir < 0, r2.Float64())
+			m.Space = &space.Orbit{
+				ParentId: gid, Radius: localRadius, PeriodMs: period,
+				Phase: wrapSubTurnFraction(r2.Float64()), Inclination: incl, Node: wrapSubTurnFraction(r2.Float64()),
+			}
+			m.Size = drawFeatureSize(FeatureMoon, r2)
 		}
-		m.Size = drawFeatureSize(FeatureMoon, r2)
 		features = append(features, m)
 	}
 
@@ -126,9 +153,15 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		}
 		f := orbitFeature(fmt.Sprintf("feat-special-%d", i), ft, ring, diskOrCaptured(sysDir, params.RetrogradeChance, r), r, sched)
 		if ft == FeatureAnomaly {
-			f.Resources = []Resource{{Kind: ResourceExotic, Richness: 0.4 + 0.6*r.Float64()*dial.RichnessMult}}
+			// The float64() conversion is load-bearing: it forces the
+			// intermediate rounding that inhibits FMA contraction on arm64.
+			// Assigning the product to a local does NOT — gc fuses across
+			// statements. Do not "simplify" this (openspec
+			// pin-system-generation-determinism, design.md Decision 1).
+			f.Resources = []Resource{{Kind: ResourceExotic, Richness: 0.4 + float64(0.6*r.Float64()*dial.RichnessMult)}}
 		} else {
-			f.Resources = []Resource{{Kind: ResourceResearch, Richness: 0.3 + 0.5*r.Float64()*dial.RichnessMult}}
+			// Same load-bearing float64() guard as the anomaly branch above.
+			f.Resources = []Resource{{Kind: ResourceResearch, Richness: 0.3 + float64(0.5*r.Float64()*dial.RichnessMult)}}
 		}
 		continuousStarParented(&f, ring, r2)
 		features = append(features, f)
@@ -244,14 +277,27 @@ func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams
 	orb := orbitFor(ring, dir, r, sched)
 	f := Feature{
 		Id: id, Type: FeatureBelt, Orbit: &orb, Footprint: arc,
-		Resources: []Resource{{Kind: kind, Richness: 0.3 + 0.5*r.Float64()*dial.RichnessMult}},
+		// The float64() conversion is load-bearing: it forces the
+		// intermediate rounding that inhibits FMA contraction on arm64.
+		// Assigning the product to a local does NOT — gc fuses across
+		// statements. Do not "simplify" this (openspec
+		// pin-system-generation-determinism, design.md Decision 1).
+		Resources: []Resource{{Kind: kind, Richness: 0.3 + float64(0.5*r.Float64()*dial.RichnessMult)}},
 	}
 	continuousStarParented(&f, ring, r2)
 	// Width is the belt's full radial thickness, persisted at generation
 	// time rather than re-derived on read (design.md Decision 5): a later
 	// retune of BeltWidthFraction must never retroactively move an
 	// already-materialized belt's members.
-	f.Width = float64(BeltWidthFraction * f.Space.Radius)
+	//
+	// NIL-GUARD serving TestGenerate_Scenario_LatticePlacementUnchangedWhetherContinuousDrawsPresentOrAbsent
+	// (generate_streams_test.go): continuousStarParented leaves f.Space nil
+	// when r2 == nil (continuous draws absent), and this line panics on nil
+	// otherwise — the one non-obvious guard site, found by running it
+	// (design.md Decision 2, point 2).
+	if f.Space != nil {
+		f.Width = float64(BeltWidthFraction * f.Space.Radius)
+	}
 	return f
 }
 
@@ -305,7 +351,15 @@ func resourcesFor(band Band, ft FeatureType, richnessMult float64, r *rand.Rand)
 }
 
 func rich(lo, hi, mult float64, r *rand.Rand) float64 {
-	v := (lo + (hi-lo)*r.Float64()) * mult
+	// Both float64() conversions are load-bearing: the inner one guards the
+	// fusible `lo + (hi-lo)*r.Float64()` shape, forcing the intermediate
+	// rounding that inhibits FMA contraction on arm64; the outer one guards
+	// the multiply-by-mult defensively, so a later edit adding a downstream
+	// term cannot silently re-open the site. Assigning either product to a
+	// local does NOT inhibit fusion — gc fuses across statements. Do not
+	// "simplify" this (openspec pin-system-generation-determinism, design.md
+	// Decision 1).
+	v := float64(float64(lo+float64((hi-lo)*r.Float64())) * mult)
 	if v > 1 {
 		v = 1
 	}

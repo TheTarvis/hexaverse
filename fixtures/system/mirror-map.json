@@ -1,0 +1,120 @@
+{
+  "$comment": [
+    "ANTI-mirror map for backend/system <-> frontend/lib/system (openspec:",
+    "pin-system-generation-determinism, design.md Decision 5 — `system` is",
+    "designated Go-sole-authority for interior generation, and shipped",
+    "cross-stack-determinism binds that designation to an anti-mirror check:",
+    "'A mirror map for a capability designated Go-sole-authority (no",
+    "TypeScript mirror) SHALL instead run in anti-mirror mode: it SHALL fail",
+    "if any function name is declared in both the Go package and the",
+    "designated non-mirror TypeScript directory, unless that name appears in",
+    "an explicit, empty-by-default sharedNames allowlist recorded in the",
+    "pair's mirror-map file.'",
+    "",
+    "This is `backend/space`'s SECOND anti-mirror sibling (fixtures/space/",
+    "mirror-map.json is the first) — same shape, same rationale: there is",
+    "deliberately no 'pairs' array, because a pairs entry would assert the",
+    "very mirror this designation forbids.",
+    "",
+    "'sharedNames' is empty BY DEFAULT and should stay that way.",
+    "",
+    "frontend/lib/system does not exist (design.md Decision 5 / tasks.md",
+    "5.6): .claude/scripts/check-mirror-map.sh's generalized anti_mirror",
+    "function takes its existing directory-does-not-exist branch for the",
+    "'system' pass and prints a stated trivial pass — the same shape 'space'",
+    "had before frontend/lib/space existed. anti_mirror reads ONLY",
+    "'sharedNames' (never 'coverage' or 'inventory' — those are read by",
+    "check_mirror, which system has no 'pairs' for), and for 'system' it does",
+    "not read even that: the directory-absent branch returns before opening",
+    "this file at all. So 'coverage' and 'inventory' below are declared,",
+    "greppable documentation with a named owner, not an asserted check — the",
+    "day someone adds frontend/lib/system, this map (and the generalized",
+    "anti_mirror pass) is already watching.",
+    "",
+    "'coverage' is this package's COVERAGE INVENTORY (design.md Decision 5 /",
+    "tasks.md 4.1b), scoped to the RULE-BEARING SURFACE ONLY: the functions",
+    "declared in generator.go, continuous.go, belt.go, bodies.go,",
+    "params_continuous.go (no functions of its own — constants/tables only),",
+    "and station_continuous.go. DAO, handler, service and generated-mock",
+    "functions are NOT rule-bearing and are out of scope for this list —",
+    "concretely, that excludes bodies.go's (*Service) methods (BodyTable,",
+    "addGates: Firestore/service orchestration), BodyTable's own pure",
+    "accessor methods (Body, StarId, StarSize, Extent, Ids: field getters,",
+    "not computed rules), and asDisclosureWorld (a compile-time-only",
+    "capability check with zero production callers, wrapping a pointer with",
+    "no computation of its own).",
+    "",
+    "Values: 'family:<name>' — asserted by that family in",
+    "fixtures/system/cases.json, directly or indirectly as a callee of the",
+    "family's function; 'inventory' — no family exercises it, tracked as a",
+    "gap in 'inventory' below, each entry naming an owning change per the",
+    "shipped rule that a rule-bearing shared function SHALL NOT remain in the",
+    "inventory across more than one change that modifies its package."
+  ],
+
+  "sharedNames": [],
+
+  "coverage": [
+    { "go": "newRand", "coverage": "family:interiorElements", "note": "indirect: constructs the RNG streams generateWithStreams consumes (fixtures_test.go's computeInteriorElementsCase calls it directly for the continuous stream)" },
+    { "go": "Generate", "coverage": "family:interiorElements", "note": "the production entry point; exercised by TestInteriorElementsSweep_MatchesLatticeIdentitySweep (generate_streams_test.go), which asserts it against generateWithStreams's own recorded projection" },
+    { "go": "generateWithStreams", "coverage": "family:interiorElements", "note": "direct: computeInteriorElementsCase (fixtures_test.go) calls it under the instrumented lattice stream" },
+    { "go": "featureSizeById", "coverage": "family:interiorElements", "note": "indirect: the moon loop's parent-size lookup, drawn whenever a case's skeleton includes a gas giant" },
+    { "go": "orbitFeature", "coverage": "family:interiorElements", "note": "indirect: every skeleton-body, extra-planet, and special placement" },
+    { "go": "orbitFor", "coverage": "family:interiorElements", "note": "indirect: called by orbitFeature, beltFeature, and hazardFeature" },
+    { "go": "DominantOrbitDirection", "coverage": "family:interiorElements", "note": "indirect: the system-wide disk spin every case reads once" },
+    { "go": "diskOrCaptured", "coverage": "family:interiorElements", "note": "indirect: extra-planet and mid-band special placements in the sweep's dialed cases" },
+    { "go": "beltFeature", "coverage": "family:interiorElements", "note": "indirect: cases whose region dial rolls Belts > 0 — this is one of the four sites this change's fix touches (generator.go:247)" },
+    { "go": "hazardFeature", "coverage": "family:interiorElements", "note": "indirect: cases whose region dial rolls Hazards > 0" },
+    { "go": "resourcesFor", "coverage": "family:interiorElements", "note": "indirect: every skeleton body, extra planet, and moon draws its resources through it" },
+    { "go": "rich", "coverage": "family:interiorElements", "note": "indirect: the shared richness helper this change's fix touches (generator.go:308)" },
+    { "go": "featureTypeForBody", "coverage": "family:interiorElements", "note": "indirect: maps every skeleton body's galaxy-tier type onto a feature type" },
+    { "go": "clampRing", "coverage": "family:interiorElements", "note": "indirect: every skeleton body's raw ring is clamped through it; TestClampRing_StaysMonotonicNonDecreasing (lattice_identity_test.go) is a separate unit probe of its monotonicity, not a fixture family" },
+    { "go": "maxInt", "coverage": "family:interiorElements", "note": "indirect: trivial helper bounding the mid-band special ring span" },
+
+    { "go": "continuousSeed", "coverage": "family:interiorElements", "note": "indirect: derives the continuous stream's seed from the per-system seed on every case" },
+    { "go": "mix64", "coverage": "family:beltMemberOrbit", "note": "direct callee of beltMemberUnit; also feeds the deferred stationOrbit derivation (station_continuous.go) — see that inventory entry" },
+    { "go": "fnv1a64", "coverage": "family:beltMemberOrbit", "note": "direct callee of beltMemberUnit" },
+    { "go": "unitFraction", "coverage": "family:beltMemberOrbit", "note": "direct callee of beltMemberUnit" },
+    { "go": "ContinuousRadius", "coverage": "family:continuousRadius", "note": "direct; also called indirectly by continuousStarParented on every interiorElements case" },
+    { "go": "keplerPeriodMs", "coverage": "inventory", "note": "see the deferred-family inventory entry below" },
+    { "go": "StarSize", "coverage": "family:starSizeForClass", "note": "direct; also called indirectly for every case's star feature" },
+    { "go": "MaxFeatureSize", "coverage": "inventory", "note": "its only caller is the deferred stationOrbit derivation (station_continuous.go) — see that inventory entry" },
+    { "go": "drawFeatureSize", "coverage": "family:interiorElements", "note": "indirect: every star-parented feature's Size and the moon's Size" },
+    { "go": "MoonOrbitLocalRadius", "coverage": "family:interiorElements", "note": "indirect: the moon loop's local-radius law" },
+    { "go": "wrapSubTurnFraction", "coverage": "family:interiorElements", "note": "indirect: continuousStarParented and the moon loop; also feeds family:beltMemberOrbit via beltMemberOrbit's own phase draw" },
+    { "go": "inclinationFor", "coverage": "family:interiorElements", "note": "indirect: continuousStarParented and the moon loop; also feeds family:beltMemberOrbit via beltMemberOrbit's own inclination draw" },
+    { "go": "continuousStarParented", "coverage": "family:interiorElements", "note": "direct: attaches every star-parented feature's continuous element set, the guard this change's present-vs-absent assertion exercises on both sides" },
+
+    { "go": "beltMemberUnit", "coverage": "family:beltMemberOrbit", "note": "direct" },
+    { "go": "beltMemberOrbit", "coverage": "family:beltMemberOrbit", "note": "direct" },
+
+    { "go": "gateId", "coverage": "inventory", "note": "see the gateId inventory entry below" },
+    { "go": "gateOrbit", "coverage": "inventory", "note": "see the deferred-family inventory entry below" },
+
+    { "go": "StationContinuousOrbit", "coverage": "inventory", "note": "see the deferred-family (stationOrbit) inventory entry below" },
+    { "go": "inclinationForDominant", "coverage": "inventory", "note": "its only caller is StationContinuousOrbit — see that inventory entry" }
+  ],
+
+  "inventory": [
+    {
+      "pair": "keplerPeriodMs",
+      "why": "Pure function of a continuous radius over its full R¹ domain; interiorElements exercises it only at the radii generation happens to produce (coverage, not a contract over the full box). Per the orchestrator's ruling (design.md Decision 5, Open Question 1), owned downstream rather than built out here for a fast-tracked determinism fix.",
+      "expectedChange": "migrate-fleet-to-continuous-burns (link 4)"
+    },
+    {
+      "pair": "gateOrbit",
+      "why": "Pure function of two galaxy-tier coordinate pairs and a system's continuous Extent; no fixture family sweeps its input box (the bearing derivation via space.PhaseIndexOf, the fixed radius factor, the dz/dx horizontal-projection convention). Named explicitly in design.md Decision 5 as deferred.",
+      "expectedChange": "migrate-fleet-to-continuous-burns (link 4)"
+    },
+    {
+      "pair": "StationContinuousOrbit",
+      "why": "Named 'stationOrbit' in design.md Decision 5: a pure function of the galaxy seed, system id, and skeleton, with its own parent-selection hash and type-keyed ceiling; no fixture family sweeps it, and its two callees (MaxFeatureSize, inclinationForDominant) are consequently uncovered too.",
+      "expectedChange": "migrate-fleet-to-continuous-burns (link 4)"
+    },
+    {
+      "pair": "gateId",
+      "why": "A deterministic string-format helper (\"gate-\" + destSystemId) with no floating-point or cross-target arithmetic content — not the kind of value this capability's fixture machinery exists to pin. Covered functionally by bodies_test.go, not by a byte-for-byte fixture family.",
+      "expectedChange": "the change that first gives lane gates a fixture-worthy rule (e.g. a gate id format change) — until then this is a documentation gap, not a determinism risk"
+    }
+  ]
+}

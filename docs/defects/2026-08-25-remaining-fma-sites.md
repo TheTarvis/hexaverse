@@ -23,7 +23,7 @@ $ cd backend && GOOS=linux GOARCH=arm64 go build -gcflags=-S ./... \
                                               (FIXED 2026-08-27: now 0 — see that doc)
    8 backend/fleet/routing.go               -> 2026-08-25-lane-eta-arch-divergence.md
    6 backend/board/hex.go                   -> 2026-08-25-line-fma-arch-divergence.md
-   4 backend/system/generator.go            -> THIS DOC
+   4 backend/system/generator.go            -> THIS DOC (RESOLVED 2026-08-29, float64(...) conversions)
    3 backend/corporations/siteselection.go  -> THIS DOC (RESOLVED 2026-08-27, sites deleted)
    2 backend/market/provisioning.go         -> THIS DOC
    2 backend/board/gate.go                  -> 2026-08-25-line-fma-arch-divergence.md
@@ -41,7 +41,26 @@ Cloud Run.
 
 ## The three sites and what each persists
 
-### 1. `backend/system/generator.go:88,90,186,238` — feature richness
+### 1. `backend/system/generator.go:129,131,247,308` — feature richness — **RESOLVED 2026-08-29**
+
+**Fixed by `pin-system-generation-determinism`, not deferred.** Each of the
+four richness-producing products (the anomaly and ruin special branches, the
+belt primary-lode branch, and the shared `rich()` helper) now carries an
+explicit `float64(...)` conversion around its fusible product, forcing the
+intermediate rounding that inhibits FMA contraction on arm64 — the same
+remedy `board.Line`'s sibling defect used where the float could not be
+deleted outright (see that resolution's own note, and design.md Decision 1
+for why deletion does not apply here: richness is the stored result itself,
+not a discrete choice with an integer form to retreat to). `backend/system`
+now emits zero arm64 FMA sites (`go build -gcflags=-S ./system/` on
+`GOOS=linux GOARCH=arm64` prints no `FMADDD`/`FMSUBD`), the generator's full
+output (lattice projection AND the continuous element set) is byte-identical
+between `GOARCH=arm64` and `GOARCH=amd64 GOAMD64=v1`, and the four register
+entries naming these sites were removed in the same commit. The original
+description (below) is kept as the record of what was there; its line
+numbers (88,90,186,238) had already drifted to 129,131,247,308 by the time
+of this fix (see the register's own re-anchoring notes, now removed with the
+entries).
 
 ```go
 f.Resources = []Resource{{Kind: ResourceExotic,
@@ -124,11 +143,26 @@ p := (b-a)*t ; return a + p    ->  FSUBD ; FMADDD          STILL fused
 a + float64((b-a)*t)           ->  FSUBD ; FMULD ; FADDD   not fused
 ```
 
-Better for sites (1) and (3): both derive a bounded scalar from a hash or RNG
-draw and then persist it. Quantizing to a fixed integer scale at generation time
-(e.g. richness in basis points, premium in whole credits) removes the
-floating-point dependence entirely rather than pinning which way it rounds —
-the discretization discipline `cross-stack-determinism` already prescribes.
+**CORRECTION (2026-08-29, `pin-system-generation-determinism` design.md
+Decision 1): the "better for sites (1) and (3)" quantization suggestion
+above is wrong, and site (1) was fixed with the plain `float64(...)`
+conversion instead.** Quantizing an already-divergent float to a fixed
+integer scale does not remove the floating-point dependence — it only
+*lowers the probability the divergence survives rounding*, converting a
+reliably reproducible disagreement (13 of ~500 richness values, measured
+over the 80-case sweep) into a rare one that appears only when the
+pre-quantization value lands within 1 ULP of a quantum boundary. A rarer
+nondeterminism is a *worse* one: it survives every test run and then shows
+up in exactly one player's world. Quantization would also introduce a bare
+rounding call into a package `check-transcendental.sh` already lints for
+that exact shape (`RULE_BEARING_GO_PACKAGES` contains `system`), trading one
+problem for a second. Quantization is only sound *on top of* the
+`float64(...)` fix, at which point the fix has already finished the job —
+so for a value-producing site (the float *is* the stored result, with no
+discrete choice to retreat to, unlike an argmin-shaped site such as (2)),
+the plain conversion is the whole remedy, not a stopgap. Site (3)
+(`market/provisioning.go`) remains open and unfixed; if it is ever
+"improved" by quantizing instead of converting, that repeats this mistake.
 
 ## Related
 

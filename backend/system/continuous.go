@@ -224,6 +224,16 @@ func inclinationFor(retrograde bool, jitterFrac float64) space.SubTurns {
 // comes from the continuous stream, which is what keeps the two
 // representations from silently disagreeing on retrograde/prograde.
 func continuousStarParented(f *Feature, orbitalIndex int, r2 *rand.Rand) {
+	// NIL-GUARD serving TestGenerate_Scenario_LatticePlacementUnchangedWhetherContinuousDrawsPresentOrAbsent
+	// (generate_streams_test.go / system-interior: "Lattice Placement Is
+	// Independent Of The Continuous Stream"): r2 == nil means "generate no
+	// continuous elements" (openspec pin-system-generation-determinism,
+	// design.md Decision 2, point 2). This early return is what makes
+	// "absent" well-defined — no continuous value ever feeds back into a
+	// lattice field, so this guard must not be deleted as dead code.
+	if r2 == nil {
+		return
+	}
 	radius := ContinuousRadius(orbitalIndex)
 	period := keplerPeriodMs(radius)
 	retrograde := f.Orbit != nil && f.Orbit.Dir < 0
