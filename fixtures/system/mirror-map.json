@@ -76,9 +76,9 @@
     { "go": "fnv1a64", "coverage": "family:beltMemberOrbit", "note": "direct callee of beltMemberUnit" },
     { "go": "unitFraction", "coverage": "family:beltMemberOrbit", "note": "direct callee of beltMemberUnit" },
     { "go": "ContinuousRadius", "coverage": "family:continuousRadius", "note": "direct; also called indirectly by continuousStarParented on every interiorElements case" },
-    { "go": "keplerPeriodMs", "coverage": "inventory", "note": "see the deferred-family inventory entry below" },
+    { "go": "keplerPeriodMs", "coverage": "family:keplerPeriodMs", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.1) as a pinned randomized sweep over radius in [0, 1e9] — the full non-negative domain, well beyond what generation produces. Radius < 0 is DELIBERATELY EXCLUDED from the golden family: it triggers a discovered, pre-existing cross-build-target divergence (math.Sqrt of a negative ratio yields NaN, and int64(NaN) is architecture-dependent — 0 on arm64, math.MinInt64 on amd64/GOAMD64=v1), reported as a production defect rather than merged as a non-byte-identical case." },
     { "go": "StarSize", "coverage": "family:starSizeForClass", "note": "direct; also called indirectly for every case's star feature" },
-    { "go": "MaxFeatureSize", "coverage": "inventory", "note": "its only caller is the deferred stationOrbit derivation (station_continuous.go) — see that inventory entry" },
+    { "go": "MaxFeatureSize", "coverage": "family:stationOrbit", "note": "indirect: its only caller is StationContinuousOrbit, recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.3)" },
     { "go": "drawFeatureSize", "coverage": "family:interiorElements", "note": "indirect: every star-parented feature's Size and the moon's Size" },
     { "go": "MoonOrbitLocalRadius", "coverage": "family:interiorElements", "note": "indirect: the moon loop's local-radius law" },
     { "go": "wrapSubTurnFraction", "coverage": "family:interiorElements", "note": "indirect: continuousStarParented and the moon loop; also feeds family:beltMemberOrbit via beltMemberOrbit's own phase draw" },
@@ -89,28 +89,13 @@
     { "go": "beltMemberOrbit", "coverage": "family:beltMemberOrbit", "note": "direct" },
 
     { "go": "gateId", "coverage": "inventory", "note": "see the gateId inventory entry below" },
-    { "go": "gateOrbit", "coverage": "inventory", "note": "see the deferred-family inventory entry below" },
+    { "go": "gateOrbit", "coverage": "family:gateOrbit", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.2) as a pinned randomized sweep over two independently drawn galaxy.Coords and an extent" },
 
-    { "go": "StationContinuousOrbit", "coverage": "inventory", "note": "see the deferred-family (stationOrbit) inventory entry below" },
-    { "go": "inclinationForDominant", "coverage": "inventory", "note": "its only caller is StationContinuousOrbit — see that inventory entry" }
+    { "go": "StationContinuousOrbit", "coverage": "family:stationOrbit", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.3) as a pinned randomized sweep over a galaxy seed, a synthetic system id, and a 1-8 body-type skeleton" },
+    { "go": "inclinationForDominant", "coverage": "family:stationOrbit", "note": "indirect: its only caller is StationContinuousOrbit" }
   ],
 
   "inventory": [
-    {
-      "pair": "keplerPeriodMs",
-      "why": "Pure function of a continuous radius over its full R¹ domain; interiorElements exercises it only at the radii generation happens to produce (coverage, not a contract over the full box). Per the orchestrator's ruling (design.md Decision 5, Open Question 1), owned downstream rather than built out here for a fast-tracked determinism fix.",
-      "expectedChange": "migrate-fleet-to-continuous-burns (link 4)"
-    },
-    {
-      "pair": "gateOrbit",
-      "why": "Pure function of two galaxy-tier coordinate pairs and a system's continuous Extent; no fixture family sweeps its input box (the bearing derivation via space.PhaseIndexOf, the fixed radius factor, the dz/dx horizontal-projection convention). Named explicitly in design.md Decision 5 as deferred.",
-      "expectedChange": "migrate-fleet-to-continuous-burns (link 4)"
-    },
-    {
-      "pair": "StationContinuousOrbit",
-      "why": "Named 'stationOrbit' in design.md Decision 5: a pure function of the galaxy seed, system id, and skeleton, with its own parent-selection hash and type-keyed ceiling; no fixture family sweeps it, and its two callees (MaxFeatureSize, inclinationForDominant) are consequently uncovered too.",
-      "expectedChange": "migrate-fleet-to-continuous-burns (link 4)"
-    },
     {
       "pair": "gateId",
       "why": "A deterministic string-format helper (\"gate-\" + destSystemId) with no floating-point or cross-target arithmetic content — not the kind of value this capability's fixture machinery exists to pin. Covered functionally by bodies_test.go, not by a byte-for-byte fixture family.",

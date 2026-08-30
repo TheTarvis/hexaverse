@@ -576,6 +576,174 @@ func jpark(p Park) parkJSON {
 	}
 }
 
+// --- codec case shapes (EncodeVec/DecodeVec/EncodeSubTurns/DecodeSubTurns) --
+//
+// params.go's Firestore/action.Params codec (design.md Decision 4, tasks.md
+// 1.4 of migrate-fleet-to-continuous-burns — the first change that gives
+// backend/space a real consumer). Its domain is storage-native primitives,
+// not geometry, so the error paths (a non-finite or out-of-extent
+// component, an unrecognized input shape) are as much this family's
+// subject as the round trip itself.
+
+// encodeVecCase is one EncodeVec hand case: a Vec3 in, its []float64 wire
+// shape out (design.md Decision 4 pins the order literally: x, y, z).
+type encodeVecCase struct {
+	Note string `json:"note"`
+	In   vec3   `json:"in"`
+	Out  vec3   `json:"out"`
+}
+
+// decodeVecInput is one DecodeVec input, described reviewably rather than
+// as a raw `any` literal. Shape names the numeric-slice shape the value is
+// constructed as, matching decodeNumericSlice's own recognized container/
+// element combinations plus the shapes it (and checkedCoordinate) must
+// reject:
+//   - "float64Slice"    a []float64 (EncodeVec's own output shape, or a
+//     wrong-length slice when len(Values) != 3)
+//   - "anySliceFloat64" a []any of float64s (a JSON HTTP body decode)
+//   - "anySliceInt64"   a []any of int64s (a Firestore round trip)
+//   - "anySliceInt"     a []any of ints (an in-memory literal built by hand)
+//   - "anySliceMixed"   int, int64, float64 elements in that cyclic order —
+//     decodeNumber's three accepted branches in one call
+//   - "anySliceBad"     Values plus one trailing non-numeric element
+//   - "notASlice"       a value that is not a slice at all
+//   - "wrongType"       a slice of an unsupported element type
+//
+// Bad/BadAt substitute a non-finite value into Values[BadAt] at call time
+// (never encoded into the fixture file as JSON, which cannot represent
+// NaN/Inf as a number) — "nan" | "posInf" | "negInf".
+type decodeVecInput struct {
+	note   string
+	shape  string
+	values []float64
+	bad    string
+	badAt  int
+}
+
+func (in decodeVecInput) value() any {
+	nums := append([]float64{}, in.values...)
+	if in.bad != "" {
+		switch in.bad {
+		case "nan":
+			nums[in.badAt] = math.NaN()
+		case "posInf":
+			nums[in.badAt] = math.Inf(1)
+		case "negInf":
+			nums[in.badAt] = math.Inf(-1)
+		default:
+			panic("decodeVecInput: unknown bad kind " + in.bad)
+		}
+	}
+	switch in.shape {
+	case "float64Slice":
+		return nums
+	case "anySliceFloat64":
+		out := make([]any, len(nums))
+		for i, v := range nums {
+			out[i] = v
+		}
+		return out
+	case "anySliceInt64":
+		out := make([]any, len(nums))
+		for i, v := range nums {
+			out[i] = int64(v)
+		}
+		return out
+	case "anySliceInt":
+		out := make([]any, len(nums))
+		for i, v := range nums {
+			out[i] = int(v)
+		}
+		return out
+	case "anySliceMixed":
+		converters := []func(float64) any{
+			func(v float64) any { return v },
+			func(v float64) any { return int64(v) },
+			func(v float64) any { return int(v) },
+		}
+		out := make([]any, len(nums))
+		for i, v := range nums {
+			out[i] = converters[i%len(converters)](v)
+		}
+		return out
+	case "anySliceBad":
+		out := make([]any, 0, len(nums)+1)
+		for _, v := range nums {
+			out = append(out, v)
+		}
+		return append(out, "not-a-number")
+	case "notASlice":
+		return "not-a-slice"
+	case "wrongType":
+		return map[string]any{"x": 1.0}
+	default:
+		panic("decodeVecInput: unknown shape " + in.shape)
+	}
+}
+
+// decodeVecCase is decodeVecInput's recorded, reviewable counterpart: the
+// input description plus the actual DecodeVec(in.value()) outcome.
+type decodeVecCase struct {
+	Note   string    `json:"note"`
+	Shape  string    `json:"shape"`
+	Values []float64 `json:"values,omitempty"`
+	Bad    string    `json:"bad,omitempty"`
+	BadAt  int       `json:"badAt,omitempty"`
+	Out    vec3      `json:"out,omitempty"`
+	Err    string    `json:"err,omitempty"`
+}
+
+// encodeSubTurnsCase is one EncodeSubTurns hand case: a SubTurns angle in,
+// its int64 wire shape out (design.md Decision 4).
+type encodeSubTurnsCase struct {
+	Note string `json:"note"`
+	In   int64  `json:"in"`
+	Out  int64  `json:"out"`
+}
+
+// decodeSubTurnsInput is one DecodeSubTurns input, described reviewably.
+// Kind names the accepted-or-rejected shape: "int" | "int64" | "float64"
+// (N or F carries the payload) | "nan" | "posInf" | "negInf" | "invalid"
+// (an unsupported shape, e.g. a string).
+type decodeSubTurnsInput struct {
+	note string
+	kind string
+	n    int64
+	f    float64
+}
+
+func (in decodeSubTurnsInput) value() any {
+	switch in.kind {
+	case "int":
+		return int(in.n)
+	case "int64":
+		return in.n
+	case "float64":
+		return in.f
+	case "nan":
+		return math.NaN()
+	case "posInf":
+		return math.Inf(1)
+	case "negInf":
+		return math.Inf(-1)
+	case "invalid":
+		return "not a number"
+	default:
+		panic("decodeSubTurnsInput: unknown kind " + in.kind)
+	}
+}
+
+// decodeSubTurnsCase is decodeSubTurnsInput's recorded, reviewable
+// counterpart.
+type decodeSubTurnsCase struct {
+	Note string  `json:"note"`
+	Kind string  `json:"kind"`
+	N    int64   `json:"n,omitempty"`
+	F    float64 `json:"f,omitempty"`
+	Out  int64   `json:"out,omitempty"`
+	Err  string  `json:"err,omitempty"`
+}
+
 // --- sweep counts ------------------------------------------------------------
 //
 // cross-stack-determinism's randomized-sweep clause recommends 100,000
@@ -920,7 +1088,15 @@ func sweepSolveBurn(t testing.TB, n, rounds int) solveSweepResult {
 		// bulges clear of it").
 		if clearance > 0 {
 			out.clearanceCases++
-			if minDistanceFromOriginOf(b.Curve, arcSampleCount) <= clearance {
+			// task 1.5 (migrate-fleet-to-continuous-burns): calls the
+			// surviving minDistanceAndParamOf directly, discarding the
+			// curve-parameter component, rather than through
+			// minDistanceFromOriginOf — that thin wrapper had no production
+			// caller and this was its last reference anywhere in the
+			// package, clearing it for deletion (reported to the
+			// orchestrator/developer; not performed here since it is a
+			// production-file edit).
+			if d, _ := minDistanceAndParamOf(b.Curve, arcSampleCount); d <= clearance {
 				out.clearanceViolations++
 			}
 		}
@@ -1075,7 +1251,10 @@ func sweepRealisticTraffic(t testing.TB) realisticStats {
 				residuals = append(residuals, float64(d))
 				flights = append(flights, float64(b.ArriveMs-b.DepartMs))
 
-				if minDistanceFromOriginOf(b.Curve, arcSampleCount) <= clearance {
+				// task 1.5 (migrate-fleet-to-continuous-burns): see the
+				// identical note in sweepSolveBurn above — this is the
+				// wrapper's other (and now last) reference in the package.
+				if d, _ := minDistanceAndParamOf(b.Curve, arcSampleCount); d <= clearance {
 					out.StarClearanceViolations++
 				}
 				folded, fe := StateAt(bodies, ShipState{Mode: ModeBurn, Burn: &b}, b.ArriveMs)
@@ -1267,6 +1446,91 @@ func sweepStateAt(t testing.TB, n int) (int, string) {
 	return sh.lines, sh.sum()
 }
 
+// --- codec: EncodeVec / DecodeVec / EncodeSubTurns / DecodeSubTurns --------
+
+var encodeVecAxes = axVec("v", -1e9, 1e9)
+
+// sweepEncodeVec draws a Vec3 from a generous box; EncodeVec performs no
+// validation of its own, so this pins that the output is exactly the three
+// input components, in order, with no arithmetic in between.
+func sweepEncodeVec(n int) (int, string) {
+	r := newSweepRNG(sweepSeed)
+	sh := newSweepHash()
+	for i := 0; i < n; i++ {
+		v := r.vec(-1e9, 1e9)
+		out := EncodeVec(v)
+		sh.line(sline(sfloat(out[0]), sfloat(out[1]), sfloat(out[2])))
+	}
+	return sh.lines, sh.sum()
+}
+
+var decodeVecAxes = axVec("v", -2e12, 2e12)
+
+// sweepDecodeVec draws a Vec3 from a box overhanging the configured
+// +/-1e12 coordinate extent (checkedCoordinate) at both ends, fed through
+// DecodeVec as an in-memory []float64 — so both the accepted and the
+// ErrCoordinateOutOfExtent branches are drawn in the same sweep.
+func sweepDecodeVec(n int) (int, string) {
+	r := newSweepRNG(sweepSeed)
+	sh := newSweepHash()
+	for i := 0; i < n; i++ {
+		v := r.vec(-2e12, 2e12)
+		out, err := DecodeVec([]float64{v.X, v.Y, v.Z})
+		if err != nil {
+			sh.line(errToken)
+			continue
+		}
+		sh.line(svec(out))
+	}
+	return sh.lines, sh.sum()
+}
+
+var encodeSubTurnsAxes = []sweepAxis{iax("a", -10_000_000, 10_000_000)}
+
+// sweepEncodeSubTurns draws a SubTurns angle from a wide integer box;
+// EncodeSubTurns performs no validation, so this pins that the output is
+// exactly int64(a).
+func sweepEncodeSubTurns(n int) (int, string) {
+	r := newSweepRNG(sweepSeed)
+	sh := newSweepHash()
+	for i := 0; i < n; i++ {
+		a := SubTurns(r.ibox(-10_000_000, 10_000_000))
+		sh.line(strconv.FormatInt(EncodeSubTurns(a), 10))
+	}
+	return sh.lines, sh.sum()
+}
+
+var decodeSubTurnsAxes = []sweepAxis{iax("raw", -10_000_000, 10_000_000)}
+
+// sweepDecodeSubTurns draws an integer from a wide box and cycles it
+// through DecodeSubTurns's three accepted shapes (int, int64, float64) by
+// draw index, in that order — the NaN/Inf/unsupported-shape branches are
+// not reachable from a uniform box draw and are covered by hand cases
+// instead.
+func sweepDecodeSubTurns(n int) (int, string) {
+	r := newSweepRNG(sweepSeed)
+	sh := newSweepHash()
+	for i := 0; i < n; i++ {
+		raw := r.ibox(-10_000_000, 10_000_000)
+		var v any
+		switch i % 3 {
+		case 0:
+			v = int(raw)
+		case 1:
+			v = raw
+		case 2:
+			v = float64(raw)
+		}
+		out, err := DecodeSubTurns(v)
+		if err != nil {
+			sh.line(errToken)
+			continue
+		}
+		sh.line(strconv.FormatInt(int64(out), 10))
+	}
+	return sh.lines, sh.sum()
+}
+
 // --- the pinned turn table's own family --------------------------------------
 
 // sweepTurnTable is EXHAUSTIVE, not randomized: CosSin's domain is every
@@ -1429,6 +1693,16 @@ type fixtures struct {
 
 	StateAt      []stateAtCase `json:"stateAt"`
 	StateAtSweep []randomSweep `json:"stateAtSweep"`
+
+	EncodeVec      []encodeVecCase `json:"encodeVec"`
+	EncodeVecSweep []randomSweep   `json:"encodeVecSweep"`
+	DecodeVec      []decodeVecCase `json:"decodeVec"`
+	DecodeVecSweep []randomSweep   `json:"decodeVecSweep"`
+
+	EncodeSubTurns      []encodeSubTurnsCase `json:"encodeSubTurns"`
+	EncodeSubTurnsSweep []randomSweep        `json:"encodeSubTurnsSweep"`
+	DecodeSubTurns      []decodeSubTurnsCase `json:"decodeSubTurns"`
+	DecodeSubTurnsSweep []randomSweep        `json:"decodeSubTurnsSweep"`
 }
 
 // --- hand-selected cases ---------------------------------------------------
@@ -1459,6 +1733,8 @@ func errName(err error) string {
 		return "ErrNonFiniteCoordinate"
 	case errors.Is(err, ErrCoordinateOutOfExtent):
 		return "ErrCoordinateOutOfExtent"
+	case errors.Is(err, errNotAVector):
+		return "errNotAVector"
 	default:
 		return "unexpected:" + err.Error()
 	}
@@ -2036,6 +2312,114 @@ func handStateAt(t testing.TB) []stateAtCase {
 	return out
 }
 
+func handEncodeVec() []encodeVecCase {
+	inputs := []struct {
+		note string
+		v    Vec3
+	}{
+		{"the zero vector encodes to three zeros", Vec3{}},
+		{"positive components encode in x,y,z order", Vec3{X: 12.5, Y: -3.25, Z: 999.125}},
+		{"negative components round-trip their sign", Vec3{X: -1, Y: -2, Z: -3}},
+		{"EncodeVec performs no validation of its own: a magnitude beyond the configured extent still encodes", Vec3{X: 5e12, Y: 0, Z: 0}},
+	}
+	out := make([]encodeVecCase, 0, len(inputs))
+	for _, in := range inputs {
+		enc := EncodeVec(in.v)
+		out = append(out, encodeVecCase{
+			Note: in.note,
+			In:   fvec(in.v),
+			Out:  vec3{fnum(enc[0]), fnum(enc[1]), fnum(enc[2])},
+		})
+	}
+	return out
+}
+
+func handDecodeVec() []decodeVecCase {
+	inputs := []decodeVecInput{
+		{note: "an in-memory []float64, EncodeVec's own output shape, round-trips exactly", shape: "float64Slice", values: []float64{12.5, -3.25, 999.125}},
+		{note: "a []any of float64s, the shape a JSON HTTP body decode produces", shape: "anySliceFloat64", values: []float64{1, 2, 3}},
+		{note: "a []any of int64s, the shape a Firestore round trip produces", shape: "anySliceInt64", values: []float64{1, 2, 3}},
+		{note: "a []any of ints, an in-memory literal built by hand", shape: "anySliceInt", values: []float64{4, 5, 6}},
+		{note: "a []any mixing int, int64, and float64 elements in draw order — decodeNumber's three accepted branches in one call", shape: "anySliceMixed", values: []float64{7, 8, 9}},
+		{note: "the zero vector round-trips exactly", shape: "float64Slice", values: []float64{0, 0, 0}},
+		{note: "negative components round-trip exactly", shape: "float64Slice", values: []float64{-1, -2, -3}},
+
+		{note: "a NaN x component is rejected by name, not silently", shape: "float64Slice", values: []float64{0, 0, 0}, bad: "nan", badAt: 0},
+		{note: "a positive-infinity y component is rejected by name", shape: "float64Slice", values: []float64{0, 0, 0}, bad: "posInf", badAt: 1},
+		{note: "a negative-infinity z component is rejected by name", shape: "float64Slice", values: []float64{0, 0, 0}, bad: "negInf", badAt: 2},
+		{note: "a component beyond the configured +/-1e12 extent is rejected by name", shape: "float64Slice", values: []float64{0, 0, 2e12}},
+		{note: "a two-element slice is rejected — not a recognized shape", shape: "float64Slice", values: []float64{1, 2}},
+		{note: "a four-element slice is rejected — not a recognized shape", shape: "float64Slice", values: []float64{1, 2, 3, 4}},
+		{note: "a []any with one trailing non-numeric element is rejected", shape: "anySliceBad", values: []float64{1, 2}},
+		{note: "a value that is not a slice at all is rejected", shape: "notASlice"},
+		{note: "a slice of an unsupported element type is rejected", shape: "wrongType"},
+	}
+	out := make([]decodeVecCase, 0, len(inputs))
+	for _, in := range inputs {
+		got, err := DecodeVec(in.value())
+		var values []float64
+		if len(in.values) > 0 {
+			values = append([]float64{}, in.values...)
+		}
+		c := decodeVecCase{
+			Note: in.note, Shape: in.shape,
+			Values: values,
+			Bad:    in.bad, BadAt: in.badAt,
+		}
+		if err != nil {
+			c.Err = errName(err)
+		} else {
+			c.Out = fvec(got)
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func handEncodeSubTurns() []encodeSubTurnsCase {
+	inputs := []struct {
+		note string
+		a    SubTurns
+	}{
+		{"zero encodes to zero", 0},
+		{"a positive angle encodes to the identical int64", 123456},
+		{"a negative angle encodes to the identical int64 — no non-negative assumption", -42},
+		{"a multi-turn magnitude round-trips exactly", SubTurns(SubTurn * 3)},
+	}
+	out := make([]encodeSubTurnsCase, 0, len(inputs))
+	for _, in := range inputs {
+		out = append(out, encodeSubTurnsCase{Note: in.note, In: int64(in.a), Out: EncodeSubTurns(in.a)})
+	}
+	return out
+}
+
+func handDecodeSubTurns() []decodeSubTurnsCase {
+	inputs := []decodeSubTurnsInput{
+		{note: "an in-memory int round-trips exactly", kind: "int", n: 777},
+		{note: "a Firestore int64 round-trips exactly", kind: "int64", n: 777},
+		{note: "a JSON float64 round-trips exactly", kind: "float64", f: 777},
+		{note: "a negative angle round-trips exactly", kind: "int64", n: -42},
+		{note: "a positive fractional float64 truncates toward zero", kind: "float64", f: 1234.9},
+		{note: "a negative fractional float64 truncates toward zero", kind: "float64", f: -1234.9},
+		{note: "a NaN float64 is rejected by name, not silently", kind: "nan"},
+		{note: "a positive-infinity float64 is rejected by name", kind: "posInf"},
+		{note: "a negative-infinity float64 is rejected by name", kind: "negInf"},
+		{note: "an unsupported shape is rejected, distinct from the non-finite error", kind: "invalid"},
+	}
+	out := make([]decodeSubTurnsCase, 0, len(inputs))
+	for _, in := range inputs {
+		got, err := DecodeSubTurns(in.value())
+		c := decodeSubTurnsCase{Note: in.note, Kind: in.kind, N: in.n, F: in.f}
+		if err != nil {
+			c.Err = errName(err)
+		} else {
+			c.Out = int64(got)
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
 // --- assembly ----------------------------------------------------------------
 
 func randSweep(note string, axes []sweepAxis, count, lines int, digest, serialization string) []randomSweep {
@@ -2177,6 +2561,32 @@ func computeFixtures(t testing.TB) fixtures {
 		lines, digest := sweepStateAt(t, sweepCountCurve)
 		f.StateAtSweep = randSweep("the burnPosition draw stream with a target selection appended and a time straddling arrival; the output is the folded mode, the settled park's stored fields and the folded position",
 			stateAtAxes, sweepCountCurve, lines, digest, serMixed)
+	}
+
+	// --- codec: EncodeVec / DecodeVec / EncodeSubTurns / DecodeSubTurns -----
+	f.EncodeVec = handEncodeVec()
+	{
+		lines, digest := sweepEncodeVec(sweepCountCheap)
+		f.EncodeVecSweep = randSweep("a Vec3 drawn from a generous box; EncodeVec performs no validation of its own, so the output is exactly the three input components in x,y,z order",
+			encodeVecAxes, sweepCountCheap, lines, digest, serFloats)
+	}
+	f.DecodeVec = handDecodeVec()
+	{
+		lines, digest := sweepDecodeVec(sweepCountCheap)
+		f.DecodeVecSweep = randSweep("a Vec3 drawn from a box overhanging the configured +/-1e12 coordinate extent (checkedCoordinate) at both ends, fed through DecodeVec as an in-memory []float64; both the accepted and the ErrCoordinateOutOfExtent branches are drawn",
+			decodeVecAxes, sweepCountCheap, lines, digest, serFloats)
+	}
+	f.EncodeSubTurns = handEncodeSubTurns()
+	{
+		lines, digest := sweepEncodeSubTurns(sweepCountCheap)
+		f.EncodeSubTurnsSweep = randSweep("a SubTurns angle drawn from a wide integer box; EncodeSubTurns performs no validation, so the output is exactly int64(a)",
+			encodeSubTurnsAxes, sweepCountCheap, lines, digest, serMixed)
+	}
+	f.DecodeSubTurns = handDecodeSubTurns()
+	{
+		lines, digest := sweepDecodeSubTurns(sweepCountCheap)
+		f.DecodeSubTurnsSweep = randSweep("an integer drawn from a wide box, cycled through DecodeSubTurns's three accepted shapes (int, int64, float64) by draw index in that order; the NaN/Inf/unsupported-shape branches are hand cases instead, since a uniform box draw cannot produce them",
+			decodeSubTurnsAxes, sweepCountCheap, lines, digest, serMixed)
 	}
 
 	// --- the measured parameters (tasks.md 3.4-3.6) -------------------------

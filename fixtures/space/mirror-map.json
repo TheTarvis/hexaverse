@@ -76,7 +76,7 @@
 
     { "go": "TargetPosition", "coverage": "family:buildCurve", "note": "indirect: both target forms are swept" },
     { "go": "BuildCurve", "coverage": "family:buildCurve" },
-    { "go": "minDistanceFromOriginOf", "coverage": "inventory", "note": "unreferenced outside its own package; see the inventory entry" },
+    { "go": "minDistanceFromOriginOf", "coverage": "inventory", "note": "resolved as DELETE by migrate-fleet-to-continuous-burns tasks.md 1.5 (see the inventory entry) — zero references remain anywhere in the package as of this change's test-side edit; pending only the production deletion, routed to the developer" },
     { "go": "minDistanceAndParamOf", "coverage": "family:buildCurve", "note": "indirect: the fixed 33-sample closest-approach scan" },
     { "go": "perpendicularToChord", "coverage": "family:buildCurve", "note": "indirect: the chord-parallel grazing regression case" },
     { "go": "avoidStar", "coverage": "family:buildCurve", "note": "indirect: the swept star-clearance axis" },
@@ -104,35 +104,34 @@
     { "go": "StateAt", "coverage": "family:stateAt" },
     { "go": "StatePosition", "coverage": "family:stateAt", "note": "recorded as the last component of every stateAt sweep line" },
 
-    { "go": "EncodeVec", "coverage": "inventory" },
-    { "go": "DecodeVec", "coverage": "inventory" },
-    { "go": "decodeNumericSlice", "coverage": "inventory" },
-    { "go": "decodeNumber", "coverage": "inventory" },
-    { "go": "checkedCoordinate", "coverage": "inventory" },
-    { "go": "EncodeSubTurns", "coverage": "inventory" },
-    { "go": "DecodeSubTurns", "coverage": "inventory" }
+    { "go": "EncodeVec", "coverage": "family:encodeVec", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.4) as a hand-case set plus a pinned randomized sweep" },
+    { "go": "DecodeVec", "coverage": "family:decodeVec", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.4); the round trip, every decodeNumericSlice/decodeNumber input shape, and the named error paths (non-finite, out-of-extent, unrecognized shape) are all hand cases, plus a pinned randomized sweep over the accepted []float64 shape straddling the coordinate-extent boundary" },
+    { "go": "decodeNumericSlice", "coverage": "family:decodeVec", "note": "indirect callee of DecodeVec — every recognized/rejected container shape is a decodeVec hand case" },
+    { "go": "decodeNumber", "coverage": "family:decodeVec", "note": "indirect callee of decodeNumericSlice — the int/int64/float64 element shapes are decodeVec hand cases (the 'anySliceMixed' case cycles all three in one call)" },
+    { "go": "checkedCoordinate", "coverage": "family:decodeVec", "note": "indirect callee of DecodeVec — the non-finite and out-of-extent rejections are decodeVec hand cases, and the accepted branch is also drawn by decodeVec's own sweep" },
+    { "go": "EncodeSubTurns", "coverage": "family:encodeSubTurns", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.4) as a hand-case set plus a pinned randomized sweep" },
+    { "go": "DecodeSubTurns", "coverage": "family:decodeSubTurns", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.4); the int/int64/float64 accepted shapes are the sweep (cycled by draw index), and NaN/+-Inf/unsupported-shape are hand cases" },
+
+    { "go": "Drift.Position", "coverage": "inventory", "note": "does not exist yet — added by this change's OWN section 2 (tasks.md 2.1), not section 1. Recorded here per tasks.md 1.8 as an inventory gap rather than fabricated, since the function has no implementation to sweep yet; section 2/3's own fixture work (or a follow-up family) is expected to close it before this change completes." },
+    { "go": "Drift.Velocity", "coverage": "inventory", "note": "does not exist yet — see Drift.Position's note; added by this change's own section 2 (tasks.md 2.1)." },
+    { "go": "the cut-drive conversion helper (burn-to-drift at cut time)", "coverage": "inventory", "note": "does not exist yet — added by this change's own section 2 (tasks.md 2.2); name TBD until the developer names it. See Drift.Position's note." }
   ],
 
   "inventory": [
     {
-      "pair": "EncodeVec/DecodeVec/EncodeSubTurns/DecodeSubTurns (+ decodeNumericSlice, decodeNumber, checkedCoordinate)",
-      "why": "The Firestore/action.Params codec is a persistence boundary, not a geometry function: its outputs are storage-native primitives and its failures are named sentinels, neither of which a byte-for-byte float family adds anything to. It is covered by backend/space/params_test.go across the accepted int/int64/float64 arrival shapes and the non-finite / out-of-extent rejections.",
-      "expectedChange": "the first change that gives backend/space a consumer — at which point a stored round trip crosses a real Firestore document and a fixture family earns its keep"
-    },
-    {
       "pair": "StationKeepRate/StationKeepUpkeep",
-      "why": "Upkeep is a closed-form product of a body-derived rate and elapsed world time, unit-tested in park_test.go (the floor, the ordering of an inner vs an outer body, and read-count independence over 500 sub-intervals). No family sweeps it because nothing consumes a station-keep charge yet.",
-      "expectedChange": "the change that introduces a delta-v or credit consumer for station-keeping — the first point at which the rate becomes a rule-bearing stored value rather than a computable one"
+      "why": "Upkeep is a closed-form product of a body-derived rate and elapsed world time, unit-tested in park_test.go (the floor, the ordering of an inner vs an outer body, and read-count independence over 500 sub-intervals). migrate-fleet-to-continuous-burns (link 4) ships no station-keep currency — parks arise only from burn insertion (ParkOrbit) and stop-in-place (ParkPoint) — so the rate stays computable, not rule-bearing, through that change. Re-filed per Decision 17 (a rule-bearing shared function SHALL NOT remain in the inventory across more than one change that modifies backend/space) rather than carried forward unchanged.",
+      "expectedChange": "add-fuel-as-cargo"
     },
     {
       "pair": "ReleaseStationkeep",
-      "why": "Covered by three hand-selected parkPosition cases (the (3,2,4) planar re-circularization, the directly-above minimum-radius case, and the released park evaluated later) but by no randomized sweep, so an offset distribution it mishandles could still hide.",
-      "expectedChange": "the change that first lets a player release a station-keep hold"
+      "why": "Covered by three hand-selected parkPosition cases (the (3,2,4) planar re-circularization, the directly-above minimum-radius case, and the released park evaluated later) but by no randomized sweep, so an offset distribution it mishandles could still hide. add-fuel-as-cargo (link 7) is where a player-initiated release first has a caller, but it also settles the 2026-08-29 fleet-stranding ruling's guardrail: station-keeping upkeep SHALL NOT drain a fleet to zero, so when upkeep cannot be paid the park force-demotes to orbit, the free mode. That force-demote-to-orbit path is this function's first release path, ahead of any player-initiated release verb.",
+      "expectedChange": "add-fuel-as-cargo"
     },
     {
       "pair": "minDistanceFromOriginOf",
-      "why": "A thin wrapper over minDistanceAndParamOf, retained for readability and currently called only by tests. Its companion IS swept via buildCurve's star-clearance axis.",
-      "expectedChange": "delete it, or give it a caller, in the change that first migrates a consumer onto backend/space"
+      "why": "RESOLVED by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.5) as DELETE, not give-a-caller: this change is 'the change that first migrates a consumer onto backend/space' the original entry named, and it gives backend/space's rule-bearing functions (SolveBurn, StateAt, etc.) their first PRODUCTION caller (fleet) — but no new production caller for this specific wrapper. Its only references anywhere in the package were backend/space/fixtures_test.go's two star-clearance checks (sweepSolveBurn, sweepRealisticTraffic), both now re-pointed to call the surviving minDistanceAndParamOf directly (discarding the curve-parameter component it doesn't need), leaving the wrapper with zero references. SDET action taken: the two test call sites were updated (test-code-only change). Production action NOT taken (out of SDET scope, reported to the orchestrator to route to the developer): delete `minDistanceFromOriginOf` from backend/space/burn.go. minDistanceAndParamOf itself needs no separate fixture family — it is already swept via buildCurve's star-clearance axis.",
+      "expectedChange": "RESOLVED (link 4) — no fixture family needed; production deletion pending, routed to the developer"
     }
   ]
 }

@@ -737,5 +737,325 @@
     "serialization": "latticeProjection (canonical JSON),continuousLine (canonical JSON),latticeDrawCount",
     "lines": 80,
     "digest": "ea8ccc8e26b3795b5edd4348a4a220e045afe01b3e1cfac6175226144111de25"
-  }
+  },
+  "keplerPeriodMs": [
+    {
+      "note": "radius equal to KeplerBaseRadius — ratio 1, the law's own reference point",
+      "radius": "5629499534213120p-47",
+      "outMs": 40000
+    },
+    {
+      "note": "radius zero — a degenerate orbit; ratio 0, sqrt 0, seconds 0, clamped to the 1ms floor (well-behaved: no NaN)",
+      "radius": "0p-1074",
+      "outMs": 1
+    },
+    {
+      "note": "the smallest radius generation ever actually places a star-parented body at (idx 0)",
+      "radius": "6755399441055744p-48",
+      "outMs": 18591
+    },
+    {
+      "note": "a radius far below anything generation produces",
+      "radius": "4722366482869645p-72",
+      "outMs": 1
+    },
+    {
+      "note": "a radius far above anything generation produces, well short of the seconds*1000 overflow-to-+Inf threshold (~1e203)",
+      "radius": "8388608000000000p-23",
+      "outMs": 5000000000000000
+    },
+    {
+      "note": "an arbitrary interior radius",
+      "radius": "4837851162214400p-45",
+      "outMs": 254932
+    }
+  ],
+  "keplerPeriodMsSweep": [
+    {
+      "note": "a non-negative radius drawn from [0, 1e9] — the full range of radii a physical distance can take, well beyond anything generation produces, EXCLUDING radius \u003c 0 (a reported, pre-existing cross-build-target divergence via NaN-\u003eint64 conversion; see the family's own doc comment above handKeplerPeriodMs)",
+      "prng": "splitmix64",
+      "seed": 20260830,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi; a string axis draws an int index into a named, finite choice list",
+      "draws": [
+        {
+          "name": "radius",
+          "kind": "float",
+          "hi": 1000000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), strings verbatim, components joined by ','",
+      "lines": 100000,
+      "digest": "29b855c1fba8f0852029937291c92bd0dce0c34a2fe178e49113f623da2c1b20"
+    }
+  ],
+  "gateOrbit": [
+    {
+      "note": "a zero horizontal projection resolves to the named default phase index",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        0,
+        0,
+        0
+      ],
+      "extent": 500,
+      "out": "feat-star,4837851162214400p-43,0,0,0,0"
+    },
+    {
+      "note": "elevation (Z, the coordinate's third component) is dropped — only X/Y (the horizontal plane) resolves the bearing",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        30,
+        40,
+        999
+      ],
+      "extent": 500,
+      "out": "feat-star,4837851162214400p-43,0,154752,0,0"
+    },
+    {
+      "note": "an exact tie (straight along the table's index-0 direction) resolves to the documented lower index",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        100,
+        0,
+        0
+      ],
+      "extent": 500,
+      "out": "feat-star,4837851162214400p-43,0,0,0,0"
+    },
+    {
+      "note": "a negative-quadrant bearing",
+      "from": [
+        10,
+        10,
+        0
+      ],
+      "to": [
+        -90,
+        -40,
+        0
+      ],
+      "extent": 200,
+      "out": "feat-star,7740561859543041p-45,0,601664,0,0"
+    },
+    {
+      "note": "a large extent",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        500,
+        -500,
+        0
+      ],
+      "extent": 5000,
+      "out": "feat-star,6047313952768000p-40,0,917504,0,0"
+    },
+    {
+      "note": "a tiny extent",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        1,
+        1,
+        0
+      ],
+      "extent": 0.001,
+      "out": "feat-star,5072854620270127p-62,0,131071,0,0"
+    },
+    {
+      "note": "a fractional, non-integer bearing",
+      "from": [
+        3.5,
+        -7.25,
+        12
+      ],
+      "to": [
+        -4.125,
+        9.75,
+        -3
+      ],
+      "extent": 733.5,
+      "out": "feat-star,7097127654968525p-43,0,332508,0,0"
+    }
+  ],
+  "gateOrbitSweep": [
+    {
+      "note": "two independently drawn galaxy.Coords (from, to) and an extent, all from generous boxes; the output is the derived orbit's parentId/radius/periodMs/phase/inclination/node",
+      "prng": "splitmix64",
+      "seed": 20260830,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi; a string axis draws an int index into a named, finite choice list",
+      "draws": [
+        {
+          "name": "from.x",
+          "kind": "float",
+          "lo": -2000,
+          "hi": 2000
+        },
+        {
+          "name": "from.y",
+          "kind": "float",
+          "lo": -2000,
+          "hi": 2000
+        },
+        {
+          "name": "from.z",
+          "kind": "float",
+          "lo": -2000,
+          "hi": 2000
+        },
+        {
+          "name": "to.x",
+          "kind": "float",
+          "lo": -2000,
+          "hi": 2000
+        },
+        {
+          "name": "to.y",
+          "kind": "float",
+          "lo": -2000,
+          "hi": 2000
+        },
+        {
+          "name": "to.z",
+          "kind": "float",
+          "lo": -2000,
+          "hi": 2000
+        },
+        {
+          "name": "extent",
+          "kind": "float",
+          "lo": 1,
+          "hi": 5000
+        }
+      ],
+      "count": 100000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), strings verbatim, components joined by ','",
+      "lines": 100000,
+      "digest": "33200b5d8e3ef82017c70dfadbffd0f815e3e900392fe634bfec5be50506bc08"
+    }
+  ],
+  "stationOrbit": [
+    {
+      "note": "an empty skeleton falls back to a star-parented orbit at the configured fallback radius (unreachable in production today — MinBodies=1 — but a named branch)",
+      "galaxySeed": 1,
+      "systemId": "sys-0",
+      "bodyTypes": [],
+      "out": "feat-star,5629499534213120p-47,41000,0,524288,0"
+    },
+    {
+      "note": "a single-body skeleton — the mix64-derived parent index is always 0",
+      "galaxySeed": 42,
+      "systemId": "sys-1",
+      "bodyTypes": [
+        "rocky"
+      ],
+      "out": "feat-body-0,5629499534213120p-49,14000,0,524288,0"
+    },
+    {
+      "note": "a gas-giant parent draws the largest type-keyed size ceiling",
+      "galaxySeed": 7,
+      "systemId": "sys-2",
+      "bodyTypes": [
+        "gas_giant"
+      ],
+      "out": "feat-body-0,8162774324609024p-49,18050,0,524288,0"
+    },
+    {
+      "note": "a multi-body skeleton exercises the mix64-derived parent selection",
+      "galaxySeed": 12345,
+      "systemId": "sys-3",
+      "bodyTypes": [
+        "rocky",
+        "ice",
+        "gas_giant",
+        "oceanic"
+      ],
+      "out": "feat-body-1,6051711999279104p-49,14675,0,524288,0"
+    },
+    {
+      "note": "a different system id with the same galaxy seed and skeleton selects independently — SystemSeed mixes the id into the hash",
+      "galaxySeed": 12345,
+      "systemId": "sys-4",
+      "bodyTypes": [
+        "rocky",
+        "ice",
+        "gas_giant",
+        "oceanic"
+      ],
+      "out": "feat-body-3,5629499534213120p-49,14000,0,0,0"
+    },
+    {
+      "note": "a negative galaxy seed",
+      "galaxySeed": -9876543210,
+      "systemId": "sys-5",
+      "bodyTypes": [
+        "molten",
+        "barren"
+      ],
+      "out": "feat-body-0,5629499534213120p-49,14000,0,0,0"
+    },
+    {
+      "note": "a zero galaxy seed",
+      "galaxySeed": 0,
+      "systemId": "sys-6",
+      "bodyTypes": [
+        "oceanic"
+      ],
+      "out": "feat-body-0,5629499534213120p-49,14000,0,0,0"
+    }
+  ],
+  "stationOrbitSweep": [
+    {
+      "note": "a galaxy seed, a synthetic system id (one of 12), and a skeleton of 1-8 independently drawn galaxy.BodyType values; the output is the derived station orbit's parentId/radius/periodMs/phase/inclination/node",
+      "prng": "splitmix64",
+      "seed": 20260830,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi; a string axis draws an int index into a named, finite choice list",
+      "draws": [
+        {
+          "name": "galaxySeed",
+          "kind": "int",
+          "lo": -1099511627776,
+          "hi": 1099511627776
+        },
+        {
+          "name": "systemId",
+          "kind": "string",
+          "note": "one of 12 synthetic ids sys-0..sys-11, selected by an int draw"
+        },
+        {
+          "name": "bodyCount",
+          "kind": "int",
+          "lo": 1,
+          "hi": 8
+        },
+        {
+          "name": "bodyTypes[i]",
+          "kind": "string",
+          "note": "each of bodyCount draws one of the 6 galaxy.BodyType values, in order"
+        }
+      ],
+      "count": 100000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), strings verbatim, components joined by ','",
+      "lines": 100000,
+      "digest": "2ad5cd8a80c4d2071459537825eac8cd058060fc589b4c07628a502fbae5725a"
+    }
+  ]
 }

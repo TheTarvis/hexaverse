@@ -7823,5 +7823,472 @@
       "lines": 20000,
       "digest": "3d6ec11cdd55db4716d670761b95423a637c2d29db7b46f9311a0de6f60d421c"
     }
+  ],
+  "encodeVec": [
+    {
+      "note": "the zero vector encodes to three zeros",
+      "in": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ],
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "positive components encode in x,y,z order",
+      "in": [
+        "7036874417766400p-49",
+        "-7318349394477056p-51",
+        "8788396440813568p-43"
+      ],
+      "out": [
+        "7036874417766400p-49",
+        "-7318349394477056p-51",
+        "8788396440813568p-43"
+      ]
+    },
+    {
+      "note": "negative components round-trip their sign",
+      "in": [
+        "-4503599627370496p-52",
+        "-4503599627370496p-51",
+        "-6755399441055744p-51"
+      ],
+      "out": [
+        "-4503599627370496p-52",
+        "-4503599627370496p-51",
+        "-6755399441055744p-51"
+      ]
+    },
+    {
+      "note": "EncodeVec performs no validation of its own: a magnitude beyond the configured extent still encodes",
+      "in": [
+        "5120000000000000p-10",
+        "0p-1074",
+        "0p-1074"
+      ],
+      "out": [
+        "5120000000000000p-10",
+        "0p-1074",
+        "0p-1074"
+      ]
+    }
+  ],
+  "encodeVecSweep": [
+    {
+      "note": "a Vec3 drawn from a generous box; EncodeVec performs no validation of its own, so the output is exactly the three input components in x,y,z order",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "v.x",
+          "kind": "float",
+          "lo": -1000000000,
+          "hi": 1000000000
+        },
+        {
+          "name": "v.y",
+          "kind": "float",
+          "lo": -1000000000,
+          "hi": 1000000000
+        },
+        {
+          "name": "v.z",
+          "kind": "float",
+          "lo": -1000000000,
+          "hi": 1000000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "62842db686bbc4ca603954ed760a88f757b647dd31b6242b427aa011d6146a07"
+    }
+  ],
+  "decodeVec": [
+    {
+      "note": "an in-memory []float64, EncodeVec's own output shape, round-trips exactly",
+      "shape": "float64Slice",
+      "values": [
+        12.5,
+        -3.25,
+        999.125
+      ],
+      "out": [
+        "7036874417766400p-49",
+        "-7318349394477056p-51",
+        "8788396440813568p-43"
+      ]
+    },
+    {
+      "note": "a []any of float64s, the shape a JSON HTTP body decode produces",
+      "shape": "anySliceFloat64",
+      "values": [
+        1,
+        2,
+        3
+      ],
+      "out": [
+        "4503599627370496p-52",
+        "4503599627370496p-51",
+        "6755399441055744p-51"
+      ]
+    },
+    {
+      "note": "a []any of int64s, the shape a Firestore round trip produces",
+      "shape": "anySliceInt64",
+      "values": [
+        1,
+        2,
+        3
+      ],
+      "out": [
+        "4503599627370496p-52",
+        "4503599627370496p-51",
+        "6755399441055744p-51"
+      ]
+    },
+    {
+      "note": "a []any of ints, an in-memory literal built by hand",
+      "shape": "anySliceInt",
+      "values": [
+        4,
+        5,
+        6
+      ],
+      "out": [
+        "4503599627370496p-50",
+        "5629499534213120p-50",
+        "6755399441055744p-50"
+      ]
+    },
+    {
+      "note": "a []any mixing int, int64, and float64 elements in draw order — decodeNumber's three accepted branches in one call",
+      "shape": "anySliceMixed",
+      "values": [
+        7,
+        8,
+        9
+      ],
+      "out": [
+        "7881299347898368p-50",
+        "4503599627370496p-49",
+        "5066549580791808p-49"
+      ]
+    },
+    {
+      "note": "the zero vector round-trips exactly",
+      "shape": "float64Slice",
+      "values": [
+        0,
+        0,
+        0
+      ],
+      "out": [
+        "0p-1074",
+        "0p-1074",
+        "0p-1074"
+      ]
+    },
+    {
+      "note": "negative components round-trip exactly",
+      "shape": "float64Slice",
+      "values": [
+        -1,
+        -2,
+        -3
+      ],
+      "out": [
+        "-4503599627370496p-52",
+        "-4503599627370496p-51",
+        "-6755399441055744p-51"
+      ]
+    },
+    {
+      "note": "a NaN x component is rejected by name, not silently",
+      "shape": "float64Slice",
+      "values": [
+        0,
+        0,
+        0
+      ],
+      "bad": "nan",
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "ErrNonFiniteCoordinate"
+    },
+    {
+      "note": "a positive-infinity y component is rejected by name",
+      "shape": "float64Slice",
+      "values": [
+        0,
+        0,
+        0
+      ],
+      "bad": "posInf",
+      "badAt": 1,
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "ErrNonFiniteCoordinate"
+    },
+    {
+      "note": "a negative-infinity z component is rejected by name",
+      "shape": "float64Slice",
+      "values": [
+        0,
+        0,
+        0
+      ],
+      "bad": "negInf",
+      "badAt": 2,
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "ErrNonFiniteCoordinate"
+    },
+    {
+      "note": "a component beyond the configured +/-1e12 extent is rejected by name",
+      "shape": "float64Slice",
+      "values": [
+        0,
+        0,
+        2000000000000
+      ],
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "ErrCoordinateOutOfExtent"
+    },
+    {
+      "note": "a two-element slice is rejected — not a recognized shape",
+      "shape": "float64Slice",
+      "values": [
+        1,
+        2
+      ],
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "errNotAVector"
+    },
+    {
+      "note": "a four-element slice is rejected — not a recognized shape",
+      "shape": "float64Slice",
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "errNotAVector"
+    },
+    {
+      "note": "a []any with one trailing non-numeric element is rejected",
+      "shape": "anySliceBad",
+      "values": [
+        1,
+        2
+      ],
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "errNotAVector"
+    },
+    {
+      "note": "a value that is not a slice at all is rejected",
+      "shape": "notASlice",
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "errNotAVector"
+    },
+    {
+      "note": "a slice of an unsupported element type is rejected",
+      "shape": "wrongType",
+      "out": [
+        "",
+        "",
+        ""
+      ],
+      "err": "errNotAVector"
+    }
+  ],
+  "decodeVecSweep": [
+    {
+      "note": "a Vec3 drawn from a box overhanging the configured +/-1e12 coordinate extent (checkedCoordinate) at both ends, fed through DecodeVec as an in-memory []float64; both the accepted and the ErrCoordinateOutOfExtent branches are drawn",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "v.x",
+          "kind": "float",
+          "lo": -2000000000000,
+          "hi": 2000000000000
+        },
+        {
+          "name": "v.y",
+          "kind": "float",
+          "lo": -2000000000000,
+          "hi": 2000000000000
+        },
+        {
+          "name": "v.z",
+          "kind": "float",
+          "lo": -2000000000000,
+          "hi": 2000000000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "31f9e144375c6fe16b7bf8c4546abcb04b378a496cc35bba8da54f7d8a02a2c0"
+    }
+  ],
+  "encodeSubTurns": [
+    {
+      "note": "zero encodes to zero",
+      "in": 0,
+      "out": 0
+    },
+    {
+      "note": "a positive angle encodes to the identical int64",
+      "in": 123456,
+      "out": 123456
+    },
+    {
+      "note": "a negative angle encodes to the identical int64 — no non-negative assumption",
+      "in": -42,
+      "out": -42
+    },
+    {
+      "note": "a multi-turn magnitude round-trips exactly",
+      "in": 3145728,
+      "out": 3145728
+    }
+  ],
+  "encodeSubTurnsSweep": [
+    {
+      "note": "a SubTurns angle drawn from a wide integer box; EncodeSubTurns performs no validation, so the output is exactly int64(a)",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "a",
+          "kind": "int",
+          "lo": -10000000,
+          "hi": 10000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "b1a17621c97c3871cccbf846e9328d5d9f077f7173e37084d2ea2c3af54e5451"
+    }
+  ],
+  "decodeSubTurns": [
+    {
+      "note": "an in-memory int round-trips exactly",
+      "kind": "int",
+      "n": 777,
+      "out": 777
+    },
+    {
+      "note": "a Firestore int64 round-trips exactly",
+      "kind": "int64",
+      "n": 777,
+      "out": 777
+    },
+    {
+      "note": "a JSON float64 round-trips exactly",
+      "kind": "float64",
+      "f": 777,
+      "out": 777
+    },
+    {
+      "note": "a negative angle round-trips exactly",
+      "kind": "int64",
+      "n": -42,
+      "out": -42
+    },
+    {
+      "note": "a positive fractional float64 truncates toward zero",
+      "kind": "float64",
+      "f": 1234.9,
+      "out": 1234
+    },
+    {
+      "note": "a negative fractional float64 truncates toward zero",
+      "kind": "float64",
+      "f": -1234.9,
+      "out": -1234
+    },
+    {
+      "note": "a NaN float64 is rejected by name, not silently",
+      "kind": "nan",
+      "err": "ErrNonFiniteCoordinate"
+    },
+    {
+      "note": "a positive-infinity float64 is rejected by name",
+      "kind": "posInf",
+      "err": "ErrNonFiniteCoordinate"
+    },
+    {
+      "note": "a negative-infinity float64 is rejected by name",
+      "kind": "negInf",
+      "err": "ErrNonFiniteCoordinate"
+    },
+    {
+      "note": "an unsupported shape is rejected, distinct from the non-finite error",
+      "kind": "invalid",
+      "err": "errNotAVector"
+    }
+  ],
+  "decodeSubTurnsSweep": [
+    {
+      "note": "an integer drawn from a wide box, cycled through DecodeSubTurns's three accepted shapes (int, int64, float64) by draw index in that order; the NaN/Inf/unsupported-shape branches are hand cases instead, since a uniform box draw cannot produce them",
+      "prng": "splitmix64",
+      "seed": 20260827,
+      "drawMapping": "u = float64(word \u003e\u003e 11) * 0x1p-53; float axis = lo + float64(u*(hi-lo)); int axis = lo + int64(float64(u*float64(hi-lo+1))), clamped to hi",
+      "draws": [
+        {
+          "name": "raw",
+          "kind": "int",
+          "lo": -10000000,
+          "hi": 10000000
+        }
+      ],
+      "count": 100000,
+      "serialization": "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token !err",
+      "lines": 100000,
+      "digest": "b1a17621c97c3871cccbf846e9328d5d9f077f7173e37084d2ea2c3af54e5451"
+    }
   ]
 }

@@ -324,19 +324,13 @@ func BuildCurve(bodies Bodies, from Vec3, target Target, arriveMs common.WorldMi
 	return CurveResult{Curve: curve, Intercept: intercept, InsertionPhase: insertionPhase}, nil
 }
 
-// minDistanceFromOriginOf evaluates c.Point at n+1 equal steps of the curve
+// minDistanceAndParamOf evaluates c.Point at n+1 equal steps of the curve
 // parameter (matching the spec's own "fixed 33-sample evaluation" when
 // n == arcSampleCount) and returns the minimum distance from the origin —
-// the star, per this package's own notion of it (BuildCurve's doc comment).
-func minDistanceFromOriginOf(c Curve, n int) float64 {
-	min, _ := minDistanceAndParamOf(c, n)
-	return min
-}
-
-// minDistanceAndParamOf is minDistanceFromOriginOf's companion, also
-// reporting the curve parameter the minimum occurred at — used to size the
-// star-avoidance push against that specific point's own (possibly small,
-// near either endpoint) Bernstein sensitivity to a C1/C2 displacement,
+// the star, per this package's own notion of it (BuildCurve's doc comment) —
+// along with the curve parameter the minimum occurred at. That parameter
+// sizes the star-avoidance push against that specific point's own (possibly
+// small, near either endpoint) Bernstein sensitivity to a C1/C2 displacement,
 // rather than assuming every point responds equally to the same push.
 func minDistanceAndParamOf(c Curve, n int) (dist float64, u float64) {
 	dist = math.Inf(1)

@@ -1,37 +1,37 @@
 ## 1. Fixtures first — the seven-family obligation (design.md Decision 1, 17)
 
-- [ ] 1.1 Record the `keplerPeriodMs` fixture family in `fixtures/system` over its
+- [x] 1.1 Record the `keplerPeriodMs` fixture family in `fixtures/system` over its
       full R¹ domain (not just the radii generation happens to produce); flip its
       `fixtures/system/mirror-map.json` inventory entry from `expectedChange:
       migrate-fleet-to-continuous-burns` to `family:keplerPeriodMs`.
-- [ ] 1.2 Record the `gateOrbit` fixture family (the bearing derivation via
+- [x] 1.2 Record the `gateOrbit` fixture family (the bearing derivation via
       `space.PhaseIndexOf`, the fixed radius factor, the dz/dx horizontal-projection
       convention) in `fixtures/system`; flip its inventory entry the same way.
-- [ ] 1.3 Record the `stationOrbit` (`StationContinuousOrbit`) fixture family,
+- [x] 1.3 Record the `stationOrbit` (`StationContinuousOrbit`) fixture family,
       covering its callees `MaxFeatureSize` and `inclinationForDominant`, in
       `fixtures/system`; flip its inventory entry the same way.
-- [ ] 1.4 Record the codec fixture family (`EncodeVec`/`DecodeVec`/
+- [x] 1.4 Record the codec fixture family (`EncodeVec`/`DecodeVec`/
       `EncodeSubTurns`/`DecodeSubTurns` + `decodeNumericSlice`/`decodeNumber`/
       `checkedCoordinate`) in `fixtures/space` — this is the first change that
       gives `backend/space` a real consumer, which is exactly the condition its
       inventory entry names as due; flip that entry to `family:<name>`.
-- [ ] 1.5 Resolve `minDistanceFromOriginOf`'s inventory entry: either delete the
+- [x] 1.5 Resolve `minDistanceFromOriginOf`'s inventory entry: either delete the
       function (it is a thin, test-only wrapper over `minDistanceAndParamOf`) or
       give it a real production caller, per the entry's own stated choice for
       "the change that first migrates a consumer onto `backend/space`" — that is
       this change.
-- [ ] 1.6 Re-file `StationKeepRate`/`StationKeepUpkeep`'s `fixtures/space`
+- [x] 1.6 Re-file `StationKeepRate`/`StationKeepUpkeep`'s `fixtures/space`
       inventory entry with a fresh `expectedChange: add-fuel-as-cargo` (link 7)
       and updated `why` text — this change carries no station-keep currency, so
       the entries are not due, but Decision 17's rule (a rule-bearing shared
       function SHALL NOT remain in the inventory across more than one change
       that modifies its package) means they must be re-filed, not silently
       carried forward unchanged.
-- [ ] 1.7 Re-file `ReleaseStationkeep`'s `fixtures/space` inventory entry the same
+- [x] 1.7 Re-file `ReleaseStationkeep`'s `fixtures/space` inventory entry the same
       way, with `expectedChange: add-fuel-as-cargo` (link 7) and updated `why`
       text naming the force-demote-to-`orbit` guardrail as its first release
       path.
-- [ ] 1.8 Extend `fixtures/space/mirror-map.json`'s `coverage` list with every
+- [x] 1.8 Extend `fixtures/space/mirror-map.json`'s `coverage` list with every
       function this change adds to `backend/space`: `Drift.Position`,
       `Drift.Velocity`, the cut-drive conversion helper, and the newly-recorded
       codec entries from 1.4.
