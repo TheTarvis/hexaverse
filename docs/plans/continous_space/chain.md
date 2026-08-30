@@ -4,10 +4,22 @@ The ordered set of OpenSpec changes that carries the game from the polar
 lattice to the continuous-space system map. `README.md` is the model,
 `decisions.md` is the settled rulings; this is the sequencing.
 
-**Status (2026-08-27):** links 1–2 landed. Links 3–8 unproposed. Two
-lattice-era changes (`add-station-exchange`, `revise-scan-instant-and-emission`)
-were removed from `openspec/changes/` on 2026-08-27 to clear the board — see
-*Removed* at the bottom.
+**Status (2026-08-29):** links 1–3 landed, plus one unplanned insert. Links
+4–9 remain. All three chain-gating design decisions are now settled — see
+*Open decisions gating the chain* below. Two lattice-era changes
+(`add-station-exchange`, `revise-scan-instant-and-emission`) were removed from
+`openspec/changes/` on 2026-08-27 to clear the board — see *Removed* at the
+bottom.
+
+**The insert:** `pin-system-generation-determinism` (`b64be39`) landed between
+links 3 and 4. Link 3's work exposed that `backend/system` generation was
+architecture-dependent — 13 of ~500 `Resource.Richness` values differed by one
+ULP between arm64 and amd64 — from four pre-existing FMA-contraction sites, and
+that the byte-for-byte cross-target rule was enforced in **zero** places
+despite two reports claiming otherwise. It fixed the four sites, retired a
+golden-master digest whose failure message misdiagnosed its own cause, recorded
+`fixtures/system/`, and enrolled `system` across what turned out to be eight
+hand-maintained enforcement lists rather than the three originally believed.
 
 The eight-step sequencing in
 `openspec/changes/archive/2026-08-27-add-space-kinematics/design.md:829` is
@@ -23,7 +35,8 @@ after that design was written.
 | --- | --- | --- | --- |
 | 1 | `add-space-kinematics` | `backend/space` — orbits, burns, parking, the fold | ✅ `a05dddf` |
 | 2 | `add-proximity-disclosure` | `backend/disclosure` — the visibility mechanism, pure | ✅ `fca73ef` |
-| 3 | `add-orbital-system-bodies` | Interiors emit real orbits; lane gates become bodies | ⬜ |
+| 3 | `add-orbital-system-bodies` | Interiors emit real orbits; lane gates become bodies | ✅ `e00e79e` |
+| — | `pin-system-generation-determinism` | *(unplanned insert)* generation pinned byte-identical across build targets | ✅ `b64be39` |
 | 4 | `migrate-fleet-to-continuous-burns` | Fleets fly curves; cut drive / stop in place | ⬜ |
 | 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ⬜ |
 | 6 | `re-express-economy-positions` | Mine/sell/dock re-anchored to bodies | ⬜ |
@@ -50,10 +63,21 @@ The work is re-expressing the elements, not inventing them:
 | --- | --- |
 | `Ring int` | `Radius float64` |
 | `Angle0 int` (slot) | `Phase SubTurns` |
-| `Dir int` | sign folded into `PeriodMs` |
+| `Dir int` | ~~sign folded into `PeriodMs`~~ → **`Inclination`** (see below) |
 | `Period` from `Tuning().OrbitPeriod(ring)` | `PeriodMs` stored |
 | — | `Inclination SubTurns`, `Node SubTurns` (new) |
 | `Footprint []board.Cell` | deleted |
+
+**Correction to the table above (found during link 3, 2026-08-29).** The
+`Dir int` row was wrong as originally written. A non-positive `PeriodMs` means
+**motionless**, not retrograde — `backend/space/orbit.go:45` returns the stored
+phase unchanged, and `space-kinematics` pins it. Folding direction into the
+period sign would have silently frozen every retrograde body in the galaxy, and
+it collides head-on with the lane-gate design, which spends the non-positive
+period on "motionless" deliberately. Retrograde is expressed as **inclination
+past a quarter turn** — the real astronomical convention, and at `SubTurn/2` the
+rotation has determinant −1, so the sweep reverses while the phase still
+advances positively.
 
 **Also lands lane gates** (`decisions.md`, 2026-08-27): an ordinary entry in
 the same `Bodies` table, placed at a derived bearing from the galaxy layout
@@ -63,8 +87,9 @@ the `stations` precedent — derived, never rolled.
 - **Touches:** `system-interior` (MODIFIED, heavy), `galaxy-generation` (gate
   bearings), `trading-station` (orbit re-expressed), `space-kinematics`
   (unchanged — `Bodies` is already the seam).
-- **Needs decided first:** whether a gate imposes a dwell time before jumping.
-  Recorded as still open.
+- **Decided (2026-08-29):** a gate imposes **no dwell** before jumping. The
+  question was deferred out of link 3 (which carries no verb to attach it to)
+  and is carried into link 4, where the jump lives.
 
 ## Link 4 — `migrate-fleet-to-continuous-burns`
 
@@ -117,9 +142,12 @@ remains is **storage and wiring**, not model:
   `proximity-disclosure` (MODIFIED — widen masking from "a ship docked to a
   host" to attached objects generally, per `decisions.md`'s spec note),
   `fleet-movement`, `galaxy-view`, `system-interior`, new sighting capability.
-- **Needs decided first:** focused-scan pricing — time on the sensor channel,
-  range gating, or fuel — so masking is strong but sweeping every body isn't
-  free. Recorded as still open.
+- **Decided (2026-08-29):** focused-scan pricing is **time on the `action`
+  sensor channel, scaling with range**, and **the scan emits** — the scanning
+  fleet is detectable for the duration of the sweep. Range gating was already
+  shipped (`disclosure.FocusedScanRange`), so it was never really open. Fuel is
+  explicitly rejected as the currency: it does not exist until link 7 and the
+  scan needs its price here.
 
 ## Link 6 — `re-express-economy-positions`
 
@@ -146,7 +174,14 @@ down as Δv is spent — the economy's first real sink against M11's pure faucet
   independent of loaded mass. Coupling them yields the rocket equation, which
   turns flight time into a differential equation and destroys the closed-form
   brachistochrone the whole capability rests on.
-- **Needs decided first:** whether a fleet can strand.
+- **Decided (2026-08-29):** a fleet **can** strand, and stranding is a setback
+  rather than a death — commit-time validation means it never strands
+  mid-burn, `orbit` is free so it sits indefinitely, and fuel-as-cargo means
+  another fleet can rescue it. **No blanket reserve** ("enough to get home" has
+  no local computable definition). Two guardrails are part of the ruling:
+  station-keeping upkeep force-demotes the park to `orbit` rather than draining
+  to zero, and commit **warns without blocking** when a burn would leave the
+  fleet unable to reach a station or gate.
 
 ## Link 8 — `build-production-space-view`
 
@@ -189,12 +224,19 @@ and integration goes last among the three.
 
 ## Open decisions gating the chain
 
-| Decision | Gates |
-| --- | --- |
-| Gate dwell time before jumping | link 3 |
-| Focused-scan pricing | link 5 |
-| Whether a fleet can strand | link 7 |
-| What "holding" a body means; mine entity shape | combat — deferred, off-chain |
+**All three chain-gating decisions are settled** (2026-08-29). Rulings and
+their reasoning live in `decisions.md`; summarized here so the table reads in
+one place.
+
+| Decision | Gated | Ruling |
+| --- | --- | --- |
+| Gate dwell time before jumping | link 3 → carried to link 4 | ✅ **No dwell.** Docking makes a fleet immediately jump-eligible. A docked camper is already masked and an arrival already unmasked, so a dwell adds waiting without adding a decision. |
+| Focused-scan pricing | link 5 | ✅ **Sensor-channel time, scaled by range, and the scan emits.** Range gating was already shipped (`disclosure.FocusedScanRange`). Fuel explicitly rejected — it does not exist until link 7. |
+| Whether a fleet can strand | link 7 | ✅ **Yes, and it is a setback, not a death.** No blanket reserve — "enough to get home" has no local computable definition. Station-keeping upkeep force-demotes to `orbit` rather than draining to zero; commit warns without blocking. |
+| What "holding" a body means; mine entity shape | combat — deferred, off-chain | ⬜ open, and deliberately so |
+
+Also still open, and deferred with combat: whether a fleet can be attacked
+while docked at a gate awaiting a jump.
 
 ## Removed
 

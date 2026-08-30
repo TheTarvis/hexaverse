@@ -187,9 +187,10 @@ docking, disclosure, occlusion, and masking all apply with no new rules.
   fuel cost of a lane trip is getting to the gate plus leaving the far one;
   the jump itself is free. This is accepted.
 
-**Still open.** Whether a gate imposes a dwell time before jumping (which
-would make camping more viable), and whether a fleet can be attacked while
-docked at a gate awaiting a jump.
+**Partly settled 2026-08-29.** Whether a gate imposes a dwell time before
+jumping is decided — it does not; see *A lane gate imposes no dwell before
+jumping* below. Whether a fleet can be attacked while docked at a gate
+awaiting a jump remains open, and stays deferred with combat.
 
 ## 2026-08-27 — Occlusion is star-only, and blocks everything
 
@@ -219,10 +220,21 @@ occlusion path.
 
 **Decision.** There is no "cancel" that undoes a burn. There are two verbs:
 
-- **Cut drive** — free, instant, no delta-v. The burn's interval is
-  truncated at that world time; the fleet keeps its current velocity and
-  drifts in a straight line at constant speed until commanded again. Because
-  emission ends with the interval, the fleet **goes dark the same instant**.
+- **Cut drive** — free, instant, no delta-v. The fleet keeps its current
+  velocity and drifts in a straight line at constant speed until commanded
+  again, and because emission ends with the burn, it **goes dark the same
+  instant**.
+
+  *Wording corrected 2026-08-29 (link 4 analysis).* This originally read "the
+  burn's interval is truncated at that world time," which is not implementable
+  against the shipped code: `space.Burn.Position(t)` returns the burn's
+  **intercept** for any `t >= ArriveMs`, so shortening `ArriveMs` would
+  teleport the fleet to its original destination, and `StateAt` would then
+  settle it into the target's insertion park — arriving for free. The
+  implementable form is that cut drive **replaces** the stored burn with a
+  free-drift state anchored at the burn's position at the cut time, carrying
+  the burn's tangent scaled by its speed at that time. Same intent; the
+  original phrasing described an edit that cannot be made.
 - **Stop in place** — commit a new burn that nulls velocity and parks at the
   current position. Costs delta-v and fuel, and is itself loud.
 
@@ -312,6 +324,122 @@ kinematics that `add-space-kinematics` is built on — its flight time is the
 brachistochrone of a *fixed* arc length at a *fixed* acceleration, evaluated
 in a fixed number of rounds. This is a realism knob that must stay off.
 
-**Still open.** Whether a fleet can strand — run dry far from any station —
-or whether some reserve is always retained. Stranding is dramatic but
-frustrating; not decided here.
+**Settled 2026-08-29** — see *A fleet can strand, and stranding is a setback
+rather than a death* below.
+
+## 2026-08-29 — Focused-scan pricing is sensor-channel time, and the scan emits
+
+**Decision.** A focused scan is priced in **time on the `action` sensor
+channel, scaling with range to the target**, and the scanning fleet is
+**detectable for the duration of the sweep**. Fuel is explicitly not the
+currency.
+
+Range gating is not part of this decision because it was never actually open:
+`disclosure.FocusedScanRange` and `proximity-disclosure`'s existing rejection
+requirement already shipped. That is the floor the pricing sits on, not a
+choice being made now.
+
+**Why time on the sensor channel.** The channel is single-slot, so occupying
+it with a long sweep is the whole cost: clearing a system means committing
+your sensor channel for a long time while other players move. It needs no new
+resource and no new machinery — the radial scan already frames its ETA as a
+round trip, and this is the same framing aimed at one body. Scaling with
+range means sweeping a distant body costs more than sweeping the one you are
+parked at, so proximity buys tempo.
+
+**Why the scan emits.** An active sensor emits. Without this, the counter-verb
+has no counter: a scanner could sit dark and interrogate every body in reach
+at no risk, and masking would reduce to a resource check. Making the sweep
+visible turns hunting into a mind-game — looking for hidden ships tells the
+hidden ships where you are, and a masked fleet that sees itself being swept
+learns something too. The disclosure model already prices emission through
+plume, so this is an existing mechanism aimed at a new verb rather than a new
+one. Whether the emission reuses the plume channel or gets its own radius is
+a spec question; that it emits is not.
+
+**Why not fuel.** Ordering. Fuel does not exist until link 7 and the scan
+needs its price at link 5. A placeholder priced in a resource that does not
+yet exist would be a forward dependency across two links, and the sensor
+channel is a better answer regardless — the scarce thing a scout has is
+attention, not propellant.
+
+**Consequences.**
+
+- **Sweeping every body is self-defeating**, not merely expensive: it is slow
+  *and* loud, so a thorough search is the most detectable thing a fleet can do
+  short of burning.
+- **Masking stays strong but beatable.** The counter exists, costs tempo, and
+  announces itself.
+- **A camped gate can be checked**, but checking it is an event the camper
+  sees — which is the same asymmetry the arrival/camper matchup already has.
+
+## 2026-08-29 — A fleet can strand, and stranding is a setback rather than a death
+
+**Decision.** Yes, a fleet can run dry far from any station. No blanket
+reserve is retained. The rules already landed make this a setback rather than
+a loss, and that is the intended shape.
+
+**Why it is survivable without a special rule.** Three landed decisions
+compose:
+
+- **Commit-time delta-v validation** means a burn whose price exceeds
+  available fuel is rejected at commit, so a fleet never strands *mid-burn* —
+  it strands parked, at a place it chose.
+- **`orbit` is the free park**, so a dry fleet sits indefinitely at zero cost.
+  It is immobile, not dying.
+- **Fuel is cargo**, so another fleet can rescue it with a transfer that
+  already exists as a verb.
+
+Stranding is therefore immobility pending rescue — a supply-line drama, which
+is precisely what pricing delta-v in cargo mass exists to create.
+
+**Why the blanket reserve is rejected — on definition, not taste.** "Retain
+enough to get home" requires solving a return path, and that path changes
+every time the fleet moves and may cross several lanes. There is no local
+quantity that guarantees it. Any reserve that *is* computable is therefore
+arbitrary, and an arbitrary reserve removes the teeth from the supply line
+while still failing to deliver the guarantee its name promises.
+
+**Two guardrails that are part of this decision, not optional polish.**
+
+- **Station-keeping upkeep SHALL NOT drain a fleet to zero.** This is the one
+  path where a fleet strands *passively, while doing nothing* — frustration
+  with no decision attached to it. When upkeep cannot be paid, the park
+  force-demotes to `orbit`, the free mode. This reuses the states that already
+  exist; no new state is invented for it, and it matches the tank-dry
+  auto-drop the PoC already demonstrated.
+- **Warn at commit; do not block.** The delta-v to reach the nearest station
+  or gate is a single closed-form body-target solve, so "this burn leaves you
+  unable to reach anything" is cheap to surface at commit time. It stays a
+  warning and the commit is still permitted. The complaint about stranding is
+  that it happens *invisibly*, not that it happens.
+
+**Forecloses.** A lost-in-space rule, a fuel-death state, and any soft wall
+that pushes a fleet back toward supply. The bound on sailing into the void
+stays economic — the fuel to come back — exactly as *Cancel is two verbs*
+already recorded for drift.
+
+## 2026-08-29 — A lane gate imposes no dwell before jumping
+
+**Decision.** Docking at a gate makes a fleet immediately jump-eligible. No
+dwell timer.
+
+Ruled by the spec team under delegated authority while sequencing link 3
+(`add-orbital-system-bodies`), and accepted for link 4, where the jump verb
+actually lives. Recorded here because `decisions.md` is the index.
+
+**Why.** Link 3 delivered placement and carried no verb, so a dwell
+requirement written there would have had no implementable scenario. More
+substantively, a dwell buys nothing against the rules already landed: a docked
+camper is **masked**, and an arrival parks near the gate **unmasked**, so the
+camper's informational advantage is already total. What is missing is a way to
+*act* on it — combat, or a gate-focused scan — and both are deferred. A dwell
+would add waiting without adding a decision.
+
+**Forecloses nothing.** Adding a dwell later is an additive commit-time rule;
+removing one is a regression players feel. This is the answer that survives
+being wrong.
+
+**Still open.** Whether a fleet can be attacked while docked at a gate — the
+other half of the 2026-08-27 lane-gate entry's open question. That is a combat
+question and stays deferred with combat.
