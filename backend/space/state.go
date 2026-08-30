@@ -10,14 +10,19 @@ const (
 	ModeBurn ShipMode = iota
 	// ModeParked is idle, holding a Park.
 	ModeParked
+	// ModeDrift is a free, unpowered coast at constant velocity — a third
+	// mode, not a fourth ParkKind, because a drift has velocity and is not
+	// idle (design.md Decision 5).
+	ModeDrift
 )
 
-// ShipState is a ship's stored kinematic state: exactly one of Burn or Park
-// is set, matching Mode.
+// ShipState is a ship's stored kinematic state: exactly one of Burn, Park,
+// or Drift is set, matching Mode.
 type ShipState struct {
-	Mode ShipMode
-	Burn *Burn
-	Park *Park
+	Mode  ShipMode
+	Burn  *Burn
+	Park  *Park
+	Drift *Drift
 }
 
 // StateAt is the effective-state fold: a burn whose arrival time has
@@ -30,7 +35,10 @@ type ShipState struct {
 // re-derived from the intercept — with the insertion standoff radius and
 // period for that body, epoched at the burn's stored arrival millisecond. A
 // point-targeted burn settles into a point park at the intercept. An
-// already-parked state folds to itself, unchanged.
+// already-parked or already-drifting state folds to itself, unchanged — a
+// drift never settles into a park at any fold distance, in either time
+// direction (space-kinematics: "A Free-Drifting Ship Coasts in a Straight
+// Line at Constant Velocity").
 func StateAt(bodies Bodies, s ShipState, t common.WorldMillis) (ShipState, error) {
 	if s.Mode == ModeParked || s.Burn == nil {
 		return s, nil
@@ -75,6 +83,8 @@ func StatePosition(bodies Bodies, s ShipState, t common.WorldMillis) (Vec3, erro
 		return folded.Burn.Position(t), nil
 	case ModeParked:
 		return folded.Park.Position(bodies, t)
+	case ModeDrift:
+		return folded.Drift.Position(t), nil
 	default:
 		return Vec3{}, ErrUnknownParkKind
 	}

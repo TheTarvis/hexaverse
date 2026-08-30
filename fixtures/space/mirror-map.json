@@ -76,7 +76,7 @@
 
     { "go": "TargetPosition", "coverage": "family:buildCurve", "note": "indirect: both target forms are swept" },
     { "go": "BuildCurve", "coverage": "family:buildCurve" },
-    { "go": "minDistanceFromOriginOf", "coverage": "inventory", "note": "resolved as DELETE by migrate-fleet-to-continuous-burns tasks.md 1.5 (see the inventory entry) — zero references remain anywhere in the package as of this change's test-side edit; pending only the production deletion, routed to the developer" },
+    { "go": "minDistanceFromOriginOf", "coverage": "inventory", "note": "DELETED by migrate-fleet-to-continuous-burns tasks.md 1.5: a thin wrapper with no production callers. Its only references were two star-clearance checks in fixtures_test.go, re-pointed to minDistanceAndParamOf; the wrapper was then removed from burn.go and its doc comment folded into the companion" },
     { "go": "minDistanceAndParamOf", "coverage": "family:buildCurve", "note": "indirect: the fixed 33-sample closest-approach scan" },
     { "go": "perpendicularToChord", "coverage": "family:buildCurve", "note": "indirect: the chord-parallel grazing regression case" },
     { "go": "avoidStar", "coverage": "family:buildCurve", "note": "indirect: the swept star-clearance axis" },
@@ -112,9 +112,14 @@
     { "go": "EncodeSubTurns", "coverage": "family:encodeSubTurns", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.4) as a hand-case set plus a pinned randomized sweep" },
     { "go": "DecodeSubTurns", "coverage": "family:decodeSubTurns", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.4); the int/int64/float64 accepted shapes are the sweep (cycled by draw index), and NaN/+-Inf/unsupported-shape are hand cases" },
 
-    { "go": "Drift.Position", "coverage": "inventory", "note": "does not exist yet — added by this change's OWN section 2 (tasks.md 2.1), not section 1. Recorded here per tasks.md 1.8 as an inventory gap rather than fabricated, since the function has no implementation to sweep yet; section 2/3's own fixture work (or a follow-up family) is expected to close it before this change completes." },
-    { "go": "Drift.Velocity", "coverage": "inventory", "note": "does not exist yet — see Drift.Position's note; added by this change's own section 2 (tasks.md 2.1)." },
-    { "go": "the cut-drive conversion helper (burn-to-drift at cut time)", "coverage": "inventory", "note": "does not exist yet — added by this change's own section 2 (tasks.md 2.2); name TBD until the developer names it. See Drift.Position's note." }
+    { "go": "Drift.Position", "coverage": "inventory", "note": "implemented by this change's section 2 (tasks.md 2.1); exercised by drift_test.go/state_drift_test.go/state_settle_regression_test.go unit tests, but no golden fixture family is recorded for it in section 2 — see the inventory entry below." },
+    { "go": "CutDrive", "coverage": "inventory", "note": "implemented by this change's section 2 (tasks.md 2.2, design.md Decision 6); exercised by cutdrive_test.go unit tests, but no golden fixture family is recorded for it in section 2 — see the inventory entry below. (Drift.Velocity, named separately in an earlier draft of this entry, is a stored FIELD per drift_test.go's own ASSUMED API CONTRACT ADDENDUM, not a function — nothing to cover.)" },
+    { "go": "EncodeBurn", "coverage": "inventory", "note": "the widened codec (tasks.md 2.5, design.md Decision 9); exercised by codec_kinematic_state_test.go's round-trip and negative-control unit tests, but no golden fixture family is recorded for it in section 2 — see the inventory entry below." },
+    { "go": "DecodeBurn", "coverage": "inventory", "note": "see EncodeBurn's note." },
+    { "go": "EncodePark", "coverage": "inventory", "note": "see EncodeBurn's note." },
+    { "go": "DecodePark", "coverage": "inventory", "note": "see EncodeBurn's note." },
+    { "go": "EncodeDrift", "coverage": "inventory", "note": "see EncodeBurn's note." },
+    { "go": "DecodeDrift", "coverage": "inventory", "note": "see EncodeBurn's note." }
   ],
 
   "inventory": [
@@ -130,7 +135,7 @@
     },
     {
       "pair": "minDistanceFromOriginOf",
-      "why": "RESOLVED by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.5) as DELETE, not give-a-caller: this change is 'the change that first migrates a consumer onto backend/space' the original entry named, and it gives backend/space's rule-bearing functions (SolveBurn, StateAt, etc.) their first PRODUCTION caller (fleet) — but no new production caller for this specific wrapper. Its only references anywhere in the package were backend/space/fixtures_test.go's two star-clearance checks (sweepSolveBurn, sweepRealisticTraffic), both now re-pointed to call the surviving minDistanceAndParamOf directly (discarding the curve-parameter component it doesn't need), leaving the wrapper with zero references. SDET action taken: the two test call sites were updated (test-code-only change). Production action NOT taken (out of SDET scope, reported to the orchestrator to route to the developer): delete `minDistanceFromOriginOf` from backend/space/burn.go. minDistanceAndParamOf itself needs no separate fixture family — it is already swept via buildCurve's star-clearance axis.",
+      "why": "RESOLVED by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.5) as DELETE, not give-a-caller: this change is 'the change that first migrates a consumer onto backend/space' the original entry named, and it gives backend/space's rule-bearing functions (SolveBurn, StateAt, etc.) their first PRODUCTION caller (fleet) — but no new production caller for this specific wrapper. Its only references anywhere were backend/space/fixtures_test.go's two star-clearance checks (sweepSolveBurn, sweepRealisticTraffic), both re-pointed to call the surviving minDistanceAndParamOf directly (discarding the curve-parameter component they do not need). The wrapper has since been deleted from backend/space/burn.go and its doc comment folded into minDistanceAndParamOf. minDistanceAndParamOf itself needs no separate fixture family — it is already swept via buildCurve's star-clearance axis.",
       "expectedChange": "RESOLVED (link 4) — no fixture family needed; production deletion pending, routed to the developer"
     }
   ]

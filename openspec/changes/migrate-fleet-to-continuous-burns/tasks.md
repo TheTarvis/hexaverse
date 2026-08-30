@@ -38,7 +38,7 @@
 
 ## 2. `space` — free drift, cut-drive conversion, the widened codec
 
-- [ ] 2.1 Add `ModeDrift` as a third `ShipMode` (not a fourth `ParkKind`) and a
+- [x] 2.1 Add `ModeDrift` as a third `ShipMode` (not a fourth `ParkKind`) and a
       `Drift{Anchor, Velocity, EpochMs}` type with a closed-form
       `Position(t) = anchor + velocity*seconds(t-epoch)` and a constant
       `Velocity()` — no terminal condition, no clamp in either time direction
@@ -48,7 +48,7 @@
       zero-velocity drift equals its anchor forever, the far-future fold stays a
       drift, a large time jump is safe by construction, bit-identical repeat
       evaluation).
-- [ ] 2.2 Implement the burn-to-drift conversion: at cut millisecond `cutMs`,
+- [x] 2.2 Implement the burn-to-drift conversion: at cut millisecond `cutMs`,
       `Anchor = burn.Position(cutMs)`, `Velocity = burn.Tangent(cutMs).Scale(
       burn.Speed(cutMs))`, `EpochMs = cutMs` — replacing the burn, never
       truncating its stored geometry — and refuse a cut at or after the burn's
@@ -58,16 +58,16 @@
       millisecond, direction follows the tangent past the deceleration flip, a
       cut exactly at depart yields a zero-velocity drift with no special case, a
       cut at/after arrival is refused by name, cutting charges no delta-v).
-- [ ] 2.3 Add `StopInPlaceSpeedFloor` to `space/params_const.go` (design.md
+- [x] 2.3 Add `StopInPlaceSpeedFloor` to `space/params_const.go` (design.md
       Decision 8) — the speed at or below which stop-in-place is a discrete,
       free conversion to a point park rather than a solved burn. Starting value
       per design.md Open Question 1's recommendation: derive it from the speed
       at which the stopping burn's arc would equal `space.MinArcLength`.
-- [ ] 2.4 Fix `space/state.go:73` (`StatePosition`'s `default:` arm) to handle
+- [x] 2.4 Fix `space/state.go:73` (`StatePosition`'s `default:` arm) to handle
       `ModeDrift` — this is a named task because it compiles cleanly today and
       fails every drifting fleet's position read at runtime, silently, with no
       compiler signal (design.md Decision 5, Decision 21C item 1).
-- [ ] 2.5 Extend the named codec to a ship's whole kinematic state: a burn
+- [x] 2.5 Extend the named codec to a ship's whole kinematic state: a burn
       (origin, target identity or point, intercept, all six curve control
       points, curve length, depart/arrive world-milliseconds, commanded
       acceleration, insertion phase index for a body target), a park (any of
@@ -84,14 +84,14 @@
       kind and a drift round-trip exactly, the wrong control-point count fails
       by name, a disagreeing stored curve length fails by name, a non-finite
       control-point component fails by the existing named error).
-- [ ] 2.6 Add a sibling purity test for `space` (mirroring
+- [x] 2.6 Add a sibling purity test for `space` (mirroring
       `disclosure/purity_test.go`'s structural import-allowlist assertion) —
       today the package's purity is doc-comment-true only, and this change is
       the one most likely to tempt a `firestore:` tag onto the codec extension.
-- [ ] 2.7 Confirm `backend/space`'s own test suite is green with no consumer
+- [x] 2.7 Confirm `backend/space`'s own test suite is green with no consumer
       wired yet — this step ships before `fleet` touches any of it (design.md
       Migration Plan step 2).
-- [ ] 2.8 Confirm the settle-at-arrival fold (a burn past its stored arrival
+- [x] 2.8 Confirm the settle-at-arrival fold (a burn past its stored arrival
       millisecond IS its settled park, with no extra persisted field) still
       holds unchanged once `ModeDrift` and the widened codec land — a
       regression check, not new code, since this behavior is `space`'s
@@ -533,6 +533,27 @@
       requirement (section 7.7) to replace, rather than removing
       `observation-fog-and-scan` "entirely" as originally predicted (design.md
       Decision 11, Open Question 6).
+- [ ] 9.7 Guard `keplerPeriodMs` (`backend/system/continuous.go:94`) against a
+      non-finite or negative radius, mirroring 4.11's pattern. `math.Sqrt` of a
+      negative ratio is NaN, and the function's existing `if ms < 1` clamp does
+      **not** catch it — every comparison against NaN is false, so NaN falls
+      straight through to `int64(NaN)`, which is `WorldMillis(0)` on arm64 and
+      `WorldMillis(-9223372036854775808)` on amd64. Unreachable today (the sole
+      caller passes a positive `ContinuousRadius`), so this is a defensive
+      guard on a currently-dead path, not a live bug. **Do not add the NaN case
+      to the `keplerPeriodMs` golden family** — a case whose value diverges
+      across the build-target matrix cannot be byte-identical, and recording it
+      would break the very rule `pin-system-generation-determinism` established.
+      Assert the rejection in an ordinary unit test instead. Note this task
+      edits `backend/system`, a package link 4 does not otherwise touch; it is
+      here because it was found while recording section 1's fixtures.
+      This is the **third** instance of the int64-of-NaN class in two links
+      (commanded acceleration, this, and 4.11's coverage). The orchestrator's
+      judgment is that the systemic answer — a shared guarded float→integer
+      conversion, or a lint/grep check for a raw `int64(` over a float
+      expression — belongs in its own change and NOT in link 4, on the same
+      reasoning that made `pin-system-generation-determinism` its own change
+      rather than link 3's work. This task is the bounded point fix only.
 
 ## 10. Validation
 

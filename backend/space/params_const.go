@@ -47,6 +47,22 @@ const (
 // star's size (design.md Risks: "the star-clearance factor (2.5x)").
 const starClearanceFactor float64 = 2.5
 
+// StopInPlaceSpeedFloor is the speed at or below which stop-in-place is a
+// discrete, free conversion to a point park rather than a solved burn
+// (space-kinematics/fleet-movement: "Stop In Place Commits a
+// Velocity-Nulling Burn"; design.md Decision 8, Open Question 1's own
+// recommendation). Value per that recommendation: the peak speed of a
+// symmetric accelerate-flip-decelerate burn (burn.go's own profile) whose
+// arc length is exactly MinArcLength, under the nominal acceleration — the
+// speed at which the stopping burn's own solved arc would sit right at the
+// floor SolveBurn already enforces (ErrArcTooShort). That peak speed is
+// Accel*(flightSeconds/2), and flightSeconds = FlightSeconds(L, Accel) =
+// 2*sqrt(L/Accel), so the peak reduces to sqrt(Accel*L):
+// sqrt(nominalAccel * MinArcLength) = sqrt(8 * 2) = 4. Not spec-pinned — "a
+// feel dial ... not spec-pinned" per Decision 8's own alternatives
+// discussion — but strictly positive and MinArcLength-derived, as required.
+const StopInPlaceSpeedFloor float64 = 4.0
+
 // SolveRounds is the configured, unconditional fixed round count
 // SolveBurn's fixed-point iteration runs (space-kinematics: "Intercept
 // Against a Moving Target Converges in a Fixed Number of Rounds"). It is
