@@ -641,6 +641,38 @@ Decision 19) — wiring it in is link 5's work.
 
 ## MODIFIED Requirements
 
+### Requirement: Fleet Read Surfaces Roster, Cargo, and Derived Capacity
+
+The system SHALL include the fleet's ship roster, its cargo pool, its
+derived total cargo capacity, its derived free hold, and its derived
+mining rate in the response of the fleet read endpoints (`GET
+/v1/fleets/:fleetId`, `GET /v1/fleets?systemId=`, `GET
+/v1/fleets?mine=true`) for an owning corporation reading its own fleet —
+these are not internal-only values computed for the mining verb's use, but
+part of the fleet's observable state. A foreign fleet carries no such
+fields in any response, because "Fleet Read Endpoints Serve Own Fleets
+Only" omits a foreign fleet from a list read and 404s it on a direct
+fetch — there is no partial-visibility snapshot of a foreign fleet in this
+change for these fields, or any other, to be redacted from.
+
+#### Scenario: The fleet read response includes roster, cargo, and derived capacity
+
+- **WHEN** an owning corporation reads its fleet via the existing fleet
+  GET endpoint
+- **THEN** the response includes the fleet's `ships` roster, its `cargo`
+  pool by kind, its derived total cargo capacity, its derived free hold
+  (capacity minus total tons held), and its derived mining rate (the
+  roster's summed extraction rate)
+
+#### Scenario: A foreign fleet's cargo and roster are not disclosed
+
+- **WHEN** a requester lists fleets in a system containing a foreign
+  fleet, or fetches that foreign fleet directly by id
+- **THEN** the foreign fleet is omitted entirely from the list response,
+  and the direct fetch is `404 Not Found` — no roster, cargo, derived
+  capacity, or derived mining rate is disclosed, because the fleet itself
+  is not disclosed
+
 ### Requirement: Effective Position Resolution
 
 The system SHALL resolve a fleet's live position from its effective (folded)

@@ -91,31 +91,58 @@
 - [ ] 2.7 Confirm `backend/space`'s own test suite is green with no consumer
       wired yet — this step ships before `fleet` touches any of it (design.md
       Migration Plan step 2).
+- [ ] 2.8 Confirm the settle-at-arrival fold (a burn past its stored arrival
+      millisecond IS its settled park, with no extra persisted field) still
+      holds unchanged once `ModeDrift` and the widened codec land — a
+      regression check, not new code, since this behavior is `space`'s
+      existing fold; a drift never settles into a park at any fold distance
+      (space-kinematics MODIFIED: *A Burn Past Its Arrival Is Its Settled
+      Park, With No Extra Persisted State* — still burning immediately before
+      arrival and settled immediately after, folding at two later times gives
+      identical results, a settled body-targeted burn rides its insertion
+      orbit, a burn to a fixed point settles into a point park).
 
 ## 3. Fleet state model + persistence
 
-- [ ] 3.1 Replace `fleet.Fleet.State board.MovementState` with
+- [ ] 3.1 **(red phase — write this before any of 3.2 onward exists in
+      production code)** Write the failing test suite that pins the
+      `attachedTo`-clearing invariant: a burn order clears `attachedTo` at
+      commit (not at resolve), cut-drive and stop-in-place leave it cleared,
+      and a body-targeted burn sets it only at resolve. This invariant's
+      absence yielded three conforming-but-wrong implementations in earlier
+      attempts at this work, including `mine` and `sell` working at
+      unlimited range because a stale `attachedTo` was never cleared when a
+      fleet burned away from its dock. Pinning it red-first, before 3.9's
+      production edit lands, is what keeps a fourth wrong implementation
+      from also passing (fleet-movement: *In-System Burn Order to a Body or
+      a Point* — "committing a burn detaches the fleet from its host"; *Cut
+      Drive Converts the Burn to a Drift and Goes Dark* — "a burning fleet's
+      `attachedTo` was already cleared at that burn's commit"; *Stop In
+      Place Commits a Velocity-Nulling Burn* — "the system SHALL clear the
+      fleet's `attachedTo` at the instant a stop-in-place order is
+      accepted").
+- [ ] 3.2 Replace `fleet.Fleet.State board.MovementState` with
       `space.ShipState`; add `AttachedTo string` with a `DockedTo() (string,
       bool)` accessor, carrying a code comment at the declaration naming link 6
       (`re-express-economy-positions`) as its eventual deleter/redefiner
       (design.md Decision 4, Decision 13 — the standing rule that nothing
       additive may quietly become permanent).
-- [ ] 3.2 Add a fleet-owned `Jump *JumpTransit` field for lane-transit
+- [ ] 3.3 Add a fleet-owned `Jump *JumpTransit` field for lane-transit
       representation — not a `space.ShipState` shape, since a fleet in transit
       has no position in either system (design.md Decision 4).
-- [ ] 3.3 Leave `activeActionId`/`activeScanId` as independently claimable
+- [ ] 3.4 Leave `activeActionId`/`activeScanId` as independently claimable
       channels, unchanged in mechanism; retain `ActiveScanId`/`action.SlotSensor`
       declared and unwritten, with a comment naming link 5 as the change that
       first claims the sensor channel (design.md Open Question 4) (fleet-movement
       *Single Kinematic-State Fleet Record* — "a scan can run while a burn is
       active").
-- [ ] 3.4 Add a `BodySource` interface (`BodyTable(ctx, systemID)
+- [ ] 3.5 Add a `BodySource` interface (`BodyTable(ctx, systemID)
       (*system.BodyTable, error)`) to `fleet.Service`, satisfied by
       `system.Service`; resolve it once per request and thread it as a
       parameter through every burn solve, position read, and resolve — never
       fetched per body, never memoized in package-level state, and never used
       to enumerate `Ids()` into a response (design.md Decision 16).
-- [ ] 3.5 Validate every stored kinematic-state value through the `space` codec
+- [ ] 3.6 Validate every stored kinematic-state value through the `space` codec
       at every boundary that reads persisted or committed coordinate data;
       surface a decode failure as a named, countable error carrying `cause`
       (`non-finite-coordinate`, `coordinate-out-of-extent`, `undecodable-shape`,
@@ -127,7 +154,7 @@
       command fails by name on a bad decode, a decoded action parameter
       coordinate fails the codec, coordinate rejections are countable per
       cause).
-- [ ] 3.6 Implement effective position resolution through
+- [ ] 3.7 Implement effective position resolution through
       `space.StatePosition(bodies, f.State, now)` as the capability's sole
       canonical position path: a docked fleet resolves through its host's live
       position (its orbit if it orbits, else its fixed anchor); a free-flying
@@ -136,7 +163,7 @@
       MODIFIED: *Effective Position Resolution* — a docked fleet rides its
       parent's live position, a free-flying fleet resolves through
       `space.StatePosition`).
-- [ ] 3.7 Re-point `fleet.SeedFleet` from `at board.Cell` to a `space` park:
+- [ ] 3.8 Re-point `fleet.SeedFleet` from `at board.Cell` to a `space` park:
       deterministic from the account id, idempotent per account (a healed
       retry reproduces the same position, never a second fleet), rejecting a
       requested position inside the system star's configured clearance radius
@@ -145,18 +172,18 @@
       corporation-spawn: *One Starting Hull at a Deterministic Home Park* — the
       starting hull is deterministic per account, the starting hull never lands
       inside the star's clearance).
-- [ ] 3.8 Delete `corporations.rimCell`/`RimRing`; replace with a deterministic
+- [ ] 3.9 Delete `corporations.rimCell`/`RimRing`; replace with a deterministic
       continuous spawn position derived from the home interior's `Extent` and
       the `GateRadiusFactor` (1.1), phase-seeded by account id (design.md
       Decision 16, Open Question 3 — the exact geometric target, e.g. a
       `ParkOrbit` around the star vs. docked at the home station, is left open
       by design.md; pick and document the default inline).
-- [ ] 3.9 Delete `fleet.ErrCoreDestination` and `SeedFleet`'s destination-identity
+- [ ] 3.10 Delete `fleet.ErrCoreDestination` and `SeedFleet`'s destination-identity
       core rejection — the star is now excluded by
       `space.BuildCurve`'s endpoint-clearance guard alone, with no special case
       (design.md Decision 14; fleet-movement: *In-System Burn Order to a Body or
       a Point* — "ordering the star's own body id is rejected by geometry").
-- [ ] 3.10 Add a calibration test (mirroring
+- [ ] 3.11 Add a calibration test (mirroring
       `TestCalibration_Scenario_NoStarSizePlacesBodyInsideClearanceShell`) that
       reads `space.StarClearanceRadius` and `space.InsertionStandoff` directly
       and asserts every star size this generator can emit is rejected with
@@ -195,7 +222,10 @@
       to handle `ModeDrift` — named separately from 2.4 because it is a second
       call site that compiles cleanly and fails at runtime, silently, the
       moment link 5 wires a disclosure read (design.md Decision 5, Decision
-      21C item 2).
+      21C item 2) (proximity-disclosure: *A Drifting Contact Reports Its
+      Drift Velocity and Does Not Emit* — a drifting contact reports its
+      stored drift velocity, a zero-velocity drift reports a stationary
+      contact).
 - [ ] 4.5 Implement `POST /v1/fleets/:fleetId/stop`: above the configured speed
       floor, commit a velocity-nulling burn to a point ahead of the fleet
       (charging Δv, taking time, emitting for its duration, settling to a
@@ -236,6 +266,28 @@
       `validateFleetRing`, `maxStateRing`, `msPerTileFor`, `msPerLaneUnitFor`,
       `featureOrbit`, `featureAnchor`, `haltState`, and `Scan` (design.md
       Decision 21A).
+- [ ] 4.11 Pin the NaN/±infinity commanded-acceleration rejection
+      **cross-target in the fixture family**, not only in a unit test:
+      `nan > ceiling` and `nan < floor` are both false, so an unguarded path
+      reaches `int64(math.Ceil(NaN*1000))`, which is `0` on arm64 and
+      `-9223372036854775808` on amd64 — exactly the divergence class
+      `pin-system-generation-determinism` was created to eliminate. Add the
+      commanded-acceleration validation's `NaN`/±infinity/zero/negative cases
+      to the relevant `fixtures/space` (or `fixtures/fleet`, if one exists by
+      then) family so both build targets assert the same rejected outcome,
+      not merely that *a* rejection occurred (fleet-movement: *Derived Fleet
+      Acceleration and Drive Output* — "a non-finite or non-positive
+      commanded acceleration is rejected").
+- [ ] 4.12 Write the full test suite for proximity-disclosure's drifting-
+      contact requirement, covering all three of its scenarios: the two
+      `contactVelocity` fixes from 4.4, plus a dedicated test that a
+      drifting fleet is never emitting at any world time — this last
+      scenario needs no code change (`disclosure/predicate.go:42`'s
+      `s.Mode != space.ModeBurn` check already handles `ModeDrift` correctly,
+      per design.md Decision 5's audit), but it is a new requirement and
+      needs its own pinned coverage, not an assumption that already-correct
+      code stays correct (proximity-disclosure: *A Drifting Contact Reports
+      Its Drift Velocity and Does Not Emit* — a drifting fleet never emits).
 
 ## 5. jump verb + gate attachment
 
@@ -284,6 +336,17 @@
       Only* — a foreign fleet is omitted from a list read, a foreign fleet
       404s on direct fetch, own fleets are always returned in full, `mine=true`
       with no corp returns an empty list).
+- [ ] 5.8 Confirm the fleet read endpoints continue to surface the roster,
+      cargo pool, derived total capacity, derived free hold, and derived
+      mining rate for an owning corporation's own fleet, and confirm none of
+      those fields appear anywhere in a response touching a foreign fleet —
+      an explicit assertion, not an assumption, now that "Fleet Read
+      Endpoints Serve Own Fleets Only" (5.7) omits a foreign fleet outright
+      rather than redacting individual fields from it (fleet-movement
+      MODIFIED: *Fleet Read Surfaces Roster, Cargo, and Derived Capacity* —
+      the fleet read response includes roster/cargo/derived capacity for an
+      owning corporation, a foreign fleet's cargo and roster are not
+      disclosed because the fleet itself is not disclosed).
 
 ## 6. Cross-domain consumers
 
@@ -294,7 +357,7 @@
       13, 21A).
 - [ ] 6.3 Update `corporations.Spawn`'s call site for the re-pointed
       `SeedFleet` signature (a `space` park in place of `board.Cell`, per
-      3.7/3.8) and confirm the package compiles and its tests stay green.
+      3.8/3.9) and confirm the package compiles and its tests stay green.
 - [ ] 6.4 Update `router.go`/`cmd/seed/main.go`: drop the deleted `/route` and
       `/scan` wiring, register the new `/cut-drive`/`/stop`/`/jump` routes, and
       register the jump resolver alongside `BurnResolver` on the action spine's
@@ -339,6 +402,13 @@
       (`replace-observation-with-sightings`) as the change that replaces it
       with a `disclosure`-projected read, mirroring the standing
       additive-then-refill discipline used elsewhere in this change.
+- [ ] 7.9 Confirm `GET /v1/systems/:systemId` still serves the system's
+      radius, character, star class, features, charted lane gates, and
+      current world time, and still 404s for an unknown/ungenerated system id
+      or when no galaxy has been generated — the base endpoint contract
+      restated (not changed) alongside 7.7's unfogged interim body
+      (system-interior: *Interior Read Endpoint Serves Unfogged Features* —
+      unknown or ungenerated system 404s, no live galaxy 404s).
 
 ## 8. Frontend reduction (design.md Decision 12)
 
@@ -385,6 +455,54 @@
       credits, camera, accessibility, and renderer-unavailability states) still
       compile and pass against the new fleet shape with no `board.Cell`/
       `MovementState` reference.
+- [ ] 8.8 Extend the roster row (8.5) with per-row command visibility: burn is
+      always offered regardless of kinematic state; cut-drive is offered only
+      while the row's effective state is a burn; stop-in-place is offered
+      only while burning or drifting; jump is offered only while the fleet is
+      attached to a lane-gate body whose lane the corporation has charted
+      (fleet-roster ADDED: *The Roster Row Is the Fleet Command Surface* —
+      burn always available, cut-drive offered only while burning and
+      withheld outside a burn, stop-in-place offered while burning or
+      drifting and withheld while parked, jump offered only while attached to
+      a charted gate and withheld when unattached or at an uncharted gate).
+- [ ] 8.9 Implement the roster panel's running-mine gate: while the acting
+      fleet has a running mine action whose ETA has not passed, disable the
+      row's burn/cut-drive/stop/jump commands and show a countdown to the
+      mine's ETA; offer a cancel-mine control that cancels via the generic
+      action-cancel endpoint and leaves kinematic state and `attachedTo`
+      untouched; lift the gating once the ETA passes, with no navigation
+      required (board-view ADDED: *Running Mine Gates the Fleet Panel's
+      Commands* — burn/cut-drive/stop/jump disabled while mining, a running
+      mine can be cancelled).
+- [ ] 8.10 Implement single-selection semantics over the reduced selection set
+      (a feature, a bare cell, or a lane gate — never a fleet, since the
+      board draws no fleet layer): re-selecting the current selection clears
+      it, selecting a different item replaces it (board-view MODIFIED:
+      *Toggle-to-Deselect Single Selection* — re-selecting the same feature
+      deselects it, selecting a hex replaces a feature selection, clicking
+      board background clears the selection).
+- [ ] 8.11 Confirm the system board route's data fan-in reads the unfogged
+      interim interior (7.7/7.9), fetches no fleet data, shows its loading
+      state until the interior read resolves and (while the rendering
+      context is healthy) a first frame is produced, shows an error state on
+      a failed read, and yields precedence to the renderer-unavailable and
+      lost-context states over its own loading placeholder (board-view
+      MODIFIED: *System Board Route and Data Fan-In* — loading before data
+      arrives, error on a failed interior read, loading persists through
+      first frame, an unsupported rendering context takes precedence over
+      the loading placeholder).
+- [ ] 8.12 Confirm the galaxy view's presence markers and recenter target skip
+      an own fleet whose `jump` field is set — a jump is atomic and
+      single-hop, so there is no held-mid-lane state left for a fleet to
+      occupy at its origin system (galaxy-view MODIFIED: *Own-Fleet Presence
+      and Recenter Target* — a traveling fleet is not marked at the system it
+      left).
+- [ ] 8.13 Render lanes carrying the `bridge` marker in a visually distinct
+      (fainter/differentiated) style, with no route-preview or travel-commit
+      interaction on any lane, bridge or ordinary — a lane crossing is
+      commanded from the roster panel (8.8), never from a galaxy-view lane
+      interaction (galaxy-view ADDED: *Bridge Lane Rendering Is Visually
+      Distinct* — a bridge lane renders distinctly).
 
 ## 9. Register + housekeeping
 
@@ -427,7 +545,44 @@
 - [ ] 10.3 Run `make test` (backend), `npx vitest run` (frontend), and the
       relevant `/check` gates (lint, Go tests, transcendental/FMA checks) green
       end to end.
-- [ ] 10.4 Confirm every scenario across all eight delta files
+- [ ] 10.4 Confirm every scenario across all **nine** delta files
       (`fleet-movement`, `space-kinematics`, `observation-fog-and-scan`,
       `system-interior`, `board-view`, `fleet-roster`, `corporation-spawn`,
-      `galaxy-view`) traces to at least one completed task above.
+      `galaxy-view`, `proximity-disclosure`) traces to at least one completed
+      task above.
+
+## 11. Post-archive hygiene — stale `## Purpose` blocks
+
+OpenSpec deltas cannot touch a capability's `## Purpose` block; the archiver
+replaces requirement bodies but leaves `## Purpose` exactly as it stood. Each
+of the following is stale the instant this change archives and must be
+hand-edited afterward — there is no delta representation for this work.
+
+- [ ] 11.1 Hand-edit `openspec/specs/fleet-movement/spec.md`'s `## Purpose`
+      block — it still describes "one movement-state field (coast, burn,
+      docked, lane transit, lane hold) … and the sensor scan verb it
+      carries," none of which survive this change: the stored state is now
+      `space.ShipState` (burn/park/drift) plus `attachedTo`/`jump`, the scan
+      verb is gone, and the graph-tier trip is a single-hop jump, not a
+      multi-leg route (design.md Decision 4, 10, 11).
+- [ ] 11.2 Hand-edit `openspec/specs/board-view/spec.md`'s `## Purpose`
+      block — it still says the view "lets the player select a body, cell,
+      fleet, or lane gate, previews the order that selection would commit …
+      and commits move/scan/cancel/travel verbs"; the board selects no
+      fleet and commits no move, scan, cancel, or travel verb after this
+      change — only mine, sell, and the roster-driven commands survive
+      (design.md Decision 12).
+- [ ] 11.3 Hand-edit `openspec/specs/observation-fog-and-scan/spec.md`'s
+      `## Purpose` block — it still advertises "the live sensor coverage
+      (passive ambient bubbles plus a running scan's growing echo disc)
+      every board read projects through" and "the reveal writers (scan
+      resolution, path-swept ambient-on-move, travel arrival)"; this change
+      deletes the live coverage and two of those three reveal writers
+      outright, leaving only the graph-tier ladder, arrival reveals, and the
+      charted-lane set (design.md Decision 11).
+- [ ] 11.4 Check `openspec/specs/system-interior/spec.md`'s `## Purpose`
+      block for fog/band language and hand-edit it if present — it currently
+      reads "fog of war applied per requester," which no longer describes
+      the fully-disclosed interim read this change installs (design.md
+      Decision 11); leave it alone only if this exact wording is no longer
+      there by the time this task runs.

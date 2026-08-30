@@ -109,9 +109,59 @@ forgotten):
 
 ## Impact
 
-- Affected specs: `fleet-movement`, `space-kinematics`,
-  `observation-fog-and-scan`, `system-interior`, `board-view`, `fleet-roster`,
-  `corporation-spawn`, `galaxy-view`
+- Affected specs, each carrying its own reason:
+  - `fleet-movement` — the fleet's stored state, its burn/cut-drive/stop/jump
+    verbs, and its movement command endpoints move from `board.MovementState`
+    and lattice geometry to `space.ShipState` and `system.BodyTable`
+    resolution (design.md Decision 4, 9, 10, 13, 14, 21).
+  - `space-kinematics` — free drift (`ModeDrift`) is added as a third
+    `ShipMode`, the cut-drive burn-to-drift conversion is specified, and the
+    persistence codec is widened to burns, parks, and drifts (design.md
+    Decision 5, 6, 9).
+  - `observation-fog-and-scan` — the live half (ambient coverage, running-scan
+    echo disc, scan reveal mint, ambient path-sweep reveal, fleet audience
+    visibility) is removed outright, since a fleet has no board cell left for
+    coverage to be computed from (design.md Decision 11).
+  - `system-interior` — with `observation`'s live half gone, the three-band
+    fog projection has no coverage source or memory writer to read from, so
+    interior reads become a stated, temporary, fully-disclosed interim
+    (design.md Decision 11).
+  - `board-view` — the board loses its fleet layer and every
+    geometry-dependent verb (move/scan/cancel/lane-gate departure); only
+    mine/sell/credits/camera/accessibility and a reduced picking/refetch
+    surface survive (design.md Decision 12).
+  - `fleet-roster` — **two reasons, both live in this delta.** First, status
+    is re-derived from kinematic state: the roster's requirement now names
+    `coast`/`docked`/`laneTransit`/`laneHold` alongside `space.ShipState`'s
+    burn/park/drift, and three of the five old `board.MovementState` shapes
+    have no successor (design.md Decision 4, 10). Second, the roster row
+    becomes the fleet's command surface — burn, cut-drive, stop, and jump are
+    all ordered by naming a target from a fleet row, since the board no
+    longer offers a move/cancel/jump control of its own (design.md
+    Decision 12).
+  - `corporation-spawn` — the starting hull's seed position moves from a
+    rim-ring `board.Cell` to a deterministic continuous-space park that
+    rejects only a position inside the home star's clearance radius (design.md
+    Decision 14, 16).
+  - `galaxy-view` — the route-preview gesture and the multi-hop transit card
+    are removed along with multi-hop routing itself; bridge-lane rendering is
+    re-expressed without the deleted travel interaction (design.md
+    Decision 10).
+  - `proximity-disclosure` — this change adds a third `ShipMode` (drift) that
+    two of `proximity-disclosure`'s already-shipped requirements
+    (`contactVelocity`, emission) switch on, and its *Whether a Plume Exists
+    Is an Exact Integer Test* scenario set covers parked and burning but never
+    drifting — so a drifting contact's velocity and emission state were
+    undefined until this change's ADDED requirement closes the gap
+    (design.md Decision 5).
+- `action-dispatch` takes **no** delta, on purpose: `backend/action/
+  params_validator.go`'s allowlist already accepts every shape the new codec
+  emits (`float64`, `[]float64`, `int64`, `[]int64`, `map[string]any`,
+  `[]any`), and the rule being added governs what the **codec emits**, not
+  what the **validator accepts** — so it belongs in `space-kinematics`
+  (design.md Decision 15). `docs/plans/continous_space/chain.md`'s link-4
+  entry predicted an `action-dispatch` delta; that prediction was wrong and
+  `chain.md` is corrected accordingly.
 - Affected code: `backend/fleet`, `backend/space`, `backend/system`,
   `backend/observation`, `backend/disclosure`, `backend/mine`,
   `backend/market`, `backend/corporations`, `frontend/`

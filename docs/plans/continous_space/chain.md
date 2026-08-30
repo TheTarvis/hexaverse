@@ -98,9 +98,19 @@ drift. `BurnResolver` settles curved burns; the channel split and the delta
 ledger carry over unchanged, since the fold contract is identical.
 
 **Adds the cancel verbs** (`decisions.md`, 2026-08-27): *cut drive* (free,
-instant, truncates the burn interval, straight-line drift at constant
+instant, **replaces** the burn with a straight-line drift at constant
 velocity, goes dark the same instant) and *stop in place* (a new burn that
 nulls velocity — costs Δv, and is loud).
+
+*Wording corrected 2026-08-30.* This read "truncates the burn interval" until
+the link 4 analysis found that is not implementable: `space.Burn.Position(t)`
+returns the burn's **intercept** for any `t >= ArriveMs`, so shortening
+`ArriveMs` would teleport the fleet to its original destination and `StateAt`
+would then settle it into that target's insertion park — arriving for free.
+The implementable form anchors a free drift at the burn's position at the cut
+time, carrying its tangent scaled by its speed there. Same intent; the
+original phrasing described an edit that cannot be made. `decisions.md`
+carries the full correction.
 
 Free drift is a new stored shape alongside the three park modes, so this link
 carries an ADDED requirement into `space-kinematics`. It is closed-form
@@ -108,9 +118,29 @@ carries an ADDED requirement into `space-kinematics`. It is closed-form
 own change is the recommendation, since the fixture family it would have to
 prove itself against already exists.
 
-- **Touches:** `fleet-movement` (MODIFIED, wholesale), `space-kinematics`
-  (ADDED: free drift), `action-dispatch` (the coordinate codec — float vectors
-  through `space`'s named codec, same non-primitive-param discipline).
+- **Touches nine capabilities, not the three originally predicted here:**
+  `fleet-movement` (MODIFIED, wholesale), `space-kinematics` (ADDED: free
+  drift; MODIFIED: the persistence codec widens to burns/parks/drifts),
+  `observation-fog-and-scan` (its live half removed outright — coverage has
+  no centre once a fleet has no board cell), `system-interior` (the
+  three-band fog projection loses its coverage source and becomes a stated,
+  temporary, fully-disclosed interim), `board-view` (loses its fleet layer
+  and every geometry-dependent verb), `fleet-roster` (re-derives status from
+  kinematic state and becomes the fleet's command surface), `corporation-spawn`
+  (the starting hull's seed position becomes a continuous-space park),
+  `galaxy-view` (the route-preview gesture and transit card are removed with
+  multi-hop routing), and `proximity-disclosure` (ADDED: the drifting-contact
+  velocity/emission requirement `ModeDrift` needs). See `design.md`'s Impact
+  section for each capability's specific reason.
+- **`action-dispatch` was predicted here to take a delta. That prediction is
+  wrong, and this link ships no delta against it.** Verified against
+  `backend/action/params_validator.go`: its allowlist (`nil, string, bool,
+  int, int64, float64, []string, []int64, []float64, []any,
+  map[string]any`, recursed) already accepts every shape the new codec
+  emits. The rule this link adds governs what the codec **emits**, not what
+  the validator **accepts**, so it belongs in `space-kinematics`'s
+  *Coordinates Cross the Persistence Boundary Through a Named Codec*
+  requirement instead (design.md Decision 15).
 - **Inherited obligation** (`pin-system-generation-determinism`, design.md
   Decision 5 / Open Question 1): this link owns recording the three fixture
   families link 3's Decision 13 declared but that change deferred —
@@ -196,7 +226,20 @@ reversal cost as bounded while `space` has no consumers — by this link it no
 longer will. If previews read as laggy in play, reversing means building
 `frontend/lib/space` as a true fixed-point mirror.
 
-- **Touches:** `board-view` (REPLACED by a space view), `galaxy-view`.
+- **`board-view` is no longer link 8's alone to replace.** Link 4 already
+  strips most of the fleet layer out of `board-view`: 12 of its requirements
+  are REMOVED there (confirmed by archive rehearsal), of which 3 are
+  re-expressed under a new name (picking, refetch rules, the running-mine
+  gate), 1 is the fog-band cascade from `observation`'s live-half removal,
+  and the remaining 8 are truly unrenderable once a fleet has no board cell
+  (move/scan preview and commit, cancel, lane-gate departure, foreign-fleet
+  contact marks, the scan-emission-cell render). What link 4 leaves behind is
+  mine/sell/credits/camera/accessibility and the reduced picking/refetch
+  surface — not a whole capability waiting to be swapped out. Link 8
+  therefore **builds a new space view**, rather than replacing one still
+  intact.
+- **Touches:** `board-view` (its surviving mine/sell/camera surface folds
+  into or alongside the new view), `galaxy-view`.
 
 ## Link 9 — `delete-the-lattice`
 

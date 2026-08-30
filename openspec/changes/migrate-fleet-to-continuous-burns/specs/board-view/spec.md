@@ -235,3 +235,75 @@ a scan or self-scheduled for an own fleet's burn arrival.
 - **THEN** the periodic poll continues at its constant baseline interval,
   unaffected by any own fleet's burn arrival or by scan state — the board
   tracks neither
+
+## MODIFIED Requirements
+
+### Requirement: Toggle-to-Deselect Single Selection
+
+The system SHALL maintain exactly one selection at a time, among a
+feature, a bare cell, or a lane gate; selecting the currently selected item
+again SHALL clear the selection (deselect) rather than re-select it;
+selecting a different item of any kind SHALL replace the current
+selection. The board draws no fleet layer, so a fleet is never a member of
+this selection set (design.md Decision 12).
+
+#### Scenario: Re-selecting the same feature deselects it
+
+- **WHEN** a feature is selected and then clicked again
+- **THEN** the selection becomes empty
+
+#### Scenario: Selecting a hex replaces a feature selection
+
+- **WHEN** a feature is selected and a bare cell is then clicked
+- **THEN** the selection becomes that cell, and the feature is no longer
+  selected
+
+#### Scenario: Clicking board background clears the selection
+
+- **WHEN** a feature is selected and a point on the board outside the
+  lattice is clicked
+- **THEN** the selection becomes empty
+
+### Requirement: System Board Route and Data Fan-In
+
+The system SHALL render `/systems/:systemId` by reading the system's
+interior — an unfogged interim read (design.md Decision 11: every feature
+is served live to any authenticated requester until link 5 replaces this
+with a `disclosure` projection) — disabled until a non-empty system id is
+known; SHALL show a loading state while that read is in flight, or, while
+the board's rendering context is available and uninterrupted, until it has
+produced its first rendered frame; and SHALL show an error state (with the
+underlying error message when available) if the interior read fails. The
+board fetches no fleet data (design.md Decision 12). The unsupported and
+interrupted states defined by `### Requirement: Renderer Unavailability Is
+an Explicit State` and `### Requirement: Lost Rendering Context Recovers
+Without Navigation` (both `add-renderer-availability-states`) take
+precedence over this loading state: once either fires, the board shows
+that state, not the loading placeholder, regardless of whether a first
+frame has ever been produced.
+
+#### Scenario: Loading state before data arrives
+
+- **WHEN** the system board route is opened and its data has not yet
+  loaded
+- **THEN** a loading placeholder is shown
+
+#### Scenario: Error state on a failed interior read
+
+- **WHEN** the interior read fails
+- **THEN** an error panel is shown instead of the board
+
+#### Scenario: Loading persists through first frame after data arrives
+
+- **WHEN** the interior read has completed and the board's rendering
+  context is available and uninterrupted, but it has not yet produced its
+  first frame
+- **THEN** the loading placeholder remains shown rather than an empty or
+  black canvas
+
+#### Scenario: An unsupported rendering context takes precedence over the loading placeholder
+
+- **WHEN** the interior read has completed but the board's rendering
+  context cannot be created
+- **THEN** the board's canvas region shows the unsupported state, not the
+  loading placeholder

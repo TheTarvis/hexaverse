@@ -80,3 +80,60 @@ falls back to the kinematic-state-derived activity.
   galaxy data
 - **THEN** its where label falls back to the raw system id rather than
   failing to render
+
+### Requirement: The Roster Row Is the Fleet Command Surface
+
+The system SHALL offer, on each owned fleet's roster row, the commands that
+kinematic state and attachment make valid: burn SHALL be offered
+regardless of the fleet's current kinematic state; cut drive SHALL be
+offered only while the fleet's effective kinematic state is a burn; stop in
+place SHALL be offered only while the fleet's effective kinematic state is
+a burn or a drift; and jump SHALL be offered only while the fleet is
+attached to a lane-gate body whose lane the corporation has charted. A
+command not made valid by the fleet's current state or attachment SHALL
+NOT be offered.
+
+#### Scenario: Burn is always available
+
+- **WHEN** a roster row is shown for a fleet in any kinematic state (burn,
+  park, or drift)
+- **THEN** the burn command is offered on that row
+
+#### Scenario: Cut drive is offered only while burning
+
+- **WHEN** a fleet's effective kinematic state is a burn
+- **THEN** the cut-drive command is offered on its row
+
+#### Scenario: Cut drive is withheld outside a burn
+
+- **WHEN** a fleet's effective kinematic state is a park or a drift
+- **THEN** the cut-drive command is not offered on its row
+
+#### Scenario: Stop in place is offered while burning or drifting
+
+- **WHEN** a fleet's effective kinematic state is a burn or a drift
+- **THEN** the stop-in-place command is offered on its row
+
+#### Scenario: Stop in place is withheld while parked
+
+- **WHEN** a fleet's effective kinematic state is a park
+- **THEN** the stop-in-place command is not offered on its row, the fleet
+  already having nothing to stop
+
+#### Scenario: Jump is offered only while attached to a charted gate
+
+- **WHEN** a fleet is attached to a lane-gate body whose lane the
+  corporation has charted
+- **THEN** the jump command is offered on its row
+
+#### Scenario: Jump is withheld when not attached to a gate
+
+- **WHEN** a fleet has no `attachedTo` set, or is attached to a body that
+  is not a lane gate
+- **THEN** the jump command is not offered on its row
+
+#### Scenario: Jump is withheld at an uncharted gate
+
+- **WHEN** a fleet is attached to a lane-gate body whose lane the
+  corporation has not charted
+- **THEN** the jump command is not offered on its row
