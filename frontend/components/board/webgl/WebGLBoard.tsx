@@ -3,10 +3,12 @@
 // WebGLBoard — the board's GL world layer: scene assembly, post chain, render
 // loop (port-board-to-webgl-renderer). Plumbing only: everything it draws
 // arrives pre-resolved through the boundary contract (./contract) — a
-// PackedScene built once per board read, PackedFleetInstance[] reconciled on
-// every roster update, and a getFrame callback producing each frame's resolved
-// positions/accents/clock. No domain DTO and no palette record crosses into
-// this module; the decisions all happened outside (board-pack/board-frame).
+// PackedScene built once per board read, and a getFrame callback producing
+// each frame's resolved positions/clock. No domain DTO and no palette record
+// crosses into this module; the decisions all happened outside
+// (board-pack/board-frame). The board draws no fleet layer after
+// migrate-fleet-to-continuous-burns (design.md Decision 12) — this module no
+// longer reconciles or draws a fleet instance set.
 //
 // The post chain is where "flat" actually gets solved:
 //   RenderPass → UnrealBloomPass → InstrumentShader → OutputPass
@@ -30,11 +32,10 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { createStarfield } from './scene-starfield'
 import { createLattice } from './scene-lattice'
 import { createBodies, createStar } from './scene-bodies'
-import { createFleets } from './scene-fleets'
 import { createOrbitRings } from './scene-rings'
 import { InstrumentShader } from './instrument-pass'
 import { TUNED_LOOK } from './contract'
-import type { BoardCameraState, FrameData, PackedFleetInstance, PackedScene, Rgb } from './contract'
+import type { BoardCameraState, FrameData, PackedScene, Rgb } from './contract'
 
 // The tuned production defaults (TUNED_LOOK in ./contract): the effects
 // should make the board legible, not announce themselves. Constants, not spec
@@ -60,7 +61,6 @@ export interface WebGLBoardProps {
   // node the render guard's contextlost/contextrestored listeners are bound to.
   canvas: HTMLCanvasElement
   scene: PackedScene
-  fleets: PackedFleetInstance[]
   camera: BoardCameraState
   getFrame: (wallNowMs: number) => FrameData
   settings?: Partial<WebGLBoardSettings>
@@ -78,7 +78,7 @@ export interface BoardRenderHealth {
   frames: number
 }
 
-export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, onFirstFrame }: WebGLBoardProps) {
+export function WebGLBoard({ canvas, scene, camera, getFrame, settings, onFirstFrame }: WebGLBoardProps) {
   const cameraRef = useRef(camera)
   cameraRef.current = camera
   const getFrameRef = useRef(getFrame)
@@ -87,12 +87,10 @@ export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, 
   settingsRef.current = settings
   const onFirstFrameRef = useRef(onFirstFrame)
   onFirstFrameRef.current = onFirstFrame
-  const fleetsRef = useRef<ReturnType<typeof createFleets> | null>(null)
-  const pendingFleetsRef = useRef(fleets)
 
   // Rebuild only when the packed SCENE changes (a fresh board read). Camera,
-  // settings, frames and fleet syncs all ride refs/effects so nothing else
-  // tears down the GL context.
+  // settings and frames all ride refs/effects so nothing else tears down the
+  // GL context.
   useEffect(() => {
     const renderer = new THREE.WebGLRenderer({
       canvas,
@@ -128,11 +126,6 @@ export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, 
     const star = scene.star ? createStar(scene.star.radius, scene.star.tint) : null
     if (star) world.add(star.mesh)
 
-    const fleetsVisual = createFleets(scene.theme.thruster, scene.theme.signal)
-    world.add(fleetsVisual.group)
-    fleetsRef.current = fleetsVisual
-    fleetsVisual.sync(pendingFleetsRef.current)
-
     const composer = new EffectComposer(renderer)
     composer.addPass(new RenderPass(world, cam))
     const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), TUNED_LOOK.bloom, 0.4, BLOOM_THRESHOLD)
@@ -157,7 +150,6 @@ export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, 
     resize()
 
     let raf = 0
-    let last = performance.now()
     let frames = 0
     // Accumulate draw stats across the whole post chain — auto-reset would
     // leave only the final OutputPass quad (1 call, 1 triangle) visible to
@@ -170,11 +162,8 @@ export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, 
       // Correctness never depends on this — the world clock is a closed-form
       // re-anchored projection, not an integrated accumulator.
       if (document.hidden) {
-        last = now
         return
       }
-      const dt = Math.min((now - last) / 1000, 0.05)
-      last = now
 
       const c = cameraRef.current
       const s = settingsRef.current
@@ -182,7 +171,6 @@ export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, 
 
       const starTint = s?.starTint ?? null
       bodies.update(f.bodyOffsets, f.fxTime, c.worldPerPixel, s?.bodyScale ?? TUNED_LOOK.bodyScale, starTint)
-      fleetsVisual.update(f.fleets, f.fxTime, dt, c.worldPerPixel)
       lattice.update(f.fxTime, f.pulse, f.sensor, c.worldPerPixel)
       rings.update(f.selectedRing)
       star?.update(f.fxTime, c.worldPerPixel, s?.starScale ?? TUNED_LOOK.starScale, starTint)
@@ -227,25 +215,16 @@ export function WebGLBoard({ canvas, scene, fleets, camera, getFrame, settings, 
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
-      fleetsRef.current = null
       starfield.dispose()
       lattice.dispose()
       rings.dispose()
       bodies.dispose()
       star?.dispose()
-      fleetsVisual.dispose()
       bloom.dispose()
       composer.dispose()
       renderer.dispose()
     }
   }, [canvas, scene])
-
-  // Fleet arrivals/departures reconcile against the live scene — on the same
-  // roster update, never waiting for a scene rebuild.
-  useEffect(() => {
-    pendingFleetsRef.current = fleets
-    fleetsRef.current?.sync(fleets)
-  }, [fleets])
 
   return null
 }

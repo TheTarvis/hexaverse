@@ -6,6 +6,7 @@ import { corporationService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
 import { toast } from '@/lib/toast'
 import type { SpawnResult } from '@/lib/types/corporation'
+import { SHIP_MODE_PARKED } from '@/lib/types/fleet'
 
 const { pushSpy } = vi.hoisted(() => ({ pushSpy: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushSpy }) }))
@@ -26,8 +27,22 @@ const spawnResult = {
     id: 'fleet_1',
     corporationId: 'corp_1',
     systemId: 'sys-9',
-    state: { mode: 'coast' as const },
-    position: { ring: 15, slot: 0 },
+    state: {
+      Mode: SHIP_MODE_PARKED,
+      Burn: null,
+      Park: {
+        Kind: 0,
+        BodyId: '',
+        Radius: 0,
+        PeriodMs: 0,
+        Phase: 0,
+        EpochMs: 0,
+        Offset: { X: 0, Y: 0, Z: 0 },
+        Point: { X: 0, Y: 0, Z: 0 },
+      },
+      Drift: null,
+    },
+    position: { X: 15, Y: 0, Z: 0 },
     own: true,
     worldTime: 1000,
   },

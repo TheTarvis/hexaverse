@@ -57,28 +57,10 @@ export interface PackedRing {
   points: number[]
 }
 
-// One fleet's static instance data. `audience` is the own/foreign fork, decided
-// outside: 0 = own (roster-driven formation), 1 = foreign (constant contact
-// mark — formation is always a single centred slot regardless of the owner's
-// actual roster; that constancy is the confidentiality property).
-export interface PackedFleetInstance {
-  id: string
-  audience: 0 | 1
-  // Hull slots in fleet-local space (+y forward), one per drawn hull.
-  formation: { dx: number; dy: number }[]
-}
-
-// One fleet's per-frame resolved state: position/heading in GL world space,
-// accent already a colour triple (the movement-mode decision happened outside).
-export interface FleetFrame {
-  id: string
-  x: number
-  y: number
-  headingRad: number
-  accent: Rgb
-  burning: 0 | 1
-  docked: 0 | 1
-}
+// PackedFleetInstance/FleetFrame (the fleet hull/plume/trail instance data)
+// had no successor after migrate-fleet-to-continuous-burns: the board draws
+// no fleet layer at all (design.md Decision 12). Deleted here, not adapted;
+// see tasks.md 8.1/8.7.
 
 // The full static scene the canvas mounts from — all decisions pre-resolved.
 export interface PackedScene {
@@ -110,7 +92,6 @@ export interface FrameData {
   fxTime: number
   // xy per body, GL world space, in the same order as PackedScene.bodies.
   bodyOffsets: Float32Array
-  fleets: FleetFrame[]
   // The scan pulse ring and single-centre sensor bubble are spike-era lattice
   // effects; production draws scan/sensor UI on the SVG overlay and passes
   // null here.

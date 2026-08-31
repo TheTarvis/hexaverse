@@ -5,27 +5,31 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { auth } from '@/lib/firebase'
 import { queryKeys } from '@/lib/query-keys'
 
-// useBoardRealtime — the three #0005 client refetch rules for an open board:
+// useBoardRealtime — board-view ADDED "Realtime Refetch Rules While the
+// Board Is Open, With No Fleet Layer to Track" (migrate-fleet-to-continuous-
+// burns, tasks.md 8.4) — the two remaining client refetch rules for an open
+// board, plus a constant baseline poll that nothing tightens any more (the
+// scan verb, and the fleet layer it revealed, are both gone):
 //
-//  1. ETA self-schedule — when an own action has a known arrival (a burn's
-//     arriveTime), schedule one refetch just after it, so a resolved-by-read verb
-//     lands without a manual refresh.
+//  1. ETA self-schedule — when a running mine has a known ETA, schedule one
+//     refetch just after it, so a resolved-by-read verb lands without a
+//     manual refresh. (Never self-scheduled for an own fleet's burn arrival
+//     — the board fetches no fleet data to know one from; design.md
+//     Decision 12.)
 //  2. SSE — subscribe to the system channel; refetch on `action.completed`
 //     (something resolved) and again on reconnect (we may have missed events).
-//  3. Gentle poll — a slow interval backstop while the board is open, covering
-//     verbs whose ETA the client can't know precisely (e.g. a scan).
 //
-// All three converge on one idempotent invalidation of the interior + fleet +
-// running-actions reads; the fog/animation layers pick the fresh state up on
-// the next render. The actions inbox rides along (add-mine-ui) so a resolved
-// verb's stale `running` entry clears with the same read that lands its
-// effects (a mine's credited cargo, a freed movement slot).
+// Both converge on one idempotent invalidation of the interior + running-
+// actions reads; the `fleets.inSystem` key is invalidated too, purely as a
+// harmless no-op today — nothing produces a query under it any more, but the
+// key SHAPE is still read by `use-actions.ts`/`use-market.ts`'s own
+// invalidations, so it stays a live query-key factory entry.
+//
+// SCAN_POLL_MS and the `scanning` tightening have no successor: the `scanning`
+// option is still accepted (a caller may still pass it) but has NO effect —
+// the poll runs at BOARD_POLL_MS unconditionally.
 
 export const BOARD_POLL_MS = 20_000
-// The tightened poll while a scan is running (radial echo): the front reveals
-// progressively, and each board read is what materializes the echoes that have
-// returned since the last one — so the poll IS the reveal cadence mid-scan.
-export const SCAN_POLL_MS = 5_000
 // A small cushion so the ETA refetch fires just AFTER the server would resolve.
 const ETA_CUSHION_MS = 400
 
@@ -34,9 +38,9 @@ export interface UseBoardRealtimeOptions {
   // The live world time (for measuring how far off each ETA is). Read via a ref,
   // never depended on, so the per-frame tick can't reset the timers.
   worldTime: number
-  // Future world-times to self-schedule a refetch at — own fleets' arrival ETAs.
+  // Future world-times to self-schedule a refetch at — a running mine's ETA.
   etaCandidates?: number[]
-  // True while an own scan is running here — tightens the poll to SCAN_POLL_MS.
+  // Accepted for API compatibility; has no effect (see module note above).
   scanning?: boolean
   enabled?: boolean
 }
@@ -51,7 +55,8 @@ export function useBoardRealtime({
   systemId,
   worldTime,
   etaCandidates,
-  scanning = false,
+  // Accepted, deliberately unused — see the module note above.
+  scanning: _scanning = false,
   enabled = true,
 }: UseBoardRealtimeOptions): void {
   const qc = useQueryClient()
@@ -78,16 +83,14 @@ export function useBoardRealtime({
     return () => clearTimeout(timer)
   }, [active, soonest, systemId, qc])
 
-  // Rule 3 — gentle poll while open; tightened while a scan's echoes are
-  // landing (each read materializes the front's progress).
+  // Rule 3 — gentle poll while open, at a constant baseline interval: nothing
+  // tightens it any more (the scan verb had no successor). `scanning` is
+  // deliberately NOT a dependency here — it must have zero effect.
   useEffect(() => {
     if (!active) return
-    const interval = setInterval(
-      () => invalidateBoard(qc, systemId),
-      scanning ? SCAN_POLL_MS : BOARD_POLL_MS,
-    )
+    const interval = setInterval(() => invalidateBoard(qc, systemId), BOARD_POLL_MS)
     return () => clearInterval(interval)
-  }, [active, systemId, qc, scanning])
+  }, [active, systemId, qc])
 
   // Rule 2 — SSE on the system channel: refetch on completion and on reconnect.
   useEffect(() => {

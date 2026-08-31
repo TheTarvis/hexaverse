@@ -4,11 +4,12 @@
 //
 // The production board renderer (components/board/webgl/*) on a fixture,
 // packed through the SAME pure pack functions the live board uses
-// (createPackedScene, packFleetInstance, createFramePacker). What the bench
-// adds is knobs — bloom/instrument/tilt/speed sliders — so the tuned
-// production constants can be revisited against known content without
-// touching production. The SVG comparator half retired with the SVG board
-// (port-board-to-webgl-renderer task 6.3).
+// (createPackedScene, createFramePacker). What the bench adds is knobs —
+// bloom/instrument/tilt/speed sliders — so the tuned production constants
+// can be revisited against known content without touching production. The
+// SVG comparator half retired with the SVG board (port-board-to-webgl-
+// renderer task 6.3). No fleet content after migrate-fleet-to-continuous-
+// burns (design.md Decision 12) — the board draws no fleet layer.
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -19,7 +20,7 @@ import { Text } from '@/components/catalyst/text'
 import { Select } from '@/components/catalyst/select'
 import { buildMockSystemBoard } from './mock-board'
 import { FOG_TREATMENT, VOID } from '@/components/board/board-palette'
-import { createPackedScene, packFleetInstance } from '@/components/board/board-pack'
+import { createPackedScene } from '@/components/board/board-pack'
 import { createFramePacker } from '@/components/board/board-frame'
 import { BOARD_TILT_DEG, useBoardProjection } from '@/components/board/use-board-projection'
 import { TUNED_LOOK } from '@/components/board/webgl/contract'
@@ -96,7 +97,6 @@ export default function WebGLBoardSpikePage() {
 
   const fixture = useMemo(() => buildMockSystemBoard(seed, character, 16), [seed, character])
   const scene = useMemo(() => createPackedScene(fixture.board), [fixture])
-  const packedFleets = useMemo(() => fixture.fleets.map(packFleetInstance), [fixture])
 
   // Bench clock: world time runs from the mount instant at the speed slider.
   // Production always runs scale 1 off the server anchor; the multiplier is a
@@ -107,7 +107,6 @@ export default function WebGLBoardSpikePage() {
     () =>
       createFramePacker({
         features: fixture.board.features,
-        fleets: fixture.fleets,
         anchor,
         timeScale: speed,
         fxEpochWall: mountWall,
@@ -156,7 +155,6 @@ export default function WebGLBoardSpikePage() {
             <WebGLBoard
               canvas={canvasEl}
               scene={scene}
-              fleets={packedFleets}
               camera={projection.camera}
               getFrame={getFrame}
               settings={settings}

@@ -1,60 +1,47 @@
 // board-frame — the per-frame packer: (fogged reads, wall clock) → the resolved
 // FrameData the canvas draws (port-board-to-webgl-renderer). This is where the
 // per-frame decisions live, outside webgl/: positions through glyph-geometry
-// (the Go↔TS determinism seam — reused, never reimplemented), movement-mode
-// accents through stateAt, the reduced-motion freeze, the selected ring.
+// (the Go↔TS determinism seam — reused, never reimplemented), and the selected
+// ring.
 //
 // World time comes from the SAME anchor math as useWorldTime
 // (projectWorldTime, re-anchored on every fresh server read) — never a locally
 // integrated timer. That is what makes tab-backgrounding resume correct: the
 // clock is a closed-form projection of the server reading, so a paused rAF
 // loop costs nothing (task 3.2a pins this).
+//
+// The board draws no fleet layer after migrate-fleet-to-continuous-burns
+// (design.md Decision 12) — this packer no longer folds a fleet's movement
+// state or resolves its glide pixel/heading; see tasks.md 8.1/8.7.
 
-import { productionSchedule, stateAt } from '@/lib/board'
+import { productionSchedule } from '@/lib/board'
 import type { BoardFeature } from '@/lib/types/system-board'
-import type { Fleet } from '@/lib/types/fleet'
 import { projectWorldTime, type WorldAnchor } from '@/hooks/use-world-time'
-import { FLEET_ACCENT, FLEET_FOREIGN } from './board-palette'
-import { hexToRgb, sortFeaturesForDraw } from './board-pack'
-import {
-  featureMaps,
-  fleetDockedParentId,
-  fleetGlidePixel,
-  fleetOnBoard,
-} from './glyph-geometry'
+import { sortFeaturesForDraw } from './board-pack'
+import { featureMaps } from './glyph-geometry'
 import { boardToWorld } from './use-board-projection'
-import type { FleetFrame, FrameData, Rgb } from './webgl/contract'
+import type { FrameData } from './webgl/contract'
 
-// A small worldTime step used only to sample a fleet's heading (visual, not
-// logic) — the same constant the SVG scene used.
-const HEADING_DT = 2_000
-
-// The frame packer folds movement state and projects positions but never
-// enumerates cells or clamps to the rim, so the process-wide schedule is exact
-// here (design.md, schedule-threading Decision).
+// The frame packer projects positions but never enumerates cells or clamps to
+// the rim, so the process-wide schedule is exact here (design.md,
+// schedule-threading Decision).
 const SCHEDULE = productionSchedule()
-
-const ACCENT_RGB: Record<string, Rgb> = Object.fromEntries(
-  Object.entries(FLEET_ACCENT).map(([mode, hex]) => [mode, hexToRgb(hex)]),
-) as Record<string, Rgb>
-const FOREIGN_RGB = hexToRgb(FLEET_FOREIGN)
 
 export interface FramePackerInput {
   features: BoardFeature[]
-  fleets: Fleet[]
   // The server world-time anchor — re-created by the owner on every fresh
   // board read, exactly as useWorldTime re-anchors.
   anchor: WorldAnchor
   // World-ms per wall-ms. Production is ALWAYS 1 (the spike's speed multiplier
   // does not carry over — scaling it would desynchronise glyph positions from
-  // stateAt and every server ETA); the tuning bench may pass its slider.
+  // every server ETA); the tuning bench may pass its slider.
   timeScale?: number
   // Wall-clock instant decorative time is measured from — held stable by the
   // owner across packer re-creations so shader noise doesn't jump on refetch.
   fxEpochWall: number
   // While true, the decorative shader clock is FROZEN (reduced motion): the
-  // starfield/nebula/grain/body-surface/plume animation holds its static
-  // state, while positions below keep advancing with world time.
+  // starfield/nebula/grain/body-surface animation holds its static state,
+  // while positions below keep advancing with world time.
   reducedMotion: boolean
   // Read fresh each frame (a ref-backed callback) so selection changes don't
   // rebuild the packer: the id of the selected feature, or null.
@@ -67,7 +54,6 @@ export function createFramePacker(input: FramePackerInput): FramePacker {
   const order = sortFeaturesForDraw(input.features)
   const bodyOffsets = new Float32Array(order.length * 2)
   const scale = input.timeScale ?? 1
-  const fleets: FleetFrame[] = []
 
   return (wallNowMs: number): FrameData => {
     const worldTime = projectWorldTime(input.anchor, wallNowMs, scale)
@@ -81,30 +67,6 @@ export function createFramePacker(input: FramePackerInput): FramePacker {
       bodyOffsets[i * 2 + 1] = w.y
     }
 
-    fleets.length = 0
-    for (const fleet of input.fleets) {
-      if (!fleetOnBoard(fleet, worldTime, SCHEDULE)) continue
-      const parentId = fleetDockedParentId(fleet, worldTime, SCHEDULE)
-      const parentPixel = parentId ? pixelById.get(parentId) : undefined
-      const p = boardToWorld(fleetGlidePixel(fleet, worldTime, SCHEDULE, parentPixel))
-      const ahead = boardToWorld(fleetGlidePixel(fleet, worldTime + HEADING_DT, SCHEDULE, parentPixel))
-      // Hull models point along local +y; heading 0 = "up-board". atan2 of the
-      // GL-space velocity, offset so +y is zero.
-      const dx = ahead.x - p.x
-      const dy = ahead.y - p.y
-      const headingRad = dx === 0 && dy === 0 ? 0 : Math.atan2(-dx, dy)
-      const mode = stateAt(fleet.state, worldTime, SCHEDULE).mode
-      fleets.push({
-        id: fleet.id,
-        x: p.x,
-        y: p.y,
-        headingRad,
-        accent: fleet.own ? (ACCENT_RGB[mode] ?? FOREIGN_RGB) : FOREIGN_RGB,
-        burning: fleet.own && (mode === 'burn' || mode === 'laneTransit') ? 1 : 0,
-        docked: fleet.own && mode === 'docked' ? 1 : 0,
-      })
-    }
-
     const selectedId = input.getSelectedId()
     const selectedCell = selectedId ? cellById.get(selectedId) : undefined
     const selectedRing = selectedCell ? selectedCell.ring : -1
@@ -112,7 +74,6 @@ export function createFramePacker(input: FramePackerInput): FramePacker {
     return {
       fxTime,
       bodyOffsets,
-      fleets,
       // Scan/sensor UI draws on the SVG overlay in production; the lattice's
       // spike-era pulse/bubble stay dark.
       pulse: null,

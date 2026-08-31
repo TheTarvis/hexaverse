@@ -5,10 +5,8 @@
 // transparent SVG authored in BOARD coordinates (today's fitViewBox), carried
 // into pixel register with the canvas by useBoardProjection's camera-matched
 // CSS 3D transform. It owns everything drawn AS UI: every hit target and
-// data-testid, the selection ring, the selected-hex and hover highlights, the
-// move/scan previews, the committed burn paths, the ambient sensor bubble,
-// and the lane-gate marks. Everything LIT (tiles, bodies, hulls, plumes)
-// belongs to the canvas underneath.
+// data-testid, the selection ring, the selected-hex and hover highlights, and
+// the lane-gate marks.
 //
 // No three.js import, no GL context: this layer mounts for real in jsdom,
 // which is what keeps SystemBoardView's structural tests and the e2e testid
@@ -18,62 +16,35 @@
 // hit shapes re-enable pointer-events, so tile and background clicks fall
 // through to the canvas and resolve via unproject (BoardStage). Overlapping
 // hit shapes resolve topmost-wins by DOM order: lane gates lowest, then
-// features (parents before children, so a moon beats its parent), then
-// fleets. Keyboard order is decoupled from that DOM order via explicit
-// tabIndex: features → fleets → lane gates, each group in stable id order.
+// features (parents before children, so a moon beats its parent) — the same
+// priority board-selection.ts's `resolvePick` runs as a pure function.
+// Keyboard order is decoupled from that DOM order via explicit tabIndex:
+// features → lane gates, each group in stable id order.
+//
+// The board draws no fleet layer after migrate-fleet-to-continuous-burns
+// (design.md Decision 12: a fleet has no board cell any more, only a
+// continuous-space position) — the fleet-glyph group, the committed burn
+// paths, and the ambient sensor bubble (observation's live coverage, removed
+// server-side per section 7) have no successor here; see tasks.md 8.1/8.3/8.7.
 
 import { useMemo, useState } from 'react'
 import {
-  boardLegBurn,
-  cellKey,
   cellToPoint,
   RADIAL_UNIT,
   schedule as boardSchedule,
-  stateAt,
   wedgePath,
   type Cell,
-  type Point,
   type Schedule,
 } from '@/lib/board'
 import type { BoardFeature, LaneGate } from '@/lib/types/system-board'
-import type { Fleet } from '@/lib/types/fleet'
-import {
-  featureMaps,
-  fleetDockedParentId,
-  fleetGlidePixel,
-  fleetLogicalCell,
-  fleetOnBoard,
-  sensorBubbleCells,
-} from './glyph-geometry'
-import { GATE_ACCENT, PREVIEW_BURN, SCAN_BUBBLE_FILL, SCAN_BUBBLE_STROKE, SELECTION_STROKE } from './board-palette'
-import { SelectionPreview } from './SelectionPreview'
-import { ScanOverlay } from './ScanOverlay'
-import { ScanPing } from './ScanPing'
-import { ArcScan } from './ArcScan'
-import type { MovePlan } from './move-preview'
-import type { ScanPlan } from './scan-preview'
-
-// The ambient-sensor radius (cells) the backend uses
-// (observation.DefaultSensorParams) — drawn live around own units.
-export const AMBIENT_RADIUS = 3
-
-// The running scan's effect inputs — pinned emission cell and frozen eta
-// (`Running Scan Renders From Its Pinned Emission Cell`); `fx` picks the
-// playtest effect variant.
-export interface ScanFxInput {
-  originCell: Cell
-  features: BoardFeature[]
-  rimRing: number
-  committedAt: number
-  eta: number
-  fx: 'ping' | 'arc'
-}
+import { featureMaps } from './glyph-geometry'
+import { GATE_ACCENT, SELECTION_STROKE } from './board-palette'
 
 export interface BoardOverlayProps {
   // Where this overlay's glyph tab stops begin. The board's camera controls
   // occupy the first stops (they must precede the glyphs), so the stage passes
-  // their count here; the port's own features → fleets → gates order inside
-  // the group is unchanged.
+  // their count here; the port's own features → gates order inside the group
+  // is unchanged.
   tabIndexBase?: number
   viewBox: string
   // The board square's half-width in board pixels — the numeric form of
@@ -83,21 +54,13 @@ export interface BoardOverlayProps {
   radius: number
   worldTime: number
   features: BoardFeature[]
-  fleets: Fleet[]
   gates?: LaneGate[]
   selectedId?: string | null
   selectedGateId?: string | null
   selectedCell?: Cell | null
   hoverCell?: Cell | null
   onSelectFeature?: (id: string) => void
-  onSelectFleet?: (id: string) => void
   onSelectGate?: (destSystemId: string) => void
-  // Prop-driven preview layers (never children — the canvas can't take React
-  // children into its draw loop, so the overlay owns them all).
-  plan?: MovePlan | null
-  activeSweep?: ScanPlan | null
-  sweepPreview?: ScanPlan | null
-  scanFx?: ScanFxInput | null
 }
 
 const GATE_R = RADIAL_UNIT * 0.4
@@ -109,30 +72,23 @@ export function BoardOverlay({
   radius,
   worldTime,
   features,
-  fleets,
   gates = [],
   selectedId,
   selectedGateId,
   selectedCell,
   hoverCell,
   onSelectFeature,
-  onSelectFleet,
   onSelectGate,
-  plan,
-  activeSweep,
-  sweepPreview,
-  scanFx,
   tabIndexBase = 0,
 }: BoardOverlayProps) {
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
 
   // The board's slot schedule, resolved once from this system's radius and
   // threaded into every projection below (design.md, schedule-threading
-  // Decision). The overlay ENUMERATES cells (the sensor bubble), so this must
-  // be the per-system schedule, never the process-wide default.
+  // Decision).
   const schedule: Schedule = useMemo(() => boardSchedule(radius), [radius])
 
-  const { pixelById, cellById } = useMemo(
+  const { pixelById } = useMemo(
     () => featureMaps(features, worldTime, schedule),
     [features, worldTime, schedule],
   )
@@ -152,59 +108,7 @@ export function BoardOverlay({
     return new Map(sorted.map((f, i) => [f.id, tabIndexBase + i + 1]))
   }, [features, tabIndexBase])
 
-  const onBoard = useMemo(
-    () => fleets.filter((f) => fleetOnBoard(f, worldTime, schedule)),
-    [fleets, worldTime, schedule],
-  )
-  const fleetsSorted = useMemo(() => [...onBoard].sort((a, b) => (a.id < b.id ? -1 : 1)), [onBoard])
-  const fleetTabBase = tabIndexBase + features.length
-  const gateTabBase = fleetTabBase + fleetsSorted.length
-
-  const fleetPixel = (f: Fleet): Point => {
-    const parentId = fleetDockedParentId(f, worldTime, schedule)
-    const parentPixel = parentId ? pixelById.get(parentId) : undefined
-    return fleetGlidePixel(f, worldTime, schedule, parentPixel)
-  }
-
-  // The live ambient sensor bubble around own units (task 5.1b).
-  // The bubble's centres are LOGICAL cells, so the union only changes when an
-  // own unit crosses a cell — not on every animation frame. Keying the memo on
-  // the centres themselves (rather than on worldTime) keeps both the BFS and
-  // the wedge-path DOM it feeds off the per-frame path.
-  const centerKeys = onBoard
-    .filter((f) => f.own)
-    .map((f) =>
-      cellKey(
-        fleetLogicalCell(
-          f,
-          worldTime,
-          schedule,
-          cellById.get(fleetDockedParentId(f, worldTime, schedule) ?? ''),
-        ),
-      ),
-    )
-    .join(',')
-  const bubble = useMemo(() => {
-    const centers = centerKeys
-      ? centerKeys.split(',').map((k) => {
-          const [ring, slot] = k.split(':')
-          return { ring: Number(ring), slot: Number(slot) }
-        })
-      : []
-    return sensorBubbleCells(centers, AMBIENT_RADIUS, radius, schedule)
-  }, [centerKeys, radius, schedule])
-
-  // Committed paths of own fleets — a burn, or a trip's leg 0 (task 5.1a). A
-  // burn that already arrived folds away via stateAt (no stale path).
-  const burnPaths = useMemo(
-    () =>
-      onBoard
-        .filter((f) => f.own)
-        .map((f) => ({ id: f.id, path: committedPath(f, worldTime, schedule) }))
-        .filter((p): p is { id: string; path: Cell[] } => !!p.path)
-        .map((p) => ({ id: p.id, points: pathPolyline(p.path, schedule) })),
-    [onBoard, worldTime, schedule],
-  )
+  const gateTabBase = tabIndexBase + features.length
 
   const keyActivate = (fn: () => void) => (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -235,56 +139,9 @@ export function BoardOverlay({
         pointerEvents="none"
       />
 
-      {/* The committed sweep of a running scan (solid), or the hover preview
-          of what a sweep from here would leave in shadow (faint). */}
-      <ScanOverlay plan={activeSweep ?? null} variant="active" schedule={schedule} hideOrigin />
-      {!activeSweep && <ScanOverlay plan={sweepPreview ?? null} variant="aim" schedule={schedule} />}
-      {activeSweep && scanFx && (
-        scanFx.fx === 'arc' ? (
-          <ArcScan
-            originCell={scanFx.originCell}
-            originPixel={cellToPoint(scanFx.originCell, schedule)}
-            features={scanFx.features}
-            rimRing={scanFx.rimRing}
-            schedule={schedule}
-            committedAt={scanFx.committedAt}
-            eta={scanFx.eta}
-            worldTime={worldTime}
-          />
-        ) : (
-          <ScanPing
-            originCell={scanFx.originCell}
-            originPixel={cellToPoint(scanFx.originCell, schedule)}
-            features={scanFx.features}
-            rimRing={scanFx.rimRing}
-            schedule={schedule}
-            committedAt={scanFx.committedAt}
-            eta={scanFx.eta}
-            worldTime={worldTime}
-          />
-        )
-      )}
-
-      <g data-testid="burn-paths" fill="none" pointerEvents="none">
-        {burnPaths.map((p) => (
-          <polyline key={p.id} points={p.points} stroke={PREVIEW_BURN} strokeWidth={1.5} strokeOpacity={0.8} />
-        ))}
-      </g>
-
-      <g data-testid="scan-bubble" pointerEvents="none">
-        {bubble.map((c) => (
-          <path
-            key={cellKey(c)}
-            d={wedgePath(c, schedule)}
-            fill={SCAN_BUBBLE_FILL}
-            stroke={SCAN_BUBBLE_STROKE}
-            strokeWidth={1}
-          />
-        ))}
-      </g>
-
-      {/* The selected bare cell, visibly marked (task 4.3a) — one dynamic
-          shape, not a per-cell node. */}
+      {/* The selected bare cell, visibly marked (board-view ADDED "Board
+          Picking Resolves to the Feature, Cell, or Lane Gate Under the
+          Pointer" — "a selected bare hex is visibly marked on the board"). */}
       {selectedCell && selectedCell.ring <= radius && (
         <path
           data-testid="selected-cell"
@@ -296,8 +153,8 @@ export function BoardOverlay({
         />
       )}
 
-      {/* Cell hover feedback (task 4.6a) — tracks the pointer's unprojected
-          cell, computed by BoardStage. */}
+      {/* Cell hover feedback — tracks the pointer's unprojected cell,
+          computed by BoardStage. */}
       {hoverCell && hoverCell.ring <= radius && (
         <path
           data-testid="hover-cell"
@@ -308,9 +165,9 @@ export function BoardOverlay({
         />
       )}
 
-      <SelectionPreview plan={plan ?? null} schedule={schedule} />
-
-      {/* Hit shapes, in hit-priority DOM order: gates lowest, fleets topmost. */}
+      {/* Hit shapes, in hit-priority DOM order: gates lowest, features
+          topmost — features win over a co-located gate (board-selection.ts's
+          `resolvePick`). */}
       <g data-testid="lane-gates">
         {gates.map((g, gi) => {
           const p = cellToPoint(g.cell, schedule)
@@ -396,67 +253,8 @@ export function BoardOverlay({
           )
         })}
       </g>
-
-      <g data-testid="fleet-glyphs">
-        {fleetsSorted.map((f, fi) => {
-          const p = fleetPixel(f)
-          const mode = stateAt(f.state, worldTime, schedule).mode
-          // The docked-fleet shrunk hit target: a docked fleet draws at
-          // exactly its parent's pixel, so clicks around the hull must fall
-          // through to the body underneath (the mine gesture).
-          const hitR = mode === 'docked' ? RADIAL_UNIT * 0.18 : RADIAL_UNIT * 0.5
-          const ring = RADIAL_UNIT * 0.42
-          const selected = selectedId === f.id
-          return (
-            <g
-              key={f.id}
-              data-testid={`fleet-glyph-${f.id}`}
-              data-own={f.own}
-              transform={`translate(${p.x.toFixed(2)}, ${p.y.toFixed(2)})`}
-              className="cursor-pointer"
-              pointerEvents="auto"
-              tabIndex={fleetTabBase + fi + 1}
-              role="button"
-              aria-label={f.own ? `Fleet ${f.id}` : 'Foreign contact'}
-              onFocus={() => setFocusedKey(`fleet-${f.id}`)}
-              onBlur={() => setFocusedKey((k) => (k === `fleet-${f.id}` ? null : k))}
-              onKeyDown={keyActivate(() => onSelectFleet?.(f.id))}
-              onClick={(e) => {
-                e.stopPropagation()
-                onSelectFleet?.(f.id)
-              }}
-            >
-              {selected && (
-                <circle r={ring + 5} fill="none" stroke={SELECTION_STROKE} strokeWidth={1.5} data-testid="selection-ring" />
-              )}
-              {focusedKey === `fleet-${f.id}` && (
-                <circle r={ring + 9} fill="none" stroke={SELECTION_STROKE} strokeWidth={1.25} strokeDasharray="2 3" data-testid="glyph-focus-ring" />
-              )}
-              <circle r={hitR} fill="transparent" />
-            </g>
-          )
-        })}
-      </g>
     </svg>
   )
 }
 
-// committedPath — the cell path a fleet is currently flying on this board: a
-// burn, or a trip's board leg. Null for a fleet that isn't flying one.
-function committedPath(f: Fleet, worldTime: number, s: Schedule): Cell[] | null {
-  const eff = stateAt(f.state, worldTime, s)
-  if (eff.mode === 'burn' && eff.burn) return eff.burn.path
-  if (eff.mode === 'laneTransit' && eff.laneTransit) {
-    return boardLegBurn(eff.laneTransit)?.path ?? null
-  }
-  return null
-}
-
-function pathPolyline(path: Cell[], s: Schedule): string {
-  return path
-    .map((c) => {
-      const p = cellToPoint(c, s)
-      return `${p.x.toFixed(2)},${p.y.toFixed(2)}`
-    })
-    .join(' ')
-}
+export default BoardOverlay

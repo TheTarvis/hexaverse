@@ -1,12 +1,24 @@
 'use client'
 
-// SystemBoardView — the container the /systems/[systemId] route renders (#0007).
-// It fans in the two fogged reads (the interior + the requester's fleets), runs
-// the shared world clock (useWorldTime), and owns the select → preview → commit
-// gesture for the slice verbs (move + scan). The heavy lifting lives in leaves:
-// BoardStage draws (BoardCanvas's WebGL world + BoardOverlay's hit layer),
-// FactsPanel commands, glyph-geometry/move-preview do the math. The three
-// #0005 refetch rules ride useBoardRealtime.
+// SystemBoardView — the container the /systems/[systemId] route renders
+// (migrate-fleet-to-continuous-burns, design.md Decision 12). It fans in the
+// unfogged interior read (system-interior "Interior Read Endpoint Serves
+// Unfogged Features", 7.7/7.9), runs the shared world clock (useWorldTime),
+// and owns single-selection picking (board-selection.ts) for the mine/sell
+// offers and the informational body/cell/gate facts panel. The board draws
+// no fleet layer and fetches no fleet data itself (board-view MODIFIED
+// "System Board Route and Data Fan-In") — the roster panel (mounted here,
+// same as the galaxy view) owns its own `useMyFleets` read, and this
+// container reuses that SAME shared query-cache read (never a new,
+// system-scoped fleet fetch) only to find the acting fleet and its docked
+// body for the mine/sell offers.
+//
+// Movement (burn/cut-drive/stop/jump) is commanded from the roster panel,
+// composed here from the current board selection (a burn's body-id target)
+// — design.md Decision 12: "Targets are named by body id from the interior
+// read, not by picking a tile." The heavy lifting lives in leaves: BoardStage
+// draws (BoardCanvas's WebGL world + BoardOverlay's hit layer), FactsPanel
+// shows the fleet/selection facts and commands mine/sell.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -15,40 +27,26 @@ import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import { toast } from '@/lib/toast'
 import { useSystemBoard } from '@/hooks/use-system-board'
-import { useFleetsInSystem, useFleetOrders, useMine, useScan, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
+import { useCutDrive, useJump, useMine, useMyFleets, useOrder, useStop } from '@/hooks/use-fleets'
 import { useMarketBoard, useSell, useStation } from '@/hooks/use-market'
 import { useCorporationOptional } from '@/components/corporation-provider'
 import { newOperationKey } from '@/lib/services/market-service'
 import { isPriceChanged, saleErrorCopy } from '@/lib/market-copy'
 import { MarketBoardPanel } from '@/components/market/MarketBoardPanel'
-import { useCancelAction, useRunningMine, useRunningScan } from '@/hooks/use-actions'
+import { useRunningMine } from '@/hooks/use-actions'
 import type { ResourceKind } from '@/lib/types/system-board'
 import { useWorldTime } from '@/hooks/use-world-time'
 import { useBoardRealtime } from '@/hooks/use-board-realtime'
-import { schedule as boardSchedule, type Cell, type Target } from '@/lib/board'
 import type { Fleet } from '@/lib/types/fleet'
 import { FleetRoster } from '@/components/fleet/FleetRoster'
 import { BoardStage } from './BoardStage'
 import { hexToRgb } from './board-pack'
 import { BoardTuning, type BoardLook } from './BoardTuning'
-import type { ScanFxInput } from './BoardOverlay'
-import { FactsPanel, type BoardSelection } from './FactsPanel'
-import {
-  featureLogicalCell,
-  fleetDockedParentId,
-  fleetLogicalCell,
-  fleetOnBoard,
-} from './glyph-geometry'
-import { planToBody, planToCell, type MovePlan } from './move-preview'
-import { occluderKey, planSweepFrom, sweepOccluders, type ScanPlan } from './scan-preview'
+import { FactsPanel } from './FactsPanel'
+import { toggleSelection, type BoardSelection } from './board-selection'
 
 const STAGE = 'relative h-dvh w-full overflow-hidden bg-[#05070d]'
 
-// The persisted playtest FX preference: which effect a running scan renders.
-// 'ping' is the slice mechanic's honest picture (radial echo); 'arc' is the
-// rotating-beam look kept alive as a future variant (ArcScan).
-const SCAN_FX_KEY = 'hexaverse.scanFx'
-type ScanFx = 'ping' | 'arc'
 const PANEL =
   'pointer-events-auto rounded-xl border border-zinc-200 bg-zinc-50/90 p-4 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]'
 
@@ -58,7 +56,6 @@ export interface SystemBoardViewProps {
 
 export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const { data: board, isLoading, isError, error } = useSystemBoard(systemId)
-  const { data: fleets } = useFleetsInSystem(systemId)
   const worldTime = useWorldTime(board?.worldTime)
   const router = useRouter()
   // The admin custom claim (set via scripts/dev/admin/set-admin-claims.js;
@@ -67,11 +64,6 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const { isAdmin } = useAccountContext()
 
   const [selection, setSelection] = useState<BoardSelection>(null)
-
-  // The board's slot schedule for THIS system, resolved once and threaded into
-  // every solve and projection below (design.md, schedule-threading Decision).
-  // Per-system, not the process-wide default: the solves here route to the rim.
-  const schedule = useMemo(() => boardSchedule(board?.radius ?? 0), [board?.radius])
   const [activeFleetId, setActiveFleetId] = useState<string | null>(null)
   // The renderer's availability (BoardCanvas's guard) and first-frame signal —
   // together they decide how long the loading placeholder persists (the
@@ -80,26 +72,8 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   // precedence and replaces it.
   const [boardAvailable, setBoardAvailable] = useState(true)
   const [firstFrame, setFirstFrame] = useState(false)
-  // True while the player hovers/focuses the Scan verb — the only moment the
-  // aim corridor draws (selecting things to plan a burn stays quiet).
-  const [scanPreview, setScanPreview] = useState(false)
-  // The scan-FX toggle, read from storage after mount (not in the initializer,
-  // so server and first client render agree) and persisted on change.
-  const [scanFx, setScanFx] = useState<ScanFx>('ping')
-  useEffect(() => {
-    const stored = window.localStorage.getItem(SCAN_FX_KEY)
-    if (stored === 'arc' || stored === 'ping') setScanFx(stored)
-  }, [])
-  const toggleScanFx = () =>
-    setScanFx((fx) => {
-      const next: ScanFx = fx === 'ping' ? 'arc' : 'ping'
-      window.localStorage.setItem(SCAN_FX_KEY, next)
-      return next
-    })
 
-  // The dev tuning panel's look override (null = the tuned constants). The
-  // panel itself mounts only in development builds; in production this stays
-  // null and BoardStage receives no override props at all.
+  // The dev tuning panel's look override (null = the tuned constants).
   const [look, setLook] = useState<BoardLook | null>(null)
   const lookProps = useMemo(
     () =>
@@ -110,9 +84,6 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
               instrument: look.instrument,
               starfield: look.starfield,
               starScale: look.starScale,
-              // The panel stores an sRGB hex; the GL contract speaks linear
-              // triples — hexToRgb is the same linearisation every packed
-              // colour goes through.
               starTint: look.starTint ? hexToRgb(look.starTint) : null,
               bodyScale: look.bodyScale,
             },
@@ -122,193 +93,101 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     [look],
   )
 
-  const { order, cancel } = useFleetOrders(systemId)
-  const scan = useScan(systemId)
+  // The requester's own fleets — the SAME shared read the roster panel uses
+  // (design.md Decision 12: "the board fetches no fleet data"). Filtered to
+  // this system for the acting fleet / mine / sell surface only.
+  const { data: myFleets } = useMyFleets()
+  const ownFleetsHere = useMemo(
+    () => (myFleets ?? []).filter((f) => f.systemId === systemId),
+    [myFleets, systemId],
+  )
+  const activeFleet = useMemo<Fleet | null>(
+    () => ownFleetsHere.find((f) => f.id === activeFleetId) ?? ownFleetsHere[0] ?? null,
+    [ownFleetsHere, activeFleetId],
+  )
+
+  // Departure hand-off (board-view "Departure Hand-Off to the Galaxy View",
+  // untouched by this change — still in force). `ownFleetsHere` is this
+  // board's live "who's present here" read; a fleet id that was in that set
+  // on a prior render and has since fallen out of it transited its
+  // departure gate while this board was watching it (its systemId flips
+  // only at the jump resolver — design.md Decision 10), so we follow it to
+  // the galaxy view. A fleet that was ALREADY elsewhere when this board was
+  // opened was never in the watched set to begin with, so opening a board
+  // like that is correctly a no-op here.
+  const watchedFleetIdsRef = useRef<Set<string>>(new Set())
+  const watchedSystemIdRef = useRef(systemId)
+  useEffect(() => {
+    if (watchedSystemIdRef.current !== systemId) {
+      watchedSystemIdRef.current = systemId
+      watchedFleetIdsRef.current = new Set()
+    }
+    const currentIds = new Set(ownFleetsHere.map((f) => f.id))
+    const departed = [...watchedFleetIdsRef.current].some((id) => !currentIds.has(id))
+    watchedFleetIdsRef.current = currentIds
+    if (departed) {
+      router.push('/')
+    }
+  }, [ownFleetsHere, systemId, router])
+
+  const order = useOrder()
+  const cutDrive = useCutDrive()
+  const stop = useStop()
+  const jump = useJump()
   const mine = useMine(systemId)
 
-  // The market (#0011). The station read is gated server-side by graph tier, so
-  // a system whose station the requester cannot see simply resolves to nothing.
+  // The market. The station read is gated server-side by graph tier, so a
+  // system whose station the requester cannot see simply resolves to nothing.
   const stationQuery = useStation(systemId)
   const station = stationQuery.data ?? null
   const boardQuery = useMarketBoard(!!station)
-  const sell = useSell(systemId)
-  // Optional: the balance is supplementary here, and the board must not go
-  // blank because the readout could not find its provider.
-  const corporation = useCorporationOptional()
-  // Sale feedback the panel announces: the last settled proceeds, the last
-  // failure's player-facing copy, and the price a re-priced offer moved FROM.
-  const [lastSaleProceeds, setLastSaleProceeds] = useState<number | null>(null)
-  const [saleFailure, setSaleFailure] = useState<string | null>(null)
-  const [sellRepricedFrom, setSellRepricedFrom] = useState<number | null>(null)
-  const cancelAction = useCancelAction(systemId)
-  const travel = useFleetTravel()
-  const pending =
-    order.isPending ||
-    cancel.isPending ||
-    scan.isPending ||
-    mine.isPending ||
-    cancelAction.isPending ||
-    travel.isPending ||
-    // The sell control's double-submit guard: disabled from commit until the
-    // sale settles or fails, so a double-click cannot become two sales.
-    sell.isPending
-
-  const allFleets = useMemo(() => fleets ?? [], [fleets])
-  const ownFleets = useMemo(() => allFleets.filter((f) => f.own), [allFleets])
-  const activeFleet = useMemo<Fleet | null>(
-    () => ownFleets.find((f) => f.id === activeFleetId) ?? ownFleets[0] ?? null,
-    [ownFleets, activeFleetId],
-  )
-
-  // A selected rim gate previews the charted route from the acting fleet to that
-  // neighbour (#0008) — disabled until both a fleet and a gate are in hand; a
-  // no-charted-route destination surfaces as the query's 422 error.
-  const selectedGateDest = selection?.kind === 'gate' ? selection.gate.destSystemId : null
-  const routeQuery = useRoutePreview(activeFleet?.id ?? null, selectedGateDest)
-
-  // The acting fleet's live cell — the origin of every previewed order. The
-  // docked parent comes off the EFFECTIVE state (a finished dock-on-arrive burn
-  // rides its body from the arrival instant, not from the next refetch).
-  const fromCell = useMemo<Cell | null>(() => {
-    if (!activeFleet || !board) return null
-    const parentId = fleetDockedParentId(activeFleet, worldTime, schedule)
-    const parent = parentId ? board.features.find((f) => f.id === parentId) : undefined
-    const parentCell = parent ? featureLogicalCell(parent, worldTime, schedule) : undefined
-    return fleetLogicalCell(activeFleet, worldTime, schedule, parentCell)
-  }, [activeFleet, board, worldTime, schedule])
-
-  // The feature the acting fleet is docked to, if any — the mine offer's
-  // anchor (add-mine-ui "Mine Offer on the Docked Fleet"): the verb needs no
-  // selection, just the docked state and the body's visible resources.
-  const dockedFeature = useMemo(() => {
-    if (!activeFleet || !board) return null
-    const parentId = fleetDockedParentId(activeFleet, worldTime, schedule)
-    return parentId ? (board.features.find((f) => f.id === parentId) ?? null) : null
-  }, [activeFleet, board, worldTime, schedule])
-
-  // Docked at THIS system's station — the sell offer's anchor, the same
-  // docked-state test the mine offer uses. A station is dockable but never
-  // mineable, so the two offers are mutually exclusive by construction.
-  const dockedAtStation = !!station && !!activeFleet &&
-    fleetDockedParentId(activeFleet, worldTime, schedule) === station.featureId
-
-  // This station's live quotes, pulled out of the aggregate board read rather
-  // than fetched separately — the board already carries every visible venue.
   const stationQuotes = useMemo(() => {
     if (!station) return null
     const venue = boardQuery.data?.venues.find((v) => v.systemId === station.systemId)
     return venue?.quotes ?? null
   }, [station, boardQuery.data])
+  const sell = useSell(systemId)
+  const corporation = useCorporationOptional()
+  const [lastSaleProceeds, setLastSaleProceeds] = useState<number | null>(null)
+  const [saleFailure, setSaleFailure] = useState<string | null>(null)
+  const [sellRepricedFrom, setSellRepricedFrom] = useState<number | null>(null)
+  // Cancelling a running mine is a roster-panel command (FleetRoster owns its
+  // own `useCancelAction` call, per fleet-roster ADDED "The Roster Row Is the
+  // Fleet Command Surface" superseding the removed board-side control) — this
+  // container's `pending` guard has no cancel mutation of its own to fold in.
+  const pending =
+    order.isPending ||
+    cutDrive.isPending ||
+    stop.isPending ||
+    jump.isPending ||
+    mine.isPending ||
+    // The sell control's double-submit guard: disabled from commit until the
+    // sale settles or fails, so a double-click cannot become two sales.
+    sell.isPending
 
-  // The sweep preview: what a scan from HERE would leave in shadow (#0006
-  // Decision #21 — the sweep is 360°, so the shadow is the signal). Only
-  // computed while the Scan verb is being considered (hover/focus).
-  // Memoized on the resolved occluder set rather than on worldTime: the solve
-  // is O(cells × occluders) and its answer only changes when an occluder
-  // crosses a cell, not on every animation frame.
-  const previewOccluders = useMemo(
-    () => (scanPreview && board ? sweepOccluders(board.features, worldTime, schedule) : []),
-    [scanPreview, board, worldTime, schedule],
-  )
-  const previewKey = fromCell ? occluderKey(fromCell, previewOccluders) : ''
-  const sweepPreview = useMemo<ScanPlan | null>(() => {
-    if (!scanPreview || !board || !fromCell) return null
-    return planSweepFrom(fromCell, previewOccluders, board.radius, schedule)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanPreview, board?.radius, previewKey, schedule])
-
-  // The RUNNING scan's committed sweep: the origin is the EMISSION CELL pinned
-  // in the action's params at commit (#0006 Decision #26 — the pulse stays
-  // where it was fired; the durable sweep mints from the same cell), occluders
-  // evaluated at the frozen eta — exactly what resolution will cover — drawn
-  // until the eta passes and the reveal lands via the board refetch. A scan
-  // committed before the origin was pinned falls back to the fleet at eta.
-  const runningScan = useRunningScan(activeFleet?.id ?? null).data ?? null
-  // The RUNNING mine (#0010, add-mine-ui): the movement channel's busy signal.
-  // Its eta gates move/mine in the panel and joins the refetch candidates so
-  // the resolved cargo + freed slot land without user action.
+  // The RUNNING mine (add-mine-ui): the movement channel's busy signal. Its
+  // eta gates the roster panel's commands (fleet-roster/board-view) and joins
+  // the refetch candidates so the resolved cargo + freed slot land without
+  // user action.
   const runningMine = useRunningMine(activeFleet?.id ?? null).data ?? null
-  // The committed sweep is evaluated at the FROZEN eta, so it does not change
-  // as world time advances — only whether it is still being drawn does. The
-  // running/expired test therefore sits outside the memo; leaving worldTime in
-  // its dependency list re-solved an identical shadow on every frame.
-  const scanRunning =
-    !!runningScan && runningScan.status === 'running' && worldTime < runningScan.eta
-  const activeSweep = useMemo<ScanPlan | null>(() => {
-    if (!board || !activeFleet || !runningScan) return null
-    if (runningScan.status !== 'running') return null
-    const eta = runningScan.eta
-    let origin = runningScan.params?.origin ?? null
-    if (!origin) {
-      const parentId = fleetDockedParentId(activeFleet, eta, schedule)
-      const parent = parentId ? board.features.find((f) => f.id === parentId) : undefined
-      const parentCell = parent ? featureLogicalCell(parent, eta, schedule) : undefined
-      origin = fleetLogicalCell(activeFleet, eta, schedule, parentCell)
-    }
-    if (!origin) return null
-    return planSweepFrom(origin, sweepOccluders(board.features, eta, schedule), board.radius, schedule)
-  }, [board, activeFleet, runningScan, schedule])
 
-  // The drawn sweep: the frozen solve above, shown only while the scan is still
-  // running. Splitting the gate from the solve is what keeps the solve off the
-  // per-frame path.
-  const drawnSweep = scanRunning ? activeSweep : null
+  // isChartedGate: the fleet-roster jump command's gate — "is the body this
+  // fleet is attached to a lane gate whose lane the corporation has
+  // charted?" `LaneGate` (lib/types/system-board.ts) carries no body id, only
+  // {destSystemId, cell} — there is no wire field correlating a gate BODY id
+  // (what `attachedTo` holds) with a charted lane gate entry. That is a
+  // backend gap, not a frontend one (a `LaneGate.bodyId` field, or
+  // equivalent, would close it) — recorded, not invented around. Until it
+  // exists this predicate is conservatively `false`, which is also exactly
+  // what a fresh corporation reaches today regardless (spawn charts zero
+  // lanes; the focused-scan verb that would chart one is link 5's).
+  const isChartedGate = () => false
 
-  // The live preview plan for the current selection — recomputed each frame so a
-  // led intercept tracks the moving target. The star at the core cell is a body,
-  // not a destination (you can't fly onto it or dock it), so it yields no plan.
-  const plan = useMemo<MovePlan | null>(() => {
-    if (!fromCell || !selection) return null
-    if (selection.kind === 'feature') {
-      const f = selection.feature
-      if (f.fixed || isCore(featureLogicalCell(f, worldTime, schedule))) return null
-      if (f.orbit) return planToBody(fromCell, f.orbit, worldTime, schedule)
-      return planToCell(fromCell, featureLogicalCell(f, worldTime, schedule), worldTime, schedule)
-    }
-    if (selection.kind === 'cell') {
-      return isCore(selection.cell) ? null : planToCell(fromCell, selection.cell, worldTime, schedule)
-    }
-    // A gate previews the in-system burn to its gate cell (leg 0 of the trip); the
-    // lanes past it are shown as ETAs in the facts panel, not on the board.
-    if (selection.kind === 'gate') return planToCell(fromCell, selection.gate.cell, worldTime, schedule)
-    return null
-  }, [fromCell, selection, worldTime, schedule])
-
-  // Own fleets' arrival ETAs feed the self-scheduled refetch (rule 1) — a burn's
-  // arrival, a trip's gate ETA (the moment the fleet leaves this board), and a
-  // running scan's eta (the refetched board read runs the #0005 fold, so this is
-  // what makes the reveal land the moment the sweep finishes).
   const etaCandidates = useMemo(
-    () => [
-      ...ownFleets.flatMap((f) => {
-        if (f.state.mode === 'burn' && f.state.burn) return [f.state.burn.arriveTime]
-        const gateEta = f.state.mode === 'laneTransit' ? f.state.laneTransit?.boardLeg?.gateEta : undefined
-        return gateEta === undefined ? [] : [gateEta]
-      }),
-      ...(runningScan?.status === 'running' ? [runningScan.eta] : []),
-      ...(runningMine?.status === 'running' ? [runningMine.eta] : []),
-    ],
-    [ownFleets, runningScan, runningMine],
+    () => (runningMine?.status === 'running' ? [runningMine.eta] : []),
+    [runningMine],
   )
-  useBoardRealtime({ systemId, worldTime, etaCandidates, scanning: !!drawnSweep, enabled: !!board })
-
-  // Departure hand-off (#0008): a fleet that transits its gate is out on a lane —
-  // it has no hex on this board any more, and the crawl it's now doing is the
-  // galaxy view's picture. Follow it there, but only for a departure we actually
-  // watched happen (a ref, so revisiting the board mid-trip doesn't bounce you).
-  const watchedDeparture = useRef(false)
-  useEffect(() => {
-    const inTransit = ownFleets.filter((f) => f.state.mode === 'laneTransit')
-    if (inTransit.length === 0) return
-    if (inTransit.some((f) => fleetOnBoard(f, worldTime, schedule))) {
-      watchedDeparture.current = true
-      return
-    }
-    if (watchedDeparture.current) {
-      watchedDeparture.current = false
-      router.push('/')
-    }
-  }, [ownFleets, worldTime, router, schedule])
+  useBoardRealtime({ systemId, worldTime, etaCandidates, enabled: !!board })
 
   if (isLoading) {
     return (
@@ -333,106 +212,72 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     )
   }
 
-  // --- selection (toggle-to-deselect) ---------------------------------------
-  const selectFeature = (id: string) => {
-    const feature = board.features.find((f) => f.id === id)
-    if (!feature) return
-    setSelection((prev) =>
-      prev?.kind === 'feature' && prev.feature.id === id ? null : { kind: 'feature', feature },
-    )
-  }
-  const selectFleet = (id: string) => {
-    const f = allFleets.find((fl) => fl.id === id)
-    if (!f) return
-    if (f.own) setActiveFleetId(id)
-    setSelection((prev) => (prev?.kind === 'fleet' && prev.fleet.id === id ? null : { kind: 'fleet', fleet: f }))
-  }
-  const selectCell = (cell: Cell) =>
-    setSelection((prev) =>
-      prev?.kind === 'cell' && prev.cell.ring === cell.ring && prev.cell.slot === cell.slot
-        ? null
-        : { kind: 'cell', cell },
-    )
-  const selectGate = (destSystemId: string) => {
-    const gate = board.laneGates.find((g) => g.destSystemId === destSystemId)
-    if (!gate) return
-    setSelection((prev) =>
-      prev?.kind === 'gate' && prev.gate.destSystemId === destSystemId ? null : { kind: 'gate', gate },
-    )
-  }
+  // --- picking (board-view ADDED "Board Picking Resolves to the Feature,
+  // Cell, or Lane Gate Under the Pointer"; MODIFIED "Toggle-to-Deselect
+  // Single Selection") — BoardOverlay's own glyph clicks already resolve
+  // feature/gate-wins (DOM hit-priority + stopPropagation); these two
+  // handlers cover the remaining cases board-selection.ts's `resolvePick`
+  // documents (a bare-cell pick, and the outside-the-lattice clear), plus
+  // the shared toggle rule for every kind.
+  const pick = (picked: BoardSelection) => setSelection((prev) => toggleSelection(prev, picked))
+  const selectFeature = (id: string) => pick({ kind: 'feature', id })
+  const selectGate = (destSystemId: string) => pick({ kind: 'gate', destSystemId })
+  const selectCell = (cell: { ring: number; slot: number }) => pick({ kind: 'cell', cell })
+  const selectEmpty = () => pick(null)
 
-  // A roster row: a fleet on this board becomes the acting one (and gets
-  // selected); a fleet in another system opens that board; one out on a lane has
-  // no board at all — the galaxy is where it's visible.
-  const showFleet = (f: Fleet) => {
-    if (f.state.mode === 'laneTransit' || f.state.mode === 'laneHold') {
-      if (!fleetOnBoard(f, worldTime, schedule)) {
-        router.push('/')
-        return
-      }
-    }
-    if (f.systemId !== systemId) {
-      router.push(`/systems/${f.systemId}`)
+  // --- roster commands (fleet-roster "The Roster Row Is the Fleet Command
+  // Surface") — burn's target is the current board selection (a feature id);
+  // there is no valid point target from a board-cell selection (a hex has no
+  // continuous-space coordinate — design.md Decision 12's "visually
+  // unplayable" interim), so a burn without a feature selected is refused
+  // client-side with a toast rather than sent as a malformed request.
+  const handleBurn = (fleet: Fleet) => {
+    if (selection?.kind !== 'feature') {
+      toast.error('Select a body to target first')
       return
     }
-    setActiveFleetId(f.id)
-    setSelection({ kind: 'fleet', fleet: f })
-  }
-
-  // --- verbs -----------------------------------------------------------------
-  const commitMove = () => {
-    if (!activeFleet || !selection) return
-    let target: Target | null = null
-    if (selection.kind === 'feature') target = { featureId: selection.feature.id }
-    else if (selection.kind === 'cell') target = { cell: selection.cell }
-    if (!target) return
     order.mutate(
-      { fleetId: activeFleet.id, target },
+      { fleetId: fleet.id, request: { bodyId: selection.id } },
       {
-        onSuccess: () => {
-          toast.success('Course laid in')
-          setSelection(null)
-        },
+        onSuccess: () => toast.success('Course laid in'),
         onError: (e) => toast.error(e.message || 'Order failed'),
       },
     )
   }
-  // The scan is a 360° sweep (#0006 Decision #21): one manual trigger, no aim.
-  const commitScan = () => {
-    if (!activeFleet) return
-    scan.mutate(activeFleet.id, {
-      onSuccess: () => toast.success('Scanning…'),
-      onError: (e) => toast.error(e.message || 'Scan failed'),
+  const handleCutDrive = (fleet: Fleet) => {
+    cutDrive.mutate(fleet.id, {
+      onSuccess: () => toast.success('Drive cut'),
+      onError: (e) => toast.error(e.message || 'Cut drive failed'),
     })
   }
-  const commitCancel = () => {
-    if (!activeFleet) return
-    cancel.mutate(activeFleet.id, {
-      onSuccess: () => toast.success('Burn cancelled'),
-      onError: (e) => toast.error(e.message || 'Cancel failed'),
+  const handleStop = (fleet: Fleet) => {
+    stop.mutate(fleet.id, {
+      onSuccess: () => toast.success('Stopping'),
+      onError: (e) => toast.error(e.message || 'Stop failed'),
     })
   }
-  // Mine (#0010, add-mine-ui): the panel picked kind + tons; the featureId is
-  // the fleet's dock parent — no selection involved. The countdown + refetch
-  // arming ride the invalidated inbox.
+  const handleJump = (_fleet: Fleet) => {
+    // Unreachable while `isChartedGate` is conservatively false (see above) —
+    // `jump` (useJump()) is wired here for when the backend gap closes, but
+    // there is no laneId to send yet, so this refuses rather than guesses.
+    toast.error('No charted lane known for this gate')
+  }
+
+  // --- mine / sell (kept board-view requirements: Mine Offer/ETA/Commit,
+  // Fleet Panel Hold Readout, sell) — anchored on `attachedTo`, never a
+  // selection.
+  const dockedAtStation = !!station && !!activeFleet && activeFleet.attachedTo === station.featureId
+
   const commitMine = (kind: ResourceKind, tons: number) => {
-    if (!activeFleet || !dockedFeature) return
+    if (!activeFleet || !activeFleet.attachedTo) return
     mine.mutate(
-      { fleetId: activeFleet.id, request: { featureId: dockedFeature.id, kind, tons } },
+      { fleetId: activeFleet.id, request: { featureId: activeFleet.attachedTo, kind, tons } },
       {
         onSuccess: () => toast.success('Extractors running'),
         onError: (e) => toast.error(e.message || 'Mine failed'),
       },
     )
   }
-  // Sell (#0011): the panel picked kind + tons and quoted a first-ton price; the
-  // featureId is the fleet's dock parent, exactly as mine's is.
-  //
-  // ONE operation key per user-initiated attempt — the key is the entire guard
-  // against a lost response becoming a double sale, since a sale claims no
-  // action slot and so inherits none of the spine's retry safety. A re-priced
-  // re-commit mints a fresh key; reusing the old one would be answered as a
-  // replay of the previous sale.
   const commitSell = (kind: ResourceKind, tons: number, expectedUnitPrice: number) => {
     if (!activeFleet || !station) return
     setSaleFailure(null)
@@ -456,9 +301,6 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
         onError: (e) => {
           const copy = saleErrorCopy(e.message)
           setSaleFailure(copy)
-          // A price-changed rejection after a multi-minute haul must not leave a
-          // stale, un-committable offer on screen: re-price it and say what
-          // moved. The invalidated board read supplies the new price.
           if (isPriceChanged(e.message)) {
             setSellRepricedFrom(expectedUnitPrice)
             void stationQuery.refetch()
@@ -468,83 +310,31 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       },
     )
   }
-  const commitCancelMine = () => {
-    if (!activeFleet || !runningMine) return
-    cancelAction.mutate(
-      { actionId: runningMine.id, fleetId: activeFleet.id },
-      {
-        onSuccess: () => toast.success('Mining cancelled'),
-        onError: (e) => toast.error(e.message || 'Cancel failed'),
-      },
-    )
-  }
-  const commitDepart = () => {
-    if (!activeFleet || selection?.kind !== 'gate') return
-    travel.mutate(
-      { fleetId: activeFleet.id, systemId: selection.gate.destSystemId },
-      {
-        onSuccess: () => {
-          toast.success('Fleet departing')
-          setSelection(null)
-          // Arm the hand-off here too: a fleet already sitting on the gate has a
-          // zero-length board leg, so it's off-board before any frame renders it.
-          watchedDeparture.current = true
-        },
-        onError: (e) => toast.error(e.message || 'Departure failed'),
-      },
-    )
-  }
 
-  const selectedId =
-    selection?.kind === 'feature'
-      ? selection.feature.id
-      : selection?.kind === 'fleet'
-        ? selection.fleet.id
-        : null
-  const selectedGateId = selection?.kind === 'gate' ? selection.gate.destSystemId : null
-
-  // The running scan's effect, pinned at the emission hex (#0006 Decision #26
-  // — the pulse stays where it was fired; the ship moves on). The FX toggle
-  // (playtest) swaps in the arc-scan look. Prop-driven onto the overlay.
-  const scanFxInput: ScanFxInput | null =
-    drawnSweep && runningScan && activeFleet
-      ? {
-          originCell: drawnSweep.origin,
-          features: board.features,
-          rimRing: board.radius,
-          committedAt: runningScan.committedAt,
-          eta: runningScan.eta,
-          fx: scanFx,
-        }
-      : null
+  const selectedId = selection?.kind === 'feature' ? selection.id : null
+  const selectedGateId = selection?.kind === 'gate' ? selection.destSystemId : null
 
   return (
     <div data-testid="system-board-view" className={STAGE}>
       <BoardStage
         systemId={systemId}
         board={board}
-        fleets={allFleets}
+        fleets={[]}
         worldTime={worldTime}
         selectedId={selectedId}
         selectedGateId={selectedGateId}
         selectedCell={selection?.kind === 'cell' ? selection.cell : null}
         onSelectFeature={selectFeature}
-        onSelectFleet={selectFleet}
         onSelectGate={selectGate}
         onSelectCell={selectCell}
-        onSelectEmpty={() => setSelection(null)}
-        plan={selection?.kind === 'fleet' ? null : plan}
-        activeSweep={drawnSweep}
-        sweepPreview={sweepPreview}
-        scanFx={scanFxInput}
+        onSelectEmpty={selectEmpty}
         onAvailabilityChange={setBoardAvailable}
         onFirstFrame={() => setFirstFrame(true)}
         {...lookProps}
       />
 
-      {/* Loading persists through the first rendered frame (task 6.1a) — but
-          never over an unsupported/interrupted notice, which takes precedence
-          (the placeholder MUST NOT persist when no frame can ever come). */}
+      {/* Loading persists through the first rendered frame — but never over an
+          unsupported/interrupted notice, which takes precedence. */}
       {!firstFrame && boardAvailable && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#05070d] text-sm text-white/50">
           Charting the system…
@@ -552,24 +342,34 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       )}
 
       <div className="pointer-events-none absolute inset-0 flex justify-between gap-4 p-4">
-        {/* The roster is the same panel the galaxy shows — where every fleet is,
-            whichever canvas you're standing on. A fleet on this board becomes the
-            one you're commanding; one elsewhere drills into its system. */}
-        {/* Left column, mirroring GalaxyView's overlay: panels stack at the
-            edge so the board's centre stays clickable — a loose third flex
-            child under justify-between would float over the middle of an
-            unpannable board and swallow glyph clicks (pointer-events-auto). */}
         <div className="flex flex-col gap-4 self-start">
           <FleetRoster
             worldTime={worldTime}
+            isChartedGate={isChartedGate}
             activeFleetId={activeFleet?.id ?? null}
             currentSystemId={systemId}
-            onSelect={showFleet}
+            onSelect={(f) => {
+              // A mid-jump fleet has no cell on ANY board — its systemId
+              // hasn't flipped yet (design.md Decision 10: only the jump
+              // resolver flips it, on arrival) — so `jump` set means "no
+              // board presence" regardless of which systemId it still
+              // reads, same rule as galaxy view's presence.ts.
+              if (f.jump) {
+                router.push('/')
+                return
+              }
+              if (f.systemId !== systemId) {
+                router.push(`/systems/${f.systemId}`)
+                return
+              }
+              setActiveFleetId(f.id)
+            }}
+            onBurn={handleBurn}
+            onCutDrive={handleCutDrive}
+            onStop={handleStop}
+            onJump={handleJump}
           />
-          {/* The market board's second mount point (the first is the galaxy view).
-              The SAME shared panel: it ranks and presents, and this view decides
-              what a row selection means — here, drilling into that system's board.
-              Shown only where there is a station to trade at. */}
+          {/* The market board's second mount point (the first is the galaxy view). */}
           {station && (
             <div className={PANEL}>
               <MarketBoardPanel
@@ -587,42 +387,25 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           character={board.character}
           radius={board.radius}
           featureCount={board.features.length}
+          features={board.features}
           selection={selection}
           activeFleet={activeFleet}
-          dockedFeature={dockedFeature}
-          plan={plan}
           worldTime={worldTime}
           pending={pending}
-          scanEta={runningScan?.status === 'running' ? runningScan.eta : null}
           mineEta={runningMine?.status === 'running' ? runningMine.eta : null}
-          route={
-            selection?.kind === 'gate'
-              ? { isLoading: routeQuery.isLoading, isError: routeQuery.isError, data: routeQuery.data }
-              : null
-          }
-          onMove={commitMove}
-          onScan={commitScan}
           onMine={commitMine}
-          onCancelMine={commitCancelMine}
           stationQuotes={dockedAtStation ? stationQuotes : null}
           onSell={commitSell}
           sellRepricedFrom={sellRepricedFrom}
           credits={corporation?.credits ?? null}
           lastSaleProceeds={lastSaleProceeds}
           saleFailure={saleFailure}
-          onScanPreview={setScanPreview}
-          scanFx={scanFx}
-          onToggleScanFx={toggleScanFx}
           available={boardAvailable}
-          onCancel={commitCancel}
-          onDepart={commitDepart}
         />
       </div>
 
       {/* Look tuning (the bench's knobs on live content) — always on in dev
-          builds, admin-claim-gated everywhere else. The claim is a Firebase
-          custom claim; the gate is cosmetic-only (no privileged reads ride
-          it), so client-side gating is enough. */}
+          builds, admin-claim-gated everywhere else. */}
       {(isAdmin || process.env.NODE_ENV === 'development') && (
         <div className="pointer-events-none absolute bottom-4 right-4">
           <BoardTuning onChange={setLook} />
@@ -630,12 +413,6 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       )}
     </div>
   )
-}
-
-// isCore reports whether a cell is the star's core cell — never a valid
-// move destination.
-function isCore(c: Cell): boolean {
-  return c.ring === 0
 }
 
 export default SystemBoardView

@@ -1,15 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { RADIAL_UNIT } from '@/lib/board'
 import type { BoardFeature, FogBand } from '@/lib/types/system-board'
-import type { Fleet } from '@/lib/types/fleet'
 import {
   DRAW_RADIUS,
   createPackedScene,
   fogQuadFor,
-  formationOffsets,
   hexToRgb,
   packBodyInstance,
-  packFleetInstance,
   packRings,
   seedFromId,
   sortFeaturesForDraw,
@@ -22,17 +19,6 @@ function feature(overrides: Partial<BoardFeature> & { id: string }): BoardFeatur
     band: 'visible',
     live: true,
     orbit: { ring: 3, angle0: 0, period: 60_000, dir: 1 },
-    ...overrides,
-  }
-}
-
-function fleet(overrides: Partial<Fleet> & { id: string; own: boolean }): Fleet {
-  return {
-    corporationId: 'corp',
-    systemId: 'sys',
-    state: { mode: 'coast', coast: { ring: 2, angle0: 0, period: 60_000, dir: 1 } },
-    position: { ring: 2, slot: 0 },
-    worldTime: 0,
     ...overrides,
   }
 }
@@ -103,62 +89,16 @@ describe('sortFeaturesForDraw', () => {
   })
 })
 
-// `### Requirement: Foreign Fleets Render as Contact Marks Only` — the
-// own/foreign fork, decided outside the renderer.
-describe('packFleetInstance', () => {
-  it('draws one hull per roster ship for an own fleet', () => {
-    const f = fleet({
-      id: 'own',
-      own: true,
-      roster: { ships: [{ class: 'a' }, { class: 'b' }, { class: 'c' }], cargo: null, cargoCapacity: 0, freeHold: 0, miningRate: 0 },
-    })
-    const packed = packFleetInstance(f)
-    expect(packed.audience).toBe(0)
-    expect(packed.formation).toHaveLength(3)
-  })
-
-  it('renders a rosterless own fleet as a single hull without error', () => {
-    const packed = packFleetInstance(fleet({ id: 'own', own: true }))
-    expect(packed.audience).toBe(0)
-    expect(packed.formation).toHaveLength(1)
-  })
-
-  it('renders a foreign fleet as the constant contact mark, roster or not', () => {
-    const bare = packFleetInstance(fleet({ id: 'a', own: false }))
-    expect(bare.audience).toBe(1)
-    expect(bare.formation).toEqual([{ dx: 0, dy: 0 }])
-  })
-
-  it('two foreign fleets of different composition pack identically (minus id)', () => {
-    // Even if a roster somehow leaked onto a foreign read, the mark must not
-    // vary with ANY field of the fleet.
-    const a = packFleetInstance(
-      fleet({ id: 'a', own: false, roster: { ships: [{ class: 'x' }], cargo: null, cargoCapacity: 1, freeHold: 1, miningRate: 1 } }),
-    )
-    const b = packFleetInstance(
-      fleet({
-        id: 'b',
-        own: false,
-        roster: { ships: [{ class: 'x' }, { class: 'y' }, { class: 'z' }], cargo: null, cargoCapacity: 9, freeHold: 0, miningRate: 2 },
-      }),
-    )
-    expect({ ...a, id: null }).toEqual({ ...b, id: null })
-  })
-})
-
-describe('formationOffsets', () => {
-  it('gives the leader the centre slot and wingmen staggered pairs', () => {
-    const slots = formationOffsets(3)
-    expect(slots[0]).toEqual({ dx: 0, dy: 0 })
-    expect(slots[1]!.dx).toBeLessThan(0)
-    expect(slots[2]!.dx).toBeGreaterThan(0)
-    expect(slots[1]!.dy).toBe(slots[2]!.dy)
-  })
-
-  it('never returns an empty formation', () => {
-    expect(formationOffsets(0)).toHaveLength(1)
-  })
-})
+// `packFleetInstance`/`formationOffsets` (the fleet hull-slot pack, covering
+// `### Requirement: Foreign Fleets Render as Contact Marks Only`) DELETED,
+// with reason: migrate-fleet-to-continuous-burns design.md Decision 12 — the
+// board draws no fleet layer at all after this change (a fleet's position is
+// now a continuous-space `space.Vec3`, not a board cell, so there is nothing
+// left to pack an instance from). `board-view` REMOVED "Foreign Fleets
+// Render as Contact Marks Only" with no successor (openspec/changes/
+// migrate-fleet-to-continuous-burns/specs/board-view/spec.md). `board-pack.ts`
+// itself confirms the deletion in its own trailing comment. No test replaces
+// these — there is no scenario left to cover.
 
 describe('createPackedScene', () => {
   const board = {

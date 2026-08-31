@@ -7,7 +7,7 @@ describe('buildMockSystemBoard', () => {
     const b = buildMockSystemBoard(1234, 'star_rich', 12)
     expect(b.board.features.map((x) => x.id)).toEqual(a.board.features.map((x) => x.id))
     expect(b.board.features.map((x) => x.band)).toEqual(a.board.features.map((x) => x.band))
-    expect(b.fleets).toEqual(a.fleets)
+    expect(b.sensorOrigin).toEqual(a.sensorOrigin)
   })
 
   it('always keeps the star live — it is the scene light, never fogged out', () => {
@@ -19,12 +19,11 @@ describe('buildMockSystemBoard', () => {
   })
 
   it('puts every body inside the demo sensor bubble on the live band', () => {
-    const { board, fleets } = buildMockSystemBoard(7, 'star_rich', 14)
-    const home = fleets[0]!.position
+    const { board, sensorOrigin } = buildMockSystemBoard(7, 'star_rich', 14)
     let checked = 0
     for (const f of board.features) {
       if (!f.orbit) continue
-      if (ringDistance({ ring: f.orbit.ring, slot: f.orbit.angle0 }, home) <= DEMO_SENSOR_RINGS) {
+      if (ringDistance({ ring: f.orbit.ring, slot: f.orbit.angle0 }, sensorOrigin) <= DEMO_SENSOR_RINGS) {
         expect(f.band).toBe('visible')
         checked++
       }
@@ -49,14 +48,14 @@ describe('buildMockSystemBoard', () => {
     }
   })
 
-  it('ships the own/foreign demo cast: a burner, a flotilla, and a bare contact', () => {
-    const { fleets } = buildMockSystemBoard()
-    expect(fleets.map((f) => f.own)).toEqual([true, true, false])
-    expect(fleets[0]!.roster?.ships.length).toBe(2)
-    expect(fleets[1]!.roster?.ships.length).toBe(4)
-    // Audience fog: the foreign read carries no roster at all.
-    expect(fleets[2]!.roster).toBeUndefined()
-  })
+  // `ships the own/foreign demo cast: a burner, a flotilla, and a bare
+  // contact` DELETED, with reason: migrate-fleet-to-continuous-burns
+  // design.md Decision 12 — the board draws no fleet layer after this
+  // change, and `buildMockSystemBoard` carries no fleet content at all any
+  // more (`mock-board.ts`'s own header comment: "No fleet content... there
+  // is nothing left to pack a fleet instance from"). `MockSystemFixture`
+  // has no `fleets` field to assert on. No test replaces this — there is no
+  // scenario left to cover.
 
   it('never marks an astronomical body mineable', () => {
     const { board } = buildMockSystemBoard()

@@ -1,161 +1,175 @@
+// RED-phase(-ish) suite for the rebuilt `hooks/use-fleets.ts`
+// (migrate-fleet-to-continuous-burns, tasks.md 8.1: the old use-fleets.ts —
+// and its paired test — were deleted wholesale; this file is the fresh
+// replacement `code-quality-checks`'s frontend-test-coverage validator
+// requires). No SDET suite pins this hook's exact shape (FleetRoster.test.tsx
+// mocks the whole module and only requires `useMyFleets` to exist), so its
+// internal contract — which verb each hook commits, and what it invalidates
+// — is this implementer's own design decision, tested directly against
+// design.md's endpoint list (Decision 10, "the fleet contract") rather than
+// against the implementation itself.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor, act } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useFleetsInSystem, useFleetOrders, useMine, useScan } from './use-fleets'
+import {
+  useCutDrive,
+  useJump,
+  useMine,
+  useMyFleets,
+  useOrder,
+  useStop,
+} from './use-fleets'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
-import type { Fleet } from '@/lib/types/fleet'
+import type { Fleet, MineCommit } from '@/lib/types/fleet'
 
 vi.mock('@/lib/services', () => ({
   fleetService: {
-    listInSystem: vi.fn(),
+    listMine: vi.fn(),
     order: vi.fn(),
-    cancel: vi.fn(),
-    scan: vi.fn(),
+    cutDrive: vi.fn(),
+    stop: vi.fn(),
+    jump: vi.fn(),
     mine: vi.fn(),
   },
 }))
 
 const mockService = vi.mocked(fleetService)
 
-const fleet: Fleet = {
+const parkedFleet: Fleet = {
   id: 'fleet_1',
-  corporationId: 'corp-user1',
-  systemId: 'sys-7',
-  state: { mode: 'coast' },
-  position: { ring: 3, slot: 0 },
+  corporationId: 'corp',
+  systemId: 'sys-0',
+  state: { Mode: 1, Burn: null, Park: null, Drift: null },
+  position: { X: 0, Y: 0, Z: 0 },
   own: true,
   worldTime: 0,
 }
 
-const createWrapper = () => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+function createWrapper() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   )
   Wrapper.displayName = 'TestWrapper'
-  return Wrapper
+  return { Wrapper, qc }
 }
 
-describe('useFleetsInSystem', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockService.listInSystem.mockResolvedValue([fleet])
-  })
+describe('useMyFleets', () => {
+  beforeEach(() => vi.clearAllMocks())
 
-  it('reads the fogged fleet layer for the given system', async () => {
-    const { result } = renderHook(() => useFleetsInSystem('sys-7'), { wrapper: createWrapper() })
+  it('reads the requester’s own fleets across systems', async () => {
+    mockService.listMine.mockResolvedValue([parkedFleet])
+    const { Wrapper } = createWrapper()
 
+    const { result } = renderHook(() => useMyFleets(), { wrapper: Wrapper })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    expect(mockService.listInSystem).toHaveBeenCalledWith('sys-7')
-    expect(result.current.data).toEqual([fleet])
+    expect(mockService.listMine).toHaveBeenCalled()
+    expect(result.current.data).toEqual([parkedFleet])
   })
 
-  it('stays disabled until a systemId is known', async () => {
-    const { result } = renderHook(() => useFleetsInSystem(''), { wrapper: createWrapper() })
+  it('honours an `enabled: false` override (the logged-out start area)', async () => {
+    const { Wrapper } = createWrapper()
+    const { result } = renderHook(() => useMyFleets({ enabled: false }), { wrapper: Wrapper })
 
     await Promise.resolve()
-    expect(mockService.listInSystem).not.toHaveBeenCalled()
+    expect(mockService.listMine).not.toHaveBeenCalled()
     expect(result.current.fetchStatus).toBe('idle')
   })
 })
 
-describe('useFleetOrders / useScan', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockService.order.mockResolvedValue(fleet)
-    mockService.cancel.mockResolvedValue(fleet)
-    mockService.scan.mockResolvedValue(fleet)
-  })
+describe('useOrder — fleet-movement "In-System Burn Order to a Body or a Point"', () => {
+  beforeEach(() => vi.clearAllMocks())
 
-  // A shared client so we can assert the verb invalidated the board reads.
-  function orderWrapper() {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  it('commits a burn through fleetService.order and invalidates the fleet + board reads', async () => {
+    mockService.order.mockResolvedValue({ ...parkedFleet, attachedTo: undefined })
+    const { Wrapper, qc } = createWrapper()
     const invalidate = vi.spyOn(qc, 'invalidateQueries')
-    const Wrapper = ({ children }: { children: React.ReactNode }) => (
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    )
-    Wrapper.displayName = 'OrderWrapper'
-    return { Wrapper, invalidate }
-  }
 
-  it('orders a burn and invalidates the fleet + interior reads', async () => {
-    const { Wrapper, invalidate } = orderWrapper()
-    const { result } = renderHook(() => useFleetOrders('sys-7'), { wrapper: Wrapper })
+    const { result } = renderHook(() => useOrder(), { wrapper: Wrapper })
+    result.current.mutate({ fleetId: 'fleet_1', request: { bodyId: 'body-1' } })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    await act(async () => {
-      await result.current.order.mutateAsync({ fleetId: 'fleet_1', target: { cell: { ring: 2, slot: 0 } } })
-    })
-
-    expect(mockService.order).toHaveBeenCalledWith('fleet_1', { cell: { ring: 2, slot: 0 } })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.fleets.inSystem('sys-7') })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.systemBoard.detail('sys-7') })
+    expect(mockService.order).toHaveBeenCalledWith('fleet_1', { bodyId: 'body-1' })
+    const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(queryKeys.fleets.mine())
+    expect(keys).toContainEqual(queryKeys.fleets.detail('fleet_1'))
+    expect(keys).toContainEqual(queryKeys.systemBoard.detail('sys-0'))
   })
+})
 
-  it('scans a fleet and invalidates the board + running-scan indicator', async () => {
-    const { Wrapper, invalidate } = orderWrapper()
-    const { result } = renderHook(() => useScan('sys-7'), { wrapper: Wrapper })
+describe('useCutDrive — fleet-movement "Cut Drive Converts the Burn to a Drift and Goes Dark"', () => {
+  beforeEach(() => vi.clearAllMocks())
 
-    await act(async () => {
-      await result.current.mutateAsync('fleet_1')
-    })
+  it('posts to the cut-drive endpoint with no body', async () => {
+    mockService.cutDrive.mockResolvedValue(parkedFleet)
+    const { Wrapper } = createWrapper()
 
-    expect(mockService.scan).toHaveBeenCalledWith('fleet_1')
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.systemBoard.detail('sys-7') })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.actions.running('fleet_1') })
+    const { result } = renderHook(() => useCutDrive(), { wrapper: Wrapper })
+    result.current.mutate('fleet_1')
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(mockService.cutDrive).toHaveBeenCalledWith('fleet_1')
+  })
+})
+
+describe('useStop — fleet-movement "Stop In Place Commits a Velocity-Nulling Burn"', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('posts to the stop endpoint', async () => {
+    mockService.stop.mockResolvedValue(parkedFleet)
+    const { Wrapper } = createWrapper()
+
+    const { result } = renderHook(() => useStop(), { wrapper: Wrapper })
+    result.current.mutate('fleet_1')
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(mockService.stop).toHaveBeenCalledWith('fleet_1')
+  })
+})
+
+describe('useJump — fleet-movement "Lane Jump From a Docked Gate"', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('posts the laneId to the jump endpoint', async () => {
+    mockService.jump.mockResolvedValue(parkedFleet)
+    const { Wrapper } = createWrapper()
+
+    const { result } = renderHook(() => useJump(), { wrapper: Wrapper })
+    result.current.mutate({ fleetId: 'fleet_1', laneId: 'lane-9' })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(mockService.jump).toHaveBeenCalledWith('fleet_1', 'lane-9')
   })
 })
 
 describe('useMine', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockService.mine.mockResolvedValue({ actionId: 'act_9', eta: 200_000, worldTime: 0 })
-  })
+  beforeEach(() => vi.clearAllMocks())
 
-  function mineWrapper() {
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  it('commits a mine run and invalidates the fleet, board, and running-actions reads', async () => {
+    const commit: MineCommit = { actionId: 'action_1', eta: 90_000, worldTime: 0 }
+    mockService.mine.mockResolvedValue(commit)
+    const { Wrapper, qc } = createWrapper()
     const invalidate = vi.spyOn(qc, 'invalidateQueries')
-    const Wrapper = ({ children }: { children: React.ReactNode }) => (
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    )
-    Wrapper.displayName = 'MineWrapper'
-    return { Wrapper, invalidate }
-  }
 
-  it('commits a run and refreshes the fleet reads + running-actions inbox', async () => {
-    const { Wrapper, invalidate } = mineWrapper()
-    const { result } = renderHook(() => useMine('sys-7'), { wrapper: Wrapper })
-
-    await act(async () => {
-      await result.current.mutateAsync({
-        fleetId: 'fleet_1',
-        request: { featureId: 'feat-belt', kind: 'metals', tons: 40 },
-      })
+    const { result } = renderHook(() => useMine('sys-0'), { wrapper: Wrapper })
+    result.current.mutate({
+      fleetId: 'fleet_1',
+      request: { featureId: 'body-1', kind: 'metals', tons: 40 },
     })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
     expect(mockService.mine).toHaveBeenCalledWith('fleet_1', {
-      featureId: 'feat-belt',
+      featureId: 'body-1',
       kind: 'metals',
       tons: 40,
     })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.fleets.inSystem('sys-7') })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.fleets.detail('fleet_1') })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.actions.running('fleet_1') })
-  })
-
-  it('surfaces the server’s distinguishable rejection as the mutation error', async () => {
-    mockService.mine.mockRejectedValue(new Error('mine: fleet is not docked to the target feature'))
-    const { Wrapper } = mineWrapper()
-    const { result } = renderHook(() => useMine('sys-7'), { wrapper: Wrapper })
-
-    await act(async () => {
-      await expect(
-        result.current.mutateAsync({
-          fleetId: 'fleet_1',
-          request: { featureId: 'feat-belt', kind: 'metals', tons: 40 },
-        }),
-      ).rejects.toThrow(/not docked/)
-    })
+    const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(queryKeys.fleets.mine())
+    expect(keys).toContainEqual(queryKeys.fleets.detail('fleet_1'))
+    expect(keys).toContainEqual(queryKeys.systemBoard.detail('sys-0'))
+    expect(keys).toContainEqual(queryKeys.actions.running('fleet_1'))
   })
 })

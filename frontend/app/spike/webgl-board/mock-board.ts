@@ -1,8 +1,13 @@
-// SPIKE — the tuning bench's fixture: a SystemBoard + Fleet[] shaped exactly
-// like the production reads, so the bench packs it through the SAME pure pack
-// functions the live board uses (createPackedScene, packFleetInstance,
-// createFramePacker). Kept permanently as the WebGL-only bench's data source
-// (port-board-to-webgl-renderer, Migration Plan preamble).
+// SPIKE — the tuning bench's fixture: a SystemBoard shaped exactly like the
+// production reads, so the bench packs it through the SAME pure pack
+// functions the live board uses (createPackedScene, createFramePacker).
+// Kept permanently as the WebGL-only bench's data source
+// (port-board-to-webgl-renderer, Migration Plan preamble). No fleet content
+// after migrate-fleet-to-continuous-burns (design.md Decision 12) — the
+// board draws no fleet layer, so there is nothing left to pack a fleet
+// instance from (a fleet's position is now a continuous-space `space.Vec3`,
+// not a board cell). `sensorOrigin` below survives as the fog-band demo's
+// reference point, standing in for where a fleet used to sit.
 //
 // Orbits follow the production law: lib/hex `Orbit` records evaluated by
 // orbState/glyph-geometry (#0007 "quantize the simulation, interpolate the
@@ -11,7 +16,6 @@
 
 import { ringCells, schedule as boardSchedule, type Cell } from '@/lib/board'
 import type { BoardFeature, SystemBoard } from '@/lib/types/system-board'
-import type { Fleet } from '@/lib/types/fleet'
 import { generateMockSystem, type Character } from '../hex-board/mock-system'
 
 export type FogBand = 'visible' | 'remembered' | 'astronomical'
@@ -53,8 +57,11 @@ export function ringDistance(a: Cell, b: Cell): number {
 
 export interface MockSystemFixture {
   board: SystemBoard
-  fleets: Fleet[]
   name: string
+  // The fog-band demo's reference point (previously a fleet's position,
+  // before migrate-fleet-to-continuous-burns removed the board's fleet
+  // layer): every feature within DEMO_SENSOR_RINGS of this cell reads live.
+  sensorOrigin: Cell
 }
 
 // buildMockSystemBoard assigns the three fog bands so all of them are on
@@ -73,7 +80,7 @@ export function buildMockSystemBoard(
   // The mock system generator still speaks its own (q,r) grid; the bench maps
   // each generated tile onto the polar ring it was generated for, at a slot
   // derived from its index around that ring.
-  const fleetCell: Cell = { ring: Math.min(radius, 6), slot: 0 }
+  const sensorOrigin: Cell = { ring: Math.min(radius, 6), slot: 0 }
   const sensorRadius = DEMO_SENSOR_RINGS
 
   const features: BoardFeature[] = []
@@ -97,7 +104,7 @@ export function buildMockSystemBoard(
     // ring's slot count.
     const angle0 = ringSet.length > 0 ? Math.abs(tile.q * 7 + tile.r * 13) % ringSet.length : 0
     const cell: Cell = { ring, slot: angle0 }
-    const d = ringDistance(cell, fleetCell)
+    const d = ringDistance(cell, sensorOrigin)
     let band: FogBand
     if (d <= sensorRadius) band = 'visible'
     else if (rng() < 0.45) band = 'remembered'
@@ -131,69 +138,5 @@ export function buildMockSystemBoard(
     worldTime: 0,
   }
 
-  // An inward spiral from the entry cell — long enough that the bench shows
-  // the plume/trail for minutes at 1×, and it exercises the arc path the polar
-  // lattice actually flies (a straight westward run no longer exists).
-  const burnPath: Cell[] = []
-  for (let i = 0; i <= 12; i++) {
-    const ring = Math.max(1, fleetCell.ring - Math.floor(i / 3))
-    const slots = ringCells(ring, sched).length
-    burnPath.push({ ring, slot: (fleetCell.slot + i) % slots })
-  }
-
-  const roster = (ships: number) => ({
-    ships: Array.from({ length: ships }, () => ({ class: 'corvette' })),
-    cargo: null,
-    cargoCapacity: ships * 100,
-    freeHold: ships * 100,
-    miningRate: ships * 0.001,
-  })
-
-  const fleets: Fleet[] = [
-    {
-      id: 'own-burner',
-      corporationId: 'mock-corp',
-      systemId: board.systemId,
-      state: {
-        mode: 'burn',
-        burn: {
-          path: burnPath,
-          startTime: 0,
-          arriveTime: burnPath.length * 60_000,
-          target: { cell: burnPath[burnPath.length - 1]! },
-        },
-      },
-      position: fleetCell,
-      own: true,
-      roster: roster(2),
-      worldTime: 0,
-    },
-    {
-      id: 'own-flotilla',
-      corporationId: 'mock-corp',
-      systemId: board.systemId,
-      state: {
-        mode: 'coast',
-        coast: { ring: Math.max(3, Math.floor(radius / 3)), angle0: 2, period: 240_000, dir: 1 },
-      },
-      position: fleetCell,
-      own: true,
-      roster: roster(4),
-      worldTime: 0,
-    },
-    {
-      id: 'foreign-contact',
-      corporationId: 'rival-corp',
-      systemId: board.systemId,
-      state: {
-        mode: 'coast',
-        coast: { ring: Math.max(5, Math.floor(radius / 2)), angle0: 9, period: 300_000, dir: -1 },
-      },
-      position: fleetCell,
-      own: false,
-      worldTime: 0,
-    },
-  ]
-
-  return { board, fleets, name: sys.name }
+  return { board, name: sys.name, sensorOrigin }
 }

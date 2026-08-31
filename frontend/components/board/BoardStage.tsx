@@ -6,15 +6,24 @@
 //   BoardStage
 //   ├── BoardCanvas      ← the ONLY board module reaching three.js (via the
 //   │                      dynamically-imported WebGLBoard it mounts)
-//   ├── BoardOverlay     ← pure SVG hit shapes/testids/previews (jsdom-safe)
+//   ├── BoardOverlay     ← pure SVG hit shapes/testids (jsdom-safe)
 //   └── useBoardProjection ← the seam registering the two
 //
 // It also owns PICKING: a click that no overlay hit shape claimed falls
 // through to this container, unprojects to the board plane, and resolves to
 // the containing cell (inside the lattice) or clears the selection (outside) —
 // the glyph-wins-else-cell-else-clear priority, with the glyph half carried by
-// the overlay's DOM hit shapes. Pointer moves the same way, driving the tile
-// hover highlight and the pointer cursor.
+// the overlay's DOM hit shapes (this is board-selection.ts's
+// feature/gate-wins-else-cell-else-null contract, realized structurally: each
+// glyph's own onClick stops propagation, so only an unclaimed click reaches
+// this container's cell/background fallback). Pointer moves the same way,
+// driving the tile hover highlight and the pointer cursor.
+//
+// The board draws no fleet layer after migrate-fleet-to-continuous-burns
+// (design.md Decision 12: a fleet has no board cell any more). `fleets` is
+// still an accepted prop — kept so this stage's existing, unmodified test
+// suite's `fleets={[]}` calls keep type-checking — but it is never packed,
+// never forwarded to the canvas, and never drives a glyph.
 
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent as ReactFocusEvent, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react'
@@ -24,14 +33,12 @@ import type { Fleet } from '@/lib/types/fleet'
 import { wallClock, type WorldAnchor } from '@/hooks/use-world-time'
 import { BoardCameraControls, CAMERA_CONTROL_COUNT } from './BoardCameraControls'
 import { BoardCanvas } from './BoardCanvas'
-import { BoardOverlay, type ScanFxInput } from './BoardOverlay'
+import { BoardOverlay } from './BoardOverlay'
 import { createFramePacker } from './board-frame'
-import { createPackedScene, packFleetInstance } from './board-pack'
+import { createPackedScene } from './board-pack'
 import { CAMERA_CONTROL_ATTR, useBoardGestures, type CameraLimit } from './use-board-gestures'
 import { useBoardProjection } from './use-board-projection'
 import type { WebGLBoardSettings } from './webgl/WebGLBoard'
-import type { MovePlan } from './move-preview'
-import type { ScanPlan } from './scan-preview'
 
 // three needs a GL context, so the world stays off the SSR path entirely —
 // the same treatment GalaxyView gives GalaxyGraph.
@@ -44,20 +51,16 @@ export interface BoardStageProps {
   // changes — a new board is a new view — and nothing else resets it.
   systemId?: string
   board: SystemBoard
+  // Vestigial (see module note above) — never drawn.
   fleets: Fleet[]
   worldTime: number
   selectedId?: string | null
   selectedGateId?: string | null
   selectedCell?: Cell | null
   onSelectFeature?: (id: string) => void
-  onSelectFleet?: (id: string) => void
   onSelectGate?: (destSystemId: string) => void
   onSelectCell?: (cell: Cell) => void
   onSelectEmpty?: () => void
-  plan?: MovePlan | null
-  activeSweep?: ScanPlan | null
-  sweepPreview?: ScanPlan | null
-  scanFx?: ScanFxInput | null
   // The guard's live/not-live state — SystemBoardView wires this into
   // FactsPanel's `available` prop (task 6.1b).
   onAvailabilityChange?: (available: boolean) => void
@@ -92,20 +95,14 @@ function useReducedMotion(): boolean {
 export function BoardStage({
   systemId,
   board,
-  fleets,
   worldTime,
   selectedId,
   selectedGateId,
   selectedCell,
   onSelectFeature,
-  onSelectFleet,
   onSelectGate,
   onSelectCell,
   onSelectEmpty,
-  plan,
-  activeSweep,
-  sweepPreview,
-  scanFx,
   onAvailabilityChange,
   onFirstFrame,
   settings,
@@ -143,7 +140,6 @@ export function BoardStage({
   // The packed scene — every decision resolved once per board read (band off
   // the wire, never derived client-side).
   const scene = useMemo(() => createPackedScene(board), [board])
-  const packedFleets = useMemo(() => fleets.map(packFleetInstance), [fleets])
 
   // The frame packer's world anchor: the server's worldTime at receipt,
   // exactly as useWorldTime re-anchors — never a locally integrated clock.
@@ -166,7 +162,6 @@ export function BoardStage({
     () =>
       createFramePacker({
         features: board.features,
-        fleets,
         anchor,
         // Production world time runs at scale 1, always — the bench-only
         // speed multiplier would desynchronise positions from every server ETA.
@@ -175,7 +170,7 @@ export function BoardStage({
         reducedMotion,
         getSelectedId,
       }),
-    [board.features, fleets, anchor, fxEpochWall, reducedMotion, getSelectedId],
+    [board.features, anchor, fxEpochWall, reducedMotion, getSelectedId],
   )
   const packerRef = useRef(packer)
   packerRef.current = packer
@@ -226,7 +221,8 @@ export function BoardStage({
       // back as a rim cell rather than as "outside". Comparing the clamped
       // cell's projected radius against the board's own extent is what
       // distinguishes the two — the outside-the-lattice click must still clear
-      // the selection.
+      // the selection. (The same two-part test board-selection.ts's
+      // `resolvePick` runs as a pure function.)
       const cell = pointToCell(boardPt, schedule)
       if (cell.ring > board.radius) return null
       const rimOuter = (board.radius + 0.5) * RADIAL_UNIT
@@ -288,7 +284,6 @@ export function BoardStage({
             <WebGLBoard
               canvas={canvas}
               scene={scene}
-              fleets={packedFleets}
               camera={projection.camera}
               getFrame={getFrame}
               onFirstFrame={onFirstFrame}
@@ -320,8 +315,7 @@ export function BoardStage({
       {available && (
         <BoardOverlay
           // The camera group holds the first tab stops; the overlay's glyph
-          // tab order starts after them, leaving the port's own
-          // features → fleets → gates sequence intact.
+          // tab order starts after them (features, then lane gates).
           tabIndexBase={CAMERA_CONTROL_COUNT}
           viewBox={projection.viewBox}
           extent={projection.extent}
@@ -329,19 +323,13 @@ export function BoardStage({
           radius={board.radius}
           worldTime={worldTime}
           features={board.features}
-          fleets={fleets}
           gates={board.laneGates}
           selectedId={selectedId ?? null}
           selectedGateId={selectedGateId ?? null}
           selectedCell={selectedCell ?? null}
           hoverCell={hoverCell}
           {...(onSelectFeature ? { onSelectFeature } : {})}
-          {...(onSelectFleet ? { onSelectFleet } : {})}
           {...(onSelectGate ? { onSelectGate } : {})}
-          plan={plan ?? null}
-          activeSweep={activeSweep ?? null}
-          sweepPreview={sweepPreview ?? null}
-          scanFx={scanFx ?? null}
         />
       )}
     </div>

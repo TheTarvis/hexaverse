@@ -1,83 +1,73 @@
-// Fleet service — typed wrapper around the #0004/#0007 fleet reads and the two
-// slice verbs (move + scan). Every call goes through apiClient (auth refresh,
-// 401 retry); the board never touches raw fetch.
+// Fleet service — typed wrapper around the fleet reads and the continuous-
+// space verbs (migrate-fleet-to-continuous-burns): burn ordering, cut-drive,
+// stop-in-place, jump, and mine. Every call goes through apiClient (auth
+// refresh, 401 retry); nothing here touches raw fetch.
 //
-// The reads are fogged server-side (#0006): `listInSystem` returns own units +
-// sensed foreigns; `get` 404s a foreign the requester can't sense. The verbs
-// commit through the action spine on the backend (#0005) — the response is the
-// fleet's new state, and an `action.completed` SSE fires on the system channel
-// at the committed ETA.
+// The board draws no fleet layer (design.md Decision 12), so there is no
+// per-system fleet list read any more — only the requester's own fleets
+// (`listMine`/`get`), which the roster panel and the board's mine/sell
+// surface both read from.
 
 import { apiClient } from '../api-client'
-import type { Fleet, FleetList, MineCommit, MineRequest, RoutePreview } from '../types/fleet'
-import type { Target } from '@/lib/board'
+import type {
+  Fleet,
+  FleetList,
+  JumpRequest,
+  MineCommit,
+  MineRequest,
+  OrderRequest,
+} from '../types/fleet'
 
 class FleetService {
-  // GET /v1/fleets?systemId= — the requester's fogged fleet layer for one system.
-  async listInSystem(systemId: string): Promise<Fleet[]> {
-    const response = await apiClient.get<FleetList>(
-      `/v1/fleets?systemId=${encodeURIComponent(systemId)}`,
-    )
-    return response.data.fleets ?? []
-  }
-
-  // GET /v1/fleets?mine=true — the requester's own fleets across systems (transit
-  // included), the galaxy view's fleet layer (#0008).
+  // GET /v1/fleets?mine=true — the requester's own fleets across systems (a
+  // corpless requester gets an empty list, not an error).
   async listMine(): Promise<Fleet[]> {
     const response = await apiClient.get<FleetList>('/v1/fleets?mine=true')
     return response.data.fleets ?? []
   }
 
-  // GET /v1/fleets/:id/route?systemId= — preview the shortest lane route to a
-  // destination system (route + per-leg/total ETA) without committing (#0008).
-  async previewRoute(fleetId: string, destSystemId: string): Promise<RoutePreview> {
-    const response = await apiClient.get<RoutePreview>(
-      `/v1/fleets/${fleetId}/route?systemId=${encodeURIComponent(destSystemId)}`,
-    )
-    return response.data
-  }
-
-  // POST /v1/fleets/:id/orders {systemId} — commit a graph-tier trip. The server
-  // pathfinds + freezes the route; the response is the fleet now in lane transit.
-  async travel(fleetId: string, systemId: string): Promise<Fleet> {
-    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/orders`, { systemId })
-    return response.data
-  }
-
-  // GET /v1/fleets/:id — one fleet (404 if foreign and unsensed).
+  // GET /v1/fleets/:id — one own fleet (404 if foreign, per fleet-movement
+  // "Fleet Read Endpoints Serve Own Fleets Only").
   async get(fleetId: string): Promise<Fleet> {
     const response = await apiClient.get<Fleet>(`/v1/fleets/${fleetId}`)
     return response.data
   }
 
-  // POST /v1/fleets/:id/orders — commit a burn to a cell or a feature (led
-  // intercept). The server solves; the response is the fleet now burning.
-  async order(fleetId: string, target: Target): Promise<Fleet> {
-    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/orders`, { target })
+  // POST /v1/fleets/:id/orders {bodyId|point, accel?} — commit a burn to a
+  // body or an explicit point (fleet-movement "In-System Burn Order to a
+  // Body or a Point"). The server solves; the response is the fleet now
+  // burning, detached (`attachedTo` cleared at commit).
+  async order(fleetId: string, request: OrderRequest): Promise<Fleet> {
+    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/orders`, request)
     return response.data
   }
 
-  // POST /v1/fleets/:id/cancel — drop to coast at the current position.
-  async cancel(fleetId: string): Promise<Fleet> {
-    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/cancel`, {})
+  // POST /v1/fleets/:id/cut-drive — free, instant: converts the active burn
+  // to a drift and cancels the running movement action.
+  async cutDrive(fleetId: string): Promise<Fleet> {
+    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/cut-drive`, {})
     return response.data
   }
 
-  // POST /v1/fleets/:id/scan — commit the 360° sweep (#0006 Decision #21):
-  // one manual trigger, an automatic all-around sweep occluded by large
-  // bodies. Rides the sensor channel, so a burning fleet can scan; 409 only
-  // if a scan is already running.
-  async scan(fleetId: string): Promise<Fleet> {
-    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/scan`, {})
+  // POST /v1/fleets/:id/stop — a velocity-nulling burn above the speed
+  // floor, or an instant/free conversion to a point park at or below it.
+  async stop(fleetId: string): Promise<Fleet> {
+    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/stop`, {})
+    return response.data
+  }
+
+  // POST /v1/fleets/:id/jump {laneId} — a single-hop lane crossing from a
+  // docked, charted gate (fleet-movement "Lane Jump From a Docked Gate").
+  async jump(fleetId: string, laneId: string): Promise<Fleet> {
+    const request: JumpRequest = { laneId }
+    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/jump`, request)
     return response.data
   }
 
   // POST /v1/fleets/:id/mine {featureId, kind, tons} — commit an extraction
-  // run (#0010, add-mine-ui). Rides the MOVEMENT channel: rejected 409 while
-  // burning or already mining. Every rejection carries a distinguishable
-  // `error` reason (not docked, unknown kind, over free hold, depleted lode,
-  // busy slot) which apiClient surfaces as the thrown error's message — the
-  // board toasts it verbatim.
+  // run. Rides the movement channel: rejected 409 while burning or already
+  // mining. Every rejection carries a distinguishable `error` reason, which
+  // apiClient surfaces as the thrown error's message.
   async mine(fleetId: string, request: MineRequest): Promise<MineCommit> {
     const response = await apiClient.post<MineCommit>(`/v1/fleets/${fleetId}/mine`, request)
     return response.data

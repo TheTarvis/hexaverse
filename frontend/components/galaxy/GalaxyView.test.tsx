@@ -1,12 +1,45 @@
+// RED-phase suite for GalaxyView against the migrate-fleet-to-continuous-
+// burns contract (design.md Decision 12; tasks.md 8.6, 8.7, 8.12).
+//
+// Cause for rewriting this whole file wholesale: `galaxy-view` REMOVED
+// "Select-Preview-Commit Travel Gesture" (no route-preview/travel-button
+// surface survives — a lane crossing is a single-hop `jump` commanded from
+// the roster panel, attached to a gate, design.md Decision 10) and "Transit
+// Fleet Selection and Card" (no `transitFleets`/lane-marker-click/fleet-card
+// surface survives — a jump is atomic and single-hop, with no crawling
+// mid-lane state to draw or click, design.md Decision 4/10). Both are
+// "Superseded by nothing" per the delta — no successor test replaces them.
+// `GalaxyGraph`'s props dropped `transitFleets`/`onSelectFleet` accordingly
+// (component/galaxy/GalaxyGraph.tsx). `hooks/use-fleets.ts` dropped
+// `useRoutePreview`/`useFleetTravel` entirely; `lib/types/fleet.ts` carries
+// the mixed-case `space.ShipState` wire shape plus camelCase
+// `attachedTo`/`jump`.
+//
+// What survives here (design.md Decision 12's roster-panel-as-command-
+// surface precedent): burn/cut-drive/stop are composed and committed from
+// this container via the mounted roster panel — burn has no target-naming
+// surface at the galaxy tier, so it sends the player to the system board
+// instead of guessing (`handleBurn`). `galaxy-view` MODIFIED "Own-Fleet
+// Presence and Recenter Target" (components/galaxy/presence.ts) and ADDED
+// "Bridge Lane Rendering Is Visually Distinct" (components/galaxy/
+// bridge-lane-style.test.tsx) are pure-function/component-level concerns
+// already pinned in their own test files — this file only re-verifies the
+// CONTAINER wires their inputs through (the `fleetSystemIds`/`homeSystemId`
+// props reaching `<GalaxyGraph>`), not their derivation.
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { GalaxyView } from './GalaxyView'
 import { useGalaxy } from '@/hooks/use-galaxy'
-import { useMyFleets, useRoutePreview, useFleetTravel } from '@/hooks/use-fleets'
+import { useCutDrive, useMyFleets, useStop } from '@/hooks/use-fleets'
+import { useCancelAction } from '@/hooks/use-actions'
+import { useMarketBoard } from '@/hooks/use-market'
+import { toast } from '@/lib/toast'
 import type { Galaxy } from '@/lib/types/galaxy'
-import type { Fleet, RoutePreview } from '@/lib/types/fleet'
+import type { Fleet } from '@/lib/types/fleet'
+import { SHIP_MODE_PARKED } from '@/lib/types/fleet'
 import { stubUnsupported } from '@/components/render-guard/test-canvas'
 
 // Spies the mocked graph hands back through onReady (recenter/focusSystem) so we
@@ -58,7 +91,10 @@ vi.mock('next/dynamic', async () => {
 })
 
 // Stub the three.js renderer. Renders a select button per node and reports a
-// controller via onReady so recenter is exercised.
+// controller via onReady so recenter is exercised. No `transitFleets`/
+// `onSelectFleet` — the board draws no fleet-crawl layer any more
+// (design.md Decision 12; galaxy-view REMOVED "Transit Fleet Selection and
+// Card").
 vi.mock('@/components/galaxy/GalaxyGraph', async () => {
   const React = await import('react')
   return {
@@ -67,12 +103,10 @@ vi.mock('@/components/galaxy/GalaxyGraph', async () => {
       onSelect,
       onReady,
       fleetSystemIds,
-      transitFleets,
-      onSelectFleet,
       homeSystemId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }: any) => {
-      graphPropsSpy({ fleetSystemIds, transitFleets, homeSystemId })
+      graphPropsSpy({ fleetSystemIds, homeSystemId })
       // SDET-added: a real (mock) canvas exposed via the controller's
       // `canvas()` accessor — GalaxyView wires
       // `setGuardCanvas(controller.canvas?.() ?? null)` from this, so a test
@@ -98,17 +132,6 @@ vi.mock('@/components/galaxy/GalaxyGraph', async () => {
       return (
         <div data-testid="mock-graph">
           <canvas ref={canvasRef} data-testid="mock-graph-canvas" />
-          {/* Stands in for clicking a fleet's lane marker (raycast in the real
-              graph, a button here). */}
-          {(transitFleets ?? []).map((f: Fleet) => (
-            <button
-              key={f.id}
-              data-testid={`click-lane-marker-${f.id}`}
-              onClick={() => onSelectFleet?.(f.id)}
-            >
-              marker
-            </button>
-          ))}
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           {galaxy.nodes.map((n: any) => (
             <button key={n.id} data-testid={`select-${n.id}`} onClick={() => onSelect(n)}>
@@ -126,14 +149,18 @@ vi.mock('react-force-graph-3d', () => ({ default: () => null }))
 
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
 
-// Fleet hooks + the world clock are mocked so the view renders synchronously
-// without a live backend; travel tests drive them per-case.
+// Fleet/roster hooks + the world clock are mocked so the view renders
+// synchronously without a live backend. `useCancelAction` is mocked because
+// the mounted `<FleetRoster>` calls it directly (not through this view).
 vi.mock('@/hooks/use-fleets', () => ({
   useMyFleets: vi.fn(),
-  useRoutePreview: vi.fn(),
-  useFleetTravel: vi.fn(),
+  useCutDrive: vi.fn(),
+  useStop: vi.fn(),
 }))
+vi.mock('@/hooks/use-actions', () => ({ useCancelAction: vi.fn() }))
+vi.mock('@/hooks/use-market', () => ({ useMarketBoard: vi.fn() }))
 vi.mock('@/hooks/use-world-time', () => ({ useWorldTime: () => 0 }))
+vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 // The floating account chip reads auth context; default to logged-out (no chip).
 vi.mock('@/components/account-provider', () => ({
@@ -142,8 +169,13 @@ vi.mock('@/components/account-provider', () => ({
 
 const mockUseGalaxy = vi.mocked(useGalaxy)
 const mockUseMyFleets = vi.mocked(useMyFleets)
-const mockUseRoutePreview = vi.mocked(useRoutePreview)
-const mockUseFleetTravel = vi.mocked(useFleetTravel)
+const mockUseCutDrive = vi.mocked(useCutDrive)
+const mockUseStop = vi.mocked(useStop)
+const mockUseCancelAction = vi.mocked(useCancelAction)
+const mockUseMarketBoard = vi.mocked(useMarketBoard)
+
+const cutDriveMutate = vi.fn()
+const stopMutate = vi.fn()
 
 // GalaxyView calls useQueryClient (for the arrival self-schedule); wrap in a
 // provider. The fleet DATA comes from the mocked hooks above, not real queries.
@@ -155,13 +187,31 @@ function renderView() {
   return render(<GalaxyView />, { wrapper })
 }
 
-function coastFleet(id: string, systemId: string): Fleet {
+function parkState() {
+  return {
+    Mode: SHIP_MODE_PARKED,
+    Burn: null,
+    Park: {
+      Kind: 2,
+      BodyId: '',
+      Radius: 0,
+      PeriodMs: 0,
+      Phase: 0,
+      EpochMs: 0,
+      Offset: { X: 0, Y: 0, Z: 0 },
+      Point: { X: 0, Y: 0, Z: 0 },
+    },
+    Drift: null,
+  }
+}
+
+function parkedFleet(id: string, systemId: string): Fleet {
   return {
     id,
     corporationId: 'corp',
     systemId,
-    state: { mode: 'coast', coast: { ring: 1, angle0: 0, period: 1, dir: 1 } },
-    position: { ring: 1, slot: 0 },
+    state: parkState(),
+    position: { X: 0, Y: 0, Z: 0 },
     own: true,
     worldTime: 0,
   }
@@ -225,17 +275,12 @@ describe('GalaxyView', () => {
     vi.clearAllMocks()
     sessionStorage.clear()
     graphBehavior.throwOnRender = false
-    // Default: no fleets, no route, an inert travel mutation.
+    // Default: no fleets, inert command mutations.
     mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
-    mockUseRoutePreview.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useRoutePreview>)
-    mockUseFleetTravel.mockReturnValue({
-      mutate: vi.fn(),
-      isPending: false,
-    } as unknown as ReturnType<typeof useFleetTravel>)
+    mockUseCutDrive.mockReturnValue({ mutate: cutDriveMutate, isPending: false } as unknown as ReturnType<typeof useCutDrive>)
+    mockUseStop.mockReturnValue({ mutate: stopMutate, isPending: false } as unknown as ReturnType<typeof useStop>)
+    mockUseCancelAction.mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof useCancelAction>)
+    mockUseMarketBoard.mockReturnValue({ data: undefined, isLoading: false, isError: false } as unknown as ReturnType<typeof useMarketBoard>)
   })
 
   it('renders the intel panel with system/lane/region stats', async () => {
@@ -302,7 +347,7 @@ describe('GalaxyView', () => {
   it('marks the fleet’s system on the graph and targets it as home', async () => {
     mockGalaxyState()
     mockUseMyFleets.mockReturnValue({
-      data: [coastFleet('fleet_1', 'sys-0')],
+      data: [parkedFleet('fleet_1', 'sys-0')],
     } as unknown as ReturnType<typeof useMyFleets>)
 
     renderView()
@@ -360,71 +405,11 @@ describe('GalaxyView', () => {
     expect(screen.getByText(/boom/i)).toBeInTheDocument()
   })
 
-  it('previews a route and commits a trip from the inspector', async () => {
-    mockGalaxyState()
-    mockUseMyFleets.mockReturnValue({
-      data: [coastFleet('fleet_1', 'sys-0')],
-    } as unknown as ReturnType<typeof useMyFleets>)
-    const preview: RoutePreview = {
-      route: ['sys-0', 'sys-1'],
-      legEtas: [60_000, 660_000],
-      totalEta: 660_000,
-      departGate: { ring: 16, slot: 2 },
-      worldTime: 0,
-    }
-    mockUseRoutePreview.mockReturnValue({
-      data: preview,
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useRoutePreview>)
-    const mutate = vi.fn()
-    mockUseFleetTravel.mockReturnValue({
-      mutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof useFleetTravel>)
-
-    renderView()
-    // Select the OTHER system (not the fleet's) → route preview + Travel button.
-    fireEvent.click(await screen.findByTestId('select-sys-1'))
-    expect(screen.getByTestId('route-preview')).toHaveTextContent('Borealis')
-    fireEvent.click(screen.getByTestId('travel-button'))
-    expect(mutate).toHaveBeenCalledWith(
-      { fleetId: 'fleet_1', systemId: 'sys-1' },
-      expect.anything(),
-    )
-  })
-
-  it('says so when the destination has no charted route', async () => {
-    mockGalaxyState()
-    mockUseMyFleets.mockReturnValue({
-      data: [coastFleet('fleet_1', 'sys-0')],
-    } as unknown as ReturnType<typeof useMyFleets>)
-    mockUseRoutePreview.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-    } as unknown as ReturnType<typeof useRoutePreview>)
-
-    renderView()
-    fireEvent.click(await screen.findByTestId('select-sys-1'))
-    expect(screen.getByTestId('no-route')).toBeInTheDocument()
-    expect(screen.queryByTestId('travel-button')).not.toBeInTheDocument()
-  })
-
   it('shows a travelling fleet in the roster, with its route and a live ETA', () => {
     mockGalaxyState()
     const traveling: Fleet = {
-      ...coastFleet('fleet_1', 'sys-0'),
-      state: {
-        mode: 'laneTransit',
-        laneTransit: {
-          route: ['sys-0', 'sys-1'],
-          legEtas: [60_000, 660_000],
-          departTime: 0,
-          arriveTime: 660_000,
-          entryGate: { ring: 16, slot: 2 },
-        },
-      },
+      ...parkedFleet('fleet_1', 'sys-0'),
+      jump: { laneId: 'lane-0', destSystemId: 'sys-1', departMs: 0, arriveMs: 660_000 },
     }
     mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
 
@@ -435,97 +420,51 @@ describe('GalaxyView', () => {
     expect(screen.getByTestId('fleet-row-eta-fleet_1')).toHaveTextContent('11m')
   })
 
-  // Spec: 0008/S8
-  it('opens a card for the fleet whose lane marker is clicked, and closes it again', async () => {
+  // burn has no target-naming surface at the galaxy tier (design.md Decision
+  // 12: "Targets are named by body id from the interior read" — which only
+  // exists once a system board is open) — the roster's Burn command sends
+  // the player there instead of guessing.
+  it('sends the player to the system board when Burn is invoked from the galaxy tier, with no target to guess', () => {
     mockGalaxyState()
-    const traveling: Fleet = {
-      ...coastFleet('fleet_1', 'sys-0'),
-      state: {
-        mode: 'laneTransit',
-        laneTransit: {
-          route: ['sys-0', 'sys-1'],
-          legEtas: [60_000, 660_000],
-          departTime: 0,
-          arriveTime: 660_000,
-          entryGate: { ring: 16, slot: 2 },
-        },
-      },
-    }
-    mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
-
+    mockUseMyFleets.mockReturnValue({
+      data: [parkedFleet('fleet_1', 'sys-0')],
+    } as unknown as ReturnType<typeof useMyFleets>)
     renderView()
-    // Nothing selected: the inspector's empty state, no fleet card.
-    expect(screen.queryByTestId('fleet-card')).not.toBeInTheDocument()
 
-    fireEvent.click(await screen.findByTestId('click-lane-marker-fleet_1'))
+    fireEvent.click(screen.getByTestId('fleet-cmd-burn-fleet_1'))
 
-    const card = screen.getByTestId('fleet-card')
-    expect(card).toHaveTextContent('Axion → Borealis')
-    expect(card).toHaveTextContent('In transit')
-    expect(screen.getByTestId('fleet-card-eta')).toHaveTextContent('11m')
-    // It names the lane chain ahead of the hull.
-    expect(card).toHaveTextContent('Borealis')
-
-    fireEvent.click(screen.getByTestId('fleet-card-close'))
-    expect(screen.queryByTestId('fleet-card')).not.toBeInTheDocument()
-    expect(screen.getByTestId('inspector')).toBeInTheDocument()
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Open the system board to choose a target')
+    expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0')
   })
 
-  // Spec: 0008/S8
-  it('a roster row for a fleet on a lane glides the camera to it and opens its card', async () => {
+  it('cuts the drive and toasts on success, composed the same way as the board view', () => {
     mockGalaxyState()
-    const traveling: Fleet = {
-      ...coastFleet('fleet_1', 'sys-0'),
+    const burning: Fleet = {
+      ...parkedFleet('fleet_1', 'sys-0'),
       state: {
-        mode: 'laneTransit',
-        laneTransit: {
-          route: ['sys-0', 'sys-1'],
-          legEtas: [0, 660_000],
-          departTime: 0,
-          arriveTime: 660_000,
-          entryGate: { ring: 16, slot: 2 },
+        Mode: 0,
+        Burn: {
+          Origin: { X: 0, Y: 0, Z: 0 },
+          Target: { BodyId: 'p-1', Point: null },
+          Intercept: { X: 1, Y: 0, Z: 0 },
+          Curve: {},
+          Length: 10,
+          DepartMs: 0,
+          ArriveMs: 90_000,
+          Accel: 1,
+          InsertionPhase: 0,
         },
+        Park: null,
+        Drift: null,
       },
     }
-    mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
-
+    mockUseMyFleets.mockReturnValue({ data: [burning] } as unknown as ReturnType<typeof useMyFleets>)
+    cutDriveMutate.mockImplementation((_id, opts) => (opts as { onSuccess?: () => void })?.onSuccess?.())
     renderView()
-    await screen.findByTestId('mock-graph')
-    fireEvent.click(screen.getByTestId('fleet-row-fleet_1'))
 
-    // The camera goes to the hull's point on the lane — not to a star, because it
-    // isn't at one.
-    expect(focusPointSpy).toHaveBeenCalled()
-    expect(focusSpy).not.toHaveBeenCalled()
-    expect(screen.getByTestId('fleet-card')).toBeInTheDocument()
-  })
-
-  // Spec: 0008/S7
-  it('hands a travelling fleet to the transit layer instead of pinning it to the star it left', async () => {
-    mockGalaxyState()
-    const traveling: Fleet = {
-      ...coastFleet('fleet_1', 'sys-0'),
-      state: {
-        mode: 'laneTransit',
-        laneTransit: {
-          route: ['sys-0', 'sys-1'],
-          legEtas: [60_000, 660_000],
-          departTime: 0,
-          arriveTime: 660_000,
-          entryGate: { ring: 16, slot: 2 },
-        },
-      },
-    }
-    mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
-
-    renderView()
-    await screen.findByTestId('mock-graph')
-
-    const props = graphPropsSpy.mock.calls.at(-1)![0]
-    // It's drawn crawling its lane…
-    expect(props.transitFleets.map((f: Fleet) => f.id)).toEqual(['fleet_1'])
-    // …and NOT as a presence pip on sys-0, which it has already left.
-    expect(props.fleetSystemIds).not.toContain('sys-0')
+    fireEvent.click(screen.getByTestId('fleet-cmd-cut-drive-fleet_1'))
+    expect(cutDriveMutate).toHaveBeenCalledWith('fleet_1', expect.anything())
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Drive cut')
   })
 
   // --- renderer availability (add-renderer-availability-states) --------------
@@ -582,7 +521,7 @@ describe('GalaxyView', () => {
       restoreCanvas = stubUnsupported()
       mockGalaxyState()
       mockUseMyFleets.mockReturnValue({
-        data: [coastFleet('fleet_1', 'sys-0')],
+        data: [parkedFleet('fleet_1', 'sys-0')],
       } as unknown as ReturnType<typeof useMyFleets>)
       renderView()
       await screen.findByTestId('renderer-unsupported')
@@ -591,48 +530,29 @@ describe('GalaxyView', () => {
       expect(screen.getByTestId('fleet-row-fleet_1')).toBeInTheDocument()
     })
 
-    it('roster selection still reaches a system, its inspector, and travel while the canvas is unsupported (Scenario: Roster selection still reaches a system, its inspector, and travel)', async () => {
+    it('roster selection still reaches a system and its inspector while the canvas is unsupported (Scenario: Roster selection still reaches a system, its inspector, and travel)', async () => {
       restoreCanvas = stubUnsupported()
       mockGalaxyState()
-      // QA fixture-gap fix: a SINGLE-fleet fixture makes `previewDest`
-      // permanently null — the acting fleet's roster row always selects its
-      // OWN system, so `selectedId === activeFleet.systemId` (isHere) on
-      // every click, and `travel-button` can never render. Two own fleets,
-      // at DIFFERENT systems, fix this: fleet_1 (first in the array, so the
-      // idle `activeFleet` GalaxyView commands travel for) stays at sys-0;
-      // fleet_2 sits at sys-1. Clicking fleet_2's row selects sys-1 — a
-      // system the acting fleet is NOT already at — so `previewDest` is
-      // genuinely non-null and TravelSection renders its live route +
-      // `travel-button`, not just the "Your fleet is here" note a
-      // same-system fixture would always hit.
+      // Two own fleets, at DIFFERENT systems: fleet_1 stays at sys-0;
+      // fleet_2 sits at sys-1. Clicking fleet_2's row selects sys-1 through
+      // the roster path alone (`handleShowFleet`), with no graph selection
+      // involved. There is no travel-button on this surface any more
+      // (galaxy-view REMOVED "Select-Preview-Commit Travel Gesture" — the
+      // successor gesture is a roster-panel jump from a docked, charted
+      // gate); this pins that the SYSTEM-reaching half of the removed
+      // scenario survives via Enter System, unaffected by canvas
+      // availability.
       mockUseMyFleets.mockReturnValue({
-        data: [coastFleet('fleet_1', 'sys-0'), coastFleet('fleet_2', 'sys-1')],
+        data: [parkedFleet('fleet_1', 'sys-0'), parkedFleet('fleet_2', 'sys-1')],
       } as unknown as ReturnType<typeof useMyFleets>)
-      const preview: RoutePreview = {
-        route: ['sys-0', 'sys-1'],
-        legEtas: [60_000, 660_000],
-        totalEta: 660_000,
-        departGate: { ring: 16, slot: 2 },
-        worldTime: 0,
-      }
-      mockUseRoutePreview.mockReturnValue({
-        data: preview,
-        isLoading: false,
-        isError: false,
-      } as unknown as ReturnType<typeof useRoutePreview>)
 
       renderView()
       await screen.findByTestId('renderer-unsupported')
 
-      // handleShowFleet: a roster row for a fleet NOT at the acting fleet's
-      // own system selects that system directly — no graph selection
-      // involved — reaching it, its inspector, and a genuinely live
-      // travel-button, all through the fleet-roster path alone.
       fireEvent.click(screen.getByTestId('fleet-row-fleet_2'))
 
       expect(screen.getByTestId('inspector-name')).toHaveTextContent('Borealis')
-      expect(screen.getByTestId('route-preview')).toBeInTheDocument()
-      expect(screen.getByTestId('travel-button')).toBeInTheDocument()
+      expect(screen.getByTestId('enter-system-button')).toBeInTheDocument()
     })
 
     it('surrounding affordances remain usable for a logged-out visitor: counts, region breakdown, and sign-in prompt shown; the roster is not mounted (Scenario: Surrounding galaxy affordances remain usable for a logged-out visitor)', async () => {

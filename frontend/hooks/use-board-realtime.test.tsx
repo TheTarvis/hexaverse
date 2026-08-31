@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BOARD_POLL_MS, SCAN_POLL_MS, useBoardRealtime } from './use-board-realtime'
+import { BOARD_POLL_MS, useBoardRealtime } from './use-board-realtime'
 
 // A controllable EventSource stand-in.
 class MockEventSource {
@@ -82,18 +82,35 @@ describe('useBoardRealtime', () => {
     expect(invalidate).toHaveBeenCalled()
   })
 
-  it('rule 3: tightens the poll while a scan is running — the read cadence IS the echo cadence', () => {
+  // migrate-fleet-to-continuous-burns, board-view delta (REMOVED → ADDED):
+  // "Realtime Refetch Rules While the Board Is Open" is superseded by
+  // "...With No Fleet Layer to Track" — the scan verb is deleted outright, so
+  // there is nothing left to tighten the poll for; the poll runs at its
+  // constant baseline interval unconditionally (task 8.4).
+  //
+  // This replaces the old "tightens the poll while scanning" test above
+  // (removed — its scenario has no successor). Cause: the spec changed
+  // (REMOVED "Realtime Refetch Rules While the Board Is Open" / ADDED
+  // "...With No Fleet Layer to Track", board-view spec.md).
+  it('rule 3: the poll never tightens — a scan signal has no effect on the interval', () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const invalidate = vi.spyOn(qc, 'invalidateQueries')
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <QueryClientProvider client={qc}>{children}</QueryClientProvider>
     )
+    // Passing `scanning: true` mirrors the old (now-removed) tightening
+    // signal — the option must have no effect at all, not just default off.
     renderHook(() => useBoardRealtime({ systemId: 'sys-7', worldTime: 0, scanning: true }), {
       wrapper,
     })
     invalidate.mockClear()
 
-    vi.advanceTimersByTime(SCAN_POLL_MS + 10)
+    // The OLD tightened cadence (5s) must NOT have fired a refetch —
+    // the poll stays on the constant baseline the whole time.
+    vi.advanceTimersByTime(BOARD_POLL_MS - 1_000)
+    expect(invalidate).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(2_000) // past BOARD_POLL_MS
     expect(invalidate).toHaveBeenCalled()
   })
 

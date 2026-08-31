@@ -1,12 +1,23 @@
 'use client'
 
-// FactsPanel — the board's right-hand inspector + command surface (#0007). It
-// shows the system header, the acting (own) fleet with its verbs (scan / cancel),
-// and whatever is selected — a body (type, fog band, worth where earned), a fleet,
-// or a bare tile — with the move commit + its previewed ETA. It reads the plan the
-// container recomputes each frame, so a led-intercept ETA ticks as the world turns.
+// FactsPanel — the board's right-hand inspector + fleet panel
+// (migrate-fleet-to-continuous-burns, design.md Decision 12). It shows the
+// system header, the acting (own) fleet's hold/mine/sell offers, and
+// whatever is selected — a body (type, fog band, worth where earned), a bare
+// cell, or a lane gate. Movement (burn/cut-drive/stop/jump) is commanded from
+// the roster panel, not from here — this panel owns no board.Cell/
+// MovementState-shaped verb (design.md Decision 12; fleet-roster "The Roster
+// Row Is the Fleet Command Surface").
 //
-// Toasts live here (component), not in the hooks (#frontend/CLAUDE.md).
+// `board-selection.ts`'s `BoardSelection` carries only an id/destSystemId/
+// cell (lean, no embedded domain object) — this panel resolves a selected
+// feature id back to its `BoardFeature` from the interior read's own feature
+// list, the same list it resolves the acting fleet's docked body from
+// (`activeFleet.attachedTo`, design.md Decision 13 — a body id directly, no
+// board-cell relation).
+//
+// Toasts live in the container (component), not in the hooks
+// (#frontend/CLAUDE.md).
 
 import { useState } from 'react'
 import { Button } from '@/components/catalyst/button'
@@ -14,63 +25,37 @@ import { Badge } from '@/components/catalyst/badge'
 import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import { Input } from '@/components/catalyst/input'
-import { productionSchedule, stateAt, type Cell } from '@/lib/board'
-import type { BoardFeature, LaneGate, ResourceKind } from '@/lib/types/system-board'
-import type { Fleet, FleetRoster, RoutePreview } from '@/lib/types/fleet'
+import type { BoardFeature, ResourceKind } from '@/lib/types/system-board'
+import type { Fleet, FleetRoster } from '@/lib/types/fleet'
+import { SHIP_MODE_BURN } from '@/lib/types/fleet'
 import type { Quote } from '@/lib/types/market'
-import { etaLabel, type MovePlan } from './move-preview'
+import { formatEta as etaLabel } from '@/lib/eta'
 import { FOG_TREATMENT } from './board-palette'
 import { SellSection } from './SellSection'
 import { BalanceReadout } from './BalanceReadout'
+import type { BoardSelection } from './board-selection'
 
-export type BoardSelection =
-  | { kind: 'feature'; feature: BoardFeature }
-  | { kind: 'cell'; cell: Cell }
-  | { kind: 'fleet'; fleet: Fleet }
-  | { kind: 'gate'; gate: LaneGate }
-  | null
-
-// The route-preview query state the depart section reads (a subset of the
-// useRoutePreview result) — a 422 no-charted-route surfaces as `isError`.
-export interface RouteState {
-  isLoading: boolean
-  isError: boolean
-  data?: RoutePreview
-}
+export type { BoardSelection } from './board-selection'
 
 export interface FactsPanelProps {
   starClass: string
   character: string
   radius: number
   featureCount: number
+  // The interior read's full feature list — how a selected/docked id resolves
+  // to its facts.
+  features: BoardFeature[]
   selection: BoardSelection
   activeFleet: Fleet | null
-  // The feature the acting fleet is currently docked to (resolved by the
-  // container from the interior read), or null. The mine offer anchors here —
-  // a fleet can only mine what it's docked to, so no selection is involved
-  // (add-mine-ui "Mine Offer on the Docked Fleet").
-  dockedFeature?: BoardFeature | null
-  plan: MovePlan | null
   worldTime: number
   pending: boolean
-  // The running scan's frozen eta (null when no scan is in flight) — drives the
-  // Scanning… countdown and blocks a second scan (#0006 Decision #19).
-  scanEta?: number | null
-  // The running mine's frozen eta (null when no run is in flight) — the
-  // movement channel's busy signal: gates move + mine, never scan (#0010,
-  // add-mine-ui "Running Mine Gates the Movement Channel").
+  // The running mine's frozen eta (null when no run is in flight) — drives
+  // the countdown and blocks a new mine offer.
   mineEta?: number | null
-  route: RouteState | null
-  onMove: () => void
-  onScan: () => void
   // Commit a mine run against the docked feature; the panel owns the
   // kind/tonnage choice, the container owns the featureId (the dock parent).
   onMine: (kind: ResourceKind, tons: number) => void
-  // Cancel the running mine via the generic #0005 action endpoint.
-  onCancelMine: () => void
   // The station's live quotes when the acting fleet is docked at one, else null.
-  // The sell offer anchors on the DOCKED state exactly as the mine offer does —
-  // goods can only be sold where they physically are (#0011).
   stationQuotes?: Quote[] | null
   // Commit a sale of the docked-at station. The panel owns the kind/tonnage and
   // the first-ton price it quoted; the container owns the featureId and the
@@ -79,30 +64,12 @@ export interface FactsPanelProps {
   // Set after a "price changed" rejection: the price the player HAD expected, so
   // the re-priced offer can show what moved rather than freezing a stale one.
   sellRepricedFrom?: number | null
-  // The corporation's credit balance, from session data. Credits are instant and
-  // location-independent, so there is no in-flight state to render.
+  // The corporation's credit balance, from session data.
   credits?: number | null
-  // The last settled sale's proceeds, and the last failure's player-facing copy.
-  // Both are announced through the balance readout's live region.
   lastSaleProceeds?: number | null
   saleFailure?: string | null
-  // Hover/focus intent on the Scan verb — the parent shows the aim-corridor
-  // overlay only while the player is actually considering a scan, so clicking
-  // around to plan a burn stays visually quiet.
-  onScanPreview?: (show: boolean) => void
-  // The playtest FX toggle: which effect a running scan renders — the radial
-  // ping (the slice mechanic's picture) or the arc-scan (kept as a future
-  // variant's look). Absent → no toggle shown.
-  scanFx?: 'ping' | 'arc'
-  onToggleScanFx?: () => void
-  onCancel: () => void
-  onDepart: () => void
-  // Whether the board's rendering context is live (add-renderer-availability-states,
-  // tasks.md 2.2b) — defaults to true so every existing caller is unaffected.
-  // false while the board's canvas region shows the unsupported/interrupted
-  // state: the empty-selection prompt stops inviting a selection on a canvas
-  // that doesn't exist, and `scan-fx-toggle` (2.2c) — a canvas-only control —
-  // is disabled, since it only switches which effect the board draws.
+  // Whether the board's rendering context is live
+  // (add-renderer-availability-states) — defaults to true.
   available?: boolean
 }
 
@@ -114,61 +81,37 @@ export function FactsPanel({
   character,
   radius,
   featureCount,
+  features,
   selection,
   activeFleet,
-  dockedFeature = null,
-  plan,
   worldTime,
   pending,
-  scanEta = null,
   mineEta = null,
-  route,
-  onMove,
-  onScan,
   onMine,
-  onCancelMine,
   stationQuotes = null,
   onSell,
   sellRepricedFrom = null,
   credits = null,
   lastSaleProceeds = null,
   saleFailure = null,
-  onScanPreview,
-  scanFx,
-  onToggleScanFx,
-  onCancel,
-  onDepart,
   available = true,
 }: FactsPanelProps) {
-  // Mode reads off the EFFECTIVE state (stateAt): a burn whose arrival passed is
-  // already docked/coasting, so the badge and verb gates don't lag the picture.
-  // A readout panel: it folds movement state but never enumerates cells or
-  // clamps to the rim, so the process-wide schedule is exact here (design.md,
-  // schedule-threading Decision).
-  const effectiveState = activeFleet
-    ? stateAt(activeFleet.state, worldTime, productionSchedule())
-    : null
-  const activeMode = effectiveState?.mode
-  const burning = activeMode === 'burn'
-  const canMoveToSelection = !!activeFleet && (selection?.kind === 'feature' || selection?.kind === 'cell')
-  // The scan is a 360° sweep (#0006 Decision #21) — one manual trigger, no
-  // aim. Burning does NOT gate it: movement and sensing are separate channels
-  // (#0006 Decision #19). One scan at a time, though — a running scan holds
-  // the sensor slot until eta.
-  const scanning = scanEta !== null && scanEta > worldTime
-  const scanSecondsLeft = scanning ? Math.max(1, Math.ceil((scanEta - worldTime) / 1000)) : 0
-  // A running mine holds the MOVEMENT slot until eta (#0010): move + mine gate
-  // on it, scan doesn't. Past-eta entries stop gating by world time alone —
-  // the refetch that resolves them lands via the board's realtime rules.
+  // A burn whose ArriveMs has passed IS its settled state — the trivial fold
+  // (t >= ArriveMs), never a re-derivation of the settled park's geometry
+  // (design.md Decision 1; the same discipline components/fleet/roster-*.ts
+  // use).
+  const state = activeFleet?.state
+  const burning =
+    state?.Mode === SHIP_MODE_BURN && !!state.Burn && worldTime < state.Burn.ArriveMs
+  const dockedBodyId = activeFleet?.attachedTo
+  const dockedFeature = dockedBodyId ? (features.find((f) => f.id === dockedBodyId) ?? null) : null
   const mining = mineEta !== null && mineEta > worldTime
-  const mineSecondsLeft = mining ? Math.max(1, Math.ceil((mineEta - worldTime) / 1000)) : 0
-  // Mine anchors to the DOCKED state, never a selection (add-mine-ui "Mine
-  // Offer on the Docked Fleet"): the fleet can only mine what it's docked to,
-  // and its own glyph occludes that body on the board. Offered while docked
-  // at a body with visible resources and the movement channel is free.
-  const docked = effectiveState?.mode === 'docked'
+  const mineSecondsLeft = mining ? Math.max(1, Math.ceil((mineEta! - worldTime) / 1000)) : 0
   const mineable =
-    docked && !!dockedFeature?.resources?.length && !!activeFleet?.roster && !mining && !burning
+    !!dockedFeature && !!dockedFeature.resources?.length && !!activeFleet?.roster && !mining && !burning
+
+  const selectedFeature = selection?.kind === 'feature' ? (features.find((f) => f.id === selection.id) ?? null) : null
+
   return (
     <aside data-testid="facts-panel" className={PANEL}>
       <div>
@@ -193,53 +136,14 @@ export function FactsPanel({
         <section data-testid="active-fleet" className="border-t border-white/10 pt-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-white">Your fleet</span>
-            <Badge color={burning ? 'amber' : activeMode === 'docked' ? 'green' : 'cyan'}>
-              {activeMode}
+            <Badge color={burning ? 'amber' : dockedBodyId ? 'green' : 'cyan'}>
+              {burning ? 'burning' : dockedBodyId ? 'docked' : 'free-flying'}
             </Badge>
           </div>
-          <div className="mt-3 flex gap-2">
-            <Button
-              data-testid="scan-button"
-              color="cyan"
-              disabled={pending || scanning}
-              onClick={onScan}
-              onMouseEnter={() => onScanPreview?.(true)}
-              onMouseLeave={() => onScanPreview?.(false)}
-              onFocus={() => onScanPreview?.(true)}
-              onBlur={() => onScanPreview?.(false)}
-            >
-              {scanning ? 'Scanning…' : 'Scan'}
-            </Button>
-            {burning && (
-              <Button data-testid="cancel-button" outline disabled={pending} onClick={onCancel}>
-                Cancel burn
-              </Button>
-            )}
-          </div>
-          {scanning ? (
-            <p data-testid="scan-countdown" className="mt-2 text-[11px] text-cyan-300/80">
-              Sensors sweeping — resolves in {scanSecondsLeft}s.
-            </p>
-          ) : (
-            <p className="mt-2 text-[11px] text-zinc-400">
-              Sweeps 360° from your position — large bodies shadow what’s behind them.
-            </p>
-          )}
           {mining && (
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <p data-testid="mine-countdown" className="text-[11px] text-amber-300/80">
-                Extractors running — resolves in {mineSecondsLeft}s.
-              </p>
-              <Button
-                data-testid="cancel-mine-button"
-                plain
-                disabled={pending}
-                onClick={onCancelMine}
-                className="!px-1 !py-0 !text-[11px] !text-zinc-400 hover:!text-amber-300"
-              >
-                Cancel
-              </Button>
-            </div>
+            <p data-testid="mine-countdown" className="mt-2 text-[11px] text-amber-300/80">
+              Extractors running — resolves in {mineSecondsLeft}s.
+            </p>
           )}
           {activeFleet.roster && <HoldReadout roster={activeFleet.roster} />}
           {mineable && dockedFeature && activeFleet.roster && (
@@ -251,55 +155,40 @@ export function FactsPanel({
               onMine={onMine}
             />
           )}
-          {/* Docked at a station: the sell offer. A station is dockable but not
-              mineable, so this and the mine offer are never both shown. */}
           {stationQuotes && onSell && activeFleet.roster && (
             <SellSection
               quotes={stationQuotes}
               roster={activeFleet.roster}
-              pending={pending}
+              pending={pending || burning || mining}
               onSell={onSell}
               repricedFrom={sellRepricedFrom}
             />
-          )}
-          {scanFx && onToggleScanFx && (
-            <Button
-              plain
-              disabled={!available}
-              data-testid="scan-fx-toggle"
-              onClick={onToggleScanFx}
-              className="mt-1 !px-0 !py-0 !font-mono !text-[10px] tracking-wide !text-zinc-500 uppercase hover:!text-cyan-300"
-            >
-              scan fx: {scanFx === 'arc' ? 'arc-scan' : 'radial ping'} ⇄
-            </Button>
           )}
         </section>
       )}
 
       <section data-testid="selection" className="border-t border-white/10 pt-3">
-        {selection?.kind === 'feature' && (
-          <FeatureFacts feature={selection.feature} worldTime={worldTime} />
+        {selection?.kind === 'feature' && selectedFeature && (
+          <FeatureFacts feature={selectedFeature} worldTime={worldTime} />
         )}
         {selection?.kind === 'cell' && (
           <Text className="!text-zinc-300">
             Ring {selection.cell.ring}, slot {selection.cell.slot}
           </Text>
         )}
-        {selection?.kind === 'fleet' && (
-          <Text className="!text-zinc-300">
-            {selection.fleet.own ? 'Your fleet' : 'Foreign contact'} —{' '}
-            {stateAt(selection.fleet.state, worldTime, productionSchedule()).mode}
-          </Text>
-        )}
         {selection?.kind === 'gate' && (
-          <GateFacts
-            gate={selection.gate}
-            hasFleet={!!activeFleet}
-            route={route}
-            worldTime={worldTime}
-            pending={pending}
-            onDepart={onDepart}
-          />
+          <div data-testid="gate-facts">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-white">Lane gate</span>
+              <Badge color="sky">GATE</Badge>
+            </div>
+            <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-400">
+              → {selection.destSystemId}
+            </p>
+            <p className="mt-3 text-[11px] text-zinc-500">
+              Dock a fleet to this gate, then jump from the roster panel.
+            </p>
+          </div>
         )}
         {!selection && available && (
           <Text data-testid="selection-prompt" className="!text-zinc-500">
@@ -308,99 +197,11 @@ export function FactsPanel({
         )}
         {!selection && !available && (
           <Text data-testid="selection-prompt" className="!text-zinc-500">
-            The board must be available to choose a move or departure target.
+            The board must be available to inspect a body, tile, or gate.
           </Text>
-        )}
-
-        {canMoveToSelection && plan && (
-          <div className="mt-3 flex items-center gap-3">
-            <Button data-testid="move-button" color="cyan" disabled={pending || mining} onClick={onMove}>
-              {selection?.kind === 'feature' ? 'Intercept' : 'Move here'}
-            </Button>
-            <span data-testid="move-eta" className="font-mono text-xs text-zinc-400">
-              {plan.tiles} cells · ETA {etaLabel(plan.etaMs)}
-            </span>
-          </div>
-        )}
-        {canMoveToSelection && !plan && (
-          <p data-testid="core-blocked" className="mt-3 text-[11px] text-zinc-500">
-            The star can’t be a destination — you can’t fly onto the core or dock a sun.
-          </p>
         )}
       </section>
     </aside>
-  )
-}
-
-// GateFacts is the board-tier depart gesture (#0008): a selected rim gate shows
-// its charted route (per-leg + total ETA) and offers Depart, mirroring the galaxy
-// view's TravelSection. Leg 0 (the in-system burn to this gate) rides in the trip
-// action server-side; the on-board dashed overlay draws it, so the panel shows the
-// journey past the gate. A no-charted-route destination surfaces as `route.isError`.
-function GateFacts({
-  gate,
-  hasFleet,
-  route,
-  worldTime,
-  pending,
-  onDepart,
-}: {
-  gate: LaneGate
-  hasFleet: boolean
-  route: RouteState | null
-  worldTime: number
-  pending: boolean
-  onDepart: () => void
-}) {
-  return (
-    <div data-testid="gate-facts">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-white">Lane gate</span>
-        <Badge color="sky">DEPART</Badge>
-      </div>
-      <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-400">→ {gate.destSystemId}</p>
-
-      {!hasFleet && (
-        <p className="mt-3 text-[11px] text-zinc-500">Bring a fleet here to depart through this gate.</p>
-      )}
-
-      {hasFleet && route?.isLoading && <p className="mt-3 text-sm text-zinc-400">Plotting a route…</p>}
-
-      {hasFleet && route?.isError && (
-        <p data-testid="gate-no-route" className="mt-3 text-sm text-amber-400">
-          No charted route this way. Explore toward it first.
-        </p>
-      )}
-
-      {hasFleet && route?.data && (
-        <div className="mt-3 flex flex-col gap-2">
-          <ul className="flex flex-col gap-0.5">
-            {route.data.route.slice(1).map((sysId, i) => (
-              <li
-                key={sysId}
-                className="flex items-center justify-between rounded-md border border-zinc-800/50 bg-black/20 px-2.5 py-1 text-sm text-white"
-              >
-                <span className="truncate font-mono text-xs">
-                  <span className="text-zinc-500">{i + 1}.</span> {sysId}
-                </span>
-                <span className="font-mono text-xs text-zinc-400">
-                  {etaLabel(Math.max(0, route.data!.legEtas[i + 1] - worldTime))}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <Button
-            data-testid="depart-button"
-            color="sky"
-            disabled={pending}
-            onClick={onDepart}
-            className="w-full"
-          >
-            {`Depart · ${etaLabel(Math.max(0, route.data.totalEta - worldTime))}`}
-          </Button>
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -416,12 +217,10 @@ const RESOURCE_ACCENT: Record<ResourceKind, { dot: string; meter: string }> = {
   exotic: { dot: 'bg-fuchsia-400', meter: 'bg-fuchsia-400/80' },
 }
 
-// HoldReadout — the fleet's cargo picture (#0010 "Fleet Panel Hold Readout"):
-// used/total capacity over a stacked fill meter (one colour-coded segment per
-// kind), tons by kind with matching dots, and the free hold remainder —
-// straight off the owner-only roster block the fleet read serves. Kinds at
-// zero are absent from `cargo`, so an empty hold renders as the bare capacity
-// line over an empty track.
+// HoldReadout — the fleet's cargo picture: used/total capacity over a
+// stacked fill meter (one colour-coded segment per kind), tons by kind with
+// matching dots, and the free hold remainder — straight off the owner-only
+// roster block the fleet read serves.
 function HoldReadout({ roster }: { roster: FleetRoster }) {
   const entries = Object.entries(roster.cargo ?? {}).filter(([, tons]) => tons > 0) as [
     ResourceKind,
@@ -475,11 +274,8 @@ function HoldReadout({ roster }: { roster: FleetRoster }) {
 
 // MineSection — the extraction verb's offer on the fleet card (#0010 "Mine
 // Offer on the Docked Fleet"): pick a kind from what the player can SEE on
-// the docked feature (fog decides the menu — richness-labelled chips, richest
-// preselected), size the run in tons (default: fill the hold; clamped to the
-// free hold — the lode's truth stays server-side, the honest outcome reports
-// any shortfall), and preview eta = tons ÷ the fleet's SERVED mining rate.
-// Keyed by feature id so re-docking elsewhere resets it.
+// the docked feature, size the run in tons, and preview eta = tons ÷ the
+// fleet's SERVED mining rate.
 function MineSection({
   feature,
   roster,
@@ -495,12 +291,9 @@ function MineSection({
   const richest = resources.reduce((a, b) => (b.richness > a.richness ? b : a), resources[0])
   const [kind, setKind] = useState<ResourceKind>(richest.kind)
   const [tons, setTons] = useState<number>(Math.max(0, roster.freeHold))
-  // The input clamps as it changes — never over the free hold, never negative
-  // (the lode-side clamp stays server-side; its outcome reports shortfalls).
   const clampTons = (v: number) => Math.min(Math.max(Number.isFinite(v) ? v : 0, 0), roster.freeHold)
 
   const committable = tons > 0 && !pending
-  // Advisory only — the commit's frozen server ETA drives the countdown.
   const previewMs = roster.miningRate > 0 ? tons / roster.miningRate : null
 
   return (

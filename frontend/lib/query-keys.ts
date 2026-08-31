@@ -39,20 +39,17 @@ export const queryKeys = {
   },
 
   fleets: {
-    // The fogged fleet layer (#0004/#0007). `inSystem` backs the board's fleet
-    // glyphs; `detail` a single fleet. Move/scan mutations invalidate both plus
-    // `systemBoard.detail` (a scan reveals features) and self-schedule the ETA
-    // refetch.
+    // The requester's own fleets (migrate-fleet-to-continuous-burns: the
+    // board draws no fleet layer, so there is no per-system fleet list read
+    // any more — only `mine`/`detail`). `inSystem` is kept as a key SHAPE
+    // only, for `use-actions.ts`/`use-market.ts`'s existing invalidations
+    // against a query nothing currently produces.
     all: ['fleets'] as const,
     inSystem: (systemId: string) => [...queryKeys.fleets.all, 'in-system', systemId] as const,
     detail: (id: string) => [...queryKeys.fleets.all, 'detail', id] as const,
-    // The requester's own fleets across systems (transit included) — the galaxy
-    // view's fleet layer (#0008).
+    // The requester's own fleets across systems (transit included) — the
+    // roster panel and the galaxy/board views' fleet source.
     mine: () => [...queryKeys.fleets.all, 'mine'] as const,
-    // A trip route preview: the fleet's shortest lane route to a destination
-    // system + frozen ETAs. Keyed by both ids so switching targets refetches.
-    route: (fleetId: string, destSystemId: string) =>
-      [...queryKeys.fleets.all, 'route', fleetId, destSystemId] as const,
   },
 
   actions: {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { corporationService } from './corporation-service'
 import { apiClient } from '../api-client'
 import type { Corporation, SpawnResult } from '../types/corporation'
+import { SHIP_MODE_PARKED } from '../types/fleet'
 
 vi.mock('../api-client', () => ({
   apiClient: { get: vi.fn(), post: vi.fn() },
@@ -48,8 +49,22 @@ describe('corporationService', () => {
         id: 'fleet_1',
         corporationId: 'corp_1',
         systemId: 'sys-9',
-        state: { mode: 'coast', coast: { ring: 15, angle0: 0, period: 1 << 30, dir: 1 } },
-        position: { ring: 15, slot: 0 },
+        state: {
+          Mode: SHIP_MODE_PARKED,
+          Burn: null,
+          Park: {
+            Kind: 0,
+            BodyId: '',
+            Radius: 0,
+            PeriodMs: 0,
+            Phase: 0,
+            EpochMs: 0,
+            Offset: { X: 0, Y: 0, Z: 0 },
+            Point: { X: 0, Y: 0, Z: 0 },
+          },
+          Drift: null,
+        },
+        position: { X: 15, Y: 0, Z: 0 },
         own: true,
         worldTime: 1000,
       },

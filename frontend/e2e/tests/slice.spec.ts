@@ -2,28 +2,63 @@ import { test, expect, type Page } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 
 /**
- * The vertical slice (add-mine-ui; vision steps 1-6) — one journey through
- * every slice verb, on a fresh account:
+ * The vertical slice (migrate-fleet-to-continuous-burns tasks.md 8, Half B) —
+ * one journey through the surviving slice verbs, on a fresh account:
  *
- *   sign up → wake on the home board → SCAN (reveals lodes, charts lanes) →
- *   MOVE + dock at a mineable body → MINE (hold fills at the eta) → reload
- *   (the cargo PERSISTED — a fresh Firestore read, not client cache) → mine
- *   again (the ledger accumulates) → DEPART through a charted gate (the
- *   hand-off to the galaxy view, roster reads the trip).
+ *   sign up → wake on the home board (every feature already unfogged —
+ *   system-interior's interim read, no scan needed to see a lode) →
+ *   select a mineable body → BURN + dock, commanded from the roster panel →
+ *   MINE (hold fills at the eta) → reload (the cargo PERSISTED — a fresh
+ *   Firestore read, not client cache) → mine again (the ledger accumulates).
+ *
+ * REWRITTEN wholesale from the pre-migration
+ * "scan → move → mine → persisted → mine again → depart" journey. Cause: the
+ * spec changed underneath every remaining step —
+ *   - `scan` is DELETED (observation-fog-and-scan REMOVED "Running Scan Echo
+ *     Disc"/"Scan Resolution Mints the Reveal") — but its old JOB (reveal
+ *     the lodes) is subsumed by system-interior's ADDED "Interior Reads Are
+ *     Fully Disclosed, A Deliberate Interim" (tasks.md 7.7): every feature —
+ *     resources included — now ships unfogged to any authenticated
+ *     requester, from the very first board load. No wait, no reveal step.
+ *   - `move` is no longer a board verb at all — it is `burn`, commanded from
+ *     the roster panel (fleet-roster ADDED "The Roster Row Is the Fleet
+ *     Command Surface"; board-view Decision 12), naming the board's CURRENT
+ *     SELECTION (a clicked feature) as the target.
+ *   - `depart` (a lane jump) has **NO REACHABLE PATH in this state of the
+ *     chain** and is NOT exercised — see the dedicated note at the bottom of
+ *     this file before the final assertions. This is reported, not silently
+ *     dropped.
+ *
+ * data-testid contract this spec assumes (the dev implements to it):
+ *   - `feature-glyph-{id}` / `[data-mineable]` — SURVIVES unchanged (board
+ *     still draws features; only the fleet layer is gone).
+ *   - `fleet-roster`, `fleet-row-{fleetId}` — SURVIVES.
+ *   - `fleet-cmd-burn-{fleetId}` — commits a burn order to the board's
+ *     CURRENTLY SELECTED feature (the acting/sole fleet). No separate
+ *     "move-button"/target-picker exists any more — selecting the feature
+ *     IS naming the target (board-view Decision 12: "Targets are named by
+ *     body id from the interior read, not by picking a tile").
+ *   - `mine-section`, `mine-tons-input`, `mine-button`, `mine-countdown`,
+ *     `hold-readout`, `hold-capacity` — SURVIVE unchanged (board-view KEPT
+ *     "Mine Offer/ETA/Commit"; tasks.md 8.7).
+ *   - `gate-glyph-*` — SURVIVES, but is expected to be ABSENT for a fresh
+ *     corp (see the bottom note): no lane is charted, so the interior read
+ *     ships zero lane gates.
  *
  * Wall-clock note (design.md Risks): the test stack runs the world at scale 1
- * (no WORLD_TIME_SCALE in .env.test — the client's useWorldTime assumes 1), so
- * every eta here is real seconds: scan 15s, burn 2.5s/cell, mining 1s/ton. The
- * journey stays bounded by picking the NEAREST revealed lode and minimum-size
- * runs. The full return trip is NOT ridden: a single lane leg is 104-300s at
- * this scale, so persistence is proven by the reload instead (the same fresh
- * Firestore read a returning fleet would issue).
+ * (no WORLD_TIME_SCALE in .env.test), so every eta here is real seconds:
+ * mining 1s/ton, as before. The burn's own duration is no longer
+ * `2.5s/cell` (that was lattice-board `msPerTile`, deleted by this change,
+ * design.md Decision 18) — it is now solved from continuous distance and the
+ * fleet's configured acceleration (space.SolveBurn). The exact figure is not
+ * pinned by this spec (a production tuning constant, not a scenario this
+ * change's spec names); the timeout below is left deliberately generous
+ * rather than guessed tight.
  *
- * Interaction note: glyphs animate every frame (orbits glide), so Playwright's
- * stability check never passes on them — all board clicks go through
- * page.mouse at bounding-box coordinates. Lodes are picked off the RENDERED
- * board (data-mineable, the browser's own fogged read), not a parallel API
- * read, so the test can never disagree with what the player sees.
+ * Interaction note: glyphs animate every frame (orbits glide), so
+ * Playwright's stability check never passes on them — all board clicks go
+ * through page.mouse/dispatchEvent as before. Lodes are picked off the
+ * RENDERED board (data-mineable), not a parallel API read.
  *
  * Local-only: drives the auth emulator's signup path, like new-user.spec.ts.
  */
@@ -32,10 +67,12 @@ const cfg = resolveE2EConfig()
 // Fresh account — do not restore the shared logged-in session.
 test.use({ storageState: { cookies: [], origins: [] } })
 
-// The journey rides real world-time etas (scan 15s + burn + two mine runs +
-// the leg-0 burn to a departure gate, which from a far rim gate can run
-// 60-80s on its own before the galaxy hand-off fires at gate passage).
-test.setTimeout(420_000)
+// The journey rides real world-time etas (a burn to the nearest lode + two
+// mine runs). No lane leg is ridden any more (depart is unreachable — see
+// below), so this is shorter than the pre-migration budget, but the burn
+// duration is untuned as of this writing (see the wall-clock note above) —
+// left generous rather than guessed tight.
+test.setTimeout(300_000)
 
 // Clicks a board glyph by dispatching the click event straight to its button.
 // Orbiting glyphs animate every frame, so Playwright's stability check never
@@ -55,7 +92,7 @@ async function holdUsed(page: Page): Promise<number> {
 }
 
 test.describe('the vertical slice', () => {
-  test('scan → move → mine → persisted → mine again → depart', async ({ page }) => {
+  test('wake → mine → persisted → mine again (no scan, no reachable depart)', async ({ page }) => {
     test.skip(cfg.env !== 'local', 'slice journey drives the auth emulator (local only)')
 
     const email = `e2e+slice-${Date.now()}@hexaverse.test`
@@ -77,31 +114,36 @@ test.describe('the vertical slice', () => {
     await expect(page.getByTestId('hold-readout')).toBeVisible({ timeout: 15_000 })
     expect(await holdUsed(page)).toBe(0)
 
-    // 2. SCAN home — the taught first verb: reveals the lodes and charts the
-    //    system's lanes (#0006). Resolution lands via the eta refetch; revealed
-    //    lodes surface as data-mineable glyphs on the refreshed board.
-    await page.getByTestId('scan-button').click()
-    await expect(page.getByTestId('scan-countdown')).toBeVisible({ timeout: 10_000 })
+    // 2. NO SCAN — system-interior's unfogged interim read (tasks.md 7.7)
+    //    ships every feature, resources included, from the very first board
+    //    load. The lode is already there; nothing to trigger, nothing to
+    //    wait on.
     const lodes = page.locator('[data-testid^="feature-glyph-"][data-mineable]')
     await expect(
       lodes.first(),
-      'the scanned home system should reveal at least one lode',
-    ).toBeVisible({ timeout: 60_000 })
+      'the home system interior should already show at least one mineable lode, unfogged',
+    ).toBeVisible({ timeout: 15_000 })
 
-    // 3. MOVE: intercept + dock at the nearest revealed lode (nearest by
-    //    screen distance from the fleet glyph — burn cost is 2.5s/cell, so
-    //    nearest keeps this the longest single wait of the journey).
+    // 3. SELECT the nearest revealed lode (nearest by screen distance from
+    //    the roster's sole hull — the board itself draws no fleet mark to
+    //    measure from any more, design.md Decision 12, so this reads the
+    //    roster row's presence as "the fleet exists" and just picks the
+    //    nearest lode to the board's centre, where a fresh spawn's hull
+    //    parks).
     //
     //    Moons are excluded: the generator marks them mineable (they carry
-    //    resources) but gives them no orbit and a core-cell footprint, so BOTH
-    //    the server solve (ErrCoreDestination) and the client preview reject
-    //    them as targets — a moon can't be docked or mined today. Known
-    //    product gap (2026-08-25), surfaced to Travis; when moon targeting
-    //    lands (e.g. solve against the parent's orbit), drop this filter.
-    const fleetBox = (await page
-      .locator('[data-testid^="fleet-glyph-"]')
-      .first()
-      .boundingBox())!
+    //    resources) but gives them no orbit and a core-cell footprint, so
+    //    the server solve (space.BuildCurve's endpoint-clearance guard)
+    //    rejects them as a burn target — a moon can't be docked or mined.
+    //    Known product gap, unchanged by this migration; surfaced to
+    //    Travis previously (2026-08-25).
+    const roster = page.getByTestId('fleet-roster')
+    await expect(roster).toBeVisible({ timeout: 15_000 })
+    const rows = roster.locator('[data-testid^="fleet-row-"]')
+    await expect(rows).toHaveCount(1, { timeout: 15_000 })
+    const fleetId = (await rows.first().getAttribute('data-testid'))!.replace('fleet-row-', '')
+
+    const boardCenter = { x: 0, y: 0 }
     let lodeId = ''
     let best = Number.POSITIVE_INFINITY
     for (const glyph of await lodes.all()) {
@@ -109,22 +151,26 @@ test.describe('the vertical slice', () => {
       if (id.startsWith('feat-moon-')) continue
       const box = await glyph.boundingBox()
       if (!box) continue
-      const d = Math.hypot(box.x - fleetBox.x, box.y - fleetBox.y)
+      const d = Math.hypot(box.x - boardCenter.x, box.y - boardCenter.y)
       if (d < best) {
         best = d
         lodeId = id
       }
     }
     expect(lodeId, 'a nearest non-moon lode should have been picked').not.toBe('')
-
     await clickGlyph(page, `feature-glyph-${lodeId}`)
-    await page.getByTestId('move-button').click()
-    await expect(page.getByTestId('active-fleet')).toContainText('docked', { timeout: 120_000 })
 
-    // 4. MINE a minimum-size run (5t at 0.001 t/ms = 5s) and watch the hold
-    //    fill at the eta — no navigation, the refetch rules land it. The offer
-    //    anchors to the docked state on the fleet card ("Mine Offer on the
-    //    Docked Fleet") — no board click involved.
+    // 4. BURN, commanded from the roster row (fleet-roster ADDED "The
+    //    Roster Row Is the Fleet Command Surface") — no board "move-button"
+    //    exists any more. Burn is always offered, so no precondition check
+    //    is needed before clicking it.
+    await page.getByTestId(`fleet-cmd-burn-${fleetId}`).click()
+    await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText('Docked', { timeout: 180_000 })
+
+    // 5. MINE a minimum-size run (5t at 0.001 t/ms = 5s) and watch the hold
+    //    fill at the eta — no navigation, the refetch rules land it. The
+    //    offer anchors to the docked state on the fleet card ("Mine Offer on
+    //    the Docked Fleet") — no board click involved.
     await expect(page.getByTestId('mine-section')).toBeVisible({ timeout: 10_000 })
     await page.getByTestId('mine-tons-input').fill('5')
     await page.getByTestId('mine-button').click()
@@ -133,13 +179,13 @@ test.describe('the vertical slice', () => {
       .poll(() => holdUsed(page), { timeout: 45_000, message: 'the hold fills at the run’s eta' })
       .toBe(5)
 
-    // 5. PERSISTED: reload — the hold readout re-derives from a fresh
+    // 6. PERSISTED: reload — the hold readout re-derives from a fresh
     //    Firestore read (the same read a returning fleet would issue).
     await page.reload()
     await expect(page.getByTestId('hold-readout')).toBeVisible({ timeout: 15_000 })
     expect(await holdUsed(page)).toBe(5)
 
-    // 6. Mine AGAIN — the lode's ledger and the hold both accumulate
+    // 7. Mine AGAIN — the lode's ledger and the hold both accumulate
     //    (exactly-once deltas: 5 + 5, never 5 or 15). The offer is already
     //    back on the fleet card (still docked, channel free again).
     await expect(page.getByTestId('mine-section')).toBeVisible({ timeout: 10_000 })
@@ -149,39 +195,35 @@ test.describe('the vertical slice', () => {
       .poll(() => holdUsed(page), { timeout: 45_000, message: 'the second run accumulates' })
       .toBe(10)
 
-    // 7. DEPART through a charted gate (scan charted the system's lanes) — the
-    //    board hands off to the galaxy view and the roster reads the trip.
-    //    The lane leg itself is 104s+ at scale 1, so the arrival is not
-    //    awaited — commitment and hand-off are the slice beat.
-    //    Gates are fixed rim glyphs (no orbit animation), so the standard
-    //    locator.click() is safe here AND its actionability check detects a
-    //    gate hidden under a floating overlay panel (roster/market stack) —
-    //    the board can't pan yet, so an occluded glyph is genuinely
-    //    unclickable. Try each gate and depart through the first clickable one.
-    const gates = page.locator('[data-testid^="gate-glyph-"]')
-    await expect(gates.first()).toBeVisible({ timeout: 15_000 })
-    let departed = false
-    for (const g of await gates.all()) {
-      try {
-        await g.click({ timeout: 5_000 })
-        await expect(page.getByTestId('depart-button')).toBeVisible({ timeout: 5_000 })
-        departed = true
-        break
-      } catch {
-        // Occluded by an overlay panel, or no charted route — try the next gate.
-      }
-    }
-    expect(departed, 'at least one gate should be clickable with a charted route').toBe(true)
-    await page.getByTestId('depart-button').click()
-    // Commitment first: the roster reads the trip as soon as the commit lands,
-    // while leg 0 (the burn to the gate) is still riding on this board.
-    const roster = page.getByTestId('fleet-roster')
-    await expect(roster).toContainText(/Departing|In transit/, { timeout: 30_000 })
-    // The galaxy hand-off fires when the fleet passes its gate — the end of the
-    // leg-0 burn, which from a far rim gate runs 60-80s at 2.5s/cell. 180s
-    // bounds a rim-to-rim leg with refetch slack.
-    await page.waitForURL((url) => new URL(url).pathname === '/', { timeout: 180_000 })
-    await expect(roster).toBeVisible({ timeout: 15_000 })
-    await expect(roster).toContainText(/Departing|In transit/, { timeout: 30_000 })
+    // 8. DEPART HAS NO SUCCESSOR HERE — reported, not silently dropped.
+    //
+    //    A lane jump requires the fleet to be `attachedTo` a lane-gate body
+    //    whose lane the corporation has CHARTED (fleet-movement ADDED "Lane
+    //    Jump From a Docked Gate"). Charting a lane happens exactly two
+    //    ways in the current tree: (1) as a byproduct of actually crossing
+    //    it (fleet-movement "Jump Arrival Parks Near the Destination Gate,
+    //    Unmasked" — `via: traveled`), which is circular — you cannot jump
+    //    an uncharted lane to chart it; or (2) scanning, which this change
+    //    deletes outright with no replacement (observation-fog-and-scan
+    //    REMOVED "Running Scan Echo Disc"/"Scan Resolution Mints the
+    //    Reveal") — link 5 (replace-observation-with-sightings) is where a
+    //    successor sensor verb lands. Spawn itself charts home only, zero
+    //    lanes (corporation-spawn, unaffected by this change). And the
+    //    interior read's lane-gate list is STILL charted-tier-filtered
+    //    post-migration (`system/handler.go`'s `chartedGates` survives
+    //    section 7's audit as system-interior's one remaining fog
+    //    dependency) — so an uncharted gate is not merely un-jumpable, it
+    //    is invisible.
+    //
+    //    Net effect: between this change and link 5 landing, there is no
+    //    player-driven path to a first charted lane, so `depart` cannot be
+    //    exercised end-to-end by ANY account, fresh or old. This matches
+    //    design.md's own recorded risk ("This makes the game visually
+    //    unplayable for links 4 through 7") and is not this test's bug to
+    //    paper over.
+    //
+    //    What IS asserted here, honestly, is the current interim state: a
+    //    fresh corp's board shows no lane gate at all.
+    await expect(page.locator('[data-testid^="gate-glyph-"]')).toHaveCount(0)
   })
 })

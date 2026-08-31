@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fleetService } from './fleet-service'
 import { apiClient } from '../api-client'
 import type { Fleet, FleetList } from '../types/fleet'
+import { SHIP_MODE_PARKED } from '../types/fleet'
 
 vi.mock('../api-client', () => ({
   apiClient: { get: vi.fn(), post: vi.fn() },
@@ -16,8 +17,13 @@ const fleet: Fleet = {
   id: 'fleet_1',
   corporationId: 'corp-user1',
   systemId: 'sys-7',
-  state: { mode: 'coast', coast: { ring: 3, angle0: 0, period: 1 << 30, dir: 1 } },
-  position: { ring: 3, slot: 0 },
+  state: {
+    Mode: SHIP_MODE_PARKED,
+    Burn: null,
+    Park: { Kind: 0, BodyId: '', Radius: 0, PeriodMs: 0, Phase: 0, EpochMs: 0, Offset: { X: 0, Y: 0, Z: 0 }, Point: { X: 0, Y: 0, Z: 0 } },
+    Drift: null,
+  },
+  position: { X: 0, Y: 0, Z: 0 },
   own: true,
   worldTime: 123456,
 }
@@ -27,40 +33,63 @@ describe('fleetService', () => {
     vi.clearAllMocks()
   })
 
-  it('lists fleets in a system, encoding the systemId query', async () => {
+  it('lists the requester’s own fleets via GET /v1/fleets?mine=true', async () => {
     const list: FleetList = { fleets: [fleet], worldTime: 123456 }
     mockGet.mockResolvedValue(ok(list))
 
-    const result = await fleetService.listInSystem('sys 7')
+    const result = await fleetService.listMine()
 
-    expect(mockGet).toHaveBeenCalledWith('/v1/fleets?systemId=sys%207')
+    expect(mockGet).toHaveBeenCalledWith('/v1/fleets?mine=true')
     expect(result).toEqual([fleet])
   })
 
   it('returns an empty array when the envelope carries no fleets', async () => {
     mockGet.mockResolvedValue(ok({ worldTime: 1 } as FleetList))
-    expect(await fleetService.listInSystem('sys-7')).toEqual([])
+    expect(await fleetService.listMine()).toEqual([])
   })
 
-  it('orders a burn to a target through POST /orders', async () => {
+  it('gets one own fleet via GET /v1/fleets/:id', async () => {
+    mockGet.mockResolvedValue(ok(fleet))
+    const result = await fleetService.get('fleet_1')
+    expect(mockGet).toHaveBeenCalledWith('/v1/fleets/fleet_1')
+    expect(result).toEqual(fleet)
+  })
+
+  it('orders a burn to a body through POST /orders', async () => {
     mockPost.mockResolvedValue(ok(fleet))
 
-    await fleetService.order('fleet_1', { cell: { ring: 5, slot: 2 } })
+    await fleetService.order('fleet_1', { bodyId: 'p-1' })
+
+    expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/orders', { bodyId: 'p-1' })
+  })
+
+  it('orders a burn to an explicit point, carrying an optional accel through', async () => {
+    mockPost.mockResolvedValue(ok(fleet))
+
+    await fleetService.order('fleet_1', { point: { X: 1, Y: 2, Z: 3 }, accel: 0.5 })
 
     expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/orders', {
-      target: { cell: { ring: 5, slot: 2 } },
+      point: { X: 1, Y: 2, Z: 3 },
+      accel: 0.5,
     })
   })
 
-  it('cancels and scans via their POST endpoints', async () => {
+  it('cuts the drive via POST /cut-drive', async () => {
     mockPost.mockResolvedValue(ok(fleet))
+    await fleetService.cutDrive('fleet_1')
+    expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/cut-drive', {})
+  })
 
-    await fleetService.cancel('fleet_1')
-    expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/cancel', {})
+  it('stops in place via POST /stop', async () => {
+    mockPost.mockResolvedValue(ok(fleet))
+    await fleetService.stop('fleet_1')
+    expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/stop', {})
+  })
 
-    // The scan is a 360° sweep (#0006 Decision #21) — no aim, no body.
-    await fleetService.scan('fleet_1')
-    expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/scan', {})
+  it('jumps a lane via POST /jump {laneId}', async () => {
+    mockPost.mockResolvedValue(ok(fleet))
+    await fleetService.jump('fleet_1', 'lane-9')
+    expect(mockPost).toHaveBeenCalledWith('/v1/fleets/fleet_1/jump', { laneId: 'lane-9' })
   })
 
   it('commits a mine run through POST /mine and returns the action id + frozen eta', async () => {
@@ -90,5 +119,13 @@ describe('fleetService', () => {
     await expect(
       fleetService.mine('fleet_1', { featureId: 'feat-belt', kind: 'metals', tons: 999 }),
     ).rejects.toThrow(/free hold/)
+  })
+
+  it('lets an order rejection propagate with the server reason intact', async () => {
+    mockPost.mockRejectedValue(new Error('order: commanded accel below the configured minimum'))
+
+    await expect(
+      fleetService.order('fleet_1', { bodyId: 'p-1', accel: 0.0001 }),
+    ).rejects.toThrow(/minimum/)
   })
 })

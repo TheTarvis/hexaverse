@@ -1,44 +1,77 @@
+// RED-phase suite for SystemBoardView against the migrate-fleet-to-
+// continuous-burns contract (design.md Decision 12; tasks.md 8.7, 8.11).
+//
+// Cause for rewriting this whole file wholesale: the board's fleet layer,
+// move/scan/depart verbs, and route-preview surface are gone
+// (board-view REMOVED "Move Preview...", "Move Commit", "Scan Aim Preview
+// Only While Considering the Verb", "Scan Commit and Single-Slot Gating",
+// "Cancel Command Available Only While Burning", "Lane Gate Selection
+// Previews and Commits Departure" — replaced by roster-panel burn/cut-
+// drive/stop/jump commands composed from the board's current selection,
+// design.md Decision 12: "Targets are named by body id from the interior
+// read, not by picking a tile"). `hooks/use-fleets.ts` dropped
+// `useFleetsInSystem`/`useFleetOrders`/`useScan`/`useRoutePreview`/
+// `useFleetTravel` entirely; `lib/types/fleet.ts` carries the mixed-case
+// `space.ShipState` wire shape (Mode/Burn/Park/Drift, capitalized/untagged)
+// plus camelCase `attachedTo`/`jump`.
+//
+// board-view MODIFIED "System Board Route and Data Fan-In" pins: "The board
+// fetches no fleet data" — 8.11 asks this be independently pinned (it was
+// not before). See the dedicated "fetches no fleet data" test below.
+//
+// Two scenarios in this file are RED FOR A REAL REASON — not a test-
+// authoring defect — and are reported to the orchestrator as production
+// findings, not silently dropped: `board-view` › "Departure Hand-Off to the
+// Galaxy View" and `board-view` › "Fleet Roster Cross-Navigation" ›
+// "Selecting a fleet with no board presence navigates to the galaxy" are
+// UNTOUCHED by this change's delta (neither REMOVED, ADDED, nor MODIFIED in
+// openspec/changes/migrate-fleet-to-continuous-burns/specs/board-view/
+// spec.md) — they remain in force verbatim from openspec/specs/board-view/
+// spec.md, but `SystemBoardView.tsx` as shipped contains NO navigate-away-
+// on-departure logic at all (no effect watches `activeFleet.systemId`/
+// `.jump` across renders), and its roster `onSelect` handler checks only
+// `f.systemId !== systemId` — never `f.jump` — so a fleet mid-jump whose
+// `systemId` has not yet flipped (design.md Decision 10: SystemId flips only
+// at jump RESOLUTION) reads as "here" and is never handed to the galaxy
+// view. See the `// FINDING:` comments on those two tests.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SystemBoardView } from './SystemBoardView'
 import { useSystemBoard } from '@/hooks/use-system-board'
-import {
-  useFleetsInSystem,
-  useFleetOrders,
-  useMine,
-  useScan,
-  useRoutePreview,
-  useFleetTravel,
-  useMyFleets,
-} from '@/hooks/use-fleets'
+import { useCutDrive, useJump, useMine, useMyFleets, useOrder, useStop } from '@/hooks/use-fleets'
 import { useGalaxy } from '@/hooks/use-galaxy'
-import { useCancelAction, useRunningMine, useRunningScan } from '@/hooks/use-actions'
+import { useCancelAction, useRunningMine } from '@/hooks/use-actions'
+import { useMarketBoard, useSell, useStation } from '@/hooks/use-market'
+import { useCorporationOptional } from '@/components/corporation-provider'
 import { toast } from '@/lib/toast'
-import { useBoardRealtime } from '@/hooks/use-board-realtime'
 import type { SystemBoard } from '@/lib/types/system-board'
 import type { Fleet } from '@/lib/types/fleet'
+import { SHIP_MODE_PARKED } from '@/lib/types/fleet'
 import type { GameAction } from '@/lib/types/action'
 import type { UseQueryResult } from '@tanstack/react-query'
 
 vi.mock('@/hooks/use-system-board', () => ({ useSystemBoard: vi.fn() }))
 vi.mock('@/hooks/use-actions', () => ({
-  useRunningScan: vi.fn(),
   useRunningMine: vi.fn(),
   useCancelAction: vi.fn(),
 }))
 vi.mock('@/hooks/use-fleets', () => ({
-  useFleetsInSystem: vi.fn(),
-  useFleetOrders: vi.fn(),
-  useScan: vi.fn(),
-  useMine: vi.fn(),
-  useRoutePreview: vi.fn(),
-  useFleetTravel: vi.fn(),
-  // The roster the board mounts reads every own fleet (and the galaxy, for
-  // system names) — both stubbed so this suite stays about the board.
   useMyFleets: vi.fn(),
+  useOrder: vi.fn(),
+  useCutDrive: vi.fn(),
+  useStop: vi.fn(),
+  useJump: vi.fn(),
+  useMine: vi.fn(),
 }))
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
+vi.mock('@/hooks/use-market', () => ({
+  useMarketBoard: vi.fn(),
+  useStation: vi.fn(),
+  useSell: vi.fn(),
+}))
+vi.mock('@/components/corporation-provider', () => ({ useCorporationOptional: vi.fn() }))
 // The admin claim gating the tuning panel (BoardTuning). NODE_ENV is 'test'
 // here, so the dev-build half of the gate is off and the claim alone decides.
 const adminState = vi.hoisted(() => ({ isAdmin: false }))
@@ -76,25 +109,27 @@ const push = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 
 const mockBoard = vi.mocked(useSystemBoard)
-const mockFleets = vi.mocked(useFleetsInSystem)
-const mockOrders = vi.mocked(useFleetOrders)
-const mockScan = vi.mocked(useScan)
-const mockRoutePreview = vi.mocked(useRoutePreview)
-const mockTravel = vi.mocked(useFleetTravel)
 const mockMyFleets = vi.mocked(useMyFleets)
-const mockGalaxy = vi.mocked(useGalaxy)
-const mockRunningScan = vi.mocked(useRunningScan)
-const mockRunningMine = vi.mocked(useRunningMine)
+const mockOrder = vi.mocked(useOrder)
+const mockCutDrive = vi.mocked(useCutDrive)
+const mockStop = vi.mocked(useStop)
+const mockJump = vi.mocked(useJump)
 const mockMine = vi.mocked(useMine)
+const mockGalaxy = vi.mocked(useGalaxy)
+const mockRunningMine = vi.mocked(useRunningMine)
 const mockCancelAction = vi.mocked(useCancelAction)
-
-const travelMutate = vi.fn()
+const mockMarketBoard = vi.mocked(useMarketBoard)
+const mockStation = vi.mocked(useStation)
+const mockSell = vi.mocked(useSell)
+const mockCorp = vi.mocked(useCorporationOptional)
 
 const orderMutate = vi.fn()
-const cancelMutate = vi.fn()
-const scanMutate = vi.fn()
+const cutDriveMutate = vi.fn()
+const stopMutate = vi.fn()
+const jumpMutate = vi.fn()
 const mineMutate = vi.fn()
 const cancelActionMutate = vi.fn()
+const sellMutate = vi.fn()
 
 function boardFixture(): SystemBoard {
   return {
@@ -118,12 +153,30 @@ function boardFixture(): SystemBoard {
   }
 }
 
+function parkState() {
+  return {
+    Mode: SHIP_MODE_PARKED,
+    Burn: null,
+    Park: {
+      Kind: 2,
+      BodyId: '',
+      Radius: 0,
+      PeriodMs: 0,
+      Phase: 0,
+      EpochMs: 0,
+      Offset: { X: 0, Y: 0, Z: 0 },
+      Point: { X: 0, Y: 0, Z: 0 },
+    },
+    Drift: null,
+  }
+}
+
 const ownFleet: Fleet = {
   id: 'mine',
   corporationId: 'corp-user1',
   systemId: 'sys-7',
-  state: { mode: 'coast', coast: { ring: 3, angle0: 0, period: 2 ** 60, dir: 1 } },
-  position: { ring: 3, slot: 0 },
+  state: parkState(),
+  position: { X: 0, Y: 0, Z: 0 },
   own: true,
   worldTime: 0,
 }
@@ -143,33 +196,8 @@ function render(ui: React.ReactElement) {
 function boardState(state: Partial<UseQueryResult<SystemBoard, Error>>) {
   mockBoard.mockReturnValue(state as UseQueryResult<SystemBoard, Error>)
 }
-function fleetsState(fleets: Fleet[]) {
-  mockFleets.mockReturnValue({ data: fleets } as UseQueryResult<Fleet[], Error>)
-}
-
-// A fleet mid-departure: burning across the board to the rim gate it leaves by.
-function departingFleet(gateEta: number): Fleet {
-  return {
-    ...ownFleet,
-    state: {
-      mode: 'laneTransit',
-      laneTransit: {
-        boardLeg: {
-          path: [
-            { ring: 3, slot: 0 },
-            { ring: 2, slot: 0 },
-          ],
-          startTime: 0,
-          gateEta,
-        },
-        route: ['sys-7', 'sys-9'],
-        legEtas: [gateEta, gateEta + 60_000],
-        departTime: 0,
-        arriveTime: gateEta + 60_000,
-        entryGate: { ring: 3, slot: 0 },
-      },
-    },
-  }
+function myFleetsState(fleets: Fleet[]) {
+  mockMyFleets.mockReturnValue({ data: fleets } as unknown as ReturnType<typeof useMyFleets>)
 }
 
 describe('SystemBoardView', () => {
@@ -178,27 +206,22 @@ describe('SystemBoardView', () => {
     clock.now = 0
     guard.available = true
     adminState.isAdmin = false
-    mockOrders.mockReturnValue({
-      order: { mutate: orderMutate, isPending: false },
-      cancel: { mutate: cancelMutate, isPending: false },
-    } as unknown as ReturnType<typeof useFleetOrders>)
-    mockScan.mockReturnValue({ mutate: scanMutate, isPending: false } as unknown as ReturnType<typeof useScan>)
-    mockRoutePreview.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useRoutePreview>)
-    mockTravel.mockReturnValue({ mutate: travelMutate, isPending: false } as unknown as ReturnType<typeof useFleetTravel>)
-    mockMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
-    mockGalaxy.mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useGalaxy>)
-    mockRunningScan.mockReturnValue({ data: null } as unknown as ReturnType<typeof useRunningScan>)
-    mockRunningMine.mockReturnValue({ data: null } as unknown as ReturnType<typeof useRunningMine>)
+    mockOrder.mockReturnValue({ mutate: orderMutate, isPending: false } as unknown as ReturnType<typeof useOrder>)
+    mockCutDrive.mockReturnValue({ mutate: cutDriveMutate, isPending: false } as unknown as ReturnType<typeof useCutDrive>)
+    mockStop.mockReturnValue({ mutate: stopMutate, isPending: false } as unknown as ReturnType<typeof useStop>)
+    mockJump.mockReturnValue({ mutate: jumpMutate, isPending: false } as unknown as ReturnType<typeof useJump>)
     mockMine.mockReturnValue({ mutate: mineMutate, isPending: false } as unknown as ReturnType<typeof useMine>)
+    mockGalaxy.mockReturnValue({ data: undefined } as unknown as ReturnType<typeof useGalaxy>)
+    mockRunningMine.mockReturnValue({ data: null } as unknown as ReturnType<typeof useRunningMine>)
     mockCancelAction.mockReturnValue({
       mutate: cancelActionMutate,
       isPending: false,
     } as unknown as ReturnType<typeof useCancelAction>)
-    fleetsState([])
+    mockMarketBoard.mockReturnValue({ data: undefined, isLoading: false, isError: false } as unknown as ReturnType<typeof useMarketBoard>)
+    mockStation.mockReturnValue({ data: undefined, refetch: vi.fn() } as unknown as ReturnType<typeof useStation>)
+    mockSell.mockReturnValue({ mutate: sellMutate, isPending: false } as unknown as ReturnType<typeof useSell>)
+    mockCorp.mockReturnValue(null)
+    myFleetsState([])
   })
 
   it('shows a charting placeholder while loading', () => {
@@ -213,7 +236,7 @@ describe('SystemBoardView', () => {
     // canvas region never fires onFirstFrame) — a black canvas must not show,
     // so the charting placeholder persists over the mounted board.
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([ownFleet])
+    myFleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
     expect(screen.getByTestId('board-overlay')).toBeInTheDocument()
     expect(screen.getByText(/charting the system/i)).toBeInTheDocument()
@@ -222,14 +245,14 @@ describe('SystemBoardView', () => {
   it('lets an unavailable renderer take precedence over the loading placeholder', () => {
     guard.available = false
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([ownFleet])
+    myFleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
     // No loading veil over the unsupported/interrupted notice — the
     // placeholder must never persist when no frame can ever come.
     expect(screen.queryByText(/charting the system/i)).not.toBeInTheDocument()
     // The overlay's hit shapes are gone with it; verbs needing a board
-    // selection are unavailable, and the facts panel says why (task 7.10) —
-    // not the default "select a body" copy.
+    // selection are unavailable, and the facts panel says why — not the
+    // default "select a body" copy.
     expect(screen.queryByTestId('board-overlay')).not.toBeInTheDocument()
     expect(screen.getByTestId('facts-panel')).toHaveTextContent(/board must be available/i)
   })
@@ -243,24 +266,45 @@ describe('SystemBoardView', () => {
 
   it('mounts the real board, scene, and facts panel on success', () => {
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([ownFleet])
+    myFleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
 
     expect(screen.getByTestId('board-overlay')).toBeInTheDocument()
     expect(screen.getByTestId('board-lattice')).toBeInTheDocument()
     expect(screen.getByTestId('feature-glyph-f-star')).toBeInTheDocument()
-    expect(screen.getByTestId('fleet-glyph-mine')).toBeInTheDocument()
     const facts = screen.getByTestId('facts-panel')
     expect(facts).toHaveTextContent('Class G system')
-    // An own fleet is present, so the scan verb is offered.
-    expect(screen.getByTestId('scan-button')).toBeInTheDocument()
+  })
+
+  // board-view MODIFIED "System Board Route and Data Fan-In": "The board
+  // fetches no fleet data" (design.md Decision 12) — not independently
+  // pinned before this rewrite (dev's own note, tasks.md 8.11).
+  it('fetches no fleet data of its own — the board draws no fleet layer at all', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    // Two own fleets: one here, one elsewhere — proves the board draws
+    // neither, from the SAME shared `useMyFleets` read the roster panel
+    // uses, never a system-scoped fetch (there is no such hook to call —
+    // `hooks/use-fleets.ts` exports no `useFleetsInSystem` any more; if
+    // `SystemBoardView.tsx` called one, this mocked module — which supplies
+    // only the surviving surface — would throw at render, failing every
+    // test in this file).
+    myFleetsState([ownFleet, { ...ownFleet, id: 'elsewhere', systemId: 'sys-9' }])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    // No fleet-glyph mark of any kind reaches the overlay.
+    expect(screen.queryAllByTestId(/^fleet-glyph-/)).toHaveLength(0)
+    // `useMyFleets` is the ONLY fleet-data hook this container (or the
+    // roster it mounts) calls — asserted by call count being exactly the
+    // number of components that read it (this container + FleetRoster), not
+    // some larger number a per-system fetch would add.
+    expect(mockMyFleets).toHaveBeenCalledTimes(2)
   })
 
   it('offers the tuning panel to an admin, and hides it otherwise', () => {
     // NODE_ENV is 'test' here, so the dev-build half of the gate is off and
     // the admin claim alone decides.
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([ownFleet])
+    myFleetsState([ownFleet])
     const { unmount } = render(<SystemBoardView systemId="sys-7" />)
     expect(screen.queryByTestId('board-tuning-toggle')).not.toBeInTheDocument()
     unmount()
@@ -272,7 +316,7 @@ describe('SystemBoardView', () => {
 
   it('toggles selection off on re-click, and a board click outside the lattice clears it', () => {
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([ownFleet])
+    myFleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
 
     // Select → the selection ring appears; re-click the same feature → deselect.
@@ -288,94 +332,75 @@ describe('SystemBoardView', () => {
     expect(screen.getByTestId('feature-glyph-p-1').querySelector('[data-testid="selection-ring"]')).toBeNull()
   })
 
-  it('previews and commits a move to a selected body', () => {
+  // --- roster commands, composed from the board's selection (fleet-roster
+  // "The Roster Row Is the Fleet Command Surface"; design.md Decision 12) ---
+
+  it('composes a burn order from the current feature selection and commits it via the roster’s Burn command', () => {
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([ownFleet])
+    myFleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
 
-    // Select the planet → a move button + ETA preview appear.
     fireEvent.click(screen.getByTestId('feature-glyph-p-1'))
-    expect(screen.getByTestId('move-button')).toBeInTheDocument()
-    expect(screen.getByTestId('move-eta')).toBeInTheDocument()
-    expect(screen.getByTestId('selection-preview')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('fleet-cmd-burn-mine'))
 
-    // Commit → orders the active fleet to intercept that feature.
-    fireEvent.click(screen.getByTestId('move-button'))
     expect(orderMutate).toHaveBeenCalledWith(
-      { fleetId: 'mine', target: { featureId: 'p-1' } },
+      { fleetId: 'mine', request: { bodyId: 'p-1' } },
       expect.anything(),
     )
   })
 
-  it('commits the sweep, previewing its shadow coverage on hover', () => {
+  it('refuses a burn commit client-side, with a toast, when nothing is selected', () => {
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([ownFleet])
+    myFleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
 
-    // Clicking around to plan a burn stays quiet — no scan overlay.
-    fireEvent.click(screen.getByTestId('feature-glyph-p-1'))
-    expect(screen.queryByTestId('scan-overlay-aim')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('fleet-cmd-burn-mine'))
 
-    // Considering the Scan verb (hover) previews the sweep; leaving hides it.
-    fireEvent.mouseEnter(screen.getByTestId('scan-button'))
-    expect(screen.getByTestId('scan-overlay-aim')).toBeInTheDocument()
-    fireEvent.mouseLeave(screen.getByTestId('scan-button'))
-    expect(screen.queryByTestId('scan-overlay-aim')).not.toBeInTheDocument()
-
-    // Commit — the 360° sweep needs no aim (#0006 Decision #21).
-    fireEvent.click(screen.getByTestId('scan-button'))
-    expect(scanMutate).toHaveBeenCalledWith('mine', expect.anything())
+    expect(orderMutate).not.toHaveBeenCalled()
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Select a body to target first')
   })
 
-  it('draws the committed sweep and a countdown while a scan runs', () => {
+  it('cuts the drive and toasts on success', () => {
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([ownFleet])
-    const running: GameAction = {
-      id: 'action_scan',
-      type: 'scan',
-      actor: 'mine',
-      scope: 'sys-7',
-      params: { systemId: 'sys-7' },
-      committedAt: 0,
-      eta: 30_000,
-      status: 'running',
-      worldTime: 0,
+    // Cut-drive is offered only while burning (fleet-roster ADDED "The
+    // Roster Row Is the Fleet Command Surface") — a burning fixture is
+    // needed to reach the button at all.
+    const burning: Fleet = {
+      ...ownFleet,
+      state: {
+        Mode: 0,
+        Burn: {
+          Origin: { X: 0, Y: 0, Z: 0 },
+          Target: { BodyId: 'p-1', Point: null },
+          Intercept: { X: 1, Y: 0, Z: 0 },
+          Curve: {},
+          Length: 10,
+          DepartMs: 0,
+          ArriveMs: 90_000,
+          Accel: 1,
+          InsertionPhase: 0,
+        },
+        Park: null,
+        Drift: null,
+      },
     }
-    mockRunningScan.mockReturnValue({ data: running } as unknown as ReturnType<typeof useRunningScan>)
+    myFleetsState([burning])
+    cutDriveMutate.mockImplementation((_id, opts) => (opts as { onSuccess?: () => void })?.onSuccess?.())
     render(<SystemBoardView systemId="sys-7" />)
 
-    // The committed sweep is on the board, and the panel counts down.
-    expect(screen.getByTestId('scan-overlay-active')).toBeInTheDocument()
-    // The radial ping expands from the fleet's live point.
-    expect(screen.getByTestId('scan-ping')).toBeInTheDocument()
-    expect(screen.getByTestId('scan-ping-pulse')).toBeInTheDocument()
-    expect(screen.getByTestId('scan-countdown')).toHaveTextContent(/30s/)
-    expect(screen.getByTestId('scan-button')).toBeDisabled()
-    // The scan's eta feeds the realtime rules — the eta-scheduled board refetch
-    // is the read that resolves the scan server-side — and the poll tightens
-    // while echoes are landing (radial echo).
-    const realtimeArgs = vi.mocked(useBoardRealtime).mock.calls.at(-1)![0]
-    expect(realtimeArgs.etaCandidates).toContain(30_000)
-    expect(realtimeArgs.scanning).toBe(true)
-
-    // The FX toggle swaps the running scan's effect to the arc-scan look,
-    // then back. (Persistence rides localStorage — stubbed flat in this
-    // suite's environment, so asserted by behavior only.)
-    fireEvent.click(screen.getByTestId('scan-fx-toggle'))
-    expect(screen.queryByTestId('scan-ping')).not.toBeInTheDocument()
-    expect(screen.getByTestId('arc-scan')).toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('scan-fx-toggle'))
-    expect(screen.getByTestId('scan-ping')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('fleet-cmd-cut-drive-mine'))
+    expect(cutDriveMutate).toHaveBeenCalledWith('mine', expect.anything())
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Drive cut')
   })
 
-  // --- mine (#0010, add-mine-ui) --------------------------------------------
+  // --- mine (kept: "Mine Offer on the Docked Fleet", "Mine Commit") --------
 
-  // A board whose planet carries lodes, and a fleet docked to it with the
-  // owner-only roster block the mine offer reads.
+  // A board whose planet carries lodes, and a fleet docked (attachedTo) to
+  // it with the owner-only roster block the mine offer reads.
   function mineFixtures() {
     const board = boardFixture()
     board.features[1] = {
-      ...board.features[1],
+      ...board.features[1]!,
       band: 'visible',
       live: true,
       resources: [
@@ -385,12 +410,11 @@ describe('SystemBoardView', () => {
     }
     const docked: Fleet = {
       ...ownFleet,
-      state: { mode: 'docked', docked: { parentId: 'p-1' } },
-      position: { ring: 2, slot: 0 },
+      attachedTo: 'p-1',
       roster: { ships: [{ class: 'seed' }], cargo: {}, cargoCapacity: 200, freeHold: 200, miningRate: 0.001 },
     }
     boardState({ isLoading: false, isError: false, data: board })
-    fleetsState([docked])
+    myFleetsState([docked])
   }
 
   it('offers mine on the fleet card while docked at a lode — no selection — and commits the run', () => {
@@ -405,7 +429,8 @@ describe('SystemBoardView', () => {
     expect(screen.getByTestId('mine-tons-input')).toHaveValue(200)
 
     fireEvent.click(screen.getByTestId('mine-button'))
-    // The featureId is the fleet's dock parent, resolved by the container.
+    // The featureId is the fleet's dock parent (`attachedTo`), resolved by
+    // the container.
     expect(mineMutate).toHaveBeenCalledWith(
       { fleetId: 'mine', request: { featureId: 'p-1', kind: 'water', tons: 200 } },
       expect.anything(),
@@ -431,7 +456,7 @@ describe('SystemBoardView', () => {
     expect(screen.getByTestId('mine-section')).toBeInTheDocument()
   })
 
-  it('gates move + mine while a run is in flight, keeps scan free, and arms the eta refetch', () => {
+  it('gates a fresh mine offer while a run is in flight, showing a countdown instead', () => {
     mineFixtures()
     const running: GameAction = {
       id: 'action_mine',
@@ -447,82 +472,39 @@ describe('SystemBoardView', () => {
     mockRunningMine.mockReturnValue({ data: running } as unknown as ReturnType<typeof useRunningMine>)
     render(<SystemBoardView systemId="sys-7" />)
 
-    // The movement channel is busy: countdown shown, no fresh offer, move
-    // disabled — but the sensor channel stays open (#0006's mirror image).
     expect(screen.getByTestId('mine-countdown')).toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('feature-glyph-p-1'))
     expect(screen.queryByTestId('mine-section')).not.toBeInTheDocument()
-    expect(screen.getByTestId('move-button')).toBeDisabled()
-    expect(screen.getByTestId('scan-button')).toBeEnabled()
 
-    // The run's eta joins the self-scheduled refetch candidates (rule 1).
-    const realtimeArgs = vi.mocked(useBoardRealtime).mock.calls.at(-1)![0]
-    expect(realtimeArgs.etaCandidates).toContain(30_000)
-
-    // Cancelling rides the generic #0005 endpoint with the run's action id.
-    fireEvent.click(screen.getByTestId('cancel-mine-button'))
-    expect(cancelActionMutate).toHaveBeenCalledWith(
-      { actionId: 'action_mine', fleetId: 'mine' },
-      expect.anything(),
-    )
+    // board-view ADDED "Running Mine Gates the Fleet Panel's Commands" — the
+    // SAME running mine also gates the mounted roster's commands (read
+    // straight off the query cache, per FleetRoster's own contract, already
+    // pinned in FleetRoster.test.tsx and roster-commands.test.ts). Spot-
+    // checked here only for the wiring, not re-derived: the cache key this
+    // container's mocked `useRunningMine` return doesn't feed FleetRoster,
+    // so this integration point is a documented gap, not asserted further.
   })
 
-  it('selects a lane gate, previews the route, and departs', () => {
+  // --- lane gates (informational only on the board now — jump is a roster
+  // command, design.md Decision 10/12) --------------------------------------
+
+  it('selects a lane gate and shows its facts, pointing at the roster panel — no depart affordance', () => {
     const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }] }
     boardState({ isLoading: false, isError: false, data: withGate })
-    fleetsState([ownFleet])
-    mockRoutePreview.mockReturnValue({
-      data: {
-        route: ['sys-7', 'sys-9'],
-        legEtas: [30_000, 90_000],
-        totalEta: 90_000,
-        departGate: { ring: 3, slot: 0 },
-        worldTime: 0,
-      },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useRoutePreview>)
+    myFleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
 
-    // Select the rim gate → depart section with the route + a burn-to-gate overlay.
     fireEvent.click(screen.getByTestId('gate-glyph-sys-9'))
-    expect(screen.getByTestId('gate-facts')).toBeInTheDocument()
-    expect(screen.getByTestId('selection-preview')).toBeInTheDocument()
-
-    // Commit → a trip to the neighbour system.
-    fireEvent.click(screen.getByTestId('depart-button'))
-    expect(travelMutate).toHaveBeenCalledWith(
-      { fleetId: 'mine', systemId: 'sys-9' },
-      expect.anything(),
-    )
-  })
-
-  // Spec: 0008/S6
-  it('hands off to the galaxy view when a departing fleet transits its gate', () => {
-    boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([departingFleet(10_000)])
-    const { rerender } = render(<SystemBoardView systemId="sys-7" />)
-
-    // Mid-leg the fleet is still here and we stay put.
-    expect(screen.getByTestId('fleet-glyph-mine')).toBeInTheDocument()
-    expect(push).not.toHaveBeenCalled()
-
-    // Past the gate ETA it's out on the lane: gone from the board, and the view
-    // follows it to the galaxy rather than leaving a ghost on the star.
-    clock.now = 12_000
-    rerender(<SystemBoardView systemId="sys-7" />)
-    expect(screen.queryByTestId('fleet-glyph-mine')).not.toBeInTheDocument()
-    expect(push).toHaveBeenCalledWith('/')
+    const gateFacts = screen.getByTestId('gate-facts')
+    expect(gateFacts).toHaveTextContent('sys-9')
+    expect(gateFacts).toHaveTextContent(/jump from the roster panel/i)
+    expect(screen.queryByTestId('depart-button')).not.toBeInTheDocument()
   })
 
   // Spec: 0011/S3
   it('mounts the roster, and a row for a fleet elsewhere opens that board', () => {
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([ownFleet])
     const away: Fleet = { ...ownFleet, id: 'away', systemId: 'sys-9' }
-    mockMyFleets.mockReturnValue({
-      data: [ownFleet, away],
-    } as unknown as ReturnType<typeof useMyFleets>)
+    myFleetsState([ownFleet, away])
     render(<SystemBoardView systemId="sys-7" />)
 
     // Both fleets are listed, wherever they are — that's the point of the roster.
@@ -531,14 +513,86 @@ describe('SystemBoardView', () => {
     expect(push).toHaveBeenCalledWith('/systems/sys-9')
   })
 
-  // Spec: 0008/S6
-  it('stays put when opening a board whose fleet is already out on a lane', () => {
+  // --- market / credits -----------------------------------------------------
+
+  it('mounts the market board panel once a station is present at this system', () => {
     boardState({ isLoading: false, isError: false, data: boardFixture() })
-    fleetsState([departingFleet(10_000)])
-    clock.now = 12_000
+    myFleetsState([ownFleet])
+    mockStation.mockReturnValue({
+      data: { systemId: 'sys-7', orbit: { ring: 1, angle0: 0, period: 1, dir: 1 }, featureId: 'p-1', createdAt: 0 },
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useStation>)
     render(<SystemBoardView systemId="sys-7" />)
 
-    // The departure wasn't watched from here — no bounce.
+    expect(mockMarketBoard).toHaveBeenCalled()
+  })
+
+  it('shows the credit balance readout from the corporation context', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    myFleetsState([ownFleet])
+    mockCorp.mockReturnValue({ id: 'c1', accountId: 'a1', name: 'Acme', credits: 750 } as unknown as ReturnType<typeof useCorporationOptional>)
+    render(<SystemBoardView systemId="sys-7" />)
+
+    expect(screen.getByTestId('balance-value')).toHaveTextContent('750')
+  })
+
+  // --- FINDINGS: two board-view requirements untouched by this change's
+  // delta (still in force verbatim), for which the shipped component has NO
+  // implementation. Both fail for the right reason (missing behaviour, not a
+  // harness/compile error) — reported to the orchestrator as production
+  // defects, not silently dropped or invented around.
+
+  // FINDING (production defect, not a test-authoring issue): board-view ›
+  // "Departure Hand-Off to the Galaxy View" › "Watching a fleet depart
+  // navigates to the galaxy view" — untouched by this change's delta (not
+  // REMOVED/ADDED/MODIFIED), still in force. `SystemBoardView.tsx` has no
+  // effect watching `activeFleet`'s presence in `ownFleetsHere` across
+  // renders, so a fleet that WAS on this board and then jumps away (its
+  // `systemId` flips at resolve, design.md Decision 10) never triggers a
+  // navigation to `/`. This test is RED against the shipped component.
+  it('navigates to the galaxy view when a watched fleet’s jump resolves and it leaves this system', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    myFleetsState([ownFleet])
+    const { rerender } = render(<SystemBoardView systemId="sys-7" />)
+    expect(screen.getByTestId('fleet-row-mine')).toBeInTheDocument()
     expect(push).not.toHaveBeenCalled()
+
+    // The jump resolves: the fleet's systemId flips away from sys-7, so it
+    // is no longer among `ownFleetsHere` on the next read.
+    myFleetsState([{ ...ownFleet, systemId: 'sys-9' }])
+    rerender(<SystemBoardView systemId="sys-7" />)
+
+    expect(push).toHaveBeenCalledWith('/')
+  })
+
+  it('stays put when opening a board whose fleet is already elsewhere (no watched departure)', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    // The fleet was never present at sys-7 in this session — opened
+    // straight onto a system with no own fleet.
+    myFleetsState([{ ...ownFleet, systemId: 'sys-9' }])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  // FINDING (production defect): board-view › "Fleet Roster Cross-
+  // Navigation" › "Selecting a fleet with no board presence navigates to the
+  // galaxy" — untouched by this change's delta, still in force. The
+  // shipped `onSelect` checks only `f.systemId !== systemId`, never
+  // `f.jump`; a fleet mid-jump whose `systemId` has not yet flipped (still
+  // reads as "sys-7") is therefore selected as if it were here, rather than
+  // navigated to the galaxy view. This test is RED against the shipped
+  // component.
+  it('navigates to the galaxy view when a roster row for a mid-jump fleet (no board presence) is selected', () => {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    const jumping: Fleet = {
+      ...ownFleet,
+      jump: { laneId: 'lane-1', destSystemId: 'sys-9', departMs: 0, arriveMs: 60_000 },
+    }
+    myFleetsState([jumping])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('fleet-row-mine'))
+    expect(push).toHaveBeenCalledWith('/')
   })
 })

@@ -14,7 +14,6 @@ import {
   schedule as boardSchedule,
 } from '@/lib/board'
 import type { BoardFeature, FogBand, SystemBoard } from '@/lib/types/system-board'
-import type { Fleet } from '@/lib/types/fleet'
 import {
   bandForRing,
   BAND_STYLE,
@@ -33,7 +32,6 @@ import { boardToWorld } from './use-board-projection'
 import type {
   BoardTheme,
   PackedBody,
-  PackedFleetInstance,
   PackedLatticeTile,
   PackedRing,
   PackedScene,
@@ -232,40 +230,9 @@ export function createPackedScene(board: SystemBoard): PackedScene {
   }
 }
 
-// formationOffsets — hull slots for an own fleet's roster, in fleet-local
-// space (+y forward): a leader, then staggered wingman pairs behind. Pure and
-// exported so the formation is assertable without a renderer.
-export function formationOffsets(count: number): { dx: number; dy: number }[] {
-  const n = Math.max(1, count)
-  const out: { dx: number; dy: number }[] = []
-  for (let i = 0; i < n; i++) {
-    if (i === 0) {
-      out.push({ dx: 0, dy: 0 })
-      continue
-    }
-    const pair = Math.ceil(i / 2)
-    const side = i % 2 === 1 ? -1 : 1
-    out.push({ dx: side * pair * (RADIAL_UNIT * 0.28), dy: -pair * (RADIAL_UNIT * 0.32) })
-  }
-  return out
-}
-
-// A foreign fleet's mark is derived from its position ALONE: one centred slot,
-// constant across all foreign fleets regardless of any field of the read —
-// size/instance-count/formation invariance is the confidentiality property
-// (`Foreign Fleets Render as Contact Marks Only`).
-const FOREIGN_FORMATION: { dx: number; dy: number }[] = [{ dx: 0, dy: 0 }]
-
-// packFleetInstance — the own/foreign fork, decided here, outside any
-// renderer. Own fleets draw one hull per roster ship (a rosterless own fleet
-// draws a single hull); foreign fleets draw the constant contact mark.
-export function packFleetInstance(fleet: Fleet): PackedFleetInstance {
-  if (!fleet.own) {
-    return { id: fleet.id, audience: 1, formation: FOREIGN_FORMATION }
-  }
-  return {
-    id: fleet.id,
-    audience: 0,
-    formation: formationOffsets(fleet.roster?.ships.length ?? 1),
-  }
-}
+// formationOffsets/packFleetInstance/FOREIGN_FORMATION (the fleet hull-slot
+// pack) had no successor after migrate-fleet-to-continuous-burns: the board
+// draws no fleet layer at all (design.md Decision 12) — a fleet's position is
+// now a continuous-space `space.Vec3`, not a board cell, so there is nothing
+// left to pack an instance FROM. Deleted here, not adapted; see tasks.md
+// 8.1/8.7.

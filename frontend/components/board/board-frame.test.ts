@@ -1,13 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import type { BoardFeature } from '@/lib/types/system-board'
-import type { Fleet } from '@/lib/types/fleet'
 import { projectWorldTime } from '@/hooks/use-world-time'
 import { createFramePacker } from './board-frame'
 import { featureGlidePixel } from './glyph-geometry'
 import { productionSchedule } from '@/lib/board'
 import { boardToWorld } from './use-board-projection'
-import { hexToRgb } from './board-pack'
-import { FLEET_ACCENT, FLEET_FOREIGN } from './board-palette'
 
 const orbiter: BoardFeature = {
   id: 'p1',
@@ -18,36 +15,11 @@ const orbiter: BoardFeature = {
   live: true,
 }
 
-function ownBurner(): Fleet {
-  return {
-    id: 'own-1',
-    corporationId: 'c',
-    systemId: 's',
-    state: {
-      mode: 'burn',
-      burn: {
-        path: [
-          { ring: 4, slot: 0 },
-          { ring: 3, slot: 0 },
-          { ring: 2, slot: 0 },
-        ],
-        startTime: 0,
-        arriveTime: 1_000_000,
-        target: { cell: { ring: 2, slot: 0 } },
-      },
-    },
-    position: { ring: 4, slot: 0 },
-    own: true,
-    worldTime: 0,
-  }
-}
-
 const ANCHOR = { world: 500_000, wall: 10_000 }
 
 function packerWith(overrides?: Partial<Parameters<typeof createFramePacker>[0]>) {
   return createFramePacker({
     features: [orbiter],
-    fleets: [ownBurner()],
     anchor: ANCHOR,
     fxEpochWall: 0,
     reducedMotion: false,
@@ -108,36 +80,13 @@ describe('createFramePacker — reduced motion (task 4.12)', () => {
   })
 })
 
-describe('createFramePacker — fleets', () => {
-  it('resolves an own burning fleet to its mode accent with the plume lit', () => {
-    const frame = packerWith()(ANCHOR.wall)
-    expect(frame.fleets).toHaveLength(1)
-    expect(frame.fleets[0]!.burning).toBe(1)
-    expect(frame.fleets[0]!.accent).toEqual(hexToRgb(FLEET_ACCENT.burn))
-  })
-
-  it('resolves a foreign fleet to the grey contact accent with no mode signals', () => {
-    const foreign: Fleet = {
-      ...ownBurner(),
-      id: 'foreign-1',
-      own: false,
-      state: { mode: 'coast', coast: { ring: 4, angle0: 0, period: 60_000, dir: 1 } },
-    }
-    const frame = packerWith({ fleets: [foreign] })(ANCHOR.wall)
-    expect(frame.fleets[0]!.accent).toEqual(hexToRgb(FLEET_FOREIGN))
-    expect(frame.fleets[0]!.burning).toBe(0)
-    expect(frame.fleets[0]!.docked).toBe(0)
-  })
-
-  it('folds an arrived burn to its settled mode (stateAt, not raw wire state)', () => {
-    // Past arriveTime the burn IS its coast — the accent must not stay amber
-    // waiting on a refetch.
-    const pack = packerWith()
-    const pastArrival = ANCHOR.wall + 600_000 // worldTime 1_100_000 > arriveTime
-    const frame = pack(pastArrival)
-    expect(frame.fleets[0]!.burning).toBe(0)
-  })
-})
+// `createFramePacker — fleets` DELETED, with reason: migrate-fleet-to-
+// continuous-burns design.md Decision 12 — the board draws no fleet layer
+// after this change, so `board-frame.ts`'s packer no longer folds a fleet's
+// movement state or emits a `frame.fleets` array at all (see the module's own
+// header comment and tasks.md 8.1/8.7). `board-view` REMOVED "Foreign Fleets
+// Render as Contact Marks Only" with no successor. No test replaces these —
+// there is no scenario left to cover.
 
 describe('createFramePacker — selected ring (task 3.5a)', () => {
   it('threads the selected feature ring through as a plain index', () => {
