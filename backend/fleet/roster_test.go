@@ -5,9 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"hexaverse/board"
-	"hexaverse/common"
-	"hexaverse/observation"
+	"hexaverse/space"
 	"hexaverse/system"
 
 	"go.uber.org/mock/gomock"
@@ -26,12 +24,13 @@ func TestSeedFleet_Scenario_CarriesDefaultRoster(t *testing.T) {
 	defer ctrl.Finish()
 
 	var saved Fleet
+	dao.EXPECT().ListByCorporation(gomock.Any(), "dev-corp").Return(nil, nil)
 	dao.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) error {
 		saved = f
 		return nil
 	})
 
-	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", board.Cell{Ring: 3, Slot: 0}); err != nil {
+	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", space.Vec3{X: 100}, 6.0); err != nil {
 		t.Fatal(err)
 	}
 	if len(saved.Ships) < 1 {
@@ -81,11 +80,12 @@ func TestSeedFleet_Scenario_FreshCargoPoolIsEmpty(t *testing.T) {
 	defer ctrl.Finish()
 
 	var saved Fleet
+	dao.EXPECT().ListByCorporation(gomock.Any(), "dev-corp").Return(nil, nil)
 	dao.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) error {
 		saved = f
 		return nil
 	})
-	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", board.Cell{Ring: 3, Slot: 0}); err != nil {
+	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", space.Vec3{X: 100}, 6.0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -167,54 +167,23 @@ func TestDerivedFleetSpeed_Scenario_SeedClassValuePreservesGlobalConstants(t *te
 	}
 }
 
-// SDET-added regression guard (see the SDET handoff report: this is NOT
-// independently red today). Once golang-dev wires burn-ETA computation
-// through DerivedBurnRate (task 1.7), a single-seed-class fleet's END-TO-END
-// committed burn ETA must still equal today's MsPerTile-based arithmetic —
-// exercising the CURRENT (pre-refactor) orderBurn path, which already uses
-// the constant directly, so this is green today by construction. It exists
-// to catch the refactor moving existing timings, not to prove new behavior;
-// it MUST stay green through the refactor.
-func TestOrderTo_RegressionGuard_BurnEtaMatchesMsPerTile(t *testing.T) {
-	clk := &fakeClock{now: 0}
-	svc, dao, _, ctrl := newSvc(t, clk)
-	defer ctrl.Finish()
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
-
-	dest := board.Cell{Ring: 4, Slot: 0}
-	f, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{Cell: &dest}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := common.WorldMillis(4) * DefaultMovementParams().MsPerTile
-	if f.State.Burn.ArriveTime != want {
-		t.Fatalf("burn ETA = %d, want %d (4 hexes × today's MsPerTile) — the derived-rate refactor must not move this", f.State.Burn.ArriveTime, want)
-	}
-}
-
-// SDET-added regression guard (the lane-leg counterpart of the burn-ETA guard
-// above; NOT independently red today — see the SDET handoff report). Reuses
-// routing_test.go's shared travel fixtures (fakeGraph/fakeTiers/chainGalaxy/
-// travelSvc), whose lanes are each 10 units long.
-func TestOrderTravel_RegressionGuard_LaneLegEtaMatchesLaneMsPerDistance(t *testing.T) {
-	clk := &fakeClock{now: 0}
-	svc, dao, _ := travelSvc(t, clk, map[string]observation.Tier{
-		"A": observation.TierExplored, "B": observation.TierExplored, "C": observation.TierExplored,
-	})
-	f := &Fleet{Id: "fleet_1", CorporationId: "corp", SystemId: "A",
-		State: board.MovementState{Mode: board.ModeCoast, Coast: &board.Orbit{Ring: 0}}}
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(f, nil)
-
-	got, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{SystemId: "C"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	lt := got.State.LaneTransit
-	if len(lt.LegEtas) != 3 {
-		t.Fatalf("fixture broken: LegEtas = %v, want length 3 (A,B,C)", lt.LegEtas)
-	}
-	wantPerLeg := common.WorldMillis(10 * DefaultMovementParams().LaneMsPerDistance) // each fixture lane is 10 units
-	if gotLeg := lt.LegEtas[2] - lt.LegEtas[1]; gotLeg != wantPerLeg {
-		t.Fatalf("lane leg cost = %d, want %d (10 units × today's LaneMsPerDistance) — the derived-rate refactor must not move this", gotLeg, wantPerLeg)
-	}
-}
+// DELETED (migrate-fleet-to-continuous-burns): this file used to carry two
+// SDET-added regression guards pinning that the derived-rate refactor
+// (ClassStats.BurnRate/LaneRate replacing the global MsPerTile/
+// LaneMsPerDistance constants) moved no fleet's existing ETA arithmetic —
+// TestOrderTo_RegressionGuard_BurnEtaMatchesMsPerTile (a hex-grid burn's
+// arriveTime = hexes × MsPerTile) and
+// TestOrderTravel_RegressionGuard_LaneLegEtaMatchesLaneMsPerDistance (a
+// multi-hop lane leg's cost = length × LaneMsPerDistance, via the deleted
+// planRoute/travelSvc fixtures).
+//
+// Both guards have no successor: OrderTo no longer computes a burn ETA from
+// MsPerTile at all — it solves through space.SolveBurn against a commanded
+// acceleration (design.md Decision 4/9) — and multi-hop lane travel is
+// deleted outright (design.md Decision 10; ErrNoRoute/planRoute/routing.go
+// are gone). There is no "the refactor must not move this arithmetic"
+// property left to guard, because the arithmetic itself no longer exists.
+// TestDerivedFleetSpeed_Scenario_SeedClassValuePreservesGlobalConstants
+// (above) is untouched — it pins DefaultClassStats() against
+// DefaultMovementParams()'s still-live MsPerTile/LaneMsPerDistance fields,
+// which is a params-table invariant independent of how OrderTo spends them.

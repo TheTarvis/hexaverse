@@ -10,6 +10,13 @@ import (
 
 // add-mine-extraction, fleet-movement spec delta (ADDED): "Fleet Read
 // Surfaces Roster, Cargo, and Derived Capacity" (tasks 1.9/1.10/1.10a).
+//
+// migrate-fleet-to-continuous-burns, design.md Decision 2 (MODIFIED): the
+// second scenario's body changed from "a foreign fleet is redacted [to a
+// snapshot without roster]" to "a foreign fleet is not returned [at all]" —
+// see handler_test.go's TestGet_Scenario_ForeignFleetDirectFetch404s /
+// TestList_Scenario_ForeignFleetOmittedEntirely for the omission half; the
+// two tests below are migrated to assert that, not a roster-redacted 200.
 
 // Scenario: The fleet read response includes roster, cargo, and derived
 // capacity.
@@ -19,7 +26,7 @@ func TestGet_Scenario_OwnFleetReadIncludesRosterCargoAndCapacity(t *testing.T) {
 		Ships: []ShipEntry{{Class: ClassSeed}},
 	}
 
-	r := newFleetRouter(&fakeFleetSvc{fleet: own}, nil)
+	r := newFleetRouter(&fakeFleetSvc{fleet: own})
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets/f1", nil))
 	if w.Code != http.StatusOK {
@@ -47,33 +54,35 @@ func TestGet_Scenario_OwnFleetReadIncludesRosterCargoAndCapacity(t *testing.T) {
 	}
 }
 
-// Scenario: A foreign fleet's cargo and roster are not disclosed (GET
-// /v1/fleets/:fleetId).
+// Scenario: A foreign fleet's cargo and roster are not disclosed — migrated
+// to the post-Decision-11 shape: the foreign fleet is not returned at all
+// (404), so there is no partial response for roster/cargo to be absent from.
 func TestGet_Scenario_ForeignFleetOmitsRosterAndCargo(t *testing.T) {
 	foreign := &Fleet{
 		Id: "f1", CorporationId: "corp-other", SystemId: "s1",
 		Ships: []ShipEntry{{Class: ClassSeed}, {Class: ClassSeed}},
 	}
-	r := newFleetRouter(&fakeFleetSvc{fleet: foreign}, fakeAudience{visible: true})
+	r := newFleetRouter(&fakeFleetSvc{fleet: foreign})
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets/f1", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (fleet is inside coverage)", w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404 (a foreign fleet is not returned at all — design.md Decision 11)", w.Code)
 	}
 	if strings.Contains(w.Body.String(), `"roster"`) {
-		t.Fatalf("foreign fleet response must omit `roster` entirely, got: %s", w.Body.String())
+		t.Fatalf("a 404 response must carry no fleet data at all, got: %s", w.Body.String())
 	}
 }
 
-// TestList_Scenario_ForeignFleetOmitsRosterAndCargo is the same redaction rule
-// exercised through the system-list endpoint (the other surface the
-// requirement names).
+// TestList_Scenario_ForeignFleetOmitsRosterAndCargo is the same
+// non-disclosure exercised through the system-list endpoint — migrated to
+// assert the foreign fleet is absent from the list entirely (design.md
+// Decision 11), not merely stripped of its roster field.
 func TestList_Scenario_ForeignFleetOmitsRosterAndCargo(t *testing.T) {
 	svc := &fakeFleetSvc{list: []Fleet{
 		{Id: "mine", CorporationId: "corp-user1", SystemId: "s1", Ships: []ShipEntry{{Class: ClassSeed}}},
 		{Id: "theirs", CorporationId: "corp-other", SystemId: "s1", Ships: []ShipEntry{{Class: ClassSeed}}},
 	}}
-	r := newFleetRouter(svc, fakeAudience{visible: true})
+	r := newFleetRouter(svc)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets?systemId=s1", nil))
 	if w.Code != http.StatusOK {
@@ -86,19 +95,23 @@ func TestList_Scenario_ForeignFleetOmitsRosterAndCargo(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	var mine, theirs map[string]interface{}
+	var mine map[string]interface{}
+	foreignPresent := false
 	for _, f := range body.Fleets {
 		if f["id"] == "mine" {
 			mine = f
 		}
 		if f["id"] == "theirs" {
-			theirs = f
+			foreignPresent = true
 		}
+	}
+	if mine == nil {
+		t.Fatalf("own fleet missing from the list response: %v", body.Fleets)
 	}
 	if _, present := mine["roster"]; !present {
 		t.Errorf("own fleet in the list response must carry `roster`, got %v", mine)
 	}
-	if _, present := theirs["roster"]; present {
-		t.Errorf("foreign fleet in the list response must omit `roster` entirely, got %v", theirs)
+	if foreignPresent {
+		t.Errorf("foreign fleet must be omitted from the list response entirely, got %v", body.Fleets)
 	}
 }

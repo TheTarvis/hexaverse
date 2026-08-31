@@ -1,12 +1,38 @@
 ---
 number: 0006
 title: Scan & Fog of War
-status: accepted   # draft | accepted | implemented | superseded
+status: superseded   # draft | accepted | implemented | superseded
 created: 2026-07-09
 owner: Travis Wilson
 supersedes:     # spec number(s) this replaces, if any
-superseded_by:  # filled in when this spec is retired
+superseded_by: openspec `proximity-disclosure` capability; removal begun by the continuous-space chain's link 4 (`migrate-fleet-to-continuous-burns`) and completed by link 5 (`replace-observation-with-sightings`)
 ---
+
+> **Superseded 2026-08-30, with the removal split across two links.** The fog
+> model this document describes — growing echo discs, live coverage unions,
+> per-feature memory, LOS-filtered three-band reads — was replaced in design by
+> `add-proximity-disclosure` (passive proximity plus going loud on burn,
+> nothing persisted on the live path).
+>
+> **Link 4 has already removed the parts this document's scenarios exercise:**
+> the `observation` capability's five live-half requirements (ambient coverage,
+> the running echo disc, scan-resolution minting, path-swept ambient reveal,
+> fleet audience visibility) and the fleet `scan` verb itself. So S3 ("a
+> burning fleet can scan") no longer has a verb to commit — though the property
+> underneath it, the sensor channel being independently claimable alongside a
+> burn, **does** survive and is pinned by `backend/fleet/channels_test.go`.
+> S7's arrival-explores behaviour survives as *Jump Arrival Parks Near the
+> Destination Gate, Unmasked*, whose implementation lands in the same change's
+> jump section.
+>
+> **Link 5 completes the removal**, deleting the surviving graph-tier half
+> (`Monotonic Graph-Tier Knowledge Ladder`, `Travel Arrival Reveal`, `Spawn
+> Arrival Reveal`, `Charted-Lane Set Projection`) and the `observation` package
+> with it. Marked superseded now rather than at link 5 because the document
+> already describes machinery the tree no longer has — leaving it `accepted`
+> would assert an implementation that does not exist, which is the failure mode
+> `docs/specs/README.md` warns about. Retained for history; **not enforced** by
+> `frontend/lib/spec-scenarios.test.ts`.
 
 # 0006 — Scan & Fog of War
 

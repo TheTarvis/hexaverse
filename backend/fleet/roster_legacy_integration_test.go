@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/space"
 )
 
 // add-mine-extraction, fleet-movement spec delta: "Fleet Ship Composition" —
@@ -32,11 +32,19 @@ func TestFleetDao_Scenario_PreExistingFleetNoStoredRosterDecodesToOneSeedHullThr
 	// no Cargo. Saved through the DAO (not a raw map) so the write path is the
 	// real one; omitempty on both fields means the stored document has no
 	// `ships`/`cargo` keys at all.
+	//
+	// The kinematic State itself is an ordinary modern space.ShipState (any
+	// valid one) — migrate-fleet-to-continuous-burns' Migration Plan is
+	// explicit that a PRE-CAPABILITY stored state (the old board.MovementState
+	// shape) is not, and will not be made to, decode into a space.ShipState;
+	// that is a deliberately separate concern (fail-closed on a disposable
+	// document, not carried forward) from THIS scenario, which is purely
+	// about the roster/cargo fallback surviving a real Firestore round trip.
 	legacy := Fleet{
 		Id:            "fleet-legacy-roster",
 		CorporationId: "corp-legacy",
 		SystemId:      "sys-legacy",
-		State:         board.CoastAt(board.Cell{Ring: 1, Slot: 0}, 0, testSched()),
+		State:         space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint}},
 	}
 	if err := dao.Save(ctx, legacy); err != nil {
 		t.Fatalf("seed legacy fleet: %v", err)

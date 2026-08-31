@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/fleet"
+	"hexaverse/space"
 	"hexaverse/system"
 )
 
@@ -18,11 +18,12 @@ const testStationFeatureID = "feat-station"
 func dockedAtStation(corp string) *fleet.Fleet {
 	return &fleet.Fleet{
 		Id: testFleetID, CorporationId: corp, SystemId: testSystemID,
-		State: board.MovementState{
-			Mode:   board.ModeDocked,
-			Docked: &board.Docked{ParentId: testStationFeatureID},
-		},
-		Ships: []fleet.ShipEntry{{Class: fleet.ClassSeed}},
+		// See dockedFleet's own comment (service_test.go): AttachedTo is the
+		// relationship mine's DockedTo() check reads; these are in-memory
+		// fixtures with no Firestore round trip.
+		State:      space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint}},
+		AttachedTo: testStationFeatureID,
+		Ships:      []fleet.ShipEntry{{Class: fleet.ClassSeed}},
 	}
 }
 

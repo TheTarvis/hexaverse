@@ -6,7 +6,6 @@ import (
 	"math"
 	"time"
 
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/corporations"
 	"hexaverse/fleet"
@@ -490,12 +489,13 @@ func (s *Service) settle(ctx context.Context, in settleInput) (*SellResult, erro
 	return out, nil
 }
 
-// dockedTo reports whether a fleet's EFFECTIVE state is docked to featureID.
-// Effective, not stored: a burn past its arrival time already IS its settled
-// dock, and board.StateAt is what folds that.
-func dockedTo(f *fleet.Fleet, featureID string, now common.WorldMillis) bool {
-	eff := board.StateAt(f.State, now, board.ProductionSchedule())
-	return eff.Mode == board.ModeDocked && eff.Docked != nil && eff.Docked.ParentId == featureID
+// dockedTo reports whether a fleet is docked to featureID. AttachedTo is a
+// relationship the commit/resolve paths keep current directly (design.md
+// Decision 13) — never re-derived from a kinematic fold, so `now` is
+// accepted only for interface stability with existing callers.
+func dockedTo(f *fleet.Fleet, featureID string, _ common.WorldMillis) bool {
+	host, docked := f.DockedTo()
+	return docked && host == featureID
 }
 
 // validateGuards rejects a guard value that is NaN, infinite, or negative —

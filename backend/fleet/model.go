@@ -1,8 +1,8 @@
 package fleet
 
 import (
-	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/space"
 )
 
 // ShipClass names a per-class stats-table entry (mining rate, hold capacity,
@@ -26,6 +26,19 @@ type ShipEntry struct {
 	Class ShipClass `json:"class" firestore:"class"`
 }
 
+// JumpTransit is fleet-owned lane-transit state (migrate-fleet-to-continuous-
+// burns, design.md Decision 4) — deliberately NOT a space.ShipState shape,
+// since a fleet crossing a lane has no position in either system
+// (fleet-movement MODIFIED "Effective Position Resolution": "A fleet mid-jump
+// reports no position in either system"). Non-nil only while the fleet is
+// mid-jump; cleared on arrival.
+type JumpTransit struct {
+	LaneId       string             `json:"laneId" firestore:"laneId"`
+	DestSystemId string             `json:"destSystemId" firestore:"destSystemId"`
+	DepartMs     common.WorldMillis `json:"departMs" firestore:"departMs"`
+	ArriveMs     common.WorldMillis `json:"arriveMs" firestore:"arriveMs"`
+}
+
 // Fleet is the map-mover — a thing at a position that can be ordered to move
 // (#0004 Decision #8). The fleet persists across systems, carrying its current
 // systemId, so it is top-level (not nested under system).
@@ -35,19 +48,52 @@ type Fleet struct {
 	// ownership enforcement in M9 is not a retrofit.
 	CorporationId string `json:"corporationId" firestore:"corporationId"`
 	SystemId      string `json:"systemId" firestore:"systemId"`
-	// State is the single movement field — coast | burn | docked. No per-tick
-	// position is stored; the live hex is computed from (State, worldTime).
-	State board.MovementState `json:"state" firestore:"state"`
+
+	// State is the fleet's kinematic mode — burn | park | drift
+	// (migrate-fleet-to-continuous-burns, design.md Decision 4). Position is
+	// ALWAYS space.StatePosition(bodies, f.State, now) (tasks.md 3.7); no
+	// other code path may re-derive, cache, or round it.
+	//
+	// Never persisted directly: backend/space carries zero firestore tags by
+	// design (its own purity test asserts this), so a bare space.ShipState in
+	// this struct would serialize under raw Go field names and silently
+	// disagree with a real Firestore round trip (design.md Decision 21C item
+	// 3). StateDoc is what actually crosses the boundary — see
+	// EncodeKinematicState/DecodeKinematicState (tasks.md 3.6).
+	State space.ShipState `json:"state" firestore:"-"`
+	// StateDoc is State's persisted, storage-native form (the discriminated
+	// `{"mode": ..., "value": ...}` shape EncodeKinematicState/
+	// DecodeKinematicState define). Nothing outside those two functions and
+	// this package's DAO constructs or reads it directly.
+	StateDoc map[string]any `json:"-" firestore:"state,omitempty"`
+
+	// AttachedTo is the id of the host this fleet is docked to (a body, a
+	// station, a gate, later a carrier), empty when free-flying. It is a
+	// RELATIONSHIP, not a kinematic mode — space.ShipState stays the only
+	// answer to "where" (design.md Decision 13).
+	//
+	// LINK 6 (re-express-economy-positions) redefines what a valid host is
+	// and deletes whatever it must. Nothing about this field is permanent.
+	AttachedTo string `json:"attachedTo,omitempty" firestore:"attachedTo,omitempty"`
+
+	// Jump is non-nil only while the fleet is crossing a lane; see
+	// JumpTransit's own doc comment for why this is not a space.ShipState
+	// shape.
+	Jump *JumpTransit `json:"jump,omitempty" firestore:"jump,omitempty"`
+
 	// ActiveActionId is the MOVEMENT channel's single-slot guard (#0005, #0006
-	// Decision #19): at most one running burn/trip/mine (#0010 Decision #9 —
-	// mine shares this channel, never a dedicated one). Claimed at commit,
-	// released at resolve/cancel — both transactionally, inside the action
-	// domain.
+	// Decision #19): at most one running burn/mine (mine shares this channel,
+	// never a dedicated one). Claimed at commit, released at resolve/cancel —
+	// both transactionally, inside the action domain.
 	ActiveActionId string `json:"activeActionId,omitempty" firestore:"activeActionId,omitempty"`
-	// ActiveScanId is the SENSOR channel's slot: at most one running scan,
-	// independent of movement — a burning (or mining) fleet can scan (#0006
-	// Decision #19).
+	// ActiveScanId is the SENSOR channel's slot: independent of the movement
+	// channel above (a burning fleet can scan). DECLARED AND UNWRITTEN by this
+	// change (design.md Open Question 4; fleet-movement "Single Kinematic-
+	// State Fleet Record" — "the sensor channel persists declared and
+	// unwritten") — chain link 5 (replace-observation-with-sightings) is the
+	// first change to claim it, with the focused scan verb.
 	ActiveScanId string `json:"activeScanId,omitempty" firestore:"activeScanId,omitempty"`
+
 	// Ships is the fleet's roster (#0010 "Fleet Ship Composition"). A fleet
 	// document written before this capability shipped carries no stored Ships
 	// field and MUST be read as one default ClassSeed hull — never as an empty
@@ -57,39 +103,30 @@ type Fleet struct {
 	// decode.
 	Ships []ShipEntry `json:"ships,omitempty" firestore:"ships,omitempty"`
 	// Cargo is the fleet-level held-resource pool (#0010 "Fleet Cargo Pool") —
-	// one pool, no per-ship allocation, credited only by mine's resolve. A
-	// fleet with no stored Cargo reads as empty (zero tons of every kind), which
-	// needs no special-case fallback (a nil/empty map already means "holds
-	// nothing").
-	//
-	// Keyed by the STRING form of system.ResourceKind, not the named type
-	// itself (string(kind)) — the cloud.google.com/go/firestore SDK's
-	// transform-extraction reflection panics on a map field keyed by a named
-	// string type (confirmed against the live emulator; SDET fix, not a
-	// design choice — see the handoff report). Callers convert at the
-	// boundary: system.ResourceKind is still the wire/API type
-	// (MineRequest.Kind, system.Resource.Kind).
+	// one pool, no per-ship allocation, credited only by mine's resolve.
 	Cargo     map[string]float64 `json:"cargo,omitempty" firestore:"cargo,omitempty"`
 	CreatedAt common.WorldMillis `json:"createdAt" firestore:"createdAt"`
 	UpdatedAt common.WorldMillis `json:"updatedAt" firestore:"updatedAt"`
 }
 
-// OrderRequest is the body of POST /v1/fleets/:id/orders. The server picks the
-// movement tier by target type: a board target (hex or feature to intercept) is
-// an in-system burn (#0004); a systemId is a graph-tier trip (#0008). Exactly one
-// of Target / SystemId is set.
-type OrderRequest struct {
-	Target   board.Target `json:"target"`
-	SystemId string       `json:"systemId,omitempty"`
-}
+// DockedTo reports the id of the host this fleet is attached to, and whether
+// it is attached at all (design.md Decision 13; mirrors mine/market's
+// pre-migration `eff.Mode == board.ModeDocked` check, now a one-line
+// re-point for link 6 to build on).
+func (f Fleet) DockedTo() (string, bool) { return f.AttachedTo, f.AttachedTo != "" }
 
-// RoutePreview is the read a client shows before committing a trip: the system
-// chain and the frozen-at-commit ETAs (per leg + total), so a 3D view that can't
-// be eyeballed for distance still surfaces the numbers (#0008 Decision #4).
-type RoutePreview struct {
-	Route      []string             `json:"route"`
-	LegEtas    []common.WorldMillis `json:"legEtas"`
-	TotalEta   common.WorldMillis   `json:"totalEta"`
-	DepartGate board.Cell           `json:"departGate"`
-	WorldTime  common.WorldMillis   `json:"worldTime"`
+// OrderRequest is the body of POST /v1/fleets/:id/orders — a burn ordered to
+// a body id or an explicit point, with an optional commanded acceleration
+// (design.md Decision 4, 9). Exactly one of BodyId/Point is meaningful for an
+// in-system burn; LaneId names a jump (chain link 4 section 5's own verb) and
+// is not validated by OrderTo.
+type OrderRequest struct {
+	BodyId string      `json:"bodyId,omitempty"`
+	Point  *space.Vec3 `json:"point,omitempty"`
+	LaneId string      `json:"laneId,omitempty"`
+	// Accel is the optional commanded acceleration (design.md Decision 9).
+	// Omitted (nil), it defaults to the fleet's configured acceleration —
+	// the roster-derived ceiling is chain link 4 section 4's own job
+	// (ClassStats.Accel / DerivedAccelCeiling do not exist yet).
+	Accel *float64 `json:"accel,omitempty"`
 }

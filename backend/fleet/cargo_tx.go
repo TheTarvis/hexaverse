@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 
-	"hexaverse/board"
 	"hexaverse/common"
 
 	"cloud.google.com/go/firestore"
@@ -120,12 +119,14 @@ func (p *CargoDebitPlan) RemainingTons() float64 { return p.newTons }
 // Cargo is the whole post-debit hold.
 func (p *CargoDebitPlan) Cargo() map[string]float64 { return p.newCargo }
 
-// DockedAt reports whether the transactionally-read fleet's EFFECTIVE state is
-// docked to featureID at `now`. Effective, not stored: a burn past its arrival
-// time already IS its settled dock, and board.StateAt is what folds that.
-func (p *CargoDebitPlan) DockedAt(featureID string, now common.WorldMillis) bool {
-	eff := board.StateAt(p.Fleet.State, now, board.ProductionSchedule())
-	return eff.Mode == board.ModeDocked && eff.Docked != nil && eff.Docked.ParentId == featureID
+// DockedAt reports whether the transactionally-read fleet is docked to
+// featureID. AttachedTo is a relationship the commit/resolve paths keep
+// current directly (design.md Decision 13) — never re-derived from a
+// kinematic fold, so `now` is accepted only for interface stability with
+// callers that still pass it.
+func (p *CargoDebitPlan) DockedAt(featureID string, _ common.WorldMillis) bool {
+	host, docked := p.Fleet.DockedTo()
+	return docked && host == featureID
 }
 
 // PrepareCargoDebitInTx on the service delegates to the DAO, keeping the

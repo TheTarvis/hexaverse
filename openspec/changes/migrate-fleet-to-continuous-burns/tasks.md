@@ -104,7 +104,7 @@
 
 ## 3. Fleet state model + persistence
 
-- [ ] 3.1 **(red phase — write this before any of 3.2 onward exists in
+- [x] 3.1 **(red phase — write this before any of 3.2 onward exists in
       production code)** Write the failing test suite that pins the
       `attachedTo`-clearing invariant: a burn order clears `attachedTo` at
       commit (not at resolve), cut-drive and stop-in-place leave it cleared,
@@ -121,28 +121,28 @@
       Place Commits a Velocity-Nulling Burn* — "the system SHALL clear the
       fleet's `attachedTo` at the instant a stop-in-place order is
       accepted").
-- [ ] 3.2 Replace `fleet.Fleet.State board.MovementState` with
+- [x] 3.2 Replace `fleet.Fleet.State board.MovementState` with
       `space.ShipState`; add `AttachedTo string` with a `DockedTo() (string,
       bool)` accessor, carrying a code comment at the declaration naming link 6
       (`re-express-economy-positions`) as its eventual deleter/redefiner
       (design.md Decision 4, Decision 13 — the standing rule that nothing
       additive may quietly become permanent).
-- [ ] 3.3 Add a fleet-owned `Jump *JumpTransit` field for lane-transit
+- [x] 3.3 Add a fleet-owned `Jump *JumpTransit` field for lane-transit
       representation — not a `space.ShipState` shape, since a fleet in transit
       has no position in either system (design.md Decision 4).
-- [ ] 3.4 Leave `activeActionId`/`activeScanId` as independently claimable
+- [x] 3.4 Leave `activeActionId`/`activeScanId` as independently claimable
       channels, unchanged in mechanism; retain `ActiveScanId`/`action.SlotSensor`
       declared and unwritten, with a comment naming link 5 as the change that
       first claims the sensor channel (design.md Open Question 4) (fleet-movement
       *Single Kinematic-State Fleet Record* — "a scan can run while a burn is
       active").
-- [ ] 3.5 Add a `BodySource` interface (`BodyTable(ctx, systemID)
+- [x] 3.5 Add a `BodySource` interface (`BodyTable(ctx, systemID)
       (*system.BodyTable, error)`) to `fleet.Service`, satisfied by
       `system.Service`; resolve it once per request and thread it as a
       parameter through every burn solve, position read, and resolve — never
       fetched per body, never memoized in package-level state, and never used
       to enumerate `Ids()` into a response (design.md Decision 16).
-- [ ] 3.6 Validate every stored kinematic-state value through the `space` codec
+- [x] 3.6 Validate every stored kinematic-state value through the `space` codec
       at every boundary that reads persisted or committed coordinate data;
       surface a decode failure as a named, countable error carrying `cause`
       (`non-finite-coordinate`, `coordinate-out-of-extent`, `undecodable-shape`,
@@ -154,7 +154,7 @@
       command fails by name on a bad decode, a decoded action parameter
       coordinate fails the codec, coordinate rejections are countable per
       cause).
-- [ ] 3.7 Implement effective position resolution through
+- [x] 3.7 Implement effective position resolution through
       `space.StatePosition(bodies, f.State, now)` as the capability's sole
       canonical position path: a docked fleet resolves through its host's live
       position (its orbit if it orbits, else its fixed anchor); a free-flying
@@ -163,7 +163,7 @@
       MODIFIED: *Effective Position Resolution* — a docked fleet rides its
       parent's live position, a free-flying fleet resolves through
       `space.StatePosition`).
-- [ ] 3.8 Re-point `fleet.SeedFleet` from `at board.Cell` to a `space` park:
+- [x] 3.8 Re-point `fleet.SeedFleet` from `at board.Cell` to a `space` park:
       deterministic from the account id, idempotent per account (a healed
       retry reproduces the same position, never a second fleet), rejecting a
       requested position inside the system star's configured clearance radius
@@ -172,18 +172,18 @@
       corporation-spawn: *One Starting Hull at a Deterministic Home Park* — the
       starting hull is deterministic per account, the starting hull never lands
       inside the star's clearance).
-- [ ] 3.9 Delete `corporations.rimCell`/`RimRing`; replace with a deterministic
+- [x] 3.9 Delete `corporations.rimCell`/`RimRing`; replace with a deterministic
       continuous spawn position derived from the home interior's `Extent` and
       the `GateRadiusFactor` (1.1), phase-seeded by account id (design.md
       Decision 16, Open Question 3 — the exact geometric target, e.g. a
       `ParkOrbit` around the star vs. docked at the home station, is left open
       by design.md; pick and document the default inline).
-- [ ] 3.10 Delete `fleet.ErrCoreDestination` and `SeedFleet`'s destination-identity
+- [x] 3.10 Delete `fleet.ErrCoreDestination` and `SeedFleet`'s destination-identity
       core rejection — the star is now excluded by
       `space.BuildCurve`'s endpoint-clearance guard alone, with no special case
       (design.md Decision 14; fleet-movement: *In-System Burn Order to a Body or
       a Point* — "ordering the star's own body id is rejected by geometry").
-- [ ] 3.11 Add a calibration test (mirroring
+- [x] 3.11 Add a calibration test (mirroring
       `TestCalibration_Scenario_NoStarSizePlacesBodyInsideClearanceShell`) that
       reads `space.StarClearanceRadius` and `space.InsertionStandoff` directly
       and asserts every star size this generator can emit is rejected with

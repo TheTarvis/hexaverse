@@ -2,6 +2,7 @@ package mine
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/fleet"
+	"hexaverse/space"
 	"hexaverse/system"
 )
 
@@ -47,6 +49,20 @@ func (f *fakeIntegrationSystem) GetOrCreateInterior(_ context.Context, systemID 
 }
 func (f *fakeIntegrationSystem) LaneGates(context.Context, string, int) ([]system.LaneGate, error) {
 	return nil, nil
+}
+
+// BodyTable satisfies fleet.BodySource (migrate-fleet-to-continuous-burns,
+// design.md Decision 16) — required to construct a fleet.Service with this
+// fake as its system dependency. None of mine's integration tests order a
+// burn or resolve a position through it (every fleet here is seeded
+// pre-docked, directly via the DAO, and only mine's own commit/resolve/
+// cancel paths are exercised), so a real *system.BodyTable — which mine's
+// tests have no way to construct outside package system anyway — is never
+// needed. Erroring loudly here, rather than returning an empty table, means
+// a future test that DOES need bodies fails with a clear message instead of
+// a silent, wrong burn solve.
+func (f *fakeIntegrationSystem) BodyTable(context.Context, string) (*system.BodyTable, error) {
+	return nil, errors.New("fakeIntegrationSystem: BodyTable not implemented — mine's integration fixtures never resolve a burn")
 }
 
 func beltFeature(id string, kinds ...system.ResourceKind) system.Feature {
@@ -92,11 +108,18 @@ func newMineTestStack(t *testing.T, params MineParams, stats map[fleet.ShipClass
 
 func (s *mineTestStack) seedFleet(t *testing.T, id, corp, systemID, featureID string, cargo map[string]float64) {
 	t.Helper()
+	// A docked fleet still carries a real space.ShipState (design.md
+	// Decision 4); AttachedTo is the separate relationship mine's DockedTo()
+	// check reads (design.md Decision 13). Saved through the real DAO, so
+	// EncodeKinematicState (via dao.Save) is what actually crosses the
+	// persistence boundary — ParkPoint needs no body-existence cross-check
+	// at decode, so the point value itself is immaterial here.
 	f := fleet.Fleet{
 		Id: id, CorporationId: corp, SystemId: systemID,
-		State: board.MovementState{Mode: board.ModeDocked, Docked: &board.Docked{ParentId: featureID}},
-		Ships: []fleet.ShipEntry{{Class: fleet.ClassSeed}},
-		Cargo: cargo,
+		State:      space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint}},
+		AttachedTo: featureID,
+		Ships:      []fleet.ShipEntry{{Class: fleet.ClassSeed}},
+		Cargo:      cargo,
 	}
 	if err := fleet.NewDaoWithClient(s.fs).Save(context.Background(), f); err != nil {
 		t.Fatalf("seed fleet %s: %v", id, err)
@@ -505,8 +528,11 @@ func TestIntegration_Scenario_GenericCancelReleasesNoDeltaNoCargo(t *testing.T) 
 	if f.ActiveActionId != "" {
 		t.Errorf("movement slot after cancel = %q, want released", f.ActiveActionId)
 	}
-	if f.State.Mode != board.ModeDocked {
-		t.Errorf("state after the GENERIC cancel = %s, want unchanged docked (no actor-state patch)", f.State.Mode)
+	// design.md Decision 20: cancelling a co-resident (non-movement) verb's
+	// slot must never force the fleet off its dock — AttachedTo is the
+	// relationship that answers "still docked", not the kinematic State.
+	if host, docked := f.DockedTo(); !docked || host != "feat-belt-0" {
+		t.Errorf("AttachedTo after the GENERIC cancel = %q (docked=%v), want unchanged docked to feat-belt-0 (no actor-state patch)", host, docked)
 	}
 	ledgerKey := LedgerKey("sys-1", "feat-belt-0", system.ResourceMetals)
 	if n := stack.deltaCount(t, ledgerKey); n != 0 {
@@ -539,8 +565,11 @@ func TestIntegration_Scenario_FleetEndpointCancelWhileMiningLeavesDocked(t *test
 	if err != nil {
 		t.Fatalf("fleet.Service.Cancel: %v", err)
 	}
-	if f.State.Mode != board.ModeDocked || f.State.Docked == nil || f.State.Docked.ParentId != "feat-belt-0" {
-		t.Fatalf("state after cancelling via the fleet endpoint while mining = %+v, want unchanged docked to feat-belt-0", f.State)
+	// design.md Decision 20: the fleet-endpoint cancel path (fleet.Service.
+	// Cancel) must not undock a fleet whose released slot was held by a
+	// non-movement verb (mine) — AttachedTo is what "still docked" means now.
+	if host, docked := f.DockedTo(); !docked || host != "feat-belt-0" {
+		t.Fatalf("AttachedTo after cancelling via the fleet endpoint while mining = %q (docked=%v), want unchanged docked to feat-belt-0", host, docked)
 	}
 	if f.ActiveActionId != "" {
 		t.Fatalf("movement slot after fleet-endpoint cancel = %q, want released", f.ActiveActionId)

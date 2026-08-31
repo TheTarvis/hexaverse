@@ -5,16 +5,20 @@ import (
 	"testing"
 
 	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/space"
 )
 
-// add-mine-extraction, fleet-movement spec delta (MODIFIED): "Cancel Halts in
-// Place" — design.md Decision #16 / task 2.6. This isolates the gap
-// `haltState` has today (falls through to board.CoastAt for ModeDocked) using
-// a synthetic non-movement action on the slot, so it is red independent of
-// whether backend/mine exists yet. See mine/integration_test.go for the
-// full-slice version through a real committed mine run (task 5.4).
+// add-mine-extraction, fleet-movement spec delta: originally "Cancel Halts in
+// Place" (MODIFIED); migrate-fleet-to-continuous-burns REMOVEs that
+// requirement and ADDs "Cut Drive"/"Stop In Place" plus "Releasing a
+// Co-Resident Verb's Slot Leaves Motion Untouched" (design.md Decision 20) —
+// the one clause of the old requirement that survives verbatim in substance:
+// cancelling a non-movement (mine) verb's slot must never force a docked
+// fleet off its dock. This isolates that gap using a synthetic non-movement
+// action on the slot, so it is red independent of whether backend/mine
+// exists. See mine/integration_test.go for the full-slice version through a
+// real committed mine run (task 5.4).
 
 // standinMutatingType is a stand-in for "mine" — any non-movement verb that
 // claims the fleet's movement slot while the fleet stays docked exercises
@@ -38,7 +42,8 @@ func TestCancel_Scenario_DockedFleetWithNonMovementSlotStaysDocked(t *testing.T)
 
 	docked := &Fleet{
 		Id: "fleet-dock-1", CorporationId: "dev-corp", SystemId: "sys-0",
-		State: board.MovementState{Mode: board.ModeDocked, Docked: &board.Docked{ParentId: "feat-planet"}},
+		AttachedTo: "feat-planet",
+		State:      space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint}},
 	}
 	if err := fleetDao.Save(ctx, *docked); err != nil {
 		t.Fatalf("seed docked fleet: %v", err)
@@ -57,11 +62,12 @@ func TestCancel_Scenario_DockedFleetWithNonMovementSlotStaysDocked(t *testing.T)
 	if err != nil {
 		t.Fatalf("cancel: %v", err)
 	}
-	if f.State.Mode != board.ModeDocked {
-		t.Fatalf("state after cancelling a non-movement slot = %s, want docked (a docked fleet has no motion to halt into a coast)", f.State.Mode)
+	if host, isDocked := f.DockedTo(); !isDocked || host != "feat-planet" {
+		t.Fatalf("AttachedTo after cancelling a non-movement slot = %q (docked=%v), want unchanged docked to feat-planet "+
+			"(a docked fleet has no motion to halt into a drift)", host, isDocked)
 	}
-	if f.State.Docked == nil || f.State.Docked.ParentId != "feat-planet" {
-		t.Fatalf("docked parent changed by cancel: %+v", f.State.Docked)
+	if f.State.Mode != space.ModeParked {
+		t.Fatalf("state after cancelling a non-movement slot = %v, want unchanged (no actor-state patch)", f.State.Mode)
 	}
 	if f.ActiveActionId != "" {
 		t.Fatalf("movement slot not released by cancel, got %q", f.ActiveActionId)

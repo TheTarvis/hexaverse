@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/space"
 
 	"cloud.google.com/go/firestore"
 )
@@ -25,12 +25,18 @@ func cargoFixture(t *testing.T, cargo map[string]float64) (*DaoImpl, *firestore.
 	fleetID := "fleet-cargo-" + t.Name()
 	ctx := context.Background()
 
+	// A docked fleet still carries a real space.ShipState (design.md Decision
+	// 4); AttachedTo is the separate relationship PrepareCargoDebitInTx's
+	// DockedAt (via Fleet.DockedTo) reads (design.md Decision 13). Saved
+	// directly through the Firestore client (not dao.Save), so StateDoc must
+	// be pre-encoded here — see fleet.EncodeKinematicState.
 	if _, err := client.Collection(firestoreCollection).Doc(fleetID).Set(ctx, Fleet{
 		Id: fleetID, CorporationId: "corp-1", SystemId: "sys-1",
-		State: board.MovementState{
-			Mode: board.ModeDocked, Docked: &board.Docked{ParentId: "feat-station"},
-		},
-		Cargo: cargo,
+		StateDoc: EncodeKinematicState(space.ShipState{
+			Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint},
+		}),
+		AttachedTo: "feat-station",
+		Cargo:      cargo,
 	}); err != nil {
 		t.Fatalf("seeding fleet: %v", err)
 	}

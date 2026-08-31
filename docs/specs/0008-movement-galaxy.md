@@ -1,12 +1,36 @@
 ---
 number: 0008
 title: Inter-system Movement (galaxy graph)
-status: accepted   # draft | accepted | implemented | superseded
+status: superseded   # draft | accepted | implemented | superseded
 created: 2026-07-09
 owner: Travis Wilson
 supersedes:     # spec number(s) this replaces, if any
-superseded_by:  # filled in when this spec is retired
+superseded_by: openspec `fleet-movement` capability, via the continuous-space chain's link 4 (`openspec/changes/migrate-fleet-to-continuous-burns/`)
 ---
+
+> **Superseded 2026-08-30 by link 4 of the continuous-space chain**
+> (`migrate-fleet-to-continuous-burns`). This document describes graph-tier
+> travel on the polar lattice, and every mechanic in its Scenarios section was
+> deleted rather than re-expressed:
+>
+> - **Multi-hop frozen routes are gone.** design.md Decision 10 replaces them
+>   with a **single-hop `jump` from a docked gate**, deleting `planRoute`,
+>   `PreviewRoute`, `RoutePreview`, `ErrNoRoute`, `ErrSameSystem`, `legMs`, and
+>   `GET /v1/fleets/:id/route`. So S1 (a commit freezing `{boardLeg, route,
+>   legEtas, arriveTime}`) and S2 (a no-charted-**route** refusal) describe a
+>   verb that no longer exists — the surviving check is per-lane charted state
+>   at the gate, not route pathfinding.
+> - **A fleet in lane transit has no position in either system** (Decision 4,
+>   and `proximity-disclosure`'s lane-transit invisibility). That deletes S4's
+>   mid-lane parking at a computed lane fraction and S7's lane crawl outright.
+> - **Arrival parks *near* the destination gate, unmasked** — not on a rim
+>   entry-gate tile — which is S3's successor in a different geometry.
+>
+> The replacement behaviour is specified in that change's `fleet-movement`
+> deltas (*Lane Jump From a Docked Gate*, *Jump Arrival Parks Near the
+> Destination Gate, Unmasked*), which are now the authority. Retained here for
+> history; **not enforced** by `frontend/lib/spec-scenarios.test.ts`, which
+> scopes enforcement to `accepted` and `implemented`.
 
 # 0008 — Inter-system Movement (galaxy graph)
 

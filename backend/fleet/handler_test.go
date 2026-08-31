@@ -7,27 +7,20 @@ import (
 	"strings"
 	"testing"
 
-	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
-	"hexaverse/observation"
+	"hexaverse/space"
 
 	"github.com/gin-gonic/gin"
 )
 
 // fakeFleetSvc is a hand fake of ServiceInterface for handler tests.
 type fakeFleetSvc struct {
-	fleet      *Fleet
-	list       []Fleet
-	preview    *RoutePreview
-	scanErr    error
-	getErr     error
-	previewErr error
+	fleet  *Fleet
+	list   []Fleet
+	getErr error
 	// pos/posErr let a test script Position's return independently of fleet —
-	// added for the trading-station "omitted station" scenario
-	// (station_omission_test.go), where Position must be able to fail even
-	// though Get succeeds.
-	pos    board.Cell
+	// used for the trading-station "omitted station" scenario family.
+	pos    space.Vec3
 	posErr error
 }
 
@@ -41,25 +34,27 @@ func (f *fakeFleetSvc) ListForCorp(context.Context, string) ([]Fleet, error) {
 func (f *fakeFleetSvc) OrderTo(context.Context, string, OrderRequest) (*Fleet, error) {
 	return f.fleet, nil
 }
-func (f *fakeFleetSvc) PreviewRoute(context.Context, string, string) (*RoutePreview, error) {
-	return f.preview, f.previewErr
-}
-func (f *fakeFleetSvc) Cancel(context.Context, string) (*Fleet, error) { return f.fleet, nil }
-func (f *fakeFleetSvc) Scan(context.Context, string) (*Fleet, error)   { return f.fleet, f.scanErr }
-func (f *fakeFleetSvc) SeedFleet(context.Context, string, string, board.Cell) (*Fleet, error) {
+func (f *fakeFleetSvc) CutDrive(context.Context, string) (*Fleet, error) { return f.fleet, nil }
+func (f *fakeFleetSvc) Stop(context.Context, string) (*Fleet, error)     { return f.fleet, nil }
+func (f *fakeFleetSvc) Cancel(context.Context, string) (*Fleet, error)   { return f.fleet, nil }
+func (f *fakeFleetSvc) SeedFleet(context.Context, string, string, space.Vec3, float64) (*Fleet, error) {
 	return f.fleet, nil
 }
-func (f *fakeFleetSvc) Position(context.Context, *Fleet) (board.Cell, error) {
+func (f *fakeFleetSvc) Position(context.Context, *Fleet, space.Bodies) (space.Vec3, error) {
 	return f.pos, f.posErr
 }
-
-type fakeAudience struct{ visible bool }
-
-func (f fakeAudience) FleetVisibleTo(context.Context, string, observation.FleetPos, common.WorldMillis) (bool, error) {
-	return f.visible, nil
+func (f *fakeFleetSvc) PositionOf(context.Context, *Fleet) (space.Vec3, error) {
+	return f.pos, f.posErr
+}
+func (f *fakeFleetSvc) HomeGeometry(context.Context, string) (float64, float64, error) {
+	return 0, 0, nil
 }
 
-func newFleetRouter(svc ServiceInterface, fog AudienceFog) *gin.Engine {
+// newFleetRouter wires a handler against svc — the AudienceFog seam this used
+// to also take is DELETED (design.md Decision 11: `fleet.AudienceFog`/
+// `Handler.WithFog` have no successor; a foreign fleet is now omitted
+// entirely rather than redacted through a fog filter).
+func newFleetRouter(svc ServiceInterface) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	// Stand in for the auth + corp-resolver middleware so ActorCorp resolves a
@@ -69,27 +64,13 @@ func newFleetRouter(svc ServiceInterface, fog AudienceFog) *gin.Engine {
 		c.Set(common.AccountIdKey, "user1")
 		c.Set(common.CorpIdKey, "corp-user1")
 	})
-	NewHandlerWith(svc, &fakeClock{}).WithFog(fog).RegisterRoutes(r.Group("/"))
+	NewHandlerWith(svc, &fakeClock{}).RegisterRoutes(r.Group("/"))
 	return r
-}
-
-// TestScan_ConflictWhenBusy maps the sensor-slot rejection to 409: a fleet may
-// burn and scan at once, but never run two scans (#0006 Decision #19). The
-// sweep takes no body (#0006 Decision #21) — one manual trigger.
-//
-// Spec: 0006/S4
-func TestScan_ConflictWhenBusy(t *testing.T) {
-	r := newFleetRouter(&fakeFleetSvc{scanErr: action.ErrActiveActionExists}, nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/fleets/f1/scan", nil))
-	if w.Code != http.StatusConflict {
-		t.Fatalf("second scan while one runs: status = %d, want 409", w.Code)
-	}
 }
 
 // TestList_RequiresSystemId 400s a bare list (no whole-galaxy fleet dump).
 func TestList_RequiresSystemId(t *testing.T) {
-	r := newFleetRouter(&fakeFleetSvc{}, nil)
+	r := newFleetRouter(&fakeFleetSvc{})
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets", nil))
 	if w.Code != http.StatusBadRequest {
@@ -97,44 +78,59 @@ func TestList_RequiresSystemId(t *testing.T) {
 	}
 }
 
-// TestList_AudienceFogsForeigns keeps the requester's own units and drops a
-// foreign fleet the audience filter can't sense — the board's fleet layer never
-// leaks an unsensed foreign.
-func TestList_AudienceFogsForeigns(t *testing.T) {
+// TestList_Scenario_ForeignFleetOmittedEntirely is the migrated successor of
+// the pre-migration TestList_AudienceFogsForeigns: fleet-movement's ADDED
+// "Fleet Read Endpoints Serve Own Fleets Only" replaces per-fleet audience
+// fog with unconditional omission (design.md Decision 11) — a foreign fleet
+// is dropped because it belongs to another corporation, full stop, with no
+// sensor/coverage check involved at all.
+func TestList_Scenario_ForeignFleetOmittedEntirely(t *testing.T) {
 	svc := &fakeFleetSvc{list: []Fleet{
 		{Id: "mine", CorporationId: "corp-user1", SystemId: "s1"},
 		{Id: "theirs", CorporationId: "corp-other", SystemId: "s1"},
 	}}
 	// The auth stub sets account "user1", so ActorCorp = "corp-user1" — "mine" is
-	// an own unit (skips the audience check); "theirs" is foreign and the fog
-	// rejects it. So the response keeps "mine" and drops "theirs".
-	r := newFleetRouter(svc, fakeAudience{visible: false})
+	// an own unit; "theirs" belongs to another corporation and is omitted
+	// unconditionally. So the response keeps "mine" and drops "theirs".
+	r := newFleetRouter(svc)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets?systemId=s1", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("list: status = %d, want 200", w.Code)
 	}
 	if !strings.Contains(w.Body.String(), "mine") || strings.Contains(w.Body.String(), "theirs") {
-		t.Fatalf("audience fog leaked or dropped a fleet: body = %s", w.Body.String())
+		t.Fatalf("a foreign fleet leaked or an own fleet was dropped: body = %s", w.Body.String())
 	}
 }
 
-// TestGet_ForeignFleetFoggedTo404 proves the audience filter hides a fleet the
-// requester can't sense; and shows it when they can.
-func TestGet_ForeignFleetFoggedTo404(t *testing.T) {
+// TestGet_Scenario_ForeignFleetDirectFetch404s is the migrated successor of
+// the pre-migration TestGet_ForeignFleetFoggedTo404: fleet-movement ADDED
+// "Fleet Read Endpoints Serve Own Fleets Only" — "A fleet belonging to
+// another corporation SHALL ... 404 on a direct fetch" (spec.md scenario "A
+// foreign fleet 404s on a direct fetch"). There is no audience/coverage
+// check left to script (design.md Decision 11 deletes AudienceFog); a
+// foreign fleet 404s purely because it belongs to another corporation.
+func TestGet_Scenario_ForeignFleetDirectFetch404s(t *testing.T) {
 	foreign := &Fleet{Id: "f1", CorporationId: "corp-other", SystemId: "s1"}
 
-	hidden := newFleetRouter(&fakeFleetSvc{fleet: foreign}, fakeAudience{visible: false})
+	r := newFleetRouter(&fakeFleetSvc{fleet: foreign})
 	w := httptest.NewRecorder()
-	hidden.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets/f1", nil))
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets/f1", nil))
 	if w.Code != http.StatusNotFound {
-		t.Fatalf("uncovered foreign fleet: status = %d, want 404", w.Code)
+		t.Fatalf("direct fetch of a foreign fleet: status = %d, want 404", w.Code)
 	}
+}
 
-	shown := newFleetRouter(&fakeFleetSvc{fleet: foreign}, fakeAudience{visible: true})
-	w = httptest.NewRecorder()
-	shown.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets/f1", nil))
+// TestGet_Scenario_OwnFleetDirectFetchReturns200 is the always-full-visibility
+// half of the same requirement, isolated from the roster/cargo assertions
+// roster_handler_test.go's own "own fleet" scenario covers.
+func TestGet_Scenario_OwnFleetDirectFetchReturns200(t *testing.T) {
+	own := &Fleet{Id: "f1", CorporationId: "corp-user1", SystemId: "s1"}
+
+	r := newFleetRouter(&fakeFleetSvc{fleet: own})
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets/f1", nil))
 	if w.Code != http.StatusOK {
-		t.Fatalf("covered fleet: status = %d, want 200", w.Code)
+		t.Fatalf("direct fetch of an own fleet: status = %d, want 200", w.Code)
 	}
 }

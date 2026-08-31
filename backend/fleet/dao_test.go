@@ -4,9 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/space"
 )
+
+// anyParkedState is a valid, minimal stored kinematic state — every fixture
+// in this file needs SOME decodable state (fleet-movement ADDED "Undecodable
+// Stored Kinematic State Is Rejected, Never Panicked": a fleet document with
+// no stored state at all is rejected by name, never defaulted), and these
+// tests are about corporation-scoping / roster fallback, not about which
+// kinematic mode is stored.
+func anyParkedState() space.ShipState {
+	return space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint}}
+}
 
 // TestListByCorporation proves the coverage input query returns only a
 // corporation's own fleets — the boundary fog isolation rides on.
@@ -17,9 +27,9 @@ func TestListByCorporation(t *testing.T) {
 	ctx := context.Background()
 	dao := NewDaoWithClient(fs)
 	for _, f := range []Fleet{
-		{Id: "f1", CorporationId: "corp-A", SystemId: "s1"},
-		{Id: "f2", CorporationId: "corp-A", SystemId: "s2"},
-		{Id: "f3", CorporationId: "corp-B", SystemId: "s1"},
+		{Id: "f1", CorporationId: "corp-A", SystemId: "s1", State: anyParkedState()},
+		{Id: "f2", CorporationId: "corp-A", SystemId: "s2", State: anyParkedState()},
+		{Id: "f3", CorporationId: "corp-B", SystemId: "s1", State: anyParkedState()},
 	} {
 		if err := dao.Save(ctx, f); err != nil {
 			t.Fatalf("seed %s: %v", f.Id, err)
@@ -40,61 +50,22 @@ func TestListByCorporation(t *testing.T) {
 	}
 }
 
-// TestDao_CoastPeriod_RehydratedFromLiveTuning is the regression for the bug that
-// survived the first cut of "orbits are tunable": Period was still persisted on the
-// fleet doc, so a fleet kept coasting at whatever pace it SETTLED at. Retuning
-// orbits spun the planets up and left the ship hanging there.
+// DELETED (migrate-fleet-to-continuous-burns, design.md Decision 4): this
+// file used to carry TestDao_CoastPeriod_RehydratedFromLiveTuning, pinning
+// that a stored `board.Orbit`'s coast Period is rehydrated from the LIVE
+// common.Tuning().OrbitPeriod(ring) on every read, rather than frozen at the
+// world-tuning pace in effect when the fleet last settled — because a
+// lattice coast stored only Ring/Angle0/Dir and derived its period from a
+// live, retunable, ring-indexed lookup.
 //
-// Both reads (Get and the list query) must hydrate — the board view uses one, the
-// fleet roster the other, and a ship that moves on one screen and not the other is
-// worse than one that doesn't move at all.
-//
-// Ring 5 (48 slots under the pinned schedule, not 6×5=30) is a deliberate
-// non-coincidence ring — irrelevant to THIS assertion's math (it only checks
-// the period, not a per-cell rate), but kept off the coincidence set on
-// principle per tasks.md 7.5's sweep.
-func TestDao_CoastPeriod_RehydratedFromLiveTuning(t *testing.T) {
-	fs, client := common.SetupFirestoreTestDAO(t)
-	defer common.CleanupFirestoreTestData(t, client, firestoreCollection)
-
-	ctx := context.Background()
-	dao := NewDaoWithClient(fs)
-
-	// A fleet that settled long ago, under a slow world.
-	const ring = 5
-	slow := common.DefaultTuning()
-	slow.OrbitBasePeriod = 3_600_000_000 // the old "ships are static" pace
-	common.SetTuning(slow)
-
-	if err := dao.Save(ctx, Fleet{
-		Id: "f1", CorporationId: "corp-A", SystemId: "s1",
-		State: board.CoastAt(board.Cell{Ring: ring, Slot: 0}, 0, testSched()),
-	}); err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-
-	// The operator speeds the world's orbits up.
-	fast := common.DefaultTuning()
-	fast.OrbitBasePeriod = 600
-	common.SetTuning(fast)
-	defer common.SetTuning(common.DefaultTuning())
-
-	want := fast.OrbitPeriod(ring)
-
-	got, err := dao.Get(ctx, "f1")
-	if err != nil || got == nil {
-		t.Fatalf("Get: f=%v err=%v", got, err)
-	}
-	if got.State.Coast == nil || got.State.Coast.Period != want {
-		t.Errorf("Get: coast period = %v, want %d (live pace, not the settle-time pace)",
-			got.State.Coast, want)
-	}
-
-	list, err := dao.ListByCorporation(ctx, "corp-A")
-	if err != nil || len(list) != 1 {
-		t.Fatalf("list: got %d fleets, err=%v", len(list), err)
-	}
-	if list[0].State.Coast == nil || list[0].State.Coast.Period != want {
-		t.Errorf("list: coast period = %v, want %d", list[0].State.Coast, want)
-	}
-}
+// A space.Park (ParkOrbit/ParkStationkeep) has no successor lookup to
+// rehydrate: PeriodMs is computed ONCE at settle time from the park's own
+// Radius via space.InsertionPeriod(radius) — a pure function of a stored
+// number, not a retunable ring-indexed rate looked up again at read time
+// (space/park.go's InsertionPeriod; space-kinematics: "A Committed Burn's
+// Geometry Is Fixed at Commit and Evaluated Closed-Form", extended to a
+// park's own insertion elements by the same principle). There is nothing
+// left to "rehydrate from live tuning" — the whole bug class (an operator
+// retuning orbit pace and stranding already-settled ships at their old
+// speed) cannot recur, because nothing about a stored park's motion is
+// looked up again at read time in the first place.

@@ -2,30 +2,17 @@ package fleet
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
-	"hexaverse/polar"
+	"hexaverse/space"
 	"hexaverse/system"
 
 	"go.uber.org/mock/gomock"
 )
-
-// testSched is the schedule fleet tests thread through every board call —
-// fleet does not hold a per-system interior, so per design.md Decision 3 it
-// always uses board.ProductionSchedule() (never a literal radius).
-func testSched() polar.Schedule { return board.ProductionSchedule() }
-
-// arcPath is a small helper standing in for the retired board.Line: any two
-// cells' arc path, computed by the SAME polar.ArcPath board.SolveCell uses
-// internally, so hand-built fixture paths stay contiguous and adjacent
-// without this test package re-deriving polar geometry by hand.
-func arcPath(from, to board.Cell) []board.Cell {
-	return polar.ArcPath(from, to, testSched())
-}
 
 // fakeClock is a settable world clock for driving arrival transitions.
 type fakeClock struct{ now common.WorldMillis }
@@ -44,6 +31,9 @@ type fakeActions struct {
 	resolved []string
 	// When set, Commit fails with it — the spine's slot guard, scriptable.
 	commitErr error
+	// resolveResult/resolveErr script ResolveActive's return, so a Service.Get
+	// test can drive resolveDue without a real action.Service.
+	resolveErr error
 }
 
 func (f *fakeActions) Commit(_ context.Context, spec action.CommitSpec) (*action.Action, error) {
@@ -62,403 +52,292 @@ func (f *fakeActions) Cancel(_ context.Context, id string, _ map[string]interfac
 
 func (f *fakeActions) ResolveActive(_ context.Context, actor string) ([]action.Action, error) {
 	f.resolved = append(f.resolved, actor)
-	return nil, nil
+	return nil, f.resolveErr
 }
 
-// fakeSystem returns a fixed interior: a static star and a (slow ⇒ static)
-// planet, so the motion-off reduction is exercised.
+// fakeSystem is an inert BodySource with no real bodies — used directly (not
+// via newSvc) by fixtures whose fleet never reaches a body-dependent call
+// (e.g. cancel_dock_test.go's docked-but-not-burning fleet).
 type fakeSystem struct{}
 
-func (f *fakeSystem) GetOrCreateInterior(context.Context, string) (*system.GeneratedInterior, error) {
-	planetOrbit := &system.Orbit{Ring: 5, Angle0: 3, Period: 1 << 60, Dir: 1} // effectively static
-	planetCell := board.OrbState(board.Orbit{Ring: 5, Angle0: 3, Period: 1 << 60, Dir: 1}, 0, testSched())
-	return &system.GeneratedInterior{
-		Interior: system.SystemInterior{SystemId: "sys-0", Radius: 16},
-		Features: []system.Feature{
-			{Id: "feat-star", Type: system.FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-			{Id: "feat-planet", Type: system.FeatureRocky, Orbit: planetOrbit,
-				Footprint: []board.Cell{planetCell}},
-		},
-	}, nil
+func (f *fakeSystem) BodyTable(context.Context, string) (*system.BodyTable, error) {
+	return nil, errors.New("fleet test fixture: fakeSystem carries no real bodies")
 }
 
-func (f *fakeSystem) LaneGates(context.Context, string, int) ([]system.LaneGate, error) {
-	return nil, nil
-}
-
-func coastFleetAtCentre() *Fleet {
-	return &Fleet{
-		Id: "fleet_1", CorporationId: "dev-corp", SystemId: "sys-0",
-		State: board.MovementState{Mode: board.ModeCoast, Coast: &board.Orbit{Ring: 0, Angle0: 0, Period: 1, Dir: 1}},
-	}
-}
-
+// newSvc's default BodySource is a REAL *system.BodyTable ("sys-0", a size-6
+// star, no other bodies) built through testBodyTable (space_testutil_test.go)
+// — not an inert stub — because at least one pre-existing, untouchable
+// section-3 test (attached_to_test.go's TestStop_Scenario_
+// ClearsAttachedToAtAcceptance) calls a body-dependent Service method
+// (Stop) without ever overriding bodies via WithBodies. Tests that need a
+// DIFFERENT body set still override it explicitly with
+// svc.WithBodies(stubBodySourceFixed{bt: testBodyTable(t, ...)}).
 func newSvc(t *testing.T, clk *fakeClock) (*Service, *MockDao, *fakeActions, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
 	dao := NewMockDao(ctrl)
 	fa := &fakeActions{}
-	return NewServiceWith(dao, &fakeSystem{}, fa, clk), dao, fa, ctrl
+	bodies := testBodyTable(t, "sys-0", 6.0)
+	return NewServiceWith(dao, stubBodySourceFixed{bt: bodies}, fa, clk), dao, fa, ctrl
 }
 
-func TestOrderTo_Cell_BurnPathAndEta(t *testing.T) {
+// --- OrderTo happy path (successor of the lattice-era
+// TestOrderTo_Cell_BurnPathAndEta / TestOrderTo_Feature_InterceptMeetsBodyAndDocks
+// / TestOrderTo_MotionOffReduction — collapsed into one point case and one body
+// case, since space.SolveBurn has no separate "static vs moving body" code
+// path the way board.OrbState's motion-off reduction did: every body target
+// resolves through the same intercept solve regardless of whether it moves.) ---
+
+func TestOrderTo_Scenario_PointTargetCommitsABurnWithARealEta(t *testing.T) {
 	clk := &fakeClock{now: 0}
 	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
-	// The burn commits through the action spine (Commit writes the fleet doc), so
-	// OrderTo no longer calls dao.Save directly.
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
+	bodies := testBodyTable(t, "sys-0", 6.0)
+	svc.WithBodies(stubBodySourceFixed{bt: bodies})
+	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(freshParkedFleet(), nil)
 
-	dest := board.Cell{Ring: 5, Slot: 0}
-	f, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{Cell: &dest}})
+	point := space.Vec3{X: 400}
+	f, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Point: &point})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.State.Mode != board.ModeBurn {
-		t.Fatalf("expected burn, got %s", f.State.Mode)
+	if f.State.Mode != space.ModeBurn {
+		t.Fatalf("expected burn, got %v", f.State.Mode)
 	}
 	if f.ActiveActionId != "action_test" {
 		t.Fatalf("expected active action claimed, got %q", f.ActiveActionId)
 	}
 	b := f.State.Burn
-	if b.Path[0] != (board.Cell{Ring: 0, Slot: 0}) || b.Path[len(b.Path)-1] != dest {
-		t.Fatalf("path endpoints wrong: %v", b.Path)
+	if b.Intercept != point {
+		t.Fatalf("intercept = %+v, want the ordered point %+v", b.Intercept, point)
 	}
-	// A radial path from the core to ring 5 (same slot, angle inherited from
-	// the core endpoint) crosses exactly 6 cells (rings 0..5) — independently
-	// derived here from polar.ArcPath, not from the burn's own output length.
-	if wantLen := len(arcPath(board.Cell{Ring: 0, Slot: 0}, dest)); len(b.Path) != wantLen {
-		t.Fatalf("burn path has %d cells, want %d (a plain radial arc from the core to ring 5)", len(b.Path), wantLen)
-	}
-	wantSteps := common.WorldMillis(len(b.Path) - 1)
-	if want := wantSteps * svc.params.MsPerTile; b.ArriveTime != want {
-		t.Fatalf("arriveTime = %d, want %d (%d cells × %d ms/tile)",
-			b.ArriveTime, want, wantSteps, svc.params.MsPerTile)
-	}
-	for i := 1; i < len(b.Path); i++ {
-		if board.Distance(b.Path[i-1], b.Path[i], testSched()) != 1 {
-			t.Fatalf("path not contiguous at %d", i)
-		}
+	if b.ArriveMs <= b.DepartMs {
+		t.Fatalf("arriveMs (%d) must be after departMs (%d)", b.ArriveMs, b.DepartMs)
 	}
 	// Committed as a burn action scoped to the system, eta = the arrival.
 	if fa.committed == nil || fa.committed.Type != burnType {
 		t.Fatalf("expected a burn commit, got %+v", fa.committed)
 	}
-	if fa.committed.Scope != "sys-0" || fa.committed.Eta != b.ArriveTime {
+	if fa.committed.Scope != "sys-0" || fa.committed.Eta != b.ArriveMs {
 		t.Fatalf("commit scope/eta wrong: %+v", fa.committed)
 	}
 }
 
-func TestOrderTo_Feature_InterceptMeetsBodyAndDocks(t *testing.T) {
+func TestOrderTo_Scenario_BodyTargetSolvesARealIntercept(t *testing.T) {
 	clk := &fakeClock{now: 0}
 	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
+	target := orbitingFeature("feat-body-a", 40, 2.0)
+	bodies := testBodyTable(t, "sys-0", 6.0, target)
+	svc.WithBodies(stubBodySourceFixed{bt: bodies})
+	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(freshParkedFleet(), nil)
 
-	f, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{FeatureId: "feat-planet"}})
+	f, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{BodyId: "feat-body-a"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if f.State.Mode != space.ModeBurn {
+		t.Fatalf("expected burn, got %v", f.State.Mode)
+	}
 	b := f.State.Burn
-	if b.DockOnArrive != "feat-planet" {
-		t.Fatalf("dockOnArrive = %q", b.DockOnArrive)
+	if b.Target.BodyId != "feat-body-a" {
+		t.Fatalf("burn target = %+v, want body feat-body-a", b.Target)
 	}
-	// Meet cell equals the body's computed position at arriveTime (intercept determinism).
-	planet := board.Orbit{Ring: 5, Angle0: 3, Period: 1 << 60, Dir: 1}
-	if b.Path[len(b.Path)-1] != board.OrbState(planet, b.ArriveTime, testSched()) {
-		t.Fatalf("meet cell != body pos at arriveTime")
+	// The intercept is the body's insertion-standoff orbit position at
+	// ArriveMs, not the body's own centre (space.InsertionStandoff) —
+	// independently recomputed via space.Position + the standoff distance,
+	// rather than re-deriving BuildCurve's own park construction.
+	body, ok := bodies.Body("feat-body-a")
+	if !ok {
+		t.Fatal("fixture: feat-body-a not found in the body table")
 	}
-	if fa.committed == nil || fa.committed.Params["dockOnArrive"] != "feat-planet" {
-		t.Fatalf("commit params should record the dock target: %+v", fa.committed)
+	bodyAt, err := space.Position(bodies, "feat-body-a", b.ArriveMs)
+	if err != nil {
+		t.Fatalf("recomputing target position: %v", err)
 	}
-}
-
-func TestOrderTo_MotionOffReduction(t *testing.T) {
-	// A featureId target (static planet) yields the SAME order as a cell target
-	// at the planet's cell — no intercept special-case.
-	planetCell := board.OrbState(board.Orbit{Ring: 5, Angle0: 3, Period: 1 << 60, Dir: 1}, 0, testSched())
-
-	clk := &fakeClock{now: 0}
-	svc, dao, _, ctrl := newSvc(t, clk)
-	defer ctrl.Finish()
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
-	byFeature, _ := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{FeatureId: "feat-planet"}})
-
-	clk2 := &fakeClock{now: 0}
-	svc2, dao2, _, ctrl2 := newSvc(t, clk2)
-	defer ctrl2.Finish()
-	dao2.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
-	byCell, _ := svc2.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{Cell: &planetCell}})
-
-	if byFeature.State.Burn.ArriveTime != byCell.State.Burn.ArriveTime {
-		t.Fatalf("arriveTime differs: feature=%d cell=%d",
-			byFeature.State.Burn.ArriveTime, byCell.State.Burn.ArriveTime)
+	wantStandoff := space.InsertionStandoff(body)
+	gotStandoff := b.Intercept.Sub(bodyAt).Length()
+	if diff := gotStandoff - wantStandoff; diff > 1e-6 || diff < -1e-6 {
+		t.Fatalf("intercept distance from the body's centre = %v, want the insertion standoff %v", gotStandoff, wantStandoff)
 	}
-	if byFeature.State.Burn.Path[len(byFeature.State.Burn.Path)-1] != byCell.State.Burn.Path[len(byCell.State.Burn.Path)-1] {
-		t.Fatal("meet cell differs between feature and cell targets")
+	if fa.committed == nil || fa.committed.Type != burnType {
+		t.Fatalf("expected a burn commit, got %+v", fa.committed)
 	}
 }
 
-// fleet-movement, "In-System Burn Order" — scenario "Ordering a feature
-// absent from the system fails". SDET NOTE: this scenario had NO existing
-// test anywhere in the pre-migration corpus (grep for ErrFeatureAbsent
-// across fleet/*_test.go found nothing before this file) — filed here as a
-// genuine coverage gap closed, not a port.
-func TestOrderTo_Scenario_FeatureAbsentFromSystemFails(t *testing.T) {
+// fleet-movement, "In-System Burn Order to a Body or a Point" — successor of
+// the pre-migration "Ordering a feature absent from the system fails"
+// scenario (fleet.ErrFeatureAbsent had no consumer path once burns solve
+// through space.SolveBurn against a system.BodyTable): ordering a burn to an
+// unknown body id now fails through space's own body-existence check
+// (space.ErrUnknownBody), the same identity BuildCurve already uses for any
+// unresolvable target — not a fleet-specific sentinel.
+func TestOrderTo_Scenario_UnknownBodyIdFails(t *testing.T) {
 	clk := &fakeClock{now: 0}
 	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
 
-	_, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{Target: board.Target{FeatureId: "feat-does-not-exist"}})
-	if err != ErrFeatureAbsent {
-		t.Fatalf("err = %v, want ErrFeatureAbsent", err)
+	bodies := testBodyTable(t, "sys-0", 6.0) // no "feat-does-not-exist"
+	svc.WithBodies(stubBodySourceFixed{bt: bodies})
+	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(freshParkedFleet(), nil)
+
+	_, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{BodyId: "feat-does-not-exist"})
+	if !errors.Is(err, space.ErrUnknownBody) {
+		t.Fatalf("err = %v, want space.ErrUnknownBody", err)
 	}
 	if fa.committed != nil {
 		t.Fatalf("a rejected order must not commit an action: %+v", fa.committed)
 	}
 }
 
-func TestOrderTo_RejectsTheCore(t *testing.T) {
-	// The star at the core is a body, not a destination: neither a cell order to
-	// {0,0} nor an order to dock the star feature is allowed.
-	core := board.Cell{Ring: 0, Slot: 0}
-	cases := []struct {
-		name string
-		req  OrderRequest
-	}{
-		{"cell {0,0}", OrderRequest{Target: board.Target{Cell: &core}}},
-		{"dock the star", OrderRequest{Target: board.Target{FeatureId: "feat-star"}}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			clk := &fakeClock{now: 0}
-			svc, dao, fa, ctrl := newSvc(t, clk)
-			defer ctrl.Finish()
-			dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(coastFleetAtCentre(), nil)
+// --- order request validation (fleet-movement "Order Request Validation") ---
 
-			_, err := svc.OrderTo(context.Background(), "fleet_1", tc.req)
-			if err != ErrCoreDestination {
-				t.Fatalf("expected ErrCoreDestination, got %v", err)
-			}
-			if fa.committed != nil {
-				t.Fatalf("a rejected order must not commit an action: %+v", fa.committed)
-			}
-		})
-	}
-}
-
-func TestSeedFleet_RejectsTheCore(t *testing.T) {
+func TestOrderTo_Scenario_EmptyOrderRejected(t *testing.T) {
 	clk := &fakeClock{now: 0}
-	svc, _, _, ctrl := newSvc(t, clk)
+	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
+	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(freshParkedFleet(), nil).AnyTimes()
 
-	// No dao.Save is expected — seeding onto the core (0,0) must reject first.
-	_, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", board.Cell{Ring: 0, Slot: 0})
-	if err != ErrCoreDestination {
-		t.Fatalf("expected ErrCoreDestination, got %v", err)
+	_, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{})
+	if !errors.Is(err, ErrEmptyOrder) {
+		t.Fatalf("err = %v, want ErrEmptyOrder", err)
+	}
+	if fa.committed != nil {
+		t.Fatalf("a rejected order must not commit an action: %+v", fa.committed)
 	}
 }
 
-func TestGet_ArrivalDocksAfterEta(t *testing.T) {
+func TestOrderTo_Scenario_AmbiguousOrderRejected(t *testing.T) {
+	clk := &fakeClock{now: 0}
+	svc, dao, fa, ctrl := newSvc(t, clk)
+	defer ctrl.Finish()
+	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(freshParkedFleet(), nil).AnyTimes()
+
+	point := space.Vec3{X: 10}
+	_, err := svc.OrderTo(context.Background(), "fleet_1", OrderRequest{BodyId: "feat-body-a", Point: &point})
+	if !errors.Is(err, ErrAmbiguousOrder) {
+		t.Fatalf("err = %v, want ErrAmbiguousOrder", err)
+	}
+	if fa.committed != nil {
+		t.Fatalf("a rejected order must not commit an action: %+v", fa.committed)
+	}
+}
+
+// --- Get() opportunistic arrival resolve (successor of the lattice-era
+// TestGet_ArrivalDocksAfterEta / TestGet_ArrivalCoastsWhenNoDock — the real
+// settle logic now lives entirely in BurnResolver (resolver_test.go), so at
+// the Service level the only thing left to pin is the DELEGATION: a due
+// arrival is resolved through the action spine, opportunistically, on read,
+// with no scheduler.) ---
+
+func TestGet_Scenario_DueArrivalDelegatesToTheActionSpine(t *testing.T) {
 	clk := &fakeClock{now: 500_000} // past arrival
-	svc, dao, _, ctrl := newSvc(t, clk)
+	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
-	burning := coastFleetAtCentre()
-	burning.State = board.MovementState{Mode: board.ModeBurn, Burn: &board.Burn{
-		Path: arcPath(board.Cell{Ring: 0, Slot: 0}, board.Cell{Ring: 5, Slot: 0}), StartTime: 0, ArriveTime: 300_000,
-		DockOnArrive: "feat-planet",
-	}}
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(burning, nil)
-	var saved Fleet
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) error {
-		saved = f
-		return nil
-	})
+	burning := &Fleet{
+		Id: "fleet_1", CorporationId: "dev-corp", SystemId: "sys-0", ActiveActionId: "action_running",
+		State: space.ShipState{Mode: space.ModeBurn, Burn: &space.Burn{DepartMs: 0, ArriveMs: 300_000}},
+	}
+	settled := &Fleet{
+		Id: "fleet_1", CorporationId: "dev-corp", SystemId: "sys-0",
+		State: space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint}},
+	}
+	gomock.InOrder(
+		dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(burning, nil),
+		dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(settled, nil),
+	)
 
 	f, err := svc.Get(context.Background(), "fleet_1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.State.Mode != board.ModeDocked || saved.State.Docked.ParentId != "feat-planet" {
-		t.Fatalf("expected docked to feat-planet, got %+v", f.State)
+	if len(fa.resolved) != 1 || fa.resolved[0] != "fleet_1" {
+		t.Fatalf("expected the action spine's ResolveActive to be called for fleet_1, got %v", fa.resolved)
+	}
+	if f.State.Mode != space.ModeParked {
+		t.Fatalf("expected the re-loaded (settled) doc, got %+v", f.State)
 	}
 }
 
-func TestGet_ArrivalCoastsWhenNoDock(t *testing.T) {
-	clk := &fakeClock{now: 500_000}
-	svc, dao, _, ctrl := newSvc(t, clk)
+func TestGet_Scenario_NotYetDueBurnIsNotResolved(t *testing.T) {
+	clk := &fakeClock{now: 100_000} // before arrival
+	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
-	burning := coastFleetAtCentre()
-	dest := board.Cell{Ring: 5, Slot: 0}
-	burning.State = board.MovementState{Mode: board.ModeBurn, Burn: &board.Burn{
-		Path: arcPath(board.Cell{Ring: 0, Slot: 0}, dest), StartTime: 0, ArriveTime: 300_000,
-	}}
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(burning, nil)
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
+	burning := &Fleet{
+		Id: "fleet_1", CorporationId: "dev-corp", SystemId: "sys-0", ActiveActionId: "action_running",
+		State: space.ShipState{Mode: space.ModeBurn, Burn: &space.Burn{DepartMs: 0, ArriveMs: 300_000}},
+	}
+	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(burning, nil).Times(1)
 
 	f, err := svc.Get(context.Background(), "fleet_1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.State.Mode != board.ModeCoast {
-		t.Fatalf("expected coast on arrival, got %s", f.State.Mode)
+	if len(fa.resolved) != 0 {
+		t.Fatalf("expected no resolve before the eta, got %v", fa.resolved)
 	}
-	// Coasts the local orbit of the cell it settled on (ring 5).
-	if f.State.Coast.Ring != dest.Ring {
-		t.Fatalf("coast ring = %d, want %d", f.State.Coast.Ring, dest.Ring)
+	if f.State.Mode != space.ModeBurn {
+		t.Fatalf("expected the still-burning doc unchanged, got %+v", f.State)
 	}
 }
 
-func TestCancel_MidBurnResumesCoast(t *testing.T) {
+// --- Cancel delegates to CutDrive for a burning fleet (thin-passthrough
+// successor of the lattice-era TestCancel_MidBurnResumesCoast — CutDrive's
+// own conversion arithmetic is pinned directly by attached_to_test.go's
+// TestCutDrive_Scenario_LeavesAttachedToCleared; this only pins that Cancel
+// routes a burning fleet through it rather than some other path). ---
+
+func TestCancel_Scenario_MidBurnConvertsToADrift(t *testing.T) {
 	clk := &fakeClock{now: 120_000} // partway through a 300k burn
-	svc, dao, _, ctrl := newSvc(t, clk)
+	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
-	burn := board.Burn{
-		Path: arcPath(board.Cell{Ring: 0, Slot: 0}, board.Cell{Ring: 5, Slot: 0}), StartTime: 0, ArriveTime: 300_000,
+	burning := &Fleet{
+		Id: "fleet_1", CorporationId: "dev-corp", SystemId: "sys-0", ActiveActionId: "action_running",
+		State: space.ShipState{Mode: space.ModeBurn, Burn: &space.Burn{
+			Origin: space.Vec3{}, Target: space.Target{Point: &space.Vec3{X: 100}},
+			Intercept: space.Vec3{X: 100}, Accel: 8, DepartMs: 0, ArriveMs: 300_000,
+		}},
 	}
-	// Capture the mid-burn cell BEFORE Cancel mutates the fleet's state to coast.
-	midCell := board.BurnPos(burn, 120_000)
-
-	burning := coastFleetAtCentre()
-	burning.State = board.MovementState{Mode: board.ModeBurn, Burn: &burn}
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(burning, nil)
-	var saved Fleet
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) error {
-		saved = f
-		return nil
-	})
+	// Cancel loads the fleet once itself, then delegates to CutDrive, which
+	// loads it again — two dao.Get calls for one Cancel on a burning fleet.
+	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(burning, nil).Times(2)
 
 	f, err := svc.Cancel(context.Background(), "fleet_1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.State.Mode != board.ModeCoast {
-		t.Fatalf("cancel should coast, got %s", f.State.Mode)
+	if f.State.Mode != space.ModeDrift {
+		t.Fatalf("cancel mid-burn should convert to a drift, got %v", f.State.Mode)
 	}
-	if saved.State.Coast.Ring != midCell.Ring {
-		t.Fatalf("coast ring %d != mid-burn cell ring %d", saved.State.Coast.Ring, midCell.Ring)
+	if len(fa.cancelled) != 1 || fa.cancelled[0] != "action_running" {
+		t.Fatalf("expected the running movement action to be cancelled, got %v", fa.cancelled)
 	}
 }
 
-// TestListInSystem_ArrivedBurnReadsAsMoving is the "my ship stopped dead" bug: the
-// board's read (ListInSystem) doesn't WRITE the arrival settle — that's Get's job —
-// but it must still SHOW the fleet where physics puts it. An unprojected arrived
-// burn reads as a burn forever, and BurnPos pins a past-ETA burn to its last path
-// cell, so the ship sat frozen at its destination while the system turned around it.
-func TestListInSystem_ArrivedBurnReadsAsMoving(t *testing.T) {
-	const arriveTime = 300_000
-	clk := &fakeClock{now: arriveTime + 10_000} // the burn finished a while ago
-	svc, dao, _, ctrl := newSvc(t, clk)
+// --- FleetsForCorp's reduced interim contract (successor of the lattice-era
+// TestFleetsForCorp_DockedToOrbitingBodyRidesIt, whose rich "sensor position
+// rides the docked body's live cell" behaviour has no successor: a fleet has
+// no board cell to answer observation.FleetPos with (design.md Decision 11).
+// The honest interim is "no coverage from any unit", pinned here as a plain
+// contract test — SDET-added, since the pre-migration corpus never had to
+// assert a no-op.) ---
+
+func TestFleetsForCorp_Scenario_ReportsNoCoverageInThisInterim(t *testing.T) {
+	clk := &fakeClock{now: 0}
+	svc, _, _, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
-	// Ring 5 is a NON-coincidence ring under the pinned schedule (48 slots, not
-	// 6×5=30) — deliberately used here (tasks.md 7.5) rather than a coincidence
-	// ring (1, 2, 4, 8, 16, 32) so the per-cell cadence below is read from the
-	// live schedule, never a hardcoded 6×ring.
-	dest := board.Cell{Ring: 5, Slot: 0}
-	arrived := coastFleetAtCentre()
-	arrived.State = board.MovementState{Mode: board.ModeBurn, Burn: &board.Burn{
-		Path: arcPath(board.Cell{Ring: 0, Slot: 0}, dest), StartTime: 0, ArriveTime: arriveTime,
-	}}
-	dao.EXPECT().ListBySystem(gomock.Any(), "sys-0").Return([]Fleet{*arrived}, nil)
-
-	list, err := svc.ListInSystem(context.Background(), "sys-0")
-	if err != nil || len(list) != 1 {
-		t.Fatalf("list: got %d fleets, err=%v", len(list), err)
+	got, err := svc.FleetsForCorp(context.Background(), "dev-corp", clk.Now())
+	if err != nil {
+		t.Fatalf("FleetsForCorp: %v", err)
 	}
-	f := list[0]
-
-	if f.State.Mode != board.ModeCoast || f.State.Coast == nil {
-		t.Fatalf("an arrived fleet must read as coasting, got %s", f.State.Mode)
-	}
-	// It is in the orbit it entered AT the moment it arrived — no teleport...
-	if got, _ := board.ShipPos(f.State, arriveTime, testSched()); got != dest {
-		t.Errorf("at arrival the fleet is at %+v, want its destination %+v", got, dest)
-	}
-	// ...and it has MOVED since, because it's coasting, not parked. The per-cell
-	// cadence is derived from the LIVE SCHEDULE's slot count for ring 5, never
-	// a hardcoded 6×ring (that formula is wrong on this ring under the pinned
-	// polar schedule — see tasks.md 7.5).
-	sched := testSched()
-	perCell := common.Tuning().OrbitPeriod(dest.Ring) / common.WorldMillis(sched.Slots(dest.Ring))
-	if got, _ := board.ShipPos(f.State, arriveTime+perCell, testSched()); got == dest {
-		t.Errorf("still on %+v a full cell-time after arrival — the ship is frozen", dest)
-	}
-}
-
-// movingBodySystem is an interior whose body actually ORBITS (the default fake's
-// planet is motion-off), so a dock onto it is a dock onto something that moves.
-type movingBodySystem struct{ orbit system.Orbit }
-
-func (f *movingBodySystem) GetOrCreateInterior(context.Context, string) (*system.GeneratedInterior, error) {
-	o := f.orbit
-	return &system.GeneratedInterior{
-		Interior: system.SystemInterior{SystemId: "sys-0", Radius: 16},
-		Features: []system.Feature{{Id: "feat-belt-0", Type: system.FeatureBelt, Orbit: &o,
-			Footprint: []board.Cell{{Ring: o.Ring, Slot: 0}}}},
-	}, nil
-}
-
-func (f *movingBodySystem) LaneGates(context.Context, string, int) ([]system.LaneGate, error) {
-	return nil, nil
-}
-
-// TestFleetsForCorp_DockedToOrbitingBodyRidesIt: the fog's coverage source must see
-// a due arrival SETTLED, or a ship that docked onto an orbiting body lends its
-// sensor bubble to the cell the burn ended on — a cell the body has since orbited
-// away from. The body then falls outside the corp's own coverage and drops out of
-// its board payload: the ship stops seeing the very thing it is holding onto (and
-// the client, with no parent to ride, jumps the ship tile-to-tile instead of
-// gliding it around the orbit).
-//
-// Ring 5 (48 slots, not 6×5=30) is a deliberate non-coincidence ring (tasks.md
-// 7.5's fleet/service_test.go:372 site).
-func TestFleetsForCorp_DockedToOrbitingBodyRidesIt(t *testing.T) {
-	const arriveTime = 100_000
-	sched := testSched()
-	const ring = 5
-	// One cell's worth of world-time on this ring, read from the live schedule
-	// — never a hardcoded 6×ring.
-	period := common.WorldMillis(144_000)
-	orbit := system.Orbit{Ring: ring, Angle0: 0, Period: period, Dir: 1}
-	sys := &movingBodySystem{orbit: orbit}
-
-	elements := board.Orbit{Ring: orbit.Ring, Angle0: orbit.Angle0, Period: orbit.Period, Dir: orbit.Dir}
-	burnEnd := board.OrbState(elements, arriveTime, sched) // where the belt was on arrival
-
-	// Long enough after arrival that the belt has swung well clear of that cell.
-	oneCell := period / common.WorldMillis(sched.Slots(ring))
-	clk := &fakeClock{now: arriveTime + 10*oneCell}
-	wantCell := board.OrbState(elements, clk.now, sched)
-	if wantCell == burnEnd {
-		t.Fatal("fixture: the belt must have moved by now, or this test proves nothing")
-	}
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	dao := NewMockDao(ctrl)
-	svc := NewServiceWith(dao, sys, &fakeActions{}, clk)
-
-	docked := coastFleetAtCentre()
-	docked.State = board.MovementState{Mode: board.ModeBurn, Burn: &board.Burn{
-		Path:         arcPath(board.Cell{Ring: 0, Slot: 0}, burnEnd),
-		StartTime:    0,
-		ArriveTime:   arriveTime,
-		DockOnArrive: "feat-belt-0",
-	}}
-	dao.EXPECT().ListByCorporation(gomock.Any(), "dev-corp").Return([]Fleet{*docked}, nil)
-
-	got, err := svc.FleetsForCorp(context.Background(), "dev-corp", clk.now)
-	if err != nil || len(got) != 1 {
-		t.Fatalf("FleetsForCorp: got %d, err=%v", len(got), err)
-	}
-	if got[0].Cell != wantCell {
-		t.Errorf("sensor position = %+v, want %+v (the belt's LIVE cell — %+v is where the burn ended)",
-			got[0].Cell, wantCell, burnEnd)
+	if len(got) != 0 {
+		t.Fatalf("FleetsForCorp = %v, want none — the lattice coverage this used to answer with has no "+
+			"successor after design.md Decision 4 (a fleet has no board cell); link 4's own scope stops at "+
+			"making the type change compile, degrading honestly rather than manufacturing a shadow position", got)
 	}
 }

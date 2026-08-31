@@ -7,7 +7,6 @@ import (
 	"math"
 
 	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/fleet"
 	"hexaverse/system"
@@ -147,10 +146,11 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 
 	// (c) remaining preconditions, in spec order.
 
-	// Docked to the named feature — the effective state (a burn past its
-	// arriveTime IS its settled dock; board.StateAt folds that).
-	eff := board.StateAt(f.State, now, board.ProductionSchedule())
-	if eff.Mode != board.ModeDocked || eff.Docked == nil || eff.Docked.ParentId != req.FeatureId {
+	// Docked to the named feature (fleet.Fleet.DockedTo — design.md Decision
+	// 13; link 6, re-express-economy-positions, redefines what a valid host
+	// is).
+	host, docked := f.DockedTo()
+	if !docked || host != req.FeatureId {
 		return nil, ErrNotDocked
 	}
 

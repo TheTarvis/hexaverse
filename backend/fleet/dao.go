@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"hexaverse/board"
 	"hexaverse/common"
+	"hexaverse/space"
 
 	"github.com/rs/zerolog/log"
 	"google.golang.org/api/iterator"
@@ -52,21 +52,46 @@ func (dao *DaoImpl) Get(ctx context.Context, id string) (*Fleet, error) {
 	if err := doc.DataTo(&f); err != nil {
 		return nil, err
 	}
-	hydrateCoast(&f)
+	if err := hydrateState(ctx, &f, id); err != nil {
+		return nil, err
+	}
 	return &f, nil
 }
 
-// hydrateCoast fills a decoded fleet's coast period from the live orbital law —
-// board.Orbit.Period isn't stored (see board/orbit.go). Without this a fleet keeps
-// orbiting at whatever pace it happened to SETTLE at, so retuning orbits would
-// spin the planets up and leave the ships hanging.
-func hydrateCoast(f *Fleet) {
-	if f.State.Mode == board.ModeCoast {
-		board.HydratePeriod(f.State.Coast)
+// permissiveBodies is the space.Bodies stand-in the real Firestore decode
+// boundary validates a stored kinematic-state document against (tasks.md
+// 3.6). It always reports a body id as known: a real body-existence
+// cross-check needs the request-scoped BodySource (design.md Decision 16),
+// which the DAO layer never holds (it is wired at the Service, resolved once
+// per request) — so the DAO boundary validates coordinate SHAPE (finite,
+// in-extent, well-formed) and defers the "does this body actually exist"
+// cross-check to whichever caller has a real body table (the burn/resolve
+// paths already resolve one; see service.go's bodiesFor). This is a
+// deliberate, narrower guarantee than DecodeKinematicState's full four-cause
+// contract, not a silent gap: a genuinely corrupt body id on a stored park
+// still fails downstream, the first time a real Bodies is asked to resolve
+// it, rather than on every routine read.
+type permissiveBodies struct{}
+
+func (permissiveBodies) Body(id string) (space.Body, bool) { return space.Body{Id: id}, true }
+
+// hydrateState decodes a raw-read fleet's persisted kinematic state
+// (StateDoc, populated by doc.DataTo above) into its domain form (State) —
+// the fleet-document boundary DecodeKinematicState's own contract names
+// (tasks.md 3.6). A fleet document with no stored kinematic state at all is
+// rejected by name, never defaulted to an implied origin park.
+func hydrateState(_ context.Context, f *Fleet, id string) error {
+	state, err := DecodeKinematicState(permissiveBodies{}, f.StateDoc, "", "")
+	if err != nil {
+		log.Warn().Str("fleetId", id).Err(err).Msg("Fleet document's stored kinematic state failed to decode")
+		return err
 	}
+	f.State = state
+	return nil
 }
 
 func (dao *DaoImpl) Save(ctx context.Context, f Fleet) error {
+	f.StateDoc = EncodeKinematicState(f.State)
 	return dao.db.Set(ctx, firestoreCollection, f.Id, f)
 }
 
@@ -96,7 +121,9 @@ func (dao *DaoImpl) listWhere(ctx context.Context, field, value string) ([]Fleet
 		if err := doc.DataTo(&f); err != nil {
 			return nil, err
 		}
-		hydrateCoast(&f)
+		if err := hydrateState(ctx, &f, f.Id); err != nil {
+			return nil, err
+		}
 		out = append(out, f)
 	}
 	return out, nil

@@ -2,36 +2,57 @@ package fleet
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"hexaverse/action"
-	"hexaverse/board"
-	"hexaverse/common"
+	"hexaverse/space"
 )
 
-// fakeAmbient captures whether ambient reveal ran and hands back canned writes.
-type fakeAmbient struct {
-	called bool
-	writes []action.DocWrite
-}
+// DELETED (migrate-fleet-to-continuous-burns, design.md Decision 21A, task
+// 6.5): this file used to test BurnResolverWithAmbient/AmbientRecorder — the
+// path-swept ambient reveal a resolved move used to also mint. Decision 4
+// deletes it outright: a burn's path is no longer a []board.Cell to sweep,
+// and observation's ambient-reveal write it fed is itself REMOVED (design.md
+// Decision 11). There is no successor to migrate to; link 5
+// (replace-observation-with-sightings) is where a reveal mechanism next
+// exists, and it will not be another sweep.
+//
+// It also carried TestCoastState_ObeysTheSharedOrbitalLaw, pinning that a
+// fleet settling on a lattice ring inherits the SAME live-tunable orbital
+// period a body on that ring has (common.Tuning().OrbitPeriod). That
+// property belongs to board.CoastAt/board.Orbit, which fleet no longer calls
+// at all — its board/polar coverage (if any) is the `board` package's own
+// suite's concern, not fleet's.
+//
+// What replaces both, below: direct unit tests of the REAL, currently-shipped
+// `BurnResolver` (resolver.go) — settling a due burn through space.StateAt,
+// setting AttachedTo only for a body-targeted arrival (design.md Decision 4,
+// 13; tasks.md 3.1), and leaving an already-settled state alone. This
+// function had no direct test coverage anywhere in the pre-migration corpus
+// (the old TestGet_ArrivalDocksAfterEta/TestGet_ArrivalCoastsWhenNoDock
+// exercised it only indirectly, through Service.Get with a fake action
+// spine that never actually invoked it) — filed here as a genuine coverage
+// gap this migration makes newly obvious, not a port.
 
-func (f *fakeAmbient) AmbientWrites(_ context.Context, _, _ string, _ []board.Cell, _ common.WorldMillis) ([]action.DocWrite, error) {
-	f.called = true
-	return f.writes, nil
-}
+// Scenario: A point-targeted burn past its arrival settles to a point park —
+// no AttachedTo, outcome "arrived".
+func TestBurnResolver_Scenario_PointTargetSettlesToAPointParkNoAttachedTo(t *testing.T) {
+	bodies := testBodyTable(t, "sys-0", 6.0)
+	resolver := BurnResolver(stubBodySourceFixed{bt: bodies})
 
-// TestBurnResolverWithAmbient_AppendsSweptWrites proves a resolved move both
-// settles motion state (kinematic) AND appends the path-swept ambient reveal.
-func TestBurnResolverWithAmbient_AppendsSweptWrites(t *testing.T) {
-	amb := &fakeAmbient{writes: []action.DocWrite{{Path: []string{"corporations", "corp-1", "observations", "sys-1", "features", "feat-0"}}}}
-	resolver := BurnResolverWithAmbient(DefaultMovementParams(), amb)
-
+	point := space.Vec3{X: 300}
 	burning := Fleet{
-		CorporationId: "corp-1", SystemId: "sys-1",
-		State: board.MovementState{Mode: board.ModeBurn, Burn: &board.Burn{Path: arcPath(board.Cell{Ring: 0, Slot: 0}, board.Cell{Ring: 3, Slot: 0})}},
+		Id: "fleet_1", CorporationId: "corp-1", SystemId: "sys-0",
+		StateDoc: EncodeKinematicState(space.ShipState{Mode: space.ModeBurn, Burn: &space.Burn{
+			Origin: space.Vec3{X: 20}, Target: space.Target{Point: &point}, Intercept: point,
+			Accel: 8, DepartMs: 0, ArriveMs: 100_000,
+		}}),
 	}
+
 	res, err := resolver(context.Background(), action.Resolution{
-		At: 1000,
+		At:     150_000, // past ArriveMs
+		Action: action.Action{Id: "action_1"},
 		DecodeActor: func(target interface{}) error {
 			*(target.(*Fleet)) = burning
 			return nil
@@ -40,91 +61,129 @@ func TestBurnResolverWithAmbient_AppendsSweptWrites(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	if res.ActorState == nil {
-		t.Errorf("a resolved burn must still settle motion state (kinematic)")
+	if res.Outcome != "arrived" {
+		t.Errorf("outcome = %q, want %q", res.Outcome, "arrived")
 	}
-	if !amb.called {
-		t.Errorf("ambient reveal not invoked on move resolution")
+	if res.ActorState["attachedTo"] != "" {
+		t.Errorf("attachedTo = %v, want empty for a point-targeted arrival", res.ActorState["attachedTo"])
 	}
-	if len(res.Writes) != 1 {
-		t.Errorf("swept ambient writes not appended, got %d", len(res.Writes))
+	settledDoc, ok := res.ActorState["state"].(map[string]any)
+	if !ok {
+		t.Fatalf("res.ActorState[\"state\"] = %v, want the encoded kinematic state", res.ActorState["state"])
+	}
+	settled, err := DecodeKinematicState(bodies, settledDoc, "", "")
+	if err != nil {
+		t.Fatalf("decoding the settled state: %v", err)
+	}
+	if settled.Mode != space.ModeParked || settled.Park == nil || settled.Park.Kind != space.ParkPoint {
+		t.Fatalf("settled state = %+v, want a ParkPoint", settled)
+	}
+	if settled.Park.Point != point {
+		t.Errorf("settled point = %+v, want the intercept %+v", settled.Park.Point, point)
 	}
 }
 
-// TestBurnResolverWithAmbient_NilRecorderIsPlainBurn keeps the resolver kinematic
-// when no ambient recorder is wired.
-func TestBurnResolverWithAmbient_NilRecorderIsPlainBurn(t *testing.T) {
-	resolver := BurnResolverWithAmbient(DefaultMovementParams(), nil)
+// Scenario: A body-targeted burn past its arrival settles to a ParkOrbit
+// riding the target body — AttachedTo is set to the body's id, only now, at
+// resolve (design.md Decision 4/13; tasks.md 3.1's own pinned invariant).
+func TestBurnResolver_Scenario_BodyTargetSettlesToAParkOrbitAndSetsAttachedTo(t *testing.T) {
+	target := orbitingFeature("feat-body-a", 40, 2.0)
+	bodies := testBodyTable(t, "sys-0", 6.0, target)
+	resolver := BurnResolver(stubBodySourceFixed{bt: bodies})
+
+	burning := Fleet{
+		Id: "fleet_1", CorporationId: "corp-1", SystemId: "sys-0",
+		StateDoc: EncodeKinematicState(space.ShipState{Mode: space.ModeBurn, Burn: &space.Burn{
+			Origin: space.Vec3{X: -50}, Target: space.Target{BodyId: "feat-body-a"},
+			Intercept: space.Vec3{X: 40}, Accel: 8, DepartMs: 0, ArriveMs: 100_000,
+		}}),
+	}
+
 	res, err := resolver(context.Background(), action.Resolution{
-		At: 1000,
+		At:     150_000,
+		Action: action.Action{Id: "action_1"},
 		DecodeActor: func(target interface{}) error {
-			*(target.(*Fleet)) = Fleet{State: board.MovementState{Mode: board.ModeBurn, Burn: &board.Burn{Path: []board.Cell{{Ring: 0, Slot: 0}}}}}
+			*(target.(*Fleet)) = burning
 			return nil
 		},
 	})
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	if len(res.Writes) != 0 {
-		t.Errorf("nil ambient recorder should mint no writes, got %d", len(res.Writes))
+	if res.Outcome != "docked at feat-body-a" {
+		t.Errorf("outcome = %q, want %q", res.Outcome, "docked at feat-body-a")
+	}
+	if res.ActorState["attachedTo"] != "feat-body-a" {
+		t.Errorf("attachedTo = %v, want %q", res.ActorState["attachedTo"], "feat-body-a")
+	}
+	settledDoc, ok := res.ActorState["state"].(map[string]any)
+	if !ok {
+		t.Fatalf("res.ActorState[\"state\"] = %v, want the encoded kinematic state", res.ActorState["state"])
+	}
+	settled, err := DecodeKinematicState(bodies, settledDoc, "", "")
+	if err != nil {
+		t.Fatalf("decoding the settled state: %v", err)
+	}
+	if settled.Mode != space.ModeParked || settled.Park == nil || settled.Park.Kind != space.ParkOrbit {
+		t.Fatalf("settled state = %+v, want a ParkOrbit", settled)
+	}
+	if settled.Park.BodyId != "feat-body-a" {
+		t.Errorf("settled park body = %q, want feat-body-a", settled.Park.BodyId)
 	}
 }
 
-// TestCoastState_ObeysTheSharedOrbitalLaw pins the seam that removed fleet's own
-// CoastPeriod: a fleet settling on ring N inherits the SAME period a body on ring N
-// has (common.Tuning().OrbitPeriod), so ships and rocks at one radius keep pace.
-// Regression guard — a flat, un-scaled fleet period made rim ships cross cells
-// faster than inner ones, which is the bug the two redundant knobs were hiding.
-//
-// tasks.md 7.5 fleet/resolver_test.go:104 site: re-derived onto ring 5 (a
-// non-coincidence ring — 48 slots under the pinned schedule, not 6×5=30), and
-// the per-cell divisor now reads sched.Slots(ring) live, never a hardcoded
-// 6×ring.
-func TestCoastState_ObeysTheSharedOrbitalLaw(t *testing.T) {
-	sched := testSched()
-	// A cell on ring 5 (five steps out along the slot-0 ray from the core).
-	c := board.Cell{Ring: 5, Slot: 0}
-	ring, _ := board.AngleOf(c, sched)
-	if ring != 5 {
-		t.Fatalf("fixture: AngleOf(%+v) ring = %d, want 5", c, ring)
-	}
-	if sched.Slots(ring) == 6*ring {
-		t.Fatalf("fixture: ring %d must be a non-coincidence ring (Slots != 6×ring) for this test to prove anything; got Slots=%d", ring, sched.Slots(ring))
+// Scenario: An already-settled state (a racing read got here first) writes
+// no actor state — just an honest outcome, so a duplicate resolve attempt
+// never clobbers a state a later commit may already have moved on from.
+func TestBurnResolver_Scenario_AlreadySettledWritesNoActorState(t *testing.T) {
+	bodies := testBodyTable(t, "sys-0", 6.0)
+	resolver := BurnResolver(stubBodySourceFixed{bt: bodies})
+
+	alreadyParked := Fleet{
+		Id: "fleet_1", CorporationId: "corp-1", SystemId: "sys-0",
+		StateDoc: EncodeKinematicState(space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint, Point: space.Vec3{X: 300}}}),
 	}
 
-	const settledAt = common.WorldMillis(16_000_000_000) // a realistic "now", not the epoch
-
-	st := board.CoastAt(c, settledAt, sched)
-	if st.Mode != board.ModeCoast || st.Coast == nil {
-		t.Fatalf("coastState mode = %q, coast = %+v", st.Mode, st.Coast)
+	res, err := resolver(context.Background(), action.Resolution{
+		At:     150_000,
+		Action: action.Action{Id: "action_1"},
+		DecodeActor: func(target interface{}) error {
+			*(target.(*Fleet)) = alreadyParked
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
 	}
-	if want := common.Tuning().OrbitPeriod(ring); st.Coast.Period != want {
-		t.Errorf("coast period on ring %d = %d, want %d (the body law)", ring, st.Coast.Period, want)
+	if res.ActorState != nil {
+		t.Errorf("ActorState = %v, want nil (no write) for an already-settled state", res.ActorState)
+	}
+}
+
+// Scenario: A resolve against an unknown body id (the stored burn's target
+// body no longer exists in the live table) fails through space's own
+// ErrUnknownBody, surfaced by DecodeKinematicState's decode step.
+func TestBurnResolver_Scenario_UnknownTargetBodyFails(t *testing.T) {
+	bodies := testBodyTable(t, "sys-0", 6.0) // no "feat-does-not-exist"
+	resolver := BurnResolver(stubBodySourceFixed{bt: bodies})
+
+	burning := Fleet{
+		Id: "fleet_1", CorporationId: "corp-1", SystemId: "sys-0",
+		StateDoc: EncodeKinematicState(space.ShipState{Mode: space.ModeBurn, Burn: &space.Burn{
+			Origin: space.Vec3{X: -50}, Target: space.Target{BodyId: "feat-does-not-exist"},
+			Intercept: space.Vec3{X: 40}, Accel: 8, DepartMs: 0, ArriveMs: 100_000,
+		}}),
 	}
 
-	// And the fleet is actually WHERE IT STOPPED — Angle0 is epoch-anchored, so a
-	// naive settle would advance it and teleport the ship across the ring. The
-	// anchor snaps to the nearest cell-window boundary (render continuity — see
-	// board.CoastAt), so at the settle instant the ship is within the cell it's
-	// crossing (distance ≤ 1 of c), and EXACTLY c at the snapped boundary.
-	if got := board.OrbState(*st.Coast, settledAt, sched); board.Distance(got, c, sched) > 1 {
-		t.Errorf("settled at %+v but coasts through %+v at that instant (teleport)", c, got)
-	}
-	oneStep := common.Tuning().OrbitPeriod(ring) / common.WorldMillis(sched.Slots(ring))
-	boundary := (settledAt + oneStep/2) / oneStep * oneStep
-	if got := board.OrbState(*st.Coast, boundary, sched); got != c {
-		t.Errorf("coast passes through %+v at the settle boundary, want %+v", got, c)
-	}
-
-	// And it re-paces when the world is retuned — the fleet is not frozen at the
-	// pace its resolver was registered with.
-	base := common.DefaultTuning()
-	fast := base
-	fast.OrbitBasePeriod = base.OrbitBasePeriod / 100
-	common.SetTuning(fast)
-	defer common.SetTuning(base)
-
-	if got, want := board.CoastAt(c, settledAt, sched).Coast.Period, fast.OrbitPeriod(ring); got != want {
-		t.Errorf("after retune, coast period = %d, want %d", got, want)
+	_, err := resolver(context.Background(), action.Resolution{
+		At:     150_000,
+		Action: action.Action{Id: "action_1"},
+		DecodeActor: func(target interface{}) error {
+			*(target.(*Fleet)) = burning
+			return nil
+		},
+	})
+	if !errors.Is(err, ErrKinematicDecode) {
+		t.Fatalf("err = %v, want ErrKinematicDecode (cause=unknown-body)", err)
 	}
 }

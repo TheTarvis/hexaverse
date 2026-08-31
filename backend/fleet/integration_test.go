@@ -5,15 +5,20 @@ import (
 	"testing"
 
 	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/galaxy"
+	"hexaverse/space"
 	"hexaverse/system"
 )
 
-// TestIntegration_OrderMoveArrive drives the full M4 stack against the emulator:
-// a real generated galaxy + system interior, a seeded fleet ordered to a body,
-// and an offline arrival resolved purely by advancing the clock (no scheduler).
+// TestIntegration_OrderMoveArrive drives the full stack against the emulator:
+// a real generated galaxy + system interior + BodyTable, a seeded fleet
+// ordered to a real orbiting body, and an offline arrival resolved purely by
+// advancing the clock (no scheduler) — migrated from the pre-continuous-space
+// lattice version (migrate-fleet-to-continuous-burns, design.md Decision 4/16):
+// SeedFleet takes a continuous `space.Vec3` park instead of a `board.Cell`,
+// OrderTo names a body id instead of a `board.Target`, and arrival settles
+// into a `space.ParkOrbit` (AttachedTo set) instead of `board.ModeDocked`.
 func TestIntegration_OrderMoveArrive(t *testing.T) {
 	fs, client := common.SetupFirestoreTestDAO(t)
 	ctx := context.Background()
@@ -39,10 +44,13 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Pick a coasting (orbiting) feature to intercept + dock.
+	// Pick a real orbiting (non-star) body to intercept + dock — Space is the
+	// decoded continuous orbital element set system.GetOrCreateInterior
+	// populates (system/model.go), the successor to the lattice-era `Orbit`
+	// field this test used to key on.
 	var targetID string
 	for _, f := range interior.Features {
-		if f.Orbit != nil {
+		if f.Type != system.FeatureStar && f.Space != nil {
 			targetID = f.Id
 			break
 		}
@@ -51,46 +59,58 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 		t.Skip("generated interior had no orbiting feature")
 	}
 
+	bt, err := ssvc.BodyTable(ctx, home)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
-	asvc.RegisterResolver(burnType, action.KindKinematic, BurnResolver(DefaultMovementParams()))
+	asvc.RegisterResolver(burnType, action.KindKinematic, BurnResolver(ssvc))
 	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, asvc, clk)
-	// Seed just off the core — the star at (0,0) is not a legal fleet position.
-	seeded, err := fsvc.SeedFleet(ctx, home, "dev-corp", board.Cell{Ring: 1, Slot: 0})
+
+	// Seed well clear of the star's own clearance shell — the star at the
+	// origin is not a legal fleet position (design.md Decision 14: excluded
+	// by geometry alone).
+	at := space.Vec3{X: bt.Extent() * 0.5}
+	seeded, err := fsvc.SeedFleet(ctx, home, "dev-corp", at, bt.StarSize())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Order to the body → burn with a real ETA.
-	ordered, err := fsvc.OrderTo(ctx, seeded.Id, OrderRequest{Target: board.Target{FeatureId: targetID}})
+	ordered, err := fsvc.OrderTo(ctx, seeded.Id, OrderRequest{BodyId: targetID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ordered.State.Mode != board.ModeBurn {
-		t.Fatalf("expected burn, got %s", ordered.State.Mode)
+	if ordered.State.Mode != space.ModeBurn {
+		t.Fatalf("expected burn, got %v", ordered.State.Mode)
 	}
-	arriveTime := ordered.State.Burn.ArriveTime
-	if arriveTime <= 0 {
-		t.Fatalf("expected a positive ETA, got %d", arriveTime)
+	arriveMs := ordered.State.Burn.ArriveMs
+	if arriveMs <= 0 {
+		t.Fatalf("expected a positive ETA, got %d", arriveMs)
 	}
 
 	// Read before arrival: still burning.
-	clk.now = arriveTime - 1
+	clk.now = arriveMs - 1
 	mid, err := fsvc.Get(ctx, seeded.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mid.State.Mode != board.ModeBurn {
-		t.Fatalf("before ETA should still be burning, got %s", mid.State.Mode)
+	if mid.State.Mode != space.ModeBurn {
+		t.Fatalf("before ETA should still be burning, got %v", mid.State.Mode)
 	}
 
 	// Simulate coming back online well after the ETA: arrival resolved on read.
-	clk.now = arriveTime + 1_000
+	clk.now = arriveMs + 1_000
 	arrived, err := fsvc.Get(ctx, seeded.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if arrived.State.Mode != board.ModeDocked || arrived.State.Docked.ParentId != targetID {
-		t.Fatalf("expected docked to %s, got %+v", targetID, arrived.State)
+	if arrived.State.Mode != space.ModeParked || arrived.State.Park == nil || arrived.State.Park.BodyId != targetID {
+		t.Fatalf("expected a ParkOrbit around %s, got %+v", targetID, arrived.State)
+	}
+	if host, docked := arrived.DockedTo(); !docked || host != targetID {
+		t.Fatalf("expected AttachedTo = %q (set only at resolve — design.md Decision 4/13), got %q (docked=%v)", targetID, host, docked)
 	}
 
 	// Kinematic resolve through the spine also flipped the wrapping action to done
@@ -106,8 +126,8 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 		t.Fatalf("burn action status = %s, want done", act.Status)
 	}
 
-	// The docked position resolves to the parent body's live cell.
-	pos, err := fsvc.Position(ctx, arrived)
+	// The docked position resolves through the parent body's live position.
+	pos, err := fsvc.PositionOf(ctx, arrived)
 	if err != nil {
 		t.Fatal(err)
 	}

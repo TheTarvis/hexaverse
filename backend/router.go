@@ -85,7 +85,17 @@ func SetupRouter() *gin.Engine {
 	systemSvc := system.NewService()
 	galaxySvc := galaxy.NewService()
 	actionSvc := action.NewService()
+	// systemSvc doubles as fleet's BodySource (its BodyTable method,
+	// migrate-fleet-to-continuous-burns design.md Decision 16) — the same
+	// concrete service instance every other domain already shares.
 	fleetSvc := fleet.NewServiceWith(fleet.NewDao(), systemSvc, actionSvc, clock)
+
+	// Register the burn resolver, folding a settled arrival through the same
+	// BodySource (design.md Decision 16, 21A — BurnResolver folds
+	// space.StateAt). The path-swept ambient reveal this registration used to
+	// also wire has no successor after the fleet-state migration; link 4
+	// section 7 removes the observation-side writer it fed.
+	fleet.RegisterResolvers(actionSvc, systemSvc)
 
 	// Fog of war (#0006): the fog-filter every read projects through, per
 	// Corporation. It reads live positions from fleet, interior geometry from
@@ -93,21 +103,6 @@ func SetupRouter() *gin.Engine {
 	// and registers the scan resolver.
 	fogSvc := observation.NewService(fleetSvc, systemSvc, galaxySvc)
 	fogSvc.RegisterResolvers(actionSvc)
-
-	// Graph-tier travel (#0008): the fleet service pathfinds over the galaxy graph
-	// and the requester's charted set (from fog). Wired after fog exists (fog
-	// depends on the fleet service — a construction cycle).
-	fleetSvc.WithTravel(galaxySvc, fogSvc)
-
-	// Register the burn resolver AFTER the fog service exists, so a resolved move
-	// also mints path-swept ambient memory (#0006 Decision #14).
-	fleet.RegisterResolversWithAmbient(actionSvc, fogSvc)
-
-	// The lane-travel resolver: arrival settles the fleet at the destination rim
-	// and mints the reveal (Explored + the crossed lanes charted) in one
-	// transaction (#0008, revised per #0006 Decision #17 — no onward rumor;
-	// scanning finds the roads).
-	fleet.RegisterTravelResolver(actionSvc, fogSvc)
 
 	// Spawn & identity (#0009): the corporation service orchestrates spawn through
 	// the live galaxy/fleet/fog singletons above, and resolves account→living-corp
@@ -150,7 +145,7 @@ func SetupRouter() *gin.Engine {
 
 	actionHandler := action.NewHandler(actionSvc)
 	actionHandler.RegisterRoutes(authorized)
-	fleet.NewHandlerWith(fleetSvc, clock).WithFog(fogSvc).RegisterRoutes(authorized)
+	fleet.NewHandlerWith(fleetSvc, clock).RegisterRoutes(authorized)
 
 	// Mine (#0010): the action spine's first mutating resolver. Wired after
 	// fleet/fog/travel/spawn — it rides fleet's movement channel (Decision #9)

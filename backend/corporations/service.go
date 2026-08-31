@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
 	"hexaverse/observation"
-	"hexaverse/polar"
+	"hexaverse/space"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -53,8 +52,13 @@ type GraphSource interface {
 // FleetSource places the starting hull and answers the death invariant's
 // fleet-count question. Cross-domain through the service, never the DAO.
 type FleetSource interface {
-	SeedFleet(ctx context.Context, systemID, corporationID string, at board.Cell) (*fleet.Fleet, error)
+	SeedFleet(ctx context.Context, systemID, corporationID string, at space.Vec3, starSize float64) (*fleet.Fleet, error)
 	ListForCorp(ctx context.Context, corporationID string) ([]fleet.Fleet, error)
+	// HomeGeometry resolves a system's continuous extent and star size — what
+	// homeSpawnPosition needs to derive a deterministic spawn park (design.md
+	// Decision 16, Open Question 3), without corporations depending on the
+	// system package directly.
+	HomeGeometry(ctx context.Context, systemID string) (extent, starSize float64, err error)
 }
 
 // FogSource writes the initial observations and reads other corps' explored sets
@@ -284,7 +288,12 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*Sp
 	if len(fleets) > 0 {
 		hull = &fleets[0]
 	} else {
-		hull, err = s.fleets.SeedFleet(ctx, home, corp.Id, s.rimCell(corp.AccountId, board.ProductionSchedule()))
+		extent, starSize, err := s.fleets.HomeGeometry(ctx, home)
+		if err != nil {
+			return nil, err
+		}
+		at := homeSpawnPosition(corp.AccountId, extent)
+		hull, err = s.fleets.SeedFleet(ctx, home, corp.Id, at, starSize)
 		if err != nil {
 			return nil, err
 		}
@@ -521,19 +530,4 @@ func (s *Service) claimedSpace(ctx context.Context, exceptCorpID string) (map[st
 		}
 	}
 	return claimed, nil
-}
-
-// rimCell is the starting hull's coast position: a deterministic cell on the
-// rim ring (one inside the lane-gate ring), account-seeded so a heal
-// re-places it in the same spot. Rim cells are never the core, satisfying
-// SeedFleet's guard.
-//
-// design.md Decision 5: no board.RingCells enumeration — asking the live
-// schedule's slot count for RimRing and taking the account-seeded modulus is
-// the same discretized choice with no allocation, and it draws from the
-// SCHEDULE's real slot count rather than a fixed per-ring assumption.
-func (s *Service) rimCell(accountId string, sched polar.Schedule) board.Cell {
-	slots := sched.Slots(s.params.RimRing)
-	slot := int(uint64(seedFromAccount(accountId)) % uint64(slots))
-	return board.Cell{Ring: s.params.RimRing, Slot: slot}
 }

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/fleet"
+	"hexaverse/space"
 	"hexaverse/system"
 )
 
@@ -80,8 +80,15 @@ const (
 func dockedFleet(corp string) *fleet.Fleet {
 	return &fleet.Fleet{
 		Id: testFleetID, CorporationId: corp, SystemId: testSystemID,
-		State: board.MovementState{Mode: board.ModeDocked, Docked: &board.Docked{ParentId: testFeatureID}},
-		Ships: []fleet.ShipEntry{{Class: fleet.ClassSeed}},
+		// A docked fleet still carries a real space.ShipState (design.md
+		// Decision 4) — AttachedTo is the separate relationship mine's
+		// DockedTo() check reads (design.md Decision 13, mine/service.go's
+		// re-point). These are in-memory fixtures (fakeFleets.Get returns
+		// them directly, never through Firestore), so no codec round trip is
+		// needed here.
+		State:      space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint}},
+		AttachedTo: testFeatureID,
+		Ships:      []fleet.ShipEntry{{Class: fleet.ClassSeed}},
 	}
 }
 
@@ -206,7 +213,11 @@ func TestCommit_Scenario_SubMinimumRunRejected(t *testing.T) {
 // Scenario: Not docked to the feature is rejected.
 func TestCommit_Scenario_NotDockedRejected(t *testing.T) {
 	coasting := dockedFleet(testCorpA)
-	coasting.State = board.MovementState{Mode: board.ModeCoast, Coast: &board.Orbit{Ring: 3}}
+	// Not docked means no AttachedTo relationship (design.md Decision 13) —
+	// docking is no longer a kinematic mode, so this is expressed by
+	// clearing the relationship, not swapping the ship's kinematic mode.
+	coasting.State = space.ShipState{Mode: space.ModeDrift, Drift: &space.Drift{}}
+	coasting.AttachedTo = ""
 	svc := newSvc(t, &fakeFleets{f: coasting}, &fakeFeatures{interior: featureWithMetals()}, &fakeMineActions{}, validParams())
 	_, err := svc.Commit(context.Background(), testCorpA, testFleetID, validRequest())
 	if !errors.Is(err, ErrNotDocked) {

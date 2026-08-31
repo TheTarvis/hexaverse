@@ -9,12 +9,12 @@ import (
 	"testing"
 
 	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/corporations"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
 	"hexaverse/observation"
+	"hexaverse/space"
 	"hexaverse/stations"
 	"hexaverse/system"
 
@@ -84,14 +84,22 @@ func newSaleStack(t *testing.T, startingCargo map[string]float64) (*saleStack, f
 	}
 
 	fleetID := "fleet-sale-" + t.Name()
+	// A docked fleet still carries a real space.ShipState (design.md Decision
+	// 4 — "a docked fleet still has a ShipState — it is parked at ... its
+	// host"); AttachedTo is the separate relationship market's dockedTo()
+	// check reads (design.md Decision 13). ParkPoint needs no body-existence
+	// cross-check at decode (fleet.DecodeKinematicState), so the exact point
+	// is immaterial here — only the AttachedTo relationship is under test.
+	dockedState := fleet.EncodeKinematicState(space.ShipState{
+		Mode: space.ModeParked,
+		Park: &space.Park{Kind: space.ParkPoint, Point: space.Vec3{}},
+	})
 	if _, err := client.Collection("fleets").Doc(fleetID).Set(ctx, fleet.Fleet{
 		Id: fleetID, CorporationId: corpID, SystemId: systemID,
-		State: board.MovementState{
-			Mode:   board.ModeDocked,
-			Docked: &board.Docked{ParentId: st.FeatureId},
-		},
-		Ships: []fleet.ShipEntry{{Class: fleet.ClassSeed}},
-		Cargo: startingCargo,
+		StateDoc:   dockedState,
+		AttachedTo: st.FeatureId,
+		Ships:      []fleet.ShipEntry{{Class: fleet.ClassSeed}},
+		Cargo:      startingCargo,
 	}); err != nil {
 		t.Fatalf("seeding fleet: %v", err)
 	}
@@ -328,12 +336,11 @@ func TestSell_RejectsAnUndockedFleet(t *testing.T) {
 	stack, cleanup := newSaleStack(t, map[string]float64{"metals": 40})
 	defer cleanup()
 
-	// Set the fleet coasting instead of docked.
+	// Clear the AttachedTo relationship (design.md Decision 13) — docking is
+	// no longer a kinematic mode, so "undocked" is now expressed by clearing
+	// the relationship field, not by swapping the ship's kinematic state.
 	if _, err := stack.client.Collection("fleets").Doc(stack.fleetID).Set(stack.ctx, map[string]any{
-		"state": map[string]any{
-			"mode":  "coast",
-			"coast": map[string]any{"ring": 5, "angle0": 0, "period": 60000, "dir": 1},
-		},
+		"attachedTo": "",
 	}, firestore.MergeAll); err != nil {
 		t.Fatalf("undocking fleet: %v", err)
 	}
