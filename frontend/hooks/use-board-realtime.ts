@@ -20,10 +20,13 @@ import { queryKeys } from '@/lib/query-keys'
 //     (something resolved) and again on reconnect (we may have missed events).
 //
 // Both converge on one idempotent invalidation of the interior + running-
-// actions reads; the `fleets.inSystem` key is invalidated too, purely as a
-// harmless no-op today — nothing produces a query under it any more, but the
-// key SHAPE is still read by `use-actions.ts`/`use-market.ts`'s own
-// invalidations, so it stays a live query-key factory entry.
+// actions reads, AND `fleets.mine()` — the roster/board's only fleet source
+// since the fleet layer left the board (8.1/8.5) — so a resolved mine or
+// burn arrival is visible without a manual refresh. `fleets.inSystem` is
+// invalidated too, purely as a harmless no-op today — nothing produces a
+// query under it any more, but the key SHAPE is still read by
+// `use-actions.ts`/`use-market.ts`'s own invalidations, so it stays a live
+// query-key factory entry.
 //
 // SCAN_POLL_MS and the `scanning` tightening have no successor: the `scanning`
 // option is still accepted (a caller may still pass it) but has NO effect —
@@ -48,6 +51,7 @@ export interface UseBoardRealtimeOptions {
 function invalidateBoard(qc: QueryClient, systemId: string): void {
   void qc.invalidateQueries({ queryKey: queryKeys.systemBoard.detail(systemId) })
   void qc.invalidateQueries({ queryKey: queryKeys.fleets.inSystem(systemId) })
+  void qc.invalidateQueries({ queryKey: queryKeys.fleets.mine() })
   void qc.invalidateQueries({ queryKey: queryKeys.actions.all })
 }
 

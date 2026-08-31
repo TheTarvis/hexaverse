@@ -120,6 +120,22 @@ half-integer** (Go rounds half away from zero; JS rounds half toward +infinity)
 today. The file also carries one FMA site, now localized: `mine/service.go:187` (`remainingAtNow := startTons + fold`, fed by line 186's `startTons := res.Richness * s.params.TonsPerRichness`). Lowest severity of the four; listed
 for completeness so the mechanical sweep and the register agree.
 
+### 5. `backend/fleet/service.go:128` — `msPerTileFor` — **RESOLVED 2026-08-31**
+
+**Deleted outright by `migrate-fleet-to-continuous-burns`, not repaired.**
+`msPerTileFor`'s bare `math.Round` of the derived per-tile pace was part of
+the lattice-tile movement model (`board.MovementState`,
+`fleet/service.go:128`) that this change replaces wholesale with continuous
+`space` kinematics — burns solved by `space.SolveBurn`, ETAs quantized by
+`space.QuantizeArrival`. There is no successor site: the per-tile pace
+concept has no analog once movement is continuous, so nothing needed
+converting or re-fixturing. `msPerTileFor` and its callers are confirmed
+absent from `backend/fleet` (`fleet/service.go`'s own
+`lattice_symbols_absent_test.go` pins the deletion), and the
+`fixtures/determinism-register.json` entry naming it was removed in the same
+change (tasks.md 9.1). This resolves the fleet-side site without touching
+sites 3 or 4 above, which remain open.
+
 ## Not yet measured
 
 **None of these has had its magnitude measured.** For each, the measurement is

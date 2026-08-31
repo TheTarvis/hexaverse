@@ -154,9 +154,40 @@ prove itself against already exists.
 
 ## Link 5 — `replace-observation-with-sightings`
 
+**Most important consequence of link 4, stated up front: after link 4, no
+fleet can ever jump.** Spawn charts zero lanes (`observation.RevealArrival`
+mints home `explored` only), the scan verb that used to chart lanes is
+deleted (section 7 of link 4's tasks.md), and travel-arrival charting
+(`fleet-movement`'s jump resolver) only charts the lane just crossed — which
+requires already having a charted lane to jump in the first place. That is
+circular: nothing in the tree after link 4 can produce a corporation's first
+charted lane. `backend/observation/service.go:129` names the job outright —
+"finding the roads is the first scan's job" — and link 4 deleted that job
+along with the rest of `observation`'s live half. **Link 5 restoring lane
+charting (via `disclosure`'s wiring into the reads that currently project
+through `observation`, or its successor) is what makes the galaxy traversable
+again**, and the jump verb link 4 built is untestable end-to-end — no
+corporation can ever reach a second system — until link 5 lands.
+
+**Corrected scope (2026-08-31, recorded during link 4's task 9.6): link 4
+already removed `observation`'s live half**, not link 5. Link 4's section 7
+deleted the ambient-coverage/echo-disc/scan-resolution-mint/path-swept-reveal/
+fleet-audience-visibility code outright and replaced `system`'s three-band fog
+projection with a stated, temporary, fully-disclosed interim read
+(`system-interior`: *Interior Reads Are Fully Disclosed, A Deliberate
+Interim*). So link 5 does **not** find `observation-fog-and-scan` intact and
+remove it "entirely" as originally predicted below — it inherits an already-
+reduced `observation` package (the four surviving requirements: the monotonic
+graph-tier ladder, travel arrival reveal, spawn arrival reveal, charted-lane
+set projection) plus a `system-interior` interim requirement that link 5 is
+what's expected to replace with the real `disclosure`-projected read (link 4's
+task 7.8 left a code comment at the interim read's implementation naming this
+link for exactly that reason).
+
 The integration link. `disclosure` is pure and has zero consumers; this wires
-it into every read that currently projects through `observation`, adds the
-persisted sighting pile, and deletes `observation` outright.
+it into every read that currently projects through the (now-reduced)
+`observation`, adds the persisted sighting pile, and deletes what remains of
+`observation` outright.
 
 `proximity-disclosure` already specifies more than the design doc anticipated
 — masking and its chains, the focused scan, plume radius, star occlusion,
@@ -166,12 +197,19 @@ remains is **storage and wiring**, not model:
 - the sighting store (readable, inert, sellable later — the deliberate
   exception to "live disclosure persists nothing")
 - `galaxy` / `system` / `fleet` handler reads projecting through `disclosure`
-- deleting `observation` and its spec
+- deleting the remainder of `observation` and its spec, and replacing
+  `system-interior`'s fully-disclosed interim read with a real
+  `disclosure`-projected one
+- **restoring lane charting** — without this, the jump verb is unreachable
+  past a corporation's home system (see above)
 
-- **Touches:** `observation-fog-and-scan` (REMOVED entirely),
-  `proximity-disclosure` (MODIFIED — widen masking from "a ship docked to a
-  host" to attached objects generally, per `decisions.md`'s spec note),
-  `fleet-movement`, `galaxy-view`, `system-interior`, new sighting capability.
+- **Touches:** `observation-fog-and-scan` (its four surviving requirements
+  REMOVED — not "entirely", since link 4 already removed its live half),
+  `system-interior` (its fully-disclosed interim REMOVED, replaced by a
+  `disclosure`-projected read), `proximity-disclosure` (MODIFIED — widen
+  masking from "a ship docked to a host" to attached objects generally, per
+  `decisions.md`'s spec note), `fleet-movement`, `galaxy-view`, new sighting
+  capability.
 - **Decided (2026-08-29):** focused-scan pricing is **time on the `action`
   sensor channel, scaling with range**, and **the scan emits** — the scanning
   fleet is detectable for the duration of the sweep. Range gating was already

@@ -43,7 +43,9 @@ export const queryKeys = {
     // board draws no fleet layer, so there is no per-system fleet list read
     // any more — only `mine`/`detail`). `inSystem` is kept as a key SHAPE
     // only, for `use-actions.ts`/`use-market.ts`'s existing invalidations
-    // against a query nothing currently produces.
+    // against a query nothing currently produces; `mine()` (below) is the
+    // key that replaced it as the live fleet read, and `use-board-realtime.ts`
+    // invalidates it on every realtime rule.
     all: ['fleets'] as const,
     inSystem: (systemId: string) => [...queryKeys.fleets.all, 'in-system', systemId] as const,
     detail: (id: string) => [...queryKeys.fleets.all, 'detail', id] as const,

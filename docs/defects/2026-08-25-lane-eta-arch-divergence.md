@@ -2,7 +2,7 @@
 
 **Filed:** 2026-08-25, by the `pin-cross-stack-determinism-seam` adversarial
 review; reproduced and confirmed in compiler output by the orchestrator.
-**Status:** open
+**Status:** fixed (migrate-fleet-to-continuous-burns)
 **Against:** `fleet-movement` (`backend/fleet/routing.go:186-197`) and the
 `cross-stack-determinism` capability.
 **Severity:** same class as the `board.Line` FMA defect, on a **persisted ETA**,

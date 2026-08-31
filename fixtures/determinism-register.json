@@ -26,26 +26,6 @@
   },
   "entries": [
     {
-      "site": "fleet.legMs (routing.go:187) / fleet.laneLength (routing.go:196) — persisted lane-leg ETAs",
-      "file": "backend/fleet/routing.go",
-      "checks": {
-        "cross-target": [
-          196
-        ],
-        "sqrt-pinning": [
-          196
-        ],
-        "transcendental-drift": [
-          187,
-          196
-        ]
-      },
-      "filed": "2026-08-25",
-      "defect": "docs/defects/2026-08-25-lane-eta-arch-divergence.md",
-      "magnitude": "unmeasured (no sweep of real galaxy coordinates across both architectures has been run)",
-      "note": "One site, three checks bridged (defect doc §1–3): FMA contraction in laneLength; runtime math.Sqrt with no fixture family (Go-only mirror — Go-side fixture obligation per design.md); bare math.Round into the persisted ETA. Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): fleet/routing.go is not touched by the polar migration (it operates on galaxy-tier coords, not board cells); lines re-confirmed, not assumed."
-    },
-    {
       "site": "galaxy field distance `dist` (field.go) — math.Sqrt on the placement/lane decision path; the residual arch hazard is the third-party noise library",
       "file": "backend/galaxy/field.go",
       "checks": {
@@ -109,19 +89,6 @@
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
       "magnitude": "unmeasured",
       "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): see the note on the sibling entry above."
-    },
-    {
-      "site": "fleet.msPerTileFor — bare math.Round of the derived per-tile pace (service.go:128)",
-      "file": "backend/fleet/service.go",
-      "checks": {
-        "transcendental-drift": [
-          128
-        ]
-      },
-      "filed": "2026-08-25",
-      "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
-      "magnitude": "unmeasured",
-      "note": "Re-anchored 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2): was line 117; the stored-coordinate guard (ErrRingOutOfRange, validateFleetRing, maxStateRing) added ahead of it in the file shifted this line, no expression change."
     }
   ]
 }

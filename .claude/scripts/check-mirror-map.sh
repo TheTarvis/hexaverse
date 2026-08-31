@@ -17,6 +17,10 @@
 #   - backend/system <-> frontend/lib/system (openspec:
 #     pin-system-generation-determinism, design.md Decision 5 — `system` is
 #     likewise designated Go-sole-authority for interior generation)
+#   - backend/fleet <-> frontend/lib/fleet (openspec:
+#     migrate-fleet-to-continuous-burns, tasks.md 9.8 — `fleet` is likewise
+#     designated Go-sole-authority; wires fixtures/fleet/cases.json's
+#     commandedAccelRejection family, added by tasks.md 4.11, into this check)
 # Rather than asserting a `pairs` list (which would assert the mirror the
 # designation forbids), each FAILS if any function/method name is declared
 # on BOTH sides, unless that name appears in the pair's own mirror-map.json
@@ -341,9 +345,14 @@ anti_mirror "system" \
     "$REPO_ROOT/backend/system" \
     "$REPO_ROOT/frontend/lib/system"
 
+anti_mirror "fleet" \
+    "$REPO_ROOT/fixtures/fleet/mirror-map.json" \
+    "$REPO_ROOT/backend/fleet" \
+    "$REPO_ROOT/frontend/lib/fleet"
+
 if [[ "$FAIL" -ne 0 ]]; then
     exit 2
 fi
 
-echo "PASS: all mirror maps complete — every mirrored pair fixture-covered or inventoried, and backend/space and backend/system carry no TypeScript mirror."
+echo "PASS: all mirror maps complete — every mirrored pair fixture-covered or inventoried, and backend/space, backend/system, and backend/fleet carry no TypeScript mirror."
 exit 0

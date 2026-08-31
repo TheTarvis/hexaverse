@@ -11,6 +11,7 @@ package system
 // build-target divergence risk attaches to it.
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 
@@ -92,6 +93,21 @@ func ContinuousRadius(idx int) float64 {
 // strictly positive: a non-positive period means MOTIONLESS (Decision 1),
 // and a star-parented body must never accidentally acquire it.
 func keplerPeriodMs(radius float64) common.WorldMillis {
+	// tasks.md 9.7 (migrate-fleet-to-continuous-burns): reject a non-finite
+	// or negative radius before it reaches math.Sqrt — a negative ratio
+	// yields NaN, which the `if ms < 1` clamp below cannot catch (every
+	// comparison against NaN is false), and int64(NaN)/int64(±Inf) is
+	// target-dependent (WorldMillis(0) on arm64,
+	// WorldMillis(math.MinInt64) on amd64). Zero is deliberately NOT
+	// guarded here — it is neither non-finite nor negative and keeps
+	// taking the existing ratio=0/seconds=0/ms=0 path to the 1ms floor.
+	// Unreachable today (the sole caller passes a positive
+	// ContinuousRadius); this is a defensive guard on a dead path, hence
+	// panic rather than a sentinel error (see design discussion at the
+	// call site / tasks.md 9.7).
+	if math.IsNaN(radius) || math.IsInf(radius, 0) || radius < 0 {
+		panic(fmt.Sprintf("keplerPeriodMs: non-finite or negative radius %v", radius))
+	}
 	ratio := radius / KeplerBaseRadius
 	sqrtRatio := math.Sqrt(ratio) // determinism:allow(pinned) — correctly-rounded, identical across every Go build target (design.md Decision 3; precedent space/park.go:177)
 	seconds := float64(float64(KeplerBaseSeconds*ratio) * sqrtRatio)

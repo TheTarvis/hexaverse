@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BOARD_POLL_MS, useBoardRealtime } from './use-board-realtime'
+import { queryKeys } from '@/lib/query-keys'
 
 // A controllable EventSource stand-in.
 class MockEventSource {
@@ -63,14 +64,19 @@ describe('useBoardRealtime', () => {
   })
 
   it('rule 1: the ETA refetch covers the fleet reads AND the actions inbox', () => {
-    // A resolving mine credits cargo (the fleet read) and retires its running
-    // entry (the inbox) — one scheduled refetch must land both (add-mine-ui).
+    // A resolving mine credits cargo and retires its running inbox entry —
+    // one scheduled refetch must land both. `useMyFleets` — the roster panel
+    // and the board's own mine/sell surface (design.md Decision 12) — reads
+    // ONLY `queryKeys.fleets.mine()`; `fleets.inSystem` is a dead key SHAPE
+    // with no producing query (lib/query-keys.ts), so asserting it here would
+    // pin a no-op rather than the fleet-read invalidation this rule exists
+    // for (add-mine-ui).
     const { invalidate } = setup([10_000], 0)
     invalidate.mockClear()
 
     vi.advanceTimersByTime(11_000)
     const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
-    expect(keys).toContainEqual(['fleets', 'in-system', 'sys-7'])
+    expect(keys).toContainEqual(queryKeys.fleets.mine())
     expect(keys).toContainEqual(['actions'])
   })
 
@@ -80,6 +86,10 @@ describe('useBoardRealtime', () => {
 
     vi.advanceTimersByTime(BOARD_POLL_MS + 10)
     expect(invalidate).toHaveBeenCalled()
+    // The baseline poll must land the same fleet-read key rule 1 does —
+    // `useMyFleets` is the only fleet source the roster/board read.
+    const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(queryKeys.fleets.mine())
   })
 
   // migrate-fleet-to-continuous-burns, board-view delta (REMOVED → ADDED):
@@ -126,11 +136,15 @@ describe('useBoardRealtime', () => {
     invalidate.mockClear()
     es.emit('action.completed')
     expect(invalidate).toHaveBeenCalled()
+    let keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(queryKeys.fleets.mine())
 
     // A drop then reopen resyncs.
     invalidate.mockClear()
     es.onerror?.()
     es.onopen?.()
     expect(invalidate).toHaveBeenCalled()
+    keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(queryKeys.fleets.mine())
   })
 })

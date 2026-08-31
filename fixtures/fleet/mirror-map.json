@@ -1,0 +1,36 @@
+{
+  "$comment": [
+    "ANTI-mirror map for backend/fleet <-> frontend/lib/fleet (openspec:",
+    "migrate-fleet-to-continuous-burns, tasks.md 9.8 — backend/fleet is Go-only",
+    "server logic with no TypeScript mirror; fixtures/fleet/cases.json's",
+    "commandedAccelRejection family (tasks.md 4.11) is asserted only across the",
+    "Go build-target matrix, per its own '_meta.jsRuntimeLeg' field. This file",
+    "is what wires that family into",
+    ".claude/scripts/check-mirror-map.sh's coverage sweep — mirroring",
+    "fixtures/space/mirror-map.json and fixtures/system/mirror-map.json, the",
+    "two existing anti-mirror maps.",
+    "",
+    "This is the INVERSE of fixtures/board/mirror-map.json and",
+    "fixtures/polar/mirror-map.json. Those assert a mirror EXISTS and is",
+    "covered. This one asserts a mirror does NOT exist: check-mirror-map.sh's",
+    "anti_mirror pass over this map fails if any function name is declared in",
+    "BOTH backend/fleet and frontend/lib/fleet unless it is listed in",
+    "'sharedNames'. There is deliberately no 'pairs' array — a pairs entry",
+    "would assert the very mirror this designation forbids.",
+    "",
+    "frontend/lib/fleet does not exist as of migrate-fleet-to-continuous-burns",
+    "(frontend/lib/types/fleet.ts and frontend/lib/services/fleet-service.ts",
+    "are the wire-shape/apiClient layer, not a computed-math mirror package of",
+    "the same shape as lib/board or lib/polar), so the anti_mirror check",
+    "currently passes trivially on the 'TS_DIR does not exist' branch. Should a",
+    "frontend/lib/fleet ever be created for rule-bearing math (as opposed to",
+    "wire types), that is the moment this map's anti-mirror designation needs",
+    "re-litigating, not silently satisfied.",
+    "",
+    "'sharedNames' is empty BY DEFAULT and should stay that way. Adding a name",
+    "here is a claim that a render-side function may legitimately share a name",
+    "with an authoritative Go one; it needs the same scrutiny as a spec change."
+  ],
+
+  "sharedNames": []
+}

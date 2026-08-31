@@ -51,8 +51,59 @@ package system
 //     `keplerPeriodMs`, lower-case, so unexported is assumed).
 //   - const MaxInclinationJitter space.SubTurns — the configured jitter ceiling
 //     (Decision 1/17's band boundaries; must be < SubTurn/8 per system-interior).
+//
+// --- tasks.md 9.7 addendum (migrate-fleet-to-continuous-burns) -------------
+//
+// keplerPeriodMs is unguarded against a non-finite or negative radius:
+// math.Sqrt of a negative ratio is NaN, the existing `if ms < 1` clamp does
+// NOT catch NaN (every comparison against NaN is false), and NaN falls
+// straight through int64(NaN) — WorldMillis(0) on arm64,
+// WorldMillis(-9223372036854775808) on amd64. This is the third instance of
+// the int64-of-NaN class in this chain (after fleet's commanded-acceleration
+// guard and task 4.11's fixture coverage of it).
+//
+// SDET-chosen rejection form: PANIC, not a sentinel error. Signature stays
+// `func keplerPeriodMs(radius float64) common.WorldMillis` — unchanged.
+// Justification:
+//   - Precedent already in this repo for "never a runtime condition
+//     production code should recover from": board/table.go's tablePoints
+//     panics on an out-of-family slot count, space/table.go's loadTurnTable
+//     panics on a corrupted embedded table. Both are internal-invariant
+//     guards on values that can only be wrong via programmer/data error,
+//     never live user input — exactly this case.
+//   - keplerPeriodMs's SOLE caller (continuousStarParented) only ever passes
+//     ContinuousRadius(idx), a pure geometric progression
+//     (BaseOrbitRadius * RadiusGrowth^idx) off named positive constants —
+//     never a request body, never Firestore-read data. A NaN/negative
+//     radius here is unreachable today and can only mean a corrupted
+//     constant or a future caller violating the precondition — a
+//     programmer error, not a value to propagate as a typed error.
+//   - A sentinel-error signature change would ripple through
+//     continuousStarParented's 5 call sites in generator.go and then
+//     Generate() itself, which has NO error return anywhere in the entire
+//     generation pipeline today — a systemic, invasive change disproportionate
+//     to guarding a currently-dead path. tasks.md 9.7 explicitly scopes
+//     itself as "the bounded point fix only", deferring the systemic
+//     guarded-conversion fix (a shared helper or lint) to its own change.
+//   - A panic fails loud and immediately, with identical (non-target-
+//     dependent) behavior on both arm64 and amd64 — unlike the silent,
+//     architecture-diverging WorldMillis(0)/WorldMillis(MinInt64) it
+//     replaces.
+//
+// The guard is gated on the INPUT radius (NaN, ±Inf, or radius < 0) —
+// deliberately NOT radius <= 0 — so radius == 0 keeps taking today's
+// existing path (ratio=0, sqrt=0, seconds=0, ms=0, clamped to the existing
+// `if ms < 1 { ms = 1 }` floor) with NO behavior change. Zero is pinned
+// below as an unchanged-behavior case, not a rejected one.
+//
+// Per tasks.md 9.7's explicit instruction, the NaN/Inf/negative cases are
+// NOT added to any fixtures/system golden family (a value that diverges
+// across the build-target matrix cannot be byte-identical, which is exactly
+// what pin-system-generation-determinism's rule forbids recording) — they
+// are asserted here, in an ordinary unit test, instead.
 
 import (
+	"math"
 	"testing"
 
 	"hexaverse/common"
@@ -203,6 +254,95 @@ func TestKeplerPeriodMs_NeverNonPositive(t *testing.T) {
 	for _, r := range []float64{0.001, 0.5, 1, BaseOrbitRadius} {
 		if p := keplerPeriodMs(r); p <= 0 {
 			t.Fatalf("keplerPeriodMs(%v) = %v, want strictly positive (minimum 1ms clamp)", r, p)
+		}
+	}
+}
+
+// tasks.md 9.7 (migrate-fleet-to-continuous-burns): a non-finite or negative
+// radius must be rejected — safely, not by falling through to
+// int64(NaN)/int64(-Inf), which is WorldMillis(0) on arm64 and
+// WorldMillis(math.MinInt64) on amd64. SDET-chosen rejection form: panic
+// (see the file-header addendum above for the full justification). callKepler
+// converts a panic into a normal, per-case test failure signal rather than
+// crashing the whole `go test` process.
+func callKepler(radius float64) (result common.WorldMillis, panicked bool, panicVal any) {
+	defer func() {
+		if r := recover(); r != nil {
+			panicked = true
+			panicVal = r
+		}
+	}()
+	result = keplerPeriodMs(radius)
+	return
+}
+
+// Scenario: a non-finite or negative radius panics rather than silently
+// producing a target-dependent WorldMillis (NaN, +Inf, -Inf, and an ordinary
+// negative radius — the class that reaches math.Sqrt of a negative ratio).
+func TestKeplerPeriodMs_Scenario_NonFiniteOrNegativeRadiusPanics(t *testing.T) {
+	cases := []struct {
+		name   string
+		radius float64
+	}{
+		{"NaN", math.NaN()},
+		{"PositiveInfinity", math.Inf(1)},
+		{"NegativeInfinity", math.Inf(-1)},
+		{"NegativeRadius", -1},
+		{"SmallNegativeRadius", -0.001},
+		{"LargeNegativeRadius", -1e9},
+	}
+	for _, tc := range cases {
+		t.Run("Scenario: "+tc.name, func(t *testing.T) {
+			result, panicked, _ := callKepler(tc.radius)
+			if !panicked {
+				t.Fatalf("keplerPeriodMs(%v) = %v, no panic — want a panic guarding against a non-finite or negative radius (would otherwise reach int64(NaN)/int64(-Inf): WorldMillis(0) on arm64, WorldMillis(math.MinInt64) on amd64)", tc.radius, result)
+			}
+		})
+	}
+}
+
+// Scenario: a zero radius is UNCHANGED by the guard — it is neither
+// non-finite nor negative, so it keeps taking today's existing path
+// (ratio=0, sqrt=0, seconds=0, ms=0) through the pre-existing `if ms < 1`
+// clamp to a strictly-positive 1ms floor. This pins that the guard's
+// boundary is `radius < 0`, not `radius <= 0`.
+func TestKeplerPeriodMs_Scenario_ZeroRadiusUnaffectedByGuard(t *testing.T) {
+	result, panicked, panicVal := callKepler(0)
+	if panicked {
+		t.Fatalf("keplerPeriodMs(0) panicked (%v) — a zero radius is neither non-finite nor negative and must keep taking the existing 1ms-clamp path, not be rejected by the new guard", panicVal)
+	}
+	const want common.WorldMillis = 1 // captured from the unguarded implementation, tasks.md 9.7
+	if result != want {
+		t.Fatalf("keplerPeriodMs(0) = %v, want %v (the guard must not change this already-produced value)", result, want)
+	}
+}
+
+// Scenario: the guard changes NOTHING about the value produced for any
+// finite, non-negative radius. Every expected value below was captured by
+// running the UNGUARDED implementation (git history: continuous.go as it
+// stood before tasks.md 9.7) — keplerPeriodMs feeds persisted orbital
+// periods, so a behavior change on this domain would alter every generated
+// system. covers 0, sub-1, BaseOrbitRadius, KeplerBaseRadius itself, and
+// several representative ContinuousRadius(idx) outputs.
+func TestKeplerPeriodMs_Scenario_PositiveRadiusValueUnchangedByGuard(t *testing.T) {
+	cases := []struct {
+		radius float64
+		want   common.WorldMillis
+	}{
+		{0, 1},
+		{0.001, 1},
+		{1, 159},
+		{BaseOrbitRadius, 18591},   // 24
+		{KeplerBaseRadius, 40000},  // 40
+		{100, 158114},
+		{234, 565971},
+		{658.7, 2673016},
+		{ContinuousRadius(3), 47192},
+		{ContinuousRadius(10), 414824},
+	}
+	for _, tc := range cases {
+		if got := keplerPeriodMs(tc.radius); got != tc.want {
+			t.Errorf("keplerPeriodMs(%v) = %v, want %v (unchanged from the pre-guard implementation)", tc.radius, got, tc.want)
 		}
 	}
 }

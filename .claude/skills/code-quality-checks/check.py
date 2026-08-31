@@ -1105,6 +1105,20 @@ def run_determinism_cross_target() -> dict:
         print_error("FMA-contraction check failed")
         reasons.append("FMA-contraction check failed (see output above)")
 
+    # A registered site that stops emitting FMA is only a WARN from the
+    # script above, never a failure (only a closed defect invalidates an
+    # entry) — so a forgotten register-entry removal would otherwise pass
+    # CI silently. backend/fleet's msPerTileFor/legMs/laneLength entries were
+    # removed by migrate-fleet-to-continuous-burns (tasks.md 9.1/9.2); assert
+    # here that no stale backend/fleet/ registration lingers behind a WARN.
+    if "WARN: registered cross-target site 'backend/fleet/" in fma.stdout:
+        print_error("Stale backend/fleet/ register entry: registered but no longer emitting FMA")
+        reasons.append(
+            "check-fma-contraction.sh warned about a registered backend/fleet/ site that no "
+            "longer emits FMA on arm64. Its defect is fixed and its fixtures/"
+            "determinism-register.json entry must be removed in the same commit (see "
+            "migrate-fleet-to-continuous-burns tasks.md 9.1/9.2/9.5).")
+
     print_info("Deployed-build target pin (backend/Dockerfile)...")
     dockerfile = backend_dir / "Dockerfile"
     if not dockerfile.exists():

@@ -573,6 +573,24 @@
       tightening removed, `scanning` accepted but inert. Verified against the
       SDET's own already-updated `use-board-realtime.test.tsx` (untouched),
       green 5/5.
+      **2026-08-31 correction:** the initial pass invalidated
+      `queryKeys.fleets.inSystem` (dead key SHAPE, no producing query) on all
+      three rules but never `queryKeys.fleets.mine()` — the roster/board's
+      only actual fleet source since 8.1/8.5 removed the fleet layer. Result:
+      `slice.spec.ts` (link 4's e2e) never saw a roster row settle to
+      "Docked" after a body-targeted burn — the local world clock crossed
+      `ArriveMs` on stale pre-commit `attachedTo=""` with zero refetch behind
+      it. Backend exonerated by a real-galaxy probe (9/9 mineable feature
+      types dock correctly). Fix: `invalidateBoard()` now also invalidates
+      `queryKeys.fleets.mine()`; `lib/query-keys.ts`'s `fleets` comment
+      updated to name it as the live replacement for `inSystem`. Verified
+      against the SDET's corrected `use-board-realtime.test.tsx` (now pins
+      `fleets.mine()` on all three rules, untouched by this fix), green
+      5/5; full suite green 1269/1269; lint/tsc clean.
+      **Flagged, not fixed:** when the local clock crosses `ArriveMs` before
+      the fleet doc refetches, `roster-status.ts` renders a confident "On
+      station" from stale `attachedTo=""` rather than a pending/resolving
+      state — a UX/spec question for the orchestrator, out of scope here.
 - [x] 8.5 Rebuild the roster panel as the command surface: order (naming a body
       id or point), cut-drive, stop, and jump actions per row, deriving each
       row's status from the fleet's folded kinematic state, `attachedTo`,
@@ -609,6 +627,17 @@
       both are SDET-owned rewrites, same category as the SystemBoardView
       handoff. Compiles ≠ confirmed-passing; leaving this unchecked until
       that pass lands.
+      **2026-08-31 UPDATE — the blocker cleared and this is now honestly checked.** The note above was written when `SystemBoardView.test.tsx` would not compile against the rebuilt hook surface, which was handed to a follow-up SDET pass. That pass landed: `SystemBoardView.test.tsx` (27KB) and `FactsPanel.test.tsx` now exist and pass (49 tests), and the full frontend suite is 1269/1269 green. Verified independently before checking: no live `board.Cell`/`MovementState` reference survives in board or fleet components (every remaining hit is a comment explaining the removal), and 8.11's "fetches no fleet data" clause is pinned by its own dedicated test. The checkbox is true; the paragraph above is retained for history.
+
+      **2026-08-31 UPDATE — the blocker cleared and this is now honestly checked.**
+      The note above was written when the board/FactsPanel tests would not compile
+      against the rebuilt hook surface, which was handed to a follow-up SDET pass.
+      That pass landed: `SystemBoardView.test.tsx` and `FactsPanel.test.tsx` now
+      exist and pass (49 tests together), and the full frontend suite is 1269/1269
+      green. Verified independently before checking: no live `board.Cell`/
+      `MovementState` reference survives in board or fleet components — every
+      remaining hit is a comment explaining the removal. The checkbox is true; the
+      paragraph above is retained for history.
 - [x] 8.8 Extend the roster row (8.5) with per-row command visibility: burn is
       always offered regardless of kinematic state; cut-drive is offered only
       while the row's effective state is a burn; stop-in-place is offered
@@ -690,34 +719,34 @@
 
 ## 9. Register + housekeeping
 
-- [ ] 9.1 Remove the `fleet.msPerTileFor (service.go:128)` entry from
+- [x] 9.1 Remove the `fleet.msPerTileFor (service.go:128)` entry from
       `fixtures/determinism-register.json` (design.md Decision 18).
-- [ ] 9.2 Remove the `fleet.legMs`/`fleet.laneLength (routing.go:187,196)`
+- [x] 9.2 Remove the `fleet.legMs`/`fleet.laneLength (routing.go:187,196)`
       entry from `fixtures/determinism-register.json` (design.md Decision 18).
-- [ ] 9.3 Flip `docs/defects/2026-08-25-lane-eta-arch-divergence.md`'s
+- [x] 9.3 Flip `docs/defects/2026-08-25-lane-eta-arch-divergence.md`'s
       `**Status:** open` line to `**Status:** fixed
       (migrate-fleet-to-continuous-burns)` — this is that defect's **only**
       entry, and Decision 10's replacement (`space.Vec3.Length()` +
       `space.QuantizeArrival`) closes all three of its numbered violations
       (FMA contraction, unpinned `sqrt`, bare `math.Round`).
-- [ ] 9.4 Add a resolved note to
+- [x] 9.4 Add a resolved note to
       `docs/defects/2026-08-25-remaining-fma-sites.md` for the retired fleet
       sites, in the style of its existing §1/§2 resolved notes — and leave its
       `**Status:** open` line exactly as it is: `market/provisioning.go:35,38`
       and `mine/service.go:187,224` are still live violations of the same
       class.
-- [ ] 9.5 Add a check (script or task-time assertion) that no
+- [x] 9.5 Add a check (script or task-time assertion) that no
       `WARN: registered cross-target site 'backend/fleet/` line appears in
       `.claude/scripts/check-fma-contraction.sh`'s output after 9.1/9.2 land —
       a registered site that no longer emits FMA is only a WARN, not a
       failure, so a forgotten removal would otherwise pass CI silently.
-- [ ] 9.6 Add a line to `docs/plans/continous_space/chain.md`'s Link 5 entry
+- [x] 9.6 Add a line to `docs/plans/continous_space/chain.md`'s Link 5 entry
       recording that link 4 already removed `observation`'s live half, so link
       5 inherits a reduced package plus the `system-interior` interim
       requirement (section 7.7) to replace, rather than removing
       `observation-fog-and-scan` "entirely" as originally predicted (design.md
       Decision 11, Open Question 6).
-- [ ] 9.9 **Survey for the remaining hand-maintained registries**, rather than
+- [x] 9.9 **Survey for the remaining hand-maintained registries**, rather than
       fixing only the one instance 9.8 names. Three have now bitten this chain,
       all the same species — *a list of names kept in sync by memory, where the
       omission is silent and the unit tests still pass*:
@@ -745,7 +774,77 @@
       `check.py`, and the action spine, and changes what those gates *test*
       rather than what this change *builds*. Link 4 should record the
       inventory; a separate change should derive the lists.
-- [ ] 9.8 Wire `fixtures/fleet/` into `.claude/scripts/check-mirror-map.sh`.
+      **Survey (2026-08-31).** Grepped for the shape across `.claude/`,
+      `backend/`, and `.gitlab-ci.yml`. Findings, none fixed here beyond what
+      9.1/9.2/9.5/9.8 already did:
+      - **Still open — `check.py:223`'s `DETERMINISM_GO_PACKAGES = ("board",
+        "fleet", "mine", "galaxy", "system", "corporations", "market")`** vs
+        `check-transcendental.sh:82`'s `RULE_BEARING_GO_PACKAGES=(board polar
+        space disclosure fleet mine galaxy system corporations market)` —
+        confirmed by direct read, still out of sync by exactly three packages
+        (`polar`, `space`, `disclosure` absent from `check.py`'s list). This
+        list gates which backend `.go` files `check_transcendental()` treats
+        as "seam files" for the transcendental/sqrt/Round textual lint, so a
+        rule-bearing transcendental call added to `polar`, `space`, or
+        `disclosure` today is not linted by `/check`'s file-based gate. Note
+        this is a *different* list from the one `b64be39` fixed (below) —
+        that commit touched `check_transcendental`'s frontend `seam_files`
+        suffix and the separate `determinism_trigger` predicate, not this
+        tuple.
+      - **Still open — `.gitlab-ci.yml`'s two hand-enumerated cross-target
+        legs** (~lines 338-378: the `GOAMD64=v1` amd64 leg and the
+        `qemu-aarch64` arm64 leg). Both explicitly list `./board/ ./polar/
+        ./space/ ./system/`; `fleet` is absent from both despite now owning
+        its own Go-only rule-bearing fixture family
+        (`fixtures/fleet/cases.json`'s `commandedAccelRejection`, tasks.md
+        4.11, register-bridged via `fixtures/determinism-register.json`).
+        CI's cross-target matrix does not exercise `backend/fleet` at all
+        today.
+      - **Still open — `router.go`'s block of
+        `<domain>.RegisterResolver*(actionSvc, ...)` calls** (line 98
+        `fleet.RegisterResolvers(actionSvc, systemSvc)`, line 158
+        `mine.RegisterResolver(actionSvc, mineParams, mineClassStats)`) — one
+        layer up the stack from `fleet/resolver.go`'s own list: a new
+        action-committing domain must remember to add its registration call
+        *here* too, and forgetting compiles clean and passes every
+        resolver's own unit tests — the same failure mode 6.4 found for
+        `jumpType`, one level higher. No completeness test asserts every
+        domain that calls `action.Service.RegisterResolver` in its own
+        package is also wired at this call site.
+      - **Still open, currently dead code — `backend/fleet/service.go:171`'s
+        `NewService()` convenience constructor** carries its own stale,
+        duplicate copy of the registration list:
+        `actions.RegisterResolver(burnType, action.KindKinematic,
+        BurnResolver(svc.bodies))` only, missing `jumpType` — the exact
+        omission `fleet/resolver.go`'s `RegisterResolvers` had before the
+        6.4/3bcc726 fix, surviving in a second location. Not live today —
+        `router.go` wires production through `NewServiceWith` plus the real
+        `RegisterResolvers`, and no production or test caller uses
+        `fleet.NewService()` — but a landmine if that constructor is ever
+        resurrected as a real dependency path.
+      - **Still open — `check.py`'s own `determinism_trigger` predicate**
+        (~line 1447, the file-path list gating whether
+        `run_determinism_cross_target()` runs at all under `--files-only`)
+        checks `backend/board`, `backend/polar`, `backend/space`,
+        `backend/system`, and `fixtures/`, but not `backend/fleet`. A change
+        touching only `backend/fleet/*.go` with no `fixtures/` file would not
+        trigger the cross-target matrix under a files-only run, even though
+        `fleet` is separately enrolled in `DETERMINISM_GO_PACKAGES`.
+      - **Confirmed already fixed** (verified by reading the current tree,
+        not assumed from the commit message): `check.py`'s
+        `determinism_trigger` predicate and `check_transcendental`'s frontend
+        `seam_files` suffix, both by `b64be39`; `fleet/resolver.go`'s
+        `RegisterResolvers` (now registers both `burnType` and `jumpType`),
+        by `3bcc726`; `check-mirror-map.sh`'s hardcoded directory set, by
+        this session's task 9.8 (`fleet` added in anti-mirror mode).
+      - **Checked, no live risk today** — `mine/resolver.go`'s
+        `RegisterResolver` registers exactly one action type (`mineType`);
+        with no sibling type yet, there is nothing for it to silently omit.
+        Same species of manual-registration-call pattern would apply the
+        moment `mine` grows a second action type.
+      Nothing above was fixed as part of this task — recorded per the
+      orchestrator's judgment that deriving these lists is its own change.
+- [x] 9.8 Wire `fixtures/fleet/` into `.claude/scripts/check-mirror-map.sh`.
       That script enumerates a **hardcoded directory set** and does not scan
       `fixtures/` generically, so the `fixtures/fleet/` family added in task
       4.11 exists but is checked by **nothing**. This is the ninth hand-
@@ -759,7 +858,7 @@
       generalize it, verify the existing `board`/`polar`/`space`/`system`
       passes are unchanged, including the two anti-mirror trivial-pass
       branches.
-- [ ] 9.7 Guard `keplerPeriodMs` (`backend/system/continuous.go:94`) against a
+- [x] 9.7 Guard `keplerPeriodMs` (`backend/system/continuous.go:94`) against a
       non-finite or negative radius, mirroring 4.11's pattern. `math.Sqrt` of a
       negative ratio is NaN, and the function's existing `if ms < 1` clamp does
       **not** catch it — every comparison against NaN is false, so NaN falls
@@ -783,16 +882,18 @@
 
 ## 10. Validation
 
-- [ ] 10.1 Run `openspec validate migrate-fleet-to-continuous-burns --strict`
+- [x] 10.1 Run `openspec validate migrate-fleet-to-continuous-burns --strict`
       and fix anything it reports.
-- [ ] 10.2 Rehearse `openspec archive migrate-fleet-to-continuous-burns --yes`
+- [x] 10.2 Rehearse `openspec archive migrate-fleet-to-continuous-burns --yes`
       against a scratch copy of `openspec/` — the only check that catches a
       MODIFIED block whose scenario set is not a superset of the current
       spec's; `--strict` does not catch this class of failure.
-- [ ] 10.3 Run `make test` (backend), `npx vitest run` (frontend), and the
+- [x] 10.3 Run `make test` (backend), `npx vitest run` (frontend), and the
       relevant `/check` gates (lint, Go tests, transcendental/FMA checks) green
       end to end.
-- [ ] 10.4 Confirm every scenario across all **nine** delta files
+      **2026-08-31:** gate run from the repo root: Frontend Lint ✓, Frontend Tests ✓ (1269/1269), Frontend E2E ✓ (19 passed, 1 flaky-passed-on-retry), Backend Tests ✓, Determinism Cross-Target ✓, Mirror Map ✓, Agent Lint/Tests ✓ — `All checks passed!`
+
+- [x] 10.4 Confirm every scenario across all **nine** delta files
       (`fleet-movement`, `space-kinematics`, `observation-fog-and-scan`,
       `system-interior`, `board-view`, `fleet-roster`, `corporation-spawn`,
       `galaxy-view`, `proximity-disclosure`) traces to at least one completed
@@ -804,6 +905,8 @@ OpenSpec deltas cannot touch a capability's `## Purpose` block; the archiver
 replaces requirement bodies but leaves `## Purpose` exactly as it stood. Each
 of the following is stale the instant this change archives and must be
 hand-edited afterward — there is no delta representation for this work.
+
+      **2026-08-31:** audit run. 130 scenarios across the nine deltas; all trace to a citing task, zero orphans, zero dangling citations. It flagged 8.7/8.11 as checkbox-vs-prose contradictions; investigated and resolved the other way — the blocker those notes cited had since cleared, so the checkboxes were true and the notes stale. Both annotated rather than unchecked.
 
 - [ ] 11.1 Hand-edit `openspec/specs/fleet-movement/spec.md`'s `## Purpose`
       block — it still describes "one movement-state field (coast, burn,
