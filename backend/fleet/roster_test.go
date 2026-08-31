@@ -44,7 +44,7 @@ func TestSeedFleet_Scenario_CarriesDefaultRoster(t *testing.T) {
 // Scenario: A pre-existing fleet with no stored roster reads as one default
 // hull (also pins the Migration Plan's live-data fallback, task 1.6).
 func TestFleetShipComposition_Scenario_PreExistingFleetNoStoredRosterDefaultsToOneSeedHull(t *testing.T) {
-	stats := map[ShipClass]ClassStats{ClassSeed: {MiningRate: 5, HoldCapacity: 100, BurnRate: 1, LaneRate: 1}}
+	stats := map[ShipClass]ClassStats{ClassSeed: {MiningRate: 5, HoldCapacity: 100, LaneRate: 1}}
 	legacy := Fleet{Id: "fleet-legacy"} // Ships is nil — pre-M10 SeedFleet output, real dev-emulator data
 
 	if got := DerivedCapacity(legacy, stats); got != 100 {
@@ -60,8 +60,8 @@ func TestFleetShipComposition_Scenario_PreExistingFleetNoStoredRosterDefaultsToO
 // Scenario: Capacity and rate scale with roster composition.
 func TestDerivedCapacityAndMiningRate_SumRoster(t *testing.T) {
 	stats := map[ShipClass]ClassStats{
-		ClassSeed:           {MiningRate: 5, HoldCapacity: 100, BurnRate: 1, LaneRate: 1},
-		ShipClass("hauler"): {MiningRate: 0, HoldCapacity: 300, BurnRate: 0.5, LaneRate: 0.5},
+		ClassSeed:           {MiningRate: 5, HoldCapacity: 100, LaneRate: 1},
+		ShipClass("hauler"): {MiningRate: 0, HoldCapacity: 300, LaneRate: 0.5},
 	}
 	f := Fleet{Ships: []ShipEntry{{Class: ClassSeed}, {Class: "hauler"}, {Class: ClassSeed}}}
 
@@ -115,75 +115,70 @@ func TestFreeHold_AccountsForAllKindsHeld(t *testing.T) {
 }
 
 // --- Derived Fleet Speed -----------------------------------------------------
+//
+// DELETED (migrate-fleet-to-continuous-burns, task 4.8): this section used to
+// carry three tests pinning "Derived Fleet Speed" — a REMOVED requirement in
+// this change's fleet-movement delta. `ClassStats.BurnRate`/`DerivedBurnRate`
+// have no continuous-space meaning (board cells/world-ms) and are deleted by
+// 4.8 outright; the successor requirement, "Derived Fleet Acceleration and
+// Drive Output" (a different rule: minimum accel across the roster gating the
+// fleet, summed drive output making a larger fleet louder), is already
+// covered by derived_accel_test.go's red-phase tests. The three deleted
+// tests were:
+//
+//   - TestDerivedBurnAndLaneRate_GateOnSlowestHull
+//   - TestDerivedBurnAndLaneRate_SingleHullUsesThatClassRate
+//   - TestDerivedFleetSpeed_Scenario_SeedClassValuePreservesGlobalConstants
+//
+// `ClassStats.LaneRate`/`DerivedLaneRate` are NOT part of the removed
+// requirement — design.md Decision 10 keeps a fleet lane rate for the
+// single-hop lane-jump ETA, and the successor requirement's own "Lane rate
+// gates on the slowest hull" scenario re-declares it. Each deleted test above
+// carried lane-rate assertions alongside the doomed burn-rate ones, so their
+// lane-rate halves are preserved below rather than lost with the rest of the
+// test.
 
-// Scenario: Fleet speed gates on the slowest hull on each axis.
-func TestDerivedBurnAndLaneRate_GateOnSlowestHull(t *testing.T) {
+// Scenario: Lane rate gates on the slowest hull (fleet-movement › "Derived
+// Fleet Acceleration and Drive Output").
+func TestDerivedLaneRate_Scenario_GatesOnSlowestHull(t *testing.T) {
 	stats := map[ShipClass]ClassStats{
-		ClassSeed:           {BurnRate: 1.0, LaneRate: 2.0},
-		ShipClass("hauler"): {BurnRate: 0.4, LaneRate: 0.1},
+		ClassSeed:           {LaneRate: 2.0},
+		ShipClass("hauler"): {LaneRate: 0.1},
 	}
 	f := Fleet{Ships: []ShipEntry{{Class: ClassSeed}, {Class: "hauler"}}}
 
-	if got, want := DerivedBurnRate(f, stats), 0.4; got != want {
-		t.Errorf("DerivedBurnRate = %v, want %v (the slowest hull's burn rate)", got, want)
-	}
 	if got, want := DerivedLaneRate(f, stats), 0.1; got != want {
-		t.Errorf("DerivedLaneRate = %v, want %v (the slowest hull's lane rate, independent of burn)", got, want)
+		t.Errorf("DerivedLaneRate = %v, want %v (the slowest hull's lane rate)", got, want)
 	}
 }
 
-// Scenario: A single-hull fleet moves at that hull's rates.
-func TestDerivedBurnAndLaneRate_SingleHullUsesThatClassRate(t *testing.T) {
-	stats := map[ShipClass]ClassStats{ClassSeed: {BurnRate: 0.7, LaneRate: 0.3}}
+// SDET-added boundary case: the degenerate one-element roster of the gate
+// above.
+func TestDerivedLaneRate_SingleHullUsesThatClassRate(t *testing.T) {
+	stats := map[ShipClass]ClassStats{ClassSeed: {LaneRate: 0.3}}
 	f := Fleet{Ships: []ShipEntry{{Class: ClassSeed}}}
-	if got := DerivedBurnRate(f, stats); got != 0.7 {
-		t.Errorf("single-hull DerivedBurnRate = %v, want the seed class's own rate 0.7", got)
-	}
 	if got := DerivedLaneRate(f, stats); got != 0.3 {
 		t.Errorf("single-hull DerivedLaneRate = %v, want the seed class's own rate 0.3", got)
 	}
 }
 
-// Scenario: A single seed-class fleet's ETAs are unchanged from the pre-change
-// constants — the critical regression guard: the seed class's configured
-// burn/lane rates must be the exact inverse of today's global
-// MsPerTile/LaneMsPerDistance, so the derived-rate refactor moves no existing
-// fleet's timing.
-func TestDerivedFleetSpeed_Scenario_SeedClassValuePreservesGlobalConstants(t *testing.T) {
+// SDET-added regression guard, preserved from the deleted
+// TestDerivedFleetSpeed_Scenario_SeedClassValuePreservesGlobalConstants: the
+// seed class's configured lane rate must be the exact inverse of
+// LaneMsPerDistance, so this refactor moves no existing fleet's lane-jump
+// ETA. (The BurnRate half of that same guard is deleted with BurnRate
+// itself — DefaultMovementParams().MsPerTile has no successor to pin
+// against.)
+func TestDerivedLaneRate_SeedClassValuePreservesGlobalConstants(t *testing.T) {
 	mp := DefaultMovementParams()
 	stats := DefaultClassStats()
 	seed, ok := stats[ClassSeed]
 	if !ok {
-		t.Fatalf("DefaultClassStats has no %q entry (need one to preserve today's burn/lane ETAs)", ClassSeed)
+		t.Fatalf("DefaultClassStats has no %q entry (need one to preserve today's lane ETAs)", ClassSeed)
 	}
 
-	wantBurnRate := 1.0 / float64(mp.MsPerTile) // hexes/world-ms — inverting it back reproduces MsPerTile
-	if math.Abs(seed.BurnRate-wantBurnRate) > 1e-12 {
-		t.Errorf("seed class BurnRate = %v, want %v (== 1/MsPerTile)", seed.BurnRate, wantBurnRate)
-	}
 	wantLaneRate := 1.0 / mp.LaneMsPerDistance
 	if math.Abs(seed.LaneRate-wantLaneRate) > 1e-12 {
 		t.Errorf("seed class LaneRate = %v, want %v (== 1/LaneMsPerDistance)", seed.LaneRate, wantLaneRate)
 	}
 }
-
-// DELETED (migrate-fleet-to-continuous-burns): this file used to carry two
-// SDET-added regression guards pinning that the derived-rate refactor
-// (ClassStats.BurnRate/LaneRate replacing the global MsPerTile/
-// LaneMsPerDistance constants) moved no fleet's existing ETA arithmetic —
-// TestOrderTo_RegressionGuard_BurnEtaMatchesMsPerTile (a hex-grid burn's
-// arriveTime = hexes × MsPerTile) and
-// TestOrderTravel_RegressionGuard_LaneLegEtaMatchesLaneMsPerDistance (a
-// multi-hop lane leg's cost = length × LaneMsPerDistance, via the deleted
-// planRoute/travelSvc fixtures).
-//
-// Both guards have no successor: OrderTo no longer computes a burn ETA from
-// MsPerTile at all — it solves through space.SolveBurn against a commanded
-// acceleration (design.md Decision 4/9) — and multi-hop lane travel is
-// deleted outright (design.md Decision 10; ErrNoRoute/planRoute/routing.go
-// are gone). There is no "the refactor must not move this arithmetic"
-// property left to guard, because the arithmetic itself no longer exists.
-// TestDerivedFleetSpeed_Scenario_SeedClassValuePreservesGlobalConstants
-// (above) is untouched — it pins DefaultClassStats() against
-// DefaultMovementParams()'s still-live MsPerTile/LaneMsPerDistance fields,
-// which is a params-table invariant independent of how OrderTo spends them.

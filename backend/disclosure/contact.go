@@ -116,6 +116,8 @@ func contactVelocity(bodies space.Bodies, s space.ShipState, t common.WorldMilli
 		return folded.Burn.Tangent(t).Scale(folded.Burn.Speed(t)), nil
 	case space.ModeParked:
 		return folded.Park.Velocity(bodies, t)
+	case space.ModeDrift:
+		return folded.Drift.Velocity, nil
 	default:
 		return space.Vec3{}, space.ErrUnknownParkKind
 	}

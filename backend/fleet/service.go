@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"hexaverse/action"
 	"hexaverse/common"
+	"hexaverse/disclosure"
 	"hexaverse/observation"
 	"hexaverse/space"
 	"hexaverse/system"
@@ -25,11 +27,11 @@ const burnType = "burn"
 // release the single-action slot generically without importing this package.
 const actorCollection = "fleets"
 
-// defaultAccel is the fleet's default commanded acceleration, used when an
-// OrderRequest omits one. The roster-derived ceiling (ClassStats.Accel /
-// DerivedAccelCeiling, design.md Decision 9) is chain link 4 section 4's own
-// job; this is a stand-in nominal value matching space's own MinArcLength/
-// StopInPlaceSpeedFloor worked examples (space/params_const.go).
+// defaultAccel is Stop's own nominal commanded acceleration for its
+// velocity-nulling burn (design.md Decision 8) — matching space's own
+// MinArcLength/StopInPlaceSpeedFloor worked examples (space/params_const.go).
+// OrderTo no longer uses this: an omitted OrderRequest.Accel defaults to the
+// roster-derived ceiling (DerivedAccelCeiling, design.md Decision 9).
 const defaultAccel float64 = 8
 
 var (
@@ -52,6 +54,18 @@ var (
 	// ErrNoBodySource is a programmer-error guard: a request path needing
 	// bodies was reached before WithBodies wired one (design.md Decision 16).
 	ErrNoBodySource = errors.New("fleet: no BodySource configured")
+	// ErrAccelAboveCeiling rejects a commanded acceleration greater than the
+	// fleet's roster-derived ceiling (design.md Decision 9; "Derived Fleet
+	// Acceleration and Drive Output").
+	ErrAccelAboveCeiling = errors.New("fleet: commanded acceleration exceeds the fleet's derived ceiling")
+	// ErrAccelBelowFloor rejects a commanded acceleration below
+	// disclosure.MinCommandedAccel, and — per design.md Decision 9's own
+	// wording — every non-finite (NaN, ±Inf) or non-positive (zero,
+	// negative) value too, checked FIRST and before either bound comparison
+	// ever runs (tasks.md 4.11: a NaN would otherwise reach
+	// space.SolveBurn's flight-time quantization, whose int64(NaN)
+	// conversion diverges by architecture).
+	ErrAccelBelowFloor = errors.New("fleet: commanded acceleration is below the minimum floor")
 )
 
 // BodySource resolves a system's body table — the space.Bodies implementation
@@ -285,13 +299,44 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 		return nil, err
 	}
 
-	accel := defaultAccel
+	// Commanded acceleration: an omitted value defaults to the fleet's
+	// roster-derived ceiling (design.md Decision 9). Non-finite/non-positive
+	// values are rejected FIRST, before either bound comparison, so a NaN or
+	// ±Inf never reaches space.SolveBurn's flight-time quantization
+	// (tasks.md 4.11).
+	ceiling := DerivedAccelCeiling(*f, s.classStats)
+	accel := ceiling
 	if req.Accel != nil {
 		accel = *req.Accel
 	}
+	if math.IsNaN(accel) || math.IsInf(accel, 0) || accel <= 0 {
+		return nil, ErrAccelBelowFloor
+	}
+	if accel > ceiling {
+		return nil, ErrAccelAboveCeiling
+	}
+	if accel < disclosure.MinCommandedAccel {
+		return nil, ErrAccelBelowFloor
+	}
+
+	// Depart tangent to the fleet's LIVE motion at commit time, not a fresh
+	// chord toward the new target (fleet-movement "In-System Burn Order to a
+	// Body or a Point": "re-targeting mid-burn departs tangent to current
+	// motion, not the original departure"). A fleet with no live velocity
+	// (e.g. parked at a point) normalizes to nothing, and space.SolveBurn
+	// falls back to its own chord direction exactly as before.
+	vel, err := currentVelocity(bt, f.State, now)
+	if err != nil {
+		return nil, fmt.Errorf("fleet: resolving live velocity for burn departure: %w", err)
+	}
+	var departDir *space.Vec3
+	if dir, ok := vel.Normalize(); ok {
+		departDir = &dir
+	}
+
 	starClearance := space.StarClearanceRadius(bt.StarSize())
 
-	sol, err := space.SolveBurn(bt, from, target, now, accel, nil, starClearance, space.SolveRounds)
+	sol, err := space.SolveBurn(bt, from, target, now, accel, departDir, starClearance, space.SolveRounds)
 	if err != nil {
 		return nil, fmt.Errorf("fleet: solving burn: %w", err)
 	}
@@ -349,6 +394,17 @@ func (s *Service) CutDrive(ctx context.Context, id string) (*Fleet, error) {
 
 	drift, err := space.CutDrive(*f.State.Burn, now)
 	if err != nil {
+		if errors.Is(err, space.ErrCutAfterArrival) {
+			// An already-arrived-but-unresolved burn is a settled fact, not a
+			// drift to mint: resolve it through the action spine (the same
+			// fold-first pattern OrderTo/Cancel already apply to a stale
+			// arrival) rather than leaving the stored burn unsettled. The cut
+			// itself is still rejected — with this same named reason — since
+			// there is no longer a live burn left to cut.
+			if _, rerr := s.resolveDue(ctx, f); rerr != nil {
+				return nil, rerr
+			}
+		}
 		return nil, err
 	}
 	newState := space.ShipState{Mode: space.ModeDrift, Drift: &drift}

@@ -82,9 +82,12 @@ func TestKnobsAreNeverBareLiteralsAtACallSite(t *testing.T) {
 
 // TestEveryKnobIsReferencedOrDeliberatelyPending is the other half of the
 // same discipline: a constant nobody reads is a dial that does not turn
-// anything. MinCommandedAccel is the one knob with no production reference
-// yet, and that is recorded here as a stated expectation rather than
-// discovered later as rot.
+// anything. MinCommandedAccel now has a production reference — fleet.OrderTo
+// validates a commanded acceleration against it (migrate-fleet-to-continuous-
+// burns, design.md Decision 9) — but that reference lives in backend/fleet,
+// outside this test's own package-scoped parse, so it can never trip the
+// `referenced["MinCommandedAccel"]` branch below; the retirement is this
+// comment update, not a code change to the assertion itself.
 func TestEveryKnobIsReferencedOrDeliberatelyPending(t *testing.T) {
 	referenced := map[string]bool{}
 	fset := token.NewFileSet()

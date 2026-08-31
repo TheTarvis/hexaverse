@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "generatedOn": { "goarch": "arm64" },
+    "buildTargetMatrix": "GOARCH=arm64 and GOARCH=amd64 with GOAMD64=v1",
+    "jsRuntimeLeg": "none — backend/fleet is Go-only server logic with no TypeScript mirror; this table is asserted only across the Go build-target matrix",
+    "purpose": "openspec change migrate-fleet-to-continuous-burns, tasks.md 4.11 — pins the commanded-acceleration validation's rejection DECISION for NaN/+Inf/-Inf/zero/negative inputs cross-target, deliberately WITHOUT recording any value derived from the unguarded expression those inputs would otherwise reach (space.QuantizeArrival's `int64(math.Ceil(flightSeconds*1000))`, which is `int64(math.Ceil(NaN*1000))` when accel is NaN — 0 on arm64, -9223372036854775808 on amd64; this is the exact class pin-system-generation-determinism was created to eliminate for backend/system's keplerPeriodMs). The recorded field here is `wantErr`, a Go sentinel-error identity name — a value that is, by construction, the SAME string on every architecture, because a correct implementation must reject these inputs BEFORE they ever reach the divergent conversion. Recording a value here is therefore safe in a way recording keplerPeriodMs's NaN case was not: this family pins the guard's decision, never the guarded-against arithmetic's result.",
+    "crossTargetSafety": "every 'wantErr' value below is a Go identifier name (fleet.ErrAccelBelowFloor), never a numeric result of evaluating the commanded acceleration — see 'purpose' above for why that distinction is what makes cross-target pinning valid here."
+  },
+  "commandedAccelRejection": [
+    { "name": "NaN", "input": "NaN", "wantErr": "ErrAccelBelowFloor" },
+    { "name": "positive infinity", "input": "+Inf", "wantErr": "ErrAccelBelowFloor" },
+    { "name": "negative infinity", "input": "-Inf", "wantErr": "ErrAccelBelowFloor" },
+    { "name": "zero", "input": "0", "wantErr": "ErrAccelBelowFloor" },
+    { "name": "negative", "input": "-3", "wantErr": "ErrAccelBelowFloor" },
+    { "name": "below the disclosure floor but finite and positive", "input": "0.1", "wantErr": "ErrAccelBelowFloor" },
+    { "name": "above the fleet's ceiling", "input": "999", "wantErr": "ErrAccelAboveCeiling" }
+  ]
+}

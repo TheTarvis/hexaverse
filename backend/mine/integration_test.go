@@ -154,7 +154,7 @@ func (s *mineTestStack) deltaCount(t *testing.T, ledgerKey string) int {
 }
 
 var stdStats = map[fleet.ShipClass]fleet.ClassStats{
-	fleet.ClassSeed: {MiningRate: 10, HoldCapacity: 1000, BurnRate: 1, LaneRate: 1},
+	fleet.ClassSeed: {MiningRate: 10, HoldCapacity: 1000, LaneRate: 1},
 }
 
 // Task 3.1: gates every other integration test below — proves the

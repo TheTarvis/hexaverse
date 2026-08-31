@@ -192,7 +192,7 @@
 
 ## 4. burn / cut-drive / stop verbs
 
-- [ ] 4.1 Implement burn ordering to a body id or an explicit point: solve
+- [x] 4.1 Implement burn ordering to a body id or an explicit point: solve
       through `space.SolveBurn` against the system's `system.BodyTable`,
       departing tangent to the fleet's live position/velocity at commit time;
       commit through the action spine on the movement channel, replacing any
@@ -204,11 +204,11 @@
       one, an order over a completed-but-unresolved order settles it first,
       re-targeting mid-burn departs tangent to live motion not the original
       departure).
-- [ ] 4.2 Implement order-request validation: reject an order naming neither a
+- [x] 4.2 Implement order-request validation: reject an order naming neither a
       body id, a point, nor a `laneId`, and reject one naming more than one
       (fleet-movement MODIFIED: *Order Request Validation* — empty order body
       rejected, ambiguous order body rejected).
-- [ ] 4.3 Implement `POST /v1/fleets/:fleetId/cut-drive`: free, instant,
+- [x] 4.3 Implement `POST /v1/fleets/:fleetId/cut-drive`: free, instant,
       converts the active burn to a drift via the 2.2 conversion, cancels the
       running movement action with no delta and no other effect; reject an
       already-arrived-but-unresolved burn (resolving the arrival instead) and a
@@ -218,7 +218,7 @@
       cutting an already-arrived burn resolves the arrival instead, cutting a
       parked/drifting/in-transit fleet is rejected by name, cut drive charges
       no delta-v, a cut fleet is immediately re-orderable).
-- [ ] 4.4 Fix `disclosure/contact.go:114` (`contactVelocity`'s `default:` arm)
+- [x] 4.4 Fix `disclosure/contact.go:114` (`contactVelocity`'s `default:` arm)
       to handle `ModeDrift` — named separately from 2.4 because it is a second
       call site that compiles cleanly and fails at runtime, silently, the
       moment link 5 wires a disclosure read (design.md Decision 5, Decision
@@ -226,7 +226,7 @@
       Drift Velocity and Does Not Emit* — a drifting contact reports its
       stored drift velocity, a zero-velocity drift reports a stationary
       contact).
-- [ ] 4.5 Implement `POST /v1/fleets/:fleetId/stop`: above the configured speed
+- [x] 4.5 Implement `POST /v1/fleets/:fleetId/stop`: above the configured speed
       floor, commit a velocity-nulling burn to a point ahead of the fleet
       (charging Δv, taking time, emitting for its duration, settling to a
       `point` park on arrival); at or below the floor, convert instantly and
@@ -234,7 +234,7 @@
       In Place Commits a Velocity-Nulling Burn* — stopping above the floor
       commits a nulling burn, stopping at or below the floor is instant and
       free).
-- [ ] 4.6 Implement derived fleet acceleration (minimum over the roster's
+- [x] 4.6 Implement derived fleet acceleration (minimum over the roster's
       per-class `Accel`) and drive output (sum over the roster); add optional
       `Accel` to `OrderRequest`, defaulting to the ceiling when omitted,
       rejecting a value above the ceiling or below `disclosure.MinCommandedAccel`
@@ -245,16 +245,16 @@
       acceleration above the ceiling is rejected, a commanded acceleration
       below the disclosure floor is rejected, an omitted commanded acceleration
       defaults to the ceiling).
-- [ ] 4.7 Manually retire the `MinCommandedAccel` pending note in
+- [x] 4.7 Manually retire the `MinCommandedAccel` pending note in
       `disclosure/params_test.go:112-113` once `fleet` references the constant
       — its `t.Log` parses only `backend/disclosure`'s own directory, so a
       cross-package reference will **not** retire it automatically (design.md
       Decision 9).
-- [ ] 4.8 Replace `ClassStats.BurnRate` with `Accel` in `fleet/params.go`/
+- [x] 4.8 Replace `ClassStats.BurnRate` with `Accel` in `fleet/params.go`/
       `roster.go`; delete `DerivedBurnRate`, add `DerivedAccelCeiling` and the
       drive-output sum (fleet-movement REMOVED: *Derived Fleet Speed*, replaced
       by 4.6).
-- [ ] 4.9 Implement co-resident-slot release: cancelling a non-movement verb's
+- [x] 4.9 Implement co-resident-slot release: cancelling a non-movement verb's
       action (e.g. a running `mine`) that shares a fleet's dock releases only
       that action's slot, leaving the fleet's kinematic state and `attachedTo`
       untouched, identically via `POST /v1/fleets/:fleetId/cancel` and
@@ -262,11 +262,11 @@
       Co-Resident Verb's Slot Leaves Motion Untouched* — cancelling via the
       fleet endpoint while mining leaves the fleet docked, cancelling the mine
       action directly leaves the fleet docked).
-- [ ] 4.10 Delete `fleet/service.go`'s `ErrRingOutOfRange`, `ErrNotOnBoard`,
+- [x] 4.10 Delete `fleet/service.go`'s `ErrRingOutOfRange`, `ErrNotOnBoard`,
       `validateFleetRing`, `maxStateRing`, `msPerTileFor`, `msPerLaneUnitFor`,
       `featureOrbit`, `featureAnchor`, `haltState`, and `Scan` (design.md
       Decision 21A).
-- [ ] 4.11 Pin the NaN/±infinity commanded-acceleration rejection
+- [x] 4.11 Pin the NaN/±infinity commanded-acceleration rejection
       **cross-target in the fixture family**, not only in a unit test:
       `nan > ceiling` and `nan < floor` are both false, so an unguarded path
       reaches `int64(math.Ceil(NaN*1000))`, which is `0` on arm64 and
@@ -278,7 +278,7 @@
       not merely that *a* rejection occurred (fleet-movement: *Derived Fleet
       Acceleration and Drive Output* — "a non-finite or non-positive
       commanded acceleration is rejected").
-- [ ] 4.12 Write the full test suite for proximity-disclosure's drifting-
+- [x] 4.12 Write the full test suite for proximity-disclosure's drifting-
       contact requirement, covering all three of its scenarios: the two
       `contactVelocity` fixes from 4.4, plus a dedicated test that a
       drifting fleet is never emitting at any world time — this last

@@ -26,9 +26,9 @@ func NewHandlerWith(svc ServiceInterface, clock common.WorldTime) *Handler {
 
 // RegisterRoutes wires the surviving endpoint set (design.md Decision 21A):
 // GET /route and POST /scan are deleted with no successor here (routing and
-// scanning are chain link 4 sections 5/observation's own concerns);
-// /cut-drive, /stop, and /jump are section 4/5's verbs and are not wired by
-// this section's own scope.
+// scanning are chain link 4 sections 5/observation's own concerns); /jump is
+// chain link 4 section 5's own verb and is not wired by this section's own
+// scope.
 func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	g := authorized.Group("/fleets")
 	{
@@ -36,6 +36,8 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 		g.GET("/:fleetId", h.Get)
 		g.POST("/:fleetId/orders", h.Order)
 		g.POST("/:fleetId/cancel", h.Cancel)
+		g.POST("/:fleetId/cut-drive", h.CutDrive)
+		g.POST("/:fleetId/stop", h.Stop)
 	}
 }
 
@@ -120,6 +122,20 @@ func (h *Handler) Order(c *gin.Context) {
 
 func (h *Handler) Cancel(c *gin.Context) {
 	f, err := h.svc.Cancel(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
+	h.respond(c, f, err)
+}
+
+// CutDrive handles POST /v1/fleets/:fleetId/cut-drive (fleet-movement "Cut
+// Drive Converts the Burn to a Drift and Goes Dark").
+func (h *Handler) CutDrive(c *gin.Context) {
+	f, err := h.svc.CutDrive(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
+	h.respond(c, f, err)
+}
+
+// Stop handles POST /v1/fleets/:fleetId/stop (fleet-movement "Stop In Place
+// Commits a Velocity-Nulling Burn").
+func (h *Handler) Stop(c *gin.Context) {
+	f, err := h.svc.Stop(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
 	h.respond(c, f, err)
 }
 

@@ -102,7 +102,7 @@ func featureWithMetals() *system.GeneratedInterior {
 
 func validStats() map[fleet.ShipClass]fleet.ClassStats {
 	return map[fleet.ShipClass]fleet.ClassStats{
-		fleet.ClassSeed: {MiningRate: 10, HoldCapacity: 100, BurnRate: 1, LaneRate: 1},
+		fleet.ClassSeed: {MiningRate: 10, HoldCapacity: 100, LaneRate: 1},
 	}
 }
 
