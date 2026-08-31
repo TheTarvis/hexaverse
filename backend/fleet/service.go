@@ -248,9 +248,72 @@ func (s *Service) ListInSystem(ctx context.Context, systemID string) ([]Fleet, e
 	return s.dao.ListBySystem(ctx, systemID)
 }
 
-// ListForCorp returns every fleet a corporation owns.
+// ListForCorp returns every fleet a corporation owns, opportunistically
+// settling any active burn whose ETA has already passed — the same
+// fold-first predicate OrderTo/CutDrive/Jump evaluate through settleIfDue
+// (tasks.md 5.0). The roster is now the corp's only fleet surface
+// (SystemBoardView -> useMyFleets -> GET /v1/fleets?mine=true -> this
+// method), so a fleet that has actually docked must read that way here too,
+// not just through the single-fleet Get path — otherwise a body-targeted
+// burn whose AttachedTo is set only at resolve (tasks.md 3.1) reads as
+// forever mid-burn from the roster's point of view.
+//
+// A corp's fleets can span multiple systems, so settling the list requires a
+// per-system BodySource, not one fixed table (settleIfDue's bt parameter is
+// scoped to a single system). This resolves the body table ONCE PER DISTINCT
+// SystemId present in the result — never once per fleet — mirroring
+// bodiesFor's own "resolved once per request" contract (design.md Decision
+// 16) at list scope instead of single-fleet scope. Fleets are grouped by
+// system and each one is decided through the existing settleIfDue seam
+// itself (no reimplemented "is it due" predicate), so a parked fleet running
+// a co-resident mine on the same movement slot (settleIfDue's ModeBurn-only
+// guard) is left untouched exactly as it is on every other door.
+//
+// Neither a body-table failure nor a per-fleet settle failure fails the
+// whole list: each degrades to returning that system's (or that fleet's)
+// entry unsettled, logged at Warn so the degradation is never silent. This
+// mirrors two existing precedents rather than inventing a third: Get's own
+// body-source failure on a settled jump's destination-interior materialize
+// is caught and logged, never propagated (service.go's Get, "Fleet jump
+// settled but the destination interior failed to materialize"); and
+// system.BodyTable's own rule that a per-body/per-feature read failure
+// degrades to a smaller table rather than failing the whole build
+// (system/bodies.go: "The Table Degrades to Fewer Bodies Rather Than a
+// Failed Build"). A list read that already has other corp fleets to show is
+// the same shape of "partial data beats no data" as those two — one
+// system's transient Firestore hiccup should not blank the whole roster.
 func (s *Service) ListForCorp(ctx context.Context, corporationID string) ([]Fleet, error) {
-	return s.dao.ListByCorporation(ctx, corporationID)
+	fleets, err := s.dao.ListByCorporation(ctx, corporationID)
+	if err != nil {
+		return nil, err
+	}
+
+	bySystem := make(map[string][]int, len(fleets))
+	for i := range fleets {
+		bySystem[fleets[i].SystemId] = append(bySystem[fleets[i].SystemId], i)
+	}
+
+	for systemID, idxs := range bySystem {
+		bt, err := s.bodiesFor(ctx, systemID)
+		if err != nil {
+			log.Warn().Ctx(ctx).Err(err).Str("corporationId", corporationID).Str("systemId", systemID).
+				Msg("ListForCorp: resolving the body table failed; returning this system's fleets unsettled")
+			continue
+		}
+		for _, i := range idxs {
+			settled, due, serr := s.settleIfDue(ctx, &fleets[i], bt)
+			if serr != nil {
+				log.Warn().Ctx(ctx).Err(serr).Str("corporationId", corporationID).Str("fleetId", fleets[i].Id).
+					Msg("ListForCorp: settling a due arrival failed; returning this fleet unsettled")
+				continue
+			}
+			if due {
+				fleets[i] = *settled
+			}
+		}
+	}
+
+	return fleets, nil
 }
 
 // bodiesFor resolves the request-scoped body table for systemID exactly once
