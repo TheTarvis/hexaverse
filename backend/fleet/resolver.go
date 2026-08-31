@@ -24,6 +24,21 @@ import (
 // deletes the observation-side reveal writer it fed.
 func RegisterResolvers(a *action.Service, bodies BodySource) {
 	a.RegisterResolver(burnType, action.KindKinematic, BurnResolver(bodies))
+	// jump is registered KindKinematic, not KindMutating: action.Kind's own
+	// doc comment (action/model.go) already draws this line — "Kinematic
+	// actions (burn, lane-travel) settle a computed state on their actor;
+	// mutating actions (mine, scan) append a ledger delta" — and jump is
+	// exactly that lane-travel case. JumpResolver returns no action.Delta
+	// (mine's ledger-additive effect); it settles ActorState (systemId,
+	// jump cleared, the parked kinematic state) the same way BurnResolver
+	// does, plus Writes for the arrival chart/explored mint — a path burn's
+	// own settle doesn't need but that Kind is silent on (Writes apply
+	// identically for both kinds; action/dao.go's ResolveOne never branches
+	// on Kind at all — it is a stored classification for readers, not a
+	// dispatch switch). Kind's asymmetry that DOES matter operationally is
+	// KindMutating's ledger-delta bookkeeping (LedgerKey, exactly-once
+	// Delta doc), which jump has no use for.
+	a.RegisterResolver(jumpType, action.KindKinematic, JumpResolver)
 }
 
 // BurnResolver is the fleet's kinematic resolver, registered with the action

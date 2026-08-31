@@ -379,25 +379,65 @@
 
 ## 6. Cross-domain consumers
 
-- [ ] 6.1 Re-point `mine/service.go:152-153` from
+> **Section 6 audit (2026-08-31, before implementing).** Six of these seven
+> tasks were already discharged as *compile-forced* work during sections 3–5:
+> a type change forces its callers, and refusing would have left the tree
+> uncompilable. Verified individually rather than assumed:
+> `6.1` `mine/service.go:152` calls `f.DockedTo()`; `6.2` `market/service.go:497`
+> likewise; `6.3` `corporations/service.go:55,296` already passes a
+> `space.Vec3` to the re-pointed `SeedFleet`; `6.5` `AmbientRecorder`/
+> `BurnResolverWithAmbient` survive only as a historical comment at
+> `fleet/resolver.go:21`; `6.6` `fleet/travel.go` and `travel_resolver.go` are
+> gone; `6.7` neither `fleet/cargo_tx.go` nor `fleet/dao.go` imports `board`.
+> Checked off to record they are true of the tree, not to claim this session
+> did them. **Only 6.4 has real work left** — see its own note.
+
+- [x] 6.1 Re-point `mine/service.go:152-153` from
       `eff.Mode == board.ModeDocked && eff.Docked.ParentId == featureID` to
       `fleet.DockedTo()` (design.md Decision 13, 21A).
-- [ ] 6.2 Re-point `market/service.go:497-498` the same way (design.md Decision
+- [x] 6.2 Re-point `market/service.go:497-498` the same way (design.md Decision
       13, 21A).
-- [ ] 6.3 Update `corporations.Spawn`'s call site for the re-pointed
+- [x] 6.3 Update `corporations.Spawn`'s call site for the re-pointed
       `SeedFleet` signature (a `space` park in place of `board.Cell`, per
       3.8/3.9) and confirm the package compiles and its tests stay green.
-- [ ] 6.4 Update `router.go`/`cmd/seed/main.go`: drop the deleted `/route` and
+- [x] 6.4 Update `router.go`/`cmd/seed/main.go`: drop the deleted `/route` and
       `/scan` wiring, register the new `/cut-drive`/`/stop`/`/jump` routes, and
       register the jump resolver alongside `BurnResolver` on the action spine's
       `ResolveFunc` registry.
-- [ ] 6.5 Delete `AmbientRecorder`/`BurnResolverWithAmbient` from
+      **Audit 2026-08-31: half done, and the missing half was a live functional
+      gap.** The HTTP routes ARE wired (`fleet/handler.go:37-39`) and `/route`
+      and `/scan` are gone. But `fleet/resolver.go:25`'s `RegisterResolvers`
+      registered **only** `burnType → BurnResolver` — the jump resolver was
+      never put on the action spine's registry. A committed jump's ETA would
+      therefore pass with no resolver to settle it, leaving the fleet in
+      `laneTransit` **permanently**, with no position in either system. Section
+      5's tests did not catch this because they invoke `JumpResolver` directly
+      rather than through the registry.
+      **Fixed 2026-08-31:** `fleet/resolver.go`'s `RegisterResolvers` now also
+      calls `a.RegisterResolver(jumpType, action.KindKinematic, JumpResolver)`.
+      Registered `KindKinematic`, not `KindMutating` — `action/model.go`'s own
+      doc comment already draws this line ("Kinematic actions (burn,
+      lane-travel) settle a computed state on their actor; mutating actions
+      (mine, scan) append a ledger delta"), and jump is exactly the
+      lane-travel case: it settles `ActorState` (systemId, cleared Jump, the
+      parked kinematic state) and returns no `action.Delta`. Its `Writes`
+      (arrival chart/explored mint) apply the same for either `Kind` —
+      `action/dao.go`'s `ResolveOne` never branches on `Kind` when applying
+      `ActorState`/`Delta`/`Writes`; `Kind` is a stored classification for
+      readers, not a dispatch switch. `router.go:98` already calls
+      `fleet.RegisterResolvers(actionSvc, systemSvc)` — the fix lands at that
+      exact call site with no router.go change needed (verified by reading
+      router.go, not assumed). Confirmed by
+      `resolver_registration_test.go`'s
+      `TestRegisterResolvers_Scenario_JumpTypeRegisteredAlongsideBurn`, now
+      green (test file untouched).
+- [x] 6.5 Delete `AmbientRecorder`/`BurnResolverWithAmbient` from
       `fleet/resolver.go`; fold `BurnResolver` through `space.StateAt` (design.md
       Decision 21A).
-- [ ] 6.6 Delete `fleet/travel.go` and `fleet/travel_resolver.go`'s multi-hop
+- [x] 6.6 Delete `fleet/travel.go` and `fleet/travel_resolver.go`'s multi-hop
       machinery, superseded by the single-hop jump commit + resolver built in
       section 5.
-- [ ] 6.7 Remove the `board` import from `fleet/cargo_tx.go`/`dao.go` and
+- [x] 6.7 Remove the `board` import from `fleet/cargo_tx.go`/`dao.go` and
       update the stored-shape encode/decode to route through the widened `space`
       codec (design.md Decision 21A, Decision 21C item 3).
 
