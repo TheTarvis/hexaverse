@@ -1,14 +1,19 @@
 // Package observation owns per-Corporation fog of war (#0006): the observation
-// atom (the shared intel-inventory record the market will later trade), the
-// reveal writes, and the fog-filter service other domains call to project any
-// read per requester. Fog reveals and remembers; it never spoils — spoilage
+// atom (the shared intel-inventory record the market will later trade) and
+// the reveal writes. Fog reveals and remembers; it never spoils — spoilage
 // (decay, valuation) belongs to the future market domain.
 //
-// Layering: this package is dependency-inverted. It defines the narrow
-// interfaces it needs from other domains (FleetSource, InteriorSource) and is
-// imported BY the read surfaces it fogs (galaxy/system/fleet handlers), so the
-// retrofit is one clean seam per read with no import cycles. It imports only
-// common, board, and action (for the scan resolver's return types).
+// migrate-fleet-to-continuous-burns tasks.md section 7 (design.md Decision
+// 11) deletes this package's live half: the lattice-hop sensor-union
+// computation read from own units' board cells, a running scan's growing
+// echo front, the scan verb's own resolve-and-mint path, the path-swept
+// passive reveal a burn resolution used to fold, and the audience-visibility
+// check a foreign fleet's read used to run. What survives is the monotonic
+// graph-tier ladder, the charted-lane set, and the two arrival reveals —
+// none of which read a live position or interior geometry, so this package
+// no longer defines a dependency-inversion seam onto either of those
+// domains. It imports only common, board (coordinate/orbit types the stored
+// records carry), and action (the arrival reveal's write-batch return type).
 package observation
 
 import (
@@ -134,74 +139,31 @@ type FeatureActivity struct {
 	Summary string `json:"summary,omitempty" firestore:"summary,omitempty"`
 }
 
-// --- projection outputs (what the fog filter hands consumers) ---------------
-
-// Band is a board-tier feature's visibility for a requester. Unseen features are
-// simply absent from the projection (empty space is never remembered).
-type Band string
-
-const (
-	// BandVisible — inside the requester's live sensor union right now (live truth).
-	BandVisible Band = "visible"
-	// BandRemembered — observed before, no longer covered (last snapshot; geometry
-	// still ticks, activity frozen at AsOf).
-	BandRemembered Band = "remembered"
-)
-
-// FeatureMemory is what a consumer needs to render a remembered feature: its
-// elements (to compute the current position) plus the frozen detail/activity.
-type FeatureMemory struct {
-	Elements *board.Orbit
-	Anchor   *board.Cell
-	Detail   *FeatureDetail
-	Activity *FeatureActivity
-	AsOf     common.WorldMillis
-}
-
 // --- dependency-inversion inputs (defined here, implemented by other domains) -
-
-// FleetPos is a unit's live position for coverage math — the minimal shape
-// observation needs from the fleet domain, so it never imports fleet.
-type FleetPos struct {
-	Id            string
-	CorporationId string
-	SystemId      string
-	Cell          board.Cell
-	// ActiveScanId is the unit's running scan, if any — the radial-echo
-	// revision reads it to grow the live echo disc during the scan.
-	ActiveScanId string
-}
-
-// FeatureGeom is the minimal geometry+composition observation needs from the
-// system domain to compute coverage and mint scan snapshots — so it never
-// imports system. Astronomical marks the free layer (star + major bodies), which
-// is shown to every arriver regardless of fog.
-type FeatureGeom struct {
-	Id           string
-	Elements     *board.Orbit
-	Anchor       board.Cell
-	Astronomical bool
-	// OcclusionRadius2 is the squared radial-unit radius (in board.LineOfSight
-	// units) within which this feature's chord blocks sight from both sensing
-	// modes (#0006 Decision #16) — zero means "does not occlude". The
-	// kind→radius table (StarOcclusionRadius2, PlanetOcclusionRadius2) is the
-	// system domain's rule (design.md Decision 1); observation stays purely
-	// geometric and never learns what a gas giant is.
-	OcclusionRadius2 int64
-	Detail           *FeatureDetail
-}
-
-// FleetSource is the fleet-domain dependency (fleet.Service implements it). It
-// returns the corp's units with positions resolved at `now`.
-type FleetSource interface {
-	FleetsForCorp(ctx context.Context, corporationID string, now common.WorldMillis) ([]FleetPos, error)
-}
-
-// InteriorSource is the system-domain dependency (system.Service implements it),
-// returning a system's features as minimal geometry.
-type InteriorSource interface {
-	Features(ctx context.Context, systemID string) ([]FeatureGeom, error)
-}
+//
+// Band/BandVisible/BandRemembered (a board-tier feature's per-requester
+// visibility) and FeatureMemory (the remembered-feature render shape) used to
+// live here too, backing the same three-band fog projection RememberedFeatures
+// served (see the doc comment on service.go's reveal-writes section). Deleted
+// here as part of resolving tasks.md 7's ambiguity note 1: with
+// RememberedFeatures itself already gone, nothing in this codebase's four
+// surviving requirements (the graph-tier ladder, travel/spawn arrival reveal,
+// the charted-lane set projection) constructs or reads a Band or a
+// FeatureMemory. FeatureObservation — the stored atom these were built FROM —
+// is kept: it is still read and written by the DAO
+// (ListFeatureObservations/UpsertFeatureObservation), still exercised directly
+// by observation/dao_test.go's round-trip test, and is the persisted board-tier
+// record surviving requirements' storage layer, distinct from the deleted
+// per-requester projection shape.
+//
+// The unit-position and interior-geometry shapes the deleted lattice-hop
+// coverage computation, echo front, and scan mint read from the fleet and
+// system domains are deleted outright by migrate-fleet-to-continuous-burns
+// tasks.md 7.1-7.5 (design.md Decision 11): a fleet no longer has a board
+// cell for such a shape to carry, and nothing in this package's surviving
+// requirements reads interior geometry. The system package's method that
+// used to project a system's features into that shape is replaced (not
+// adapted) by system-interior's unfogged interim read (tasks.md 7.7).
 
 // LaneEnd is one lane incident to a system: its id and the far endpoint —
 // what a scan charts and rumors (#0006 Decision #17).

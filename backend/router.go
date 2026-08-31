@@ -97,12 +97,14 @@ func SetupRouter() *gin.Engine {
 	// section 7 removes the observation-side writer it fed.
 	fleet.RegisterResolvers(actionSvc, systemSvc)
 
-	// Fog of war (#0006): the fog-filter every read projects through, per
-	// Corporation. It reads live positions from fleet, interior geometry from
-	// system, and the lane graph from galaxy via interfaces (no import cycle),
-	// and registers the scan resolver.
-	fogSvc := observation.NewService(fleetSvc, systemSvc, galaxySvc)
-	fogSvc.RegisterResolvers(actionSvc)
+	// Fog of war (#0006), reduced (migrate-fleet-to-continuous-burns tasks.md
+	// section 7, design.md Decision 11): the graph-tier ladder, the
+	// charted-lane set, and the arrival reveal writers. Its live half — the
+	// per-Corporation sensor-coverage projection this used to read from
+	// fleet/system/galaxy, and the scan resolver it used to register — is
+	// deleted outright; link 5 (replace-observation-with-sightings) is what
+	// replaces it, not this change.
+	fogSvc := observation.NewService()
 
 	// Spawn & identity (#0009): the corporation service orchestrates spawn through
 	// the live galaxy/fleet/fog singletons above, and resolves account→living-corp

@@ -318,26 +318,21 @@ func TestCancel_Scenario_MidBurnConvertsToADrift(t *testing.T) {
 	}
 }
 
-// --- FleetsForCorp's reduced interim contract (successor of the lattice-era
-// TestFleetsForCorp_DockedToOrbitingBodyRidesIt, whose rich "sensor position
-// rides the docked body's live cell" behaviour has no successor: a fleet has
-// no board cell to answer observation.FleetPos with (design.md Decision 11).
-// The honest interim is "no coverage from any unit", pinned here as a plain
-// contract test — SDET-added, since the pre-migration corpus never had to
-// assert a no-op.) ---
-
-func TestFleetsForCorp_Scenario_ReportsNoCoverageInThisInterim(t *testing.T) {
-	clk := &fakeClock{now: 0}
-	svc, _, _, ctrl := newSvc(t, clk)
-	defer ctrl.Finish()
-
-	got, err := svc.FleetsForCorp(context.Background(), "dev-corp", clk.Now())
-	if err != nil {
-		t.Fatalf("FleetsForCorp: %v", err)
-	}
-	if len(got) != 0 {
-		t.Fatalf("FleetsForCorp = %v, want none — the lattice coverage this used to answer with has no "+
-			"successor after design.md Decision 4 (a fleet has no board cell); link 4's own scope stops at "+
-			"making the type change compile, degrading honestly rather than manufacturing a shadow position", got)
-	}
-}
+// TestFleetsForCorp_Scenario_ReportsNoCoverageInThisInterim removed 2026-08-31
+// (SDET Item B, migrate-fleet-to-continuous-burns section 7 close-out).
+//
+// Reason: this test pinned FleetsForCorp's no-op return purely so the method
+// had a caller to justify keeping it. FleetsForCorp implemented
+// observation.FleetSource (the lattice-hop ambient-coverage dependency
+// inversion); that interface is deleted (7.1, confirmed absent by
+// observation/lattice_live_half_absent_test.go) and FleetsForCorp has zero
+// production callers left (grep confirms — no handler, no service, no other
+// package references it). Its return type, []struct{}, cannot carry any
+// information; the assertion "len(got) != 0" is a tautology once you accept
+// the method exists only to be called by this test. No surviving
+// requirement — the four kept `observation` requirements or any `fleet`
+// requirement — names this behavior, and design.md's own break table
+// (fleet/service.go site) already lists FleetsForCorp for outright deletion
+// at a later step of this migration. Deleting the test unblocks that
+// deletion; the production stub itself is left for the dev to remove
+// (reported, not deleted here — SDET does not touch production code).

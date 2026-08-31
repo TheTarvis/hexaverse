@@ -1,173 +1,236 @@
 package observation
 
+// service.go is the fog-of-war domain's surviving half after
+// migrate-fleet-to-continuous-burns tasks.md 7.1-7.5 (design.md Decision 11):
+// the graph-tier ladder (SystemTiers), the charted-lane set (ChartedLanes),
+// and the two arrival reveal writers (RevealArrival, ArrivalWrites).
+//
+// TestChartedLanes_* (relocated intact from the now-deleted
+// charted_lanes_gap_test.go) and TestArrivalWrites_* (relocated intact from
+// the now-deleted arrival_test.go) call Service methods directly — no
+// assertion changed in the move. TestSystemTiers_* and TestRevealArrival_*
+// are new: SystemTiers and RevealArrival had no direct test anywhere in the
+// package (graph_tier_ladder_gaps_test.go's two tests, which stay in their
+// own file, exercise the DAO layer under SystemTiers's documented contract,
+// not the Service method itself).
+
 import (
 	"context"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/common"
-	"hexaverse/polar"
 
 	"github.com/google/uuid"
 )
 
-// testSched is the schedule observation tests thread through every board
-// call — observation holds no per-system interior of its own (no Radius
-// field on Service), so per design.md Decision 3 it defaults to
-// board.ProductionSchedule().
-func testSched() polar.Schedule { return board.ProductionSchedule() }
+// --- SystemTiers -------------------------------------------------------
 
-// fakeInteriors is a hand fake of InteriorSource returning fixed geometry.
-type fakeInteriors struct{ feats map[string][]FeatureGeom }
-
-func (f fakeInteriors) Features(_ context.Context, systemID string) ([]FeatureGeom, error) {
-	return f.feats[systemID], nil
-}
-
-// fakeFleets is a hand fake of FleetSource returning each corp's units.
-type fakeFleets struct{ byCorp map[string][]FleetPos }
-
-func (f fakeFleets) FleetsForCorp(_ context.Context, cid string, _ common.WorldMillis) ([]FleetPos, error) {
-	return f.byCorp[cid], nil
-}
-
-// sampleInterior is a star + an orbiting rocky planet + a belt — enough to
-// exercise astronomical vs. detail features and orbiting geometry.
-func sampleInterior(systemID string) fakeInteriors {
-	return fakeInteriors{feats: map[string][]FeatureGeom{
-		systemID: {
-			{Id: "feat-star", Anchor: board.Cell{Ring: 0, Slot: 0}, Astronomical: true,
-				Detail: &FeatureDetail{FeatureType: "star"}},
-			{Id: "feat-body-0", Elements: &board.Orbit{Ring: 3, Angle0: 0, Period: 0, Dir: 1}, Astronomical: true,
-				Detail: &FeatureDetail{FeatureType: "rocky", Resources: []ResourceReading{{Kind: "metals", Richness: 0.7}}}},
-			{Id: "feat-belt-0", Elements: &board.Orbit{Ring: 5, Angle0: 2, Period: 0, Dir: 1},
-				Detail: &FeatureDetail{FeatureType: "belt"}},
-		},
-	}}
-}
-
-// TestFogIsolation_OneScans_OtherUnchanged is the M6 keystone (build-order:
-// write the two-player isolation test first). One Corporation scans a system;
-// the other Corporation's projection of that same system is entirely unchanged —
-// no tier, no remembered features, no coverage. Fog is strictly per-Corporation.
-func TestFogIsolation_OneScans_OtherUnchanged(t *testing.T) {
-	service, client := common.SetupFirestoreTestDAO(t)
-	defer common.CleanupFirestoreTestData(t, client, corporationsCollection)
-
-	ctx := context.Background()
-	corpA := "corp-" + uuid.NewString()
-	corpB := "corp-" + uuid.NewString()
-	const sys = "sys-1"
-
-	interiors := sampleInterior(sys)
-	// Corp A has a fleet sitting at the star; corp B has none in this system.
-	fleets := fakeFleets{byCorp: map[string][]FleetPos{
-		corpA: {{Id: "fa", CorporationId: corpA, SystemId: sys, Cell: board.Cell{Ring: 0, Slot: 0}}},
-	}}
-	svc := NewServiceWith(NewDaoWithClient(service), fleets, interiors, beamLanes{}, common.WorldClock())
-
-	at := common.WorldMillis(1_000)
-	if err := svc.MintScan(ctx, corpA, sys, board.Cell{Ring: 0, Slot: 0}, at); err != nil {
-		t.Fatalf("corp A scan: %v", err)
-	}
-
-	// Corp A earned per-feature memory — and no graph tier: scanning reveals the
-	// board and charts lanes, it never writes surveyed (#0006 Decision #20).
-	tiersA, err := svc.SystemTiers(ctx, corpA)
-	if err != nil {
-		t.Fatalf("tiers A: %v", err)
-	}
-	if got, ok := tiersA[sys]; ok {
-		t.Errorf("corp A gained graph tier %q from a scan; scans grant none", got)
-	}
-	remA, err := svc.RememberedFeatures(ctx, corpA, sys)
-	if err != nil {
-		t.Fatalf("remembered A: %v", err)
-	}
-	if len(remA) != 3 {
-		t.Errorf("corp A remembered %d features, want 3", len(remA))
-	}
-
-	// Corp B is completely unaffected — the isolation invariant.
-	tiersB, err := svc.SystemTiers(ctx, corpB)
-	if err != nil {
-		t.Fatalf("tiers B: %v", err)
-	}
-	if _, leaked := tiersB[sys]; leaked {
-		t.Errorf("corp B leaked a subspace tier for a system only corp A scanned")
-	}
-	remB, err := svc.RememberedFeatures(ctx, corpB, sys)
-	if err != nil {
-		t.Fatalf("remembered B: %v", err)
-	}
-	if len(remB) != 0 {
-		t.Errorf("corp B leaked %d remembered features from corp A's scan", len(remB))
-	}
-
-	// Coverage is per-corp: A covers its fleet's cell; B covers nothing here.
-	covA, err := svc.Coverage(ctx, corpA, sys, at)
-	if err != nil {
-		t.Fatalf("coverage A: %v", err)
-	}
-	if !covA.Covers(board.Cell{Ring: 0, Slot: 0}) {
-		t.Errorf("corp A should cover its own fleet's cell")
-	}
-	covB, err := svc.Coverage(ctx, corpB, sys, at)
-	if err != nil {
-		t.Fatalf("coverage B: %v", err)
-	}
-	if !covB.Empty() {
-		t.Errorf("corp B should have no coverage in a system it has no units in")
-	}
-
-	// Own-perception is never fogged; a foreign fleet outside your coverage is.
-	aFleet := FleetPos{Id: "fa", CorporationId: corpA, SystemId: sys, Cell: board.Cell{Ring: 0, Slot: 0}}
-	if vis, _ := svc.FleetVisibleTo(ctx, corpA, aFleet, at); !vis {
-		t.Errorf("a corp must always see its own fleet")
-	}
-	if vis, _ := svc.FleetVisibleTo(ctx, corpB, aFleet, at); vis {
-		t.Errorf("corp A's fleet leaked to corp B, which has no coverage of it")
-	}
-}
-
-// TestRememberedKeepsOrbiting proves a remembered feature stores its orbital
-// elements, so a consumer draws it at its CURRENT computed position while its
-// activity/detail stay frozen at asOf (geometry lives, activity freezes).
-//
-// Ring 5 (48 slots under the pinned schedule, not 6×5=30 — tasks.md 7.5's
-// observation/service_test.go:140 site) is a deliberate non-coincidence ring.
-func TestRememberedKeepsOrbiting(t *testing.T) {
+// Scenario (SDET-added): SystemTiers folds stored observations to a
+// systemId→tier map, and a never-queried system is simply absent from that
+// map (SystemTiers's own doc comment: "the caller defaults them" — the fold
+// itself synthesizes no entry for an absent system).
+func TestSystemTiers_Scenario_FoldsStoredObservationsToATierMap(t *testing.T) {
 	service, client := common.SetupFirestoreTestDAO(t)
 	defer common.CleanupFirestoreTestData(t, client, corporationsCollection)
 
 	ctx := context.Background()
 	corp := "corp-" + uuid.NewString()
-	const sys = "sys-1"
-	// A planet with a real period, so its position advances over time.
-	interiors := fakeInteriors{feats: map[string][]FeatureGeom{
-		sys: {{Id: "feat-body-0", Elements: &board.Orbit{Ring: 5, Angle0: 0, Period: 24_000, Dir: 1}}},
-	}}
-	svc := NewServiceWith(NewDaoWithClient(service), fakeFleets{}, interiors, beamLanes{}, common.WorldClock())
+	dao := NewDaoWithClient(service)
+	svc := NewServiceWith(dao, nil, nil, nil, common.WorldClock())
 
-	if err := svc.MintScan(ctx, corp, sys, board.Cell{Ring: 0, Slot: 0}, 1_000); err != nil {
-		t.Fatalf("scan: %v", err)
+	if err := dao.UpsertSystemObservation(ctx, corp, SystemObservation{SystemId: "sys-a", Tier: TierRumored, AsOf: 100}); err != nil {
+		t.Fatalf("seed sys-a: %v", err)
 	}
-	rem, err := svc.RememberedFeatures(ctx, corp, sys)
+	if err := dao.UpsertSystemObservation(ctx, corp, SystemObservation{SystemId: "sys-b", Tier: TierExplored, AsOf: 200}); err != nil {
+		t.Fatalf("seed sys-b: %v", err)
+	}
+
+	tiers, err := svc.SystemTiers(ctx, corp)
 	if err != nil {
-		t.Fatalf("remembered: %v", err)
+		t.Fatalf("SystemTiers: %v", err)
 	}
-	mem, ok := rem["feat-body-0"]
-	if !ok || mem.Elements == nil {
-		t.Fatalf("remembered feature lost its orbital elements")
+	if tiers["sys-a"] != TierRumored {
+		t.Errorf("sys-a tier = %q, want rumored", tiers["sys-a"])
 	}
-	// The stored elements evaluate to different cells at different times — the
-	// clockwork keeps ticking in memory.
-	early := board.OrbState(*mem.Elements, 1_000, testSched())
-	late := board.OrbState(*mem.Elements, 7_000, testSched())
-	if early == late {
-		t.Errorf("remembered feature is frozen in place; it should keep orbiting (early=%v late=%v)", early, late)
+	if tiers["sys-b"] != TierExplored {
+		t.Errorf("sys-b tier = %q, want explored", tiers["sys-b"])
 	}
-	if mem.AsOf != 1_000 {
-		t.Errorf("activity/detail should freeze at asOf=1000, got %d", mem.AsOf)
+	if _, present := tiers["sys-never-queried"]; present {
+		t.Errorf("SystemTiers minted an entry for a never-queried system; the fold must leave it absent, "+
+			"not synthesize starVisible — got %v", tiers)
+	}
+	if len(tiers) != 2 {
+		t.Errorf("tiers = %v, want exactly the 2 stored observations", tiers)
+	}
+}
+
+// --- RevealArrival -------------------------------------------------------
+
+// Scenario (SDET-added): RevealArrival writes the destination as Explored
+// through the DAO — the non-action path (#0009 spawn) uses; waking IS
+// arriving.
+func TestRevealArrival_Scenario_WritesDestinationExplored(t *testing.T) {
+	service, client := common.SetupFirestoreTestDAO(t)
+	defer common.CleanupFirestoreTestData(t, client, corporationsCollection)
+
+	ctx := context.Background()
+	corp := "corp-" + uuid.NewString()
+	dao := NewDaoWithClient(service)
+	svc := NewServiceWith(dao, nil, nil, nil, common.WorldClock())
+
+	if err := svc.RevealArrival(ctx, corp, "sys-home", 1000); err != nil {
+		t.Fatalf("RevealArrival: %v", err)
+	}
+
+	got, err := dao.GetSystemObservation(ctx, corp, "sys-home")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got == nil {
+		t.Fatalf("no observation stored for sys-home after RevealArrival")
+	}
+	if got.Tier != TierExplored {
+		t.Errorf("tier = %q, want explored", got.Tier)
+	}
+	if got.AsOf != 1000 {
+		t.Errorf("asOf = %d, want 1000 (the arrival stamp)", got.AsOf)
+	}
+}
+
+// Scenario (SDET-added): RevealArrival is idempotent — re-running on an
+// already-explored system never lowers it (safe on an idempotent re-spawn,
+// per the method's own doc comment).
+func TestRevealArrival_Scenario_IdempotentOnRepeat(t *testing.T) {
+	service, client := common.SetupFirestoreTestDAO(t)
+	defer common.CleanupFirestoreTestData(t, client, corporationsCollection)
+
+	ctx := context.Background()
+	corp := "corp-" + uuid.NewString()
+	dao := NewDaoWithClient(service)
+	svc := NewServiceWith(dao, nil, nil, nil, common.WorldClock())
+
+	if err := svc.RevealArrival(ctx, corp, "sys-home", 1000); err != nil {
+		t.Fatalf("first RevealArrival: %v", err)
+	}
+	if err := svc.RevealArrival(ctx, corp, "sys-home", 1000); err != nil {
+		t.Fatalf("second RevealArrival: %v", err)
+	}
+
+	got, err := dao.GetSystemObservation(ctx, corp, "sys-home")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Tier != TierExplored {
+		t.Errorf("tier = %q, want explored to survive the repeat", got.Tier)
+	}
+}
+
+// --- ChartedLanes --------------------------------------------------------
+//
+// "Charted-Lane Set Projection" is one of observation's four SURVIVING
+// requirements (design.md Decision 11 — it "carries no lattice geometry" and
+// "is still read by jump validation and by the galaxy view"). Relocated
+// intact from charted_lanes_gap_test.go.
+
+// Scenario: An explored system with no charted lane grants none
+//
+// A corporation can be `explored` at a system (e.g. a dev-seeded starting
+// position, or — after this change — a spawn/travel arrival reveal) without
+// ever having scanned or traveled a specific lane. The charted-lane set is
+// its own independent record (LaneObservation, presence-of-doc IS charted) —
+// there is no derived-from-tier fallback.
+func TestChartedLanes_Scenario_ExploredSystemWithNoChartedLaneGrantsNone(t *testing.T) {
+	service, client := common.SetupFirestoreTestDAO(t)
+	defer common.CleanupFirestoreTestData(t, client, corporationsCollection)
+
+	ctx := context.Background()
+	corp := "corp-" + uuid.NewString()
+	const sys = "sys-home"
+	dao := NewDaoWithClient(service)
+	svc := NewServiceWith(dao, nil, nil, nil, common.WorldClock())
+
+	// The corp is Explored at sys-home (a dev-seeded starting position) but has
+	// never scanned or traveled any of its lanes.
+	if err := dao.UpsertSystemObservation(ctx, corp, SystemObservation{SystemId: sys, Tier: TierExplored, AsOf: 100}); err != nil {
+		t.Fatalf("seed explored tier: %v", err)
+	}
+	// A DIFFERENT corp charted a lane incident to sys-home — proves the
+	// projection is per-corp, not derived from the lane's own existence.
+	other := "corp-" + uuid.NewString()
+	if err := dao.UpsertLane(ctx, other, LaneObservation{LaneId: "lane-home-a", Via: ViaScanned, AsOf: 100}); err != nil {
+		t.Fatalf("seed other corp's charted lane: %v", err)
+	}
+
+	charted, err := svc.ChartedLanes(ctx, corp)
+	if err != nil {
+		t.Fatalf("ChartedLanes: %v", err)
+	}
+	if len(charted) != 0 {
+		t.Errorf("charted-lane set = %v, want empty — being Explored grants no lane by itself, "+
+			"and another corp's charted lane must never leak in", charted)
+	}
+}
+
+// Scenario boundary (SDET-added): charting is per-corp and reflects exactly
+// the corp's own upserted lane records — the presence-of-doc rule stated
+// directly, complementing the negative case above with a positive one.
+func TestChartedLanes_Scenario_ChartedLaneAppearsInTheSet(t *testing.T) {
+	service, client := common.SetupFirestoreTestDAO(t)
+	defer common.CleanupFirestoreTestData(t, client, corporationsCollection)
+
+	ctx := context.Background()
+	corp := "corp-" + uuid.NewString()
+	dao := NewDaoWithClient(service)
+	svc := NewServiceWith(dao, nil, nil, nil, common.WorldClock())
+
+	if err := dao.UpsertLane(ctx, corp, LaneObservation{LaneId: "lane-a", Via: ViaTraveled, AsOf: 200}); err != nil {
+		t.Fatalf("seed charted lane: %v", err)
+	}
+
+	charted, err := svc.ChartedLanes(ctx, corp)
+	if err != nil {
+		t.Fatalf("ChartedLanes: %v", err)
+	}
+	if !charted["lane-a"] {
+		t.Errorf("charted-lane set = %v, want lane-a present", charted)
+	}
+	if len(charted) != 1 {
+		t.Errorf("charted-lane set = %v, want exactly 1 entry", charted)
+	}
+}
+
+// --- ArrivalWrites --------------------------------------------------------
+//
+// Relocated intact from arrival_test.go.
+
+// ArrivalWrites reveals the destination as Explored and charts the lanes the
+// trip actually crossed `via: traveled` — and nothing else (#0006 Decision
+// #17, 2026-07-14): no onward-lane rumor, no tier for anything but the
+// destination. Explored is the top tier, so the blind MergeAll never lowers it.
+func TestArrivalWrites_ExploredDestAndTraveledLanes(t *testing.T) {
+	svc := &Service{}
+	writes := svc.ArrivalWrites("corp", "dest", []string{"lane-1", "lane-2"}, 5000)
+
+	// Destination write is always present and Explored.
+	if len(writes) != 3 {
+		t.Fatalf("expected the destination write + 2 lane writes, got %d", len(writes))
+	}
+	if got := writes[0].Data["tier"]; got != string(TierExplored) {
+		t.Fatalf("destination tier = %v, want explored", got)
+	}
+	if writes[0].Path[len(writes[0].Path)-1] != "dest" {
+		t.Fatalf("first write should target the destination, got %v", writes[0].Path)
+	}
+
+	// The crossed lanes are charted `via: traveled`; no other tier writes exist.
+	charted := map[string]string{}
+	for _, w := range writes[1:] {
+		if w.Path[len(w.Path)-2] != lanesCollection {
+			t.Fatalf("arrival minted a non-lane write beyond the destination: %v (onward rumor is scanning's job)", w.Path)
+		}
+		charted[w.Path[len(w.Path)-1]] = w.Data["via"].(string)
+	}
+	if charted["lane-1"] != ViaTraveled || charted["lane-2"] != ViaTraveled {
+		t.Fatalf("crossed lanes should be charted via traveled, got %v", charted)
 	}
 }

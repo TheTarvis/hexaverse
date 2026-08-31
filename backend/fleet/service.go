@@ -9,7 +9,6 @@ import (
 	"hexaverse/action"
 	"hexaverse/common"
 	"hexaverse/disclosure"
-	"hexaverse/observation"
 	"hexaverse/space"
 	"hexaverse/system"
 
@@ -252,18 +251,6 @@ func (s *Service) ListInSystem(ctx context.Context, systemID string) ([]Fleet, e
 // ListForCorp returns every fleet a corporation owns.
 func (s *Service) ListForCorp(ctx context.Context, corporationID string) ([]Fleet, error) {
 	return s.dao.ListByCorporation(ctx, corporationID)
-}
-
-// FleetsForCorp implements observation.FleetSource. The lattice-cell coverage
-// it used to answer with has no successor after Decision 4 (a fleet has no
-// board cell) — chain link 4's own scope stops at making the type change
-// compile; deleting the five now-vacuous observation requirements this fed
-// is link 4 section 7's job (design.md Decision 11). Degrading to "no
-// coverage from any unit" here is the honest interim: it is strictly more
-// restrictive than today, and it manufactures no shadow lattice position
-// (the ground rules' standing prohibition) to keep the old shape alive.
-func (s *Service) FleetsForCorp(_ context.Context, _ string, _ common.WorldMillis) ([]observation.FleetPos, error) {
-	return nil, nil
 }
 
 // bodiesFor resolves the request-scoped body table for systemID exactly once

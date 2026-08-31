@@ -443,22 +443,66 @@
 
 ## 7. `observation` live-half removal
 
-- [ ] 7.1 Delete the *Ambient Sensor Coverage From Own Units* code: the
+> **Section 7 audit (2026-08-31, updated same day post-adjudication).** All of
+> 7.1-7.9 are now discharged. The 7.1 test dispute filed earlier the same day
+> (see git history) was adjudicated by the orchestrator: `BoardFog`
+> (`system/handler.go`) was already narrowed to just `SystemTiers` by the 7.7
+> pass, so the only remaining fog dependency is the charted-lane-gate tier
+> lookup — `Coverage`/`NewCoverage`/`NewCoverageWithOccluders` had no
+> remaining reason to exist even as a stub, and are deleted outright
+> (`observation/service.go`). That intentionally leaves `system/handler_test.go`
+> and `system/interior_unfogged_interim_test.go` failing to compile on their
+> `fakeBoardFog` (`undefined: observation.Coverage`, `undefined:
+> observation.FeatureMemory`, `undefined: observation.NewCoverage`) — expected
+> and handed to the SDET to narrow the fake, not fixed here (no test file
+> edited). Ambiguity note 1 (`RememberedFeatures`/`FeatureObservation`/
+> `FeatureMemory`/`Band`+`BandVisible`+`BandRemembered`) is resolved:
+> `RememberedFeatures` was already gone; `FeatureObservation` is kept (real
+> caller — the DAO's `ListFeatureObservations`/`UpsertFeatureObservation`,
+> still exercised directly by `observation/dao_test.go`); `FeatureMemory` and
+> `Band`/`BandVisible`/`BandRemembered` are deleted (`observation/model.go`) —
+> no surviving requirement constructed or read either, once
+> `RememberedFeatures` was gone. Verified: `go build ./...` clean,
+> `go test ./observation/ -short -count=1` green including
+> `TestPackage_Scenario_LatticeLiveHalfSymbolsAreAbsent`'s "shared Coverage
+> machinery" subtest now passing, `go test ./system/ -short -count=1` fails to
+> compile exactly as described above (handoff to SDET), and
+> `./fleet/ ./space/ ./action/ ./corporations/ ./mine/ ./market/` stay green.
+>
+> **Follow-up (2026-08-31).** The one remaining loose end from 7.1 —
+> `fleet.Service.FleetsForCorp`, the vestigial `[]struct{}` stub kept alive
+> only by its own interim-contract test — is now deleted. The SDET removed
+> `TestFleetsForCorp_Scenario_ReportsNoCoverageInThisInterim` (reason recorded
+> in `fleet/service_test.go`), clearing the blocker: `observation.FleetSource`
+> is confirmed absent from production per
+> `TestPackage_Scenario_LatticeLiveHalfSymbolsAreAbsent`, `FleetsForCorp` had
+> zero production callers, and `design.md`'s break table already named it for
+> outright deletion. Section 7 is fully closed.
+
+- [x] 7.1 Delete the *Ambient Sensor Coverage From Own Units* code: the
       union-of-lattice-hop-discs coverage computation and `FleetSource`/
       `FleetPos`.
-- [ ] 7.2 Delete the *Running Scan Echo Disc* code: the growing echo-front
+      **2026-08-31: complete.** `FleetSource`/`FleetPos`, the computation
+      itself (discs, occluders, the line-of-sight check, `Service.Coverage`),
+      and — post-adjudication — the `Coverage` type and `NewCoverage`
+      constructor themselves are all gone from `observation/service.go`. The
+      two protected `system`-package test files that named those symbols by
+      type now fail to compile on their `fakeBoardFog`; that is the
+      adjudicated, expected handoff to the SDET's next pass (narrow the
+      fake), not a blocker on this task.
+- [x] 7.2 Delete the *Running Scan Echo Disc* code: the growing echo-front
       measured in lattice hops from a fleet's board-cell emission point.
-- [ ] 7.3 Delete the *Scan Resolution Mints the Reveal* code: the scan action's
+- [x] 7.3 Delete the *Scan Resolution Mints the Reveal* code: the scan action's
       resolver and its reveal mint.
-- [ ] 7.4 Delete the *Path-Swept Ambient Reveal on Move Resolution* code: the
+- [x] 7.4 Delete the *Path-Swept Ambient Reveal on Move Resolution* code: the
       fold over a burn resolution's swept `board.Cell` path.
-- [ ] 7.5 Delete the *Fleet Audience Visibility* code: the lattice
+- [x] 7.5 Delete the *Fleet Audience Visibility* code: the lattice
       sensor-coverage union a foreign fleet's visibility was computed from.
-- [ ] 7.6 Confirm `observation`'s four surviving requirements (the monotonic
+- [x] 7.6 Confirm `observation`'s four surviving requirements (the monotonic
       graph-tier ladder, travel arrival reveal, spawn arrival reveal, charted-lane
       set projection) compile and stay green with no reference to the deleted
       fleet-cell types.
-- [ ] 7.7 Replace `system`'s three-band fog projection (`system/fog.go`,
+- [x] 7.7 Replace `system`'s three-band fog projection (`system/fog.go`,
       `fog_source.go`, `handler.go`) with an unfogged interim read: every
       feature of a materialized interior — geometry, composition, threat detail
       — served in full to every authenticated requester, computing no band
@@ -467,11 +511,11 @@
       requester receives every feature in full, no feature is omitted for lack
       of a stored observation, the interim applies uniformly whether the
       requester is spawned or corpless).
-- [ ] 7.8 Add a code comment at the interim read's implementation naming link 5
+- [x] 7.8 Add a code comment at the interim read's implementation naming link 5
       (`replace-observation-with-sightings`) as the change that replaces it
       with a `disclosure`-projected read, mirroring the standing
       additive-then-refill discipline used elsewhere in this change.
-- [ ] 7.9 Confirm `GET /v1/systems/:systemId` still serves the system's
+- [x] 7.9 Confirm `GET /v1/systems/:systemId` still serves the system's
       radius, character, star class, features, charted lane gates, and
       current world time, and still 404s for an unknown/ungenerated system id
       or when no galaxy has been generated — the base endpoint contract
@@ -602,6 +646,34 @@
       requirement (section 7.7) to replace, rather than removing
       `observation-fog-and-scan` "entirely" as originally predicted (design.md
       Decision 11, Open Question 6).
+- [ ] 9.9 **Survey for the remaining hand-maintained registries**, rather than
+      fixing only the one instance 9.8 names. Three have now bitten this chain,
+      all the same species — *a list of names kept in sync by memory, where the
+      omission is silent and the unit tests still pass*:
+      - `check.py`'s hardcoded package list — the cross-target determinism rule
+        was enforced **nowhere** (fixed in `b64be39`)
+      - `check-mirror-map.sh`'s hardcoded directory set — `fixtures/fleet/` is
+        checked by **nothing** (task 9.8)
+      - `fleet/resolver.go`'s `RegisterResolvers` — `JumpResolver` was called by
+        **nothing**, which would have stranded jumping fleets permanently and
+        invisibly (fixed in `3bcc726`)
+      Grep for the shape: a literal slice/array/map of package, directory,
+      type, or route names that must be updated whenever a sibling is added.
+      Known candidates to check at minimum — `.gitlab-ci.yml`'s two hand-
+      enumerated cross-target legs, `check.py:223`'s `DETERMINISM_GO_PACKAGES`
+      (already known out of sync with `check-transcendental.sh:82` by three
+      packages), `check-transcendental.sh`'s `RULE_BEARING_GO_PACKAGES`, and
+      every other `RegisterResolvers`-style function on the action spine
+      (`mine/resolver.go` at least). **Record what you find; do not fix them
+      all here.**
+      **Orchestrator judgment: the general fix is bigger than link 4 and
+      belongs with the other cross-package cleanups.** Making these derived
+      rather than declared — a registry-completeness test asserting every
+      `ResolveFunc` in a package is registered, or discovering `fixtures/*/`
+      and `backend/*/` generically — spans the CI config, two shell scripts,
+      `check.py`, and the action spine, and changes what those gates *test*
+      rather than what this change *builds*. Link 4 should record the
+      inventory; a separate change should derive the lists.
 - [ ] 9.8 Wire `fixtures/fleet/` into `.claude/scripts/check-mirror-map.sh`.
       That script enumerates a **hardcoded directory set** and does not scan
       `fixtures/` generically, so the `fixtures/fleet/` family added in task

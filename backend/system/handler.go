@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/galaxy"
 	"hexaverse/observation"
@@ -15,14 +14,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// BoardFog is the fog dependency the interior read needs: the requester's live
-// sensor union (Visible) and their stored per-feature memory (Remembered). Nil
-// on the logged-out/dev path — the interior then ships unfogged.
+// BoardFog is the interior read's one remaining fog dependency: the
+// requester's graph-tier knowledge, so lane gates ship only for charted
+// neighbours (chartedGates) — no leaking uncharted stars. Nil on the
+// logged-out/dev path — the interior then ships every gate unfiltered.
+//
+// Until migrate-fleet-to-continuous-burns tasks.md 7.7 this interface also
+// carried the two methods a per-requester feature projection read (a live
+// sensor-coverage lookup and a stored per-feature memory lookup). Both are
+// deleted along with that projection (design.md Decision 11): every feature
+// now ships in full to every authenticated requester (see projectUnfogged),
+// so nothing here needs either any more. Lane gate filtering by charted tier
+// is the one piece of per-requester fog that survives this change
+// (system-interior: "Charted Lane Gate Filtering").
 type BoardFog interface {
-	Coverage(ctx context.Context, cid, systemID string, now common.WorldMillis) (observation.Coverage, error)
-	RememberedFeatures(ctx context.Context, cid, systemID string) (map[string]observation.FeatureMemory, error)
-	// SystemTiers is the requester's graph-tier knowledge, so lane gates ship
-	// only for charted neighbours (chartedGates) — no leaking uncharted stars.
 	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
 }
 
@@ -66,10 +71,13 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	authorized.GET("/systems/:systemId", h.GetInterior)
 }
 
-// GetInterior serves a system's interior, materializing it on first request (the
-// dev-only trigger until #0008), then fogging it per requester at this boundary
-// (#0006): the astronomical layer for anyone, live detail inside their sensor
-// union, remembered features elsewhere.
+// GetInterior serves a system's interior, materializing it on first request
+// (the dev-only trigger until #0008). Every feature ships in full to every
+// authenticated requester (system-interior: "Interior Reads Are Fully
+// Disclosed, A Deliberate Interim" — migrate-fleet-to-continuous-burns
+// tasks.md 7.7, design.md Decision 11); the one piece of per-requester
+// filtering that survives is lane gates, restricted to the requester's
+// charted neighbours when a corp id resolves.
 func (h *Handler) GetInterior(c *gin.Context) {
 	systemID := common.RequiredHttpParam(c, "systemId")
 	ctx := c.Request.Context()
@@ -103,28 +111,20 @@ func (h *Handler) GetInterior(c *gin.Context) {
 		return
 	}
 
+	// tasks.md 7.7 (design.md Decision 11): every feature ships in full to
+	// every authenticated requester — no per-requester band computed, no
+	// feature omitted. See fog.go's projectUnfogged doc comment for the
+	// interim's scope and its stated successor (link 5,
+	// replace-observation-with-sightings).
 	features := projectUnfogged(gen)
 	if h.fog != nil {
 		if cid := common.ActorCorp(c); cid != "" {
-			cov, err := h.fog.Coverage(ctx, cid, systemID, now)
-			if err != nil {
-				log.Error().Ctx(c).Err(err).Str("systemId", systemID).Msg("Failed to compute coverage")
-				c.AbortWithStatus(http.StatusInternalServerError)
-				return
-			}
-			remembered, err := h.fog.RememberedFeatures(ctx, cid, systemID)
-			if err != nil {
-				log.Error().Ctx(c).Err(err).Str("systemId", systemID).Msg("Failed to load remembered features")
-				c.AbortWithStatus(http.StatusInternalServerError)
-				return
-			}
 			tiers, err := h.fog.SystemTiers(ctx, cid)
 			if err != nil {
 				log.Error().Ctx(c).Err(err).Str("systemId", systemID).Msg("Failed to load system tiers")
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
-			features = projectFogged(gen, cov, remembered, now, board.Schedule(gen.Interior.Radius))
 			gates = chartedGates(gates, tiers)
 		}
 	}

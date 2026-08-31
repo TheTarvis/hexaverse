@@ -1,64 +1,27 @@
 package system
 
 import (
-	"context"
 	"strings"
 
 	"hexaverse/board"
-	"hexaverse/observation"
 )
 
-// Features implements observation.InteriorSource: a system's features projected
-// to the minimal geometry + composition the fog domain needs to compute sensor
-// coverage and mint scan snapshots — so observation never imports system.
-//
-// This whole file, plus fog.go and backend/observation and its spec, dies at
-// link 5 of the continuous-space chain (replace-observation-with-sightings).
-// Nothing here reads the continuous element set (Feature.Space/Size) added
-// by openspec add-orbital-system-bodies, and nothing should: this is the
-// lattice fog projection, additive-coexisting beside the continuous bodies
-// BodyTable resolves, not consuming them.
-func (s *Service) Features(ctx context.Context, systemID string) ([]observation.FeatureGeom, error) {
-	gen, err := s.GetOrCreateInterior(ctx, systemID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]observation.FeatureGeom, 0, len(gen.Features))
-	for i := range gen.Features {
-		f := &gen.Features[i]
-		// The station is excluded from the fog/scan feature source entirely
-		// (#0011 Decision 5). This is the actual mechanism that keeps
-		// observation-fog-and-scan untouched by the station splice: because
-		// GetOrCreateInterior now splices a station in ungated, an unfiltered
-		// projection here would make a scan mint a feature observation for it and
-		// give it occluder geometry. A station's visibility is governed entirely
-		// by its own graph-tier rule — never by anything sensed or remembered.
-		if f.Type == FeatureStation {
-			continue
-		}
-		g := observation.FeatureGeom{
-			Id:               f.Id,
-			Astronomical:     isAstronomical(f.Id),
-			OcclusionRadius2: occlusionRadius2(f.Type),
-			Detail:           featureDetail(f),
-		}
-		if f.Orbit != nil {
-			g.Elements = &board.Orbit{Ring: f.Orbit.Ring, Angle0: f.Orbit.Angle0, Period: f.Orbit.Period, Dir: f.Orbit.Dir}
-		}
-		if len(f.Footprint) > 0 {
-			g.Anchor = f.Footprint[0]
-		}
-		out = append(out, g)
-	}
-	return out, nil
-}
+// migrate-fleet-to-continuous-burns tasks.md 7.7 (design.md Decision 11)
+// deletes this file's former reason to exist: projecting a system's
+// features into the minimal geometry/composition shape observation's
+// deleted sensor-coverage computation and scan mint needed. What remains are
+// two small, purely local helpers with no tie to observation at all —
+// occlusionRadius2 and isAstronomical are exercised directly by
+// station_splice_test.go and are exactly the per-feature-type facts a
+// future line-of-sight-aware read (link 5's disclosure-projected read, or
+// any other consumer of board.LineOfSight-shaped occlusion) will need
+// again, so they stay rather than being deleted and reinvented.
 
 // occlusionRadius2 maps a feature type to its pinned squared occlusion radius
 // (design.md Decision 1): the star and planets shadow the lightspeed channel
-// with a real radius now, not a boolean; belts, moons, hazards, and the
-// station (never generated here — it's excluded above) don't occlude at all.
-// Which feature types qualify, and their radius, is this domain's rule;
-// observation stays purely geometric and never learns what a gas giant is.
+// with a real radius, not a boolean; belts, moons, hazards, and the station
+// (excluded from every feature source that would ask) don't occlude at all.
+// Which feature types qualify, and their radius, is this domain's rule.
 func occlusionRadius2(t FeatureType) int64 {
 	switch t {
 	case FeatureStar:
@@ -71,20 +34,9 @@ func occlusionRadius2(t FeatureType) int64 {
 }
 
 // isAstronomical marks the free telescope layer — the star + the major-body
-// skeleton (feat-body-N, mirroring generator.go's ids). Detail features (belts,
-// moons, hazards, anomalies) are earned by presence or scan (#0006 free/earned
-// line runs between body types).
+// skeleton (feat-body-N, mirroring generator.go's ids). A station is never
+// astronomical: its visibility comes from its own graph-tier rule, not this
+// classification.
 func isAstronomical(featureID string) bool {
 	return featureID == "feat-star" || strings.HasPrefix(featureID, "feat-body-")
-}
-
-func featureDetail(f *Feature) *observation.FeatureDetail {
-	d := &observation.FeatureDetail{FeatureType: string(f.Type)}
-	for _, r := range f.Resources {
-		d.Resources = append(d.Resources, observation.ResourceReading{Kind: string(r.Kind), Richness: r.Richness})
-	}
-	if f.Effects != nil && f.Effects.Block {
-		d.Threat = "hazard"
-	}
-	return d
 }
