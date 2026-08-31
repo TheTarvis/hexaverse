@@ -7,9 +7,7 @@ requester's fleet roster, and the select→preview→commit gesture for
 graph-tier travel — serving both authenticated players (the live,
 per-corporation-fogged galaxy) and logged-out visitors (a frozen static
 start area).
-
 ## Requirements
-
 ### Requirement: Live-vs-Start-Area Data Source by Auth State
 The system SHALL, once authentication has resolved, fetch the live galaxy
 (`GET /v1/galaxy`) for an authenticated user or the frozen static
@@ -97,72 +95,20 @@ enter).
 - **THEN** no "Enter system" action is offered
 
 ### Requirement: Own-Fleet Presence and Recenter Target
+
 The system SHALL mark systems hosting at least one of the requester's own
-fleets that are not currently in transit (traveling a lane or held
-mid-lane) as presence markers on the graph, and SHALL drive the recenter
-control to snap to the requester's active fleet's system when one exists,
-falling back to a whole-galaxy framing otherwise.
+fleets that are not currently mid-jump (crossing a lane) as presence
+markers on the graph, and SHALL drive the recenter control to snap to the
+requester's active fleet's system when one exists, falling back to a
+whole-galaxy framing otherwise. A jump is atomic and single-hop — there is
+no held-mid-lane state for a fleet to occupy (design.md Decision 4,
+Decision 10).
 
 #### Scenario: A traveling fleet is not marked at the system it left
-- **WHEN** an own fleet is in lane transit or lane-held
+
+- **WHEN** an own fleet's `jump` field is set (a lane crossing is underway)
 - **THEN** its origin system is not marked with a presence indicator for
-  that fleet (the fleet is drawn on the transit layer instead)
-
-### Requirement: Select-Preview-Commit Travel Gesture
-The system SHALL, when an idle-or-available own fleet exists and a
-different system is selected, preview the shortest charted lane route
-(per-leg and total ETA) from that fleet to the selected system, offer a
-"Travel here" commit when a route exists, and show a "no charted route"
-message instead when none does; selecting the fleet's own current system
-SHALL show a simple "your fleet is here" note instead of a route preview.
-
-#### Scenario: Selecting the fleet's own system shows no route preview
-- **WHEN** the system the active fleet currently occupies is selected
-- **THEN** a "your fleet is here" note is shown, with no route preview or
-  travel action
-
-#### Scenario: Committing a previewed route departs the fleet
-- **WHEN** "Travel here" is invoked for a previewed route
-- **THEN** a travel order is submitted for the active fleet to the
-  selected destination, and on success the selection is cleared and a
-  success toast is shown
-
-#### Scenario: An unreachable destination offers no commit
-- **WHEN** the selected destination has no charted route from the active
-  fleet
-- **THEN** a "no charted route" message is shown and no travel commit is
-  offered
-
-### Requirement: Bridge Lane Rendering
-The galaxy view SHALL render lanes carrying the `bridge` marker visually
-distinct from ordinary lanes (a fainter/differentiated style), so
-void-crossing routes read differently from local roads, while treating them
-identically for interaction (selection, route preview, travel commit).
-
-#### Scenario: A bridge lane renders distinctly
-- **WHEN** the galaxy view renders a charted lane whose `bridge` flag is set
-- **THEN** its visual style differs from ordinary charted lanes
-
-#### Scenario: A bridge lane behaves like any lane for travel
-- **WHEN** the user previews and commits a route that rides a bridge lane
-- **THEN** the gesture, preview, and commit behave exactly as over an
-  ordinary lane
-
-### Requirement: Transit Fleet Selection and Card
-The system SHALL let a fleet currently in lane transit or lane-held be
-selected (via its lane marker on the graph or its roster row), showing a
-card with its current leg, activity, remaining-time countdown, and its
-route with per-leg ETAs, in place of the system inspector; selecting a
-system node SHALL close any open fleet card.
-
-#### Scenario: Selecting a transiting fleet's marker opens its card
-- **WHEN** a fleet's lane marker is selected
-- **THEN** a fleet card is shown with its route and live countdown,
-  replacing the system inspector
-
-#### Scenario: Selecting a system node closes an open fleet card
-- **WHEN** a system node is selected while a fleet card is open
-- **THEN** the fleet card closes and the system inspector shows instead
+  that fleet
 
 ### Requirement: Self-Scheduled Arrival Refresh
 The system SHALL, for each of the requester's fleets in transit with a
@@ -452,3 +398,19 @@ transition.
 - **THEN** focus moves to the retry affordance, or to the state's
   explanatory text if no retry affordance is shown
 - **AND** focus is never silently dropped to the document body
+
+### Requirement: Bridge Lane Rendering Is Visually Distinct
+
+The galaxy view SHALL render lanes carrying the `bridge` marker visually
+distinct from ordinary lanes (a fainter/differentiated style), so
+void-crossing routes read differently from local roads. The galaxy view
+offers no route preview or travel-commit interaction on any lane, bridge or
+ordinary — a lane crossing is commanded as a single-hop `jump` from the
+roster panel, not by interacting with a lane in this view (design.md
+Decision 10, Decision 12).
+
+#### Scenario: A bridge lane renders distinctly
+
+- **WHEN** the galaxy view renders a charted lane whose `bridge` flag is set
+- **THEN** its visual style differs from ordinary charted lanes
+

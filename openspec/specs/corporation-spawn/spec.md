@@ -6,9 +6,7 @@ and the wake-up flow that mints one per account: choosing a home system,
 seeding its one starting hull, and writing its initial fog, so a fresh
 account becomes a playable presence in the galaxy in a single idempotent
 call.
-
 ## Requirements
-
 ### Requirement: One Living Corporation Per Account
 The system SHALL enforce that an account has at most one living
 (not-yet-died) corporation at a time, anchored by a create-if-absent
@@ -250,17 +248,6 @@ expected outcome of accumulating players.
   Corporation Per Account) without re-running selection or consuming
   re-pick attempts
 
-### Requirement: One Starting Hull at a Deterministic Rim Position
-The system SHALL, on fresh spawn, seed exactly one fleet for the new
-corporation in its chosen home system, coasting at a deterministic cell on
-the rim ring (one ring inside the lane-gate ring) derived from the
-account id, so a healed retry places the hull at the same position.
-
-#### Scenario: The starting hull never lands on the core
-- **WHEN** a starting hull is seeded
-- **THEN** its position is a rim-ring cell, never the core cell
-  `{ring 0, slot 0}`
-
 ### Requirement: Home-Only Initial Fog, No Lanes Charted
 The system SHALL, on spawn, reveal only the home system as `explored` for
 the new corporation and SHALL chart no lanes — discovering onward roads is
@@ -342,6 +329,26 @@ healing pass.
 - **THEN** exactly one station exists for its home system afterward, exactly
   one opening-grant ledger entry exists, and the stored balance equals the
   configured starting value — never twice either
+
+### Requirement: One Starting Hull at a Deterministic Home Park
+
+The system SHALL, on fresh spawn, seed exactly one fleet for the new
+corporation in its chosen home system via `fleet.SeedFleet`, parked at a
+position deterministic from the account id, so a healed retry places the
+hull at the same position — never re-seeding a second hull for an account
+whose corporation already has one (see "Spawn Asset Healing").
+
+#### Scenario: The starting hull is deterministic per account
+
+- **WHEN** a fresh spawn seeds the starting hull for an account
+- **THEN** its position derives deterministically from that account id, so a
+  later healing retry for the same account reproduces the identical position
+
+#### Scenario: The starting hull never lands inside the star's clearance
+
+- **WHEN** a starting hull is seeded
+- **THEN** its position lies outside the home system star's configured
+  clearance radius
 
 ## Notes for future maintainers
 

@@ -12,190 +12,74 @@ drawn as an annular sector; the star occupies the single core cell,
 `{ring: 0, slot: 0}`.
 ## Requirements
 ### Requirement: System Board Route and Data Fan-In
-The system SHALL render `/systems/:systemId` by reading the system's fogged
-interior and the fogged fleets in that system, disabled until a non-empty
-system id is known; SHALL show a loading state while either read is in
-flight, or, while the board's rendering context is available and
-uninterrupted, until it has produced its first rendered frame; and SHALL
-show an error state (with the underlying error message when available) if
-the interior read fails. The unsupported and interrupted states defined by
-`### Requirement: Renderer Unavailability Is an Explicit State` and
-`### Requirement: Lost Rendering Context Recovers Without Navigation` (both
-`add-renderer-availability-states`) take precedence over this loading
-state: once either fires, the board shows that state, not the loading
-placeholder, regardless of whether a first frame has ever been produced.
+
+The system SHALL render `/systems/:systemId` by reading the system's
+interior — an unfogged interim read (design.md Decision 11: every feature
+is served live to any authenticated requester until link 5 replaces this
+with a `disclosure` projection) — disabled until a non-empty system id is
+known; SHALL show a loading state while that read is in flight, or, while
+the board's rendering context is available and uninterrupted, until it has
+produced its first rendered frame; and SHALL show an error state (with the
+underlying error message when available) if the interior read fails. The
+board fetches no fleet data (design.md Decision 12). The unsupported and
+interrupted states defined by `### Requirement: Renderer Unavailability Is
+an Explicit State` and `### Requirement: Lost Rendering Context Recovers
+Without Navigation` (both `add-renderer-availability-states`) take
+precedence over this loading state: once either fires, the board shows
+that state, not the loading placeholder, regardless of whether a first
+frame has ever been produced.
 
 #### Scenario: Loading state before data arrives
+
 - **WHEN** the system board route is opened and its data has not yet
   loaded
 - **THEN** a loading placeholder is shown
 
 #### Scenario: Error state on a failed interior read
+
 - **WHEN** the interior read fails
 - **THEN** an error panel is shown instead of the board
 
 #### Scenario: Loading persists through first frame after data arrives
-- **WHEN** the interior and fleet reads have completed and the board's
-  rendering context is available and uninterrupted, but it has not yet
-  produced its first frame
+
+- **WHEN** the interior read has completed and the board's rendering
+  context is available and uninterrupted, but it has not yet produced its
+  first frame
 - **THEN** the loading placeholder remains shown rather than an empty or
   black canvas
 
 #### Scenario: An unsupported rendering context takes precedence over the loading placeholder
-- **WHEN** the interior and fleet reads have completed but the board's
-  rendering context cannot be created
+
+- **WHEN** the interior read has completed but the board's rendering
+  context cannot be created
 - **THEN** the board's canvas region shows the unsupported state, not the
   loading placeholder
 
 ### Requirement: Toggle-to-Deselect Single Selection
+
 The system SHALL maintain exactly one selection at a time, among a
-feature, a bare cell, a fleet, or a lane gate; selecting the currently
-selected item again SHALL clear the selection (deselect) rather than
-re-select it; selecting a different item of any kind SHALL replace the
-current selection.
+feature, a bare cell, or a lane gate; selecting the currently selected item
+again SHALL clear the selection (deselect) rather than re-select it;
+selecting a different item of any kind SHALL replace the current
+selection. The board draws no fleet layer, so a fleet is never a member of
+this selection set (design.md Decision 12).
 
 #### Scenario: Re-selecting the same feature deselects it
+
 - **WHEN** a feature is selected and then clicked again
 - **THEN** the selection becomes empty
 
 #### Scenario: Selecting a hex replaces a feature selection
+
 - **WHEN** a feature is selected and a bare cell is then clicked
 - **THEN** the selection becomes that cell, and the feature is no longer
   selected
 
 #### Scenario: Clicking board background clears the selection
+
 - **WHEN** a feature is selected and a point on the board outside the
   lattice is clicked
 - **THEN** the selection becomes empty
-
-### Requirement: Move Preview From the Acting Fleet's Live Position
-The system SHALL compute a live move preview from the acting fleet's
-current effective position (its docked parent's live position if docked,
-otherwise its board cell) to the current selection: a lead-intercept path
-if the selection is an orbiting feature, a direct path if it is a fixed
-feature or a bare cell, or the in-system leg to a gate's tile if the
-selection is a lane gate — recomputed every frame so a led intercept's
-countdown tracks the moving target. A selection resolving to the core cell
-`{ring: 0, slot: 0}` — the single innermost cell of the lattice, which the
-star occupies — or to a fixed feature, SHALL yield no move plan.
-
-#### Scenario: Selecting an orbiting body previews a lead intercept
-- **WHEN** an orbiting feature is selected with an active fleet present
-- **THEN** the move preview is the lead-solved intercept path to that body,
-  recomputed each frame
-
-#### Scenario: Selecting the star yields no plan
-- **WHEN** the star (a fixed feature at the core) is selected
-- **THEN** no move plan is shown
-
-#### Scenario: Selecting the core hex directly yields no plan
-- **WHEN** the bare core cell `{ring: 0, slot: 0}` is selected
-- **THEN** no move plan is shown
-
-### Requirement: Move Commit
-The system SHALL, when the move command is invoked with an active fleet
-and a feature or cell selection, submit an order for that target; on
-success it SHALL clear the selection and show a success toast; on failure
-it SHALL show an error toast and leave the selection unchanged.
-
-#### Scenario: A successful move clears the selection
-- **WHEN** the move command succeeds
-- **THEN** the selection is cleared and a success toast is shown
-
-#### Scenario: A failed move keeps the selection and toasts the error
-- **WHEN** the move command fails
-- **THEN** the selection remains, and an error toast shows the failure
-  reason
-
-### Requirement: Scan Aim Preview Only While Considering the Verb
-The system SHALL show the 360° sweep's shadow preview (what the sweep
-would leave dark from the fleet's current position) only while the player
-is hovering or keyboard-focusing the scan control — not while merely
-selecting things to plan a move — and SHALL hide it otherwise.
-
-#### Scenario: Hovering the scan control shows the sweep preview
-- **WHEN** the pointer hovers (or keyboard focus lands on) the scan
-  control
-- **THEN** the sweep shadow preview is drawn from the fleet's current
-  position
-
-#### Scenario: Selecting a move target does not show the sweep preview
-- **WHEN** a feature or cell is selected to plan a move, without hovering
-  the scan control
-- **THEN** no sweep preview is drawn
-
-### Requirement: Scan Commit and Single-Slot Gating
-The system SHALL, when the scan command is invoked with an active fleet,
-submit a scan order; the scan control SHALL be disabled while a scan
-already has an unexpired ETA (a scan is running) or while any verb is
-pending, and SHALL NOT be disabled merely because the fleet is burning
-(movement and sensing are independent channels).
-
-#### Scenario: Scan is available while burning
-- **WHEN** the acting fleet's effective state is `burn`
-- **THEN** the scan control remains enabled
-
-#### Scenario: Scan is disabled while a scan is already running
-- **WHEN** the acting fleet has a running scan whose ETA has not yet
-  passed
-- **THEN** the scan control is disabled and shows a countdown to
-  resolution
-
-### Requirement: Cancel Command Available Only While Burning
-The system SHALL show the cancel-burn command only when the acting
-fleet's effective state is `burn`, and SHALL invoke the cancel order when
-it is pressed.
-
-#### Scenario: Cancel is hidden when not burning
-- **WHEN** the acting fleet's effective state is not `burn`
-- **THEN** no cancel-burn control is shown
-
-### Requirement: Lane Gate Selection Previews and Commits Departure
-The system SHALL, when a lane gate is selected, preview the charted route
-from the acting fleet to that gate's destination system (per-leg and
-total ETA); if no charted route exists, it SHALL show a "no charted
-route" message instead of a preview; and SHALL, when the depart command is
-invoked with a gate selection, submit a travel order to that destination,
-clearing the selection and toasting success or failure.
-
-#### Scenario: An uncharted destination shows no-route messaging
-- **WHEN** a lane gate whose destination has no charted route from the
-  acting fleet is selected
-- **THEN** a "no charted route" message is shown instead of a route
-  preview, with no depart action offered
-
-#### Scenario: Departing clears the selection on success
-- **WHEN** the depart command succeeds for a selected gate
-- **THEN** the selection is cleared and a success toast is shown
-
-### Requirement: Realtime Refetch Rules While the Board Is Open
-The system SHALL keep the open board's interior and fleet reads current
-via three independent mechanisms: (1) a self-scheduled refetch shortly
-after the soonest known future ETA among the requester's own fleets'
-arrivals, the running scan's ETA, and the running mine's ETA, (2) a live
-subscription to the system's event channel that refetches on a completion
-event and again on reconnect after a drop, and (3) a periodic poll —
-tightened while an own scan is running (its progressively landing echoes)
-and relaxed otherwise.
-
-#### Scenario: An own fleet's arrival self-schedules a refetch
-- **WHEN** an own fleet in the system has a burn with a known arrival time
-- **THEN** a refetch is scheduled to fire shortly after that arrival time
-
-#### Scenario: A running mine self-schedules a refetch at its ETA
-- **WHEN** the acting fleet has a running mine with a known ETA
-- **THEN** a refetch is scheduled to fire shortly after that ETA, so the
-  resolved cargo and freed movement channel land without user action
-
-#### Scenario: A missed event on reconnect triggers a resync
-- **WHEN** the system channel's live connection drops and later
-  reconnects
-- **THEN** a refetch fires on reconnect to resync any missed completions
-
-#### Scenario: The poll tightens while a scan is running
-- **WHEN** the acting fleet has a running scan on this board
-- **THEN** the periodic poll interval is shorter than when no scan is
-  running
 
 ### Requirement: Departure Hand-Off to the Galaxy View
 The system SHALL, when an own fleet that was being watched on this board
@@ -299,28 +183,6 @@ rejection reason and leave the offer's state unchanged.
   lode, busy movement slot)
 - **THEN** an error toast surfaces the server's rejection reason and the
   offer remains available
-
-### Requirement: Running Mine Gates the Movement Channel
-The system SHALL, while the acting fleet has a running mine action whose
-ETA has not yet passed, disable the mine and move commands and show a
-countdown to the run's ETA; the scan command SHALL remain enabled
-(independent sensor channel); and a cancel-mine control SHALL be offered
-that cancels the run via the generic action cancel endpoint. Once the ETA
-passes, the gating SHALL lift without requiring navigation.
-
-#### Scenario: Move is disabled while a mine is running
-- **WHEN** the acting fleet has a running mine whose ETA is in the future
-- **THEN** the move command is unavailable and a countdown to the mine's
-  ETA is shown
-
-#### Scenario: Scan stays enabled while a mine is running
-- **WHEN** the acting fleet has a running mine whose ETA is in the future
-- **THEN** the scan control remains enabled
-
-#### Scenario: A running mine can be cancelled
-- **WHEN** the cancel-mine control is invoked during a running mine
-- **THEN** the cancellation is submitted through the generic action cancel
-  endpoint and the movement channel frees on success
 
 ### Requirement: Fleet Panel Hold Readout
 The system SHALL show, for the acting (own) fleet, a hold readout derived
@@ -577,177 +439,6 @@ transition.
   explanatory text if no retry affordance is shown
 - **AND** focus is never silently dropped to the document body
 
-### Requirement: Fog Band Determines a Feature's Board Treatment
-This requirement governs only features carrying the three-band fog
-projection defined by `system-interior`'s *Three-Band Fog Projection of
-Features* (`visible`/`remembered`/`astronomical`); a board entity explicitly
-exempt from that projection — for example, a system's trading station,
-whose board visibility is governed by its own graph-tier rule — is out of
-this requirement's scope and needs its own treatment rule.
-
-The system SHALL determine each such feature's rendered treatment from the
-fog band the server assigned it, and from no other input: a feature in the
-`astronomical` band SHALL be drawn as an outline of its predicted geometry
-only, with no lit surface and no `data-mineable` affordance; a feature in
-the `remembered` band SHALL be drawn with a treatment visibly distinct from
-`visible` (dimmed, and marked as a past observation), and SHALL keep its
-stored resource detail available to the board's selection affordances — its
-hit shape's `data-mineable` attribute, and the facts panel's `asOf` readout
-once that feature is selected; a feature in the `visible` band SHALL be
-drawn at full live strength, with its hit shape's `data-mineable` attribute
-reflecting its current resources. The board SHALL NOT infer, randomise, or
-otherwise derive a fog band client-side — a feature's band is read from the
-data the server sent and never assigned or seeded locally. A feature whose
-band is absent or is not one of `visible`, `remembered`, `astronomical`
-SHALL receive the `astronomical` treatment. The band → treatment mapping
-SHALL be a function of the fogged feature alone, evaluable and assertable
-without a rendering context, and the renderer SHALL consume its output
-without re-deriving any part of the mapping. The board SHALL treat the
-server's fog projection as the sole source of a feature's detail, and SHALL
-NOT hold, cache, or derive resource, activity, or composition detail that
-the projection omitted for that requester.
-
-#### Scenario: A visible-band feature is drawn at full live strength
-- **WHEN** the interior read returns a feature with band `visible` and
-  resources
-- **THEN** the feature is drawn at full strength and its hit shape carries
-  `data-mineable`
-
-#### Scenario: An astronomical-band feature yields outline-only treatment
-- **WHEN** the interior read returns a feature with band `astronomical`
-- **THEN** the feature is drawn as an unfilled outline of its predicted
-  geometry, with no lit surface and no `data-mineable` attribute on its hit
-  shape
-
-#### Scenario: A remembered-band feature carries its frozen detail
-- **WHEN** the interior read returns a feature with band `remembered` and
-  stored resources
-- **THEN** the feature's treatment is visibly distinct from `visible`, its
-  hit shape still carries `data-mineable`, and selecting it shows the
-  observation's `asOf` in the facts panel's readout
-
-#### Scenario: Band treatment is deterministic, not client-derived
-- **WHEN** the same feature is rendered twice in the same session, and
-  again in a new session, with an unchanged server-assigned band
-- **THEN** its rendered treatment is identical each time — no seeded or
-  randomised client-side band assignment influences it
-
-#### Scenario: An unrecognised band falls back to the most restrictive treatment
-- **WHEN** the interior read returns a feature whose `band` is absent or is
-  not one of `visible`, `remembered`, `astronomical`
-- **THEN** the feature is drawn with the `astronomical` treatment — outline
-  only, no `data-mineable` attribute — and the board continues to render
-  without error
-
-#### Scenario: Band treatment is assertable without a rendering context
-- **WHEN** a fogged feature is passed to the board's band → treatment
-  mapping outside any renderer
-- **THEN** the mapping returns that band's complete treatment values —
-  including whether a lit surface is emitted at all — and those values are
-  what the renderer draws, with no part of the band decision made inside
-  the rendering backend
-
-#### Scenario: An astronomical feature carries no detail to withhold
-- **WHEN** the interior read returns a feature with band `astronomical`
-- **THEN** that feature arrives with no `resources`, no `effects`, and no
-  `asOf`, and the board's treatment mapping is given no such fields —
-  the absence of detail is what the server sent, not what the renderer
-  declined to draw
-
-### Requirement: Board Picking Resolves to the Entity Under the Pointer
-The system SHALL resolve a click on the board to the entity drawn under the
-pointer: a click within a fleet, feature, or lane-gate mark SHALL select
-that entity; a click elsewhere within the lattice SHALL select the cell
-containing that point, and that cell SHALL be visibly marked as selected on
-the board; and a click outside the lattice SHALL clear the selection. Hit
-targets SHALL be positioned at the marks actually drawn, and a feature's
-hit-target size SHALL be independent of its fog-band visual treatment — an
-outline-only astronomical feature SHALL NOT be harder to select than a
-filled feature of the same type. WHEN two or more marks' hit targets
-contain the clicked point, the topmost drawn mark SHALL win, using the
-board's documented draw order (fleets above features above lane gates; a
-child feature above its parent).
-
-#### Scenario: Clicking a fleet mark selects that fleet
-- **WHEN** the pointer clicks within a fleet's drawn mark
-- **THEN** that fleet becomes the selection
-
-#### Scenario: Clicking the lattice away from any mark selects the hex
-- **WHEN** the pointer clicks a point within the lattice that is not
-  over a fleet, feature, or lane-gate mark
-- **THEN** the cell containing that point becomes the selection
-
-#### Scenario: A selected bare hex is visibly marked on the board
-- **WHEN** a bare cell (not a fleet, feature, or lane-gate mark) becomes the
-  selection
-- **THEN** that cell is visibly marked as selected on the board
-
-#### Scenario: An overlapping child mark wins over its parent
-- **WHEN** the pointer clicks a point where a moon's hit target and its
-  parent feature's hit target overlap
-- **THEN** the moon (the child, drawn on top) becomes the selection, not
-  its parent
-
-#### Scenario: Clicking outside the lattice clears the selection
-- **WHEN** the pointer clicks a point outside the lattice
-- **THEN** the selection becomes empty
-
-#### Scenario: A docked fleet's shrunk hit target falls through to its host body
-- **WHEN** a fleet's effective state is `docked` to a feature and the
-  pointer clicks just outside the fleet's hull but still over the feature's
-  mark
-- **THEN** the feature is selected, not the fleet
-
-#### Scenario: An outline-only astronomical feature keeps a full-size hit target
-- **WHEN** a feature in the `astronomical` band is drawn as an unfilled outline
-- **THEN** its hit target is the same size used for a filled feature of the
-  same type, not reduced to the outline's stroke width
-
-### Requirement: Foreign Fleets Render as Contact Marks Only
-The system SHALL render a fleet the requester does not own as a contact
-mark carrying only its position — no ship count, no class composition, and
-no movement-mode accent — and SHALL render an owned fleet from its
-owner-only roster and effective movement state, including a mode accent and
-heading. A foreign fleet's mark SHALL be derived from its position alone:
-its size, hull-instance count, and formation SHALL be constant across all
-foreign fleets and SHALL NOT vary with any field of that fleet's read.
-
-#### Scenario: An own fleet shows its movement-mode accent and heading
-- **WHEN** the board renders a fleet the requester owns
-- **THEN** the fleet's mark carries a movement-mode accent and is oriented
-  along its heading
-
-#### Scenario: A foreign fleet renders as a generic contact mark
-- **WHEN** the board renders a fleet read with `own: false`
-- **THEN** the fleet's mark carries no ship count, no class composition,
-  and no movement-mode accent
-
-#### Scenario: A foreign fleet read with no roster renders without error
-- **WHEN** a fleet read arrives with its `roster` field absent (audience
-  fog on a foreign fleet)
-- **THEN** the fleet renders as a contact mark and no error occurs
-
-#### Scenario: Two foreign fleets of different composition render identically
-- **WHEN** two fleets the requester does not own are visible in the same
-  system and their owners' rosters differ in ship count
-- **THEN** both marks are drawn with identical geometry — same size, same
-  instance count, same formation — so the mark discloses nothing about
-  either fleet's composition
-
-#### Scenario: The own/foreign fork is decided outside the renderer
-- **WHEN** a fleet read is passed to the board's fleet-mark mapping
-  outside any renderer
-- **THEN** the mapping returns the foreign contact mark's values for a
-  fleet with `own: false`, and the owned composition values for a fleet
-  with `own: true`, so the fork is assertable without a rendering context
-
-#### Scenario: A fleet absent from the latest read is removed from the board
-- **WHEN** a fleet that was drawn on the board is absent from the next
-  fleet read (a foreign fleet that left the requester's live sensor
-  coverage, or an own fleet that left the system)
-- **THEN** its mark and its hit target are removed from the board on that
-  read, leaving no stale contact at its last drawn position
-
 ### Requirement: Board Glyph Selection Is Keyboard-Operable
 The system SHALL make every fleet, feature, and lane-gate hit target on the
 board reachable via keyboard, in a consistent tab order — features, then
@@ -975,24 +666,6 @@ change.
 - **WHEN** a sell command fails and an error toast is shown
 - **THEN** the error's player-facing copy is announced via an accessible
   live region, not conveyed by a purely visual toast
-
-### Requirement: Running Scan Renders From Its Pinned Emission Cell
-The system SHALL, while the acting fleet has a running scan whose ETA has
-not yet passed, render the committed sweep centred on the scan's pinned
-emission cell (from the running action's recorded params, falling back to
-the fleet's position at the scan's ETA if no origin was recorded) — not
-the fleet's current live position — and SHALL stop rendering it once the
-scan's ETA passes.
-
-#### Scenario: The committed sweep stays anchored to where it was fired
-- **WHEN** a fleet with a running scan moves away from the cell it fired
-  from before the scan's ETA
-- **THEN** the rendered sweep remains centred on the original emission
-  cell, not the fleet's current position
-
-#### Scenario: The sweep stops rendering once the ETA passes
-- **WHEN** world time reaches or passes the running scan's ETA
-- **THEN** the committed sweep is no longer rendered
 
 ### Requirement: The Board Renders on the Polar Lattice
 The system SHALL render the tactical board on the polar ring-and-slot
@@ -1316,4 +989,101 @@ Renderer Unavailability States Are Accessible` specifies.
 - **AND** if keyboard focus was on a camera control at that moment, focus
   moves per `### Requirement: Renderer Unavailability States Are
   Accessible` and is never silently dropped to the document body
+
+### Requirement: Board Picking Resolves to the Feature, Cell, or Lane Gate Under the Pointer
+
+The system SHALL resolve a click on the board to the entity drawn under the
+pointer: a click within a feature or lane-gate mark SHALL select that
+entity; a click elsewhere within the lattice SHALL select the cell
+containing that point, and that cell SHALL be visibly marked as selected on
+the board; and a click outside the lattice SHALL clear the selection. Hit
+targets SHALL be positioned at the marks actually drawn. WHEN two or more
+marks' hit targets contain the clicked point, the topmost drawn mark SHALL
+win, using the board's documented draw order (features above lane gates; a
+child feature above its parent).
+
+#### Scenario: Clicking a feature mark selects that feature
+
+- **WHEN** the pointer clicks within a feature's drawn mark
+- **THEN** that feature becomes the selection
+
+#### Scenario: Clicking a lane-gate mark selects that gate
+
+- **WHEN** the pointer clicks within a lane gate's drawn mark
+- **THEN** that gate becomes the selection
+
+#### Scenario: Clicking the lattice away from any mark selects the hex
+
+- **WHEN** the pointer clicks a point within the lattice that is not over a
+  feature or lane-gate mark
+- **THEN** the cell containing that point becomes the selection
+
+#### Scenario: A selected bare hex is visibly marked on the board
+
+- **WHEN** a bare cell (not a feature or lane-gate mark) becomes the
+  selection
+- **THEN** that cell is visibly marked as selected on the board
+
+#### Scenario: An overlapping child mark wins over its parent
+
+- **WHEN** the pointer clicks a point where a moon's hit target and its
+  parent feature's hit target overlap
+- **THEN** the moon (the child, drawn on top) becomes the selection, not its
+  parent
+
+#### Scenario: Clicking outside the lattice clears the selection
+
+- **WHEN** the pointer clicks a point outside the lattice
+- **THEN** the selection becomes empty
+
+### Requirement: Running Mine Gates the Fleet Panel's Commands
+
+The system SHALL, while the acting fleet has a running mine action whose
+ETA has not yet passed, disable the roster panel's burn, cut-drive, stop,
+and jump commands and show a countdown to the run's ETA; and a cancel-mine
+control SHALL be offered that cancels the run via the generic action cancel
+endpoint, leaving the fleet's kinematic state and attachment untouched.
+Once the ETA passes, the gating SHALL lift without requiring navigation.
+
+#### Scenario: Burn, cut-drive, stop, and jump are disabled while a mine is running
+
+- **WHEN** the acting fleet has a running mine whose ETA is in the future
+- **THEN** the roster panel's burn, cut-drive, stop, and jump commands are
+  unavailable and a countdown to the mine's ETA is shown
+
+#### Scenario: A running mine can be cancelled
+
+- **WHEN** the cancel-mine control is invoked during a running mine
+- **THEN** the cancellation is submitted through the generic action cancel
+  endpoint, the movement channel frees on success, and the fleet's
+  kinematic state and attachment are left untouched
+
+### Requirement: Realtime Refetch Rules While the Board Is Open, With No Fleet Layer to Track
+
+The system SHALL keep the open board's interior read current via two
+independent mechanisms, since the board renders no fleet layer and offers no
+scan control to accelerate a poll for: (1) a self-scheduled refetch shortly
+after the acting fleet's running mine action's ETA, when one exists, and
+(2) a live subscription to the system's event channel that refetches on a
+completion event and again on reconnect after a drop; and SHALL otherwise
+poll the interior read at a constant baseline interval, never tightened for
+a scan or self-scheduled for an own fleet's burn arrival.
+
+#### Scenario: A running mine self-schedules a refetch at its ETA
+
+- **WHEN** the acting fleet has a running mine with a known ETA
+- **THEN** a refetch is scheduled to fire shortly after that ETA, so the
+  resolved cargo and freed movement channel land without user action
+
+#### Scenario: A missed event on reconnect triggers a resync
+
+- **WHEN** the system channel's live connection drops and later reconnects
+- **THEN** a refetch fires on reconnect to resync any missed completions
+
+#### Scenario: The poll runs at a constant interval, with no fleet arrival or scan to tighten it
+
+- **WHEN** the board is open with no running mine action pending
+- **THEN** the periodic poll continues at its constant baseline interval,
+  unaffected by any own fleet's burn arrival or by scan state — the board
+  tracks neither
 

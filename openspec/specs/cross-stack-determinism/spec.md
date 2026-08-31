@@ -21,7 +21,6 @@ capabilities use to turn a seed or a clock reading into a rule-bearing
 value.
 
 This capability governs agreement between every runtime and build target the game's rules execute on — Go on `amd64` in production, Go on `arm64` in development, and JavaScript in the browser — not merely between the two languages.
-
 ## Requirements
 ### Requirement: Shared Board Math Is Pinned By a Cross-Language Golden Fixture
 A function that computes a rule-bearing value and is implemented in both a Go package and a TypeScript module SHALL be covered by a cross-language golden fixture file; where no such file exists for that package pair, the change introducing the mirror SHALL create one. A rule-bearing Go package that computes persisted values, solve results, or ETAs, and that a change deliberately builds with no TypeScript mirror at all, SHALL likewise be covered by a golden fixture file — the trigger for this requirement is "the function is rule-bearing," not "a TypeScript mirror already exists to assert against"; a Go-only rule-bearing package is not exempt from this requirement merely because there is nothing on the other side of the seam to compare it to. Where a change designates one side of a capability authoritative and deliberately builds no mirror of it on the other side, this requirement's cross-language assertion narrows to the side(s) that exist (see `Rule-Bearing Values Are Reproducible Across Build Targets of the Same Language` and `The Golden Fixture Reproduces On Every Build Target` for what a Go-only family is still held to), and the guard against a mirror silently reappearing later is the anti-mirror check named below, not a `pairs` entry in a mirror map — a mirror map `pairs` entry asserts a mirror exists; an anti-mirror check asserts one does not. The system SHALL maintain, for each cross-language golden fixture file under `fixtures/`, a golden contract for every function shared between the corresponding Go implementation and its TypeScript mirror, grouped into named families (one family per shared function). The system SHALL maintain a mirror map naming every function defined in both a Go package and its TypeScript mirror, whether or not exported on either side; each pair in the map SHALL appear in a fixture family or in the coverage inventory. A mirror map for a capability designated Go-sole-authority (no TypeScript mirror) SHALL instead run in anti-mirror mode: it SHALL fail if any function name is declared in both the Go package and the designated non-mirror TypeScript directory, unless that name appears in an explicit, empty-by-default `sharedNames` allowlist recorded in the pair's mirror-map file. The anti-mirror check's name extraction SHALL enumerate every exported declaration in the designated non-mirror TypeScript directory — every line matching an `export` form — and classify each one into a declaration form the extractor recognizes (`function` declarations, arrow-function and function-expression bindings, class methods, and re-exported aliases); an exported declaration the extractor cannot classify SHALL fail the check, naming the offending file and line, rather than being silently skipped and counted as a pass, because a check whose extractor silently misses a form reports "pass" for the exact regression it exists to catch. `fixtures/board/cases.json` is the board-math instance of this discipline, asserted by `backend/board/fixtures_test.go` and `frontend/lib/board/fixtures.test.ts`; `fixtures/polar/cases.json` is the lattice-core instance, asserted by `backend/polar/fixtures_test.go` and `frontend/lib/polar/fixtures.test.ts`; `fixtures/market/cases.json` is the market-settlement instance, asserted by the corresponding Go and TypeScript settlement suites; `fixtures/space/cases.json` is the first Go-sole-authority instance, asserted only by `backend/space/fixtures_test.go` across the Go build-target matrix, with `frontend/lib/space` (render-only, if it exists at all) governed by the anti-mirror map instead of a `pairs` entry — all follow the rules below identically except where a rule is explicitly scoped to a mirrored pair. The Go and TypeScript test suites for a given mirrored fixture file SHALL assert their implementation reproduces every case in the file byte-for-byte; a Go-only fixture file SHALL be asserted byte-for-byte by its Go suite across the build-target matrix. A change to a shared function's behavior SHALL either reproduce the existing fixture unchanged or re-record it within the same change — a fixture update authored without the corresponding mirror-side change passing is not a valid state to merge (for a Go-only family, "the corresponding mirror-side change" means the change's own Go build-target matrix, not a TypeScript suite that does not exist). Re-recording SHALL be performed as a reviewable diff in the change's own commits; no automated pipeline SHALL regenerate a fixture file. A shared function whose input domain is enumerable within 10^6 inputs SHALL carry an exhaustive-sweep case in its fixture family: a digest recorded over the function's output for every input in that domain, in a canonical serialization both languages reproduce. For a function whose domain is a pair of polar cells, that domain is all ordered pairs of cells with ring indices at or below the sweep case's recorded maximum ring under the schedule the case names, enumerated by `fromRing`, then `fromSlot`, then `toRing`, then `toSlot`, all ascending, and the digest is the SHA-256 hash of the newline-joined decimal `ring:slot` serialization of the function's output for each input, in that fixed enumeration order both languages reproduce; where a function's domain is a cell pair plus additional parameters, the sweep is taken over the cell-pair domain at parameter values recorded in the fixture case, and a list-valued output is serialized as its cells' `ring:slot` forms joined by `,` on that input's line. A rule-bearing function whose input domain is not enumerable within 10^6 inputs — a continuous R³ or R² domain, as in `backend/space` — SHALL instead carry a pinned randomized-sweep case: the fixture record SHALL name the pseudo-random generator and its integer seed, the input box each coordinate is independently drawn from, the case count, and a SHA-256 digest computed over the newline-joined canonical serialization of the function's output for each drawn input, in draw order; the generator SHALL be pure integer arithmetic (for example `splitmix64` on an `int64` state), so the drawn inputs themselves are exactly reproducible on every build target the family is asserted on. The record SHALL additionally pin the mapping from the generator's integer output to a drawn coordinate (a form using only exact operations, for example `float64(u >> 11) * 0x1p-53`, scaled and offset onto the recorded box with an explicit `float64(...)` conversion around the product (`lo + float64(f*(hi-lo))`), so no fused multiply-add can reach a drawn coordinate on a contracting build target), the order in which an input's coordinates consume generator words, and the exact output serialization, which SHALL be a lossless binary-exponent form (`strconv.FormatFloat(v, 'b', -1, 64)` and its equivalent) rather than any decimal form, with a multi-component output serialized as its components joined by `,` on that input's line and an error outcome serialized as a fixed sentinel token — because a decimal serialization cannot express the last-ULP divergence the sweep exists to catch, and an unpinned draw mapping means the same seed selects a different domain in a re-recording. Hand-selected cases document intent; the exhaustive or randomized sweep is what makes the family a contract, because a divergence that occupies a small fraction of the input domain cannot be hand-selected for by someone who does not yet know it exists. A family whose function is under an open cross-target divergence defect SHALL record its sweep case as part of the change resolving that defect, and SHALL be named in the capability's deviation register until then (see `The Capability's Deviation Register Bridges Known Violations Across Its Checks`). Each fixture family SHALL cover exactly one shared function. A shared function with no fixture family SHALL be listed in the coverage inventory with the change expected to cover it; a rule-bearing shared function SHALL NOT remain in the inventory across more than one change that modifies its package.
@@ -249,4 +248,68 @@ instance asserted under this requirement's Go-only branch.
 - **WHEN** a pinned constant table belonging to a Go-sole-authority capability with no TypeScript mirror is asserted by its Go fixture suite compiled for `GOARCH=arm64` and for `GOARCH=amd64` with `GOAMD64=v1`
 - **THEN** every entry is byte-identical on both Go build targets
 - **AND** the absence of a JavaScript-runtime assertion for that table is not treated as a failure, because the table's fixture file records that the capability has no TypeScript mirror by design
+
+### Requirement: Recorded Cross-Target Values Live In Fixtures, Not Test Constants
+A value recorded to pin a rule-bearing function's cross-build-target or
+cross-language reproducibility SHALL be committed under `fixtures/`, never
+hard-coded as a constant inside a Go or TypeScript test file. A package's
+standing regression baseline for such a function SHALL be a fixture family
+asserted per `The Golden Fixture Reproduces On Every Build Target`, not a
+private golden constant local to one test file — a constant recorded this
+way is a second, undiscoverable implementation of the fixture machinery,
+re-recordable only by editing Go or TypeScript source rather than by the
+reviewable-diff convention the fixture files use, and it cannot distinguish
+"this package's output changed" from "this package's output diverged only on
+a build target other than the one the constant was recorded on," which is
+exactly the failure mode a golden-master constant recorded on one
+architecture exhibits when read against another.
+
+#### Scenario: A retired test-file constant is replaced by a fixture family
+- **WHEN** a package's cross-target or cross-run regression pinning is
+  migrated from a constant recorded in a `_test.go` (or `.test.ts`) file to a
+  fixture family under `fixtures/`
+- **THEN** the constant and the code path that compares against it are
+  deleted in the same change that adds the fixture family
+- **AND** the fixture family covers at least the same generation-order
+  projection the retired constant pinned
+
+#### Scenario: A hand-copied digest constant in a test file is a violation
+- **WHEN** a test file asserts a rule-bearing function's output against a
+  SHA-256 digest (or other recorded value) declared as a source-level
+  constant in that same test file, rather than read from a file under
+  `fixtures/`
+- **THEN** this is a violation of this requirement regardless of whether the
+  constant currently reproduces on every build target the function runs on
+
+### Requirement: A Cross-Target Leg That Cannot Execute Reports Loudly, Not Silently
+Where a leg of the cross-build-target matrix (for example, an emulated
+architecture leg in a CI pipeline) cannot execute because its runtime is
+unavailable, the pipeline SHALL NOT treat that leg as passed or omit mention
+of it. It SHALL instead emit a warning, in a form the pipeline's output makes
+easy to search for, naming which packages went unchecked as a result and the
+remedy that clears the condition. This holds regardless of whether the
+condition is expected to persist (an environment not yet provisioned) or
+transient — a check that degrades silently trains reviewers to stop noticing
+the degradation, which is the same failure mode as never running the leg at
+all.
+
+#### Scenario: An emulated leg missing its runtime reports a named, greppable warning
+- **WHEN** a CI leg intended to assert the cross-build-target matrix's
+  emulated-architecture leg runs on a runner whose image lacks the emulation
+  runtime the leg needs
+- **THEN** the leg prints a warning containing the literal marker
+  `DETERMINISM ARM64 LEG UNASSERTED`, naming the packages it could not check
+  and the command or artifact that would clear the condition
+
+#### Scenario: A degraded leg does not fail the pipeline by itself
+- **WHEN** the emulated-architecture leg is unable to execute for the reason
+  named in its warning
+- **THEN** the pipeline's overall result is not forced to fail solely because
+  that leg could not execute
+- **AND** the warning remains visible in the pipeline's output for that run
+
+#### Scenario: A restored runtime clears the warning without further changes
+- **WHEN** the CI runner image gains the emulation runtime the leg requires
+- **THEN** the leg executes and asserts the packages it names, and the
+  warning does not appear, with no change required to the packages' own code
 
