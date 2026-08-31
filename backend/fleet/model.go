@@ -130,3 +130,10 @@ type OrderRequest struct {
 	// (ClassStats.Accel / DerivedAccelCeiling do not exist yet).
 	Accel *float64 `json:"accel,omitempty"`
 }
+
+// JumpRequest is the body of POST /v1/fleets/:id/jump — a single-hop lane
+// crossing, distinct from OrderRequest's in-system burn shape (design.md
+// Decision 10; fleet-movement "Lane Jump From a Docked Gate").
+type JumpRequest struct {
+	LaneId string `json:"laneId"`
+}

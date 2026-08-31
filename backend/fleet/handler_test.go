@@ -36,7 +36,10 @@ func (f *fakeFleetSvc) OrderTo(context.Context, string, OrderRequest) (*Fleet, e
 }
 func (f *fakeFleetSvc) CutDrive(context.Context, string) (*Fleet, error) { return f.fleet, nil }
 func (f *fakeFleetSvc) Stop(context.Context, string) (*Fleet, error)     { return f.fleet, nil }
-func (f *fakeFleetSvc) Cancel(context.Context, string) (*Fleet, error)   { return f.fleet, nil }
+func (f *fakeFleetSvc) Jump(context.Context, string, string) (*Fleet, error) {
+	return f.fleet, nil
+}
+func (f *fakeFleetSvc) Cancel(context.Context, string) (*Fleet, error) { return f.fleet, nil }
 func (f *fakeFleetSvc) SeedFleet(context.Context, string, string, space.Vec3, float64) (*Fleet, error) {
 	return f.fleet, nil
 }

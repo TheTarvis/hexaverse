@@ -23,6 +23,12 @@ import (
 // (#0005 Decision #6).
 const burnType = "burn"
 
+// jumpType is the action dispatch key for a fleet's single-hop lane jump
+// (design.md Decision 10; fleet-movement "Lane Jump From a Docked Gate") —
+// a thin lifecycle wrapper around the transit that lives in fleet.Jump,
+// exactly as burnType wraps fleet.State.Burn.
+const jumpType = "jump"
+
 // actorCollection is where fleet docs live, so the action domain can claim and
 // release the single-action slot generically without importing this package.
 const actorCollection = "fleets"
@@ -66,6 +72,14 @@ var (
 	// space.SolveBurn's flight-time quantization, whose int64(NaN)
 	// conversion diverges by architecture).
 	ErrAccelBelowFloor = errors.New("fleet: commanded acceleration is below the minimum floor")
+	// ErrJumpNotAttached rejects a jump ordered against a fleet not attached
+	// to the named lane's own gate body (fleet-movement "Lane Jump From a
+	// Docked Gate": "jumping without attachment is rejected").
+	ErrJumpNotAttached = errors.New("fleet: jump requires attachment to the lane's own gate body")
+	// ErrLaneNotCharted rejects a jump ordered over a lane the fleet's
+	// corporation has not charted (fleet-movement "Lane Jump From a Docked
+	// Gate": "jumping an uncharted lane is rejected").
+	ErrLaneNotCharted = errors.New("fleet: jump requires the corporation to have charted the lane")
 )
 
 // BodySource resolves a system's body table — the space.Bodies implementation
@@ -75,6 +89,22 @@ var (
 // package-level state, and never used to enumerate Ids() into a response.
 type BodySource interface {
 	BodyTable(ctx context.Context, systemID string) (*system.BodyTable, error)
+}
+
+// TierSource resolves which lanes a corporation has charted — the jump
+// verb's own narrowed use of what routing.go's pre-migration TierSource used
+// to also cover for multi-hop planning (design.md Decision 10, 21A narrows
+// it to ChartedLanes alone).
+type TierSource interface {
+	ChartedLanes(ctx context.Context, cid string) (map[string]bool, error)
+}
+
+// GraphSource resolves one lane's crossing geometry: the destination system
+// id and the two endpoint systems' RAW galaxy coordinates (never a
+// precomputed length), so Jump itself is what calls space.Vec3{...}.Length()
+// (design.md Decision 10's own text names that call explicitly).
+type GraphSource interface {
+	LaneCrossing(ctx context.Context, laneId, fromSystemId string) (destSystemId string, from, to space.Vec3, err error)
 }
 
 type ServiceInterface interface {
@@ -88,6 +118,9 @@ type ServiceInterface interface {
 	OrderTo(ctx context.Context, id string, req OrderRequest) (*Fleet, error)
 	CutDrive(ctx context.Context, id string) (*Fleet, error)
 	Stop(ctx context.Context, id string) (*Fleet, error)
+	// Jump commits a single-hop lane crossing from a docked gate
+	// (fleet-movement "Lane Jump From a Docked Gate").
+	Jump(ctx context.Context, id, laneId string) (*Fleet, error)
 	Cancel(ctx context.Context, id string) (*Fleet, error)
 	SeedFleet(ctx context.Context, systemID, corporationID string, at space.Vec3, starSize float64) (*Fleet, error)
 	// Position resolves a fleet's live position at the current world time,
@@ -117,6 +150,12 @@ type Service struct {
 	// WithTravel pattern) since it is also the constructor's second
 	// positional argument for the common case where it's known up front.
 	bodies BodySource
+	// tiers resolves a corporation's charted-lane set — Jump's own
+	// eligibility check (design.md Decision 10). Wired via WithTierSource.
+	tiers TierSource
+	// graph resolves a lane's crossing geometry — Jump's own length input
+	// (design.md Decision 10). Wired via WithGraph.
+	graph GraphSource
 }
 
 func NewService() *Service {
@@ -153,6 +192,18 @@ func (s *Service) WithBodies(bodies BodySource) *Service {
 	return s
 }
 
+// WithTierSource wires the charted-lane source Jump validates against.
+func (s *Service) WithTierSource(ts TierSource) *Service {
+	s.tiers = ts
+	return s
+}
+
+// WithGraph wires the lane-crossing-geometry source Jump prices through.
+func (s *Service) WithGraph(g GraphSource) *Service {
+	s.graph = g
+	return s
+}
+
 // Get returns the fleet, opportunistically resolving a completed burn
 // (arrival is a computed fact, not a fired event — #0004 Decision #12; no
 // scheduler). Resolution runs through the action spine so the state settle
@@ -168,6 +219,26 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 	if f.ActiveActionId != "" && f.State.Mode == space.ModeBurn && f.State.Burn != nil &&
 		s.clock.Now() >= f.State.Burn.ArriveMs {
 		return s.resolveDue(ctx, f)
+	}
+	// A due, unresolved jump settles the same opportunistic way (fleet-
+	// movement "Jump Arrival Parks Near the Destination Gate, Unmasked").
+	// Deliberately NOT folded onto settleIfDue (tasks.md 5.0's own scope
+	// note: Get's signature carries no body table). Once settled, the
+	// destination system's interior is materialized (create-if-absent)
+	// STRICTLY AFTER the resolve transaction completes — a resolver may
+	// perform no writes of its own (action.Resolution's own contract), and
+	// GetOrCreateInterior against a cold system WRITES a freshly generated
+	// interior (design.md Decision 16).
+	if f.Jump != nil && s.clock.Now() >= f.Jump.ArriveMs {
+		settled, err := s.resolveDue(ctx, f)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := s.bodiesFor(ctx, settled.SystemId); err != nil {
+			log.Warn().Ctx(ctx).Err(err).Str("fleetId", id).Str("systemId", settled.SystemId).
+				Msg("Fleet jump settled but the destination interior failed to materialize")
+		}
+		return settled, nil
 	}
 	return f, nil
 }
@@ -246,6 +317,44 @@ func (s *Service) PositionOf(ctx context.Context, f *Fleet) (space.Vec3, error) 
 	return s.Position(ctx, f, bt)
 }
 
+// settleIfDue folds a fleet's stored, still-active burn through
+// space.StateAt and, if the fold reveals the burn already reached its
+// arrival — a due arrival never yet read/resolved — settles it through the
+// action spine (motion settle + slot release, one transaction) and reloads
+// the settled doc. This is the ONE seam OrderTo, CutDrive, and Jump all
+// evaluate the SAME fold-first predicate through (tasks.md 5.0: "has this
+// fleet's active burn already arrived?", previously encoded three different
+// ways — a direct field check in Get, a fold-and-compare in OrderTo, a
+// reactive catch of space.ErrCutAfterArrival in the cut path).
+//
+// A fleet with no active action, or whose stored state is not currently a
+// burn (already parked or drifting — e.g. a docked fleet running a
+// co-resident mine action on the same slot), is left untouched: there is no
+// "has the active burn arrived" question to ask of it, and folding one
+// anyway would spuriously re-resolve an unrelated, still-running action.
+//
+// Get is deliberately NOT retrofitted onto this seam — its signature
+// (ctx, id) carries no body table, and mine.FleetSource/market depend on
+// that exact shape (tasks.md 5.0's own scope note; a cross-package interface
+// change recorded for separate sequencing).
+func (s *Service) settleIfDue(ctx context.Context, f *Fleet, bt *system.BodyTable) (settled *Fleet, due bool, err error) {
+	if f.ActiveActionId == "" || f.State.Mode != space.ModeBurn {
+		return f, false, nil
+	}
+	folded, err := space.StateAt(bt, f.State, s.clock.Now())
+	if err != nil {
+		return nil, false, fmt.Errorf("fleet: folding active state: %w", err)
+	}
+	if folded.Mode == space.ModeBurn {
+		return f, false, nil
+	}
+	settled, err = s.resolveDue(ctx, f)
+	if err != nil {
+		return nil, false, err
+	}
+	return settled, true, nil
+}
+
 // OrderTo solves and commits an in-system burn to a body id or an explicit
 // point (design.md Decision 4; fleet-movement "In-System Burn Order to a
 // Body or a Point"). Committing a burn clears AttachedTo immediately — a
@@ -281,17 +390,11 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 
 	// An active movement action that already completed is a fact, not a
 	// re-taskable order: resolve it first (settle + effects), then order from
-	// the settled doc.
-	if f.ActiveActionId != "" {
-		folded, ferr := space.StateAt(bt, f.State, now)
-		if ferr != nil {
-			return nil, fmt.Errorf("fleet: folding active state: %w", ferr)
-		}
-		if folded.Mode != space.ModeBurn {
-			if f, err = s.resolveDue(ctx, f); err != nil {
-				return nil, err
-			}
-		}
+	// the settled doc — via the shared fold-first seam (tasks.md 5.0).
+	if settled, due, serr := s.settleIfDue(ctx, f, bt); serr != nil {
+		return nil, serr
+	} else if due {
+		f = settled
 	}
 
 	from, err := s.Position(ctx, f, bt)
@@ -392,19 +495,23 @@ func (s *Service) CutDrive(ctx context.Context, id string) (*Fleet, error) {
 	}
 	now := s.clock.Now()
 
+	bt, err := s.bodiesFor(ctx, f.SystemId)
+	if err != nil {
+		return nil, err
+	}
+	// An already-arrived-but-unresolved burn is a settled fact, not a drift
+	// to mint: resolve it through the shared fold-first seam (tasks.md 5.0)
+	// rather than leaving the stored burn unsettled. The cut itself is still
+	// rejected — with this same named reason — since there is no longer a
+	// live burn left to cut.
+	if _, due, serr := s.settleIfDue(ctx, f, bt); serr != nil {
+		return nil, serr
+	} else if due {
+		return nil, space.ErrCutAfterArrival
+	}
+
 	drift, err := space.CutDrive(*f.State.Burn, now)
 	if err != nil {
-		if errors.Is(err, space.ErrCutAfterArrival) {
-			// An already-arrived-but-unresolved burn is a settled fact, not a
-			// drift to mint: resolve it through the action spine (the same
-			// fold-first pattern OrderTo/Cancel already apply to a stale
-			// arrival) rather than leaving the stored burn unsettled. The cut
-			// itself is still rejected — with this same named reason — since
-			// there is no longer a live burn left to cut.
-			if _, rerr := s.resolveDue(ctx, f); rerr != nil {
-				return nil, rerr
-			}
-		}
 		return nil, err
 	}
 	newState := space.ShipState{Mode: space.ModeDrift, Drift: &drift}
@@ -528,6 +635,110 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 	f.State = newState
 	f.ActiveActionId = a.Id
 	f.UpdatedAt = now
+	return f, nil
+}
+
+// Jump commits POST /v1/fleets/:fleetId/jump {laneId} — a single-hop lane
+// crossing from a docked gate (design.md Decision 10; fleet-movement "Lane
+// Jump From a Docked Gate"). Accepted only when the fleet is attached to the
+// lane's own gate body and its corporation has charted the lane; jump-
+// eligible the SAME world millisecond it attaches — no dwell — which is why
+// a due-but-unresolved arrival is settled through the shared fold-first seam
+// (settleIfDue, tasks.md 5.0) before attachment is evaluated at all. Costs
+// no delta-v: the fleet's kinematic State is left completely untouched —
+// Jump alone carries the transit, and design.md Decision 4's own words are
+// that the stale State "SHALL NOT be evaluated by any reader" while it is
+// set. Replaces any active movement order, exactly as OrderTo/Stop do.
+func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error) {
+	f, err := s.load(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if f.Jump != nil {
+		return nil, ErrFleetInTransit
+	}
+
+	bt, err := s.bodiesFor(ctx, f.SystemId)
+	if err != nil {
+		return nil, err
+	}
+	if settled, due, serr := s.settleIfDue(ctx, f, bt); serr != nil {
+		return nil, serr
+	} else if due {
+		f = settled
+	}
+
+	if s.graph == nil {
+		return nil, fmt.Errorf("fleet: no GraphSource configured: %w", ErrNoBodySource)
+	}
+	destId, from, to, err := s.graph.LaneCrossing(ctx, laneId, f.SystemId)
+	if err != nil {
+		return nil, fmt.Errorf("fleet: resolving lane crossing: %w", err)
+	}
+
+	// Jump-eligible only from the lane's OWN gate body, named by the
+	// destination it leads to (system.gateId's own convention, mirrored here
+	// since system does not export it).
+	if f.AttachedTo != "gate-"+destId {
+		return nil, ErrJumpNotAttached
+	}
+
+	if s.tiers == nil {
+		return nil, fmt.Errorf("fleet: no TierSource configured: %w", ErrNoBodySource)
+	}
+	charted, err := s.tiers.ChartedLanes(ctx, f.CorporationId)
+	if err != nil {
+		return nil, fmt.Errorf("fleet: resolving charted lanes: %w", err)
+	}
+	if !charted[laneId] {
+		return nil, ErrLaneNotCharted
+	}
+
+	now := s.clock.Now()
+	// The lane's 3D length through space's own guarded, pinned arithmetic,
+	// divided by the fleet's derived lane rate — a SPEED (roster.go: "3D
+	// lane-length-units / unit-world-time") — then quantized by ceiling like
+	// every other stored duration (design.md Decision 10, corrected 2026-08-31).
+	length := space.Vec3{X: to.X - from.X, Y: to.Y - from.Y, Z: to.Z - from.Z}.Length()
+	rate := DerivedLaneRate(*f, s.classStats)
+	// A single division (length / (rate*1000)) rather than length/rate
+	// followed by a second /1000 — the latter round-trips through an extra
+	// float64 rounding step that can push an exact-in-world-ms crossing
+	// (e.g. 700/0.35) a whole millisecond past QuantizeArrival's ceiling.
+	flightSeconds := length / (rate * 1000)
+	eta := space.QuantizeArrival(now, flightSeconds)
+
+	jump := &JumpTransit{LaneId: laneId, DestSystemId: destId, DepartMs: now, ArriveMs: eta}
+
+	// Re-task: release the current slot before claiming a new one — a
+	// running action while jumping is the norm (a docked fleet mining, or a
+	// completed-but-unresolved burn already folded away above).
+	if f.ActiveActionId != "" {
+		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, nil); err != nil && !errors.Is(err, action.ErrNotRunning) {
+			return nil, err
+		}
+	}
+
+	a, err := s.actions.Commit(ctx, action.CommitSpec{
+		Type:            jumpType,
+		Actor:           id,
+		ActorCollection: actorCollection,
+		Scope:           f.SystemId,
+		Params:          map[string]interface{}{"laneId": laneId, "destSystemId": destId},
+		Eta:             eta,
+		ActorState: map[string]interface{}{
+			"jump": *jump, "updatedAt": int64(now),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	f.Jump = jump
+	f.ActiveActionId = a.Id
+	f.UpdatedAt = now
+	log.Info().Ctx(ctx).Str("fleetId", id).Str("laneId", laneId).Str("actionId", a.Id).
+		Int64("arriveMs", int64(eta)).Msg("Fleet jumped")
 	return f, nil
 }
 

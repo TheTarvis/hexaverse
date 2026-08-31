@@ -291,19 +291,48 @@
 
 ## 5. jump verb + gate attachment
 
-- [ ] 5.1 Implement `POST /v1/fleets/:fleetId/jump {laneId}`: accept only when
+- [x] 5.0 **Before writing the jump verb**, extract the resolve-a-due-arrival
+      step into one private seam (e.g. `settleIfDue(ctx, f, bt)`) and route the
+      jump through it, rather than hand-rolling a fourth copy of the check.
+      The fold-first bug has now appeared at three sites, each detecting the
+      **same** predicate — "has this fleet's active burn already arrived?" — a
+      different way: `Get` (`service.go:163`) inspects fields directly
+      (`Mode == ModeBurn && Burn != nil && now >= Burn.ArriveMs`); `OrderTo`
+      (`~:286`) folds through `space.StateAt(bt, …)` and tests
+      `folded.Mode != ModeBurn`; the cut path (`~:404`) is purely reactive,
+      learning only by catching `space.ErrCutAfterArrival`. Three encodings of
+      one question is how the hand-rolled one silently drifts from what the
+      fold would say. Retrofit `OrderTo` and the cut path onto the seam — both
+      already hold a `bt`.
+      **Deliberately NOT in scope: retrofitting `Get`.** Its signature is
+      `Get(ctx, id)` with no body table, and `mine.FleetSource`
+      (`mine/service.go:70`) plus `market` depend on that exact shape, so
+      folding it means threading a `BodySource` through two other domains'
+      interfaces. That is a cross-package interface change and is recorded for
+      the orchestrator to sequence as its own change, not widened into link 4.
+- [x] 5.1 Implement `POST /v1/fleets/:fleetId/jump {laneId}`: accept only when
       the fleet is attached to that lane's gate body and its corporation has
       charted the lane; a fleet is jump-eligible on the same world millisecond
       it attaches — no dwell (fleet-movement: *Lane Jump From a Docked Gate* —
       jumping from a charted, attached gate commits, jump-eligible the instant
       of attachment with no dwell, jumping without attachment is rejected,
       jumping an uncharted lane is rejected, jump costs no delta-v).
-- [ ] 5.2 Compute jump crossing time as `space.Vec3{...}.Length()` (the lane's
-      3D length) times the fleet's configured lane rate, quantized via
-      `space.QuantizeArrival` — replacing `legMs`/`laneLength` (design.md
+- [x] 5.2 Compute jump crossing time as `space.Vec3{...}.Length()` (the lane's
+      3D length) **divided by** the fleet's derived lane rate, quantized via
+      `space.QuantizeArrival`
+      *(Corrected 2026-08-31: this task originally read "times the fleet's
+      configured lane rate", which is dimensionally backwards. `LaneRate` is
+      defined as "3D lane-length units per unit world-time" — a **speed** — in
+      both `fleet/roster.go:27` and the spec requirement itself
+      (`fleet-movement` › Derived Fleet Acceleration and Drive Output). Time is
+      therefore length ÷ rate. The corroborating check: the spec derives the
+      effective lane rate as the **minimum** across the roster and calls that
+      "the slowest ship", which is only true of a speed under division —
+      multiplying would make the minimum the FASTEST crossing. Caught by the
+      SDET declining to encode the task's literal wording.)* — replacing `legMs`/`laneLength` (design.md
       Decision 10; this is what discharges those functions' determinism-register
       entries in section 9).
-- [ ] 5.3 Implement the jump resolver: on ETA, flip the fleet's `systemId`,
+- [x] 5.3 Implement the jump resolver: on ETA, flip the fleet's `systemId`,
       clear `Jump`, settle into a `park` near the destination gate's insertion
       standoff, never attached (unmasked arrival); chart the crossed lane for
       the corporation as `via: traveled` and mint no onward rumor; materialize
@@ -313,21 +342,21 @@
       unattached near the gate, arrival charts the crossed lane as traveled and
       rumors nothing onward, first arrival materializes the destination's
       interior).
-- [ ] 5.4 Delete `fleet/routing.go` wholesale: `Service.PreviewRoute`,
+- [x] 5.4 Delete `fleet/routing.go` wholesale: `Service.PreviewRoute`,
       `planRoute`, `reconstruct`, `buildTrip`, `legMs`, `laneLength`,
       `ErrNoRoute`, `ErrSameSystem`, `RoutePreview`; narrow `TierSource` to its
       `ChartedLanes` use only (design.md Decision 10, Decision 21A).
-- [ ] 5.5 Delete `GET /v1/fleets/:fleetId/route` and `POST
+- [x] 5.5 Delete `GET /v1/fleets/:fleetId/route` and `POST
       /v1/fleets/:fleetId/scan`; add `POST /v1/fleets/:fleetId/cut-drive`,
       `POST /v1/fleets/:fleetId/stop`, `POST /v1/fleets/:fleetId/jump`; delete
       `WithFog`/`AudienceFog` from `fleet/handler.go` (design.md Decision 21A).
-- [ ] 5.6 Restate the existing no-fleet-ownership-check defect over the new
+- [x] 5.6 Restate the existing no-fleet-ownership-check defect over the new
       endpoint set — `common.ActorCorp(c)` is still never consulted by
       `/orders`, `/cancel`, `/cut-drive`, `/stop`, or `/jump` — as the current,
       observable, unfixed behavior (fleet-movement: *Movement Command Endpoints
       Enforce No Fleet Ownership* — a foreign corp can order/cancel/cut-drive/
       stop/jump another corp's fleet, five scenarios, one per verb).
-- [ ] 5.7 Implement `GET /v1/fleets/:fleetId`, `GET /v1/fleets?systemId=`, and
+- [x] 5.7 Implement `GET /v1/fleets/:fleetId`, `GET /v1/fleets?systemId=`, and
       `GET /v1/fleets?mine=true`: a requester's own fleets always return in
       full (complete kinematic state, target, ETA); a fleet belonging to
       another corporation is omitted entirely from a list read and 404s on
@@ -336,7 +365,7 @@
       Only* — a foreign fleet is omitted from a list read, a foreign fleet
       404s on direct fetch, own fleets are always returned in full, `mine=true`
       with no corp returns an empty list).
-- [ ] 5.8 Confirm the fleet read endpoints continue to surface the roster,
+- [x] 5.8 Confirm the fleet read endpoints continue to surface the roster,
       cargo pool, derived total capacity, derived free hold, and derived
       mining rate for an owning corporation's own fleet, and confirm none of
       those fields appear anywhere in a response touching a foreign fleet —
@@ -533,6 +562,20 @@
       requirement (section 7.7) to replace, rather than removing
       `observation-fog-and-scan` "entirely" as originally predicted (design.md
       Decision 11, Open Question 6).
+- [ ] 9.8 Wire `fixtures/fleet/` into `.claude/scripts/check-mirror-map.sh`.
+      That script enumerates a **hardcoded directory set** and does not scan
+      `fixtures/` generically, so the `fixtures/fleet/` family added in task
+      4.11 exists but is checked by **nothing**. This is the ninth hand-
+      maintained list of the same species `pin-system-generation-determinism`
+      catalogued (it found the cross-target rule enforced across eight such
+      lists, every one needing a manual edit) — and a fixture family that
+      exists but is verified by no check is precisely the state that change
+      was created to eliminate. Recreating it one link later would be the
+      same defect with a new name. Either add `fleet` to the enumeration, or
+      make the script discover `fixtures/*/` directories generically; if you
+      generalize it, verify the existing `board`/`polar`/`space`/`system`
+      passes are unchanged, including the two anti-mirror trivial-pass
+      branches.
 - [ ] 9.7 Guard `keplerPeriodMs` (`backend/system/continuous.go:94`) against a
       non-finite or negative radius, mirroring 4.11's pattern. `math.Sqrt` of a
       negative ratio is NaN, and the function's existing `if ms < 1` clamp does

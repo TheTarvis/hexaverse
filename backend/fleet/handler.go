@@ -26,9 +26,7 @@ func NewHandlerWith(svc ServiceInterface, clock common.WorldTime) *Handler {
 
 // RegisterRoutes wires the surviving endpoint set (design.md Decision 21A):
 // GET /route and POST /scan are deleted with no successor here (routing and
-// scanning are chain link 4 sections 5/observation's own concerns); /jump is
-// chain link 4 section 5's own verb and is not wired by this section's own
-// scope.
+// scanning are chain link 4 sections 5/observation's own concerns).
 func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	g := authorized.Group("/fleets")
 	{
@@ -38,6 +36,7 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 		g.POST("/:fleetId/cancel", h.Cancel)
 		g.POST("/:fleetId/cut-drive", h.CutDrive)
 		g.POST("/:fleetId/stop", h.Stop)
+		g.POST("/:fleetId/jump", h.Jump)
 	}
 }
 
@@ -139,6 +138,18 @@ func (h *Handler) Stop(c *gin.Context) {
 	h.respond(c, f, err)
 }
 
+// Jump handles POST /v1/fleets/:fleetId/jump {laneId} (fleet-movement "Lane
+// Jump From a Docked Gate").
+func (h *Handler) Jump(c *gin.Context) {
+	var req JumpRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	f, err := h.svc.Jump(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"), req.LaneId)
+	h.respond(c, f, err)
+}
+
 func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 	switch {
 	case errors.Is(err, ErrNotFound):
@@ -147,6 +158,8 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrFleetInTransit):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet is in lane transit"})
+	case errors.Is(err, ErrJumpNotAttached), errors.Is(err, ErrLaneNotCharted):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case err != nil:
 		log.Error().Ctx(c).Err(err).Msg("fleet operation failed")
 		c.AbortWithStatus(http.StatusInternalServerError)

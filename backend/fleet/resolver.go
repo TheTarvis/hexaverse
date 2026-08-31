@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"hexaverse/action"
+	"hexaverse/observation"
 	"hexaverse/space"
+	"hexaverse/system"
 )
 
 // RegisterResolvers wires fleet's per-type action resolvers onto the shared
@@ -74,4 +76,62 @@ func BurnResolver(bodies BodySource) action.ResolveFunc {
 			},
 		}, nil
 	}
+}
+
+// JumpResolver is the jump verb's resolver, registered with the action
+// service for type "jump" (fleet-movement "Jump Arrival Parks Near the
+// Destination Gate, Unmasked"; design.md Decision 10). Unlike BurnResolver,
+// it takes no injected BodySource and matches action.ResolveFunc's own
+// signature directly: Resolution's own contract forbids a resolver from
+// performing writes, and GetOrCreateInterior against a cold destination
+// system WRITES a freshly generated interior — so the settled park is
+// parented to the destination gate body BY ID alone, at a standoff derived
+// from the UNIVERSAL system.GateSize constant (every gate is the same size —
+// design.md Decision 14's own worked bound), never from the destination's
+// own (possibly not-yet-materialized) real orbit. Materializing that orbit
+// for real — and the destination's interior — is a deliberate, separate,
+// service-level step run strictly AFTER this resolve transaction completes
+// (Service.Get).
+func JumpResolver(_ context.Context, r action.Resolution) (action.ResolveResult, error) {
+	var f Fleet
+	if err := r.DecodeActor(&f); err != nil {
+		return action.ResolveResult{}, err
+	}
+
+	// Already settled (a racing read got here first) — no further write.
+	if f.Jump == nil {
+		return action.ResolveResult{Outcome: "jump already settled"}, nil
+	}
+
+	destId := f.Jump.DestSystemId
+	laneId := f.Jump.LaneId
+	// The destination gate's body id names the lane BACK to the fleet's
+	// origin system — from the destination's perspective, the origin IS its
+	// destination — mirroring system.gateId's own naming convention
+	// ("gate-"+destSystemId), the only way a fleet-package function can
+	// refer to "the gate home" without system exporting gateId.
+	homeGateId := "gate-" + f.SystemId
+	standoff := space.InsertionStandoff(space.Body{Size: system.GateSize})
+	settled := space.ShipState{Mode: space.ModeParked, Park: &space.Park{
+		Kind: space.ParkOrbit, BodyId: homeGateId, Radius: standoff,
+	}}
+
+	// Charts the crossed lane `via: traveled`, marks the destination
+	// Explored, and mints no onward rumor — observation's own ArrivalWrites
+	// primitive, the same one travel-arrival already uses (design.md
+	// Decision 11). Pure w.r.t. Firestore, so a zero-value Service is safe
+	// to call it on.
+	writes := (&observation.Service{}).ArrivalWrites(f.CorporationId, destId, []string{laneId}, r.At)
+
+	return action.ResolveResult{
+		Outcome: fmt.Sprintf("jumped to %s", destId),
+		ActorState: map[string]interface{}{
+			"systemId":   destId,
+			"jump":       nil,
+			"attachedTo": "",
+			"state":      EncodeKinematicState(settled),
+			"updatedAt":  int64(r.At),
+		},
+		Writes: writes,
+	}, nil
 }
