@@ -1,0 +1,250 @@
+## REMOVED Requirements
+
+### Requirement: Fleet Read Endpoints Serve Own Fleets Only
+**Reason**: Superseded — a disclosed foreign fleet now reaches a client as
+an anonymous contact on the system interior read (design.md Decision 6),
+so this requirement's own claim that "this capability computes no partial
+visibility for a foreign fleet" is no longer true and the temporary-interim
+framing it carried (pending link 5) no longer applies. Restated under a
+name that names the contact channel and states the own-fleets-only rule as
+permanent (design.md Decision 7).
+**Migration**: None — no backwards compatibility is retained (solo
+project; see docs/plans/continous_space/README.md ground rules).
+
+### Requirement: Lane Jump From a Docked Gate
+**Reason**: Superseded — design.md Decision 2 drops the charted-lane
+precondition entirely: jump-eligibility is exactly "attached to the
+lane's own gate body, no dwell," so the "Jumping an uncharted lane is
+rejected" scenario is no longer true and the commit scenario's own title
+names "charted" as a precondition that no longer exists.
+**Migration**: None — no backwards compatibility is retained (solo
+project; see docs/plans/continous_space/README.md ground rules).
+
+### Requirement: Single Kinematic-State Fleet Record
+**Reason**: Superseded — the focused-scan verb now claims and writes
+`activeScanId`, and the fleet document gains a stored `Scan *ScanWindow`
+field, when a sweep is running (design.md Decision 8, Decision 11), so
+"The sensor channel persists declared and unwritten" is no longer true.
+**Migration**: None — no backwards compatibility is retained (solo
+project; see docs/plans/continous_space/README.md ground rules).
+
+### Requirement: Movement Command Endpoints Enforce No Fleet Ownership
+**Reason**: Superseded — design.md Decision 21 closes this authorization
+defect: every mutating fleet handler now compares `common.ActorCorp(c)`
+against the fleet's `corporationId` and rejects a foreign requester, so
+all five "a foreign corp can..." scenarios are no longer true.
+**Migration**: None — no backwards compatibility is retained (solo
+project; see docs/plans/continous_space/README.md ground rules).
+
+## ADDED Requirements
+
+### Requirement: Fleet Read Endpoints Serve Own Fleets In Full and Foreign Fleets As Contacts
+The system SHALL serve `GET /v1/fleets/:fleetId` (single fleet),
+`GET /v1/fleets?systemId=` (every fleet in a system), and
+`GET /v1/fleets?mine=true` (every fleet the requester's corporation owns,
+across systems) as own-fleets-only endpoints, permanently: a requester's
+own fleets SHALL always be returned in full, with their complete
+kinematic state (curve/park/drift detail, target, ETA), regardless of any
+other corporation's presence, and a fleet belonging to another
+corporation SHALL be omitted entirely from a list read and SHALL 404 on a
+direct fetch by id. These endpoints compute no partial-visibility
+snapshot of a foreign fleet and never will, because a foreign fleet has
+no addressable identity for this capability to serve one against
+(design.md Decision 6, Decision 7). A disclosed foreign fleet's presence
+reaches a requester exclusively through the system interior read's
+anonymous contact projection, never through a fleet endpoint; a contact
+carries no fleet id, so there is no id a direct fleet fetch could ever
+resolve.
+
+#### Scenario: A foreign fleet is omitted from a list read
+- **WHEN** a requester lists fleets in a system that contains a fleet
+  belonging to another corporation
+- **THEN** that foreign fleet does not appear anywhere in the response,
+  disclosed or not — its disclosed presence, if any, surfaces only as a
+  contact on the system interior read
+
+#### Scenario: A foreign fleet 404s on a direct fetch
+- **WHEN** a requester fetches a specific fleet id belonging to another
+  corporation
+- **THEN** the response is `404 Not Found`, because a foreign fleet has
+  no id this capability will resolve, whether or not that fleet is
+  currently disclosed as a contact elsewhere
+
+#### Scenario: Own fleets are always returned in full
+- **WHEN** a requester fetches or lists their own fleets
+- **THEN** every one is returned with `own: true` and its full kinematic
+  state, regardless of any other corporation's presence or activity
+
+#### Scenario: mine=true with no corp returns an empty list
+- **WHEN** an authenticated but corpless requester calls
+  `GET /v1/fleets?mine=true`
+- **THEN** the response is an empty fleet list, not an error
+
+### Requirement: Lane Jump From an Attached Gate
+The system SHALL, on a jump order naming a lane, accept the order only
+when the fleet is attached to the gate body for that lane — charting
+plays no part in eligibility (design.md Decision 2; charted-lane state is
+map knowledge and a sellable intel product, never a permission). A fleet
+SHALL be jump-eligible on the same world millisecond it attaches to a
+gate — no dwell time is imposed. The system SHALL commit the jump through
+the action spine on the movement channel, with an ETA of the current
+world time plus the lane's crossing time (derived from the lane's 3D
+length and the fleet's configured lane rate), replacing any active
+movement order.
+
+#### Scenario: Jumping from an attached gate commits
+- **WHEN** a fleet attached to a lane's gate body is ordered to jump that
+  lane
+- **THEN** the jump commits on the movement channel with an ETA equal to
+  now plus the lane's crossing time
+
+#### Scenario: A fleet is jump-eligible the instant it attaches, with no dwell
+- **WHEN** a fleet's burn resolves into attachment at a lane's gate body,
+  and a jump order for that lane is submitted at that same resolve
+  instant
+- **THEN** the jump is accepted — no minimum dwell duration is enforced
+  between attaching and jumping
+
+#### Scenario: Jumping without attachment to the named gate is rejected
+- **WHEN** a fleet not attached to the lane's gate body is ordered to
+  jump that lane
+- **THEN** the order fails with a named error and no action is committed
+
+#### Scenario: Jump costs no delta-v
+- **WHEN** a jump is committed and later resolves
+- **THEN** no delta-v is debited for the crossing — only time is spent
+
+### Requirement: Single Kinematic-State Fleet Record With Two Action Channels
+The system SHALL represent each fleet as one document carrying a
+`space.ShipState` (burn, park, or drift — see `space-kinematics`) as its
+kinematic-state field, plus a separate `jump` field (fleet-owned, see
+"Lane Jump From an Attached Gate") that is non-nil only while the fleet
+is in lane transit. While `jump` is non-nil, the stored `space.ShipState`
+is stale and SHALL NOT be evaluated by any reader — a fleet is in exactly
+one of the two regimes, kinematic or in-transit, at a time, never both
+live. The document SHALL also carry a `corporationId`, its current
+`systemId`, an optional `attachedTo` host id, and at most one active id
+per action channel: `activeActionId` for movement, `activeScanId` for the
+sensor channel, independently claimable and releasable. The sensor
+channel SHALL be a fully live channel in this capability: the fleet
+document SHALL carry a `Scan *ScanWindow` field (`HostId`, `DepartMs`,
+`ArriveMs`, `Range`), non-nil only while a focused scan is running and
+cleared at that scan's resolve, mirroring `jump`'s own field-for-field
+shape and lifecycle. A fleet document whose stored kinematic state does
+not decode to one of the three `space.ShipState` shapes, when `jump` is
+not set, SHALL be rejected by name — never defaulted to an origin
+position or an idle park.
+
+#### Scenario: A running sweep writes its window to the sensor channel
+- **GIVEN** a fleet with no running focused scan
+- **WHEN** a focused scan is committed against a host
+- **THEN** the fleet document's `activeScanId` and `Scan` window are both
+  written non-empty, and cleared again once that scan resolves or is
+  cancelled
+
+#### Scenario: A fleet with no stored kinematic state is rejected by name
+- **WHEN** a fleet document with no `jump` set is read whose stored
+  kinematic-state field decodes to none of burn, park, or drift
+- **THEN** the read fails with a named error
+- **AND** the fleet is never treated as if it were parked at an implied
+  origin
+
+### Requirement: Movement Command Endpoints Are Restricted to the Owning Corporation
+The system SHALL, on `POST /v1/fleets/:fleetId/orders`,
+`POST /v1/fleets/:fleetId/cancel`, `POST /v1/fleets/:fleetId/cut-drive`,
+`POST /v1/fleets/:fleetId/stop`, and `POST /v1/fleets/:fleetId/jump`,
+compare `common.ActorCorp(c)` against the named fleet's `corporationId`
+before acting, and SHALL respond `404 Not Found` — not `403` — when they
+do not match or when the requester has no corporation, matching the read
+endpoints' own absence semantics: a foreign fleet is indistinguishable
+from a nonexistent one, and a `403` would itself confirm the id exists
+(design.md Decision 21). This closes the authorization defect the
+requirement of the same predecessor name recorded as open. The sibling
+defect on the action-dispatch endpoints (`/actions?actor=`,
+`/actions/:id`, `/acknowledge`, `/cancel`) closes in the same change, in
+`action-dispatch`'s own delta — closing only this side would leave a
+bypass reaching the same movement slot through `/actions/:id/cancel`.
+
+#### Scenario: A foreign corp cannot order another corp's fleet
+- **WHEN** an authenticated account whose corporation does not own fleet
+  F submits `POST /v1/fleets/F/orders` with a valid target
+- **THEN** the response is `404 Not Found` and F's kinematic state is
+  unchanged
+
+#### Scenario: A foreign corp cannot cancel another corp's fleet
+- **WHEN** an authenticated account whose corporation does not own fleet
+  F submits `POST /v1/fleets/F/cancel`
+- **THEN** the response is `404 Not Found` and F's active movement order
+  is unaffected
+
+#### Scenario: A foreign corp cannot cut another corp's fleet's drive
+- **WHEN** an authenticated account whose corporation does not own fleet
+  F submits `POST /v1/fleets/F/cut-drive`
+- **THEN** the response is `404 Not Found` and F's burn is unaffected
+
+#### Scenario: A foreign corp cannot order another corp's fleet to stop in place
+- **WHEN** an authenticated account whose corporation does not own fleet
+  F submits `POST /v1/fleets/F/stop`
+- **THEN** the response is `404 Not Found` and F is unaffected
+
+#### Scenario: A foreign corp cannot order another corp's fleet to jump
+- **WHEN** an authenticated account whose corporation does not own fleet
+  F submits `POST /v1/fleets/F/jump`
+- **THEN** the response is `404 Not Found` and no jump is committed
+
+#### Scenario: A corpless requester is rejected the same way
+- **WHEN** an authenticated but corpless account submits any movement
+  command endpoint against an existing fleet
+- **THEN** the response is `404 Not Found`
+
+## MODIFIED Requirements
+
+### Requirement: Jump Arrival Parks Near the Destination Gate, Unmasked
+
+The system SHALL, when a jump's ETA passes, flip the fleet's `systemId` to
+the destination, clear its lane-transit state, and settle it into a `park`
+near the destination gate's insertion standoff — never attached to the
+gate — so the arrival is not masked. The system SHALL, in the same
+resolve transaction, mark the destination system `explored` for the
+fleet's corporation and chart the crossed lane for the fleet's
+corporation as `via: traveled`, and mint no rumor of any lane onward from
+the destination. The system SHALL, after the resolve transaction
+completes and before the destination's first body-table build for this
+arrival, ensure the destination system's true lane horizon is
+materialized (`galaxy.EnsureLaneHorizon`) — the ordering is load-bearing,
+because a system's gate bodies are derived from its materialized lanes,
+and building the body table first would strand an arriving fleet with
+fewer gates than truly exist. The system SHALL then materialize the
+destination system's interior (create-if-absent).
+
+#### Scenario: Arrival flips the system and parks unattached near the gate
+
+- **WHEN** a jump's ETA passes and the fleet is read/resolved
+- **THEN** the fleet's `systemId` becomes the destination, its
+  lane-transit state is cleared, and it settles into a park near the
+  destination gate's insertion standoff with `attachedTo` empty
+
+#### Scenario: Arrival charts the crossed lane as traveled and rumors nothing onward
+
+- **WHEN** a jump resolves into a destination system
+- **THEN** the destination system is marked `explored` for the fleet's
+  corporation, the crossed lane is charted for the fleet's corporation
+  with `via: traveled`, and no lane onward from the destination is
+  rumored by this resolve
+
+#### Scenario: First arrival materializes the destination's interior
+
+- **WHEN** a fleet's jump resolves into a system with no materialized
+  interior
+- **THEN** the destination's interior is generated (create-if-absent)
+  after the resolve transaction completes
+
+#### Scenario: Arrival at the frontier materializes the full lane horizon before the gate set is built
+
+- **GIVEN** a jump resolving into a destination system at the edge of the
+  galaxy's currently materialized region
+- **WHEN** the arrival settles
+- **THEN** the destination system's true lane horizon is materialized
+  before its body table (and therefore its gate set) is first built for
+  this arrival, so the destination's full gate set — not a truncated one
+  — is present to the arriving fleet
