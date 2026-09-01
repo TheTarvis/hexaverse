@@ -350,9 +350,14 @@ anti_mirror "fleet" \
     "$REPO_ROOT/backend/fleet" \
     "$REPO_ROOT/frontend/lib/fleet"
 
+anti_mirror "galaxy" \
+    "$REPO_ROOT/fixtures/galaxy/mirror-map.json" \
+    "$REPO_ROOT/backend/galaxy" \
+    "$REPO_ROOT/frontend/lib/galaxy"
+
 if [[ "$FAIL" -ne 0 ]]; then
     exit 2
 fi
 
-echo "PASS: all mirror maps complete — every mirrored pair fixture-covered or inventoried, and backend/space, backend/system, and backend/fleet carry no TypeScript mirror."
+echo "PASS: all mirror maps complete — every mirrored pair fixture-covered or inventoried, and backend/space, backend/system, backend/fleet, and backend/galaxy carry no TypeScript mirror."
 exit 0

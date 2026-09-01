@@ -1,0 +1,94 @@
+{
+  "$comment": [
+    "Golden fixture for openspec change replace-observation-with-sightings,",
+    "tasks.md 4.13 / galaxy-view spec.md 'A Galaxy Link's Id Is Its Lane's",
+    "Stable Id' — 'A cross-stack fixture pins the equality under the",
+    "Go-sole-authority regime'.",
+    "",
+    "Pins that galaxy.LaneIdBetween(aSystemId, bSystemId) — the derivation a",
+    "gate-attachment write (charts.GateAttachmentWrite), a gate body's served",
+    "laneId (system.LaneGate.LaneId), and the fleet DTO's served laneId all",
+    "share — agrees with the STORED Lane.Id the generator itself assigns via",
+    "the independent laneIdFor(cell,cell)/SystemIdFor(cell) pair",
+    "(backend/galaxy/field.go). These are two different code paths over the",
+    "same unordered system-id pair; nothing enforces they stay in sync except",
+    "this fixture.",
+    "",
+    "Governed by cross-stack-determinism's Go-sole-authority regime:",
+    "backend/galaxy has no TypeScript mirror (mirror-map.json here runs in",
+    "anti-mirror mode, matching fixtures/space and fixtures/fleet), so this",
+    "family is asserted only across the Go build-target matrix.",
+    "",
+    "Case provenance:",
+    "  - ordinaryLane_adjacentPositiveCoordinates / negativeCoordinateEndpoint:",
+    "    hand-picked Cell pairs; wantLaneId computed from laneIdFor's",
+    "    documented format (\"lane_%d_%d_%d_%d\", ordered by the lexicographically",
+    "    smaller (X,Y) endpoint first) and confirmed against the running",
+    "    LaneIdBetween at fixture-authoring time.",
+    "  - bridgeLane: a REAL bridge lane discovered from the deterministic",
+    "    NewField(3, voidParams()) fixture field_test.go's own",
+    "    TestField_BridgeConstruction exercises (same seed, same params) —",
+    "    not a hand-picked pair. lane_id_stable_fixture_test.go's own",
+    "    TestLaneIdBetween_Scenario_BridgeCaseIsARealBridgeLane re-derives it",
+    "    from that live field and cross-checks Bridge==true and the id",
+    "    against this case, so a generator change that moves or removes this",
+    "    specific bridge fails loud rather than leaving a stale case unnoticed.",
+    "  - sameCrossing_orderA / sameCrossing_orderB_swapped: the SAME crossing",
+    "    as ordinaryLane_adjacentPositiveCoordinates, endpoints swapped —",
+    "    both orderings of one pair must yield the same id.",
+    "  - unparseableEndpoint_collapsesToZeroCell: SDET-added boundary probe,",
+    "    not a scenario this task fixes — tasks.md 4.13 flags",
+    "    LaneIdBetween(\"bogus\", \"sys_5_5\") == \"lane_0_0_5_5\" as a silent",
+    "    landmine (an unparseable system id collapses to the zero Cell rather",
+    "    than erroring, which COULD collide with a real crossing at (0,0)-",
+    "    (5,5)). Pinned here as documented, deliberate current behavior — not",
+    "    an assertion that it is correct — so a future change to this",
+    "    fallback is a visible decision, not a silent diff."
+  ],
+
+  "laneIdEquality": [
+    {
+      "name": "ordinaryLane_adjacentPositiveCoordinates",
+      "aSystemId": "sys_3_4",
+      "bSystemId": "sys_4_4",
+      "bridge": false,
+      "wantLaneId": "lane_3_4_4_4"
+    },
+    {
+      "name": "negativeCoordinateEndpoint",
+      "aSystemId": "sys_-3_-2",
+      "bSystemId": "sys_2_-2",
+      "bridge": false,
+      "wantLaneId": "lane_-3_-2_2_-2"
+    },
+    {
+      "name": "bridgeLane",
+      "aSystemId": "sys_-15_-7",
+      "bSystemId": "sys_-12_-7",
+      "bridge": true,
+      "wantLaneId": "lane_-15_-7_-12_-7"
+    },
+    {
+      "name": "sameCrossing_orderA",
+      "aSystemId": "sys_3_4",
+      "bSystemId": "sys_4_4",
+      "bridge": false,
+      "wantLaneId": "lane_3_4_4_4"
+    },
+    {
+      "name": "sameCrossing_orderB_swapped",
+      "aSystemId": "sys_4_4",
+      "bSystemId": "sys_3_4",
+      "bridge": false,
+      "wantLaneId": "lane_3_4_4_4"
+    },
+    {
+      "name": "unparseableEndpoint_collapsesToZeroCell",
+      "aSystemId": "bogus",
+      "bSystemId": "sys_5_5",
+      "bridge": false,
+      "wantLaneId": "lane_0_0_5_5",
+      "note": "SDET-added boundary probe (tasks.md 4.13's own landmine note), not a scenario this task fixes."
+    }
+  ]
+}

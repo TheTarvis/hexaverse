@@ -3,8 +3,10 @@ package fleet
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"hexaverse/common"
+	"hexaverse/galaxy"
 	"hexaverse/space"
 
 	"github.com/gin-gonic/gin"
@@ -182,15 +184,24 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 // position and worldTime, so the client can render immediately. `own` tells
 // the client whether it may drive this fleet.
 type fleetDTO struct {
-	Id            string             `json:"id"`
-	CorporationId string             `json:"corporationId"`
-	SystemId      string             `json:"systemId"`
-	State         space.ShipState    `json:"state"`
-	AttachedTo    string             `json:"attachedTo,omitempty"`
-	Jump          *JumpTransit       `json:"jump,omitempty"`
-	Position      space.Vec3         `json:"position"`
-	Own           bool               `json:"own"`
-	WorldTime     common.WorldMillis `json:"worldTime"`
+	Id            string          `json:"id"`
+	CorporationId string          `json:"corporationId"`
+	SystemId      string          `json:"systemId"`
+	State         space.ShipState `json:"state"`
+	AttachedTo    string          `json:"attachedTo,omitempty"`
+	// LaneId names the lane of the gate this fleet is attached to, if any
+	// (fleet-movement "Fleet Read Serves the Attached Gate's Lane Id").
+	// Derived purely from f.SystemId and AttachedTo's "gate-"+destSystemId
+	// convention (system.gateId) via galaxy.LaneIdBetween — deliberately NOT
+	// sourced from the corporation's charted-lane set (GET /v1/galaxy's
+	// links[] is charted-filtered and therefore empty for a fresh
+	// attachment). Empty when the fleet is unattached or attached to a
+	// non-gate body.
+	LaneId    string             `json:"laneId,omitempty"`
+	Jump      *JumpTransit       `json:"jump,omitempty"`
+	Position  space.Vec3         `json:"position"`
+	Own       bool               `json:"own"`
+	WorldTime common.WorldMillis `json:"worldTime"`
 	// Roster is the owner-only ships/cargo/derived-capacity surface (#0010
 	// "Fleet Read Surfaces Roster, Cargo, and Derived Capacity"). nil for a
 	// foreign fleet — omitted from the JSON entirely (`omitempty`).
@@ -223,6 +234,23 @@ func rosterFieldsFor(f *Fleet, own bool) *rosterDTO {
 	}
 }
 
+// gateBodyPrefix is system.gateId's own naming convention ("gate-"+
+// destSystemId), mirrored here rather than imported since system does not
+// export gateId (also mirrored independently by charts.gateBodyPrefix and
+// fleet's own resolver.go homeGateId construction).
+const gateBodyPrefix = "gate-"
+
+// attachedGateLaneId derives the lane id of the gate f is attached to, or ""
+// if f is unattached or attached to a non-gate body. Pure: no Firestore
+// read, no dependency on any corporation's charted-lane set.
+func attachedGateLaneId(f *Fleet) string {
+	destSystemId, ok := strings.CutPrefix(f.AttachedTo, gateBodyPrefix)
+	if !ok {
+		return ""
+	}
+	return galaxy.LaneIdBetween(f.SystemId, destSystemId)
+}
+
 // toDTO resolves the fleet's position (through its own system's body table)
 // and shapes the read DTO. A mid-jump fleet's position resolves to the zero
 // vector with no error surfaced to the caller — Jump being set is itself the
@@ -245,6 +273,7 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 		SystemId:      f.SystemId,
 		State:         f.State,
 		AttachedTo:    f.AttachedTo,
+		LaneId:        attachedGateLaneId(f),
 		Jump:          f.Jump,
 		Position:      pos,
 		Own:           own,

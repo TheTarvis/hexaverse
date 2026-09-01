@@ -33,7 +33,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { GalaxyView } from './GalaxyView'
 import { useGalaxy } from '@/hooks/use-galaxy'
-import { useCutDrive, useMyFleets, useStop } from '@/hooks/use-fleets'
+import { useCutDrive, useJump, useMyFleets, useStop } from '@/hooks/use-fleets'
 import { useCancelAction } from '@/hooks/use-actions'
 import { useMarketBoard } from '@/hooks/use-market'
 import { toast } from '@/lib/toast'
@@ -156,6 +156,7 @@ vi.mock('@/hooks/use-fleets', () => ({
   useMyFleets: vi.fn(),
   useCutDrive: vi.fn(),
   useStop: vi.fn(),
+  useJump: vi.fn(),
 }))
 vi.mock('@/hooks/use-actions', () => ({ useCancelAction: vi.fn() }))
 vi.mock('@/hooks/use-market', () => ({ useMarketBoard: vi.fn() }))
@@ -171,11 +172,13 @@ const mockUseGalaxy = vi.mocked(useGalaxy)
 const mockUseMyFleets = vi.mocked(useMyFleets)
 const mockUseCutDrive = vi.mocked(useCutDrive)
 const mockUseStop = vi.mocked(useStop)
+const mockUseJump = vi.mocked(useJump)
 const mockUseCancelAction = vi.mocked(useCancelAction)
 const mockUseMarketBoard = vi.mocked(useMarketBoard)
 
 const cutDriveMutate = vi.fn()
 const stopMutate = vi.fn()
+const jumpMutate = vi.fn()
 
 // GalaxyView calls useQueryClient (for the arrival self-schedule); wrap in a
 // provider. The fleet DATA comes from the mocked hooks above, not real queries.
@@ -279,6 +282,7 @@ describe('GalaxyView', () => {
     mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
     mockUseCutDrive.mockReturnValue({ mutate: cutDriveMutate, isPending: false } as unknown as ReturnType<typeof useCutDrive>)
     mockUseStop.mockReturnValue({ mutate: stopMutate, isPending: false } as unknown as ReturnType<typeof useStop>)
+    mockUseJump.mockReturnValue({ mutate: jumpMutate, isPending: false } as unknown as ReturnType<typeof useJump>)
     mockUseCancelAction.mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof useCancelAction>)
     mockUseMarketBoard.mockReturnValue({ data: undefined, isLoading: false, isError: false } as unknown as ReturnType<typeof useMarketBoard>)
   })
@@ -500,6 +504,86 @@ describe('GalaxyView', () => {
     renderView()
 
     expect(screen.queryByTestId('fleet-cmd-jump-fleet_1')).not.toBeInTheDocument()
+  })
+
+  // --- Jump Commit at the galaxy tier (replace-observation-with-sightings
+  // tasks.md 4.13; galaxy-view ADDED "A Galaxy Link's Id Is Its Lane's
+  // Stable Id" / "Jump Commit") ------------------------------------------
+  //
+  // THE TWO DEFECTS THIS SECTION CLOSES, both in GalaxyView.tsx as shipped:
+  //
+  //   1. `isGateBody` cross-references `galaxy?.links` (charted-filtered,
+  //      per galaxy-generation "Lanes are filtered to the corp's charted
+  //      set") to decide whether an attached body is a lane gate at all —
+  //      so a FRESH corp whose gate attachment the server has only just
+  //      charted (via: gate, task 2.4) still reads an empty `links[]` on
+  //      this separately-cadenced `GET /v1/galaxy` read, and the jump
+  //      command is never offered. The existing "offers jump…" test above
+  //      does not catch this: its default `galaxy` fixture already carries
+  //      a `sys-0`↔`sys-1` link, so the charted-filtered lookup accidentally
+  //      succeeds. These tests use `links: []` explicitly, per tasks.md
+  //      4.13's own instruction, to prove the offer no longer depends on it.
+  //
+  //   2. `handleJump` is a hard-coded refusal — `toast.error('This gate
+  //      cannot be jumped from yet — no lane id on this read')` — for every
+  //      gate, because there is no `laneId` on the galaxy-view's own read to
+  //      name. Per fleet-movement "Fleet Read Serves the Attached Gate's
+  //      Lane Id", the fix resolves it off the FLEET DTO's own `laneId`
+  //      field instead (never `galaxy.links[]`, charted-filtered and not
+  //      resolvable this way at all per the requirement's own text).
+  //
+  // `atGate` below carries `laneId` directly (cast through `unknown` — the
+  // `Fleet` type does not carry this field yet; adding it is production
+  // code, task 4.13's own job, not this suite's).
+
+  it('offers the jump command for a gate absent from the fetched galaxy graph (galaxy-view "Jump Commit" — "The jump command is offered for a gate absent from the graph")', () => {
+    mockGalaxyState({ data: { ...galaxy, links: [] } })
+    const atGate: Fleet = {
+      ...parkedFleet('fleet_1', 'sys-0'),
+      attachedTo: 'gate-sys-9',
+    }
+    mockUseMyFleets.mockReturnValue({ data: [atGate] } as unknown as ReturnType<typeof useMyFleets>)
+    renderView()
+
+    expect(screen.getByTestId('fleet-cmd-jump-fleet_1')).toBeInTheDocument()
+  })
+
+  it('submits a jump order naming the attached gate’s fleet-DTO laneId, even with an empty fetched galaxy graph (galaxy-view "Jump Commit" — "A gate absent from the fetched galaxy graph still commits")', () => {
+    mockGalaxyState({ data: { ...galaxy, links: [] } })
+    const atGate = {
+      ...parkedFleet('fleet_1', 'sys-0'),
+      attachedTo: 'gate-sys-9',
+      laneId: 'lane-sys0-sys9',
+    } as unknown as Fleet
+    mockUseMyFleets.mockReturnValue({ data: [atGate] } as unknown as ReturnType<typeof useMyFleets>)
+    renderView()
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-fleet_1'))
+
+    expect(jumpMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ fleetId: 'fleet_1', laneId: 'lane-sys0-sys9' }),
+      expect.anything(),
+    )
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
+  })
+
+  it('toasts the server’s rejection reason on a failed jump commit from the galaxy tier, row unchanged (galaxy-view "Jump Commit")', () => {
+    mockGalaxyState({ data: { ...galaxy, links: [] } })
+    const atGate = {
+      ...parkedFleet('fleet_1', 'sys-0'),
+      attachedTo: 'gate-sys-9',
+      laneId: 'lane-sys0-sys9',
+    } as unknown as Fleet
+    mockUseMyFleets.mockReturnValue({ data: [atGate] } as unknown as ReturnType<typeof useMyFleets>)
+    jumpMutate.mockImplementation((_vars, opts) =>
+      (opts as { onError?: (e: Error) => void })?.onError?.(new Error('fleet: jump not attached to named gate')),
+    )
+    renderView()
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-fleet_1'))
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('fleet: jump not attached to named gate')
+    expect(screen.getByTestId('fleet-row-fleet_1')).toBeInTheDocument()
   })
 
   // --- renderer availability (add-renderer-availability-states) --------------

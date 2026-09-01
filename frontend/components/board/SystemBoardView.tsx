@@ -228,18 +228,31 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   const selectEmpty = () => pick(null)
 
   // --- roster commands (fleet-roster "The Roster Row Is the Fleet Command
-  // Surface") — burn's target is the current board selection (a feature id);
-  // there is no valid point target from a board-cell selection (a hex has no
-  // continuous-space coordinate — design.md Decision 12's "visually
-  // unplayable" interim), so a burn without a feature selected is refused
-  // client-side with a toast rather than sent as a malformed request.
+  // Surface") — burn's target is the current board selection, named by body
+  // id. A selected lane-gate body commands a burn through this exact same
+  // path (board-view "Burn Command Targets a Selected Lane-Gate Body Like
+  // Any Other Body" — gates ARE bodies, `docs/plans/continous_space/
+  // decisions.md`): its body id is the same "gate-"+destSystemId convention
+  // `attachedTo` reports on arrival (and `isGateBody`/`handleJump` above
+  // already correlate against). There is no valid point target from a
+  // board-cell selection (a hex has no continuous-space coordinate —
+  // design.md Decision 12's "visually unplayable" interim), so only an
+  // empty or bare-cell selection — with no body id to name — is refused
+  // client-side with a toast rather than sent as a malformed request; no
+  // distinct refusal copy exists for a gate target.
+  const targetBodyId =
+    selection?.kind === 'feature'
+      ? selection.id
+      : selection?.kind === 'gate'
+        ? `gate-${selection.destSystemId}`
+        : null
   const handleBurn = (fleet: Fleet) => {
-    if (selection?.kind !== 'feature') {
+    if (!targetBodyId) {
       toast.error('Select a body to target first')
       return
     }
     order.mutate(
-      { fleetId: fleet.id, request: { bodyId: selection.id } },
+      { fleetId: fleet.id, request: { bodyId: targetBodyId } },
       {
         onSuccess: () => toast.success('Course laid in'),
         onError: (e) => toast.error(e.message || 'Order failed'),

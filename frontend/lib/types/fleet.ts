@@ -124,6 +124,12 @@ export interface Fleet {
   attachedTo?: string
   // Non-null while crossing a lane (design.md Decision 10).
   jump?: JumpTransit
+  // The attached lane-gate body's lane id (fleet-movement "Fleet Read
+  // Serves the Attached Gate's Lane Id") — derived server-side via
+  // `galaxy.LaneIdBetween`, from a source neither filtered by nor derived
+  // from the corporation's charted-lane set. Absent/empty when the fleet
+  // is not attached to a lane-gate body.
+  laneId?: string
   // The fleet's live position, `space.StatePosition` resolved server-side.
   position: Vec3
   // Whether the requester owns this fleet. A foreign fleet is omitted from

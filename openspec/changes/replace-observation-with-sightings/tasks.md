@@ -335,7 +335,7 @@
       (board-view: *Jump Commit* — Invoking jump submits the attached
       gate's lane; A gate whose lane the corporation has not charted still
       commits; A failed jump commit toasts the reason)
-- [ ] 4.12 **Frontend.** Unify gate selection with body selection in
+- [x] 4.12 **Frontend.** Unify gate selection with body selection in
       `SystemBoardView.tsx`: a lane-gate body commands a burn through the
       same path as any other selected body, with no
       `selection.kind !== 'feature'`-shaped branch carved out for a gate.
@@ -366,7 +366,7 @@
       submits an order; Attachment from a gate-targeted burn makes the jump
       command available; No gate-specific refusal copy exists; A selected
       gate still shows its facts and its selected mark)
-- [ ] 4.13 **Backend + Frontend + fixture.** `GET /v1/galaxy`'s `links[]` is
+- [x] 4.13 **Backend + Frontend + fixture.** `GET /v1/galaxy`'s `links[]` is
       charted-filtered (`galaxy-generation`: *Lanes are filtered to the
       corp's charted set*), so it is empty for exactly the fresh-spawn/
       just-attached case this jump command exists to serve — it CANNOT be

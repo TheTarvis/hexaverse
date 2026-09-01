@@ -9,7 +9,11 @@ import { resolveE2EConfig } from '../config/env'
  *   system-interior's interim read, no scan needed to see a lode) →
  *   select a mineable body → BURN + dock, commanded from the roster panel →
  *   MINE (hold fills at the eta) → reload (the cargo PERSISTED — a fresh
- *   Firestore read, not client cache) → mine again (the ledger accumulates).
+ *   Firestore read, not client cache) → mine again (the ledger accumulates)
+ *   → select the home system's nearest lane-gate body → BURN + dock to it
+ *   (board-view "Burn Command Targets a Selected Lane-Gate Body Like Any
+ *   Other Body") → JUMP, commanded from the roster panel (board-view "Jump
+ *   Commit").
  *
  * REWRITTEN wholesale from the pre-migration
  * "scan → move → mine → persisted → mine again → depart" journey. Cause: the
@@ -24,10 +28,20 @@ import { resolveE2EConfig } from '../config/env'
  *     the roster panel (fleet-roster ADDED "The Roster Row Is the Fleet
  *     Command Surface"; board-view Decision 12), naming the board's CURRENT
  *     SELECTION (a clicked feature) as the target.
- *   - `depart` (a lane jump) has **NO REACHABLE PATH in this state of the
- *     chain** and is NOT exercised — see the dedicated note at the bottom of
- *     this file before the final assertions. This is reported, not silently
- *     dropped.
+ *   - `depart` (a lane jump) previously had **NO REACHABLE PATH** in this
+ *     journey (see git history for the prior note, dated against
+ *     migrate-fleet-to-continuous-burns): the interior read's lane-gate list
+ *     was still charted-tier-filtered, and charting a lane was circular
+ *     (only jumping or the now-deleted scan verb charted one). Both premises
+ *     are now FALSE, closed by replace-observation-with-sightings §1 (task
+ *     1.3 deletes `chartedGates` — "every lane-gate body ships unfiltered to
+ *     every authenticated requester," system-interior "Bodies Are Public;
+ *     Ships Are Disclosed") and tasks.md 4.10-4.13 (the roster's jump
+ *     command is gated by attachment alone, and both the board- and
+ *     galaxy-tier jump commands resolve a `laneId` with no charted-lane
+ *     dependency at all). `depart` is exercised below as the journey's
+ *     final leg — this is the section's own acceptance criterion (see the
+ *     SDET handoff report's "player-path e2e" verdict).
  *
  * data-testid contract this spec assumes (the dev implements to it):
  *   - `feature-glyph-{id}` / `[data-mineable]` — SURVIVES unchanged (board
@@ -41,9 +55,15 @@ import { resolveE2EConfig } from '../config/env'
  *   - `mine-section`, `mine-tons-input`, `mine-button`, `mine-countdown`,
  *     `hold-readout`, `hold-capacity` — SURVIVE unchanged (board-view KEPT
  *     "Mine Offer/ETA/Commit"; tasks.md 8.7).
- *   - `gate-glyph-*` — SURVIVES, but is expected to be ABSENT for a fresh
- *     corp (see the bottom note): no lane is charted, so the interior read
- *     ships zero lane gates.
+ *   - `gate-glyph-*` — SURVIVES, and is now expected PRESENT even for a
+ *     fresh corp with nothing charted: every lane-gate body on a
+ *     materialized system's board ships unfiltered (system-interior "Bodies
+ *     Are Public; Ships Are Disclosed"), so the home system's own lane
+ *     gates are visible from the very first board load, same as any other
+ *     body.
+ *   - `fleet-cmd-jump-{fleetId}` — the roster's jump command, offered once
+ *     the fleet is `attachedTo` a lane-gate body (fleet-roster "The Roster
+ *     Row Is the Fleet Command Surface, Jump Gated by Attachment Alone").
  *
  * Wall-clock note (design.md Risks): the test stack runs the world at scale 1
  * (no WORLD_TIME_SCALE in .env.test), so every eta here is real seconds:
@@ -67,12 +87,11 @@ const cfg = resolveE2EConfig()
 // Fresh account — do not restore the shared logged-in session.
 test.use({ storageState: { cookies: [], origins: [] } })
 
-// The journey rides real world-time etas (a burn to the nearest lode + two
-// mine runs). No lane leg is ridden any more (depart is unreachable — see
-// below), so this is shorter than the pre-migration budget, but the burn
-// duration is untuned as of this writing (see the wall-clock note above) —
-// left generous rather than guessed tight.
-test.setTimeout(300_000)
+// The journey rides real world-time etas (a burn to the nearest lode, two
+// mine runs, a second burn to the nearest lane gate, and a jump commit) —
+// every leg's duration is untuned as of this writing (see the wall-clock
+// note above) — left generous rather than guessed tight.
+test.setTimeout(600_000)
 
 // Clicks a board glyph by dispatching the click event straight to its button.
 // Orbiting glyphs animate every frame, so Playwright's stability check never
@@ -92,7 +111,7 @@ async function holdUsed(page: Page): Promise<number> {
 }
 
 test.describe('the vertical slice', () => {
-  test('wake → mine → persisted → mine again (no scan, no reachable depart)', async ({ page }) => {
+  test('wake → mine → persisted → mine again → fly to a gate → jump', async ({ page }) => {
     test.skip(cfg.env !== 'local', 'slice journey drives the auth emulator (local only)')
 
     const email = `e2e+slice-${Date.now()}@hexaverse.test`
@@ -195,35 +214,93 @@ test.describe('the vertical slice', () => {
       .poll(() => holdUsed(page), { timeout: 45_000, message: 'the second run accumulates' })
       .toBe(10)
 
-    // 8. DEPART HAS NO SUCCESSOR HERE — reported, not silently dropped.
+    // 8. DEPART — select the home system's nearest lane-gate body, BURN +
+    //    dock to it (board-view "Burn Command Targets a Selected Lane-Gate
+    //    Body Like Any Other Body" — replace-observation-with-sightings
+    //    tasks.md 4.12 closes the ONLY remaining client wiring gap in this
+    //    leg: `handleBurn` used to refuse this exact click with "Select a
+    //    body to target first", because a gate's selection is
+    //    `{kind:'gate'}`, not `{kind:'feature'}`), then JUMP (fleet-roster
+    //    "The Roster Row Is the Fleet Command Surface, Jump Gated by
+    //    Attachment Alone" + board-view "Jump Commit" — tasks.md 4.10/4.11,
+    //    both already landed, offer and wire the command entirely from THIS
+    //    board's own `board.laneGates` read; no galaxy-tier fix is needed
+    //    for this leg of the journey). This is the section's own
+    //    acceptance criterion (see the SDET handoff report's "player-path
+    //    e2e" verdict), not a bonus assertion.
     //
-    //    A lane jump requires the fleet to be `attachedTo` a lane-gate body
-    //    whose lane the corporation has CHARTED (fleet-movement ADDED "Lane
-    //    Jump From a Docked Gate"). Charting a lane happens exactly two
-    //    ways in the current tree: (1) as a byproduct of actually crossing
-    //    it (fleet-movement "Jump Arrival Parks Near the Destination Gate,
-    //    Unmasked" — `via: traveled`), which is circular — you cannot jump
-    //    an uncharted lane to chart it; or (2) scanning, which this change
-    //    deletes outright with no replacement (observation-fog-and-scan
-    //    REMOVED "Running Scan Echo Disc"/"Scan Resolution Mints the
-    //    Reveal") — link 5 (replace-observation-with-sightings) is where a
-    //    successor sensor verb lands. Spawn itself charts home only, zero
-    //    lanes (corporation-spawn, unaffected by this change). And the
-    //    interior read's lane-gate list is STILL charted-tier-filtered
-    //    post-migration (`system/handler.go`'s `chartedGates` survives
-    //    section 7's audit as system-interior's one remaining fog
-    //    dependency) — so an uncharted gate is not merely un-jumpable, it
-    //    is invisible.
+    //    Every home system has at least one lane-gate body — the backend's
+    //    own end-to-end traversability test (tasks.md 1.6,
+    //    backend/traversability_e2e_test.go) hard-fails a spawn whose home
+    //    system's interior read carries zero lane gates, so this is a
+    //    structural guarantee, not a lucky seed. And since §1 (task 1.3)
+    //    deleted `chartedGates`, that gate is visible from the very first
+    //    board load, unfiltered by charted knowledge (system-interior
+    //    "Bodies Are Public; Ships Are Disclosed") — closing the OTHER half
+    //    of the old blocker this section's predecessor note described
+    //    (an uncharted gate used to be not merely un-jumpable, but
+    //    invisible).
+    const gates = page.locator('[data-testid^="gate-glyph-"]')
+    await expect(
+      gates.first(),
+      'the home system interior should show at least one lane-gate body, unfiltered by charted knowledge',
+    ).toBeVisible({ timeout: 15_000 })
+
+    let gateDestId = ''
+    best = Number.POSITIVE_INFINITY
+    for (const glyph of await gates.all()) {
+      const id = (await glyph.getAttribute('data-testid'))!.replace('gate-glyph-', '')
+      const box = await glyph.boundingBox()
+      if (!box) continue
+      const d = Math.hypot(box.x - boardCenter.x, box.y - boardCenter.y)
+      if (d < best) {
+        best = d
+        gateDestId = id
+      }
+    }
+    expect(gateDestId, 'a nearest lane-gate body should have been picked').not.toBe('')
+    await clickGlyph(page, `gate-glyph-${gateDestId}`)
+
+    // Burn toward the SELECTED gate body — the exact same roster command,
+    // the exact same click, as burning toward the lode above (board-view
+    // "No gate-specific refusal copy exists": no separate affordance, no
+    // distinct refusal). This is the click that used to be silently
+    // swallowed by the "Select a body to target first" refusal.
     //
-    //    Net effect: between this change and link 5 landing, there is no
-    //    player-driven path to a first charted lane, so `depart` cannot be
-    //    exercised end-to-end by ANY account, fresh or old. This matches
-    //    design.md's own recorded risk ("This makes the game visually
-    //    unplayable for links 4 through 7") and is not this test's bug to
-    //    paper over.
-    //
-    //    What IS asserted here, honestly, is the current interim state: a
-    //    fresh corp's board shows no lane gate at all.
-    await expect(page.locator('[data-testid^="gate-glyph-"]')).toHaveCount(0)
+    // FALSE-POSITIVE GUARD (why this waits for "Under way" FIRST): the
+    // fleet is ALREADY showing "Docked" here — still attached to the LODE
+    // from step 7 — so asserting "Docked" alone, without first observing a
+    // transition AWAY from it, would pass trivially even if this burn click
+    // were silently swallowed (the pre-4.12 refusal never calls
+    // order.mutate at all, so `attachedTo` would just stay pointed at the
+    // lode the whole time and this assertion would never actually catch
+    // that). A burn commit clears `attachedTo` immediately
+    // (roster-status.ts's own comment: "the backend clears at burn commit,
+    // sets only at resolve") and reads "Under way" while it runs — that
+    // transition is the genuine proof an order was actually submitted
+    // toward the gate, not a no-op.
+    await page.getByTestId(`fleet-cmd-burn-${fleetId}`).click()
+    await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText(/under way/i, { timeout: 15_000 })
+    await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText('Docked', { timeout: 240_000 })
+
+    // JUMP — offered the instant the fleet is attached to the gate, no
+    // charted-lane precondition (fleet-roster "Jump Gated by Attachment
+    // Alone"); commits naming the attached gate's laneId, sourced straight
+    // off the already-open interior read, no second read (board-view "Jump
+    // Commit").
+    await expect(page.getByTestId(`fleet-cmd-jump-${fleetId}`)).toBeVisible({ timeout: 10_000 })
+    await page.getByTestId(`fleet-cmd-jump-${fleetId}`).click()
+
+    // The jump committed — this board's own roster row for the SAME fleet
+    // reflects lane-transit state ("In transit", roster-status.ts) rather
+    // than staying docked. This is the honest, minimal success signal: a
+    // fleet's `systemId` does not flip until the jump RESOLVES (design.md
+    // Decision 10), so navigating away is not expected here, and asserting
+    // a resolved arrival would mean waiting out the lane's full crossing
+    // time on the real wall clock for no additional coverage of this
+    // section's own scope (jump COMMIT, not jump resolution — already
+    // covered end-to-end, with a time-skipped arrival, by
+    // backend/traversability_e2e_test.go).
+    await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText(/in transit/i, { timeout: 15_000 })
   })
 })

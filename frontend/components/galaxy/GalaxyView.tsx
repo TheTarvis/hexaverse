@@ -29,7 +29,7 @@ import { Heading, Subheading } from '@/components/catalyst/heading'
 import { Button } from '@/components/catalyst/button'
 import { Text, TextLink, Strong } from '@/components/catalyst/text'
 import { useGalaxy } from '@/hooks/use-galaxy'
-import { useCutDrive, useMyFleets, useStop } from '@/hooks/use-fleets'
+import { useCutDrive, useJump, useMyFleets, useStop } from '@/hooks/use-fleets'
 import { useMarketBoard } from '@/hooks/use-market'
 import { MarketBoardPanel } from '@/components/market/MarketBoardPanel'
 import type { Quote } from '@/lib/types/market'
@@ -299,29 +299,43 @@ export function GalaxyView() {
     },
     [stop],
   )
-  const handleJump = useCallback(() => {
-    // Jump is now offered on attachment alone (isGateBody below, task 4.10)
-    // — but there is no laneId on this read to name useJump's required
-    // parameter yet (the same wiring gap SystemBoardView documents),
-    // distinct from (and no longer about) charted knowledge.
-    toast.error('This gate cannot be jumped from yet — no lane id on this read')
-  }, [])
+  const jump = useJump()
+  // handleJump — names the laneId straight off the attached gate's OWN fleet
+  // DTO field (fleet-movement "Fleet Read Serves the Attached Gate's Lane
+  // Id"), never `galaxy.links[]` — that read is charted-filtered
+  // (galaxy-generation "Lanes are filtered to the corp's charted set") and
+  // is empty for exactly the fresh-spawn/just-attached case this command
+  // exists to serve (replace-observation-with-sightings tasks.md 4.13;
+  // galaxy-view "Jump Commit"). No second read, no charted-lane
+  // precondition — the same success/error toast shape
+  // SystemBoardView.tsx's `handleJump` already uses.
+  const handleJump = useCallback(
+    (fleet: Fleet) => {
+      if (!fleet.laneId) {
+        toast.error('Not attached to a lane gate')
+        return
+      }
+      jump.mutate(
+        { fleetId: fleet.id, laneId: fleet.laneId },
+        {
+          onSuccess: () => toast.success('Jump underway'),
+          onError: (e) => toast.error(e.message || 'Jump failed'),
+        },
+      )
+    },
+    [jump],
+  )
   // isGateBody: "is the body this fleet is attached to a lane-gate body at
-  // all?" (replace-observation-with-sightings tasks.md 4.10; fleet-roster
-  // ADDED "The Roster Row Is the Fleet Command Surface, Jump Gated by
-  // Attachment Alone"). No charted-lane precondition — charting is map
-  // knowledge, never a permission (design.md Decision 2). A gate body id
-  // follows `system.gateId`'s own "gate-"+destSystemId convention and names
-  // only the DESTINATION system, never the origin it sits in — so a valid
-  // gate body can be identified from `galaxy.links` alone (already fetched
-  // here) without knowing which system the attached fleet is physically in:
-  // a "gate-X" body is a real lane gate exactly when X is one endpoint of
-  // some charted-galaxy lane.
-  const isGateBody = (bodyId: string) => {
-    if (!bodyId.startsWith('gate-')) return false
-    const destId = bodyId.slice('gate-'.length)
-    return galaxy?.links.some((l) => l.source === destId || l.target === destId) ?? false
-  }
+  // all?" (replace-observation-with-sightings tasks.md 4.10, 4.13;
+  // fleet-roster ADDED "The Roster Row Is the Fleet Command Surface, Jump
+  // Gated by Attachment Alone"). No charted-lane precondition — charting is
+  // map knowledge, never a permission (design.md Decision 2) — so this
+  // consults no `galaxy.links` read (charted-filtered, and empty for
+  // exactly the fresh-spawn/just-attached case this predicate exists to
+  // serve). A gate body id follows `system.gateId`'s own
+  // "gate-"+destSystemId convention; the prefix alone is sufficient to
+  // identify one, with no cross-reference against any charted set.
+  const isGateBody = (bodyId: string) => bodyId.startsWith('gate-')
 
   if (isLoading) {
     return (

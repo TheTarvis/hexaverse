@@ -636,6 +636,87 @@ describe('SystemBoardView', () => {
     expect(screen.queryByTestId('fleet-cmd-jump-mine')).not.toBeInTheDocument()
   })
 
+  // --- Burn targets a selected lane-gate body (replace-observation-with-
+  // sightings tasks.md 4.12; board-view ADDED "Burn Command Targets a
+  // Selected Lane-Gate Body Like Any Other Body") -----------------------
+  //
+  // THE DEFECT THIS SECTION CLOSES: `handleBurn` (SystemBoardView.tsx)
+  // refuses to submit an order unless `selection?.kind === 'feature'`. A
+  // lane-gate body's selection is `{kind:'gate', destSystemId}`
+  // (board-selection.ts) — so today, commanding a burn with a gate selected
+  // hits the SAME "Select a body to target first" refusal as no selection
+  // at all, even though the gate glyph is genuinely selected on screen.
+  // Gates are bodies (docs/plans/continous_space/decisions.md) — this is
+  // the client wiring gap, not a missing board capability (picking already
+  // resolves a gate correctly; board-selection.test.ts and
+  // BoardOverlay.test.tsx cover that half and are untouched here).
+
+  function gateSelectedFixture() {
+    const withGate = {
+      ...boardFixture(),
+      laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }],
+    }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    myFleetsState([ownFleet])
+    const view = render(<SystemBoardView systemId="sys-7" />)
+    fireEvent.click(screen.getByTestId('gate-glyph-sys-9'))
+    return view
+  }
+
+  // Scenario: Commanding a burn toward a selected lane-gate body submits an
+  // order — naming the SAME body id `attachedTo` reports on arrival
+  // ("gate-sys-9", system.gateId's own convention), never the bare
+  // destination system id.
+  it('commands a burn toward a selected lane-gate body, naming the gate’s body id (board-view "Burn Command Targets a Selected Lane-Gate Body Like Any Other Body")', () => {
+    gateSelectedFixture()
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-burn-mine'))
+
+    expect(orderMutate).toHaveBeenCalledWith(
+      { fleetId: 'mine', request: { bodyId: 'gate-sys-9' } },
+      expect.anything(),
+    )
+  })
+
+  // Scenario: No gate-specific refusal copy exists — the "select a body to
+  // target first" refusal is reachable only from an empty/bare-cell
+  // selection, never from a selected gate.
+  it('shows no gate-specific refusal copy when burn is invoked with a gate selected — an order is submitted instead', () => {
+    gateSelectedFixture()
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-burn-mine'))
+
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
+    expect(orderMutate).toHaveBeenCalledTimes(1)
+  })
+
+  // Scenario: A selected gate still shows its facts and its selected mark —
+  // the preservation clause. Folding the 'gate' selection kind away (the
+  // preferred implementation) must not blank FactsPanel's selection section
+  // or drop the gate glyph's drawn selected mark: `FactsPanel.tsx`'s
+  // `features.find(f => f.id === selection.id)` never matches a gate
+  // (`board.features` never contains a gate body), and the gate glyph's
+  // selection-stroke circle (BoardOverlay.tsx) is keyed on
+  // `selectedGateId === g.destSystemId` today — both need a gate-aware
+  // lookup that survives the refactor even though the selection object may
+  // become 'feature'-shaped.
+  it('keeps showing the gate’s facts and its drawn selected mark once a selected gate can command a burn', () => {
+    gateSelectedFixture()
+
+    const gateFacts = screen.getByTestId('gate-facts')
+    expect(gateFacts).toHaveTextContent('sys-9')
+    expect(gateFacts).toHaveTextContent(/jump from the roster panel/i)
+
+    // The drawn selected mark: BoardOverlay draws exactly one extra
+    // selection-stroke circle on a selected gate glyph (no dedicated
+    // `selection-ring` testid exists for a gate, unlike a feature — a
+    // circle-count delta is the only observable signal this glyph type
+    // exposes). 3 circles are drawn unconditionally (outer ring, inner
+    // dot, transparent hit target); a 4th appears only while selected.
+    const circles = screen.getByTestId('gate-glyph-sys-9').querySelectorAll('circle')
+    expect(circles.length).toBeGreaterThanOrEqual(4)
+  })
+
   // --- Jump Commit (replace-observation-with-sightings tasks.md 4.11, 8.8;
   // board-view ADDED "Jump Commit") -----------------------------------------
   //
