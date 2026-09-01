@@ -54,6 +54,15 @@ func (g *stubGalaxyNoGates) NeighborsOf(context.Context, string) ([]string, erro
 	return nil, nil
 }
 
+// EnsureLaneHorizon is a no-op stub: replace-observation-with-sightings
+// tasks.md 1.4 (design.md Decision 23) adds this call to addGates' own path,
+// immediately before NeighborsOf, so it is now a genuinely intended call on
+// this fake's call path rather than the "accidental new dependency" this
+// type's nil embed exists to catch — see the type's own doc comment above.
+func (g *stubGalaxyNoGates) EnsureLaneHorizon(context.Context, string) error {
+	return nil
+}
+
 // testBodyTable builds a genuine *system.BodyTable for systemID, carrying a
 // star of starSize plus every extra feature supplied, via the real
 // system.Service (backed by a Firestore Dao mock returning the interior

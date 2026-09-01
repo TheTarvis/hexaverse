@@ -43,8 +43,7 @@ func TestJump_Scenario_SettlesDueArrivalBeforeEvaluatingAttachmentNoDwell(t *tes
 	gate := orbitingFeature("gate-sys-1", 220, system.GateSize)
 	bodies := testBodyTable(t, "sys-0", 6.0, gate)
 	svc.WithBodies(stubBodySourceFixed{bt: bodies})
-	svc.WithTierSource(&fakeTierSource{charted: map[string]bool{"lane-1": true}})
-	svc.WithGraph(&fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 100}})
+	svc.graph = &fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 100}}
 	svc.classStats = map[ShipClass]ClassStats{ClassSeed: {LaneRate: 1.0}}
 
 	unsettled := &Fleet{

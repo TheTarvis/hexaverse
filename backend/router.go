@@ -88,7 +88,11 @@ func SetupRouter() *gin.Engine {
 	// systemSvc doubles as fleet's BodySource (its BodyTable method,
 	// migrate-fleet-to-continuous-burns design.md Decision 16) — the same
 	// concrete service instance every other domain already shares.
-	fleetSvc := fleet.NewServiceWith(fleet.NewDao(), systemSvc, actionSvc, clock)
+	// galaxySvc doubles as fleet's lane-crossing-geometry source (its
+	// LaneCrossing method, replace-observation-with-sightings design.md
+	// Decision 22, blocker 3) — a required constructor parameter here, not a
+	// post-construction accessor that a future refactor could silently drop.
+	fleetSvc := fleet.NewServiceComplete(fleet.NewDao(), systemSvc, galaxySvc, actionSvc, clock)
 
 	// Register the burn resolver, folding a settled arrival through the same
 	// BodySource (design.md Decision 16, 21A — BurnResolver folds

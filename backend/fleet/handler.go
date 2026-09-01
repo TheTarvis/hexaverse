@@ -158,7 +158,7 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrFleetInTransit):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet is in lane transit"})
-	case errors.Is(err, ErrJumpNotAttached), errors.Is(err, ErrLaneNotCharted):
+	case errors.Is(err, ErrJumpNotAttached):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case err != nil:
 		log.Error().Ctx(c).Err(err).Msg("fleet operation failed")

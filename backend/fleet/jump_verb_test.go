@@ -5,24 +5,25 @@ package fleet
 // "Compute jump crossing time as space.Vec3{...}.Length() ... times the
 // fleet's configured lane rate, quantized via space.QuantizeArrival".
 //
-// Neither the verb nor its two new dependencies exist anywhere in this
-// package today (confirmed by source grep: no TierSource, no GraphSource, no
-// Jump method survive the section-3 deletion of routing.go, which used to
-// declare a TierSource/GraphSource pair of the same shape for multi-hop
-// routing). This file is therefore a genuinely RED, SDET-authored CONTRACT —
-// mirroring body_source_test.go's own established convention of stating the
-// shape in a comment and then simply USING the not-yet-existing symbol,
-// rather than declaring it here (declaring it here would collide with the
-// production declaration once a developer adds it in the same package).
+// UPDATED by replace-observation-with-sightings tasks.md 1.1/1.2 (design.md
+// Decisions 2/22): jump-eligibility dropped its map-knowledge precondition —
+// attachment to the lane's own gate body is now the ENTIRE eligibility
+// check, no dwell, and the lane-crossing-geometry source is wired as a
+// required constructor parameter (fleet.NewServiceComplete) rather than
+// through a deleted post-construction accessor. The scenarios pinning the
+// now-removed charted-lane requirement are deleted outright below, per the
+// same test-immutability protocol handler_test.go's own deleted
+// TestGetInterior_LaneGatesFogFilterToCharted documents (an authorized
+// change: the spec removed the requirement these scenarios pinned); the
+// surviving scenarios are adapted only in their construction plumbing — this
+// package's own established convention (see svc.classStats below) is that a
+// same-package test may set an unexported Service field directly, which is
+// exactly how each surviving scenario now supplies its lane-crossing fake in
+// place of the deleted accessor.
 //
 // CONTRACT this suite assumes:
 //
 //   func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error)
-//
-//   type TierSource interface {
-//       ChartedLanes(ctx context.Context, cid string) (map[string]bool, error)
-//   }
-//   func (s *Service) WithTierSource(ts TierSource) *Service
 //
 //   type GraphSource interface {
 //       // LaneCrossing resolves one lane's crossing geometry, given the lane
@@ -34,19 +35,17 @@ package fleet
 //       LaneCrossing(ctx context.Context, laneId, fromSystemId string) (
 //           destSystemId string, from, to space.Vec3, err error)
 //   }
-//   func (s *Service) WithGraph(g GraphSource) *Service
 //
 //   var ErrJumpNotAttached = errors.New(...) // "jumping without attachment to the named gate is rejected"
-//   var ErrLaneNotCharted  = errors.New(...) // "jumping an uncharted lane is rejected"
 //
 // The gate body a jump departs from is named "gate-"+destSystemId, mirroring
 // system.gateId's own convention (system/bodies.go) — the fleet's
 // AttachedTo is compared against this literal, since system does not export
-// gateId. The charted-lane check and the eligibility check both key on the
-// FLEET's own CorporationId, not a caller-supplied requester id: no verb in
-// this package threads a requester identity through the service layer today
-// (design.md Decision 21/tasks.md 5.6 — ownership is never checked), so "the
-// requester corporation" operationally means "the fleet's corporation".
+// gateId. The eligibility check keys on the FLEET's own CorporationId, not a
+// caller-supplied requester id: no verb in this package threads a requester
+// identity through the service layer today (design.md Decision 21/tasks.md
+// 5.6 — ownership is never checked), so "the requester corporation"
+// operationally means "the fleet's corporation".
 //
 // A developer landing a materially different but scenario-equivalent shape
 // should raise it as a test dispute for orchestrator adjudication, not
@@ -62,17 +61,6 @@ import (
 
 	"go.uber.org/mock/gomock"
 )
-
-// fakeTierSource is the SDET-authored fake for the not-yet-existing
-// TierSource dependency (see CONTRACT above).
-type fakeTierSource struct {
-	charted map[string]bool
-	err     error
-}
-
-func (f *fakeTierSource) ChartedLanes(context.Context, string) (map[string]bool, error) {
-	return f.charted, f.err
-}
 
 // fakeGraph is the SDET-authored fake for the not-yet-existing GraphSource
 // dependency (see CONTRACT above). from/to are handed over as RAW
@@ -121,8 +109,7 @@ func TestJump_Scenario_ChartedAttachedGateCommits(t *testing.T) {
 	defer ctrl.Finish()
 
 	svc.classStats = map[ShipClass]ClassStats{ClassSeed: {LaneRate: 1.0}}
-	svc.WithTierSource(&fakeTierSource{charted: map[string]bool{"lane-1": true}})
-	svc.WithGraph(&fakeGraph{destSystemId: "sys-1", from: space.Vec3{}, to: space.Vec3{X: 200, Y: 300, Z: 600}})
+	svc.graph = &fakeGraph{destSystemId: "sys-1", from: space.Vec3{}, to: space.Vec3{X: 200, Y: 300, Z: 600}}
 
 	f := gateParkedFleet("gate-sys-1")
 	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(f, nil)
@@ -181,8 +168,7 @@ func TestJump_Scenario_CrossingTimeDividesLengthByLaneRate(t *testing.T) {
 	// Length 700 (see the fixture above), LaneRate 0.35 units/ms ⇒
 	// flight = 700 / 0.35 = 2000ms exactly, distinguishable from 700*0.35=245.
 	svc.classStats = map[ShipClass]ClassStats{ClassSeed: {LaneRate: 0.35}}
-	svc.WithTierSource(&fakeTierSource{charted: map[string]bool{"lane-1": true}})
-	svc.WithGraph(&fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 200, Y: 300, Z: 600}})
+	svc.graph = &fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 200, Y: 300, Z: 600}}
 
 	f := gateParkedFleet("gate-sys-1")
 	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(f, nil)
@@ -213,8 +199,7 @@ func TestJump_Scenario_RejectedWithoutAttachment(t *testing.T) {
 			svc, dao, fa, ctrl := newSvc(t, clk)
 			defer ctrl.Finish()
 
-			svc.WithTierSource(&fakeTierSource{charted: map[string]bool{"lane-1": true}})
-			svc.WithGraph(&fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 1}})
+			svc.graph = &fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 1}}
 			dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(c.fleet, nil)
 
 			_, err := svc.Jump(context.Background(), "fleet_1", "lane-1")
@@ -228,26 +213,17 @@ func TestJump_Scenario_RejectedWithoutAttachment(t *testing.T) {
 	}
 }
 
-// Scenario: Jumping an uncharted lane is rejected.
-func TestJump_Scenario_RejectedUnchartedLane(t *testing.T) {
-	clk := &fakeClock{now: 1_000}
-	svc, dao, fa, ctrl := newSvc(t, clk)
-	defer ctrl.Finish()
-
-	svc.WithTierSource(&fakeTierSource{charted: map[string]bool{}}) // lane-1 NOT charted
-	svc.WithGraph(&fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 1}})
-
-	f := gateParkedFleet("gate-sys-1")
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(f, nil)
-
-	_, err := svc.Jump(context.Background(), "fleet_1", "lane-1")
-	if !errors.Is(err, ErrLaneNotCharted) {
-		t.Fatalf("err = %v, want ErrLaneNotCharted", err)
-	}
-	if fa.committed != nil {
-		t.Fatalf("a rejected jump must not commit an action, got %+v", fa.committed)
-	}
-}
+// TestJump_Scenario_RejectedUnchartedLane (DELETED —
+// replace-observation-with-sightings tasks.md 1.2) used to prove Jump
+// rejected an uncharted lane. That precondition is REMOVED by design.md
+// Decision 2: jump-eligibility is attachment to the lane's own gate body
+// alone, no map-knowledge check — the charting circularity this scenario
+// pinned (you cannot chart without arriving, and cannot arrive without
+// charting) is exactly what made the galaxy untraversable for a fresh
+// corporation. Deleted rather than inverted, per the same test-immutability
+// protocol handler_test.go's own deleted TestGetInterior_LaneGatesFogFilterToCharted
+// documents (an authorized change: the spec removed the requirement this
+// test pinned).
 
 // Scenario: Jump costs no delta-v.
 //
@@ -263,8 +239,7 @@ func TestJump_Scenario_CostsNoDeltaV(t *testing.T) {
 	svc, dao, _, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
-	svc.WithTierSource(&fakeTierSource{charted: map[string]bool{"lane-1": true}})
-	svc.WithGraph(&fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 1}})
+	svc.graph = &fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 1}}
 
 	f := gateParkedFleet("gate-sys-1")
 	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(f, nil)
@@ -287,8 +262,7 @@ func TestJump_Scenario_ReplacesActiveMovementOrder(t *testing.T) {
 	svc, dao, fa, ctrl := newSvc(t, clk)
 	defer ctrl.Finish()
 
-	svc.WithTierSource(&fakeTierSource{charted: map[string]bool{"lane-1": true}})
-	svc.WithGraph(&fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 1}})
+	svc.graph = &fakeGraph{destSystemId: "sys-1", to: space.Vec3{X: 1}}
 
 	f := gateParkedFleet("gate-sys-1")
 	f.ActiveActionId = "action_running_mine"

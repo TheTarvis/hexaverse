@@ -1,6 +1,6 @@
 ## 1. Traversability First
 
-- [ ] 1.1 Implement a production `fleet.GraphSource` (`LaneCrossing(ctx,
+- [x] 1.1 Implement a production `fleet.GraphSource` (`LaneCrossing(ctx,
       laneId, fromSystemId) (destSystemId string, from, to space.Vec3, err
       error)`) resolving a lane's crossing geometry from the galaxy's raw
       coordinates, and construct the fleet service in `router.go` by
@@ -10,14 +10,14 @@
       omit) — closing blocker 3.
       (fleet-movement: *Lane Jump From an Attached Gate* — Jumping from an
       attached gate commits; Jump costs no delta-v)
-- [ ] 1.2 Drop `Jump`'s charted-lane precondition: jump-eligibility becomes
+- [x] 1.2 Drop `Jump`'s charted-lane precondition: jump-eligibility becomes
       "attached to the lane's own gate body, no dwell" — delete
       `ErrLaneNotCharted` and the charted-lane check from `fleet.Service.Jump`.
       (fleet-movement: *Lane Jump From an Attached Gate* — Jumping from an
       attached gate commits; A fleet is jump-eligible the instant it
       attaches, with no dwell; Jumping without attachment to the named gate
       is rejected)
-- [ ] 1.3 Delete `system/gates.go`'s `chartedGates`, `system/handler.go`'s
+- [x] 1.3 Delete `system/gates.go`'s `chartedGates`, `system/handler.go`'s
       `BoardFog.SystemTiers` tier lookup and its call site — every lane-gate
       body ships unfiltered to every authenticated requester, closing
       blocker 2.
@@ -26,7 +26,7 @@
       (system-body-table: *The Body Table Is an Unfiltered Internal Seam,
       Never a Response* — The table carries bodies the requester could not
       see)
-- [ ] 1.4 Wire `galaxy.EnsureLaneHorizon` into jump-arrival settlement
+- [x] 1.4 Wire `galaxy.EnsureLaneHorizon` into jump-arrival settlement
       (`fleet.Service.Get`'s post-jump-settle step), called strictly before
       the destination's first `BodyTable` build for that arrival — closing
       blocker 4.
@@ -36,7 +36,7 @@
       (galaxy-generation: *Lazy, Idempotent Block Materialization* — A jump
       arrival at the frontier materializes the destination's full lane
       horizon before its gate set is built)
-- [ ] 1.5 In the jump-resolve transaction, write the destination's knowledge
+- [x] 1.5 In the jump-resolve transaction, write the destination's knowledge
       tier to `explored` and chart the crossed lane `via: traveled`, and
       settle the fleet's `systemId`/lane-transit state into an unattached
       park near the destination gate's insertion standoff; materialize the
@@ -46,7 +46,7 @@
       Unmasked* — Arrival flips the system and parks unattached near the
       gate; Arrival charts the crossed lane as traveled and rumors nothing
       onward; First arrival materializes the destination's interior)
-- [ ] 1.6 End-to-end traversability integration test — the link's first
+- [x] 1.6 End-to-end traversability integration test — the link's first
       milestone: spawn, burn to a gate, dock, jump, arrive parked unmasked
       near the destination gate, confirm the crossed lane appears on the
       galaxy map, confirm the destination's full gate set is present. This

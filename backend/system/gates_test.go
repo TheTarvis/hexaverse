@@ -6,7 +6,6 @@ import (
 
 	"hexaverse/board"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 )
 
 // threeSystemGalaxy: sys-0 at the origin with two lanes — east to sys-e, north to
@@ -68,24 +67,16 @@ func TestLaneGates_UnknownSystemNotFound(t *testing.T) {
 	}
 }
 
-func TestChartedGates_KeepsOnlyRumoredOrBetter(t *testing.T) {
-	gates := []LaneGate{
-		{DestSystemId: "sys-e", Cell: board.Cell{Ring: 16, Slot: 0}},
-		{DestSystemId: "sys-n", Cell: board.Cell{Ring: 16, Slot: 24}},
-		{DestSystemId: "sys-dark", Cell: board.Cell{Ring: 16, Slot: 48}},
-	}
-	tiers := map[string]observation.Tier{
-		"sys-e": observation.TierExplored, // charted (arrived)
-		"sys-n": observation.TierRumored,  // charted (lane known)
-		// sys-dark absent → star-visible only → uncharted, must not leak
-	}
-	got := chartedGates(gates, tiers)
-	if len(got) != 2 {
-		t.Fatalf("got %d charted gates, want 2", len(got))
-	}
-	for _, g := range got {
-		if g.DestSystemId == "sys-dark" {
-			t.Fatalf("leaked uncharted neighbour sys-dark")
-		}
-	}
-}
+// TestChartedGates_KeepsOnlyRumoredOrBetter (DELETED —
+// replace-observation-with-sightings tasks.md 1.3) used to prove LaneGates'
+// charted-tier filter kept only gates whose neighbour the requester had
+// charted. That filter — chartedGates — is deleted outright, not inverted:
+// system-interior's own "Charted Lane Gate Filtering" requirement is REMOVED
+// by this change (design.md Decision 5), replaced by "Bodies Are Public;
+// Ships Are Disclosed" — every lane-gate body now ships unfiltered to every
+// authenticated requester. This test asserted the OPPOSITE of that new
+// requirement, so it is deleted rather than inverted (test-immutability
+// protocol: an authorized change, cause = the spec removed the requirement
+// this test pinned — the same protocol handler_test.go's own deleted
+// TestGetInterior_LaneGatesFogFilterToCharted documents for the sibling
+// behavioral test).

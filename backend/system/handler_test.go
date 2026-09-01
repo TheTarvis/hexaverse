@@ -43,10 +43,26 @@ func (sysTestClock) Now() common.WorldMillis               { return 0 }
 func (sysTestClock) FromWall(time.Time) common.WorldMillis { return 0 }
 func (sysTestClock) Scale() float64                        { return 1 }
 
-// TestGetInterior_LaneGatesFogFilterToCharted proves the interior read ships lane
-// gates, filtered to the requester's charted neighbours — a Rumored/Explored lane
-// shows, an uncharted (star-visible) one never leaks.
-func TestGetInterior_LaneGatesFogFilterToCharted(t *testing.T) {
+// TestGetInterior_LaneGatesFogFilterToCharted (DELETED — replace-observation-
+// with-sightings tasks.md 1.3) used to prove the interior read filtered lane
+// gates to the requester's charted neighbours. That is now the removed
+// behavior: system-interior's own "Charted Lane Gate Filtering" requirement
+// is REMOVED by this change (design.md Decision 5) — "every system's star
+// already ships to everyone... standing next to a physical gate and reading
+// the sign on it tells you where the road goes." This test asserted the
+// OPPOSITE of the new "Bodies Are Public; Ships Are Disclosed" /
+// system-body-table "unfiltered" requirements below, so it is deleted
+// outright rather than inverted (test-immutability protocol: an authorized
+// change, cause = the spec removed the requirement this test pinned).
+
+// Scenario: No body is omitted for lack of stored knowledge (system-interior)
+// / The table carries bodies the requester could not see (system-body-table)
+// — applied to the interior read's laneGates array, replace-observation-
+// with-sightings tasks.md 1.3, closing blocker 2. A corp with ZERO stored
+// knowledge (no tier for either neighbour) must still see every lane-gate
+// body — chartedGates' filtering is exactly what made a fresh corp's galaxy
+// untraversable (every gate invisible, nothing to jump to).
+func TestGetInterior_Scenario_NoLaneGateOmittedForLackOfCharting(t *testing.T) {
 	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1", Radius: 16}}
 	gates := []LaneGate{
 		{DestSystemId: "sys-known", Cell: board.Cell{Ring: 16, Slot: 0}},
@@ -59,10 +75,13 @@ func TestGetInterior_LaneGatesFogFilterToCharted(t *testing.T) {
 		c.Set(common.AccountIdKey, "user1")
 		c.Set(common.CorpIdKey, "corp-user1") // #0009: ActorCorp now reads the resolved corp id
 	})
+	// ZERO stored knowledge for either neighbour — this is exactly a freshly
+	// spawned corporation's state (spawn charts no lanes, and the deleted
+	// scan-charting writer means nothing else charts one either): the tier
+	// map is present but empty, so chartedGates() (if it still ran) would
+	// keep neither gate.
 	NewHandlerWith(&fakeSysSvc{gen: gen, gates: gates}, sysTestClock{}).
-		WithFog(fakeBoardFog{
-			tiers: map[string]observation.Tier{"sys-known": observation.TierRumored},
-		}).
+		WithFog(fakeBoardFog{tiers: map[string]observation.Tier{}}).
 		RegisterRoutes(r.Group("/"))
 
 	w := httptest.NewRecorder()
@@ -79,10 +98,23 @@ func TestGetInterior_LaneGatesFogFilterToCharted(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if len(body.LaneGates) != 1 || body.LaneGates[0].DestSystemId != "sys-known" {
-		t.Fatalf("gates = %+v, want only the charted sys-known", body.LaneGates)
+	if len(body.LaneGates) != 2 {
+		t.Fatalf("gates = %+v, want BOTH gates present despite zero stored knowledge of either neighbour "+
+			"(system-interior \"Bodies Are Public; Ships Are Disclosed\": \"No body is omitted for lack of "+
+			"stored knowledge\") — a fresh corporation with zero charted lanes must still see every lane-gate "+
+			"body to have anything to jump to (blocker 2)", body.LaneGates)
 	}
 }
+
+// Scenario: The rule applies uniformly, corpless or not (system-interior
+// "Bodies Are Public; Ships Are Disclosed") — NOT independently automated as
+// a new red test here: today's handler.go already skips the whole
+// tier/chartedGates block when no corp id resolves (`if cid := ...; cid !=
+// ""`), so a corpless requester already sees every gate unfiltered before
+// this change lands — this specific sub-scenario is incidentally green
+// already, not newly red, and would only regress if a future edit moved the
+// gating outside that guard. Recorded here rather than omitted silently; see
+// the SDET handoff report's coverage table.
 
 type fakeDueActions struct{ scopes []string }
 

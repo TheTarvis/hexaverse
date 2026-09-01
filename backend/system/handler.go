@@ -8,28 +8,21 @@ import (
 	"hexaverse/action"
 	"hexaverse/common"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
 
-// BoardFog is the interior read's one remaining fog dependency: the
-// requester's graph-tier knowledge, so lane gates ship only for charted
-// neighbours (chartedGates) — no leaking uncharted stars. Nil on the
-// logged-out/dev path — the interior then ships every gate unfiltered.
-//
-// Until migrate-fleet-to-continuous-burns tasks.md 7.7 this interface also
-// carried the two methods a per-requester feature projection read (a live
-// sensor-coverage lookup and a stored per-feature memory lookup). Both are
-// deleted along with that projection (design.md Decision 11): every feature
-// now ships in full to every authenticated requester (see projectUnfogged),
-// so nothing here needs either any more. Lane gate filtering by charted tier
-// is the one piece of per-requester fog that survives this change
-// (system-interior: "Charted Lane Gate Filtering").
-type BoardFog interface {
-	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
-}
+// BoardFog previously restricted the interior read's lane gates to the
+// requester's charted neighbours. Removed as of replace-observation-with-
+// sightings design.md Decision 5: standing next to a physical gate and
+// reading the sign on it is how a corporation finds the roads, so every
+// lane-gate body now ships unfiltered to every authenticated requester
+// (system-interior "Bodies Are Public; Ships Are Disclosed" — "No body is
+// omitted for lack of stored knowledge"). The interface is kept, now with no
+// required methods, purely so WithFog keeps a stable wiring seam; nothing
+// reads it any more.
+type BoardFog interface{}
 
 // DueActions is the #0005 read-fold seam: resolving a scope's due actions.
 // The interior read runs it first, so a verb that completed while nobody was
@@ -72,12 +65,11 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 }
 
 // GetInterior serves a system's interior, materializing it on first request
-// (the dev-only trigger until #0008). Every feature ships in full to every
-// authenticated requester (system-interior: "Interior Reads Are Fully
-// Disclosed, A Deliberate Interim" — migrate-fleet-to-continuous-burns
-// tasks.md 7.7, design.md Decision 11); the one piece of per-requester
-// filtering that survives is lane gates, restricted to the requester's
-// charted neighbours when a corp id resolves.
+// (the dev-only trigger until #0008). Every feature and every lane-gate body
+// ships in full, unconditionally, to every authenticated requester
+// (system-interior: "Bodies Are Public; Ships Are Disclosed" —
+// replace-observation-with-sightings design.md Decisions 4/5): no per-
+// requester band computed, no body omitted for lack of stored knowledge.
 func (h *Handler) GetInterior(c *gin.Context) {
 	systemID := common.RequiredHttpParam(c, "systemId")
 	ctx := c.Request.Context()
@@ -111,23 +103,10 @@ func (h *Handler) GetInterior(c *gin.Context) {
 		return
 	}
 
-	// tasks.md 7.7 (design.md Decision 11): every feature ships in full to
-	// every authenticated requester — no per-requester band computed, no
-	// feature omitted. See fog.go's projectUnfogged doc comment for the
-	// interim's scope and its stated successor (link 5,
-	// replace-observation-with-sightings).
+	// Every feature and every lane-gate body ships in full to every
+	// authenticated requester — no per-requester band computed, no body
+	// omitted (replace-observation-with-sightings design.md Decisions 4/5).
 	features := projectUnfogged(gen)
-	if h.fog != nil {
-		if cid := common.ActorCorp(c); cid != "" {
-			tiers, err := h.fog.SystemTiers(ctx, cid)
-			if err != nil {
-				log.Error().Ctx(c).Err(err).Str("systemId", systemID).Msg("Failed to load system tiers")
-				c.AbortWithStatus(http.StatusInternalServerError)
-				return
-			}
-			gates = chartedGates(gates, tiers)
-		}
-	}
 	c.JSON(http.StatusOK, interiorDTO{
 		SystemId:  gen.Interior.SystemId,
 		Radius:    gen.Interior.Radius,

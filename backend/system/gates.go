@@ -6,7 +6,6 @@ import (
 
 	"hexaverse/board"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 )
 
 // LaneGate is a charted lane's fixed gate cell on this system's board — the
@@ -24,8 +23,13 @@ type LaneGate struct {
 
 // LaneGates returns every lane gate on the given system's board: for each lane
 // touching the system, the gate tile where it departs toward its neighbour,
-// bearing-projected onto a board of the given radius. Unfiltered by fog — the
-// read boundary applies the charted-lane rule per requester (chartedGates).
+// bearing-projected onto a board of the given radius. Unfiltered — every
+// lane-gate body ships to every authenticated requester regardless of stored
+// map knowledge (replace-observation-with-sightings design.md Decision 5;
+// system-interior "Bodies Are Public; Ships Are Disclosed"): standing next to
+// a physical gate and reading the sign on it is how a corporation finds the
+// roads, and gating that would make a fresh corporation's galaxy
+// untraversable.
 func (s *Service) LaneGates(ctx context.Context, systemID string, radius int) ([]LaneGate, error) {
 	gal, err := s.galaxySvc.GetLive(ctx)
 	if err != nil {
@@ -68,19 +72,4 @@ func (s *Service) LaneGates(ctx context.Context, systemID string, radius int) ([
 	// Deterministic order so the read is stable across requests.
 	sort.Slice(gates, func(i, j int) bool { return gates[i].DestSystemId < gates[j].DestSystemId })
 	return gates, nil
-}
-
-// chartedGates keeps only gates whose neighbour the requester has charted — a
-// lane you know reaches somewhere (tier >= Rumored). Arrival at a system charts
-// all its onward lanes to Rumored (observation.ArrivalWrites), so a system you
-// have explored shows all its gates; and it never leaks an uncharted neighbour's
-// existence — the same fog-honest rule routing uses (fleet/routing.go).
-func chartedGates(gates []LaneGate, tiers map[string]observation.Tier) []LaneGate {
-	out := make([]LaneGate, 0, len(gates))
-	for _, g := range gates {
-		if tiers[g.DestSystemId].AtLeast(observation.TierRumored) {
-			out = append(out, g)
-		}
-	}
-	return out
 }

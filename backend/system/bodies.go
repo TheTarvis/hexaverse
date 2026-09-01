@@ -171,6 +171,23 @@ func gateId(destSystemId string) string {
 // read failure, and a degradation is recorded distinguishably from genuine
 // absence: a real, empty neighbour set logs nothing.
 func (s *Service) addGates(ctx context.Context, systemID string, extent float64, bodies map[string]space.Body) {
+	// Materialize the destination's full lane horizon before reading its
+	// incident lanes (replace-observation-with-sightings design.md Decision
+	// 23; galaxy-generation "Lazy, Idempotent Block Materialization": "A jump
+	// arrival at the frontier materializes the destination's full lane
+	// horizon before its gate set is built"). This is the exact seam that
+	// ordering constraint names — NeighborsOf below enumerates only
+	// MATERIALIZED lanes, so a system whose own block is materialized but
+	// whose neighbours are not yet would otherwise ship a gate set short of
+	// what truly exists. Idempotent and cheap once already materialized (the
+	// common case for any system that isn't a fresh frontier arrival);
+	// degrades to the pre-horizon neighbour set on failure, never fails the
+	// whole gate build.
+	if err := s.galaxySvc.EnsureLaneHorizon(ctx, systemID); err != nil {
+		log.Warn().Ctx(ctx).Err(err).Str("systemId", systemID).
+			Msg("Ensuring the lane horizon failed; gate set may be missing frontier neighbours")
+	}
+
 	neighbors, err := s.galaxySvc.NeighborsOf(ctx, systemID)
 	if err != nil {
 		log.Warn().Ctx(ctx).Err(err).Str("systemId", systemID).

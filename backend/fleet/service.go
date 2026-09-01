@@ -72,13 +72,13 @@ var (
 	// conversion diverges by architecture).
 	ErrAccelBelowFloor = errors.New("fleet: commanded acceleration is below the minimum floor")
 	// ErrJumpNotAttached rejects a jump ordered against a fleet not attached
-	// to the named lane's own gate body (fleet-movement "Lane Jump From a
-	// Docked Gate": "jumping without attachment is rejected").
+	// to the named lane's own gate body (fleet-movement "Lane Jump From an
+	// Attached Gate": "jumping without attachment to the named gate is
+	// rejected"). Jump-eligibility is attachment alone, no dwell, and no
+	// map-knowledge precondition (design.md Decision 2 of
+	// replace-observation-with-sightings: charting is map knowledge and a
+	// sellable intel product, never a permission).
 	ErrJumpNotAttached = errors.New("fleet: jump requires attachment to the lane's own gate body")
-	// ErrLaneNotCharted rejects a jump ordered over a lane the fleet's
-	// corporation has not charted (fleet-movement "Lane Jump From a Docked
-	// Gate": "jumping an uncharted lane is rejected").
-	ErrLaneNotCharted = errors.New("fleet: jump requires the corporation to have charted the lane")
 )
 
 // BodySource resolves a system's body table — the space.Bodies implementation
@@ -88,14 +88,6 @@ var (
 // package-level state, and never used to enumerate Ids() into a response.
 type BodySource interface {
 	BodyTable(ctx context.Context, systemID string) (*system.BodyTable, error)
-}
-
-// TierSource resolves which lanes a corporation has charted — the jump
-// verb's own narrowed use of what routing.go's pre-migration TierSource used
-// to also cover for multi-hop planning (design.md Decision 10, 21A narrows
-// it to ChartedLanes alone).
-type TierSource interface {
-	ChartedLanes(ctx context.Context, cid string) (map[string]bool, error)
 }
 
 // GraphSource resolves one lane's crossing geometry: the destination system
@@ -149,11 +141,11 @@ type Service struct {
 	// WithTravel pattern) since it is also the constructor's second
 	// positional argument for the common case where it's known up front.
 	bodies BodySource
-	// tiers resolves a corporation's charted-lane set — Jump's own
-	// eligibility check (design.md Decision 10). Wired via WithTierSource.
-	tiers TierSource
 	// graph resolves a lane's crossing geometry — Jump's own length input
-	// (design.md Decision 10). Wired via WithGraph.
+	// (design.md Decision 10). Required at construction by NewServiceComplete
+	// (design.md Decision 22 of replace-observation-with-sightings: the
+	// production composition root supplies this directly, never through a
+	// post-construction accessor that a wiring change can silently omit).
 	graph GraphSource
 }
 
@@ -183,23 +175,30 @@ func NewServiceWith(dao Dao, bodies BodySource, actions action.CommitInterface, 
 	}
 }
 
+// NewServiceComplete wires a fleet Service exactly as NewServiceWith does,
+// plus the lane-crossing-geometry source Jump's commit path requires,
+// supplied here as a required constructor parameter rather than through a
+// post-construction accessor (design.md Decision 22 of
+// replace-observation-with-sightings: an optional accessor that a wiring
+// change can silently omit is exactly what left Jump unreachable in
+// production). This is the composition root's own constructor (router.go);
+// task 6.3 folds this shape into NewServiceWith itself as a required
+// positional parameter across every call site — deferred here because
+// several of this package's own existing tests (including this section's
+// own frontier-arrival integration test) construct a Service through
+// NewServiceWith's current four-argument shape to exercise paths that never
+// reach Jump's commit step, and are not this dispatch's tests to edit.
+func NewServiceComplete(dao Dao, bodies BodySource, graph GraphSource, actions action.CommitInterface, clock common.WorldTime) *Service {
+	s := NewServiceWith(dao, bodies, actions, clock)
+	s.graph = graph
+	return s
+}
+
 // WithBodies overrides the BodySource — the seam body_source_test.go uses to
 // inject a call-counting spy, and the general post-construction wiring point
 // for a dependency not available at NewServiceWith's call site.
 func (s *Service) WithBodies(bodies BodySource) *Service {
 	s.bodies = bodies
-	return s
-}
-
-// WithTierSource wires the charted-lane source Jump validates against.
-func (s *Service) WithTierSource(ts TierSource) *Service {
-	s.tiers = ts
-	return s
-}
-
-// WithGraph wires the lane-crossing-geometry source Jump prices through.
-func (s *Service) WithGraph(g GraphSource) *Service {
-	s.graph = g
 	return s
 }
 
@@ -689,9 +688,12 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 }
 
 // Jump commits POST /v1/fleets/:fleetId/jump {laneId} — a single-hop lane
-// crossing from a docked gate (design.md Decision 10; fleet-movement "Lane
-// Jump From a Docked Gate"). Accepted only when the fleet is attached to the
-// lane's own gate body and its corporation has charted the lane; jump-
+// crossing from an attached gate (design.md Decision 10; fleet-movement "Lane
+// Jump From an Attached Gate"). Accepted whenever the fleet is attached to
+// the lane's own gate body — no map-knowledge precondition (design.md
+// Decision 2 of replace-observation-with-sightings drops the charted-lane
+// requirement: eligibility is attachment alone, which is what actually keeps
+// the galaxy traversable for a corporation with nothing charted yet); jump-
 // eligible the SAME world millisecond it attaches — no dwell — which is why
 // a due-but-unresolved arrival is settled through the shared fold-first seam
 // (settleIfDue, tasks.md 5.0) before attachment is evaluated at all. Costs
@@ -719,7 +721,7 @@ func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error) {
 	}
 
 	if s.graph == nil {
-		return nil, fmt.Errorf("fleet: no GraphSource configured: %w", ErrNoBodySource)
+		return nil, fmt.Errorf("fleet: no lane-crossing source configured: %w", ErrNoBodySource)
 	}
 	destId, from, to, err := s.graph.LaneCrossing(ctx, laneId, f.SystemId)
 	if err != nil {
@@ -728,20 +730,10 @@ func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error) {
 
 	// Jump-eligible only from the lane's OWN gate body, named by the
 	// destination it leads to (system.gateId's own convention, mirrored here
-	// since system does not export it).
+	// since system does not export it). No map-knowledge check follows: the
+	// gate body itself is the entire eligibility gate (design.md Decision 2).
 	if f.AttachedTo != "gate-"+destId {
 		return nil, ErrJumpNotAttached
-	}
-
-	if s.tiers == nil {
-		return nil, fmt.Errorf("fleet: no TierSource configured: %w", ErrNoBodySource)
-	}
-	charted, err := s.tiers.ChartedLanes(ctx, f.CorporationId)
-	if err != nil {
-		return nil, fmt.Errorf("fleet: resolving charted lanes: %w", err)
-	}
-	if !charted[laneId] {
-		return nil, ErrLaneNotCharted
 	}
 
 	now := s.clock.Now()
