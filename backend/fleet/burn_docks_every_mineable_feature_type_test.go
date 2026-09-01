@@ -56,7 +56,10 @@ func TestIntegration_BurnToEveryMineableFeatureType_DocksAgainstARealGeneratedSy
 
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
-	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, asvc, clk)
+	// The REAL galaxy service is this stack's GraphSource — it is already in
+	// scope and satisfies the interface, so the graph dependency is genuine
+	// here rather than stubbed.
+	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, gsvc, asvc, clk)
 	RegisterResolvers(asvc, ssvc)
 
 	t.Cleanup(func() {

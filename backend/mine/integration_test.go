@@ -65,6 +65,22 @@ func (f *fakeIntegrationSystem) BodyTable(context.Context, string) (*system.Body
 	return nil, errors.New("fakeIntegrationSystem: BodyTable not implemented — mine's integration fixtures never resolve a burn")
 }
 
+// LaneCrossing satisfies fleet.GraphSource (replace-observation-with-sightings
+// tasks.md 6.3), which is now a required positional parameter of
+// fleet.NewServiceWith — so this fake serves as mine's local graph as well as
+// its local body source, keeping mine's stack one fake rather than two.
+// mine has no galaxy service in scope and no test here jumps (every fleet is
+// seeded pre-docked via the DAO, and only mine's commit/resolve/cancel paths
+// run), so, exactly as BodyTable above, this errors loudly rather than
+// returning a zero crossing: a future test that DOES jump fails with a clear
+// message instead of silently transiting to system "" over a zero-length lane.
+// Passing nil for the graph instead would recreate the graph-less fleet
+// service the required parameter exists to make unconstructable.
+func (f *fakeIntegrationSystem) LaneCrossing(context.Context, string, string) (string, space.Vec3, space.Vec3, error) {
+	return "", space.Vec3{}, space.Vec3{}, errors.New(
+		"fakeIntegrationSystem: LaneCrossing not implemented — mine's integration fixtures never jump")
+}
+
 func beltFeature(id string, kinds ...system.ResourceKind) system.Feature {
 	res := make([]system.Resource, len(kinds))
 	for i, k := range kinds {
@@ -90,7 +106,7 @@ func newMineTestStack(t *testing.T, params MineParams, stats map[fleet.ShipClass
 	clk := &mutableClock{}
 	actionSvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
 	sysFake := &fakeIntegrationSystem{interiors: map[string]*system.GeneratedInterior{}}
-	fleetSvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), sysFake, actionSvc, clk)
+	fleetSvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), sysFake, sysFake, actionSvc, clk)
 	mineSvc := NewServiceWith(fleetSvc, sysFake, actionSvc, clk, params, stats)
 	actionSvc.RegisterResolver(mineType, action.KindMutating, Resolver(params, stats))
 

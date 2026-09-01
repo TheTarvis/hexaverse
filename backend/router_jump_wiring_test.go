@@ -19,11 +19,24 @@ package main
 // so the regression net that matters is the end-to-end behavior, not the
 // wiring itself."
 //
-// EXPECTED TO BE RED TODAY: router.go's fleetSvc :=
-// fleet.NewServiceWith(fleet.NewDao(), systemSvc, actionSvc, clock) never
-// calls .WithGraph(...), so Jump's own s.graph == nil guard fires before any
-// game rule runs, and Handler.respond's default branch maps that error to
-// 500 (fleet/handler.go's error switch has no case for it).
+// WHY THIS TEST EXISTS (it was RED when written, and the reason it is now
+// green is the whole point): router.go used to build the fleet service as
+// fleet.NewServiceWith(fleet.NewDao(), systemSvc, actionSvc, clock) and never
+// call the optional post-construction accessor that supplied the lane graph —
+// so Jump's own nil-graph guard fired before any game rule ran, and
+// Handler.respond's default branch mapped that error to a 500 (fleet/handler.go's
+// error switch has no case for it). Jump was unreachable and fleets were stuck.
+//
+// tasks.md 6.3 closed that at the type level: the GraphSource is now a
+// REQUIRED POSITIONAL PARAMETER of fleet.NewServiceWith — the package's only
+// constructor, with no optional accessor and no zero-dependency variant — so
+// router.go passes galaxySvc explicitly (router.go:99) and a router that
+// forgot to would not compile. That makes the wiring itself uncheckable by
+// test and unbreakable by omission; what remains worth pinning, and what this
+// test pins, is the END-TO-END BEHAVIOR through the real composition: a jump
+// submitted to SetupRouter()'s own router never 5xxs on a server-side
+// dependency. fleet/jump_deletion_test.go locks the deleted constructors so
+// the omissible-dependency shape cannot return.
 
 import (
 	"context"
@@ -112,7 +125,8 @@ func TestRouter_Scenario_OwningCorporationsJumpOrderSucceedsAtTheHTTPSurface(t *
 		t.Fatalf("fleet-movement \"The owning corporation's jump order succeeds at the HTTP surface\": "+
 			"POST /v1/fleets/:fleetId/jump against the REAL production-constructed router (SetupRouter(), "+
 			"no fake GraphSource) returned %d — never a 5xx caused by an unconfigured or missing server-side "+
-			"dependency (design.md Decision 22, blocker 3: router.go never calls fleetSvc.WithGraph(...)). "+
+			"dependency (design.md Decision 22, blocker 3: the fleet service reaching Jump without a "+
+			"GraphSource, historically because router.go left that dependency unstated). "+
 			"Body: %s", w.Code, w.Body.String())
 	}
 	if w.Code != http.StatusOK {

@@ -13,6 +13,11 @@ import (
 type Handler struct {
 	svc   *Service
 	clock common.WorldTime
+	// owner resolves an action's actor to its owning corporation — the seam
+	// every one of the four endpoints below authorizes through
+	// (action-dispatch "Action Endpoints Are Restricted to the Owning
+	// Corporation"). Supplied by the composition root via WithActorOwner.
+	owner ActorOwner
 }
 
 func NewHandler(svc *Service) *Handler {
@@ -21,6 +26,14 @@ func NewHandler(svc *Service) *Handler {
 
 func NewHandlerWith(svc *Service, clock common.WorldTime) *Handler {
 	return &Handler{svc: svc, clock: clock}
+}
+
+// WithActorOwner wires the actor→corporation resolution seam. router.go
+// supplies an adapter over the fleet service; a handler without one serves no
+// actor-scoped endpoint at all (see ownsActor).
+func (h *Handler) WithActorOwner(owner ActorOwner) *Handler {
+	h.owner = owner
+	return h
 }
 
 func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
@@ -48,10 +61,81 @@ func (h *Handler) toDTO(a Action) actionDTO {
 	return actionDTO{Action: a, WorldTime: h.clock.Now()}
 }
 
+// ownsActor decides whether the requester's corporation owns the named actor,
+// answering `404 Not Found` with an empty body — never `403`, never a body
+// naming the actor or the reason — when it does not, or when the requester has
+// no corporation at all (action-dispatch "Action Endpoints Are Restricted to
+// the Owning Corporation": a foreign actor is indistinguishable from a
+// nonexistent one, and a 403 would itself confirm the actor exists —
+// design.md Decision 21).
+//
+// collection is the actor's home collection (Action.ActorCollection), or ""
+// when the request names an actor id alone and no action document has been
+// read — see ActorOwner's own doc comment.
+func (h *Handler) ownsActor(c *gin.Context, collection, actorId string) bool {
+	requesterCid := common.ActorCorp(c)
+	if requesterCid == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+		return false
+	}
+	if h.owner == nil {
+		// An unwired seam cannot authorize anything; refusing is the only safe
+		// reading. Logged at Error because it is a composition-root defect, not
+		// a request-level one.
+		log.Error().Ctx(c).Msg("action handler has no ActorOwner wired; refusing every actor-scoped request")
+		c.AbortWithStatus(http.StatusNotFound)
+		return false
+	}
+	ownerCid, err := h.owner.OwnerOf(c.Request.Context(), collection, actorId)
+	if err != nil {
+		// IMPLEMENTATION CHOICE, NOT A SPEC REQUIREMENT. tasks.md 7.7 item (3)
+		// records that no scenario in this change decides whether an
+		// ActorOwner lookup ERROR should fail open or closed (unlike
+		// request-authorization's corporation-resolution seam, which
+		// explicitly fails open). This handler fails CLOSED: the seam exists
+		// solely to authorize, so an unanswered "who owns this?" cannot be
+		// read as "you do". The failure is indistinguishable from absence, as
+		// every other rejection on these endpoints is.
+		log.Error().Ctx(c).Err(err).Str("actor", actorId).Msg("resolving an action actor's owner failed")
+		c.AbortWithStatus(http.StatusNotFound)
+		return false
+	}
+	if ownerCid == "" || ownerCid != requesterCid {
+		c.AbortWithStatus(http.StatusNotFound)
+		return false
+	}
+	return true
+}
+
+// ownedAction loads the action a request names and returns it only to the
+// corporation that owns its underlying actor; on false the 404 is already
+// written.
+func (h *Handler) ownedAction(c *gin.Context) (*Action, bool) {
+	actionId := common.RequiredHttpParam(c, "actionId")
+	if actionId == "" {
+		return nil, false // RequiredHttpParam already aborted with 400
+	}
+	a, err := h.svc.Get(c.Request.Context(), actionId)
+	if err != nil {
+		h.respond(c, nil, err)
+		return nil, false
+	}
+	if !h.ownsActor(c, a.ActorCollection, a.Actor) {
+		return nil, false
+	}
+	return a, true
+}
+
 func (h *Handler) Inbox(c *gin.Context) {
 	actor := c.Query("actor")
 	if actor == "" {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "actor query param is required"})
+		return
+	}
+	// The inbox names an actor id and no collection — hence the empty
+	// collection argument. The check runs before the query, so a foreign
+	// actor's actions are never read, let alone served.
+	if !h.ownsActor(c, "", actor) {
 		return
 	}
 	var statuses []Status
@@ -72,17 +156,28 @@ func (h *Handler) Inbox(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	a, err := h.svc.Get(c.Request.Context(), common.RequiredHttpParam(c, "actionId"))
-	h.respond(c, a, err)
+	a, ok := h.ownedAction(c)
+	if !ok {
+		return
+	}
+	h.respond(c, a, nil)
 }
 
 func (h *Handler) Acknowledge(c *gin.Context) {
-	a, err := h.svc.Acknowledge(c.Request.Context(), common.RequiredHttpParam(c, "actionId"))
+	owned, ok := h.ownedAction(c)
+	if !ok {
+		return
+	}
+	a, err := h.svc.Acknowledge(c.Request.Context(), owned.Id)
 	h.respond(c, a, err)
 }
 
 func (h *Handler) Cancel(c *gin.Context) {
-	a, err := h.svc.Cancel(c.Request.Context(), common.RequiredHttpParam(c, "actionId"), nil)
+	owned, ok := h.ownedAction(c)
+	if !ok {
+		return
+	}
+	a, err := h.svc.Cancel(c.Request.Context(), owned.Id, nil)
 	h.respond(c, a, err)
 }
 

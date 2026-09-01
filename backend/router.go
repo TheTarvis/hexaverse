@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"hexaverse/account"
@@ -94,7 +96,7 @@ func SetupRouter() *gin.Engine {
 	// LaneCrossing method, replace-observation-with-sightings design.md
 	// Decision 22, blocker 3) — a required constructor parameter here, not a
 	// post-construction accessor that a future refactor could silently drop.
-	fleetSvc := fleet.NewServiceComplete(fleet.NewDao(), systemSvc, galaxySvc, actionSvc, clock)
+	fleetSvc := fleet.NewServiceWith(fleet.NewDao(), systemSvc, galaxySvc, actionSvc, clock)
 	// The interior read's contact union (replace-observation-with-sightings
 	// tasks.md 4.1, 4.4, 4.5): systemSvc consumes fleetSvc as its
 	// system.FleetSource, structurally — system never imports fleet (that
@@ -161,7 +163,12 @@ func SetupRouter() *gin.Engine {
 	galaxy.NewHandler().WithFog(galaxyFogAdapter{fogSvc}).RegisterRoutes(authorized)
 	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).WithActions(actionSvc).WithContacts(systemSvc).RegisterRoutes(authorized)
 
-	actionHandler := action.NewHandler(actionSvc)
+	// The action inbox authorizes through the actor→corporation seam
+	// (action-dispatch "Action Endpoints Are Restricted to the Owning
+	// Corporation"), satisfied here by the fleet service — action declares the
+	// interface and never imports fleet, since that dependency already runs
+	// the other way.
+	actionHandler := action.NewHandler(actionSvc).WithActorOwner(fleetActorOwner{fleetSvc})
 	actionHandler.RegisterRoutes(authorized)
 	fleet.NewHandlerWith(fleetSvc, clock).RegisterRoutes(authorized)
 
@@ -226,6 +233,42 @@ func SetupRouter() *gin.Engine {
 	}
 
 	return router
+}
+
+// fleetActorCollection is the collection every fleet-actor action records in
+// Action.ActorCollection (fleet/service.go's own actorCollection constant,
+// unexported there). Today it is the only actor collection in the system.
+const fleetActorCollection = "fleets"
+
+// fleetActorOwner adapts the fleet service to action.ActorOwner at the
+// composition root (replace-observation-with-sightings tasks.md 6.5): action
+// declares the seam and resolves through it, and never imports fleet — that
+// dependency already runs the other way (fleet imports action to commit and
+// resolve), so reversing it would be an import cycle.
+type fleetActorOwner struct{ fleets *fleet.Service }
+
+// OwnerOf resolves an action actor to its owning corporation. An empty
+// collection means the caller had no action document to read one off (the
+// inbox endpoint); since fleets are the only actor collection in the system,
+// both that case and an explicit "fleets" resolve through the fleet service.
+// An actor in any other collection resolves to no owner rather than an error —
+// the handler reads that as absence, which for an unknown collection is
+// exactly right.
+func (a fleetActorOwner) OwnerOf(ctx context.Context, collection, actorId string) (string, error) {
+	if collection != "" && collection != fleetActorCollection {
+		return "", nil
+	}
+	f, err := a.fleets.Get(ctx, actorId)
+	if errors.Is(err, fleet.ErrNotFound) {
+		return "", nil // a nonexistent actor is not an error; it simply has no owner
+	}
+	if err != nil {
+		return "", fmt.Errorf("resolving the owning corporation of actor %q: %w", actorId, err)
+	}
+	if f == nil {
+		return "", nil
+	}
+	return f.CorporationId, nil
 }
 
 // galaxyFogAdapter adapts charts.Service to galaxy.GraphFog at the

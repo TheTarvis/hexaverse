@@ -45,7 +45,10 @@ func spawnStack(t *testing.T) (*Service, *charts.Service, *galaxy.Service, *fake
 
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
-	fsvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), ssvc, asvc, clk)
+	// gsvc — the real, seeded galaxy service — is the fleet stack's
+	// GraphSource (the only production implementation of LaneCrossing), so
+	// spawn's fleet service is wired exactly as router.go wires it.
+	fsvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), ssvc, gsvc, asvc, clk)
 	fogSvc := charts.NewServiceWith(charts.NewDaoWithClient(fs), clk)
 	corpSvc := NewServiceWith(NewDaoWithClient(fs), gsvc, fsvc, fogSvc, clk).
 		WithSpawnParams(DefaultSpawnParams())

@@ -23,8 +23,9 @@ package fleet
 // ONLY symbols that exist today — no fakeGraph, no speculative not-yet-
 // existing wiring seam guessed at.
 //
-// SETUP TECHNIQUE: rather than committing a jump through Service.Jump (which
-// today 500s for want of a GraphSource — blocker 3, exercised elsewhere) and
+// SETUP TECHNIQUE: rather than committing a jump through Service.Jump (whose
+// own commit path is blocker 3's concern and is exercised elsewhere — see
+// jump_verb_test.go and backend/router_jump_wiring_test.go) and
 // rather than waiting out a real ETA, this test commits the "jump" action
 // directly through action.Service.Commit with the EXACT ActorState shape
 // Service.Jump itself writes (mirroring jump_settle_test.go's own "as if
@@ -125,7 +126,11 @@ func TestIntegration_Scenario_JumpArrivalAtFrontierMaterializesFullLaneHorizonBe
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
 	asvc.RegisterResolver(jumpType, action.KindKinematic, JumpResolver)
 	fdao := NewDaoWithClient(fs)
-	fsvc := NewServiceWith(fdao, ssvc, asvc, clk)
+	// gsvc — the real galaxy service seeded above — is this stack's
+	// GraphSource. This test drives the ARRIVAL path, which needs no graph
+	// (see the file header), but the constructor now requires the dependency
+	// to be stated, and a real one is already in scope.
+	fsvc := NewServiceWith(fdao, ssvc, gsvc, asvc, clk)
 
 	// Seed a fleet mid-jump, arriving at the frontier system — mirroring
 	// exactly what Service.Jump's own commit writes (jumpType action,

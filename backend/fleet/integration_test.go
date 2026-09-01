@@ -66,7 +66,9 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
 	asvc.RegisterResolver(burnType, action.KindKinematic, BurnResolver(ssvc))
-	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, asvc, clk)
+	// The real galaxy service doubles as this stack's GraphSource (it is the
+	// only production implementation of LaneCrossing) — full stack, no stub.
+	fsvc := NewServiceWith(NewDaoWithClient(fs), ssvc, gsvc, asvc, clk)
 
 	// Seed well clear of the star's own clearance shell — the star at the
 	// origin is not a legal fleet position (design.md Decision 14: excluded

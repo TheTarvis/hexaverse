@@ -9,8 +9,9 @@ package fleet
 // Decisions 2/22): jump-eligibility dropped its map-knowledge precondition —
 // attachment to the lane's own gate body is now the ENTIRE eligibility
 // check, no dwell, and the lane-crossing-geometry source is wired as a
-// required constructor parameter (fleet.NewServiceComplete) rather than
-// through a deleted post-construction accessor. The scenarios pinning the
+// required positional parameter of fleet.NewServiceWith — the package's only
+// constructor (tasks.md 6.3) — rather than through a deleted
+// post-construction accessor. The scenarios pinning the
 // now-removed charted-lane requirement are deleted outright below, per the
 // same test-immutability protocol handler_test.go's own deleted
 // TestGetInterior_LaneGatesFogFilterToCharted documents (an authorized

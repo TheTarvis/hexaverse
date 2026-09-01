@@ -38,7 +38,11 @@ func newStaleArrivalSvc(t *testing.T, bodies *system.BodyTable) (*Service, Dao, 
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
 	asvc.RegisterResolver(burnType, action.KindKinematic, BurnResolver(src))
 	dao := NewDaoWithClient(fs)
-	svc := NewServiceWith(dao, src, asvc, clk)
+	// Every order in this family targets a bare point and every cancel acts on
+	// a burn — no jump, so the GraphSource is the inert loud stub rather than
+	// nil (see fakeGraphUnused). A future stale-arrival case that DOES jump
+	// will fail with that stub's message instead of a nil dereference.
+	svc := NewServiceWith(dao, src, fakeGraphUnused{}, asvc, clk)
 	return svc, dao, clk, context.Background()
 }
 

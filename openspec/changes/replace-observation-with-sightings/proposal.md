@@ -227,7 +227,16 @@ listing-fee sink (link 6); fuel as the scan's currency (link 7);
 `disclosure.ScanMints` and a radial-scan verb, left knowingly orphaned like
 `board.BeamCells` — no verb is invented to give it a consumer; mines as
 entities and the combat they belong to (deferred); contact rendering on the
-client (link 8); `board`/`polar` deletion and the lattice wire fields
+client (link 8); **the focused scan's entire player-facing surface**
+(link 8) — this change ships the verb with no affordance whatsoever: no
+scan command anywhere in the UI, no `scan` method on
+`frontend/lib/services/fleet-service.ts` and no `useScan` hook behind one,
+no testid, and no view for `GET /v1/sightings` either, so both the sweep
+and the pile it mints are reachable through the API only. A scan button
+whose results cannot be seen is half a feature shipped twice, and link 8
+(`build-production-space-view`) already owns contact rendering, so the
+command surface and the sightings display belong in the same change and
+land there together; `board`/`polar` deletion and the lattice wire fields
 (link 9); `fleet.Service.Get`'s fold-through-`space.StateAt` retrofit
 (verified not forced here — `disclosure` already folds through
 `space.StateAt` internally on every position it takes, so an unsettled but

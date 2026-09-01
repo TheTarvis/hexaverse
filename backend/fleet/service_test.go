@@ -64,6 +64,27 @@ func (f *fakeSystem) BodyTable(context.Context, string) (*system.BodyTable, erro
 	return nil, errors.New("fleet test fixture: fakeSystem carries no real bodies")
 }
 
+// fakeGraphUnused is the GraphSource counterpart of fakeSystem: an inert
+// lane-crossing source for fixtures whose fleet never reaches Jump's commit
+// path (Jump is the ONLY caller of GraphSource). It exists because
+// GraphSource is a required positional parameter of the package's one
+// constructor (tasks.md 6.3) — passing nil here would reconstruct exactly the
+// graph-less Service that decision makes unconstructable, so the "I don't
+// need a graph" case gets a named, loud stub instead of a nil.
+//
+// It ERRORS rather than returning a zero crossing, deliberately mirroring
+// fakeSystem: a zero crossing is a silently valid answer (destination system
+// "", a zero-length lane) that would let an unintended Jump commit a nonsense
+// transit and fail far from its cause. The scriptable fake for tests that DO
+// exercise Jump is fakeGraph (jump_verb_test.go), assigned to svc.graph
+// directly.
+type fakeGraphUnused struct{}
+
+func (fakeGraphUnused) LaneCrossing(context.Context, string, string) (string, space.Vec3, space.Vec3, error) {
+	return "", space.Vec3{}, space.Vec3{}, errors.New(
+		"fleet test fixture: fakeGraphUnused resolves no lanes — this fixture was built for a path that never jumps")
+}
+
 // newSvc's default BodySource is a REAL *system.BodyTable ("sys-0", a size-6
 // star, no other bodies) built through testBodyTable (space_testutil_test.go)
 // — not an inert stub — because at least one pre-existing, untouchable
@@ -72,12 +93,19 @@ func (f *fakeSystem) BodyTable(context.Context, string) (*system.BodyTable, erro
 // (Stop) without ever overriding bodies via WithBodies. Tests that need a
 // DIFFERENT body set still override it explicitly with
 // svc.WithBodies(stubBodySourceFixed{bt: testBodyTable(t, ...)}).
+//
+// Its default GraphSource is the inert fakeGraphUnused: every test that
+// actually exercises Jump assigns its own scriptable fakeGraph to svc.graph
+// (jump_verb_test.go / jump_settle_test.go), and the one Jump test that does
+// not — TestJump_Scenario_RejectedWhileAlreadyInTransit — is rejected by the
+// in-transit guard strictly before Jump reads s.graph, so the stub's error is
+// unreachable there rather than merely unasserted.
 func newSvc(t *testing.T, clk *fakeClock) (*Service, *MockDao, *fakeActions, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
 	dao := NewMockDao(ctrl)
 	fa := &fakeActions{}
 	bodies := testBodyTable(t, "sys-0", 6.0)
-	return NewServiceWith(dao, stubBodySourceFixed{bt: bodies}, fa, clk), dao, fa, ctrl
+	return NewServiceWith(dao, stubBodySourceFixed{bt: bodies}, fakeGraphUnused{}, fa, clk), dao, fa, ctrl
 }
 
 // --- OrderTo happy path (successor of the lattice-era

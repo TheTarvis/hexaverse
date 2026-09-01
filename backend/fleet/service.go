@@ -157,61 +157,40 @@ type Service struct {
 	// and Mining Rate").
 	classStats map[ShipClass]ClassStats
 	// bodies resolves a system's space.Bodies table (design.md Decision 16).
-	// Wired via WithBodies post-construction (mirroring the pre-existing
-	// WithTravel pattern) since it is also the constructor's second
-	// positional argument for the common case where it's known up front.
+	// Supplied at construction; WithBodies overrides it later for a
+	// dependency not available at the constructor's call site.
 	bodies BodySource
 	// graph resolves a lane's crossing geometry — Jump's own length input
-	// (design.md Decision 10). Required at construction by NewServiceComplete
-	// (design.md Decision 22 of replace-observation-with-sightings: the
-	// production composition root supplies this directly, never through a
-	// post-construction accessor that a wiring change can silently omit).
+	// (design.md Decision 10). Supplied at construction, as a required
+	// positional parameter of the package's ONE constructor (design.md
+	// Decision 22 of replace-observation-with-sightings, tasks.md 6.3: every
+	// caller states this dependency or fails to compile, because an optional
+	// post-construction accessor a wiring change can silently omit is exactly
+	// what left Jump unreachable in production — twice).
 	graph GraphSource
 }
 
-func NewService() *Service {
-	params := DefaultMovementParams()
-	actions := action.NewService()
-	svc := &Service{
-		dao:        NewDao(),
-		actions:    actions,
-		clock:      common.WorldClock(),
-		params:     params,
-		classStats: DefaultClassStats(),
-		bodies:     system.NewService(),
-	}
-	actions.RegisterResolver(burnType, action.KindKinematic, BurnResolver(svc.bodies))
-	return svc
-}
-
-// NewServiceWith wires a fleet Service from explicit dependencies. bodies
-// satisfies BodySource (a *system.Service does, structurally) and seeds the
-// service's default body source; WithBodies overrides it later (tests, or a
-// dependency not available at construction time).
-func NewServiceWith(dao Dao, bodies BodySource, actions action.CommitInterface, clock common.WorldTime) *Service {
+// NewServiceWith wires a fleet Service from explicit dependencies — the
+// package's only constructor (tasks.md 6.3). bodies satisfies BodySource and
+// graph satisfies GraphSource (a *system.Service and a *galaxy.Service do,
+// respectively, structurally); both are the resolved-dependency sources every
+// commit path folds through, so they sit adjacent in the signature. Neither is
+// optional: there is no zero-dependency variant and no post-construction
+// accessor for graph, which is what makes a graph-less Service unconstructable
+// rather than merely discouraged.
+//
+// It registers NO resolvers: registration is a composition-root act (router.go
+// calls RegisterResolvers and RegisterScanResolver), never a constructor side
+// effect (tasks.md 6.1, design.md Decision 22). A constructor-side
+// registration builds a SECOND, PARTIAL resolver table on an action.Service
+// the composition root never sees — the bug fixed in 3bcc726, which left
+// fleets uncommandable because jump and scan were never registered on the
+// table the request path actually dispatched through.
+func NewServiceWith(dao Dao, bodies BodySource, graph GraphSource, actions action.CommitInterface, clock common.WorldTime) *Service {
 	return &Service{
-		dao: dao, bodies: bodies, actions: actions, clock: clock,
+		dao: dao, bodies: bodies, graph: graph, actions: actions, clock: clock,
 		params: DefaultMovementParams(), classStats: DefaultClassStats(),
 	}
-}
-
-// NewServiceComplete wires a fleet Service exactly as NewServiceWith does,
-// plus the lane-crossing-geometry source Jump's commit path requires,
-// supplied here as a required constructor parameter rather than through a
-// post-construction accessor (design.md Decision 22 of
-// replace-observation-with-sightings: an optional accessor that a wiring
-// change can silently omit is exactly what left Jump unreachable in
-// production). This is the composition root's own constructor (router.go);
-// task 6.3 folds this shape into NewServiceWith itself as a required
-// positional parameter across every call site — deferred here because
-// several of this package's own existing tests (including this section's
-// own frontier-arrival integration test) construct a Service through
-// NewServiceWith's current four-argument shape to exercise paths that never
-// reach Jump's commit step, and are not this dispatch's tests to edit.
-func NewServiceComplete(dao Dao, bodies BodySource, graph GraphSource, actions action.CommitInterface, clock common.WorldTime) *Service {
-	s := NewServiceWith(dao, bodies, actions, clock)
-	s.graph = graph
-	return s
 }
 
 // WithBodies overrides the BodySource — the seam body_source_test.go uses to
@@ -740,9 +719,6 @@ func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error) {
 		f = settled
 	}
 
-	if s.graph == nil {
-		return nil, fmt.Errorf("fleet: no lane-crossing source configured: %w", ErrNoBodySource)
-	}
 	destId, from, to, err := s.graph.LaneCrossing(ctx, laneId, f.SystemId)
 	if err != nil {
 		return nil, fmt.Errorf("fleet: resolving lane crossing: %w", err)

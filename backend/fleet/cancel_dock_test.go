@@ -38,7 +38,10 @@ func TestCancel_Scenario_DockedFleetWithNonMovementSlotStaysDocked(t *testing.T)
 		return action.ResolveResult{Outcome: "n/a"}, nil
 	})
 	fleetDao := NewDaoWithClient(fs)
-	fleetSvc := NewServiceWith(fleetDao, &fakeSystem{}, actionSvc, clk)
+	// Inert bodies AND inert graph: this fixture's fleet is docked and only
+	// ever cancels a slot, so neither dependency is on its path. Both are
+	// named loud stubs rather than nil — see fakeGraphUnused's own comment.
+	fleetSvc := NewServiceWith(fleetDao, &fakeSystem{}, fakeGraphUnused{}, actionSvc, clk)
 
 	docked := &Fleet{
 		Id: "fleet-dock-1", CorporationId: "dev-corp", SystemId: "sys-0",

@@ -552,22 +552,46 @@
 
 ## 6. Carry-Overs
 
-- [ ] 6.1 Fix the `fleet/service.go:171` `NewService()` landmine: delete
+- [x] 6.1 Fix the `fleet/service.go:171` `NewService()` landmine: delete
       resolver registration from the constructor entirely (never delegate
       to `RegisterResolvers` from inside it) — registration belongs at the
       composition root, not as a constructor side effect.
       (no dedicated scenario — design.md Decision 22, the byte-for-byte
       recurrence of the bug fixed in `3bcc726`)
-- [ ] 6.2 Add an AST-scan test, in the same species as `purity_test.go`,
+- [x] 6.2 Add an AST-scan test, in the same species as `purity_test.go`,
       asserting `RegisterResolvers` is the package's sole
       `action.RegisterResolver` call site.
-- [ ] 6.3 Make `fleet.NewServiceWith`'s `GraphSource` a required positional
+      (SDET: `backend/fleet/resolver_registration_sole_callsite_test.go`,
+      written and run — currently RED on `service.go:183`'s `NewService()`
+      registration, which is task 6.1's to delete. **Deviation escalated for
+      adjudication:** the check allows TWO registration entry points,
+      `RegisterResolvers` **and** `RegisterScanResolver`, because task 5.8
+      deliberately landed the latter as a separate composition-root function
+      and router.go calls both; a literal one-function check would fail on
+      §5's own shipped, documented decision. The rule encoded is "no
+      `action.RegisterResolver` call outside this package's dedicated
+      registration functions, and never in a constructor" — see the test's
+      header comment.)
+- [x] 6.3 Make `fleet.NewServiceWith`'s `GraphSource` a required positional
       constructor parameter; delete `WithGraph`, `TierSource`,
       `WithTierSource`, and the now-unreachable `graph == nil` guard and
       its sentinel.
       (no dedicated scenario — design.md Decision 22, closes blocker 3 at
       the type level so it cannot recur)
-- [ ] 6.4 Close the fleet-movement authorization defect: on
+      (SDET: all ten test call sites migrated — seven in `fleet`, plus
+      `corporations`/`market`/`mine`. **Zero `nil` graphs**: six sites pass a
+      real `*galaxy.Service` already in scope; three use the new inert
+      `fakeGraphUnused` stub in `fleet/service_test.go`; `mine`'s existing
+      `fakeIntegrationSystem` grew a `LaneCrossing` method. Both stubs ERROR
+      rather than return a zero crossing, so an unintended `Jump` fails
+      loudly. Deletion locked by a new AST-declaration absence scenario,
+      `TestPackage_Scenario_ZeroDependencyConstructorsAreAbsent` in
+      `fleet/jump_deletion_test.go`, guarding `NewServiceComplete`,
+      `NewService`, `NewHandler`. Verified green: `go build ./...`,
+      `go vet ./...`, `go test -short ./...`, and
+      `ENV=TEST go test -p 1 -count=1 ./...` — 20/20 packages ok, root e2e
+      31/31 tests passing, 0 skipped.)
+- [x] 6.4 Close the fleet-movement authorization defect: on
       `POST /v1/fleets/:fleetId/orders|cancel|cut-drive|stop|jump|scan`,
       compare `common.ActorCorp(c)` against the fleet's `corporationId` and
       respond `404` — not `403` — on mismatch or no corporation, so that a
@@ -584,7 +608,7 @@
       sweep with another corp's fleet; A corpless requester is rejected
       the same way; The owning corporation's jump order succeeds at the
       HTTP surface)
-- [ ] 6.5 Close the sibling action-dispatch authorization defect in the same
+- [x] 6.5 Close the sibling action-dispatch authorization defect in the same
       change: inject an `ActorOwner{OwnerOf(ctx, collection, actorId)
       (corpId string, err error)}` into `action.Handler`, wired in
       `router.go` from the fleet service; 404 (not 403) on mismatch or no
@@ -596,7 +620,7 @@
       cannot acknowledge another actor's action; A foreign corp cannot
       cancel another actor's action; A corpless requester is rejected the
       same way; The owning corporation's own requests still succeed)
-- [ ] 6.6 No code change: `request-authorization`'s own "Corporation
+- [x] 6.6 No code change: `request-authorization`'s own "Corporation
       Resolution Seam" scenario asserted, as current fact, that a mutating
       fleet or action endpoint on another corp's id "currently succeeds" —
       false the instant tasks 6.4/6.5 land. Its delta retires that
@@ -609,7 +633,7 @@
       open, not closed; A resolution failure is indistinguishable from
       genuine corplessness to the player (gap, not an endorsement);
       Mutating fleet and action endpoints now enforce ownership)
-- [ ] 6.7 No code change: correct `mine-extraction`'s own citation of
+- [x] 6.7 No code change: correct `mine-extraction`'s own citation of
       `fleet-movement`'s baseline (it names the requirement
       `replace-observation-with-sightings` closes, and drops a word from
       that requirement's actual title) so it cites the closed defect
@@ -621,7 +645,7 @@
       cannot mine with another corp's fleet; The owning corporation may
       mine its own fleet)
 
-- [ ] 6.8 No code change: correct `fleet-movement`'s own citation in "Fleet
+- [x] 6.8 No code change: correct `fleet-movement`'s own citation in "Fleet
       Read Surfaces Roster, Cargo, and Derived Capacity" — it names
       "Fleet Read Endpoints Serve Own Fleets Only", the requirement task
       4.8 replaces in this same change — to cite the requirement's new
@@ -633,7 +657,7 @@
       Capacity* — The fleet read response includes roster, cargo, and
       derived capacity; A foreign fleet's cargo and roster are not
       disclosed)
-- [ ] 6.9 No code change: correct `request-authorization`'s own citation in
+- [x] 6.9 No code change: correct `request-authorization`'s own citation in
       "The Sell Endpoint Ignores a Client-Supplied Corporation Id" — it
       names "Corporation Resolution Seam", the requirement task 6.6
       replaces in this same change — to cite the requirement's new name,

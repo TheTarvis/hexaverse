@@ -20,10 +20,11 @@ type Handler struct {
 	clock common.WorldTime
 }
 
-func NewHandler() *Handler {
-	return &Handler{svc: NewService(), clock: common.WorldClock()}
-}
-
+// NewHandlerWith is this package's only handler constructor: a fleet Service
+// cannot be built from process-wide singletons alone (its lane-crossing
+// GraphSource is a required constructor parameter, tasks.md 6.3), so there is
+// deliberately no zero-argument NewHandler — the composition root wires the
+// service and passes it in.
 func NewHandlerWith(svc ServiceInterface, clock common.WorldTime) *Handler {
 	return &Handler{svc: svc, clock: clock}
 }
@@ -121,56 +122,119 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"fleets": out, "worldTime": h.clock.Now()})
 }
 
+// commandedFleetId resolves the fleet a command endpoint names, but ONLY for
+// the corporation that owns it (fleet-movement "Fleet Command Endpoints Are
+// Restricted to the Owning Corporation"). It answers `404 Not Found` with an
+// empty body — never `403`, and never a body naming the fleet, its owner, or
+// the reason — when the fleet does not exist, when the requester has no
+// corporation at all, or when it belongs to another corporation: a foreign
+// fleet is indistinguishable from a nonexistent one, and a 403 or an
+// explanatory body would itself confirm the id exists (design.md Decision 21).
+//
+// The corpless case is checked unconditionally rather than by equality alone:
+// a bare `ActorCorp(c) != f.CorporationId` comparison would hand every
+// ownerless fleet record to every corpless requester.
+//
+// Every command endpoint calls this BEFORE binding its body and before
+// reaching the service, so a rejected request dispatches nothing: no order is
+// committed, no burn is cut, no sensor-channel slot is claimed and no masking
+// stripped. For POST /scan in particular the rejection must precede scan-host
+// resolution — ErrScanHostUnresolved also maps to 404, so a check made any
+// later would pass for the wrong reason while the foreign scan still ran.
+//
+// Returns the fleet id and true when the command may proceed; on false the
+// response is already written.
+func (h *Handler) commandedFleetId(c *gin.Context) (string, bool) {
+	fleetId := common.RequiredHttpParam(c, "fleetId")
+	if fleetId == "" {
+		return "", false // RequiredHttpParam already aborted with 400
+	}
+	f, err := h.svc.Get(c.Request.Context(), fleetId)
+	if err != nil {
+		h.respond(c, nil, err)
+		return "", false
+	}
+	if requesterCid := common.ActorCorp(c); f == nil || requesterCid == "" || f.CorporationId != requesterCid {
+		h.respond(c, nil, ErrNotFound)
+		return "", false
+	}
+	return fleetId, true
+}
+
 func (h *Handler) Order(c *gin.Context) {
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
 	var req OrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	f, err := h.svc.OrderTo(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"), req)
+	f, err := h.svc.OrderTo(c.Request.Context(), fleetId, req)
 	h.respond(c, f, err)
 }
 
 func (h *Handler) Cancel(c *gin.Context) {
-	f, err := h.svc.Cancel(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
+	f, err := h.svc.Cancel(c.Request.Context(), fleetId)
 	h.respond(c, f, err)
 }
 
 // CutDrive handles POST /v1/fleets/:fleetId/cut-drive (fleet-movement "Cut
 // Drive Converts the Burn to a Drift and Goes Dark").
 func (h *Handler) CutDrive(c *gin.Context) {
-	f, err := h.svc.CutDrive(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
+	f, err := h.svc.CutDrive(c.Request.Context(), fleetId)
 	h.respond(c, f, err)
 }
 
 // Stop handles POST /v1/fleets/:fleetId/stop (fleet-movement "Stop In Place
 // Commits a Velocity-Nulling Burn").
 func (h *Handler) Stop(c *gin.Context) {
-	f, err := h.svc.Stop(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
+	f, err := h.svc.Stop(c.Request.Context(), fleetId)
 	h.respond(c, f, err)
 }
 
 // Jump handles POST /v1/fleets/:fleetId/jump {laneId} (fleet-movement "Lane
 // Jump From a Docked Gate").
 func (h *Handler) Jump(c *gin.Context) {
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
 	var req JumpRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	f, err := h.svc.Jump(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"), req.LaneId)
+	f, err := h.svc.Jump(c.Request.Context(), fleetId, req.LaneId)
 	h.respond(c, f, err)
 }
 
 // Scan handles POST /v1/fleets/:fleetId/scan {hostId} (focused-scan "A
 // Focused Sweep Commits On the Sensor Channel").
 func (h *Handler) Scan(c *gin.Context) {
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
 	var req ScanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	f, err := h.svc.Scan(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"), req.HostId)
+	f, err := h.svc.Scan(c.Request.Context(), fleetId, req.HostId)
 	h.respond(c, f, err)
 }
 

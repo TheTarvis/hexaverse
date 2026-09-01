@@ -4,9 +4,12 @@ The ordered set of OpenSpec changes that carries the game from the polar
 lattice to the continuous-space system map. `README.md` is the model,
 `decisions.md` is the settled rulings; this is the sequencing.
 
-**Status (2026-08-29):** links 1–3 landed, plus one unplanned insert. Links
-4–9 remain. All three chain-gating design decisions are now settled — see
-*Open decisions gating the chain* below. Two lattice-era changes
+**Status (2026-09-01):** links 1–4 landed, plus one unplanned insert. Link 5
+is **in implementation** — its spec is complete and adversary-clean, and
+sections 1–5 of its 9 have shipped; sections 6–9 (carry-overs, housekeeping,
+validation, cleanup) remain. Links 6–9 unstarted. All three chain-gating
+design decisions are settled — see *Open decisions gating the chain* below.
+Two lattice-era changes
 (`add-station-exchange`, `revise-scan-instant-and-emission`) were removed from
 `openspec/changes/` on 2026-08-27 to clear the board — see *Removed* at the
 bottom.
@@ -37,8 +40,8 @@ after that design was written.
 | 2 | `add-proximity-disclosure` | `backend/disclosure` — the visibility mechanism, pure | ✅ `fca73ef` |
 | 3 | `add-orbital-system-bodies` | Interiors emit real orbits; lane gates become bodies | ✅ `e00e79e` |
 | — | `pin-system-generation-determinism` | *(unplanned insert)* generation pinned byte-identical across build targets | ✅ `b64be39` |
-| 4 | `migrate-fleet-to-continuous-burns` | Fleets fly curves; cut drive / stop in place | ⬜ |
-| 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ⬜ |
+| 4 | `migrate-fleet-to-continuous-burns` | Fleets fly curves; cut drive / stop in place | ✅ `1f1c88a`…`55c46fb` |
+| 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | 🔄 §1–5 of 9 (`8f4dd65`…`d18c255`) |
 | 6 | `re-express-economy-positions` | Mine/sell/dock re-anchored to bodies | ⬜ |
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ⬜ |
 | 8 | `build-production-space-view` | The renderer; `board-view` retired | ⬜ |
@@ -92,6 +95,28 @@ the `stations` precedent — derived, never rolled.
   and is carried into link 4, where the jump lives.
 
 ## Link 4 — `migrate-fleet-to-continuous-burns`
+
+**Landed 2026-08-30** across ten commits (`1f1c88a`…`55c46fb`), 90/94 tasks —
+the four unchecked are §11's post-archive `## Purpose` hand-edits, which
+deltas structurally cannot reach. Archived 2026-08-31 in `c235497`.
+
+Four defects it surfaced are worth remembering, because each was invisible to
+a green suite:
+
+- **The jump resolver was never registered.** `RegisterResolvers` wired only
+  `burnType`, so a committed jump's ETA would pass with nothing to settle it —
+  leaving the fleet in `laneTransit` permanently, and since a fleet in transit
+  has no position in either system, **invisible and uncommandable**. The unit
+  was correct and tested; nothing called it.
+- **Lane crossing time was specified backwards.** `tasks.md` said length ×
+  lane rate; `LaneRate` is a *speed*, and the spec derives the effective rate
+  as the minimum across the roster and calls it "the slowest ship" — which
+  only holds under division. Multiplying would have made the slowest hull
+  produce the **fastest** crossing. Caught by an SDET refusing to encode it.
+- **The fold-first bug reached three sites** before `settleIfDue` became the
+  single seam every transition routes through.
+- **`GET /v1/fleets/:fleetId` had no ownership check at all** — only `List`
+  filtered — returning 200 for any fleet to any caller.
 
 Fleet position becomes a `space` state — park mode, committed burn, or free
 drift. `BurnResolver` settles curved burns; the channel split and the delta
@@ -153,6 +178,31 @@ prove itself against already exists.
   re-file the deferral explicitly if it still cannot.
 
 ## Link 5 — `replace-observation-with-sightings`
+
+**In implementation (2026-09-01).** Spec complete and adversary-clean after
+three rounds — 16 deltas, 191 scenarios, three new capabilities
+(`galaxy-knowledge`, `sighting-records`, `focused-scan`). Sections 1–5 of 9
+have shipped; §6–§9 (carry-overs, housekeeping, validation, cleanup) remain.
+The *Touches* bullet below still lists the six capabilities predicted before
+authoring and is corrected by this change's own task 7.4.
+
+What has landed so far: **the galaxy is traversable again** — a player can
+spawn, fly to a lane gate, and jump using only the UI, proven by a Playwright
+journey against the real stack (`3d7e72d`, `886159b`, `9bde5b1`).
+`backend/observation` is deleted and `backend/charts` holds the graph-tier
+ladder, **rehomed rather than deleted** because `decisions.md`'s "no tier
+ladder" is scoped to the live path, which the ladder was never on, and four
+shipped capabilities consume it (`c0ba51e`). The sighting store (`7e972c5`),
+`disclosure`'s wiring into the reads (`9c00216`), and the focused-scan verb
+(`d18c255`) are in.
+
+**Restoring traversability took four attempts, each ending with a green suite
+and a stuck player** — the server 500, then a jump button that never rendered,
+then a rendered button with no `laneId` to send, then a galaxy view deriving
+gate identity from a charted-filtered list that is empty for exactly the
+player who needs it. Worth remembering as the canonical example of why an
+end-to-end test through the real router still is not evidence that a human can
+perform the action.
 
 **Most important consequence of link 4, stated up front: after link 4, no
 fleet can ever jump.** Spawn charts zero lanes (`observation.RevealArrival`
@@ -264,6 +314,20 @@ reversal cost as bounded while `space` has no consumers — by this link it no
 longer will. If previews read as laggy in play, reversing means building
 `frontend/lib/space` as a true fixed-point mirror.
 
+- **Required scope, inherited from link 5: the focused scan's entire
+  player-facing half.** Link 5 shipped the verb
+  (`POST /v1/fleets/:fleetId/scan`) and the sighting pile
+  (`GET /v1/sightings`) with **no client surface at all** — no scan command
+  on any fleet or board view, no `scan` method on
+  `frontend/lib/services/fleet-service.ts` and no `useScan` hook behind one
+  (link 4 deleted the lattice-era `useScan` and link 5 did not restore it),
+  no testid, and nothing that renders a sighting. The scan is API-only in
+  the tree this link inherits. That was a deliberate deferral recorded in
+  link 5's proposal, not an oversight: a scan button whose results cannot be
+  seen is half a feature shipped twice, and this link already owns contact
+  rendering, so the command surface and the sightings display are **one
+  piece of work here** — the verb's affordance and the view of what it
+  minted land together, or neither lands.
 - **`board-view` is no longer link 8's alone to replace.** Link 4 already
   strips most of the fleet layer out of `board-view`: 12 of its requirements
   are REMOVED there (confirmed by archive rehearsal), of which 3 are

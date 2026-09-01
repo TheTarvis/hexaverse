@@ -53,7 +53,10 @@ func newSaleStack(t *testing.T, startingCargo map[string]float64) (*saleStack, f
 
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
-	fsvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), ssvc, asvc, clk)
+	// gsvc — the real, seeded galaxy service — is the fleet stack's
+	// GraphSource (the only production implementation of LaneCrossing), so
+	// the sale stack's fleet service is wired exactly as router.go wires it.
+	fsvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), ssvc, gsvc, asvc, clk)
 	fogSvc := charts.NewServiceWith(charts.NewDaoWithClient(fs), clk)
 	stSvc := stations.NewServiceWith(stations.NewDaoWithClient(fs), gsvc, fogSvc, clk)
 	credits := corporations.NewCreditStoreWith(fs)

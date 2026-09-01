@@ -61,7 +61,9 @@ func TestFleetsInSystem_Scenario_ScanWindowWiredOntoDisclosureShip(t *testing.T)
 	}
 
 	dao.EXPECT().ListBySystem(gomock.Any(), "sys-0").Return([]Fleet{running, stale, idle}, nil)
-	svc := NewServiceWith(dao, stubBodySourceFixed{}, &fakeActions{}, clk)
+	// FleetsInSystem is a read; no jump is on its path, so the GraphSource is
+	// the inert loud stub rather than nil (see fakeGraphUnused).
+	svc := NewServiceWith(dao, stubBodySourceFixed{}, fakeGraphUnused{}, &fakeActions{}, clk)
 
 	presences, _, err := svc.FleetsInSystem(context.Background(), "sys-0")
 	if err != nil {
