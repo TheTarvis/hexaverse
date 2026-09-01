@@ -20,8 +20,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"hexaverse/charts"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 )
 
 func main() {
@@ -74,9 +74,9 @@ func writeStartArea(out string) error {
 
 	// The frozen start area is the fog-off showcase: every system ships explored,
 	// with no per-player state (#0006 acceptance).
-	tiers := make(map[string]observation.Tier, len(gen.Systems))
+	tiers := make(map[string]string, len(gen.Systems))
 	for _, s := range gen.Systems {
-		tiers[s.Id] = observation.TierExplored
+		tiers[s.Id] = string(charts.TierExplored)
 	}
 	// nil charted set = the no-fog baseline: every lane ships in the showcase.
 	dto := galaxy.ToDTO(&gen, 0, tiers, nil)

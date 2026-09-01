@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"hexaverse/action"
+	"hexaverse/charts"
 	"hexaverse/common"
 	"hexaverse/corporations"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 	"hexaverse/space"
 	"hexaverse/stations"
 	"hexaverse/system"
@@ -54,7 +54,7 @@ func newSaleStack(t *testing.T, startingCargo map[string]float64) (*saleStack, f
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
 	fsvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), ssvc, asvc, clk)
-	fogSvc := observation.NewServiceWith(observation.NewDaoWithClient(fs), fsvc, ssvc, gsvc, clk)
+	fogSvc := charts.NewServiceWith(charts.NewDaoWithClient(fs), clk)
 	stSvc := stations.NewServiceWith(stations.NewDaoWithClient(fs), gsvc, fogSvc, clk)
 	credits := corporations.NewCreditStoreWith(fs)
 
@@ -119,7 +119,7 @@ func newSaleStack(t *testing.T, startingCargo map[string]float64) (*saleStack, f
 			fmt.Sprintf("corporations/%s/ledger", corpID),
 			fmt.Sprintf("corporations/%s/reconciliation", corpID),
 			fmt.Sprintf("galaxies/%s/systems/%s/station", gid, systemID),
-			fmt.Sprintf("corporations/%s/observations", corpID),
+			fmt.Sprintf("corporations/%s/charts", corpID),
 			"galaxies/"+gid+"/systems", "galaxies/"+gid+"/lanes", "galaxies/"+gid+"/blocks",
 			"fleets", "corporations", "corpByAccount", "spawnClaims", "galaxies", "galaxy_pointers", "actions")
 	}

@@ -1,8 +1,8 @@
 package market
 
 import (
+	"hexaverse/charts"
 	"hexaverse/common"
-	"hexaverse/observation"
 )
 
 // Params holds every knob this milestone's market introduces: the starting
@@ -78,7 +78,7 @@ type Params struct {
 	// precedent (a gate ships once its destination clears `rumored`), and is the
 	// SAME tier the station splice and the price board both read, so the two
 	// surfaces can never disagree about which stations are "known".
-	MinVisibilityTier observation.Tier
+	MinVisibilityTier charts.Tier
 
 	// BoardRefreshCadence is the price board's stated poll cadence — the freshness
 	// contract the UI honours and the staleness a player may assume.
@@ -121,7 +121,7 @@ func DefaultParams() Params {
 		BudgetPerWindow:     0,
 		AbsorptionPerWindow: 0,
 
-		MinVisibilityTier:   observation.TierRumored,
+		MinVisibilityTier:   charts.TierRumored,
 		BoardRefreshCadence: 30_000, // 30s — a price that stale is fine for a
 		// decision that itself costs minutes of travel to act on.
 	}

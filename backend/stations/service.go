@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"hexaverse/board"
+	"hexaverse/charts"
 	"hexaverse/common"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 	"hexaverse/system"
 
 	"github.com/rs/zerolog/log"
@@ -26,7 +26,7 @@ type GraphSource interface {
 // its own existence, which is public information at the price board's tier, not
 // a sensed-and-remembered fact.
 type TierSource interface {
-	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
+	SystemTiers(ctx context.Context, cid string) (map[string]charts.Tier, error)
 }
 
 type ServiceInterface interface {
@@ -65,7 +65,7 @@ type Service struct {
 	// minTier is market.Params.MinVisibilityTier, INJECTED rather than imported:
 	// market imports this package (a sale decrements a station's requests), so
 	// importing market here would cycle. router.go is where the two meet.
-	minTier observation.Tier
+	minTier charts.Tier
 }
 
 func NewService(graph GraphSource, tiers TierSource) *Service {
@@ -75,7 +75,7 @@ func NewService(graph GraphSource, tiers TierSource) *Service {
 		tiers:    tiers,
 		clock:    common.WorldClock(),
 		gateRing: common.Tuning().BoardRadius,
-		minTier:  observation.TierRumored,
+		minTier:  charts.TierRumored,
 	}
 }
 
@@ -83,13 +83,13 @@ func NewServiceWith(dao Dao, graph GraphSource, tiers TierSource, clock common.W
 	return &Service{
 		dao: dao, graph: graph, tiers: tiers, clock: clock,
 		gateRing: common.Tuning().BoardRadius,
-		minTier:  observation.TierRumored,
+		minTier:  charts.TierRumored,
 	}
 }
 
 // WithMinVisibilityTier sets the graph tier a requester must reach before a
 // station discloses to them (market.Params.MinVisibilityTier).
-func (s *Service) WithMinVisibilityTier(t observation.Tier) *Service {
+func (s *Service) WithMinVisibilityTier(t charts.Tier) *Service {
 	s.minTier = t
 	return s
 }

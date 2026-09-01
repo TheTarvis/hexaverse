@@ -86,6 +86,19 @@ func cellLess(a, b Cell) bool {
 	return a.Y < b.Y
 }
 
+// LaneIdBetween derives a lane's document id from the unordered pair of
+// endpoint SYSTEM ids, purely (no read) — exported over the existing
+// laneIdFor/CellForSystemId pair (replace-observation-with-sightings
+// design.md Decision 3, tasks.md 2.1) so a gate-attachment knowledge write
+// can derive its lane id without reading the destination system. An
+// unparseable system id yields the zero Cell, matching CellForSystemId's own
+// permissive-decode convention elsewhere in this package.
+func LaneIdBetween(aSysId, bSysId string) string {
+	a, _ := CellForSystemId(aSysId)
+	b, _ := CellForSystemId(bSysId)
+	return laneIdFor(a, b)
+}
+
 // --- Deterministic hashing --------------------------------------------------
 
 // cellHash is the per-cell entropy source: a pure function of (seed, cx, cy).

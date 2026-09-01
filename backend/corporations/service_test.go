@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"hexaverse/action"
+	"hexaverse/charts"
 	"hexaverse/common"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 	"hexaverse/system"
 )
 
@@ -24,7 +24,7 @@ func (c *fakeClock) Scale() float64                        { return 1 }
 // galaxy + the fleet/fog/corporation services spawn orchestrates through. Returns
 // the corporation service under test plus the fog service (for asserting the
 // initial observations) and the live galaxy.
-func spawnStack(t *testing.T) (*Service, *observation.Service, *galaxy.Service, *fakeClock) {
+func spawnStack(t *testing.T) (*Service, *charts.Service, *galaxy.Service, *fakeClock) {
 	t.Helper()
 	fs, client := common.SetupFirestoreTestDAO(t)
 	ctx := context.Background()
@@ -46,7 +46,7 @@ func spawnStack(t *testing.T) (*Service, *observation.Service, *galaxy.Service, 
 	ssvc := system.NewServiceWith(system.NewDaoWithClient(fs), gsvc, clk)
 	asvc := action.NewServiceWith(action.NewDaoWith(fs, clk), clk, nil)
 	fsvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), ssvc, asvc, clk)
-	fogSvc := observation.NewServiceWith(observation.NewDaoWithClient(fs), fsvc, ssvc, gsvc, clk)
+	fogSvc := charts.NewServiceWith(charts.NewDaoWithClient(fs), clk)
 	corpSvc := NewServiceWith(NewDaoWithClient(fs), gsvc, fsvc, fogSvc, clk).
 		WithSpawnParams(DefaultSpawnParams())
 	return corpSvc, fogSvc, gsvc, clk
@@ -115,7 +115,7 @@ func TestSpawn_CreatesCorpFleetAndFog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tiers[home] != observation.TierExplored {
+	if tiers[home] != charts.TierExplored {
 		t.Fatalf("home tier = %q, want explored", tiers[home])
 	}
 	if len(tiers) != 1 {

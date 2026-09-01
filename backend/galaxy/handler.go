@@ -6,22 +6,35 @@ import (
 	"net/http"
 
 	"hexaverse/common"
-	"hexaverse/observation"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
 
 // GraphFog is the fog dependency the graph read needs: the requester's monotonic
-// subspace tiers over the always-visible star map, plus their charted-lane set
-// (#0006 Decision #17 — lanes are per-lane records written by travel and scan,
-// not derived from tiers). The star layer renders regardless. Nil on the
-// logged-out path and in unit tests (every system reads starVisible, every lane
-// ships).
+// subspace tiers (as raw tier strings — see below) over the always-visible star
+// map, plus their charted-lane set (#0006 Decision #17 — lanes are per-lane
+// records written by travel and gate attachment, not derived from tiers). The
+// star layer renders regardless. Nil on the logged-out path and in unit tests
+// (every system reads starVisible, every lane ships).
+//
+// SystemTiers returns raw strings, not charts.Tier, DELIBERATELY: charts
+// itself imports this package (galaxy.LaneIdBetween, for its gate-attachment
+// writer — replace-observation-with-sightings design.md Decision 3), so this
+// package importing charts back would cycle. Nothing here needs Tier's ranking
+// behavior (AtLeast/Max) — the value is written straight to the wire as
+// systemDTO.Tier — so a plain string carries everything this read needs;
+// router.go adapts the typed charts.Service at the one seam that wires the two
+// packages together.
 type GraphFog interface {
-	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
+	SystemTiers(ctx context.Context, cid string) (map[string]string, error)
 	ChartedLanes(ctx context.Context, cid string) (map[string]bool, error)
 }
+
+// starVisibleTier is the free baseline's wire value — string(charts.TierStarVisible),
+// duplicated as a literal rather than imported (see GraphFog's doc comment on
+// why this package cannot import charts).
+const starVisibleTier = "starVisible"
 
 type Handler struct {
 	svc   ServiceInterface
@@ -69,7 +82,7 @@ func (h *Handler) GetGalaxy(c *gin.Context) {
 		return
 	}
 
-	var tiers map[string]observation.Tier
+	var tiers map[string]string
 	var charted map[string]bool
 	if h.fog != nil {
 		if cid := common.ActorCorp(c); cid != "" {
@@ -140,14 +153,14 @@ type galaxyDTO struct {
 // ToDTO maps the domain galaxy to the pinned wire contract. tiers is the
 // requester's subspace knowledge (nil ⇒ every system star-visible); charted is
 // their charted-lane set (nil ⇒ the no-fog baseline, every lane ships).
-func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]observation.Tier, charted map[string]bool) galaxyDTO {
+func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]string, charted map[string]bool) galaxyDTO {
 	systems := make([]systemDTO, len(gen.Systems))
 	for i, s := range gen.Systems {
 		bodies := make([]bodyDTO, len(s.Skeleton.Bodies))
 		for j, b := range s.Skeleton.Bodies {
 			bodies[j] = bodyDTO{Type: b.Type, Ring: b.Ring}
 		}
-		tier := observation.TierStarVisible
+		tier := starVisibleTier
 		if t, ok := tiers[s.Id]; ok {
 			tier = t
 		}
@@ -156,7 +169,7 @@ func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]observ
 			Coords:   s.Coords,
 			Name:     s.Name,
 			Region:   s.Region,
-			Tier:     string(tier),
+			Tier:     tier,
 			Skeleton: skeletonDTO{StarClass: s.Skeleton.StarClass, Bodies: bodies},
 		}
 	}

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"hexaverse/action"
-	"hexaverse/observation"
+	"hexaverse/charts"
 	"hexaverse/space"
 	"hexaverse/system"
 )
@@ -79,9 +79,18 @@ func BurnResolver(bodies BodySource) action.ResolveFunc {
 
 		outcome := "arrived"
 		attachedTo := ""
+		var writes []action.DocWrite
 		if settled.Mode == space.ModeParked && settled.Park != nil && settled.Park.BodyId != "" {
 			attachedTo = settled.Park.BodyId
 			outcome = "docked at " + attachedTo
+			// A body-targeted burn settling into an attached park at a
+			// lane-gate body charts that gate's lane `via: gate` for the
+			// fleet's corporation (design.md Decision 3 item 2;
+			// specs/galaxy-knowledge/spec.md — "Gate-Attachment Knowledge
+			// Write"). GateAttachmentWrite gates internally on the
+			// "gate-" body-id prefix and returns nil for any other body,
+			// so no branching on gate-ness is needed here.
+			writes = charts.GateAttachmentWrite(f.CorporationId, f.SystemId, attachedTo, r.At)
 		}
 
 		return action.ResolveResult{
@@ -89,6 +98,7 @@ func BurnResolver(bodies BodySource) action.ResolveFunc {
 			ActorState: map[string]interface{}{
 				"state": EncodeKinematicState(settled), "attachedTo": attachedTo, "updatedAt": int64(r.At),
 			},
+			Writes: writes,
 		}, nil
 	}
 }
@@ -132,11 +142,11 @@ func JumpResolver(_ context.Context, r action.Resolution) (action.ResolveResult,
 	}}
 
 	// Charts the crossed lane `via: traveled`, marks the destination
-	// Explored, and mints no onward rumor — observation's own ArrivalWrites
-	// primitive, the same one travel-arrival already uses (design.md
-	// Decision 11). Pure w.r.t. Firestore, so a zero-value Service is safe
-	// to call it on.
-	writes := (&observation.Service{}).ArrivalWrites(f.CorporationId, destId, []string{laneId}, r.At)
+	// Explored, and mints no onward rumor — charts' own ArrivalWrites
+	// primitive, the same one travel-arrival already uses
+	// (replace-observation-with-sightings design.md Decision 1). Pure
+	// w.r.t. Firestore, so a zero-value Service is safe to call it on.
+	writes := (&charts.Service{}).ArrivalWrites(f.CorporationId, destId, []string{laneId}, r.At)
 
 	return action.ResolveResult{
 		Outcome: fmt.Sprintf("jumped to %s", destId),

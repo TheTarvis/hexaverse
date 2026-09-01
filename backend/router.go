@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"time"
 
 	"hexaverse/account"
 	"hexaverse/action"
+	"hexaverse/charts"
 	"hexaverse/common"
 	"hexaverse/config"
 	"hexaverse/corporations"
@@ -14,7 +16,6 @@ import (
 	"hexaverse/market"
 	"hexaverse/middlewares"
 	"hexaverse/mine"
-	"hexaverse/observation"
 	"hexaverse/sse"
 	"hexaverse/stations"
 	"hexaverse/system"
@@ -101,14 +102,14 @@ func SetupRouter() *gin.Engine {
 	// section 7 removes the observation-side writer it fed.
 	fleet.RegisterResolvers(actionSvc, systemSvc)
 
-	// Fog of war (#0006), reduced (migrate-fleet-to-continuous-burns tasks.md
-	// section 7, design.md Decision 11): the graph-tier ladder, the
-	// charted-lane set, and the arrival reveal writers. Its live half — the
-	// per-Corporation sensor-coverage projection this used to read from
-	// fleet/system/galaxy, and the scan resolver it used to register — is
-	// deleted outright; link 5 (replace-observation-with-sightings) is what
-	// replaces it, not this change.
-	fogSvc := observation.NewService()
+	// Galaxy knowledge (#0006, rehomed by replace-observation-with-sightings
+	// design.md Decision 1 from backend/observation into backend/charts): the
+	// graph-tier ladder, the charted-lane set, and the arrival/attachment
+	// reveal writers. Live perception (masking, contacts, sightings) is owned
+	// by disclosure/sightings instead — this store is never consulted to
+	// decide it (specs/galaxy-knowledge/spec.md — "A Knowledge Write Never
+	// Decides Live Disclosure").
+	fogSvc := charts.NewService()
 
 	// Spawn & identity (#0009): the corporation service orchestrates spawn through
 	// the live galaxy/fleet/fog singletons above, and resolves account→living-corp
@@ -146,7 +147,7 @@ func SetupRouter() *gin.Engine {
 
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
 	corpHandler.RegisterRoutes(authorized, strictLimit)
-	galaxy.NewHandler().WithFog(fogSvc).RegisterRoutes(authorized)
+	galaxy.NewHandler().WithFog(galaxyFogAdapter{fogSvc}).RegisterRoutes(authorized)
 	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).WithActions(actionSvc).RegisterRoutes(authorized)
 
 	actionHandler := action.NewHandler(actionSvc)
@@ -208,4 +209,28 @@ func SetupRouter() *gin.Engine {
 	}
 
 	return router
+}
+
+// galaxyFogAdapter adapts charts.Service to galaxy.GraphFog at the
+// composition root: charts imports galaxy (galaxy.LaneIdBetween, for its
+// gate-attachment writer — replace-observation-with-sightings design.md
+// Decision 3), so galaxy cannot import charts back without a cycle.
+// galaxy.GraphFog therefore takes raw tier strings; this is the one seam
+// that converts charts' typed Tier to the string the wire already carries.
+type galaxyFogAdapter struct{ charts *charts.Service }
+
+func (a galaxyFogAdapter) SystemTiers(ctx context.Context, cid string) (map[string]string, error) {
+	tiers, err := a.charts.SystemTiers(ctx, cid)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(tiers))
+	for systemID, tier := range tiers {
+		out[systemID] = string(tier)
+	}
+	return out, nil
+}
+
+func (a galaxyFogAdapter) ChartedLanes(ctx context.Context, cid string) (map[string]bool, error) {
+	return a.charts.ChartedLanes(ctx, cid)
 }

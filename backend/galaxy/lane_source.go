@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"hexaverse/observation"
 	"hexaverse/space"
 )
 
@@ -13,15 +12,28 @@ import (
 // the materialized graph.
 var ErrLaneNotFound = errors.New("galaxy: lane not found for this system")
 
-// LanesOf implements observation.LaneSource: the lanes incident to a system,
-// each with its far endpoint — what a scan charts and rumors (#0006 Decision
-// #17). Reads the MATERIALIZED graph with a per-system query, so a scan pays
-// for its own system's roads, not the whole world's.
+// LaneEnd is one lane incident to a system: its id and the far endpoint.
+// Formerly observation.LaneEnd (replace-observation-with-sightings design.md
+// Decision 1) — moved here rather than into charts, since nothing outside
+// this package's own LanesOf/LaneCrossing pair constructs or consumes it
+// (the old scan-resolve-and-mint path that read it via
+// observation.LaneSource is deleted with the package it lived in, and
+// charts's arrival/gate-attachment writers take lane ids as plain strings,
+// never a LaneEnd).
+type LaneEnd struct {
+	LaneId        string
+	OtherSystemId string
+}
+
+// LanesOf is the lanes incident to a system, each with its far endpoint —
+// fleet.GraphSource's LaneCrossing resolves a jump's crossing geometry
+// through it. Reads the MATERIALIZED graph with a per-system query, so a
+// caller pays for its own system's roads, not the whole world's.
 //
 // Callers that can look past the frontier must EnsureLaneHorizon first — after
-// that, this is the system's true field adjacency and a scan can never report a
-// false dead end.
-func (s *Service) LanesOf(ctx context.Context, systemID string) ([]observation.LaneEnd, error) {
+// that, this is the system's true field adjacency and a caller can never
+// report a false dead end.
+func (s *Service) LanesOf(ctx context.Context, systemID string) ([]LaneEnd, error) {
 	id, err := s.dao.GetLivePointer(ctx)
 	if err != nil {
 		return nil, err
@@ -75,14 +87,14 @@ func (s *Service) LaneCrossing(ctx context.Context, laneId, fromSystemId string)
 }
 
 // lanesOf projects a lane list to the ends incident to one system.
-func lanesOf(lanes []Lane, systemID string) []observation.LaneEnd {
-	var out []observation.LaneEnd
+func lanesOf(lanes []Lane, systemID string) []LaneEnd {
+	var out []LaneEnd
 	for _, l := range lanes {
 		switch systemID {
 		case l.AId:
-			out = append(out, observation.LaneEnd{LaneId: l.Id, OtherSystemId: l.BId})
+			out = append(out, LaneEnd{LaneId: l.Id, OtherSystemId: l.BId})
 		case l.BId:
-			out = append(out, observation.LaneEnd{LaneId: l.Id, OtherSystemId: l.AId})
+			out = append(out, LaneEnd{LaneId: l.Id, OtherSystemId: l.AId})
 		}
 	}
 	return out

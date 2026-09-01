@@ -56,22 +56,22 @@
 
 ## 2. `observation` → `galaxy-knowledge`
 
-- [ ] 2.1 Export `galaxy.LaneIdBetween(aSysId, bSysId string) string` over
+- [x] 2.1 Export `galaxy.LaneIdBetween(aSysId, bSysId string) string` over
       the existing `laneIdFor`/`CellForSystemId` pair, purely (no read),
       so a gate-attachment write can derive its lane id without a lookup.
       (no dedicated scenario — design.md Decision 3, supports task 2.4)
-- [ ] 2.2 Scaffold `backend/charts` (the standard six-file domain shape) and
+- [x] 2.2 Scaffold `backend/charts` (the standard six-file domain shape) and
       port the monotonic knowledge ladder: `charts.Tier`,
       `charts.TierExplored`, never-downgrade-on-write semantics.
       (galaxy-knowledge: *Monotonic System-Knowledge Ladder* — A system with
       no stored knowledge is star-visible; A lower-tier write never
       downgrades a higher stored tier; A higher-tier write upgrades the
       stored tier)
-- [ ] 2.3 Port the charted-lane set projection into `charts`: presence of a
+- [x] 2.3 Port the charted-lane set projection into `charts`: presence of a
       charted-lane record IS "charted," no tier-derived incidence.
       (galaxy-knowledge: *Charted-Lane Set Projection* — An explored system
       with no charted lane grants none)
-- [ ] 2.4 Port the travel-arrival and spawn-arrival knowledge writers into
+- [x] 2.4 Port the travel-arrival and spawn-arrival knowledge writers into
       `charts.ArrivalWrites`, idempotent on repeat for the spawn writer; add
       the new gate-attachment writer (`via: gate`, using task 2.1's
       `LaneIdBetween`, computed without reading the destination system).
@@ -81,12 +81,12 @@
       the spawn arrival write is a no-op; *Gate-Attachment Knowledge Write*
       — Docking at a gate charts its lane; Attaching to a non-gate body
       charts nothing)
-- [ ] 2.5 Rename the stored collections with no data carried:
+- [x] 2.5 Rename the stored collections with no data carried:
       `corporations/{cid}/observations/*` → `.../charts/*`,
       `corporations/{cid}/lanes/*` → `.../chartedLanes/*`. Land this rename
       as its own commit, before any behavioural work, per design.md's
       Migration Plan.
-- [ ] 2.6 Rewire the eleven production consumers of `observation.Tier` —
+- [x] 2.6 Rewire the eleven production consumers of `observation.Tier` —
       `router.go`, `galaxy/handler.go`, `galaxy/lane_source.go`,
       `system/handler.go`, `system/gates.go`, `stations/service.go`,
       `market/params.go`, `market/service.go`, `corporations/service.go`,
@@ -96,13 +96,13 @@
       with a default tier when fog is not wired; A corp's fog decorates
       system tiers; Lanes are filtered to the corp's charted set; An
       authenticated corpless requester receives the unfogged galaxy)
-- [ ] 2.7 When porting `NewServiceWith`, collapse its three unused `any`
+- [x] 2.7 When porting `NewServiceWith`, collapse its three unused `any`
       parameters (`observation/service.go:50`'s `_, _, _ any`) entirely
       rather than carrying the placeholder forward into `charts`.
-- [ ] 2.8 Delete `backend/observation` (package, `FeatureObservation` and its
+- [x] 2.8 Delete `backend/observation` (package, `FeatureObservation` and its
       DAO paths, tests). The `observation-fog-and-scan` OpenSpec capability
       is retired separately, by hand, post-archive — see task 7.6.
-- [ ] 2.9 Add an import-graph test asserting `disclosure` never imports
+- [x] 2.9 Add an import-graph test asserting `disclosure` never imports
       `charts`: `disclosure/purity_test.go`'s existing allow-list already
       fails the build the instant `disclosure` imports anything outside
       `errors`, `hexaverse/common`, `hexaverse/space`, so this task adds an
@@ -111,7 +111,7 @@
       reviewer of this capability's tests will find it.
       (galaxy-knowledge: *A Knowledge Write Never Decides Live Disclosure* —
       Explored knowledge does not disclose a foreign fleet)
-- [ ] 2.10 Wire spawn site selection's claimed-space set to the union of
+- [x] 2.10 Wire spawn site selection's claimed-space set to the union of
       every OTHER living corporation's `explored`-tier systems from
       `charts` (`claimedSpace`'s existing `exceptCorpID` parameter already
       excludes the corporation currently being sited, live today at
@@ -123,7 +123,7 @@
       against every other living corporation)
       (corporation-spawn: *Home-Only Initial Fog, No Lanes Charted* — Spawn
       charts no lanes)
-- [ ] 2.11 Add `charts` and `chartedLanes` to `CleanupFirestoreTestData()`.
+- [x] 2.11 Add `charts` and `chartedLanes` to `CleanupFirestoreTestData()`.
 
 ## 3. The Sighting Store
 

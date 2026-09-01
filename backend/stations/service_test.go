@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
+	"hexaverse/charts"
 	"hexaverse/common"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 
 	"cloud.google.com/go/firestore"
 )
@@ -27,11 +27,11 @@ func (f *fakeGraph) LiveGalaxyMeta(context.Context) (*galaxy.Galaxy, error) {
 
 // fakeTiers answers the graph-tier fog read the visibility gate keys on.
 type fakeTiers struct {
-	byCorp map[string]map[string]observation.Tier
+	byCorp map[string]map[string]charts.Tier
 	err    error
 }
 
-func (f *fakeTiers) SystemTiers(_ context.Context, cid string) (map[string]observation.Tier, error) {
+func (f *fakeTiers) SystemTiers(_ context.Context, cid string) (map[string]charts.Tier, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -153,9 +153,9 @@ func TestEnsureStation_ConcurrentCallsConvergeOnOne(t *testing.T) {
 
 func TestGetVisible_GateHidesExistenceBelowTheTier(t *testing.T) {
 	sysID := "sys-gated"
-	tiers := &fakeTiers{byCorp: map[string]map[string]observation.Tier{
-		"corp-knows":   {sysID: observation.TierRumored},
-		"corp-glimpse": {sysID: observation.TierStarVisible},
+	tiers := &fakeTiers{byCorp: map[string]map[string]charts.Tier{
+		"corp-knows":   {sysID: charts.TierRumored},
+		"corp-glimpse": {sysID: charts.TierStarVisible},
 		"corp-blind":   {},
 	}}
 	svc, client, _ := newStationFixture(t, tiers)

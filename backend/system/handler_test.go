@@ -11,7 +11,6 @@ import (
 	"hexaverse/action"
 	"hexaverse/board"
 	"hexaverse/common"
-	"hexaverse/observation"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,11 +28,17 @@ func (f *fakeSysSvc) LaneGates(context.Context, string, int) ([]LaneGate, error)
 	return f.gates, nil
 }
 
+// fakeBoardFog satisfies system.BoardFog — an empty interface{} since
+// replace-observation-with-sightings tasks.md 1.3 deleted the interior
+// read's tier lookup call site (design.md Decision 5). Its SystemTiers
+// method is therefore dead — kept only so this fixture still reads as "a fog
+// dependency" at the call site below — and its tier value type is a plain
+// string (not charts.Tier) since nothing here ranks it.
 type fakeBoardFog struct {
-	tiers map[string]observation.Tier
+	tiers map[string]string
 }
 
-func (f fakeBoardFog) SystemTiers(context.Context, string) (map[string]observation.Tier, error) {
+func (f fakeBoardFog) SystemTiers(context.Context, string) (map[string]string, error) {
 	return f.tiers, nil
 }
 
@@ -81,7 +86,7 @@ func TestGetInterior_Scenario_NoLaneGateOmittedForLackOfCharting(t *testing.T) {
 	// map is present but empty, so chartedGates() (if it still ran) would
 	// keep neither gate.
 	NewHandlerWith(&fakeSysSvc{gen: gen, gates: gates}, sysTestClock{}).
-		WithFog(fakeBoardFog{tiers: map[string]observation.Tier{}}).
+		WithFog(fakeBoardFog{tiers: map[string]string{}}).
 		RegisterRoutes(r.Group("/"))
 
 	w := httptest.NewRecorder()

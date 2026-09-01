@@ -7,8 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"hexaverse/observation"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -124,7 +122,7 @@ func TestToDTO_ChartedLaneFilter(t *testing.T) {
 			{Id: "l-home-far", AId: "sys-2", BId: "sys-0"},
 		},
 	}
-	tiers := map[string]observation.Tier{"sys-0": observation.TierExplored}
+	tiers := map[string]string{"sys-0": "explored"}
 
 	// No fog wired → every lane ships (unit-test / logged-out baseline).
 	if got := ToDTO(gen, 0, nil, nil); len(got.Lanes) != 3 {

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
+	"hexaverse/charts"
 	"hexaverse/common"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 	"hexaverse/space"
 
 	"github.com/google/uuid"
@@ -66,7 +66,7 @@ type FleetSource interface {
 // 2026-07-14): the first home scan finds the roads — the wake-up tutorial beat.
 type FogSource interface {
 	RevealArrival(ctx context.Context, cid, destSystemID string, at common.WorldMillis) error
-	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
+	SystemTiers(ctx context.Context, cid string) (map[string]charts.Tier, error)
 }
 
 // StationSource provisions the home system's NPC trading station as a spawn
@@ -524,7 +524,7 @@ func (s *Service) claimedSpace(ctx context.Context, exceptCorpID string) (map[st
 			return nil, err
 		}
 		for sysID, tier := range tiers {
-			if tier.AtLeast(observation.TierExplored) {
+			if tier.AtLeast(charts.TierExplored) {
 				claimed[sysID] = true
 			}
 		}

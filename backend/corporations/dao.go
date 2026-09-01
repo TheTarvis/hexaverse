@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	// corporationsCollection holds the corp docs. It shares its name with the fog
-	// store's root (observations nest under corporations/{cid}/observations) —
-	// same key by design: the corp id IS the fog partition key (#0006/#0009).
+	// corporationsCollection holds the corp docs. It shares its name with the
+	// graph-knowledge store's root (charts nests under
+	// corporations/{cid}/charts) — same key by design: the corp id IS the
+	// knowledge partition key (#0006/#0009).
 	corporationsCollection = "corporations"
 	// accountPointerCollection maps an account to its ONE living corp. A
 	// create-if-absent write here is the uniqueness anchor + the O(1) lookup the

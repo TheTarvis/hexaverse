@@ -6,11 +6,11 @@ import (
 	"math"
 	"time"
 
+	"hexaverse/charts"
 	"hexaverse/common"
 	"hexaverse/corporations"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
-	"hexaverse/observation"
 	"hexaverse/stations"
 
 	"cloud.google.com/go/firestore"
@@ -51,7 +51,7 @@ type CreditSource interface {
 }
 
 type TierSource interface {
-	SystemTiers(ctx context.Context, cid string) (map[string]observation.Tier, error)
+	SystemTiers(ctx context.Context, cid string) (map[string]charts.Tier, error)
 }
 
 type Service struct {

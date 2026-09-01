@@ -40,7 +40,7 @@ import (
 	"testing"
 
 	"hexaverse/action"
-	"hexaverse/observation"
+	"hexaverse/charts"
 	"hexaverse/space"
 	"hexaverse/system"
 )
@@ -119,13 +119,14 @@ func TestJumpResolver_Scenario_ArrivalFlipsSystemParksUnattachedChartsLaneNoRumo
 	}
 
 	// Charts the crossed lane `via: traveled`, marks the destination
-	// Explored, and mints no onward rumor — exactly observation's own
+	// Explored, and mints no onward rumor — exactly charts' own
 	// ArrivalWrites primitive (the same one travel-arrival already uses;
-	// design.md Decision 11 keeps it). Built through the REAL function so
-	// this assertion can't silently drift from what ArrivalWrites emits.
-	want := (&observation.Service{}).ArrivalWrites("corp-1", destId, []string{"lane-1"}, 100_000)
+	// replace-observation-with-sightings design.md Decision 1 rehomes it
+	// from observation unchanged). Built through the REAL function so this
+	// assertion can't silently drift from what ArrivalWrites emits.
+	want := (&charts.Service{}).ArrivalWrites("corp-1", destId, []string{"lane-1"}, 100_000)
 	if !docWritesEqual(res.Writes, want) {
-		t.Errorf("Writes = %+v, want exactly observation.ArrivalWrites' output %+v — charts the crossed lane "+
+		t.Errorf("Writes = %+v, want exactly charts.ArrivalWrites' output %+v — charts the crossed lane "+
 			"`via: traveled`, marks the destination explored, and mints no onward rumor", res.Writes, want)
 	}
 }
