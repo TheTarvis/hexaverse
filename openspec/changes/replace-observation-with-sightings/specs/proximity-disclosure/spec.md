@@ -27,15 +27,23 @@ and the combat they belong to, are deferred to a later change.
   time
 - **THEN** the two disclosures are field-for-field identical
 
-#### Scenario: A body-attached mine is masked like any other attached object
-- **GIVEN** a mine entity attached to a body, well inside the observer's
-  passive proximity range
+#### Scenario: The masking predicate applies to any attached id, not just ships
+- **GIVEN** a non-ship attachment fixture (any entity id the masking
+  predicate is given, standing in for a future attachable entity such as a
+  mine) attached to a body, well inside the observer's passive proximity
+  range
 - **WHEN** live disclosure is evaluated
-- **THEN** the mine is not disclosed
+- **THEN** the attached fixture is not disclosed
 - **AND** the host body is disclosed as it normally would be, exactly as
   it would be with a ship masked at it instead
 
 ### Requirement: Lighting a Drive Breaks Masking
+**Ownership note**: the sweep disjunct in this requirement is the
+canonical, authoritative statement of "an active sweep breaks masking."
+`focused-scan`'s own "A Sweep Unmasks Its Scanner" restates it at the verb
+level for that capability's reader; this requirement governs if the two
+ever diverge.
+
 The system SHALL treat a ship as unmasked from the moment its burn's
 emission interval opens, so that departing a host is a detectable event,
 and SHALL likewise treat a ship as unmasked for the full interval any
@@ -98,9 +106,44 @@ the resolution time.
   scanning fleet than the named focused-scan range
 - **THEN** the command is rejected
 
+### Requirement: A Scan Resolves Composition That a Live Contact Withholds
+The system SHALL include, in a scan-minted sighting record, the sighted
+fleet's hull count and the hull types present, stamped `asOf` the sighting
+like every other field. A live contact — passive or plume — SHALL NOT carry
+hull count, hull types, or any field from which either could be derived; it
+reports position, velocity, whether the fleet is emitting a drive plume, and
+whether it is running a focused scan (`Contact.Scanning`, see "A Sweep's
+Emission Radius Scales With Its Range"), and nothing further. Neither a live
+contact nor a sighting record SHALL name the owning corporation. The
+scanning flag is a fourth reported field, not a fifth channel of
+composition: it says a sweep is running, never who is running it or with
+what. `disclosure/contact_test.go`'s exhaustive field-set assertion is
+widened to four fields in this change, deliberately.
+
+#### Scenario: A live contact withholds composition
+- **WHEN** a fleet is disclosed by passive proximity or by its plume
+- **THEN** the contact carries position, velocity, emitting state, and
+  scanning state
+- **AND** it carries no hull count, hull type, or owner field
+
+#### Scenario: A scan resolves hull count and types
+- **WHEN** a scan resolves against a fleet of known composition
+- **THEN** the minted sighting record reports its hull count and the hull
+  types present
+
+#### Scenario: Composition is frozen at the sighting's stamp
+- **GIVEN** a sighting record minted when a fleet had a given composition
+- **WHEN** that fleet later loses or gains hulls
+- **THEN** the record still reports the composition it was minted with
+
 ## ADDED Requirements
 
 ### Requirement: An Active Sweep Emits For Its Duration
+**Ownership note**: this requirement is the canonical, authoritative
+statement of the sweeping-flag interval test. `focused-scan`'s own "A Sweep
+Emits For Its Duration" restates it at the verb level for that
+capability's reader; this requirement governs if the two ever diverge.
+
 The system SHALL decide whether a ship is scanning at a requested world
 time by the exact integer interval test over its stored sweep window —
 `departTime <= T < arriveTime` — consulting no distance, exactly as
@@ -136,6 +179,14 @@ emission. A ship's detection radius to a given observer SHALL be the
 observer's passive range plus the greater of its plume radius and its
 sweep-emission radius, with the emission and scanning flags each reported
 independently — a ship both burning and sweeping SHALL report both flags.
+A ship SHALL be disclosed to an observer on the strength of its sweep
+alone, with no plume and no burn, when the squared distance between them is
+within the squared sum of the observer's passive range and the ship's
+sweep-emission radius — evaluated under the same squared, inclusive,
+canonical-path, and star-occluded rules that already govern the plume
+channel's own disclosure consequence, so the emission radius this
+requirement defines is not merely computed but actually consumed by a live
+disclosure decision.
 
 `disclosure/contact_test.go` asserts `Contact`'s field set by reflection;
 adding `Scanning` to that field set is a deliberate edit to that test,
@@ -163,6 +214,15 @@ made in this change, and not a silent drift the test happened to permit.
 - **GIVEN** a ship with both a running burn and a running sweep
 - **WHEN** its `Contact` is projected
 - **THEN** both `Contact.Emitting` and `Contact.Scanning` are true
+
+#### Scenario: A parked, sweeping ship is disclosed by its sweep emission alone
+- **GIVEN** a parked, non-burning foreign ship running a focused scan,
+  positioned outside the observer's passive range but within the
+  observer's passive range plus the ship's sweep-emission radius, with a
+  clear sightline
+- **WHEN** disclosure is evaluated for that observer
+- **THEN** the ship is disclosed
+- **AND** its contact reports `Scanning` true and `Emitting` false
 
 #### Scenario: Detection radius combines passive range with the louder of plume or sweep emission
 - **GIVEN** an observer with a passive range, and a target ship whose plume

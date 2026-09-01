@@ -55,8 +55,11 @@ this link needs them again.
   body, no dwell"); delete `chartedGates`, `BoardFog`'s tier lookup, and
   `system-interior`'s *Charted Lane Gate Filtering* requirement so every
   gate body ships unfiltered; implement a production `fleet.GraphSource`
-  and wire `WithGraph` (and drop `WithTierSource`/`TierSource` entirely,
-  since Decision 2 removes what it gated) in `router.go`; call
+  and construct `fleet.Service` with it as a **required positional
+  constructor parameter** (there is no `WithGraph` to wire — Decision 22
+  deletes that optional-wiring shape outright, along with
+  `WithTierSource`/`TierSource`, since Decision 2 removes what they gated),
+  so the dependency cannot be silently omitted in `router.go` again; call
   `galaxy.EnsureLaneHorizon` at jump arrival, ordered strictly before the
   destination's first body-table build, so an arriving fleet is never
   stranded with a truncated gate set.
@@ -81,7 +84,12 @@ this link needs them again.
   destination — ships in full to every authenticated requester,
   unconditionally. This replaces `system-interior`'s stated interim with a
   principled rule: the intel economy this change builds is about ships,
-  never body composition.
+  never body composition. Two unmodified specs otherwise contradict that
+  rule and take deltas of their own: `trading-station`'s tier gate on "the
+  board read" narrows to the **direct** station-read endpoint only (the
+  system-interior/board read already ships a station as an ordinary body),
+  and `system-body-table`'s "only through a disclosure filter" exception
+  narrows to ship presence alone — bodies are served unfiltered.
 - **Wire `disclosure` into the interior read**: a top-level `contacts`
   array, deduplicated by target across the requester's own fleets in the
   system, alongside the pre-existing `features`/`laneGates`. **Additive on
@@ -96,13 +104,21 @@ this link needs them again.
   the interior read's contact projection.
 - **Add the focused-scan verb**: `POST /v1/fleets/:fleetId/scan {hostId}`
   commits on the action spine's sensor channel (`activeScanId`,
-  `action.KindMutating`), priced as a round trip scaling with commit-time
-  range (frozen at commit, immune to the scanner's later motion), rejected
-  at commit against live range/occlusion, unmasking the scanning fleet for
-  the sweep's duration exactly as a drive plume does, and cancellable
-  (releasing the slot, ending the sweep flag immediately, minting nothing).
-  The sweep also emits at a range-scaled floored radius on its own
-  `Contact.Scanning` flag, distinct from `Contact.Emitting`.
+  `action.KindMutating`), owned exclusively by the naming fleet's own
+  corporation (see the authorization defects below), priced as a round trip
+  scaling with commit-time range (frozen at commit, immune to the
+  scanner's later motion), rejected at commit against live range/occlusion,
+  unmasking the scanning fleet for the sweep's duration exactly as a drive
+  plume does, and cancellable through `POST /v1/actions/:actionId/cancel`
+  (releasing the slot, ending the sweep flag immediately, minting nothing —
+  the fleet-scoped `POST /v1/fleets/:fleetId/cancel` never touches a
+  running sweep). `hostId` names either a body, or a fleet owned by the
+  scanning fleet's own corporation — never a foreign fleet, which would
+  itself disclose that fleet's presence and range, and which no client
+  surface ever hands out an id for anyway; a foreign-fleet `hostId` is
+  rejected identically to an unresolvable one. The sweep also emits at a
+  range-scaled floored radius on its own `Contact.Scanning` flag, distinct
+  from `Contact.Emitting`.
 - **Resolve a sweep into sightings via `ResolveResult.Writes`, minted from
   inside the resolve transaction** (not a post-resolve service-layer write):
   a sighting per ship masked at the host (including down an attachment
@@ -119,16 +135,29 @@ this link needs them again.
   the existing purity allow-list test, making "no stored record decides
   live disclosure" unbreakable rather than a review obligation. A sighting
   is immutable, never expires, and stores its target id without ever
-  serializing it to the client.
+  serializing it to the client. `fleet` also imports `sightings` — it is
+  where the focused-scan resolver that mints records lives, alongside
+  `BurnResolver` — while `system`, which assembles the interior's
+  `contacts` response, is compile-time forbidden from importing it, so the
+  narrow rule is "no package that assembles a live-disclosure response
+  imports the pile," not "no package downstream of a scan does."
 - **Widen masking** from "a ship docked to a host" to any attached object,
   so a body-attached mine is masked by the same rule the instant a mine
   entity exists, with no second masking implementation needed for it.
-- **Close two authorization defects together, not separately**: the five
-  fleet movement-command endpoints and the four action-dispatch endpoints
-  (`/actions?actor=`, `/actions/:id`, `/acknowledge`, `/cancel`) both gain
-  an owning-corporation check, responding `404` (not `403`) on mismatch or
-  no corporation. Closing only the fleet side would leave a bypass to the
-  same movement-channel slot through `/actions/:id/cancel`.
+- **Close two authorization defects together, not separately**: the six
+  fleet command endpoints — the five movement-command endpoints plus the
+  focused-scan endpoint this change introduces — and the four
+  action-dispatch endpoints (`/actions?actor=`, `/actions/:id`,
+  `/acknowledge`, `/cancel`) both gain an owning-corporation check,
+  responding `404` (not `403`) on mismatch or no corporation. Closing only
+  the fleet side would leave a bypass to the same movement-channel slot
+  through `/actions/:id/cancel`; omitting `scan` from the fleet side would
+  let a foreign corporation claim a victim fleet's sensor-channel slot and
+  strip its masking on demand. `request-authorization`'s own "Corporation
+  Resolution Seam" carried a scenario asserting the pre-closure behavior as
+  current fact; it takes a delta here too, retiring that scenario rather
+  than shipping a stale acceptance test, and `mine-extraction`'s citation
+  of the closed `fleet-movement` baseline is corrected in the same pass.
 - **Make the jump-wiring defect impossible to repeat**: `GraphSource`
   becomes a required constructor parameter (no more optional `WithGraph`
   that can be silently omitted), and `fleet/service.go`'s `NewService()`
@@ -155,19 +184,27 @@ this link needs them again.
 
 - Affected specs: `galaxy-knowledge` (new), `sighting-records` (new),
   `focused-scan` (new), `proximity-disclosure`, `fleet-movement`,
-  `observation-fog-and-scan` (deleted), `system-interior`,
-  `galaxy-generation`, `action-dispatch`, `corporation-spawn`.
+  `fleet-roster`, `trading-station`, `observation-fog-and-scan` (deleted),
+  `system-interior`, `system-body-table`, `galaxy-generation`,
+  `action-dispatch`, `corporation-spawn`, `request-authorization`,
+  `mine-extraction`.
 - Affected code: `backend/observation` (deleted), new `backend/charts`,
   new `backend/sightings`, `backend/disclosure` (widened masking, `Scanning`
   contact flag, `Sighting.SystemId`), `backend/fleet` (jump precondition,
   `GraphSource`/`ScanWindow`, ownership checks, constructor fix),
   `backend/system` (gate filtering removed, `contacts` array, bodies-public
   rule), `backend/galaxy` (`EnsureLaneHorizon` wiring, exported lane-id
-  helper), `backend/corporations`, `backend/stations`, `backend/market`
-  (rename `observation.Tier` → `charts.Tier`), `backend/action` (ownership
-  check, `ActorOwner`), `router.go`, `cmd/seed`, `common/tuning.go`,
-  `common/firestore_test_helpers.go`, frontend reads of the interior and
-  fleet endpoints, `.claude/scripts/check-mirror-map.sh`,
+  helper), `backend/corporations`, `backend/stations` (drop the
+  `observation.InteriorSource` exclusion, which no longer has anything to
+  exclude from), `backend/market` (rename `observation.Tier` → `charts.Tier`),
+  `backend/action` (ownership check, `ActorOwner`), `router.go`, `cmd/seed`,
+  `common/tuning.go`, `common/firestore_test_helpers.go`, and **the
+  frontend's roster jump-command gate** (`fleet-roster`'s command-surface
+  logic drops its client-side charted-lane check, since jump-eligibility is
+  now attachment alone and the client's charted set arrives on a
+  differently cadenced read than attachment does — the one concrete
+  frontend change this link makes; contact/space rendering itself stays
+  link 8's), `.claude/scripts/check-mirror-map.sh`,
   `.claude/skills/code-quality-checks/check.py`, `docs/plans/continous_space/chain.md`.
 - `observation-fog-and-scan` is deleted with **no `specs/observation-fog-
   and-scan/` delta in this change** — see "Retiring
@@ -229,3 +266,33 @@ archiver then treats it as a *new* spec and applies the same
 directory entirely and delete the spec folder by hand after archiving (task
 7.6) — the same path `polar-lattice-math` took in commit `4b7f0a2`. This is
 a repo-wide OpenSpec mechanic, not specific to this change.
+
+## Known Carried Debris
+
+Two more capabilities carry prose that goes stale the instant this change
+archives, beyond the two citations corrected above
+(`fleet-movement`'s and `request-authorization`'s). Neither is fixed in
+this change — fixing either means opening a brand-new delta directory for a
+capability this change otherwise leaves untouched, for a prose-only
+citation, and one of the two capabilities is itself scheduled for deletion
+before that fix would matter:
+
+- **`market-price-board`**'s requirement "Live Quotes, Never Frozen At An
+  Observation's asOf" (and its purpose-section prose) frames its live-vs-
+  frozen distinction in terms of "observation's `asOf`" — a concept this
+  change retires along with the `observation-fog-and-scan` capability.
+  `market-price-board` carries no delta in this change and is left with a
+  stale conceptual reference; the requirement's own behavior (quotes are
+  live, never frozen) is unaffected.
+- **`board-view`**'s "System Board Route and Data Fan-In" cites
+  `system-interior`'s unfogged-interim framing ("design.md Decision 11:
+  every feature is served live... until link 5 replaces this with a
+  `disclosure` projection") — the interim this very change replaces.
+  `board-view` is not touched here because it dies outright at links 8–9
+  of `docs/plans/continous_space/chain.md` (the lattice-board deletion),
+  so a delta correcting this citation now would itself be dead weight
+  within two links.
+
+Both are prose-only staleness, not behavioral drift, and both are left for
+whichever future change next touches their capability for a substantive
+reason.

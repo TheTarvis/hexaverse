@@ -115,8 +115,10 @@ different question and SHALL NOT be wired into the answer to that one.
 
 ### Requirement: The Corporation's Visited-System Set Is the Spawn-Distance Input
 The system SHALL expose, for spawn site selection, the union of every
-living corporation's `explored`-tier systems, and spawn siting SHALL
-measure its minimum-distance rule against that union and no other set.
+OTHER living corporation's `explored`-tier systems (excluding the
+corporation currently being sited, so a re-pick never fences itself out of
+its own already-explored space), and spawn siting SHALL measure its
+minimum-distance rule against that union.
 
 #### Scenario: A corporation's explored systems count toward claimed space
 - **GIVEN** a living corporation with one or more systems at tier
@@ -126,8 +128,11 @@ measure its minimum-distance rule against that union and no other set.
 - **THEN** every system at `explored` or above for the existing corporation
   is included in that set
 
-#### Scenario: A corporation excludes its own systems when re-siting itself
-- **GIVEN** a corporation undergoing a heal-time spawn re-pick
-- **WHEN** the claimed-space set is computed for that same corporation
-- **THEN** that corporation's own explored systems are excluded from the
-  set its own re-pick is measured against
+#### Scenario: A re-pick under reservation contention measures against every other living corporation
+- **GIVEN** a fresh spawn whose initially picked site is reserved by a
+  different account before this spawn's own reservation commits
+- **WHEN** site selection re-picks a new candidate site, bounded by the
+  configured re-pick budget
+- **THEN** the re-pick's claimed-space set is the union of every other
+  living corporation's `explored`-tier systems, unaffected by the losing
+  candidate site itself having been claimed

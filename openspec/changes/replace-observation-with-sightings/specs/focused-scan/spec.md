@@ -16,7 +16,46 @@ resolution around them.
 The system SHALL commit a focused scan as an action of type `scan` claiming
 the actor's sensor-channel slot, distinct from the movement-channel slot a
 burn or lane transit claims, so that a fleet's sensor and movement commands
-are independent single-slot claims rather than one shared channel.
+are independent single-slot claims rather than one shared channel. The
+scan's `hostId` SHALL name either a body, or a fleet owned by the scanning
+fleet's own corporation, present in the scanning fleet's own system at
+commit time. A `hostId` naming a fleet owned by a **different** corporation
+SHALL be rejected identically to a `hostId` that does not resolve at all —
+same error, same response shape, no field distinguishing the two — because
+a commit that succeeded against a foreign fleet id would itself disclose
+that fleet's presence, range, and occlusion state, which
+`proximity-disclosure`'s absence rule forbids for an undisclosed entity,
+and because no surface in this model ever hands a client a foreign fleet's
+id to name in the first place. A scan commit SHALL be rejected — creating
+no action and claiming no sensor-channel slot — when the named `hostId`
+does not resolve this way, or when the scanning fleet is itself in lane
+transit at commit time.
+
+#### Scenario: An unresolvable host is rejected
+- **WHEN** a focused scan is commanded with a `hostId` that does not resolve
+  to any body or own fleet in the scanning fleet's system
+- **THEN** the commit is rejected with a named error, no scan action is
+  created, and no sensor-channel slot is claimed
+
+#### Scenario: A host outside the scanning fleet's system is rejected
+- **GIVEN** a `hostId` naming a body or own fleet present in a different
+  system than the scanning fleet's own
+- **WHEN** a focused scan is commanded against it
+- **THEN** the commit is rejected the same way, with no action created and
+  no sensor-channel slot claimed
+
+#### Scenario: A foreign fleet's id is rejected identically to an unresolvable one
+- **GIVEN** a `hostId` naming a fleet owned by a different corporation than
+  the scanning fleet's own
+- **WHEN** a focused scan is commanded against it
+- **THEN** the commit is rejected with the same named error and the same
+  response shape as an unresolvable `hostId`
+
+#### Scenario: A scanner in lane transit at commit is rejected
+- **GIVEN** a fleet in lane transit
+- **WHEN** it attempts to commit a focused scan
+- **THEN** the commit is rejected the same way, with no action created and
+  no sensor-channel slot claimed
 
 #### Scenario: A burning fleet can commit a sweep
 - **GIVEN** a fleet with a running action on its movement channel
@@ -41,7 +80,21 @@ distance from the scanning fleet to the target host at commit time, using a
 named base duration and a named signal speed, quantized upward to a whole
 unit of world time, and SHALL freeze that duration — and therefore the
 scan's ETA — at commit; the scanning fleet's motion after commit SHALL NOT
-change an already-committed sweep's ETA.
+change an already-committed sweep's ETA. The committed sweep window SHALL
+span the entire sweep: its depart time SHALL be the commit world time and
+its arrive time SHALL be the committed ETA, so the emission interval, the
+masking break, and the action's own lifetime are the same interval, and the
+pulse-reach instant is their exact midpoint. No other depart time SHALL be
+stored — in particular, a depart time set to anything short of the full
+sweep's duration (for example, one millisecond before arrival) would leave
+the scanner detectable for only a sliver of the sweep it is actually
+running, silently reopening free gate interrogation.
+
+#### Scenario: The committed window spans the entire sweep
+- **GIVEN** a focused scan committed at world time `T0` with a duration `D`
+- **WHEN** the fleet's stored sweep window is read
+- **THEN** the window's depart time is `T0` and its arrive time is `T0 + D`
+- **AND** that arrive time is exactly the action's own committed ETA
 
 #### Scenario: A farther host costs a longer sweep
 - **GIVEN** two hosts at different distances from the same scanning fleet
@@ -89,6 +142,13 @@ and the occlusion boundary is strict.
   disclosure
 
 ### Requirement: A Sweep Emits For Its Duration
+**Ownership note**: the sweeping-flag interval test stated below is
+`proximity-disclosure`'s own predicate ("An Active Sweep Emits For Its
+Duration"), which is the canonical, authoritative statement of this rule.
+It is restated here at the verb level because a reader of this capability
+needs to know a sweep is detectable for its whole run; if the two ever
+diverge, `proximity-disclosure`'s wording governs.
+
 The system SHALL decide whether a fleet is sweeping at a requested world
 time by the exact integer interval test over its stored sweep window —
 `departTime <= T < arriveTime` — consulting no distance, and SHALL report
@@ -113,6 +173,13 @@ and a fleet doing both reports both independently.
 - **THEN** it is reported as sweeping and not reported as emitting a plume
 
 ### Requirement: A Sweep Unmasks Its Scanner
+**Ownership note**: this masking-break rule is `proximity-disclosure`'s own
+predicate ("Lighting a Drive Breaks Masking", the sweep disjunct added
+alongside emission), which is the canonical, authoritative statement of it.
+It is restated here at the verb level for the same reason as the sibling
+note above; if the two ever diverge, `proximity-disclosure`'s wording
+governs.
+
 The system SHALL treat a fleet as unmasked for the full interval its
 focused scan is running, exactly as it is unmasked while emitting a drive
 plume: masking and an active sweep SHALL NOT hold simultaneously for the
@@ -143,7 +210,17 @@ pulse-reach instant, and SHALL fizzle — minting nothing at all, and
 recording a reason code distinguishing "out of range at pulse-reach" from
 "occluded at pulse-reach" — when that re-check fails. The system SHALL
 likewise fizzle, minting nothing, when the scanning fleet has left the
-target host's system or is in lane transit by pulse-reach.
+target host's system or is in lane transit by pulse-reach, or when the
+target host itself cannot be resolved in the scanning fleet's system at
+pulse-reach — for a body host, because a degraded body-table build omitted
+it (`system-body-table`'s "The Table Degrades to Fewer Bodies Rather Than
+a Failed Build"); for an own-fleet host, because that fleet has since left
+the system or entered lane transit. A fizzle for any of these reasons
+SHALL still release the sensor-channel
+slot at resolve, exactly as a successful mint does: an unresolvable host
+SHALL NOT leave the resolve transaction returning an error on every
+subsequent read, which would strand the slot claimed and the fleet
+unable to commit a new scan.
 
 #### Scenario: A resolving sweep mints sightings for the chain masked at its host
 - **GIVEN** a ship docked to a carrier, and that carrier docked to the
@@ -183,14 +260,35 @@ target host's system or is in lane transit by pulse-reach.
 - **WHEN** the scan resolves
 - **THEN** no sighting record is minted
 
+#### Scenario: An unresolvable body host mints nothing and releases the slot
+- **GIVEN** a running focused scan whose target host is a body that cannot
+  be resolved in the scanning fleet's system at pulse-reach — for example,
+  a lane-gate body a degraded body-table build omits
+  (`system-body-table`'s "The Table Degrades to Fewer Bodies Rather Than a
+  Failed Build")
+- **WHEN** the scan resolves
+- **THEN** no sighting record is minted
+- **AND** the resolved action carries a reason code identifying the host as
+  unresolved
+- **AND** the fleet's sensor-channel slot is released, exactly as it would
+  be on a successful resolution
+
 ### Requirement: Cancelling a Sweep Releases the Slot, Mints Nothing, and Ends Emission
 The system SHALL, on cancel of a running focused scan, release its claimed
 sensor-channel slot, apply no resolver effect (no sighting record is
 minted for a cancelled sweep), and end the fleet's sweeping flag at the
 instant of cancellation rather than at the scan's original arrive time.
+Cancellation of a running sweep is through `POST /v1/actions/:actionId/
+cancel` naming the scan action's own id — the action-dispatch spine's
+generic cancel surface, not a fleet-scoped one. `POST
+/v1/fleets/:fleetId/cancel` releases only the fleet's movement-channel
+slot (its running burn or lane-transit order, if any) and SHALL NOT affect
+a running sweep on the sensor channel; the two channels are cancelled
+independently, exactly as they are claimed independently.
 
 #### Scenario: Cancelling a running sweep releases the sensor slot
-- **WHEN** a running focused scan is cancelled
+- **WHEN** a running focused scan is cancelled via
+  `POST /v1/actions/:actionId/cancel`
 - **THEN** the fleet's sensor-channel slot is released
 - **AND** the fleet may commit a new focused scan immediately after
 
@@ -204,3 +302,11 @@ instant of cancellation rather than at the scan's original arrive time.
 - **WHEN** that scan is cancelled
 - **THEN** the fleet is no longer reported as sweeping from that instant
   on, rather than continuing until the scan's original arrive time
+
+#### Scenario: The fleet-level cancel endpoint never touches a running sweep
+- **GIVEN** a fleet with a running movement-channel order and a running
+  focused scan
+- **WHEN** `POST /v1/fleets/:fleetId/cancel` is submitted
+- **THEN** the movement-channel order is cancelled
+- **AND** the running focused scan continues unaffected, releasable only
+  through its own `POST /v1/actions/:actionId/cancel`

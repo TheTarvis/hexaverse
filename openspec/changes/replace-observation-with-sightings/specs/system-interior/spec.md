@@ -125,7 +125,12 @@ SHALL serve the result as a top-level `contacts` array alongside `features`
 and `laneGates` — never folded into either. A contact carries no fleet id
 (`proximity-disclosure`'s own `Contact` shape); a corporation with no
 fleet present in the system, including an authenticated but corpless
-requester, SHALL receive an empty `contacts` array.
+requester, SHALL receive an empty `contacts` array. Each contact's wire
+representation SHALL carry the `scanning` field alongside position,
+velocity, and `emitting`, exactly as `proximity-disclosure`'s `Contact`
+shape defines it (`Contact.Scanning`, see "A Sweep's Emission Radius Scales
+With Its Range") — the serialization step from `Contact` to the wire SHALL
+NOT drop it.
 
 #### Scenario: Contacts reflect the requester's own union of observers
 - **GIVEN** a requester corporation with one or more of its own fleets
@@ -151,3 +156,10 @@ requester, SHALL receive an empty `contacts` array.
   detect a particular foreign ship present there
 - **WHEN** the requester reads that system's interior
 - **THEN** that foreign ship does not appear in `contacts`
+
+#### Scenario: A contact's scanning state is served on the wire
+- **GIVEN** a foreign ship disclosed as a contact, running a focused scan at
+  the moment the interior is read
+- **WHEN** the requester reads that system's interior
+- **THEN** the corresponding entry in the response's `contacts` array
+  carries `scanning: true`

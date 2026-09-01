@@ -149,21 +149,29 @@ position or an idle park.
 - **AND** the fleet is never treated as if it were parked at an implied
   origin
 
-### Requirement: Movement Command Endpoints Are Restricted to the Owning Corporation
+### Requirement: Fleet Command Endpoints Are Restricted to the Owning Corporation
 The system SHALL, on `POST /v1/fleets/:fleetId/orders`,
 `POST /v1/fleets/:fleetId/cancel`, `POST /v1/fleets/:fleetId/cut-drive`,
-`POST /v1/fleets/:fleetId/stop`, and `POST /v1/fleets/:fleetId/jump`,
-compare `common.ActorCorp(c)` against the named fleet's `corporationId`
-before acting, and SHALL respond `404 Not Found` — not `403` — when they
-do not match or when the requester has no corporation, matching the read
-endpoints' own absence semantics: a foreign fleet is indistinguishable
-from a nonexistent one, and a `403` would itself confirm the id exists
-(design.md Decision 21). This closes the authorization defect the
-requirement of the same predecessor name recorded as open. The sibling
-defect on the action-dispatch endpoints (`/actions?actor=`,
-`/actions/:id`, `/acknowledge`, `/cancel`) closes in the same change, in
-`action-dispatch`'s own delta — closing only this side would leave a
-bypass reaching the same movement slot through `/actions/:id/cancel`.
+`POST /v1/fleets/:fleetId/stop`, `POST /v1/fleets/:fleetId/jump`, and
+`POST /v1/fleets/:fleetId/scan`, compare `common.ActorCorp(c)` against the
+named fleet's `corporationId` before acting, and SHALL respond `404 Not
+Found` — not `403` — when they do not match or when the requester has no
+corporation, matching the read endpoints' own absence semantics: a foreign
+fleet is indistinguishable from a nonexistent one, and a `403` would
+itself confirm the id exists (design.md Decision 21). This closes the
+authorization defect `Movement Command Endpoints Enforce No Fleet
+Ownership` recorded as open, widened to cover the focused-scan endpoint
+this change introduces: an unchecked `scan` would let a foreign
+corporation claim a victim fleet's sensor-channel slot and strip its
+masking on demand (`focused-scan`'s "A Sweep Unmasks Its Scanner") for a
+duration the attacker picks by naming a distant host, which is a sharper
+hole than the five-endpoint movement gap this requirement's predecessor
+closed, and would leave undefined whose corporation the resulting
+sightings mint under. The sibling defect on the action-dispatch endpoints
+(`/actions?actor=`, `/actions/:id`, `/acknowledge`, `/cancel`) closes in
+the same change, in `action-dispatch`'s own delta — closing only this side
+would leave a bypass reaching the same movement or sensor slot through
+`/actions/:id/cancel`.
 
 #### Scenario: A foreign corp cannot order another corp's fleet
 - **WHEN** an authenticated account whose corporation does not own fleet
@@ -192,12 +200,60 @@ bypass reaching the same movement slot through `/actions/:id/cancel`.
   F submits `POST /v1/fleets/F/jump`
 - **THEN** the response is `404 Not Found` and no jump is committed
 
+#### Scenario: A foreign corp cannot commit a sweep with another corp's fleet
+- **WHEN** an authenticated account whose corporation does not own fleet F
+  submits `POST /v1/fleets/F/scan` naming any host
+- **THEN** the response is `404 Not Found`, no scan action is created, F's
+  sensor-channel slot is unclaimed, and F's masked state is unchanged
+
 #### Scenario: A corpless requester is rejected the same way
 - **WHEN** an authenticated but corpless account submits any movement
   command endpoint against an existing fleet
 - **THEN** the response is `404 Not Found`
 
+#### Scenario: The owning corporation's jump order succeeds at the HTTP surface
+- **GIVEN** a fleet attached to a lane's gate body, owned by the requesting
+  corporation
+- **WHEN** that corporation submits `POST /v1/fleets/:fleetId/jump` naming
+  that lane
+- **THEN** the response reports success carrying the committed jump's ETA
+- **AND** the response is never a `5xx` caused by an unconfigured or
+  missing server-side dependency
+
 ## MODIFIED Requirements
+
+### Requirement: Fleet Read Surfaces Roster, Cargo, and Derived Capacity
+
+The system SHALL include the fleet's ship roster, its cargo pool, its
+derived total cargo capacity, its derived free hold, and its derived
+mining rate in the response of the fleet read endpoints (`GET
+/v1/fleets/:fleetId`, `GET /v1/fleets?systemId=`, `GET
+/v1/fleets?mine=true`) for an owning corporation reading its own fleet —
+these are not internal-only values computed for the mining verb's use, but
+part of the fleet's observable state. A foreign fleet carries no such
+fields in any response, because "Fleet Read Endpoints Serve Own Fleets In
+Full and Foreign Fleets As Contacts" omits a foreign fleet from a list read
+and 404s it on a direct fetch — there is no partial-visibility snapshot of
+a foreign fleet in this change for these fields, or any other, to be
+redacted from.
+
+#### Scenario: The fleet read response includes roster, cargo, and derived capacity
+
+- **WHEN** an owning corporation reads its fleet via the existing fleet
+  GET endpoint
+- **THEN** the response includes the fleet's `ships` roster, its `cargo`
+  pool by kind, its derived total cargo capacity, its derived free hold
+  (capacity minus total tons held), and its derived mining rate (the
+  roster's summed extraction rate)
+
+#### Scenario: A foreign fleet's cargo and roster are not disclosed
+
+- **WHEN** a requester lists fleets in a system containing a foreign
+  fleet, or fetches that foreign fleet directly by id
+- **THEN** the foreign fleet is omitted entirely from the list response,
+  and the direct fetch is `404 Not Found` — no roster, cargo, derived
+  capacity, or derived mining rate is disclosed, because the fleet itself
+  is not disclosed
 
 ### Requirement: Jump Arrival Parks Near the Destination Gate, Unmasked
 
