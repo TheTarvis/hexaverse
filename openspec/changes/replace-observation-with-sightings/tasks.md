@@ -311,6 +311,26 @@
       always available; Cut drive is offered only while burning; Cut drive
       is withheld outside a burn; Stop in place is offered while burning or
       drifting; Stop in place is withheld while parked)
+- [x] 4.11 **Follow-on — §4's other work above is already complete and
+      green.** Close the remaining traversability gap: the jump command is
+      now offered (4.10) but cannot be clicked to effect, since no gate DTO
+      carries a lane id for `useJump({fleetId, laneId})` to send.
+      Backend: add `LaneId` to `system.LaneGate`
+      (`backend/system/gates.go`), populated via `galaxy.LaneIdBetween`
+      alongside the existing `DestSystemId`/`Cell` derivation, serialized
+      on the wire as `laneId`. Frontend: add `laneId: string` to
+      `LaneGate` (`frontend/lib/types/system-board.ts:83`) and wire the
+      roster row's `handleJump` to call `useJump({fleetId, laneId})` with
+      the attached gate's `laneId` instead of leaving the click a no-op.
+      (system-interior: *Lane-Gate Bodies Carry Their Lane Id* — A
+      materialized system's read carries each lane-gate body's lane id;
+      The served lane id is the one the jump endpoint accepts; The served
+      lane id matches the server's own derivation for the same crossing; A
+      fresh corporation with no charted lanes still receives a usable lane
+      id)
+      (board-view: *Jump Commit* — Invoking jump submits the attached
+      gate's lane; A gate whose lane the corporation has not charted still
+      commits; A failed jump commit toasts the reason)
 
 ## 5. The Focused-Scan Verb
 
@@ -673,3 +693,11 @@
       station read shows its home station; A system at exactly the
       configured minimum tier includes its station on a direct read; The
       board read serves the station regardless of tier)
+- [ ] 8.8 End-to-end frontend test covering the full wire-to-click path task
+      4.11 wires: read a materialized system's interior, take the served
+      `laneId` off an attached lane-gate body, and invoke the jump command
+      with it — asserting the jump order is actually submitted (not a
+      no-op or a client-side refusal), closing the gap a per-scenario unit
+      test on either half alone would miss.
+      (board-view: *Jump Commit* — Invoking jump submits the attached
+      gate's lane)

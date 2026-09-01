@@ -21,6 +21,16 @@ import (
 type LaneGate struct {
 	DestSystemId string     `json:"destSystemId"`
 	Cell         board.Cell `json:"cell"`
+	// LaneId is this crossing's lane id, derived purely from the unordered
+	// pair of system ids (galaxy.LaneIdBetween — replace-observation-with-
+	// sightings tasks.md 4.11, system-interior "Lane-Gate Bodies Carry Their
+	// Lane Id"). Set at construction (LaneGates below), never by a
+	// degradable post-pass like fillGateGeometry: unlike Space/Size, it has
+	// no missing-data case — it is a pure function of two known system ids
+	// — so it must never zero-value. It is the id POST
+	// /v1/fleets/:fleetId/jump accepts, served regardless of charted
+	// knowledge, exactly as the gate body itself is.
+	LaneId string `json:"laneId"`
 	// Space/Size are the gate body's continuous position and physical
 	// radius, additive alongside Cell (replace-observation-with-sightings
 	// design.md Decisions 5/26; tasks.md 4.7 — "every body, bodies and gate
@@ -105,6 +115,7 @@ func (s *Service) LaneGates(ctx context.Context, systemID string, radius int) ([
 		gates = append(gates, LaneGate{
 			DestSystemId: nb,
 			Cell:         board.LaneGateCell(self.Coords.X, self.Coords.Y, nc.X, nc.Y, radius),
+			LaneId:       galaxy.LaneIdBetween(systemID, nb),
 		})
 	}
 	// Deterministic order so the read is stable across requests.

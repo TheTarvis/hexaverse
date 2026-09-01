@@ -83,6 +83,13 @@ export interface BoardFeature {
 export interface LaneGate {
   destSystemId: string
   cell: Cell
+  // The lane id a jump order names to cross from this gate (system-interior
+  // "Lane-Gate Bodies Carry Their Lane Id") — present on every gate the
+  // interior read serves, charted or not (board-view "Jump Commit": no
+  // second read to resolve it, no charted-lane precondition). Optional only
+  // in the type (older fixtures in tests predating this field construct a
+  // gate without it); the wire always sends it.
+  laneId?: string
 }
 
 // The fogged system interior — exactly what `GET /v1/systems/:id` returns.

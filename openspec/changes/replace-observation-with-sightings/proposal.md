@@ -184,10 +184,10 @@ this link needs them again.
 
 - Affected specs: `galaxy-knowledge` (new), `sighting-records` (new),
   `focused-scan` (new), `proximity-disclosure`, `fleet-movement`,
-  `fleet-roster`, `trading-station`, `observation-fog-and-scan` (deleted),
-  `system-interior`, `system-body-table`, `galaxy-generation`,
-  `action-dispatch`, `corporation-spawn`, `request-authorization`,
-  `mine-extraction`.
+  `fleet-roster`, `board-view`, `trading-station`,
+  `observation-fog-and-scan` (deleted), `system-interior`,
+  `system-body-table`, `galaxy-generation`, `action-dispatch`,
+  `corporation-spawn`, `request-authorization`, `mine-extraction`.
 - Affected code: `backend/observation` (deleted), new `backend/charts`,
   new `backend/sightings`, `backend/disclosure` (widened masking, `Scanning`
   contact flag, `Sighting.SystemId`), `backend/fleet` (jump precondition,
@@ -199,12 +199,14 @@ this link needs them again.
   exclude from), `backend/market` (rename `observation.Tier` → `charts.Tier`),
   `backend/action` (ownership check, `ActorOwner`), `router.go`, `cmd/seed`,
   `common/tuning.go`, `common/firestore_test_helpers.go`, and **the
-  frontend's roster jump-command gate** (`fleet-roster`'s command-surface
-  logic drops its client-side charted-lane check, since jump-eligibility is
-  now attachment alone and the client's charted set arrives on a
-  differently cadenced read than attachment does — the one concrete
-  frontend change this link makes; contact/space rendering itself stays
-  link 8's), `.claude/scripts/check-mirror-map.sh`,
+  frontend's roster jump-command gate and the jump command's lane-id
+  wiring** (`fleet-roster`'s command-surface logic drops its client-side
+  charted-lane check, since jump-eligibility is now attachment alone and
+  the client's charted set arrives on a differently cadenced read than
+  attachment does; `lib/types/system-board.ts`'s `LaneGate` gains `laneId`
+  and the board view's `handleJump` wires it through to the jump commit —
+  this link's only concrete frontend changes; contact/space rendering
+  itself stays link 8's), `.claude/scripts/check-mirror-map.sh`,
   `.claude/skills/code-quality-checks/check.py`, `docs/plans/continous_space/chain.md`.
 - `observation-fog-and-scan` is deleted with **no `specs/observation-fog-
   and-scan/` delta in this change** — see "Retiring
@@ -287,12 +289,26 @@ before that fix would matter:
 - **`board-view`**'s "System Board Route and Data Fan-In" cites
   `system-interior`'s unfogged-interim framing ("design.md Decision 11:
   every feature is served live... until link 5 replaces this with a
-  `disclosure` projection") — the interim this very change replaces.
-  `board-view` is not touched here because it dies outright at links 8–9
-  of `docs/plans/continous_space/chain.md` (the lattice-board deletion),
-  so a delta correcting this citation now would itself be dead weight
-  within two links.
+  `disclosure` projection") — the interim this very change replaces. This
+  stale citation is not fixed here: it is prose-only, and `board-view` dies
+  outright at links 8–9 of `docs/plans/continous_space/chain.md` (the
+  lattice-board deletion), so a delta correcting it now would itself be
+  dead weight within two links.
 
-Both are prose-only staleness, not behavioral drift, and both are left for
-whichever future change next touches their capability for a substantive
-reason.
+Both of the above are prose-only staleness, not behavioral drift, and both
+are left for whichever future change next touches their capability for a
+substantive reason. **This does not extend to `board-view`'s *Jump
+Commit* requirement added in this change**: that requirement is not a
+stale citation but the behavior that makes this link's traversability fix
+reach the player at all (`system-interior`'s *Lane-Gate Bodies Carry Their
+Lane Id* closes the wire gap; nothing closed the player-facing one before
+it). A `board-view` delta was warranted here specifically because the gap
+was behavioral, not prose — the same distinction that keeps the
+`market-price-board` and route-citation items above out of scope.
+
+**Also noted, not fixed**: `galaxy.ErrLaneNotFound` has no case in
+`fleet/handler.go`'s `respond`, so a `laneId` not incident to the fleet's
+current system returns `500`, not a `400`/`404` the client could
+distinguish. This change makes that path easier to reach — lane ids now
+flow into player hands on every gate body read, not just through charted
+state — but does not fix it; it is a candidate for a later link.

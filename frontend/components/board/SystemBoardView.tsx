@@ -258,13 +258,26 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       onError: (e) => toast.error(e.message || 'Stop failed'),
     })
   }
-  const handleJump = (_fleet: Fleet) => {
-    // Jump is now offered on attachment alone (isGateBody above, task 4.10)
-    // — but `LaneGate` (lib/types/system-board.ts) still carries no laneId,
-    // only {destSystemId, cell}, so there is no wire field to name useJump's
-    // required `laneId` yet. Refuses rather than guesses; a genuine
-    // wiring gap, distinct from (and no longer about) charted knowledge.
-    toast.error('This gate cannot be jumped from yet — no lane id on this read')
+  // handleJump — names the laneId straight off the attached gate on the
+  // already-open interior read (`board.laneGates`, correlated to
+  // `attachedTo` by the same "gate-"+destSystemId convention `isGateBody`
+  // uses above). No second read, no charted-lane precondition (board-view
+  // "Jump Commit"; design.md Decision 2: charting is map knowledge, never a
+  // permission) — the command is never a no-op or a client-side refusal for
+  // any gate the interior read served.
+  const handleJump = (fleet: Fleet) => {
+    const gate = board.laneGates.find((g) => `gate-${g.destSystemId}` === fleet.attachedTo)
+    if (!gate?.laneId) {
+      toast.error('Not attached to a lane gate')
+      return
+    }
+    jump.mutate(
+      { fleetId: fleet.id, laneId: gate.laneId },
+      {
+        onSuccess: () => toast.success('Jump underway'),
+        onError: (e) => toast.error(e.message || 'Jump failed'),
+      },
+    )
   }
 
   // --- mine / sell (kept board-view requirements: Mine Offer/ETA/Commit,

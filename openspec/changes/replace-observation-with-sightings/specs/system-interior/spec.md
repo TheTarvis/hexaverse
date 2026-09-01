@@ -163,3 +163,46 @@ NOT drop it.
 - **WHEN** the requester reads that system's interior
 - **THEN** the corresponding entry in the response's `contacts` array
   carries `scanning: true`
+
+### Requirement: Lane-Gate Bodies Carry Their Lane Id
+The system SHALL serve, for every lane-gate body in a materialized
+system's interior read, the stable id of the lane it serves (wire field
+`laneId`), alongside — never replacing — that gate body's existing
+`destSystemId` and `cell` fields, so a client can commit a jump
+(`POST /v1/fleets/:fleetId/jump {laneId}`) by passing this value straight
+through, with no second lookup and no client-side re-derivation of the id.
+This id SHALL be the same id the jump endpoint accepts, and SHALL match
+the id the server derives for the same crossing on either endpoint
+(`galaxy.LaneIdBetween`, order-independent over the unordered system-pair,
+is the single derivation both gate attachment and travel arrival already
+agree on). This field SHALL be served regardless of the requester's
+charted knowledge, exactly as the gate body itself is served regardless of
+charted knowledge under "Bodies Are Public; Ships Are Disclosed": a fresh
+corporation with no charted lanes still receives a usable `laneId` on
+every gate body it reads.
+
+#### Scenario: A materialized system's read carries each lane-gate body's lane id
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** every lane-gate body in the response carries a **non-empty**
+  `laneId` field alongside its `destSystemId` and `cell`
+
+#### Scenario: The served lane id is the one the jump endpoint accepts
+- **GIVEN** a lane-gate body's `laneId` from a system interior read
+- **WHEN** that value is passed as `POST /v1/fleets/:fleetId/jump`'s
+  `laneId` for a fleet attached to that gate
+- **THEN** the server accepts it as naming that lane, with no additional
+  lookup required of the client
+
+#### Scenario: The served lane id matches the server's own derivation for the same crossing
+- **GIVEN** a lane between two systems
+- **WHEN** its id is derived via `galaxy.LaneIdBetween` for the crossing
+  from either system's own gate-attachment or travel-arrival write
+- **THEN** the id served on the corresponding lane-gate body in either
+  system's interior read is identical to it
+
+#### Scenario: A fresh corporation with no charted lanes still receives a usable lane id
+- **GIVEN** a corporation with no charted lanes
+- **WHEN** it reads a materialized system's interior
+- **THEN** every lane-gate body in the response still carries its `laneId`,
+  unfiltered by the corporation's charted knowledge

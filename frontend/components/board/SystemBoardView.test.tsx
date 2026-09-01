@@ -635,4 +635,79 @@ describe('SystemBoardView', () => {
 
     expect(screen.queryByTestId('fleet-cmd-jump-mine')).not.toBeInTheDocument()
   })
+
+  // --- Jump Commit (replace-observation-with-sightings tasks.md 4.11, 8.8;
+  // board-view ADDED "Jump Commit") -----------------------------------------
+  //
+  // THE DEFECT THIS SECTION CLOSES: `handleJump` (SystemBoardView.tsx) is
+  // currently a hard-coded refusal — `toast.error('This gate cannot be
+  // jumped from yet — no lane id on this read')` — regardless of which gate
+  // is attached, because `LaneGate` (lib/types/system-board.ts) carries no
+  // `laneId` for it to read (system-interior "Lane-Gate Bodies Carry Their
+  // Lane Id" closes the wire-side half of this gap; these three tests pin
+  // the CLICK side: that once a laneId is on the wire, this component
+  // actually uses it to submit `useJump`, rather than continuing to refuse).
+  // Mounts the real component and fires a real click, exactly like the
+  // sibling burn/cut-drive/stop/mine tests above — only the data hooks are
+  // mocked (useSystemBoard/useMyFleets/useJump), never `handleJump` itself.
+
+  // Scenario: Invoking jump submits the attached gate's lane.
+  it('submits a jump order naming the attached gate’s laneId (board-view "Jump Commit")', () => {
+    const withGate = {
+      ...boardFixture(),
+      laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }],
+    }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    myFleetsState([{ ...ownFleet, attachedTo: 'gate-sys-9' }])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-mine'))
+
+    expect(jumpMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ fleetId: 'mine', laneId: 'lane-sys7-sys9' }),
+      expect.anything(),
+    )
+  })
+
+  // Scenario: A gate whose lane the corporation has not charted still
+  // commits — no client-side refusal. The corp's charted set (`useGalaxy`)
+  // is explicitly empty here, proving the jump command consults no charted-
+  // lane state at all (design.md Decision 2 of this change: charting is map
+  // knowledge, never a permission).
+  it('commits the jump for an uncharted lane too — not refused client-side (board-view "Jump Commit")', () => {
+    const withGate = {
+      ...boardFixture(),
+      laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }],
+    }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    mockGalaxy.mockReturnValue({ data: { nodes: [], links: [] } } as unknown as ReturnType<typeof useGalaxy>)
+    myFleetsState([{ ...ownFleet, attachedTo: 'gate-sys-9' }])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-mine'))
+
+    expect(jumpMutate).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
+  })
+
+  // Scenario: A failed jump commit toasts the reason, leaving the row
+  // unchanged (still listed, no navigation away).
+  it('toasts the server’s rejection reason on a failed jump commit, row unchanged (board-view "Jump Commit")', () => {
+    const withGate = {
+      ...boardFixture(),
+      laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }],
+    }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    myFleetsState([{ ...ownFleet, attachedTo: 'gate-sys-9' }])
+    jumpMutate.mockImplementation((_vars, opts) =>
+      (opts as { onError?: (e: Error) => void })?.onError?.(new Error('fleet: jump not attached to named gate')),
+    )
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-mine'))
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('fleet: jump not attached to named gate')
+    expect(screen.getByTestId('fleet-row-mine')).toBeInTheDocument()
+    expect(push).not.toHaveBeenCalled()
+  })
 })
