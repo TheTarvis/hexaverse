@@ -10,9 +10,16 @@ import "sync"
 // # What belongs here
 //
 // PACING knobs only — values that govern a RUNNING world and that an operator
-// would plausibly retune: how long a hex of burn costs, how long a scan takes,
-// how far a passive sensor reaches. Plus the handful of cross-domain STRUCTURAL
-// invariants that were previously duplicated with "must match" comments.
+// would plausibly retune: how long a cell of burn costs, how long a unit of
+// lane takes to cross, how long one revolution takes at ring 1. Plus the
+// handful of cross-domain STRUCTURAL invariants that were previously
+// duplicated with "must match" comments.
+//
+// Sensing is the instructive absence. A scan's duration and a sensor's reach
+// are pacing in every felt sense, and they are still not here: both are
+// denominated in continuous-space DISTANCE, and a distance belongs to the
+// package that defines the geometry it measures. See the sensing note on the
+// struct below for where they went.
 //
 // # What does NOT belong here
 //
@@ -32,7 +39,7 @@ import "sync"
 // # Layering
 //
 // common imports no domain package, so this holds primitives and common types
-// (WorldMillis) — never a domain type like observation.Tier. Domains keep their
+// (WorldMillis) — never a domain type like charts.Tier. Domains keep their
 // own params structs (fleet.MovementParams etc.) and SOURCE their values from
 // here. That way `fleet` still owns the meaning of its knobs; `common` only owns
 // the numbers.
@@ -77,19 +84,14 @@ type GameTuning struct {
 	// what it buys you and what it costs.
 	OrbitBasePeriod WorldMillis
 
-	// ——— Sensing & intel (observation) ———
-
-	// ScanDuration is the world-ms an active scan takes; its ETA is
-	// committedAt + ScanDuration. The scan is a full 360° line-of-sight sweep
-	// (#0006 Decision #21); the deferred directional variant's beam-width
-	// knobs return with it. The client's radar-sweep animation paces itself
-	// off the committed window (eta − committedAt), so turning this re-paces
-	// the visual too — no mirrored constant (frontend: board/scan-sweep.ts,
-	// SWEEP_TUNING, which holds the theater-only dials).
-	ScanDuration WorldMillis
-	// AmbientRadius is the passive sensor bubble, in lattice hops (the polar
-	// board's hop metric — board.Distance/board.Within), that rides any unit.
-	AmbientRadius int
+	// ——— Sensing & intel: deliberately NOT here ———
+	//
+	// There is no global sensing knob. A focused scan prices its OWN duration
+	// from its range (fleet/params.go: roundTripMs = ScanBaseDurationMs +
+	// ScanRoundTripMsPerUnit × d), and the perception radii are distances in
+	// continuous space that only their own package can state meaningfully
+	// (disclosure/params.go: PassiveRange, FocusedScanRange). The flat
+	// ScanDuration that used to sit here priced the deleted 360° radial sweep.
 
 	// ——— Board geometry (structural invariant, not pacing) ———
 
@@ -105,9 +107,8 @@ type GameTuning struct {
 //
 // Retuned 2026-07-13 for pace: a cell of burn was one world-MINUTE (60s of real
 // time at scale 1), which made the slice feel sluggish to play. It is now 5s.
-// Scan came down from a world-hour to 30s for the same reason. The RELATIVE cost
-// of a cell vs a lane vs a scan is preserved — this is a uniform speed-up, not a
-// rebalance.
+// The RELATIVE cost of a cell vs a lane is preserved — this is a uniform
+// speed-up, not a rebalance.
 func DefaultTuning() GameTuning {
 	return GameTuning{
 		// Movement
@@ -121,10 +122,6 @@ func DefaultTuning() GameTuning {
 		// fastest on the sparsest inner rings and slowest where a band has
 		// just doubled its slot count.
 		OrbitBasePeriod: 36000,
-
-		// Sensing
-		ScanDuration:  15_000, // 15s — one faster origin-pinned ring (#0006 Decision #26; was 30s)
-		AmbientRadius: 3,      // lattice hops
 
 		// Geometry
 		BoardRadius: 16,

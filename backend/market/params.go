@@ -11,11 +11,11 @@ import (
 //
 // These live HERE, not in common.GameTuning, and the line is deliberate.
 // GameTuning is for PACING on a running world — values an operator would
-// plausibly hot-retune (MsPerTile, ScanDuration). Pricing explicitly never
+// plausibly hot-retune (MsPerTile, OrbitBasePeriod). Pricing explicitly never
 // responds to anything happening in a running world (that is this capability's
 // own stated non-goal), which by definition makes it not a mid-session knob
 // either. It is closer to mine.MineParams' richness curve than to
-// Tuning().ScanDuration, and it follows the same shape: one struct, one
+// Tuning().MsPerTile, and it follows the same shape: one struct, one
 // Default*Params() constructor, read at service construction.
 type Params struct {
 	// StartingCredits is the one-time opening grant at spawn. Injected into the

@@ -183,8 +183,6 @@ prove itself against already exists.
 three rounds — 16 deltas, 191 scenarios, three new capabilities
 (`galaxy-knowledge`, `sighting-records`, `focused-scan`). Sections 1–5 of 9
 have shipped; §6–§9 (carry-overs, housekeeping, validation, cleanup) remain.
-The *Touches* bullet below still lists the six capabilities predicted before
-authoring and is corrected by this change's own task 7.4.
 
 What has landed so far: **the galaxy is traversable again** — a player can
 spawn, fly to a lane gate, and jump using only the UI, proven by a Playwright
@@ -213,11 +211,14 @@ requires already having a charted lane to jump in the first place. That is
 circular: nothing in the tree after link 4 can produce a corporation's first
 charted lane. `backend/observation/service.go:129` names the job outright —
 "finding the roads is the first scan's job" — and link 4 deleted that job
-along with the rest of `observation`'s live half. **Link 5 restoring lane
-charting (via `disclosure`'s wiring into the reads that currently project
-through `observation`, or its successor) is what makes the galaxy traversable
-again**, and the jump verb link 4 built is untestable end-to-end — no
-corporation can ever reach a second system — until link 5 lands.
+along with the rest of `observation`'s live half. **Restoring traversability
+was therefore link 5's first job, and it is done** (§1, `3d7e72d`): the
+charted-lane precondition was dropped outright rather than re-supplied,
+because lane gates are bodies and reaching one is the real constraint.
+Charting demotes to map and intel. This paragraph is kept in the past tense
+as the record of *why* link 5 opened where it did — the jump verb link 4
+built was untestable end-to-end, with no corporation able to reach a second
+system, until that landed.
 
 **Corrected scope (2026-08-31, recorded during link 4's task 9.6): link 4
 already removed `observation`'s live half**, not link 5. Link 4's section 7
@@ -226,13 +227,13 @@ fleet-audience-visibility code outright and replaced `system`'s three-band fog
 projection with a stated, temporary, fully-disclosed interim read
 (`system-interior`: *Interior Reads Are Fully Disclosed, A Deliberate
 Interim*). So link 5 does **not** find `observation-fog-and-scan` intact and
-remove it "entirely" as originally predicted below — it inherits an already-
-reduced `observation` package (the four surviving requirements: the monotonic
-graph-tier ladder, travel arrival reveal, spawn arrival reveal, charted-lane
-set projection) plus a `system-interior` interim requirement that link 5 is
-what's expected to replace with the real `disclosure`-projected read (link 4's
-task 7.8 left a code comment at the interim read's implementation naming this
-link for exactly that reason).
+remove it "entirely" as this document originally predicted — it inherits an
+already-reduced `observation` package (the four surviving requirements: the
+monotonic graph-tier ladder, travel arrival reveal, spawn arrival reveal,
+charted-lane set projection) plus a `system-interior` interim requirement that
+link 5 is what's expected to replace with the real `disclosure`-projected read
+(link 4's task 7.8 left a code comment at the interim read's implementation
+naming this link for exactly that reason).
 
 The integration link. `disclosure` is pure and has zero consumers; this wires
 it into every read that currently projects through the (now-reduced)
@@ -253,13 +254,72 @@ remains is **storage and wiring**, not model:
 - **restoring lane charting** — without this, the jump verb is unreachable
   past a corporation's home system (see above)
 
-- **Touches:** `observation-fog-and-scan` (its four surviving requirements
-  REMOVED — not "entirely", since link 4 already removed its live half),
-  `system-interior` (its fully-disclosed interim REMOVED, replaced by a
-  `disclosure`-projected read), `proximity-disclosure` (MODIFIED — widen
-  masking from "a ship docked to a host" to attached objects generally, per
-  `decisions.md`'s spec note), `fleet-movement`, `galaxy-view`, new sighting
-  capability.
+- **Touches sixteen capabilities, not the six originally predicted here**,
+  three of them brand new — `galaxy-knowledge`, `sighting-records`, and
+  `focused-scan`.
+  - `observation-fog-and-scan`'s four surviving requirements are **MOVED,
+    not REMOVED**: the monotonic knowledge ladder, the charted-lane set
+    projection, and the two arrival writers are re-ADDED unchanged in
+    substance under the new `galaxy-knowledge` capability (Go package
+    `backend/charts`), because `market`, `stations`, `corporations`, and
+    `galaxy-generation` still consume them and the graph tiers were never
+    on the live-perception path the pivot deleted. The capability itself
+    retires with **no delta directory of its own** — the archiver rejects a
+    rebuilt spec left with zero requirements — so
+    `openspec/specs/observation-fog-and-scan/` is deleted by hand *after*
+    the archive succeeds (task 7.6; `polar-lattice-math` is the precedent).
+  - `system-interior` — its fully-disclosed interim and its charted-gate
+    filter REMOVED, replaced by a `disclosure`-projected read (public
+    bodies, disclosed ships, foreign presence as contacts, gates carrying
+    their lane id).
+  - `proximity-disclosure` — masking widens from "a ship docked to a host"
+    to attached objects generally (per `decisions.md`'s spec note), plus
+    the sweep's emission and its range-scaled emission radius, the
+    union-over-a-corporation's-own-assets rule, and a sighting's system
+    stamp.
+  - `fleet-movement` — jump re-expressed as gated by gate *attachment*
+    alone, foreign fleets served as contacts rather than 404s, and every
+    command endpoint restricted to the owning corporation; `fleet-roster`,
+    `galaxy-view`, and `board-view` carry the matching jump-commit and
+    lane-id surfaces.
+  - `action-dispatch` — its endpoints stop being caller-identity-blind and
+    become owner-restricted (a foreign actor is indistinguishable from a
+    nonexistent one); `request-authorization`'s corporation-resolution seam
+    is re-expressed as something ownership checks consume, and
+    `mine-extraction`'s ownership rule is restated on it.
+  - `galaxy-generation` — `EnsureLaneHorizon` finally gets a production
+    caller at jump arrival (blocker 4), and the graph read endpoint follows.
+  - `corporation-spawn` (its arrival write rehomed onto `galaxy-knowledge`),
+    `trading-station` (its fog-source exclusion retires with the fog), and
+    `system-body-table` (the body table pinned as an unfiltered internal
+    seam, never a response) round out the sixteen.
+- **Four traversability blockers, not one.** The charting circularity above
+  is only the first; three more sit under it, two of them silent because
+  every unit test injects a fake for the thing production forgot to wire
+  (proposal.md's *Why*; design.md Decisions 2, 5, 22, 23):
+  1. **The circularity itself** — dissolved by dropping `Jump`'s
+     charted-lane precondition entirely. Gates are bodies now, so
+     *reaching* one physically is the constraint; charting demotes to map
+     knowledge and a sellable intel product, never a permission.
+  2. **`system/gates.go`'s `chartedGates`** filters every lane gate away
+     from a corporation with no charted lane — which is every fresh
+     corporation — so even with the precondition gone there would be
+     nothing to fly to. Deleted, along with `BoardFog`'s tier lookup and
+     `system-interior`'s *Charted Lane Gate Filtering*; gate bodies ship
+     unfiltered.
+  3. **`fleet.GraphSource` has no production implementation, and
+     `router.go` never calls `WithGraph`/`WithTierSource`** — so `POST
+     /v1/fleets/:id/jump` returns 500 for every real caller before any game
+     rule runs. CI has never seen it: `jump_verb_test.go` injects a
+     `fakeGraph`. Closed at the type signature rather than by a wiring
+     test — the `GraphSource` becomes a required positional parameter of
+     `fleet.NewServiceWith` and the optional-wiring shape is deleted
+     outright, so an unwired router is a compile error.
+  4. **`galaxy.EnsureLaneHorizon` has no production caller at all**, so the
+     endless galaxy silently stops growing at the materialized frontier the
+     moment a fleet reaches it. Called at jump arrival, ordered strictly
+     before the destination's first body-table build, so an arriving fleet
+     is never stranded with a truncated gate set.
 - **Decided (2026-08-29):** focused-scan pricing is **time on the `action`
   sensor channel, scaling with range**, and **the scan emits** — the scanning
   fleet is detectable for the duration of the sweep. Range gating was already

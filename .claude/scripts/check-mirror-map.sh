@@ -21,6 +21,15 @@
 #     migrate-fleet-to-continuous-burns, tasks.md 9.8 — `fleet` is likewise
 #     designated Go-sole-authority; wires fixtures/fleet/cases.json's
 #     commandedAccelRejection family, added by tasks.md 4.11, into this check)
+#   - backend/galaxy <-> frontend/lib/galaxy (openspec:
+#     replace-observation-with-sightings, tasks.md 4.13 — the lane-id
+#     derivation is server-only; the client consumes the served wire value)
+#   - backend/disclosure <-> frontend/lib/disclosure (openspec:
+#     replace-observation-with-sightings, tasks.md 7.3 — `disclosure` is
+#     likewise designated Go-sole-authority, per add-proximity-disclosure's
+#     Decision 1: its knife-edge float predicates decide who sees whom, so a
+#     JavaScript second implementation would disagree with the server about
+#     visibility at the boundary)
 # Rather than asserting a `pairs` list (which would assert the mirror the
 # designation forbids), each FAILS if any function/method name is declared
 # on BOTH sides, unless that name appears in the pair's own mirror-map.json
@@ -355,9 +364,14 @@ anti_mirror "galaxy" \
     "$REPO_ROOT/backend/galaxy" \
     "$REPO_ROOT/frontend/lib/galaxy"
 
+anti_mirror "disclosure" \
+    "$REPO_ROOT/fixtures/disclosure/mirror-map.json" \
+    "$REPO_ROOT/backend/disclosure" \
+    "$REPO_ROOT/frontend/lib/disclosure"
+
 if [[ "$FAIL" -ne 0 ]]; then
     exit 2
 fi
 
-echo "PASS: all mirror maps complete — every mirrored pair fixture-covered or inventoried, and backend/space, backend/system, backend/fleet, and backend/galaxy carry no TypeScript mirror."
+echo "PASS: all mirror maps complete — every mirrored pair fixture-covered or inventoried, and backend/space, backend/system, backend/fleet, backend/galaxy, and backend/disclosure carry no TypeScript mirror."
 exit 0

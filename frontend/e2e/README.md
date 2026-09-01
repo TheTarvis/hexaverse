@@ -70,6 +70,44 @@ Playwright suite and the backend Go integration suite must share one project id
 execution, not separate namespaces. Don't run both suites concurrently in separate
 terminals against a persistent emulator.
 
+### The wipe clears the Go e2e suite's galaxy — and the failure looks like a code bug
+
+The consequence of sharing one project, stated as a symptom because that is how
+you will meet it. `globalSetup` wipes the emulator project's Firestore
+(`setup/backend-stack.ts:83`, `wipeProject`), and **nothing reseeds a galaxy
+afterward**. The backend Go e2e suite (`cd backend && ENV=TEST go test .`) has an
+undocumented precondition: the emulator must hold a **live galaxy pointer**.
+
+So after any Playwright run — or any manual Firestore wipe — the backend Go e2e
+suite fails **fast and wholesale**: all ~30 tests error with `no live galaxy`,
+and `POST /v1/corporations` returns `500`. It reads exactly like a code
+regression, and it is not one. Recovery is one command:
+
+```bash
+cd backend && ENV=TEST go run ./cmd/seed
+```
+
+`backend-stack.ts:81` already warns not to run the two suites concurrently; this
+is the same hazard **sequentially**, which is easier to trip and gives no
+warning at all.
+
+### The Go e2e suite gets slower the dirtier the emulator gets
+
+Also worth knowing before you conclude the suite has hung. The backend e2e
+package's runtime scales with **accumulated** emulator state, not with the code
+under test:
+
+| Emulator state | Per test | Whole package (~30 tests) |
+|---|---|---|
+| Freshly seeded | ~0.5–3s | ~60s |
+| Dirty (many prior runs) | ~70s | ~36 min |
+
+The likely cause is spawn site selection: `corporations.Spawn` must find a home
+at least `minSpawnDistance` graph-hops from **living** corps' explored sets, and
+leftover corps from earlier runs push that search outward, materializing more
+galaxy blocks on each attempt. Nothing in the suite prunes them. If the backend
+e2e suite starts crawling, wipe and reseed rather than waiting it out.
+
 ## Targeting deployed environments
 
 Set `E2E_ENV=dev` (or `prod`) plus `E2E_BASE_URL`, `E2E_API_URL`,

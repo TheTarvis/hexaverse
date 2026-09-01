@@ -13,7 +13,7 @@ package main
 // behaviour the six scenarios name, so an implementation that satisfies them
 // is correct regardless of how the seam is shaped. The seam's SHAPE is
 // pinned separately, structurally, by
-// backend/action/actor_owner_seam_test.go.
+// backend/action/actor_owner_test.go.
 //
 // DELIBERATELY NOT PINNED (tasks.md 7.7 item 3): what the handler should do
 // when the ownership lookup ERRORS, as opposed to resolving a definitive

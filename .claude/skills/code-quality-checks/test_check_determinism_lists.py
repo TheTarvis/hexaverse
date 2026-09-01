@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
-"""RED-phase regression net for replace-observation-with-sightings §4,
-tasks.md 7.2 (design.md Decision 25): check.py's DETERMINISM_GO_PACKAGES and
-check-transcendental.sh's RULE_BEARING_GO_PACKAGES must name the exact same
-set of Go packages, or the transcendental lint silently stops covering
-whatever check.py's own copy omits. This is the fifth instance of the
-hand-maintained-list-drift species (link 4's task 9.9 inventory); the fix in
-THIS change is limited to fixing the current three-package drift
-(`polar`, `space`, `disclosure`) and adding this test so the class fails
-loudly rather than needing rediscovery — deriving the list from one source is
-explicitly out of scope for this change.
+"""Drift guard for two hand-maintained package lists (replace-observation-with-
+sightings, tasks.md 7.2 / design.md Decision 25).
 
-Dependency-free (stdlib only, no pytest) so it runs anywhere:
+THE JOB: check.py's DETERMINISM_GO_PACKAGES and check-transcendental.sh's
+RULE_BEARING_GO_PACKAGES must name the exact same set of Go packages. When
+they diverge, the shorter list silently stops linting whatever it omits — a
+failure with no symptom, which is why the same drift needed rediscovering
+three separate times (`polar`, `space`, `disclosure`) before this check
+existed. It is the fifth instance of the hand-maintained-list-drift species
+catalogued in link 4's task 9.9 inventory. Deriving both lists from one
+source remains out of scope; this check is the loud-failure net in the
+meantime.
+
+STATE OF THE TREE: green. The three-package drift this check was written
+against was fixed in commit 9c00216 — both lists now name board, polar,
+space, disclosure, fleet, mine, galaxy, system, corporations and market. The
+test therefore passes today and fails only on a future divergence, which is
+its whole point. (This docstring previously said "EXPECTED RED TODAY" and
+described check.py's tuple as still missing polar/space/disclosure; that has
+been false since 9c00216.)
+
+HOW IT RUNS: from check.py, unconditionally, via
+run_determinism_lists_check() — not by hand and not behind a changed-file
+trigger, because either script can introduce the drift and both live outside
+the paths the determinism and mirror triggers watch. It stays dependency-free
+(stdlib only, no pytest) so it also runs standalone:
 
     python3 .claude/skills/code-quality-checks/test_check_determinism_lists.py
-
-EXPECTED RED TODAY: check.py's tuple is ("board", "fleet", "mine", "galaxy",
-"system", "corporations", "market") — missing "polar", "space", "disclosure",
-all three present in check-transcendental.sh's array. This is a genuine
-CURRENT DEFECT (design.md: "despite check.py's own comment asserting 'Must
-match check-transcendental.sh's own gate'"), not a tautological assertion —
-it is expected to still be red immediately after `disclosure` alone is added
-without also fixing the pre-existing `polar`/`space` omission, per tasks.md
-7.2's own instruction that "a list two-thirds fixed is the same defect with a
-smaller number."
 """
 
 import ast

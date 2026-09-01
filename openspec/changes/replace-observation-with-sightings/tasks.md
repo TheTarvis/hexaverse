@@ -124,6 +124,18 @@
       (corporation-spawn: *Home-Only Initial Fog, No Lanes Charted* — Spawn
       charts no lanes)
 - [x] 2.11 Add `charts` and `chartedLanes` to `CleanupFirestoreTestData()`.
+      **RE-OPENED 2026-09-01 (orchestrator):** this box was checked in §2 but
+      its outcome was never in the tree — `backend/common/firestore_test_helpers.go`
+      contains neither `charts` nor `chartedLanes`. Verified by grep against the
+      committed file. Folded into task 7.5, which registers `sightings`
+      alongside them; the two are one edit and are done together there.
+      **CLOSED 2026-09-01 (SDET):** the outcome is now in the tree.
+      `common.RegisteredSubcollections` names `charts`, `chartedLanes`,
+      `sightings`, `ledger` and `reconciliation` under `corporations`, and
+      `CleanupFirestoreTestData` clears them (including piles already orphaned
+      by an earlier run, via `DocumentRefs`). Pinned non-vacuously by
+      `backend/common/firestore_cleanup_registry_test.go` — both tests were
+      confirmed red with the registration removed and green with it.
 
 ## 3. The Sighting Store
 
@@ -669,31 +681,87 @@
 
 ## 7. Housekeeping
 
-- [ ] 7.1 Delete `common.Tuning().AmbientRadius` and `.ScanDuration`
+- [x] 7.1 Delete `common.Tuning().AmbientRadius` and `.ScanDuration`
       (consumed only by `observation/params.go`, deleted with the package
       in task 2.8); confirm no other caller references either.
-- [ ] 7.2 Resync `check.py`'s `DETERMINISM_GO_PACKAGES` to add all three
+- [x] 7.2 Resync `check.py`'s `DETERMINISM_GO_PACKAGES` to add all three
       missing packages — `polar`, `space`, `disclosure` — matching
       `check-transcendental.sh`'s `RULE_BEARING_GO_PACKAGES`, and add a
       check that asserts the two lists are equal, failing with both
       contents printed. Fix all three together; a list two-thirds fixed is
       the same defect with a smaller number.
-- [ ] 7.3 Add `fixtures/disclosure/mirror-map.json` in anti-mirror mode and
+- [x] 7.3 Add `fixtures/disclosure/mirror-map.json` in anti-mirror mode and
       wire a matching `anti_mirror "disclosure" ...` invocation into
       `.claude/scripts/check-mirror-map.sh` — `disclosure` is Go-sole-
       authority, no TypeScript mirror now or ever.
-- [ ] 7.4 Correct `docs/plans/continous_space/chain.md`'s Link 5 "Touches"
+- [x] 7.4 Correct `docs/plans/continous_space/chain.md`'s Link 5 "Touches"
       list: add `action-dispatch` and `galaxy-generation`; restate the four
       rehomed `observation-fog-and-scan` requirements as MOVED to the new
       `galaxy-knowledge` capability rather than simply REMOVED; and name
       all four traversability blockers (the charting circularity,
       `chartedGates`, the unwired `GraphSource`, the uncalled
       `EnsureLaneHorizon`) rather than only the circularity.
-- [ ] 7.5 Add `sightings` to `CleanupFirestoreTestData()` alongside `charts`
+      **2026-09-01:** done. The bullet now opens "Touches sixteen
+      capabilities, not the six originally predicted here" — 16 delta
+      directories and three new capabilities (`galaxy-knowledge`,
+      `sighting-records`, `focused-scan`) verified by listing
+      `specs/` and checking which names are absent from `openspec/specs/`,
+      not taken from the header count. All sixteen are named with their
+      reason, the four rehomed requirements read as MOVED (with the
+      no-delta-directory retirement mechanic and its post-archive hand
+      deletion cross-referenced to task 7.6), and a second bullet names all
+      four blockers with the fix each one takes. Also deleted the
+      orchestrator's marker sentence above the bullet ("The *Touches*
+      bullet below still lists the six capabilities predicted before
+      authoring and is corrected by this change's own task 7.4"), which
+      existed only to flag the staleness this task removes. Link 8's
+      deferred-scan-UI entry was left untouched — it is already there,
+      single copy.
+- [x] 7.5 Add `sightings` to `CleanupFirestoreTestData()` alongside `charts`
       and `chartedLanes` (task 2.11). Record `CleanupFirestoreTestData()`
       itself as a sixth instance of the hand-maintained-list species
       catalogued in link 4's task 9.9 — noted here, not fixed as a class:
       the general derivation fix stays its own change.
+      **Recorded 2026-09-01 (documentation half only; the code half is
+      another agent's, and this box stays open until its outcome is in the
+      tree).** The species is *a list of names kept in sync by memory,
+      where the omission is silent and the unit tests still pass*.
+      `CleanupFirestoreTestData()` fits it exactly: the helper
+      (`backend/common/firestore_test_helpers.go:43`) takes collection
+      names variadically and deletes every document in each, so the
+      "registry" is whatever each caller remembers to pass, and
+      `backend/CLAUDE.md:70` states the rule ("New collections must be
+      added to `CleanupFirestoreTestData()` ... so emulator state doesn't
+      leak between tests") without anything enforcing it. Firestore does
+      not cascade, so a forgotten name orphans documents into the next
+      test's world — and nothing fails until something downstream reads a
+      world it did not write.
+      **A seventh instance, found today:** that doc-side rule in
+      `backend/CLAUDE.md` is itself a second hand-maintained registry, and
+      the code had already drifted from it — `charts`, `chartedLanes`, and
+      `sightings` were **all three** unregistered, i.e. every collection
+      this change introduced. `backend/charts/dao_test.go` is the shape of
+      the fix that does not add an eighth list: `charts.SubcollectionPaths`
+      is that package's own single source of truth for its collection
+      names (mirroring `galaxy.SubcollectionPaths`), cross-checked
+      structurally against the `*Collection` constants in its `dao.go`, so
+      a collection added to the DAO and forgotten in cleanup fails a test
+      rather than leaking.
+      **Cross-reference — this edit makes an open defect strictly worse:**
+      `docs/defects/2026-09-01-cross-package-emulator-test-race.md`. The
+      collections this helper wipes are *global* — one emulator, one
+      project (`dev~test`), no per-run namespacing — so a deferred cleanup
+      in one package's test binary deletes documents out from under
+      another's mid-assertion, and `go test ./...` is red in five packages
+      on an untouched tree (`go test -p 1 ./...` is green). Every name
+      added here is one more globally-shared collection any package may
+      wipe from under any other; task 7.5 adds three. That is a reason to
+      derive cleanup scope rather than declare it — the same fix shape link
+      4's 9.9 deferred for the registry lists, and probably the same
+      change — not a reason to skip the registration, since the leak the
+      registration prevents is real too. Note also for task 8.3: run it as
+      `go test -p 1 ./...` and record both results, so a red parallel run
+      is attributed to that defect and not to this change.
 - [ ] 7.6 **Post-archive step — do after `openspec archive
       replace-observation-with-sightings` succeeds, not before:** delete
       `openspec/specs/observation-fog-and-scan/` by hand. This change carries
@@ -711,7 +779,7 @@
       specific to this change — worth remembering before the next capability
       retirement rediscovers it.
 
-- [ ] 7.7 No code change: record three carried minors so an implementer does
+- [x] 7.7 No code change: record three carried minors so an implementer does
       not invent an answer for any of them mid-build. (1) `GET
       /v1/sightings`'s behavior for an authenticated but corpless requester
       is unspecified by this change's delta — neither "empty page" nor
@@ -722,13 +790,32 @@
       supplied on a later page looks like) is unspecified — *A read without
       further parameters returns at most the page maximum* and *Records are
       ordered newest-minted-first* pin the no-continuation case only; the
-      continuation format itself is left to implementation. (3)
-      `action.Handler`'s injected `ActorOwner.OwnerOf` erroring (as opposed
-      to returning a definitive owner or "not found") has no pinned
-      behavior — unlike `request-authorization`'s own corporation-resolution
-      seam, which explicitly fails open, no scenario here says whether an
-      `ActorOwner` lookup error should fail open (proceed unauthorized-
-      checked) or closed (404). All three are deliberately deferred, not
+      continuation format itself is left to implementation. (3) **DECIDED
+      2026-09-01 — fails closed, as an implementation choice, not a spec
+      requirement.** No scenario in this change pins what
+      `action.Handler`'s injected `ActorOwner.OwnerOf` *erroring* means (as
+      opposed to returning a definitive owner or "not found"), and unlike
+      `request-authorization`'s own corporation-resolution seam — which
+      explicitly fails open — the question was left open here. It is now
+      answered in fact, so it is recorded rather than left reading as
+      undecided: `backend/action/handler.go`'s `ownsActor` aborts with 404
+      on a lookup error, under a comment marked "IMPLEMENTATION CHOICE, NOT
+      A SPEC REQUIREMENT" that cites this task. The reasoning: the seam
+      exists solely to authorize, so an unanswered "who owns this?" cannot
+      be read as "you do" — failing open would turn a transient Firestore
+      error into a privilege escalation — and the refusal is
+      indistinguishable from absence, as every other rejection on these
+      endpoints is. A test now guards it:
+      `TestHandlerEndpoints_OwnershipLookupFailureIsNeverServedAsSuccess`
+      (`backend/action/handler_test.go`) drives every actor-scoped endpoint
+      with a failing `ActorOwner` and asserts the response is not 2xx, does
+      not name the action, and performs no ack/cancel mutation. That test
+      deliberately does **not** pin the status code (404 vs anything else
+      stays an implementation detail), but it does forbid fail-open as this
+      task defined it, since "proceed unauthorized-checked" is exactly a
+      success naming the action. Should the spec ever want the behavior
+      pinned, it takes a scenario in `action-dispatch` and a tightened test,
+      in that order. Items (1) and (2) remain deliberately deferred, not
       decided by this change.
 
 ## 8. Validation

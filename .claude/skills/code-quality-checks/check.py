@@ -1165,6 +1165,42 @@ def run_mirror_map_check() -> dict:
     return {"passed": False, "reason": "Mirror map coverage check failed (see output above)"}
 
 
+def run_determinism_lists_check() -> dict:
+    """Hand-maintained-list drift check (openspec
+    replace-observation-with-sightings, tasks.md 7.2 / design.md Decision 25):
+    DETERMINISM_GO_PACKAGES above and check-transcendental.sh's
+    RULE_BEARING_GO_PACKAGES must name the same set of rule-bearing Go
+    packages. When they diverge, the shorter list silently unlints whatever it
+    omits — a failure mode with no symptom, which is why it needed rediscovery
+    three times (polar, space, disclosure) before this check existed.
+
+    Runs unconditionally rather than behind a changed-file trigger: it reads
+    two files and compares two literals, so gating it would cost more
+    reasoning than it saves, and the drift it catches can be introduced by an
+    edit to either script (both of which live outside the backend/ and
+    fixtures/ paths the determinism and mirror triggers watch)."""
+    print_header("Checking Determinism Package-List Agreement")
+
+    result = run_command(
+        "python3 .claude/skills/code-quality-checks/test_check_determinism_lists.py",
+        check=False,
+    )
+    # unittest writes its report to stderr.
+    output = (result.stdout or "") + (result.stderr or "")
+    if result.returncode == 0:
+        print_success("check.py and check-transcendental.sh name the same rule-bearing packages")
+        return {"passed": True}
+    print(output, end="")
+    print_error("Determinism package lists disagree")
+    return {
+        "passed": False,
+        "reason": "check.py's DETERMINISM_GO_PACKAGES and check-transcendental.sh's "
+                  "RULE_BEARING_GO_PACKAGES name different package sets — the shorter "
+                  "list unlints whatever it omits (see output above for both lists).",
+        "output": output,
+    }
+
+
 def print_summary(results: dict):
     """Print summary of check results."""
     print_header("Check Summary")
@@ -1190,6 +1226,7 @@ def print_summary(results: dict):
         "frontend_e2e": "Frontend E2E Tests",
         "backend_tests_suite": "Backend Tests",
         "determinism_cross_target": "Determinism Cross-Target (build matrix)",
+        "determinism_lists": "Determinism Package-List Agreement",
         "mirror_map": "Determinism Mirror Map",
         "agent_lint": "Agent Lint",
         "agent_tests": "Agent Tests"
@@ -1474,6 +1511,11 @@ def main():
     )
     if mirror_trigger:
         results["mirror_map"] = run_mirror_map_check()
+
+    # Unconditional: see run_determinism_lists_check's docstring. A drift
+    # check behind a trigger that neither of the two drifting files can
+    # satisfy is a check that cannot fire.
+    results["determinism_lists"] = run_determinism_lists_check()
 
     # E2E runs in --run-all/default too, but best-effort: it needs the local dev
     # stack and takes minutes, so when the stack is down it's skipped (not failed)

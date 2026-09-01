@@ -126,8 +126,17 @@ func (h *Handler) ownedAction(c *gin.Context) (*Action, bool) {
 	return a, true
 }
 
+// Inbox query parameter names. Named constants rather than
+// common.RequiredQueryParam/OptionalQueryParam: the required-param helper
+// aborts with its own body ("Missing required parameter: actor") and an
+// Error-level log, which is not the 400 contract this endpoint already serves.
+const (
+	actorQueryParam  = "actor"
+	statusQueryParam = "status"
+)
+
 func (h *Handler) Inbox(c *gin.Context) {
-	actor := c.Query("actor")
+	actor := c.Query(actorQueryParam)
 	if actor == "" {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "actor query param is required"})
 		return
@@ -139,7 +148,7 @@ func (h *Handler) Inbox(c *gin.Context) {
 		return
 	}
 	var statuses []Status
-	if s := c.Query("status"); s != "" {
+	if s := c.Query(statusQueryParam); s != "" {
 		statuses = append(statuses, Status(s))
 	}
 	actions, err := h.svc.Inbox(c.Request.Context(), actor, statuses...)

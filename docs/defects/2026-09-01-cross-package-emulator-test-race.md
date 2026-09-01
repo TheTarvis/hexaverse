@@ -93,7 +93,58 @@ names to the list makes this race strictly worse, since each added name is one
 more shared collection that any package may wipe out from under any other.
 Task 7.5 will add three.
 
-## Candidate fixes, none applied here
+---
+
+## Update, later the same day: the hand-maintained half is fixed. The race is not.
+
+Link 5 §7 (tasks 2.11 / 7.5) landed a real registry in
+`backend/common/firestore_test_helpers.go` —
+`RegisteredTopLevelCollections` (9 entries) plus `RegisteredSubcollections`,
+with cleanup of a parent clearing its registered children, and enumeration via
+`DocumentRefs` rather than `Documents` so it also heals piles an earlier run
+already orphaned (Firestore's query surface hides "missing" parents).
+
+**The race described above is untouched and still open.** The registry says
+*which* collections to clean; it does not make them per-run. Every name in it is
+still global to the shared emulator, so the parallel-run wipe hazard stands
+exactly as documented. Candidate fix (1) below remains the only real answer.
+
+### The enforcement shape — imitate this, don't just count it
+
+The registry is worth more than one entry in the inventory, because of *how* it
+is guarded. `common.UnregisteredCollections(ctx, client)` walks the live
+database and returns every collection path the registry does not name; the root
+e2e package's `TestMain` calls it **after `m.Run()`** and fails the package on
+any finding.
+
+That placement is the whole trick. The suite starts from a wiped project and
+drives the real router, so whatever Firestore holds afterwards is exactly what
+production code wrote — the one moment in this repo where "which collections
+does this backend create?" has an authoritative answer. No AST parsing, no
+constant resolution, and no false positives: anything it names really exists and
+really is unregistered.
+
+Contrast the static alternative, which was considered and rejected: parsing
+`.Collection(x).Doc(y).Collection(z)` chains cannot see
+`corporations/credits.go`'s `s.corpRef(id).Collection(ledgerSubcollection)` or
+`galaxy/dao.go`'s `blocksPath(gid)` helper. It would have shipped a guard with
+holes that reports "all clear" — the same failure it was built to prevent.
+
+**This is the model for the deferred derivation change.** Every other
+hand-maintained list this chain has found failed identically: silent omission,
+everything green — `check.py`'s package tuple, `check-mirror-map.sh`'s
+directory set, `RegisterResolvers`, the query-invalidation list, the
+authorization closure, the CI legs. Each was found by accident, late. This one
+fails loudly on the next omission instead of waiting for someone to notice a
+suite got slow. When the derivation change is sequenced, the pattern to copy is
+*observe the real system at the one moment it is authoritative, then assert the
+declaration matches* — not *parse the declaration harder*.
+
+Known limitation, honestly: `UnregisteredCollections` only sees collections the
+root e2e suite exercises. `market` / `mine` / `stations` writes are not covered.
+Extending it is one line per suite — the function is exported for exactly that.
+
+## Candidate fixes for the race, none applied here
 
 1. **Namespace the test data per package or per run.** A collection prefix
    drawn from the package name or a run id (`test_<run>_galaxies`) removes the

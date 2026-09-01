@@ -30,6 +30,14 @@ func TestSetTuning_IsObservedByLaterReads(t *testing.T) {
 // The pacing knobs must be positive — a zero MsPerTile would make burns
 // instantaneous (and a zero LaneMsPerDistance would make travel free), which is
 // the kind of thing an admin page could ship by accident.
+//
+// The ScanDuration assertion that used to sit here was REMOVED 2026-09-01
+// (replace-observation-with-sightings task 7.1, orchestrator-adjudicated): it
+// pinned a knob nothing reads. The focused scan prices its own duration from
+// fleet/params.go's roundTripMs (ScanBaseDurationMs + ceil(k·d), design.md
+// Decision 8) and never consults common.Tuning(); Tuning().ScanDuration is the
+// deleted lattice-era 360° sweep's flat constant, and 7.1 deletes the field
+// itself. An assertion over a constant no behaviour reads protects nothing.
 func TestDefaultTuning_PacingIsPositive(t *testing.T) {
 	d := DefaultTuning()
 	if d.MsPerTile <= 0 {
@@ -37,9 +45,6 @@ func TestDefaultTuning_PacingIsPositive(t *testing.T) {
 	}
 	if d.LaneMsPerDistance <= 0 {
 		t.Errorf("LaneMsPerDistance = %f, must be > 0 (else travel is free)", d.LaneMsPerDistance)
-	}
-	if d.ScanDuration <= 0 {
-		t.Errorf("ScanDuration = %d, must be > 0 (else scans resolve instantly)", d.ScanDuration)
 	}
 	if d.OrbitBasePeriod <= 0 {
 		t.Errorf("OrbitBasePeriod = %d, must be > 0 (orbit math divides by the period)", d.OrbitBasePeriod)
