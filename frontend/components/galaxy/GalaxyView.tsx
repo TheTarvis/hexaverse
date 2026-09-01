@@ -300,12 +300,28 @@ export function GalaxyView() {
     [stop],
   )
   const handleJump = useCallback(() => {
-    toast.error('No charted lane known for this gate')
+    // Jump is now offered on attachment alone (isGateBody below, task 4.10)
+    // — but there is no laneId on this read to name useJump's required
+    // parameter yet (the same wiring gap SystemBoardView documents),
+    // distinct from (and no longer about) charted knowledge.
+    toast.error('This gate cannot be jumped from yet — no lane id on this read')
   }, [])
-  // See SystemBoardView's identical note: `LaneGate` carries no body id, so
-  // there is no wire field to correlate a gate BODY id (`attachedTo`) with a
-  // charted lane — a backend gap, not invented around here either.
-  const isChartedGate = () => false
+  // isGateBody: "is the body this fleet is attached to a lane-gate body at
+  // all?" (replace-observation-with-sightings tasks.md 4.10; fleet-roster
+  // ADDED "The Roster Row Is the Fleet Command Surface, Jump Gated by
+  // Attachment Alone"). No charted-lane precondition — charting is map
+  // knowledge, never a permission (design.md Decision 2). A gate body id
+  // follows `system.gateId`'s own "gate-"+destSystemId convention and names
+  // only the DESTINATION system, never the origin it sits in — so a valid
+  // gate body can be identified from `galaxy.links` alone (already fetched
+  // here) without knowing which system the attached fleet is physically in:
+  // a "gate-X" body is a real lane gate exactly when X is one endpoint of
+  // some charted-galaxy lane.
+  const isGateBody = (bodyId: string) => {
+    if (!bodyId.startsWith('gate-')) return false
+    const destId = bodyId.slice('gate-'.length)
+    return galaxy?.links.some((l) => l.source === destId || l.target === destId) ?? false
+  }
 
   if (isLoading) {
     return (
@@ -432,7 +448,7 @@ export function GalaxyView() {
           />
           <FleetRoster
             worldTime={worldTime}
-            isChartedGate={isChartedGate}
+            isChartedGate={isGateBody}
             activeFleetId={activeFleetId}
             onSelect={(f) => {
               setActiveFleetId(f.id)

@@ -31,10 +31,21 @@ import (
 //
 // contact_test.go asserts the absence of those fields by reflection, so
 // adding one is a test failure rather than a review miss.
+//
+// Scanning is a fourth reported field, distinct from Emitting (a
+// zero-velocity ship running a focused sweep has no drive output to report
+// as emission) — proximity-disclosure "A Sweep's Emission Radius Scales
+// With Its Range" (design.md Decision 9). Its DERIVATION — the
+// range-scaled sweep-emission radius, and folding it into detectionRadius
+// — is the focused-scan verb's own work (replace-observation-with-sightings
+// tasks.md 5.1/5.5, section 5, out of scope here): today every disclosed
+// Contact carries Scanning at its zero value, false, until that section
+// wires a stored sweep window for Disclose to read.
 type Contact struct {
 	Position space.Vec3
 	Velocity space.Vec3
 	Emitting bool
+	Scanning bool
 }
 
 // Disclose evaluates whether target is disclosed to obs at world time t,

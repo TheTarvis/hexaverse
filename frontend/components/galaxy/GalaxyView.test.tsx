@@ -467,6 +467,41 @@ describe('GalaxyView', () => {
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Drive cut')
   })
 
+  // --- jump gating (replace-observation-with-sightings tasks.md 4.10,
+  // fleet-roster ADDED "The Roster Row Is the Fleet Command Surface, Jump
+  // Gated by Attachment Alone") -----------------------------------------
+  //
+  // THE SAME DEFECT AS SystemBoardView.test.tsx's own jump-gating tests, in
+  // the second of the two places design.md's own "isChartedGate below (the
+  // same backend gap SystemBoardView documents)" comment names:
+  // GalaxyView.tsx also hardcodes `isChartedGate = () => false`. Unlike
+  // SystemBoardView (which reads a single system's `board.laneGates`), the
+  // data this predicate needs at the galaxy tier is `galaxy.links` — already
+  // fetched here (see "marks the fleet's system on the graph" above, and the
+  // per-system lane-count derivation a few lines up in the component) — a
+  // link's `source`/`target` are exactly the two systems the fleet's own
+  // `attachedTo` gate id ("gate-"+destSystemId) could name. No new data
+  // source is required; this is the identical wiring bug, not a materially
+  // harder one, once `galaxy.links` is consulted instead of a per-system
+  // `laneGates` array.
+  it('offers jump on a roster row for a fleet attached to a lane-gate body, with no charted-lane precondition', () => {
+    mockGalaxyState()
+    const atGate: Fleet = { ...parkedFleet('fleet_1', 'sys-0'), attachedTo: 'gate-sys-1' }
+    mockUseMyFleets.mockReturnValue({ data: [atGate] } as unknown as ReturnType<typeof useMyFleets>)
+    renderView()
+
+    expect(screen.getByTestId('fleet-cmd-jump-fleet_1')).toBeInTheDocument()
+  })
+
+  it('withholds jump on a roster row for a fleet attached to an ordinary (non-gate) body', () => {
+    mockGalaxyState()
+    const atBody: Fleet = { ...parkedFleet('fleet_1', 'sys-0'), attachedTo: 'body-somewhere' }
+    mockUseMyFleets.mockReturnValue({ data: [atBody] } as unknown as ReturnType<typeof useMyFleets>)
+    renderView()
+
+    expect(screen.queryByTestId('fleet-cmd-jump-fleet_1')).not.toBeInTheDocument()
+  })
+
   // --- renderer availability (add-renderer-availability-states) --------------
   //
   // The mocked '@/components/galaxy/GalaxyGraph' above stands in for the

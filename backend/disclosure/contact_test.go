@@ -166,21 +166,33 @@ func TestDisclose_AHeldSightingNeverFeedsTheLivePath(t *testing.T) {
 // Scenario: A live contact withholds composition (proximity-disclosure › "A
 // Scan Resolves Composition That a Live Contact Withholds"). tasks.md 7.5.
 //
+// DELIBERATELY WIDENED to four fields by replace-observation-with-sightings
+// §4 (tasks.md 4.5, design.md Decision 9, proximity-disclosure "A Sweep's
+// Emission Radius Scales With Its Range": "disclosure/contact_test.go
+// asserts Contact's field set by reflection; adding Scanning to that field
+// set is a deliberate edit to that test, made in this change, and not a
+// silent drift the test happened to permit"). This is a NAMED, SPEC-MANDATED
+// test edit, not a silent weakening: the set grows from three fields to
+// four, and every one of the original three assertions (Position, Velocity,
+// Emitting present; nothing identifying or compositional) survives
+// unchanged. See the SDET handoff report.
+//
 // Asserted by reflection over the wire type rather than by reading it,
 // because the failure mode is somebody adding a convenient field later. The
 // positive half matters too: a contact that carried nothing would pass a
 // pure absence check.
-func TestContact_CarriesKinematicsAndNothingIdentifying(t *testing.T) {
+func TestContact_CarriesKinematicsScanningStateAndNothingIdentifying(t *testing.T) {
 	typ := reflect.TypeOf(Contact{})
 
-	want := map[string]bool{"Position": true, "Velocity": true, "Emitting": true}
+	want := map[string]bool{"Position": true, "Velocity": true, "Emitting": true, "Scanning": true}
 	got := map[string]bool{}
 	for i := 0; i < typ.NumField(); i++ {
 		got[typ.Field(i).Name] = true
 	}
 	for name := range want {
 		if !got[name] {
-			t.Errorf("Contact has no %s field; a live contact reports position, velocity, and emitting state", name)
+			t.Errorf("Contact has no %s field; a live contact reports position, velocity, emitting state, and "+
+				"scanning state (proximity-disclosure \"A Sweep's Emission Radius Scales With Its Range\")", name)
 		}
 	}
 
@@ -196,7 +208,7 @@ func TestContact_CarriesKinematicsAndNothingIdentifying(t *testing.T) {
 				t.Errorf("Contact.%s reads as composition or identity; a live contact carries neither", field)
 			}
 		}
-		t.Errorf("Contact.%s is not one of the three fields a live contact is specified to carry", field)
+		t.Errorf("Contact.%s is not one of the four fields a live contact is specified to carry", field)
 	}
 }
 

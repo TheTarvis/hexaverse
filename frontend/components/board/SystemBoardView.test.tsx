@@ -595,4 +595,44 @@ describe('SystemBoardView', () => {
     fireEvent.click(screen.getByTestId('fleet-row-mine'))
     expect(push).toHaveBeenCalledWith('/')
   })
+
+  // --- jump gating (replace-observation-with-sightings tasks.md 4.10,
+  // fleet-roster ADDED "The Roster Row Is the Fleet Command Surface, Jump
+  // Gated by Attachment Alone") -----------------------------------------
+
+  // Scenario: Jump is offered while attached to any lane-gate body.
+  //
+  // THE REAL DEFECT THIS SECTION CLOSES: `rosterCommandVisibility` itself
+  // (roster-commands.ts) already offers jump correctly given a predicate
+  // that reports "is this body a lane gate" — its own contract never
+  // depended on charted knowledge. The bug lives one layer up, at this
+  // component's own composition root: `isChartedGate` here is hardcoded to
+  // `() => false` (see SystemBoardView.tsx's own comment, "conservatively
+  // false" pending a backend gap that design.md Decision 5 already closed —
+  // every lane-gate body ships unfiltered on `board.laneGates`, correlatable
+  // to `attachedTo` by the same "gate-"+destSystemId convention the backend
+  // itself uses). A pure-function test of roster-commands.ts cannot catch
+  // this: it would inject a correct predicate and observe correct output,
+  // exactly as roster-commands.test.ts already does. Only a test that
+  // mounts THIS component and lets it compute its own predicate from
+  // `board.laneGates` can catch a wiring regression here — the same
+  // standing rule as the backend's router-level tests in this section.
+  it('offers jump on a roster row attached to a lane-gate body, with no charted-lane precondition', () => {
+    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }] }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    myFleetsState([{ ...ownFleet, attachedTo: 'gate-sys-9' }])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    expect(screen.getByTestId('fleet-cmd-jump-mine')).toBeInTheDocument()
+  })
+
+  // Scenario: Jump is withheld when not attached to a gate.
+  it('withholds jump on a roster row attached to an ordinary (non-gate) body', () => {
+    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }] }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    myFleetsState([{ ...ownFleet, attachedTo: 'p-1' }])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    expect(screen.queryByTestId('fleet-cmd-jump-mine')).not.toBeInTheDocument()
+  })
 })

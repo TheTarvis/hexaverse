@@ -220,7 +220,7 @@ def run_transcendental_check(file_path: str) -> Optional[dict]:
 # The Go packages whose outputs are rule-bearing (persisted values, solve
 # results, ETAs, disclosure decisions) — the transcendental lint's scope gate.
 # Must match check-transcendental.sh's own gate.
-DETERMINISM_GO_PACKAGES = ("board", "fleet", "mine", "galaxy", "system", "corporations", "market")
+DETERMINISM_GO_PACKAGES = ("board", "polar", "space", "disclosure", "fleet", "mine", "galaxy", "system", "corporations", "market")
 
 
 def print_deviation_register():

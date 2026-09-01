@@ -8,10 +8,11 @@ package system
 // map. It is an UNFILTERED, requester-agnostic internal seam — see Ids's own
 // doc — never a response, in whole, in part, or as a derived count.
 //
-// Zero consumers today, exactly as `space` and `disclosure` were when they
-// landed (design.md Non-Goals): `fleet` still flies the lattice,
-// `observation` still serves fog, `mine`/`market`/`stations` still resolve
-// through `board`.
+// This package's own interior handler is now a real consumer (Contacts,
+// contacts.go — replace-observation-with-sightings tasks.md 4.4/4.5/4.7):
+// every body's continuous position/size and the requester's live disclosure
+// union both resolve through this table. `mine`/`market`/`stations` still
+// resolve through `board`; the lattice's own deletion is a later link.
 
 import (
 	"context"
@@ -80,11 +81,14 @@ func (t *BodyTable) Ids() []string { return t.ids }
 
 var _ space.Bodies = (*BodyTable)(nil)
 
-// asDisclosureWorld is a compile-time-only capability check (task 7.6):
-// *BodyTable satisfies space.Bodies and carries exactly what
-// disclosure.World needs (Bodies, StarId, StarSize) to be constructed from
-// it. system has zero disclosure consumers today; this function is never
-// called in production.
+// asDisclosureWorld builds the base disclosure.World a BodyTable carries
+// everything for (Bodies, StarId, StarSize) — Attachments and SystemId are
+// per-read facts this function has no way to know, so contacts.go's own
+// Contacts sets them on the returned value before evaluating anything.
+// Originally a compile-time-only capability check with no production
+// caller (task 7.6 of migrate-fleet-to-continuous-burns); Contacts
+// (contacts.go, tasks.md 4.4/4.5 of replace-observation-with-sightings) is
+// this package's first real consumer.
 func asDisclosureWorld(t *BodyTable) disclosure.World {
 	return disclosure.World{Bodies: t, StarId: t.StarId(), StarSize: t.StarSize()}
 }

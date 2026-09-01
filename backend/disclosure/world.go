@@ -78,6 +78,12 @@ type World struct {
 	StarId string
 	// StarSize is the star's radius, the occlusion sphere's size.
 	StarSize float64
+	// SystemId is the id of the system this World describes — additive
+	// (replace-observation-with-sightings design.md Decision 16; tasks.md
+	// 4.3): a bare Vec3 is meaningless without the system it is in, and every
+	// disclosure.Sighting this capability computes must carry it (see
+	// FocusedScan, sighting.go).
+	SystemId string
 }
 
 // Ship is the disclosure-relevant view of one ship. Every field is a STORED

@@ -95,7 +95,13 @@ function fleet(overrides: Record<string, unknown> = {}): Fleet {
 }
 
 const noChartedGates = () => false
-const allGatesCharted = () => true
+// Renamed from allGatesCharted (replace-observation-with-sightings tasks.md
+// 4.10): the injected predicate's SEMANTICS moved from "is this gate's lane
+// charted" to "is this body a lane gate at all" — jump no longer has a
+// charted-knowledge precondition — even though rosterCommandVisibility's own
+// call shape (a single (bodyId: string) => boolean) never changed.
+const isAnyLaneGate = () => true
+const noGateBodies = () => false
 
 describe('rosterCommandVisibility — fleet-roster ADDED "The Roster Row Is the Fleet Command Surface"', () => {
   // Scenario: Burn is always available
@@ -128,24 +134,34 @@ describe('rosterCommandVisibility — fleet-roster ADDED "The Roster Row Is the 
     expect(rosterCommandVisibility(fleet({ state: parkState() }), 0, noChartedGates).stop).toBe(false)
   })
 
-  // Scenario: Jump is offered only while attached to a charted gate
-  it('offers jump while attached to a body whose gate lane is charted', () => {
-    const v = rosterCommandVisibility(fleet({ state: parkState(), attachedTo: 'gate-1' }), 0, allGatesCharted)
+  // Scenario: Jump is offered while attached to any lane-gate body
+  // (fleet-roster ADDED "The Roster Row Is the Fleet Command Surface, Jump
+  // Gated by Attachment Alone" — replace-observation-with-sightings tasks.md
+  // 4.10, design.md Decision 2: charting is map knowledge and a sellable
+  // intel product, never a permission, so jump is offered on attachment
+  // ALONE, with no dependency on whether the corporation has charted the
+  // gate's lane).
+  //
+  // rosterCommandVisibility's own jump logic (`!!attachedTo &&
+  // isGateBody(attachedTo)`) is unchanged from before this rename — it was
+  // always agnostic to what its injected predicate actually tests. The
+  // REGRESSION this section closes lives entirely in the predicate the
+  // MOUNTING VIEW hands in (SystemBoardView.tsx / GalaxyView.tsx, both
+  // hardcoded to `() => false` — see the dedicated composition-root test in
+  // SystemBoardView.test.tsx). This test is retitled/renamed
+  // (allGatesCharted → isAnyLaneGate) to state the CURRENT contract rather
+  // than the superseded charted-lane one; its assertion is unchanged.
+  it('offers jump while attached to any lane-gate body, charted or not', () => {
+    const v = rosterCommandVisibility(fleet({ state: parkState(), attachedTo: 'gate-1' }), 0, isAnyLaneGate)
     expect(v.jump).toBe(true)
   })
 
   // Scenario: Jump is withheld when not attached to a gate
   it('withholds jump when unattached, or attached to a non-gate body', () => {
-    expect(rosterCommandVisibility(fleet({ state: parkState() }), 0, allGatesCharted).jump).toBe(false)
+    expect(rosterCommandVisibility(fleet({ state: parkState() }), 0, isAnyLaneGate).jump).toBe(false)
     expect(
-      rosterCommandVisibility(fleet({ state: parkState(), attachedTo: 'planet-1' }), 0, noChartedGates).jump,
+      rosterCommandVisibility(fleet({ state: parkState(), attachedTo: 'planet-1' }), 0, noGateBodies).jump,
     ).toBe(false)
-  })
-
-  // Scenario: Jump is withheld at an uncharted gate
-  it('withholds jump at a gate whose lane is not charted', () => {
-    const v = rosterCommandVisibility(fleet({ state: parkState(), attachedTo: 'gate-1' }), 0, noChartedGates)
-    expect(v.jump).toBe(false)
   })
 
   // A burn past its own arrival must be read as settled (park), not burn —

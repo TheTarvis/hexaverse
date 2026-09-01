@@ -29,6 +29,25 @@ type ServiceInterface interface {
 	LaneGates(ctx context.Context, systemID string, radius int) ([]LaneGate, error)
 }
 
+// ContactsSource resolves everything the interior read needs beyond the
+// stored interior itself — every body's continuous position/size and the
+// requester corporation's own live disclosure of foreign ship presence
+// (tasks.md 4.4, 4.5, 4.7) — behind ONE seam, deliberately never exposing
+// the body table type by name to system/handler.go
+// (system-body-table's own "The Body Table Is an Unfiltered Internal Seam,
+// Never a Response": bodies_test.go's assertNoHandlerReferences greps every
+// handler.go in the repo for the literal substring "BodyTable", so the
+// interior handler must never spell the type even in a variable
+// declaration). A separate handler-level seam, exactly like
+// BoardFog/DueActions in handler.go, so that this package's own
+// pre-existing ServiceInterface fakes (fog_test.go and friends) need not
+// grow this method just to keep compiling. Satisfied structurally by
+// *Service (contacts.go), wired at the composition root (router.go)
+// alongside WithFog/WithActions.
+type ContactsSource interface {
+	InteriorReadExtras(ctx context.Context, systemID, requesterCorpId string, features []fogFeatureDTO, gates []LaneGate, now common.WorldMillis) (InteriorExtras, error)
+}
+
 // StationSource supplies a system's trading station as a board feature (#0011).
 // Consumer-declared here so `system` never imports the station package — the
 // station package imports THIS one (for Orbit, the feature shape, and the
@@ -45,6 +64,10 @@ type Service struct {
 	// stations splices the system's station into every interior read. Nil ⇒ no
 	// station is ever spliced, which is exactly the pre-#0011 behaviour.
 	stations StationSource
+	// fleets supplies the interior read's contact union (tasks.md 4.4, 4.5).
+	// Nil ⇒ Contacts always answers empty, mirroring stations' own
+	// no-dependency-no-feature degradation.
+	fleets FleetSource
 }
 
 // WithStations wires the station splice. Post-construction, like fleet's
@@ -52,6 +75,17 @@ type Service struct {
 // alongside this one.
 func (s *Service) WithStations(src StationSource) *Service {
 	s.stations = src
+	return s
+}
+
+// WithFleets wires the interior read's contact union source (tasks.md 4.1,
+// 4.4), post-construction like WithStations, since the fleet service is
+// constructed alongside this one at the composition root and this package
+// must never import it directly (system/never_imports_sightings_test.go's
+// own narrow rule generalizes: the dependency runs fleet -> system, for
+// BodySource, so it cannot run the other way too without a cycle).
+func (s *Service) WithFleets(src FleetSource) *Service {
+	s.fleets = src
 	return s
 }
 

@@ -171,17 +171,19 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   // user action.
   const runningMine = useRunningMine(activeFleet?.id ?? null).data ?? null
 
-  // isChartedGate: the fleet-roster jump command's gate — "is the body this
-  // fleet is attached to a lane gate whose lane the corporation has
-  // charted?" `LaneGate` (lib/types/system-board.ts) carries no body id, only
-  // {destSystemId, cell} — there is no wire field correlating a gate BODY id
-  // (what `attachedTo` holds) with a charted lane gate entry. That is a
-  // backend gap, not a frontend one (a `LaneGate.bodyId` field, or
-  // equivalent, would close it) — recorded, not invented around. Until it
-  // exists this predicate is conservatively `false`, which is also exactly
-  // what a fresh corporation reaches today regardless (spawn charts zero
-  // lanes; the focused-scan verb that would chart one is link 5's).
-  const isChartedGate = () => false
+  // isGateBody: the fleet-roster jump command's gate — "is the body this
+  // fleet is attached to a lane-gate body at all?" (replace-observation-
+  // with-sightings tasks.md 4.10; fleet-roster ADDED "The Roster Row Is the
+  // Fleet Command Surface, Jump Gated by Attachment Alone"). No charted-lane
+  // precondition — charting is map knowledge, never a permission (design.md
+  // Decision 2), and the corporation's charted set arrives on a separately
+  // cadenced `GET /v1/galaxy` read that would otherwise impose a client-side
+  // dwell the no-dwell ruling forbids. `board.laneGates` ships every gate on
+  // this system's rim unfiltered by charted knowledge since §1 dropped the
+  // charted-lane tier filter server-side; a gate body id follows
+  // `system.gateId`'s own "gate-"+destSystemId convention, so it correlates
+  // to `attachedTo` by re-deriving that same id from each entry.
+  const isGateBody = (bodyId: string) => board?.laneGates.some((g) => `gate-${g.destSystemId}` === bodyId) ?? false
 
   const etaCandidates = useMemo(
     () => (runningMine?.status === 'running' ? [runningMine.eta] : []),
@@ -257,10 +259,12 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     })
   }
   const handleJump = (_fleet: Fleet) => {
-    // Unreachable while `isChartedGate` is conservatively false (see above) —
-    // `jump` (useJump()) is wired here for when the backend gap closes, but
-    // there is no laneId to send yet, so this refuses rather than guesses.
-    toast.error('No charted lane known for this gate')
+    // Jump is now offered on attachment alone (isGateBody above, task 4.10)
+    // — but `LaneGate` (lib/types/system-board.ts) still carries no laneId,
+    // only {destSystemId, cell}, so there is no wire field to name useJump's
+    // required `laneId` yet. Refuses rather than guesses; a genuine
+    // wiring gap, distinct from (and no longer about) charted knowledge.
+    toast.error('This gate cannot be jumped from yet — no lane id on this read')
   }
 
   // --- mine / sell (kept board-view requirements: Mine Offer/ETA/Commit,
@@ -345,7 +349,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
         <div className="flex flex-col gap-4 self-start">
           <FleetRoster
             worldTime={worldTime}
-            isChartedGate={isChartedGate}
+            isChartedGate={isGateBody}
             activeFleetId={activeFleet?.id ?? null}
             currentSystemId={systemId}
             onSelect={(f) => {

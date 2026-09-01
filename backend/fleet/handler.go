@@ -41,10 +41,15 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 }
 
 // Get returns the requester's own fleet in full; a fleet belonging to
-// another corporation 404s outright (fleet-movement "Fleet Read Endpoints
-// Serve Own Fleets Only" — design.md Decision 11: there is no per-fleet
-// audience fog left to redact through, only unconditional omission, mirrored
-// here from List's own ownership check).
+// another corporation 404s outright — permanently, not an interim
+// (fleet-movement "Fleet Read Endpoints Serve Own Fleets In Full and
+// Foreign Fleets As Contacts", replace-observation-with-sightings design.md
+// Decision 7: a foreign fleet has no addressable identity, so this 404 is
+// not a redaction, it is the shipped absence semantics — "a direct read of
+// an undisclosed entity is indistinguishable from absence." Foreign
+// presence reaches a client through the interior read's `contacts`
+// projection and nowhere else, mirrored here from List's own ownership
+// check).
 func (h *Handler) Get(c *gin.Context) {
 	f, err := h.svc.Get(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"))
 	if err != nil {
@@ -64,11 +69,11 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 // List returns every fleet the requester may see in a system: their own
-// units in full; foreign fleets are omitted entirely (fleet-movement "Fleet
-// Read Endpoints Serve Own Fleets Only" — the interim replacing per-fleet
-// audience fog, design.md Decision 11: own fleets are returned in full, a
-// foreign fleet is omitted from a list read). Read-only: it never settles a
-// due arrival.
+// units in full; foreign fleets are omitted entirely — permanently
+// (fleet-movement "Fleet Read Endpoints Serve Own Fleets In Full and
+// Foreign Fleets As Contacts": own fleets are returned in full, a foreign
+// fleet is omitted from a list read, `mine=true` with no corporation
+// returns an empty list). Read-only: it never settles a due arrival.
 func (h *Handler) List(c *gin.Context) {
 	requesterCid := common.ActorCorp(c)
 	ctx := c.Request.Context()

@@ -37,9 +37,16 @@ const (
 	FeatureRadiation   FeatureType = "radiation"
 	// FeatureStation is an NPC/player trading station (#0011). Unlike every other
 	// type here it is NOT produced by the generator and never lives in the
-	// features subcollection — it is spliced into a read from its own store. It
-	// is also excluded from the fog/scan feature source: it occludes nothing and
-	// no scan ever mints an observation for it.
+	// features subcollection — it is spliced into a read from its own store.
+	// It ships in full, unconditionally, exactly like any other body
+	// (replace-observation-with-sightings design.md Decision 4/9,
+	// system-interior "Bodies Are Public; Ships Are Disclosed"): the
+	// per-feature observation model that used to exclude it from a
+	// fog/scan feature source is gone along with that model, so there is
+	// nothing left to exclude it from. occlusionRadius2 still reports zero
+	// for it (proximity-disclosure's own occlusion rule occludes only by
+	// the star) — that is a fact about occlusion, not a survivor of the
+	// deleted fog/scan feature source.
 	FeatureStation FeatureType = "station"
 )
 

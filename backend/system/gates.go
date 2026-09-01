@@ -5,7 +5,9 @@ import (
 	"sort"
 
 	"hexaverse/board"
+	"hexaverse/common"
 	"hexaverse/galaxy"
+	"hexaverse/space"
 )
 
 // LaneGate is a charted lane's fixed gate cell on this system's board — the
@@ -19,6 +21,42 @@ import (
 type LaneGate struct {
 	DestSystemId string     `json:"destSystemId"`
 	Cell         board.Cell `json:"cell"`
+	// Space/Size are the gate body's continuous position and physical
+	// radius, additive alongside Cell (replace-observation-with-sightings
+	// design.md Decisions 5/26; tasks.md 4.7 — "every body, bodies and gate
+	// bodies alike, carries a continuous position and size"). Zero-valued
+	// when no body table was available to resolve them (GetInterior's own
+	// degradation) — filled by the interior handler, never by LaneGates
+	// itself, which has no body table to resolve them from.
+	Space space.Vec3 `json:"space"`
+	Size  float64    `json:"size"`
+}
+
+// fillGateGeometry additively populates gates' Space/Size fields from a
+// resolved body table — a second pass over LaneGates' own output rather
+// than a BodyTable parameter threaded through LaneGates itself, since
+// LaneGates' existing signature and tests (gates_test.go) predate this
+// capability and name no such dependency. Degrades a gate to a zero
+// Space/Size (never dropping it, never failing the read) when its body
+// isn't resolvable in bt — the same "an unfiltered body list may still
+// individually degrade" posture BodyTable's own gate derivation already
+// takes (bodies.go: addGates).
+func fillGateGeometry(gates []LaneGate, bt *BodyTable, now common.WorldMillis) {
+	if bt == nil {
+		return
+	}
+	for i := range gates {
+		body, ok := bt.Body(gateId(gates[i].DestSystemId))
+		if !ok {
+			continue
+		}
+		pos, err := space.Position(bt, gateId(gates[i].DestSystemId), now)
+		if err != nil {
+			continue
+		}
+		gates[i].Space = pos
+		gates[i].Size = body.Size
+	}
 }
 
 // LaneGates returns every lane gate on the given system's board: for each lane

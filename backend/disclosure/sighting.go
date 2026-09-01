@@ -39,6 +39,14 @@ var ErrScanOccluded = errors.New("disclosure: focused-scan target occluded by th
 // way a value of it comes into existence, and sighting_test.go asserts that
 // structurally.
 type Sighting struct {
+	// SystemId is the id of the system this sighting was computed in
+	// (proximity-disclosure "A Disclosure-Computed Sighting Carries Its
+	// System"; design.md Decision 16) — a bare position is not resolvable to
+	// a place without it. Set by every path that mints a Sighting value
+	// (FocusedScan below, reading it off the World it was given); NOT a
+	// MintSighting parameter, since MintSighting's signature is pinned by
+	// sighting_test.go's already-committed call sites.
+	SystemId string
 	// AsOf is the world time the pulse reached the target. Every other
 	// field is frozen at this moment and stays frozen as the world moves on.
 	AsOf common.WorldMillis
@@ -174,10 +182,15 @@ func FocusedScan(w World, scanner space.Vec3, hostId string, ships map[string]Sh
 		if err != nil {
 			return nil, err
 		}
+		// SystemId is not a MintSighting parameter (see Sighting's own doc
+		// comment) — every computed Sighting value carries the World it was
+		// computed against, set here rather than threaded through the
+		// signature sighting_test.go's committed call sites already pin.
+		s.SystemId = w.SystemId
 		out = append(out, s)
 	}
 	if len(out) == 0 {
-		return []Sighting{{AsOf: t, HostId: hostId, CleanSweep: true}}, nil
+		return []Sighting{{SystemId: w.SystemId, AsOf: t, HostId: hostId, CleanSweep: true}}, nil
 	}
 	return out, nil
 }

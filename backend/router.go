@@ -95,6 +95,11 @@ func SetupRouter() *gin.Engine {
 	// Decision 22, blocker 3) — a required constructor parameter here, not a
 	// post-construction accessor that a future refactor could silently drop.
 	fleetSvc := fleet.NewServiceComplete(fleet.NewDao(), systemSvc, galaxySvc, actionSvc, clock)
+	// The interior read's contact union (replace-observation-with-sightings
+	// tasks.md 4.1, 4.4, 4.5): systemSvc consumes fleetSvc as its
+	// system.FleetSource, structurally — system never imports fleet (that
+	// dependency already runs the other way, for BodySource).
+	systemSvc.WithFleets(fleetSvc)
 
 	// Register the burn resolver, folding a settled arrival through the same
 	// BodySource (design.md Decision 16, 21A — BurnResolver folds
@@ -149,7 +154,7 @@ func SetupRouter() *gin.Engine {
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
 	corpHandler.RegisterRoutes(authorized, strictLimit)
 	galaxy.NewHandler().WithFog(galaxyFogAdapter{fogSvc}).RegisterRoutes(authorized)
-	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).WithActions(actionSvc).RegisterRoutes(authorized)
+	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).WithActions(actionSvc).WithContacts(systemSvc).RegisterRoutes(authorized)
 
 	actionHandler := action.NewHandler(actionSvc)
 	actionHandler.RegisterRoutes(authorized)

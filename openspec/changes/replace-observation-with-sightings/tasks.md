@@ -138,6 +138,10 @@
       `asOf`, whether the target was emitting, its hull count, and its hull
       types (`disclosure.Sighting` already carries all of this; the model
       here is the stored superset that adds provenance around it).
+      **The "no update/delete function" clause is a permanent structural
+      guard rather than a red-to-green scenario — it can only be checked
+      once the package has production content, so it rides along with this
+      task's other work and never has a red run of its own.**
       (sighting-records: *A Sighting Carries Its Own Provenance* — A minted
       sighting carries its system; A minted sighting carries its provenance
       fields; A minted sighting carries its kinematic and composition
@@ -184,6 +188,11 @@
       (`fleet-movement`'s *Fleet Read Endpoints Serve Own Fleets In Full
       and Foreign Fleets As Contacts*) and are therefore never on this
       path.
+      **This check is a permanent structural guard, not a red-to-green
+      scenario: it is true both before and after `backend/sightings`
+      exists, so no reviewer should expect to reproduce a red run for it.**
+      The two behavioural scenarios cited below are NOT satisfied by this
+      guard — they need §4's `contacts` assembly and are written there.
       (sighting-records: *A Sighting Is Never Consulted To Decide Live
       Disclosure* — Holding a sighting does not disclose its target live; A
       sighting for a target now out of range is absent from contacts; No
@@ -197,21 +206,27 @@
 
 ## 4. `disclosure` Wiring
 
-- [ ] 4.1 Implement a `disclosure.Attachments` adapter over
+- [x] 4.1 Implement a `disclosure.Attachments` adapter over
       `fleet.Fleet.AttachedTo`/`DockedTo` (`HostOf`, `AttachedTo`), wired at
       the composition root — the seam `ScanResolver` (section 5) and the
       interior read (this section) both consume.
-- [ ] 4.2 Widen masking from "a ship docked to a host" to any attached
+- [x] 4.2 Widen masking from "a ship docked to a host" to any attached
       object.
       (proximity-disclosure: *A Docked Ship Is Masked and Registers Only As
       Its Host* — A masked ship is not disclosed inside passive range; The
       host's disclosure is identical either way; The masking predicate
       applies to any attached id, not just ships)
-- [ ] 4.3 Add `Sighting.SystemId` and thread it through `MintSighting` and
-      every computed `disclosure.Sighting` value.
+- [x] 4.3 Add `Sighting.SystemId` and thread it through every computed
+      `disclosure.Sighting` value. Threaded via a new additive
+      `World.SystemId` with `FocusedScan`'s signature unchanged (it already
+      takes `World`, so it reads `w.SystemId` internally) rather than by
+      changing `MintSighting`'s signature — no scenario requires that
+      specific call site, and changing it would have broken §3's immutable
+      `sighting_test.go` call sites for a phrase that states intent, not a
+      signature contract.
       (proximity-disclosure: *A Disclosure-Computed Sighting Carries Its
       System* — A computed sighting names its system)
-- [ ] 4.4 Implement "Disclosure to a Corporation Is the Union Over Its Own
+- [x] 4.4 Implement "Disclosure to a Corporation Is the Union Over Its Own
       Assets": union across the requester's own fleets present in the
       system, deduplicated by target, a masked/docked own fleet still
       contributing, a lane-transiting own fleet contributing nothing.
@@ -220,7 +235,7 @@
       disclosed; A target seen by more than one own fleet is disclosed
       exactly once; A masked, docked own fleet still observes; A fleet in
       lane transit contributes no observation)
-- [ ] 4.5 In the system interior handler, resolve the body table once, run
+- [x] 4.5 In the system interior handler, resolve the body table once, run
       the union from 4.4, dedup, and add a top-level `contacts` array
       alongside `features`/`laneGates`, empty for a corpless requester. The
       handler SHALL NOT read or join against the `sightings` store when
@@ -238,7 +253,7 @@
       (sighting-records: *A Sighting Is Never Consulted To Decide Live
       Disclosure* — A sighting for a target now out of range is absent from
       contacts)
-- [ ] 4.6 Delete `projectUnfogged`'s per-feature fog framing; serve every
+- [x] 4.6 Delete `projectUnfogged`'s per-feature fog framing; serve every
       body of a materialized system's interior in full to every
       authenticated requester unconditionally, computing no per-requester
       band.
@@ -250,7 +265,7 @@
       (system-body-table: *The Body Table Is an Unfiltered Internal Seam,
       Never a Response* — The table carries bodies the requester could not
       see; No response field is derived from the unfiltered table)
-- [ ] 4.7 Extend the interior response additively: continuous position and
+- [x] 4.7 Extend the interior response additively: continuous position and
       size on every body (bodies and gate bodies alike), alongside — never
       replacing — the pre-existing lattice footprint, `band` (constant
       `"visible"`), and `live` (constant `true`).
@@ -258,7 +273,7 @@
       system; No live galaxy; A materialized system's read carries every
       body's continuous position and size; Pre-existing wire fields are
       unchanged)
-- [ ] 4.8 Make `GET /v1/fleets/:fleetId`, `GET /v1/fleets?systemId=`, and
+- [x] 4.8 Make `GET /v1/fleets/:fleetId`, `GET /v1/fleets?systemId=`, and
       `GET /v1/fleets?mine=true` permanently own-fleets-only: a foreign
       fleet 404s on direct fetch and is omitted from every list read, own
       fleets always return in full, `mine=true` with no corp returns an
@@ -267,7 +282,7 @@
       Foreign Fleets As Contacts* — A foreign fleet is omitted from a list
       read; A foreign fleet 404s on a direct fetch; Own fleets are always
       returned in full; mine=true with no corp returns an empty list)
-- [ ] 4.9 Delete the code this section supersedes — the old fully-disclosed
+- [x] 4.9 Delete the code this section supersedes — the old fully-disclosed
       interim's comment/framing (`system/fog.go`), the old own-fleets-only
       interim wording — and confirm no dangling reference to
       `observation.Tier`-keyed feature fog remains in `system`. In the same
@@ -279,7 +294,7 @@
       any other body, and `proximity-disclosure`'s occlusion rule occludes
       only by the star, so there is nothing left for the station to be
       excluded from.
-- [ ] 4.10 **Frontend.** Drop `fleet-roster`'s client-side charted-lane
+- [x] 4.10 **Frontend.** Drop `fleet-roster`'s client-side charted-lane
       check on the jump command: offer jump whenever the fleet is attached
       to a lane-gate body, with no dependency on the corporation's charted
       set (which arrives on a separately cadenced `GET /v1/galaxy` read).
