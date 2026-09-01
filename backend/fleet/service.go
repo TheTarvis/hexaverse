@@ -28,6 +28,12 @@ const burnType = "burn"
 // exactly as burnType wraps fleet.State.Burn.
 const jumpType = "jump"
 
+// scanType is the action dispatch key for a fleet's focused scan
+// (focused-scan "A Focused Sweep Commits On the Sensor Channel"; design.md
+// Decision 8) — committed on the sensor channel (action.SlotSensor),
+// independent of the movement channel burn/jump claim.
+const scanType = "scan"
+
 // actorCollection is where fleet docs live, so the action domain can claim and
 // release the single-action slot generically without importing this package.
 const actorCollection = "fleets"
@@ -79,6 +85,15 @@ var (
 	// replace-observation-with-sightings: charting is map knowledge and a
 	// sellable intel product, never a permission).
 	ErrJumpNotAttached = errors.New("fleet: jump requires attachment to the lane's own gate body")
+	// ErrScanHostUnresolved rejects a focused scan whose hostId does not
+	// resolve, at commit time, to a body or to a fleet owned by the
+	// scanning fleet's own corporation, present in the scanning fleet's own
+	// system (focused-scan "A Focused Sweep Commits On the Sensor
+	// Channel"). A hostId naming a fleet owned by a DIFFERENT corporation is
+	// rejected through this exact same sentinel, with no distinguishing
+	// field — a distinguishable rejection would itself disclose that
+	// foreign fleet's presence, range, and occlusion state.
+	ErrScanHostUnresolved = errors.New("fleet: scan host does not resolve to a body or an own fleet in this system")
 )
 
 // BodySource resolves a system's body table — the space.Bodies implementation
@@ -112,6 +127,11 @@ type ServiceInterface interface {
 	// Jump commits a single-hop lane crossing from a docked gate
 	// (fleet-movement "Lane Jump From a Docked Gate").
 	Jump(ctx context.Context, id, laneId string) (*Fleet, error)
+	// Scan commits a focused sweep of a body or an own fleet in the
+	// scanning fleet's own system, on the sensor channel, independent of
+	// the movement channel a burn or jump claims (focused-scan "A Focused
+	// Sweep Commits On the Sensor Channel").
+	Scan(ctx context.Context, id, hostId string) (*Fleet, error)
 	Cancel(ctx context.Context, id string) (*Fleet, error)
 	SeedFleet(ctx context.Context, systemID, corporationID string, at space.Vec3, starSize float64) (*Fleet, error)
 	// Position resolves a fleet's live position at the current world time,
@@ -782,6 +802,122 @@ func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error) {
 	log.Info().Ctx(ctx).Str("fleetId", id).Str("laneId", laneId).Str("actionId", a.Id).
 		Int64("arriveMs", int64(eta)).Msg("Fleet jumped")
 	return f, nil
+}
+
+// Scan commits POST /v1/fleets/:fleetId/scan {hostId} — a focused sweep of
+// a body or an own fleet in the scanning fleet's own system, on the SENSOR
+// channel (action.SlotSensor), independent of the movement channel a burn
+// or jump claims (focused-scan "A Focused Sweep Commits On the Sensor
+// Channel"; design.md Decision 8). hostId is resolved and range/occlusion
+// checked against LIVE positions at commit time, reusing disclosure's own
+// predicates unchanged (design.md Decision 8's own text; task 5.4); a
+// hostId that does not resolve to a body or an own-corp fleet in this
+// system — including one naming a FOREIGN fleet — is rejected through the
+// exact same ErrScanHostUnresolved, with no distinguishing field (task
+// 5.2). Duration scales with range to the host, frozen at commit
+// (roundTripMs, task 5.3): the committed window is
+// [commitTime, commitTime + roundTripMs(d)] — depart is always the commit
+// world time, so the emission interval, the masking break, and the
+// action's own ETA are the same interval end to end.
+func (s *Service) Scan(ctx context.Context, id, hostId string) (*Fleet, error) {
+	f, err := s.load(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if f.Jump != nil {
+		return nil, ErrFleetInTransit
+	}
+
+	bt, err := s.bodiesFor(ctx, f.SystemId)
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.clock.Now()
+	from, err := s.Position(ctx, f, bt)
+	if err != nil {
+		return nil, err
+	}
+
+	hostPos, err := s.resolveScanHost(ctx, f, bt, hostId, now)
+	if err != nil {
+		return nil, err
+	}
+
+	if !disclosure.WithinRange(from, hostPos, disclosure.FocusedScanRange) {
+		return nil, disclosure.ErrScanOutOfRange
+	}
+	starPos, err := space.Position(bt, bt.StarId(), now)
+	if err != nil {
+		return nil, fmt.Errorf("fleet: resolving star position for scan occlusion: %w", err)
+	}
+	if disclosure.Occluded(from, hostPos, starPos, bt.StarSize()) {
+		return nil, disclosure.ErrScanOccluded
+	}
+
+	d := hostPos.Sub(from).Length()
+	arrive := now + roundTripMs(d)
+	window := &ScanWindow{HostId: hostId, DepartMs: now, ArriveMs: arrive, Range: d}
+
+	a, err := s.actions.Commit(ctx, action.CommitSpec{
+		Type:            scanType,
+		Actor:           id,
+		ActorCollection: actorCollection,
+		Scope:           f.SystemId,
+		Params:          map[string]interface{}{"hostId": hostId},
+		Eta:             arrive,
+		Slot:            action.SlotSensor,
+		ActorState: map[string]interface{}{
+			"scan": *window, "updatedAt": int64(now),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	f.Scan = window
+	f.ActiveScanId = a.Id
+	f.UpdatedAt = now
+	log.Info().Ctx(ctx).Str("fleetId", id).Str("hostId", hostId).Str("actionId", a.Id).
+		Int64("arriveMs", int64(arrive)).Msg("Fleet swept")
+	return f, nil
+}
+
+// resolveScanHost resolves hostId to a live position at commit time: a body
+// in the scanning fleet's own system, or a fleet owned by the SAME
+// corporation present in that system. A hostId naming a body/fleet in a
+// different system, a fleet owned by a different corporation, a fleet in
+// lane transit, or nothing at all is rejected through the exact same
+// ErrScanHostUnresolved — no distinguishing field (focused-scan "A Foreign
+// Fleet's Id Is Rejected Identically To An Unresolvable One").
+func (s *Service) resolveScanHost(ctx context.Context, scanner *Fleet, bt *system.BodyTable, hostId string, now common.WorldMillis) (space.Vec3, error) {
+	if _, ok := bt.Body(hostId); ok {
+		pos, err := space.Position(bt, hostId, now)
+		if err != nil {
+			return space.Vec3{}, fmt.Errorf("fleet: resolving scan host body position: %w", err)
+		}
+		return pos, nil
+	}
+
+	fleets, err := s.dao.ListBySystem(ctx, scanner.SystemId)
+	if err != nil {
+		return space.Vec3{}, err
+	}
+	for i := range fleets {
+		host := &fleets[i]
+		if host.Id != hostId {
+			continue
+		}
+		if host.CorporationId != scanner.CorporationId || host.Jump != nil {
+			return space.Vec3{}, ErrScanHostUnresolved
+		}
+		pos, err := space.StatePosition(bt, host.State, now)
+		if err != nil {
+			return space.Vec3{}, fmt.Errorf("fleet: resolving scan host fleet position: %w", err)
+		}
+		return pos, nil
+	}
+	return space.Vec3{}, ErrScanHostUnresolved
 }
 
 // Cancel releases the fleet's active movement-channel action, if any.

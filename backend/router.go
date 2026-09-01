@@ -107,6 +107,11 @@ func SetupRouter() *gin.Engine {
 	// also wire has no successor after the fleet-state migration; link 4
 	// section 7 removes the observation-side writer it fed.
 	fleet.RegisterResolvers(actionSvc, systemSvc)
+	// The focused-scan resolver (replace-observation-with-sightings §5, task
+	// 5.8) — its own registration function, separate from RegisterResolvers,
+	// since it needs a ShipSource (fleetSvc itself, structurally) alongside
+	// the BodySource every other resolver already takes.
+	fleet.RegisterScanResolver(actionSvc, fleetSvc, systemSvc)
 
 	// Galaxy knowledge (#0006, rehomed by replace-observation-with-sightings
 	// design.md Decision 1 from backend/observation into backend/charts): the

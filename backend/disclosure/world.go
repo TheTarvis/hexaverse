@@ -112,6 +112,27 @@ type Ship struct {
 	// contact never carries them (contact.go).
 	HullCount int
 	HullTypes []string
+	// Scan is the ship's own running focused-scan window, non-nil only while
+	// a sweep is in flight (replace-observation-with-sightings design.md
+	// Decision 11, mirroring fleet.Fleet.Scan field-for-field). disclosure
+	// cannot import fleet (purity_test.go's closed allow-list), so this is
+	// disclosure's own small mirror of that shape rather than a shared type.
+	Scan *ScanWindow
+}
+
+// ScanWindow is the disclosure-relevant view of a ship's own running focused
+// scan: the committed depart/arrive interval Scanning tests, and the
+// commit-time range scanEmissionRadius derives its emission radius from. A
+// STORED value, read directly, never re-derived from motion — the same rule
+// State.Burn is already held to.
+type ScanWindow struct {
+	DepartMs common.WorldMillis
+	ArriveMs common.WorldMillis
+	// Range is the commit-time distance from the scanning fleet to its host
+	// — the "d" in scanEmissionRadius(d) (design.md Decision 9). Frozen at
+	// commit; disclosure never recomputes it because it never sees the host,
+	// only the sweeping ship.
+	Range float64
 }
 
 // Observer is the disclosure-relevant view of the requesting fleet's own

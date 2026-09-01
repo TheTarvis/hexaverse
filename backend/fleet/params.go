@@ -1,6 +1,10 @@
 package fleet
 
-import "hexaverse/common"
+import (
+	"math"
+
+	"hexaverse/common"
+)
 
 // MovementParams holds the burn-tuning knobs (tuning is data). MsPerTile is the
 // world-ms cost to cross one hex; InterceptHorizon bounds the lead-solve search.
@@ -39,4 +43,34 @@ func DefaultMovementParams() MovementParams {
 		LaneMsPerDistance: t.LaneMsPerDistance,
 		BoardRadius:       t.BoardRadius,
 	}
+}
+
+// ScanBaseDurationMs is the minimum a focused scan ever costs, however
+// close its target — the stationary floor that bounds a sweep's duration
+// below even at zero range (focused-scan "A sweep against a host at zero
+// range still costs a positive duration"; design.md Decision 8, task 5.3).
+// Lives here, in the scan verb's own service, rather than disclosure/
+// params.go: disclosure/purity_test.go forbids math.Sqrt anywhere in that
+// package, and a duration linear in range needs one (design.md Decision 8's
+// own text).
+const ScanBaseDurationMs common.WorldMillis = 3_000
+
+// ScanRoundTripMsPerUnit is the k in roundTripMs(d) = ScanBaseDurationMs +
+// ceil(k*d) — the round-trip world-ms cost per unit of distance to the
+// target host, a named base duration and signal speed folded into one
+// linear constant (design.md Decision 8).
+const ScanRoundTripMsPerUnit float64 = 40.0
+
+// roundTripMs prices a focused scan's duration as a round trip over the
+// distance d from the scanning fleet to its target host at commit time —
+// quantized upward to a whole unit of world time, frozen at commit and
+// never recomputed from the scanner's later motion (focused-scan "Sweep
+// Duration Scales With Range to the Target"; task 5.3). d is the caller's
+// space.Vec3.Length() of the commit-time separation — this function never
+// resolves a position itself.
+func roundTripMs(d float64) common.WorldMillis {
+	// determinism:allow(pinned) Ceil is in the exact-arithmetic set (design.md
+	// Decision 8), mirroring space.QuantizeArrival's own quantize-upward Ceil.
+	extra := math.Ceil(ScanRoundTripMsPerUnit * d)
+	return ScanBaseDurationMs + common.WorldMillis(int64(extra))
 }

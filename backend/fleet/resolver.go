@@ -2,10 +2,13 @@ package fleet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"hexaverse/action"
 	"hexaverse/charts"
+	"hexaverse/disclosure"
+	"hexaverse/sightings"
 	"hexaverse/space"
 	"hexaverse/system"
 )
@@ -39,6 +42,157 @@ func RegisterResolvers(a *action.Service, bodies BodySource) {
 	// KindMutating's ledger-delta bookkeeping (LedgerKey, exactly-once
 	// Delta doc), which jump has no use for.
 	a.RegisterResolver(jumpType, action.KindKinematic, JumpResolver)
+}
+
+// ShipSource resolves every fleet currently in a system — the resolving
+// focused scan's masking-chain lookup (design.md Decision 13; task 5.8).
+// *fleet.Service already satisfies this structurally via its own
+// ListInSystem method (service.go).
+type ShipSource interface {
+	ListInSystem(ctx context.Context, systemID string) ([]Fleet, error)
+}
+
+// RegisterScanResolver wires the focused-scan resolver onto the shared
+// action service for type "scan" — kept as its own function, separate from
+// RegisterResolvers, so router.go's composition root can supply the
+// ShipSource dependency (a *fleet.Service, itself) without changing
+// RegisterResolvers' own established two-argument shape, which
+// resolver_registration_test.go and burn_docks_every_mineable_feature_type_
+// test.go already call directly.
+func RegisterScanResolver(a *action.Service, ships ShipSource, bodies BodySource) {
+	a.RegisterResolver(scanType, action.KindMutating, ScanResolver(ships, bodies))
+}
+
+// ScanResolver is the focused-scan verb's resolver, registered with the
+// action service for type "scan" (RegisterScanResolver) — alongside
+// BurnResolver/JumpResolver, mirroring BurnResolver's own injected-
+// BodySource pattern (design.md Decision 13). It reads the resolving
+// fleet's masking-chain candidates INSIDE the resolve transaction callback
+// (ships.ListInSystem, bodies.BodyTable) and mints the resulting sighting
+// records ONLY through sightings.MintWrites, returned as
+// ResolveResult.Writes — the exactly-once ledger of a resolver that
+// performs no write of its own (design.md Decision 13: a sighting does not
+// self-heal, and would be lost permanently on a crash between the status
+// flip and the write if minted after the resolve transaction instead).
+//
+// Every record is stamped at pulse-reach — the midpoint of the committed
+// depart/arrive window, never resolution time (design.md Decision 14) — by
+// evaluating range, occlusion, and the masking chain from the scanner's OWN
+// folded position at that instant, re-checked against
+// disclosure.FocusedScan's own predicates unchanged (design.md Decision
+// 15). A sweep fizzles — minting nothing, releasing the sensor-channel slot
+// all the same — when the scanner left the host's system, is in lane
+// transit at pulse-reach, the target host cannot be resolved, or the
+// geometry re-check fails; each fizzle carries a ReasonCode distinguishing
+// its cause (focused-scan "A Sweep Resolves Into Sightings, Or Fizzles").
+func ScanResolver(ships ShipSource, bodies BodySource) action.ResolveFunc {
+	return func(ctx context.Context, r action.Resolution) (action.ResolveResult, error) {
+		var f Fleet
+		if err := r.DecodeActor(&f); err != nil {
+			return action.ResolveResult{}, err
+		}
+
+		// Already settled (a racing read got here first) — no-op.
+		if f.Scan == nil {
+			return action.ResolveResult{Outcome: "scan already settled"}, nil
+		}
+		window := *f.Scan
+		pulseReach := window.DepartMs + (window.ArriveMs-window.DepartMs)/2
+
+		release := map[string]interface{}{
+			"activeScanId": "", "scan": nil, "updatedAt": int64(r.At),
+		}
+		fizzle := func(reason string) (action.ResolveResult, error) {
+			return action.ResolveResult{
+				Outcome: "scan fizzled: " + reason, ReasonCode: reason, ActorState: release,
+			}, nil
+		}
+
+		// f.Jump != nil -> lane transit; checked BEFORE the system check,
+		// since a transiting fleet's stored SystemId is stale and must not
+		// be read as "still in the origin system" (design.md Decision 4).
+		if f.Jump != nil {
+			return fizzle("laneTransit")
+		}
+		// The scan resolves scoped to the system it was COMMITTED in
+		// (r.Action.Scope) — a scanner that has since moved on is scoped
+		// elsewhere and mints nothing here.
+		if f.SystemId != r.Action.Scope {
+			return fizzle("leftSystem")
+		}
+
+		bt, err := bodies.BodyTable(ctx, f.SystemId)
+		if err != nil {
+			return action.ResolveResult{}, fmt.Errorf("fleet: resolving bodies for scan resolve: %w", err)
+		}
+		// Decoded off the STORED, Firestore-native StateDoc — never the
+		// bare State field, which carries firestore:"-" and is therefore
+		// never populated by DecodeActor's raw transactional read
+		// (BurnResolver/JumpResolver's own established pattern).
+		state, err := DecodeKinematicState(bt, f.StateDoc, scanType, r.Action.Id)
+		if err != nil {
+			return action.ResolveResult{}, err
+		}
+		scannerPos, err := space.StatePosition(bt, state, pulseReach)
+		if err != nil {
+			return action.ResolveResult{}, fmt.Errorf("fleet: resolving scanner position at pulse-reach: %w", err)
+		}
+
+		allShips, err := ships.ListInSystem(ctx, f.SystemId)
+		if err != nil {
+			return action.ResolveResult{}, fmt.Errorf("fleet: listing ships for scan resolve: %w", err)
+		}
+		shipMap := make(map[string]disclosure.Ship, len(allShips))
+		for i := range allShips {
+			raw := &allShips[i]
+			// Decoded from the raw StateDoc for the same reason the
+			// scanner's own state is above — ListInSystem's caller may be
+			// a raw fake (as the resolver's own unit tests are), never
+			// assumed pre-hydrated.
+			shipState, derr := DecodeKinematicState(bt, raw.StateDoc, scanType, r.Action.Id)
+			if derr != nil {
+				continue // a malformed foreign fleet degrades to "not found", not a failed resolve
+			}
+			shipMap[raw.Id] = disclosure.Ship{
+				Id: raw.Id, State: shipState, InLaneTransit: raw.Jump != nil,
+			}
+		}
+
+		// Attachments (attachments.go) is the shared adapter both the
+		// interior read's contact union (fleet.FleetsInSystem) and this
+		// resolver build over the fleet set they each already hold — one
+		// notion of "who is docked where", not a second, divergent one.
+		w := disclosure.World{
+			Bodies: bt, Attachments: Attachments(allShips), StarId: bt.StarId(), StarSize: bt.StarSize(), SystemId: f.SystemId,
+		}
+		records, err := disclosure.FocusedScan(w, scannerPos, window.HostId, shipMap, pulseReach)
+		switch {
+		case errors.Is(err, disclosure.ErrScanOutOfRange):
+			return fizzle("outOfRange")
+		case errors.Is(err, disclosure.ErrScanOccluded):
+			return fizzle("occluded")
+		case errors.Is(err, space.ErrUnknownBody):
+			return fizzle("hostUnresolved")
+		case err != nil:
+			return action.ResolveResult{}, err
+		}
+
+		out := make([]sightings.Sighting, 0, len(records))
+		for _, rec := range records {
+			out = append(out, sightings.Sighting{
+				SystemId: rec.SystemId, AsOf: rec.AsOf, TargetId: rec.TargetId,
+				Position: rec.Position, Velocity: rec.Velocity, Emitting: rec.Emitting,
+				HullCount: rec.HullCount, HullTypes: rec.HullTypes,
+				CleanSweep: rec.CleanSweep, HostId: rec.HostId,
+			})
+		}
+
+		return action.ResolveResult{
+			Outcome:    "swept " + window.HostId,
+			ActorState: release,
+			Writes:     sightings.MintWrites(f.CorporationId, r.Action.Id, out),
+		}, nil
+	}
 }
 
 // BurnResolver is the fleet's kinematic resolver, registered with the action

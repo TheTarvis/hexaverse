@@ -56,3 +56,34 @@ const MinCommandedAccel float64 = 1.0
 // ships masked at it. Four times PassiveRange: masking is beatable, but
 // sweeping every body in a system is not free.
 const FocusedScanRange float64 = 48
+
+// ScanEmissionFloor is the minimum radius a running focused scan's sweep
+// emits at, however close its target. Set equal to PlumeFloor — a sweep is
+// at least as loud as the quietest possible burn — and, like PlumeFloor, it
+// sits above PassiveRange with margin: sweeping is always detectable by
+// anyone who could already see the sweeper cold. params_test.go asserts
+// that relationship rather than trusting this comment (design.md Decision
+// 9).
+const ScanEmissionFloor float64 = 20
+
+// ScanEmissionPerRange is the k in scanEmissionRadius = k * d, d being the
+// commit-time range from the scanning fleet to its host. Calibrated so
+// sweeping at FocusedScanRange (48) reaches 96 — comparable to, and
+// strictly below, a nominal class-2 burn's plume radius of 128
+// (PlumeRadius(2, 8)) — delivering "a thorough search is the most
+// detectable thing a fleet can do short of burning" as an emergent property
+// of one constant. params_test.go pins the ordering (design.md Decision 9).
+const ScanEmissionPerRange float64 = 2.0
+
+// scanEmissionRadius derives how far a running focused scan's own emission
+// reaches, from the commit-time range to its host — clamped up to
+// ScanEmissionFloor, exactly as PlumeRadius clamps up to PlumeFloor.
+// Package-private: it is consumed only by detectionRadius, itself
+// unexported, and by this package's own tests.
+func scanEmissionRadius(d float64) float64 {
+	r := ScanEmissionPerRange * d
+	if r < ScanEmissionFloor {
+		return ScanEmissionFloor
+	}
+	return r
+}

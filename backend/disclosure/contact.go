@@ -35,12 +35,11 @@ import (
 // Scanning is a fourth reported field, distinct from Emitting (a
 // zero-velocity ship running a focused sweep has no drive output to report
 // as emission) — proximity-disclosure "A Sweep's Emission Radius Scales
-// With Its Range" (design.md Decision 9). Its DERIVATION — the
-// range-scaled sweep-emission radius, and folding it into detectionRadius
-// — is the focused-scan verb's own work (replace-observation-with-sightings
-// tasks.md 5.1/5.5, section 5, out of scope here): today every disclosed
-// Contact carries Scanning at its zero value, false, until that section
-// wires a stored sweep window for Disclose to read.
+// With Its Range" (design.md Decision 9). It is derived from the ship's own
+// stored sweep window (Ship.Scan) via Scanning(target, t), and its
+// range-scaled sweep-emission radius (scanEmissionRadius) is folded into
+// detectionRadius alongside plume, so a parked, non-emitting, sweeping ship
+// is disclosed by it (replace-observation-with-sightings tasks.md 5.1/5.5).
 type Contact struct {
 	Position space.Vec3
 	Velocity space.Vec3
@@ -75,7 +74,15 @@ func Disclose(w World, obs Observer, target Ship, t common.WorldMillis) (Contact
 	if err != nil {
 		return Contact{}, false, err
 	}
-	if masked {
+	// A running sweep unmasks its scanner for the sweep's duration, exactly
+	// as emission does (proximity-disclosure "Lighting a Drive Breaks
+	// Masking" — the sweep disjunct; focused-scan "A Sweep Unmasks Its
+	// Scanner"; design.md Decision 10). Composed here, at the caller, rather
+	// than inside Masked itself — mask_test.go's already-committed,
+	// immutable scenarios pin Masked's own 4-argument signature, so the
+	// disjunct is layered on one level up, mirroring the way Emitting
+	// already wins inside Masked.
+	if masked && !Scanning(target, t) {
 		return Contact{}, false, nil
 	}
 
@@ -108,7 +115,12 @@ func Disclose(w World, obs Observer, target Ship, t common.WorldMillis) (Contact
 	if err != nil {
 		return Contact{}, false, err
 	}
-	return Contact{Position: pos, Velocity: vel, Emitting: Emitting(target.State, t)}, true, nil
+	return Contact{
+		Position: pos,
+		Velocity: vel,
+		Emitting: Emitting(target.State, t),
+		Scanning: Scanning(target, t),
+	}, true, nil
 }
 
 // contactVelocity resolves a ship's instantaneous velocity at t through the

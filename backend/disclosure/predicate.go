@@ -45,6 +45,18 @@ func Emitting(s space.ShipState, t common.WorldMillis) bool {
 	return s.Burn.DepartMs <= t && t < s.Burn.ArriveMs
 }
 
+// Scanning reports whether a ship is running a focused sweep at world time
+// t — the same exact half-open integer interval test Emitting is, over the
+// ship's own stored sweep window rather than its burn (proximity-disclosure
+// "An Active Sweep Emits For Its Duration"; design.md Decision 11). A ship
+// with no stored sweep window is never reported as scanning.
+func Scanning(s Ship, t common.WorldMillis) bool {
+	if s.Scan == nil {
+		return false
+	}
+	return s.Scan.DepartMs <= t && t < s.Scan.ArriveMs
+}
+
 // PlumeRadius derives how far an emitting fleet's plume reaches from its
 // aggregate drive output and the burn's commanded acceleration — both
 // STORED values, read directly by the caller rather than re-derived from
@@ -78,14 +90,23 @@ func PlumeReaches(observer, emitter space.Vec3, passiveRange, plumeRadius float6
 }
 
 // detectionRadius is the radius an observer actually detects a given ship
-// at: its own passive range, extended by the ship's plume when the ship is
-// emitting. Losing exactness on this geometric half costs little, because
-// exactness was only ever load-bearing through PERMANENCE — and nothing on
-// this path persists. A target sitting exactly at the edge flickers for a
-// tick and discloses nothing it was not already disclosing.
+// at: its own passive range, extended by the LOUDER of the ship's drive
+// plume and its sweep emission, when either is running (design.md Decision
+// 9 — "detectionRadius becomes obs.PassiveRange + max(plume, scanEmission),
+// with each flag reported independently: a fleet burning and sweeping
+// reports both"). Losing exactness on this geometric half costs little,
+// because exactness was only ever load-bearing through PERMANENCE — and
+// nothing on this path persists. A target sitting exactly at the edge
+// flickers for a tick and discloses nothing it was not already disclosing.
 func detectionRadius(obs Observer, target Ship, t common.WorldMillis) float64 {
-	if !Emitting(target.State, t) {
-		return obs.PassiveRange
+	loudest := 0.0
+	if Emitting(target.State, t) {
+		loudest = PlumeRadius(target.DriveOutput, target.State.Burn.Accel)
 	}
-	return obs.PassiveRange + PlumeRadius(target.DriveOutput, target.State.Burn.Accel)
+	if Scanning(target, t) {
+		if sweep := scanEmissionRadius(target.Scan.Range); sweep > loudest {
+			loudest = sweep
+		}
+	}
+	return obs.PassiveRange + loudest
 }

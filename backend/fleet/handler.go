@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"strings"
 
+	"hexaverse/action"
 	"hexaverse/common"
+	"hexaverse/disclosure"
 	"hexaverse/galaxy"
 	"hexaverse/space"
 
@@ -27,8 +29,10 @@ func NewHandlerWith(svc ServiceInterface, clock common.WorldTime) *Handler {
 }
 
 // RegisterRoutes wires the surviving endpoint set (design.md Decision 21A):
-// GET /route and POST /scan are deleted with no successor here (routing and
-// scanning are chain link 4 sections 5/observation's own concerns).
+// GET /route is deleted with no successor here (routing is chain link 4
+// section 5's own concern). POST /scan is back — the focused-scan verb
+// (replace-observation-with-sightings §5, task 5.2), on the sensor channel,
+// distinct from the lattice-era radial scan link 4 deleted.
 func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	g := authorized.Group("/fleets")
 	{
@@ -39,6 +43,7 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 		g.POST("/:fleetId/cut-drive", h.CutDrive)
 		g.POST("/:fleetId/stop", h.Stop)
 		g.POST("/:fleetId/jump", h.Jump)
+		g.POST("/:fleetId/scan", h.Scan)
 	}
 }
 
@@ -157,6 +162,18 @@ func (h *Handler) Jump(c *gin.Context) {
 	h.respond(c, f, err)
 }
 
+// Scan handles POST /v1/fleets/:fleetId/scan {hostId} (focused-scan "A
+// Focused Sweep Commits On the Sensor Channel").
+func (h *Handler) Scan(c *gin.Context) {
+	var req ScanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	f, err := h.svc.Scan(c.Request.Context(), common.RequiredHttpParam(c, "fleetId"), req.HostId)
+	h.respond(c, f, err)
+}
+
 func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 	switch {
 	case errors.Is(err, ErrNotFound):
@@ -166,6 +183,16 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 	case errors.Is(err, ErrFleetInTransit):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet is in lane transit"})
 	case errors.Is(err, ErrJumpNotAttached):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrScanHostUnresolved):
+		// A hostId naming a foreign fleet is rejected through this exact
+		// same branch as an unresolvable one — same status, same body, no
+		// distinguishing field (focused-scan "A Foreign Fleet's Id Is
+		// Rejected Identically To An Unresolvable One").
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case errors.Is(err, disclosure.ErrScanOutOfRange), errors.Is(err, disclosure.ErrScanOccluded):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, action.ErrActiveActionExists):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case err != nil:
 		log.Error().Ctx(c).Err(err).Msg("fleet operation failed")

@@ -39,6 +39,23 @@ type JumpTransit struct {
 	ArriveMs     common.WorldMillis `json:"arriveMs" firestore:"arriveMs"`
 }
 
+// ScanWindow is fleet-owned focused-scan state (replace-observation-with-
+// sightings design.md Decision 11), mirroring JumpTransit's own shape and
+// lifecycle: non-nil only while a sweep is running, cleared at resolve and
+// at cancel. HostId is the swept target; DepartMs/ArriveMs are the
+// committed sweep window — depart is always the commit world time, never a
+// value short of the full sweep, so the emission interval, the masking
+// break, and the action's own ETA are the same interval end to end
+// (focused-scan "Sweep Duration Scales With Range to the Target"). Range is
+// the commit-time distance to the host, frozen at commit — the input the
+// sweep's own emission radius derives from (disclosure.ScanWindow.Range).
+type ScanWindow struct {
+	HostId   string             `json:"hostId" firestore:"hostId"`
+	DepartMs common.WorldMillis `json:"departMs" firestore:"departMs"`
+	ArriveMs common.WorldMillis `json:"arriveMs" firestore:"arriveMs"`
+	Range    float64            `json:"range" firestore:"range"`
+}
+
 // Fleet is the map-mover — a thing at a position that can be ordered to move
 // (#0004 Decision #8). The fleet persists across systems, carrying its current
 // systemId, so it is top-level (not nested under system).
@@ -93,6 +110,11 @@ type Fleet struct {
 	// unwritten") — chain link 5 (replace-observation-with-sightings) is the
 	// first change to claim it, with the focused scan verb.
 	ActiveScanId string `json:"activeScanId,omitempty" firestore:"activeScanId,omitempty"`
+	// Scan is non-nil only while a focused scan is running, mirroring Jump's
+	// own lifecycle (replace-observation-with-sightings design.md Decision
+	// 11) — claimed on the ActiveScanId channel at commit, cleared at
+	// resolve and at cancel.
+	Scan *ScanWindow `json:"scan,omitempty" firestore:"scan,omitempty"`
 
 	// Ships is the fleet's roster (#0010 "Fleet Ship Composition"). A fleet
 	// document written before this capability shipped carries no stored Ships
@@ -136,4 +158,11 @@ type OrderRequest struct {
 // Decision 10; fleet-movement "Lane Jump From a Docked Gate").
 type JumpRequest struct {
 	LaneId string `json:"laneId"`
+}
+
+// ScanRequest is the body of POST /v1/fleets/:id/scan — a focused sweep of
+// a body or an own fleet in the scanning fleet's own system (focused-scan
+// "A Focused Sweep Commits On the Sensor Channel").
+type ScanRequest struct {
+	HostId string `json:"hostId"`
 }

@@ -71,12 +71,17 @@ func TestHandler_Scenario_RouteEndpointIsGone(t *testing.T) {
 	}
 }
 
-func TestHandler_Scenario_ScanEndpointIsGone(t *testing.T) {
-	svc := &fakeFleetSvc{fleet: &Fleet{Id: "f1", CorporationId: "corp-user1", SystemId: "s1"}}
-	r := newFleetRouter(svc)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/fleets/f1/scan", nil))
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("POST /fleets/:fleetId/scan status = %d, want 404 (deleted, design.md Decision 21A)", w.Code)
-	}
-}
+// TestHandler_Scenario_ScanEndpointIsGone (DELETED —
+// replace-observation-with-sightings tasks.md 5.2) used to prove
+// POST /v1/fleets/:fleetId/scan stayed 404 forever, per design.md Decision
+// 21A's lattice-era deletion. That absence is REMOVED by
+// replace-observation-with-sightings' own focused-scan verb: chain link 5
+// deliberately resurrects POST /v1/fleets/:fleetId/scan under new,
+// unrelated semantics (specs/focused-scan/spec.md "A Focused Sweep Commits
+// On the Sensor Channel") — the sensor channel (ActiveScanId) this test's
+// own sibling suite already left "declared and unwritten" specifically so
+// this link could claim it. Deleted rather than inverted, per the same
+// test-immutability protocol TestJump_Scenario_RejectedUnchartedLane
+// (jump_verb_test.go) and TestGetInterior_LaneGatesFogFilterToCharted
+// document: an authorized change, where a LATER capability's own spec
+// legitimately supersedes an EARLIER capability's regression guard.

@@ -37,8 +37,30 @@ func (s *Service) FleetsInSystem(ctx context.Context, systemID string) ([]system
 				State:         f.State,
 				DriveOutput:   DerivedDriveOutput(f, s.classStats),
 				InLaneTransit: f.Jump != nil,
+				Scan:          liveScanWindow(f),
 			},
 		})
 	}
 	return out, Attachments(fleets), nil
+}
+
+// liveScanWindow carries a fleet's running sweep onto the disclosure-ready
+// mirror (replace-observation-with-sightings tasks.md 5.1/5.5: "wire the
+// resulting radius into the same disclosure predicate the plume channel
+// uses, so a parked, non-emitting, sweeping ship is actually disclosed by
+// it — not merely computed and left unconsumed"). ActiveScanId — the
+// single-slot claim itself — is the authoritative signal, never the mere
+// presence of Fleet.Scan: the action-dispatch spine's generic cancel
+// surface (POST /v1/actions/:actionId/cancel, task 5.9) releases
+// ActiveScanId but writes no fleet-specific actorState, so it never clears
+// Fleet.Scan's own stale window. Gating on ActiveScanId here is what makes
+// a cancelled sweep stop being reported as sweeping IMMEDIATELY, rather
+// than lingering until the cancelled sweep's original arrive time
+// (focused-scan "Cancelling a Sweep Releases the Slot, Mints Nothing, and
+// Ends Emission" — "Cancelling a sweep ends sweeping immediately").
+func liveScanWindow(f Fleet) *disclosure.ScanWindow {
+	if f.ActiveScanId == "" || f.Scan == nil {
+		return nil
+	}
+	return &disclosure.ScanWindow{DepartMs: f.Scan.DepartMs, ArriveMs: f.Scan.ArriveMs, Range: f.Scan.Range}
 }

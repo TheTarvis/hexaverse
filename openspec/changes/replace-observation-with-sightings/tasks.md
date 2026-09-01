@@ -413,7 +413,7 @@
 
 ## 5. The Focused-Scan Verb
 
-- [ ] 5.1 Add `fleet.Fleet.Scan *ScanWindow{HostId, DepartMs, ArriveMs,
+- [x] 5.1 Add `fleet.Fleet.Scan *ScanWindow{HostId, DepartMs, ArriveMs,
       Range}`, mirroring `Jump`'s field-for-field shape and lifecycle
       (non-nil only while running); add `disclosure.Ship.Scan` and
       `disclosure.Scanning(s, t)` as the same exact half-open integer
@@ -427,7 +427,7 @@
       Scanning is on during the sweep's committed interval; The sweep's
       arrive instant ends scanning; A ship with no stored sweep window is
       never reported as scanning)
-- [ ] 5.2 Implement `POST /v1/fleets/:fleetId/scan {hostId}`: commits an
+- [x] 5.2 Implement `POST /v1/fleets/:fleetId/scan {hostId}`: commits an
       `action` of type `scan` on `action.SlotSensor` (`activeScanId`),
       `action.KindMutating`, independent of the movement channel a burn or
       jump claims. Reject the commit — creating no action and claiming no
@@ -445,7 +445,7 @@
       unresolvable host is rejected; A host outside the scanning fleet's
       system is rejected; A foreign fleet's id is rejected identically to
       an unresolvable one; A scanner in lane transit at commit is rejected)
-- [ ] 5.3 Implement `roundTripMs(d)` in the scan verb's own service (never
+- [x] 5.3 Implement `roundTripMs(d)` in the scan verb's own service (never
       in `disclosure`, which forbids `math.Sqrt`), using
       `space.Vec3.Length()`, quantized upward, frozen at commit and
       unaffected by the scanner's later motion. Store the committed window
@@ -458,12 +458,12 @@
       range still costs a positive duration; The scanner's later motion
       does not change the committed ETA; The committed window spans the
       entire sweep)
-- [ ] 5.4 Reuse `disclosure.FocusedScan`'s range and occlusion predicates,
+- [x] 5.4 Reuse `disclosure.FocusedScan`'s range and occlusion predicates,
       unchanged, as the commit-time rejection check against live positions.
       (focused-scan: *A Sweep Is Rejected Beyond Range or Behind the Star*
       — A host beyond focused-scan range is rejected; A host occluded by
       the star is rejected; A host at exactly the named range is accepted)
-- [ ] 5.5 Implement `scanEmissionRadius(d) = max(ScanEmissionFloor,
+- [x] 5.5 Implement `scanEmissionRadius(d) = max(ScanEmissionFloor,
       ScanEmissionPerRange × d)` in `disclosure/params.go`; add
       `Contact.Scanning`, distinct from `Contact.Emitting`; derive
       detection radius as passive range plus the greater of plume radius
@@ -489,11 +489,11 @@
       during its scan window; Sweeping ends at the scan's arrival instant;
       A parked, sweeping fleet reports no plume emission from the sweep
       alone)
-- [ ] 5.6 Add `params_test.go` pins: `ScanEmissionFloor > PassiveRange`, and
+- [x] 5.6 Add `params_test.go` pins: `ScanEmissionFloor > PassiveRange`, and
       `ScanEmissionPerRange × FocusedScanRange` strictly less than a
       nominal class-2 burn's plume, mirroring the existing `PlumeFloor >
       PassiveRange` pin.
-- [ ] 5.7 Implement the sweep's masking disjunct: a fleet is unmasked for
+- [x] 5.7 Implement the sweep's masking disjunct: a fleet is unmasked for
       the full interval its focused scan is running, exactly as for
       emission; masking and an active sweep never hold simultaneously.
       (focused-scan: *A Sweep Unmasks Its Scanner* — Committing a sweep
@@ -501,7 +501,7 @@
       (proximity-disclosure: *Lighting a Drive Breaks Masking* — Departure
       is visible; Arrival re-masks on dock; A sweeping ship is unmasked
       for its sweep)
-- [ ] 5.8 Implement `ScanResolver(ships ShipSource, bodies BodySource)` in
+- [x] 5.8 Implement `ScanResolver(ships ShipSource, bodies BodySource)` in
       `backend/fleet`, alongside `BurnResolver` — its home package, not
       `backend/sightings`, since only `fleet` holds the resolve-transaction
       callback shape it mirrors; `fleet` imports `sightings` to write the
@@ -537,7 +537,7 @@
       (proximity-disclosure: *A Focused Scan Reveals the Ships Masked At
       Its Target* — A focused scan finds a chained ship; A clean sweep is
       itself a record; A host beyond focused-scan range cannot be swept)
-- [ ] 5.9 Implement cancel via `POST /v1/actions/:actionId/cancel` naming
+- [x] 5.9 Implement cancel via `POST /v1/actions/:actionId/cancel` naming
       the scan action's own id: release the claimed sensor-channel slot,
       apply no resolver effect (no sighting minted), end the sweeping flag
       at the instant of cancellation rather than the scan's original

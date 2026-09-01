@@ -70,22 +70,19 @@ func TestPackage_Scenario_LatticeEraSymbolsAreAbsent(t *testing.T) {
 	}
 }
 
-// Scan is named separately: design.md 21A also deletes the Scan verb
-// itself, which — unlike the other nine identifiers, all unexported and
-// therefore uniquely named strings — is a common enough word that a naive
-// grep would false-positive on unrelated identifiers (ActiveScanId,
-// SlotSensor's own doc comments, "scan" the English word in prose). Scoped
-// to the one shape that would actually be a violation: a METHOD named Scan
-// on Service, i.e. a source line matching `func (s *Service) Scan(`.
-func TestPackage_Scenario_ScanVerbMethodIsAbsent(t *testing.T) {
-	raw, err := os.ReadFile("service.go")
-	if err != nil {
-		t.Fatalf("read service.go: %v", err)
-	}
-	if strings.Contains(string(raw), "func (s *Service) Scan(") {
-		t.Error("service.go still declares a Scan verb method — design.md Decision 21A deletes it with the " +
-			"lattice-era radial-echo scan (observation's live half); the sensor channel itself (ActiveScanId) " +
-			"is retained, declared and unwritten, for link 5's focused scan (design.md Open Question 4) — that " +
-			"field is NOT what this test checks")
-	}
-}
+// TestPackage_Scenario_ScanVerbMethodIsAbsent (DELETED —
+// replace-observation-with-sightings tasks.md 5.2) used to prove
+// service.go declared no `func (s *Service) Scan(` — design.md Decision
+// 21A's deletion of the lattice-era radial-echo scan (observation's live
+// half). That absence is REMOVED by replace-observation-with-sightings'
+// own focused-scan verb, which adds exactly that method signature
+// (specs/focused-scan/spec.md "A Focused Sweep Commits On the Sensor
+// Channel"). This test's own doc comment already anticipated the day this
+// would happen: "the sensor channel itself (ActiveScanId) is retained,
+// declared and unwritten, for link 5's focused scan." Deleted rather than
+// inverted, per the same test-immutability protocol
+// TestHandler_Scenario_ScanEndpointIsGone (routing_deletion_test.go),
+// TestJump_Scenario_RejectedUnchartedLane, and
+// TestGetInterior_LaneGatesFogFilterToCharted document: an authorized
+// change, where a LATER capability's own spec legitimately supersedes an
+// EARLIER capability's regression guard.
