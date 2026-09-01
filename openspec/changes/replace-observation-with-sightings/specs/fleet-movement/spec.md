@@ -114,6 +114,27 @@ movement order.
 - **WHEN** a jump is committed and later resolves
 - **THEN** no delta-v is debited for the crossing — only time is spent
 
+### Requirement: Fleet Read Serves the Attached Gate's Lane Id
+The system SHALL, on `GET /v1/fleets/:fleetId`, `GET /v1/fleets?systemId=`,
+and `GET /v1/fleets?mine=true`, include a `laneId` field on an owned
+fleet that is attached to a lane-gate body, naming that gate's lane id
+(`galaxy.LaneIdBetween` of the fleet's current system and the gate's
+destination system — the same id `system-interior`'s *Lane-Gate Bodies
+Carry Their Lane Id* serves on that gate body), from a source neither
+filtered by nor derived from the corporation's charted-lane set. The
+field SHALL be absent or empty when the fleet is not attached to a
+lane-gate body.
+
+#### Scenario: An attached fleet's read carries its gate's lane id
+- **GIVEN** a fleet attached to a lane-gate body
+- **WHEN** that fleet is read via any of the fleet read endpoints
+- **THEN** the response includes `laneId` naming that gate's lane id,
+  with no dependency on the corporation's charted-lane set
+
+#### Scenario: An unattached fleet's read carries no lane id
+- **WHEN** a fleet with no `attachedTo` set is read
+- **THEN** the response's `laneId` field is absent or empty
+
 ### Requirement: Single Kinematic-State Fleet Record With Two Action Channels
 The system SHALL represent each fleet as one document carrying a
 `space.ShipState` (burn, park, or drift — see `space-kinematics`) as its

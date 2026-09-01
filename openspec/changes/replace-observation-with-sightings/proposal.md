@@ -184,7 +184,7 @@ this link needs them again.
 
 - Affected specs: `galaxy-knowledge` (new), `sighting-records` (new),
   `focused-scan` (new), `proximity-disclosure`, `fleet-movement`,
-  `fleet-roster`, `board-view`, `trading-station`,
+  `fleet-roster`, `board-view`, `galaxy-view`, `trading-station`,
   `observation-fog-and-scan` (deleted), `system-interior`,
   `system-body-table`, `galaxy-generation`, `action-dispatch`,
   `corporation-spawn`, `request-authorization`, `mine-extraction`.
@@ -199,14 +199,22 @@ this link needs them again.
   exclude from), `backend/market` (rename `observation.Tier` → `charts.Tier`),
   `backend/action` (ownership check, `ActorOwner`), `router.go`, `cmd/seed`,
   `common/tuning.go`, `common/firestore_test_helpers.go`, and **the
-  frontend's roster jump-command gate and the jump command's lane-id
-  wiring** (`fleet-roster`'s command-surface logic drops its client-side
-  charted-lane check, since jump-eligibility is now attachment alone and
-  the client's charted set arrives on a differently cadenced read than
-  attachment does; `lib/types/system-board.ts`'s `LaneGate` gains `laneId`
-  and the board view's `handleJump` wires it through to the jump commit —
-  this link's only concrete frontend changes; contact/space rendering
-  itself stays link 8's), `.claude/scripts/check-mirror-map.sh`,
+  frontend's roster jump-command gate, gate-selection unification, and the
+  jump command's lane-id wiring end to end** (`fleet-roster`'s
+  command-surface logic drops its client-side charted-lane check, since
+  jump-eligibility is now attachment alone and the client's charted set
+  arrives on a differently cadenced read than attachment does;
+  `lib/types/system-board.ts`'s `LaneGate` gains `laneId` (later made
+  required once its three pre-existing test fixtures carry it) and the
+  board view's `handleJump` wires it through to the jump commit;
+  `SystemBoardView.tsx`'s burn command drops its `'gate'`-selection special
+  case so a selected lane-gate body commands a burn through the same path
+  as any other body; and `GalaxyView.tsx`'s own `handleJump` resolves a
+  lane id from the already-fetched galaxy graph's `links[]` and submits a
+  real jump order in place of its placeholder toast, backed by a new
+  cross-stack fixture pinning the galaxy-link-id/lane-id equality it
+  depends on — these are this link's concrete frontend changes; contact/
+  space rendering itself stays link 8's), `.claude/scripts/check-mirror-map.sh`,
   `.claude/skills/code-quality-checks/check.py`, `docs/plans/continous_space/chain.md`.
 - `observation-fog-and-scan` is deleted with **no `specs/observation-fog-
   and-scan/` delta in this change** — see "Retiring

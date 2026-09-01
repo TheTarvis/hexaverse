@@ -294,8 +294,10 @@
       any other body, and `proximity-disclosure`'s occlusion rule occludes
       only by the star, so there is nothing left for the station to be
       excluded from.
-- [x] 4.10 **Frontend.** Drop `fleet-roster`'s client-side charted-lane
-      check on the jump command: offer jump whenever the fleet is attached
+- [x] 4.10 **Frontend — board view only; the galaxy view's own charted-lane
+      check is a separate call site and is task 4.13's to close.** Drop
+      `fleet-roster`'s client-side charted-lane check on the jump command
+      for the board-view roster: offer jump whenever the fleet is attached
       to a lane-gate body, with no dependency on the corporation's charted
       set (which arrives on a separately cadenced `GET /v1/galaxy` read).
       This closes the client-imposed dwell the no-dwell ruling forbids, and
@@ -304,7 +306,9 @@
       client while every server test stayed green. Confirm the roster
       row's other command-visibility rules — burn, cut-drive, stop — are
       untouched by this edit and remain green under the existing frontend
-      tests for them.
+      tests for them. `GalaxyView.tsx`'s `isGateBody` renamed the same
+      charted-filtered `links[]` read rather than removing the condition —
+      that half is NOT done by this task; see 4.13.
       (fleet-roster: *The Roster Row Is the Fleet Command Surface, Jump
       Gated by Attachment Alone* — Jump is offered while attached to any
       lane-gate body; Jump is withheld when not attached to a gate; Burn is
@@ -331,6 +335,81 @@
       (board-view: *Jump Commit* — Invoking jump submits the attached
       gate's lane; A gate whose lane the corporation has not charted still
       commits; A failed jump commit toasts the reason)
+- [ ] 4.12 **Frontend.** Unify gate selection with body selection in
+      `SystemBoardView.tsx`: a lane-gate body commands a burn through the
+      same path as any other selected body, with no
+      `selection.kind !== 'feature'`-shaped branch carved out for a gate.
+      The preferred implementation deletes `board-selection.ts`'s `'gate'`
+      selection kind entirely, folding a picked lane-gate body into the
+      same `'feature'`-shaped selection (its existing `gate-${destSystemId}`
+      id already IS the burn target `handleBurn`/`useOrder` expect) rather
+      than adding a second gate-aware branch alongside the existing
+      feature-only one — a parallel path for a thing the domain says is
+      not special (`docs/plans/continous_space/decisions.md`: "gates ARE
+      bodies") is how the distinction survives. Confirm the existing
+      picking/highlight behavior (`board-view`: *Board Picking Resolves to
+      the Feature, Cell, or Lane Gate Under the Pointer*) is unaffected —
+      this task touches only the command path, not what a click resolves
+      to or how a gate mark is drawn. Folding away the `'gate'` kind must
+      NOT blank `FactsPanel.tsx`'s selection section or drop
+      `SystemBoardView.tsx`'s `selectedGateId`/selection-ring draw:
+      `FactsPanel.tsx:113`'s `features.find(f => f.id === selection.id)`
+      never matches a gate (`board.features` never contains a gate body —
+      gates ride `board.laneGates`), and `selectedGateId` today reads
+      `selection.kind === 'gate'` directly — both need a gate-aware lookup
+      against `board.laneGates` (or an equivalent discriminant carried on
+      the folded selection) so a selected gate still resolves for these
+      two consumers even though its selection object is now
+      `'feature'`-shaped.
+      (board-view: *Burn Command Targets a Selected Lane-Gate Body Like Any
+      Other Body* — Commanding a burn toward a selected lane-gate body
+      submits an order; Attachment from a gate-targeted burn makes the jump
+      command available; No gate-specific refusal copy exists; A selected
+      gate still shows its facts and its selected mark)
+- [ ] 4.13 **Backend + Frontend + fixture.** `GET /v1/galaxy`'s `links[]` is
+      charted-filtered (`galaxy-generation`: *Lanes are filtered to the
+      corp's charted set*), so it is empty for exactly the fresh-spawn/
+      just-attached case this jump command exists to serve — it CANNOT be
+      `GalaxyView.tsx`'s lane-id source (blocker: the fourth layer of the
+      traversability onion). Do not resolve the attached gate's lane id by
+      matching `galaxy.links[]` endpoints. Instead: **Backend** — serve the
+      new `laneId` field added in `fleet-movement`'s *Fleet Read Serves the
+      Attached Gate's Lane Id* on the fleet DTO (`fleet.Fleet`'s read path,
+      derived via `galaxy.LaneIdBetween(fleet.SystemId, gate destination)`
+      — no read against the charted-lane set). **Frontend** — wire
+      `GalaxyView.tsx`'s placeholder `handleJump` to call
+      `useJump({fleetId, laneId})` with that fleet-DTO `laneId`, replacing
+      `isGateBody`'s charted-filtered-`links[]` lookup entirely (it must
+      not survive renamed elsewhere in this file — it is the same
+      charted-set read task 4.10 removed from the roster row, not removed
+      here) and replacing the "no lane id on this read" toast with the
+      same success/error toast shape `SystemBoardView.tsx`'s `handleJump`
+      already uses. **Fixture** — add the cross-stack fixture pinning
+      `laneDTO.Id == LaneIdBetween(laneDTO.aId, laneDTO.bId)` per
+      `galaxy-view`'s *A Galaxy Link's Id Is Its Lane's Stable Id*
+      (Go-sole-authority regime: `fixtures/galaxy/` cases file, anti-mirror
+      `mirror-map.json` with an empty `sharedNames`, and a matching
+      invocation in `check-mirror-map.sh`) — this equality is orthogonal to
+      the jump-commit fix above (it pins the galaxy-read/jump-endpoint/
+      gate-body id agreement generally) and remains useful even though
+      `links[]` is no longer `handleJump`'s source. Include, at minimum: an
+      ordinary lane between adjacent positive-coordinate systems; a lane
+      with a negative-coordinate endpoint; a bridge lane (`Lane.Bridge ==
+      true`); and both orderings of one endpoint pair. Also note for the
+      fixture's implementer: `LaneIdBetween("bogus", "sys_5_5")` silently
+      collapses to the zero cell (`"lane_0_0_5_5"`) rather than erroring,
+      which can collide with a real crossing — worth a case, not a defect
+      this task fixes.
+      (fleet-movement: *Fleet Read Serves the Attached Gate's Lane Id* — An
+      attached fleet's read carries its gate's lane id; An unattached
+      fleet's read carries no lane id)
+      (galaxy-view: *A Galaxy Link's Id Is Its Lane's Stable Id* — A galaxy
+      link's id matches the lane id the jump endpoint accepts; A galaxy
+      link's id matches its gate bodies' served lane id; A cross-stack
+      fixture pins the equality under the Go-sole-authority regime; *Jump
+      Commit* — A gate absent from the fetched galaxy graph still commits;
+      The jump command is offered for a gate absent from the graph; A
+      failed jump commit toasts the reason)
 
 ## 5. The Focused-Scan Verb
 
@@ -701,3 +780,27 @@
       test on either half alone would miss.
       (board-view: *Jump Commit* — Invoking jump submits the attached
       gate's lane)
+
+## 9. Cleanup
+
+- [ ] 9.1 **SDET.** `lib/types/system-board.ts`'s `LaneGate.laneId` is
+      currently optional (`laneId?: string`) only because pre-existing
+      `LaneGate` literals in non-test, type-checked code construct one
+      without it, and the server always sends it — the optional type
+      currently lies about the wire. Update: the three pre-existing
+      fixtures in `SystemBoardView.test.tsx` that construct a `LaneGate`
+      without `laneId`, AND the two `LaneGate` literals inside
+      `frontend/app/spike/webgl-board/mock-board.ts:135-136`'s `const
+      board: SystemBoard` (also type-checked, also missing `laneId`) — all
+      five sites need a `laneId` before the field can be tightened. Then
+      make the field required (`laneId: string`). Also correct
+      `lib/types/system-board.ts:78-82`'s `LaneGate` doc comment, which
+      still claims "Fog-filtered server-side: only lanes the requester has
+      charted ship" — false since §1 (task 1.3 deletes `chartedGates`;
+      every lane-gate body ships unfiltered to every authenticated
+      requester). Type-only tightening plus a stale-comment fix once its
+      last excuse is gone; no behavior change.
+      (system-interior: *Lane-Gate Bodies Carry Their Lane Id* — A
+      materialized system's read carries each lane-gate body's lane id;
+      *Bodies Are Public; Ships Are Disclosed* — No body is omitted for
+      lack of stored knowledge)
