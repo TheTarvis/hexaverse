@@ -127,9 +127,9 @@
 
 ## 3. The Sighting Store
 
-- [ ] 3.1 Scaffold `backend/sightings` (six-file domain shape) storing at
+- [x] 3.1 Scaffold `backend/sightings` (six-file domain shape) storing at
       `corporations/{cid}/sightings/{id}`.
-- [ ] 3.2 Implement the `Sighting` model: minting corporation, resolving
+- [x] 3.2 Implement the `Sighting` model: minting corporation, resolving
       action id, `asOf`, system id, target id (stored, never on the wire),
       `CleanSweep` marker and host id, no update/delete function anywhere
       in the package's public surface — and, for a composition-bearing
@@ -147,7 +147,7 @@
       changes after it is minted; There is no update or delete path; *A
       Clean Sweep Is a Record* — A clean sweep mints a record with no
       target; A clean-sweep record still names the host and the sweep)
-- [ ] 3.3 Implement deterministic document paths —
+- [x] 3.3 Implement deterministic document paths —
       `corporations/{cid}/sightings/{actionId}_{targetId}` for a
       composition record, `{actionId}_clean` for a clean sweep — so
       `MergeAll` re-application on a retried resolve converges rather than
@@ -156,7 +156,7 @@
       Exactly Once* — A sighting's document id is deterministic; A retried
       resolve converges instead of duplicating; The mint is never a
       separate write after the transaction)
-- [ ] 3.4 Implement `GET /v1/sightings`, scoped to the caller's own
+- [x] 3.4 Implement `GET /v1/sightings`, scoped to the caller's own
       corporation, paginated newest-first with a named page maximum, no
       unbounded single-response read.
       (sighting-records: *A Sighting Is Readable Only By the Corporation
@@ -165,7 +165,7 @@
       Bounded Per Read* — A read without further parameters returns at
       most the page maximum; Records are ordered newest-minted-first; A
       pile within the page maximum is returned in full)
-- [ ] 3.5 Add a real import-graph check, not a read-through confirmation:
+- [x] 3.5 Add a real import-graph check, not a read-through confirmation:
       `sightings` may import `disclosure` (`disclosure`'s existing purity
       allow-list test already forbids the reverse at compile time, since
       that package's own production import set is closed to
@@ -188,7 +188,7 @@
       Disclosure* — Holding a sighting does not disclose its target live; A
       sighting for a target now out of range is absent from contacts; No
       live-disclosure-assembly package imports sightings)
-- [ ] 3.6 Test that no code path outside a resolving focused-scan mints a
+- [x] 3.6 Test that no code path outside a resolving focused-scan mints a
       sighting: reading the pile, sustained passive proximity, and a burn
       or lane-transit resolution each mint nothing.
       (sighting-records: *A Sighting Is Minted Only By a Resolving Sweep* —

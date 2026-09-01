@@ -16,6 +16,7 @@ import (
 	"hexaverse/market"
 	"hexaverse/middlewares"
 	"hexaverse/mine"
+	"hexaverse/sightings"
 	"hexaverse/sse"
 	"hexaverse/stations"
 	"hexaverse/system"
@@ -187,6 +188,12 @@ func SetupRouter() *gin.Engine {
 		corpSvc.Credits(), fogSvc, clock, common.NewFirestoreService(),
 	)
 	market.NewHandler(marketSvc, clock).RegisterRoutes(authorized, corpWriteQuota)
+
+	// The sighting pile (§3 of replace-observation-with-sightings): the read
+	// side of the persisted, immutable historical-claim store. Minting is the
+	// focused-scan resolver's job (task 5.8, backend/fleet) — this handler only
+	// serves the caller's own corporation's pile, newest pulse-reach first.
+	sightings.NewHandler(sightings.NewService()).RegisterRoutes(authorized)
 
 	// SSE: EventSource can't send custom headers, so JWT comes from the query string.
 	sseHandler := sse.NewHandler()
