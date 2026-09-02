@@ -118,7 +118,7 @@ func newMineTestStack(t *testing.T, params MineParams, stats map[fleet.ShipClass
 	sysFake := &fakeIntegrationSystem{interiors: map[string]*system.GeneratedInterior{}}
 	fleetSvc := fleet.NewServiceWith(fleet.NewDaoWithClient(fs), sysFake, sysFake, actionSvc, clk)
 	mineSvc := NewServiceWith(fleetSvc, sysFake, actionSvc, clk, params, stats)
-	actionSvc.RegisterResolver(mineType, action.KindMutating, Resolver(params, stats))
+	actionSvc.RegisterResolver(mineType, action.KindMutating, Resolver(params, stats, clk))
 
 	stack := &mineTestStack{fleetSvc: fleetSvc, mineSvc: mineSvc, actionSvc: actionSvc, sysFake: sysFake, clk: clk, fs: fs}
 	cleanup := func() {

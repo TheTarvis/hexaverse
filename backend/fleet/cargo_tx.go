@@ -150,6 +150,12 @@ type FuelCreditPlan struct {
 	ref            *firestore.DocumentRef
 	newFuel        float64
 	freeHoldBefore float64
+	// newStateDoc, when non-nil, is the restamped `stationkeep` park this
+	// credit lands into — the SAME transaction's settle-restamp-recompute
+	// step (fuel-purchase "A refuel into an open hold settles, credits, and
+	// restamps in the one transaction"). nil for every credit that does not
+	// land into an open hold, which is every one before this change.
+	newStateDoc map[string]any
 	// Fleet is the transactionally-read fleet, BEFORE this credit — so a
 	// caller can re-evaluate its own preconditions (docked state, free
 	// hold) against the SAME read this plan was validated from, and so a
@@ -212,9 +218,16 @@ func (p *FuelCreditPlan) DockedAt(featureID string) bool {
 // deliberately replaces the whole cargo map because a debit already
 // recomputed every kind's post-debit value.
 func (p *FuelCreditPlan) Apply(tx *firestore.Transaction) error {
-	if err := tx.Set(p.ref, map[string]interface{}{
+	data := map[string]interface{}{
 		"cargo": map[string]interface{}{"fuel": p.newFuel},
-	}, firestore.MergeAll); err != nil {
+	}
+	// The restamped hold rides the SAME write — never a follow-up and never
+	// a compensating one, so a failed settlement leaves neither the credit
+	// nor the restamp visible.
+	if p.newStateDoc != nil {
+		data["state"] = p.newStateDoc
+	}
+	if err := tx.Set(p.ref, data, firestore.MergeAll); err != nil {
 		return fmt.Errorf("crediting fuel: %w", err)
 	}
 	return nil
@@ -231,5 +244,12 @@ func (s *Service) PrepareFuelCreditInTx(
 	if !ok {
 		return nil, errors.New("fleet: fuel credit requires the Firestore-backed DAO")
 	}
-	return impl.PrepareFuelCreditInTx(ctx, tx, fleetID, tons)
+	plan, err := impl.PrepareFuelCreditInTx(ctx, tx, fleetID, tons)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.applyMidHoldSettlement(ctx, plan, tons); err != nil {
+		return nil, err
+	}
+	return plan, nil
 }

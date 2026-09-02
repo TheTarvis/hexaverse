@@ -98,7 +98,15 @@ func TestStop_Scenario_AtOrBelowFloorIsInstantAndFree(t *testing.T) {
 			Anchor: pos, Velocity: space.Vec3{X: space.StopInPlaceSpeedFloor}, EpochMs: 0,
 		}},
 	}
-	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(slow, nil)
+	// add-stationkeep-hold-verb task 4.5: stop-in-place's free,
+	// below-the-speed-floor branch now PERSISTS its point park, its cleared
+	// attachedTo and its updatedAt unconditionally (it previously wrote
+	// nothing at all for a fleet with no active action, against the live
+	// "Stopping at or below the speed floor is instant and free"). That is a
+	// second read and one write on this fixture's DAO — a mechanical
+	// expectation update, no assertion here changed.
+	dao.EXPECT().Get(gomock.Any(), "fleet_1").Return(slow, nil).Times(2)
+	dao.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 
 	got, err := svc.Stop(context.Background(), "fleet_1")
 	if err != nil {

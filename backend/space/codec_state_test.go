@@ -11,6 +11,16 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// The test file for codec_state.go — the widened kinematic-state codec.
+//
+// RENAMED 2026-09-02 (SDET) from codec_kinematic_state_test.go, to
+// codec_state_test.go: the repo's changed-file validator
+// (.claude/scripts/check-backend-tests.sh) pairs a Go file with its tests by
+// FILENAME, and reported codec_state.go as untested while its tests sat here
+// and in codec_stationkeep_park_test.go. Resolved by renaming rather than by
+// adding a stub — this file IS codec_state.go's test file, and the name now
+// says so.
+//
 // space-kinematics MODIFIED: "Coordinates Cross the Persistence Boundary
 // Through a Named Codec" — widened to a ship's whole kinematic state
 // (design.md Decision 9; the widened codec is tasks.md 2.5).
@@ -174,9 +184,19 @@ func TestCodec_Scenario_EveryParkKindRoundTripsExactly(t *testing.T) {
 			Kind: ParkOrbit, BodyId: "planet1", Radius: 12.5,
 			PeriodMs: 45_000, Phase: SubTurns(1000), EpochMs: 7_000,
 		},
+		// REVISED for add-stationkeep-hold-verb (cause: spec change —
+		// space-kinematics MODIFIED "Coordinates Cross the Persistence
+		// Boundary Through a Named Codec", whose scenario "Every park kind
+		// and a drift round-trip exactly through the codec" now reads
+		// "including — for a `stationkeep` park — its stored hold-start time
+		// and dry instant"). A stationkeep park with NO hold window no
+		// longer round-trips at all: the same requirement's own decode rule
+		// rejects a dry instant that is not strictly after its hold start,
+		// which zero/zero is not. See codec_stationkeep_park_test.go.
 		"stationkeep": {
 			Kind: ParkStationkeep, BodyId: "moon1",
-			Offset: Vec3{X: 1.5, Y: 0, Z: -2.5},
+			Offset:      Vec3{X: 1.5, Y: 0, Z: -2.5},
+			HoldStartMs: common.WorldMillis(12_000), DryInstantMs: common.WorldMillis(98_765),
 		},
 		"point": {
 			Kind: ParkPoint, Point: Vec3{X: -300, Y: 12, Z: 88},

@@ -204,6 +204,46 @@ func fleetCommandCases() []fleetCommandCase {
 			func(t *testing.T, v fleetOwnershipVictim) map[string]any {
 				return map[string]any{"hostId": v.withOwnHostInSweepRange(t)}
 			}},
+		// --- add-stationkeep-hold-verb ------------------------------------
+		// "an unchecked `hold` would let a foreign corporation park another
+		// corporation's fleet into a continuous fuel drain it never chose,
+		// and an unchecked `release` would let a foreign corporation force
+		// another corporation's fleet off a deliberately held position".
+		{"A foreign corp cannot start another corp's fleet station-keeping", "hold",
+			func(t *testing.T, v fleetOwnershipVictim) map[string]any {
+				v.orbitingWithFuel(t)
+				return map[string]any{}
+			}},
+		{"A foreign corp cannot release another corp's fleet's station-keep hold", "release",
+			func(t *testing.T, v fleetOwnershipVictim) map[string]any {
+				v.stationKeeping(t)
+				return map[string]any{}
+			}},
+	}
+}
+
+// orbitingWithFuel parks the victim's fleet in a real orbit park around its
+// home lane's gate body, holding ample fuel — the exact effective state `hold`
+// admits, so a foreign `hold` here is a live demonstration of the defect
+// rather than a rejection for some unrelated reason.
+func (v fleetOwnershipVictim) orbitingWithFuel(t *testing.T) {
+	t.Helper()
+	v.attachedToGate(t)
+	setFleetFuel(t, v.fleetId, reserveTons(t)+500)
+}
+
+// stationKeeping puts the victim's fleet into a REAL `stationkeep` park by
+// calling the production hold verb with the victim's OWN token — never by
+// hand-writing a park document, so this arrangement also fails loudly if the
+// hold verb itself is unreachable.
+func (v fleetOwnershipVictim) stationKeeping(t *testing.T) {
+	t.Helper()
+	v.orbitingWithFuel(t)
+	w := postHold(t, v.router, v.token, v.fleetId)
+	if w.Code != http.StatusOK {
+		t.Fatalf("arranging a station-keeping hold on the victim's own fleet: POST /hold as its OWNER "+
+			"returned %d (body: %s) — without a real hold there is nothing for a foreign `release` to attack",
+			w.Code, w.Body.String())
 	}
 }
 
@@ -271,6 +311,12 @@ func TestRouter_Scenario_ForeignCorporationCannotCommandAnotherCorpsFleet(t *tes
 			path := "/v1/fleets/" + victim.fleetId + "/" + tc.suffix
 			w := doJSON(t, router, http.MethodPost, path, intruderToken, body, nil)
 
+			// An UNREGISTERED Gin route answers 404 for every caller, which
+			// would make this scenario's "want 404" assertion pass vacuously
+			// against a verb that does not exist at all. (Added with the
+			// `hold`/`release` cases, but it guards the whole table.)
+			requireRouteImplemented(t, w)
+
 			if w.Code == http.StatusForbidden {
 				t.Fatalf("POST %s from a foreign corporation: status = 403, want 404. The status choice is "+
 					"load-bearing: fleet-movement \"Fleet Command Endpoints Are Restricted to the Owning "+
@@ -318,6 +364,13 @@ func TestRouter_Scenario_AForeignFleetIsIndistinguishableFromANonexistentOne(t *
 			ghost := doJSON(t, router, http.MethodPost,
 				"/v1/fleets/"+ghostFleetId+"/"+tc.suffix, intruderToken, body, nil)
 
+			// Without this, an UNREGISTERED route makes this scenario pass
+			// vacuously in the most perfect way available: both requests get
+			// Gin's identical generic 404, so "indistinguishable" holds for a
+			// verb that does not exist.
+			requireRouteImplemented(t, foreign)
+			requireRouteImplemented(t, ghost)
+
 			if foreign.Code != ghost.Code {
 				t.Errorf("POST .../%s: another corporation's real fleet answered %d, a fleet id that has never "+
 					"existed answered %d. The two must be indistinguishable — the difference alone tells an "+
@@ -360,6 +413,8 @@ func TestRouter_Scenario_CorplessRequesterIsRejectedFromEveryFleetCommand(t *tes
 
 			path := "/v1/fleets/" + victim.fleetId + "/" + tc.suffix
 			w := doJSON(t, router, http.MethodPost, path, corplessToken, body, nil)
+
+			requireRouteImplemented(t, w) // an unregistered route 404s for everyone; see the sibling test
 
 			if w.Code != http.StatusNotFound {
 				t.Errorf("POST %s from an authenticated but CORPLESS account: status = %d, want 404 (body: %s)",

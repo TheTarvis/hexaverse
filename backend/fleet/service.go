@@ -149,6 +149,12 @@ type ServiceInterface interface {
 	// Sweep Commits On the Sensor Channel").
 	Scan(ctx context.Context, id, hostId string) (*Fleet, error)
 	Cancel(ctx context.Context, id string) (*Fleet, error)
+	// Hold converts an orbiting fleet to a station-keeping park at its
+	// current offset, and Release converts it back — both instant, neither
+	// creating an action or claiming a channel slot (fleet-movement
+	// "Station-Keeping Hold and Release Are Fleet Verbs").
+	Hold(ctx context.Context, id string) (*Fleet, error)
+	Release(ctx context.Context, id string) (*Fleet, error)
 	SeedFleet(ctx context.Context, systemID, corporationID string, at space.Vec3, starSize float64) (*Fleet, error)
 	// Position resolves a fleet's live position at the current world time,
 	// through the injected bodies table (design.md Decision 16).
@@ -239,6 +245,17 @@ func (s *Service) WithFuelParams(p FuelParams) *Service {
 func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 	f, err := s.load(ctx, id)
 	if err != nil {
+		return nil, err
+	}
+	// Every decision this read feeds reads `cargo.fuel` — the roster's
+	// FreeHold (handler.go), the estimated maximum range, and the persistent
+	// stranded indication — so a `stationkeep` park at or after its stored
+	// dry instant is settled DURABLY first, by the preceding, independent,
+	// conditional write (fleet-movement "Every Decision Reading Fuel Settles
+	// a Past-Dry-Instant Hold First"). An in-memory fold would satisfy every
+	// "computed from the settled value" assertion while leaving the stored
+	// figure stale for the next reader to trip over.
+	if f, err = s.settleExpiredHoldFirst(ctx, f); err != nil {
 		return nil, err
 	}
 	if f.ActiveActionId != "" && f.State.Mode == space.ModeBurn && f.State.Burn != nil &&
@@ -348,6 +365,21 @@ func (s *Service) ListForCorp(ctx context.Context, corporationID string) ([]Flee
 			if due {
 				fleets[i] = *settled
 			}
+			// The roster read is the SAME FreeHold / estimated-range /
+			// stranded-indication consumer the single-fleet read is (one call
+			// site, handler.go's rosterFieldsFor), so a past-dry-instant
+			// station-keeping hold settles durably here too (fleet-movement
+			// "Every Decision Reading Fuel Settles a Past-Dry-Instant Hold
+			// First"). Degrades exactly as the due-arrival settle above does:
+			// one fleet's failure returns that fleet unsettled rather than
+			// blanking the whole roster.
+			held, herr := s.settleExpiredHoldFirst(ctx, &fleets[i])
+			if herr != nil {
+				log.Warn().Ctx(ctx).Err(herr).Str("corporationId", corporationID).Str("fleetId", fleets[i].Id).
+					Msg("ListForCorp: settling an elapsed station-keeping hold failed; returning this fleet unsettled")
+				continue
+			}
+			fleets[i] = *held
 		}
 	}
 
@@ -474,8 +506,6 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 		return nil, err
 	}
 
-	now := s.clock.Now()
-
 	// An active movement action that already completed is a fact, not a
 	// re-taskable order: resolve it first (settle + effects), then order from
 	// the settled doc — via the shared fold-first seam (tasks.md 5.0).
@@ -484,6 +514,22 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	} else if due {
 		f = settled
 	}
+
+	// A burn commit's affordability check reads `cargo.fuel` TO DECIDE, and
+	// its commit transaction rejects — so an elapsed station-keeping hold is
+	// settled by a preceding, INDEPENDENT write, never inside the commit,
+	// where action-dispatch's own abort semantics would discard it
+	// (fleet-movement "Every Decision Reading Fuel Settles a Past-Dry-Instant
+	// Hold First"). The commit's own re-read guards the window between the
+	// two transactions; see its ActorStateFunc below.
+	if f, err = s.settleExpiredHoldFirst(ctx, f); err != nil {
+		return nil, err
+	}
+	fireSettleFirstSeam(id)
+
+	// Read AFTER the settle-first write, so the burn is solved and priced at
+	// the instant the deciding transaction actually runs at.
+	now := s.clock.Now()
 
 	from, err := s.Position(ctx, f, bt)
 	if err != nil {
@@ -557,9 +603,23 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	refund := priorBurnRefund(f, now)
 	currentFuel := f.Cargo["fuel"]
 	fuelActive := fuelTrackingEngaged(f)
-	if fuelActive && currentFuel+refund < newCost {
+	// A burn ENDS an open station-keeping hold, so its accrued upkeep is
+	// settled before the burn's own cost is evaluated against the remainder
+	// (fleet-movement "A burn committed from an open station-keeping hold
+	// settles its accrued upkeep and replaces the park, without restamping").
+	// Priced here in memory only for the pre-check and the returned struct;
+	// the authoritative debit is computed inside the commit transaction from
+	// its OWN re-read.
+	holdRate := s.holdRateFor(bt, f)
+	openHoldUpkeep := s.openHoldUpkeep(f, holdRate, now)
+	if fuelActive && currentFuel+refund-openHoldUpkeep < newCost {
 		return nil, ErrInsufficientFuel
 	}
+
+	// settledUpkeep is the hold-ending upkeep the commit transaction's own
+	// producer actually debited, captured so the returned in-memory struct
+	// reports the same balance the stored document carries.
+	settledUpkeep := openHoldUpkeep
 
 	// Re-task: release the current slot before claiming a new one (a running
 	// action while ordering is the norm mid-burn). ErrNotRunning means it
@@ -596,6 +656,23 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 			// snapshot") — this is what keeps a concurrent, unserialized
 			// refuel from ever being lost to a racing burn debit.
 			fuel := readCargoFuel(actorData)
+			// The in-transaction past-dry-instant guard (fleet-movement "A
+			// hold whose dry instant passes between the settle-first write
+			// and the commit is rejected, never restamped") and, for a hold
+			// still open, its hold-ending settlement — both against THIS
+			// transaction's own re-read. The burn replaces the park outright,
+			// so nothing is restamped and no fresh dry instant is computed.
+			if p, ok := storedStationkeepPark(actorData); ok {
+				txNow := s.clock.Now()
+				if isExpiredHold(p, txNow) {
+					return nil, ErrHoldExpiredMidCommit
+				}
+				settledUpkeep = upkeepTons(stationKeepRateFor(bt, p.BodyId), p.HoldStartMs, txNow, s.fuelParams)
+				fuel -= settledUpkeep
+				if fuel < 0 {
+					fuel = 0
+				}
+			}
 			if fuel < newCost {
 				return nil, ErrInsufficientFuel
 			}
@@ -616,7 +693,10 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	f.UpdatedAt = now
 	if fuelActive {
 		f.BurnFuelCostTons = newCost
-		f.Cargo["fuel"] = currentFuel + refund - newCost
+		f.Cargo["fuel"] = currentFuel + refund - settledUpkeep - newCost
+		if f.Cargo["fuel"] < 0 {
+			f.Cargo["fuel"] = 0
+		}
 		f.StrandingWarning = s.evaluateStrandingWarning(ctx, bt, f.SystemId, sol, hullCount, f.Cargo["fuel"])
 	}
 	log.Info().Ctx(ctx).Str("fleetId", id).Str("actionId", a.Id).
@@ -693,6 +773,78 @@ func (s *Service) evaluateStrandingWarning(ctx context.Context, bt *system.BodyT
 	return !reachable
 }
 
+// actionHistory is the READ half of the action spine — the inbox query the
+// generic GET /v1/actions surface already runs, and the only way a verb can
+// ask what the spine has already settled for its actor. It is deliberately
+// NOT a second constructor parameter and NOT a With… accessor: the fleet
+// Service already requires the spine (action.CommitInterface) as a mandatory
+// dependency, and *action.Service — the one implementation any composition
+// root passes — satisfies this structurally, so there is no wiring step a
+// change can silently omit (the failure mode NewServiceWith's own doc comment
+// records having shipped twice). A CommitInterface that does not expose the
+// read side simply cannot answer the question, and the caller degrades to the
+// coarser rejection rather than guessing.
+type actionHistory interface {
+	Inbox(ctx context.Context, actor string, statuses ...action.Status) ([]action.Action, error)
+}
+
+// parkedAtItsOwnBurnArrival reports whether the LAST thing that happened to
+// this fleet was its own burn's arrival being settled — the durable trace an
+// arrival settlement leaves behind, and the seam that lets cut-drive tell
+// "your burn already arrived" from "this fleet was never burning" after the
+// settlement has already happened (fleet-movement "Cutting an already-arrived
+// burn resolves the arrival instead").
+//
+// Three signals, all durable, all read from state the settlement itself
+// wrote:
+//
+//   - The fleet is parked, free of lane transit, and holds no movement-channel
+//     claim — the exact shape BurnResolver settles a burn INTO (a park, the
+//     slot released), and the shape neither a drift nor an in-transit fleet
+//     can present.
+//   - The spine holds a `done` burn action for this fleet whose frozen Eta is
+//     the fleet document's own UpdatedAt. BurnResolver stamps
+//     `updatedAt = r.At = the action's Eta` (resolver.go), so this equality
+//     says precisely "the fleet document's most recent write IS that burn's
+//     arrival settlement". It is self-limiting without any clearing step:
+//     every later write to the fleet — a fresh order, a hold, a release, a
+//     refuel, a mine credit, a jump — restamps UpdatedAt to its own instant
+//     and the equality stops holding, at which point the fleet is an
+//     ordinary parked fleet and cut-drive rejects it by the other name.
+//   - The action's Type is the burn key. A jump or mine settling into a park
+//     stamps UpdatedAt the same way, and neither is a burn to cut.
+//
+// Deliberately NOT derived from the park alone: a body-targeted arrival park
+// carries the arrival millisecond as its EpochMs, but a POINT-targeted one
+// (space.StateAt) carries no epoch at all, so a park-only rule would repair
+// exactly half of the cases and leave the other half reporting the wrong
+// reason.
+//
+// Answers false, never an error: this runs only on a path that is already
+// rejecting, and a spine read that fails must not turn a well-named 409 into
+// a bodyless 500 — it degrades to ErrNotBurning's coarser reason instead.
+func (s *Service) parkedAtItsOwnBurnArrival(ctx context.Context, f *Fleet) bool {
+	if f.Jump != nil || f.ActiveActionId != "" || f.State.Mode != space.ModeParked {
+		return false
+	}
+	hist, ok := s.actions.(actionHistory)
+	if !ok {
+		return false
+	}
+	done, err := hist.Inbox(ctx, f.Id, action.StatusDone)
+	if err != nil {
+		log.Warn().Ctx(ctx).Err(err).Str("fleetId", f.Id).
+			Msg("Could not read the fleet's settled actions; falling back to the not-burning rejection")
+		return false
+	}
+	for _, a := range done {
+		if a.Type == burnType && a.Eta == f.UpdatedAt {
+			return true
+		}
+	}
+	return false
+}
+
 // CutDrive converts an active burn to a drift at its live position and
 // velocity (design.md Decision 6; fleet-movement "Cut Drive Converts the
 // Burn to a Drift and Goes Dark") — free, instant, and dark: no delta-v, no
@@ -704,6 +856,24 @@ func (s *Service) CutDrive(ctx context.Context, id string) (*Fleet, error) {
 		return nil, err
 	}
 	if f.State.Mode != space.ModeBurn || f.State.Burn == nil {
+		// A fleet with no live burn is TWO different rejections, and the two
+		// live scenarios insist on distinct names for them: "Cutting an
+		// already-arrived burn resolves the arrival instead" ("rejected with
+		// its own named reason") and "Cutting a parked, drifting, or
+		// in-transit fleet is rejected by name" ("distinct from the
+		// already-arrived rejection"). Over HTTP the already-arrived case
+		// NEVER reaches the settleIfDue branch below: Handler.commandedFleetId's
+		// ownership pre-read calls Service.Get, which settles a due, unresolved
+		// burn opportunistically (the no-scheduler arrival contract, and this
+		// change's durable settle-first obligation) — so by the time CutDrive
+		// loads, the arrival is already resolved and the fleet reads as parked.
+		// The pre-read is required behaviour and is deliberately left alone
+		// (design.md "commandedFleetId's ownership pre-read settles first");
+		// the distinction is re-derived here from what that settlement LEFT
+		// BEHIND instead.
+		if s.parkedAtItsOwnBurnArrival(ctx, f) {
+			return nil, space.ErrCutAfterArrival
+		}
 		return nil, ErrNotBurning
 	}
 	now := s.clock.Now()
@@ -828,23 +998,40 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 
 	if vel.Length() <= space.StopInPlaceSpeedFloor {
 		newState := space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint, Point: pos}}
-		cancelState := map[string]interface{}{
-			"state": EncodeKinematicState(newState), "attachedTo": "", "updatedAt": int64(now),
-		}
-		if fuelActive && refund != 0 {
-			cancelState["cargo"] = map[string]interface{}{"fuel": currentFuel + refund}
+
+		// The free branch's own persistence, UNCONDITIONAL (add-stationkeep-
+		// hold-verb task 4.5; write-up: docs/plans/continous_space/handoffs/
+		// drift-stop-free-branch-no-write.md). Until this change its ONLY
+		// write was s.actions.Cancel, guarded by ActiveActionId != "", and
+		// Handler.Stop performs no DAO write of its own — so for a fleet with
+		// no active movement action (which a station-keeping fleet always is,
+		// `hold` claiming no slot) this branch computed a point park, a
+		// cleared attachment and a refund entirely in memory and DROPPED
+		// them, against the already-live "Stopping at or below the speed
+		// floor is instant and free".
+		//
+		// The hold-ending settlement rides THIS write, deliberately not the
+		// action cancellation: routing it through cancelState ships a green
+		// test for a mining fleet (which does have an active action) while
+		// forgiving the accrual for a gate camper, which is exactly the
+		// defect the universal hold-ending rule exists to close.
+		settledFuel, err := s.stopInPlaceWrite(ctx, f, bt, newState, now)
+		if err != nil {
+			return nil, err
 		}
 		if f.ActiveActionId != "" {
-			if _, err := s.actions.Cancel(ctx, f.ActiveActionId, cancelState); err != nil && !errors.Is(err, action.ErrNotRunning) {
+			if _, err := s.actions.Cancel(ctx, f.ActiveActionId,
+				map[string]interface{}{"updatedAt": int64(now)}); err != nil && !errors.Is(err, action.ErrNotRunning) {
 				return nil, err
 			}
 		}
 		f.State = newState
+		f.AttachedTo = ""
 		f.ActiveActionId = ""
 		f.UpdatedAt = now
 		if fuelActive {
 			f.BurnFuelCostTons = 0
-			f.Cargo["fuel"] = currentFuel + refund
+			f.Cargo["fuel"] = settledFuel
 		}
 		return f, nil
 	}
@@ -871,9 +1058,15 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 	// and rejected if unaffordable, BEFORE the prior action is cancelled.
 	hullCount := len(effectiveRoster(*f))
 	newCost := FuelCostTons(&sol.Burn, hullCount, s.fuelParams)
-	if fuelActive && currentFuel+refund < newCost {
+	if fuelActive && currentFuel+refund-s.openHoldUpkeep(f, s.holdRateFor(bt, f), now) < newCost {
 		return nil, ErrInsufficientFuel
 	}
+
+	// holdSettledFuel/holdEnded capture what the commit's own producer
+	// settled, so the returned in-memory struct reports the same balance the
+	// stored document carries.
+	var holdSettledFuel float64
+	var holdEnded bool
 
 	if f.ActiveActionId != "" {
 		cancelState := map[string]interface{}{"updatedAt": int64(now)}
@@ -899,6 +1092,23 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 				return merge, nil
 			}
 			fuel := readCargoFuel(actorData)
+			// Stop's committed-burn branch ends an open station-keeping hold
+			// exactly as an ordinary burn commit does, and settles its accrual
+			// in this same transaction, before its own cost is evaluated
+			// against the remainder ("No path SHALL end a hold without
+			// settling it"). A hold already past its dry instant settles by
+			// the automatic fold instead — to exactly the reserve, with no
+			// upkeepTons debit stacked on top of it. Unlike the ordinary burn
+			// commit, this branch is deliberately NOT one of the three
+			// transactions that owe a PRECEDING settlement write: the fold
+			// rides the verb's own hold-ending transaction.
+			if p, ok := storedStationkeepPark(actorData); ok {
+				settled, _, ended := s.settledFuelInTx(p, fuel, stationKeepRateFor(bt, p.BodyId), s.clock.Now())
+				if ended {
+					holdSettledFuel, holdEnded = settled, true
+					fuel = settled
+				}
+			}
 			if fuel < newCost {
 				return nil, ErrInsufficientFuel
 			}
@@ -915,7 +1125,14 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 	f.UpdatedAt = now
 	if fuelActive {
 		f.BurnFuelCostTons = newCost
-		f.Cargo["fuel"] = currentFuel + refund - newCost
+		base := currentFuel + refund
+		if holdEnded {
+			base = holdSettledFuel
+		}
+		f.Cargo["fuel"] = base - newCost
+		if f.Cargo["fuel"] < 0 {
+			f.Cargo["fuel"] = 0
+		}
 		f.StrandingWarning = s.evaluateStrandingWarning(ctx, bt, f.SystemId, sol, hullCount, f.Cargo["fuel"])
 	}
 	return f, nil
@@ -1015,8 +1232,29 @@ func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error) {
 		Scope:           f.SystemId,
 		Params:          map[string]interface{}{"laneId": laneId, "destSystemId": destId},
 		Eta:             eta,
-		ActorState: map[string]interface{}{
-			"jump": *jump, "updatedAt": int64(now),
+		ActorStateFunc: func(actorData map[string]interface{}) (map[string]interface{}, error) {
+			merge := map[string]interface{}{"jump": *jump, "updatedAt": int64(now)}
+			// A jump ABANDONS an open station-keeping hold, so its accrued
+			// upkeep is settled in the same transaction that commits the jump
+			// — before JumpResolver overwrites the stored park with a fresh
+			// one at the destination and the unsettled hold is simply
+			// discarded ("No path SHALL end a hold without settling it": a
+			// fleet camping a gate under a hold and then jumping has paid for
+			// the hold). The jump itself still costs no delta-v; this debit is
+			// the HOLD's already-accrued upkeep, not a charge for the jump.
+			//
+			// A hold already past its dry instant settles by the automatic
+			// fold instead — to exactly the reserve, with no upkeepTons debit
+			// stacked on top — and that fold rides THIS transaction rather
+			// than a preceding, independent write, because a jump reads
+			// cargo.fuel neither to decide anything nor as a FreeHold
+			// consumer. A rejected jump therefore ends no hold and leaves the
+			// fleet holding for the next fuel-reading consumer to settle by
+			// the ordinary rule: self-healing, not lossy.
+			if p, ok := storedStationkeepPark(actorData); ok {
+				s.holdEndingMergeInTx(merge, actorData, stationKeepRateFor(bt, p.BodyId), s.clock.Now())
+			}
+			return merge, nil
 		},
 	})
 	if err != nil {

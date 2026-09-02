@@ -48,7 +48,7 @@ func decodeActorFleet(f fleet.Fleet) func(interface{}) error {
 func resolveWith(t *testing.T, tons, rate, startTons, fold float64, actor fleet.Fleet) (action.ResolveResult, error) {
 	t.Helper()
 	stats := map[fleet.ShipClass]fleet.ClassStats{fleet.ClassSeed: {HoldCapacity: 100}}
-	resolver := Resolver(MineParams{}, stats)
+	resolver := Resolver(MineParams{}, stats, common.WorldClock())
 	return resolver(context.Background(), action.Resolution{
 		Action:      action.Action{Id: "action_resolve_test", Params: frozenParams(tons, rate, startTons)},
 		At:          5000,

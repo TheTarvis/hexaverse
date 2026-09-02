@@ -381,7 +381,7 @@
       Past-Dry-Instant Hold First" ("A hold whose dry instant passes between
       the settle-first write and the commit is rejected, never restamped")
 
-- [ ] 4.11 Persist the resolver's `reasonCode` on the resolved action: add
+- [x] 4.11 Persist the resolver's `reasonCode` on the resolved action: add
       `{Path: "reasonCode", Value: res.ReasonCode}` to `ResolveOne`'s
       existing `tx.Update` (`backend/action/dao.go:334-339`), which is the
       resolve transaction's only write to the action document and today sets
@@ -441,21 +441,57 @@ write-up:
       handler that maps all three to one generic rejection, which is
       exactly the defect the three live scenarios' "by name" wording
       forbids
-- [ ] 5.4 Map `space.ErrCutAfterArrival` to `409 Conflict` with a
+- [x] 5.4 Map `space.ErrCutAfterArrival` to `409 Conflict` with a
       reason-bearing body, its message **pairwise distinct** from every other
       wrong-state rejection this switch serves — in particular from
       `ErrNotBurning`'s, which task 5.1 wires and whose own live scenario
-      names it "distinct from the already-arrived rejection".
-      `Service.CutDrive` surfaces this sentinel twice — directly at
-      `service.go:803`,
-      after `settleIfDue` resolves the due arrival, and by propagation from
-      `space.CutDrive` at `:806` — and `Handler.CutDrive` answers through
-      `respond`, where no case matches it today, so both fall through to the
-      bodyless `500`. Assert in tests that the reasons are **pairwise
-      distinct**, not merely non-`500`, for the same reason task 5.3 gives —
-      `fleet-movement` (live): "Cutting an already-arrived burn resolves the
-      arrival instead" (`openspec/specs/fleet-movement/spec.md:307-312`),
-      whose "rejected with its own named reason" no bodyless 5xx can satisfy
+      names it "distinct from the already-arrived rejection". **That mapping
+      is correct and already implemented** (`backend/fleet/handler.go:326`),
+      and it is necessary but **not sufficient**: the case is *unreachable*
+      over HTTP, so the second half of this task is where the remaining work
+      is.
+      **Make the sentinel reachable.** `Handler.CutDrive` resolves its fleet
+      id through `commandedFleetId` (`handler.go:150`), whose ownership check
+      calls `h.svc.Get`, and `Service.Get` opportunistically resolves a due,
+      unresolved burn (`service.go:261-264`) **before `Service.CutDrive` is
+      ever entered**. `CutDrive`'s own `f.State.Mode != space.ModeBurn` guard
+      (`service.go:786`) therefore fires first and returns `ErrNotBurning`,
+      so neither of the two sites that surface this sentinel — directly at
+      `service.go:803`, after `settleIfDue` resolves the due arrival, and by
+      propagation from `space.CutDrive` at `:806` — is reachable over HTTP,
+      and the already-arrived rejection comes back carrying `ErrNotBurning`'s
+      message. The live scenario, which demands "its own named reason"
+      explicitly distinct from that one, stays unmet. **Distinguish the
+      already-arrived case before or inside `Service.CutDrive`**, so
+      `space.ErrCutAfterArrival` actually reaches `respond` instead of being
+      pre-empted by the pre-read's settlement. (This task's original premise —
+      that the sentinel merely needed a `respond` case — predates the
+      ownership pre-read introduced in commit `6a334ce`.)
+      **The constraint that makes this non-trivial — do not "fix" it by
+      weakening the pre-read.** `Service.Get`'s opportunistic settlement is
+      REQUIRED behaviour, not incidental: it is the no-scheduler arrival
+      contract, and it is where task 4.7 sites the durable past-dry-instant
+      settlement for two of this change's own enumerated fuel-reading
+      consumers (the estimated maximum range and the stranded indication). It
+      SHALL NOT be removed, narrowed, made conditional on the caller, or
+      bypassed for `commandedFleetId`'s ownership pre-read. The distinction
+      SHALL be drawn instead from the state that settlement leaves behind — a
+      burn settled by this request's own pre-read is observably different from
+      a fleet that was never burning (a just-resolved burn action and the
+      arrival park and effects it wrote, versus neither) — never by preventing
+      the settlement from happening.
+      **What makes a test of this vacuous:** calling `Service.CutDrive`
+      directly, or otherwise bypassing `commandedFleetId` — precisely the
+      mutation that turns the assertion green while the HTTP surface stays
+      broken. Drive it through the route. Assert the reasons are **pairwise
+      distinct**, not merely non-`500`, for the same reason task 5.3 gives,
+      and assert the arrival's own effects landed (`attachedTo` set, the
+      arrived-at gate's lane charted), since the live scenario requires the
+      resolution as well as the rejection — `fleet-movement` (live): "Cutting
+      an already-arrived burn resolves the arrival instead"
+      (`openspec/specs/fleet-movement/spec.md:307-312`), whose "rejected with
+      its own named reason" neither a bodyless 5xx nor a correctly-shaped
+      response carrying the wrong reason can satisfy
 
 ## 6. Cargo-pool and mine housekeeping
 
@@ -563,7 +599,7 @@ write-up:
       motionless gate settles its accrued upkeep", "Jumping from an open
       hold settles its accrued upkeep", and (live, undelta'd) "Stopping at
       or below the speed floor is instant and free"
-- [ ] 7.10 Backend integration test: commit a burn from an open hold whose
+- [x] 7.10 Backend integration test: commit a burn from an open hold whose
       settlement plus the burn's own cost leaves exactly zero `fuel` — the
       commit succeeds, the burn replaces the park, and no `stationkeep`
       park with `dryInstant == holdStart` is ever persisted — traces to "A
@@ -578,7 +614,7 @@ write-up:
       nothing of its own — traces to "A burn commit against a
       past-dry-instant holding fleet evaluates against settled,
       reserve-level fuel"
-- [ ] 7.12 Backend integration test: commit a mine run, then hold the
+- [x] 7.12 Backend integration test: commit a mine run, then hold the
       mining fleet into `stationkeep` (attachment survives, per task 3.14)
       and let its upkeep settle before the run resolves — `freeHoldAtResolve`
       is strictly greater than `freeHoldAtCommit`, and the take is still
@@ -645,7 +681,7 @@ write-up:
       `fleet-movement`: "Stopping a fleet holding at a motionless gate
       settles its accrued upkeep" and (live, undelta'd) "Stopping at or
       below the speed floor is instant and free"
-- [ ] 7.17 `go test ./... -p 1` and
+- [x] 7.17 `go test ./... -p 1` and
       `python3 .claude/skills/code-quality-checks/check.py` clean
 - [x] 7.18 Backend integration test (**must FAIL against a build carrying
       tasks 4.8 and 4.9 but not 4.10**): hold a fleet; advance world time to
@@ -675,7 +711,7 @@ write-up:
       the very window this test exists to open — traces to
       `fleet-movement`: "A hold whose dry instant passes between the
       settle-first write and the commit is rejected, never restamped"
-- [ ] 7.19 Backend integration test: hold a fleet at a lane gate, advance
+- [x] 7.19 Backend integration test: hold a fleet at a lane gate, advance
       world time **past** its stored dry instant with no read or write
       observing the park in between, then (a) `jump` successfully — assert
       the stored `fuel` is exactly the reserve, the park is the released

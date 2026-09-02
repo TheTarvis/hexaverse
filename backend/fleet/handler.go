@@ -46,6 +46,8 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 		g.POST("/:fleetId/stop", h.Stop)
 		g.POST("/:fleetId/jump", h.Jump)
 		g.POST("/:fleetId/scan", h.Scan)
+		g.POST("/:fleetId/hold", h.Hold)
+		g.POST("/:fleetId/release", h.Release)
 	}
 }
 
@@ -239,6 +241,33 @@ func (h *Handler) Scan(c *gin.Context) {
 	h.respond(c, f, err)
 }
 
+// Hold handles POST /v1/fleets/:fleetId/hold (fleet-movement
+// "Station-Keeping Hold and Release Are Fleet Verbs") — instant, like
+// cut-drive: no action, no channel slot, no ETA. Ownership-gated through the
+// same commandedFleetId seam every other fleet command uses: an unchecked
+// hold would let a foreign corporation park another corporation's fleet into
+// a continuous fuel drain it never chose.
+func (h *Handler) Hold(c *gin.Context) {
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
+	f, err := h.svc.Hold(c.Request.Context(), fleetId)
+	h.respond(c, f, err)
+}
+
+// Release handles POST /v1/fleets/:fleetId/release — hold's instant inverse,
+// gated identically: an unchecked release would let a foreign corporation
+// force another corporation's fleet off a deliberately held position.
+func (h *Handler) Release(c *gin.Context) {
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
+	f, err := h.svc.Release(c.Request.Context(), fleetId)
+	h.respond(c, f, err)
+}
+
 // orderStrandingWarningDTO wraps the ordinary fleetDTO with the burn-
 // commit-response-only `strandingWarning` field (add-fuel-as-cargo,
 // fleet-movement "A Burn Commit Warns, But Does Not Block, When It Would
@@ -275,6 +304,50 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatus(http.StatusNotFound)
 	case errors.Is(err, ErrEmptyOrder), errors.Is(err, ErrAmbiguousOrder):
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrAccelBelowFloor), errors.Is(err, ErrAccelAboveCeiling):
+		// DRIFT REPAIR (add-stationkeep-hold-verb task 5.2; write-up:
+		// docs/plans/continous_space/handoffs/drift-fleet-wrong-state-500.md).
+		// Both were unwired and fell through to a bodyless 500, violating
+		// two live fleet-movement scenarios ("A commanded acceleration below
+		// the disclosure floor is rejected", "...above the ceiling is
+		// rejected"). 400: a commanded acceleration outside the disclosed
+		// band is a malformed request, not a state conflict. The two carry
+		// their own distinct messages — "rejected by name" is unsatisfiable
+		// through one generic rejection.
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrNotBurning):
+		// DRIFT REPAIR (task 5.1): cut-drive's own wrong-effective-state
+		// rejection, likewise unwired and likewise a bodyless 500, against
+		// the live "Cutting a parked, drifting, or in-transit fleet is
+		// rejected by name". 409 is this capability's convention for a
+		// state-precondition rejection, and this message is distinct from
+		// the already-arrived rejection's.
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, space.ErrCutAfterArrival):
+		// DRIFT REPAIR (task 5.4): cut-drive's OTHER wrong-state rejection —
+		// the burn already reached its stored arrival, so the arrival was
+		// resolved instead and there is no live burn left to cut. Reaches
+		// here on two paths (Service.CutDrive returns it directly once
+		// settleIfDue reports the arrival due, and space.CutDrive propagates
+		// it), and until now neither was wired: both fell through to the
+		// bodyless 500, which cannot satisfy the live "Cutting an
+		// already-arrived burn resolves the arrival instead" ("rejected with
+		// its own named reason"). 409, this capability's state-precondition
+		// status, with a message distinct from every other wrong-state
+		// rejection this switch serves — ErrNotBurning's above in
+		// particular, whose own scenario names it "distinct from the
+		// already-arrived rejection".
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrNotOrbiting), errors.Is(err, ErrNotStationKeeping),
+		errors.Is(err, ErrHoldWithoutFuel):
+		// The three station-keeping rejections, served as 409 with pairwise
+		// distinct reasons (fleet-movement "Station-Keeping Hold and Release
+		// Are Fleet Verbs": "the three reasons being pairwise distinct ...
+		// None of the three rejections above SHALL be served as a bodyless
+		// 5xx"). 409 is the status this capability's command surface already
+		// uses for its five wired state-precondition and
+		// resource-insufficiency rejections.
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrFleetInTransit):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet is in lane transit"})
 	case errors.Is(err, ErrJumpNotAttached):
@@ -295,6 +368,19 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		// Exceeds Available Fuel..."): this specific commit is unaffordable,
 		// never "this fleet cannot move to anything reachable at all".
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrHoldExpiredMidCommit):
+		// The in-transaction past-dry-instant guard aborted this commit on
+		// its OWN re-read (fleet-movement "Every Decision Reading Fuel
+		// Settles a Past-Dry-Instant Hold First": "the burn commit and the
+		// refuel surface it as a RETRYABLE failure that applies nothing,
+		// whose retry issues a fresh preceding settlement write"). Served
+		// with a reason, on the same retryable status ErrDestinationNotReady
+		// already uses for this capability's other apply-nothing refusal —
+		// never the bodyless 5xx below, which is the defect this change's
+		// own section-5 tasks repair for three sibling sentinels. `hold`
+		// never reaches here: it surfaces its own guard as
+		// ErrHoldWithoutFuel, above.
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrDestinationNotReady):
 		// A distinguishable, retryable rejection — never the bodyless 5xx
 		// below — per design.md Decision 28 (replace-observation-with-

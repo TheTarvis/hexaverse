@@ -524,6 +524,11 @@ type parkJSON struct {
 	EpochMs  int64      `json:"epochMs,omitempty"`
 	Offset   [3]float64 `json:"offset,omitempty"`
 	Point    [3]float64 `json:"point,omitempty"`
+	// The stationkeep-only hold window (add-stationkeep-hold-verb). Both are
+	// omitempty, so every park that carries no hold — which is every park
+	// recorded before this change — records byte-identically.
+	HoldStartMs  int64 `json:"holdStartMs,omitempty"`
+	DryInstantMs int64 `json:"dryInstantMs,omitempty"`
 }
 
 var parkKindNames = map[ParkKind]string{ParkOrbit: "orbit", ParkStationkeep: "stationkeep", ParkPoint: "point"}
@@ -539,6 +544,9 @@ func (p parkJSON) park() Park {
 		EpochMs:  common.WorldMillis(p.EpochMs),
 		Offset:   Vec3{p.Offset[0], p.Offset[1], p.Offset[2]},
 		Point:    Vec3{p.Point[0], p.Point[1], p.Point[2]},
+
+		HoldStartMs:  common.WorldMillis(p.HoldStartMs),
+		DryInstantMs: common.WorldMillis(p.DryInstantMs),
 	}
 }
 
@@ -564,6 +572,76 @@ type stateAtCase struct {
 	Err      string     `json:"err,omitempty"`
 }
 
+// --- station-keeping case shapes (add-stationkeep-hold-verb) ---------------
+
+// stationkeepCodecCase is one round trip of a `stationkeep` park through
+// EncodePark/DecodePark, plus the two new stored keys' recorded values —
+// space-kinematics MODIFIED "Coordinates Cross the Persistence Boundary
+// Through a Named Codec" ("Every park kind and a drift round-trip exactly
+// through the codec", widened to the hold window) and "A station-keep park
+// with a missing or invalid dry instant fails to decode".
+//
+// Err records the named decode failure for a rejected case, exactly as the
+// other families record theirs; RoundTrips records whether the decoded park
+// is identical to the encoded one.
+type stationkeepCodecCase struct {
+	Note             string   `json:"note"`
+	Park             parkJSON `json:"park"`
+	EncodedHoldStart int64    `json:"encodedHoldStartMs"`
+	EncodedDryInst   int64    `json:"encodedDryInstantMs"`
+	RoundTrips       bool     `json:"roundTripsExactly"`
+	Err              string   `json:"err,omitempty"`
+}
+
+// stationkeepFoldCase is one evaluation of space-kinematics' "A
+// Station-Keeping Park Past Its Dry Instant Is Its Released Orbit, With No
+// Extra Persisted State": the stored park, the observation time, the folded
+// park StateAt produces, and — recorded alongside it so the two can be read
+// against each other without leaving the file — the park
+// ReleaseStationkeep(bodyId, offset, dryInstant) produces directly.
+type stationkeepFoldCase struct {
+	Note                 string   `json:"note"`
+	System               string   `json:"system"`
+	Park                 parkJSON `json:"park"`
+	T                    int64    `json:"t"`
+	Folded               parkJSON `json:"foldedPark"`
+	ReleaseStationkeepAt parkJSON `json:"releaseStationkeepAtDryInstant"`
+	Position             *vec3    `json:"position,omitempty"`
+}
+
+// stationkeepDryInstantCase pins the ceiling-quantized INVERSE of
+// StationKeepUpkeep that fleet-movement's "Station-Keeping Upkeep Is Settled
+// at Discrete Events, Never Folded Into the Stored Cargo Pool" defines:
+//
+//	spendableDeltaV = (fuelTons − stationKeepReserveTons) × deltaVPerTon
+//	dryInstantMs    = holdStartMs + ceil_to_integer_ms(1000 × spendableDeltaV / upkeepRate)
+//
+// The two conversions are the whole point of recording it. deltaVPerTon is
+// Δv PER TON, so the BUDGET side multiplies by it and the accrual side
+// divides — inverting that understates a hold's endurance by deltaVPerTon²
+// (25× at today's placeholder 5.0). And StationKeepUpkeep already converts
+// milliseconds to seconds internally, so restating that conversion at a call
+// site moves the figure by a further 1000×. Cases below deliberately carry a
+// deltaVPerTon ≠ 1 AND a reserve ≠ 0, so either inversion, and a dropped
+// reserve subtraction, each break the recorded value.
+//
+// AccrualAtDryInstantTons and SpendableTons bracket the answer: the accrual
+// evaluated AT the recorded dry instant is at least the spendable budget and
+// less than that budget plus one millisecond's upkeep — an interval exactly
+// one millisecond wide, because the quantization is a ceiling.
+type stationkeepDryInstantCase struct {
+	Note                    string  `json:"note"`
+	HoldStartMs             int64   `json:"holdStartMs"`
+	FuelTons                float64 `json:"fuelTons"`
+	StationKeepReserveTons  float64 `json:"stationKeepReserveTons"`
+	DeltaVPerTon            float64 `json:"deltaVPerTon"`
+	UpkeepRate              float64 `json:"upkeepRate"`
+	DryInstantMs            int64   `json:"dryInstantMs"`
+	SpendableTons           num     `json:"spendableTons"`
+	AccrualAtDryInstantTons num     `json:"accrualAtDryInstantTons"`
+	OneMsOfUpkeepTons       num     `json:"oneMillisecondOfUpkeepTons"`
+}
+
 // jpark records a settled Park in the same reviewable input shape, so the
 // stateAt family's output can be read against the parkPosition family's
 // input without a second vocabulary.
@@ -571,8 +649,9 @@ func jpark(p Park) parkJSON {
 	return parkJSON{
 		Kind: parkKindNames[p.Kind], BodyId: p.BodyId, Radius: p.Radius,
 		PeriodMs: int64(p.PeriodMs), Phase: int64(p.Phase), EpochMs: int64(p.EpochMs),
-		Offset: [3]float64{p.Offset.X, p.Offset.Y, p.Offset.Z},
-		Point:  [3]float64{p.Point.X, p.Point.Y, p.Point.Z},
+		Offset:      [3]float64{p.Offset.X, p.Offset.Y, p.Offset.Z},
+		Point:       [3]float64{p.Point.X, p.Point.Y, p.Point.Z},
+		HoldStartMs: int64(p.HoldStartMs), DryInstantMs: int64(p.DryInstantMs),
 	}
 }
 
@@ -1694,6 +1773,10 @@ type fixtures struct {
 	StateAt      []stateAtCase `json:"stateAt"`
 	StateAtSweep []randomSweep `json:"stateAtSweep"`
 
+	StationkeepCodec      []stationkeepCodecCase      `json:"stationkeepCodec"`
+	StationkeepFold       []stationkeepFoldCase       `json:"stationkeepFold"`
+	StationkeepDryInstant []stationkeepDryInstantCase `json:"stationkeepDryInstant"`
+
 	EncodeVec      []encodeVecCase `json:"encodeVec"`
 	EncodeVecSweep []randomSweep   `json:"encodeVecSweep"`
 	DecodeVec      []decodeVecCase `json:"decodeVec"`
@@ -2563,6 +2646,11 @@ func computeFixtures(t testing.TB) fixtures {
 			stateAtAxes, sweepCountCurve, lines, digest, serMixed)
 	}
 
+	// --- station-keeping (add-stationkeep-hold-verb) ------------------------
+	f.StationkeepCodec = handStationkeepCodec()
+	f.StationkeepFold = handStationkeepFold(t)
+	f.StationkeepDryInstant = handStationkeepDryInstant()
+
 	// --- codec: EncodeVec / DecodeVec / EncodeSubTurns / DecodeSubTurns -----
 	f.EncodeVec = handEncodeVec()
 	{
@@ -2774,4 +2862,143 @@ func recordedMeasurements(t testing.TB) measuredParams {
 		t.Fatalf("unmarshal golden: %v", err)
 	}
 	return f.Measured
+}
+
+// --- station-keeping generators (add-stationkeep-hold-verb) ----------------
+
+func handStationkeepCodec() []stationkeepCodecCase {
+	inputs := []struct {
+		note string
+		park Park
+	}{
+		{"a station-keep park round-trips its stored hold window exactly",
+			Park{Kind: ParkStationkeep, BodyId: "moon1", Offset: Vec3{X: 1.5, Y: 0, Z: -2.5},
+				HoldStartMs: 12_000, DryInstantMs: 98_765}},
+		{"a one-millisecond hold is a legal, storable park — any strictly positive spendable remainder ceilings to at least one whole millisecond",
+			Park{Kind: ParkStationkeep, BodyId: "planet1", Offset: Vec3{X: 4, Y: 1, Z: -3},
+				HoldStartMs: 10_000, DryInstantMs: 10_001}},
+		{"a dry instant equal to its hold start fails to decode — the exact value hold's insufficient-fuel precondition exists to keep off disk, since persisting it bricks the fleet",
+			Park{Kind: ParkStationkeep, BodyId: "planet1", Offset: Vec3{X: 4, Y: 1, Z: -3},
+				HoldStartMs: 10_000, DryInstantMs: 10_000}},
+		{"a dry instant before its hold start fails to decode",
+			Park{Kind: ParkStationkeep, BodyId: "planet1", HoldStartMs: 10_000, DryInstantMs: 9_999}},
+		{"a non-positive hold start fails to decode — an absent one decodes to zero, and every accrual then runs from world-epoch zero",
+			Park{Kind: ParkStationkeep, BodyId: "planet1", HoldStartMs: 0, DryInstantMs: 20_000}},
+		{"an orbit park carries no hold window at all and still round-trips",
+			Park{Kind: ParkOrbit, BodyId: "planet1", Radius: 12.5, PeriodMs: 45_000, Phase: SubTurns(1000), EpochMs: 7_000}},
+		{"a released orbit — what the past-dry-instant fold writes over a stationkeep park — carries no hold window",
+			ReleaseStationkeep("planet1", Vec3{X: 4, Y: 1, Z: -3}, 40_000)},
+	}
+	out := make([]stationkeepCodecCase, 0, len(inputs))
+	for _, in := range inputs {
+		enc := EncodePark(in.park)
+		c := stationkeepCodecCase{
+			Note:             in.note,
+			Park:             jpark(in.park),
+			EncodedHoldStart: enc[holdStartKey].(int64),
+			EncodedDryInst:   enc[dryInstantKey].(int64),
+		}
+		got, err := DecodePark(enc)
+		if err != nil {
+			c.Err = errName(err)
+		} else {
+			c.RoundTrips = got == in.park
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func handStationkeepFold(t testing.TB) []stationkeepFoldCase {
+	bodies := systemBodies(t, "fixture")
+	held := func(bodyId string, offset Vec3, holdStart, dry common.WorldMillis) Park {
+		return Park{Kind: ParkStationkeep, BodyId: bodyId, Offset: offset,
+			HoldStartMs: holdStart, DryInstantMs: dry}
+	}
+	inputs := []struct {
+		note string
+		park Park
+		t    common.WorldMillis
+	}{
+		{"one millisecond before the dry instant — still held, at its exact stored offset",
+			held("planet1", Vec3{X: 12, Y: 4, Z: -9}, 1_000, 50_000), 49_999},
+		{"exactly at the dry instant — already released, on the same inclusive boundary the burn-arrival fold uses",
+			held("planet1", Vec3{X: 12, Y: 4, Z: -9}, 1_000, 50_000), 50_000},
+		{"one millisecond after the dry instant — released",
+			held("planet1", Vec3{X: 12, Y: 4, Z: -9}, 1_000, 50_000), 50_001},
+		{"long after the dry instant — the identical released orbit, since the fold releases AS OF the dry instant, never as of the observation time",
+			held("planet1", Vec3{X: 12, Y: 4, Z: -9}, 1_000, 50_000), 9_000_000},
+		{"a held offset with no planar component re-circularizes at the configured minimum orbit radius and the default phase",
+			held("moon1", Vec3{X: 0, Y: 7, Z: 0}, 500, 20_000), 20_001},
+		{"a park whose stored window is not strictly increasing never folds — that park is undecodable by this capability's own codec, and an in-memory one is left exactly as given",
+			held("planet1", Vec3{X: 3, Y: 0, Z: 4}, 2_000, 2_000), 999_999},
+	}
+	out := make([]stationkeepFoldCase, 0, len(inputs))
+	for _, in := range inputs {
+		p := in.park
+		folded, err := StateAt(bodies, ShipState{Mode: ModeParked, Park: &p}, in.t)
+		if err != nil {
+			t.Fatalf("stationkeepFold fixture: StateAt(%v, t=%d): %v", in.park, in.t, err)
+		}
+		c := stationkeepFoldCase{
+			Note: in.note, System: "fixture", Park: jpark(in.park), T: int64(in.t),
+			Folded:               jpark(*folded.Park),
+			ReleaseStationkeepAt: jpark(ReleaseStationkeep(in.park.BodyId, in.park.Offset, in.park.DryInstantMs)),
+		}
+		if pos, perr := StatePosition(bodies, ShipState{Mode: ModeParked, Park: &p}, in.t); perr == nil {
+			v := fvec(pos)
+			c.Position = &v
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+// handStationkeepDryInstant transcribes fleet-movement's dry-instant formula
+// LITERALLY, as the chain of named quantities the requirement states, rather
+// than as a rearrangement — so a reader can diff it against the requirement
+// line for line, and so backend/fleet's own production implementation is
+// pinned against an independently written expression rather than against
+// itself.
+func handStationkeepDryInstant() []stationkeepDryInstantCase {
+	dryInstant := func(holdStart common.WorldMillis, fuelTons, reserveTons, deltaVPerTon, rate float64) common.WorldMillis {
+		spendableDeltaV := (fuelTons - reserveTons) * deltaVPerTon
+		seconds := spendableDeltaV / rate
+		return holdStart + common.WorldMillis(int64(math.Ceil(seconds*1000)))
+	}
+	inputs := []struct {
+		note                              string
+		holdStart                         common.WorldMillis
+		fuel, reserve, deltaVPerTon, rate float64
+	}{
+		{"today's placeholder tuning at the configured upkeep floor: deltaVPerTon 5, a non-zero reserve, a whole-second answer",
+			1_000_000, 105, 5, 5, StationKeepFloor},
+		{"the same hold with the reserve dropped to zero — the dry instant moves by exactly the reserve's own endurance, which is what makes a missing subtraction visible",
+			1_000_000, 105, 0, 5, StationKeepFloor},
+		{"deltaVPerTon = 1, isolating the ms-to-seconds conversion from the tons conversion",
+			1, 42, 2, 1, 0.05},
+		{"a spendable remainder that does NOT land on a whole millisecond — the ceiling, not a truncation",
+			7, 10.0000001, 5, 5, 3.0},
+		{"a spendable remainder of one part in a billion still ceilings to a whole millisecond past the hold start",
+			500, 5 + 1e-9, 5, 5, 1.1977178758806546},
+		{"a rate far above the floor (a tight, fast-orbiting host) shortens the window without changing the arithmetic",
+			123_456, 200, 5, 5, 97.5},
+	}
+	out := make([]stationkeepDryInstantCase, 0, len(inputs))
+	for _, in := range inputs {
+		dry := dryInstant(in.holdStart, in.fuel, in.reserve, in.deltaVPerTon, in.rate)
+		out = append(out, stationkeepDryInstantCase{
+			Note:                    in.note,
+			HoldStartMs:             int64(in.holdStart),
+			FuelTons:                in.fuel,
+			StationKeepReserveTons:  in.reserve,
+			DeltaVPerTon:            in.deltaVPerTon,
+			UpkeepRate:              in.rate,
+			DryInstantMs:            int64(dry),
+			SpendableTons:           fnum(in.fuel - in.reserve),
+			AccrualAtDryInstantTons: fnum(StationKeepUpkeep(in.rate, in.holdStart, dry) / in.deltaVPerTon),
+			OneMsOfUpkeepTons:       fnum((in.rate * 0.001) / in.deltaVPerTon),
+		})
+	}
+	return out
 }

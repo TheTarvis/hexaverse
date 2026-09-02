@@ -188,7 +188,7 @@ func SetupRouter() *gin.Engine {
 	mineParams := mine.DefaultMineParams()
 	mineClassStats := fleet.DefaultClassStats()
 	mineSvc := mine.NewServiceWith(fleetSvc, systemSvc, actionSvc, clock, mineParams, mineClassStats)
-	mine.RegisterResolver(actionSvc, mineParams, mineClassStats)
+	mine.RegisterResolver(actionSvc, mineParams, mineClassStats, clock)
 	mine.NewHandlerWith(mineSvc, clock).RegisterRoutes(authorized)
 
 	// The direct station read — gated by the requester's graph tier, which is why

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"hexaverse/action"
+	"hexaverse/common"
 	"hexaverse/fleet"
 
 	"github.com/rs/zerolog/log"
@@ -30,8 +31,8 @@ func toFloat(v interface{}) float64 {
 // its dispatch type (the unexported mineType), mirroring fleet.RegisterResolvers
 // / fleet.RegisterTravelResolver — router.go calls this rather than reaching
 // for the private type literal itself.
-func RegisterResolver(a *action.Service, params MineParams, classStats map[fleet.ShipClass]fleet.ClassStats) {
-	a.RegisterResolver(mineType, action.KindMutating, Resolver(params, classStats))
+func RegisterResolver(a *action.Service, params MineParams, classStats map[fleet.ShipClass]fleet.ClassStats, clock common.WorldTime) {
+	a.RegisterResolver(mineType, action.KindMutating, Resolver(params, classStats, clock))
 }
 
 // Resolver is mine's action.ResolveFunc, registered for type "mine" (design.md
@@ -51,7 +52,12 @@ func RegisterResolver(a *action.Service, params MineParams, classStats map[fleet
 // classStats is the roster stats table freeHoldAtResolve is derived through
 // (fleet.FreeHold — re-read live at resolve, never frozen; see "Resolve
 // Clamps Yield to Reality"'s holdFull note).
-func Resolver(params MineParams, classStats map[fleet.ShipClass]fleet.ClassStats) action.ResolveFunc {
+// clock is the injected world clock the station-keeping settlement below is
+// observed at — a fold is settled at the instant it is OBSERVED, which for a
+// resolve is the world time the resolve actually runs at, not the action's
+// own frozen ETA (a rewound or long-overdue ETA would otherwise read every
+// live hold as still open).
+func Resolver(params MineParams, classStats map[fleet.ShipClass]fleet.ClassStats, clock common.WorldTime) action.ResolveFunc {
 	return func(ctx context.Context, r action.Resolution) (action.ResolveResult, error) {
 		var f fleet.Fleet
 		if err := r.DecodeActor(&f); err != nil {
@@ -72,6 +78,18 @@ func Resolver(params MineParams, classStats map[fleet.ShipClass]fleet.ClassStats
 		if remainingAtEta < 0 {
 			remainingAtEta = 0
 		}
+
+		// A `stationkeep` hold at or after its stored dry instant is settled
+		// FIRST, and inside THIS resolve's own transaction (fleet-movement
+		// "FreeHold used by mine's resolve clamp reflects a settled hold";
+		// "Every Decision Reading Fuel Settles a Past-Dry-Instant Hold
+		// First"). Without it the clamp reads the stale, over-reported fuel
+		// figure and under-reports the fleet's available capacity. The
+		// settlement only ever DEBITS fuel, so it can only widen free hold —
+		// which is exactly the equality mine-extraction's "Resolve Clamps
+		// Yield to Reality" retires: freeHoldAtResolve is no longer always
+		// equal to freeHoldAtCommit.
+		actorState, _ := fleet.SettleExpiredHold(&f, nil, fleet.DefaultFuelParams(), clock.Now())
 
 		freeHoldAtResolve := fleet.FreeHold(f, classStats)
 
@@ -108,12 +126,19 @@ func Resolver(params MineParams, classStats map[fleet.ShipClass]fleet.ClassStats
 			if f.Cargo != nil {
 				existing = f.Cargo[kind]
 			}
-			res.ActorState = map[string]interface{}{
-				"cargo": map[string]interface{}{
-					kind: existing + take,
-				},
+			if actorState == nil {
+				actorState = map[string]interface{}{}
 			}
+			cargo, _ := actorState["cargo"].(map[string]interface{})
+			if cargo == nil {
+				cargo = map[string]interface{}{}
+			}
+			cargo[kind] = existing + take
+			actorState["cargo"] = cargo
 		}
+		// Non-nil whenever the settlement wrote, even for a zero take: the
+		// hold's demotion is this transaction's to persist either way.
+		res.ActorState = actorState
 		return res, nil
 	}
 }

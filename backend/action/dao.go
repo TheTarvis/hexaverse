@@ -335,6 +335,7 @@ func (dao *DaoImpl) ResolveOne(ctx context.Context, id string, resolve ResolveFu
 		if err := tx.Update(ref, []firestore.Update{
 			{Path: "status", Value: string(StatusDone)},
 			{Path: "outcome", Value: res.Outcome},
+			{Path: "reasonCode", Value: res.ReasonCode},
 			{Path: "resolvedAt", Value: int64(dao.clock.Now())},
 		}); err != nil {
 			return err
@@ -366,6 +367,7 @@ func (dao *DaoImpl) ResolveOne(ctx context.Context, id string, resolve ResolveFu
 		}
 		a.Status = StatusDone
 		a.Outcome = res.Outcome
+		a.ReasonCode = res.ReasonCode
 		a.ResolvedAt = dao.clock.Now()
 		out = &a
 		return nil

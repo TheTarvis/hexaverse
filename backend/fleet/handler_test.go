@@ -47,6 +47,12 @@ func (f *fakeFleetSvc) Scan(context.Context, string, string) (*Fleet, error) {
 	return f.fleet, nil
 }
 func (f *fakeFleetSvc) Cancel(context.Context, string) (*Fleet, error) { return f.fleet, nil }
+
+// Hold/Release: mechanical fixture additions keeping this hand fake
+// satisfying the ServiceInterface add-stationkeep-hold-verb widened. No
+// scenario in this file asserts through them.
+func (f *fakeFleetSvc) Hold(context.Context, string) (*Fleet, error)    { return f.fleet, nil }
+func (f *fakeFleetSvc) Release(context.Context, string) (*Fleet, error) { return f.fleet, nil }
 func (f *fakeFleetSvc) SeedFleet(context.Context, string, string, space.Vec3, float64) (*Fleet, error) {
 	return f.fleet, nil
 }

@@ -114,7 +114,7 @@
 
     { "go": "Drift.Position", "coverage": "inventory", "note": "implemented by this change's section 2 (tasks.md 2.1); exercised by drift_test.go/state_drift_test.go/state_settle_regression_test.go unit tests, but no golden fixture family is recorded for it in section 2 — see the inventory entry below." },
     { "go": "CutDrive", "coverage": "inventory", "note": "implemented by this change's section 2 (tasks.md 2.2, design.md Decision 6); exercised by cutdrive_test.go unit tests, but no golden fixture family is recorded for it in section 2 — see the inventory entry below. (Drift.Velocity, named separately in an earlier draft of this entry, is a stored FIELD per drift_test.go's own ASSUMED API CONTRACT ADDENDUM, not a function — nothing to cover.)" },
-    { "go": "EncodeBurn", "coverage": "inventory", "note": "the widened codec (tasks.md 2.5, design.md Decision 9); exercised by codec_kinematic_state_test.go's round-trip and negative-control unit tests, but no golden fixture family is recorded for it in section 2 — see the inventory entry below." },
+    { "go": "EncodeBurn", "coverage": "inventory", "note": "the widened codec (tasks.md 2.5, design.md Decision 9); exercised by codec_state_test.go's round-trip and negative-control unit tests, but no golden fixture family is recorded for it in section 2 — see the inventory entry below." },
     { "go": "DecodeBurn", "coverage": "inventory", "note": "see EncodeBurn's note." },
     { "go": "EncodePark", "coverage": "inventory", "note": "see EncodeBurn's note." },
     { "go": "DecodePark", "coverage": "inventory", "note": "see EncodeBurn's note." },

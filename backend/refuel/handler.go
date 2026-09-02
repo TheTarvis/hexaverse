@@ -6,6 +6,7 @@ import (
 
 	"hexaverse/common"
 	"hexaverse/corporations"
+	"hexaverse/fleet"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -88,6 +89,16 @@ func (h *Handler) reject(c *gin.Context, err error) {
 	case errors.Is(err, corporations.ErrReconciliationDivergence),
 		errors.Is(err, corporations.ErrChainBroken):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+
+	// A refuel whose own transactional re-read still shows a station-keeping
+	// hold at or after its stored dry instant applies NONE of its effects —
+	// no purchased tonnage credited onto the stale figure — and is retryable
+	// (fleet-movement "Every Decision Reading Fuel Settles a Past-Dry-Instant
+	// Hold First"): the retry's own preceding settlement write observes the
+	// now-past dry instant and settles it before the credit is re-evaluated.
+	// Reason-bearing, never the bodyless 500 below.
+	case errors.Is(err, fleet.ErrHoldExpiredMidCommit):
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
 
 	default:
 		log.Error().Ctx(c).Err(err).Msg("Refuel failed")

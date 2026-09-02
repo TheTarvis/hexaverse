@@ -33,6 +33,26 @@ type Park struct {
 	EpochMs  common.WorldMillis
 	Offset   Vec3
 	Point    Vec3
+	// HoldStartMs is the world time a ParkStationkeep hold began — the
+	// epoch every upkeep accrual is measured from (space-kinematics: "A
+	// newly created station-keep park stores its start time and dry
+	// instant"). Meaningful only for ParkStationkeep; zero on every other
+	// kind, and on a released orbit the fold writes over one.
+	//
+	// Named as persisted state deliberately: without it an implementer
+	// reaches for Fleet.UpdatedAt as a hold-start proxy, which unrelated
+	// writes re-stamp — a silent-corruption bug no formula-level test
+	// would catch.
+	HoldStartMs common.WorldMillis
+	// DryInstantMs is the world time at which continued upkeep would have
+	// drawn the fuel held at HoldStartMs down to the holding capability's
+	// configured station-keeping reserve, computed once when the hold is
+	// created and rewritten only when that capability restamps the hold at
+	// a mid-hold fuel mutation. It moves ONLY together with HoldStartMs,
+	// and never with the mere passage of time or the act of reading the
+	// park. Observing the park at or after it folds the park to its
+	// released orbit (see StateAt).
+	DryInstantMs common.WorldMillis
 }
 
 // PhaseAt returns the orbit park's raw phase index at world time t — the

@@ -63,7 +63,7 @@
 // requirement) — control points encode as a FLAT []float64 of 18 numbers (6
 // points * 3 components, P0,C1,C2,C3,C4,P5 in that order), the one shape of
 // the three the requirement text permits that this suite picks; see
-// codec_kinematic_state_test.go's own header for the full map-key contract.
+// codec_state_test.go's own header for the full map-key contract.
 //
 // ============================================================================
 package space

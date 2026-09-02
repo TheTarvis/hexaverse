@@ -7824,6 +7824,610 @@
       "digest": "3d6ec11cdd55db4716d670761b95423a637c2d29db7b46f9311a0de6f60d421c"
     }
   ],
+  "stationkeepCodec": [
+    {
+      "note": "a station-keep park round-trips its stored hold window exactly",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "moon1",
+        "offset": [
+          1.5,
+          0,
+          -2.5
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 12000,
+        "dryInstantMs": 98765
+      },
+      "encodedHoldStartMs": 12000,
+      "encodedDryInstantMs": 98765,
+      "roundTripsExactly": true
+    },
+    {
+      "note": "a one-millisecond hold is a legal, storable park — any strictly positive spendable remainder ceilings to at least one whole millisecond",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          4,
+          1,
+          -3
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 10000,
+        "dryInstantMs": 10001
+      },
+      "encodedHoldStartMs": 10000,
+      "encodedDryInstantMs": 10001,
+      "roundTripsExactly": true
+    },
+    {
+      "note": "a dry instant equal to its hold start fails to decode — the exact value hold's insufficient-fuel precondition exists to keep off disk, since persisting it bricks the fleet",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          4,
+          1,
+          -3
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 10000,
+        "dryInstantMs": 10000
+      },
+      "encodedHoldStartMs": 10000,
+      "encodedDryInstantMs": 10000,
+      "roundTripsExactly": false,
+      "err": "unexpected:space: value is not a decodable park"
+    },
+    {
+      "note": "a dry instant before its hold start fails to decode",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 10000,
+        "dryInstantMs": 9999
+      },
+      "encodedHoldStartMs": 10000,
+      "encodedDryInstantMs": 9999,
+      "roundTripsExactly": false,
+      "err": "unexpected:space: value is not a decodable park"
+    },
+    {
+      "note": "a non-positive hold start fails to decode — an absent one decodes to zero, and every accrual then runs from world-epoch zero",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "dryInstantMs": 20000
+      },
+      "encodedHoldStartMs": 0,
+      "encodedDryInstantMs": 20000,
+      "roundTripsExactly": false,
+      "err": "unexpected:space: value is not a decodable park"
+    },
+    {
+      "note": "an orbit park carries no hold window at all and still round-trips",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 12.5,
+        "periodMs": 45000,
+        "phase": 1000,
+        "epochMs": 7000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "encodedHoldStartMs": 0,
+      "encodedDryInstantMs": 0,
+      "roundTripsExactly": true
+    },
+    {
+      "note": "a released orbit — what the past-dry-instant fold writes over a stationkeep park — carries no hold window",
+      "park": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 5,
+        "periodMs": 9500,
+        "phase": 941184,
+        "epochMs": 40000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "encodedHoldStartMs": 0,
+      "encodedDryInstantMs": 0,
+      "roundTripsExactly": true
+    }
+  ],
+  "stationkeepFold": [
+    {
+      "note": "one millisecond before the dry instant — still held, at its exact stored offset",
+      "system": "fixture",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          12,
+          4,
+          -9
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 1000,
+        "dryInstantMs": 50000
+      },
+      "t": 49999,
+      "foldedPark": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          12,
+          4,
+          -9
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 1000,
+        "dryInstantMs": 50000
+      },
+      "releaseStationkeepAtDryInstant": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 15,
+        "periodMs": 18500,
+        "phase": 941184,
+        "epochMs": 50000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "-5348024542216420p-47",
+        "4503599627370496p-50",
+        "-5064694288108770p-49"
+      ]
+    },
+    {
+      "note": "exactly at the dry instant — already released, on the same inclusive boundary the burn-arrival fold uses",
+      "system": "fixture",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          12,
+          4,
+          -9
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 1000,
+        "dryInstantMs": 50000
+      },
+      "t": 50000,
+      "foldedPark": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 15,
+        "periodMs": 18500,
+        "phase": 941184,
+        "epochMs": 50000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "releaseStationkeepAtDryInstant": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 15,
+        "periodMs": 18500,
+        "phase": 941184,
+        "epochMs": 50000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "-5348029410920709p-47",
+        "0p-1074",
+        "-5066575465585796p-49"
+      ]
+    },
+    {
+      "note": "one millisecond after the dry instant — released",
+      "system": "fixture",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          12,
+          4,
+          -9
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 1000,
+        "dryInstantMs": 50000
+      },
+      "t": 50001,
+      "foldedPark": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 15,
+        "periodMs": 18500,
+        "phase": 941184,
+        "epochMs": 50000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "releaseStationkeepAtDryInstant": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 15,
+        "periodMs": 18500,
+        "phase": 941184,
+        "epochMs": 50000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "-5347604460517876p-47",
+        "0p-1074",
+        "-5065994986273848p-49"
+      ]
+    },
+    {
+      "note": "long after the dry instant — the identical released orbit, since the fold releases AS OF the dry instant, never as of the observation time",
+      "system": "fixture",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          12,
+          4,
+          -9
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 1000,
+        "dryInstantMs": 50000
+      },
+      "t": 9000000,
+      "foldedPark": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 15,
+        "periodMs": 18500,
+        "phase": 941184,
+        "epochMs": 50000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "releaseStationkeepAtDryInstant": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 15,
+        "periodMs": 18500,
+        "phase": 941184,
+        "epochMs": 50000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "6154454764761669p-47",
+        "0p-1074",
+        "-7671161265329654p-49"
+      ]
+    },
+    {
+      "note": "a held offset with no planar component re-circularizes at the configured minimum orbit radius and the default phase",
+      "system": "fixture",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "moon1",
+        "offset": [
+          0,
+          7,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 500,
+        "dryInstantMs": 20000
+      },
+      "t": 20001,
+      "foldedPark": {
+        "kind": "orbit",
+        "bodyId": "moon1",
+        "radius": 3,
+        "periodMs": 7700,
+        "epochMs": 20000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "releaseStationkeepAtDryInstant": {
+        "kind": "orbit",
+        "bodyId": "moon1",
+        "radius": 3,
+        "periodMs": 7700,
+        "epochMs": 20000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "8446038877753522p-49",
+        "0p-1074",
+        "7384312282432338p-47"
+      ]
+    },
+    {
+      "note": "a park whose stored window is not strictly increasing never folds — that park is undecodable by this capability's own codec, and an in-memory one is left exactly as given",
+      "system": "fixture",
+      "park": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          3,
+          0,
+          4
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 2000,
+        "dryInstantMs": 2000
+      },
+      "t": 999999,
+      "foldedPark": {
+        "kind": "stationkeep",
+        "bodyId": "planet1",
+        "offset": [
+          3,
+          0,
+          4
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "holdStartMs": 2000,
+        "dryInstantMs": 2000
+      },
+      "releaseStationkeepAtDryInstant": {
+        "kind": "orbit",
+        "bodyId": "planet1",
+        "radius": 5,
+        "periodMs": 9500,
+        "phase": 154752,
+        "epochMs": 2000,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "point": [
+          0,
+          0,
+          0
+        ]
+      },
+      "position": [
+        "7459086867546340p-47",
+        "0p-1074",
+        "8999778084008878p-51"
+      ]
+    }
+  ],
+  "stationkeepDryInstant": [
+    {
+      "note": "today's placeholder tuning at the configured upkeep floor: deltaVPerTon 5, a non-zero reserve, a whole-second answer",
+      "holdStartMs": 1000000,
+      "fuelTons": 105,
+      "stationKeepReserveTons": 5,
+      "deltaVPerTon": 5,
+      "upkeepRate": 0.05,
+      "dryInstantMs": 11000000,
+      "spendableTons": "7036874417766400p-46",
+      "accrualAtDryInstantTons": "7036874417766400p-46",
+      "oneMillisecondOfUpkeepTons": "5902958103587057p-69"
+    },
+    {
+      "note": "the same hold with the reserve dropped to zero — the dry instant moves by exactly the reserve's own endurance, which is what makes a missing subtraction visible",
+      "holdStartMs": 1000000,
+      "fuelTons": 105,
+      "stationKeepReserveTons": 0,
+      "deltaVPerTon": 5,
+      "upkeepRate": 0.05,
+      "dryInstantMs": 11500000,
+      "spendableTons": "7388718138654720p-46",
+      "accrualAtDryInstantTons": "7388718138654720p-46",
+      "oneMillisecondOfUpkeepTons": "5902958103587057p-69"
+    },
+    {
+      "note": "deltaVPerTon = 1, isolating the ms-to-seconds conversion from the tons conversion",
+      "holdStartMs": 1,
+      "fuelTons": 42,
+      "stationKeepReserveTons": 2,
+      "deltaVPerTon": 1,
+      "upkeepRate": 0.05,
+      "dryInstantMs": 800001,
+      "spendableTons": "5629499534213120p-47",
+      "accrualAtDryInstantTons": "5629499534213120p-47",
+      "oneMillisecondOfUpkeepTons": "7378697629483821p-67"
+    },
+    {
+      "note": "a spendable remainder that does NOT land on a whole millisecond — the ceiling, not a truncation",
+      "holdStartMs": 7,
+      "fuelTons": 10.0000001,
+      "stationKeepReserveTons": 5,
+      "deltaVPerTon": 5,
+      "upkeepRate": 3,
+      "dryInstantMs": 8341,
+      "spendableTons": "5629499646803110p-50",
+      "accrualAtDryInstantTons": "5629949894175857p-50",
+      "oneMillisecondOfUpkeepTons": "5534023222112866p-63"
+    },
+    {
+      "note": "a spendable remainder of one part in a billion still ceilings to a whole millisecond past the hold start",
+      "holdStartMs": 500,
+      "fuelTons": 5.000000001,
+      "stationKeepReserveTons": 5,
+      "deltaVPerTon": 5,
+      "upkeepRate": 1.1977178758806546,
+      "dryInstantMs": 501,
+      "spendableTons": "4835703678566400p-82",
+      "accrualAtDryInstantTons": "8837598051550982p-65",
+      "oneMillisecondOfUpkeepTons": "8837598051550982p-65"
+    },
+    {
+      "note": "a rate far above the floor (a tight, fast-orbiting host) shortens the window without changing the arithmetic",
+      "holdStartMs": 123456,
+      "fuelTons": 200,
+      "stationKeepReserveTons": 5,
+      "deltaVPerTon": 5,
+      "upkeepRate": 97.5,
+      "dryInstantMs": 133456,
+      "spendableTons": "6860952557322240p-45",
+      "accrualAtDryInstantTons": "6860952557322240p-45",
+      "oneMillisecondOfUpkeepTons": "5620492334958379p-58"
+    }
+  ],
   "encodeVec": [
     {
       "note": "the zero vector encodes to three zeros",

@@ -455,6 +455,46 @@ explicitly by the architect (H4) as a gap the original draft left
 unstated; it is a deliberate, tested guarantee here, not an incidental
 byproduct.
 
+### Decision: `commandedFleetId`'s ownership pre-read settles first, so no fleet verb can observe unsettled state at the HTTP layer
+Every fleet command endpoint resolves its fleet id through
+`Handler.commandedFleetId` (`backend/fleet/handler.go:150`), whose ownership
+check calls `Service.Get` — and `Service.Get` settles opportunistically: a
+due, unresolved burn is resolved (`service.go:261-264`), a due jump likewise,
+and (per this change's task 4.7) a past-dry-instant `stationkeep` hold is
+settled durably by a preceding, independent write. All of that runs **before
+the verb's own service method is entered**. The consequence generalizes past
+this change and is recorded here for the implementer of the next fleet verb:
+
+**Any requirement of the form "the verb itself must observe unsettled state"
+is unstateable at the HTTP layer.** By the time the verb runs, the state it
+was meant to observe has already been settled by the ownership pre-read.
+Two consequences hit this change directly:
+
+- **Task 5.4.** `Service.CutDrive` returns `space.ErrCutAfterArrival` for an
+  already-arrived-but-unresolved burn, but over HTTP the pre-read resolves
+  that arrival first, so `CutDrive`'s `Mode != ModeBurn` guard fires and the
+  caller gets `ErrNotBurning`'s reason instead. Wiring the sentinel into
+  `respond` is correct and insufficient; the case is unreachable. The repair
+  is to distinguish the already-arrived case **from the state the settlement
+  leaves behind**, before or inside `Service.CutDrive`.
+- **Task 7.19.** Its fixtures require "no read or write observing the park in
+  between" the clock advance and the `jump`. Over HTTP there is always such a
+  read — the pre-read itself — so those assertions are sited **below the HTTP
+  surface**, against the service, which is the only layer at which the
+  unsettled park is observable at all.
+
+**The pre-read is not the thing to change.** Its settlement is required
+behaviour on both counts — the no-scheduler arrival contract, and this
+change's own durable settle-first obligation for the fleet read's
+fuel-reading consumers. Weakening, narrowing, or bypassing it to make a
+sentinel reachable trades a wrong reason string for a lost settlement.
+The two legitimate shapes are: derive the distinction from durable
+post-settlement state (task 5.4), or site the assertion below HTTP where the
+pre-read does not run (task 7.19). Which of those a future verb needs depends
+on whether the distinction is player-visible: if it must appear in a response
+body, it has to be re-derivable after the settlement.
+
+
 ## Risks / Trade-offs
 
 - **A stored `fuel` figure under-reports actual accrued draw between

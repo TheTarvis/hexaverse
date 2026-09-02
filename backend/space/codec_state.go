@@ -229,8 +229,23 @@ func EncodePark(p Park) map[string]any {
 		"epochMs":  int64(p.EpochMs),
 		"offset":   EncodeVec(p.Offset),
 		"point":    EncodeVec(p.Point),
+		// The stationkeep-only hold window. Written for EVERY kind (as the
+		// zero pair on the others) so a merge-semantics write of a released
+		// orbit park over a stationkeep one clears the old stamps rather
+		// than leaving them behind as leaf paths the merge never touched.
+		holdStartKey:  int64(p.HoldStartMs),
+		dryInstantKey: int64(p.DryInstantMs),
 	}
 }
+
+// holdStartKey / dryInstantKey are the two stored keys a stationkeep park's
+// hold window crosses the persistence boundary as (space-kinematics
+// MODIFIED "Coordinates Cross the Persistence Boundary Through a Named
+// Codec"), mirroring the existing "epochMs"/"periodMs" naming.
+const (
+	holdStartKey  = "holdStartMs"
+	dryInstantKey = "dryInstantMs"
+)
 
 // DecodePark is EncodePark's exact inverse. It fails with ErrInvalidPark on
 // every structural failure: not a map, a missing/mistyped key, or a Kind
@@ -286,15 +301,38 @@ func DecodePark(v any) (Park, error) {
 		return Park{}, err
 	}
 
+	// The hold window. A `stationkeep` park is REQUIRED to carry a strictly
+	// positive hold-start and a dry instant strictly after it; every other
+	// kind carries no window at all (absent keys decode to the zero pair,
+	// which is what every park written before this capability stores).
+	//
+	// Guarding the dry instant alone is not sufficient: an absent
+	// hold-start decodes to zero, and every upkeep accrual computed from it
+	// then runs from world-epoch zero — a debit of the fleet's entire
+	// spendable fuel, silently clamped, on a park that decoded without
+	// complaint.
+	holdStartNum, hasHoldStart := decodeNumber(m[holdStartKey])
+	dryInstantNum, hasDryInstant := decodeNumber(m[dryInstantKey])
+	if kind == ParkStationkeep {
+		if !hasHoldStart || holdStartNum <= 0 {
+			return Park{}, ErrInvalidPark
+		}
+		if !hasDryInstant || dryInstantNum <= holdStartNum {
+			return Park{}, ErrInvalidPark
+		}
+	}
+
 	return Park{
-		Kind:     kind,
-		BodyId:   bodyId,
-		Radius:   radius,
-		PeriodMs: common.WorldMillis(int64(periodNum)),
-		Phase:    phase,
-		EpochMs:  common.WorldMillis(int64(epochNum)),
-		Offset:   offset,
-		Point:    point,
+		Kind:         kind,
+		BodyId:       bodyId,
+		Radius:       radius,
+		PeriodMs:     common.WorldMillis(int64(periodNum)),
+		Phase:        phase,
+		EpochMs:      common.WorldMillis(int64(epochNum)),
+		Offset:       offset,
+		Point:        point,
+		HoldStartMs:  common.WorldMillis(int64(holdStartNum)),
+		DryInstantMs: common.WorldMillis(int64(dryInstantNum)),
 	}, nil
 }
 

@@ -40,7 +40,13 @@ type ShipState struct {
 // direction (space-kinematics: "A Free-Drifting Ship Coasts in a Straight
 // Line at Constant Velocity").
 func StateAt(bodies Bodies, s ShipState, t common.WorldMillis) (ShipState, error) {
-	if s.Mode == ModeParked || s.Burn == nil {
+	if s.Mode == ModeParked {
+		if released, folded := releasedIfDry(s.Park, t); folded {
+			return ShipState{Mode: ModeParked, Park: &released}, nil
+		}
+		return s, nil
+	}
+	if s.Burn == nil {
 		return s, nil
 	}
 	b := *s.Burn
@@ -88,4 +94,33 @@ func StatePosition(bodies Bodies, s ShipState, t common.WorldMillis) (Vec3, erro
 	default:
 		return Vec3{}, ErrUnknownParkKind
 	}
+}
+
+// releasedIfDry is the station-keeping half of the effective-state fold: a
+// `stationkeep` park observed AT OR AFTER its stored dry instant IS its
+// released orbit, computed deterministically from the stored park alone —
+// exactly mirroring "a burn past its arrival IS its settled park", with the
+// hold's dry instant substituted for the burn's arrival, and on the same
+// exact integer comparison with no epsilon (space-kinematics: "A
+// Station-Keeping Park Past Its Dry Instant Is Its Released Orbit, With No
+// Extra Persisted State").
+//
+// The release time is the DRY INSTANT, never the observation time, which is
+// what makes evaluating a past-dry park at two different later times
+// produce identical results. It is a derivation, not a write: the park it
+// is handed is never mutated.
+//
+// A park whose stored window is not well-formed (a dry instant not strictly
+// after its hold start) never folds — that park is undecodable by this
+// capability's own codec, so no such value reaches here through the
+// persistence boundary, and an in-memory one is left exactly as given
+// rather than silently released against a meaningless instant.
+func releasedIfDry(p *Park, t common.WorldMillis) (Park, bool) {
+	if p == nil || p.Kind != ParkStationkeep {
+		return Park{}, false
+	}
+	if p.DryInstantMs <= p.HoldStartMs || t < p.DryInstantMs {
+		return Park{}, false
+	}
+	return ReleaseStationkeep(p.BodyId, p.Offset, p.DryInstantMs), true
 }

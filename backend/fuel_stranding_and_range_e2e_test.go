@@ -28,6 +28,7 @@ package main
 // of hardcoding an SDET guess about internal DTO shape.
 
 import (
+	"math"
 	"net/http"
 	"testing"
 
@@ -275,10 +276,38 @@ func TestBurnCommitWarning_Scenario_LeavesUnableToReachAnyStationEvenAtFloorStil
 	sp := spawnFuelCorp(t, router, "SDET Stranding Warning Corp")
 	far := space.Vec3{X: 500_000, Y: 500_000, Z: 500_000} // far from the home station and any gate
 
+	// POST-HANDOFF REVISION (SDET, 2026-09-02). Cause: developer-reported,
+	// SDET-confirmed FIXTURE defect, pre-existing since link 7 (reproduced at
+	// HEAD 59630e7 in a clean worktree, and again here: 409 from the second
+	// commit). The original arrangement priced the burn from corp 1's fleet
+	// and then funded corp 2's fleet with that figure. Site selection places
+	// each corporation independently, so the two fleets sit at DIFFERENT
+	// origins; the arc to a fixed absolute point therefore has a different
+	// length and a different price, and the second commit was CORRECTLY
+	// rejected with ErrInsufficientFuel. This is the same defect shape the
+	// orchestrator already adjudicated for
+	// TestBurnFromHold_Scenario_ABurnLeavingExactlyZeroFuelAfterSettlement-
+	// StillCommits (fleet/stationkeep_settlement_consumers_test.go): a price
+	// computed at one arrangement, spent at another.
+	//
+	// THE ASSERTION IS UNCHANGED — the exactly-affordable commit must be
+	// ACCEPTED and must carry a stranding warning. Only the arrangement
+	// moved: the priced burn and the funded figure now come from the SAME
+	// fleet at the SAME origin, using the snapshot/restore pattern the
+	// ErrArcTooShort test below already established. A fresh spawn is a
+	// motionless `point` park (fleet.SeedFleet: "Seeding SHALL place a point
+	// park"), so restoring the snapshot restores the IDENTICAL origin and the
+	// second solve is the identical solve — no drift margin is needed, and
+	// none is taken. The premise is asserted as a fixture invariant below
+	// rather than argued here, so if it ever breaks again it fails by name
+	// instead of by an unexplained 409.
+	pristine := snapshotFleetMotion(t, sp.fleetId)
+
 	// Baseline: a cheap, safe commit's key set (never stranding) — the
 	// reference this test diffs the warning-triggering response against, so
 	// no SDET guess about the warning field's exact name is required (see
-	// fuel_e2e_helpers_test.go's keySet/extraKeys doc comments).
+	// fuel_e2e_helpers_test.go's keySet/extraKeys doc comments). It doubles
+	// as the price probe, which is the whole point: one fleet, one origin.
 	setFleetFuel(t, sp.fleetId, 1_000_000)
 	baselineResp, baselineBody, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"point": far, "accel": 4.0})
 	if code != http.StatusOK {
@@ -291,22 +320,49 @@ func TestBurnCommitWarning_Scenario_LeavesUnableToReachAnyStationEvenAtFloorStil
 	// re-derived from a guessed constant beyond the one this change's own
 	// requirement text pins — deltaVPerTonPlaceholder).
 	cost := baselineResp.State.Burn.DeltaV() / deltaVPerTonPlaceholder // hull count 1
+	if !(cost > 0) {
+		t.Fatalf("fixture invariant: the probe burn priced %v tons, want strictly positive — there is no "+
+			"exactly-affordable commit to construct from a free burn", cost)
+	}
 
-	// Rewind to a pristine, unattached start (a fresh corp — cleanest way
-	// to guarantee "no active order, no attachment" going in) and re-commit
-	// the IDENTICAL order with fuel set to EXACTLY this commit's own cost,
-	// so remaining fuel after the debit is ~0 — unable to afford ANY
-	// further floor-priced burn to a distant point with nothing nearby.
-	sp2 := spawnFuelCorp(t, router, "SDET Stranding Warning Corp (exact)")
-	setFleetFuel(t, sp2.fleetId, cost)
-	warnResp, warnBody, code := postOrder(t, router, sp2.token, sp2.fleetId, map[string]any{"point": far, "accel": 4.0})
+	// Rewind THAT SAME FLEET to its pristine, unattached, action-free start
+	// and re-commit the IDENTICAL order with fuel set to EXACTLY this
+	// commit's own cost, so remaining fuel after the debit is ~0 — unable to
+	// afford ANY further floor-priced burn to a distant point with nothing
+	// nearby.
+	restoreFleetMotion(t, sp.fleetId, pristine)
+	// `funded` is nudged UP by whole ULPs only if the literal float64 `cost`
+	// is not representably affordable against production's exact `fuel <
+	// newCost` gate. In practice zero iterations run (the test recomputes the
+	// identical expression production does, from the same Burn); the loop is
+	// the same one-ULP guard the adjudicated exactly-zero fixture uses, and
+	// it can never leave more than ~1e-13 tons of headroom — twelve orders of
+	// magnitude below anything that could reach a station.
+	funded := cost
+	for i := 0; funded < cost; i++ {
+		if i > 8 {
+			t.Fatalf("fixture invariant: could not represent a funding equal to the burn's own price %v", cost)
+		}
+		funded = math.Nextafter(funded, math.Inf(1))
+	}
+	setFleetFuel(t, sp.fleetId, funded)
+	warnResp, warnBody, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"point": far, "accel": 4.0})
 	if code != http.StatusOK {
 		t.Fatalf("fleet-movement \"The warning never blocks a commit that fuel affordability alone would "+
 			"accept\": the commit itself was rejected (status = %d) — an exactly-affordable commit must still "+
-			"succeed", code)
+			"succeed. Funded %v tons, which is this very fleet's own price for this very burn, probed from "+
+			"the identical (motionless point-park) origin moments earlier.", code, funded)
 	}
 	if warnResp.State.Burn == nil {
 		t.Fatalf("exact-cost commit did not settle a Burn: %+v", warnResp.State)
+	}
+	// The probe premise, verified against the burn actually solved: if these
+	// two prices diverge, the funding was not this commit's own price and
+	// neither a pass nor a failure of the warning assertion means anything.
+	if got := warnResp.State.Burn.DeltaV() / deltaVPerTonPlaceholder; math.Abs(got-cost) > 1e-9*math.Abs(cost) {
+		t.Fatalf("fixture invariant: the funded commit priced %v tons but the probe priced %v — the two "+
+			"commits did not solve the identical burn, so this fixture is not constructing the "+
+			"~zero-remaining balance the stranding warning is asserted against", got, cost)
 	}
 
 	extra := extraKeys(keySet(baselineBody), keySet(warnBody))
@@ -360,7 +416,7 @@ func TestBurnCommitWarning_Scenario_ACandidateTooCloseToSolveCountsAsReachableAt
 		t.Fatalf("baseline order: status = %d", code)
 	}
 
-	// REVISION (SDET, cause: developer-reported defect, confirmed against
+	// REVISION 1 (SDET, cause: developer-reported defect, confirmed against
 	// the tree): an earlier draft learned costToOwnStation from a SEPARATE
 	// "learner" corp, then applied it to a THIRD, independently-spawned
 	// corp's own (differently-placed) home station — cross-corporation
@@ -370,53 +426,97 @@ func TestBurnCommitWarning_Scenario_ACandidateTooCloseToSolveCountsAsReachableAt
 	// test actually exercises, rewound to its own pristine position
 	// afterward — the identical pattern the burn-cost-scaling tests in
 	// this suite already use.
+	//
+	// REVISION 2 (SDET, 2026-09-02; cause: developer-reported flake,
+	// REPRODUCED here — 2 failures in 5 consecutive runs, one of them this
+	// very 409). Revision 1 removed the cross-CORP mismatch but left a
+	// cross-TIME one: the candidate it burned to was the home STATION, and a
+	// station orbits. Measured against a live spawn, the floor of this exact
+	// order's price oscillates with the station's own orbital period —
+	// 34.9552 t → 35.1200 t → 34.9584 t over ~4.5 s of world time, a 0.47%
+	// swing for a 954-unit arc — and the swing is a function of the arc
+	// length, so a corp whose fleet spawns nearer its station sees a much
+	// larger RELATIVE swing. The 1% margin was therefore not a bound on
+	// anything; it was a guess that happened to hold for most spawn sites.
+	//
+	// THE ASSERTION IS UNCHANGED. The fixture now burns to a LANE-GATE body
+	// instead of the station. That is not a weakening: the scenario names
+	// "a candidate station OR GATE body's floor-priced solve", gates are in
+	// fleet.candidateHosts' bounded candidate set (fleet/fuel.go), and the
+	// rule exercised is the identical ErrArcTooShort branch — the fleet
+	// arrives at the gate's own insertion standoff, so the floor-priced
+	// solve from there back to that same gate cannot build a curve. What a
+	// gate buys is DETERMINISM: system.gateOrbit gives every gate
+	// PeriodMs = 0, so a gate does not move and the price is time-invariant.
+	// Measured over five probes spanning ~3.6 s of world time, this order's
+	// price and arc length were BIT-IDENTICAL every time (14.086400000000 t,
+	// 154.995630405 units), so the probe can be spent exactly, with no
+	// margin and no drift to absorb. The station remains in the candidate
+	// set and is still evaluated first — with zero fuel remaining it is
+	// correctly unaffordable, which is exactly what forces the evaluation
+	// onto the ErrArcTooShort branch this test exists to pin.
 	sp := spawnFuelCorp(t, router, "SDET ErrArcTooShort Test Corp")
+	gateBodyId, _ := gateBodyIdFor(t, sp)
 	pristine := snapshotFleetMotion(t, sp.fleetId)
 	setFleetFuel(t, sp.fleetId, 1_000_000)
-	learnResp, _, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": sp.stationId})
+	learnResp, _, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": gateBodyId})
 	if code != http.StatusOK || learnResp.State.Burn == nil {
-		t.Fatalf("learner order: status = %d, burn = %+v", code, learnResp.State)
+		t.Fatalf("learner order to gate %s: status = %d, burn = %+v", gateBodyId, code, learnResp.State)
 	}
-	costToOwnStation := learnResp.State.Burn.DeltaV() / deltaVPerTonPlaceholder
+	costToOwnGate := learnResp.State.Burn.DeltaV() / deltaVPerTonPlaceholder
+	if !(costToOwnGate > 0) {
+		t.Fatalf("fixture invariant: the probe burn to gate %s priced %v tons, want strictly positive",
+			gateBodyId, costToOwnGate)
+	}
 
-	// Rewind to the IDENTICAL pristine position, set fuel to the learned
-	// cost PLUS A SMALL SAFETY MARGIN (not exactly equal), then order to
-	// burn to ITS OWN home station again — the resulting park is at (or
-	// arriving at) that very station, so a reachability candidate solving
-	// a burn from there BACK to the same station must fail with
-	// space.ErrArcTooShort (the curve is too short to build), which SHALL
-	// count as reachable at zero cost — regardless of the near-zero fuel
-	// remaining after this commit's own debit.
-	//
-	// The margin exists because the two commits are NOT bit-identical: real
-	// wall-clock time elapses between learning the cost and re-committing,
-	// and the station's own orbital position (if any) can drift in that
-	// window, making the second commit's TRUE cost infinitesimally
-	// different from the first's. An exact-equality fixture would then
-	// fail (or pass) depending on the sign of that drift — a coin flip
-	// unrelated to the ErrArcTooShort rule this test exists to pin. A 1%
-	// margin keeps "remaining fuel is near-zero relative to the original
-	// learning balance" true while absorbing the drift.
+	// Rewind to the IDENTICAL pristine position and set fuel to EXACTLY the
+	// learned cost (ULP-nudged up only if that literal is not representably
+	// affordable against production's exact `fuel < newCost` gate — in
+	// practice zero iterations, since the test recomputes the identical
+	// expression production does from the same Burn). Then burn to that same
+	// motionless gate again: the resulting park is at (or arrives at) that
+	// very gate, so a reachability candidate solving a floor-priced burn
+	// from there BACK to it must fail with space.ErrArcTooShort (the curve
+	// is too short to build), which SHALL count as reachable at zero cost —
+	// with, by construction, exactly zero fuel remaining after this commit's
+	// own debit.
 	restoreFleetMotion(t, sp.fleetId, pristine)
-	setFleetFuel(t, sp.fleetId, costToOwnStation*1.01+0.01)
-	resp, body, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": sp.stationId})
+	funded := costToOwnGate
+	for i := 0; funded < costToOwnGate; i++ {
+		if i > 8 {
+			t.Fatalf("fixture invariant: could not represent a funding equal to the burn's own price %v",
+				costToOwnGate)
+		}
+		funded = math.Nextafter(funded, math.Inf(1))
+	}
+	setFleetFuel(t, sp.fleetId, funded)
+	resp, body, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": gateBodyId})
 	if code != http.StatusOK {
 		t.Fatalf("fleet-movement \"A candidate too close to solve counts as reachable at zero cost\": the "+
-			"exactly-affordable commit to the fleet's OWN home station was rejected (status = %d) — it must "+
-			"succeed exactly as any other affordable commit would", code)
+			"exactly-affordable commit to the fleet's OWN lane gate was rejected (status = %d) — it must "+
+			"succeed exactly as any other affordable commit would. Funded %v tons, this very fleet's own "+
+			"price for this very burn to motionless gate %s, probed from the identical origin moments "+
+			"earlier.", code, funded, gateBodyId)
 	}
 	if resp.State.Burn == nil {
 		t.Fatalf("commit did not settle a Burn: %+v", resp.State)
+	}
+	// The probe premise, verified against the burn actually solved.
+	if got := resp.State.Burn.DeltaV() / deltaVPerTonPlaceholder; math.Abs(got-costToOwnGate) > 1e-9*costToOwnGate {
+		t.Fatalf("fixture invariant: the funded commit priced %v tons but the probe priced %v — a gate is "+
+			"supposed to be motionless (system.gateOrbit: PeriodMs = 0), so these two solves must be "+
+			"identical; this fixture is no longer constructing the zero-remaining balance it asserts",
+			got, costToOwnGate)
 	}
 
 	extra := extraKeys(keySet(baselineBody), keySet(body))
 	if len(extra) != 0 {
 		t.Errorf("fleet-movement \"A candidate too close to solve counts as reachable at zero cost\": a burn "+
-			"TO the fleet's own home station (leaving ~0 fuel remaining) carries EXTRA key(s) %v not present on "+
-			"a definitely-safe baseline commit — this reads as a fired stranding warning. Burning to the very "+
-			"station being evaluated is the single most routine configuration in the game (a fleet parked at, "+
-			"or burning to, its own refuelling point); an ErrArcTooShort candidate must count as reachable at "+
-			"zero cost, not as unreachable", extra)
+			"TO a candidate lane-gate body (leaving exactly 0 fuel remaining) carries EXTRA key(s) %v not "+
+			"present on a definitely-safe baseline commit — this reads as a fired stranding warning. Burning "+
+			"to the very station or gate being evaluated is the single most routine configuration in the game "+
+			"(a fleet parked at, or burning to, its own refuelling point or its own lane gate); an "+
+			"ErrArcTooShort candidate must count as reachable at zero cost, not as unreachable", extra)
 	}
 }
 
