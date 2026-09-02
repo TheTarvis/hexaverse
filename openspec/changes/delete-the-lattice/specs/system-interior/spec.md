@@ -50,6 +50,12 @@ one.
   feature's continuous phase is collected
 - **THEN** the collected phases occupy every quadrant of `[0, SubTurn)`,
   not only a sub-arc of it
+- **AND** the greatest common divisor of the collected phases is `1`, so the
+  draw is not confined to a coarse sub-lattice of the turn — a generator
+  drawing only multiples of some `SubTurn/k` covers every quadrant while
+  leaving almost every phase unreachable, which is the continuous
+  restatement of the very defect the retired every-slot-is-reached scenario
+  existed to catch
 
 ### Requirement: Every Generated Body Carries a Continuous Orbital Element Set and a Size
 The system SHALL generate a continuous orbital element set (`space.Orbit`)

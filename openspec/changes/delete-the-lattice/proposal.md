@@ -75,8 +75,8 @@ three more preconditions of its own, each verified in section 1:
   it**, and re-express (never silently drop) the six requirements whose lattice
   half was load-bearing.
 - **De-enrol `board` and `polar` from every enforcement list, changed-file
-  trigger, CI leg, register and defect doc that names them** — 29 sites across
-  12 files, enumerated in `design.md`.
+  trigger, CI leg, register and defect doc that names them** — 32 sites across
+  15 files, enumerated in `design.md`.
 - **Enrol `backend/market` ↔ `frontend/lib/market` as a `check_mirror` pair**
   with its own `fixtures/market/mirror-map.json`. It is a genuine mirrored pair
   with a golden fixture and no mirror map, which already violates the live
@@ -111,8 +111,23 @@ three more preconditions of its own, each verified in section 1:
 | `session-wakeup` | One sentence and two scenario bodies route the player to a "hex board route". |
 | `action-dispatch` | One scenario body uses "a board coordinate" as its example of a rejected non-primitive param. |
 | `galaxy-generation` | The skeleton's ring ordinal is defined partly by what it is *not* ("never itself a lattice ring"). |
-| `world-clock` | Its domain enumeration names `board` — and `observation`, a package link 5 deleted and this sweep also catches. |
+| `world-clock` | Its domain enumeration names `board` — and `observation`, a package link 5 deleted and this sweep also catches. **This one is not wording-only:** the delta also *widens* the enumeration, adding `space`, `disclosure` and `charts` (see below). |
 | `mine-extraction` | Two references to "the containing system's board" as the read that resolves a due mine. |
+
+**`world-clock`'s widening, declared rather than smuggled.** *Scaled World
+Time* enumerates the domains forbidden from reading `time.Now()` directly. The
+live list is *galaxy, system, board, fleet, action, observation, corporations*.
+The delta removes `board` and `observation` (both deleted packages) — that part
+is wording-only — but it also **adds `space`, `disclosure` and `charts`, and
+renames the example timestamp from "an observation's `asOf`" to "a sighting's
+`asOf`"**. Those three packages exist, hold gameplay timestamps, and were
+created by links 2–8 after this requirement was last written; they were never
+in scope of the constraint. Adding them is a genuine broadening of an
+architectural rule, not a citation repair, and it is **already satisfied** —
+`grep -rn 'time\.Now()' backend/space backend/disclosure backend/charts
+--include='*.go' | grep -v _test.go` returns one hit, a doc comment in
+`space/vec.go:10`, and no call. Task 10.3 re-runs that grep rather than
+assuming it.
 
 **Deliberately untouched, with reasons:**
 
@@ -134,12 +149,14 @@ three more preconditions of its own, each verified in section 1:
   `mine-extraction`.
 - **Affected code:** `backend/board` (deleted), `backend/polar` (deleted),
   `backend/system`, `backend/stations`, `backend/common`, `backend/fleet`,
-  `backend/market`, `backend/action`, `backend/mine`, `frontend/lib/board`
-  (deleted), `frontend/lib/polar` (deleted), `frontend/lib/market`.
+  `backend/corporations`, `backend/market`, `backend/action`, `backend/mine`,
+  `frontend/lib/board` (deleted), `frontend/lib/polar` (deleted),
+  `frontend/lib/market`.
 - **Affected fixtures and governance:** `fixtures/board/` (deleted),
   `fixtures/polar/` (deleted), `fixtures/market/mirror-map.json` (new),
-  `fixtures/system/cases.json` (re-recorded), `fixtures/determinism-register.json`.
-- **Affected enforcement:** `.gitlab-ci.yml`,
+  `fixtures/system/cases.json` (re-recorded),
+  `fixtures/system/mirror-map.json`, `fixtures/determinism-register.json`.
+- **Affected enforcement:** `.gitlab-ci.yml`, `infra/docker/test-runner.Dockerfile`,
   `.claude/skills/code-quality-checks/check.py`,
   `.claude/skills/code-quality-checks/test_check_determinism_lists.py`,
   `.claude/scripts/check-mirror-map.sh`,

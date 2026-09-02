@@ -89,19 +89,43 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       backend/` returning nothing
 - [ ] 2.10 Remove the `"hexaverse/board"` and `"hexaverse/polar"` imports from
       every remaining `backend/system` file, production and test alike, and
-      delete or rewrite the tests that exist only to exercise the lattice
-      (`bodies_test.go`, `gates_test.go`, `fog_test.go`,
-      `generator_placement_test.go`, `generator_test.go`, `handler_test.go`,
-      `interior_*_test.go`, `splice_completeness_test.go`,
-      `spliced_body_complete_or_loud_test.go`, `station_splice_test.go` — keep
-      every assertion about continuous behaviour, drop only lattice assertions)
+      delete or rewrite the tests that exist only to exercise the lattice —
+      keeping every assertion about continuous behaviour and dropping only
+      lattice assertions. **Derive the file list mechanically; do not work from
+      a hand-written enumeration.** The list is whatever this returns:
+      `grep -l -E 'clampRing|featureRingOK|generateWithStreams|PeriodFor|Footprint|LaneGates\(|Orbit\.(Ring|Angle0|Dir)|latticeDrawCount' backend/system/*_test.go`
+      — today **21 files**, nine of which (`continuous_test.go`,
+      `cross_target_test.go`, `dao_test.go`, `fixtures_test.go`,
+      `gates_lane_id_test.go`, `generate_streams_test.go`,
+      `generator_continuous_test.go`, `lattice_identity_test.go`,
+      `model_test.go`) an earlier hand-written list omitted. The compiler
+      catches all nine, so nothing is silently lost — but this chain's failure
+      mode is agents trusting an enumeration over a query, so re-run the grep
+      rather than reading the list above
+- [ ] 2.10b `generator_continuous_test.go` is **re-sourced, not trimmed.** Its
+      retrograde assertions read `f.Orbit.Dir` to check that a body's
+      continuous inclination matches its lattice direction. Deleting the
+      comparison leaves the retrograde path asserted by nothing. Repoint each
+      assertion at the `DominantOrbitDirection` / `diskOrCaptured` roll that
+      task 2.5 makes the sole source of the side, so the test still fails if
+      `retrograde` becomes always-false — the exact silent-rule-change task 2.5
+      itself warns about (every capture-plausible body turns prograde and every
+      test still passes). Same treatment for the retrograde legs of
+      `continuous_test.go` and `lattice_identity_test.go`
 - [ ] 2.11 Add the test the removed slot-coverage scenario leaves behind:
       generate interiors across many seeds, collect every feature's continuous
-      phase, and assert the collected phases occupy every quadrant of
-      `[0, SubTurn)` (`system-interior`: *Interior Generation Is Lazy and
-      Deterministic* › "Generated phases span the whole turn"). Without this,
-      deleting the slot-coverage scenario removes reachability coverage instead
-      of relocating it
+      phase, and assert **both** legs (`system-interior`: *Interior Generation
+      Is Lazy and Deterministic* › "Generated phases span the whole turn"):
+      (a) the collected phases occupy every quadrant of `[0, SubTurn)`; and
+      (b) `gcd` of the collected phases is `1`. Leg (b) is not optional
+      decoration. `SubTurn` is `1<<20 = 1048576`, so leg (a) alone is four
+      buckets over a million values: a generator drawing
+      `phase = wrapSubTurnFraction(float64(r.Intn(16))/16)` passes it while
+      leaving 99.999% of phases unreachable — the continuous restatement of
+      exactly the defect the retired every-slot-is-reached scenario caught.
+      Today's generator is fine; it is the **spec** that would permit the
+      regression. Without this task, deleting the slot-coverage scenario
+      removes reachability coverage instead of relocating it
 - [ ] 2.12 `cd backend && go test ./system/ -short -count=1` green
 
 ## 3. Backend — remove the lattice tier from `backend/stations`
@@ -151,9 +175,48 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `common.GameTuning.OrbitPeriod`, and the `board.Schedule` /
       `board-tactical-math` comment at `common/tuning.go:143`. Verified by
       `grep -rn 'OrbitBasePeriod\|OrbitPeriod(' backend/` returning nothing
+- [ ] 4.2b Delete **two further dead lattice knobs** that no `lattice`-word
+      sweep finds, each in both `common.GameTuning` and its `fleet.Params`
+      twin, with their assignments in `DefaultTuning()` and
+      `DefaultMovementParams()`:
+      - `MsPerTile` (`common/tuning.go:69-71,115`; `fleet/params.go:17,41`) —
+        **zero production readers**. Its doc comment is "the world-ms cost to
+        burn across one cell of a system board", so leaving it makes the
+        central tuning struct describe a cell grid that no longer exists
+      - `InterceptHorizon` (`common/tuning.go:75-78,117`;
+        `fleet/params.go:18,42`) — **zero production readers**. It bounded the
+        lead-solve search of `board.SolveIntercept`, which task 5.1 deletes
+
+      Also repoint the four surviving comments that describe them:
+      `fleet/params.go:9-10` ("MsPerTile is the world-ms cost to cross one
+      hex"), `fleet/roster.go:37` ("crossing a system board
+      (MsPerTile=2500ms/hex)"), `fleet/model.go:17` ("against today's global
+      MsPerTile/LaneMsPerDistance") and `market/params.go:14,18` (which cites
+      `MsPerTile` and `OrbitBasePeriod` as its hot-retune exemplars). Delete
+      the `MsPerTile` legs of `common/tuning_test.go:22-26,43-44` and the
+      comment at `fleet/roster_test.go:170`. Verified by
+      `grep -rn 'MsPerTile\|InterceptHorizon' backend/` returning nothing
 - [ ] 4.3 Delete `fleet.Params.BoardRadius` and its assignment, now that
       `LaneGates` takes no radius (task 2.7). Verified by `grep -rn 'BoardRadius'
-      backend/` returning nothing
+      backend/` returning nothing. Beyond the production sites, that grep is
+      only clean once the test readers are handled too:
+      `backend/fleet/params_test.go:13-19`, `backend/common/tuning_test.go:52`,
+      `backend/system/params_test.go:11` and — the one no task reached —
+      `backend/corporations/params_test.go` (task 4.3b)
+- [ ] 4.3b **Rewrite, do not delete, `backend/corporations/params_test.go`'s
+      `TestBoardRadiusInvariant` and `TestBoardRadiusInvariant_TracksTuning`.**
+      Both read `fleet.DefaultMovementParams().BoardRadius`, so both become
+      compile errors the moment 4.1/4.3 land, and `backend/corporations` is
+      named in no other task. **Delete only the `fleet` leg** (lines 56-58 and
+      75-78). **Keep the `system.DefaultParams().Radius ==
+      common.Tuning().<new name>` leg in both tests**, renaming the tests to
+      match the new knob: that assertion is the *only* live guard that the
+      renamed knob still drives system-generation radius, which is precisely
+      what Decision 5 keeps it alive for. Deleting these tests to clear the
+      compile error is the obvious repair and it silently removes the guard
+      task 4.1 depends on. The `_TracksTuning` test's `SetTuning`-and-observe
+      structure is what proves the wiring is live rather than coincidental —
+      keep it
 - [ ] 4.4 Delete `backend/common/tuning_schedule_test.go` (it exists to assert
       the tuning radius against a board schedule) and repoint
       `backend/action/commit_params_validator_test.go`'s rejected non-primitive
@@ -161,6 +224,20 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       Non-Primitive Action Parameters* › "A domain struct in params is rejected
       at commit"). The test must still be red for the right reason — confirm it
       fails when the validator's allowlist is widened
+- [ ] 4.4b Repoint the **acceptance** half of the same file, which task 4.4
+      does not reach: `commit_params_validator_test.go:98-116` builds
+      `board.EncodeCell(board.Cell{Ring: 4, Slot: 9})` and asserts the stored
+      params carry `gotOrigin["ring"] == 4 && gotOrigin["slot"] == 9` against a
+      hand-built `map[string]any`. After this change no code produces that
+      shape, so the assertion is green forever against a literal nothing
+      writes. Replace it with `space.EncodeVec` of a fixed `space.Vec3`,
+      asserting the stored value round-trips through `space.DecodeVec`
+      (`action-dispatch`: *Commit Rejects Non-Primitive Action Parameters* ›
+      "An encoded coordinate map commits normally"). Also repoint the
+      `ActorState` case at `:122-155`, which carries a `board.MovementState`
+      with a `board.Orbit{Ring, Angle0, Period, Dir}`, at the continuous
+      movement-state struct (› "Actor state carrying a domain struct still
+      commits")
 - [ ] 4.5 Repoint `backend/mine/integration_test.go` and
       `backend/interior_additive_wire_e2e_test.go` off `board`, keeping every
       continuous assertion
@@ -198,12 +275,30 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 - [ ] 7.2 Create `fixtures/market/mirror-map.json` for the
       `backend/market` ↔ `frontend/lib/market` pair (design.md Decision 4),
       naming `FoldSale`/`foldSale`, `FirstTonPrice`/`firstTonPrice` and
-      `Capacity`/`capacity` as pairs and `bestPriceFor` as `tsOnly`, with
-      coverage `family:foldSale` / `family:firstTonPrice` (and `capacity` as an
-      indirect callee, following `fixtures/polar/mirror-map.json`'s `note`
-      convention). Any shared function this surfaces with no family goes to the
-      map's coverage `inventory` with an `expectedChange`, not to a new fixture
-      family — recording a new family is out of scope here
+      `Capacity`/`capacity` as pairs and `bestPriceFor` as `tsOnly`. The
+      coverage strings are **`family:fold`** and **`family:firstTonPrice`** —
+      `fixtures/market/cases.json`'s two non-empty families are named `fold`
+      and `firstTonPrice`, and `check_mirror` matches a coverage claim against
+      that file's own top-level keys with `grep -qx`, so `family:foldSale`
+      fails. `Capacity`/`capacity` claims `family:fold` as an indirect callee,
+      following `fixtures/polar/mirror-map.json`'s `note` convention. Any
+      shared function this surfaces with no family goes to the map's coverage
+      `inventory` with an `expectedChange`, not to a new fixture family —
+      recording a new family is out of scope here
+- [ ] 7.2b Populate `goOnly` **mechanically, not by hand**: `check_mirror`'s
+      rule 1 extracts *every* top-level `^func ` in the Go directory — receiver
+      methods and unexported functions included — and fails with `MISSING_GO`
+      for each one absent from `pairs` + `goOnly`. `backend/market`'s non-test
+      files define **28**, so `goOnly` must carry the **25** that are not in
+      `pairs`. Generate the list by running the extractor itself
+      (`.claude/scripts/check-mirror-map.sh:75-78`) rather than transcribing
+      it:
+      `for f in backend/market/*.go; do case "$f" in *_test.go) continue;; esac; grep -hE '^func ' "$f"; done | sed -E 's/^func (\([^)]*\) )?//; s/[([].*$//; s/[[:space:]]*$//' | grep -v '^$' | sort -u`
+      — then subtract the three `pairs` entries. **Do not respond to
+      `MISSING_GO` failures by moving `market` to `anti_mirror` mode.**
+      `anti_mirror` checks only `.sharedNames`, so it passes trivially, leaves
+      `check_mirror` with zero call sites anyway, and defeats Decision 4's
+      entire purpose while `/check` reports green
 - [ ] 7.3 Replace `check_mirror board` and `check_mirror polar` in
       `.claude/scripts/check-mirror-map.sh` with a single `check_mirror market`
       pass over `fixtures/market/mirror-map.json`,
@@ -240,12 +335,19 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       "Every surviving rule-bearing sqrt call site names its pinning family",
       "A delta-v computation using sqrt is pinned", "A newly introduced
       rule-bearing sqrt arrives with its family")
-- [ ] 7.7 Edit `fixtures/determinism-register.json`'s `checks` legend: the
-      `cross-target` entry names "the amd64 differential **board-test** leg in
-      /check", which no longer exists. Repoint it at the surviving leg. Confirm
-      the five open entries (galaxy, market ×2, mine ×2) are **unchanged** —
-      none is lattice, and a deletion change must not quietly clear a live
-      defect suppression
+- [ ] 7.7 Edit `fixtures/determinism-register.json`'s `checks` legend — **two
+      entries, not one**:
+      - the `cross-target` entry names "the amd64 differential **board-test**
+        leg in /check", which no longer exists. Repoint it at the surviving leg
+      - the **`sqrt-pinning`** entry names *Square Roots In Rules Are Pinned,
+        Not Assumed*, a requirement this change REMOVES. Repoint it at the
+        replacement, *Rule-Bearing Square Roots Are Pinned By a Recorded
+        Fixture Family*. A register legend citing a retired requirement is a
+        dangling citation nothing checks (task 12.5b)
+
+      Confirm the five open entries (galaxy, market ×2, mine ×2) are
+      **unchanged** — none is lattice, and a deletion change must not quietly
+      clear a live defect suppression
 
 ## 8. Enforcement lists, CI legs, and changed-file triggers
 
@@ -303,7 +405,27 @@ names the file and states its verification.
       `python3 .claude/skills/code-quality-checks/check.py --backend-tests` and
       confirm the determinism cross-target matrix **still runs** and still names
       `./space/ ./system/ ./galaxy/`, rather than silently skipping
-
+- [ ] 8.13 `infra/docker/test-runner.Dockerfile:5` (site 30): the comment
+      justifying `qemu-user-static` says the arm64 leg "runs the `GOARCH=arm64`
+      **board** fixture suite under `qemu-aarch64-static`". Keep the install —
+      the leg survives for `./space/ ./system/` — and repoint the prose at the
+      packages the leg actually runs
+- [ ] 8.14 `check.py:250` (site 31): `check_transcendental`'s docstring cites
+      "the TS **board-math** mirror". Repoint it at the surviving TS seam. This
+      is a third, separate docstring from sites 8 and 10
+- [ ] 8.15 `fixtures/system/mirror-map.json` (site 32): delete the
+      `generateWithStreams` (line 60) and `clampRing` (line 71) coverage
+      entries and the `generateWithStreams` /
+      `TestInteriorElementsSweep_MatchesLatticeIdentitySweep` mentions inside
+      the `newRand` and `Generate` notes (lines 58-59); repoint the
+      `orbitFeature` / `orbitFor` / `beltFeature` / `hazardFeature` notes off
+      lattice placement. **Nothing will fail if you skip this:** this map runs
+      in `anti_mirror` mode, which reads only `.sharedNames` (`[]`) and never
+      inspects `.coverage`, so a stale entry naming a deleted symbol passes
+      forever. That is exactly the silently-inert record Goal 2 forbids, so it
+      must be repaired by hand and verified by
+      `grep -n 'clampRing\|generateWithStreams\|Lattice' fixtures/system/mirror-map.json`
+      returning nothing
 ## 9. Defect docs, project docs, and the numbered spec series
 
 - [ ] 9.1 `docs/defects/2026-08-26-station-on-gate-ring.md`: flip
@@ -346,20 +468,63 @@ names the file and states its verification.
       SHALL return hits only under `openspec/changes/archive/`,
       `docs/plans/`, `docs/handoffs/` and `docs/defects/` — all historical
       record, which stays. Every other hit is fixed or removed
-- [ ] 10.2 `grep -rni '\blattice\b' backend frontend .claude fixtures
+- [ ] 10.1b Run a **second, bare-token** sweep, because the enforcement lists
+      do not spell the packages as paths and 10.1's path patterns miss all of
+      them: `check.py`'s `DETERMINISM_GO_PACKAGES = ("board", "polar", …)`,
+      `check-transcendental.sh`'s `RULE_BEARING_GO_PACKAGES=(board polar …)`,
+      and the `go test ./board/ ./polar/ …` command strings in both `check.py`
+      and `.gitlab-ci.yml` are the exact sites section 8 de-enrols, and 10.1
+      cannot confirm any of them. Run
+      `grep -rnE '"board"|"polar"|\(board |[( ]polar[) ]|\./board/|\./polar/' .claude .gitlab-ci.yml infra`
+      and require it to return nothing. Without this leg the section-8 tasks
+      are self-attested
+- [ ] 10.2 `grep -rni 'lattice' backend frontend .claude fixtures
       --exclude-dir=node_modules` SHALL return only the deliberate wire-contract
       guard `build-production-space-view` added (`system-interior`: "Lattice-only
       fields are absent from the response") and its implementing test
-      (design.md Decision 6). Anything else is a leftover
-- [ ] 10.3 Confirm the four wording-only deltas landed and have no code to
+      (design.md Decision 6). Anything else is a leftover. **The pattern is
+      deliberately unanchored**: `\blattice\b` misses the two shapes that
+      matter most, because both GNU and BSD `grep` treat `_` as a word
+      character and `\b` does not fire inside CamelCase — so
+      `backend/system/lattice_identity_test.go` (a whole file) and
+      `MatchesLatticeIdentitySweep` (cited from three files) both survive a
+      word-bounded sweep
+- [ ] 10.3 Confirm the three wording-only deltas landed and have no code to
       change, so they are not mistaken later for unimplemented work:
-      `world-clock` (*Scaled World Time* — drops `board` **and** `observation`,
-      a package link 5 deleted and this sweep also catches), `session-wakeup`
-      (*Successful Spawn Hands Off to the Home Board*), `galaxy-generation`
-      (*Per-System Body Skeleton*), and `mine-extraction` (*Ledger Key Is
-      System-And-Kind-Qualified, Channel Scope Is Per-System*). Each names a
-      route, a package list or an example that the code already satisfies;
-      verify that by grep rather than by assumption
+      `session-wakeup` (*Successful Spawn Hands Off to the Home Board*),
+      `galaxy-generation` (*Per-System Body Skeleton*), and `mine-extraction`
+      (*Ledger Key Is System-And-Kind-Qualified, Channel Scope Is Per-System*).
+      Each names a route or an example that the code already satisfies; verify
+      that by grep rather than by assumption
+- [ ] 10.3b `world-clock`'s *Scaled World Time* is **not** wording-only and
+      must not be checked off as such. Beyond dropping `board` and
+      `observation` (both deleted packages), the delta **widens** the
+      forbidden-`time.Now()` enumeration by adding `space`, `disclosure` and
+      `charts` — three packages links 2–8 created after the requirement was
+      last written — and renames the example stamp from "an observation's
+      `asOf`" to "a sighting's `asOf`". The widening is declared in the
+      proposal; verify it holds rather than asserting it:
+      `grep -rn 'time\.Now()' backend/space backend/disclosure backend/charts
+      --include='*.go' | grep -v _test.go` SHALL return only the doc-comment
+      mention at `space/vec.go:10` and no call site. A hit that is a real call
+      means the widened requirement ships already violated
+- [ ] 10.3c Confirm the two extra `trading-station` `MODIFIED` blocks landed
+      and are wording-only: *A Station's Continuous Orbit Is Derived, Never
+      Rolled* drops "never read from a lattice `Dir` (the station carries
+      none)" — a clause that becomes unfalsifiable once `Orbit.Dir` no longer
+      exists — and *Station Id Is the Home System's Id; Feature Id Is
+      System-Scoped and Separate* drops "board" from "the station's board
+      **feature id**" in the requirement body and its second scenario. Neither
+      changes behaviour; both are surviving requirements no other task reached,
+      and both would otherwise leave lattice vocabulary in a live spec after a
+      change whose Goal 1 forbids it. The scenario heading *The board read
+      serves the station regardless of tier* (in *Home Station Visible On the
+      Direct Station Read*) is **deliberately unchanged** even though "board"
+      there means the system-interior read: a `MODIFIED` block must reproduce
+      every live scenario heading character-for-character or the archiver
+      refuses, and there is no scenario-level `RENAMED` mechanism. It joins
+      Decision 1's three residual lattice-vocabulary titles as recorded, not
+      forgotten
 - [ ] 10.4 `python3 .claude/skills/code-quality-checks/check.py` fully green
 
 ## 11. Validation
@@ -424,17 +589,49 @@ archiver that must be rehearsed.
       `grep -rn 'board-tactical-math' openspec/specs/`. There SHALL be no
       remaining citation. `--strict` does not catch a dangling cross-reference
       to a retired capability, so this grep is the only guard
-- [ ] 12.5 In that copy, run the **retired-requirement-title** sweep, which no
-      tool performs: for every one of `board-tactical-math`'s 22 requirement
-      titles, and for every requirement title this change retires in
-      `system-interior`, `trading-station` and `cross-stack-determinism`,
-      `grep` all of `openspec/specs/` for that exact title. Each hit is a
-      citation of a requirement that no longer exists and must be repointed or
-      removed. (Authoring found two such citations up front —
-      `trading-station`'s *Station-Store Read Failure Degrades* and
-      `cross-stack-determinism`'s *Rule-Bearing Values Cross the Seam*, both
-      already repaired by this change's deltas — so the sweep's job is to catch
-      the ones the predecessors introduce)
+- [ ] 12.5 Build the **retired-requirement-title list** once, into a file, so
+      both legs of the sweep below run against the same list: every one of
+      `board-tactical-math`'s 22 requirement titles, plus every requirement
+      title this change retires in `system-interior`, `trading-station` and
+      `cross-stack-determinism` (the six `REMOVED`+`ADDED` originals and the
+      five pure `REMOVED`). Write them one per line to
+      `/tmp/retired-titles.txt`
+- [ ] 12.5a **Leg one — in the scratch copy**, `grep -F -f /tmp/retired-titles.txt
+      -rn openspec/specs/`. Each hit is a citation of a requirement that no
+      longer exists and must be repointed or removed. (Authoring found two such
+      citations up front — `trading-station`'s *Station-Store Read Failure
+      Degrades* and `cross-stack-determinism`'s *Rule-Bearing Values Cross the
+      Seam*, both already repaired by this change's deltas — so this leg's job
+      is to catch the ones the predecessors introduce)
+- [ ] 12.5b **Leg two — against the whole real repo**, because requirement
+      titles are cited far outside `openspec/specs/`:
+      `grep -F -f /tmp/retired-titles.txt -rn . --exclude-dir=node_modules
+      --exclude-dir=.git --exclude-dir=archive --exclude-dir=handoffs
+      --exclude-dir=plans`. Scoping this sweep to `openspec/specs/` alone
+      misses every code comment, register legend and test-file header that
+      names a retired requirement — and those are the citations nothing else
+      surfaces, because the files still compile and still pass. **Six are
+      already confirmed and must be repaired by name:**
+      - `fixtures/determinism-register.json:24` — the `sqrt-pinning` legend
+        names *Square Roots In Rules Are Pinned, Not Assumed*, which this
+        change REMOVES (repointed by task 7.7)
+      - `backend/system/generator_continuous_test.go:8-9` — cites *Interiors
+        Emit Continuous Orbital Elements For Every Body* and *A Retrograde
+        Orbit Is Expressed By Inclination, Never By a Non-Positive Period*
+      - `backend/system/continuous_test.go:114` — cites *Orbital Radii Ascend
+        With the Skeleton Ordinal...*
+      - `backend/system/generate_streams_test.go:5-6` — cites *Lattice
+        Placement Is Independent Of The Continuous Stream*
+      - `backend/system/generator.go:47` — the same citation, in production
+        code
+      - `backend/stations/no_lattice_dock_predicate_test.go:3` — cites
+        *trading-station*'s "Docking to the station involves no lattice
+        predicate", a scenario this change retires. **This file is named in no
+        other task**, still compiles and still passes, so nothing else surfaces
+        it; delete it under Decision 6 (its own header records that the package
+        implements no dock predicate at all) or repoint it at *Station Is a
+        Dockable, Non-Mineable Body* › "Position coincidence without attachment
+        is not docking"
 
 ## 13. Post-archive manual steps
 

@@ -50,26 +50,44 @@ Three surviving requirement titles keep lattice-era vocabulary:
 (`galaxy-view`, modified by `build-production-space-view`). This change edits
 their bodies and leaves their titles alone.
 
-**Why, measured rather than assumed.** `openspec-reconcile.py` matches a
-`MODIFIED` block against the *live* spec by requirement name and does not read
-`RENAMED` blocks at all. A `RENAMED` + `MODIFIED`-under-the-new-name pair — the
-shape `add-fuel-as-cargo` used and the archiver accepts — makes reconcile report
-`MODIFIED '<new name>' — NO SUCH live requirement`, and exit non-zero.
-Reproduced on a scratch copy during this change's authoring. Putting the
-`MODIFIED` under the *old* name instead satisfies reconcile and would break the
-archiver, which applies renames first.
+**Why — and note the reason changed under this change's feet.** At authoring
+time `openspec-reconcile.py` matched a `MODIFIED` block against the *live* spec
+by requirement name and did not read `RENAMED` blocks at all, so a `RENAMED` +
+`MODIFIED`-under-the-new-name pair — the shape `add-fuel-as-cargo` used and the
+archiver accepts — made reconcile report `MODIFIED '<new name>' — NO SUCH live
+requirement` and exit non-zero, while putting the `MODIFIED` under the *old*
+name satisfied reconcile and broke the archiver, which applies renames first.
+A rename could therefore pass one gate or the other but never both.
 
-So: a rename is currently unreachable without either failing a required gate or
-patching the gate. Requirement titles are identifiers, not prose, and a title
-containing the word "Board" is not a reference to a deleted artifact the way a
-body citing `fixtures/board/cases.json` is. The three residual titles are
-recorded here so they are visible rather than forgotten.
+**That is no longer true.** `6edb831` — the very commit that authored this
+change — added `parse_renames()` to `.claude/scripts/openspec-reconcile.py`,
+which resolves a `MODIFIED` block's target through the delta's `## RENAMED
+Requirements` block before matching it against the live spec.
+`docs/plans/continous_space/handoffs/README.md` records the fix, and it was
+verified in both directions: the archiver's shape passes, and a scenario
+dropped *through* a rename is still caught. **A rename is now mechanically
+reachable.**
 
-- Alternative considered: **teach `openspec-reconcile.py` to resolve
-  `RENAMED`.** Correct, and a real defect in the tool — it false-flags any
-  renaming change. Rejected *for this change* because patching the gate a
-  change must pass, inside that change, makes the gate's result meaningless.
-  Recorded as OQ-3.
+This change nevertheless leaves the three titles alone, for a smaller and
+purely editorial reason: requirement titles are identifiers, not prose, and a
+title containing the word "Board" is not a reference to a deleted artifact the
+way a body citing `fixtures/board/cases.json` is. Renaming them is now a
+cheap, safe follow-up rather than a blocked one — see OQ-3. The three residual
+titles are recorded here so they are visible rather than forgotten.
+
+One **scenario** heading is residual for a harder reason: `trading-station`'s
+*The board read serves the station regardless of tier* uses "board" for the
+system-interior read. Scenario headings have no `RENAMED` mechanism at all, and
+a `MODIFIED` block must reproduce every live heading character-for-character or
+the archiver refuses. It is therefore unchangeable by any change that does not
+also delete and re-ADD its requirement, which would put it back outside the
+archiver's scenario protection. Recorded, not fixed.
+
+- Alternative considered: **rename all three in this change, now that the gate
+  resolves `RENAMED`.** Not rejected on mechanics — it would work. Deferred
+  because a rename touches every citation of the title (task 12.5's sweep runs
+  repo-wide for exactly this reason), and folding three renames into a deletion
+  change of this size trades a real risk for a cosmetic gain.
 
 ### Decision 2: `MODIFIED` where possible; `REMOVED` + `ADDED` only where a live scenario must die
 
@@ -154,6 +172,25 @@ that hole and keeps the machinery alive at the same time.
   Rejected: an uninvoked check is indistinguishable from a passing one, and a
   future pair would be enrolled against a function nobody has run in months.
 
+**What enrolling actually costs, stated plainly.** `board` and `polar` were
+pure-math packages whose entire exported surface was the mirrored contract.
+`backend/market` is not: it is a Gin/Firestore application package with
+handlers, a service, a DAO seam and unexported helpers. `check_mirror`'s rule 1
+extracts **every** top-level `^func ` in the directory — receiver methods and
+unexported functions included — and fails on any name absent from the map. The
+package defines 28 such functions today, three of which are the mirrored pair;
+the other 25 must be listed in `goOnly`. That makes `fixtures/market/
+mirror-map.json` a **whole-package census**, and it fails the moment anyone
+adds a service method, a handler or a private helper to `backend/market` — a
+recurring maintenance tax on an application package, not the one-time cost a
+pure-math enrolment carries. This is accepted because the pair is a live
+violation of the golden-fixture requirement regardless of this change
+(`FoldSale`/`foldSale`, `FirstTonPrice`/`firstTonPrice` and `Capacity`/
+`capacity` are implemented on both sides with no mirror map), so the census is
+owed either way — but it is not "one JSON file plus one invocation", and
+task 7.2b requires the list to be generated by the extractor rather than
+transcribed, because a hand-copied census is wrong on its first edit.
+
 ### Decision 5: `BoardRadius` is renamed, not deleted
 
 `common.GameTuning.BoardRadius` looks like pure lattice, and most of its
@@ -208,7 +245,7 @@ disagreement" already governs it. Task 9.3 requires that to be checked against
 the recorded `gateOrbit` sweep and filed if it is not covered, rather than
 assumed closed.
 
-## The enforcement surface — 29 sites, 12 files
+## The enforcement surface — 32 sites, 15 files
 
 `pin-system-generation-determinism` catalogued **eight** hand-maintained
 package lists after two earlier reports undercounted them. Every one names
@@ -281,6 +318,27 @@ leaves a check that passes forever:
     `frontend/lib/spec-scenarios.test.ts`, which requires every `### S<n>`
     scenario in them to be cited by a surviving test.
 
+**Three more, found by adversary review after the count of 29 was fixed** —
+kept numbered separately rather than renumbering, so the earlier count stays
+comparable against the report that produced it:
+
+30. `infra/docker/test-runner.Dockerfile:5` — the comment justifying
+    `qemu-user-static` says the arm64 leg "runs the `GOARCH=arm64` **board**
+    fixture suite". The install is still needed; the justification names a
+    suite that ceases to exist.
+31. `.claude/skills/code-quality-checks/check.py:250` —
+    `check_transcendental`'s docstring, "the rule-bearing Go packages and the
+    TS **board-math** mirror". Distinct from site 7 (the predicate) and site 8
+    (a different docstring).
+32. `fixtures/system/mirror-map.json:59, 60, 71` — the coverage inventory names
+    `generateWithStreams` (twice, once inside a `note`) and `clampRing`, both
+    deleted by tasks 2.3 and 2.6, plus `TestClampRing_StaysMonotonicNonDecreasing`
+    and `TestInteriorElementsSweep_MatchesLatticeIdentitySweep`. This map runs
+    in **`anti_mirror`** mode, and `anti_mirror` reads only `.sharedNames`
+    (which is `[]`) — it never looks at `.coverage` at all. A stale entry here
+    therefore **cannot fail**, which makes it precisely the silently-inert
+    record Goal 2 forbids. Repair it by hand; nothing will surface it.
+
 ## `board-tactical-math` — the supersession map
 
 All 22 requirements retire. Nothing is re-ADDed. Each is superseded by a live
@@ -328,10 +386,13 @@ requirement elsewhere, or governs a computation that ceases to exist:
   it.** Every section-8 task states the file, the site, and the grep that
   proves the site is gone; section 10 re-greps the whole tree.
 - **`check_mirror` gains a new pair in a deletion change (Decision 4).** This is
-  the one place where this change adds rather than removes, and the addition is
-  scoped to one JSON file plus one invocation. If enrolling `market` surfaces an
-  uncovered shared function, the coverage inventory absorbs it — no new fixture
-  family is in scope here.
+  the one place where this change adds rather than removes, and it is **not**
+  cheap: `backend/market` is an application package, so its mirror map is a
+  whole-package census of 28 functions that goes stale on the next service
+  method anyone adds (Decision 4, *What enrolling actually costs*). The cost is
+  accepted because the pair already violates the golden-fixture requirement
+  today. If enrolling `market` surfaces an uncovered shared function, the
+  coverage inventory absorbs it — no new fixture family is in scope here.
 - **`space-kinematics`'s exemption clause requires a spike path in its
   Purpose.** `build-production-space-view` task 13.1 repoints it at the spikes
   that survive. This change deletes no spike, so that clause stays satisfied —
@@ -362,12 +423,17 @@ Left for Travis. Not answered by fiat.
   the constraint (no "board", no "ring") but not the name. Candidates:
   `OrbitalShellCount`, `MaxOrbitalIndex`, `GeneratedOrbitCount`. The value
   (16) does not change.
-- **OQ-3 — should `openspec-reconcile.py` learn to resolve `RENAMED`?** It
-  currently false-flags any change that renames a requirement (Decision 1,
-  reproduced on a scratch copy). Fixing it is a small, correct improvement to a
-  tool this project owns, and it would let a later change clean up the three
-  residual lattice-vocabulary titles. Deliberately not done inside the change
-  whose gate it is.
+- **OQ-3 — should link 9 also rename the three residual lattice-vocabulary
+  titles?** The blocker is gone: `6edb831` taught
+  `.claude/scripts/openspec-reconcile.py` to resolve `RENAMED`
+  (`parse_renames`), so a `RENAMED` + `MODIFIED`-under-the-new-name pair now
+  passes both the archiver and the gate. The three are
+  `Shared Board Math Is Pinned By a Cross-Language Golden Fixture`
+  (`cross-stack-determinism`), `Successful Spawn Hands Off to the Home Board`
+  (`session-wakeup`) and `Drill-In Navigation to the System Board`
+  (`galaxy-view`). Decision 1 defers them as cosmetic; a rename would also have
+  to repoint every citation the repo-wide sweep in task 12.5b finds. **Travis:
+  rename them here, or leave them to a follow-up?**
 - **OQ-4 — `docs/specs/0004-movement-board.md` and `0007-hex-board-view.md`.**
   Both describe the lattice era. `0007`'s renderer is deleted by
   `build-production-space-view`; `0004`'s two scenarios (S1, S2) are still cited
