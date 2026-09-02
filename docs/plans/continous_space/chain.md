@@ -41,7 +41,7 @@ after that design was written.
 | — | `pin-system-generation-determinism` | *(unplanned insert)* generation pinned byte-identical across build targets | ✅ `b64be39` |
 | 4 | `migrate-fleet-to-continuous-burns` | Fleets fly curves; cut drive / stop in place | ✅ `1f1c88a`…`55c46fb` |
 | 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ✅ `8f4dd65`…`99747e2` |
-| 6 | `re-express-economy-positions` | Mine/sell/dock re-anchored to bodies | ⬜ |
+| 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | 📝 spec CLEAR, 0/33 |
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ⬜ |
 | 8 | `build-production-space-view` | The renderer; `board-view` retired | ⬜ |
 | 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | ⬜ |
@@ -355,15 +355,51 @@ remains is **storage and wiring**, not model:
 
 ## Link 6 — `re-express-economy-positions`
 
-Mine, sell, and dock re-anchored from cells to bodies. Cheap by design:
-`decisions.md` settled that **places are bodies**, which is a recognition that
-every landed mechanic already treats the body as the atom of place — docking,
-mining, stations, gates, masking hosts, focused-scan targets.
+**Spec complete and adversary-CLEAR (2026-09-02); 0/33 tasks implemented.**
 
-- **Touches:** `mine-extraction`, `goods-sale`, `trading-station`,
-  `npc-market-demand`, `market-price-board`.
-- Co-location predicates become dock-state or radius tests. `board.Within`
-  becomes a sphere test.
+**This link's premise above was wrong, and the spec says so.** Link 4 already
+re-pointed the predicates: `mine` and `market` resolve "docked" through
+`fleet.Fleet.DockedTo()`, and `grep 'board\.'` across their non-test sources
+returns zero hits. `board.Within` and `board.LineOfSight` have no production
+callers at all — their successors shipped in link 2 — so "becomes a sphere test"
+was already true. Both are link 9 deletion material.
+
+What the link actually turned out to be, once grounded against the code:
+
+- **A belt member is a minable body `mine` structurally cannot mine.** Members
+  (`<beltId>#<k>`, `AsteroidsPerBelt = 8`) exist only in the `BodyTable`, never in
+  `interior.Features`, while `mine.Commit` resolves targets via
+  `findFeature(interior, …)`. A fleet attached to `feat-belt-0#3` gets
+  `ErrUnknownKind`. Fixed by resolving a member id to its parent belt for
+  mineability, kinds, and ledger key alike.
+- **`featureId` becomes a parsed client string** that composes a Firestore
+  document id, and `action.Commit` validates `Params` but never `LedgerKey`.
+  Validation lands, and the key is composed from the RESOLVED parent plus the
+  fleet's own stored `systemId` — never client input.
+- **Every body is a valid attachment host — and therefore a hiding place.**
+  Attachment is the masking predicate's sole input, so this had to be written
+  down with its consequence rather than left implicit.
+
+**A ruling was reversed mid-flight.** The first shape split each belt into eight
+independently-contestable member lodes with the belt demoted to a non-minable
+container. The panel showed that would make belt mining *unreachable*: members
+have no client affordance until link 8, so it closed the only reachable path
+while its replacement had none — and the container would still have rendered a
+mine panel refusing every commit. It also built a mechanic ahead of its only
+consumer, the species this chain has now paid for five times. Reversed to **one
+belt, one lode**; the ledger key never changes. Per-member lodes are deferred to
+whichever link makes a member pickable, with the contested-place rationale
+preserved so it is inherited rather than rediscovered.
+
+- **Touches seven capabilities, not the five predicted:** `mine-extraction`
+  (2 ADDED, 3 MODIFIED), `trading-station` (2 MODIFIED), `board-view` (2),
+  `market-price-board` (2), `fleet-movement` (1 ADDED), `system-interior` (1),
+  `goods-sale` (1). **`npc-market-demand` gets none** — it carries no positional
+  language at all.
+- **Q1 ruling:** `trading-station`'s lattice placement *derivation* is RETAINED
+  until links 8-9 — the `Footprint` it derives is what the only playable view
+  renders. Only the *predicate* half re-points. `stations/placement.go`'s comment
+  claiming it "dies at link 6" is wrong and is corrected by a task.
 
 ## Link 7 — `add-fuel-as-cargo`
 
