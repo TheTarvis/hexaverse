@@ -2,7 +2,15 @@
 
 **Found** 2026-09-02 by link 8b's adversary (round 2), while checking whether the
 fizzle-copy requirement had an input. **Verified independently.**
-**Status:** fixed by `add-scan-and-sightings-surface` (link 8b).
+**Status:** fixed by `add-stationkeep-hold-verb` (link 7b), task 4.11 — **reassigned
+2026-09-02**, having first been routed to `add-scan-and-sightings-surface` (link 8b).
+
+> Why it moved: 7b's own `mine-extraction` delta already requires the resolved action's
+> reason code at four places (`specs/mine-extraction/spec.md:78,84,90,111`) and carried no
+> task to persist it, so the requirement was in scope while the work was not. 7b's
+> developer halted on the failing assertion and reported it out of scope, reading it as
+> 8b's. That reading was half right — outside 7b's *tasks*, inside 7b's *spec*. 8b's tasks
+> 1.12/3.10 already anticipate arriving to an already-green state.
 
 ## The finding
 

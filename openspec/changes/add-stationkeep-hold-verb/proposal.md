@@ -234,13 +234,26 @@ retains agency after a drain it never chose.
   pre-existing violation of `fleet-movement`'s live "Stopping at or below
   the speed floor is instant and free". Write-up:
   `docs/plans/continous_space/handoffs/drift-stop-free-branch-no-write.md`.
-- **Three pre-existing sentinels are wired**, as declared tasks with no spec
+- **Four pre-existing sentinels are wired**, as declared tasks with no spec
   delta (their requirements are already live and already correct):
-  `fleet.ErrNotBurning`, `ErrAccelBelowFloor`, and `ErrAccelAboveCeiling`
-  today fall through to a bodyless `500`, violating three live
-  `fleet-movement` scenarios. This change already rewrites that exact
-  `respond` switch. See
+  `fleet.ErrNotBurning`, `ErrAccelBelowFloor`, `ErrAccelAboveCeiling`, and
+  `space.ErrCutAfterArrival` today fall through to a bodyless `500`,
+  violating four live `fleet-movement` scenarios that each demand the
+  rejection carry "its own named reason". This change already rewrites that
+  exact `respond` switch. See
   `docs/plans/continous_space/handoffs/drift-fleet-wrong-state-500.md`.
+- **The action resolver's `reasonCode` is persisted**, as a declared task
+  with no spec delta here: `action.DaoImpl.ResolveOne`'s single write to the
+  action document sets `status`, `outcome`, and `resolvedAt` and nothing
+  else, so a resolver's computed reason code reaches no document and — being
+  `omitempty` — is always absent from `GET /v1/actions`. This change's own
+  `mine-extraction` delta requires the `clean`/`lodeDry`/`holdFull` codes on
+  the resolved action, including in the station-keeping scenario it adds, so
+  the fix is in this change's scope even though the requirement making it a
+  general rule (`action-dispatch`) belongs to `add-scan-and-sightings-
+  surface`, which carries the same fix and expects it to be possibly already
+  green. See
+  `docs/plans/continous_space/handoffs/drift-reasoncode-never-persisted.md`.
 
 ## Impact
 
@@ -274,9 +287,12 @@ retains agency after a drain it never chose.
   station-keeping settlement landing mid-run can widen relative to
   `freeHoldAtCommit`), `backend/refuel/` (the settle-restamp-recompute step
   a refuel landing mid-hold must perform inside its own settlement
-  transaction), `backend/middlewares/` or router wiring (ownership checks
-  on the two new routes), and a widened `fixtures/space/` case family for
-  the two new `Park` fields' codec round-trip.
+  transaction), `backend/action/` (`ResolveOne`'s resolve-transaction write,
+  which must persist `reasonCode` for this change's own `mine-extraction`
+  reason-code assertions to be satisfiable), `backend/middlewares/` or router
+  wiring (ownership checks on the two new routes), and a widened
+  `fixtures/space/` case family for the two new `Park` fields' codec
+  round-trip.
 - No migrations, no backwards compatibility (solo toy) — lands outright.
 - **This change MUST archive after `add-fuel-as-cargo` (chain link 7) has
   already archived.** Both changes MODIFY `fleet-movement`'s "Fleet Cargo
