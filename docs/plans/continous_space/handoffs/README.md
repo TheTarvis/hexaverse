@@ -186,3 +186,37 @@ requirements, so a rename could pass the archiver or this gate but never both. F
 2026-09-02 — it now maps a MODIFIED block under the new name back to the live requirement
 under the old one, because the archiver applies renames first. The change that found it
 declined to patch the gate from inside the change being gated, which was right.
+
+## Lesson six — the integrity check had no baseline, and the suite command could not pass
+
+Two harness findings from link 7b's implementation, both from the SDET rather than review.
+
+**1. The post-development integrity check was unfalsifiable.** Its job is to prove no test
+was modified, weakened, skipped or deleted since the red handoff. That needs a baseline —
+and the red suite is *untracked*, because a red suite does not compile by design and
+committing it would turn `main` red and fail the pipeline. So the SDET could only offer
+filesystem mtimes ("every handed-off file still carries an mtime in the red-phase window")
+and said plainly that this is weaker evidence than a diff and should not be read as
+equivalent. That honesty is the only reason the gap is visible at all.
+
+The fix keeps both properties instead of trading one away:
+`.claude/scripts/openspec-red-manifest.sh record <change-id> <paths...>` hashes the suite
+at handoff and writes `red-manifest-<change-id>.txt` here; `verify <change-id>` diffs the
+current state against it and exits non-zero on any modification, deletion or unrecorded
+addition. Self-tested both directions. **Record the manifest at the moment of red handoff,
+before any developer starts** — link 7b's own manifest was recorded after its SDET revision
+pass, so it is a post-revision baseline, not a true red one. That baseline is gone and
+cannot be reconstructed.
+
+**2. The mandated suite command could not pass.** Every delegation carried
+`cd backend && go test -p 1 ./...`. The root `hexaverse` e2e package takes ~19.5 minutes on
+this machine and dies at go's **600s default** with goroutine dumps — reported as
+`FAIL hexaverse 600.704s`, which looks exactly like an assertion failure. `-timeout 40m` is
+required. Note this is the same failure mode a prior commit already fixed *inside* the
+suite ("A TIMEOUT IS NOT AN ASSERTION FAILURE") — the banner went into CI while the
+instruction agents were handed stayed wrong.
+
+The pattern behind both: an instruction repeated across many delegations is never
+re-derived by the people following it. Lesson five was a prohibition that outlived its
+cause; this is a command that never worked. Both survived because they were *inherited*,
+and both were caught by an agent doing the work rather than by a reviewer reading it.
