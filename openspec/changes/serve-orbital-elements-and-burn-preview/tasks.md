@@ -72,7 +72,13 @@ reason.
       clock's scale alongside its world time"; `fleet-movement`: "A fleet read
       carries the world clock's scale", "The scale is served even on an
       unwarped world")
-- [ ] 1.11 Record a golden wire sample of one materialized interior read and
+- [ ] 1.11 Interior `extent` contract: the interior read carries a continuous
+      `extent` equal to the stored `SystemInterior.Extent`, alongside and
+      distinct from the lattice `radius`, so `build-production-space-view` has
+      a continuous per-system scale to size its camera, pan bound and pick
+      radius against without reading `radius` (`system-interior`: "The read
+      carries the interior's continuous extent")
+- [ ] 1.12 Record a golden wire sample of one materialized interior read and
       one preview response under the backend test tree, so
       `build-production-space-view`'s TypeScript types are written against a
       real payload rather than a paraphrase of this document
@@ -104,12 +110,19 @@ reason.
       not be resolved: elements are stored data, position is a resolution
       result (`system-interior`: "A body served without a resolvable continuous
       position is still element-complete")
-- [ ] 2.6 Serve `common.WorldTime.Scale()` on the interior read alongside the
+- [ ] 2.6 Serve the interior's continuous `extent` on `system.interiorDTO`
+      (`backend/system/handler.go`), populated from `SystemInterior.Extent`
+      — which is generated (`system/generator.go`), persisted
+      (`system/model.go`) and held on `BodyTable` today, and is on no DTO.
+      Serve it alongside, not in place of, the lattice `radius`; removing
+      `radius` is `build-production-space-view`'s (`system-interior`: "The
+      read carries the interior's continuous extent")
+- [ ] 2.7 Serve `common.WorldTime.Scale()` on the interior read alongside the
       `worldTime` the response already carries, read from the same clock that
       produced it, and unconditionally rather than only when it differs from 1
       (`system-interior`: "The read carries the world clock's scale alongside
       its world time")
-- [ ] 2.7 Update the Go interior-read handler tests and any recorded response
+- [ ] 2.8 Update the Go interior-read handler tests and any recorded response
       shape they assert; re-record rather than relax
 
 ## 3. Burn order preview

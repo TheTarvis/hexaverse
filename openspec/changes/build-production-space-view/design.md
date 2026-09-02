@@ -469,10 +469,39 @@ gate carries no signal, and a genuine regression introduced anywhere in
 sections 1–8 is indistinguishable from the self-inflicted breakage.
 
 Nothing in sections 1–8 requires the fields to be **absent**. They require
-`orbitElements`, the preview endpoint, the upkeep rate, and the world-clock
-scale to be **present**, and the sibling change already delivers all four
-additively. The removal's only
+`orbitElements`, the `extent`, the preview endpoint, the upkeep rate, and the
+world-clock scale to be **present**, and the sibling change already delivers
+all five additively. The removal's only
 consumer is link 9.
+
+**Amendment (panel review): the ordering holds, but this rationale overstated
+what it buys.** The claim above is that deferring section 9 preserves gate
+signal across sections 1–8. Half of that is false. Task **2.1 replaces the
+live route** — `app/systems/[systemId]/page.tsx` renders
+`components/board/SystemBoardView` today, and 2.1 rewrites it over
+`components/space/SystemSpaceView` — so the moment 2.1 lands, the four e2e
+suites that drive that route through **board test ids**
+(`jump-commit.spec.ts`, `slice.spec.ts`, `refuel-commit.spec.ts`,
+`new-user.spec.ts`) go red regardless of where section 9 sits. The e2e leg of
+the gate is lost at 2.1, roughly eighty tasks before 9.1, and no ordering of
+the backend removal changes that.
+
+What the ordering **does** still buy, and why it stays: the *component and
+unit* suites for the surviving board pieces keep running against a wire that
+still carries their fields, so a regression in sections 1–8 is still
+distinguishable there; and nothing between 9.1 and 10.1 reads a removed
+field, which is the invariant that actually makes the late removal safe. The
+ordering is correct; only the "all six e2e suites" sentence above overclaimed
+its scope, and it is left in place above as the record of what was believed,
+corrected here.
+
+**The repair is a task, not a caveat.** Section 2 now carries task 2.1b: at
+the same commit that replaces the route, either rewrite those four suites
+against the new view's test ids or `test.skip` them **by name** with a
+comment naming task 10.8 as the change that restores them. Either way a red
+e2e run after 2.1 is a real signal again, rather than expected noise a
+reviewer learns to ignore for eighty tasks — which is precisely how link 5
+shipped four consecutive states with a green suite and a stuck player.
 
 **Alternatives considered.**
 
@@ -810,6 +839,17 @@ Left genuinely open for Travis — recorded rather than answered by fiat:
   pins that there is one named client constant and that the resulting ceiling
   is displayed; its value needs play to choose, and choosing it by fiat here
   would be inventing a number.
+- **OQ-14 (new) — the preview refresh interval's value** (*Burn Preview
+  Reflects the Server-Solved Order, Without Committing*). The spec pins that
+  the cadence is a single named client-side constant defined in one place,
+  that exactly one request goes out per elapsed interval, and that the
+  endpoint is not free (a body-table read, a possible settlement write, and
+  an N-solve stranding scan per acting fleet per player). Its **value** is a
+  play-and-load trade-off — too slow and the quote drifts against a moving
+  target, too fast and a busy system multiplies that cost by every player
+  with a selection open — and picking a number here would be inventing one.
+  Related: the sibling change's own open question on whether
+  `/orders/preview` warrants a server-side rate limit.
 - **OQ-7 — sighting visual aging** and **OQ-9 — where the sighting log
   mounts.** Both 8b's scope; recorded for continuity.
 

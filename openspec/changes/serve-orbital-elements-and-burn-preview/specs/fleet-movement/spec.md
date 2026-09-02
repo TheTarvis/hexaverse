@@ -53,6 +53,16 @@ Contacts").
 - **THEN** the response is `404 Not Found`, and no field of F's position,
   velocity, roster, or fuel appears in the response body
 
+#### Scenario: A foreign preview is refused before anything is settled
+- **GIVEN** fleet F, owned by another corporation, whose stored burn's
+  arrival time has already passed and has not yet been settled
+- **WHEN** a foreign or corpless requester submits
+  `POST /v1/fleets/F/orders/preview`
+- **THEN** the response is `404 Not Found` and F's stored record is
+  byte-identical before and after the request — the ownership check runs
+  ahead of the settlement seam, so no unauthorized caller triggers a write
+  on a victim's fleet
+
 #### Scenario: A foreign corp cannot cancel another corp's fleet
 - **WHEN** an authenticated account whose corporation does not own fleet
   F submits `POST /v1/fleets/F/cancel`
@@ -129,7 +139,19 @@ stranding warning.
 
 The preview SHALL be available exactly when a commit of the same order
 would be available, and SHALL be rejected exactly where a commit would be
-rejected. In particular it SHALL be served for a fleet that is currently
+rejected, **with one stated exception — an insufficient-fuel condition
+SHALL NOT reject a preview**. Where a commit whose solved fuel cost exceeds
+the fleet's currently held `fuel` is rejected ("A Burn Commit Is Rejected
+When Its Fuel Cost Exceeds Available Fuel, Debited At Commit Never At
+Resolve"), the preview of that same order SHALL instead be **served in
+full** — the complete solve, with its affordability indication reading
+false — because the preview exists precisely so a player can discover that
+a target is out of reach before committing, and a rejection would leave
+that player with no arrival time, no delta-v, and no fuel figure to plan a
+refuel or a nearer target against. This is the only divergence between the
+two paths' rejection sets; every other rejection below is shared.
+
+In particular the preview SHALL be served for a fleet that is currently
 burning — re-targeting mid-flight is an ordinary commit against the fleet's
 live tangent (`space-kinematics`'s "Departure Is Tangent to the Ship's Actual Motion at Commit"),
 and it is the highest-stakes order in the game, so forbidding its preview
@@ -140,13 +162,26 @@ channel already claimed by a non-burn verb (a running mine); an ambiguous
 or empty target; an out-of-bounds commanded acceleration; a target body
 absent from this system's body table; and a target whose solved curve
 violates `space.BuildCurve`'s endpoint-clearance guard, which is the sole
-mechanism by which the system's own star is excluded. The preview SHALL NOT
+mechanism by which the system's own star is excluded. An insufficient-fuel
+condition is explicitly **not** a member of that set: it is reported on a
+served response, never as a rejection. The preview SHALL NOT
 apply a destination-identity check of any kind against the star or any
 other body: a star target is rejected because its solve fails the clearance
 guard, on the same code path and with the same observable reason as a
 commit, and a preview that short-circuited before the solve would
 reintroduce exactly the identity special case `fleet.ErrCoreDestination`'s
 deletion removed.
+
+The ownership check "Fleet Command Endpoints Are Restricted to the Owning
+Corporation" defines SHALL run **before** the settlement seam described
+below, and SHALL be the first thing the handler does after resolving the
+fleet. A foreign or corpless requester's preview SHALL therefore reach no
+settlement, no solve, and no write of any kind. Ordering the check after
+the settlement would let an unauthorized caller trigger a state-mutating
+write on a victim's fleet, and would make the `404` observably slower when
+that fleet has an arrival due than when it does not — a timing side channel
+disclosing the victim's kinematic state through a response this requirement
+otherwise renders indistinguishable from a nonexistent fleet's.
 
 The preview SHALL create no `action-dispatch` action, claim no channel
 slot, debit no fuel, and store no burn. Its only permitted persisted effect
@@ -208,9 +243,13 @@ of a fleet with nothing due SHALL write nothing at all.
 #### Scenario: A preview reports an unaffordable target as such
 - **WHEN** a preview's solved fuel cost exceeds the fleet's currently held
   `fuel`
-- **THEN** the response reports the target as not currently affordable,
-  carrying the solved control points, arrival time, delta-v, and fuel cost
-  for display regardless
+- **THEN** the request is served rather than rejected, and the response
+  reports the target as not currently affordable, carrying the solved
+  control points, arrival time, delta-v, and fuel cost for display
+  regardless
+- **AND** a commit of that same order, submitted from the same state, is
+  rejected with the insufficient-fuel reason — the one condition on which
+  the preview and the commit deliberately diverge
 
 #### Scenario: A preview reports the stranding warning when it would apply
 - **WHEN** a preview's resulting park would leave the fleet unable to
@@ -239,6 +278,20 @@ re-quote against the true figure without a second round trip. When
 behave exactly as it did before this change. A `maxFuelTons` that is
 negative or not a finite number SHALL be rejected as an invalid request
 rather than treated as absent.
+
+**Absence SHALL be distinguished from zero.** A `maxFuelTons` of exactly
+`0` is a *present* cap — the caller asserting the order must cost nothing —
+and SHALL reject any order whose solved fuel cost is strictly positive; it
+SHALL NOT be treated as an absent cap and SHALL NOT be silently ignored. A
+plain Go `float64` field makes the two indistinguishable on decode, so the
+request shape SHALL carry the presence bit explicitly (a pointer, an
+`omitempty`-aware wrapper, or an equivalent), and a decoder that cannot
+tell `{"maxFuelTons": 0}` from a body omitting the key entirely does not
+satisfy this requirement. This is not a hypothetical: the uncapped path is
+the pre-change behaviour, so conflating the two turns a caller's strictest
+possible cap into no cap at all — the exact failure the cap exists to
+prevent, reached by the exact value a defensive caller is most likely to
+send.
 
 The two rejections SHALL remain distinguishable to a caller: the
 insufficient-fuel reason answers "this fleet cannot pay," and this one
@@ -278,6 +331,13 @@ the other.
   a finite number
 - **THEN** the request is rejected as invalid, and the order is not
   committed uncapped
+
+#### Scenario: A cap of exactly zero is a present cap, not an absent one
+- **WHEN** a burn is committed with `maxFuelTons` set to exactly `0` and the
+  order's solved fuel cost is strictly positive
+- **THEN** the commit is rejected with the quoted-cap reason, no fuel is
+  debited, and no burn is stored — the zero is honoured as a cap rather
+  than read as an omitted field
 
 ### Requirement: Fleet Read Serves the Station-Keeping Upkeep Rate in Fuel Tons
 The system SHALL serve, on the owner-only roster surface of a fleet read
@@ -337,6 +397,17 @@ reading and extrapolating live world time between reads projects at the
 world's own rate rather than at an assumed rate of 1. The scale SHALL be
 served unconditionally, on a world running at any scale, so a client never has
 to distinguish "scale 1" from "scale absent".
+
+Serving it on the **fleet** reads as well as the interior read has a named
+consumer, not merely symmetry: every surface that renders a fleet countdown
+or a live fleet position without an interior read alongside it reads its
+clock from here. That is the galaxy view's lane crawl and the shared fleet
+roster, which never fetch an interior at all; and it is the per-system view
+whenever its interior read has **failed** — a state that capability
+specifies as leaving the roster and the fleet-anchored commands fully
+usable, with their ETAs and countdowns still ticking. In every one of those
+states the fleet read is the only clock on screen, and without its scale
+those countdowns run at an assumed rate of 1 on a warped world.
 
 #### Scenario: A fleet read carries the world clock's scale
 - **WHEN** a requester reads a fleet on a world whose simulation clock runs

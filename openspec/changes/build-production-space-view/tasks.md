@@ -11,14 +11,29 @@
 - [ ] 1.2 Make `check-mirror-map.sh`'s anti-mirror comparison
       **case-insensitive** on both sides, and match `sharedNames`
       case-insensitively too, so `ArcParam`/`arcParam`, `Speed`/`speed` and
-      `StateAt`/`stateAt` collide (`cross-stack-determinism`: "A
-      Go-sole-authority capability's mirror map runs in anti-mirror mode",
-      "A lower-camel twin of an authoritative Go export fails the check" — a
-      code-is-wrong fix to a check too weak to enforce a live requirement)
+      `StateAt`/`stateAt` collide. In the same edit, fix the scan's **reach**:
+      `anti_mirror` walks `for f in "$TS_DIR"/*.ts` — one directory level, and
+      `.tsx` excluded — while the requirement it enforces demands *every*
+      exported declaration in that directory. Make it **recurse** into
+      subdirectories and include `.tsx`, excluding `*.test.ts`/`*.test.tsx` as
+      today. Its failure mode is a silent pass: a mirror one directory down,
+      or in a `.tsx` file, is invisible to the check that exists to catch it
+      (`cross-stack-determinism`: "A Go-sole-authority capability's mirror map
+      runs in anti-mirror mode", "A lower-camel twin of an authoritative Go
+      export fails the check", "A declaration form the extractor has no rule
+      for fails the check rather than passing" — a code-is-wrong fix to a
+      check too weak to enforce a live requirement)
 - [ ] 1.3 Add a regression case to the check's own coverage: a TypeScript file
       declaring a lower-camel twin of an existing `backend/space` export must
-      make the check exit non-zero (`cross-stack-determinism`: "A lower-camel
-      twin of an authoritative Go export fails the check")
+      make the check exit non-zero. Place that regression twin in a
+      **subdirectory** of `frontend/lib/space/` (and add a second in a `.tsx`
+      file), so 1.2's recursion is what the case proves — a twin placed at the
+      directory's top level passes under both the old glob and the new one and
+      therefore proves nothing. Add a third case twinning an **unexported** Go
+      function (`cross-stack-determinism`: "A lower-camel twin of an
+      authoritative Go export fails the check", "A twin in a subdirectory or a
+      .tsx file fails the check", "An unexported Go function counts as an
+      authoritative name")
 - [ ] 1.4 Create `frontend/lib/space/` with exactly four kinds of pure
       function: a position from a served orbital element set; a position from
       a served park or drift; a served quintic Bézier evaluated at a
@@ -33,8 +48,18 @@
       1.2's case-insensitive comparison the bare names collide with
       `backend/space`'s `Add`, `Sub`, `Dot`, `Cross`, `Length`, `Point`,
       `Scale`, `Position`, `Velocity` and `Speed` — Go TitleCase against TS
-      camelCase for the same trivial helpers. A collision is a signal to
-      rename the TypeScript, never to widen the allowlist
+      camelCase for the same trivial helpers. **Unexported Go functions count
+      too**: the check's Go side is `grep -hE '^func '`, which enumerates
+      every top-level declaration regardless of export, so the reserved set
+      also includes `resolvePosition`, `resolveVelocity`, `bernsteinPoint`,
+      `bernsteinDerivative`, `flightSeconds`, `coveredLength`, `octantOf`,
+      `floorMod`, `wrapSubTurn`, `decodeControlPoints`, `avoidStar`,
+      `angularRateScale`, `elevateCubicToQuintic`, `perpendicularToChord`,
+      `crossAtOrBefore`, `minDistanceAndParamOf`, `rotateInclinationNode` and
+      `loadTurnTable`. Several are the obvious TypeScript name for a render
+      helper, so an implementer WILL hit one; the answer is always to rename
+      the TypeScript. A collision is never a reason to widen the allowlist —
+      `sharedNames` stays empty, and it is the door that must stay empty
       (`cross-stack-determinism`: "A lower-camel twin of an authoritative Go
       export fails the check")
 - [ ] 1.6 Implement the burning-fleet mark at
@@ -59,6 +84,16 @@
       shell over `components/space/SystemSpaceView`, the WebGL canvas
       dynamically imported with SSR disabled, and its existing
       `page.test.tsx` rewritten against the new shell (design.md Decision 7)
+- [ ] 2.1b **In the same commit as 2.1**, deal with the four e2e suites that
+      drive `/systems/:systemId` through board test ids —
+      `jump-commit.spec.ts`, `slice.spec.ts`, `refuel-commit.spec.ts`,
+      `new-user.spec.ts`: either rewrite them against the new view's test ids
+      now, or `test.skip` each **by name** with a comment naming task 10.8 as
+      the change that restores it. 2.1 replaces the live route, so these four
+      go red the moment it lands — about eighty tasks before section 9 — and
+      an e2e leg that is expected to be red for eighty tasks is an e2e leg
+      that reports nothing. Do not leave them failing silently (design.md
+      Decision 11's amendment)
 - [ ] 2.2 Read the interior (`GET /v1/systems/:systemId`) and the requester's
       own fleets via `GET /v1/fleets?mine=true`, filtered to this system on
       the client; issue no `systemId`-scoped fleet list request from this view
@@ -66,8 +101,11 @@
       own-fleets read is the corporation-scoped one", "An arrived fleet reads
       as arrived on both the canvas and the roster")
 - [ ] 2.3 Drive the view's clock from `useWorldTime(serverWorldTime, { scale })`
-      with the **served** world-clock scale from the interior read, never the
-      hook's default of 1. `frontend/hooks/use-world-time.ts` defaults `scale`
+      with the **served** world-clock scale from the interior read, and fall
+      back to the **own-fleets read's** served scale whenever the interior read
+      has failed — the state in which the roster and the fleet-anchored
+      commands stay mounted with their countdowns still ticking, and the fleet
+      read is the only clock on screen. Never the hook's default of 1. `frontend/hooks/use-world-time.ts` defaults `scale`
       to 1 today with a comment anticipating exactly this; `WORLD_TIME_SCALE`
       is a real server flag, and under continuous space a mis-scaled clock
       draws every orbit and burn mark visibly wrong (`system-space-view`:
@@ -98,9 +136,14 @@
       an arrival ghost")
 - [ ] 2.8 Omit a fleet reporting no position (`system-space-view`: "A fleet
       with no reported position is omitted from the scene")
-- [ ] 2.9 Render the interior read's `contacts` at their served positions,
-      distinguishing emitting and scanning contacts, with no identity
-      (`system-space-view`: "Foreign Contacts Render at Their Live Position")
+- [ ] 2.9 Render the interior read's `contacts` **frozen at their served
+      positions** — never integrated forward from the served `velocity` —
+      distinguishing emitting and scanning contacts, with no identity; and
+      display the served `velocity` as a heading-and-speed readout on the
+      selected or hovered contact, which is that field's one consumer
+      (`system-space-view`: "Foreign Contacts Render at Their Served
+      Position", "A contact does not drift between reads", "A contact's
+      served velocity is displayed, not integrated")
 - [ ] 2.10 Omit and log any non-star body, fleet, or contact resolving to the
       exact origin, and render the star there normally (`system-space-view`:
       "A Non-Star Position at the Origin Is Omitted From the Scene, Not Drawn
@@ -134,6 +177,14 @@
       targets, and documented draw-order precedence for overlapping marks
       (`system-space-view`: "Space View Picking Resolves to the Body, Lane
       Gate, or Point Under the Pointer")
+- [ ] 3.2b Draw a **visible selected mark for a picked point in empty space**,
+      at the position it was picked at. A point in vacuum has no body mark to
+      highlight and no intrinsic outline, so without this an implementer can
+      ship an invisible point selection and still satisfy every other
+      scenario — the player commits a burn to a target they cannot see. The
+      live `board-view` guaranteed this for a bare cell, with its own
+      scenario, and it was thinned out of the port (`system-space-view`: "A
+      selected point in empty space is visibly marked")
 - [ ] 3.3 Off-screen affordance for every body and lane gate whose mark is
       outside the viewport, operable by pointer and by touch, selecting and
       reframing; offered only for off-screen marks (`system-space-view`:
@@ -144,7 +195,9 @@
       Keyboard-Operable")
 - [ ] 3.5 Keyboard-reachable control that selects the point at the camera's
       current pan target, producing a selection indistinguishable from a
-      clicked point (`system-space-view`: "A keyboard control selects the
+      clicked point — and reachable to a **legal** target, which requires
+      task 5.5's keyboard pan: at default framing the pan target is the star,
+      which every burn solve rejects (`system-space-view`: "A keyboard control selects the
       point at the camera's pan target", "The point-selection control is in
       the tab order and shows focus")
 
@@ -165,11 +218,18 @@
       a target shows a preview curve and its figures", "A burning fleet's
       re-target is previewed", "No preview is requested while a mine holds the
       movement channel")
-- [ ] 4.3 Refresh the preview at a bounded interval while shown and
-      uncommitted; clear it on selection change, clear, or commit; render an
-      unaffordable preview distinctly (`system-space-view`: "The preview
-      refreshes periodically while shown", "Clearing the selection clears the
-      preview", "An unaffordable preview is shown as such")
+- [ ] 4.3 Refresh the preview on a **single named client-side interval
+      constant, defined in exactly one module** — exactly one request per
+      elapsed interval, none between; clear it on selection change, clear, or
+      commit; render an unaffordable preview distinctly. The endpoint reads
+      the body table, may write an arrival settlement, and runs an N-solve
+      stranding scan per acting fleet per player, so the cadence is a real
+      server cost and SHALL NOT be scattered across call sites. Its **value**
+      is design.md OQ-14, open for Travis; pick a placeholder and name it
+      (`system-space-view`: "The preview refreshes on exactly one named
+      interval while shown", "The refresh interval is defined in exactly one
+      place", "Clearing the selection clears the preview", "An unaffordable
+      preview is shown as such")
 - [ ] 4.4 Preview failure states: a no-quote state with a retry for a failed
       first request, and a stale marking with a retry for a failed refresh,
       cleared by a later success (`system-space-view`: "A failed first preview
@@ -224,21 +284,49 @@
       disambiguation at the 8px threshold, and gestures beginning over a mark
       still moving the camera (`system-space-view`: "Space View Camera Orbit,
       Pan, and Zoom")
+- [ ] 5.1b Scale the default distance, the zoom clamps, the pan bound, and the
+      maximum pick radius off the interior read's served continuous `extent`
+      — one configured multiplier each, never an absolute scene constant and
+      never the lattice `radius`, which section 9 removes and link 9 deletes
+      the producer of. Task 10.11's grep looks for `@/lib/board` **imports**,
+      so a camera scaled off a lattice-derived wire field would pass it
+      silently (`system-space-view`: "The framing scales with the system's
+      served extent")
+- [ ] 5.1c Clamp the pan target to the configured bound and pin it with a test
+      that drives the pan repeatedly in one direction, by drag and by
+      keyboard, and asserts it stops — the live `board-view` camera had this
+      scenario and it was thinned out of the port (`system-space-view`: "Pan
+      clamps at the configured bound")
 - [ ] 5.2 Camera state persists across selection change and realtime refetch;
       resets to default framing with no transition on `systemId` change
       (`system-space-view`: "Camera state survives a selection change and a
       realtime refetch", "Camera resets when the system changes")
 - [ ] 5.3 Picking stays correct after camera movement, including a
-      point-in-space click (`system-space-view`: "Picking survives camera
-      movement", "A point-in-space click resolves correctly after camera
+      point-in-space click and a beyond-pick-radius click that still clears
+      the selection (`system-space-view`: "Picking survives camera movement",
+      "A point-in-space click resolves correctly after camera movement", "A
+      click beyond the pick radius still clears the selection after camera
       movement")
-- [ ] 5.4 Touch pinch-zoom, single-finger orbit, and the stationary-tap
-      selection path with its threshold (`system-space-view`: "Space View
-      Camera Touch Pinch-Zoom")
-- [ ] 5.5 Keyboard-operable camera: arrow-key orbit, dedicated zoom keys, tab
-      order before body and gate hit targets, off-screen-focus reframing, and
-      a distinguishable at-limit state (`system-space-view`: "Space View
-      Camera Is Keyboard-Operable")
+- [ ] 5.4 Touch pinch-zoom keeping the pan target fixed on screen (never
+      anchoring on the pinch midpoint), single-finger orbit, and the
+      stationary-tap selection path with its threshold pinned at **exactly**
+      8 CSS pixels resolving as an orbit — both boundaries were live in
+      `board-view` and thinned out of the port (`system-space-view`: "Space
+      View Camera Touch Pinch-Zoom", "Pinch zoom keeps the centred point fixed
+      on screen", "Movement exactly at the tap threshold resolves as an
+      orbit")
+- [ ] 5.5 Keyboard-operable camera: arrow-key orbit, **a dedicated pan input
+      distinct from the orbit input**, dedicated zoom keys, tab order before
+      body and gate hit targets, off-screen-focus reframing, and a
+      distinguishable at-limit state on all three axes. Keyboard pan is not
+      optional: two requirements cite a "keyboard-operable orbit/pan/zoom
+      affordance", and the point-selection control reads the camera's pan
+      target — with no keyboard pan that target is the star at default
+      framing, the one point every burn solve rejects by the
+      endpoint-clearance guard (`system-space-view`: "Space View Camera Is
+      Keyboard-Operable", "Pan keys translate the camera's target", "A
+      keyboard-only player can pan to a point away from the star", "Keyboard
+      input at a clamp is distinguishable from no input")
 - [ ] 5.6 Manual recenter, keyboard-reachable, a no-op at default framing
       (`system-space-view`: "Space View Camera Manual Recenter")
 - [ ] 5.7 Camera controls unrendered and non-intercepting while the canvas is
@@ -260,8 +348,10 @@
 - [ ] 6.3 Disable or hide canvas-only controls, and suppress the
       select-a-target prompt, while the canvas is unavailable
       (`system-space-view`: "A canvas-only control is disabled while the
-      canvas is unavailable", "Burn and departure verbs are unreachable
-      without the canvas")
+      canvas is unavailable", "Burn target selection is unreachable without
+      the canvas") — and confirm jump stays invokable in this state, since its
+      lane comes from the acting fleet's own attachment, not from a canvas
+      selection
 - [ ] 6.4 Error-state precedence: unsupported state independent of the data
       reads, a failed interior read taking precedence in the canvas region
       with the panel still usable, and a failed own-fleets read not
@@ -313,18 +403,27 @@
       client at all, so this change is the only thing that can give them one
       (design.md Decision 14)
 - [ ] 7.10 Station-keeping hold/release control offered by effective park mode,
-      committing instantly via `/hold` and `/release`, with the zero-fuel
-      rejection toasted (`docked-fleet-actions`: "Station-Keeping Hold and
+      committing instantly via `/hold` and `/release`, with the
+      **at-or-below-reserve** rejection toasted. Map that reason to copy
+      naming the reserve as the boundary, never "no fuel":
+      `add-stationkeep-hold-verb` rejects at or below
+      `FuelParams.StationKeepReserveTons`, so a fleet holding 0.4 t against a
+      1 t reserve hits it (`docked-fleet-actions`: "Station-Keeping Hold and
       Release Controls", "Holding an orbiting fleet submits hold and the panel
       reflects station-keep", "Releasing a station-keeping fleet submits
       release and the panel reflects orbit", "No control is offered while
-      burning, drifting, or point-parked", "A zero-fuel hold is rejected and
-      toasted, not silently accepted")
-- [ ] 7.11 Drain readout taken **only** from the fleet read's served
+      burning, drifting, or point-parked", "A hold at or below the reserve is
+      rejected and toasted, not silently accepted")
+- [ ] 7.11 Upkeep readout taken **only** from the fleet read's served
       upkeep-rate field, with no client-side derivation from a body's radius,
-      period, or orbital elements anywhere in the view
-      (`docked-fleet-actions`: "The drain readout shows the served upkeep rate
-      while holding", "The drain readout is never derived from orbital
+      period, or orbital elements anywhere in the view — rendered on **both**
+      park modes the field is served for: as the live drain while
+      `stationkeep`, and on the "Hold here" control while `orbit`, as what
+      holding would cost. Serving the orbit-park rate and rendering only the
+      hold case is the built-and-never-called pattern this chain has already
+      recorded five times (`docked-fleet-actions`: "The drain readout shows
+      the served upkeep rate while holding", "The Hold control prices the hold
+      before it is taken", "The drain readout is never derived from orbital
       elements")
 - [ ] 7.12 No client-side prediction of the dry-instant force-demotion; the
       panel changes only when a refetch lands it (`docked-fleet-actions`:
@@ -361,14 +460,15 @@
 - [ ] 8.4 Migrate the refuel commit's hand-rolled `useRef` guard onto the
       shared hook, with its existing scenarios as the regression
       (`docked-fleet-actions`: "Refuel Control Guards Against Double-Submit")
-- [ ] 8.5 Playwright scenarios for sell, mine, and burn that fire two
+- [ ] 8.5 Playwright scenarios for sell, mine, refuel, and burn that fire two
       activations with **no `await` between them**, asserting exactly one
       request and one operation key leaves the client. A unit test whose
       harness holds the mutation promise open cannot observe this failure —
       `hooks/use-refuel.test.tsx` passes against the broken code — so these
       SHALL be browser-level and SHALL NOT be substituted with unit tests
       (`docked-fleet-actions`: "Two activations in one tick submit one sale
-      and mint one key", "Two activations in one tick submit one mine run";
+      and mint one key", "Two activations in one tick submit one mine run",
+      "Two activations in one tick submit one refuel and mint one key";
       `system-space-view`: "Two activations in one tick submit one burn
       order")
 
@@ -386,10 +486,15 @@ scale **present**, and `serve-orbital-elements-and-burn-preview` delivers all
 four additively. This is an ordering change only: there is still no flag, no
 dual path, and no coexistence in what ships (design.md Decision 11).
 
-- [ ] 9.1 Drop `Footprint`, `Orbit` (the lattice object), `ParentId`, `Fixed`,
-      `Band`, `Live`, and `AsOf` from `system.fogFeatureDTO`, and `Cell` from
-      `system.LaneGate`, leaving a feature body's `id`, `type`, `resources`,
-      `effects`, `space`, `size` and `orbitElements`, and a lane-gate body's
+- [ ] 9.1 Drop the lattice `Radius` from `system.interiorDTO` — the continuous
+      `extent` the sibling change added is its successor, and leaving both
+      would let a consumer keep scaling continuous space off the lattice
+      number — and drop `Footprint`, `Orbit` (the lattice object), `ParentId`,
+      `Fixed`, `Band`, `Live`, and `AsOf` from `system.fogFeatureDTO`, and
+      `Cell` from `system.LaneGate`, leaving a response carrying `systemId`,
+      `extent`, `character`, `starClass`, `worldTime`, `scale`, `features`,
+      `laneGates` and `contacts`; a feature body's `id`, `type`, `resources`,
+      `effects`, `space`, `size` and `orbitElements`; and a lane-gate body's
       `destSystemId`, `laneId`, `space`, `size` and `orbitElements`. (An
       earlier draft also listed `ownerCorpId` as surviving; it is on the
       `system.Feature` domain model, never on `fogFeatureDTO`, so there is
@@ -410,8 +515,9 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       read carries its full orbital element set", "A lane-gate body's read
       carries its full orbital element set", "The star carries no orbital
       element set", "A body served without a resolvable continuous position
-      is still element-complete", "The read carries the world clock's scale
-      alongside its world time")
+      is still element-complete", "The read carries the interior's continuous
+      extent", "The read carries the world clock's scale alongside its world
+      time")
 - [ ] 9.4 `grep` `backend/` for every remaining production reader of the
       dropped fields and remove or repoint it before deleting the
       serialization; re-record the interior-read fixtures and handler tests
@@ -514,6 +620,19 @@ archiver that must be rehearsed.
       "Pre-existing wire fields are unchanged" gone from the file — the
       retirement and re-add landed, rather than a MODIFIED block having
       silently shed it
+- [ ] 12.1b Re-run the **re-ADD audit** mechanically against the live
+      `openspec/specs/board-view/spec.md` before archiving: for every
+      requirement this change re-ADDs under `system-space-view` or
+      `docked-fleet-actions`, diff the requirement body and the scenario list
+      against its `board-view` original, and account for every clause and
+      every scenario title that is absent — restored, merged, redistributed,
+      or deliberately dropped with a stated reason. This audit has been run
+      once (its findings are recorded in the proposal's `board-view`
+      retirement bullet), and it must be re-run if any re-ADDed requirement
+      is edited, because the archiver's MODIFIED-block scenario check does
+      **not** see a re-ADD under a new capability and neither does
+      `openspec-reconcile.py`. This structure is exactly what removes that
+      protection, so the audit is the only thing standing in for it
 - [ ] 12.2 In the same rehearsal copy, delete `openspec/specs/board-view/` and
       `grep` every surviving spec for the literal `board-view`; there SHALL be
       no remaining citation. `--strict` does not catch a dangling

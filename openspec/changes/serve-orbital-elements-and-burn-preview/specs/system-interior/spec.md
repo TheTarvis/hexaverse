@@ -39,6 +39,19 @@ world time between reads projects at the world's real rate rather than at an
 assumed one. The scale SHALL be the scale of the same clock the response's
 `worldTime` was read from.
 
+This response SHALL additionally carry the interior's continuous **`extent`**
+— the star-frame upper bound over every generated body's orbital radius,
+already generated and persisted on the interior document ("Interiors Emit
+Continuous Orbital Elements For Every Body") and already resolved on the
+system's body table, serialized here rather than held server-side only. One
+float, purely additive. It is served because a client that must scale a
+camera, clamp a pan bound, or bound a pick radius to this system otherwise
+has exactly one system-sized number on this wire — the **lattice** `radius`
+— and would scale continuous space off a lattice-derived field. The
+`extent` is the continuous quantity that survives the lattice's removal;
+the `radius` is not. Serving it is what makes a consumer's later
+independence from `radius` a pure deletion rather than a re-derivation.
+
 The star SHALL carry no `orbitElements` (it is parentless and positioned at
 the origin). Every other body reaching this response carries a complete
 element set by construction — a body whose stored element set is missing or
@@ -94,6 +107,13 @@ Its Incompleteness Is Loud") — so there is no partially-populated
 - **WHEN** an authenticated requester reads a materialized system's
   interior
 - **THEN** the star's response entry carries no `orbitElements` key
+
+#### Scenario: The read carries the interior's continuous extent
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** the response carries a continuous `extent` equal to the value
+  that interior's stored document holds, alongside — and distinct from —
+  the lattice `radius` it already serves
 
 #### Scenario: The read carries the world clock's scale alongside its world time
 - **WHEN** an authenticated requester reads a materialized system's

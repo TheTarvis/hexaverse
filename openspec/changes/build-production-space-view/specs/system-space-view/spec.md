@@ -237,7 +237,7 @@ default position.
 - **THEN** it is omitted from the rendered scene rather than drawn at a
   stale or default position
 
-### Requirement: Foreign Contacts Render at Their Live Position
+### Requirement: Foreign Contacts Render at Their Served Position
 The system SHALL render every entry in the interior read's `contacts` array
 (`system-interior`'s *Foreign Presence Is Served As System Contacts*) at
 its served position, visually distinguishing an emitting contact and a
@@ -245,9 +245,31 @@ scanning contact from a quiet one, and carrying no owner identity or fleet
 id in its rendering — the wire's own anonymity. An empty or absent
 `contacts` array SHALL render no foreign presence.
 
+A contact SHALL be drawn **frozen at its served position** between reads and
+SHALL NOT be integrated forward from its served `velocity`. The served
+velocity SHALL instead be **displayed**, as a heading-and-speed readout on
+the selected or hovered contact's facts surface, so the field has exactly
+one named consumer and is not served-and-unread. Integrating it would place
+a contact's drawn position at a point the server never disclosed — a
+disclosure decision made client-side, and the one thing this capability's
+served-position rule exists to prevent; a contact is a momentary disclosure,
+not a tracked object with a trajectory (`sighting-records` is the surface
+that freezes a trajectory, and it freezes it explicitly).
+
 #### Scenario: A disclosed contact renders at its served position
 - **WHEN** the interior read's `contacts` array carries an entry
 - **THEN** the view renders it at that entry's served position
+
+#### Scenario: A contact does not drift between reads
+- **WHEN** world time advances between two interior reads while a contact is
+  rendered
+- **THEN** the contact's drawn position is unchanged from its served
+  position, and no client-side integration of its served `velocity` moves it
+
+#### Scenario: A contact's served velocity is displayed, not integrated
+- **WHEN** a rendered contact is selected or hovered
+- **THEN** its served `velocity` is displayed as a heading-and-speed
+  readout, and that readout is the field's only consumer
 
 #### Scenario: An emitting or scanning contact is visually distinguished
 - **WHEN** a rendered contact carries `emitting: true` or `scanning: true`
@@ -323,10 +345,19 @@ requested while the acting fleet's movement channel is claimed by a running
 mine, or while it is in lane transit, since a commit would be refused in both
 cases.
 
-The preview SHALL refresh from a fresh server solve at a bounded interval
-while it remains shown and the selection is uncommitted, so it does not drift
-stale against a moving target or a changing fuel balance, and SHALL clear when
-the selection is cleared or replaced, or when an order commits.
+The preview SHALL refresh from a fresh server solve on a **single named
+client-side interval constant, defined in exactly one place**, while it
+remains shown and the selection is uncommitted, so it does not drift stale
+against a moving target or a changing fuel balance; and SHALL clear when
+the selection is cleared or replaced, or when an order commits. Exactly one
+fresh preview request SHALL be sent per elapsed interval while a preview is
+shown, and none between — the endpoint is not free (it reads the body
+table, may write an arrival settlement, and runs an N-solve stranding scan,
+N bounded by the destination system's body count, per acting fleet per
+player), so an unbounded or ad-hoc cadence is a real server cost, and a
+refresh rate scattered across call sites is one no reviewer can price. The
+constant's **value** is an open question recorded in design.md (OQ-14), not
+fixed here.
 
 #### Scenario: Selecting a target shows a preview curve and its figures
 - **WHEN** a body, lane-gate body, or point becomes the selection and a
@@ -344,10 +375,18 @@ the selection is cleared or replaced, or when an order commits.
 - **WHEN** the current selection is cleared or replaced
 - **THEN** the previously shown preview is removed
 
-#### Scenario: The preview refreshes periodically while shown
-- **WHEN** a preview remains shown against an uncommitted selection
-- **THEN** a fresh preview request is sent at a bounded interval, and the
-  rendered curve and figures update to the newest response
+#### Scenario: The preview refreshes on exactly one named interval while shown
+- **WHEN** a preview remains shown against an uncommitted selection across
+  several elapsed refresh intervals
+- **THEN** exactly one fresh preview request is sent per elapsed interval
+  and none is sent between them, the interval being the single named
+  client-side constant
+- **AND** the rendered curve and figures update to the newest response
+
+#### Scenario: The refresh interval is defined in exactly one place
+- **WHEN** the view's preview-refresh scheduling is inspected
+- **THEN** every refresh reads one named constant defined in a single
+  module, with no second literal or per-call-site cadence
 
 #### Scenario: An unaffordable preview is shown as such
 - **WHEN** a preview response reports the target unaffordable at the
@@ -591,7 +630,10 @@ instruction, and its drawn mark SHALL continue to show the selected state.
   inspected
 - **THEN** no lane-gate-specific or point-specific selection kind and no
   kind-aware command branch exists — a selected gate or point reaches the
-  order mutation through the identical code path a selected planet does
+  order mutation through the identical code path a selected planet does — a
+  kind-aware lookup used only to present a selected gate's destination
+  system and its drawn mark is not such a branch, since this same
+  requirement mandates that presentation
 
 ### Requirement: Jump Commit
 The system SHALL, when the jump command is invoked for a fleet attached to
@@ -787,7 +829,9 @@ the fleet's own attachment (*Jump Commit*). A control in the surrounding panels 
 unavailable canvas SHALL be disabled or hidden while the unsupported or
 interrupted state is shown, rather than presented as operable. This view's
 selection prompt SHALL NOT instruct the player to select a body, gate, or
-point while no canvas exists to select one on.
+point while no canvas exists to select one on — a statement about **burn
+target selection** only, not about departure: jump stays invokable in this
+state, as the paragraph above and *Jump Commit* both require.
 
 An error thrown while constructing, listening to, or retrying this view's
 rendering context SHALL be contained to the view's canvas region: caught by
@@ -835,13 +879,16 @@ own-fleets data reads.
 - **THEN** a control whose only effect is on the canvas is disabled or
   hidden, not presented as operable
 
-#### Scenario: Burn and departure verbs are unreachable without the canvas
+#### Scenario: Burn target selection is unreachable without the canvas
 - **WHEN** the view's canvas region shows the unsupported or interrupted
   state AND no target is already selected
 - **THEN** this view's selection prompt SHALL NOT instruct the player to
   select a body, gate, or point
-- **AND** this view indicates that choosing a burn or departure target
-  requires the canvas to be available
+- **AND** this view indicates that choosing a burn target requires the
+  canvas to be available
+- **AND** jump remains invokable, since its lane comes from the acting
+  fleet's own attachment rather than from a canvas selection
+  (*Jump Commit*)
 
 #### Scenario: The unsupported state is independent of the interior data read
 - **WHEN** the system interior and own-fleets reads succeed but the
@@ -1048,7 +1095,12 @@ keyboard-only player can reach two of this view's three selection kinds, and
 the third — the one that makes `space-kinematics`'s point target reachable
 from any UI at all — would be pointer-only. The control SHALL be in the same
 tab order as the hit targets, SHALL show a focus indicator, and SHALL produce
-a selection indistinguishable from one made by clicking that same point.
+a selection indistinguishable from one made by clicking that same point. The
+pan target the control reads SHALL be reachable from the keyboard alone
+(*Space View Camera Is Keyboard-Operable*'s pan input): at default framing
+that target is the star, which every burn solve rejects by the
+endpoint-clearance guard, so a control fed by a pan target the keyboard
+cannot move is a control that can only ever produce an illegal target.
 
 #### Scenario: Tab reaches hit targets in the defined order
 - **WHEN** a user tabs through the space view's interactive surface
@@ -1099,19 +1151,26 @@ selection state continues to render accurately.
 ### Requirement: Space View Camera Orbit, Pan, and Zoom
 The space view's *default framing* — the framing this capability resets
 and recenters to — is a configured framing centred on the system's star,
-presented on first render before any camera input. The specific default
-distance, viewing angle, and pan bound are configured values chosen by
-playtesting against a real system's scale, not fixed by this requirement;
-what this requirement fixes is that they are single configured values, that
-they are applied before any camera input, and that reset and recenter both
-return to them. The system SHALL let the player orbit the camera around its current
+presented on first render before any camera input. The default distance,
+the zoom range, and the pan bound SHALL each be expressed as a multiple of
+the interior read's served continuous `extent` (`system-interior`'s
+*Interior Read Serves Continuous Bodies*), never as an absolute scene
+constant and never derived from any lattice-derived wire field, so one set
+of multipliers frames a compact system and a sprawling one alike. The
+multipliers themselves, and the default viewing angle, are configured values
+chosen by playtesting against a real system's scale, not fixed by this
+requirement; what this requirement fixes is that they are single configured
+values, that they scale off the served `extent`, that they are applied
+before any camera input, and that reset and recenter both return to them. The system SHALL let the player orbit the camera around its current
 pan target via a primary-button pointer drag (changing viewing angle
 without translating the target), pan the camera's target via a
 secondary-button pointer drag, and zoom via a wheel gesture — dollying the
 camera toward or away from its current pan target along the view
 direction, so that target's on-screen position is unchanged by the zoom —
-all clamped to a configured zoom range and a configured pan bound around
-the system. For the purposes of *Space View Picking Resolves to the Body,
+all clamped to the configured zoom range and to a pan bound that confines
+the camera's pan target to a configured multiple of the served `extent`
+around the system's star, so the view's centre is always over the system
+rather than the system being pushed entirely off screen. For the purposes of *Space View Picking Resolves to the Body,
 Lane Gate, or Point Under the Pointer*, a pointer sequence whose movement
 between press and release stays under **8 CSS pixels** SHALL resolve as a
 click and SHALL NOT be treated as an orbit or pan; a pointer sequence whose
@@ -1160,6 +1219,21 @@ that point.
   or maximum
 - **THEN** the effective zoom stops at that bound and does not move further
 
+#### Scenario: Pan clamps at the configured bound
+- **WHEN** the camera's pan target is driven repeatedly in one direction,
+  by secondary-button drag or by keyboard pan, past the configured bound
+- **THEN** panning stops with the pan target confined to the configured
+  multiple of the served `extent` around the star, so the view's centre
+  remains over the system rather than the system being pushed entirely off
+  screen
+
+#### Scenario: The framing scales with the system's served extent
+- **WHEN** the view opens for a system whose served `extent` differs from
+  another system's
+- **THEN** the default camera distance, the zoom clamps, and the pan bound
+  are each that system's own `extent` times the same configured multiplier
+  — no absolute scene constant and no lattice-derived field takes part
+
 #### Scenario: A sub-threshold pointer press-release still resolves as a click
 - **WHEN** a pointer press-release over a mark moves less than 8 CSS
   pixels between press and release
@@ -1205,7 +1279,9 @@ that point.
 ### Requirement: Space View Camera Touch Pinch-Zoom
 The system SHALL let the player zoom the space view's camera with a
 two-finger pinch gesture on a touch-capable device, clamped to the same
-configured zoom range as wheel zoom. A single-finger touch drag SHALL
+configured zoom range as wheel zoom. A pinch gesture SHALL keep the camera's
+current pan target fixed at the same screen position, identically to wheel
+zoom, rather than anchoring on the pinch midpoint. A single-finger touch drag SHALL
 orbit the camera, using the same behavior as a primary-button pointer
 drag. A single-finger touch that begins and ends staying under the same
 **8 CSS pixel** movement threshold defined in *Space View Camera Orbit,
@@ -1221,6 +1297,12 @@ tap within that threshold from producing a selection.
   on the space view
 - **THEN** the camera dollies toward (outward) or away from (inward) its
   pan target accordingly
+
+#### Scenario: Pinch zoom keeps the centred point fixed on screen
+- **WHEN** a two-finger pinch gesture changes the camera's distance from
+  its pan target
+- **THEN** that pan target's on-screen position is unchanged by the zoom,
+  rather than the view re-centring on the pinch midpoint
 
 #### Scenario: Pinch zoom respects the same clamp as wheel zoom
 - **WHEN** a pinch gesture continues zooming past the configured minimum or
@@ -1240,30 +1322,53 @@ tap within that threshold from producing a selection.
   entity under it the same as a pointer click, and the camera does not move
 
 #### Scenario: A single-finger touch that moves past the tap threshold orbits
-- **WHEN** a single-finger touch moves beyond the tap threshold before
-  release
+- **WHEN** a single-finger touch moves 8 or more CSS pixels between
+  touchstart and touchend
 - **THEN** the camera orbits by the moved distance and no selection change
   occurs on release
 
+#### Scenario: Movement exactly at the tap threshold resolves as an orbit
+- **WHEN** a single-finger touch moves exactly 8 CSS pixels between
+  touchstart and touchend
+- **THEN** the touch resolves as an orbit gesture, not a selection — the
+  threshold is inclusive on the gesture side, matching the pointer twin's
+  "8 or more CSS pixels"
+- **AND** a touch moving 9 CSS pixels also resolves as an orbit gesture
+
 ### Requirement: Space View Camera Is Keyboard-Operable
-The system SHALL let the player orbit and zoom the space view's camera
-from the keyboard, without requiring a pointer or touch input: arrow-key
-input SHALL orbit the camera by a configured increment per key press, and
-dedicated zoom-in/zoom-out key input SHALL zoom the camera by a configured
-increment per key press, both respecting the same clamps as pointer and
-touch input. The space view's keyboard-operable camera controls, together
+The system SHALL let the player orbit, **pan**, and zoom the space view's
+camera from the keyboard, without requiring a pointer or touch input:
+arrow-key input SHALL orbit the camera by a configured increment per key
+press; a dedicated pan input, distinct from the orbit input and reachable
+without a pointer, SHALL translate the camera's pan target by a configured
+increment per key press in the corresponding direction; and dedicated
+zoom-in/zoom-out key input SHALL zoom the camera by a configured increment
+per key press — all three respecting the same clamps as pointer and touch
+input.
+
+Keyboard pan is load-bearing, not polish. Two requirements of this
+capability name a "keyboard-operable orbit/pan/zoom affordance" as an
+existing thing (*Space View Camera Orbit, Pan, and Zoom* and *Camera
+Controls Are Inert While the Space View Is Unavailable*), and *Body,
+Lane-Gate, and Point Selection Is Keyboard-Operable*'s point-selection
+control selects the point at the camera's **current pan target**. Without a
+keyboard pan that target is the star at default framing for every
+keyboard-only player, and the star is the one point `space.BuildCurve`'s
+endpoint-clearance guard always rejects — so that accessibility requirement
+would be satisfiable while shipping a control whose every activation
+produces an illegal burn target. The space view's keyboard-operable camera controls, together
 with the recenter control, SHALL occupy the view's tab order before the
-body and lane-gate hit targets, leaving the group order *Body and Lane-Gate
+body and lane-gate hit targets, leaving the group order *Body, Lane-Gate, and Point
 Selection Is Keyboard-Operable* defines intact; they SHALL be reachable via
 the view's normal tab order, and SHALL be distinguishable by a visible
 focus indicator while focused. WHEN keyboard focus moves, via Tab, to a
 body or lane-gate hit target that lies outside the camera's current
 framing, the camera SHALL reframe by the minimum adjustment that brings
 that hit target's focus indicator fully within the visible viewport,
-immediately and with no animated or eased transition. WHEN arrow-key orbit
-or zoom-key input is given while the camera is already at the orbit or
-zoom clamp in the direction of that input, the camera control SHALL expose
-an at-limit state in the DOM (an attribute or a status message conveyed to
+immediately and with no animated or eased transition. WHEN orbit, pan,
+or zoom key input is given while the camera is already at the orbit, pan,
+or zoom clamp in the direction of that input, the camera control SHALL
+expose an at-limit state in the DOM (an attribute or a status message conveyed to
 assistive technology) that is absent when the same input is given away
 from the clamp.
 
@@ -1272,6 +1377,21 @@ from the clamp.
   have keyboard focus
 - **THEN** the camera orbits by one configured increment in the
   corresponding direction, respecting the same clamp as pointer drag
+
+#### Scenario: Pan keys translate the camera's target
+- **WHEN** the dedicated pan input is given while the space view's camera
+  controls have keyboard focus
+- **THEN** the camera's pan target translates by one configured increment
+  in the corresponding direction, respecting the same pan bound as a
+  secondary-button drag, and the viewing angle is unchanged
+
+#### Scenario: A keyboard-only player can pan to a point away from the star
+- **GIVEN** the view at its default framing, whose pan target is the star
+- **WHEN** a keyboard-only player gives the pan input and then activates the
+  point-selection control
+- **THEN** the selected point is the panned-to point, away from the star,
+  and a burn commit against it is not rejected by the star's
+  endpoint-clearance guard on account of the framing alone
 
 #### Scenario: Zoom keys zoom the camera
 - **WHEN** zoom-in or zoom-out key input is given while the space view's
@@ -1293,8 +1413,8 @@ from the clamp.
   immediately and with no animated or eased transition
 
 #### Scenario: Keyboard input at a clamp is distinguishable from no input
-- **WHEN** arrow-key orbit or zoom-key input is given while the camera is
-  already at a clamp, in the direction of that clamp
+- **WHEN** orbit, pan, or zoom key input is given while the camera is
+  already at the corresponding clamp, in the direction of that clamp
 - **THEN** the camera control exposes an at-limit state in the DOM (an
   attribute or a status message conveyed to assistive technology) that is
   absent when the same input is given away from the clamp
@@ -1345,9 +1465,16 @@ camera control at the moment that state appears, focus SHALL move as
 The system SHALL resolve a click on the space view to the entity drawn
 under the pointer: a click within a body's or a lane gate's drawn mark
 SHALL select that entity; a click that resolves against the scene's pick
-plane at a point over no such mark SHALL select that point; and a click
+plane at a point over no such mark SHALL select that point, **and that
+point SHALL be visibly marked as selected in the scene**; and a click
 that resolves to no point at all (misses the pick plane, or lies beyond
-the configured maximum pick radius) SHALL clear the selection. Hit targets
+the maximum pick radius — itself a configured multiple of the interior
+read's served continuous `extent`, never an absolute constant and never a
+lattice-derived field) SHALL clear the selection. A point in vacuum,
+unlike a body, has no mark of its own to highlight and no intrinsic
+outline, so without an explicit marker a point selection is invisible: the
+player has committed to a burn target they cannot see, and every scenario
+of this capability would still pass. Hit targets
 SHALL be positioned at the marks actually drawn, sized generously around
 each body's drawn radius. WHEN two or more marks' hit targets contain the
 clicked point, the topmost drawn mark SHALL win, using the view's
@@ -1367,6 +1494,13 @@ above a belt's decorative field).
   plane and is not over a body or lane-gate mark
 - **THEN** that point becomes the selection
 
+#### Scenario: A selected point in empty space is visibly marked
+- **WHEN** a point in empty space (not a body or lane-gate mark) becomes
+  the selection
+- **THEN** that point is visibly marked as selected in the scene, at the
+  position it was picked at, rather than being held only in state with no
+  rendered indication
+
 #### Scenario: An overlapping child mark wins over its parent
 - **WHEN** the pointer clicks a point where a moon's hit target and its
   parent planet's hit target overlap
@@ -1375,8 +1509,15 @@ above a belt's decorative field).
 
 #### Scenario: A click resolving to no point clears the selection
 - **WHEN** the pointer clicks a point that misses the pick plane, or lies
-  beyond the configured maximum pick radius
+  beyond the maximum pick radius
 - **THEN** the selection becomes empty
+
+#### Scenario: A click beyond the pick radius still clears the selection after camera movement
+- **WHEN** the camera has been orbited, panned, and/or zoomed away from its
+  default framing and a point beyond the maximum pick radius is then
+  clicked
+- **THEN** the selection becomes empty, exactly as it would at the view's
+  default framing
 
 ### Requirement: Off-Screen Bodies and Lane Gates Are Reachable by Pointer and Touch
 The system SHALL offer an on-screen affordance, operable by pointer and by

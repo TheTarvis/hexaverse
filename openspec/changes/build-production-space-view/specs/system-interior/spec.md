@@ -19,11 +19,15 @@ lattice fields' own removal is the change this retirement exists to express.
 
 ### Requirement: Interior Read Serves Continuous Bodies
 The system SHALL serve `GET /v1/systems/:systemId`, returning the system's
-radius, character, star class, current world time, every body (including
-each lane-gate body, unfiltered by any charted-knowledge gate — see "Bodies
-Are Public; Ships Are Disclosed"), and a `contacts` array reflecting the
-requester's own live disclosure of foreign ship presence in that system
-(see "Foreign Presence Is Served As System Contacts").
+continuous `extent` — the star-frame upper bound over every generated body's
+orbital radius — its character, star class, current world time, every body
+(including each lane-gate body, unfiltered by any charted-knowledge gate —
+see "Bodies Are Public; Ships Are Disclosed"), and a `contacts` array
+reflecting the requester's own live disclosure of foreign ship presence in
+that system (see "Foreign Presence Is Served As System Contacts"). The
+`extent` is this response's only system-sized scalar: it is what a client
+scales a camera, a pan bound, and a pick radius against, and it replaces the
+lattice `radius` this requirement's predecessor served.
 
 Every non-star body, and every lane-gate body, SHALL carry its continuous
 orbital element set under the wire key `orbitElements`, an object carrying
@@ -46,11 +50,15 @@ extrapolating live world time between reads projects at the world's own rate
 rather than at an assumed rate of 1.
 
 This response SHALL NOT carry any polar-lattice placement field. Specifically,
-a body SHALL carry no `footprint`, no `orbit` object (the lattice orbit
-`{ring, angle0, period, dir}`), no `parentId` at the top level of the body (the
-continuous parent is `orbitElements.parentId`), no `fixed` flag, no `band`
-value, no `live` value, and no `asOf` stamp; and a lane-gate body SHALL carry
-no `cell`. These fields described a position on the polar ring-and-slot board
+the response SHALL carry no top-level lattice `radius` (the continuous
+`extent` above is its successor, and the two are different quantities in
+different units — serving both would leave a consumer free to scale
+continuous space off the lattice one); a body SHALL carry no `footprint`, no
+`orbit` object (the lattice orbit `{ring, angle0, period, dir}`), no
+`parentId` at the top level of the body (the continuous parent is
+`orbitElements.parentId`), no `fixed` flag, no `band` value, no `live` value,
+and no `asOf` stamp; and a lane-gate body SHALL carry no `cell`. These fields
+described a position on the polar ring-and-slot board
 and a visibility banding that no longer exists — `band` has been constant
 `"visible"`, `live` constant `true`, and `asOf` constant absent since bodies
 became public — and this capability's continuous-space consumer reads none of
@@ -98,6 +106,12 @@ with them.
   interior
 - **THEN** the star's response entry carries no `orbitElements` key
 
+#### Scenario: The read carries the interior's continuous extent
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** the response carries a continuous `extent` equal to the value
+  that interior's stored document holds
+
 #### Scenario: The read carries the world clock's scale alongside its world time
 - **WHEN** an authenticated requester reads a materialized system's
   interior on a world whose simulation clock runs at a scale other than 1
@@ -116,5 +130,6 @@ with them.
 #### Scenario: Lattice-only fields are absent from the response
 - **WHEN** an authenticated requester reads a materialized system's
   interior
-- **THEN** no body carries `footprint`, `orbit`, a top-level `parentId`,
-  `fixed`, `band`, `live`, or `asOf`, and no lane-gate body carries `cell`
+- **THEN** the response carries no top-level lattice `radius`, no body
+  carries `footprint`, `orbit`, a top-level `parentId`, `fixed`, `band`,
+  `live`, or `asOf`, and no lane-gate body carries `cell`

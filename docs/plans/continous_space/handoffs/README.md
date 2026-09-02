@@ -114,3 +114,40 @@ validator error that does not reproduce. The conclusion was right and the mechan
 invented. Both halves are worth remembering: a confident empirical claim from a
 specialist is still a claim, and the fix it proposes can be correct even when its
 reasoning is not.
+
+## Lesson four — retiring a capability trades a hard gate for a manual one
+
+To make `build-production-space-view` archivable, its `system-interior` block was
+restructured from `MODIFIED` to `REMOVED` + `ADDED`. That was the right fix — the archiver
+refuses a MODIFIED block that omits a live scenario — but it has a cost nobody stated at
+the time:
+
+**The archiver's scenario check only protects MODIFIED blocks.** A requirement re-ADDed
+under a *new* capability is invisible to it, and `.claude/scripts/openspec-reconcile.py`
+inherits the same blind spot. So the moment a capability is retired and its requirements
+re-expressed elsewhere, the guarantee that nothing is silently dropped stops being
+mechanical and becomes a promise in a proposal.
+
+The promise did not hold. A mechanical diff of all 31 requirements 8a-2 re-ADDs from
+retired `board-view`, against their live originals, found **six** load-bearing losses:
+
+- a selected point's visible mark (found by review; a point in vacuum, unlike a lattice
+  cell, has no intrinsic outline, so an implementer could ship an invisible selection and
+  satisfy every scenario)
+- the camera's pan clamp — a SHALL whose only scenario was dropped
+- keyboard pan entirely, while two other requirements still cited an "orbit/pan/zoom"
+  affordance, and the keyboard point-selection control reads the pan target
+- pinch zoom keeping the centred point fixed
+- the tap/pan threshold's exactly-at-boundary case
+- **a carve-out no reviewer flagged**: `board-view`'s "a gate-aware lookup used only to
+  present a selected gate's facts is not a kind-specific branch". Without it the re-ADDed
+  requirement forbids what the same requirement mandates.
+
+Five of the six were found by adversarial review; the sixth only by the diff.
+
+**The rule:** whenever a capability is retired and re-expressed, diff every re-ADDed
+requirement's body and scenario list against its live original, mechanically, and re-run
+that diff before archive whenever a re-ADDed requirement is edited. `--strict` passing,
+`reconcile` passing, and an archive rehearsal succeeding all remain true while substance
+is quietly missing. **Link 9 (`delete-the-lattice`) retires capabilities too — this
+applies there.**

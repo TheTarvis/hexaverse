@@ -223,7 +223,18 @@ new intent, never a retry of the old one).
 ### Requirement: Sell Control Guards Against Double-Submit
 The sell control SHALL be disabled from the moment of commit until the
 request settles or fails, so a double-click or repeated-Enter cannot
-submit two sales. Exactly one operation key SHALL be generated per
+submit two sales. The guard SHALL take effect synchronously, within the
+same invocation that submits the request — **before any operation key is
+minted** — and SHALL NOT depend on a state flip that only reaches the
+control's `disabled` attribute on a later render: two activations a tick
+apart both reach the handler before any re-render, so a render-dependent
+guard does not exist at the moment it is needed, and a second activation
+that mints its own key defeats server-side idempotency-by-key structurally
+rather than merely racing it. This sentence is added because the weaker
+form was not enough: `commitSell` was written against "disabled from the
+moment of commit" and read `disabled={!committable}` as satisfying it,
+which is exactly how the confirmed double-charge defect shipped. Exactly
+one operation key SHALL be generated per
 user-initiated sell attempt; that same key SHALL be reused across
 transport-level retries of that one attempt (so a network retry dedups
 against the original), while a freshly initiated or re-priced sell attempt
@@ -337,7 +348,11 @@ its commit.
 The refuel control SHALL be disabled from the moment of commit until the
 request settles or fails, so a double-click or repeated-Enter cannot
 submit two refuels — mirroring the sell control's identical guard for the
-game's second credit-mutating route. Exactly one operation key SHALL be
+game's second credit-mutating route. The guard SHALL take effect
+synchronously, within the same invocation that submits the request —
+**before any operation key is minted** — and SHALL NOT depend on a state
+flip that only reaches the control's `disabled` attribute on a later
+render. Exactly one operation key SHALL be
 generated per user-initiated refuel attempt; that same key SHALL be reused
 across transport-level retries of that one attempt (so a network retry
 dedups against the original, per `fuel-purchase`'s "Idempotent By
@@ -362,6 +377,16 @@ global constant that never moves.
 - **THEN** the new attempt generates a new operation key, distinct from the
   completed refuel's key
 
+#### Scenario: Two activations in one tick submit one refuel and mint one key
+- **GIVEN** the refuel control is rendered enabled and committable
+- **WHEN** two activations reach the refuel handler within the same tick,
+  with no render cycle and no awaited step between them
+- **THEN** exactly one refuel request leaves the client, carrying exactly
+  one operation key
+- **AND** the second activation mints no operation key and issues no request
+- **AND** the guard holds even though the control's `disabled` attribute has
+  not yet been updated by a render
+
 ### Requirement: Station-Keeping Hold and Release Controls
 The system SHALL offer a station-keeping control on the acting fleet's
 panel section, anchored to the fleet's own effective park mode alone
@@ -375,11 +400,18 @@ burn, a drift, or a `point` park, no station-keeping control SHALL be
 offered. Both submissions SHALL settle synchronously (no action, no ETA)
 and SHALL, on success, refresh the fleet's read so the panel reflects the
 new park mode and, while holding, the upkeep rate for the held body,
-without requiring navigation. WHILE the fleet's effective park mode is
-`stationkeep`, the panel SHALL show that upkeep rate as a live drain
-readout in fuel tons per unit time, taken **only** from the served
-owner-only rate field (`fleet-movement`'s "Fleet Read Serves the
-Station-Keeping Upkeep Rate in Fuel Tons"). The readout SHALL NOT be
+without requiring navigation. WHENEVER the fleet read serves an upkeep rate
+— which is on **both** park modes with a host body (`fleet-movement`'s
+"Fleet Read Serves the Station-Keeping Upkeep Rate in Fuel Tons") — the
+panel SHALL show it in fuel tons per unit time, taken **only** from that
+served owner-only rate field: while the mode is `stationkeep`, as the live
+drain the hold is costing now; while it is `orbit`, on the "Hold here"
+control itself, as what holding here **would** cost. The `orbit` case is not
+optional. The rate is served on an orbiting fleet precisely so a player can
+price the hold before paying for it, and rendering it only once the hold is
+already open would make the served figure a value built and never called —
+the sixth instance of that pattern this chain has recorded — while leaving
+the one decision it exists to inform unpriced. The readout SHALL NOT be
 derived on the client from the held body's served orbital elements, its
 radius, or its period: that derivation is `space.StationKeepRate` — a
 rule-bearing computation with a floor clamp and a non-positive-period
@@ -390,10 +422,16 @@ stored dry instant passes, the panel SHALL reflect the server's automatic
 force-demotion to `orbit` (`fleet-movement`'s "Station-Keeping Upkeep Is
 Settled at Discrete Events, Never Folded Into the Stored Cargo Pool") with
 no client-side prediction of the demotion. On failure — including `hold`'s
-rejection when the computed dry instant would not be strictly after the
-hold's start (zero held fuel) — the system SHALL show an error toast
-carrying the server's distinguishable rejection reason, mapped to
-player-facing copy, and leave the panel's state unchanged.
+rejection when the fleet's currently held `fuel` is **at or below the
+configured station-keeping reserve** (`FuelParams.StationKeepReserveTons`),
+which is where the predecessor verb actually rejects, and which is *not*
+the same as holding no fuel — the system SHALL show an error toast carrying
+the server's distinguishable rejection reason, mapped to player-facing
+copy, and leave the panel's state unchanged. That reason's mapped copy
+SHALL name the **reserve** as the boundary, and SHALL NOT tell the player
+they have no fuel: a fleet holding 0.4 t against a 1 t reserve is rejected
+by this rule, and copy reading "no fuel" would be both false and
+unactionable — the player's actual remedy is to refuel above the reserve.
 
 #### Scenario: Holding an orbiting fleet submits hold and the panel reflects station-keep
 - **WHEN** "Hold here" is invoked while the acting fleet's effective park
@@ -417,16 +455,26 @@ player-facing copy, and leave the panel's state unchanged.
 - **THEN** the panel shows a live drain readout in fuel tons per unit time
   whose value is the fleet read's served upkeep-rate field
 
+#### Scenario: The Hold control prices the hold before it is taken
+- **WHEN** the acting fleet's effective park mode is `orbit` and its read
+  serves an upkeep rate for its host body
+- **THEN** the "Hold here" control shows that served rate, in fuel tons per
+  unit time, as what holding here would cost — before the hold is submitted
+
 #### Scenario: The drain readout is never derived from orbital elements
 - **WHEN** the drain readout is rendered
 - **THEN** its value comes from the served rate field alone
 - **AND** no client-side computation of the rate from a body's radius,
   period, or orbital elements exists anywhere in the view
 
-#### Scenario: A zero-fuel hold is rejected and toasted, not silently accepted
-- **WHEN** "Hold here" is invoked for an orbiting fleet holding zero `fuel`
+#### Scenario: A hold at or below the reserve is rejected and toasted, not silently accepted
+- **WHEN** "Hold here" is invoked for an orbiting fleet whose held `fuel` is
+  at or below the configured station-keeping reserve — including a fleet
+  holding a strictly positive amount below it
 - **THEN** the request is rejected, an error toast surfaces the server's
-  distinguishable reason, and the panel's park-mode display is unchanged
+  distinguishable reason mapped to copy naming the **reserve** as the
+  boundary rather than claiming the fleet has no fuel, and the panel's
+  park-mode display is unchanged
 
 #### Scenario: Reaching the dry instant is reflected only on the next refetch
 - **WHEN** a station-keeping fleet's stored dry instant passes

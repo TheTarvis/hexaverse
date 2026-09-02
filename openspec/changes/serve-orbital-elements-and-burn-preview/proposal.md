@@ -53,6 +53,16 @@ renderer half's atomic-swap risk profile demands.
   `orbitElements.periodMs`/`radius` — which would be a mirror of
   `space.StationKeepRate` and the `FuelParams.DeltaVPerTon` conversion, both
   rule-bearing.
+- **ADD the interior's continuous `extent` to the interior read.**
+  `SystemInterior.Extent` — the star-frame upper bound over every generated
+  body's orbital radius — is generated, persisted, and resolved on the body
+  table today, and is on **no** DTO; `interiorDTO` serves only the lattice
+  `radius`. `build-production-space-view` needs a continuous per-system scale
+  in three places (camera pan bound, maximum pick radius, default framing),
+  and without `extent` the only system-sized number on this wire is the
+  lattice one — so the space view would scale continuous space off a field
+  `delete-the-lattice` deletes, and that link's "pure deletion" would not be
+  one. One float, purely additive.
 - **ADD the simulation clock's `scale` beside the `worldTime`** both the
   interior read and the fleet reads already serve. Every position
   `build-production-space-view` draws is a live extrapolation of world time on
