@@ -35,6 +35,7 @@ import { MarketBoardPanel } from '@/components/market/MarketBoardPanel'
 import type { Quote } from '@/lib/types/market'
 import { useWorldTime } from '@/hooks/use-world-time'
 import { toast } from '@/lib/toast'
+import { jumpErrorCopy, jumpErrorReason } from '@/lib/jump-copy'
 import type { Fleet } from '@/lib/types/fleet'
 import type { Galaxy, GalaxyNode, Region } from '@/lib/types/galaxy'
 import { FleetRoster } from '@/components/fleet/FleetRoster'
@@ -305,10 +306,13 @@ export function GalaxyView() {
   // Id"), never `galaxy.links[]` — that read is charted-filtered
   // (galaxy-generation "Lanes are filtered to the corp's charted set") and
   // is empty for exactly the fresh-spawn/just-attached case this command
-  // exists to serve (replace-observation-with-sightings tasks.md 4.13;
+  // exists to serve (replace-observation-with-sightings tasks.md 4.13, 4.16;
   // galaxy-view "Jump Commit"). No second read, no charted-lane
-  // precondition — the same success/error toast shape
-  // SystemBoardView.tsx's `handleJump` already uses.
+  // precondition — the same success toast shape SystemBoardView.tsx's
+  // `handleJump` already uses; on failure the toast copy is mapped from the
+  // server's rejection reason (board-view "Rejection Reasons Map to
+  // Player-Facing Copy, Not Raw Server Text"), never the raw sentinel
+  // string.
   const handleJump = useCallback(
     (fleet: Fleet) => {
       if (!fleet.laneId) {
@@ -319,7 +323,7 @@ export function GalaxyView() {
         { fleetId: fleet.id, laneId: fleet.laneId },
         {
           onSuccess: () => toast.success('Jump underway'),
-          onError: (e) => toast.error(e.message || 'Jump failed'),
+          onError: (e) => toast.error(jumpErrorCopy(jumpErrorReason(e))),
         },
       )
     },

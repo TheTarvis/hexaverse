@@ -156,6 +156,15 @@ type Feature struct {
 	// rather than re-derived (design.md Decision 5). Strictly positive on a
 	// belt feature; zero/absent on every other feature type.
 	Width float64 `json:"width,omitempty" firestore:"width,omitempty"`
+	// Spliced marks a feature that arrived from an in-process SPLICE (e.g.
+	// spliceStation's StationSource call) rather than from storage — never
+	// persisted, never serialized (`firestore:"-" json:"-"`), an in-memory-only
+	// population marker. applyContinuousCascade uses it to distinguish a
+	// spliced body's incompleteness (a producer bug: Error severity, omitted)
+	// from a stored feature's own corrupt-document decode failure
+	// (data rot: Warn severity, omitted) — replace-observation-with-sightings
+	// design.md Decision 29's population split (tasks.md 10.9).
+	Spliced bool `json:"-" firestore:"-"`
 }
 
 // SystemInterior is the interior metadata doc — tiles and features are derived

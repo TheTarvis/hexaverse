@@ -1075,25 +1075,31 @@ def run_determinism_cross_target() -> dict:
 
     reasons = []
 
-    print_info("Board + polar + space + system fixture suites, native arch...")
-    native = run_command("go test ./board/ ./polar/ ./space/ ./system/ -short -count=1", cwd=backend_dir, check=False)
+    print_info("Board + polar + space + system + galaxy fixture suites, native arch...")
+    native = run_command(
+        "go test ./board/ ./polar/ ./space/ ./system/ ./galaxy/ -short -count=1", cwd=backend_dir, check=False
+    )
     if native.returncode == 0:
-        print_success("native arch board/polar/space/system tests passed")
+        print_success("native arch board/polar/space/system/galaxy tests passed")
     else:
-        print_error("native arch board/polar/space/system tests failed")
-        reasons.append("native-arch board/polar/space/system tests failed:\n" + native.stdout + native.stderr)
+        print_error("native arch board/polar/space/system/galaxy tests failed")
+        reasons.append(
+            "native-arch board/polar/space/system/galaxy tests failed:\n" + native.stdout + native.stderr)
 
-    print_info("Board + polar + space + system fixture suites, GOARCH=amd64 GOAMD64=v1 (non-contracting target)...")
+    print_info(
+        "Board + polar + space + system + galaxy fixture suites, GOARCH=amd64 GOAMD64=v1 "
+        "(non-contracting target)..."
+    )
     amd64 = run_command(
-        "GOARCH=amd64 GOAMD64=v1 go test ./board/ ./polar/ ./space/ ./system/ -short -count=1",
+        "GOARCH=amd64 GOAMD64=v1 go test ./board/ ./polar/ ./space/ ./system/ ./galaxy/ -short -count=1",
         cwd=backend_dir, check=False
     )
     if amd64.returncode == 0:
-        print_success("amd64/GOAMD64=v1 board/polar/space/system tests passed")
+        print_success("amd64/GOAMD64=v1 board/polar/space/system/galaxy tests passed")
     else:
-        print_error("amd64/GOAMD64=v1 board/polar/space/system tests failed")
+        print_error("amd64/GOAMD64=v1 board/polar/space/system/galaxy tests failed")
         reasons.append(
-            "amd64/GOAMD64=v1 board/polar/space/system tests failed (on Apple Silicon this leg needs "
+            "amd64/GOAMD64=v1 board/polar/space/system/galaxy tests failed (on Apple Silicon this leg needs "
             "Rosetta 2 — `softwareupdate --install-rosetta`):\n" + amd64.stdout + amd64.stderr)
 
     print_info("Compiled-output FMA-contraction inspection (backend module, arm64 vs amd64/v1)...")

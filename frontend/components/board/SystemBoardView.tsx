@@ -26,6 +26,7 @@ import { useAccountContext } from '@/components/account-provider'
 import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import { toast } from '@/lib/toast'
+import { jumpErrorCopy, jumpErrorReason } from '@/lib/jump-copy'
 import { useSystemBoard } from '@/hooks/use-system-board'
 import { useCutDrive, useJump, useMine, useMyFleets, useOrder, useStop } from '@/hooks/use-fleets'
 import { useMarketBoard, useSell, useStation } from '@/hooks/use-market'
@@ -173,17 +174,17 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
 
   // isGateBody: the fleet-roster jump command's gate — "is the body this
   // fleet is attached to a lane-gate body at all?" (replace-observation-
-  // with-sightings tasks.md 4.10; fleet-roster ADDED "The Roster Row Is the
-  // Fleet Command Surface, Jump Gated by Attachment Alone"). No charted-lane
-  // precondition — charting is map knowledge, never a permission (design.md
-  // Decision 2), and the corporation's charted set arrives on a separately
-  // cadenced `GET /v1/galaxy` read that would otherwise impose a client-side
-  // dwell the no-dwell ruling forbids. `board.laneGates` ships every gate on
-  // this system's rim unfiltered by charted knowledge since §1 dropped the
-  // charted-lane tier filter server-side; a gate body id follows
-  // `system.gateId`'s own "gate-"+destSystemId convention, so it correlates
-  // to `attachedTo` by re-deriving that same id from each entry.
-  const isGateBody = (bodyId: string) => board?.laneGates.some((g) => `gate-${g.destSystemId}` === bodyId) ?? false
+  // with-sightings tasks.md 4.10, 4.15; fleet-roster ADDED "The Roster Row
+  // Is the Fleet Command Surface, Jump Gated by Attachment Alone"). No
+  // charted-lane precondition — charting is map knowledge, never a
+  // permission (design.md Decision 2). Answered by naming convention alone
+  // (`system.gateId`'s own "gate-"+destSystemId prefix), never by
+  // cross-referencing `board.laneGates` — that list is scoped to the
+  // CURRENTLY OPEN system's board, and `useMyFleets` (the roster's source)
+  // is cross-system by construction, so a fleet attached to a gate in a
+  // DIFFERENT system would be wrongly withheld by a local-board lookup (the
+  // same cross-system gap `handleJump` below closes for the actual laneId).
+  const isGateBody = (bodyId: string) => bodyId.startsWith('gate-')
 
   const etaCandidates = useMemo(
     () => (runningMine?.status === 'running' ? [runningMine.eta] : []),
@@ -223,29 +224,32 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   // the shared toggle rule for every kind.
   const pick = (picked: BoardSelection) => setSelection((prev) => toggleSelection(prev, picked))
   const selectFeature = (id: string) => pick({ kind: 'feature', id })
-  const selectGate = (destSystemId: string) => pick({ kind: 'gate', destSystemId })
+  // selectGate — replace-observation-with-sightings tasks.md 4.12: a picked
+  // lane-gate body folds into the SAME 'feature'-shaped selection as any
+  // other body, naming its "gate-"+destSystemId convention id directly
+  // (gates ARE bodies, `docs/plans/continous_space/decisions.md`) rather
+  // than a second, gate-specific selection kind. `board-selection.ts`'s own
+  // `resolvePick` folds a gate hit into this exact same shape — there is no
+  // 'gate' selection kind anywhere in this type any more.
+  const selectGate = (destSystemId: string) => pick({ kind: 'feature', id: `gate-${destSystemId}` })
   const selectCell = (cell: { ring: number; slot: number }) => pick({ kind: 'cell', cell })
   const selectEmpty = () => pick(null)
 
   // --- roster commands (fleet-roster "The Roster Row Is the Fleet Command
   // Surface") — burn's target is the current board selection, named by body
   // id. A selected lane-gate body commands a burn through this exact same
-  // path (board-view "Burn Command Targets a Selected Lane-Gate Body Like
-  // Any Other Body" — gates ARE bodies, `docs/plans/continous_space/
-  // decisions.md`): its body id is the same "gate-"+destSystemId convention
-  // `attachedTo` reports on arrival (and `isGateBody`/`handleJump` above
-  // already correlate against). There is no valid point target from a
-  // board-cell selection (a hex has no continuous-space coordinate —
-  // design.md Decision 12's "visually unplayable" interim), so only an
-  // empty or bare-cell selection — with no body id to name — is refused
-  // client-side with a toast rather than sent as a malformed request; no
-  // distinct refusal copy exists for a gate target.
-  const targetBodyId =
-    selection?.kind === 'feature'
-      ? selection.id
-      : selection?.kind === 'gate'
-        ? `gate-${selection.destSystemId}`
-        : null
+  // path, with no `selection.kind !== 'feature'`-shaped branch carved out
+  // for a gate (board-view "Burn Command Targets a Selected Lane-Gate Body
+  // Like Any Other Body" — gates ARE bodies, `docs/plans/continous_space/
+  // decisions.md`): `selectGate` above already folds a picked gate into
+  // this same 'feature' shape, naming the same "gate-"+destSystemId
+  // convention id `attachedTo` reports on arrival. There is no valid point
+  // target from a board-cell selection (a hex has no continuous-space
+  // coordinate — design.md Decision 12's "visually unplayable" interim), so
+  // only an empty or bare-cell selection — with no body id to name — is
+  // refused client-side with a toast rather than sent as a malformed
+  // request; no distinct refusal copy exists for a gate target.
+  const targetBodyId = selection?.kind === 'feature' ? selection.id : null
   const handleBurn = (fleet: Fleet) => {
     if (!targetBodyId) {
       toast.error('Select a body to target first')
@@ -274,21 +278,39 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
   // handleJump — names the laneId straight off the attached gate on the
   // already-open interior read (`board.laneGates`, correlated to
   // `attachedTo` by the same "gate-"+destSystemId convention `isGateBody`
-  // uses above). No second read, no charted-lane precondition (board-view
-  // "Jump Commit"; design.md Decision 2: charting is map knowledge, never a
-  // permission) — the command is never a no-op or a client-side refusal for
-  // any gate the interior read served.
+  // uses above) WHEN the commanding fleet is actually IN this system.
+  // `FleetRoster` mounts `useMyFleets()` with no system filter (replace-
+  // observation-with-sightings tasks.md 4.15; fleet-roster "mounts the
+  // roster, and a row for a fleet elsewhere opens that board"), so a row can
+  // name a fleet attached to a gate in a DIFFERENT system than the one
+  // whose board is open — this board's own `laneGates` say nothing about
+  // that gate, and (the trap a naive same-id lookup falls into) two systems
+  // can each have their own "gate-"+destSystemId body toward a shared
+  // neighbour, naming two DIFFERENT lanes. So the local lookup only applies
+  // when the fleet is on THIS board; otherwise the fleet's own served
+  // `laneId` (fleet-movement "Fleet Read Serves the Attached Gate's Lane
+  // Id") is the only trustworthy source (board-view "Jump Commit": "A fleet
+  // attached to a gate in another system still commits"). No second read,
+  // no charted-lane precondition — the command is never a no-op or a
+  // client-side refusal for any gate the interior read (or the fleet's own
+  // read) served. On failure, the toast copy is mapped from the server's
+  // rejection reason (board-view "Rejection Reasons Map to Player-Facing
+  // Copy, Not Raw Server Text"), never the raw sentinel string.
   const handleJump = (fleet: Fleet) => {
-    const gate = board.laneGates.find((g) => `gate-${g.destSystemId}` === fleet.attachedTo)
-    if (!gate?.laneId) {
+    const localGate =
+      fleet.systemId === systemId
+        ? board.laneGates.find((g) => `gate-${g.destSystemId}` === fleet.attachedTo)
+        : undefined
+    const laneId = localGate?.laneId ?? fleet.laneId
+    if (!laneId) {
       toast.error('Not attached to a lane gate')
       return
     }
     jump.mutate(
-      { fleetId: fleet.id, laneId: gate.laneId },
+      { fleetId: fleet.id, laneId },
       {
         onSuccess: () => toast.success('Jump underway'),
-        onError: (e) => toast.error(e.message || 'Jump failed'),
+        onError: (e) => toast.error(jumpErrorCopy(jumpErrorReason(e))),
       },
     )
   }
@@ -341,8 +363,18 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     )
   }
 
-  const selectedId = selection?.kind === 'feature' ? selection.id : null
-  const selectedGateId = selection?.kind === 'gate' ? selection.destSystemId : null
+  // A selected lane-gate body is 'feature'-shaped now (`selectGate` above),
+  // so BoardOverlay's gate-glyph selection ring (`selectedGateId`) and its
+  // feature-glyph ring (`selectedId`) both need a gate-aware lookup against
+  // `board.laneGates` to tell which glyph family the selected id actually
+  // belongs to — `board.features` never carries a gate body (replace-
+  // observation-with-sightings tasks.md 4.12).
+  const selectedGate =
+    selection?.kind === 'feature'
+      ? (board.laneGates.find((g) => `gate-${g.destSystemId}` === selection.id) ?? null)
+      : null
+  const selectedId = selection?.kind === 'feature' && !selectedGate ? selection.id : null
+  const selectedGateId = selectedGate?.destSystemId ?? null
 
   return (
     <div data-testid="system-board-view" className={STAGE}>
@@ -418,6 +450,7 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           radius={board.radius}
           featureCount={board.features.length}
           features={board.features}
+          laneGates={board.laneGates}
           selection={selection}
           activeFleet={activeFleet}
           worldTime={worldTime}

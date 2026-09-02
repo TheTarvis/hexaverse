@@ -81,6 +81,16 @@ func (f *fakeIntegrationSystem) LaneCrossing(context.Context, string, string) (s
 		"fakeIntegrationSystem: LaneCrossing not implemented — mine's integration fixtures never jump")
 }
 
+// EnsureLaneHorizon satisfies fleet.GraphSource's widened surface
+// (replace-observation-with-sightings design.md Decision 28, tasks.md
+// 10.2/10.3): mine's integration fixtures never jump, so this is never
+// called in practice, but it must exist for fakeIntegrationSystem to keep
+// satisfying fleet.GraphSource at all.
+func (f *fakeIntegrationSystem) EnsureLaneHorizon(context.Context, string) error {
+	return errors.New(
+		"fakeIntegrationSystem: EnsureLaneHorizon not implemented — mine's integration fixtures never jump")
+}
+
 func beltFeature(id string, kinds ...system.ResourceKind) system.Feature {
 	res := make([]system.Resource, len(kinds))
 	for i, k := range kinds {

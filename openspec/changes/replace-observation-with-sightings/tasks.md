@@ -36,6 +36,20 @@
       (galaxy-generation: *Lazy, Idempotent Block Materialization* — A jump
       arrival at the frontier materializes the destination's full lane
       horizon before its gate set is built)
+      **SEAM CORRECTION SUPERSEDED 2026-09-01 (architect review, design.md
+      Decision 28).** The earlier annotation here claimed the shipped seam
+      was "stronger than the one specified: EVERY BodyTable build gets it."
+      That is false in both halves. The call sits in
+      `system.Service.addGates` (`backend/system/bodies.go:190`), inside
+      every `BodyTable` build — and two of those builds run inside Firestore
+      resolve transactions (`fleet/resolver.go:124`, `:214`, invoked from
+      `action/dao.go`'s `RunTransaction`), where the Firestore client
+      rejects the nested transaction `EnsureLaneHorizon` needs. It is
+      therefore inert on exactly the frontier branch it exists for, and it
+      makes the plain interior read an unenumerated galaxy-materialization
+      trigger, which `galaxy-generation` forbids. Superseded by tasks 10.1-
+      10.6; this checkbox stands only for the blocker having been
+      investigated, not closed.
 - [x] 1.5 In the jump-resolve transaction, write the destination's knowledge
       tier to `explored` and chart the crossed lane `via: traveled`, and
       settle the fleet's `systemId`/lane-transit state into an unattached
@@ -53,6 +67,16 @@
       single path must fail if any of blockers 1–4 regress.
       (fleet-movement, galaxy-generation, galaxy-knowledge — the same
       scenarios cited in 1.1–1.5, exercised together end to end)
+      **SCOPE CORRECTION 2026-09-01 (checkbox audit).** The test exists and
+      drives the real `SetupRouter()`, but its closing claim — "must fail if
+      any of blockers 1-4 regress" — is NOT true for blocker 4. The
+      burn-to-gate/dock leg is arranged by writing the fleet doc directly
+      (`fdao.Save`), not driven through `POST /orders`; and the destination
+      assertion is only `len(dest.LaneGates) != 0`, which still passes with a
+      gate set short of the true horizon. Both reductions are disclosed in
+      the test file's own SCOPE DECISION header, which points at
+      `fleet/jump_arrival_lane_horizon_test.go` for the frontier case. Task
+      8.2 is where the blocker-4 ordering net actually lands.
 
 ## 2. `observation` → `galaxy-knowledge`
 
@@ -377,7 +401,21 @@
       Other Body* — Commanding a burn toward a selected lane-gate body
       submits an order; Attachment from a gate-targeted burn makes the jump
       command available; No gate-specific refusal copy exists; A selected
-      gate still shows its facts and its selected mark)
+      gate still shows its facts and its selected mark; No gate-specific
+      selection branch survives the unification)
+      **RE-OPENED 2026-09-01 (orchestrator, checkbox audit).** The
+      BEHAVIOURAL half shipped — a selected gate does submit a burn to
+      `gate-${destSystemId}` through the same `order.mutate` path, and
+      board-view's *Burn Command Targets a Selected Lane-Gate Body Like Any
+      Other Body* scenarios pass. The STRUCTURAL half did not: the
+      `'gate'` selection kind survives, and with it exactly the parallel
+      gate-aware branch this task's own text forbade — the thing it names
+      as "how the distinction survives." Present at
+      `board-selection.ts:15,77,99`, `SystemBoardView.tsx:226,246,345`,
+      `FactsPanel.tsx:179`. Ownership stays on this task: the newly added
+      *No gate-specific selection branch survives the unification* scenario
+      above is what finally makes the violation detectable, and this task
+      does not close until that scenario passes (task 4.17 is its test).
 - [x] 4.13 **Backend + Frontend + fixture.** `GET /v1/galaxy`'s `links[]` is
       charted-filtered (`galaxy-generation`: *Lanes are filtered to the
       corp's charted set*), so it is empty for exactly the fresh-spawn/
@@ -422,6 +460,106 @@
       Commit* — A gate absent from the fetched galaxy graph still commits;
       The jump command is offered for a gate absent from the graph; A
       failed jump commit toasts the reason)
+
+- [x] 4.14 **Backend tooling.** `backend/galaxy` is enrolled in
+      `check.py`'s `DETERMINISM_GO_PACKAGES`, `check-transcendental.sh`'s
+      `RULE_BEARING_GO_PACKAGES`, and `check-mirror-map.sh`'s `anti_mirror
+      "galaxy"` invocation, but a fourth, separate hardcoded list —
+      `check.py`'s `run_determinism_cross_target()` build matrix at lines
+      1078 and 1088, which runs `go test ./board/ ./polar/ ./space/
+      ./system/` on the native and `GOARCH=amd64 GOAMD64=v1` legs — omits
+      `./galaxy/`, so `fixtures/galaxy/cases.json`'s cases never run on the
+      second target. Add `./galaxy/` to both invocations, and record in
+      `fixtures/galaxy/cases.json`'s header the `GOARCH`/`GOAMD64` it was
+      generated on plus the "no JavaScript-runtime leg by design" note
+      `cross-stack-determinism`'s *The Golden Fixture Reproduces On Every
+      Build Target* requires of every file under `fixtures/`.
+      (galaxy-view: *A Galaxy Link's Id Is Its Lane's Stable Id* — A
+      cross-stack fixture pins the equality under the Go-sole-authority
+      regime)
+- [x] 4.15 **Frontend.** `SystemBoardView.tsx`'s `handleJump` resolves a
+      jump's `laneId` from `board.laneGates` only, scoped to the currently
+      open system's board — it cannot serve a roster row for a fleet
+      attached to a gate in a *different* system, which `fleet-roster`'s
+      cross-system roster requires jump be offered for. Prefer the fleet's
+      own `laneId` (`fleet-movement`: *Fleet Read Serves the Attached
+      Gate's Lane Id*) when the attached gate is not one of the open
+      board's own `laneGates`, so a foreign-system attachment still
+      resolves to that fleet's own gate's lane id rather than a same-named
+      local gate or a silent no-op.
+      (board-view: *Jump Commit* — A fleet attached to a gate in another
+      system still commits)
+- [x] 4.16 **Frontend.** Add the client-side rejection-reason-to-copy
+      mapping `board-view`: *Rejection Reasons Map to Player-Facing Copy,
+      Not Raw Server Text* requires, and apply it to the jump command's
+      error toast in both `SystemBoardView.tsx`'s and `GalaxyView.tsx`'s
+      `handleJump`, replacing `toast.error(e.message || '...')` with mapped
+      copy and a generic fallback when the response carries no mapped
+      reason (for example a `5xx`).
+      (board-view: *Jump Commit* — A failed jump commit toasts the reason;
+      A failure with no distinguishable reason still toasts safely)
+      (galaxy-view: *Jump Commit* — A failed jump commit toasts the
+      reason; A failure with no distinguishable reason still toasts
+      safely)
+
+- [x] 4.17 **Frontend — SDET.** Test for task 4.12's structural removal: a
+      unit test over `board-selection.ts` and `SystemBoardView.tsx` (or
+      equivalent static/behavioral check) asserting no `'gate'`-shaped
+      selection kind and no gate-aware branch remains in the burn-command
+      path — a selected lane-gate body and a selected feature body both
+      reach `order.mutate` through the identical code path. Scope the
+      assertion to the burn-command path only: the gate-aware lookup task
+      4.12 requires for `FactsPanel.tsx`'s facts and `selectedGateId`'s
+      drawn mark is presentation, not a command branch, and is out of this
+      test's scope. This is the test that makes 4.12's re-opened
+      structural half detectable, where today's behavioral-only tests pass
+      with the parallel branch present.
+      (board-view: *Burn Command Targets a Selected Lane-Gate Body Like Any
+      Other Body* — No gate-specific selection branch survives the
+      unification)
+
+- [x] 4.18 **Frontend.** Extend `frontend/lib/jump-copy.ts`'s `COPY` table
+      from its current four substrings (`attach`, `transit`, `running`,
+      `not found`) to the full enumerated jump-rejection set `board-view`
+      and `galaxy-view`'s *Jump Commit* now name: not attached to the named
+      gate; already in lane transit; lane not incident to the fleet's
+      current system; and the destination's lane horizon could not be
+      materialized (the new `fleet.ErrDestinationNotReady`/`503` reason
+      task 10.13 adds) — with copy that reads as retryable for that last
+      one. The bare `404` a foreign-corp jump receives (`fleet-movement`:
+      *Fleet Command Endpoints Are Restricted to the Owning Corporation*)
+      SHALL NOT get its own `COPY` entry — it carries no reason body to key
+      on and MUST fall through to the same `GENERIC_JUMP_FAILURE` fallback
+      as any other unmapped response. Create
+      `frontend/lib/jump-copy.test.ts`, which does not exist today despite
+      its precedent `frontend/lib/market-copy.test.ts` existing, covering
+      each mapped reason plus the unmapped-reason fallback to
+      `GENERIC_JUMP_FAILURE`.
+      **Key the mapping on the response body's reason (`ApiError.data`), not
+      on `e.message`** — `lib/api-client.ts:72` synthesizes
+      `API Error: ${status} ${statusText}` for a response with NO body, so a
+      bare `404` arrives as the literal string `API Error: 404 Not Found`,
+      which today matches the `not found` needle and yields "That lane could
+      not be found." for a foreign-corp rejection. That violates the
+      generic-fallback carve-out above by construction. When the response
+      carries no body, pass no reason so the fallback fires; the call site
+      (`SystemBoardView.tsx`'s `onError: (e) => toast.error(jumpErrorCopy(
+      e.message))`, and `GalaxyView.tsx`'s equivalent) moves off `e.message`
+      with it. `jump-copy.test.ts` SHALL cover that exact literal string
+      asserting `GENERIC_JUMP_FAILURE`.
+      (board-view: *Jump Commit* — A failed jump commit toasts the reason;
+      A jump against a fleet the requester does not own toasts generically;
+      A destination-not-ready rejection toasts as retryable, not
+      generically; A failure with no distinguishable reason still toasts
+      safely)
+      (galaxy-view: *Jump Commit* — A failed jump commit toasts the
+      reason; A jump against a fleet the requester does not own toasts
+      generically; A destination-not-ready rejection toasts as retryable,
+      not generically; A failure with no distinguishable reason still
+      toasts safely)
+      (fleet-movement: *Jump Arrival Parks Near the Destination Gate,
+      Unmasked* — A jump toward a destination whose horizon cannot be
+      materialized is rejected)
 
 ## 5. The Focused-Scan Verb
 
@@ -820,14 +958,14 @@
 
 ## 8. Validation
 
-- [ ] 8.1 Additive-wire guard test: the interior read continues to serve
+- [x] 8.1 Additive-wire guard test: the interior read continues to serve
       `features[].footprint`, `features[].band` (constant `"visible"`),
       `features[].live` (constant `true`), and `laneGates[].cell` unchanged
       alongside the new `space`/`size`/`contacts` fields — the live board
       is the only playable view until a later link deletes these.
       (system-interior: *Interior Read Endpoint* — Pre-existing wire fields
       are unchanged)
-- [ ] 8.2 Consequence tests for the two silent blockers: an HTTP-level test
+- [x] 8.2 Consequence tests for the two silent blockers: an HTTP-level test
       that submits `POST /v1/fleets/:fleetId/jump` against the real,
       production-constructed router (no fake `GraphSource`) for a fleet
       attached to a gate, and asserts a success response carrying the
@@ -838,21 +976,25 @@
       end-to-end behavior, not the wiring itself; this is the same
       assertion as fleet-movement's *The owning corporation's jump order
       succeeds at the HTTP surface*); and an emulator-backed ordering test
-      asserting `EnsureLaneHorizon` runs before the destination's first
-      `BodyTable` build on jump arrival at the frontier (blocker 4) — both
-      regression nets on top of the end-to-end slice in task 1.6, per
-      design.md Decision 24.
+      asserting `EnsureLaneHorizon` runs strictly before the destination's
+      first `BodyTable` build on jump arrival at the frontier — observed by
+      recording both the galaxy seam and the `fleet.BodySource` seam into
+      one ordered event log, since an assertion pinned only against
+      `NeighborsOf` passes whether the horizon call sits inside the
+      body-table build or outside it, and therefore cannot detect the seam
+      drift design.md Decision 28 corrects — both regression nets on top of
+      the end-to-end slice in task 1.6, per design.md Decisions 24 and 28.
       (fleet-movement: *Fleet Command Endpoints Are Restricted to the
       Owning Corporation* — The owning corporation's jump order succeeds at
       the HTTP surface)
-- [ ] 8.3 Run the full backend test suite (`go test ./...`, emulators up)
+- [x] 8.3 Run the full backend test suite (`go test ./...`, emulators up)
       and `/check`.
-- [ ] 8.4 `openspec validate replace-observation-with-sightings --strict`.
-- [ ] 8.5 Rehearse `openspec archive replace-observation-with-sightings` on
+- [x] 8.4 `openspec validate replace-observation-with-sightings --strict`.
+- [x] 8.5 Rehearse `openspec archive replace-observation-with-sightings` on
       a scratch copy of the repo — the only check that catches a MODIFIED
       requirement whose scenario set doesn't match the archiver's
       expectations verbatim.
-- [ ] 8.6 Regression-confirm `galaxy-generation`'s existing block-
+- [x] 8.6 Regression-confirm `galaxy-generation`'s existing block-
       materialization and galaxy-read behavior is unaffected by this
       change's touches to `galaxy/handler.go`, `galaxy/lane_source.go`, and
       `galaxy/service.go` (tasks 1.4, 2.1, 2.6) — these scenarios carry
@@ -869,21 +1011,27 @@
       galaxy documents; New stars are public astronomy; *Galaxy Graph Read
       Endpoint* — The response grows as the world materializes; Bounds
       track the materialized extent)
-- [ ] 8.7 Regression-confirm `trading-station`'s tier gate applies only to
+- [x] 8.7 Regression-confirm `trading-station`'s tier gate applies only to
       the direct station read (`GET /v1/systems/:systemId/station`) and
       never to the system-interior/board read, which serves a system's
       station unconditionally per `system-interior`'s *Bodies Are Public;
-      Ships Are Disclosed* — the same body-publicity task 4.6 implements. No
-      code change: `system/service.go`'s `spliceStation` already splices
-      the station ungated; this task confirms the spec correction matches
-      shipped behavior rather than re-introducing a tier check at the
-      interior seam.
+      Ships Are Disclosed* — the same body-publicity task 4.6 implements.
+      **PREMISE FALSIFIED 2026-09-01 (architect review, design.md Decision
+      29).** The tier half of this task's premise holds — `spliceStation`
+      does splice ungated, and no tier check is re-introduced. The "No code
+      change" half does not: the spliced station carries neither a
+      continuous orbit nor a `Size`, so `applyContinuousCascade` drops it
+      and the station is absent from EVERY interior read, for every
+      requester including its owner — nothing to do with tiers. This task's
+      own test (`backend/station_read_tier_scope_e2e_test.go`) is what
+      surfaced it. The code work is tasks 10.7-10.10; this task remains the
+      tier-scope confirmation only, and cannot pass until 10.7 lands.
       (trading-station: *Home Station Visible On the Direct Station Read,
       No Scan Required* — A freshly spawned corporation's first direct
       station read shows its home station; A system at exactly the
       configured minimum tier includes its station on a direct read; The
       board read serves the station regardless of tier)
-- [ ] 8.8 End-to-end frontend test covering the full wire-to-click path task
+- [x] 8.8 End-to-end frontend test covering the full wire-to-click path task
       4.11 wires: read a materialized system's interior, take the served
       `laneId` off an attached lane-gate body, and invoke the jump command
       with it — asserting the jump order is actually submitted (not a
@@ -894,7 +1042,7 @@
 
 ## 9. Cleanup
 
-- [ ] 9.1 **SDET.** `lib/types/system-board.ts`'s `LaneGate.laneId` is
+- [x] 9.1 **SDET.** `lib/types/system-board.ts`'s `LaneGate.laneId` is
       currently optional (`laneId?: string`) only because pre-existing
       `LaneGate` literals in non-test, type-checked code construct one
       without it, and the server always sends it — the optional type
@@ -915,3 +1063,213 @@
       materialized system's read carries each lane-gate body's lane id;
       *Bodies Are Public; Ships Are Disclosed* — No body is omitted for
       lack of stored knowledge)
+      **DONE 2026-09-01 (SDET).** The task's own five-site count was
+      short: `npx tsc --noEmit` after tightening the field surfaced FOUR
+      more type-checked `LaneGate` literals missing `laneId`, all in
+      `components/board/BoardOverlay.test.tsx` (lines 65, 83, 126 — the
+      last used at two call sites). Fixed all nine (not five) so the
+      required field actually compiles; the `laneGates` array field's own
+      doc comment on `SystemBoard` (carrying the same "already filtered to
+      the requester's charted lanes" falsehood a few lines below the cited
+      block) was corrected alongside `LaneGate`'s for consistency — same
+      no-behavior-change edit, same false claim. Verified: `npx tsc --noEmit`
+      clean; `npx vitest run components/board/BoardOverlay.test.tsx
+      components/board/SystemBoardView.test.tsx` — 38/38 passing (2 files).
+
+## 10. Lane-horizon seam correction (design.md Decision 28)
+
+- [x] 10.1 Delete the `galaxy.EnsureLaneHorizon` call and its warning log
+      from `system.Service.addGates` (`backend/system/bodies.go:190-193`),
+      restoring `addGates` to a pure read of the live lane set. Drop the
+      now-unused paragraph of its doc comment that justified the call.
+      `system` must retain no materializing dependency on `galaxy`; verify
+      by grepping `backend/system` for `EnsureLaneHorizon` and finding only
+      test stubs.
+      (galaxy-generation: *Lazy, Idempotent Block Materialization* —
+      Building a system's body table creates no galaxy documents; Reads
+      create no galaxy documents)
+      (system-body-table: *A Body-Table Build Materializes Nothing* — A
+      build at an unmaterialized frontier creates no galaxy documents)
+
+- [x] 10.2 Call `galaxy.EnsureLaneHorizon(ctx, destId)` in
+      `fleet.Service.Jump` (`backend/fleet/service.go`), after
+      `s.graph.LaneCrossing` yields `destId` and before the action is
+      committed. **FAILS CLOSED, not log-and-continue** (design.md
+      Decision 28, corrected 2026-09-01): on failure, log at Error with
+      `systemId`/`fleetId`, commit no action, leave the fleet attached to
+      the gate, and return the new `fleet.ErrDestinationNotReady` sentinel
+      (task 10.13 defines it and its handler mapping) instead of a
+      committed jump — a distinguishable, retryable refusal, never a
+      silently swallowed background failure. Because `LaneHorizon(systemID)`
+      is a pure function of the id and materialization is monotonic, a
+      successful commit-time ensure is permanent: there is no unhealed
+      state left for the arrival-site call in 10.3 to retry, because a
+      commit-time failure means no fleet ever entered transit.
+      (fleet-movement: *Jump Arrival Parks Near the Destination Gate,
+      Unmasked* — A jump toward a destination whose horizon cannot be
+      materialized is rejected; A sweep-settled arrival still has the
+      destination's full gate set)
+
+- [x] 10.3 Call `galaxy.EnsureLaneHorizon(ctx, settled.SystemId)` in
+      `fleet.Service.Get`'s post-jump-settle branch
+      (`backend/fleet/service.go:230-235`), strictly after `resolveDue`
+      returns and strictly before the `s.bodiesFor(ctx, settled.SystemId)`
+      line. **This is a REDUNDANT IDEMPOTENT CONFIRMATION, not coverage of
+      a failure mode 10.2 cannot reach** (design.md Decision 28, corrected
+      2026-09-01: the two call sites do not cover disjoint failure modes —
+      10.2's commit-time ensure is the load-bearing one, and this call can
+      only ever re-confirm an already-materialized horizon or catch a
+      future commit path that forgets to call it). It pins the
+      requirement's literal ordering. A failure here logs at Error and does
+      not fail the read. This requires threading a galaxy dependency into
+      `fleet.Service`; wire it the same way `WithGraph` is wired (design.md
+      Decision 22's required-positional-parameter discipline) so an
+      unwired router is a compile error rather than a silent no-op.
+      (fleet-movement: *Jump Arrival Parks Near the Destination Gate,
+      Unmasked* — Arrival at the frontier materializes the full lane
+      horizon before the gate set is built)
+      (galaxy-generation: *Lazy, Idempotent Block Materialization* — A jump
+      arrival at the frontier materializes the destination's full lane
+      horizon before its gate set is built)
+
+- [x] 10.4 Record the seam rule where it can be seen: add to
+      `system.Service.BodyTable`'s doc comment that it is a READ-ONLY,
+      TRANSACTION-SAFE seam — it is called from inside `action` resolve
+      transactions (`backend/fleet/resolver.go:124` and `:214`, invoked from
+      `action/dao.go`'s `RunTransaction`), where the Firestore client
+      rejects a nested transaction outright, so any materializing call added
+      to it or to `addGates` is permanently inert on exactly those paths.
+      Cross-reference the same rule already stated at
+      `backend/fleet/resolver.go:265`.
+      (system-body-table: *A Body-Table Build Materializes Nothing* — A
+      build from inside a resolve transaction issues no galaxy write)
+
+- [x] 10.5 **SDET.** Resolve-path regression test: a burn resolve driven
+      through the real `action` service against the emulator, with the
+      galaxy service wrapped in the existing `orderRecordingGalaxy` spy,
+      asserting ZERO `EnsureLaneHorizon` calls are recorded during the
+      resolve. This is the assertion that fails if a materializing call is
+      ever reintroduced into the body-table path, and it fails for the right
+      reason — it does not depend on observing a Firestore error.
+      (system-body-table: *A Body-Table Build Materializes Nothing* — A
+      build from inside a resolve transaction issues no galaxy write)
+
+- [x] 10.6 **SDET.** Sweep-settled arrival test: commit a jump toward a
+      frontier destination, settle it via the action sweep (`ResolveAllDue`)
+      rather than via `fleet.Service.Get`, then read the destination's body
+      table and assert its gate set contains the frontier neighbour. This is
+      the only test that fails if the horizon call lives solely at the
+      arrival site.
+      (fleet-movement: *Jump Arrival Parks Near the Destination Gate,
+      Unmasked* — A sweep-settled arrival still has the destination's full
+      gate set)
+
+- [x] 10.7 Populate the spliced station's continuous half at the splice seam:
+      in `system.Service.spliceStation` (`backend/system/service.go:171-184`),
+      set `Space = StationContinuousOrbit(meta.Seed, systemID,
+      node.Skeleton)` and `Size = StationSize` on the feature returned by the
+      `StationSource` before appending it. Resolve the skeleton via the
+      service's existing `galaxySvc.GetLiveSystem`; skip the lookup entirely
+      when the source returns no station. No `stations` schema change, no
+      stored field, no re-seed — the orbit is a pure function of (galaxy
+      seed, system id, skeleton), so every already-provisioned station heals
+      on its next read. `applyContinuousCascade` needs NO change: its loop
+      already passes through any feature arriving with `Space != nil`
+      (`system/service.go:256-259`).
+      (trading-station: *Home Station Visible On the Direct Station Read, No
+      Scan Required* — The board read serves the station regardless of tier)
+      (system-interior: *Bodies Are Public; Ships Are Disclosed* — An
+      authenticated, spawned requester receives every body in full)
+      (system-body-table: *A Table Contains No Body With a Non-Positive Size*
+      — No body in a successfully built table has a non-positive size)
+
+- [x] 10.8 Delete `backend/stations/continuous_orbit.go` and
+      `backend/stations/continuous_orbit_test.go`. `stations` is not the
+      wiring site under 10.7, and `system/station_continuous_test.go` already
+      pins `StationContinuousOrbit`'s determinism, so no coverage is lost. Do
+      NOT touch `stations/placement.go`, `DeriveOrbit`, `Station.Orbit`,
+      `ErrStationRingOutOfRange`, or `stations/orbit_guard_test.go` — the
+      lattice orbit still derives the station's `Footprint`, which the live
+      board renders, and it dies with the lattice at links 8-9 (design.md
+      Decisions 26 and 29).
+
+- [x] 10.9 Split the degradation signal by population: in
+      `system.Service.applyContinuousCascade` and
+      `system.Service.spliceStation`, a body that arrived from the SPLICE
+      (in-process construction) rather than from storage and carries no
+      `Space`, or a non-positive `Size`, is logged at **Error** naming the
+      producing source and the missing field — distinct from the existing
+      Warn for a stored feature whose `SpaceDoc` failed to decode. Stored
+      features keep omit-never-fail exactly as today: one corrupt document
+      must never permanently fail every corporation's read of a system
+      (design.md Decision 29's population split).
+      (system-interior: *A Spliced Body Is Complete or Omitted, and Its
+      Incompleteness Is Loud* — A spliced body missing its orbit or a
+      positive size is omitted and recorded loudly)
+
+- [x] 10.10 **SDET.** Splice-completeness test in `system`: for every feature
+      the splice path can produce, assert it carries a non-nil `Space` AND a
+      strictly positive `Size`, and that it SURVIVES `applyContinuousCascade`
+      into the served interior — not merely that the fields were set, since a
+      station whose skeleton parent was dropped by the ring guard cascades
+      out correctly and the test must distinguish the two. Written over the
+      `StationSource` seam so it fails for any FUTURE spliced body family
+      that forgets, not only the station.
+      (system-body-table: *A Table Contains No Body With a Non-Positive Size*
+      — No body in a successfully built table has a non-positive size)
+      (system-interior: *Bodies Are Public; Ships Are Disclosed* — An
+      authenticated, spawned requester receives every body in full)
+
+- [x] 10.12 **SDET.** Fail-closed jump-rejection test: commit a jump toward a
+      destination whose lane-horizon materialization is forced to fail
+      (an injected `galaxy` seam returning an error), and assert the HTTP
+      response is a distinguishable, retryable rejection — with a reason
+      body, never a bodyless status — never a committed jump — that no
+      action was created, and that the fleet remains attached to the
+      originating gate rather than entering lane transit.
+      (fleet-movement: *Jump Arrival Parks Near the Destination Gate,
+      Unmasked* — A jump toward a destination whose horizon cannot be
+      materialized is rejected)
+
+- [x] 10.13 Define the sentinel `fleet.ErrDestinationNotReady` and map it in
+      `fleet/handler.go`'s `respond` to `503` (retryable), with a reason
+      body, never a bodyless status, alongside the jump command's other
+      enumerated rejection reasons (`board-view`/`galaxy-view`: *Jump
+      Commit*'s enumeration). This is the sentinel task 10.2's fail-closed
+      `Jump` returns when the commit-time `EnsureLaneHorizon` call fails.
+      (fleet-movement: *Jump Arrival Parks Near the Destination Gate,
+      Unmasked* — A jump toward a destination whose horizon cannot be
+      materialized is rejected)
+
+- [x] 10.14 **SDET.** Test the new `system-interior` ADDED requirement *A
+      Spliced Body Is Complete or Omitted, and Its Incompleteness Is Loud*
+      directly: a spliced body missing `Space`, and separately one with a
+      non-positive `Size`, is each omitted from the interior read and from
+      any table built from it, with the omission recorded at Error severity
+      naming the splicing source and the missing field — distinguishably
+      from a stored feature's Warn-severity decode omission (task 10.9's
+      seam); and a complete spliced body (both fields set) is served
+      indistinguishably from a stored feature.
+      (system-interior: *A Spliced Body Is Complete or Omitted, and Its
+      Incompleteness Is Loud* — A spliced body missing its orbit or a
+      positive size is omitted and recorded loudly; A complete spliced body
+      is served)
+
+- [x] 10.15 Add `case errors.Is(err, galaxy.ErrLaneNotFound):` to
+      `fleet/handler.go`'s `respond`, responding `404` with a reason body,
+      so a `laneId` not incident to the fleet's current system is a
+      distinguishable rejection rather than the bodyless `500` it is today
+      (`proposal.md`'s "Also noted, not fixed" paragraph is deleted with it —
+      `board-view`/`galaxy-view`'s *Jump Commit* enumeration now requires
+      this reason to be distinguishable).
+      (board-view: *Jump Commit* — A failed jump commit toasts the reason)
+      (galaxy-view: *Jump Commit* — A failed jump commit toasts the reason)
+
+- [x] 10.16 **SDET.** HTTP-surface test for task 10.15: commit a jump naming
+      a `laneId` not incident to the fleet's current system and assert the
+      response is `404 Not Found` carrying a reason body distinguishable
+      from every other mapped rejection reason — never the bodyless `500`
+      this path returns today — and that no action was created and the
+      fleet remains attached to its originating gate.
+      (board-view: *Jump Commit* — A failed jump commit toasts the reason)
+      (galaxy-view: *Jump Commit* — A failed jump commit toasts the reason)

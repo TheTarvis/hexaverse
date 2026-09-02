@@ -106,14 +106,16 @@ a caller already reads.
   interior
 - **THEN** every body in the response, including each lane-gate body,
   carries a continuous position and a size, alongside its pre-existing
-  lattice footprint
+  lattice placement (a feature body's `footprint`, a lane-gate body's
+  `cell`)
 
 #### Scenario: Pre-existing wire fields are unchanged
 - **WHEN** an authenticated requester reads a materialized system's
   interior
-- **THEN** every body's `band` value is `"visible"` and `live` value is
-  `true`, exactly as before this change, and every body still carries its
-  lattice footprint
+- **THEN** every feature body's `band` value is `"visible"`, its `live`
+  value is `true`, and its lattice footprint is still present, and every
+  lane-gate body still carries its lattice `cell` — exactly as before this
+  change
 
 ### Requirement: Foreign Presence Is Served As System Contacts
 The system SHALL, on the interior read, compute the requester
@@ -206,3 +208,59 @@ every gate body it reads.
 - **WHEN** it reads a materialized system's interior
 - **THEN** every lane-gate body in the response still carries its `laneId`,
   unfiltered by the corporation's charted knowledge
+
+### Requirement: A Spliced Body Is Complete or Omitted, and Its Incompleteness Is Loud
+The system SHALL treat a body constructed in process and spliced into an
+interior (for example a system's trading station) as complete only when it
+carries both a continuous orbital element set and a strictly positive size.
+Such a body SHALL be omitted from the interior read and from any table built
+from it when it carries neither or either is missing, and that omission
+SHALL be recorded at error severity, naming the splicing source and the
+missing field — distinguishably from a stored feature's decode omission,
+which this capability's *Interior Feature Decode Validates Its Orbital
+Element Set, Omitting Rather Than Failing* records at warn severity, because
+an incomplete spliced body can only ever be a programming error, never
+corrupt or legacy stored data. A spliced body SHALL never be served with a
+non-positive size.
+
+#### Scenario: A spliced body missing its orbit or a positive size is omitted and recorded loudly
+- **WHEN** a body constructed in process and spliced into an interior (for
+  example a system's trading station) carries no continuous orbital element
+  set, or a size that is not strictly positive
+- **THEN** that body is omitted from the interior read and from any table
+  built from it, and the omission is recorded at error severity naming the
+  splicing source and the missing field — distinguishably from a stored
+  feature's decode omission, and never served with a non-positive size
+
+#### Scenario: A complete spliced body is served
+- **WHEN** a body constructed in process and spliced into an interior
+  carries both a continuous orbital element set and a strictly positive
+  size
+- **THEN** it is served in the interior read and in any table built from it,
+  indistinguishably from a stored feature
+
+## MODIFIED Requirements
+
+### Requirement: An Interior Predating This Capability Fails Closed, Never Silently
+The system SHALL treat a persisted interior whose stored extent is absent
+or not strictly positive, or whose non-star feature carries no `SpaceDoc`
+key at all (as distinct from one that is present but fails to decode), as
+generated before this capability existed. Such an interior SHALL NOT be
+completed with a zero-magnitude extent, a zero-radius gate, or an
+additional parentless non-star body. A read or table build that
+encounters a missing or non-positive extent SHALL fail by name. A
+non-star feature carrying no `SpaceDoc` key SHALL be omitted and
+recorded, exactly as a present-but-undecodable one is — "closed" here
+means the feature is never reinterpreted as a legitimate parentless
+body, not that the read fails.
+
+#### Scenario: An interior with no stored extent fails rather than yielding a zero-radius gate
+- **WHEN** a system's interior document has no stored extent, or a
+  non-positive one
+- **THEN** deriving that system's lane gates fails by name, and no gate is
+  placed at or near radius zero
+
+#### Scenario: A non-star feature with no orbital element set at all fails, never reads as parentless
+- **WHEN** a non-star feature's document carries no `SpaceDoc` key
+- **THEN** that feature is treated as a decode failure — omitted and logged
+  with its id — and never surfaces as an additional parentless body

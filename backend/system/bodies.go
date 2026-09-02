@@ -106,6 +106,22 @@ func asDisclosureWorld(t *BodyTable) disclosure.World {
 // an interior read failure — including an interior predating this
 // capability, or one with no positively-sized star — fails the whole
 // build, producing no table.
+//
+// READ-ONLY, TRANSACTION-SAFE SEAM (replace-observation-with-sightings
+// design.md Decision 28, tasks.md 10.4). This method is called from inside
+// action's Firestore resolve transactions — ScanResolver
+// (backend/fleet/resolver.go:124) and BurnResolver
+// (backend/fleet/resolver.go:214), both invoked by action/dao.go's
+// RunTransaction — where the Firestore client refuses a nested transaction
+// outright. Any materializing GALAXY call added to this method or to
+// addGates is therefore permanently inert on exactly those paths: the same
+// rule fleet/resolver.go's JumpResolver doc comment already states for a
+// resolver generally ("Resolution's own contract forbids a resolver from
+// performing writes"). The rule is scoped to galaxy writes only: the
+// interior create-if-absent this method performs via GetOrCreateInterior is
+// required by system-body-table's "One Table Resolves Every Body In a
+// System, Absence Never An Error" and is NOT a galaxy write, so it is not
+// what this rule forbids — do not "fix" it.
 func (s *Service) BodyTable(ctx context.Context, systemID string) (*BodyTable, error) {
 	gen, err := s.GetOrCreateInterior(ctx, systemID)
 	if err != nil {
@@ -175,23 +191,6 @@ func gateId(destSystemId string) string {
 // read failure, and a degradation is recorded distinguishably from genuine
 // absence: a real, empty neighbour set logs nothing.
 func (s *Service) addGates(ctx context.Context, systemID string, extent float64, bodies map[string]space.Body) {
-	// Materialize the destination's full lane horizon before reading its
-	// incident lanes (replace-observation-with-sightings design.md Decision
-	// 23; galaxy-generation "Lazy, Idempotent Block Materialization": "A jump
-	// arrival at the frontier materializes the destination's full lane
-	// horizon before its gate set is built"). This is the exact seam that
-	// ordering constraint names — NeighborsOf below enumerates only
-	// MATERIALIZED lanes, so a system whose own block is materialized but
-	// whose neighbours are not yet would otherwise ship a gate set short of
-	// what truly exists. Idempotent and cheap once already materialized (the
-	// common case for any system that isn't a fresh frontier arrival);
-	// degrades to the pre-horizon neighbour set on failure, never fails the
-	// whole gate build.
-	if err := s.galaxySvc.EnsureLaneHorizon(ctx, systemID); err != nil {
-		log.Warn().Ctx(ctx).Err(err).Str("systemId", systemID).
-			Msg("Ensuring the lane horizon failed; gate set may be missing frontier neighbours")
-	}
-
 	neighbors, err := s.galaxySvc.NeighborsOf(ctx, systemID)
 	if err != nil {
 		log.Warn().Ctx(ctx).Err(err).Str("systemId", systemID).

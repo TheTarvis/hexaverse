@@ -22,6 +22,10 @@ type fakeFleetSvc struct {
 	// used for the trading-station "omitted station" scenario family.
 	pos    space.Vec3
 	posErr error
+	// jumpErr scripts Jump's error return — used by
+	// jump_fail_closed_lane_horizon_test.go's HTTP-level 503 assertion
+	// (mechanical fixture addition, not a scenario assertion itself).
+	jumpErr error
 }
 
 func (f *fakeFleetSvc) Get(context.Context, string) (*Fleet, error) { return f.fleet, f.getErr }
@@ -37,7 +41,7 @@ func (f *fakeFleetSvc) OrderTo(context.Context, string, OrderRequest) (*Fleet, e
 func (f *fakeFleetSvc) CutDrive(context.Context, string) (*Fleet, error) { return f.fleet, nil }
 func (f *fakeFleetSvc) Stop(context.Context, string) (*Fleet, error)     { return f.fleet, nil }
 func (f *fakeFleetSvc) Jump(context.Context, string, string) (*Fleet, error) {
-	return f.fleet, nil
+	return f.fleet, f.jumpErr
 }
 func (f *fakeFleetSvc) Scan(context.Context, string, string) (*Fleet, error) {
 	return f.fleet, nil

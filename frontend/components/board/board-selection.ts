@@ -12,7 +12,6 @@ import { pointToCell, RADIAL_UNIT, type Cell, type Point, type Schedule } from '
 
 export type BoardSelection =
   | { kind: 'feature'; id: string }
-  | { kind: 'gate'; destSystemId: string }
   | { kind: 'cell'; cell: Cell }
   | null
 
@@ -66,7 +65,11 @@ function hitGate(point: Point, gates: PickableGate[]): PickableGate | null {
 // resolvePick hit-tests `point` against features and gates (features win
 // over gates; among features, a child wins over its overlapping parent),
 // falling back to the containing cell, or null when the point falls outside
-// the lattice altogether.
+// the lattice altogether. A gate hit folds into the SAME 'feature'-shaped
+// selection as any other body (replace-observation-with-sightings tasks.md
+// 4.12 — gates ARE bodies, `docs/plans/continous_space/decisions.md`), named
+// by its "gate-"+destSystemId convention id — the same id `attachedTo`
+// reports on arrival. There is no dedicated 'gate' kind.
 export function resolvePick(input: PickInput): BoardSelection {
   const { point, features, gates, radius, schedule } = input
 
@@ -74,7 +77,7 @@ export function resolvePick(input: PickInput): BoardSelection {
   if (feature) return { kind: 'feature', id: feature.id }
 
   const gate = hitGate(point, gates)
-  if (gate) return { kind: 'gate', destSystemId: gate.destSystemId }
+  if (gate) return { kind: 'feature', id: `gate-${gate.destSystemId}` }
 
   // pointToCell CLAMPS to the rim, so a point outside the lattice comes back
   // as a rim cell rather than as "outside" — comparing the clamped cell's
@@ -95,9 +98,6 @@ export function toggleSelection(current: BoardSelection, picked: BoardSelection)
 
   if (current.kind === 'feature' && picked.kind === 'feature') {
     return current.id === picked.id ? null : picked
-  }
-  if (current.kind === 'gate' && picked.kind === 'gate') {
-    return current.destSystemId === picked.destSystemId ? null : picked
   }
   if (current.kind === 'cell' && picked.kind === 'cell') {
     return current.cell.ring === picked.cell.ring && current.cell.slot === picked.cell.slot

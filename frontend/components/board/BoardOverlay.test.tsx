@@ -62,7 +62,7 @@ function overlay(props: Partial<React.ComponentProps<typeof BoardOverlay>> = {})
 
 describe('BoardOverlay — hit shapes and attributes', () => {
   it('carries the full testid inventory with data attributes', () => {
-    render(overlay({ gates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }] }))
+    render(overlay({ gates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }] }))
     expect(screen.getByTestId('board-overlay')).toBeInTheDocument()
     expect(screen.getByTestId('board-lattice')).toBeInTheDocument()
     expect(screen.getByTestId('feature-glyph-p-1')).toHaveAttribute('data-band', 'visible')
@@ -80,7 +80,7 @@ describe('BoardOverlay — hit shapes and attributes', () => {
   })
 
   it('orders hit shapes for topmost-wins: gates below features, moon after parent', () => {
-    render(overlay({ gates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }] }))
+    render(overlay({ gates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }] }))
     const svg = screen.getByTestId('board-overlay')
     const order = ['lane-gates', 'feature-glyphs'].map((tid) =>
       Array.prototype.indexOf.call(svg.children, svg.querySelector(`[data-testid="${tid}"]`)),
@@ -123,7 +123,7 @@ describe('BoardOverlay — hit shapes and attributes', () => {
 
 // `### Requirement: Board Glyph Selection Is Keyboard-Operable`
 describe('BoardOverlay — keyboard operability', () => {
-  const gates = [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }]
+  const gates = [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }]
 
   it('tabs features first, then lane gates, each in stable id order', () => {
     render(overlay({ gates }))

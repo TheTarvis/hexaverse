@@ -258,6 +258,18 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, action.ErrActiveActionExists):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrDestinationNotReady):
+		// A distinguishable, retryable rejection — never the bodyless 5xx
+		// below — per design.md Decision 28 (replace-observation-with-
+		// sightings, tasks.md 10.13): the jump commit failed closed because
+		// the destination's lane horizon could not be materialized.
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+	case errors.Is(err, galaxy.ErrLaneNotFound):
+		// A laneId not incident to the fleet's current system is a pure
+		// client error — a reason-bearing 404, never the bodyless 5xx below,
+		// and never conflated with ErrNotFound's deliberately bodyless 404
+		// (task 10.15, replace-observation-with-sightings).
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case err != nil:
 		log.Error().Ctx(c).Err(err).Msg("fleet operation failed")
 		c.AbortWithStatus(http.StatusInternalServerError)

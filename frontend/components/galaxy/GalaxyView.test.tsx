@@ -567,8 +567,25 @@ describe('GalaxyView', () => {
     expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
   })
 
-  it('toasts the server’s rejection reason on a failed jump commit from the galaxy tier, row unchanged (galaxy-view "Jump Commit")', () => {
-    mockGalaxyState({ data: { ...galaxy, links: [] } })
+  // --- Rejection copy mapping (replace-observation-with-sightings tasks.md
+  // 4.16; galaxy-view "Jump Commit" — "A failed jump commit toasts the
+  // reason" / "A failure with no distinguishable reason still toasts
+  // safely") ----------------------------------------------------------------
+  //
+  // THE DEFECT THIS SECTION CLOSES: `handleJump` (GalaxyView.tsx) does
+  // `toast.error(e.message || 'Jump failed')` — the same raw-Go-sentinel
+  // leak `SystemBoardView.test.tsx`'s sibling section closes for the board
+  // view. Same rationale for not pinning exact copy text: these assert the
+  // OBSERVABLE contract (raw string never shown; two distinguishable
+  // reasons map to two DIFFERENT copies; an unmapped/reasonless failure
+  // falls back to one stable, non-technical, distinct generic message) —
+  // not a specific wording choice.
+
+  const NOT_ATTACHED_REASON = "fleet: jump requires attachment to the lane's own gate body"
+  const IN_TRANSIT_REASON = 'fleet is in lane transit' // fleet/handler.go's own ErrFleetInTransit serialization
+  const REASONLESS_5XX = 'API Error: 500 Internal Server Error' // apiClient's bodyless-response fallback
+
+  function atGateFixture(reason: string) {
     const atGate = {
       ...parkedFleet('fleet_1', 'sys-0'),
       attachedTo: 'gate-sys-9',
@@ -576,14 +593,74 @@ describe('GalaxyView', () => {
     } as unknown as Fleet
     mockUseMyFleets.mockReturnValue({ data: [atGate] } as unknown as ReturnType<typeof useMyFleets>)
     jumpMutate.mockImplementation((_vars, opts) =>
-      (opts as { onError?: (e: Error) => void })?.onError?.(new Error('fleet: jump not attached to named gate')),
+      (opts as { onError?: (e: Error) => void })?.onError?.(new Error(reason)),
     )
+  }
+
+  it('maps a distinguishable jump rejection reason to player-facing copy, never the raw server string, row unchanged (galaxy-view "Jump Commit")', () => {
+    mockGalaxyState({ data: { ...galaxy, links: [] } })
+    atGateFixture(NOT_ATTACHED_REASON)
     renderView()
 
     fireEvent.click(screen.getByTestId('fleet-cmd-jump-fleet_1'))
 
-    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('fleet: jump not attached to named gate')
+    expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1)
+    const shown = vi.mocked(toast.error).mock.calls[0]![0] as string
+    expect(shown).not.toBe(NOT_ATTACHED_REASON)
+    expect(shown.toLowerCase()).not.toContain('fleet:')
     expect(screen.getByTestId('fleet-row-fleet_1')).toBeInTheDocument()
+  })
+
+  it('maps a SECOND distinguishable reason to DIFFERENT copy than the first — a real per-reason mapping, not one blanket rewrite (galaxy-view "Jump Commit")', () => {
+    mockGalaxyState({ data: { ...galaxy, links: [] } })
+    atGateFixture(NOT_ATTACHED_REASON)
+    const { unmount } = renderView()
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-fleet_1'))
+    const notAttachedCopy = vi.mocked(toast.error).mock.calls.at(-1)![0] as string
+    unmount()
+
+    vi.mocked(toast.error).mockClear()
+    mockGalaxyState({ data: { ...galaxy, links: [] } })
+    atGateFixture(IN_TRANSIT_REASON)
+    renderView()
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-fleet_1'))
+    const inTransitCopy = vi.mocked(toast.error).mock.calls.at(-1)![0] as string
+
+    expect(inTransitCopy).not.toBe(IN_TRANSIT_REASON)
+    expect(inTransitCopy).not.toBe(notAttachedCopy)
+  })
+
+  it('shows one stable, non-technical generic toast for a reasonless failure (e.g. a 5xx), row unchanged (galaxy-view "Jump Commit")', () => {
+    mockGalaxyState({ data: { ...galaxy, links: [] } })
+    atGateFixture(REASONLESS_5XX)
+    renderView()
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-fleet_1'))
+
+    const shown = vi.mocked(toast.error).mock.calls[0]![0] as string
+    expect(shown).not.toBe(REASONLESS_5XX)
+    expect(shown).not.toContain('API Error')
+    expect(shown).not.toMatch(/\b5\d\d\b/)
+    expect(shown.toLowerCase()).not.toContain('fleet:')
+    expect(screen.getByTestId('fleet-row-fleet_1')).toBeInTheDocument()
+  })
+
+  it('shows the SAME generic toast for two different unmapped reasons — one stable fallback bucket, not per-message noise (galaxy-view "Jump Commit")', () => {
+    mockGalaxyState({ data: { ...galaxy, links: [] } })
+    atGateFixture(REASONLESS_5XX)
+    const { unmount } = renderView()
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-fleet_1'))
+    const first = vi.mocked(toast.error).mock.calls.at(-1)![0] as string
+    unmount()
+
+    vi.mocked(toast.error).mockClear()
+    mockGalaxyState({ data: { ...galaxy, links: [] } })
+    atGateFixture('API Error: 502 Bad Gateway')
+    renderView()
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-fleet_1'))
+    const second = vi.mocked(toast.error).mock.calls.at(-1)![0] as string
+
+    expect(second).toBe(first)
   })
 
   // --- renderer availability (add-renderer-availability-states) --------------

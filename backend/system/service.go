@@ -165,9 +165,26 @@ func (s *Service) GetOrCreateInterior(ctx context.Context, systemID string) (*Ge
 // requester at all), so the visibility gate lives at the requester-scoped read
 // surfaces instead.
 //
-// DEGRADES, never fails: a station-store read error omits only the station and
-// leaves the rest of the interior intact. The interior read has no market
-// dependency today and this splice must not introduce one.
+// Completes the station's continuous half here, at the seam, rather than
+// leaving it to the StationSource producer (design.md Decision 29): the
+// orbit is a pure function of (galaxy seed, system id, skeleton), so it is
+// derived fresh on every splice — no stored field, no re-seed — and every
+// already-provisioned station heals on its next read. Size is likewise set
+// to the package's own StationSize constant, never left at the producer's
+// zero value (system-body-table's "A Table Contains No Body With a
+// Non-Positive Size" names the station explicitly). Only attempted when the
+// feature arrives without a Space of its own — a producer (or a stand-in
+// test double) that already supplies one is trusted, matching this seam's
+// own long-standing pass-through-verbatim behaviour for every other field.
+//
+// DEGRADES, never fails: a station-store read error omits the station from
+// the interior entirely, same as always. A failure resolving the
+// skeleton/seed needed to derive the orbit is milder still — it leaves the
+// returned feature's Space/Size unset rather than omitting the feature
+// outright, so the pre-existing SpaceDoc-decode path (applyContinuousCascade
+// / readInterior) remains the fallback for a feature that happens to carry
+// its own decodable orbital element set. Either way the rest of the
+// interior is untouched, and the interior read gains no market dependency.
 func (s *Service) spliceStation(ctx context.Context, gen *GeneratedInterior) {
 	if s.stations == nil || gen == nil {
 		return
@@ -178,9 +195,29 @@ func (s *Service) spliceStation(ctx context.Context, gen *GeneratedInterior) {
 			Msg("Station store unavailable; serving interior without its station")
 		return
 	}
-	if feat != nil {
-		gen.Features = append(gen.Features, *feat)
+	if feat == nil {
+		return
 	}
+	if feat.Type == FeatureStation && feat.Space == nil && s.galaxySvc != nil {
+		node, nerr := s.galaxySvc.GetLiveSystem(ctx, gen.Interior.SystemId)
+		if nerr != nil || node == nil {
+			log.Warn().Ctx(ctx).Err(nerr).Str("systemId", gen.Interior.SystemId).
+				Msg("Live system skeleton unavailable; serving spliced station without a derived orbit")
+		} else if meta, merr := s.galaxySvc.LiveGalaxyMeta(ctx); merr != nil {
+			log.Warn().Ctx(ctx).Err(merr).Str("systemId", gen.Interior.SystemId).
+				Msg("Live galaxy metadata unavailable; serving spliced station without a derived orbit")
+		} else {
+			orbit := StationContinuousOrbit(meta.Seed, gen.Interior.SystemId, node.Skeleton)
+			feat.Space = &orbit
+			feat.Size = StationSize
+		}
+	}
+	// Marks this feature as SPLICED (in-process construction, never storage)
+	// so applyContinuousCascade can hold it to the stricter completeness
+	// contract design.md Decision 29 requires — an in-memory-only marker,
+	// never persisted (tasks.md 10.9).
+	feat.Spliced = true
+	gen.Features = append(gen.Features, *feat)
 }
 
 // readInterior returns the stored interior (+ features), or nil if not yet
@@ -251,20 +288,43 @@ func (s *Service) readInterior(ctx context.Context, galaxyID, systemID string) (
 // its own feature id and the id of the ancestor that (at the time of the
 // drop) it named as parent — distinguishable from a direct decode failure,
 // which names only the offending feature's own id.
+//
+// The completeness check below (design.md Decision 29's population split,
+// tasks.md 10.9) holds a SPLICED feature (Feature.Spliced, set only by
+// spliceStation's in-process construction) to a stricter bar than a stored
+// one: a spliced feature carrying no orbital element set — neither a
+// non-nil Space nor a decodable SpaceDoc — or a non-positive Size is a
+// PRODUCER BUG, never data rot, and is logged at Error naming the splicing
+// source and the missing field before being omitted. A stored feature's own
+// decode failure keeps the pre-existing Warn-severity omit-never-fail
+// behaviour unchanged — one corrupt document must never permanently fail
+// every corporation's read of a system.
 func (s *Service) applyContinuousCascade(ctx context.Context, systemID string, gen *GeneratedInterior) {
 	decoded := make([]Feature, 0, len(gen.Features))
 	for _, f := range gen.Features {
-		if f.Type == FeatureStar || f.Space != nil {
+		if f.Type == FeatureStar {
 			decoded = append(decoded, f)
 			continue
 		}
-		o, err := space.DecodeOrbit(f.SpaceDoc)
-		if err != nil {
-			log.Warn().Ctx(ctx).Str("systemId", systemID).Str("featureId", f.Id).Err(err).
-				Msg("Spliced feature's orbital element set failed to decode; omitting from the interior read")
+		if f.Space == nil {
+			o, err := space.DecodeOrbit(f.SpaceDoc)
+			if err != nil {
+				if f.Spliced {
+					log.Error().Ctx(ctx).Str("systemId", systemID).Str("featureId", f.Id).Err(err).
+						Msg("Spliced body carries no orbital element set (missing Space); omitting from the interior read — producer bug, not data rot")
+				} else {
+					log.Warn().Ctx(ctx).Str("systemId", systemID).Str("featureId", f.Id).Err(err).
+						Msg("Spliced feature's orbital element set failed to decode; omitting from the interior read")
+				}
+				continue
+			}
+			f.Space = &o
+		}
+		if f.Spliced && !(f.Size > 0) {
+			log.Error().Ctx(ctx).Str("systemId", systemID).Str("featureId", f.Id).Float64("size", f.Size).
+				Msg("Spliced body carries a non-positive Size; omitting from the interior read — producer bug, not data rot")
 			continue
 		}
-		f.Space = &o
 		decoded = append(decoded, f)
 	}
 	gen.Features = decoded

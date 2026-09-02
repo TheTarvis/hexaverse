@@ -32,3 +32,27 @@ that ship-presence filter or the unfiltered-body rule above.
 - **AND** the only value the response derives from the table through a
   per-requester filter is foreign ship presence, projected through
   `proximity-disclosure` before serialization
+
+## ADDED Requirements
+
+### Requirement: A Body-Table Build Materializes Nothing
+The system SHALL treat a `BodyTable` build as a pure read of the galaxy:
+building a table SHALL NOT create or modify any galaxy system, lane, or
+block-anchor document, and SHALL derive lane gates from whatever lanes are
+materialized at the moment of the build. A build SHALL succeed when
+performed from inside an action-resolve transaction, issuing no galaxy write
+of its own. The interior create-if-absent required by this capability's
+*One Table Resolves Every Body In a System, Absence Never An Error* is
+unaffected and is not a galaxy write.
+
+#### Scenario: A build at an unmaterialized frontier creates no galaxy documents
+- **WHEN** a table is built for a system whose lane horizon is not fully
+  materialized
+- **THEN** no galaxy system, lane, or block-anchor document is created, and
+  the table's gate set reflects only the lanes materialized at build time
+
+#### Scenario: A build from inside a resolve transaction issues no galaxy write
+- **WHEN** a table is built from inside an action-resolve transaction for a
+  system whose interior is already materialized
+- **THEN** the build succeeds and creates or modifies no galaxy system,
+  lane, or block-anchor document

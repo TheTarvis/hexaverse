@@ -25,7 +25,7 @@ import { Badge } from '@/components/catalyst/badge'
 import { Subheading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 import { Input } from '@/components/catalyst/input'
-import type { BoardFeature, ResourceKind } from '@/lib/types/system-board'
+import type { BoardFeature, LaneGate, ResourceKind } from '@/lib/types/system-board'
 import type { Fleet, FleetRoster } from '@/lib/types/fleet'
 import { SHIP_MODE_BURN } from '@/lib/types/fleet'
 import type { Quote } from '@/lib/types/market'
@@ -45,6 +45,15 @@ export interface FactsPanelProps {
   // The interior read's full feature list — how a selected/docked id resolves
   // to its facts.
   features: BoardFeature[]
+  // The interior read's served lane gates (replace-observation-with-
+  // sightings tasks.md 4.12) — a picked lane-gate body folds into the SAME
+  // 'feature'-shaped `selection` as any other body (its id is the
+  // "gate-"+destSystemId convention `attachedTo` also reports), and
+  // `board.features` never carries a gate body — so this is how the panel
+  // still recognises one and shows its facts instead of blanking the
+  // selection section. Optional/defaulted so a caller that never selects a
+  // gate need not pass it.
+  laneGates?: LaneGate[]
   selection: BoardSelection
   activeFleet: Fleet | null
   worldTime: number
@@ -82,6 +91,7 @@ export function FactsPanel({
   radius,
   featureCount,
   features,
+  laneGates = [],
   selection,
   activeFleet,
   worldTime,
@@ -111,6 +121,14 @@ export function FactsPanel({
     !!dockedFeature && !!dockedFeature.resources?.length && !!activeFleet?.roster && !mining && !burning
 
   const selectedFeature = selection?.kind === 'feature' ? (features.find((f) => f.id === selection.id) ?? null) : null
+  // gateDestSystemId — a picked lane-gate body's destination. The selection
+  // is 'feature'-shaped like any other body (`board.features` never carries
+  // a gate body, so this panel needs the served `laneGates` list to
+  // recognise one — replace-observation-with-sightings tasks.md 4.12).
+  const gateDestSystemId =
+    selection?.kind === 'feature'
+      ? (laneGates.find((g) => `gate-${g.destSystemId}` === selection.id)?.destSystemId ?? null)
+      : null
 
   return (
     <aside data-testid="facts-panel" className={PANEL}>
@@ -176,14 +194,14 @@ export function FactsPanel({
             Ring {selection.cell.ring}, slot {selection.cell.slot}
           </Text>
         )}
-        {selection?.kind === 'gate' && (
+        {gateDestSystemId && (
           <div data-testid="gate-facts">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-white">Lane gate</span>
               <Badge color="sky">GATE</Badge>
             </div>
             <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-400">
-              → {selection.destSystemId}
+              → {gateDestSystemId}
             </p>
             <p className="mt-3 text-[11px] text-zinc-500">
               Dock a fleet to this gate, then jump from the roster panel.

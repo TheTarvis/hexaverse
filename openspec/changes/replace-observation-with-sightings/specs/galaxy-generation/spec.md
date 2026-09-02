@@ -4,7 +4,7 @@
 The system SHALL persist the galaxy as the materialized subset of the
 deterministic star field, growing it in **blocks** — fixed
 `BlockSize × BlockSize` cell tiles, the materialization atom — under an
-atomic create-if-absent anchor per block: when a trigger (jump arrival at a
+atomic create-if-absent anchor per block: when a trigger (a jump commit, a jump arrival at a
 system past the currently materialized frontier, the spawn walk, or initial
 seeding) touches an unmaterialized block, the system SHALL compute that
 block's systems and lanes from the field and persist them in one
@@ -26,8 +26,10 @@ Seeding starts the materialized set at the origin block. Materialization
 SHALL be invisible to players: a materialized-on-demand system is
 indistinguishable from one persisted at initial seeding, and newly
 materialized systems enter every requester's star layer (the field is
-public astronomy). Plain reads (`GET /v1/galaxy`, `GetLiveSystem`) SHALL
-NOT themselves create system or lane documents.
+public astronomy). Plain reads SHALL NOT themselves create system,
+lane, or block-anchor documents — this includes `GET /v1/galaxy`,
+`GetLiveSystem`, the system-interior read, and every body-table build,
+none of which is a materialization trigger.
 
 #### Scenario: Concurrent materialization of the same block converges
 - **WHEN** two triggers concurrently materialize the same unmaterialized
@@ -64,7 +66,8 @@ NOT themselves create system or lane documents.
 - **THEN** no system, lane, or anchor documents are created or modified
 
 #### Scenario: Reads create no galaxy documents
-- **WHEN** `GET /v1/galaxy` or `GetLiveSystem` is served
+- **WHEN** `GET /v1/galaxy`, `GetLiveSystem`, or `GET /v1/systems/:systemId`
+  is served
 - **THEN** no system, lane, or block-anchor documents are created by the
   read itself
 
@@ -83,6 +86,14 @@ NOT themselves create system or lane documents.
   before that system's body table — and therefore its gate set — is first
   built for the arrival, so the arriving fleet is never shown fewer gates
   than truly exist
+
+#### Scenario: Building a system's body table creates no galaxy documents
+- **WHEN** a system's body table is built — including from inside an
+  action-resolve transaction — for a system whose lane horizon is not
+  fully materialized
+- **THEN** no system, lane, or block-anchor document is created by the
+  build, and the gate set is derived from whatever lanes are materialized
+  at that moment
 
 ### Requirement: Galaxy Graph Read Endpoint
 The system SHALL serve `GET /v1/galaxy` returning the live galaxy's id,

@@ -278,8 +278,9 @@ remains is **storage and wiring**, not model:
     union-over-a-corporation's-own-assets rule, and a sighting's system
     stamp.
   - `fleet-movement` — jump re-expressed as gated by gate *attachment*
-    alone, foreign fleets served as contacts rather than 404s, and every
-    command endpoint restricted to the owning corporation; `fleet-roster`,
+    alone, foreign fleets 404'd on a direct fetch and surfaced only as
+    anonymous contacts, and every command endpoint restricted to the
+    owning corporation; `fleet-roster`,
     `galaxy-view`, and `board-view` carry the matching jump-commit and
     lane-id surfaces.
   - `action-dispatch` — its endpoints stop being caller-identity-blind and

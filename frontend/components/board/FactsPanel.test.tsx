@@ -423,11 +423,18 @@ describe('FactsPanel', () => {
     expect(screen.getByTestId('selection')).toHaveTextContent('Ring 3, slot 1')
   })
 
+  // A selected lane-gate body is 'feature'-shaped (replace-observation-
+  // with-sightings tasks.md 4.12 — gates ARE bodies, `docs/plans/
+  // continous_space/decisions.md`), named by its "gate-"+destSystemId
+  // convention id. `board.features` never carries a gate body, so the panel
+  // recognises one via its own `laneGates` prop (the interior read's served
+  // lane gates) rather than a dedicated selection kind.
   it('describes a selected lane gate — no depart affordance, points at the roster panel', () => {
     render(
       <FactsPanel
         {...base}
-        selection={{ kind: 'gate', destSystemId: 'sys-neighbour' } as BoardSelection}
+        laneGates={[{ destSystemId: 'sys-neighbour', cell: { ring: 4, slot: 0 }, laneId: 'lane-here-neighbour' }]}
+        selection={{ kind: 'feature', id: 'gate-sys-neighbour' } as BoardSelection}
         activeFleet={null}
       />,
     )

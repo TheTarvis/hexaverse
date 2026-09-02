@@ -203,6 +203,15 @@ function myFleetsState(fleets: Fleet[]) {
 describe('SystemBoardView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // `vi.clearAllMocks()` clears call/result history but NOT a mock's
+    // configured implementation — `jumpFailsWith` (the rejection-copy-
+    // mapping section below) sets one via `.mockImplementation`, which
+    // would otherwise leak into whichever test runs next, regardless of
+    // declaration order. Reset it explicitly, unconditionally, so a test
+    // that never calls `jumpFailsWith` always sees a neutral no-op mock —
+    // this must survive even a PRIOR test failing before it reaches its own
+    // click (an unconsumed `.mockImplementationOnce` would not).
+    jumpMutate.mockReset()
     clock.now = 0
     guard.available = true
     adminState.isAdmin = false
@@ -488,7 +497,7 @@ describe('SystemBoardView', () => {
   // command, design.md Decision 10/12) --------------------------------------
 
   it('selects a lane gate and shows its facts, pointing at the roster panel — no depart affordance', () => {
-    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }] }
+    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }] }
     boardState({ isLoading: false, isError: false, data: withGate })
     myFleetsState([ownFleet])
     render(<SystemBoardView systemId="sys-7" />)
@@ -618,7 +627,7 @@ describe('SystemBoardView', () => {
   // `board.laneGates` can catch a wiring regression here — the same
   // standing rule as the backend's router-level tests in this section.
   it('offers jump on a roster row attached to a lane-gate body, with no charted-lane precondition', () => {
-    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }] }
+    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }] }
     boardState({ isLoading: false, isError: false, data: withGate })
     myFleetsState([{ ...ownFleet, attachedTo: 'gate-sys-9' }])
     render(<SystemBoardView systemId="sys-7" />)
@@ -628,7 +637,7 @@ describe('SystemBoardView', () => {
 
   // Scenario: Jump is withheld when not attached to a gate.
   it('withholds jump on a roster row attached to an ordinary (non-gate) body', () => {
-    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 } }] }
+    const withGate = { ...boardFixture(), laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }] }
     boardState({ isLoading: false, isError: false, data: withGate })
     myFleetsState([{ ...ownFleet, attachedTo: 'p-1' }])
     render(<SystemBoardView systemId="sys-7" />)
@@ -771,24 +780,203 @@ describe('SystemBoardView', () => {
     expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
   })
 
-  // Scenario: A failed jump commit toasts the reason, leaving the row
-  // unchanged (still listed, no navigation away).
-  it('toasts the server’s rejection reason on a failed jump commit, row unchanged (board-view "Jump Commit")', () => {
+  // --- Rejection copy mapping (replace-observation-with-sightings tasks.md
+  // 4.16; board-view "Jump Commit" — "A failed jump commit toasts the
+  // reason" / "A failure with no distinguishable reason still toasts
+  // safely"; board-view (LIVE) "Rejection Reasons Map to Player-Facing
+  // Copy, Not Raw Server Text" — the pre-existing requirement this section
+  // extends to the jump command) ------------------------------------------
+  //
+  // THE DEFECT THIS SECTION CLOSES: `handleJump` (SystemBoardView.tsx) does
+  // `toast.error(e.message || 'Jump failed')` — the server's raw Go
+  // sentinel string (package-prefixed, e.g. "fleet: jump requires
+  // attachment to the lane's own gate body") reaches the player verbatim.
+  //
+  // These tests deliberately do NOT pin exact copy text (a UX/wording
+  // choice left to whoever implements the mapping, same as
+  // `lib/market-copy.ts`'s own precedent) — they pin the OBSERABLE
+  // contract the spec actually states: (1) the raw server string never
+  // reaches the toast, (2) two DIFFERENT distinguishable reasons map to
+  // DIFFERENT copy (proving a real per-reason mapping exists, not a single
+  // blanket rewrite of every message), and (3) an unmapped/reasonless
+  // failure (no body, e.g. a bare apiClient "API Error: 5xx ..." message)
+  // falls back to ONE stable, non-technical generic message — distinct from
+  // either mapped copy. A test asserting only "toast !== raw string" would
+  // pass for a trivial `e.message.replace('fleet: ', '')` transform that
+  // still leaks the sentinel's substance; the cross-reason distinctness and
+  // package-prefix checks below close that gap.
+
+  const NOT_ATTACHED_REASON = "fleet: jump requires attachment to the lane's own gate body"
+  const IN_TRANSIT_REASON = 'fleet is in lane transit' // fleet/handler.go's own ErrFleetInTransit serialization
+  const REASONLESS_5XX = 'API Error: 500 Internal Server Error' // apiClient's bodyless-response fallback
+
+  function jumpFailsWith(reason: string) {
+    jumpMutate.mockImplementation((_vars, opts) =>
+      (opts as { onError?: (e: Error) => void })?.onError?.(new Error(reason)),
+    )
+  }
+
+  it('maps a distinguishable jump rejection reason to player-facing copy, never the raw server string, row unchanged (board-view "Jump Commit")', () => {
     const withGate = {
       ...boardFixture(),
       laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }],
     }
     boardState({ isLoading: false, isError: false, data: withGate })
     myFleetsState([{ ...ownFleet, attachedTo: 'gate-sys-9' }])
-    jumpMutate.mockImplementation((_vars, opts) =>
-      (opts as { onError?: (e: Error) => void })?.onError?.(new Error('fleet: jump not attached to named gate')),
-    )
+    jumpFailsWith(NOT_ATTACHED_REASON)
     render(<SystemBoardView systemId="sys-7" />)
 
     fireEvent.click(screen.getByTestId('fleet-cmd-jump-mine'))
 
-    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('fleet: jump not attached to named gate')
+    expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1)
+    const shown = vi.mocked(toast.error).mock.calls[0]![0] as string
+    expect(shown).not.toBe(NOT_ATTACHED_REASON)
+    // No raw Go sentinel jargon (every backend error in this domain is
+    // "pkgname: ...") ever reaches the toast.
+    expect(shown.toLowerCase()).not.toContain('fleet:')
     expect(screen.getByTestId('fleet-row-mine')).toBeInTheDocument()
     expect(push).not.toHaveBeenCalled()
+  })
+
+  it('maps a SECOND distinguishable reason to DIFFERENT copy than the first — a real per-reason mapping, not one blanket rewrite (board-view "Jump Commit")', () => {
+    const withGate = {
+      ...boardFixture(),
+      laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }],
+    }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    myFleetsState([{ ...ownFleet, attachedTo: 'gate-sys-9' }])
+
+    jumpFailsWith(NOT_ATTACHED_REASON)
+    const { unmount } = render(<SystemBoardView systemId="sys-7" />)
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-mine'))
+    const notAttachedCopy = vi.mocked(toast.error).mock.calls.at(-1)![0] as string
+    unmount()
+
+    vi.mocked(toast.error).mockClear()
+    jumpFailsWith(IN_TRANSIT_REASON)
+    render(<SystemBoardView systemId="sys-7" />)
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-mine'))
+    const inTransitCopy = vi.mocked(toast.error).mock.calls.at(-1)![0] as string
+
+    expect(inTransitCopy).not.toBe(IN_TRANSIT_REASON)
+    expect(inTransitCopy).not.toBe(notAttachedCopy)
+  })
+
+  it('shows one stable, non-technical generic toast for a reasonless failure (e.g. a 5xx), row unchanged (board-view "Jump Commit")', () => {
+    const withGate = {
+      ...boardFixture(),
+      laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }],
+    }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    myFleetsState([{ ...ownFleet, attachedTo: 'gate-sys-9' }])
+    jumpFailsWith(REASONLESS_5XX)
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-mine'))
+
+    const shown = vi.mocked(toast.error).mock.calls[0]![0] as string
+    expect(shown).not.toBe(REASONLESS_5XX)
+    expect(shown).not.toContain('API Error')
+    expect(shown).not.toMatch(/\b5\d\d\b/) // no raw status code leaks through
+    expect(shown.toLowerCase()).not.toContain('fleet:')
+    expect(screen.getByTestId('fleet-row-mine')).toBeInTheDocument()
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('shows the SAME generic toast for two different unmapped reasons — one stable fallback bucket, not per-message noise (board-view "Jump Commit")', () => {
+    const withGate = {
+      ...boardFixture(),
+      laneGates: [{ destSystemId: 'sys-9', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys9' }],
+    }
+    boardState({ isLoading: false, isError: false, data: withGate })
+    myFleetsState([{ ...ownFleet, attachedTo: 'gate-sys-9' }])
+
+    jumpFailsWith(REASONLESS_5XX)
+    const { unmount } = render(<SystemBoardView systemId="sys-7" />)
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-mine'))
+    const first = vi.mocked(toast.error).mock.calls.at(-1)![0] as string
+    unmount()
+
+    vi.mocked(toast.error).mockClear()
+    jumpFailsWith('API Error: 502 Bad Gateway')
+    render(<SystemBoardView systemId="sys-7" />)
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-mine'))
+    const second = vi.mocked(toast.error).mock.calls.at(-1)![0] as string
+
+    expect(second).toBe(first)
+  })
+
+  // --- Cross-system attachment (replace-observation-with-sightings
+  // tasks.md 4.15; board-view "Jump Commit" — "A fleet attached to a gate
+  // in another system still commits") --------------------------------------
+  //
+  // THE DEFECT THIS SECTION CLOSES: `isGateBody`/`handleJump`
+  // (SystemBoardView.tsx) resolve exclusively against `board.laneGates` —
+  // the CURRENTLY OPEN system's own gates. `useMyFleets()` (mounted by
+  // `FleetRoster`, unfiltered by system — see "mounts the roster, and a row
+  // for a fleet elsewhere opens that board" above) is cross-system by
+  // construction, so a fleet attached to a gate in a DIFFERENT system than
+  // the one whose board is open never matches `board.laneGates`, and where
+  // the two systems happen to share a like-named neighbour
+  // ("gate-"+destSystemId collides), the WRONG lane id would be submitted.
+  // Neither half is reachable through a pure-function test of
+  // roster-commands.ts (it takes a correct predicate and reports correct
+  // output) — only mounting this component and letting it compute its own
+  // predicate/laneId from `board.laneGates` catches a wiring regression
+  // here, exactly like the sibling "Jump Commit" tests above.
+
+  it('offers and commits jump for a fleet attached to a gate in a DIFFERENT, non-colliding system, naming that fleet’s own laneId — withheld-command half (board-view "Jump Commit")', () => {
+    // sys-7's own board carries no gates at all — nothing for the foreign
+    // attachment to (accidentally) collide with.
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    const elsewhere: Fleet = {
+      ...ownFleet,
+      id: 'away',
+      systemId: 'sys-9', // a DIFFERENT system than the open board (sys-7)
+      attachedTo: 'gate-sys-42',
+      laneId: 'lane-sys9-sys42', // the fleet's OWN read (fleet-movement "Fleet Read Serves the Attached Gate's Lane Id")
+    }
+    myFleetsState([elsewhere])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    // Offered at all — not withheld just because sys-7's own board carries
+    // no matching gate.
+    expect(screen.getByTestId('fleet-cmd-jump-away')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-away'))
+
+    expect(jumpMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ fleetId: 'away', laneId: 'lane-sys9-sys42' }),
+      expect.anything(),
+    )
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
+  })
+
+  it('names the foreign fleet’s OWN laneId, never a same-named local gate’s, when the two systems’ gate ids collide — collision half (board-view "Jump Commit")', () => {
+    // sys-7's own board ALSO carries a gate toward "sys-42" — the SAME
+    // "gate-"+destSystemId the foreign fleet's own attachment reports, but
+    // naming a DIFFERENT lane (sys-7↔sys-42, not the fleet's real
+    // sys-9↔sys-42 crossing).
+    const withCollidingGate = {
+      ...boardFixture(),
+      laneGates: [{ destSystemId: 'sys-42', cell: { ring: 3, slot: 0 }, laneId: 'lane-sys7-sys42' }],
+    }
+    boardState({ isLoading: false, isError: false, data: withCollidingGate })
+    const elsewhere: Fleet = {
+      ...ownFleet,
+      id: 'away',
+      systemId: 'sys-9',
+      attachedTo: 'gate-sys-42',
+      laneId: 'lane-sys9-sys42',
+    }
+    myFleetsState([elsewhere])
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('fleet-cmd-jump-away'))
+
+    expect(jumpMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ fleetId: 'away', laneId: 'lane-sys9-sys42' }),
+      expect.anything(),
+    )
   })
 })

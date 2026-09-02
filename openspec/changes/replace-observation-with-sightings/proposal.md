@@ -5,8 +5,10 @@ After link 4, no fleet can ever jump. Spawn charts zero lanes
 used to chart lanes is deleted, and travel-arrival charting only charts the
 lane a jump already crossed — which requires already having a charted lane
 to jump on in the first place. That circularity is fatal, and it is only the
-first of four blockers, three of them in code and two of them silent because
-every unit test injects a fake for the thing production forgot to wire:
+first of five blockers, three of them in code and two of them silent because
+every unit test injects a fake for the thing production forgot to wire, plus
+a fifth discovered only once this change went to build the loop it depends
+on:
 
 1. **The charting circularity itself** — dissolved by dropping the
    charted-lane precondition on `Jump` entirely. Gates are bodies now, so
@@ -22,6 +24,13 @@ every unit test injects a fake for the thing production forgot to wire:
 4. **`galaxy.EnsureLaneHorizon` has no production caller at all** — the
    endless galaxy silently stops growing at the currently materialized
    frontier the moment a fleet reaches it.
+5. **The spliced trading station has no continuous position or size** —
+   `system.StationContinuousOrbit` and the station's configured `Size` are
+   unit-tested against their own determinism and never called by
+   `spliceStation`, so the home station is silently absent from every
+   `GET /v1/systems/:systemId` response, for every requester including its
+   owner. The board is the only playable view, so M11's dock-then-sell loop
+   is unreachable through the UI until this is fixed (design.md Decision 29).
 
 Underneath the traversability crisis is the second half of this link's job:
 `backend/disclosure` shipped at an earlier link as a pure mechanism with
@@ -60,9 +69,12 @@ this link needs them again.
   deletes that optional-wiring shape outright, along with
   `WithTierSource`/`TierSource`, since Decision 2 removes what they gated),
   so the dependency cannot be silently omitted in `router.go` again; call
-  `galaxy.EnsureLaneHorizon` at jump arrival, ordered strictly before the
-  destination's first body-table build, so an arriving fleet is never
-  stranded with a truncated gate set.
+  `galaxy.EnsureLaneHorizon` at jump **commit** — before the order is
+  committed and therefore before transit begins — failing the jump order
+  closed with a distinguishable, retryable reason if materialization fails,
+  with a redundant idempotent confirmation retained at the arrival site
+  (design.md Decision 28), so an arriving fleet is never stranded with a
+  truncated gate set.
 - **Rehome `observation`'s four surviving graph-knowledge requirements** to
   a new capability, `galaxy-knowledge`, in Go package `backend/charts`
   (`charts.Tier`, `charts.TierExplored`, `charts.ChartedLanes`,
@@ -87,8 +99,11 @@ this link needs them again.
   never body composition. Two unmodified specs otherwise contradict that
   rule and take deltas of their own: `trading-station`'s tier gate on "the
   board read" narrows to the **direct** station-read endpoint only (the
-  system-interior/board read already ships a station as an ordinary body),
-  and `system-body-table`'s "only through a disclosure filter" exception
+  station is in fact dropped from every interior read today —
+  `applyContinuousCascade` fails to decode its missing orbital elements and
+  omits it; task 10.7's splice-seam fix is what makes this narrowing true
+  rather than aspirational), and `system-body-table`'s "only through a
+  disclosure filter" exception
   narrows to ship presence alone — bodies are served unfiltered.
 - **Wire `disclosure` into the interior read**: a top-level `contacts`
   array, deduplicated by target across the requester's own fleets in the
@@ -191,12 +206,21 @@ this link needs them again.
 - Affected code: `backend/observation` (deleted), new `backend/charts`,
   new `backend/sightings`, `backend/disclosure` (widened masking, `Scanning`
   contact flag, `Sighting.SystemId`), `backend/fleet` (jump precondition,
-  `GraphSource`/`ScanWindow`, ownership checks, constructor fix),
+  `GraphSource`/`ScanWindow`, ownership checks, constructor fix, plus a new
+  `galaxy` dependency threaded into `fleet.Service`'s constructor for the
+  commit-time `EnsureLaneHorizon` call and its fail-closed
+  `ErrDestinationNotReady` sentinel, and a redundant idempotent
+  confirmation call at the arrival site),
   `backend/system` (gate filtering removed, `contacts` array, bodies-public
-  rule), `backend/galaxy` (`EnsureLaneHorizon` wiring, exported lane-id
-  helper), `backend/corporations`, `backend/stations` (drop the
+  rule, `addGates`'s `EnsureLaneHorizon` call removed entirely, `spliceStation`
+  completed with the station's continuous position and size),
+  `backend/galaxy` (exported lane-id helper — `EnsureLaneHorizon` itself is
+  now called from `backend/fleet`, not from `backend/galaxy`),
+  `backend/corporations`, `backend/stations` (drop the
   `observation.InteriorSource` exclusion, which no longer has anything to
-  exclude from), `backend/market` (rename `observation.Tier` → `charts.Tier`),
+  exclude from, and delete the orphaned `continuous_orbit.go`/
+  `continuous_orbit_test.go` delegate that `spliceStation`'s completion
+  supersedes), `backend/market` (rename `observation.Tier` → `charts.Tier`),
   `backend/action` (ownership check, `ActorOwner`), `router.go`, `cmd/seed`,
   `common/tuning.go`, `common/firestore_test_helpers.go`, and **the
   frontend's roster jump-command gate, gate-selection unification, and the
@@ -209,11 +233,15 @@ this link needs them again.
   board view's `handleJump` wires it through to the jump commit;
   `SystemBoardView.tsx`'s burn command drops its `'gate'`-selection special
   case so a selected lane-gate body commands a burn through the same path
-  as any other body; and `GalaxyView.tsx`'s own `handleJump` resolves a
-  lane id from the already-fetched galaxy graph's `links[]` and submits a
-  real jump order in place of its placeholder toast, backed by a new
-  cross-stack fixture pinning the galaxy-link-id/lane-id equality it
-  depends on — these are this link's concrete frontend changes; contact/
+  as any other body; and `GalaxyView.tsx`'s own `handleJump` resolves the
+  attached gate's lane id from the **fleet DTO's own `laneId` field**
+  (`fleet-movement`: *Fleet Read Serves the Attached Gate's Lane Id*) and
+  submits a real jump order in place of its placeholder toast — never from
+  `GET /v1/galaxy`'s `links[]`, which is charted-filtered and therefore
+  empty for exactly the just-attached fleet this command exists to serve;
+  a new cross-stack fixture pins the galaxy-link-id/lane-id equality
+  separately, as a general regression guard rather than as this command's
+  source — these are this link's concrete frontend changes; contact/
   space rendering itself stays link 8's), `.claude/scripts/check-mirror-map.sh`,
   `.claude/skills/code-quality-checks/check.py`, `docs/plans/continous_space/chain.md`.
 - `observation-fog-and-scan` is deleted with **no `specs/observation-fog-
@@ -244,7 +272,10 @@ due burn yields the same disclosure answer as a settled one; carried to
 link 6, where mine/sell/dock start reading stored state in ways disclosure
 does not); and the general hand-maintained-registry-derivation fix (its own
 change — this link only enrolls the one list it is about to make
-load-bearing).
+load-bearing; a wiring-obligation checker (a `// WIRE-BY: <change-id>` marker
+plus a Go AST check that fails when a marked function has no non-test caller)
+is the structural answer to the blocker-3/4/5 species and is deferred to its
+own change, because it is a CI mechanism no requirement here demands).
 
 ## Retiring `observation-fog-and-scan`
 
@@ -322,10 +353,3 @@ Lane Id* closes the wire gap; nothing closed the player-facing one before
 it). A `board-view` delta was warranted here specifically because the gap
 was behavioral, not prose — the same distinction that keeps the
 `market-price-board` and route-citation items above out of scope.
-
-**Also noted, not fixed**: `galaxy.ErrLaneNotFound` has no case in
-`fleet/handler.go`'s `respond`, so a `laneId` not incident to the fleet's
-current system returns `500`, not a `400`/`404` the client could
-distinguish. This change makes that path easier to reach — lane ids now
-flow into player hands on every gate body read, not just through charted
-state — but does not fix it; it is a candidate for a later link.

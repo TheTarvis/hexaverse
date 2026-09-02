@@ -79,6 +79,14 @@ func (g *fakeGraph) LaneCrossing(context.Context, string, string) (string, space
 	return g.destSystemId, g.from, g.to, g.err
 }
 
+// EnsureLaneHorizon is a no-op success by default: this fixture's whole job
+// is scripting LaneCrossing for tests that never exercise the fail-closed
+// horizon path (that path has its own dedicated, real-*galaxy.Service-backed
+// test — jump_fail_closed_lane_horizon_test.go). Mechanical addition to keep
+// this fixture satisfying the widened GraphSource interface (design.md
+// Decision 28, tasks 10.2/10.3) — not a scenario assertion.
+func (g *fakeGraph) EnsureLaneHorizon(context.Context, string) error { return nil }
+
 // gateParkedFleet returns a fleet parked in orbit of the named gate body,
 // attached to it — the "jump-eligible" precondition ("Lane Jump From a
 // Docked Gate": "accept the order only when the fleet is attached to the

@@ -94,6 +94,13 @@ var (
 	// field — a distinguishable rejection would itself disclose that
 	// foreign fleet's presence, range, and occlusion state.
 	ErrScanHostUnresolved = errors.New("fleet: scan host does not resolve to a body or an own fleet in this system")
+	// ErrDestinationNotReady rejects a jump commit whose destination's lane
+	// horizon could not be materialized (replace-observation-with-sightings
+	// design.md Decision 28, corrected 2026-09-01: EnsureLaneHorizon fails
+	// closed at Jump commit). A distinguishable, retryable refusal — no
+	// action is committed and the fleet remains attached to the originating
+	// gate — mapped by the handler to 503.
+	ErrDestinationNotReady = errors.New("fleet: destination's lane horizon could not be materialized")
 )
 
 // BodySource resolves a system's body table — the space.Bodies implementation
@@ -108,9 +115,18 @@ type BodySource interface {
 // GraphSource resolves one lane's crossing geometry: the destination system
 // id and the two endpoint systems' RAW galaxy coordinates (never a
 // precomputed length), so Jump itself is what calls space.Vec3{...}.Length()
-// (design.md Decision 10's own text names that call explicitly).
+// (design.md Decision 10's own text names that call explicitly). It also
+// exposes EnsureLaneHorizon — the destination-materialization seam Decision
+// 28 of replace-observation-with-sightings hoists onto the jump path (tasks
+// 10.2/10.3) — so a *galaxy.Service satisfies this interface structurally
+// with no new constructor parameter (design.md Decision 22's
+// required-positional-parameter discipline: the ONE dependency this package
+// already threads covers both needs).
 type GraphSource interface {
 	LaneCrossing(ctx context.Context, laneId, fromSystemId string) (destSystemId string, from, to space.Vec3, err error)
+	// EnsureLaneHorizon materializes systemID's full lane horizon —
+	// idempotent and a pure function of the id (galaxy.Service.EnsureLaneHorizon).
+	EnsureLaneHorizon(ctx context.Context, systemID string) error
 }
 
 type ServiceInterface interface {
@@ -230,6 +246,18 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 		settled, err := s.resolveDue(ctx, f)
 		if err != nil {
 			return nil, err
+		}
+		// Redundant idempotent confirmation of the destination's lane
+		// horizon (replace-observation-with-sightings design.md Decision 28,
+		// corrected 2026-09-01): commit time (Jump, above) is the
+		// load-bearing ensure, so this call can only ever re-confirm an
+		// already-materialized horizon or catch a future commit path that
+		// forgets to call it. A failure here logs at Error and does not fail
+		// the read — the flip has already committed, so failing would strand
+		// a fleet that has genuinely arrived.
+		if err := s.graph.EnsureLaneHorizon(ctx, settled.SystemId); err != nil {
+			log.Error().Ctx(ctx).Err(err).Str("fleetId", id).Str("systemId", settled.SystemId).
+				Msg("Jump arrival's redundant lane-horizon confirmation failed")
 		}
 		if _, err := s.bodiesFor(ctx, settled.SystemId); err != nil {
 			log.Warn().Ctx(ctx).Err(err).Str("fleetId", id).Str("systemId", settled.SystemId).
@@ -730,6 +758,22 @@ func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error) {
 	// gate body itself is the entire eligibility gate (design.md Decision 2).
 	if f.AttachedTo != "gate-"+destId {
 		return nil, ErrJumpNotAttached
+	}
+
+	// Materialize the destination's full lane horizon before committing the
+	// jump (replace-observation-with-sightings design.md Decision 28,
+	// corrected 2026-09-01: hoisted out of system.Service.addGates onto this
+	// commit-time seam, the only site whose failure has a consequence for the
+	// player). FAILS CLOSED: no action is committed, the fleet stays attached
+	// to the originating gate, and the caller gets a distinguishable,
+	// retryable rejection rather than a silently swallowed background
+	// failure. Because materialization is monotonic and EnsureLaneHorizon is
+	// a pure function of the id, a successful ensure here is permanent — no
+	// unhealed state is left behind for a failed jump to worry about.
+	if err := s.graph.EnsureLaneHorizon(ctx, destId); err != nil {
+		log.Error().Ctx(ctx).Err(err).Str("systemId", destId).Str("fleetId", id).
+			Msg("Jump rejected: the destination's lane horizon could not be materialized")
+		return nil, ErrDestinationNotReady
 	}
 
 	now := s.clock.Now()

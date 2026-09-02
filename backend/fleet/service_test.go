@@ -85,6 +85,16 @@ func (fakeGraphUnused) LaneCrossing(context.Context, string, string) (string, sp
 		"fleet test fixture: fakeGraphUnused resolves no lanes — this fixture was built for a path that never jumps")
 }
 
+// EnsureLaneHorizon satisfies GraphSource's widened surface
+// (replace-observation-with-sightings design.md Decision 28, tasks.md
+// 10.2/10.3), erroring rather than succeeding silently, mirroring
+// LaneCrossing above: a fixture built for a path that never jumps should
+// never have this called either.
+func (fakeGraphUnused) EnsureLaneHorizon(context.Context, string) error {
+	return errors.New(
+		"fleet test fixture: fakeGraphUnused ensures no horizon — this fixture was built for a path that never jumps")
+}
+
 // newSvc's default BodySource is a REAL *system.BodyTable ("sys-0", a size-6
 // star, no other bodies) built through testBodyTable (space_testutil_test.go)
 // — not an inert stub — because at least one pre-existing, untouchable

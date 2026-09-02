@@ -588,6 +588,9 @@ fails the moment a third copy appears.
 
 ### Decision 23 — Re-home `EnsureLaneHorizon` at jump arrival, before the destination's first body table (blocker 4)
 
+**Superseded by Decision 28** — the arrival site is retained but is no
+longer the primary trigger.
+
 `galaxy.EnsureLaneHorizon` has no production caller, so the endless galaxy
 stops growing at the materialized frontier. Jump arrival is the natural site —
 it is the only remaining trigger that can look past the frontier now that scan
@@ -663,6 +666,385 @@ stored doc is invisible to every predicate here.
 Recorded rather than silently dropped, so it stays a live carried item: link 6
 re-anchors mine/sell/dock to bodies, and those verbs read stored state directly
 in ways disclosure does not, which is where the retrofit actually bites.
+
+### Decision 28 — `EnsureLaneHorizon` moves out of `BodyTable` onto the jump path; a body-table build materializes nothing (blocker 4, corrected)
+
+Decision 23 ruled the horizon call belongs in `fleet.Service.Get`'s
+post-jump-settle step, before the destination's first `BodyTable` build. What
+shipped is somewhere else: it is the first statement of `system.Service.addGates`
+(`system/bodies.go:190`), which `BodyTable` calls at `bodies.go:147` — i.e.
+**inside** every body-table build, just before `NeighborsOf` derives the gate
+set. `backend/fleet` contains no `EnsureLaneHorizon` call at all. tasks.md 1.4
+carries a "SEAM CORRECTION" annotation defending this as *"stronger than the one
+specified: EVERY `BodyTable` build gets it."* That defence does not survive
+three facts.
+
+**Fact 1 — two of those builds are inside Firestore transactions, where the call
+cannot work.** `BodyTable` is called from `ScanResolver` (`fleet/resolver.go:124`)
+and `BurnResolver` (`fleet/resolver.go:214`), both of which `action`'s
+`ResolveOne` invokes with the *transactional* context (`action/dao.go:229` —
+`resolve(ctx, …)` inside `dao.db.RunTransaction`). `EnsureLaneHorizon` reaches
+`galaxy` `MaterializeBlock`/`MergeExtent`, which open their own
+`RunTransaction` (`galaxy/dao.go:180`, `:241`), and the Firestore Go client
+refuses a nested transaction outright — `errNestedTransaction`, returned before
+any RPC, on a context already stamped with `transactionInProgressKey`
+(`firestore@v1.9.0/transaction.go:97-98`, stamped at `:132`). The call is not
+merely unwired on those paths; it is *unwirable*.
+
+**Fact 2 — it fires exactly when it would have done work, and is silent
+otherwise.** `ensureBlocksIn` short-circuits: it reads `MaterializedBlocks`
+first and `continue`s past every block already present, so when `created == 0`
+it returns without ever opening a transaction (`galaxy/service.go:192-212`).
+In steady state — a system whose horizon is already materialized — the call is a
+pure read and returns `nil`. It only reaches `RunTransaction`, and therefore only
+fails, when there is genuinely an unmaterialized block. That is precisely the
+frontier case the requirement exists for. So this is not a per-resolve warning
+flood (the orchestrator's read of it as "every burn and scan resolve" is the
+volume, not the incidence); it is a seam that is dead on exactly the branch that
+matters and quiet on the branch that doesn't — the worst possible shape for
+something you hope CI will notice.
+
+**Fact 3 — a body-table build is not a materialization trigger, and
+`galaxy-generation` already says so.** That capability enumerates the triggers —
+*"jump arrival at a system past the currently materialized frontier, the spawn
+walk, or initial seeding"* — and then constrains the complement: *"Plain reads
+(`GET /v1/galaxy`, `GetLiveSystem`) SHALL NOT themselves create system or lane
+documents."* `BodyTable` is a read (`system-body-table`: *"Lane Gates Are Derived
+Fresh At Every Build"* — derived **from the live lane set**, not by growing it).
+Putting the horizon call inside `addGates` therefore did not strengthen the
+specified seam; it added an unenumerated fourth trigger on the read path — the
+`GET /v1/systems/:id` interior read now silently grows the galaxy. That is a
+scope violation, not a bonus.
+
+**The spec is the correct side of this drift.** Its placement — *"after the
+resolve transaction completes and before the destination's first body-table
+build for this arrival"* — is exactly the constraint that would have prevented a
+permanently-dead call, and it is the constraint the shipped code violates.
+
+**Ruling.** Hoist `EnsureLaneHorizon` out of `addGates`. It gets exactly two
+call sites, both non-transactional, both on the jump path, neither on a read
+path:
+
+1. **Jump commit** — `fleet.Service.Jump`, once `LaneCrossing` has yielded
+   `destId` and the order is about to be committed (`fleet/service.go:723-733`).
+   This is the primary site, and — corrected 2026-09-01, see below — the only
+   site whose failure has a consequence for the player. `EnsureLaneHorizon`
+   runs before the action is committed; **IF it errors, `Jump` FAILS
+   CLOSED**: it logs at Error with `systemId`/`fleetId`, commits no action,
+   leaves the fleet attached to the gate, and returns a new sentinel
+   (`fleet.ErrDestinationNotReady`, mapped by the handler to `503`) instead of
+   the committed jump — a distinguishable, retryable refusal, not a silently
+   swallowed background failure. Because materialization is monotonic and
+   `LaneHorizon(systemID)` is a pure function of the id, a successful
+   commit-time ensure is permanent: there is no unhealed state to worry about
+   afterward, only a rejected order the player can resubmit.
+2. **Jump arrival** — `fleet.Service.Get`, after `resolveDue` returns and before
+   the `s.bodiesFor(ctx, settled.SystemId)` line (`fleet/service.go:230-235`).
+   This is the site Decision 23 named and the one the requirement's ordering
+   sentence describes. Because site 1's commit-time ensure is now the
+   load-bearing one, this call is a **redundant idempotent confirmation** —
+   it re-runs an already-satisfied point read, pins the requirement's literal
+   ordering, and guards against a future commit path that forgets to call
+   it — not coverage of a failure mode site 1 cannot reach.
+
+Do not add it to the interior read path, and do not add it to any other
+body-table caller. `system` loses its materializing dependency on `galaxy`
+entirely; `addGates` goes back to a pure read of the live lane set, which is what
+its own capability says it is.
+
+**Why commit must fail closed rather than log-and-continue — the sweep gap.**
+`Get`'s post-settle step is guarded on `f.Jump != nil` (`fleet/service.go:228`),
+so it runs only when *that read* settles the arrival. The action sweep
+(`POST /v1/push/action-sweep` → `ResolveAllDue`) can settle a due jump first, and
+`jump` is a registered resolver, so it does. After a sweep-settled arrival the
+fleet reads back with `Jump == nil` and the post-settle step never runs at all —
+neither the horizon call nor, already today, the destination-interior
+materialize. The interior heals anyway, because `GetOrCreateInterior` is
+create-if-absent on any subsequent read; a horizon call that only ran at the
+arrival site, and only logged on failure, would not — a fleet could be
+permanently stranded short its true gate set, with no path back, exactly the
+"silent dead end that reads as a correctly-generated cul-de-sac" this
+capability exists to rule out. **Ensuring at commit, and rejecting the order
+when it cannot be ensured, closes that hole at the root**: it happens before
+the transit even starts, so there are exactly two outcomes — either the
+destination's true horizon is materialized before any arrival (read-settled or
+sweep-settled) can ever be reached, or the order never commits and there is no
+fleet in transit and no state left to heal. There is no third, silently-broken
+outcome for a sweep to inherit.
+
+**An earlier draft of this decision called the two sites "belt-and-suspenders,
+justified because the two sites cover disjoint failure modes rather than the
+same one twice." That claim is false, and the 2026-09-01 review upheld the
+finding.** Site 1's `EnsureLaneHorizon` and site 2's are the same idempotent,
+pure-of-id call against the same destination system; a commit-time failure is
+now rejected before transit begins, so there is no in-flight arrival left for
+a redundant arrival-site call to "retry" or "heal" — there is no arrival at
+all, because the jump never committed. Site 2 is retained as a redundant
+confirmation and a guard against a future commit path that forgets to call it,
+not because commit-time failure leaves anything behind for it to clean up. Its
+failure logs at Error and does not fail the read, exactly as before. The spec
+text below states the commit-time ensure and its fail-closed rejection
+directly, replacing the earlier "after the resolve transaction completes,"
+read-as-sole-permitted-moment framing entirely rather than merely widening it.
+
+**Why the jump path alone is sufficient — the completeness argument.** The
+only two ways a fleet comes to be in a system are spawn and jump arrival. Spawn
+already ensures the horizon through `LaneHorizonBlocks`/`EnsureBlocks`
+(`corporations/siteselection.go`); the jump is what this decision wires. So every
+system a corporation is *in* has a complete gate set, and a jump can only be
+issued from a gate the fleet is attached to in the system it occupies. A system
+nobody has visited may still serve a gate set short of its true horizon on a
+bare interior read — accepted deliberately: that is a display truncation of a
+system you cannot yet act in, it heals the instant anyone arrives, and it never
+manifests as a traversal dead end. The enumerated trigger set is complete; the
+read path needs no trigger of its own.
+
+**The resolvers do not need the call, and never did.** Traced: `BurnResolver`
+uses its table for `DecodeKinematicState` + `space.StateAt`; `ScanResolver` uses
+it for the scanner's and every co-resident ship's state, the star's occlusion
+geometry, and `disclosure.FocusedScan`. Both can therefore be hurt by a missing
+gate body — `fleet/kinematic_decode.go:121-126` and `:134-138` return
+`CauseUnknownBody` for an unresolvable burn target or park host, which would fail
+the resolve, roll back the transaction, and wedge the fleet on every subsequent
+read. But a truncated table cannot arise there, because **every commit path
+builds a non-transactional `BodyTable` for the same system first** —
+`OrderTo` (`fleet/service.go:432`), `Jump` (`:712`), `Scan` (`:808`) — and
+materialization is monotonic while `LaneHorizon(systemID)` is a pure function of
+the id. Once a system's horizon is materialized it stays materialized, so the
+resolve-time `NeighborsOf` sees the same complete set the commit-time build
+ensured. Removing the call from `addGates` cannot truncate any resolver's gate
+set. **Verdict: a dead call, not a live correctness bug** — but "dead and
+harmless" rests on a non-local invariant, and the failure mode if that invariant
+ever breaks is a wedged fleet, not a log line. Which is why the invariant gets
+written down and tested rather than left to be re-derived.
+
+**Alternatives rejected.**
+
+*Split `BodyTable` into a horizon-ensuring variant and a plain one.* Rejected: it
+keeps a materializing write inside the body-table seam (still violating
+`galaxy-generation`'s read constraint on the interior read path), doubles the
+surface, and makes correctness depend on every future caller picking the right
+variant — the same hand-maintained-list species Decision 25 is closing in this
+very change. One seam that materializes nothing is strictly cheaper to keep true.
+
+*Leave the seam and narrow the spec to the observable invariant.* Rejected on two
+counts. It would have to relax `galaxy-generation`'s "reads create no galaxy
+documents" to bless the interior read as a trigger, which is a real behavioural
+loosening smuggled in as a documentation fix. And it would bless a write issued
+from inside a resolve transaction — the one thing `fleet/resolver.go:265` already
+states as a rule (*"a resolver may perform no writes of its own"*) — leaving the
+codebase with a rule and a live counterexample to it.
+
+**On the silent degrade (part B).** `addGates`'s two remaining degradations
+(`NeighborsOf` and `GetLiveSystems` read failures → omit gates, keep the table)
+stay exactly as they are: they are spec'd behaviour
+(`system-body-table`: *"The Table Degrades to Fewer Bodies Rather Than a Failed
+Build"*). At the horizon call's new home, log-and-continue is also right — the
+flip has already committed, so failing the read would strand a fleet that has
+genuinely arrived — but it is logged at **Error**, not Warn: after the hoist,
+this is the only place the galaxy can fail to grow, and it is not a degradation
+the system is designed to tolerate indefinitely. It is safe to log-and-continue
+here only because site 1 fails closed: nothing reached transit without a
+materialized horizon, so this call has nothing to heal — it does not self-heal
+a commit-time failure, and no such failure exists to heal.
+
+We do **not** add a branch distinguishing a nested-transaction error from a
+genuine materialization failure. `errNestedTransaction` is unexported in the
+Firestore SDK; matching it means string-comparing a third-party error message,
+which is a fragile coupling to buy a diagnostic. More to the point, after the
+hoist a nested-transaction error against `galaxy` is unreachable by
+construction on this path, so the branch would be dead code guarding a bug the
+structure now prevents.
+
+**Correction (2026-09-01 review, BLOCKER 2): that unreachability claim is
+scoped to `galaxy` writes only, and an earlier draft of this decision stated
+it without that scope.** `system.Service.BodyTable`'s own interior read runs
+`GetOrCreateInterior`, whose create-if-absent path performs a real Firestore
+write (`dao.CreateInterior`) the first time a resolve-time build touches a
+system whose interior has never been materialized — including from inside an
+`action` resolve transaction. That write predates this change: it is the same
+seam `system-body-table`'s baseline *One Table Resolves Every Body In a
+System, Absence Never An Error* already relies on, and this change's own
+`fleet-movement` *First arrival materializes the destination's interior*
+scenario depends on it. This decision does not alter that behaviour —
+*A Body-Table Build Materializes Nothing*'s "no write of its own" is scoped to
+**galaxy** documents for exactly this reason, not to every write a
+resolve-time build can still trigger. It is recorded here as a named, accepted
+residual risk rather than fixed: a resolve-time build for a never-before-read
+system still performs a Firestore write nested inside `action`'s resolve
+transaction, and this decision's structural guard (below) does not cover it,
+because the interior create-if-absent path is out of this change's scope — it
+predates it and no requirement here asks it to change.
+
+The correct guard for the `galaxy` seam is structural and testable:
+`system.Service.BodyTable` records in its own doc
+comment that it is a **read-only, transaction-safe** seam called from inside
+`action` resolve transactions, and no materializing call may be added to it or to
+`addGates`; and a resolve-path test asserts zero `EnsureLaneHorizon` calls during
+a burn resolve. That is the same species of guard as the rule in
+`fleet/resolver.go:265` that would have caught this, promoted from a comment on
+one function to an assertion in CI.
+
+**tasks.md 1.4's "SEAM CORRECTION" annotation must not reach the archive as
+written.** Its claim that the cited scenario is satisfied and the seam is
+stronger than specified is false in both halves: the scenario's ordering
+constraint is unmet on the transactional builds, and the seam is weaker
+(unenumerated on the read path, inert on the frontier path) rather than stronger.
+It is replaced by the tasks in §10.
+
+### Decision 29 — The spliced station is completed at the splice seam, not stored and not decoded (blocker 5)
+
+`system.StationContinuousOrbit` (`system/station_continuous.go:30`) and its
+one-line delegate `stations.DeriveContinuousOrbit`
+(`stations/continuous_orbit.go:22`) have **zero production callers** — grep
+returns only their own definitions, their tests, and comments. Link 3
+(`add-orbital-system-bodies`) listed `trading-station` in its Touches, shipped
+the derivation, and never wired it. `stations.EnsureStation` still provisions
+with the lattice derivation alone (`stations/service.go:114`), `Station` has no
+field for a continuous orbit at all (`stations/model.go:35` types `Orbit` as
+`system.Orbit` — Ring/Angle0/Dir/Period), and `stations.FeatureOf`
+(`stations/service.go:224-239`) therefore returns a `system.Feature` carrying no
+`Space` and no `SpaceDoc`. `system.Service.applyContinuousCascade`
+(`system/service.go:254-270`) calls `space.DecodeOrbit(f.SpaceDoc)` on every
+non-star feature, fails, logs *"Spliced feature's orbital element set failed to
+decode; omitting from the interior read"*, and drops it.
+
+**Consequence: the home trading station is absent from every
+`GET /v1/systems/:systemId` response, for every requester including its owner.**
+The board is the only playable view (Decision 26), so M11's dock-then-sell loop
+is unreachable through the UI. Third instance of the species behind blockers 3
+and 4, and the second one Decision 28 was written about: a derivation built,
+unit-tested against its own determinism, and never called.
+
+**This is fixed here, not deferred.** Three requirements this change is about to
+archive are demonstrably violated by shipped code: `trading-station`'s ADDED
+*"Home Station Visible On the Direct Station Read"* — scenario *The board read
+serves the station regardless of tier*, which is the failing test;
+`system-interior`'s ADDED *"Bodies Are Public; Ships Are Disclosed"* — "every
+body ... in full to every authenticated requester"; and, per the second half
+below, `system-body-table`'s *"A Table Contains No Body With a Non-Positive
+Size"*. Archiving would ratify all three as satisfied.
+
+**Second half of the defect, not in the original report: `Size` is missing too.**
+`FeatureOf`'s struct literal sets `Id`, `Type`, `Name`, `Orbit`, `Footprint`,
+`OwnerCorpId` — and no `Size`. `system.StationSize = 0.9` exists
+(`system/params_continuous.go:117-119`) and `MaxFeatureSize(FeatureStation)`
+already returns it (`system/continuous.go:178-179`); nothing sets it on the
+feature. `system-body-table`'s non-positive-size requirement **names the station
+explicitly** — "the station per its configured constant" — so repairing only
+`Space` would move the station from "silently absent" to "present at size zero,"
+which is worse: `space.InsertionStandoff` on a zero-size body yields a
+degenerate standoff, so a fleet would dock *at the station's centre*. The two
+fields are one fix and must land together.
+
+**Ruling — derive at the splice seam; store nothing; change no schema.**
+`system.Service.spliceStation` (`system/service.go:171-184`) sets both halves on
+the feature it appends: `Space = StationContinuousOrbit(meta.Seed, systemID,
+node.Skeleton)` and `Size = StationSize`. Nothing else moves.
+
+Why this shape and not the alternatives:
+
+*Replace `Station.Orbit`'s type with `space.Orbit` and delete `DeriveOrbit` /
+`stations/placement.go` outright.* **Rejected — it would re-break the bug it
+fixes.** The lattice `Orbit` is what `FeatureOf` derives `Footprint` from, and
+`Footprint` is what the current renderer draws the station at. Decision 26 is
+this change's standing rule — *"Additive on the wire; nothing the live board
+consumes is removed"* — and the chain has an explicit deletion point for the
+lattice at links 8-9, with `placement.go`'s own doc comment naming link 6 for the
+docking half. Deleting it here jumps the chain's own sequencing and blanks the
+station from the only playable view. The no-backcompat ground rule
+(`docs/plans/continous_space/README.md`) governs **stored data and migrations** —
+never plan a migration, regenerate instead — and it is not a licence to delete a
+live subsystem three links ahead of its scheduled removal. Both readings of
+"delete is preferred" are honoured by deleting the orphan delegate (below)
+rather than the load-bearing lattice.
+
+*Add a stored continuous orbit to the `Station` document.* Rejected on the
+domain's own stated rule. The station orbit is **derived, never rolled** — a pure
+function of (galaxy seed, system id, skeleton) — and `DeriveOrbit`'s doc comment
+already leans on that: *"A fleet already docked to a station resolves its live
+position by recomputing this in-process, never by re-reading the station
+store."* Storing a second copy of a pure derivation invents a staleness class
+that does not currently exist, and it forces every already-provisioned station in
+the dev emulator through a re-seed to become visible again. Deriving costs a
+`GetLiveSystem` point read on a path that already point-reads `LiveGalaxyMeta`,
+and every existing station heals on the next read with zero data work.
+
+*Populate `SpaceDoc` at read time and let the cascade decode it.* Rejected as the
+wrong field. `SpaceDoc` is documented as the persistence-native form, constructed
+only by `space.EncodeOrbit` and this package's DAO (`system/model.go:145-148`);
+filling it in memory to have it immediately decoded is an encode/decode
+round-trip for nothing, and it launders an in-process construction through a
+storage-boundary guard. Setting `Space` directly is both cheaper and more
+honest — and it needs **no cascade change at all**, because
+`applyContinuousCascade`'s own loop already passes through any feature arriving
+with `Space != nil` (`system/service.go:256-259`), exactly as its doc comment
+anticipates ("decodes the spliced station's SpaceDoc *if it arrived undecoded*").
+
+**Why `system.spliceStation` and not `stations.FeatureOf`.** `stations`'
+`GraphSource` exposes only `LiveGalaxyMeta`, so wiring the derivation there means
+widening that interface with `GetLiveSystem` and threading a skeleton through
+`FeatureOf`'s signature. `system` already holds both dependencies, and
+`StationContinuousOrbit` is *defined in `system`* — the derivation, the constant,
+and the splice all live in one package. `stations` keeps what it actually owns:
+identity, ownership, requests, the lattice placement `Footprint` still needs, and
+the `ErrStationRingOutOfRange` guard, **all untouched**. That guard and its
+backing requirement *"A Station Orbit Outside the Live Board Radius Is Omitted,
+Never Panicked"* survive intact, so no spec removal is needed — a decisive
+advantage over the type-replacement option, which would have orphaned a live
+requirement.
+
+**Delete the orphan delegate.** `stations/continuous_orbit.go` and
+`stations/continuous_orbit_test.go` go, since `stations` is not the wiring site
+and `system/station_continuous_test.go` already pins the real function's
+determinism. Leaving a permanently-uncalled delegate in place after diagnosing
+this species would be self-parody.
+
+**Implementation hazard the implementer must confirm, not assume.**
+`StationContinuousOrbit` parents the station to `feat-body-{k}` for `k` indexing
+`skeleton.Bodies` (`station_continuous.go:43-49`); `generator.go:78` names major
+bodies with the same `feat-body-%d` scheme over the same slice, so the ids line
+up — but if that parent body was itself dropped by the ring guard or an earlier
+cascade pass, the station cascades out with it. That is *correct* (its parent is
+genuinely gone) and must not be special-cased; the acceptance test therefore
+asserts the station **survives the cascade**, not merely that `Space` was set.
+
+**On the silent omit (part B) — the degradation policy is right; the population
+split is what was missing.** The station never crossed the persistence boundary
+as a feature: `FeatureOf` builds it in memory. `readInterior`'s and
+`applyContinuousCascade`'s decode guards are **storage-boundary** guards, whose
+purpose is surviving corrupt or legacy stored documents without permanently
+500-ing every corporation's read of a system. That policy is correct and stays.
+Applying it to an in-process construction is a category error: it converts a
+producer bug — a struct literal missing two fields — into a runtime omission
+indistinguishable, in the log, from data rot. That is precisely the mechanism
+that hid this for a whole link.
+
+So: keep omit-never-fail for **stored** features; make a **spliced** body that
+arrives without a `Space` or without a strictly positive `Size` loud, because
+that can only ever be a programming error. Log it at Error naming the producing
+source, and — more importantly, since a log nobody reads is what got us here —
+pin it with a splice-completeness test that fails for *any* future spliced body
+family, not just the station.
+
+**Does omit-with-200 violate "An Interior Predating This Capability Fails Closed,
+Never Silently"? Ruled: no, but the requirement is genuinely ambiguous and the
+ambiguity is worth closing.** Its body says *"a read or table build that
+encounters one SHALL fail by name rather than degrade"*, while its own scenario
+*"A non-star feature with no orbital element set at all fails, never reads as
+parentless"* says the feature is *"treated as a decode failure — omitted and
+logged with its id"*. The reconciling reading — and the one the code implements —
+is that "fail by name" attaches to the **extent** clause
+(`ErrInteriorPredatesContinuum`, `system/bodies.go:113-115`), while "closed" for
+the SpaceDoc clause means "never silently reinterpreted as a legitimate
+parentless body," which omission does achieve. The sibling requirement settles
+the intent: *"Interior Feature Decode Validates Its Orbital Element Set, Omitting
+Rather Than Failing"* folds *"or a missing key"* into its own omit-not-fatal
+scenario explicitly. So this is not a live spec violation — but a requirement
+whose prose supports two opposite behaviours is exactly what let a reviewer wave
+this through, and it is worth one clarifying MODIFIED block. Recorded as a
+finding with paste-ready text; taking it is the orchestrator's call, and
+deferring it to link 6 costs nothing but a re-litigation.
 
 ## Risks / Trade-offs
 

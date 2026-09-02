@@ -74,22 +74,23 @@ export interface BoardFeature {
   asOf?: number
 }
 
-// A charted lane's fixed rim cell on this board (#0008 Decision #10) — where the
-// lane toward `destSystemId` departs. Bearing-projected and deterministic
-// (backend board.LaneGateCell; mirrored in lib/board/gate.ts), so the glyph sits
-// on the exact cell a departing fleet burns to. Fog-filtered server-side: only
-// lanes the requester has charted ship, so an uncharted neighbour never leaks
-// here.
+// A lane's fixed rim cell on this board (#0008 Decision #10) — where the lane
+// toward `destSystemId` departs. Bearing-projected and deterministic (backend
+// board.LaneGateCell; mirrored in lib/board/gate.ts), so the glyph sits on the
+// exact cell a departing fleet burns to. Bodies are public (system-interior
+// "Bodies Are Public; Ships Are Disclosed"): every lane-gate body on this
+// system's rim ships unfiltered to every authenticated requester, charted or
+// not — `replace-observation-with-sightings` §1 deleted `chartedGates`, the
+// server-side charted-lane tier filter this used to ride.
 export interface LaneGate {
   destSystemId: string
   cell: Cell
   // The lane id a jump order names to cross from this gate (system-interior
   // "Lane-Gate Bodies Carry Their Lane Id") — present on every gate the
   // interior read serves, charted or not (board-view "Jump Commit": no
-  // second read to resolve it, no charted-lane precondition). Optional only
-  // in the type (older fixtures in tests predating this field construct a
-  // gate without it); the wire always sends it.
-  laneId?: string
+  // second read to resolve it, no charted-lane precondition). The wire always
+  // sends it — required, not optional.
+  laneId: string
 }
 
 // The fogged system interior — exactly what `GET /v1/systems/:id` returns.
@@ -99,8 +100,9 @@ export interface SystemBoard {
   character: string
   starClass: string
   features: BoardFeature[]
-  // The charted lane gates on the rim — the departure cells for inter-system
-  // travel (#0008), already filtered to the requester's charted lanes.
+  // The lane gates on the rim — the departure cells for inter-system travel
+  // (#0008). Every lane-gate body on this system's rim, unfiltered by charted
+  // knowledge (see `LaneGate`'s own doc comment).
   laneGates: LaneGate[]
   // Server world time at read (world-milliseconds) — the offset source that
   // drives client-side orbit/fleet animation (#0005).

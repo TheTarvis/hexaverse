@@ -4,12 +4,10 @@
 // decision, decoupled from the DOM/SVG/canvas layer it drives (BoardStage's
 // click handler, BoardOverlay's per-glyph onClick).
 //
-// Contract this test pins for `components/board/board-selection.ts` (does
-// not exist yet):
+// Contract this test pins for `components/board/board-selection.ts`:
 //
 //   export type BoardSelection =
 //     | { kind: 'feature'; id: string }
-//     | { kind: 'gate'; destSystemId: string }
 //     | { kind: 'cell'; cell: Cell }
 //     | null
 //
@@ -26,7 +24,16 @@
 //   // resolvePick hit-tests `point` against features and gates (features win
 //   // over gates; among features, a child wins over its overlapping parent —
 //   // the board's documented draw order), falling back to the containing
-//   // cell, or null when the point falls outside the lattice altogether.
+//   // cell, or null when the point falls outside the lattice altogether. A
+//   // gate hit folds into the SAME 'feature'-shaped selection as any other
+//   // body (replace-observation-with-sightings tasks.md 4.12 — gates ARE
+//   // bodies, `docs/plans/continous_space/decisions.md`), named by its
+//   // "gate-"+destSystemId convention id — the same id `attachedTo` reports
+//   // on arrival, and the same id `SystemBoardView.tsx`'s `selectGate` (the
+//   // live wiring) already constructs. There is no dedicated 'gate' kind any
+//   // more; a caller that needs to know a selected feature-shaped id names a
+//   // gate re-derives that from `board.laneGates` (`FactsPanel.tsx`'s own
+//   // `laneGates` prop is exactly that lookup).
 //   export function resolvePick(input: PickInput): BoardSelection
 //
 //   // toggleSelection: re-picking the current selection clears it; picking
@@ -80,10 +87,13 @@ describe('resolvePick — board-view ADDED "Board Picking Resolves to the Featur
     expect(picked).toEqual<BoardSelection>({ kind: 'feature', id: 'planet-1' })
   })
 
-  // Scenario: Clicking a lane-gate mark selects that gate
-  it('selects a lane gate clicked within its drawn mark', () => {
+  // Scenario: Clicking a lane-gate mark selects that gate — folded into
+  // the SAME 'feature'-shaped selection as any other body (replace-
+  // observation-with-sightings tasks.md 4.12), named by its
+  // "gate-"+destSystemId convention id.
+  it('selects a lane gate clicked within its drawn mark, as a feature-shaped "gate-"+destSystemId id', () => {
     const picked = resolvePick({ ...baseInput(), features: [], point: cellToPoint(GATE_CELL, SCHEDULE) })
-    expect(picked).toEqual<BoardSelection>({ kind: 'gate', destSystemId: 'sys-far' })
+    expect(picked).toEqual<BoardSelection>({ kind: 'feature', id: 'gate-sys-far' })
   })
 
   // Scenario: Clicking the lattice away from any mark selects the hex
@@ -150,11 +160,13 @@ describe('toggleSelection — board-view MODIFIED "Toggle-to-Deselect Single Sel
     expect(toggleSelection(current, null)).toBeNull()
   })
 
-  // Re-picking the same gate/cell also deselects — the toggle rule is
-  // generic across all three selection kinds, not feature-only.
-  it('deselects a re-picked gate and a re-picked cell identically', () => {
-    const gateSel: BoardSelection = { kind: 'gate', destSystemId: 'sys-far' }
-    expect(toggleSelection(gateSel, { kind: 'gate', destSystemId: 'sys-far' })).toBeNull()
+  // Re-picking the same gate (now feature-shaped, "gate-"+destSystemId —
+  // replace-observation-with-sightings tasks.md 4.12) or the same cell also
+  // deselects — the toggle rule is generic across every selection kind, not
+  // feature-only.
+  it('deselects a re-picked gate (feature-shaped) and a re-picked cell identically', () => {
+    const gateSel: BoardSelection = { kind: 'feature', id: 'gate-sys-far' }
+    expect(toggleSelection(gateSel, { kind: 'feature', id: 'gate-sys-far' })).toBeNull()
 
     const cell: Cell = { ring: 2, slot: 3 }
     const cellSel: BoardSelection = { kind: 'cell', cell }

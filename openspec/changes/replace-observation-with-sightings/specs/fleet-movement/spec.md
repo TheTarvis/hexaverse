@@ -285,13 +285,21 @@ gate — so the arrival is not masked. The system SHALL, in the same
 resolve transaction, mark the destination system `explored` for the
 fleet's corporation and chart the crossed lane for the fleet's
 corporation as `via: traveled`, and mint no rumor of any lane onward from
-the destination. The system SHALL, after the resolve transaction
-completes and before the destination's first body-table build for this
-arrival, ensure the destination system's true lane horizon is
-materialized (`galaxy.EnsureLaneHorizon`) — the ordering is load-bearing,
-because a system's gate bodies are derived from its materialized lanes,
-and building the body table first would strand an arriving fleet with
-fewer gates than truly exist. The system SHALL then materialize the
+the destination. The system SHALL ensure the destination
+system's true lane horizon is materialized before that system's first
+body-table build for this arrival — the ordering is load-bearing, because a
+system's gate bodies are derived from its materialized lanes, and building
+the body table first would strand an arriving fleet with fewer gates than
+truly exist. Committing the jump SHALL itself ensure the destination's
+horizon, so the horizon is materialized before the transit begins and
+therefore before the arrival is settled — whether that arrival is settled
+by a read of the fleet or by a background sweep. IF the destination's
+horizon cannot be materialized at commit, THEN the jump order SHALL be
+rejected with a distinguishable, retryable reason carried in the response
+body in the same form as this endpoint's other distinguishable rejection
+reasons, and no fleet SHALL enter lane transit toward that destination.
+Building a body table SHALL NOT
+itself materialize the horizon. The system SHALL then materialize the
 destination system's interior (create-if-absent).
 
 #### Scenario: Arrival flips the system and parks unattached near the gate
@@ -325,3 +333,23 @@ destination system's interior (create-if-absent).
   before its body table (and therefore its gate set) is first built for
   this arrival, so the destination's full gate set — not a truncated one
   — is present to the arriving fleet
+
+#### Scenario: A sweep-settled arrival still has the destination's full gate set
+
+- **GIVEN** a jump into a destination system at the edge of the galaxy's
+  currently materialized region, whose arrival is settled by the
+  background action sweep rather than by a read of the fleet
+- **WHEN** the arrived fleet's destination system is next read
+- **THEN** the destination's full gate set — not a truncated one — is
+  present, because the lane horizon was already ensured when the jump was
+  committed
+
+#### Scenario: A jump toward a destination whose horizon cannot be materialized is rejected
+
+- **GIVEN** a fleet attached to a lane gate whose destination lies past the
+  materialized frontier
+- **WHEN** it commits a jump and the destination's lane-horizon materialization
+  fails
+- **THEN** the order is rejected with a distinguishable, retryable reason, no
+  action is committed, and the fleet remains attached to the gate rather than
+  entering lane transit

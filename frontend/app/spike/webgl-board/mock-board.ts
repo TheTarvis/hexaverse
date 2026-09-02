@@ -132,8 +132,12 @@ export function buildMockSystemBoard(
     starClass: sys.starClass,
     features,
     laneGates: [
-      { destSystemId: 'mock-neighbour-a', cell: rim[0]! },
-      { destSystemId: 'mock-neighbour-b', cell: rim[Math.floor(rim.length / 2)]! },
+      { destSystemId: 'mock-neighbour-a', cell: rim[0]!, laneId: 'lane_mock-system_mock-neighbour-a' },
+      {
+        destSystemId: 'mock-neighbour-b',
+        cell: rim[Math.floor(rim.length / 2)]!,
+        laneId: 'lane_mock-system_mock-neighbour-b',
+      },
     ],
     worldTime: 0,
   }

@@ -8,6 +8,21 @@ import (
 	"hexaverse/board"
 )
 
+// TEST REVISION 2026-09-01 (SDET, authorized): spec changed — system-interior
+// ADDED "A Spliced Body Is Complete or Omitted, and Its Incompleteness Is
+// Loud" (openspec change replace-observation-with-sightings, tasks.md 10.9/
+// 10.14). TestSpliceStation_AppendsTheStationWhenOneExists previously
+// constructed &Service{stations: src} with NO galaxySvc and asserted only
+// that a lattice Orbit was attached — an unreachable production
+// configuration (system.NewService always wires galaxySvc) that no longer
+// reflects what "the station is appended" must mean now that appending an
+// INCOMPLETE spliced body (no continuous orbital element set, no positive
+// Size) is exactly the defect this capability forbids. Revised below to wire
+// a fake galaxySvc (oneBodySkeletonGalaxy, already used by
+// splice_completeness_test.go / spliced_body_complete_or_loud_test.go in this
+// package) and assert the appended station is COMPLETE — non-nil Space and a
+// strictly positive Size — rather than merely present with a lattice Orbit.
+
 // fakeStationSource stands in for the station store: it either yields a station
 // feature, yields none, or fails — the three cases the splice must handle.
 type fakeStationSource struct {
@@ -48,7 +63,11 @@ func interiorFixture() *GeneratedInterior {
 
 func TestSpliceStation_AppendsTheStationWhenOneExists(t *testing.T) {
 	src := &fakeStationSource{feat: stationFeatureFixture()}
-	s := &Service{stations: src}
+	// galaxySvc wired (the only reachable production configuration —
+	// system.NewService always sets it), so spliceStation's own self-heal
+	// derives the station's continuous orbit at the splice seam (design.md
+	// Decision 29) rather than appending an incomplete body.
+	s := &Service{stations: src, galaxySvc: oneBodySkeletonGalaxy()}
 	gen := interiorFixture()
 
 	s.spliceStation(context.Background(), gen)
@@ -60,11 +79,16 @@ func TestSpliceStation_AppendsTheStationWhenOneExists(t *testing.T) {
 	if last.Type != FeatureStation {
 		t.Errorf("spliced feature type = %q, want station", last.Type)
 	}
-	// It must carry orbital elements: fleet.Position resolves a docked fleet
-	// through the generic featureOrbit branch, so a station with no orbit would
-	// leave a docked fleet unresolvable.
-	if last.Orbit == nil {
-		t.Error("spliced station carries no orbital elements")
+	// system-interior "A Spliced Body Is Complete or Omitted, and Its
+	// Incompleteness Is Loud": the appended station must be COMPLETE — a
+	// non-nil continuous orbital element set and a strictly positive Size —
+	// not merely carrying a lattice Orbit, which alone is not enough to
+	// survive applyContinuousCascade's completeness contract.
+	if last.Space == nil {
+		t.Error("spliced station carries no continuous orbital element set (Space)")
+	}
+	if !(last.Size > 0) {
+		t.Errorf("spliced station carries a non-positive Size (%v)", last.Size)
 	}
 }
 
