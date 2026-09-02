@@ -712,7 +712,39 @@ events are exactly:
   is already at or past its stored dry instant instead settles via the
   automatic past-dry-instant fold above, before its own preconditions
   evaluate, per "Every Decision Reading Fuel Settles a Past-Dry-Instant
-  Hold First."
+  Hold First" — and where that ending verb reads `cargo.fuel` neither to
+  decide anything nor as a `FreeHold` consumer, **that fold SHALL be
+  carried by the verb's own hold-ending transaction**, exactly as the
+  not-yet-dry settlement above is, and SHALL NOT be hoisted into a
+  preceding, independent write. `jump` and `stop` are today's two such
+  verbs; they are deliberately **absent** from the consumers "Every
+  Decision Reading Fuel Settles a Past-Dry-Instant Hold First" enumerates,
+  and SHALL NOT be added to them. Such a verb SHALL NOT then also apply
+  the `upkeepTons` debit on top of that fold: the fold has already priced
+  the whole hold, settling `cargo.fuel` to exactly
+  `FuelParams.StationKeepReserveTons`, and charging both would debit one
+  accrual twice.
+
+  The abort-with-an-answer hazard that forces the burn commit, the
+  transaction-scoped free-hold figure a refuel re-evaluates inside its own
+  settlement transaction, and `hold`'s own commit to settle in a
+  **preceding, independent** write does not reach these two, and this
+  requirement states why rather than leaving a future reader to "fix" it
+  back. Those three read `fuel` **to decide** — affordability, free hold,
+  sufficiency — so a settlement discarded along with their rejection would
+  leave them deciding against a stale, over-reported figure. `jump` and
+  `stop` read it for neither purpose. If such a verb's transaction aborts —
+  a jump rejected for not being attached to the named lane's own gate body,
+  or for already being in lane transit — then **no hold was ended**: the
+  fleet is still station-keeping, still at or past its stored dry instant,
+  and the next fuel-reading consumer settles it by the ordinary rule above.
+  Nothing is lost and nothing is stale, because that settlement's only
+  purpose inside that transaction was to price a hold the transaction
+  turned out not to end. The universal hold-ending rule therefore subsumes
+  the past-dry case inside the verb's own transaction, and doing so is
+  **self-healing rather than lossy** — where hoisting it into a preceding
+  write would buy nothing and would add one more unserialized `cargo.fuel`
+  writer.
 
 This reuses the two park modes "Station-Keeping Hold and Release Are Fleet
 Verbs" already defines; no new park mode is invented for the
@@ -807,6 +839,33 @@ force-demoted case.
   upkeep accrued since the hold's stored start time, so a fleet that camps
   a gate under a hold and then jumps has paid for the hold — the jump
   itself still costs no delta-v
+
+#### Scenario: A jump against a past-dry-instant hold settles it in the jump's own transaction
+- **WHEN** a jump is committed against a fleet whose stored `stationkeep`
+  park is already at or after its dry instant, unobserved by any prior
+  write
+- **THEN** the settlement — the fold to the released orbit, with
+  `cargo.fuel` persisted at exactly `FuelParams.StationKeepReserveTons` —
+  is carried by the jump's **own** commit transaction, not by a preceding,
+  independent write, since the jump reads `cargo.fuel` neither to decide
+  anything nor as a `FreeHold` consumer
+- **AND** no `upkeepTons` hold-ending debit is applied on top of that fold,
+  so the accrual is charged exactly once, and the jump itself still costs
+  no delta-v
+
+#### Scenario: A rejected jump leaves a past-dry-instant hold open and unsettled for the next reader
+- **GIVEN** a fleet whose stored `stationkeep` park is already at or after
+  its dry instant, unobserved by any prior write
+- **WHEN** a jump against that fleet is rejected — it is not attached to
+  the named lane's own gate body, or it is already in lane transit — so its
+  transaction applies **none** of its effects, the settlement among them
+- **THEN** the fleet's stored park is still that unsettled `stationkeep`
+  park and its stored `cargo.fuel` still shows the pre-fold figure, no hold
+  having been ended
+- **AND** the next consumer that reads that fleet's fuel settles it by the
+  ordinary past-dry-instant rule, to exactly the configured
+  station-keeping reserve — nothing is forgiven and nothing is lost by the
+  abort
 
 #### Scenario: A refuel during an open hold settles the accrual, restamps the hold, and recomputes the dry instant
 - **WHEN** a fleet's `fuel` cargo is credited by a refuel purchase while it

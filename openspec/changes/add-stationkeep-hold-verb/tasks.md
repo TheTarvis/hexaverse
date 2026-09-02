@@ -278,8 +278,21 @@
       transaction that commits the jump (`service.go:938-1010` leaves the
       kinematic state untouched at commit, and `JumpResolver` then
       overwrites it with a fresh destination park, so an unsettled hold is
-      simply discarded). The jump itself still costs no delta-v — same
-      requirement ("Jumping from an open hold settles its accrued upkeep")
+      simply discarded). The jump itself still costs no delta-v. Carry the
+      **past-dry-instant** case in that same transaction too — for `jump`
+      and for `stop` (task 4.5), the fold settling `cargo.fuel` to the
+      reserve rides the verb's own hold-ending transaction, **not** a
+      preceding independent write, and no `upkeepTons` debit is stacked on
+      top of it. Do **not** add either verb to task 4.7's eight consumers
+      or to task 4.10's three abortable transactions: neither reads `fuel`
+      to decide or as a `FreeHold` consumer, so an aborted jump
+      (`ErrJumpNotAttached`, `ErrFleetInTransit`) ends no hold and leaves
+      the fleet holding, past its dry instant, for the next fuel-reading
+      consumer to settle by the ordinary rule — self-healing, not lossy —
+      same requirement ("Jumping from an open hold settles its accrued
+      upkeep", "A jump against a past-dry-instant hold settles it in the
+      jump's own transaction", "A rejected jump leaves a past-dry-instant
+      hold open and unsettled for the next reader")
 - [ ] 4.7 Implement the settle-past-dry-instant-first step in every
       fuel-reading decision path the requirement names: the burn-commit
       affordability check, `FreeHold`'s **five** production call sites
@@ -603,3 +616,23 @@ this change already rewrites that exact `respond` switch. Full write-up:
       the very window this test exists to open — traces to
       `fleet-movement`: "A hold whose dry instant passes between the
       settle-first write and the commit is rejected, never restamped"
+- [ ] 7.19 Backend integration test: hold a fleet at a lane gate, advance
+      world time **past** its stored dry instant with no read or write
+      observing the park in between, then (a) `jump` successfully — assert
+      the stored `fuel` is exactly the reserve, the park is the released
+      `orbit`, the accrual is charged **once** (no `upkeepTons` debit on
+      top of the fold), and that no write touched the fleet document before
+      the jump's own commit transaction; and (b) from the same setup, issue
+      a jump that is **rejected** (not attached to that lane's gate body,
+      or already in transit) — assert the stored park is still the
+      unsettled `stationkeep` park with its original stamps, the stored
+      `fuel` is still the pre-fold figure, and a subsequent fuel-reading
+      consumer then settles it to exactly the reserve.
+      **What makes this vacuous:** any setup step that observes the park
+      between the clock advance and the jump (a `GET /v1/fleets/:id`, a
+      `FreeHold` consumer), which pre-settles the fleet and makes both
+      halves pass regardless; and asserting on the response body rather
+      than a re-read of the stored fleet document — traces to
+      `fleet-movement`: "A jump against a past-dry-instant hold settles it
+      in the jump's own transaction", "A rejected jump leaves a
+      past-dry-instant hold open and unsettled for the next reader"
