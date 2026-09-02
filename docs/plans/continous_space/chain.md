@@ -6,10 +6,8 @@ lattice to the continuous-space system map. `README.md` is the model,
 
 **Status (2026-09-02):** links 1–6 landed, plus one unplanned insert. Links 5
 and 6 are **done and archived** (90/90 and 33/33). Link 7 was split in two by its
-own panel review — `add-fuel-as-cargo` (53 tasks) is **done and archived**
-(`41e3c46`, 22/22 e2e, 1360/1360 unit), and `add-stationkeep-hold-verb` is
-**spec-complete after four adversary rounds** with its red phase written; they
-MUST archive in that order.
+own panel review — both are now **done and archived**: `add-fuel-as-cargo`
+(53 tasks, `41e3c46`) and `add-stationkeep-hold-verb` (59 tasks, `ca7e5d2`).
 
 That change is worth a note. Its review loop ran one round past the nominal
 cap of three, deliberately — every round's blockers were bred by the previous
@@ -18,8 +16,9 @@ instant bought **indefinite free station-keeping**, the exact behaviour the
 change exists to price. Round 4 then found the same exploit reachable through
 a time-of-check/time-of-use window between the settle-first write and the
 commit transaction. A cap exists to stop unbounded iteration, not to ship a
-known exploit. It also grew from 26 tasks to 54 in the process, which is the
-honest measure of how much the first draft had missed.
+known exploit. It grew from 26 tasks to 59 in the process, which is the honest
+measure of how much the first draft had missed — none of it new scope, all of
+it already true and simply unwritten.
 
 Link 8's 8a was split **again** by its panel — it was 131 tasks, not the 47 it
 claimed — into `serve-orbital-elements-and-burn-preview` (37, purely additive,
@@ -71,7 +70,7 @@ after that design was written.
 | 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ✅ `8f4dd65`…`99747e2` |
 | 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | ✅ `5fd28b5`…`fbbb316` |
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ✅ `41e3c46` |
-| 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | 🔨 spec final (4 adversary rounds), 0/57 |
+| 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | ✅ `ca7e5d2` |
 | 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | 📝 spec final, 0/42 |
 | 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | 📝 spec final, 0/106 |
 | 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | 📝 spec final (3 adversary rounds), 0/105 |

@@ -312,25 +312,60 @@ The three `outcome` text forms (full yield, lode-dry clamp, hold-full
 clamp) SHALL be reliably distinguishable by a caller inspecting the string
 (e.g. via a stable substring or prefix per reason code), not merely equal
 in narrative intent, so a later UI can safely branch on which constraint
-bound. The `holdFull` branch remains structurally unreachable in this
-version, but for a different reason than when it was first specified:
-`goods-sale` is now a second writer of `fleet.cargo` (a sale debits it
-instantly, outside the action spine — see `goods-sale`'s "Instant, Not an
-Action"), so mine is no longer the cargo field's only writer. What still
-prevents a concurrent sale from mutating `freeHoldAtResolve` mid-run is
-`fleet-movement`'s single-movement-state invariant: a mine run holds the
+bound. The `holdFull` branch remains structurally unreachable through a
+concurrent *sale*: `goods-sale` is a second writer of `fleet.cargo` (a sale
+debits it instantly, outside the action spine — see `goods-sale`'s
+"Instant, Not an Action"), but `fleet-movement`'s single-movement-state
+invariant still forbids a sale from landing mid-run — a mine run holds the
 fleet `docked` to the mined feature for the run's whole duration, and
 `goods-sale`'s "Sale Requires the Fleet Docked To the Buying Station"
-rejects a sale unless the fleet is currently docked to a station — a fleet
-cannot be simultaneously docked to a lode (mining) and docked to a station
-(selling), so no sale can land between this run's commit and its resolve,
-and `freeHoldAtResolve` therefore still always equals `freeHoldAtCommit`.
-It stays specified (the reason code and clamp math cost nothing extra and
-are exercised directly, not through a second writer) because a future verb
-that can mutate cargo while a fleet is docked to a mined feature (e.g., a
-transfer between two docked fleets, or a same-feature multi-run future)
-will make it reachable, and resolve must already floor and report
-correctly when it is.
+rejects a sale unless the fleet is currently docked to a station, and a
+fleet cannot be simultaneously docked to a lode and docked to a station.
+**That invariant does not extend to station-keeping.** `hold` (see
+`fleet-movement`'s "Station-Keeping Hold and Release Are Fleet Verbs")
+requires only that the fleet's effective park mode be `orbit`, and, per
+that same capability's "A fleet's attachment survives hold, release, and
+force-demotion", never alters `attachedTo` — so a fleet mining a feature
+(`docked`, i.e. `attachedTo` naming that feature) can be held into
+`stationkeep` without ever ceasing to be docked to it. That hold's own settlement — `release` called mid-run,
+or the automatic past-dry-instant fold, which can fire on any read or
+write that observes it — debits the fleet's `fuel` cargo between this
+run's commit and its resolve. This is exactly the "future verb that can
+mutate cargo while a fleet is docked to a mined feature" this requirement
+previously held open as unreachable, and **the claim retired here is that
+one claim alone: `freeHoldAtResolve` no longer always equals
+`freeHoldAtCommit`.** It can now be strictly larger, by exactly a
+station-keeping settlement's `fuel` debit, if one lands inside the run's
+window.
+
+Nothing else changes, and in particular the `holdFull` branch **remains
+structurally unreachable in production**. A station-keeping settlement only
+ever *debits* `fuel`, so it can only widen free hold, never narrow it; and
+`take = min(tons, remainingAtEta, freeHoldAtResolve)` with `tons` already
+admitted at commit against the narrower `freeHoldAtCommit` means a widened
+free hold can never bind the take. No production writer can grow a fleet's
+cargo of **any** kind between a run's commit and its resolve either, and the
+reason is docking exclusivity rather than which kind is credited: `mine`'s
+own resolver is the sole crediter of mined cargo and the run holds the
+movement slot for its whole duration; a sale requires the fleet docked to a
+station; and a refuel likewise requires the fleet docked to a station
+(`fuel-purchase`'s "Refuel Requires the Fleet Docked To the Selling
+Station"), which a fleet docked to the mined feature is not. That last
+exclusion is load-bearing and SHALL NOT be replaced by the weaker
+observation that a refuel credits `fuel` rather than a mined kind: free hold
+counts **all** kinds including fuel (`fleet-movement`'s "Fuel occupies cargo
+capacity exactly like a mined resource"), so a mid-run refuel would *narrow*
+free hold and make `holdFull` genuinely reachable. It is unreachable because
+the refuel cannot land mid-run at all. The `holdFull` branch and its
+scenario therefore stay specified and tested against a directly constructed
+state, not against a sequence of production verbs — asserting otherwise
+would require a test that writes cargo straight into the fleet document,
+which is the shape of test this chain has already been burned by.
+`remainingAtEta`, `take`, and the reason code are all computed from
+`freeHoldAtResolve` read fresh at resolve, never from a value cached at
+commit, so every clamp already floors and reports correctly against this new
+source of mid-run free-hold movement — nothing above required correction,
+only the retired claim of invariance.
 
 #### Scenario: A clean run takes the full target
 - **WHEN** neither the lode's remaining tonnage nor the fleet's free hold
@@ -358,6 +393,20 @@ correctly when it is.
   is appended at all (never a positive, tonnage-restoring one, and never a
   zero-amount one — see "Exactly-Once Lode Delta"), and the fleet's cargo
   is not decremented
+
+#### Scenario: A station-keeping settlement landing mid-run widens free hold and changes no take
+- **GIVEN** a mine run committed for a `tons` that `freeHoldAtCommit`
+  admitted at commit, against a fleet simultaneously holding a
+  `stationkeep` park while docked to the mined feature
+- **WHEN** that hold settles inside the run's window — by `release` or by
+  the automatic past-dry-instant fold — debiting the fleet's `fuel`
+- **THEN** `freeHoldAtResolve`, read fresh with that settlement applied, is
+  strictly greater than `freeHoldAtCommit` — the equality this requirement
+  previously claimed no longer holds
+- **AND** the take is still the full requested `tons` and the resolved
+  action's reason code is still `clean`, because a widened free hold can
+  never bind `take = min(tons, remainingAtEta, freeHoldAtResolve)` when
+  `tons` was already admitted against the narrower commit-time figure
 
 ### Requirement: Exactly-Once Lode Delta
 The system SHALL, in the same transaction that computes the clamped take,

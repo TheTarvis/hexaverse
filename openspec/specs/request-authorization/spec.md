@@ -431,8 +431,10 @@ a corpless account rather than rejecting the request, and SHALL fail open
 leaking a prior request's or another corporation's identity. This seam is
 consumed both by every fog-filtered GET read and, since
 `replace-observation-with-sightings`, by every mutating fleet-movement and
-action-dispatch endpoint's ownership check: a request naming an id owned by
-a different corporation is rejected `404 Not Found` rather than acted on.
+action-dispatch endpoint's ownership check, widened by this change to
+cover the station-keeping `hold` and `release` verbs: a request naming an
+id owned by a different corporation is rejected `404 Not Found` rather than
+acted on.
 
 #### Scenario: A corpless request carries no corporation id
 - **WHEN** an authenticated account with no living corporation makes a
@@ -463,17 +465,14 @@ a different corporation is rejected `404 Not Found` rather than acted on.
 
 #### Scenario: Mutating fleet and action endpoints now enforce ownership
 - **WHEN** an authenticated caller invokes a mutating fleet endpoint
-  (`POST /v1/fleets/:fleetId/orders|cancel|cut-drive|stop|jump|scan`) or a
-  generic action endpoint (`GET /v1/actions?actor=`,
+  (`POST /v1/fleets/:fleetId/orders|cancel|cut-drive|stop|jump|scan|hold|release`)
+  or a generic action endpoint (`GET /v1/actions?actor=`,
   `GET /v1/actions/:actionId`, `POST /v1/actions/:actionId/acknowledge`,
   `POST /v1/actions/:actionId/cancel`) naming an id owned by a different
   corporation
 - **THEN** the request is rejected `404 Not Found` — `common.ActorCorp` is
   compared against the named id's owning corporation before the handler
   acts, closing the gap the seam's predecessor scenario recorded as open
-  (see `fleet-movement`'s "Fleet Command Endpoints Are Restricted to the
-  Owning Corporation" and `action-dispatch`'s "Action Endpoints Are
-  Restricted to the Owning Corporation")
 
 ### Requirement: The Sell and Refuel Endpoints Ignore a Client-Supplied Corporation Id
 `POST /v1/fleets/:fleetId/sell` (`goods-sale`'s sale endpoint) and
