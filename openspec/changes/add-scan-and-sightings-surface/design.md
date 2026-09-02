@@ -25,6 +25,15 @@ verb.
 Three wire gaps stood between the shipped API and a usable surface. Each is
 decided below against the code, not against the docs.
 
+Adversarial review then found three more, all of them **live defects in shipped
+code** rather than gaps in this change's plan, and all of them invisible to the
+existing suite: the resolver's `reasonCode` is never persisted (Decision 18),
+the settled-action inbox is neither ordered nor bounded (Decision 19), and the
+body table's derived belt members are accepted scan hosts (Decision 17). The
+first two are why this change carries an `action-dispatch` delta despite not
+owning that capability — a requirement here reads a field that capability never
+writes, and folds a list it never orders.
+
 ## Goals / Non-Goals
 
 **Goals**
@@ -457,6 +466,8 @@ The cost is one composite index (`systemId asc, asOf desc, __name__ desc`) in
 `firestore-indexes.tf`, which Travis must `terraform apply`. Note that the
 emulator auto-indexes, so the tests pass without it and only production fails —
 the same trap `credit-reconcile` and the action inbox's indexes already carry.
+**Decision 19 adds a second index under the same trap**, on `actions`; both must
+land in the same `terraform apply`.
 
 ### Decision 15 — A fleet with a claimed sensor slot has an empty target set
 
@@ -484,8 +495,110 @@ relying on the response's order.
 
 The same finding exposes a second problem: `GET /v1/actions?actor=&status=done`
 returns **every action that fleet has ever completed**, unbounded, and this
-change would be its first caller. A bound (`limit`, a `type` filter, or both) is
-carried as a task; see the Risks section for what that leaves unspecified.
+change would be its first caller. Round 2 showed that a bound alone is not just
+insufficient but actively wrong — see Decision 19, which promotes it from a task
+to an `action-dispatch` delta and answers OQ-9.
+
+### Decision 17 — A derived belt member is not a scan host, on either surface
+
+`system/bodies.go:150-155` synthesizes `AsteroidsPerBelt` (8) member bodies per
+belt into the `BodyTable`, ids `{beltId}#{k}`, derived and never persisted.
+`fleet/service.go:1120-1127`'s `resolveScanHost` accepts **any** `bt.Body(hostId)`,
+so a belt member is an accepted scan host today. `system/handler.go:124-155`
+serves features and lane gates only, so no read publishes a member id — which
+makes the new scan-target read the **first** surface that would.
+
+That collides with two settled things: `build-production-space-view`'s *Belt
+Members Render as Decorative Detail, Never as Separate Pickable Bodies* ("no
+member SHALL carry its own hit target, selection, or facts display") and link
+8's OQ-4 ruling, "one body, members decorative and unpickable". It is not a
+corner case either: a fleet docked at a belt is the canonical mining position,
+so the first player to open the scan control while mining would see nine
+entries for one belt, with ids the client has no name, mark, or facts surface
+for.
+
+**Decision (binding, and OQ-4 is NOT reopened).** Exclude derived members from
+the served set, and reject a commit naming one identically to an unresolvable
+`hostId` — the same both-sides shape Decision 13 applies to the self-sweep, and
+for the same reason: excluding from the list alone leaves the commit accepting a
+host the list cannot offer. The belt feature itself remains an eligible host.
+Alternative considered and rejected: serving members with a "belt member" kind
+so the client could group them — that is per-member lodes and a wire-size
+question by another name, both of which OQ-4 closed.
+
+### Decision 18 — `reasonCode` is persisted in the resolve transaction
+
+`action/dao.go:334-339` is the resolve transaction's only write to the action
+document, and it sets `status`, `outcome`, and `resolvedAt` — not `reasonCode`.
+`ResolveOne` is the only applier. `Action.ReasonCode` is `omitempty`, so
+`GET /v1/actions` serves the key **absent, always**. The five-way fizzle copy
+this change specifies would therefore render its unrecognized-code fallback for
+every fizzle, and task 9.2's orphan audit would still pass — the field has a
+named consumer, it just has no producer.
+
+Two things hid this, and both are recorded so they are not rediscovered:
+`action/model.go:203-206` documents `ResolveResult.ReasonCode` as "the
+structured classifier **mirrored onto `Action.ReasonCode` at the same status
+flip**", which the code does not do — the same failure shape as `encodeCursor`'s
+"opaque wire shape" comment; and `fleet/scan_resolver_test.go:280,371` assert
+`res.ReasonCode != ""` on the resolver's **return value**, never on the stored
+action, so the suite is green while the field is dropped.
+
+This is also a **live requirement violation**, not merely a gap in this change:
+`openspec/specs/focused-scan/spec.md:237-241` and `:264-266` already require
+that the resolved action carry a reason code.
+
+**Decision.** Add `reasonCode` to the existing `tx.Update` and mirror it onto
+the returned in-memory action, specified as an `action-dispatch` MODIFIED
+delta on *Exactly-Once Resolution*, and assert it by **reading the action back
+from the store** — never from the `ResolveResult`, which is precisely the
+assertion that already passes. Writing an empty string for verbs that set no
+code is harmless; `omitempty` keeps it off the wire.
+
+### Decision 19 — The settled inbox is ordered as well as bounded, and it needs an index
+
+`action/dao.go:148-177`'s `List` is `Where("actor","==")` plus an optional
+status equality, with **no `OrderBy` and no `Limit`**. A bare limit on an
+unordered query returns an **arbitrary subset**, so the report would fold
+"greatest `resolvedAt`" over that subset: it can show a stale sweep or none
+while the newest stays unacknowledged forever, and dismissing the wrong report
+acknowledges the wrong action. Both of the report's ordering scenarios pass
+under a bare limit anyway, because a two-action fixture is under any bound.
+
+**Decision.** Specify ordering *and* bound as an `action-dispatch` MODIFIED
+delta on *Inbox by Actor Query Param* — this is OQ-9's answer: it wanted a
+small delta, not a bare task.
+
+Two constraints ride with it. First, `(actor ASC, status ASC, resolvedAt DESC)`
+is a composite index and `infra/terraform/firestore-indexes.tf:58-73` has only
+`(actor, status, eta ASC)`; the emulator auto-indexes, so tests stay green and
+only production 500s — the same trap Decision 14 flags for the sightings index,
+which is why both are named in one place. Second, the ordering applies **only**
+on the `done` path: `resolvedAt` is `firestore:"...,omitempty"` and absent from
+a running action's document, and Firestore's `OrderBy` excludes documents
+missing the ordered field — so an unconditional order would silently return zero
+running actions and break `useRunningScan`, the hook this change exists to give
+a consumer.
+
+### Decision 20 — The swept host's raw id is the ordinary label, and the name path stays
+
+`system.Feature.Name` is set in exactly two places: `system/generator.go:64`
+(the star, which is never a scan host) and `stations/service.go:238` (the
+trading station). Planets, moons, belts, and lane gates carry no name; a fleet
+host has none at all. So the log's "host is named" path is inducible only
+against a station, and most rows will render `feat-planet-3`.
+
+**Decision.** Keep the name clause and make the fallback's status explicit
+rather than dropping it: the client's body type carries the optional served
+`name` (task 4.2a), and the raw host id is specified as a **legitimate label,
+the ordinary case** — no placeholder, no empty cell, no degraded-state
+indication. Alternative considered and rejected: dropping the name clause for a
+"type + id" label rule. It reads better for a body in the open system but has no
+source anywhere else — a log row carries only the record's `hostId`, so a row
+for another system's sweep has neither a name nor a type, and the rule would
+need its own fallback to the bare id regardless. That trades one honest fallback
+for two. The name path also stays true to the wire, which does serve names for
+some hosts and may serve more later.
 
 ## Risks / Trade-offs
 
@@ -516,15 +629,14 @@ carried as a task; see the Risks section for what that leaves unspecified.
   by the system's body count (five to seven planets, some moons, a station, a
   gate per lane). It is not a new class of cost — the interior read already
   resolves every body's position — but it is per-request and owner-scoped.
-- **The settled-inbox bound is a task with no requirement behind it.** Task 3.8
-  bounds `GET /v1/actions?actor=&status=done`, which today returns every action
-  an actor ever completed. That endpoint belongs to `action-dispatch`, and this
-  change writes no delta against that capability, so the bound's exact shape
-  (`limit`, `type`, or both) is decided by the implementer rather than by a
-  scenario. This is a deliberate, recorded gap: the alternative was for this
-  change to spec a neighbouring capability's read surface on its way past.
-  Flagged for Travis — if the bound should be a requirement, it belongs in an
-  `action-dispatch` delta, here or in a follow-up.
+- **This change now writes against `action-dispatch`, a capability it does not
+  own.** Decisions 18 and 19 add two MODIFIED requirements there. Both were
+  forced: a requirement in *this* change reads a field that capability never
+  persists, and another folds a list that capability never orders. Specifying a
+  neighbour's read surface on the way past is a real cost, taken here because
+  the alternative is a client that renders a fallback for every fizzle and a
+  report that names an arbitrary action — neither of which any test in this
+  change would catch.
 - **The per-own-fleet inbox read is N reads, not one.** Re-anchoring the settle
   refetch to every own fleet in the open system (Decision 7 / MAJOR 5) means one
   `GET /v1/actions?actor=<fleetId>&status=running` per own fleet in that system,
@@ -594,10 +706,9 @@ be answered by inventing a value.
    pile size this game can produce, and the requirement's shape survives any
    change to the number. Travis may set it higher or lower; what must not
    change is that the width is *named* and the derivation is unseeded.
-9. **Should the settled-action inbox's bound be a requirement, and whose?**
-   `GET /v1/actions?actor=&status=done` is unbounded and unordered
-   (`action.Dao.List` applies neither), and this change is its first caller. The
-   bound is carried here as a task (3.8) rather than as a scenario, because the
-   endpoint belongs to `action-dispatch` and this change writes no delta against
-   that capability. If the bound should be specified rather than implemented,
-   it wants an `action-dispatch` delta — here or in a follow-up.
+9. ~~**Should the settled-action inbox's bound be a requirement, and whose?**~~
+   **ANSWERED (round 2, Decision 19).** It should, and it is `action-dispatch`'s:
+   this change now carries an `action-dispatch` delta modifying *Inbox by Actor
+   Query Param* to require ordering **and** a bound on the `done` path. A bare
+   bound was not merely under-specified but wrong — an arbitrary subset of an
+   unordered query. Nothing here remains open.

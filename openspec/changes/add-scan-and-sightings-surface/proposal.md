@@ -35,6 +35,17 @@ clothes.*
   predicate. This is the ruled answer to link 8's OQ-6: a dedicated target
   list, not a shared canvas selection, so "sweeping every body is
   self-defeating" is legible in the control itself.
+- **ADD to `focused-scan`**: a **derived belt member is never a scan host**.
+  `system/bodies.go` synthesizes `AsteroidsPerBelt` (8) members per belt into
+  the body table with ids `{beltId}#{k}`, and `resolveScanHost` accepts any
+  body in that table — so this new read would be the **first wire surface to
+  publish member ids**, serving nine entries for one belt that no other read
+  mentions and the client cannot label. That contradicts
+  `build-production-space-view`'s *Belt Members Render as Decorative Detail,
+  Never as Separate Pickable Bodies* and link 8's OQ-4 ruling ("one body,
+  members decorative and unpickable"), which this change does **not** reopen. A
+  member is absent from the list and a commit naming one is rejected identically
+  to an unresolvable `hostId`; the belt feature itself stays eligible.
 - **ADD to `focused-scan`**: a fleet may not sweep **itself**. It can today —
   host resolution finds the scanner among its own system's fleets, the range
   test passes at distance zero, and a zero-length sightline is never occluded —
@@ -90,6 +101,33 @@ clothes.*
   space view without leaving it, and row↔ghost cross-highlighting keyed on the
   new record `id`.
 
+- **MODIFY `action-dispatch`** (two requirements, both closing live defects
+  this change's own requirements now depend on):
+  - *Exactly-Once Resolution* SHALL record the resolver's **reason code**
+    alongside its outcome and resolve timestamp. **It does not today**:
+    `ResolveOne`'s single `tx.Update` writes `status`, `outcome`, and
+    `resolvedAt` and nothing else, so `Action.ReasonCode` — `omitempty` — is
+    served absent, always. `openspec/specs/focused-scan/spec.md` already
+    requires that "the resolved action carries a reason code identifying
+    whether the failure was range or occlusion", so **shipped code violates a
+    live requirement**, and without the fix this change's five-way fizzle copy
+    map renders its unrecognized-code fallback for every fizzle while the
+    orphan audit still passes. Two things kept this hidden:
+    `action/model.go:203-206` documents the field as "mirrored onto
+    `Action.ReasonCode` at the same status flip", which is false, and
+    `fleet/scan_resolver_test.go:280,371` assert on the resolver's **return
+    value** rather than the stored action.
+  - *Inbox by Actor Query Param* SHALL serve a `done`-filtered read **ordered by
+    resolve timestamp and bounded**. `action.Dao.List` applies no ordering and
+    no limit, and a bare limit over an unordered query returns an arbitrary
+    subset — the settled-sweep report would fold "greatest `resolvedAt`" over
+    that subset and could report a stale sweep, or none, while the newest stays
+    unacknowledged and a dismissal acknowledges the wrong action. This answers
+    the change's own OQ-9, which asked whether the bound wanted a delta rather
+    than a bare task. The ordering applies only on the `done` path:
+    `resolvedAt` is `omitempty` and absent on a running action's document, so an
+    unconditional order would drop every running action.
+
 No capability is retired by this change, so it needs no post-archive
 hand-delete.
 
@@ -97,12 +135,17 @@ hand-delete.
 
 - Affected specs: `focused-scan`, `sighting-records`, `system-space-view`
   (created by `build-production-space-view`, which archives immediately
-  before this change), `sighting-log` (new).
+  before this change), `sighting-log` (new), `action-dispatch`.
 - Affected code: `backend/sightings/` (mint doc-id derivation, wire `id`, the
-  `systemId` filter on the pile read), `infra/terraform/firestore-indexes.tf`
-  (one composite index for that filter — Travis must `terraform apply`),
-  `backend/fleet/` (the scan-target read, its handler, and the self-sweep
-  rejection),
+  `systemId` filter on the pile read), `backend/action/` (persisting
+  `reasonCode` in `ResolveOne`'s resolve transaction; ordering and bounding
+  `Dao.List`'s `done` path), `infra/terraform/firestore-indexes.tf` (**two**
+  composite indexes — `(systemId asc, asOf desc, __name__ desc)` on
+  `sightings` and `(actor asc, status asc, resolvedAt desc)` on `actions`;
+  **Travis must `terraform apply`**, and note the emulator auto-indexes so the
+  tests pass without either and only production fails),
+  `backend/fleet/` (the scan-target read, its handler, the self-sweep
+  rejection, and the belt-member rejection),
   `frontend/lib/services/` (fleet `scan`, `scanTargets`; a new sighting
   service; the action inbox's done-status read and acknowledge),
   `frontend/lib/query-keys.ts`, `frontend/hooks/` (`useRunningScan`'s first

@@ -15,7 +15,16 @@ column's own fallback (*An Unknown System Name Falls Back to Its Id*). No
 other name source is available: the log's rows span every system the
 corporation has ever swept, and only the open system's bodies are loaded, so a
 row for another system's sweep has no name to resolve and SHALL show the raw
-host id rather than an empty cell. A row for a record that names a target SHALL
+host id rather than an empty cell.
+
+**The raw host id is the ordinary case, not the exception.** The interior read
+serves a name for a body only where one was generated, which today is the star
+and a trading station and nothing else — a planet, a moon, a belt, and a lane
+gate all carry no name, and a fleet host carries none either. The fallback is
+therefore what most rows render, and it SHALL be presented as a legitimate
+label rather than as a degraded or error state: no placeholder text, no empty
+cell, no "unknown host". The name path stays specified because the wire does
+serve names for some hosts and may serve more later. A row for a record that names a target SHALL
 show that target's hull count and the hull types present. A row for a
 clean-sweep record SHALL instead show a clean-sweep marker and no composition,
 because the sweep found nothing masked at that host — itself a filed claim, not
@@ -31,18 +40,21 @@ an absence of one.
 - **THEN** its row shows the record's system, `asOf`, swept host, hull count,
   and hull types
 
-#### Scenario: A host in the open system is named
-- **GIVEN** a record whose swept host id has a name in the open system's
-  interior read
+#### Scenario: A host the interior read names is shown by that name
+- **GIVEN** a record whose swept host id is one the open system's interior read
+  supplies a name for, such as its trading station
 - **WHEN** its row is shown
 - **THEN** the swept host is shown by that name
 
-#### Scenario: A host with no loaded name falls back to its id
+#### Scenario: A host with no served name falls back to its id, as an ordinary row
 - **GIVEN** a record whose swept host id has no name in the open system's
-  interior read — a sweep in another system, or a host no longer served
+  interior read — a planet, a moon, a belt, a lane gate, a fleet, a sweep in
+  another system, or a host no longer served
 - **WHEN** its row is shown
 - **THEN** the swept host is shown as the raw host id, and the row renders
   normally
+- **AND** the row carries no placeholder, empty cell, or degraded-state
+  indication on account of the missing name
 
 #### Scenario: A clean-sweep row shows the clean-sweep marker
 - **WHEN** a served record is a clean sweep
@@ -193,22 +205,33 @@ reading it against is a log they will not open.
   the log was opened
 
 ### Requirement: A Log Row and Its Ghost Address the Same Record By Its Served Id
-WHEN a log row whose record belongs to the open system is selected, the system
-SHALL highlight that record's ghost in the scene; WHEN a ghost is selected, the
-system SHALL highlight its row. Both directions SHALL match on the record's
-served `id` and on nothing else — never on position, `asOf`, host, or
-composition, any of which two records can legitimately share.
+WHEN a log row whose record has a ghost drawn in the open system is selected,
+the system SHALL highlight that ghost in the scene; WHEN a ghost is activated
+in the scene, the system SHALL highlight its row. Both directions SHALL match
+on the record's served `id` and on nothing else — never on position, `asOf`,
+host, or composition, any of which two records can legitimately share.
 
-A row whose record belongs to another system, and a clean-sweep row, have no
-ghost to highlight; selecting one SHALL say so rather than highlighting an
-unrelated mark.
+A selected row whose record has **no ghost currently drawn** SHALL be reported
+as having no mark in the open system, and SHALL highlight nothing. That is not
+a two-case exception; the log SHALL determine it from what the scene actually
+drew rather than from a list of reasons, because this change creates several
+and a row that assumes a mark exists either does nothing or dereferences a
+missing one. The record may belong to another system; it may be a clean sweep,
+which names no target and carries no position; it may fall outside the ghost
+layer's single bounded page (*A Sighting Ghost Renders at Its Frozen Position,
+Never a Predicted One*), the log paging further than the layer does; its stored
+position may be exactly the origin, which the scene omits (*A Ghost at the
+Origin Is Omitted From the Scene, Not Drawn Atop the Star*); or the canvas
+region may be unavailable, in which case no ghost is drawn at all (*The Scan
+Surface Remains Usable While the Canvas Is Unavailable*) while the log stays
+fully readable.
 
 #### Scenario: Selecting a row highlights its ghost
-- **WHEN** a row whose record belongs to the open system is selected
+- **WHEN** a row whose record has a ghost drawn in the open system is selected
 - **THEN** that record's ghost is highlighted in the scene
 
-#### Scenario: Selecting a ghost highlights its row
-- **WHEN** a ghost is selected in the scene
+#### Scenario: Activating a ghost highlights its row
+- **WHEN** a ghost is activated in the scene
 - **THEN** the log row for that record is highlighted
 
 #### Scenario: Two records with identical contents highlight independently
@@ -217,8 +240,11 @@ unrelated mark.
 - **WHEN** each row is selected in turn
 - **THEN** each highlights its own ghost, matched by the record's served `id`
 
-#### Scenario: A row with no ghost says so
-- **WHEN** a row for a clean-sweep record, or for a record in another system, is
-  selected
+#### Scenario: A row with no ghost says so, whatever the reason
+- **WHEN** a row is selected whose record has no ghost drawn — a clean sweep, a
+  record in another system, a record beyond the ghost layer's single page, a
+  record whose stored position is the origin, or any row while the canvas
+  region is unavailable
 - **THEN** the log states that this record has no mark in the open system, and
   no unrelated mark is highlighted
+- **AND** the row's own contents render normally in every one of those cases

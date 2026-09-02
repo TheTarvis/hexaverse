@@ -50,7 +50,27 @@
       re-derive a document id from the same `(actionId, targetId)` against a
       pinned expected constant, so a per-process or randomly seeded derivation
       cannot pass
-- [ ] 1.11 Verify every test written in section 1 is red **for the right reason**
+- [ ] 1.11 Write the failing Go test for the belt-member exclusion: a fleet in
+      range of a belt with a clear sightline reads exactly one entry for that
+      belt and none for any `{beltId}#{k}` member, and a commit naming a member
+      id is rejected with the same named error as an unresolvable host
+      (`focused-scan` — *A belt is served as one host, never as its members*).
+      Both are currently GREEN-WRONG: `system/bodies.go` puts every synthesized
+      member in the `BodyTable` and `resolveScanHost` accepts any
+      `bt.Body(hostId)`
+- [ ] 1.12 Write the failing Go test for the persisted `reasonCode`: resolve a
+      fizzling scan, then **read the action back from the store** and over
+      `GET /v1/actions`, and assert both carry the resolver's reason code. Do
+      not assert on the returned `ResolveResult` — that assertion already passes
+      against a field no document holds (`action-dispatch` — *A resolver's
+      reason code is persisted on the action and served*)
+- [ ] 1.13 Write the failing Go tests for the settled-inbox read: more settled
+      actions than the bound, served most-recently-settled first and truncated
+      to the newest rather than to an arbitrary subset; a fixture large enough
+      that a bare unordered limit fails it; and a `running`-status read that
+      still serves an action carrying no `resolvedAt`
+      (`action-dispatch` — *Inbox by Actor Query Param*'s three new scenarios)
+- [ ] 1.14 Verify every test written in section 1 is red **for the right reason**
       in a scratch copy with the missing symbols stubbed, not merely red because
       a symbol does not compile
 
@@ -73,7 +93,13 @@
 - [ ] 2.3 Add `Id` to `sightings.Sighting`, populated from the document id on
       read, serialized as `id`; keep `TargetId` at `json:"-"`
 - [ ] 2.4 Populate `Id` in `Dao.Get` and `Dao.List` from each snapshot's
-      document id, so a record served from any path carries the same identifier
+      document id, so a record served from any path carries the same
+      identifier. Note that `Dao.Get` has **no production caller** — `Dao.List`
+      is the only path a record reaches the wire by — so this half is
+      consistency work, not a served surface; the orphan audit in section 9
+      covers fields, not methods, and would not have flagged it. Do not add a
+      caller for it, and do not let a test of `Get` stand in for a test of the
+      served `id`
 - [ ] 2.5 Update `backend/router_sightings_read_test.go`'s hand-derived
       `docId` and `backend/disclosure_wiring_e2e_test.go`'s minted fixture to
       the new derivation
@@ -107,18 +133,29 @@
 - [ ] 3.2 Add `Service.ScanTargets(ctx, fleetId)` returning, for each eligible
       host, its host id, whether it is a body or an own fleet, and the sweep
       duration `roundTripMs` would price at the same world time
-- [ ] 3.3 Exclude from the set: **the reading fleet itself**, every fleet owned
-      by another corporation, every own fleet in lane transit, every host beyond
-      `disclosure.FocusedScanRange`, and every host the star occludes — with no
-      entry and no reason field for any of them. The self-exclusion is not
-      implied by the geometry: distance zero passes `WithinRange` and
-      `Occluded` early-returns `false` for a zero-length segment
-- [ ] 3.4 Reject a scan commit whose `hostId` is the scanning fleet's own id in
+- [ ] 3.3 Exclude from the set: **the reading fleet itself**, **every derived
+      belt member**, every fleet owned by another corporation, every own fleet
+      in lane transit, every host beyond `disclosure.FocusedScanRange`, and
+      every host the star occludes — with no entry and no reason field for any
+      of them. The self-exclusion is not implied by the geometry: distance zero
+      passes `WithinRange` and `Occluded` early-returns `false` for a
+      zero-length segment. The belt-member exclusion is not implied either:
+      `system/bodies.go` synthesizes `AsteroidsPerBelt` members per belt into
+      the `BodyTable` with ids `{beltId}#{k}`, and iterating the table would
+      publish nine entries for one belt — member ids no other read serves and
+      the client has no name, mark, or facts surface for (`focused-scan` — *A
+      belt is served as one host, never as its members*; `system-space-view`'s
+      *Belt Members Render as Decorative Detail, Never as Separate Pickable
+      Bodies*). The belt feature itself stays eligible
+- [ ] 3.4 Reject a scan commit whose `hostId` is the scanning fleet's own id,
+      **and one whose `hostId` names a derived belt member**, in
       `resolveScanHost`, through the existing `ErrScanHostUnresolved` — the same
       named error and response shape as any unresolvable host, so no new
       player-facing copy is needed (`focused-scan` — *A Fleet Is Never a Host
-      For Its Own Sweep*). Excluding it from the list alone leaves the commit
-      accepting it
+      For Its Own Sweep*, *A commit naming a belt member is rejected as
+      unresolvable*). Excluding either from the list alone leaves the commit
+      accepting it: `resolveScanHost` accepts any `bt.Body(hostId)`, and the
+      body table contains every synthesized member
 - [ ] 3.5 Return an empty set (not an error) when the scanning fleet is itself
       in lane transit, when it already has a running focused scan (its sensor
       slot is claimed, so no commit would be accepted), and when nothing is in
@@ -132,14 +169,61 @@
       time — so serving one here would be this chain's signature defect
       committed inside the change whose goal is a named consumer for every
       field added
-- [ ] 3.8 Bound the settled-action inbox read the outcome report consumes:
-      `action.Dao.List` applies no ordering and no limit, so
-      `GET /v1/actions?actor=&status=done` returns every action that fleet ever
-      completed. Add a bound the report can rely on (a `limit`, a `type`
-      filter, or both) rather than paying an unbounded read per settled-sweep
-      poll
+- [ ] 3.8 Order **and** bound the settled-action inbox read the outcome report
+      consumes: add `OrderBy("resolvedAt", Desc)` plus a named limit to
+      `action.Dao.List`'s `done`-status path, so
+      `GET /v1/actions?actor=&status=done` serves the most recently settled
+      actions rather than every action that fleet ever completed. A bare limit
+      is **not** sufficient and is worse than none: the query today is
+      `Where("actor","==")` plus an optional status with no `OrderBy`, so a
+      limit over an unordered query returns an **arbitrary subset** — the
+      report would fold "greatest `resolvedAt`" over that subset and could show
+      a stale sweep, or none, while the newest stays unacknowledged forever and
+      a dismissal acknowledges the wrong action. Both ordering scenarios still
+      pass under a bare limit, because a two-action fixture is under any bound
+      (`action-dispatch` — *A settled-status read is bounded, and its bound
+      keeps the newest*)
+- [ ] 3.8a Apply the ordering **only on the `done` path**, and add the
+      composite index `(actor ASC, status ASC, resolvedAt DESC)` for the
+      `actions` collection to `infra/terraform/firestore-indexes.tf` — which
+      today carries only `(actor, status, eta ASC)` — and record that Travis
+      must `terraform apply`. Two traps: the emulator auto-indexes, so the
+      tests stay green and only production 500s (the same trap Decision 14
+      already flags for the sightings index); and `resolvedAt` is
+      `firestore:"...,omitempty"` and therefore **absent** on a running action's
+      document, so an unconditional `OrderBy("resolvedAt")` would drop every
+      running action and silently break `useRunningScan`
+      (`action-dispatch` — *A running-status read is unaffected by the settled
+      ordering*)
 - [ ] 3.9 Wire the route in the router and confirm section 1's
       `requireRouteImplemented` guard now passes for the right reason
+- [ ] 3.10 Persist `reasonCode` on the resolved action: add
+      `{Path: "reasonCode", Value: res.ReasonCode}` to the existing `tx.Update`
+      in `action.DaoImpl.ResolveOne` (`action/dao.go`), which is the resolve
+      transaction's only write to the action doc and today sets `status`,
+      `outcome`, and `resolvedAt` and nothing else, and mirror it onto the
+      returned in-memory `Action` beside `a.Outcome = res.Outcome`. Assert it by
+      **reading the action back from the store** (and over
+      `GET /v1/actions`), never by inspecting the returned `ResolveResult` —
+      `fleet/scan_resolver_test.go:280,371` assert `res.ReasonCode != ""` on the
+      resolver's return value and pass today against a field that reaches no
+      document and no wire. Writing the empty string for verbs that set no code
+      is harmless: `json:"reasonCode,omitempty"` keeps it off the wire.
+      This is a **live defect**, not new work: `openspec/specs/focused-scan/
+      spec.md` already requires that "the resolved action carries a reason code
+      identifying whether the failure was range or occlusion", and shipped code
+      violates it. Without it, section 6's five-way fizzle copy map renders its
+      unrecognized-code fallback for every fizzle, and task 9.2's orphan audit
+      passes anyway — the field has a named consumer and no producer
+      (`action-dispatch` — *A resolver's reason code is persisted on the action
+      and served*)
+- [ ] 3.11 Correct `action/model.go:203-206`'s comment on
+      `ResolveResult.ReasonCode`, which documents the field as "the structured
+      classifier **mirrored onto `Action.ReasonCode` at the same status flip**"
+      — an assertion the code does not implement, and the reason this survived
+      review. Once 3.10 lands the comment becomes true; if 3.10 is ever
+      reverted the comment must go with it. Same failure shape as
+      `encodeCursor`'s "opaque wire shape" comment
 
 ## 4. Client plumbing
 
@@ -148,6 +232,17 @@
       to `frontend/lib/types/`
 - [ ] 4.2 Add the scan-target types (host id, kind, sweep duration — and no
       world time; see 3.7)
+- [ ] 4.2a Carry the interior read's optional `name` on the space view's own
+      body type (the type `build-production-space-view` task 10.3 generates
+      against the recorded wire sample), and add it there if that generation
+      omitted it — `system.Feature.Name` is `json:"name,omitempty"` and is set
+      in exactly two places (`system/generator.go`'s star and
+      `stations/service.go`'s trading station), so the field is absent from
+      most bodies and the type it lands on must make it optional. This is the
+      only name source the scan control (5.1) and the log (8.3) have; the raw
+      id fallback is the ordinary rendering, not an error path
+      (`sighting-log` — *A host with no served name falls back to its id, as an
+      ordinary row*)
 - [ ] 4.3 Widen `frontend/lib/types/action.ts`'s `GameAction` with the served
       `reasonCode`, `resolvedAt`, and `acknowledgedAt` fields section 6
       consumes; all three are already on the backend's `Action` and absent from
@@ -185,8 +280,10 @@
 
 - [ ] 5.1 Build the scan control in the space view's fleet panel, listing exactly
       the served targets, each labelled body-or-own-fleet and showing its served
-      sweep duration, resolving body names from the interior read and fleet names
-      from the own-fleets read
+      sweep duration, resolving body names from the interior read (4.2a) and
+      fleet names from the own-fleets read — and rendering the raw host id
+      where neither supplies a name, which is the ordinary case for a planet, a
+      moon, a belt, and a lane gate, never a placeholder or an error state
 - [ ] 5.2 Assert in test that a body present in the interior read but absent from
       the served target set is not offered, and that no range or occlusion
       predicate is evaluated client-side
@@ -294,9 +391,13 @@
       types) and a clean-sweep row (system, `asOf`, swept host, clean-sweep
       marker, no composition)
 - [ ] 8.3 Name the swept host from the open system's interior read when it
-      supplies a name for that host id, and fall back to the raw host id
+      supplies a name for that host id (4.2a), and fall back to the raw host id
       otherwise — a row for another system's sweep has no name source at all,
-      mirroring the system column's own fallback
+      mirroring the system column's own fallback. Assert **both** paths, and
+      note that the named path is inducible only against a host the server
+      actually names, which today is the trading station: every other body type
+      carries no name, so the id fallback is what most rows render and must be
+      presented as a legitimate label
 - [ ] 8.4 Assert no row displays an owner, corporation, or fleet identity for the
       sighted target
 - [ ] 8.5 Resolve the system name from the loaded galaxy data, falling back to the
@@ -336,6 +437,13 @@
       `acknowledgedAt` (report suppression). Confirm too that the scan-target
       read serves **no** world time — the field cut in 3.7, and the one this
       audit was written to catch
+- [ ] 9.2a Run the audit in the other direction for every field named in 9.2:
+      confirm each has a **producer** as well as a consumer, by observing it on
+      a real response body rather than on a struct definition or a mock.
+      `reasonCode` is why this task exists — it had a named consumer, a struct
+      field, a Firestore tag, a doc comment asserting it was written, and green
+      tests, and reached no document and no wire (3.10). A field-with-consumer
+      audit passes on exactly that
 - [ ] 9.3 Confirm no field was added to `fleetDTO` for the sweep window, and that
       the window is read only from the action inbox
 - [ ] 9.4 Confirm no client module computes a range or occlusion predicate; any

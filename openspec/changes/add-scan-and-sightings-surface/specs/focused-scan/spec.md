@@ -76,6 +76,21 @@ its presence, range, and occlusion state — the same disclosure `focused-scan`'
 identical-rejection rule exists to prevent — and no surface in this model hands
 a client a foreign fleet's id in the first place.
 
+**A derived belt member SHALL never appear in the set, and a commit naming
+one SHALL be rejected identically to an unresolvable `hostId`** — the same
+named error, the same response shape, no field distinguishing the two. A belt
+is one body on every surface this game serves: its members are derived at
+body-table build time, never persisted, and are published by no read — the
+interior read serves features and lane gates only. Serving them here would make
+this endpoint the first surface to hand a client member ids, contradicting
+`system-space-view`'s *Belt Members Render as Decorative Detail, Never as
+Separate Pickable Bodies* (no member carries its own hit target, selection, or
+facts display) and offering a target list in which one belt appears as many
+entries the client has no name, mark, or facts surface for. A fleet parked at a
+belt is the canonical mining position, so this is the ordinary case rather than
+a corner of one. The belt feature itself remains an eligible host on its own
+terms; only its members are excluded.
+
 **The reading fleet itself SHALL never appear in its own set.** It satisfies
 every geometric predicate trivially — the distance from a fleet to itself is
 zero, so the range test passes, and a zero-length sightline is never occluded —
@@ -128,6 +143,19 @@ Never a Host For Its Own Sweep*); the list and the commit agree.
 - **WHEN** the served set is inspected
 - **THEN** that same fleet's own id is absent from it, though it trivially
   satisfies the range test at distance zero and is never self-occluded
+
+#### Scenario: A belt is served as one host, never as its members
+- **GIVEN** a fleet within focused-scan range of a belt with a clear sightline
+- **WHEN** its scan targets are read
+- **THEN** the belt appears as exactly one entry, and no derived belt member
+  appears as an entry of its own
+
+#### Scenario: A commit naming a belt member is rejected as unresolvable
+- **WHEN** a fleet commits a focused scan whose `hostId` names a derived member
+  of a belt rather than the belt itself
+- **THEN** the commit is rejected with the same named error and response shape
+  as an unresolvable `hostId`, no scan action is created, and no
+  sensor-channel slot is claimed
 
 #### Scenario: An own fleet in lane transit is absent
 - **GIVEN** a second fleet owned by the same corporation that is in lane transit

@@ -290,6 +290,12 @@ fleet being in lane transit, and the host no longer resolving — each reading a
 its own statement, since a fizzle mints nothing and is otherwise
 indistinguishable to the player from a sweep that never ran.
 
+This copy depends on the reason code being **served**, which requires
+`action-dispatch`'s *Exactly-Once Resolution* to persist it on the resolved
+action — until it does, every fizzle carries no reason code at all and this
+whole five-way mapping renders its unrecognized-code fallback, indistinguishably
+from correct behaviour.
+
 The system SHALL NOT display the raw reason code or the action's raw outcome
 text. A reason code this client does not recognize SHALL be reported as a sweep
 that returned nothing, never as a blank report or as raw text. Dismissing the
@@ -347,9 +353,26 @@ elements, so any forward integration would draw the target at a place no sweep
 ever observed, and every sighting in this model is a glimpse rather than a
 track.
 
+That filtered read is **one bounded page, newest by `asOf`**, and the ghost
+layer SHALL NOT page further: it draws the newest page of this system's records
+and no more. The bound is stated here so it is a specified property of the
+layer rather than an accident of the endpoint — the pile never expires, so a
+system swept enough times will hold more records than one page, and a layer
+that silently drew "some of them" would be indistinguishable from the
+client-side-filtering defect this requirement exists to forbid. Whether ghosts
+should page is not decided here.
+
 The record's stored velocity SHALL instead be **displayed**, as a
-heading-and-speed readout on the ghost's facts surface — its only consumer —
-mirroring the rule a live contact's served velocity already follows.
+heading-and-speed readout on the ghost's facts surface — the same facts surface
+a live contact's served velocity readout already uses (*Foreign Contacts Render
+at Their Served Position*), shown for a highlighted or hovered ghost, and this
+readout is the stored velocity's only consumer.
+
+A ghost is **highlighted**, never selected: the space view's selection is a
+burn's input and admits no ghost at all (*A Ghost Is Not a Member of the Space
+View's Selection, and a Burn Never Consumes One*), so this capability says
+*highlighted* wherever a ghost is being read and reserves *selected* for the
+view's own selection.
 
 A clean-sweep record SHALL draw no ghost. It names no target and carries no
 position at all, so there is nothing to draw and nowhere to draw it; *A Ghost
@@ -376,9 +399,17 @@ layer with the clean-sweep marker lost.
   stored velocity or prediction of an orbit moves it
 
 #### Scenario: A ghost's stored velocity is displayed, not integrated
-- **WHEN** a rendered ghost is selected or hovered
-- **THEN** its stored velocity is displayed as a heading-and-speed readout, and
-  that readout is the field's only consumer
+- **WHEN** a rendered ghost is highlighted or hovered
+- **THEN** its stored velocity is displayed as a heading-and-speed readout on
+  the same facts surface a live contact's velocity readout uses, and that
+  readout is the field's only consumer
+
+#### Scenario: A system with more records than one page draws the newest page
+- **GIVEN** a corporation whose pile holds more records for the open system
+  than one page of the filtered read serves
+- **WHEN** the ghost layer sources its records
+- **THEN** it draws a ghost for each record of that single bounded page,
+  newest `asOf` first, and issues no further page request
 
 #### Scenario: A ghost is visually distinct from a live contact
 - **WHEN** a ghost and a live contact are both rendered
@@ -430,10 +461,12 @@ The system SHALL NOT admit a ghost mark to the space view's single selection
 (*Toggle-to-Deselect Single Selection Among a Body, a Lane Gate, or a Point*):
 selecting a ghost SHALL NOT become a body, gate, or point selection, SHALL NOT
 replace or clear an existing selection, and SHALL NOT supply a burn's target.
-A ghost highlight for cross-reading with the sighting log (`sighting-log`'s *A
-Log Row and Its Ghost Address the Same Record By Its Served Id*) is a separate,
-additional state, held alongside the space view's own selection rather than
-inside it.
+Activating a ghost SHALL instead **highlight** it: a ghost highlight for
+cross-reading with the sighting log (`sighting-log`'s *A Log Row and Its Ghost
+Address the Same Record By Its Served Id*) is a separate, additional state,
+held alongside the space view's own selection rather than inside it. Throughout
+this capability a ghost is *highlighted*; *selected* names only the view's own
+single selection, which no ghost ever enters.
 
 The picking rule is exhaustive: a click that resolves against the pick plane
 over no body or lane-gate mark **selects that point**, and a burn commands
@@ -444,14 +477,14 @@ it silently arms a burn to the coordinate a foreign fleet occupied at some past
 `asOf`. That is a commanded manoeuvre produced by an inspection gesture, and a
 frozen sighting is the worst possible source for a burn target.
 
-#### Scenario: Selecting a ghost leaves the view's selection untouched
+#### Scenario: Activating a ghost leaves the view's selection untouched
 - **GIVEN** a body is the space view's current selection and a ghost is drawn
-- **WHEN** the player selects that ghost
-- **THEN** the space view's selection is still that body, and the ghost is not
-  a member of the selection
+- **WHEN** the player activates that ghost
+- **THEN** the space view's selection is still that body, the ghost is
+  highlighted instead, and it is not a member of the selection
 
-#### Scenario: A ghost selection never supplies a burn target
-- **GIVEN** a ghost is selected for cross-highlighting and the space view's own
+#### Scenario: A highlighted ghost never supplies a burn target
+- **GIVEN** a ghost is highlighted for cross-reading and the space view's own
   selection is empty
 - **WHEN** the burn command surface is inspected
 - **THEN** it offers no target, and the ghost's position is not proposed as one
