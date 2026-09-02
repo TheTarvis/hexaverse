@@ -358,7 +358,13 @@ func attachedGateLaneId(f *Fleet) string {
 // and shapes the read DTO. A mid-jump fleet's position resolves to the zero
 // vector with no error surfaced to the caller — Jump being set is itself the
 // disclosed fact; ErrFleetInTransit is an internal signal, not an HTTP
-// failure.
+// failure. A stored `attachedTo` the body table no longer resolves
+// (space.ErrUnknownBody — e.g. a belt-member index a retuned
+// AsteroidsPerBelt no longer derives, or a lane gate a degraded gate read
+// omits) degrades the same way: no position reported, the fleet still
+// returned with its unresolved `attachedTo` unchanged, the host id logged
+// (re-express-economy-positions tasks.md 3.8 — "A fleet attached to a body
+// the table no longer resolves degrades, never panics").
 func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 	requesterCid := common.ActorCorp(c)
 	own := requesterCid != "" && f.CorporationId == requesterCid
@@ -366,6 +372,9 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 	var pos space.Vec3
 	if resolved, err := h.svc.PositionOf(c.Request.Context(), f); err == nil {
 		pos = resolved
+	} else if errors.Is(err, space.ErrUnknownBody) {
+		log.Warn().Ctx(c).Str("fleetId", f.Id).Str("attachedTo", f.AttachedTo).
+			Msg("fleet attached to a body the table no longer resolves; degrading read")
 	} else if !errors.Is(err, ErrFleetInTransit) {
 		return fleetDTO{}, err
 	}

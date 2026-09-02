@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"hexaverse/action"
 	"hexaverse/common"
@@ -57,9 +60,102 @@ var (
 	// ErrOverFreeHold: the requested tons exceeds the fleet's current free
 	// hold.
 	ErrOverFreeHold = errors.New("mine: requested tons exceeds free hold")
+
+	// featureId validation sentinels (re-express-economy-positions
+	// mine-extraction: "A Client-Supplied Feature Id Is Validated Before
+	// Resolution"). Each rejection this family defines carries its own
+	// distinguishable sentinel — none of these ever collapse onto
+	// ErrUnknownKind or onto one another (design.md Decision 2a; "Mine
+	// Commit Rejections Report a Distinguishable Reason" extended to this
+	// family).
+	//
+	// Lexical phase — checked before the string is parsed for the belt-
+	// member separator "#" at all.
+	ErrFeatureIdPathSeparator  = errors.New("mine: featureId must not contain a path separator")
+	ErrFeatureIdIsDot          = errors.New(`mine: featureId must not be exactly "."`)
+	ErrFeatureIdIsDotDot       = errors.New(`mine: featureId must not be exactly ".."`)
+	ErrFeatureIdReservedDunder = errors.New("mine: featureId must not match the reserved dunder pattern")
+	ErrFeatureIdOverlong       = errors.New("mine: featureId exceeds the maximum configured length")
+	// Resolution phase — checked only once the lexical phase has passed,
+	// after "#" is parsed but before the resulting prefix resolves anything.
+	ErrFeatureIdMultipleSeparators = errors.New("mine: featureId must contain at most one member separator")
+	ErrFeatureIdSuffixNotNumeric   = errors.New("mine: featureId's member suffix is not a base-10 integer")
+	ErrFeatureIdSuffixOutOfRange   = errors.New("mine: featureId's member suffix is outside the valid index range")
+	ErrFeatureIdPrefixNotFound     = errors.New("mine: featureId's member prefix does not resolve to an existing feature")
+	ErrFeatureIdPrefixNotBelt      = errors.New("mine: featureId's member prefix does not resolve to a belt feature")
+
 	// errNotImplemented marks Commit's red-phase compile stub.
 	errNotImplemented = errors.New("mine: Commit not implemented")
 )
+
+// featureIdDunderPattern is Firestore's own reserved document-id pattern
+// (`^__.*__$`) — the lexical phase's third rejection.
+var featureIdDunderPattern = regexp.MustCompile(`^__.*__$`)
+
+// validateFeatureIdLexical is the LEXICAL phase of featureId validation
+// (design.md Decision 2a): run before the string is parsed for the belt-
+// member separator "#" at all. maxBytes <= 0 disables the length check
+// (used only by test fixtures that never opted into it — DefaultMineParams'
+// production default is always positive).
+func validateFeatureIdLexical(featureId string, maxBytes int) error {
+	if strings.Contains(featureId, "/") {
+		return ErrFeatureIdPathSeparator
+	}
+	if featureId == "." {
+		return ErrFeatureIdIsDot
+	}
+	if featureId == ".." {
+		return ErrFeatureIdIsDotDot
+	}
+	if featureIdDunderPattern.MatchString(featureId) {
+		return ErrFeatureIdReservedDunder
+	}
+	if maxBytes > 0 && len(featureId) > maxBytes {
+		return ErrFeatureIdOverlong
+	}
+	return nil
+}
+
+// resolveFeatureId is the RESOLUTION phase of featureId validation (design.md
+// Decision 2a) plus target lookup: run only on a featureId that has already
+// passed validateFeatureIdLexical, after "#" is parsed but before the
+// resulting prefix is used to resolve anything. A featureId with no "#" is
+// resolved directly by exact id (existence/kind are the caller's concern, as
+// today); a featureId of the form "<prefix>#<suffix>" resolves to its parent
+// belt feature — never by searching interior.Features for the member id
+// itself, which never appears there (mine-extraction: "Belt Member Targets
+// Resolve Through Their Parent Belt Feature"). Returns the resolved feature
+// (nil only for the no-separator, not-found case) and the resolved feature's
+// own id — the value every caller must use for the ledger key and Params,
+// never the raw client string (design.md Decision 2a).
+func resolveFeatureId(featureId string, interior *system.GeneratedInterior) (*system.Feature, string, error) {
+	sep := strings.IndexByte(featureId, '#')
+	if sep < 0 {
+		if f := findFeature(interior, featureId); f != nil {
+			return f, f.Id, nil
+		}
+		return nil, featureId, nil
+	}
+	if strings.Count(featureId, "#") > 1 {
+		return nil, "", ErrFeatureIdMultipleSeparators
+	}
+	prefix, suffix := featureId[:sep], featureId[sep+1:]
+	idx, err := strconv.Atoi(suffix)
+	if err != nil {
+		return nil, "", ErrFeatureIdSuffixNotNumeric
+	}
+	if idx < 0 || idx >= system.AsteroidsPerBelt {
+		return nil, "", ErrFeatureIdSuffixOutOfRange
+	}
+	parent := findFeature(interior, prefix)
+	if parent == nil {
+		return nil, "", ErrFeatureIdPrefixNotFound
+	}
+	if parent.Type != system.FeatureBelt {
+		return nil, "", ErrFeatureIdPrefixNotBelt
+	}
+	return parent, parent.Id, nil
+}
 
 // FleetSource is the narrow fleet-domain read mine needs at commit: the live
 // fleet doc (with any due arrival opportunistically settled — see
@@ -120,9 +216,29 @@ func NewServiceWith(fleets FleetSource, features FeatureSource, actions Actions,
 }
 
 // Commit is the mine verb's commit path: ownership → tonnage validity →
-// remaining preconditions (docked, kind, lode-not-depleted, mining rate,
-// free hold, movement slot free) → freeze params → commit through the action
-// spine (design.md task 2.2).
+// docked-state → featureId validation → remaining preconditions (kind,
+// lode-not-depleted, mining rate, free hold, movement slot free) → freeze
+// params → commit through the action spine (design.md task 2.2).
+//
+// The resolved target — the value every downstream precondition (kind,
+// richness/startTons, ledger key) reads — is either the named feature
+// itself, or, for a validated belt-member id (`<beltFeatureId>#<k>`), its
+// parent belt feature (re-express-economy-positions, mine-extraction: "Belt
+// Member Targets Resolve Through Their Parent Belt Feature"); a member is
+// never an independent lode of its own.
+//
+// The submitted featureId is validated in two phases, run strictly AFTER
+// the ownership check and the not-docked rejection — never before, so an
+// invalid or unresolvable id can never turn this endpoint into an existence
+// oracle for a foreign fleet's target (mine-extraction: "A Client-Supplied
+// Feature Id Is Validated Before Resolution"). A LEXICAL phase runs before
+// the string is parsed for the belt-member separator "#" at all (rejects a
+// path separator, exactly "." or "..", the reserved dunder pattern, or an
+// overlong id). A RESOLUTION phase runs only on a string the lexical phase
+// passed, after "#" is parsed but before the resulting prefix resolves
+// anything (rejects more than one "#", a non-numeric or out-of-range member
+// suffix, or a prefix that does not resolve to an existing belt-type
+// feature). Each rejection carries its own distinguishable sentinel.
 func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, req MineRequest) (*action.Action, error) {
 	// (a) ownership — resolved before any other precondition, existence hidden
 	// (design.md Decision #10).
@@ -154,11 +270,30 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 		return nil, ErrNotDocked
 	}
 
+	// featureId validation (design.md Decision 2a) runs STRICTLY after
+	// ownership and the not-docked rejection above, never before — an
+	// invalid/unresolvable id rejected any earlier would let a caller probe
+	// the shape or existence of a foreign fleet's docked target before
+	// ownership is established, turning this endpoint into an existence
+	// oracle (mine-extraction: "An unresolvable member rejection never
+	// precedes ownership or the not-docked rejection").
+	if err := validateFeatureIdLexical(req.FeatureId, s.params.MaxFeatureIdBytes); err != nil {
+		return nil, err
+	}
+
 	interior, err := s.features.GetOrCreateInterior(ctx, f.SystemId)
 	if err != nil {
 		return nil, fmt.Errorf("mine: reading system interior: %w", err)
 	}
-	feat := findFeature(interior, req.FeatureId)
+	// Resolution phase + target lookup: a bare id resolves directly; a
+	// validated member id (<beltFeatureId>#<k>) resolves through its parent
+	// belt feature — never by searching interior.Features for the member id
+	// itself, which never appears there (mine-extraction: "Belt Member
+	// Targets Resolve Through Their Parent Belt Feature").
+	feat, resolvedFeatureId, err := resolveFeatureId(req.FeatureId, interior)
+	if err != nil {
+		return nil, err
+	}
 	// A station is a dockable but NOT mineable feature (#0011). Checked before
 	// the kind lookup so it reports its own reason: a station carries no
 	// resources, so falling through would reject it as "feature does not carry
@@ -176,7 +311,14 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 		return nil, ErrUnknownKind
 	}
 
-	ledgerKey := LedgerKey(f.SystemId, req.FeatureId, req.Kind)
+	// The ledger key's feature component is always the RESOLVED feature's own
+	// id (the named feature itself, or a member's resolved parent belt
+	// feature) — never the raw client-supplied featureId string — and its
+	// system component is always the fleet's own stored SystemId — never a
+	// client-supplied system identifier (design.md Decision 2a;
+	// mine-extraction: "A resolved run's ledger key never contains the raw
+	// client string or a client-supplied system id").
+	ledgerKey := LedgerKey(f.SystemId, resolvedFeatureId, req.Kind)
 	// The commit-time courtesy fold ("Already-Depleted Lode Rejected At
 	// Commit") — the same fold the resolver folds at resolve, evaluated now.
 	fold, err := s.actions.Remaining(ctx, ledgerKey, now)
@@ -229,7 +371,7 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 		Scope:           f.SystemId, // read-resolution/SSE stays system-aligned (Decision #12)
 		LedgerKey:       ledgerKey,  // per-feature, per-kind depletion (Decisions #12/#14)
 		Params: map[string]interface{}{
-			"featureId": req.FeatureId,
+			"featureId": resolvedFeatureId, // resolved — never the raw client string
 			"kind":      string(req.Kind),
 			"tons":      req.Tons,
 			"rate":      fleetRate,
@@ -241,7 +383,7 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 		return nil, err
 	}
 	log.Info().Ctx(ctx).Str("fleetId", fleetId).Str("actionId", a.Id).
-		Str("featureId", req.FeatureId).Str("kind", string(req.Kind)).Float64("tons", req.Tons).
+		Str("featureId", resolvedFeatureId).Str("kind", string(req.Kind)).Float64("tons", req.Tons).
 		Int64("eta", int64(eta)).Msg("Fleet ordered to mine")
 	return a, nil
 }

@@ -2,31 +2,31 @@
   "$comment": [
     "The cross-stack-determinism capability's deviation register (openspec: cross-stack-determinism,",
     "requirement 'The Capability's Deviation Register Bridges Known Violations Across Its Checks').",
-    "ONE register for the whole capability — no check maintains its own. Each entry admits a KNOWN,",
+    "ONE register for the whole capability \u2014 no check maintains its own. Each entry admits a KNOWN,",
     "FILED, not-yet-fixed violation past exactly the check(s) and site(s) it names, and nothing else.",
     "",
     "An entry is valid only while its referenced defect doc under docs/defects/ carries a",
     "'**Status:** open' line. The change that fixes a defect flips that line to",
-    "'**Status:** fixed (<change-id>)' and REMOVES the entry here in the same commit — a stale entry",
+    "'**Status:** fixed (<change-id>)' and REMOVES the entry here in the same commit \u2014 a stale entry",
     "fails every check that consults it. Checks print this register's contents on every run.",
     "",
     "Entry shape: 'file' is repo-relative; 'checks' maps a check slug (see 'checks' legend) to the",
     "line numbers it suppresses in that file ([] = suppression keyed on the named family/function,",
-    "not lines). 'magnitude' is 'unmeasured' or 'measured (<basis>)' — never a bare 'measured'.",
+    "not lines). 'magnitude' is 'unmeasured' or 'measured (<basis>)' \u2014 never a bare 'measured'.",
     "Line numbers are load-bearing: if a site drifts, the consulting check fails until the entry is",
     "updated, which keeps every suppression a reviewable diff."
   ],
   "capability": "cross-stack-determinism",
   "checks": {
-    "cross-target": "Rule-Bearing Values Are Reproducible Across Build Targets of the Same Language — enforced by .claude/scripts/check-fma-contraction.sh (compiled-output FMADDD/FMSUBD inspection, arm64 vs amd64/GOAMD64=v1) and the amd64 differential board-test leg in /check",
-    "golden-fixture-sweep": "Shared Board Math Is Pinned By a Cross-Language Golden Fixture — the exhaustive-sweep clause; a listed family's sweep case is BLOCKED until its defect is fixed (recording it now would freeze one architecture's answers)",
-    "transcendental-drift": "Rule-Bearing Values Cross the Seam By Exact Arithmetic or By Discretization — enforced by .claude/scripts/check-transcendental.sh (textual lint: transcendentals, sqrt, bare Round)",
-    "sqrt-pinning": "Square Roots In Rules Are Pinned, Not Assumed — a runtime sqrt reaching a rule-bearing value with no fixture family pinning it",
+    "cross-target": "Rule-Bearing Values Are Reproducible Across Build Targets of the Same Language \u2014 enforced by .claude/scripts/check-fma-contraction.sh (compiled-output FMADDD/FMSUBD inspection, arm64 vs amd64/GOAMD64=v1) and the amd64 differential board-test leg in /check",
+    "golden-fixture-sweep": "Shared Board Math Is Pinned By a Cross-Language Golden Fixture \u2014 the exhaustive-sweep clause; a listed family's sweep case is BLOCKED until its defect is fixed (recording it now would freeze one architecture's answers)",
+    "transcendental-drift": "Rule-Bearing Values Cross the Seam By Exact Arithmetic or By Discretization \u2014 enforced by .claude/scripts/check-transcendental.sh (textual lint: transcendentals, sqrt, bare Round)",
+    "sqrt-pinning": "Square Roots In Rules Are Pinned, Not Assumed \u2014 a runtime sqrt reaching a rule-bearing value with no fixture family pinning it",
     "discretized-choice": "Inexact Arithmetic Is Rule-Bearing Only Through a Discretized, Tie-Broken Choice"
   },
   "entries": [
     {
-      "site": "galaxy field distance `dist` (field.go) — math.Sqrt on the placement/lane decision path; the residual arch hazard is the third-party noise library",
+      "site": "galaxy field distance `dist` (field.go) \u2014 math.Sqrt on the placement/lane decision path; the residual arch hazard is the third-party noise library",
       "file": "backend/galaxy/field.go",
       "checks": {
         "transcendental-drift": [
@@ -35,11 +35,11 @@
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-galaxy-generation-arch-divergence.md",
-      "magnitude": "narrowed 2026-08-27 (add-endless-galaxy): backend/galaxy now emits ZERO arm64 FMA sites (was 12) and no trigonometry writes a coordinate. math.Sqrt is IEEE correctly-rounded and target-stable; the unmeasured residual is github.com/ojrac/opensimplex-go, which emits 273 arm64 FMA sites and whose Eval3 output is threshold-compared to classify a candidate's region — the region selects the gap that decides survival",
-      "note": "Rewritten for the endless galaxy: the finite disc's rejection sampling, its sin/cos placement and its FMA sites are gone. dist stays registered rather than pragma'd because it shares the open galaxy-generation architecture-divergence defect with the noise library. Exposure is HIGHER than before by design — blocks materialize lazily over a world's life, so 'same seed, same universe' now spans hosts and build targets, not one seed run — which is why the fixable sites were fixed here instead of deferred."
+      "magnitude": "narrowed 2026-08-27 (add-endless-galaxy): backend/galaxy now emits ZERO arm64 FMA sites (was 12) and no trigonometry writes a coordinate. math.Sqrt is IEEE correctly-rounded and target-stable; the unmeasured residual is github.com/ojrac/opensimplex-go, which emits 273 arm64 FMA sites and whose Eval3 output is threshold-compared to classify a candidate's region \u2014 the region selects the gap that decides survival",
+      "note": "Rewritten for the endless galaxy: the finite disc's rejection sampling, its sin/cos placement and its FMA sites are gone. dist stays registered rather than pragma'd because it shares the open galaxy-generation architecture-divergence defect with the noise library. Exposure is HIGHER than before by design \u2014 blocks materialize lazily over a world's life, so 'same seed, same universe' now spans hosts and build targets, not one seed run \u2014 which is why the fixable sites were fixed here instead of deferred."
     },
     {
-      "site": "market.Params.ProvisionRequests — premium-band FMA `premium := p.PremiumBandLow + unitFloat(h)*(...)` (provisioning.go:35)",
+      "site": "market.Params.ProvisionRequests \u2014 premium-band FMA `premium := p.PremiumBandLow + unitFloat(h)*(...)` (provisioning.go:35)",
       "file": "backend/market/provisioning.go",
       "checks": {
         "cross-target": [
@@ -49,10 +49,10 @@
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
       "magnitude": "unmeasured",
-      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): this file is not touched by the polar migration (Decision 12 — mine/market are one-line changes); line re-confirmed, not assumed."
+      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): this file is not touched by the polar migration (Decision 12 \u2014 mine/market are one-line changes); line re-confirmed, not assumed."
     },
     {
-      "site": "market.Params.ProvisionRequests — quantity-band FMA `quantity := p.QuantityBandLow + unitFloat(h)*(...)` (provisioning.go:38)",
+      "site": "market.Params.ProvisionRequests \u2014 quantity-band FMA `quantity := p.QuantityBandLow + unitFloat(h)*(...)` (provisioning.go:38)",
       "file": "backend/market/provisioning.go",
       "checks": {
         "cross-target": [
@@ -65,30 +65,30 @@
       "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): this file is not touched by the polar migration (Decision 12); line re-confirmed, not assumed."
     },
     {
-      "site": "mine.Service.Commit — remainingAtNow fold `remainingAtNow := startTons + fold`, across-statement FMA fusion (service.go:187)",
+      "site": "mine.Service.Commit \u2014 remainingAtNow fold `remainingAtNow := startTons + fold`, across-statement FMA fusion (service.go:329)",
       "file": "backend/mine/service.go",
       "checks": {
         "cross-target": [
-          187
+          329
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
       "magnitude": "unmeasured",
-      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): the migration's only mine/service.go edit is threading board.ProductionSchedule() into the board.StateAt call at line 152 (Decision 12); line re-confirmed, not assumed."
+      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): the migration's only mine/service.go edit is threading board.ProductionSchedule() into the board.StateAt call at line 152 (Decision 12); line re-confirmed, not assumed. Line numbers re-confirmed 2026-09-02 (re-express-economy-positions): that change added two-phase featureId validation and belt-member resolution ABOVE both sites in mine.Service.Commit, shifting them without altering either expression. Re-located by grep against the live file, not assumed; the defects themselves are unchanged and remain open."
     },
     {
-      "site": "mine.Service.Commit — run ETA `eta := now.Add(common.WorldMillis(math.Round(req.Tons / fleetRate)))` (service.go:224)",
+      "site": "mine.Service.Commit \u2014 run ETA `eta := now.Add(common.WorldMillis(math.Round(req.Tons / fleetRate)))` (service.go:366)",
       "file": "backend/mine/service.go",
       "checks": {
         "transcendental-drift": [
-          224
+          366
         ]
       },
       "filed": "2026-08-25",
       "defect": "docs/defects/2026-08-25-remaining-fma-sites.md",
       "magnitude": "unmeasured",
-      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): see the note on the sibling entry above."
+      "note": "Verified unchanged 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 8.2 sweep): see the note on the sibling entry above. Line numbers re-confirmed 2026-09-02 (re-express-economy-positions): that change added two-phase featureId validation and belt-member resolution ABOVE both sites in mine.Service.Commit, shifting them without altering either expression. Re-located by grep against the live file, not assumed; the defects themselves are unchanged and remain open."
     }
   ]
 }

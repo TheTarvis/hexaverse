@@ -63,6 +63,14 @@ type MineParams struct {
 	// TonsPerRichness converts a feature's resources[kind].Richness (0..1) into
 	// startTons at commit (Decision #8): startTons = richness × TonsPerRichness.
 	TonsPerRichness float64
+	// MaxFeatureIdBytes bounds a client-supplied featureId's UTF-8 byte length
+	// (re-express-economy-positions design.md Decision 2a / "A Client-Supplied
+	// Feature Id Is Validated Before Resolution"), below Firestore's 1500-byte
+	// document-id limit. A zero value disables the length check entirely (test
+	// fixtures that don't set this field, e.g. this package's own
+	// validParams(), never wanted the length check exercised) — only
+	// DefaultMineParams' 256-byte default enforces it in production.
+	MaxFeatureIdBytes int
 }
 
 // Tuning-time "starting numbers" (design.md Open Questions / Decision #18).
@@ -79,6 +87,11 @@ const (
 	defaultMinRunTons          = 5.0
 	defaultTonsPerRichness     = 400.0
 	defaultMaxLedgerDeltasCeil = 100
+	// defaultMaxFeatureIdBytes is the production featureId length ceiling
+	// (design.md Decision 2a): comfortably below Firestore's 1500-byte
+	// document-id limit while remaining well past any id this generator
+	// mints.
+	defaultMaxFeatureIdBytes = 256
 )
 
 // DefaultMineParams sources the live tuning knobs (design.md Open Questions;
@@ -92,8 +105,9 @@ const (
 func DefaultMineParams() MineParams {
 	ceil := defaultMaxLedgerDeltasCeil
 	p := MineParams{
-		MinRunTons:      defaultMinRunTons,
-		TonsPerRichness: defaultTonsPerRichness,
+		MinRunTons:        defaultMinRunTons,
+		TonsPerRichness:   defaultTonsPerRichness,
+		MaxFeatureIdBytes: defaultMaxFeatureIdBytes,
 		MaxLedgerDeltas: map[system.FeatureType]int{
 			system.FeatureBelt:     ceil,
 			system.FeatureGasGiant: ceil,
@@ -126,6 +140,9 @@ func DefaultMineParams() MineParams {
 func validateMineParams(p MineParams) {
 	if p.MinRunTons <= 0 {
 		panic(fmt.Sprintf("mine: invalid MineParams: MinRunTons must be positive, got %g", p.MinRunTons))
+	}
+	if p.MaxFeatureIdBytes <= 0 {
+		panic(fmt.Sprintf("mine: invalid MineParams: MaxFeatureIdBytes must be positive, got %d", p.MaxFeatureIdBytes))
 	}
 	worstCaseCurveTons := p.TonsPerRichness * 1.0
 	worstCaseDeltas := int(math.Ceil(worstCaseCurveTons / p.MinRunTons))

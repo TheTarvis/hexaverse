@@ -72,6 +72,21 @@ func (h *Handler) Commit(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrOverFreeHold):
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrFeatureIdPathSeparator),
+		errors.Is(err, ErrFeatureIdIsDot),
+		errors.Is(err, ErrFeatureIdIsDotDot),
+		errors.Is(err, ErrFeatureIdReservedDunder),
+		errors.Is(err, ErrFeatureIdOverlong),
+		errors.Is(err, ErrFeatureIdMultipleSeparators),
+		errors.Is(err, ErrFeatureIdSuffixNotNumeric),
+		errors.Is(err, ErrFeatureIdSuffixOutOfRange),
+		errors.Is(err, ErrFeatureIdPrefixNotFound),
+		errors.Is(err, ErrFeatureIdPrefixNotBelt):
+		// featureId validation family (re-express-economy-positions,
+		// mine-extraction: "A Client-Supplied Feature Id Is Validated Before
+		// Resolution") — every rejection in this family surfaces as 400,
+		// never a bodiless 5xx.
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, action.ErrActiveActionExists):
 		// The busy-slot reason (which of burn/lane-transit/mine holds the
 		// slot) is already folded into err's message by Service.Commit

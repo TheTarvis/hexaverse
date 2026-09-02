@@ -452,11 +452,44 @@ while still failing to deliver the guarantee its name promises.
   **Ruling: link 7 ships the hold/release verbs alongside the fuel currency**,
   rather than specifying upkeep for an unreachable state and making it the
   sixth.
-- **Warn at commit; do not block.** The delta-v to reach the nearest station
-  or gate is a single closed-form body-target solve, so "this burn leaves you
-  unable to reach anything" is cheap to surface at commit time. It stays a
-  warning and the commit is still permitted. The complaint about stranding is
-  that it happens *invisibly*, not that it happens.
+
+  **Correction 2026-09-02 (link 7's own panel review): the verb and currency
+  ship together one link later, not inside link 7 itself.** Pricing this
+  upkeep in fuel the straightforward way — folding `cargo["fuel"]`
+  continuously against elapsed hold time — makes `fleet.FreeHold` (read by
+  four call sites, including `mine`'s resolve clamp) time-dependent. The
+  correct fix stores a precomputed dry instant on `space.Park` at `hold`
+  commit and folds a station-keep park past it into its released orbit,
+  mirroring "a burn past its arrival IS its settled park" — but that is a
+  `space.Park` schema change link 7's own introduction of fuel should not
+  also have to get right in the same breath. Carved out to
+  `add-stationkeep-hold-verb`, sequenced immediately after link 7. The
+  standing principle ("ship the verb with the currency, or ship neither")
+  still holds exactly; only the timing moved.
+- **Warn at commit; do not block.** "This burn leaves you unable to reach
+  anything" is surfaced at commit time. It stays a warning and the commit is
+  still permitted. The complaint about stranding is that it happens
+  *invisibly*, not that it happens.
+
+  **Correction 2026-09-02 (link 7's own panel review), two parts:**
+  1. **Not a single closed-form solve.** `space.SolveBurn` is per-target, so
+     checking every candidate station and lane-gate body in the destination
+     system costs one solve per candidate plus the body-table read — an
+     N-solves scan, N bounded by that system's body count.
+  2. **Priced at the acceleration floor, not the ceiling.**
+     `Δv = commandedAcceleration × flightSeconds`, and
+     `flightSeconds = 2·√(curveLength / commandedAcceleration)`, so
+     `Δv = 2·√(commandedAcceleration × curveLength)` — strictly *increasing*
+     in commanded acceleration. A fleet's maximum affordable reach is
+     therefore at its *minimum* legal acceleration
+     (`disclosure.MinCommandedAccel`), not its ceiling. An earlier draft of
+     link 7 priced this warning (and the read-side range estimate) at the
+     ceiling — exactly backwards, false-alarming against fleets that could
+     still reach a station or gate by crawling. Corrected in link 7's own
+     spec deltas; this also softens (without closing) link 7's flagged
+     conflict over a dry fleet drifting above the stop-in-place speed floor
+     — a fleet with any fuel at all can crawl-decelerate cheaply — see
+     link 7's `design.md` Risks section for the full accounting.
 
 **Forecloses.** A lost-in-space rule, a fuel-death state, and any soft wall
 that pushes a fleet back toward supply. The bound on sailing into the void

@@ -4,8 +4,8 @@ package system
 // continuous terms without ever reading the materialized interior
 // (openspec add-orbital-system-bodies, design.md Decision 6). Sits beside
 // `stations.DeriveOrbit`, the LATTICE derivation, which this change does
-// not touch: `stations.DeriveOrbit`'s lattice form dies at link 6
-// (re-anchor-mine-market-stations), when docking itself moves off the
+// not touch: `stations.DeriveOrbit`'s lattice form dies at link 8-9
+// (re-express-economy-positions), when docking itself moves off the
 // lattice. Until then both coexist, independently derived from the same
 // seed.
 

@@ -11,8 +11,8 @@ import (
 // add-orbital-system-bodies landed. Additive, not dual-write: the two are
 // independently derived from the same seed, neither consulted by the
 // other. This lattice form — and the docking/placement code that consumes
-// it — dies at link 6 of the continuous-space chain
-// (re-anchor-mine-market-stations), when docking itself moves off the
+// it — dies at link 8-9 of the continuous-space chain
+// (re-express-economy-positions), when docking itself moves off the
 // lattice; DeriveOrbit is not touched by this change.
 //
 // DeriveOrbit computes a station's orbital elements as a PURE function of its

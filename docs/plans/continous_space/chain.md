@@ -43,11 +43,16 @@ after that design was written.
 | 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ✅ `8f4dd65`…`99747e2` |
 | 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | 📝 spec CLEAR, 0/33 |
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ⬜ |
+| — | `add-stationkeep-hold-verb` | *(unplanned insert)* `hold`/`release` verbs + their fuel-denominated upkeep, carved out of link 7's own panel review | ⬜ |
 | 8 | `build-production-space-view` | The renderer; `board-view` retired | ⬜ |
 | 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | ⬜ |
 
 Downstream and off the critical path: `add-station-exchange` (M12) gets
-re-proposed after link 6.
+re-proposed after link 6; `add-cargo-transfer` (the rescue verb
+`decisions.md`'s stranding ruling assumed already existed but does not —
+see link 7's Why) is unscheduled, off the critical path, and a real design
+surface in its own right (partial transfers, proximity vs. attachment,
+ownership and hold capacity on both sides) rather than a bolt-on.
 
 ---
 
@@ -418,19 +423,43 @@ down as Δv is spent — the economy's first real sink against M11's pure faucet
 
 - Burn commit gains a validation: a burn whose Δv price exceeds available fuel
   is rejected at commit.
-- `stationkeep` upkeep gets a currency; `orbit` stays the free park.
 - **Guardrail that must survive review:** commanded acceleration stays
   independent of loaded mass. Coupling them yields the rocket equation, which
   turns flight time into a differential equation and destroys the closed-form
   brachistochrone the whole capability rests on.
 - **Decided (2026-08-29):** a fleet **can** strand, and stranding is a setback
   rather than a death — commit-time validation means it never strands
-  mid-burn, `orbit` is free so it sits indefinitely, and fuel-as-cargo means
-  another fleet can rescue it. **No blanket reserve** ("enough to get home" has
-  no local computable definition). Two guardrails are part of the ruling:
-  station-keeping upkeep force-demotes the park to `orbit` rather than draining
-  to zero, and commit **warns without blocking** when a burn would leave the
-  fleet unable to reach a station or gate.
+  mid-burn, and `orbit` is free so it sits indefinitely. **No blanket reserve**
+  ("enough to get home" has no local computable definition). Commit **warns
+  without blocking** when a burn would leave the fleet unable to reach a
+  station or gate, priced at the acceleration floor (not the ceiling) so the
+  warning never false-alarms against a fleet that could still crawl to
+  safety — a correction made during this link's own panel review, since
+  `Δv = 2·√(a·L)` rises with commanded acceleration, so a fleet's true
+  maximum reach is at its *minimum* legal acceleration, not its ceiling.
+- **Correction to the rescue half of the 2026-08-29 ruling, made during this
+  link's own panel review:** "fuel-as-cargo means another fleet can rescue
+  it" is false — no cargo-transfer verb exists anywhere in the tree.
+  Stranding is therefore permanent (mitigated only by jumps costing no Δv),
+  not "pending rescue." See `add-cargo-transfer` in the downstream list.
+- **`stationkeep` upkeep gets a currency, but not in this link.** Pricing
+  it in fuel the straightforward way would make `fleet.FreeHold` — read by
+  four call sites including `mine`'s resolve clamp — time-dependent. Carved
+  out to `add-stationkeep-hold-verb` (see the unplanned insert above), which
+  ships immediately after this link and stores a precomputed dry instant on
+  the park instead, mirroring "a burn past its arrival IS its settled park."
+
+## Link 7 (insert) — `add-stationkeep-hold-verb`
+
+The `hold`/`release` verbs `space.StationKeepRate`/`StationKeepUpkeep`/
+`ReleaseStationkeep` have had zero production callers since
+`add-space-kinematics` — carved out of link 7 itself (see above) rather than
+shipped inline, because the correct fold needs a `space.Park` schema change
+(a stored hold-start time and a precomputed dry instant) that link 7's own
+introduction of fuel should not also have to get right in the same breath.
+Ships the verb and its upkeep currency together, exactly as the standing
+"ship the verb with the currency, or ship neither" principle requires —
+only the timing moves, by one link.
 
 ## Link 8 — `build-production-space-view`
 
@@ -508,7 +537,7 @@ one place.
 | --- | --- | --- |
 | Gate dwell time before jumping | link 3 → carried to link 4 | ✅ **No dwell.** Docking makes a fleet immediately jump-eligible. A docked camper is already masked and an arrival already unmasked, so a dwell adds waiting without adding a decision. |
 | Focused-scan pricing | link 5 | ✅ **Sensor-channel time, scaled by range, and the scan emits.** Range gating was already shipped (`disclosure.FocusedScanRange`). Fuel explicitly rejected — it does not exist until link 7. |
-| Whether a fleet can strand | link 7 | ✅ **Yes, and it is a setback, not a death.** No blanket reserve — "enough to get home" has no local computable definition. Station-keeping upkeep force-demotes to `orbit` rather than draining to zero; commit warns without blocking. |
+| Whether a fleet can strand | link 7 | ✅ **Yes, and it is a setback, not a death — though link 7's own review found the "setback" framing rests on a rescue verb that does not exist, so stranding is permanent until `add-cargo-transfer` lands.** No blanket reserve — "enough to get home" has no local computable definition. Station-keeping upkeep force-demotes to `orbit` rather than draining to zero (link 7's own insert, `add-stationkeep-hold-verb`); commit warns without blocking, priced at the acceleration floor so it never false-alarms against a fleet that can still crawl. |
 | What "holding" a body means; mine entity shape | combat — deferred, off-chain | ⬜ open, and deliberately so |
 
 Also still open, and deferred with combat: whether a fleet can be attacked

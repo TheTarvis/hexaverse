@@ -140,6 +140,28 @@ func preconditionCases() []struct {
 		{"busy: burning", fmt.Errorf("%s: %w", BusyReason("burn"), action.ErrActiveActionExists), http.StatusConflict},
 		{"busy: lane transit", fmt.Errorf("%s: %w", BusyReason("lane-travel"), action.ErrActiveActionExists), http.StatusConflict},
 		{"busy: already mining", fmt.Errorf("%s: %w", BusyReason("mine"), action.ErrActiveActionExists), http.StatusConflict},
+
+		// featureId validation family (re-express-economy-positions,
+		// mine-extraction: "A Client-Supplied Feature Id Is Validated
+		// Before Resolution" / "Mine Commit Rejections Report a
+		// Distinguishable Reason" — "Every rejection in this list SHALL
+		// surface as a 4xx response... never a bodiless 5xx"). Added per a
+		// security-audit finding (task 2.11's own gap): the service-layer
+		// distinguishability test (feature_id_validation_reasons_test.go)
+		// never exercised handler.go's error->status->body mapping for
+		// these ten sentinels, so a dropped `errors.Is` arm in that
+		// hand-maintained list would silently 500 (bodiless) with every
+		// OTHER test in the suite still green.
+		{"featureId: path separator", ErrFeatureIdPathSeparator, http.StatusBadRequest},
+		{"featureId: is exactly dot", ErrFeatureIdIsDot, http.StatusBadRequest},
+		{"featureId: is exactly dot-dot", ErrFeatureIdIsDotDot, http.StatusBadRequest},
+		{"featureId: reserved dunder pattern", ErrFeatureIdReservedDunder, http.StatusBadRequest},
+		{"featureId: overlong", ErrFeatureIdOverlong, http.StatusBadRequest},
+		{"featureId: multiple member separators", ErrFeatureIdMultipleSeparators, http.StatusBadRequest},
+		{"featureId: non-numeric member suffix", ErrFeatureIdSuffixNotNumeric, http.StatusBadRequest},
+		{"featureId: member suffix out of range", ErrFeatureIdSuffixOutOfRange, http.StatusBadRequest},
+		{"featureId: member prefix not found", ErrFeatureIdPrefixNotFound, http.StatusBadRequest},
+		{"featureId: member prefix not a belt", ErrFeatureIdPrefixNotBelt, http.StatusBadRequest},
 	}
 }
 
