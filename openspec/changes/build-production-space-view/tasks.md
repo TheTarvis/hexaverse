@@ -534,7 +534,20 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       `webgl/` subtree, and every corresponding test — once sections 1–8 cover
       every surviving requirement
 - [ ] 10.2 Delete `frontend/hooks/use-board-realtime.ts` and
-      `use-board-realtime.test.tsx`. Its only importer is
+      `use-board-realtime.test.tsx`, **carrying `ETA_CUSHION_MS` out of the
+      file first** rather than dropping it with the rest. Define it as a
+      single exported named constant in a new `frontend/lib/realtime.ts` —
+      one definition site, imported by 2.13's rebuilt refetch and by any
+      later consumer, never redeclared. Not `lib/space/` (1.4 admits only
+      pure draw math there, and 1.5's name guard polices that directory) and
+      not a hook module: the cushion has a consumer *outside* this change —
+      `add-scan-and-sightings-surface` schedules its settle refetch on this
+      same cushion and archives after this change — which must not have to
+      import through a hook it otherwise does not use, and which today cites
+      a constant that this deletion would otherwise erase. **The value stays
+      `400`; this is a relocation, not a retuning — do not change it in
+      passing.** The rebuilt baseline poll interval belongs in the same
+      module for the same reason. Its only importer is
       `components/board/SystemBoardView.tsx` (`lib/query-keys.ts` merely names
       it in a comment, which is fixed in the same edit), so 10.1 orphans it and
       `hooks/` is outside every other deletion task's scope — it survives as

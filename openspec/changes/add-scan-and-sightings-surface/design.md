@@ -289,9 +289,12 @@ reader would have to rediscover it.
 
 The log reads on mount, after the settle refetch that follows a sweep's ETA,
 and on explicit refresh. A timer poll would be pure cost. No new cadence
-constant is invented; the settle refetch reuses the existing named ETA cushion
-(`ETA_CUSHION_MS`) that `use-board-realtime.ts` already applies to a running
-mine.
+constant is invented here; the settle refetch reuses the named ETA cushion
+`ETA_CUSHION_MS`, **inherited from `build-production-space-view`** and imported
+from `frontend/lib/realtime.ts`. That cushion is the same `400` ms the lattice
+board applied to a running mine in `hooks/use-board-realtime.ts`; 8a-2 deletes
+that hook and relocates the constant unchanged (its task 10.2), so this change
+imports it rather than reintroducing the number.
 
 **The reason is narrower than an earlier draft claimed, and the draft's version
 was false.** It said "no other player's activity and no passage of time can add
