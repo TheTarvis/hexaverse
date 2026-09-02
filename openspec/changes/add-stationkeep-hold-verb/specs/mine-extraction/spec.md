@@ -26,13 +26,12 @@ fleet `docked` to the mined feature for the run's whole duration, and
 rejects a sale unless the fleet is currently docked to a station, and a
 fleet cannot be simultaneously docked to a lode and docked to a station.
 **That invariant does not extend to station-keeping.** `hold` (see
-`fleet-movement`'s "Station-Keeping Hold and Release Are Fleet Verbs",
-added by `add-stationkeep-hold-verb`) requires only that the fleet's
-effective park mode be `orbit`, and, per that same capability's "A fleet's
-attachment survives hold, release, and force-demotion", never alters
-`attachedTo` — so a fleet mining a feature (`docked`, i.e. `attachedTo`
-naming that feature) can be held into `stationkeep` without ever ceasing
-to be docked to it. That hold's own settlement — `release` called mid-run,
+`fleet-movement`'s "Station-Keeping Hold and Release Are Fleet Verbs")
+requires only that the fleet's effective park mode be `orbit`, and, per
+that same capability's "A fleet's attachment survives hold, release, and
+force-demotion", never alters `attachedTo` — so a fleet mining a feature
+(`docked`, i.e. `attachedTo` naming that feature) can be held into
+`stationkeep` without ever ceasing to be docked to it. That hold's own settlement — `release` called mid-run,
 or the automatic past-dry-instant fold, which can fire on any read or
 write that observes it — debits the fleet's `fuel` cargo between this
 run's commit and its resolve. This is exactly the "future verb that can
@@ -49,19 +48,28 @@ ever *debits* `fuel`, so it can only widen free hold, never narrow it; and
 `take = min(tons, remainingAtEta, freeHoldAtResolve)` with `tons` already
 admitted at commit against the narrower `freeHoldAtCommit` means a widened
 free hold can never bind the take. No production writer can grow a fleet's
-**non-fuel** cargo between a run's commit and its resolve either: `mine`'s
+cargo of **any** kind between a run's commit and its resolve either, and the
+reason is docking exclusivity rather than which kind is credited: `mine`'s
 own resolver is the sole crediter of mined cargo and the run holds the
-movement slot for its whole duration, a sale requires docking to a station,
-and a refuel credits `fuel`. The `holdFull` branch and its scenario
-therefore stay specified and tested against a directly constructed state,
-not against a sequence of production verbs — asserting otherwise would
-require a test that writes cargo straight into the fleet document, which is
-the shape of test this chain has already been burned by. `remainingAtEta`,
-`take`, and the reason code are all computed from `freeHoldAtResolve` read
-fresh at resolve, never from a value cached at commit, so every clamp
-already floors and reports correctly against this new source of mid-run
-free-hold movement — nothing above required correction, only the retired
-claim of invariance.
+movement slot for its whole duration; a sale requires the fleet docked to a
+station; and a refuel likewise requires the fleet docked to a station
+(`fuel-purchase`'s "Refuel Requires the Fleet Docked To the Selling
+Station"), which a fleet docked to the mined feature is not. That last
+exclusion is load-bearing and SHALL NOT be replaced by the weaker
+observation that a refuel credits `fuel` rather than a mined kind: free hold
+counts **all** kinds including fuel (`fleet-movement`'s "Fuel occupies cargo
+capacity exactly like a mined resource"), so a mid-run refuel would *narrow*
+free hold and make `holdFull` genuinely reachable. It is unreachable because
+the refuel cannot land mid-run at all. The `holdFull` branch and its
+scenario therefore stay specified and tested against a directly constructed
+state, not against a sequence of production verbs — asserting otherwise
+would require a test that writes cargo straight into the fleet document,
+which is the shape of test this chain has already been burned by.
+`remainingAtEta`, `take`, and the reason code are all computed from
+`freeHoldAtResolve` read fresh at resolve, never from a value cached at
+commit, so every clamp already floors and reports correctly against this new
+source of mid-run free-hold movement — nothing above required correction,
+only the retired claim of invariance.
 
 #### Scenario: A clean run takes the full target
 - **WHEN** neither the lode's remaining tonnage nor the fleet's free hold

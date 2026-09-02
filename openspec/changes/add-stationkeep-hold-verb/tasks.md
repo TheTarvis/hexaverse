@@ -159,10 +159,32 @@
       exactly once and computes a fresh, independent dry instant for the
       second — same requirement, "Releasing settles the accrual before any
       subsequent hold recomputes a fresh dry instant"
-- [ ] 3.12 Confirm `attachedTo` and docked/undocked status are unchanged
+- [ ] 3.12 Resolve any past-ETA movement-channel action **before**
+      evaluating either verb's own preconditions, through the same
+      `settleIfDue` seam `OrderTo`/`CutDrive`/`Jump` already use. A
+      body-targeted burn past its arrival folds to a `ParkOrbit`
+      (`space/state.go:51-68`), so an unresolved arrival passes `hold`'s
+      orbit-mode precondition while its slot is still claimed, and
+      `BurnResolver`'s already-settled early return then applies **none** of
+      the arrival's effects — `attachedTo` never set, the arrived-at gate's
+      lane never charted. Assert those effects are applied, not merely that
+      the hold survives — `fleet-movement`: "Station-Keeping Hold and
+      Release Are Fleet Verbs" ("Holding or releasing over a
+      completed-but-unresolved movement order settles it first")
+- [ ] 3.13 Confirm `hold` is accepted for a fleet holding `fuel` strictly
+      above the reserve by an arbitrarily small margin, storing a dry
+      instant strictly after its hold-start — the accepting side of the
+      ceiling-quantized inverse's boundary, paired with task 7.8's
+      rejecting side — same requirement ("Holding with fuel just above the
+      reserve is accepted")
+- [ ] 3.14 Confirm `attachedTo` and docked/undocked status are unchanged
       by `hold`, `release`, and force-demotion — `fleet-movement`:
       "Station-Keeping Hold and Release Are Fleet Verbs" ("A fleet's
       attachment survives hold, release, and force-demotion")
+
+*(task 3.12's settle-first step also supplies the host body `hold` records
+its offset against; without it the recorded host is one the fleet is not
+attached to.)*
 
 ## 4. Settlement at every other event that touches an open hold
 
@@ -228,16 +250,32 @@
       persistent stranded indication — `fleet-movement`: "Every Decision
       Reading Fuel Settles a Past-Dry-Instant Hold First" (all five
       scenarios)
-- [ ] 4.8 Where that reading decision is a transaction that may abort — the
-      burn commit — commit the settlement in a **separate write that
-      precedes and is independent of** the commit transaction, never inside
-      it. `action-dispatch`'s "A transaction-scoped producer's error aborts
-      the commit entirely" means a settlement written inside a rejecting
-      commit is discarded by construction, and
-      `add-fuel-as-cargo`'s rejected-commit rule constrains the commit's
-      own effects. Settling first satisfies both without a delta to either
-      — same requirement ("A burn commit against a past-dry-instant
-      holding fleet evaluates against settled, reserve-level fuel")
+- [ ] 4.8 Where a reading decision is a transaction that may abort, commit
+      the settlement in a **separate write that precedes and is independent
+      of** that transaction, never inside it. There are **three** such
+      abortable transactions, not one: the burn commit; `mine`'s resolve
+      clamp, whose `FreeHold` read runs inside `ResolveOne`'s transaction
+      (`mine/resolver.go:76`); and the transaction-scoped free-hold figure
+      `refuel` re-evaluates inside its own settlement transaction
+      (`fleet/cargo_tx.go:186`). `action-dispatch`'s "A transaction-scoped
+      producer's error aborts the commit entirely" means a settlement
+      written inside a rejecting commit is discarded by construction, and
+      the rejected-commit rule of "A Burn Commit Is Rejected When Its Fuel
+      Cost Exceeds Available Fuel..." constrains the commit's own effects.
+      Settling first satisfies both without a delta to either — same
+      requirement ("A burn commit against a past-dry-instant holding fleet
+      evaluates against settled, reserve-level fuel", and the persistence
+      clause on all four consumer scenarios)
+- [ ] 4.9 Make that settle-first write **conditional and transactional**:
+      one transaction that re-reads the fleet's park and `cargo.fuel` and
+      applies the settlement only if the re-read still shows an unfolded
+      `stationkeep` park at or after its dry instant, writing **nothing**
+      otherwise, and never setting `cargo.fuel` from a value read outside
+      it. Unconditional, it is a fourth unserialized `cargo.fuel` writer
+      issued by seven consumers, and an absolute set from a stale pre-read
+      destroys a refuel that landed in between — the tonnage and the
+      credits spent on it — same requirement ("A settlement write racing a
+      refuel never discards the purchased fuel")
 
 ## 5. Drift repair — three fleet rejections currently returning a bodyless 500
 
@@ -274,7 +312,10 @@ this change already rewrites that exact `respond` switch. Full write-up:
       "A Burn Commit Is Rejected When Its Fuel Cost Exceeds Available
       Fuel, Debited At Commit Never At Resolve" and "Discarding a Running
       Burn Refunds Its Unspent Fuel, Closed-Form") `add-fuel-as-cargo`
-      installed, rather than pointing at a change id — `fleet-movement`:
+      installed, rather than pointing at a change id. **Every**
+      same-capability reference in this delta cites the requirement by bare
+      title for the same reason: a change id dangles inside the live spec
+      once this change archives — `fleet-movement`:
       "Fleet Cargo Pool" ("An open station-keeping hold does not by itself
       change the stored fuel entry"; the pre-existing scenarios are
       unaffected)
@@ -372,11 +413,31 @@ this change already rewrites that exact `respond` switch. Full write-up:
       past-dry-instant holding fleet evaluates against settled,
       reserve-level fuel"
 - [ ] 7.12 Backend integration test: commit a mine run, then hold the
-      mining fleet into `stationkeep` (attachment survives, per task 3.12)
+      mining fleet into `stationkeep` (attachment survives, per task 3.14)
       and let its upkeep settle before the run resolves — `freeHoldAtResolve`
       is strictly greater than `freeHoldAtCommit`, and the take is still
       the full requested `tons` with reason code `clean` — traces to
       `mine-extraction`: "A station-keeping settlement landing mid-run
       widens free hold and changes no take"
-- [ ] 7.13 `go test ./... -p 1` and
+- [ ] 7.13 Backend integration test: a settle-first write and a refuel
+      submitted concurrently against the same past-dry-instant holding
+      fleet leave the refuel's credited tonnage intact — the settlement
+      write, re-reading inside its own transaction, writes nothing. Then,
+      separately, assert for each of the four consumers (mine's resolve
+      clamp, refuel's free-hold precondition, the estimated range, the
+      stranded indication) that the settled figure is **durably persisted
+      before the decision**, by re-reading the stored fleet document after
+      the consumer runs — an in-memory fold satisfies every "computed from
+      the settled value" assertion while leaving the stored figure stale —
+      traces to `fleet-movement`: "Every Decision Reading Fuel Settles a
+      Past-Dry-Instant Hold First" (all six scenarios)
+- [ ] 7.14 Backend integration test: `hold` (and `release`) submitted
+      against a fleet whose body-targeted burn has passed its arrival but
+      is unresolved — the arrival resolves first, `attachedTo` is set to
+      the target body, the gate-lane charting (where the target is a gate)
+      lands, and only then is the hold evaluated. Assert the arrival's
+      effects, not merely the hold's presence — traces to "Holding or
+      releasing over a completed-but-unresolved movement order settles it
+      first"
+- [ ] 7.15 `go test ./... -p 1` and
       `python3 .claude/skills/code-quality-checks/check.py` clean

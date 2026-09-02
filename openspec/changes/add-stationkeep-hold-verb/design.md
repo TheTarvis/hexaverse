@@ -88,12 +88,15 @@ rationale is exactly that distinction between active and passive stranding.
   justified number for it — the structural rule (non-zero, subtracted from
   the spendable budget, left behind by the fold) is what is specified here.
 
-### Decision: The dry instant is computed once at `hold` commit and stored on the Park
+### Decision: The dry instant is computed at `hold` commit and stored on the Park
 `space.Park` (for `Kind: ParkStationkeep`) gains two persisted fields:
 - **the hold's start world time** (the instant `hold` was committed), and
 - **the dry instant** — the earliest world time at which continued upkeep
   would have drawn the fuel held at hold-start down to the reserve,
-  computed once, at the instant `hold` is committed.
+  computed at the instant `hold` is committed and recomputed thereafter
+  only where a mid-hold `fuel` mutation restamps the hold, which rewrites
+  both fields together (see the settlement Decision below). What it is
+  never a function of is elapsed time or the act of reading the park.
 
 It is defined as the ceiling-quantized **inverse of
 `space.StationKeepUpkeep`**: the earliest world time `T`, quantized up to
@@ -327,10 +330,50 @@ delta to either:
   released orbit whether or not the fold is persisted — so the "prior
   movement state" half is untouched in the only sense a reader can observe.
 
+**That settle-first write is itself a `cargo.fuel` mutator, and is
+therefore conditional and transactional.** It re-reads the park and
+`cargo.fuel` in its own one transaction and applies the settlement only if
+that re-read still shows an unfolded `stationkeep` park at or after its dry
+instant; otherwise it writes nothing. Without that condition, "settle
+first" adds a **fourth** unserialized writer of `cargo.fuel` — alongside a
+refuel, a burn commit's debit, and a duplicate `hold`/`release` — issued by
+any of seven consumers and performing an unconditional absolute set from a
+figure read before the write began. The concrete loss is the same one this
+change already closes for `hold`/`release`: a refuel settles the hold,
+credits 200 t and restamps in its own correct transaction, and a plain
+`GET`'s settlement write then sets `fuel := reserve` from its stale
+pre-read, destroying the tonnage and the credits spent on it. Ordering the
+settlement before the decision does not close this; only the re-read
+condition does.
+
 A test that merely asserts `FreeHold` returns a *stable* value across a
 time advance would pass even if that stable value is the stale,
 over-reported one — the regression guard must assert the settled,
 *correct* value specifically.
+
+### Decision: `hold` and `release` settle a due-but-unresolved movement action first
+Both verbs resolve any past-ETA movement-channel action before evaluating
+their own preconditions, exactly as `OrderTo` already does through
+`settleIfDue` for "Ordering over a completed-but-unresolved order settles
+it first". This is required because `space.StateAt` folds a body-targeted
+burn past its `ArriveMs` into a `ParkOrbit`
+(`backend/space/state.go:51-68`), so an arrived-but-unresolved fleet
+presents to `hold` as an ordinary orbiting fleet and passes its
+orbit-mode precondition while `activeActionId` is still claimed.
+
+The harm is the arrival's dropped effects, not a destroyed hold.
+`BurnResolver` (`backend/fleet/resolver.go`) early-returns "burn already
+settled" with **no** `ActorState` write whenever the stored state is not a
+burn, and `ResolveOne` reads the actor doc *inside* its transaction, so a
+committed hold is neither overwritten nor raced. What is lost instead is
+everything that resolve branch would have applied: `attachedTo` is never
+set, and `charts.GateAttachmentWrite` never charts an arrived-at gate's
+lane. The fleet ends up station-keeping at a fixed offset from a host body
+it is not attached to, with an arrival that silently never happened.
+
+This is stated as a requirement rather than assumed from the codebase
+because the settle-first seam is **not** applied uniformly today:
+`OrderTo`, `CutDrive`, and `Jump` call `settleIfDue`; `Stop` does not.
 
 ### Decision: Attachment survives hold, release, and force-demotion
 `hold`, `release`, and the automatic force-demotion each mutate only the
@@ -358,12 +401,18 @@ byproduct.
   pinning the refuel-during-a-hold scenario specifically (not merely
   "FreeHold is stable") is required.
 - **A future `fuel`-debiting verb that leaves a hold open would need its
-  own rule.** Every mutation reachable today that lands during an open hold
-  and leaves it open is a *credit* (a refuel, a discarded burn's refund),
-  so the restamped recomputation always yields a dry instant strictly after
-  its hold-start. A future verb that debits `fuel` while leaving the hold
-  open could drive the post-mutation balance to or below the reserve and
-  would then have to state its own disposition (reject, or release the
+  own rule.** Exactly one mutation reachable today lands during an open
+  hold and leaves it open — a refuel — and it is a *credit*, so the
+  restamped recomputation always yields a dry instant strictly after its
+  hold-start. A discarded burn's refund is deliberately **not** named as a
+  second such path: a refund arises only from a running, not-yet-arrived
+  burn, and a fleet with a running burn has no park at all, so no hold can
+  be open when one lands. Naming it would commission a
+  settle-restamp-recompute wiring in the discard path that no execution
+  could ever reach — this chain's signature defect. A future verb that
+  debits `fuel` while leaving the hold open could drive the post-mutation
+  balance to or below the reserve and would then have to state its own
+  disposition (reject, or release the
   hold) rather than restamp an undecodable park. Recorded rather than
   pre-solved, since no such verb exists and inventing one's semantics here
   would be unstated design.

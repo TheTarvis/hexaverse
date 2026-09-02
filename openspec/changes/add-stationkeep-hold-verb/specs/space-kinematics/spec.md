@@ -6,17 +6,19 @@ The system SHALL represent an idle ship's resting state as exactly one of:
 held continuously in a body's reference frame, at a continuous cost), or
 `point` (a fixed position in space, free). `orbit` and `point` SHALL impose
 no ongoing cost; `stationkeep` SHALL impose the continuous upkeep defined
-below. A `stationkeep` park SHALL additionally store the world time its
-hold began and a dry instant — the world time at which continued upkeep
-would draw the fuel held at hold-start down to the configured
-station-keeping reserve the holding capability defines, computed once when
-the hold is created (see `fleet-movement`'s "Station-Keeping Hold and
-Release Are Fleet Verbs", "Station-Keeping Upkeep Never Drains a Fleet
-Below Its Reserve", and "Station-Keeping Upkeep Is Settled at Discrete
-Events, Never Folded Into the Stored Cargo Pool") — and observing a
-`stationkeep` park at or after its stored dry instant SHALL fold it into
-its released orbit (see "A Station-Keeping Park Past Its Dry Instant Is Its
-Released Orbit, With No Extra Persisted State").
+below. A `stationkeep` park SHALL additionally store the world time its hold
+began and a dry instant — the world time at which continued upkeep would
+draw the fuel held at hold-start down to the configured station-keeping
+reserve the holding capability defines, computed when the hold is created
+and thereafter changed only where that same holding capability restamps the
+hold, in which case both fields are rewritten together against the
+mutation's own instant and the fuel level at it (see `fleet-movement`'s
+"Station-Keeping Hold and Release Are Fleet Verbs", "Station-Keeping Upkeep
+Never Drains a Fleet Below Its Reserve", and "Station-Keeping Upkeep Is
+Settled at Discrete Events, Never Folded Into the Stored Cargo Pool") — and
+observing a `stationkeep` park at or after its stored dry instant SHALL fold
+it into its released orbit (see "A Station-Keeping Park Past Its Dry Instant
+Is Its Released Orbit, With No Extra Persisted State").
 
 #### Scenario: An orbit park stays at its configured radius from its body forever
 - **WHEN** an orbit park's position and its body's position are evaluated at
@@ -38,8 +40,11 @@ Released Orbit, With No Extra Persisted State").
 - **WHEN** a `stationkeep` park is created
 - **THEN** it stores the world time it was created and a dry instant
   computed from the spendable fuel held above the reserve and the upkeep
-  rate at that same instant, and neither value changes for the life of that
-  hold
+  rate at that same instant
+- **AND** neither value changes with the mere passage of time, nor with any
+  read of the park; the two change only together, and only where the
+  holding capability restamps the hold at a mid-hold `fuel` mutation that
+  leaves the hold open
 
 ### Requirement: Coordinates Cross the Persistence Boundary Through a Named Codec
 
