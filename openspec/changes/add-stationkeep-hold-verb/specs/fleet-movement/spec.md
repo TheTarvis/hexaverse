@@ -308,12 +308,16 @@ capability SHALL define one.
 
 Both verbs SHALL, after the lane-transit rejection below (which forbids
 evaluating stored kinematic state at all) but before evaluating any of
-their own state preconditions, first resolve any of the fleet's
-movement-channel actions whose ETA has already passed but which has not yet
-been resolved — mirroring, for the same reason, "In-System Burn Order to a
-Body or a Point"'s "Ordering over a completed-but-unresolved order settles
-it first". A body-targeted burn past its arrival time folds through
-`space.StateAt` into an `orbit` park, so an
+their own state preconditions, first resolve the fleet's movement-channel
+**burn** whose arrival time has passed but which has not yet been resolved,
+where one exists — mirroring, for the same reason, "In-System Burn Order to
+a Body or a Point"'s "Ordering over a completed-but-unresolved order settles
+it first". This obligation is scoped to a due **burn** specifically, not to
+every action that may occupy the movement channel: a co-resident action of
+another type on that slot (a mine run against a docked fleet) leaves no
+stale kinematic state for either verb to misread, and settling one is not
+this requirement's concern. A body-targeted burn past its arrival time folds
+through `space.StateAt` into an `orbit` park, so an
 arrived-but-unresolved fleet presents to `hold` as an ordinary orbiting
 fleet and would be accepted while the movement channel's slot is still
 claimed and the arrival's own exactly-once effects — setting the fleet's
@@ -324,6 +328,37 @@ them, leaving a fleet holding a fixed offset from a host body it is not
 attached to, with the arrival's effects permanently dropped. This is stated
 here rather than assumed from the codebase, because settling first is not
 what every existing fleet verb does — the stop-in-place path does not.
+
+Both verbs SHALL then, still before evaluating any of their own state
+preconditions, **settle a `stationkeep` park that is at or after its stored
+dry instant** — folding it to its released orbit and persisting `cargo.fuel`
+at exactly `FuelParams.StationKeepReserveTons` — per "Every Decision Reading
+Fuel Settles a Past-Dry-Instant Hold First", and by the preceding,
+independent, conditional transaction that requirement mandates wherever the
+reading decision is itself a transaction that may abort. `hold` is exactly
+such a decision: its own insufficient-fuel precondition below reads the
+fleet's stored `fuel` to decide, and its commit transaction rejects.
+
+**Without this step `hold` grants indefinite free station-keeping**, and no
+other rule in this capability stops it. A hold whose dry instant has
+silently passed IS an `orbit` park by the automatic fold named at the head
+of this requirement (`space-kinematics`'s "A Station-Keeping Park Past Its
+Dry Instant Is Its Released Orbit, With No Extra Persisted State"), so the
+not-orbiting precondition accepts the fleet as an ordinary orbiting one; the stored
+`fuel` still over-reports by the whole accrual, exactly in the window "Every
+Decision Reading Fuel Settles a Past-Dry-Instant Hold First" exists to
+close; and a fresh dry instant computed from that over-reported figure and
+stamped over the elapsed hold's own start time and dry instant forgives the
+entire accrued upkeep (up to `fuelAtHoldStart −
+FuelParams.StationKeepReserveTons`) and skips the automatic force-demotion
+altogether. Re-issuing `hold` once after each dry instant would hold a
+position forever for the fuel of a single hold — the gate camper paying
+nothing, which is the outcome this change's whole upkeep economy exists to
+prevent. The general settle-first rule already reaches `hold` through its
+"or any other computation of a fleet's currently held fuel" clause; it is
+restated here as an ordered step of the verb because an implementer builds
+this sequence literally, and an ordered list that omits the step is what
+ships the exploit.
 
 Both verbs SHALL additionally be rejected, before any evaluation of the
 fleet's stored kinematic state, when the fleet is in lane transit — the one
@@ -435,12 +470,31 @@ rejections above SHALL be served as a bodyless `5xx`.
 
 #### Scenario: Holding or releasing over a completed-but-unresolved movement order settles it first
 - **WHEN** `hold` or `release` is submitted for a fleet whose
-  movement-channel action has already passed its ETA but has not yet been
-  resolved
-- **THEN** that action is resolved first — settled, its slot released, and
-  its exactly-once arrival effects (the fleet's `attachedTo`, and any
-  gate-lane charting) applied — and only then are the verb's own
+  movement-channel **burn** has already passed its arrival time but has not
+  yet been resolved
+- **THEN** that burn's action is resolved first — settled, its slot
+  released, and its exactly-once arrival effects (the fleet's `attachedTo`,
+  and any gate-lane charting) applied — and only then are the verb's own
   preconditions evaluated, against the resulting settled state
+
+#### Scenario: Holding over a silently expired hold settles it first and is then rejected
+- **GIVEN** a fleet whose `stationkeep` hold's stored dry instant has
+  already passed, with no intervening read or write having observed or
+  settled it, so its stored `fuel` still shows the figure it held when that
+  hold began
+- **WHEN** `hold` is submitted for that fleet, which the fold already
+  presents as an ordinary orbiting fleet
+- **THEN** the elapsed hold is settled first — folded to its released orbit
+  with `cargo.fuel` persisted at exactly the configured station-keeping
+  reserve — by a write that precedes and is independent of `hold`'s own
+  transaction
+- **AND** `hold`'s own preconditions are then evaluated against that settled
+  figure, so the new hold is rejected `409 Conflict` with the
+  insufficient-fuel reason, its spendable fuel above the reserve being zero
+- **AND** no second `stationkeep` park is stored — the fleet's stored park
+  is the released `orbit` the settlement wrote, carrying no hold-start time
+  and no dry instant — and the accrued upkeep the elapsed hold incurred is
+  never forgiven
 
 #### Scenario: A fleet's attachment survives hold, release, and force-demotion
 - **WHEN** a fleet attached to a body is held, later released (or force-
@@ -482,12 +536,20 @@ as licensing any reserve on that path.
   reserve — strictly positive, never zero, never negative
 
 #### Scenario: The reserve is never spent by upkeep across repeated hold cycles
-- **WHEN** a fleet is held to exhaustion, and a further `hold` is then
-  submitted against the resulting reserve-level fuel
-- **THEN** the second `hold` is rejected by its own named reason (its
-  spendable fuel above the reserve being zero), and the fleet's `fuel`
-  remains exactly the reserve — repeated holding can never grind the
-  reserve away
+- **GIVEN** a fleet whose hold has passed its stored dry instant with **no
+  intervening read, write, or setup step having observed or settled it** —
+  its stored `fuel` still showing the pre-hold figure rather than the
+  reserve
+- **WHEN** a further `hold` is submitted against that fleet
+- **THEN** the elapsed hold is settled first, and the second `hold` is then
+  rejected by its own named reason (its spendable fuel above the reserve
+  being zero), leaving the fleet's `fuel` at exactly the reserve — repeated
+  holding can never grind the reserve away
+- **AND** this is asserted specifically against an unsettled first hold: a
+  fixture that pre-settles the first hold in its setup satisfies every
+  assertion above while being unable to observe the free-station-keeping
+  failure the settle-first ordering exists to close (see "Station-Keeping
+  Hold and Release Are Fleet Verbs")
 
 #### Scenario: A burn may still spend the reserve down to zero
 - **WHEN** a burn whose fuel cost equals the fleet's entire held `fuel`,
@@ -724,6 +786,12 @@ force-demoted case.
   first debits the upkeep accrued since the hold's stored start time — the
   free branch charges no delta-v of its own, and still never forgives the
   hold's accrual
+- **AND** the resulting `point` park, the cleared `attachedTo`, and the
+  upkeep debit are all **durably persisted**, as observed by re-reading the
+  stored fleet document, for a fleet that has **no active movement action**
+  to cancel — a station-keeping fleet has none, `hold` claiming no channel
+  slot, so a settlement carried only on an action-cancellation write would
+  persist nothing at all on precisely this path
 
 #### Scenario: Jumping from an open hold settles its accrued upkeep
 - **WHEN** a jump is committed against a fleet whose effective park is an
@@ -815,13 +883,18 @@ two most player-visible reads: a stale range figure looks like a healthy
 one, and a stale stranded indication reads "not stranded" for a fleet that
 in fact holds only its reserve — a cry-wolf failure in reverse.
 
-Where the reading decision is itself a transaction that may abort — the burn
-commit, `mine`'s resolve-time clamp, and the transaction-scoped free-hold
-figure a refuel re-evaluates inside its own settlement transaction are the
-three such cases in hand — the settlement SHALL be committed by a **separate
-write that precedes, and is independent of, that transaction**, never as a
-write inside it. This is required by two live requirements this change does
-not modify: `action-dispatch`'s "A transaction-scoped producer's error
+Where the reading decision is itself a transaction that may abort **with an
+answer**, so that a settlement written inside it would be discarded along
+with the rejection — the burn commit, the transaction-scoped free-hold
+figure a refuel re-evaluates inside its own settlement transaction, and
+`hold`'s own commit transaction (whose insufficient-fuel precondition is one
+of the "any other computation of a fleet's currently held fuel" cases above,
+and which rejects rather than retries) are the three such cases in hand —
+the settlement SHALL be committed by a **separate write that precedes, and
+is independent of, that transaction**, never as a write inside it.
+
+This is required by two live requirements this change does not modify:
+`action-dispatch`'s "A transaction-scoped producer's error
 aborts the commit entirely" guarantees that a rejecting producer persists
 **no** actor-state mutation, so a settlement written inside a rejecting
 commit would by construction be discarded; and "A Burn Commit Is Rejected
@@ -835,6 +908,23 @@ which changes no *effective* movement state, since `space.StateAt` already
 folds that park to its released orbit whether or not the fold is persisted —
 is durable either way, so the next reader never trips over the stale value.
 
+`mine`'s resolve-time clamp is deliberately **not** among them, and SHALL
+instead settle a past-dry-instant hold **within the resolve's own
+transaction**. Two reasons, either sufficient. First, the rationale above
+does not apply to it: `action-dispatch`'s resolve transaction never rejects
+with an answer — a resolver's error aborts the transaction and leaves the
+action `running` for a later resolve to retry — so a settlement written
+inside it is retried, never silently dropped, and the resolve result's own
+actor-state merge lands on the same fleet document in that same transaction.
+Second, no outcome depends on the choice: a settlement only ever *debits*
+`fuel`, so it can only **widen** free hold (see `mine-extraction`'s "Resolve
+Clamps Yield to Reality"), and the run's requested tonnage was already
+admitted at commit against a free-hold figure no production writer can since
+have narrowed, so the resolve clamp cannot bind on either figure. Requiring
+a preceding, independent write here would instead oblige a new per-type
+pre-resolve seam in `action-dispatch` that no requirement in this change or
+any other authorizes.
+
 That preceding, independent settlement write SHALL itself be **one
 transaction that re-reads the fleet's stored park and its `cargo.fuel`**,
 and SHALL apply its settlement only if that re-read still shows an
@@ -846,8 +936,9 @@ In One Transaction Against a Transactional Re-Read"), issued by any of the
 consumers this requirement enumerates, performing an unconditional
 absolute set of `cargo.fuel` to the reserve from a figure read before the
 write began: a refuel that had already settled the same hold to the
-reserve, credited its purchased tonnage, and restamped the hold in its own
-correct transaction is then silently overwritten by a plain read's
+reserve — folding it to its released orbit, no restamp applying to a hold
+already past its dry instant — and then credited its purchased tonnage in
+its own correct transaction is silently overwritten by a plain read's
 settlement, and the purchased tonnage and the credits spent on it are both
 lost. That is the same last-write-wins class this change already closes for
 `hold` and `release`, and it is not closed by requiring the settlement to
@@ -860,9 +951,11 @@ transactional re-read.
   transaction against the same fleet are submitted concurrently
 - **THEN** the fleet's final `fuel` value reflects the refuel's credited
   tonnage in full — the settlement write, re-reading the park inside its own
-  transaction and finding the hold already settled and restamped, writes
-  nothing at all rather than setting `cargo.fuel` back to the reserve from a
-  value it read before the refuel landed
+  transaction and finding the hold already settled and folded to its
+  released orbit — no restamp being applicable, the hold having been past
+  its dry instant and therefore no longer open when the refuel landed —
+  writes nothing at all rather than setting `cargo.fuel` back to the reserve
+  from a value it read before the refuel landed
 
 #### Scenario: A burn commit against a past-dry-instant holding fleet evaluates against settled, reserve-level fuel
 - **WHEN** a burn is committed against a fleet whose `stationkeep` park's
@@ -889,8 +982,10 @@ transactional re-read.
   its released orbit, `fuel` at exactly the reserve), never the stale
   pre-fold value that would otherwise over-report the fleet's available
   capacity
-- **AND** that settled value is durably persisted by a write that precedes
-  the decision, not merely folded in memory for this one consumer
+- **AND** that settlement is applied **within the resolve's own
+  transaction**, not by a preceding, independent write — a resolver error
+  aborts that transaction and leaves the action `running` to be retried, so
+  no settlement is lost by being written inside it
 
 #### Scenario: A refuel's free-hold precondition reflects a settled hold
 - **WHEN** `fuel-purchase`'s free-hold precondition is evaluated for a

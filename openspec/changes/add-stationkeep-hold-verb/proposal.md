@@ -67,12 +67,18 @@ no longer exists once that verb's own effects are stored; the automatic
 fold past the dry instant settles the remainder down to exactly the
 reserve). Every fuel-reading decision (the burn-commit affordability check,
 `FreeHold`'s five call sites, the estimated-maximum-range read, and the
-persistent stranded indication) settles a past-dry-instant hold before
-evaluating against the result — durably, in a write that precedes the
-decision rather than an in-memory fold, and itself conditional on a
+persistent stranded indication), plus `hold`'s own insufficient-fuel
+precondition, settles a past-dry-instant hold before evaluating against the
+result — durably, never as an in-memory fold, and itself conditional on a
 transactional re-read so it can never overwrite a refuel that landed
 first — so none of them ever decides against the stale, over-reported
-figure a passed-but-unobserved dry instant would otherwise still show. This
+figure a passed-but-unobserved dry instant would otherwise still show. That
+settlement is a **preceding, independent** write wherever the decision is
+itself a transaction that may abort with an answer (the burn commit, the
+refuel's transaction-scoped free-hold figure, and `hold`'s own commit), and
+runs **inside** the decision's own transaction for `mine`'s resolve clamp,
+whose transaction never rejects with an answer and offers no per-type
+pre-resolve seam to hang a preceding write on. This
 is what keeps `FreeHold` and its consumers reading a pure,
 time-independent value with no world-time parameter threaded through any of
 their signatures.
@@ -100,11 +106,19 @@ retains agency after a drain it never chose.
   Neither creates an `action-dispatch` action, claims a channel slot, or
   computes an ETA — both are instant, like `cut-drive`. Both are rejected
   while the fleet is in lane transit, before any evaluation of its stored
-  kinematic state, and both resolve a past-ETA movement-channel action
-  before evaluating their own preconditions — an unresolved body-targeted
-  arrival folds to an `orbit` park, so `hold` would otherwise be accepted
-  over it and the arrival's exactly-once effects (`attachedTo`, gate-lane
-  charting) would be silently dropped.
+  kinematic state, and both then work through an ordered precondition
+  sequence: a due-but-unresolved movement-channel **burn** is resolved
+  first (an unresolved body-targeted arrival folds to an `orbit` park, so
+  `hold` would otherwise be accepted over it and the arrival's exactly-once
+  effects — `attachedTo`, gate-lane charting — would be silently dropped),
+  then a **`stationkeep` park past its dry instant is settled**, and only
+  then are the verb's own state and fuel preconditions evaluated. That
+  third step is what stops `hold` from being free station-keeping forever:
+  an elapsed hold IS an `orbit` park by the new fold, its stored `fuel`
+  still over-reports by the whole accrual, and a `hold` accepted over it
+  would stamp a fresh dry instant computed from that stale figure —
+  forgiving the accrual and skipping the force-demotion, indefinitely, once
+  per dry instant.
 - A new named tuning constant, `FuelParams.StationKeepReserveTons` — the
   tonnage station-keeping upkeep may never spend. The dry instant is
   computed against `fuelAtHoldStart − StationKeepReserveTons`, and the
@@ -208,6 +222,18 @@ retains agency after a drain it never chose.
   (the accrued-upkeep debit before the credit; the restamp and dry-instant
   recomputation after it), and to pin that a replayed refuel performs
   neither a second time.
+- **`stop`'s free below-the-floor branch is made to persist at all**, as a
+  declared task with no spec delta (the requirement is already live and
+  already correct). That branch's only persistence today is
+  `actions.Cancel`, guarded by `f.ActiveActionId != ""`, and `Handler.Stop`
+  writes nothing of its own — so for a fleet with no active action (which a
+  station-keeping fleet always is, `hold` claiming no slot) the `point`
+  park, the cleared `attachedTo`, and any hold settlement are computed in
+  memory and dropped. This change needs that write to exist for its
+  hold-ending settlement to ride, and the same write repairs the
+  pre-existing violation of `fleet-movement`'s live "Stopping at or below
+  the speed floor is instant and free". Write-up:
+  `docs/plans/continous_space/handoffs/drift-stop-free-branch-no-write.md`.
 - **Three pre-existing sentinels are wired**, as declared tasks with no spec
   delta (their requirements are already live and already correct):
   `fleet.ErrNotBurning`, `ErrAccelBelowFloor`, and `ErrAccelAboveCeiling`
@@ -238,8 +264,12 @@ retains agency after a drain it never chose.
   fold in `StateAt`), `backend/fleet/` (the `hold`/`release` handlers,
   `FuelParams.StationKeepReserveTons`, upkeep settlement, force-demotion,
   the hold-ending settlement on the burn-commit, stop-in-place and jump
-  paths, and `handler.go`'s `respond` switch — which also gains the three
-  drift sentinels above), `backend/mine/` (no behavioral change required,
+  paths, `Service.Stop`'s free below-the-floor branch —
+  `service.go:828-850`, which must gain an **unconditional** persistence of
+  its `point` park, cleared `attachedTo` and settlement, since its only
+  write today is an `actions.Cancel` a station-keeping fleet never reaches —
+  and `handler.go`'s `respond` switch, which also gains the three drift
+  sentinels above), `backend/mine/` (no behavioral change required,
   but its resolve clamp now runs against a `freeHoldAtResolve` that a
   station-keeping settlement landing mid-run can widen relative to
   `freeHoldAtCommit`), `backend/refuel/` (the settle-restamp-recompute step

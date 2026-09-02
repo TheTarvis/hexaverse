@@ -305,9 +305,13 @@ stranded indication). Dropping the last two — as an earlier draft did — is
 its own cry-wolf failure in reverse: a stale, pre-fold `fuel` value reads
 as a *healthy* range and a *not-stranded* fleet.
 
-**Where that reading decision is itself a transaction that may abort, the
-settlement is committed by a separate write that PRECEDES and is
-INDEPENDENT of it.** An earlier ruling on this change said the settlement
+**Where that reading decision is itself a transaction that may abort with an
+answer, the settlement is committed by a separate write that PRECEDES and is
+INDEPENDENT of it.** There are three such transactions: the burn commit, the
+transaction-scoped free-hold figure a refuel re-evaluates inside its own
+settlement, and `hold`'s own commit — which reads the stored `fuel` to
+decide its insufficient-fuel precondition and rejects. `mine`'s resolve-time
+clamp is **not** one of them (see the next decision). An earlier ruling on this change said the settlement
 persists "in the same write that first observes it, whether the commit is
 accepted or rejected." That is not merely in tension with two live
 requirements this change does not modify — it is undefined on the path the
@@ -337,10 +341,15 @@ that re-read still shows an unfolded `stationkeep` park at or after its dry
 instant; otherwise it writes nothing. Without that condition, "settle
 first" adds a **fourth** unserialized writer of `cargo.fuel` — alongside a
 refuel, a burn commit's debit, and a duplicate `hold`/`release` — issued by
-any of seven consumers and performing an unconditional absolute set from a
-figure read before the write began. The concrete loss is the same one this
-change already closes for `hold`/`release`: a refuel settles the hold,
-credits 200 t and restamps in its own correct transaction, and a plain
+any of the **eight** consumers the requirement enumerates (the burn-commit
+affordability gate, `FreeHold`'s five call sites, the estimated range, and
+the stranded indication), plus `hold`'s own precondition, which the same
+requirement reaches through its "any other computation of a fleet's
+currently held fuel" clause, and performing an unconditional absolute set
+from a figure read before the write began. The concrete loss is the same one
+this change already closes for `hold`/`release`: a refuel settles the hold —
+folding it to its released orbit, no restamp applying to a hold already past
+its dry instant — credits 200 t in its own correct transaction, and a plain
 `GET`'s settlement write then sets `fuel := reserve` from its stale
 pre-read, destroying the tonnage and the credits spent on it. Ordering the
 settlement before the decision does not close this; only the re-read
@@ -351,9 +360,39 @@ time advance would pass even if that stable value is the stale,
 over-reported one — the regression guard must assert the settled,
 *correct* value specifically.
 
+### Decision: `mine`'s resolve clamp settles inside `ResolveOne`'s own transaction
+An earlier draft grouped `mine`'s resolve-time clamp with the burn commit
+and the refuel as an abortable transaction owing a preceding, independent
+settlement write. It is not one, and the requirement would have been
+unimplementable as written. `FreeHold` is read at `backend/mine/
+resolver.go:76`, inside a `ResolveFunc` that `backend/action/dao.go`'s
+`ResolveOne` invokes **within** `RunTransaction`, with no per-type
+pre-transaction hook, reached from three fleet-unaware entry points. A
+preceding write would therefore have required a new pre-resolve seam in
+`action-dispatch` that no requirement in this change authorizes and the
+Impact section does not list.
+
+The rationale for settling first does not reach it either. `ResolveOne`'s
+transaction never rejects with an answer: a resolver error aborts the
+transaction and leaves the action `running`, so the next resolve retries it,
+and an in-transaction settlement is retried rather than lost.
+`ResolveResult.ActorState` is merged onto the same actor document in that
+same transaction, so there is nowhere for the settlement to fall out.
+
+Nor does the choice change any outcome. `take = min(tons, remainingAtEta,
+freeHoldAtResolve)`, a settlement only ever debits `fuel` and therefore only
+widens free hold (which is precisely what `mine-extraction`'s own delta in
+this change records), and `tons` was admitted at commit against a figure no
+production writer can since have narrowed. The clamp cannot bind on either
+figure.
+
+`mine`'s **commit-time** free-hold check (`backend/mine/service.go:350`) is
+a different animal — a plain pre-check outside any transaction — and
+correctly keeps the settle-first ordering.
+
 ### Decision: `hold` and `release` settle a due-but-unresolved movement action first
-Both verbs resolve any past-ETA movement-channel action before evaluating
-their own preconditions, exactly as `OrderTo` already does through
+Both verbs resolve a due-but-unresolved movement-channel **burn** before
+evaluating their own preconditions, exactly as `OrderTo` already does through
 `settleIfDue` for "Ordering over a completed-but-unresolved order settles
 it first". This is required because `space.StateAt` folds a body-targeted
 burn past its `ArriveMs` into a `ParkOrbit`
@@ -374,6 +413,36 @@ it is not attached to, with an arrival that silently never happened.
 This is stated as a requirement rather than assumed from the codebase
 because the settle-first seam is **not** applied uniformly today:
 `OrderTo`, `CutDrive`, and `Jump` call `settleIfDue`; `Stop` does not.
+
+The obligation is scoped to a due **burn**, matching `settleIfDue`'s own
+`Mode == space.ModeBurn` guard (`backend/fleet/service.go:428-432`), which
+no-ops for a fleet running a co-resident mine action on the same slot. An
+earlier draft said "any of the fleet's movement-channel actions whose ETA
+has already passed" while the task routed the work through `settleIfDue` —
+a requirement the named seam cannot satisfy. A due mine action leaves no
+stale kinematic state for `hold` or `release` to misread, so nothing is lost
+by the narrowing.
+
+### Decision: `hold` also settles a past-dry-instant hold before its own preconditions
+The ordered precondition sequence — lane transit, then a due burn, then a
+past-dry-instant hold, then the verb's own state and fuel preconditions —
+carries `hold` in its third step, and that step is load-bearing rather than
+tidy. A `stationkeep` park at or after its dry instant IS an `orbit` park by
+the fold this change adds, so `hold`'s not-orbiting precondition accepts a
+fleet whose hold silently expired; the stored `fuel` still over-reports by
+the whole accrual; and `hold` would then compute a fresh dry instant from
+that figure and stamp it over the elapsed hold's own. The accrual is
+forgiven, the force-demotion never happens, and re-issuing `hold` after each
+dry instant buys station-keeping forever for the fuel of one hold — which
+nullifies the upkeep economy this change exists to install.
+
+The general rule ("Every Decision Reading Fuel Settles a Past-Dry-Instant
+Hold First") already reaches `hold` through its catch-all clause. It is
+restated as an ordered step of the verb because an implementer builds an
+ordered sequence literally, and because an earlier draft's enumeration of
+abortable transactions listed three cases while excluding `hold` — a
+contradiction that pointed the implementer away from the very step the
+catch-all required.
 
 ### Decision: Attachment survives hold, release, and force-demotion
 `hold`, `release`, and the automatic force-demotion each mutate only the
