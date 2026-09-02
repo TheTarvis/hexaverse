@@ -8,13 +8,15 @@ held continuously in a body's reference frame, at a continuous cost), or
 no ongoing cost; `stationkeep` SHALL impose the continuous upkeep defined
 below. A `stationkeep` park SHALL additionally store the world time its
 hold began and a dry instant — the world time at which continued upkeep
-would exhaust the fuel held at hold-start, computed once when the hold is
-created (see `fleet-movement`'s "Station-Keeping Hold and Release Are
-Fleet Verbs" and "Station-Keeping Upkeep Is Settled at Discrete Events,
-Never Folded Into the Stored Cargo Pool") — and observing a `stationkeep`
-park at or after its stored dry instant SHALL fold it into its released
-orbit (see "A Station-Keeping Park Past Its Dry Instant Is Its Released
-Orbit, With No Extra Persisted State").
+would draw the fuel held at hold-start down to the configured
+station-keeping reserve the holding capability defines, computed once when
+the hold is created (see `fleet-movement`'s "Station-Keeping Hold and
+Release Are Fleet Verbs", "Station-Keeping Upkeep Never Drains a Fleet
+Below Its Reserve", and "Station-Keeping Upkeep Is Settled at Discrete
+Events, Never Folded Into the Stored Cargo Pool") — and observing a
+`stationkeep` park at or after its stored dry instant SHALL fold it into
+its released orbit (see "A Station-Keeping Park Past Its Dry Instant Is Its
+Released Orbit, With No Extra Persisted State").
 
 #### Scenario: An orbit park stays at its configured radius from its body forever
 - **WHEN** an orbit park's position and its body's position are evaluated at
@@ -35,8 +37,9 @@ Orbit, With No Extra Persisted State").
 #### Scenario: A newly created station-keep park stores its start time and dry instant
 - **WHEN** a `stationkeep` park is created
 - **THEN** it stores the world time it was created and a dry instant
-  computed from the fuel held and the upkeep rate at that same instant,
-  and neither value changes for the life of that hold
+  computed from the spendable fuel held above the reserve and the upkeep
+  rate at that same instant, and neither value changes for the life of that
+  hold
 
 ### Requirement: Coordinates Cross the Persistence Boundary Through a Named Codec
 
@@ -64,8 +67,13 @@ number exactly six, or when the decoded curve length is not bit-identical
 to the arc length recomputed from the decoded control points — and no
 downstream computation SHALL run on a partially-decoded state. A decode
 SHALL also fail, by the same named error, when a drift's stored epoch is
-absent or non-positive, or when a `stationkeep` park's stored dry instant
-is absent or not strictly after its stored hold-start time.
+absent or non-positive, when a `stationkeep` park's stored hold-start time
+is absent or non-positive, or when its stored dry instant is absent or not
+strictly after that hold-start time. Guarding the dry instant alone is not
+sufficient: an absent hold-start decodes to zero, and every upkeep accrual
+computed from it then runs from world-epoch zero — a debit of the fleet's
+entire spendable fuel, silently clamped, on a park that decoded without
+complaint.
 
 #### Scenario: A position encodes to storage-native primitives and decodes back exactly
 
@@ -136,10 +144,11 @@ is absent or not strictly after its stored hold-start time.
 
 #### Scenario: A station-keep park with a missing or invalid dry instant fails to decode
 
-- **WHEN** a stored `stationkeep` park's dry instant is absent, or is not
+- **WHEN** a stored `stationkeep` park's hold-start time is absent or
+  non-positive, or its dry instant is absent, or its dry instant is not
   strictly after its stored hold-start time
 - **THEN** decoding fails with the existing named, countable decode-failure
-  error, and no park is produced
+  error, and no park is produced, in each of those cases
 
 ## ADDED Requirements
 

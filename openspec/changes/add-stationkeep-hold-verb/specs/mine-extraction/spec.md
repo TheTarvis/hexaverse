@@ -37,16 +37,31 @@ or the automatic past-dry-instant fold, which can fire on any read or
 write that observes it — debits the fleet's `fuel` cargo between this
 run's commit and its resolve. This is exactly the "future verb that can
 mutate cargo while a fleet is docked to a mined feature" this requirement
-previously held open as unreachable; `freeHoldAtResolve` therefore no
-longer always equals `freeHoldAtCommit` — it can be strictly larger, by
-exactly a station-keeping settlement's `fuel` debit, if one lands inside
-the run's window. This does not change the clamp math above:
-`remainingAtEta`, `take`, and the reason code are all computed from
-`freeHoldAtResolve` read fresh at resolve, never from a value cached at
-commit, so the `holdFull` branch, and every other clamp, already floors
-and reports correctly against this new source of mid-run free-hold
-movement — nothing above required correction, only the retired claim of
-invariance.
+previously held open as unreachable, and **the claim retired here is that
+one claim alone: `freeHoldAtResolve` no longer always equals
+`freeHoldAtCommit`.** It can now be strictly larger, by exactly a
+station-keeping settlement's `fuel` debit, if one lands inside the run's
+window.
+
+Nothing else changes, and in particular the `holdFull` branch **remains
+structurally unreachable in production**. A station-keeping settlement only
+ever *debits* `fuel`, so it can only widen free hold, never narrow it; and
+`take = min(tons, remainingAtEta, freeHoldAtResolve)` with `tons` already
+admitted at commit against the narrower `freeHoldAtCommit` means a widened
+free hold can never bind the take. No production writer can grow a fleet's
+**non-fuel** cargo between a run's commit and its resolve either: `mine`'s
+own resolver is the sole crediter of mined cargo and the run holds the
+movement slot for its whole duration, a sale requires docking to a station,
+and a refuel credits `fuel`. The `holdFull` branch and its scenario
+therefore stay specified and tested against a directly constructed state,
+not against a sequence of production verbs — asserting otherwise would
+require a test that writes cargo straight into the fleet document, which is
+the shape of test this chain has already been burned by. `remainingAtEta`,
+`take`, and the reason code are all computed from `freeHoldAtResolve` read
+fresh at resolve, never from a value cached at commit, so every clamp
+already floors and reports correctly against this new source of mid-run
+free-hold movement — nothing above required correction, only the retired
+claim of invariance.
 
 #### Scenario: A clean run takes the full target
 - **WHEN** neither the lode's remaining tonnage nor the fleet's free hold
@@ -75,11 +90,16 @@ invariance.
   zero-amount one — see "Exactly-Once Lode Delta"), and the fleet's cargo
   is not decremented
 
-#### Scenario: A station-keeping settlement landing mid-run widens free hold before resolve
-- **WHEN** a mine run's fleet is held into `stationkeep` after the run's
-  commit, and that hold settles — by `release` or by the automatic
-  past-dry-instant fold — before the run resolves, debiting the fleet's
-  `fuel` cargo
-- **THEN** `freeHoldAtResolve` reflects the widened free hold from that
-  debit, potentially exceeding `freeHoldAtCommit`, and the take and clamp
-  reason code are computed correctly against that fresh value
+#### Scenario: A station-keeping settlement landing mid-run widens free hold and changes no take
+- **GIVEN** a mine run committed for a `tons` that `freeHoldAtCommit`
+  admitted at commit, against a fleet simultaneously holding a
+  `stationkeep` park while docked to the mined feature
+- **WHEN** that hold settles inside the run's window — by `release` or by
+  the automatic past-dry-instant fold — debiting the fleet's `fuel`
+- **THEN** `freeHoldAtResolve`, read fresh with that settlement applied, is
+  strictly greater than `freeHoldAtCommit` — the equality this requirement
+  previously claimed no longer holds
+- **AND** the take is still the full requested `tons` and the resolved
+  action's reason code is still `clean`, because a widened free hold can
+  never bind `take = min(tons, remainingAtEta, freeHoldAtResolve)` when
+  `tons` was already admitted against the narrower commit-time figure
