@@ -1,0 +1,183 @@
+## ADDED Requirements
+
+### Requirement: The Sighting Log Lists the Corporation's Own Pile in Served Order
+The system SHALL present the requesting corporation's sighting pile as a list,
+one row per served record, in the order the server returned them, and SHALL NOT
+re-sort them client-side — the pile is ordered by each record's `asOf`, the
+instant the light left, which is not the order the claims were filed, so a
+client re-sort would silently assert a different ordering than the one the
+server's pagination is built on.
+
+Each row SHALL show the record's system, its `asOf`, and the host that was
+swept. A row for a record that names a target SHALL show that target's hull
+count and the hull types present. A row for a clean-sweep record SHALL instead
+show a clean-sweep marker and no composition, because the sweep found nothing
+masked at that host — itself a filed claim, not an absence of one.
+
+#### Scenario: Rows render in the served order
+- **WHEN** the pile read returns records
+- **THEN** the log renders one row per record, in the order the response listed
+  them, with no client-side re-sorting
+
+#### Scenario: A composition row shows hulls
+- **WHEN** a served record names a target
+- **THEN** its row shows the record's system, `asOf`, swept host, hull count,
+  and hull types
+
+#### Scenario: A clean-sweep row shows the clean-sweep marker
+- **WHEN** a served record is a clean sweep
+- **THEN** its row shows a clean-sweep marker and no hull count or hull types
+- **AND** it still shows the system, `asOf`, and swept host
+
+### Requirement: A Log Row Names No Owner
+The system SHALL NOT display an owner, corporation, or fleet identity for a
+sighted target on any log row, and SHALL NOT infer one from the record's
+contents. The record carries none: composition is the rung a scan buys, and
+owner identity is on no rung of this model's information ladder — attribution
+is a read the player makes or buys, never one this surface performs.
+
+#### Scenario: A row shows composition but no identity
+- **WHEN** a row for a target-naming record is shown
+- **THEN** it displays hull count and hull types
+- **AND** it displays no owner name, corporation, or fleet id for the target
+
+### Requirement: An Unknown System Name Falls Back to Its Id
+WHEN a record's system id has no corresponding name in the loaded galaxy data,
+the system SHALL show the raw system id on that row rather than failing to
+render the row — the same fallback `fleet-roster` already applies to a fleet's
+where label.
+
+#### Scenario: A record in an unnamed system still renders
+- **WHEN** a record's system id has no corresponding name in the loaded galaxy
+  data
+- **THEN** its row shows the raw system id and renders normally
+
+### Requirement: The Log Pages Through the Pile With the Server's Own Cursor
+The system SHALL request each further page of the pile with the continuation
+cursor the previous response returned, passed back verbatim, and SHALL NOT
+parse, rewrite, or construct a cursor of its own — the cursor is opaque by the
+server's own statement, and a client that builds one is a client that breaks
+when its encoding changes. The system SHALL offer a load-more affordance only
+while the last response returned a non-empty cursor, and loading a further page
+SHALL append its rows to those already shown rather than replacing them.
+
+#### Scenario: Load-more sends the served cursor verbatim
+- **WHEN** the player loads a further page
+- **THEN** the request carries the previous response's continuation cursor
+  unchanged
+
+#### Scenario: A further page appends rather than replaces
+- **WHEN** a further page is loaded
+- **THEN** its rows are appended below the rows already shown, and the earlier
+  rows remain
+
+#### Scenario: An empty cursor ends the pile
+- **WHEN** a response returns an empty continuation cursor
+- **THEN** no load-more affordance is offered
+
+#### Scenario: The client never constructs a cursor
+- **WHEN** any page of the pile is requested
+- **THEN** every cursor sent originated verbatim from a server response, and none
+  is assembled, parsed, or modified by the client
+
+### Requirement: The Log Reads on Mount, After a Sweep Settles, and on Explicit Refresh — Never on a Timer
+The system SHALL read the pile when the log mounts, after the space view's
+post-sweep settle refetch has completed (*A Running Sweep Self-Schedules the
+Refetch That Settles It, Then Reads the Pile*), and when the player explicitly
+refreshes. It SHALL NOT poll the pile on a timer.
+
+Polling would buy nothing: a sighting is minted only by the reading
+corporation's own resolving sweep (`sighting-records`'s *A Sighting Is Minted
+Only By a Resolving Sweep*), so the pile cannot change except as an effect of an
+action this same client committed and is already tracking. No other player's
+activity, and no passage of time, can add a record to it.
+
+#### Scenario: The log does not poll while open
+- **GIVEN** the log is open with no sweep running
+- **WHEN** world time advances across any number of the view's own poll
+  intervals
+- **THEN** no further pile read is issued
+
+#### Scenario: The log refetches after a sweep settles
+- **WHEN** the space view's post-sweep settle refetch completes
+- **THEN** the pile is read again and any newly minted records appear
+
+#### Scenario: An explicit refresh reads the pile
+- **WHEN** the player invokes the log's refresh affordance
+- **THEN** the pile is read again
+
+### Requirement: The Log's Empty, Loading, and Failed States Are Each Explicit
+The system SHALL show a loading state while the pile read is in flight; an
+explicit empty state, naming the focused scan as the way a record is filed, when
+the read succeeds with no records; and a retriable error state carrying the
+underlying error message when one is available, when the read fails. A failed
+read SHALL NOT be presented as an empty pile — the two are opposite facts and a
+player who cannot tell them apart cannot tell a broken client from a quiet one.
+
+#### Scenario: A pile read in flight shows a loading state
+- **WHEN** the pile read has not yet returned
+- **THEN** the log shows a loading state
+
+#### Scenario: An empty pile is stated, with the way to fill it
+- **WHEN** the pile read succeeds and returns no records
+- **THEN** the log shows an explicit empty state naming the focused scan as the
+  way to file a record
+
+#### Scenario: A failed pile read is retriable and never reads as empty
+- **WHEN** the pile read fails
+- **THEN** the log shows an error state carrying the underlying message when
+  available, with a retry affordance
+- **AND** it does not show the empty state
+
+### Requirement: The Log Is Reachable From the System Space View Without Leaving It
+The system SHALL provide, on the system space view, an affordance that opens the
+sighting log, and opening or closing the log SHALL NOT navigate away from the
+open system: the space view stays mounted and its acting-fleet selection is
+preserved across both. A ghost drawn in the scene and the row that describes it
+are two halves of one reading, and a log that costs the player the view they are
+reading it against is a log they will not open.
+
+#### Scenario: The log is opened from the space view
+- **WHEN** the player invokes the space view's sighting-log affordance
+- **THEN** the sighting log is shown
+
+#### Scenario: Opening the log keeps the view and its acting fleet
+- **WHEN** the log is opened from the system space view
+- **THEN** the space view remains mounted and its acting-fleet selection is
+  unchanged
+
+#### Scenario: Closing the log returns to the view intact
+- **WHEN** the log is closed
+- **THEN** the space view is shown with the same acting fleet selected as before
+  the log was opened
+
+### Requirement: A Log Row and Its Ghost Address the Same Record By Its Served Id
+WHEN a log row whose record belongs to the open system is selected, the system
+SHALL highlight that record's ghost in the scene; WHEN a ghost is selected, the
+system SHALL highlight its row. Both directions SHALL match on the record's
+served `id` and on nothing else — never on position, `asOf`, host, or
+composition, any of which two records can legitimately share.
+
+A row whose record belongs to another system, and a clean-sweep row, have no
+ghost to highlight; selecting one SHALL say so rather than highlighting an
+unrelated mark.
+
+#### Scenario: Selecting a row highlights its ghost
+- **WHEN** a row whose record belongs to the open system is selected
+- **THEN** that record's ghost is highlighted in the scene
+
+#### Scenario: Selecting a ghost highlights its row
+- **WHEN** a ghost is selected in the scene
+- **THEN** the log row for that record is highlighted
+
+#### Scenario: Two records with identical contents highlight independently
+- **GIVEN** two records from one sweep whose stored position, `asOf`, host, and
+  composition are identical
+- **WHEN** each row is selected in turn
+- **THEN** each highlights its own ghost, matched by the record's served `id`
+
+#### Scenario: A row with no ghost says so
+- **WHEN** a row for a clean-sweep record, or for a record in another system, is
+  selected
+- **THEN** the log states that this record has no mark in the open system, and
+  no unrelated mark is highlighted
