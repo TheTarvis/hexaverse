@@ -5,12 +5,26 @@ lattice to the continuous-space system map. `README.md` is the model,
 `decisions.md` is the settled rulings; this is the sequencing.
 
 **Status (2026-09-02):** links 1–6 landed, plus one unplanned insert. Links 5
-and 6 are **done and archived** (90/90 and 33/33). Link 7 is **specced and
-adversary-repaired but not implemented**, and was split in two by its own panel
-review — `add-fuel-as-cargo` (53 tasks) and `add-stationkeep-hold-verb` (26),
-which MUST archive in that order. Links 8–9 unstarted; link 8 is analysed with
-its twelve open questions ruled (`handoffs/link8-rulings.md`). All three chain-gating
+and 6 are **done and archived** (90/90 and 33/33). Link 7 was split in two by its
+own panel review — `add-fuel-as-cargo` (53 tasks) is **done and archived**
+(`41e3c46`, 22/22 e2e, 1360/1360 unit), and `add-stationkeep-hold-verb` (26)
+is specced with its red phase underway; they MUST archive in that order.
+
+Link 8's 8a was split **again** by its panel — it was 131 tasks, not the 47 it
+claimed — into `serve-orbital-elements-and-burn-preview` (37, purely additive,
+so no coexistence period and no flag) then `build-production-space-view` (94).
+Neither is a deferral: 8a-2 cannot render or price without 8a-1, and 8a-1 is
+dead code until 8a-2 calls it. **Link 9 is blocked on 8b as well as 8a** —
+`add-scan-and-sightings-surface` is still unauthored, and its two halves (the
+scan command surface and the sightings display) must ship in the same change as
+each other. Link 8's twelve open questions are ruled
+(`handoffs/link8-rulings.md`). All three chain-gating
 design decisions are settled — see *Open decisions gating the chain* below.
+
+**The full archive order is** `add-fuel-as-cargo` →
+`add-stationkeep-hold-verb` → `serve-orbital-elements-and-burn-preview` →
+`build-production-space-view` → `add-scan-and-sightings-surface` →
+`delete-the-lattice`.
 Two lattice-era changes
 (`add-station-exchange`, `revise-scan-instant-and-emission`) were removed from
 `openspec/changes/` on 2026-08-27 to clear the board — see *Removed* at the
@@ -45,9 +59,11 @@ after that design was written.
 | 4 | `migrate-fleet-to-continuous-burns` | Fleets fly curves; cut drive / stop in place | ✅ `1f1c88a`…`55c46fb` |
 | 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ✅ `8f4dd65`…`99747e2` |
 | 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | ✅ `5fd28b5`…`fbbb316` |
-| 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | 📝 spec CLEAR-pending, 0/53 |
+| 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ✅ `41e3c46` |
 | 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | 📝 spec CLEAR-pending, 0/26 |
-| 8 | `build-production-space-view` | The renderer; `board-view` retired | ⬜ |
+| 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | 📝 spec, 0/37 |
+| 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | 📝 spec, 0/94 |
+| 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | ⬜ |
 | 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | ⬜ |
 
 Downstream and off the critical path: `add-station-exchange` (M12) gets

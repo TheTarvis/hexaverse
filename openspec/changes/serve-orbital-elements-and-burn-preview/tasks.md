@@ -1,0 +1,184 @@
+## 1. Contract suite, written first and red
+
+This section is the reason the change was split: every assertion below is
+writable from the spec deltas alone, before either half's implementation
+starts. Nothing in sections 2–5 begins until section 1 is red for the right
+reason.
+
+- [ ] 1.1 Interior-read wire contract (`backend/system`, handler level):
+      every non-star feature body and every lane-gate body carries
+      `orbitElements` with all six fields equal to its stored/derived element
+      set; the star carries none; a body served with a zero-valued `space`
+      position still carries a complete element set (`system-interior`:
+      "A non-star body's read carries its full orbital element set", "A
+      lane-gate body's read carries its full orbital element set", "The star
+      carries no orbital element set", "A body served without a resolvable
+      continuous position is still element-complete")
+- [ ] 1.2 Interior-read non-regression contract: the lattice `orbit` key still
+      carries `{ring, angle0, period, dir}`, and `footprint`, `band`, `live`,
+      `parentId`, `fixed`, per-feature `asOf`, and a gate's `cell` are all
+      still present and unchanged (`system-interior`: "The lattice orbit key
+      keeps its lattice meaning", "Pre-existing wire fields are unchanged", "A
+      materialized system's read carries every body's continuous position and
+      size", "Unknown or ungenerated system", "No live galaxy")
+- [ ] 1.3 Preview contract, part 1 — parity and settlement: an identical
+      preview and commit from the same fleet state and world time return
+      identical control points, depart/arrive times, delta-v, and fuel cost;
+      a preview against a fleet with a past-due arrival settles first and
+      solves from the settled park (`fleet-movement`: "A preview returns the
+      same curve, ETA, and cost a commit would produce", "A preview settles a
+      due arrival first, then solves from the settled state")
+- [ ] 1.4 Preview contract, part 2 — no effect: repeated previews of a fleet
+      with nothing due leave the stored record byte-identical, create no
+      action, claim no channel, and debit no fuel (`fleet-movement`:
+      "Repeated previews of a fleet with nothing due write nothing")
+- [ ] 1.5 Preview contract, part 3 — rejection parity: star-by-clearance with
+      no destination-identity comparison; lane transit; movement channel held
+      by a running mine; ambiguous target; empty target; out-of-bounds
+      commanded acceleration; unknown body id; a `laneId` target
+      (`fleet-movement`: "A preview against the star is rejected by the curve's
+      clearance guard, not by a destination check", "A preview is refused
+      wherever the commit would be refused", "A preview rejects a lane id")
+- [ ] 1.6 Preview contract, part 4 — the burning-fleet re-target case, plus
+      unaffordable and stranding reporting (`fleet-movement`: "A burning fleet
+      can preview a re-target", "A preview reports an unaffordable target as
+      such", "A preview reports the stranding warning when it would apply")
+- [ ] 1.7 Quoted-cap contract: over-cap rejection with the true cost, the
+      exactly-at-cap success, the absent-cap no-op, distinguishability from
+      the insufficient-fuel reason, and the malformed-cap invalid request
+      (`fleet-movement`: all six scenarios of "A Burn Commit Is Rejected When
+      Its Solved Fuel Cost Exceeds the Requester's Quoted Cap")
+- [ ] 1.8 Upkeep-rate contract: present in tons/second for an `orbit` and a
+      `stationkeep` park, absent for burn/drift/point-park, absent for a
+      foreign fleet, and read-idempotent (`fleet-movement`: all five scenarios
+      of "Fleet Read Serves the Station-Keeping Upkeep Rate in Fuel Tons")
+- [ ] 1.9 Ownership contract: `/orders/preview` returns `404` for a foreign
+      corporation and for a corpless requester, with no position, velocity,
+      roster, or fuel field in the body; re-run the ten pre-existing endpoint
+      scenarios unchanged (`fleet-movement`: "A foreign corp cannot preview
+      another corp's fleet's burn", "A corpless requester is rejected the same
+      way", and the nine sibling endpoint scenarios)
+- [ ] 1.10 Record a golden wire sample of one materialized interior read and
+      one preview response under the backend test tree, so
+      `build-production-space-view`'s TypeScript types are written against a
+      real payload rather than a paraphrase of this document
+
+## 2. Interior read — orbital elements on both DTOs
+
+- [ ] 2.1 Add `orbitElements` to `system.fogFeatureDTO` (`backend/system/fog.go`),
+      populated from `Feature.Space`, omitted when nil (the star), with all six
+      fields named exactly `parentId`, `radius`, `periodMs`, `phase`,
+      `inclination`, `node` (`system-interior`: "A non-star body's read carries
+      its full orbital element set", "The star carries no orbital element set")
+- [ ] 2.2 Add `orbitElements` to `system.LaneGate` (`backend/system/gates.go`),
+      populated in the same `fillGateGeometry` pass that already resolves a
+      gate's `space`/`size` from the body table, so a gate whose body is
+      unresolvable degrades exactly as it does today rather than failing the
+      read (`system-interior`: "A lane-gate body's read carries its full
+      orbital element set")
+- [ ] 2.3 Populate the element set from the body table's stored elements, never
+      by re-deriving `gateOrbit` at read time — the derivation stays a
+      generation-time function with one caller (`system-interior`: "A lane-gate
+      body's read carries its full orbital element set")
+- [ ] 2.4 Leave `Orbit`, `ParentId`, `Fixed`, `Footprint`, `Band`, `Live`,
+      `AsOf`, and `LaneGate.Cell` untouched, and add a DTO comment naming
+      `build-production-space-view` as the change that removes them
+      (`system-interior`: "Pre-existing wire fields are unchanged", "The lattice
+      orbit key keeps its lattice meaning")
+- [ ] 2.5 Serve the element set even when the body's continuous position could
+      not be resolved: elements are stored data, position is a resolution
+      result (`system-interior`: "A body served without a resolvable continuous
+      position is still element-complete")
+- [ ] 2.6 Update the Go interior-read handler tests and any recorded response
+      shape they assert; re-record rather than relax
+
+## 3. Burn order preview
+
+- [ ] 3.1 Extract the solve half of `fleet.OrderTo` — target resolution, the
+      fold-first `settleIfDue` step, position/tangent resolution,
+      `space.SolveBurn`, fuel-cost, affordability, and stranding evaluation —
+      into one function both `OrderTo` and the preview call, so the two cannot
+      drift (`fleet-movement`: "A preview returns the same curve, ETA, and cost
+      a commit would produce", "A preview settles a due arrival first, then
+      solves from the settled state")
+- [ ] 3.2 Add `POST /v1/fleets/:fleetId/orders/preview` with a request shape
+      identical to `orders` minus `laneId`, rejecting a `laneId` target by its
+      own named reason (`fleet-movement`: "A preview rejects a lane id")
+- [ ] 3.3 Return the six control points, `departMs`, `arriveMs`, delta-v, fuel
+      tons, affordability, and the stranding indication (`fleet-movement`:
+      "A preview reports an unaffordable target as such", "A preview reports
+      the stranding warning when it would apply")
+- [ ] 3.4 Route every rejection through the shared solve function so preview and
+      commit refuse identically — lane transit, a movement channel held by a
+      running mine, ambiguous/empty target, commanded-acceleration bounds,
+      unknown body (`fleet-movement`: "A preview is refused wherever the commit
+      would be refused")
+- [ ] 3.5 Serve the preview for a currently-burning fleet, solved from its live
+      position and tangent, leaving the running burn untouched
+      (`fleet-movement`: "A burning fleet can preview a re-target")
+- [ ] 3.6 Assert by construction that no destination-identity check reaches the
+      preview path: the star is excluded solely by `space.BuildCurve`'s
+      clearance guard, and the preview's star test asserts the observable
+      reason traces to `space.ErrEndpointInsideClearance` (`fleet-movement`:
+      "A preview against the star is rejected by the curve's clearance guard,
+      not by a destination check")
+- [ ] 3.7 Ensure the preview creates no action, claims no channel slot, debits
+      no fuel, and stores no burn, and that its only write is the shared
+      settlement (`fleet-movement`: "Repeated previews of a fleet with nothing
+      due write nothing")
+- [ ] 3.8 Add the ownership check to the new route via the same
+      `common.ActorCorp` comparison every sibling command uses, returning a
+      bare `404` with no fleet-derived field in the body (`fleet-movement`: "A
+      foreign corp cannot preview another corp's fleet's burn")
+
+## 4. Quoted fuel cap on the burn commit
+
+- [ ] 4.1 Accept an optional `maxFuelTons` on the `orders` request body;
+      reject a negative or non-finite value as an invalid request rather than
+      treating it as absent (`fleet-movement`: "A malformed cap is an invalid
+      request, not an absent cap")
+- [ ] 4.2 Reject the commit when the solved fuel cost is strictly greater than
+      the cap, before the channel claim, the fuel debit, and the burn store,
+      with its own sentinel distinct from the insufficient-fuel one
+      (`fleet-movement`: "A commit whose solved cost exceeds the quoted cap is
+      rejected", "The quoted-cap rejection is distinguishable from the
+      insufficient-fuel rejection")
+- [ ] 4.3 Carry the true solved fuel cost on the rejection response so the
+      caller can re-quote without a second round trip (`fleet-movement`: "The
+      quoted-cap rejection carries the true solved cost")
+- [ ] 4.4 Leave the uncapped path byte-for-byte unchanged, and pin the
+      exactly-at-cap boundary as a success (`fleet-movement`: "An absent cap
+      applies no cap", "A commit exactly at the quoted cap succeeds")
+
+## 5. Station-keeping upkeep rate on the fleet read
+
+- [ ] 5.1 Add the upkeep rate, in fuel tons per second, to `fleet.rosterDTO`,
+      derived from `space.StationKeepRate` for the fleet's host body and
+      converted by `FuelParams.DeltaVPerTon` without the hull-count multiplier
+      (`fleet-movement`: "An orbiting fleet's read carries the rate it would
+      pay to hold", "A holding fleet's read carries the rate it is paying")
+- [ ] 5.2 Omit the field when the fleet's effective state resolves to a burn, a
+      drift, or a `point` park — no host body, no rate — and confirm it is
+      absent from a foreign fleet's read, which carries no roster surface
+      (`fleet-movement`: "A fleet with no host body carries no rate", "A
+      foreign fleet's read carries no rate")
+- [ ] 5.3 Confirm the derivation is read-only: no settle, no debit, no restamp
+      (`fleet-movement`: "Reading the rate changes nothing")
+- [ ] 5.4 Serve the value in tons and never in delta-v, and add no
+      `DeltaVPerTon` field to any DTO, so the conversion has no client-side
+      route (`fleet-movement`: "Fleet Read Serves the Station-Keeping Upkeep
+      Rate in Fuel Tons")
+
+## 6. Validation
+
+- [ ] 6.1 Section 1's whole contract suite green
+- [ ] 6.2 `cd backend && make test`, plus the emulator-backed handler suites for
+      `system` and `fleet`
+- [ ] 6.3 `bash .claude/scripts/check-mirror-map.sh` green — this change adds no
+      TypeScript, so `backend/space`/`backend/fleet`/`backend/system` must all
+      still report no mirror
+- [ ] 6.4 `python3 .claude/skills/code-quality-checks/check.py` and
+      `bash .claude/scripts/check.sh --backend --lint --test` green
+- [ ] 6.5 `openspec validate serve-orbital-elements-and-burn-preview --strict`
+      green, and `openspec diff` reviewed against the two capabilities' live
+      text
