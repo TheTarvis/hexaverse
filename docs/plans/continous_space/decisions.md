@@ -393,6 +393,31 @@ compose:
 Stranding is therefore immobility pending rescue — a supply-line drama, which
 is precisely what pricing delta-v in cargo mass exists to create.
 
+**Correction 2026-09-02 (link 7 analysis): the third pillar does not exist, and
+stranding is therefore PERMANENT.** There is no cargo-transfer verb anywhere in
+the tree — no endpoint, no service method, no requirement in any capability.
+Cargo moves in exactly two ways: credited by `mine`'s resolver and debited by
+`goods-sale`'s settlement. So "immobility pending rescue" is not what the rules
+compose to; "immobility" is. This ruling was recorded as settled while resting on
+a premise that was never true.
+
+Two things soften it, neither of which closes it:
+
+- **A jump costs no delta-v** (`fleet-movement`: *Jump costs no delta-v*), so a
+  dry fleet that happens to be attached to a lane gate can still cross the galaxy
+  indefinitely. It simply cannot manoeuvre inside any system. A fleet dry at a
+  planet cannot reach a gate, so this rescues only the fleets that stranded in the
+  one lucky place.
+- The commit-time affordability check still means a fleet never strands
+  *mid-burn*.
+
+**Deliberately not fixed in link 7.** A transfer verb is a real design surface
+(partial transfers, proximity versus attachment, ownership on both sides, hold
+capacity on both sides) and bolting it on unreviewed is how link 5's blockers
+happened. Recorded as a follow-up change, `add-cargo-transfer`. Until it lands,
+the honest statement of this ruling is: **a fleet can strand, and stranding is
+permanent unless it stranded attached to a gate.**
+
 **Why the blanket reserve is rejected — on definition, not taste.** "Retain
 enough to get home" requires solving a return path, and that path changes
 every time the fleet moves and may cross several lanes. There is no local
@@ -408,6 +433,25 @@ while still failing to deliver the guarantee its name promises.
   force-demotes to `orbit`, the free mode. This reuses the states that already
   exist; no new state is invented for it, and it matches the tank-dry
   auto-drop the PoC already demonstrated.
+
+  **Correction 2026-09-02 (link 7 analysis): this guardrail currently governs a
+  park no player can reach.** `space.StationKeepRate`, `space.StationKeepUpkeep`
+  and `space.ReleaseStationkeep` have **zero production callers**. There is no
+  hold verb — the registered fleet verbs are `orders`, `cut-drive`, `stop`,
+  `jump`, `scan` — and `space.StateAt` settles a body-targeted burn into
+  `ParkOrbit` and a point-targeted one into `ParkPoint`, never
+  `ParkStationkeep`. `SeedFleet` places a `point` park, and `fleet-movement`
+  explicitly forbids seeding a station-keeping one. The PoC has a
+  `Hold here` / `Resume orbit` toggle; the backend does not.
+
+  So the force-demotion rule is real and correct, and it protects nothing until
+  the verb exists. This is the fifth instance in this chain of a derivation
+  built, unit-tested against its own determinism, and never called — the others
+  being `fleet.GraphSource`, `galaxy.EnsureLaneHorizon`,
+  `system.StationContinuousOrbit`, and the focused scan's client half.
+  **Ruling: link 7 ships the hold/release verbs alongside the fuel currency**,
+  rather than specifying upkeep for an unreachable state and making it the
+  sixth.
 - **Warn at commit; do not block.** The delta-v to reach the nearest station
   or gate is a single closed-form body-target solve, so "this burn leaves you
   unable to reach anything" is cheap to surface at commit time. It stays a

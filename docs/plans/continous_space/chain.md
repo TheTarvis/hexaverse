@@ -186,8 +186,9 @@ it expired the prior verdict, and re-attacking the resumed content found 3
 blockers, 7 majors and 4 minors, then 1 blocker and 2 majors in the text
 those repairs introduced.
 
-Two defects it surfaced are worth remembering, both invisible to a green
-suite and both the same species as link 4's four:
+Three findings it surfaced are worth remembering. The first two are invisible
+to a green suite and are the same species as link 4's four; the third is a
+testing trap that makes a green suite look red:
 
 - **`EnsureLaneHorizon` had been wired inside every body-table build**, not
   on the jump path. Two of those builds run inside Firestore transactions,
@@ -202,6 +203,14 @@ suite and both the same species as link 4's four:
   `applyContinuousCascade` therefore dropped the station. M11's
   dock-then-sell loop was unreachable through the UI. This is blocker 5, the
   third instance of "a derivation built, unit-tested, and never called."
+
+- **`go test ./...` is self-racing in this repo.** The root package's `TestMain`
+  wipes and re-seeds the shared test emulator project, and Go runs package tests
+  in parallel, so that wipe detonates under `action`, `corporations`, `fleet`,
+  `galaxy`, `market` and `mine` mid-test. It produced 18 failures that read as a
+  serious regression; **`-p 1` is fully green**. `backend/CLAUDE.md` warns about
+  the Playwright collision over the same emulator but not about this one. Always
+  run the emulator-backed suite as `go test ./... -p 1`.
 
 The lesson link 5 keeps re-teaching: a storage-boundary guard applied to an
 in-process construction converts a producer bug into a silent omission that
