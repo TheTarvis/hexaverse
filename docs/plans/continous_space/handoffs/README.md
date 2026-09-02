@@ -151,3 +151,38 @@ that diff before archive whenever a re-ADDed requirement is edited. `--strict` p
 `reconcile` passing, and an archive rehearsal succeeding all remain true while substance
 is quietly missing. **Link 9 (`delete-the-lattice`) retires capabilities too — this
 applies there.**
+
+## Lesson five — a binding constraint outlived its cause, and only the repo knew
+
+Every agent on this chain was handed, as a hard rule: *do not regenerate fixtures under
+`backend/system` — arm64 gives 1-ULP FMA divergence.* It is in the operating notes and it
+was repeated in every delegation.
+
+**It is stale.** `docs/defects/2026-08-25-remaining-fma-sites.md:44` records site 1,
+`backend/system/generator.go`, as **RESOLVED 2026-08-29** by
+`pin-system-generation-determinism` — and `fixtures/determinism-register.json` carries
+entries for `backend/galaxy`, `backend/market` and `backend/mine` only, with **none** for
+`backend/system`. The constraint was correct when written and became false four days
+later; the note asserting it predates the fix that dissolved it.
+
+This mattered concretely: `delete-the-lattice` **cannot proceed without re-recording**
+`fixtures/system/cases.json`. Removing the lattice `Angle0` draw from `orbitFor` shifts
+every later draw from the primary RNG stream, so the same seed generates a different
+world. Under the stale constraint the change was impossible; the constraint was simply out
+of date.
+
+Two things worth carrying:
+
+1. **A prohibition should name its cause, so the cause can be checked.** "Do not regenerate
+   X" is unfalsifiable. "Do not regenerate X *because* defect D is open" can be verified in
+   one grep, and dissolves on its own when D closes.
+2. **The resolution is not to pick a side.** `delete-the-lattice` task 7.5 re-records and
+   then requires byte-identity across `GOARCH=arm64` and `GOARCH=amd64 GOAMD64=v1` before
+   committing, stopping if they disagree. That is correct whether or not the hazard is
+   live: it re-derives the answer instead of trusting either the note or the defect doc.
+
+Related: `.claude/scripts/openspec-reconcile.py` originally could not resolve `RENAMED`
+requirements, so a rename could pass the archiver or this gate but never both. Fixed
+2026-09-02 — it now maps a MODIFIED block under the new name back to the live requirement
+under the old one, because the archiver applies renames first. The change that found it
+declined to patch the gate from inside the change being gated, which was right.

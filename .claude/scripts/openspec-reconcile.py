@@ -27,6 +27,39 @@ def parse(path):
         if m and cur: reqs[cur].append(m.group(1))
     return reqs
 
+
+REQ_LINE = re.compile(r'^\s*-\s*(FROM|TO):\s*`?###\s*Requirement:\s*(.+?)`?\s*$')
+
+
+def parse_renames(path):
+    """{new title: old title} from a delta's ## RENAMED Requirements block.
+
+    The archiver applies renames BEFORE modifications, so a MODIFIED block
+    under the NEW name targets a live requirement still carrying the OLD one.
+    Without this, a rename could not pass both this gate and the archiver.
+    """
+    if not os.path.exists(path):
+        return {}
+    out, section, pending = {}, None, None
+    for line in open(path):
+        t = line.rstrip("\n")
+        m = re.match(r'^## (ADDED|MODIFIED|REMOVED|RENAMED)', t)
+        if m:
+            section = m.group(1)
+            continue
+        if section != "RENAMED":
+            continue
+        m = REQ_LINE.match(t)
+        if not m:
+            continue
+        kind, title = m.group(1), m.group(2)
+        if kind == "FROM":
+            pending = title
+        elif pending is not None:
+            out[title] = pending
+            pending = None
+    return out
+
 def check(change, root):
     base = os.path.join(root, "changes", change, "specs")
     if not os.path.isdir(base):
@@ -35,6 +68,7 @@ def check(change, root):
     for cap in sorted(os.listdir(base)):
         delta = parse(os.path.join(base, cap, "spec.md"))
         live = parse(os.path.join(root, "specs", cap, "spec.md"))
+        renames = parse_renames(os.path.join(base, cap, "spec.md"))
         if delta is None:
             continue
         for (sec, name), scns in delta.items():
@@ -44,9 +78,11 @@ def check(change, root):
                 print(f"  [{cap}] MODIFIED '{name}' but capability has NO live spec")
                 bad += 1
                 continue
-            match = [v for (s2, n2), v in live.items() if n2 == name]
+            target = renames.get(name, name)
+            match = [v for (s2, n2), v in live.items() if n2 == target]
             if not match:
-                print(f"  [{cap}] MODIFIED '{name}' — NO SUCH live requirement (renamed? typo?)")
+                hint = f" (renamed from '{target}', which is also absent)" if target != name else ""
+                print(f"  [{cap}] MODIFIED '{name}' — NO SUCH live requirement{hint}")
                 bad += 1
                 continue
             missing = [x for x in match[0] if x not in scns]
