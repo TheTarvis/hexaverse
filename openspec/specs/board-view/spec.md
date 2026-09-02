@@ -136,8 +136,8 @@ and constrained to a positive value no greater than the free hold.
   selection required
 
 #### Scenario: Mine is not offered when merely co-located, not docked
-- **WHEN** the acting fleet occupies the same cell as a resource feature
-  but its effective state is not `docked`
+- **WHEN** the acting fleet is parked at or near a resource feature's
+  position but its effective state is not `docked` to it
 - **THEN** the mine verb is not offered
 
 #### Scenario: Mine is not offered when the docked body has no visible resources
@@ -512,8 +512,8 @@ is never shown a split or a total the settlement won't honor.
   tonnage input, with no board selection required
 
 #### Scenario: Sell is not offered when merely co-located, not docked
-- **WHEN** the acting fleet occupies the same cell as a station but its
-  effective state is not `docked`
+- **WHEN** the acting fleet is parked at or near a station's position but
+  its effective state is not `docked` to it
 - **THEN** the sell verb is not offered
 
 #### Scenario: Sell is not offered when the cargo pool is empty

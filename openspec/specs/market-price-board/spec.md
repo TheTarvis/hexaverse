@@ -8,9 +8,7 @@ decision. Quotes are live market information, never frozen at an
 observation's `asOf`, and station visibility is gated by a configured
 minimum graph tier (default `rumored`) — the read discloses quotes and
 nothing beyond what existing fog already reveals.
-
 ## Requirements
-
 ### Requirement: One Read Returns Every Visible Station's Quotes
 The system SHALL serve one read that returns, for every station (venue)
 meeting the visibility gate (see "Configured Minimum Visibility Tier"), its
@@ -41,12 +39,11 @@ stations SHALL receive an empty set, not an error.
 
 ### Requirement: Live Quotes, Never Frozen At An Observation's asOf
 Every quote this capability serves SHALL reflect the current live state of
-its floor and requests, never a stored observation's frozen `asOf`
-snapshot — market data is information, not subject to the three-band
-feature-composition freeze `system-interior` applies to scanned detail. A
-request another corporation exhausts between two of a requester's reads
-SHALL show as exhausted (or absent) on the next read with no travel or
-scan required by the reading corporation.
+its floor and requests, never a sighting's frozen `asOf` snapshot — market
+data is information, not a historical record captured at scan time the way
+a `sighting-records` entry is. A request another corporation exhausts
+between two of a requester's reads SHALL show as exhausted (or absent) on
+the next read with no travel or scan required by the reading corporation.
 
 #### Scenario: An exhausted request reflects immediately on the next read
 - **WHEN** another corporation fully sells against a request between two of
@@ -64,8 +61,9 @@ scan required by the reading corporation.
 The system SHALL include a station in this read only when the requester's
 graph-tier knowledge of that station's system is at least a configured
 minimum tier (`market.Params.MinVisibilityTier`, defaulted to `rumored`),
-following the same tier-gate pattern `system-interior`'s "Charted Lane Gate
-Filtering" already applies.
+following the same tier-gate pattern `trading-station`'s "Home Station
+Visible On the Direct Station Read, No Scan Required" already applies
+against that same configured tier.
 
 #### Scenario: A system at or above the configured minimum tier is included
 - **WHEN** a requester's graph tier for a station-bearing system is at
@@ -127,3 +125,4 @@ corporation's resolved id.
   station-bearing system each read the price board
 - **THEN** each receives a response computed against its own visibility,
   never a response cached for the other corporation
+

@@ -41,7 +41,7 @@ after that design was written.
 | — | `pin-system-generation-determinism` | *(unplanned insert)* generation pinned byte-identical across build targets | ✅ `b64be39` |
 | 4 | `migrate-fleet-to-continuous-burns` | Fleets fly curves; cut drive / stop in place | ✅ `1f1c88a`…`55c46fb` |
 | 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ✅ `8f4dd65`…`99747e2` |
-| 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | 📝 spec CLEAR, 0/33 |
+| 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | ✅ `5fd28b5`…`fbbb316` |
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ⬜ |
 | — | `add-stationkeep-hold-verb` | *(unplanned insert)* `hold`/`release` verbs + their fuel-denominated upkeep, carved out of link 7's own panel review | ⬜ |
 | 8 | `build-production-space-view` | The renderer; `board-view` retired | ⬜ |
@@ -369,7 +369,22 @@ remains is **storage and wiring**, not model:
 
 ## Link 6 — `re-express-economy-positions`
 
-**Spec complete and adversary-CLEAR (2026-09-02); 0/33 tasks implemented.**
+**Landed and archived 2026-09-02** (`5fd28b5`…`fbbb316`), 33/33 tasks. Four-person
+panel (architect, DBA, security, UX) then three adversary rounds; QA 60 scenarios
+PASS / 0 FAIL. +3 requirements, 11 modified.
+
+**Two findings worth remembering, both about evidence rather than behaviour:**
+
+- **A ruling was reversed mid-flight** — see the table below and
+  `handoffs/link6-rulings.md`. The first shape split each belt into eight
+  independently contestable lodes; the panel showed that makes belt mining
+  *unreachable*, because members have no client affordance until link 8, so it
+  closed the only reachable path while its replacement had none.
+- **Seven validation scenarios were vacuously satisfied by code that did not
+  exist**, and a later pass found two checked task boxes claiming test coverage
+  that was never written. Both were caught by review, not by a failing build:
+  the rejections were unreachable behind the not-docked check, so the existing
+  `ErrNotDocked` answered every one of them. A green suite proved nothing.
 
 **This link's premise above was wrong, and the spec says so.** Link 4 already
 re-pointed the predicates: `mine` and `market` resolve "docked" through

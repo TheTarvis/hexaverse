@@ -586,6 +586,19 @@ contain it, so that a synthesized member id can never equal a feature id
 and the owning feature of a member id is recoverable by splitting on the
 first `#` with no lookup.
 
+Each member SHALL inherit its parent belt feature's resource kinds
+unchanged — a member draws no independent resource kind of its own, and any
+consumer resolving a member's mineable resources SHALL treat them as
+identical to the parent belt's own `resources` field. A belt SHALL remain
+exactly one lode: a member draws from, and depletes, the same
+richness-derived tonnage its parent belt feature does, never a tonnage
+split or reserved for that member alone, so the belt's total available
+tonnage for a kind is unaffected by how many of its members are ever named
+as a mine target. The belt feature body itself SHALL remain a directly
+mineable target: a mine commit naming a belt feature's own id SHALL be
+accepted on the preconditions "Mine Commit Preconditions" defines for any
+resource-bearing feature, with no belt-specific rejection.
+
 #### Scenario: Belt members are reproducible from the belt's id
 - **WHEN** a belt's member bodies are derived twice from the same belt
   feature id
@@ -625,6 +638,27 @@ first `#` with no lookup.
 #### Scenario: No generated feature id contains the member separator
 - **WHEN** any interior is generated
 - **THEN** no feature's id contains a `#` character
+
+#### Scenario: A member's mineable resource kinds match its parent belt exactly
+- **WHEN** a mine commit resolves against a belt member id naming a kind its
+  parent belt feature carries, and a second commit names a kind the parent
+  does not carry
+- **THEN** the first resolves the parent's richness for that kind and the
+  second is rejected as an unknown kind — a member exposes its parent's
+  resource kinds exactly, and no others
+
+#### Scenario: A member's mining draws from and depletes the belt's one shared lode
+- **WHEN** a fleet mines a resource kind through a belt member's id
+- **THEN** the depletion is recorded against the parent belt feature's own
+  ledger key, exactly as if the belt feature had been named directly, and
+  every other member's and the belt feature's own remaining tonnage for
+  that kind reflects the same depletion
+
+#### Scenario: The belt feature remains mineable alongside its members
+- **WHEN** a fleet docked to a belt feature commits a mine run naming that
+  belt feature's own id and a kind it carries
+- **THEN** the commit is accepted on the same preconditions any other
+  resource-bearing feature's commit is, with no belt-specific rejection
 
 ### Requirement: An Interior Predating This Capability Fails Closed, Never Silently
 The system SHALL treat a persisted interior whose stored extent is absent
@@ -1025,5 +1059,5 @@ non-positive size.
   core: the far side of the inner system is genuinely dark from a given
   vantage. Which types qualify and at what radius is **this domain's
   rule**; `observation` stays purely geometric and never learns what a gas
-  giant is. This underlies scan resolution in `observation-fog-and-scan`,
-  not this capability directly.
+  giant is. This underlies scan resolution in `focused-scan` (the verb)
+  and `sighting-records` (its product), not this capability directly.

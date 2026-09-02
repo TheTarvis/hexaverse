@@ -200,7 +200,7 @@
 - [x] 5.2 Fix `backend/system/station_continuous.go`'s doc comment with
       the same two corrections as 5.1, and the same note: the surrounding
       lattice-contrast prose is left as-is, pending link 9
-- [ ] 5.3 At archive time, replace `openspec/specs/system-interior/
+- [x] 5.3 At archive time, replace `openspec/specs/system-interior/
       spec.md`'s `## Notes for future maintainers` cross-reference to
       `observation-fog-and-scan` with a pointer to `focused-scan` (the
       verb) and `sighting-records` (its product) — NOT done by this
@@ -254,7 +254,7 @@
       belt-member-resolution, validation-ordering, attachment-host,
       masking, and lattice-symbol-absence tests
 - [x] 7.2 `openspec validate re-express-economy-positions --strict` passes
-- [ ] 7.3 Update `docs/plans/continous_space/chain.md`'s Link 6 section to
+- [x] 7.3 Update `docs/plans/continous_space/chain.md`'s Link 6 section to
       match this proposal's corrected scope (predicate migration already
       done at link 4; `board.Within`/`LineOfSight` already have no
       production caller; the real work is belt-member resolution and
