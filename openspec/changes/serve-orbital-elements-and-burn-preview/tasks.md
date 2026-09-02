@@ -40,12 +40,21 @@ reason.
       action, claim no channel, and debit no fuel (`fleet-movement`:
       "Repeated previews of a fleet with nothing due write nothing")
 - [ ] 1.5 Preview contract, part 3 — rejection parity: star-by-clearance with
-      no destination-identity comparison; lane transit; movement channel held
-      by a running mine; ambiguous target; empty target; out-of-bounds
-      commanded acceleration; unknown body id; a `laneId` target
+      no destination-identity comparison; lane transit; ambiguous target;
+      empty target; out-of-bounds commanded acceleration; unknown body id; a
+      `laneId` target
       (`fleet-movement`: "A preview against the star is rejected by the curve's
       clearance guard, not by a destination check", "A preview is refused
       wherever the commit would be refused", "A preview rejects a lane id")
+- [ ] 1.5a Preview contract, part 3b — the held-movement-channel case, asserted
+      on its own terms and NOT against a commit reason: commit a mine, then
+      preview a burn on that fleet; assert the refusal carries the preview's
+      own reason, the mine action is still running with its slot held, and the
+      fleet doc is byte-identical across the request. Do not assert a commit
+      rejection here — a burn commit from that state is accepted today (see
+      `docs/plans/continous_space/handoffs/defect-burn-cancels-running-mine.md`)
+      (`fleet-movement`: "A preview against a fleet mid-mine is refused,
+      cancels nothing, and writes nothing")
 - [ ] 1.6 Preview contract, part 4 — the burning-fleet re-target case, plus
       unaffordable and stranding reporting (`fleet-movement`: "A burning fleet
       can preview a re-target", "A preview reports an unaffordable target as
@@ -142,10 +151,16 @@ reason.
       "A preview reports an unaffordable target as such", "A preview reports
       the stranding warning when it would apply")
 - [ ] 3.4 Route every rejection through the shared solve function so preview and
-      commit refuse identically — lane transit, a movement channel held by a
-      running mine, ambiguous/empty target, commanded-acceleration bounds,
-      unknown body (`fleet-movement`: "A preview is refused wherever the commit
-      would be refused")
+      commit refuse identically — lane transit, ambiguous/empty target,
+      commanded-acceleration bounds, unknown body (`fleet-movement`: "A preview
+      is refused wherever the commit would be refused")
+- [ ] 3.4a Refuse a preview whose fleet's movement channel is held by a running
+      mine with the preview path's **own** named reason, returning before any
+      write — the commit path deliberately keeps its current
+      cancel-and-proceed behaviour, so this refusal is preview-only and must
+      not be derived from a commit rejection that does not exist
+      (`fleet-movement`: "A preview against a fleet mid-mine is refused,
+      cancels nothing, and writes nothing")
 - [ ] 3.5 Serve the preview for a currently-burning fleet, solved from its live
       position and tangent, leaving the running burn untouched
       (`fleet-movement`: "A burning fleet can preview a re-target")

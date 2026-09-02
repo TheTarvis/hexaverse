@@ -139,8 +139,10 @@ stranding warning.
 
 The preview SHALL be available exactly when a commit of the same order
 would be available, and SHALL be rejected exactly where a commit would be
-rejected, **with one stated exception — an insufficient-fuel condition
-SHALL NOT reject a preview**. Where a commit whose solved fuel cost exceeds
+rejected, **with two stated exceptions, both named below — an
+insufficient-fuel condition SHALL NOT reject a preview, and a movement
+channel held by a running mine SHALL refuse a preview even though the
+commit path does not refuse it**. Where a commit whose solved fuel cost exceeds
 the fleet's currently held `fuel` is rejected ("A Burn Commit Is Rejected
 When Its Fuel Cost Exceeds Available Fuel, Debited At Commit Never At
 Resolve"), the preview of that same order SHALL instead be **served in
@@ -148,8 +150,10 @@ full** — the complete solve, with its affordability indication reading
 false — because the preview exists precisely so a player can discover that
 a target is out of reach before committing, and a rejection would leave
 that player with no arrival time, no delta-v, and no fuel figure to plan a
-refuel or a nearer target against. This is the only divergence between the
-two paths' rejection sets; every other rejection below is shared.
+refuel or a nearer target against. This is the first of the two
+divergences between the two paths' rejection sets; the second is the
+held-movement-channel case described below. Every other rejection below is
+shared.
 
 In particular the preview SHALL be served for a fleet that is currently
 burning — re-targeting mid-flight is an ordinary commit against the fleet's
@@ -157,8 +161,7 @@ live tangent (`space-kinematics`'s "Departure Is Tangent to the Ship's Actual Mo
 and it is the highest-stakes order in the game, so forbidding its preview
 while permitting its commit would remove the quote from the decision that
 most needs one. It SHALL be rejected, with the commit path's own named
-reason, where the commit path rejects: a fleet in lane transit; a movement
-channel already claimed by a non-burn verb (a running mine); an ambiguous
+reason, where the commit path rejects: a fleet in lane transit; an ambiguous
 or empty target; an out-of-bounds commanded acceleration; a target body
 absent from this system's body table; and a target whose solved curve
 violates `space.BuildCurve`'s endpoint-clearance guard, which is the sole
@@ -171,6 +174,27 @@ guard, on the same code path and with the same observable reason as a
 commit, and a preview that short-circuited before the solve would
 reintroduce exactly the identity special case `fleet.ErrCoreDestination`'s
 deletion removed.
+
+A movement channel already claimed by a **non-burn** verb — a running mine —
+SHALL refuse the preview, and this refusal SHALL NOT be specified as
+mirroring a commit rejection, **because the commit path has no such
+rejection**. `OrderTo`'s re-task branch cancels whatever holds the fleet's
+movement-channel slot without inspecting its type, so a burn ordered against
+a mining fleet is accepted today and the running mine is cancelled with no
+warning and no compensation — an open production defect recorded in
+`docs/plans/continous_space/handoffs/defect-burn-cancels-running-mine.md`,
+whose resolution (reject, warn, or forfeit the run) is an undecided gameplay
+question. This change is additive and SHALL NOT alter that behaviour, and
+SHALL NOT be read as requiring the commit to reject. The preview therefore
+carries **its own named refusal reason**, which is not required to match any
+commit reason, and — being a pure read — SHALL cancel nothing, SHALL leave
+the running mine action running and its slot held, and SHALL write nothing:
+a preview cannot mirror a commit that proceeds by cancelling the run, since
+a preview never writes. Refusing rather than quoting is the conservative
+choice while the defect stands, so the preview never hands a player a quote
+for an order whose commit would silently destroy a committed run. The
+parity clause above SHALL NOT be extended to this case unless and until a
+corrective change makes the commit path reject.
 
 The ownership check "Fleet Command Endpoints Are Restricted to the Owning
 Corporation" defines SHALL run **before** the settlement seam described
@@ -233,12 +257,24 @@ of a fleet with nothing due SHALL write nothing at all.
   tangent at the request's world time, and the running burn is unchanged
 
 #### Scenario: A preview is refused wherever the commit would be refused
-- **WHEN** a preview is requested for a fleet in lane transit, or for a
-  fleet whose movement channel is claimed by a running mine, or with an
+- **WHEN** a preview is requested for a fleet in lane transit, or with an
   ambiguous target, an empty target, an out-of-bounds commanded
   acceleration, or a body id absent from the system's body table
 - **THEN** the request is rejected with the same named reason the commit
   path uses for that case, and no solve result is returned
+
+#### Scenario: A preview against a fleet mid-mine is refused, cancels nothing, and writes nothing
+- **GIVEN** a fleet whose movement channel is held by a running mine action
+- **WHEN** a preview is requested for any target
+- **THEN** the request is refused with the preview's own named reason and no
+  solve result is returned
+- **AND** the running mine action is still running, its movement-channel
+  slot is still held, and the fleet's stored record is byte-identical before
+  and after the request
+- **AND** the refusal is deliberately NOT asserted to match a commit
+  rejection: a burn committed from that same state is accepted today and
+  cancels the mine run, an open defect this additive change leaves exactly
+  as it is
 
 #### Scenario: A preview reports an unaffordable target as such
 - **WHEN** a preview's solved fuel cost exceeds the fleet's currently held
