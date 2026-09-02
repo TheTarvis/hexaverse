@@ -53,6 +53,13 @@ renderer half's atomic-swap risk profile demands.
   `orbitElements.periodMs`/`radius` — which would be a mirror of
   `space.StationKeepRate` and the `FuelParams.DeltaVPerTon` conversion, both
   rule-bearing.
+- **ADD the simulation clock's `scale` beside the `worldTime`** both the
+  interior read and the fleet reads already serve. Every position
+  `build-production-space-view` draws is a live extrapolation of world time on
+  the client, and the client's clock (`frontend/hooks/use-world-time.ts`)
+  currently projects at a hardcoded default of 1 while `WORLD_TIME_SCALE` is a
+  real server flag and `common.WorldTime` already exposes `Scale()`. One float
+  on reads that already carry the instant it scales; see design.md Decision 7.
 - **Widen the fleet command endpoints' ownership check** to cover
   `/orders/preview`: unchecked, it would disclose a foreign fleet's live
   position, velocity, roster-derived acceleration and held fuel through the
@@ -62,11 +69,12 @@ renderer half's atomic-swap risk profile demands.
 
 - **Affected specs**: `system-interior` (*Interior Read Endpoint*),
   `fleet-movement` (*Fleet Command Endpoints Are Restricted to the Owning
-  Corporation*, plus three new requirements).
+  Corporation*, plus four new requirements).
 - **Affected code**: `backend/system` (`fog.go`'s `fogFeatureDTO`, `gates.go`'s
   `LaneGate`, `handler.go`), `backend/fleet` (`service.go`'s `OrderTo` solve
-  extraction, `handler.go`'s new route and DTO fields), `backend/space` (read
-  only — nothing in it changes).
+  extraction, `handler.go`'s new route and DTO fields), `backend/common`
+  (`WorldTime.Scale()`, read only), `backend/space` (read only — nothing in it
+  changes).
 - **Sequencing**: archives after `add-fuel-as-cargo` and
   `add-stationkeep-hold-verb` (its `fleet-movement` MODIFIED body is authored
   against their post-archive text) and before `build-production-space-view`.

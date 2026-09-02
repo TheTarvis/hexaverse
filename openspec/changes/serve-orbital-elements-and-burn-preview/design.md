@@ -229,6 +229,104 @@ halves fail:
 sends back exactly the previewed cost as its cap is not rejected by its own
 quote.
 
+### Decision 7: The world-time scale rides the wire with the world time
+
+**Taken.** The interior read and the fleet read serve the simulation clock's
+**scale** (world-milliseconds advanced per wall-millisecond) alongside the
+`worldTime` they already serve.
+
+**Why it needed deciding, and why here.** `build-production-space-view`'s whole
+animation model — bodies, gates, parks, drifts, and a burning fleet's Bézier
+parameter `u = (t − departMs)/(arriveMs − departMs)` — is a function of *live
+world time*, extrapolated on the client between polls. The client's existing
+clock (`frontend/hooks/use-world-time.ts`) anchors a server reading to the wall
+clock and projects forward at a `scale` option that **defaults to 1**, with a
+comment reading "a future time-warped world would ship its scale in the read
+and pass it here." That world is not hypothetical: `config.ServiceConfig.
+WorldTimeScale` is a real server flag (`-WORLD_TIME_SCALE`), documented as the
+knob that makes dev and test worlds run fast, and `common.WorldTime` already
+exposes `Scale()`. It happens to be 1 everywhere today only because nothing
+sets it.
+
+Under the lattice this was nearly harmless: positions quantized to a cell, so a
+mis-scaled clock produced a body that stepped late. In continuous space a
+mis-scaled clock makes every orbit and every burn mark visibly wrong, drifting
+further from truth the longer between polls — and the burn mark's `u` would
+reach 1 at the wrong wall instant, so a ship would appear to arrive early or
+never. It is a one-float addition on a read that already carries `worldTime`,
+and this is the additive change; discovering it in the renderer half means
+either a wire change in a change that promised none, or a hardcoded `1` nobody
+revisits.
+
+**Alternatives considered.**
+
+- *Leave it at a hardcoded client `1` and record the invariant.* Rejected as
+  the cheaper-looking option that costs more later: it makes `WORLD_TIME_SCALE`
+  a flag that silently corrupts the only playable view, with no failing test
+  anywhere, which is this chain's catalogued failure shape.
+- *Derive the scale client-side from two successive readings.* Rejected: it is
+  a rule-bearing value inferred from noisy samples, and it is wrong for exactly
+  as long as it takes to collect the second sample — the first frames after
+  every navigation.
+- *Serve it on a separate `GET /v1/world-clock`.* Rejected: a third read on a
+  view that already fans in two, for one number that every existing read
+  already has in hand at serialization time.
+
+### Decision 8: Do not add the non-regression scenarios the successor must delete
+
+**Taken, and it constrains this change's `system-interior` delta text.** The
+lattice non-regression assertions this change wants — that `orbit` still means
+the lattice orbit, that `footprint`/`band`/`live`/`cell` are untouched — belong
+in this change's **contract suite** (tasks 1.2, 2.4), not as new `#### Scenario:`
+blocks on *Interior Read Endpoint*.
+
+**Why, measured rather than argued — and the measurement corrected.** An
+earlier draft of this decision claimed `openspec validate --strict` rejects a
+MODIFIED block that omits a scenario the current spec carries. **That is
+false**, and it was verified false: with this change archived, `openspec
+validate build-production-space-view --strict` reports `Change
+'build-production-space-view' is valid` and exits 0. The gate is the
+**archiver**, not the validator. Rehearsed on a scratch copy — archive
+`add-stationkeep-hold-verb`, then this change, then archive
+`build-production-space-view` — the archive aborts with
+
+    system-interior MODIFIED failed for header "### Requirement: Interior Read
+    Endpoint" - current spec contains scenario(s) not present in the modified
+    block: "Pre-existing wire fields are unchanged", "The lattice orbit key
+    keeps its lattice meaning". Refresh the change spec before archiving to
+    avoid dropping scenarios.
+    Aborted. No files were changed.
+
+The conclusion is unchanged and the direction of the error is the safe one —
+it fails loudly and writes nothing, rather than dropping the scenarios
+silently. But it fails **at archive time**, after review and after
+implementation, which is the expensive moment to discover it. So every
+non-regression scenario this change adds becomes a scenario the very next
+change is **forbidden** to drop by a MODIFIED delta. One of those two
+(*Pre-existing wire fields are unchanged*) is already live and cannot be
+avoided; the other (*The lattice orbit key keeps its lattice meaning*) is one
+this change would create purely to have the successor destroy it, one change
+later, at the cost of forcing a heavier retirement mechanic.
+
+**Alternatives considered.**
+
+- *Keep both scenarios and let the successor retire the requirement.* This is
+  what the successor now does regardless (its design.md Decision 10 — a
+  REMOVED + re-ADDED pair, not a rename), because the pre-existing scenario
+  forces it. Dropping this change's own added scenario does not remove that
+  need — it only stops making it worse, and keeps this change's delta honest
+  about what is a durable behavioural rule (the element set is served; the star
+  carries none) versus what is a one-change transition guard.
+
+**Applied.** The scenario *The lattice orbit key keeps its lattice meaning* is
+**not** in this change's `system-interior` delta. Its assertion is carried by
+`tasks.md` 1.2 as a contract test and by the requirement prose that names the
+key collision, which is the durable half.
+- *Assert the non-regression in the requirement prose without a scenario.*
+  Taken for the prose that names the key collision, which is a durable rule
+  about what `orbit` and `orbitElements` mean. The *scenario* is the part that
+  becomes a liability.
+
 ## Risks / Trade-offs
 
 - **This change is dead code on arrival.** Nothing calls the preview endpoint,
@@ -239,6 +337,20 @@ quote.
   successor, and that `build-production-space-view`'s tasks call each of these
   three surfaces explicitly; the risk is real and is accepted for the SDET
   ordering benefit the split buys.
+- **The preview endpoint is not the cheap pure computation it looks like.**
+  One preview costs: a fleet read, a `settleIfDue` pass (a write when an
+  arrival is due), a **body-table read** to resolve the target and the
+  departure state, one `space.SolveBurn`, and then the stranding evaluation —
+  which `decisions.md`'s 2026-09-02 correction records as an **N-solve scan**,
+  one `SolveBurn` per candidate station and lane-gate body in the destination
+  system, N bounded by that system's body count. `build-production-space-view`
+  requests a preview on every selection change *and* refreshes it on a timer
+  while a selection is held, per acting fleet, per player. The cost model is
+  recorded here so the refresh interval that change leaves open is chosen
+  against a real number rather than an assumed one, and so a future
+  optimization (memoize the stranding scan across refreshes of an unchanged
+  selection; recompute it only when the fleet's fuel or system changes) is a
+  known lever rather than a rediscovery.
 - **Response size grows.** Six extra numbers per body, for a system with roughly
   five to seven planets, their moons, belts, a station, and a gate per lane. On
   the order of a kilobyte; measured against saving a read per rendered frame,
@@ -250,6 +362,12 @@ quote.
 - **A quoted cap can reject a commit the player wanted.** Mitigated by making it
   opt-in, by rejecting only on strictly-greater, and by returning the true cost
   so the client can re-quote in flow rather than bouncing the player out.
+
+- **The world-clock scale is served before anything varies it.** `scale` is 1
+  on every world today, so the field ships correct-and-inert. That is the
+  point: the alternative is a client that hardcodes 1, and a
+  `WORLD_TIME_SCALE` flag that then silently corrupts the only playable view
+  with no failing test anywhere (Decision 7).
 
 ## Migration Plan
 
@@ -267,8 +385,11 @@ introduce), and before `build-production-space-view`.
 - **The preview's refresh cadence** is the client's to choose and is specified
   qualitatively in `build-production-space-view`, not here. What is unresolved
   is whether a busy system's preview traffic warrants a server-side rate limit
-  on `/orders/preview`; it is a pure-computation endpoint with no write in the
-  common path, so nothing here depends on the answer.
+  on `/orders/preview`. Note that an earlier draft of this line called it "a
+  pure-computation endpoint with no write in the common path"; per the cost
+  model in Risks above, it is neither — it reads the body table, may write a
+  settlement, and runs an N-solve stranding scan. Nothing in *this* change
+  depends on the answer, but the sibling change's refresh cadence does.
 - **Whether the dry instant joins the upkeep rate on the wire** (Decision 4's
   deferred half), which depends on whether a "dry in 4:12" readout is wanted
   once the hold control is in a player's hands.

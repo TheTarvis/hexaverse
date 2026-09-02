@@ -32,6 +32,13 @@ meaning, and this response's separate `space` key is already occupied by the
 body's resolved continuous position. Serving the element set under either name
 would redefine a field a caller already reads.
 
+This response SHALL additionally carry the simulation clock's **scale** — the
+number of world-milliseconds the world advances per wall-clock millisecond —
+alongside the `worldTime` it already serves, so a client extrapolating live
+world time between reads projects at the world's real rate rather than at an
+assumed one. The scale SHALL be the scale of the same clock the response's
+`worldTime` was read from.
+
 The star SHALL carry no `orbitElements` (it is parentless and positioned at
 the origin). Every other body reaching this response carries a complete
 element set by construction — a body whose stored element set is missing or
@@ -88,13 +95,12 @@ Its Incompleteness Is Loud") — so there is no partially-populated
   interior
 - **THEN** the star's response entry carries no `orbitElements` key
 
-#### Scenario: The lattice orbit key keeps its lattice meaning
+#### Scenario: The read carries the world clock's scale alongside its world time
 - **WHEN** an authenticated requester reads a materialized system's
-  interior for a body that carries a lattice orbit
-- **THEN** that body's `orbit` key still carries the lattice object
-  (`ring`, `angle0`, `period`, `dir`) and not the continuous element set
-- **AND** its continuous element set is reachable only under
-  `orbitElements`
+  interior on a world whose simulation clock runs at a scale other than 1
+- **THEN** the response carries that clock's scale alongside its
+  `worldTime`, so a client can project live world time at the world's own
+  rate
 
 #### Scenario: A body served without a resolvable continuous position is still element-complete
 - **WHEN** a body's continuous position could not be resolved for this read

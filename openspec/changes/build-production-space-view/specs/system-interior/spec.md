@@ -1,6 +1,23 @@
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: Interior Read Endpoint
+**Reason**: The requirement's body is built around the polar-lattice placement
+fields this change deletes from the response, and it carries a scenario —
+*Pre-existing wire fields are unchanged* — that asserts those fields survive.
+A `## MODIFIED` block cannot shed a scenario the current spec carries:
+`openspec validate --strict` passes such a delta, but `openspec archive`
+refuses it outright ("current spec contains scenario(s) not present in the
+modified block ... Aborted. No files were changed."). The endpoint is
+therefore retired here and re-added below under a name that describes what it
+now serves, carrying every scenario that survives the removal.
+**Migration**: None. The endpoint, its route, and its `404` behaviour are
+unchanged; it is re-added immediately below as *Interior Read Serves
+Continuous Bodies*, and no caller of the surviving fields is affected. The
+lattice fields' own removal is the change this retirement exists to express.
+
+## ADDED Requirements
+
+### Requirement: Interior Read Serves Continuous Bodies
 The system SHALL serve `GET /v1/systems/:systemId`, returning the system's
 radius, character, star class, current world time, every body (including
 each lane-gate body, unfiltered by any charted-knowledge gate — see "Bodies
@@ -21,6 +38,12 @@ omitted from the response entirely rather than served partially (see
 Than Failing", "A Feature Omission Cascades to a Fixpoint Through the Parent
 Chain", and "A Spliced Body Is Complete or Omitted, and Its Incompleteness Is
 Loud") — so there is no partially-populated `orbitElements` case on this wire.
+
+This response SHALL carry the simulation clock's **scale** — the number of
+world-milliseconds the world advances per wall-clock millisecond — alongside
+the `worldTime` it serves, taken from the same clock, so a client
+extrapolating live world time between reads projects at the world's own rate
+rather than at an assumed rate of 1.
 
 This response SHALL NOT carry any polar-lattice placement field. Specifically,
 a body SHALL carry no `footprint`, no `orbit` object (the lattice orbit
@@ -74,6 +97,13 @@ with them.
 - **WHEN** an authenticated requester reads a materialized system's
   interior
 - **THEN** the star's response entry carries no `orbitElements` key
+
+#### Scenario: The read carries the world clock's scale alongside its world time
+- **WHEN** an authenticated requester reads a materialized system's
+  interior on a world whose simulation clock runs at a scale other than 1
+- **THEN** the response carries that clock's scale alongside its
+  `worldTime`, so a client can project live world time at the world's own
+  rate
 
 #### Scenario: A body served without a resolvable continuous position is still element-complete
 - **WHEN** a body's continuous position could not be resolved for this read

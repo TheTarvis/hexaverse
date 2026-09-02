@@ -15,12 +15,19 @@ reason.
       carries no orbital element set", "A body served without a resolvable
       continuous position is still element-complete")
 - [ ] 1.2 Interior-read non-regression contract: the lattice `orbit` key still
-      carries `{ring, angle0, period, dir}`, and `footprint`, `band`, `live`,
-      `parentId`, `fixed`, per-feature `asOf`, and a gate's `cell` are all
-      still present and unchanged (`system-interior`: "The lattice orbit key
-      keeps its lattice meaning", "Pre-existing wire fields are unchanged", "A
-      materialized system's read carries every body's continuous position and
-      size", "Unknown or ungenerated system", "No live galaxy")
+      carries `{ring, angle0, period, dir}` and is NOT the continuous element
+      set, and `footprint`, `band`, `live`, `parentId`, `fixed`, per-feature
+      `asOf`, and a gate's `cell` are all still present and unchanged. This
+      assertion lives here, in the contract suite, and deliberately NOT as a
+      `#### Scenario:` on *Interior Read Endpoint* — it is a one-change
+      transition guard that `build-production-space-view` must then destroy,
+      and a scenario it adds is a scenario that change's archive is forbidden
+      to drop (design.md Decision 8). The durable half of the rule — that
+      `orbit` and `orbitElements` are distinct keys with distinct meanings —
+      is carried by the requirement's prose instead (`system-interior`:
+      "Pre-existing wire fields are unchanged", "A materialized system's read
+      carries every body's continuous position and size", "Unknown or
+      ungenerated system", "No live galaxy")
 - [ ] 1.3 Preview contract, part 1 — parity and settlement: an identical
       preview and commit from the same fleet state and world time return
       identical control points, depart/arrive times, delta-v, and fuel cost;
@@ -58,7 +65,14 @@ reason.
       scenarios unchanged (`fleet-movement`: "A foreign corp cannot preview
       another corp's fleet's burn", "A corpless requester is rejected the same
       way", and the nine sibling endpoint scenarios)
-- [ ] 1.10 Record a golden wire sample of one materialized interior read and
+- [ ] 1.10 World-clock scale contract: the interior read and every fleet read
+      carry the simulation clock's scale alongside the `worldTime` they already
+      serve, on a world configured with a scale other than 1 and on a world
+      configured at exactly 1 (`system-interior`: "The read carries the world
+      clock's scale alongside its world time"; `fleet-movement`: "A fleet read
+      carries the world clock's scale", "The scale is served even on an
+      unwarped world")
+- [ ] 1.11 Record a golden wire sample of one materialized interior read and
       one preview response under the backend test tree, so
       `build-production-space-view`'s TypeScript types are written against a
       real payload rather than a paraphrase of this document
@@ -83,13 +97,19 @@ reason.
 - [ ] 2.4 Leave `Orbit`, `ParentId`, `Fixed`, `Footprint`, `Band`, `Live`,
       `AsOf`, and `LaneGate.Cell` untouched, and add a DTO comment naming
       `build-production-space-view` as the change that removes them
-      (`system-interior`: "Pre-existing wire fields are unchanged", "The lattice
-      orbit key keeps its lattice meaning")
+      (`system-interior`: "Pre-existing wire fields are unchanged"; the lattice
+      `orbit` key's surviving meaning is pinned by task 1.2's contract test, not
+      by a scenario — design.md Decision 8)
 - [ ] 2.5 Serve the element set even when the body's continuous position could
       not be resolved: elements are stored data, position is a resolution
       result (`system-interior`: "A body served without a resolvable continuous
       position is still element-complete")
-- [ ] 2.6 Update the Go interior-read handler tests and any recorded response
+- [ ] 2.6 Serve `common.WorldTime.Scale()` on the interior read alongside the
+      `worldTime` the response already carries, read from the same clock that
+      produced it, and unconditionally rather than only when it differs from 1
+      (`system-interior`: "The read carries the world clock's scale alongside
+      its world time")
+- [ ] 2.7 Update the Go interior-read handler tests and any recorded response
       shape they assert; re-record rather than relax
 
 ## 3. Burn order preview
@@ -164,7 +184,11 @@ reason.
       foreign fleet's read carries no rate")
 - [ ] 5.3 Confirm the derivation is read-only: no settle, no debit, no restamp
       (`fleet-movement`: "Reading the rate changes nothing")
-- [ ] 5.4 Serve the value in tons and never in delta-v, and add no
+- [ ] 5.4 Serve `common.WorldTime.Scale()` on `GET /v1/fleets/:fleetId` and on
+      every fleet list read, from the same clock the response's `worldTime` is
+      read from, unconditionally (`fleet-movement`: "A fleet read carries the
+      world clock's scale", "The scale is served even on an unwarped world")
+- [ ] 5.5 Serve the value in tons and never in delta-v, and add no
       `DeltaVPerTon` field to any DTO, so the conversion has no client-side
       route (`fleet-movement`: "Fleet Read Serves the Station-Keeping Upkeep
       Rate in Fuel Tons")

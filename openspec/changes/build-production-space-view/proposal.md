@@ -73,14 +73,18 @@ each other, or the scan surface being deferred out of the chain a second time.
   confirmed-absent precedents for this exact mechanic). The rehearsal of that
   mechanic on a copy of the tree is a task in this change, not an assertion in
   its design doc.
-- **MODIFIED `system-interior`'s *Interior Read Endpoint*: remove every
-  polar-lattice field from the wire.** The additivity clause is withdrawn, and
-  a body loses `footprint`, its lattice `orbit` object (`ring`/`angle0`/
-  `period`/`dir`), its top-level `parentId`, `fixed`, `band`, `live`, and
-  `asOf`; a lane-gate body loses `cell`. The continuous `orbitElements` set
-  that `serve-orbital-elements-and-burn-preview` added stays. **This is what
+- **REMOVED `system-interior`'s *Interior Read Endpoint*, re-ADDED as *Interior
+  Read Serves Continuous Bodies*: remove every polar-lattice field from the
+  wire.** The additivity clause is withdrawn, and a body loses `footprint`, its
+  lattice `orbit` object (`ring`/`angle0`/`period`/`dir`), its top-level
+  `parentId`, `fixed`, `band`, `live`, and `asOf`; a lane-gate body loses
+  `cell`. The continuous `orbitElements` set and the world-clock `scale` that
+  `serve-orbital-elements-and-burn-preview` added both stay. **This is what
   unblocks link 9**: while this response promised lattice fields, a caller
-  could still be reading them.
+  could still be reading them. It is a retirement-and-re-add rather than a
+  MODIFIED block because two of the old requirement's scenarios assert the
+  removed fields survive, and `openspec archive` refuses a MODIFIED block that
+  sheds a scenario the current spec carries (design.md Decision 10).
 - **MODIFIED `galaxy-view`'s *Jump Commit*** to cite `docked-fleet-actions`'s
   rejection-copy requirement instead of `board-view`'s. The citation sits
   inside a requirement body, so it is delta-reachable and is fixed now rather
@@ -126,13 +130,22 @@ each other, or the scan surface being deferred out of the chain a second time.
   `comm -12`, case-sensitively, so Go's `ArcParam`/`Speed`/`StateAt` against an
   idiomatic TypeScript `arcParam`/`speed`/`stateAt` collide zero times and the
   check passes. Since this change is the first to put any TypeScript under
-  `frontend/lib/space`, it is the change that must make that guard real.
+  `frontend/lib/space`, it is the change that must make that guard real. The
+  fix comes in two halves: **MODIFIED `cross-stack-determinism`'s *Shared
+  Board Math Is Pinned By a Cross-Language Golden Fixture*** to say the
+  comparison and the `sharedNames` match are case-insensitive and that a
+  collision is resolved by renaming the TypeScript, and then the script change
+  itself. Widening the requirement first is deliberate: a check stricter than
+  the requirement it enforces is one a future agent can "fix" back while
+  following the spec.
 
 ## Impact
 
 - **Affected specs**: `system-space-view` (new), `docked-fleet-actions`
   (new), `board-view` (retired — no delta in this change; hand-deleted
-  post-archive), `system-interior`, `galaxy-view`, `fleet-roster`.
+  post-archive), `system-interior` (*Interior Read Endpoint* REMOVED, re-ADDED
+  as *Interior Read Serves Continuous Bodies*), `galaxy-view`, `fleet-roster`,
+  `cross-stack-determinism`.
 - **Affected code**: `frontend/components/board/*` is replaced by new
   `frontend/components/space/*` + `frontend/lib/space/*` (render math lives
   under `lib/space` specifically so `check-mirror-map.sh`'s anti-mirror pass
@@ -145,10 +158,13 @@ each other, or the scan surface being deferred out of the chain a second time.
   and `board-camera.spec.ts` are deleted and the four remaining suites that
   use board test ids are rewritten; `backend/system` loses the lattice fields
   from the interior read DTO; `.claude/scripts/check-mirror-map.sh` gains a
-  case-insensitive collision comparison.
+  case-insensitive collision comparison; `frontend/lib/services/fleet-service.ts`
+  gains `preview`, `hold` and `release` with hooks over them; and
+  `frontend/hooks/use-board-realtime.ts` is deleted.
 - **Sequencing**: archives after `serve-orbital-elements-and-burn-preview`
-  (this change's `system-interior` MODIFIED body is authored against that
-  change's post-archive text) and before `delete-the-lattice`.
+  (this change's `system-interior` re-ADDED body is authored against that
+  change's post-archive text, including the `orbitElements` set and the
+  world-clock scale) and before `delete-the-lattice`.
 
 ## Exit criterion
 

@@ -103,6 +103,29 @@ Golden Fixture*, scenario *A Go-sole-authority capability's mirror map runs in
 anti-mirror mode*), which already forbids the mirror; only the check's
 comparison was too weak to enforce it. No spec delta restates it.
 
+**The case-insensitivity fix has a cost that must be paid deliberately, not
+discovered.** `backend/space` exports, among ~50 non-test names, `Position`,
+`Velocity`, `Length`, `Scale`, `Add`, `Sub`, `Dot`, `Cross`, `Normalize`,
+`Point`, `Tangent`, `Progress`, `Speed`, `PhaseAt`, `LocalPosition`,
+`LocalVelocity`, `ArcParam`, `ArcTable` and `StateAt`. Go's exported style is
+TitleCase and TypeScript's is camelCase **for the same trivial helpers**, so a
+case-insensitive comparison collides on `add`, `sub`, `dot`, `cross`,
+`normalize`, `length`, `scale`, `point` — benign vector arithmetic — as readily
+as on `arcParam`. A check that fires on `vecAdd`'s honest name is a check
+someone widens `sharedNames` to silence, and `sharedNames` is the one door the
+requirement says stays empty by default.
+
+**So the naming rule is part of this decision, not a follow-on detail.** Every
+export in `frontend/lib/space` is **subject-prefixed and draw-scoped** —
+`drawOrbitPosition`, `drawParkPosition`, `drawDriftPosition`, `bezierPointAt`,
+`vecAdd`, `vecSub`, `vecScale`, `projectToScreen` — chosen so that no name,
+compared case-insensitively, equals any `backend/space` name, and
+`fixtures/space/mirror-map.json`'s `sharedNames` stays **empty**. A collision
+that forces an allowlist entry is treated as a signal to rename the TypeScript,
+not to widen the allowlist. This also has the incidental benefit that every
+export reads as "this is for drawing", which is the constraint the requirement
+is really enforcing.
+
 *Rejected alternative:* leave the check as-is and rely on review. Rejected —
 this change is the first to put any TypeScript under `frontend/lib/space`, so
 it is the first change for which the check has ever had anything to compare,
@@ -348,10 +371,284 @@ confirmed absent from `openspec/specs/` today.
 
 An earlier draft of this document *asserted* that the mechanic "was rehearsed
 on a copy" while no task in the change recorded doing so. The rehearsal is now
-a task (section 11), performed on a copy of the tree before the real archive,
+a task (section 12), performed on a copy of the tree before the real archive,
 and it checks three things `--strict` does not: that the archive succeeds with
 a capability directory that has no delta, that no MODIFIED body silently lost a
 scenario, and that no surviving spec is left citing `board-view`.
+
+### Decision 10: The interior read is RETIRED and re-ADDED under a new name, not MODIFIED
+
+**Taken, after rehearsal, and this is a correction to the delta shape rather
+than to any behaviour.** `system-interior`'s *Interior Read Endpoint* is
+**REMOVED** by this change and re-ADDED, in the same delta file, as *Interior
+Read Serves Continuous Bodies*, carrying the eight scenarios that survive.
+
+**Why the MODIFIED form cannot work, and which tool actually stops it.** An
+earlier draft used a MODIFIED block that deliberately dropped two scenarios —
+*Pre-existing wire fields are unchanged* (live today) and *The lattice orbit
+key keeps its lattice meaning* (added by
+`serve-orbital-elements-and-burn-preview`) — on the grounds that the archiver's
+silent-drop bug is what the rehearsal task exists to catch. That premise is
+wrong, but **so was this document's first correction of it**, which claimed
+`openspec validate --strict` refuses the drop. It does not. Measured, on a
+scratch copy with the predecessors archived first:
+
+    $ openspec validate build-production-space-view --strict
+    Change 'build-production-space-view' is valid          # exit 0
+
+The **archiver** is the gate:
+
+    $ openspec archive build-production-space-view --yes
+    system-interior MODIFIED failed for header "### Requirement: Interior Read
+    Endpoint" - current spec contains scenario(s) not present in the modified
+    block: "Pre-existing wire fields are unchanged", "The lattice orbit key
+    keeps its lattice meaning". Refresh the change spec before archiving to
+    avoid dropping scenarios.
+    Aborted. No files were changed.
+
+(That measurement was taken against the MODIFIED form with the sibling change
+still adding *The lattice orbit key keeps its lattice meaning*. The sibling has
+since dropped that scenario per its own Decision 8, so only *Pre-existing wire
+fields are unchanged* now forces the retirement — one is enough.)
+
+So the change as drafted validated cleanly and could never have been archived
+— and the failure is loud and safe (nothing is written), but it lands at
+archive time, after review and after implementation. `openspec validate
+--strict` is **not** evidence that a MODIFIED delta will archive; only a
+rehearsed archive is. The one earlier claim that this change "does not even
+validate today" was false and is withdrawn.
+
+**Why REMOVED + ADDED, and not the alternatives.**
+
+- *Keep both scenario headings and rewrite their bodies to assert the removal.*
+  Rejected. *Pre-existing wire fields are unchanged* would then be a scenario
+  whose title asserts the exact opposite of its steps. The archiver is
+  satisfied and every future reader is misled — and the title, not the body, is
+  what a `grep` and a rehearsal check match on.
+- *`## RENAMED Requirements` plus a MODIFIED block.* Rejected as unrehearsed:
+  the interaction between a rename and a same-change body replacement is not
+  something this change should be the first to discover, and the REMOVED +
+  ADDED form is already the repository's precedent — `replace-observation-with-
+  sightings` moved four requirements out of `observation-fog-and-scan` by
+  exactly this mechanism.
+- *Leave the two lattice scenarios standing, asserting fields that no longer
+  exist.* Rejected outright: that is the link-9 blocker this change exists to
+  clear, restated inside the spec.
+
+**Rehearsed end to end, in the same scratch copy**: with the REMOVED + ADDED
+form the change validates `--strict`, archives cleanly (`+ 46, ~ 4, - 1`),
+`board-view` retires with no delta of its own, the two new capabilities land
+with 30 and 15 requirements, and the surviving requirement carries exactly its
+eight intended scenarios. One cosmetic consequence: a re-ADDed requirement is
+appended at the **end** of `openspec/specs/system-interior/spec.md` rather than
+kept in place, which is a reading-order nuisance and nothing more.
+
+**Cheaper still, in the sibling change — and now done:** its design.md
+Decision 8 records that it does not add *The lattice orbit key keeps its
+lattice meaning* as a scenario at all, since it existed only to be destroyed
+here; its assertion lives in that change's contract suite (tasks 1.2, 2.4)
+instead. That reduces the retirement to one forced scenario instead of two; it
+does not remove the need for this decision, because *Pre-existing wire fields
+are unchanged* is already live and this change must still shed it.
+
+### Decision 11: The backend field removal is the LAST implementation step, not the first
+
+**Taken, and applied.** Dropping the lattice fields from
+`system.fogFeatureDTO` and `system.LaneGate` now runs as `tasks.md`
+**section 9**, immediately before section 10's deletions, after the new view
+renders, previews, commands, and passes its component suite. The frontend
+sections it used to precede are renumbered 1–8.
+
+**Why the drafted order is wrong.** Task 9.1 removes `footprint`, `orbit`,
+`band`, `live`, `asOf` and a gate's `cell` from the wire. Every one of those is
+read by `frontend/components/board/*`, which task 10.1 did not delete until
+roughly ninety tasks later. Between those two points the only playable view is
+broken, its component suite is red, and all six e2e suites that drive it are
+red — so for the whole build of the replacement, the repository's own quality
+gate carries no signal, and a genuine regression introduced anywhere in
+sections 1–8 is indistinguishable from the self-inflicted breakage.
+
+Nothing in sections 1–8 requires the fields to be **absent**. They require
+`orbitElements`, the preview endpoint, the upkeep rate, and the world-clock
+scale to be **present**, and the sibling change already delivers all four
+additively. The removal's only
+consumer is link 9.
+
+**Alternatives considered.**
+
+- *Keep the removal first, to force the new view not to read the old fields.*
+  Rejected. The forcing function is already stronger and cheaper: the new view
+  is written from `system-space-view`'s own requirements, its types are
+  generated against the sibling change's recorded wire sample (task 1.11
+  there), and task 9.4's `grep` for surviving readers is what actually proves
+  the removal safe.
+- *Delete `components/board/` first, so nothing reads the fields.* Rejected:
+  that deletes the only playable view before its replacement exists, which is
+  the same window with a different cause and no partial fallback at all.
+
+**This does not soften the atomic swap.** There is still no flag, no dual path,
+and no coexistence in what ships. The ordering is about the length of the
+red window *inside the change*, not about what the change delivers.
+
+### Decision 12: Two of the "usable without the interior read" commands are not, and the seam is drawn here
+
+**Taken, and it needs matching spec text the spec writer must supply (proposed
+below).** Of the eight commands *System Space View Route and Data Fan-In*
+promises stay invokable when the interior read fails — mine, sell, refuel,
+hold, release, cut-drive, stop, jump — six genuinely are, and **two are not**:
+
+- **Mine.** *Mine Offer on the Docked Fleet* requires "a feature carrying at
+  least one visible resource" and a picker "limited to the docked feature's
+  visible resource kinds." Resource kinds exist on exactly one wire surface,
+  `fogFeatureDTO.Resources`, on the interior read. With that read failed there
+  is no kind list, so the offer cannot be rendered at all — it is not
+  "invokable," it is absent.
+- **Jump.** *Jump Commit* resolves the lane id from "this system's own interior
+  read's gate body … when the fleet is in this system, and the fleet's own read
+  … otherwise." For a fleet in the open system — the common case — the
+  specified source is the failed read.
+
+**The resolution, and why this shape.** Jump collapses to **one** source: the
+fleet's own read (`fleet-movement`'s *Fleet Read Serves the Attached Gate's
+Lane Id*), unconditionally. It is corp-scoped, it settles, it is already
+fetched by this view, it carries the id for a fleet attached to a gate in *any*
+system, and it survives an interior failure. The interior read's gate body is a
+redundant second source for the same value — and deriving gate identity from a
+served list rather than from the acting fleet is the precise shape that took
+four attempts to get right in `replace-observation-with-sightings`
+(chain.md's *Restoring traversability took four attempts*). One source, always.
+
+Mine is narrowed honestly rather than propped up: the offer depends on the
+interior read, and the fan-in's promise is corrected to say so, rather than
+inventing a cached-snapshot fallback whose staleness would be a second source
+of truth about what a body contains.
+
+**Alternatives considered.**
+
+- *Serve resource kinds on the fleet read for the docked host.* Rejected for
+  this change: it is a new wire field, so it belongs in the sibling additive
+  change or nowhere, and it duplicates a body's composition onto a second
+  surface — two definitions of one payload, which the contract rule forbids.
+- *Fall back to the last successful interior snapshot.* Rejected: React Query
+  already retains the last successful data, so "the read failed" and "we have
+  stale kinds" are different states, and specifying mine against the stale one
+  means specifying how stale is too stale, for a verb whose commit the server
+  validates anyway.
+
+**Delta text, now placed** (`system-space-view`'s *System Space View Route and
+Data Fan-In*, replacing the scenario *A failed interior read leaves the
+docked-fleet commands usable* and the bullet above it):
+
+> - IF the interior read fails, THEN the view SHALL show an error state in the
+>   canvas region — carrying the underlying error message when one is
+>   available — and SHALL offer a retry affordance that refetches the interior.
+>   The fleet roster and the `docked-fleet-actions` panel SHALL remain mounted,
+>   and every command anchored to the acting fleet's own served state SHALL
+>   remain invokable: sell, refuel, hold, release, cut drive, stop, and jump.
+>   The mine offer SHALL NOT be shown, because the docked body's visible
+>   resource kinds reach this view only on the interior read; its absence
+>   SHALL be presented as a consequence of the failed read, alongside the same
+>   retry, and never as "this body has nothing to mine."
+>
+> #### Scenario: A failed interior read leaves the fleet-state-anchored commands usable
+> - **WHEN** the interior read fails while the acting fleet is attached to a
+>   body
+> - **THEN** the fleet roster and the `docked-fleet-actions` panel remain
+>   mounted, and that fleet's sell, refuel, hold, release, cut-drive, stop,
+>   and jump commands remain invokable
+>
+> #### Scenario: A failed interior read withdraws the mine offer without misreporting the body
+> - **WHEN** the interior read fails while the acting fleet is docked to a
+>   resource-bearing body
+> - **THEN** the mine offer is not shown, and what is shown attributes its
+>   absence to the failed read and offers the same retry — never a statement
+>   that the body carries no resources
+
+and in `system-space-view`'s *Jump Commit*, replacing the two-source clause:
+
+> …submit a jump order for that fleet naming that gate's lane id, resolved
+> from the acting fleet's **own read** (`fleet-movement`'s *Fleet Read Serves
+> the Attached Gate's Lane Id*) and from no other source — never from the
+> interior read's gate list, never from `GET /v1/galaxy`'s `links[]`, and never
+> filtered by or derived from the corporation's charted-lane set. The fleet's
+> own read carries the id for a fleet attached to a gate in any system and
+> survives a failed interior read, so one source serves every case; a second
+> source would reintroduce the class of defect in which the id is present on
+> the surface the player is not looking at.
+
+with its scenario *Invoking jump submits the attached gate's lane* (title
+unchanged) re-GIVEN as "a fleet whose own read carries `laneId` for its
+attached lane-gate body", its closing sentence re-anchored from "any gate the
+interior read served" to "any gate a fleet's own read reports it attached to",
+and one scenario added:
+
+> #### Scenario: Jump still commits when the interior read has failed
+> - **GIVEN** an own fleet attached to a lane-gate body in the open system and
+>   a failed interior read
+> - **WHEN** the jump command is invoked on that fleet's row
+> - **THEN** a jump order is submitted naming the `laneId` the fleet's own read
+>   carries, with no dependency on the interior read
+
+### Decision 13: The two new capabilities are drawn at canvas-versus-panel, and the name under-describes one of them
+
+**Taken: keep the split, and record what it actually is.** `system-space-view`
+is *everything that needs the scene* — the route, the fan-in, selection,
+picking, the camera, rendering, the preview overlay, and the two verbs whose
+target comes from a pick (burn, and jump on a picked gate). `docked-fleet-
+actions` is *everything the fleet panel can do from the acting fleet's own
+served state*, with no scene and no selection. That line is real, it is the
+line the renderer-unavailability requirements already depend on, and it maps
+cleanly onto two React component subtrees.
+
+**What the name hides, stated so nobody re-litigates it by surprise.** Three
+members of `docked-fleet-actions` are not "docked" and not "fleet actions":
+the hold/release controls act on an **orbiting** fleet (docking is irrelevant
+to a station-keep park); the credit balance readout is **corporation**-scoped;
+and *Rejection Reasons Map to Player-Facing Copy, Not Raw Server Text* is a
+**shared** module consumed by `system-space-view`'s burn and jump commands and
+by `galaxy-view`'s *Jump Commit*. The capability is really "the fleet command
+panel."
+
+**Alternatives considered.**
+
+- *Rename to `fleet-command-panel`.* Rejected only because the name is fixed by
+  the orchestrator's binding ruling and the rename buys clarity at the cost of
+  a second round of citation edits across three capabilities. Worth doing if
+  the name is reopened for any other reason; not worth reopening it for.
+- *Hoist the rejection-copy mapping into `fleet-roster`.* Rejected: it is
+  consumed by three capabilities, not two, so any home is somebody's
+  dependency. Leaving it where the ruling put it and stating the dependency
+  explicitly is the cheaper honesty — and `add-scan-and-sightings-surface`
+  needs the same module, so 8b must consume it rather than start a second copy.
+
+### Decision 14: The client seams the new surfaces need, named — service methods and hooks
+
+**Taken, because the layering is where this chain has lost verbs before.**
+`frontend/CLAUDE.md` fixes the order component → hook → service → `apiClient`,
+and `/check` carries a raw-`fetch` validator. Three of this change's surfaces
+have **no existing seam at any layer**, and no task in `tasks.md` names one:
+
+- `POST /v1/fleets/:fleetId/orders/preview` — `lib/services/fleet-service.ts`
+  has `listMine`, `get`, `order`, `cutDrive`, `stop`, `jump`, `mine`, and no
+  `preview`; `hooks/` has no preview hook.
+- `POST /v1/fleets/:fleetId/hold` and `/release` — no service method, no hook.
+  Note that `add-stationkeep-hold-verb` ships both verbs server-side with no
+  client at all, so this change is the *only* thing that can give them one.
+- The space view's realtime refetch — `hooks/use-board-realtime.ts` exists and
+  is imported by exactly one module, `components/board/SystemBoardView.tsx`.
+  Deleting `components/board/` (task 10.1) orphans it, and `hooks/` is outside
+  every other deletion task's scope, so it survives as dead code unless named.
+  (`lib/query-keys.ts` also names it in a comment, which is not an import.)
+  Task 10.2 now names that deletion.
+
+**Placed as tasks 4.1 (preview service method + hook), 7.9 (hold/release
+service methods + hooks) and 10.2 (deleting the orphaned realtime hook).**
+None of this is new design; it is the seam inventory, recorded because
+`replace-observation-with-sightings` shipped `POST /v1/fleets/:fleetId/scan`
+with no `fleet-service` method and no hook, and that is precisely why 8b exists
+as a separate change today. `maxFuelTons` rides `order`'s existing request
+type, and the served upkeep rate rides the existing fleet read type, so those
+two need type widening rather than new seams.
 
 ## Inherited rulings, recorded for continuity
 
@@ -413,6 +710,33 @@ implementer does not have to reconstruct them.
   `board-view`'s post-link-4 "no fleet layer" state. Deliberate and necessary —
   the PoC's whole grammar is about rendering a ship — but it means this change
   touches more surface than a lattice-to-R³ re-skin would have.
+- **`tasks.md` 10.11's `grep` is a frontend-only precondition, and link 9 needs
+  more than it proves.** `backend/board` and `backend/polar` still have eight
+  non-test production importers after this change lands: `system/generator.go`
+  (footprints via `board.Schedule`/`board.Canon`/`board.RingCells`),
+  `system/model.go` (`Feature.Footprint`), `system/service.go` (the stored
+  interior's per-feature ring guard), `system/gates.go`
+  (`board.LaneGateCell`), `system/fog.go`, `system/fog_source.go`
+  (`board.StarOcclusionRadius2`/`PlanetOcclusionRadius2` — reachable today
+  **only from tests**, a ninth instance of the chain's built-and-never-called
+  shape and pure deletion material), `stations/placement.go`, and
+  `stations/service.go`. The `grep` this change runs proves the *frontend* is
+  clear, which is necessary and not sufficient; link 9's precondition also has
+  to cover the backend importers, `fixtures/board/`, `fixtures/polar/`, their
+  mirror-map entries, and the enforcement lists
+  `pin-system-generation-determinism` catalogued. This is recorded, not fixed,
+  because none of it is delta-reachable from this change's capabilities.
+- **One of those backend tethers becomes invisible in this change.**
+  `stations.FeatureOf` gates the station's presence in an interior read on a
+  **lattice** range check — `board.ProductionSchedule()` and
+  `st.Orbit.Ring <= sched.MaxRing` — omitting the station entirely when it
+  fails. This change removes every lattice field from that response, so after
+  it lands a station can still vanish from a system for a lattice reason with
+  nothing on the wire to hint at it, and the M11 dock-then-sell loop goes
+  unreachable exactly as it did once before
+  (`replace-observation-with-sightings` blocker 5). Task 9.4's `grep` for
+  production readers of the dropped fields is what should surface it; if the
+  repair is deferred to link 9, defer it **by name** rather than by silence.
 - **Six e2e suites reference board test ids**, not two. Two are deleted as
   lattice-specific and four are rewritten; a suite left un-rewritten is a
   green-looking gap over the exact journey the exit criterion depends on.
@@ -424,6 +748,39 @@ None. Per the project's ground rules this is a solo toy with no live users:
 expand/contract, and no feature flag. The only two-step sequences are OpenSpec
 mechanics — archive, then hand-delete the retired spec directory; archive, then
 hand-edit four stale `## Purpose` sections — not data or traffic migrations.
+
+**Two more post-archive hand-edits, not in any earlier draft.** The archiver
+creates a brand-new capability spec with a placeholder Purpose — rehearsal
+confirms both `openspec/specs/system-space-view/spec.md` and
+`openspec/specs/docked-fleet-actions/spec.md` land carrying literally
+`## Purpose` / `TBD - created by archiving change build-production-space-view.
+Update Purpose after archive.` Link 4 shipped with exactly this left undone.
+Both need a real Purpose written by hand after the archive.
+
+**And one earlier-drafted hand-edit rests on a false premise.** A task proposed
+hand-editing `space-kinematics`'s exemption clause inside *Every Rule-Bearing
+Value of This Capability Is Computed Only in the Authoritative Implementation*,
+on the grounds that it "names the now-deleted spike path." It does not: the
+clause is written generically over `frontend/app/spike/`, and `audio/`,
+`intel/`, `hex-board/` and `stealth/` all remain there, so the clause stays
+true and needed. Only the `## Purpose` sentence names `space-3d` specifically,
+and the Purpose is the part that is genuinely not delta-reachable. The clause
+should be left alone (`tasks.md` 13.4 records that as a positive
+confirm-and-do-nothing step, so the premise is not rediscovered). Where a
+requirement body *does* need changing, it goes through a MODIFIED delta —
+hand-editing `openspec/specs/` is what `add-stationkeep-hold-verb` recorded
+losing a corrected formula to.
+
+**One consequence of leaving the clause alone.** It requires the exemption to
+be "stated in the capability's Purpose alongside the named path". So the
+`space-kinematics` Purpose edit **repoints** the carve-out sentence at the
+spike paths that survive rather than deleting it; deleting the only statement
+of the exemption would leave that clause unsatisfied.
+
+These `## Purpose` edits run **before** the `board-view` directory deletion
+and its dangling-citation grep (`tasks.md` section 13 is ordered accordingly),
+since two of them are what remove the last `board-view` citations the grep
+looks for.
 
 The four `## Purpose` sections are not delta-reachable (they sit outside any
 `### Requirement:` block) and are corrected by hand after the archive:

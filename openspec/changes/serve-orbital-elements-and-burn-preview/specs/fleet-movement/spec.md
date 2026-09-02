@@ -326,3 +326,25 @@ figure.
   command in between
 - **THEN** both reads report the same rate and the fleet's stored fuel and
   park are unchanged by either read
+
+### Requirement: Fleet Reads Serve the Simulation Clock's Scale Alongside Their World Time
+The system SHALL serve the simulation clock's **scale** — the number of
+world-milliseconds the world advances per wall-clock millisecond — alongside
+the `worldTime` every fleet read already carries, on `GET /v1/fleets/:fleetId`
+and on every list form of the fleet read. The scale SHALL be the scale of the
+same clock that read's `worldTime` was taken from, so a client anchoring to a
+reading and extrapolating live world time between reads projects at the
+world's own rate rather than at an assumed rate of 1. The scale SHALL be
+served unconditionally, on a world running at any scale, so a client never has
+to distinguish "scale 1" from "scale absent".
+
+#### Scenario: A fleet read carries the world clock's scale
+- **WHEN** a requester reads a fleet on a world whose simulation clock runs
+  at a scale other than 1
+- **THEN** the response carries that clock's scale alongside its `worldTime`
+
+#### Scenario: The scale is served even on an unwarped world
+- **WHEN** a requester reads a fleet on a world whose simulation clock runs
+  at a scale of exactly 1
+- **THEN** the response still carries the scale, explicitly, rather than
+  omitting it and leaving the client to assume a value

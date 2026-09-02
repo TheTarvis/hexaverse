@@ -2,9 +2,10 @@
 
 ### Requirement: System Space View Route and Data Fan-In
 The system SHALL render `/systems/:systemId` from two independent reads: the
-system's interior (`system-interior`'s *Interior Read Endpoint* — every body's
-continuous position, size, and orbital element set, plus the `contacts` array
-of disclosed foreign presence), disabled until a non-empty system id is known;
+system's interior (`system-interior`'s *Interior Read Serves Continuous
+Bodies* — every body's continuous position, size, and orbital element set,
+plus the `contacts` array of disclosed foreign presence), disabled until a
+non-empty system id is known;
 and the requester's own fleets, read corporation-scoped through
 `GET /v1/fleets?mine=true` and filtered to this system on the client. The
 own-fleets read SHALL NOT be the system-scoped `GET /v1/fleets?systemId=`
@@ -28,10 +29,13 @@ other's surface:
 - IF the interior read fails, THEN the view SHALL show an error state in the
   canvas region — carrying the underlying error message when one is available
   — and SHALL offer a retry affordance that refetches the interior. The fleet
-  roster and the `docked-fleet-actions` panel SHALL remain mounted and their
-  commands invokable, because every one of them is anchored to the acting
-  fleet's own `attachedTo` state and to that panel's own market reads, not to
-  the interior.
+  roster and the `docked-fleet-actions` panel SHALL remain mounted, and every
+  command anchored to the acting fleet's own served state SHALL remain
+  invokable: sell, refuel, hold, release, cut drive, stop, and jump. The mine
+  offer SHALL NOT be shown, because the docked body's visible resource kinds
+  reach this view only on the interior read; its absence SHALL be presented as
+  a consequence of the failed read, alongside the same retry, and never as
+  "this body has nothing to mine".
 - IF the own-fleets read fails, THEN the view SHALL show an error state in the
   fleet panel region, with its own retry affordance, and SHALL continue to
   render the interior's bodies, lane gates, and contacts; only the own-fleet
@@ -63,12 +67,19 @@ other's surface:
   error message when available
 - **AND** a retry affordance is offered that refetches the interior
 
-#### Scenario: A failed interior read leaves the docked-fleet commands usable
+#### Scenario: A failed interior read leaves the fleet-state-anchored commands usable
 - **WHEN** the interior read fails while the acting fleet is attached to a
   body
 - **THEN** the fleet roster and the `docked-fleet-actions` panel remain
-  mounted, and that fleet's mine, sell, refuel, hold, release, cut-drive,
-  stop, and jump commands remain invokable
+  mounted, and that fleet's sell, refuel, hold, release, cut-drive, stop,
+  and jump commands remain invokable
+
+#### Scenario: A failed interior read withdraws the mine offer without misreporting the body
+- **WHEN** the interior read fails while the acting fleet is docked to a
+  resource-bearing body
+- **THEN** the mine offer is not shown, and what is shown attributes its
+  absence to the failed read and offers the same retry — never a statement
+  that the body carries no resources
 
 #### Scenario: A failed own-fleets read shows a retriable error in the fleet panel
 - **WHEN** the own-fleets read fails while the interior read succeeds
@@ -129,6 +140,16 @@ and forbids it from re-deriving a flight time, an arrival time, an intercept,
 a curve length, a delta-v price, a settled park, or a visibility answer. This
 requirement stays inside that permission by the three rules below.
 
+**The current world time** SHALL be extrapolated from the most recent served
+reading at the **served world-clock scale**, never at an assumed scale of 1.
+Both reads this view fans in carry the scale alongside their `worldTime`
+(`system-interior`'s *Interior Read Serves Continuous Bodies*,
+`fleet-movement`'s *Fleet Reads Serve the Simulation Clock's Scale Alongside
+Their World Time*), and a client projecting at the wrong rate draws every
+orbit and every burn mark progressively further from truth the longer it goes
+between polls — and reaches a burn's `u = 1` at the wrong wall instant, so a
+ship appears to arrive early or never.
+
 **A body, a lane gate, and a parked or drifting fleet** SHALL be drawn from
 their served element sets — a body's and a gate's `orbitElements`, a park's
 served radius, period, phase, epoch and offset, a drift's served anchor,
@@ -169,6 +190,13 @@ fleet reporting no position (`fleet-movement`'s *Effective Position
 Resolution* — mid-jump, or attached to a host the current body table does not
 resolve) SHALL be omitted from the scene rather than drawn at a stale or
 default position.
+
+#### Scenario: Live world time is projected at the served scale, not an assumed one
+- **GIVEN** a world whose simulation clock runs at a scale other than 1
+- **WHEN** the view extrapolates live world time between polls
+- **THEN** it projects at the scale the read served, so a body's drawn
+  position at a given wall instant matches the position the server would
+  report for that instant
 
 #### Scenario: An idle fleet renders at its live position, advancing with world time
 - **WHEN** an own fleet's effective state is a park or a drift
@@ -568,13 +596,14 @@ instruction, and its drawn mark SHALL continue to show the selected state.
 ### Requirement: Jump Commit
 The system SHALL, when the jump command is invoked for a fleet attached to
 a lane-gate body, submit a jump order for that fleet naming that gate's
-lane id, resolved from a source that is neither filtered by nor derived
-from the corporation's charted-lane set and that is available for a fleet
-attached to a gate in any system — this system's own interior read's gate
-body (`system-interior`'s *Lane-Gate Bodies Carry Their Lane Id*) when the
-fleet is in this system, and the fleet's own read (`fleet-movement`'s
-*Fleet Read Serves the Attached Gate's Lane Id*) otherwise — with no
-charted-lane condition and no second read. The server's distinguishable
+lane id, resolved from the acting fleet's **own read** (`fleet-movement`'s
+*Fleet Read Serves the Attached Gate's Lane Id*) and from no other source —
+never from the interior read's gate list, never from `GET /v1/galaxy`'s
+`links[]`, and never filtered by or derived from the corporation's
+charted-lane set. The fleet's own read carries the id for a fleet attached
+to a gate in any system and survives a failed interior read, so one source
+serves every case; a second source would reintroduce the class of defect in
+which the id is present on the surface the player is not looking at. The server's distinguishable
 jump-rejection reasons include, at minimum: not attached to the named gate;
 already in lane transit; lane not incident to the fleet's current system;
 and the destination's lane horizon could not be materialized (retryable). A
@@ -587,13 +616,21 @@ success toast, and on failure an error toast whose copy is mapped from the
 server's distinguishable rejection reason (`docked-fleet-actions`'s
 *Rejection Reasons Map to Player-Facing Copy, Not Raw Server Text*), never
 the raw reason string, leaving the fleet's row unchanged. The command SHALL
-NOT be a no-op or a refusal for any gate the interior read served.
+NOT be a no-op or a refusal for any gate a fleet's own read reports it
+attached to.
 
 #### Scenario: Invoking jump submits the attached gate's lane
-- **GIVEN** a fleet attached to a lane-gate body carrying `laneId` on this
-  system's interior read
+- **GIVEN** a fleet whose own read carries `laneId` for its attached
+  lane-gate body
 - **WHEN** the jump command is invoked on that fleet's row
 - **THEN** a jump order is submitted for that fleet naming that `laneId`
+
+#### Scenario: Jump still commits when the interior read has failed
+- **GIVEN** an own fleet attached to a lane-gate body in the open system and
+  a failed interior read
+- **WHEN** the jump command is invoked on that fleet's row
+- **THEN** a jump order is submitted naming the `laneId` the fleet's own read
+  carries, with no dependency on the interior read
 
 #### Scenario: A gate whose lane the corporation has not charted still commits
 - **GIVEN** a corporation with no charted lanes and a fleet attached to a
