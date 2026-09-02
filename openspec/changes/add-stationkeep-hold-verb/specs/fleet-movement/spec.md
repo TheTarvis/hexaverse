@@ -338,6 +338,18 @@ independent, conditional transaction that requirement mandates wherever the
 reading decision is itself a transaction that may abort. `hold` is exactly
 such a decision: its own insufficient-fuel precondition below reads the
 fleet's stored `fuel` to decide, and its commit transaction rejects.
+`release` is **not** such a decision — it reads `fuel` to *debit*, not to
+decide, so that requirement's "wherever" clause does not by itself select
+it — but its settlement of a past-dry-instant hold SHALL **likewise** be
+carried by that same preceding, independent, conditional write, never by a
+write inside `release`'s own transaction, which rejects (by the
+not-station-keeping reason, a past-dry-instant hold being already folded to
+`orbit`) and would therefore discard it. Consequently every assertion this
+change makes about the `fuel` a past-dry-instant `release` leaves behind —
+in particular "A release at exactly the dry instant is rejected, the fold
+having already released the hold"'s assertion that the fleet's `fuel` is
+exactly the configured station-keeping reserve — is an assertion against the
+**stored fleet document** after the call, not against an in-memory fold.
 
 **Without this step `hold` grants indefinite free station-keeping**, and no
 other rule in this capability stops it. A hold whose dry instant has
@@ -545,11 +557,6 @@ as licensing any reserve on that path.
   rejected by its own named reason (its spendable fuel above the reserve
   being zero), leaving the fleet's `fuel` at exactly the reserve — repeated
   holding can never grind the reserve away
-- **AND** this is asserted specifically against an unsettled first hold: a
-  fixture that pre-settles the first hold in its setup satisfies every
-  assertion above while being unable to observe the free-station-keeping
-  failure the settle-first ordering exists to close (see "Station-Keeping
-  Hold and Release Are Fleet Verbs")
 
 #### Scenario: A burn may still spend the reserve down to zero
 - **WHEN** a burn whose fuel cost equals the fleet's entire held `fuel`,
@@ -893,6 +900,47 @@ and which rejects rather than retries) are the three such cases in hand —
 the settlement SHALL be committed by a **separate write that precedes, and
 is independent of, that transaction**, never as a write inside it.
 
+That preceding write is **necessary but not sufficient**, because it is a
+*separate* transaction: it reads the fleet at one instant and the deciding
+transaction re-reads it at a later one, and the dry instant may fall in
+between — a Firestore round trip, and arbitrarily more *world* time under a
+scaled `common.NewWorldTime(epoch, scale)` clock. In that window the
+settlement write, correctly finding a not-yet-expired park, writes
+**nothing**, while the deciding transaction's own re-read finds a park that
+is by then past its dry instant — folding to `orbit`, so a not-orbiting
+precondition passes — alongside a `cargo.fuel` figure that still
+over-reports the entire accrual. Each of those three transactions SHALL
+therefore additionally verify, against its **own** transactional re-read,
+that no `stationkeep` park at or after its stored dry instant remains, and
+SHALL abort, applying **none** of its own effects, when one does — the
+preceding settlement write having been issued from an earlier read, the dry
+instant may have passed in between. `hold` surfaces that abort as its
+insufficient-fuel rejection (the settled figure being exactly
+`FuelParams.StationKeepReserveTons` by construction, so no hold is
+affordable); the burn commit and the refuel surface it as a **retryable**
+failure that applies nothing, whose retry issues a fresh preceding
+settlement write that now observes the past dry instant and settles it, so
+the retried decision evaluates against the settled figure. This check is
+**fail-closed by construction**: its only failure mode is a spurious abort
+of a decision that could have proceeded, never a decision permitted to
+proceed against an unsettled figure, and any implementation whose worst
+case is the latter has inverted it.
+
+Without it, "is there an unsettled past-dry park?" is only ever an
+**ordered step discharged by a preceding write**, and never a
+**precondition of the deciding transaction itself** — which is exactly the
+gap: a `hold` re-issued once after each dry instant lands in that window,
+passes both preconditions against the stale figure, and is restamped with a
+fresh dry instant computed from it, forgiving the whole accrued upkeep and
+skipping the force-demotion, so a position is held forever for the fuel of
+a single hold. The dry instant is deterministic and player-visible, so this
+is repeatably reachable rather than crash-only. The same window reaches the
+other two: the burn commit debits its cost from the stale figure — a burn
+paid for with fuel already spent on upkeep — and a refuel credits its
+purchased tonnage onto un-settled fuel, so the next reader's fold sets
+`cargo.fuel` to exactly the reserve and destroys both the purchased tonnage
+and the credits spent on it.
+
 This is required by two live requirements this change does not modify:
 `action-dispatch`'s "A transaction-scoped producer's error
 aborts the commit entirely" guarantees that a rejecting producer persists
@@ -1013,3 +1061,25 @@ transactional re-read.
   because its dry instant has not yet been observed by any other write
 - **AND** that settled value is durably persisted by a write that precedes
   the decision, not merely folded in memory for this one consumer
+
+#### Scenario: A hold whose dry instant passes between the settle-first write and the commit is rejected, never restamped
+- **GIVEN** a station-keeping fleet whose stored dry instant has **not** yet
+  passed at the instant `hold`'s preceding, independent settlement write
+  re-reads it, so that write correctly persists nothing
+- **WHEN** that dry instant passes before `hold`'s own commit transaction
+  performs its re-read, so the commit's re-read finds a `stationkeep` park
+  at or after its stored dry instant — folding to `orbit`, and therefore
+  passing the not-orbiting precondition — alongside a stored `cargo.fuel`
+  still showing the whole pre-hold figure
+- **THEN** the commit aborts on that re-read instead of evaluating its
+  preconditions against the stale figure, and is rejected `409 Conflict`
+  carrying the insufficient-fuel reason
+- **AND** no second `stationkeep` park is stored, no hold-start time or dry
+  instant is restamped, and the elapsed hold's accrued upkeep is never
+  forgiven
+- **AND** a burn commit and a refuel whose own transactional re-read meets
+  the same condition each apply **none** of their own effects — no burn
+  cost is debited from, and no purchased tonnage is credited onto, the
+  stale figure — failing retryably, so the retry's own preceding settlement
+  write observes the now-past dry instant and settles it before the
+  decision is re-evaluated

@@ -290,7 +290,8 @@
       insufficient-fuel precondition, which the same requirement reaches
       through its "any other computation of a fleet's currently held fuel"
       clause (task 3.15) — `fleet-movement`: "Every Decision Reading Fuel
-      Settles a Past-Dry-Instant Hold First" (all six scenarios)
+      Settles a Past-Dry-Instant Hold First" (the first six scenarios; the
+      seventh — the in-transaction guard — is task 4.10)
 - [ ] 4.8 Where a reading decision is a transaction that may abort **with
       an answer**, commit the settlement in a **separate write that
       precedes and is independent of** that transaction, never inside it.
@@ -328,12 +329,36 @@
       `stationkeep` park at or after its dry instant, writing **nothing**
       otherwise, and never setting `cargo.fuel` from a value read outside
       it. Unconditional, it is a fourth unserialized `cargo.fuel` writer
-      issued by the eight consumers the requirement enumerates (plus
+      issued by seven of the eight consumers the requirement enumerates
+      (`mine`'s resolve clamp settling in-transaction per task 4.8, plus
       `hold`'s own precondition, per task 3.15), and an absolute set from a
       stale pre-read
       destroys a refuel that landed in between — the tonnage and the
       credits spent on it — same requirement ("A settlement write racing a
       refuel never discards the purchased fuel")
+
+- [ ] 4.10 Add, inside each of the **three** abortable transactions task
+      4.8 names — the burn commit's `ActorStateFunc`
+      (`fleet/service.go:894-908`), the transaction-scoped free-hold
+      re-evaluation inside refuel's own settlement transaction
+      (`fleet/cargo_tx.go:169-188`), and `hold`'s own commit producer — a
+      guard on **that transaction's own re-read**: if the re-read fleet's
+      stored park is a `stationkeep` park at or after its stored dry
+      instant, return an error and apply **none** of the transaction's
+      effects. `hold` maps that error to its insufficient-fuel `409`
+      (the settled figure being exactly the reserve, so no hold is
+      affordable); the burn commit and the refuel return a **retryable**
+      error whose retry issues a fresh preceding settlement write, which now
+      observes the past dry instant and settles it before the decision is
+      re-evaluated. The transaction SHALL never proceed on that re-read
+      figure. Tasks 4.8 and 4.9 do not reach inside the deciding
+      transaction — 4.8 mandates only that the settlement write *precede*
+      it, 4.9 only that the write be conditional — so without this guard the
+      window between the two transactions is open, and a `hold` re-issued
+      once per dry instant is restamped from the stale figure forever —
+      `fleet-movement`: "Every Decision Reading Fuel Settles a
+      Past-Dry-Instant Hold First" ("A hold whose dry instant passes between
+      the settle-first write and the commit is rejected, never restamped")
 
 ## 5. Drift repair — three fleet rejections currently returning a bodyless 500
 
@@ -502,7 +527,8 @@ this change already rewrites that exact `respond` switch. Full write-up:
       persisted by the **resolve's own transaction** (re-read the fleet doc
       after the resolve, and assert nothing was written before it) — traces
       to `fleet-movement`: "Every Decision Reading Fuel Settles a
-      Past-Dry-Instant Hold First" (all six scenarios)
+      Past-Dry-Instant Hold First" (the first six scenarios; the seventh is
+      task 7.18)
 - [ ] 7.14 Backend integration test: `hold` (and `release`) submitted
       against a fleet whose body-targeted burn has passed its arrival but
       is unresolved — the arrival resolves first, `attachedTo` is set to
@@ -549,3 +575,31 @@ this change already rewrites that exact `respond` switch. Full write-up:
       below the speed floor is instant and free"
 - [ ] 7.17 `go test ./... -p 1` and
       `python3 .claude/skills/code-quality-checks/check.py` clean
+- [ ] 7.18 Backend integration test (**must FAIL against a build carrying
+      tasks 4.8 and 4.9 but not 4.10**): hold a fleet; advance world time to
+      strictly **before** its stored dry instant; invoke the settle-first
+      path by submitting a second `hold`, letting its preceding,
+      independent settlement write run and correctly write **nothing**; then
+      advance the clock **past** the dry instant *between* that write and
+      the commit's own re-read. Under a scaled `common.NewWorldTime(epoch,
+      scale)` clock this is an ordinary clock advance at a seam, not a race:
+      it needs no concurrency harness, only an injection point between the
+      two transactions (a test clock the settle write and the commit read
+      separately, or a hook after the settle write). Assert `409` with the
+      insufficient-fuel reason; that the stored park still carries its
+      **original** hold-start time and dry instant, un-restamped; that the
+      stored `fuel` is unchanged by the commit; and that a subsequent call
+      then settles it to exactly the reserve. Repeat the same seam for the
+      burn commit (assert `fuel` unchanged and no action created) and for
+      refuel (assert no credit landed and the credits were not spent).
+      **What makes this vacuous:** advancing the clock **before** the
+      settle-first write instead of between it and the commit — the write
+      then settles, the commit sees reserve-level fuel, and an unguarded
+      build rejects for the right reason by accident (that is exactly task
+      7.15's fixture, not this one); asserting on the response body rather
+      than a re-read of the stored fleet document; and using a single shared
+      clock reading captured once per request, which collapses the settle
+      write's instant and the commit's re-read instant into one and closes
+      the very window this test exists to open — traces to
+      `fleet-movement`: "A hold whose dry instant passes between the
+      settle-first write and the commit is rejected, never restamped"

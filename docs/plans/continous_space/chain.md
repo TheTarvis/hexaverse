@@ -7,8 +7,19 @@ lattice to the continuous-space system map. `README.md` is the model,
 **Status (2026-09-02):** links 1–6 landed, plus one unplanned insert. Links 5
 and 6 are **done and archived** (90/90 and 33/33). Link 7 was split in two by its
 own panel review — `add-fuel-as-cargo` (53 tasks) is **done and archived**
-(`41e3c46`, 22/22 e2e, 1360/1360 unit), and `add-stationkeep-hold-verb` (26)
-is specced with its red phase underway; they MUST archive in that order.
+(`41e3c46`, 22/22 e2e, 1360/1360 unit), and `add-stationkeep-hold-verb` is
+**spec-complete after four adversary rounds** with its red phase written; they
+MUST archive in that order.
+
+That change is worth a note. Its review loop ran one round past the nominal
+cap of three, deliberately — every round's blockers were bred by the previous
+round's repairs, and round 3 found that re-issuing `hold` after each dry
+instant bought **indefinite free station-keeping**, the exact behaviour the
+change exists to price. Round 4 then found the same exploit reachable through
+a time-of-check/time-of-use window between the settle-first write and the
+commit transaction. A cap exists to stop unbounded iteration, not to ship a
+known exploit. It also grew from 26 tasks to 54 in the process, which is the
+honest measure of how much the first draft had missed.
 
 Link 8's 8a was split **again** by its panel — it was 131 tasks, not the 47 it
 claimed — into `serve-orbital-elements-and-burn-preview` (37, purely additive,
