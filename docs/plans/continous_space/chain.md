@@ -4,9 +4,12 @@ The ordered set of OpenSpec changes that carries the game from the polar
 lattice to the continuous-space system map. `README.md` is the model,
 `decisions.md` is the settled rulings; this is the sequencing.
 
-**Status (2026-09-02):** links 1–5 landed, plus one unplanned insert. Link 5
-is **done and archived** — 90/90 tasks, all ten sections, three adversary
-rounds. Links 6–9 unstarted. All three chain-gating
+**Status (2026-09-02):** links 1–6 landed, plus one unplanned insert. Links 5
+and 6 are **done and archived** (90/90 and 33/33). Link 7 is **specced and
+adversary-repaired but not implemented**, and was split in two by its own panel
+review — `add-fuel-as-cargo` (53 tasks) and `add-stationkeep-hold-verb` (26),
+which MUST archive in that order. Links 8–9 unstarted; link 8 is analysed with
+its twelve open questions ruled (`handoffs/link8-rulings.md`). All three chain-gating
 design decisions are settled — see *Open decisions gating the chain* below.
 Two lattice-era changes
 (`add-station-exchange`, `revise-scan-instant-and-emission`) were removed from
@@ -44,7 +47,6 @@ after that design was written.
 | 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | ✅ `5fd28b5`…`fbbb316` |
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | 📝 spec CLEAR-pending, 0/53 |
 | 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | 📝 spec CLEAR-pending, 0/26 |
-| — | `add-stationkeep-hold-verb` | *(unplanned insert)* `hold`/`release` verbs + their fuel-denominated upkeep, carved out of link 7's own panel review | ⬜ |
 | 8 | `build-production-space-view` | The renderer; `board-view` retired | ⬜ |
 | 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | ⬜ |
 
