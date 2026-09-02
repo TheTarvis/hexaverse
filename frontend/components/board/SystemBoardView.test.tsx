@@ -43,7 +43,7 @@ import { useSystemBoard } from '@/hooks/use-system-board'
 import { useCutDrive, useJump, useMine, useMyFleets, useOrder, useStop } from '@/hooks/use-fleets'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import { useCancelAction, useRunningMine } from '@/hooks/use-actions'
-import { useMarketBoard, useSell, useStation } from '@/hooks/use-market'
+import { useMarketBoard, useRefuel, useSell, useStation } from '@/hooks/use-market'
 import { useCorporationOptional } from '@/components/corporation-provider'
 import { toast } from '@/lib/toast'
 import type { SystemBoard } from '@/lib/types/system-board'
@@ -70,6 +70,10 @@ vi.mock('@/hooks/use-market', () => ({
   useMarketBoard: vi.fn(),
   useStation: vi.fn(),
   useSell: vi.fn(),
+  // add-fuel-as-cargo tasks.md 8.5/8.7 — CONTRACT ASSUMED BY THIS SDET: the
+  // refuel verb rides this same module, `useSell`-shaped (see
+  // hooks/use-refuel.test.tsx's own contract note for the full reasoning).
+  useRefuel: vi.fn(),
 }))
 vi.mock('@/components/corporation-provider', () => ({ useCorporationOptional: vi.fn() }))
 // The admin claim gating the tuning panel (BoardTuning). NODE_ENV is 'test'
@@ -104,7 +108,13 @@ vi.mock('@/hooks/use-world-time', () => ({
     anchor.world + (wallNow - anchor.wall) * scale,
 }))
 vi.mock('@/hooks/use-board-realtime', () => ({ useBoardRealtime: vi.fn() }))
-vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+// `warning` added for add-fuel-as-cargo tasks.md 8.3's stranding-warning
+// toast (fleet-roster ADDED "A Burn Commit's Stranding Warning Is Surfaced
+// to the Player" — a non-blocking notice distinct from an error toast;
+// `lib/toast.ts` already exports a `warning` variant with its own amber
+// styling, so this is the natural surface, not a new one this SDET is
+// inventing production behavior for).
+vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
 const push = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 
@@ -121,6 +131,7 @@ const mockCancelAction = vi.mocked(useCancelAction)
 const mockMarketBoard = vi.mocked(useMarketBoard)
 const mockStation = vi.mocked(useStation)
 const mockSell = vi.mocked(useSell)
+const mockRefuel = vi.mocked(useRefuel)
 const mockCorp = vi.mocked(useCorporationOptional)
 
 const orderMutate = vi.fn()
@@ -130,6 +141,7 @@ const jumpMutate = vi.fn()
 const mineMutate = vi.fn()
 const cancelActionMutate = vi.fn()
 const sellMutate = vi.fn()
+const refuelMutate = vi.fn()
 
 function boardFixture(): SystemBoard {
   return {
@@ -229,6 +241,7 @@ describe('SystemBoardView', () => {
     mockMarketBoard.mockReturnValue({ data: undefined, isLoading: false, isError: false } as unknown as ReturnType<typeof useMarketBoard>)
     mockStation.mockReturnValue({ data: undefined, refetch: vi.fn() } as unknown as ReturnType<typeof useStation>)
     mockSell.mockReturnValue({ mutate: sellMutate, isPending: false } as unknown as ReturnType<typeof useSell>)
+    mockRefuel.mockReturnValue({ mutate: refuelMutate, isPending: false } as unknown as ReturnType<typeof useRefuel>)
     mockCorp.mockReturnValue(null)
     myFleetsState([])
   })
@@ -978,5 +991,251 @@ describe('SystemBoardView', () => {
       expect.objectContaining({ fleetId: 'away', laneId: 'lane-sys9-sys42' }),
       expect.anything(),
     )
+  })
+
+  // --- Stranding warning on burn commit (add-fuel-as-cargo tasks.md 8.3;
+  // fleet-roster ADDED "A Burn Commit's Stranding Warning Is Surfaced to
+  // the Player") ------------------------------------------------------------
+  //
+  // CONTRACT ASSUMED BY THIS SDET (confirm against the backend SDET's
+  // fleet-movement contract before implementing): the burn order's commit
+  // response — `useOrder`'s mutation already resolves with the committed
+  // `Fleet` itself — carries a new, ONE-SHOT `strandingWarning?: boolean`
+  // top-level field (present only on a commit response naming the
+  // condition, never on an ordinary read). The warning renders as a
+  // `toast.warning(...)` call ALONGSIDE the existing `toast.success('Course
+  // laid in')` — never replacing it, never routed through `toast.error`.
+  // `lib/toast.ts` already ships a `warning` variant with its own (amber)
+  // styling, which is what makes this "visually and semantically
+  // distinguished from the error styling" per the requirement text, with no
+  // new UI primitive required.
+
+  describe('stranding warning on burn commit (fleet-roster ADDED "A Burn Commit\'s Stranding Warning Is Surfaced to the Player")', () => {
+    function committedFleet(strandingWarning: boolean | undefined): Fleet {
+      return { ...ownFleet, strandingWarning } as unknown as Fleet
+    }
+
+    function burnAndCommit(fleet: Fleet) {
+      boardState({ isLoading: false, isError: false, data: boardFixture() })
+      myFleetsState([ownFleet])
+      orderMutate.mockImplementation((_vars, opts) =>
+        (opts as { onSuccess?: (f: Fleet) => void })?.onSuccess?.(fleet),
+      )
+      render(<SystemBoardView systemId="sys-7" />)
+      fireEvent.click(screen.getByTestId('feature-glyph-p-1'))
+      fireEvent.click(screen.getByTestId('fleet-cmd-burn-mine'))
+    }
+
+    // Scenario: A stranding warning renders alongside a successful commit.
+    it('renders a distinct warning alongside the order\'s own success feedback, never suppressing it', () => {
+      burnAndCommit(committedFleet(true))
+
+      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Course laid in')
+      expect(vi.mocked(toast.warning)).toHaveBeenCalledTimes(1)
+      // Never rendered as an error — the underlying order succeeded.
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
+    })
+
+    // Scenario: A commit with no warning shows no stranding notice.
+    it('shows no stranding notice when the commit response carries none', () => {
+      burnAndCommit(committedFleet(undefined))
+
+      expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Course laid in')
+      expect(vi.mocked(toast.warning)).not.toHaveBeenCalled()
+    })
+
+    it('shows no stranding notice when the commit response explicitly carries false', () => {
+      burnAndCommit(committedFleet(false))
+
+      expect(vi.mocked(toast.warning)).not.toHaveBeenCalled()
+    })
+
+    // Scenario: The warning is never rendered as an error — the amber
+    // `toast.warning` styling is visually/semantically distinct from
+    // `toast.error`'s red styling (lib/toast.ts) by construction; asserted
+    // here as "never fires toast.error" (already covered above) plus "fires
+    // the WARNING channel specifically", closing the possibility of an
+    // implementation that (wrongly) reuses `toast.error` for this notice.
+    it('uses the warning channel specifically, never the error channel, for the notice', () => {
+      burnAndCommit(committedFleet(true))
+
+      expect(vi.mocked(toast.warning)).toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
+    })
+  })
+
+  // --- Refuel offer / commit / double-submit wiring (add-fuel-as-cargo
+  // tasks.md 8.4–8.7; board-view ADDED "Refuel Offer on the Docked Fleet" /
+  // "Refuel Commit" / "Refuel Control Guards Against Double-Submit";
+  // MODIFIED "Credit Balance Readout") --------------------------------------
+  //
+  // CONTRACT ASSUMED BY THIS SDET: `commitRefuel(tons)` mirrors `commitSell`
+  // exactly — `refuel.mutate({ fleetId, request: { tons, operationKey:
+  // newOperationKey() } }, { onSuccess, onError })` — gated on
+  // `stationQuotes !== null` (the SAME "docked at a station" signal
+  // FactsPanel already uses for sell, reused here rather than a new prop —
+  // see FactsPanel.test.tsx's own contract note) rather than requiring the
+  // station to carry any sellable quotes. A successful response updates a
+  // `lastRefuelCost` piece of state threaded to `FactsPanel`/
+  // `BalanceReadout`, mirroring `lastSaleProceeds`.
+
+  function refuelFixtures() {
+    boardState({ isLoading: false, isError: false, data: boardFixture() })
+    const docked: Fleet = {
+      ...ownFleet,
+      attachedTo: 'station-1',
+      roster: {
+        ships: [{ class: 'seed' }],
+        // Deliberately empty, not `{ fuel: 10 }` — see FactsPanel.test.tsx's
+        // dedicated regression test ("does not crash when a docked fleet's
+        // cargo includes fuel") for the UNRELATED existing-`HoldReadout`
+        // production gap this SDET found and reports separately (fuel is
+        // not a recognised `ResourceKind` in `RESOURCE_ACCENT`, so a fleet
+        // actually holding fuel crashes the whole panel today). Using it
+        // here too would make every refuel test below fail for THAT reason
+        // instead of the one each test actually names.
+        cargo: {},
+        cargoCapacity: 200,
+        freeHold: 100,
+        miningRate: 0,
+        estimatedRange: 50,
+        stranded: false,
+        fuelPricePerTon: 10,
+      },
+    } as unknown as Fleet
+    myFleetsState([docked])
+    mockStation.mockReturnValue({
+      data: { systemId: 'sys-7', orbit: { ring: 1, angle0: 0, period: 1, dir: 1 }, featureId: 'station-1', createdAt: 0 },
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useStation>)
+    mockMarketBoard.mockReturnValue({
+      data: { venues: [{ venue: 'sys-7', systemId: 'sys-7', quotes: [] }], worldTime: 0, refreshCadenceMs: 30_000 },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useMarketBoard>)
+    return docked
+  }
+
+  it('offers refuel on the docked fleet even when the station has nothing tradable, and commits the chosen tonnage', () => {
+    refuelFixtures()
+    render(<SystemBoardView systemId="sys-7" />)
+
+    expect(screen.getByTestId('refuel-section')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('refuel-button'))
+
+    expect(refuelMutate).toHaveBeenCalledWith(
+      {
+        fleetId: 'mine',
+        request: { tons: expect.any(Number), operationKey: expect.any(String) },
+      },
+      expect.anything(),
+    )
+  })
+
+  // Scenario: A successful refuel refreshes hold, range, and balance.
+  it('shows a success toast and reflects the refuel’s cost on the balance readout, with no navigation', () => {
+    refuelFixtures()
+    refuelMutate.mockImplementation((_vars, opts) =>
+      (opts as { onSuccess?: (r: unknown) => void })?.onSuccess?.({
+        cost: 140,
+        cargo: { fuel: 24 },
+        balance: 860,
+        worldTime: 0,
+      }),
+    )
+    mockCorp.mockReturnValue({ id: 'c1', accountId: 'a1', name: 'Acme', credits: 860 } as unknown as ReturnType<
+      typeof useCorporationOptional
+    >)
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('refuel-button'))
+
+    expect(vi.mocked(toast.success)).toHaveBeenCalled()
+    expect(screen.getByTestId('balance-refuel-cost')).toHaveTextContent('140')
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  // Scenario: An unaffordable refuel is rejected in full, never partially
+  // filled — the client-observable half: an error toast, the offer's
+  // control still present (not torn down), and no balance/hold change
+  // applied from a rejected response.
+  it('rejects an unaffordable refuel in full — an error toast, the offer survives, no balance change applied', () => {
+    refuelFixtures()
+    refuelMutate.mockImplementation((_vars, opts) =>
+      (opts as { onError?: (e: Error) => void })?.onError?.(
+        new Error('fuel-purchase: requested tonnage costs more than available credits'),
+      ),
+    )
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('refuel-button'))
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('refuel-section')).toBeInTheDocument()
+    expect(screen.queryByTestId('balance-refuel-cost')).not.toBeInTheDocument()
+  })
+
+  // Scenario: A failed refuel toasts player-facing copy, not raw server
+  // text.
+  it('maps a refuel rejection to player-facing copy, never the raw sentinel string, verbatim', () => {
+    refuelFixtures()
+    refuelMutate.mockImplementation((_vars, opts) =>
+      (opts as { onError?: (e: Error) => void })?.onError?.(
+        new Error('fuel-purchase: requester does not own this fleet'),
+      ),
+    )
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('refuel-button'))
+
+    const shown = vi.mocked(toast.error).mock.calls[0]![0] as string
+    expect(shown).not.toBe('fuel-purchase: requester does not own this fleet')
+    expect(shown.toLowerCase()).not.toContain('fuel-purchase:')
+  })
+
+  // "Unlike the sell command, a refuel rejection carries no price-changed
+  // slippage refresh" (board-view ADDED "Refuel Commit") — the fuel price
+  // is a single global constant that never moves, so a rejected refuel must
+  // NOT trigger the station re-fetch a price-changed sale rejection does.
+  it('never triggers the station re-fetch a sale’s price-changed rejection does — refuel has no slippage to refresh', () => {
+    refuelFixtures()
+    const refetch = vi.fn()
+    mockStation.mockReturnValue({
+      data: { systemId: 'sys-7', orbit: { ring: 1, angle0: 0, period: 1, dir: 1 }, featureId: 'station-1', createdAt: 0 },
+      refetch,
+    } as unknown as ReturnType<typeof useStation>)
+    refuelMutate.mockImplementation((_vars, opts) =>
+      (opts as { onError?: (e: Error) => void })?.onError?.(new Error('fuel-purchase: some rejection')),
+    )
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('refuel-button'))
+
+    expect(refetch).not.toHaveBeenCalled()
+  })
+
+  // Scenario (MODIFIED "Credit Balance Readout"): "A refuel's balance
+  // change is announced to assistive technology" — FactsPanel/
+  // BalanceReadout's own rendering is pinned in isolation
+  // (BalanceReadout.test.tsx); this only proves the container's response
+  // data reaches the live region at all.
+  it('announces a settled refuel’s balance change through the accessible live region', () => {
+    refuelFixtures()
+    refuelMutate.mockImplementation((_vars, opts) =>
+      (opts as { onSuccess?: (r: unknown) => void })?.onSuccess?.({
+        cost: 55,
+        cargo: { fuel: 30 },
+        balance: 945,
+        worldTime: 0,
+      }),
+    )
+    mockCorp.mockReturnValue({ id: 'c1', accountId: 'a1', name: 'Acme', credits: 945 } as unknown as ReturnType<
+      typeof useCorporationOptional
+    >)
+    render(<SystemBoardView systemId="sys-7" />)
+
+    fireEvent.click(screen.getByTestId('refuel-button'))
+
+    expect(screen.getByTestId('balance-live-region')).toHaveTextContent('55')
   })
 })

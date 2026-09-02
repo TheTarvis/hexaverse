@@ -62,6 +62,21 @@ const (
 	ResourceExotic    ResourceKind = "exotic"
 )
 
+// ReservedFuelResourceKind names the cargo kind add-fuel-as-cargo reserves
+// for the fuel currency (fleet.Fleet.Cargo["fuel"]) — never a declared,
+// mineable ResourceKind (system-interior "The Fuel Resource-Kind Name Is
+// Reserved From Generation"). Deliberately declared WITHOUT an explicit
+// ResourceKind type annotation (an untyped string constant, still directly
+// comparable to a ResourceKind value): fuel_resource_kind_reserved_test.go's
+// own guard parses every ResourceKind-TYPED const out of this file to build
+// its "declared" set, and this constant existing IN that set would make the
+// guard compare itself against itself and vacuously fail. This is a
+// namespace guard over the six declared constants above, not a fifth
+// generation-time configuration surface — see add-fuel-as-cargo's own
+// implementation-contract ruling for why no ValidateResourceKind/
+// GenerationParams field exists here.
+const ReservedFuelResourceKind = "fuel"
+
 // Resource is a minable payload hanging off a feature. Richness is a 0..1 scale
 // dialed by the system's character; the economy (later) turns it into tonnage.
 type Resource struct {

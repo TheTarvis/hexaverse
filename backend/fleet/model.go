@@ -126,9 +126,33 @@ type Fleet struct {
 	Ships []ShipEntry `json:"ships,omitempty" firestore:"ships,omitempty"`
 	// Cargo is the fleet-level held-resource pool (#0010 "Fleet Cargo Pool") —
 	// one pool, no per-ship allocation, credited only by mine's resolve.
-	Cargo     map[string]float64 `json:"cargo,omitempty" firestore:"cargo,omitempty"`
-	CreatedAt common.WorldMillis `json:"createdAt" firestore:"createdAt"`
-	UpdatedAt common.WorldMillis `json:"updatedAt" firestore:"updatedAt"`
+	// Since add-fuel-as-cargo, the reserved kind "fuel" also lives here —
+	// mined by no verb, sold by none, mutated only by a burn commit's debit,
+	// a discard's refund, spawn's starting grant, and the refuel verb's
+	// credit (fleet-movement "Fleet Cargo Pool").
+	Cargo map[string]float64 `json:"cargo,omitempty" firestore:"cargo,omitempty"`
+	// BurnFuelCostTons is the fuel cost, in tons, ACTUALLY DEBITED at the
+	// commit of the burn currently stored in State (add-fuel-as-cargo,
+	// fleet-movement "The refund is symmetric with the original debit's
+	// stored cost, not a re-derivation from the roster at discard time").
+	// Written at commit alongside the burn itself; read (never re-derived)
+	// by every discard path to compute the closed-form partial refund.
+	// Meaningful only while State.Mode == ModeBurn — a stale value left
+	// over once the fleet parks or drifts is simply never read again.
+	BurnFuelCostTons float64            `json:"-" firestore:"burnFuelCostTons,omitempty"`
+	CreatedAt        common.WorldMillis `json:"createdAt" firestore:"createdAt"`
+	UpdatedAt        common.WorldMillis `json:"updatedAt" firestore:"updatedAt"`
+
+	// StrandingWarning is a TRANSIENT, never-persisted signal (add-fuel-as-
+	// cargo, fleet-movement "A Burn Commit Warns, But Does Not Block, When
+	// It Would Leave the Fleet Unable to Reach a Station or Gate") — set by
+	// OrderTo/Stop right before returning, read by the HTTP handler to add
+	// the commit-response-only `strandingWarning` field. Never round-trips
+	// through Firestore (json:"-" firestore:"-"), so an ordinary read (which
+	// never calls OrderTo/Stop) always sees it false — the persistent
+	// indication for an ordinary read is FuelStatus's own `stranded` field,
+	// a distinct signal computed fresh on every read.
+	StrandingWarning bool `json:"-" firestore:"-"`
 }
 
 // DockedTo reports the id of the host this fleet is attached to, and whether

@@ -22,6 +22,9 @@ const (
 	// mints one in this version, and a confirmed reconciliation divergence is
 	// resolved only by one landing.
 	EntryAdjustment EntryKind = "adjustment"
+	// EntryFuelPurchase is fuel-purchase's settlement debit (add-fuel-as-
+	// cargo) — fleet-scoped like a sale, always a strictly negative Amount.
+	EntryFuelPurchase EntryKind = "fuelPurchase"
 )
 
 // LedgerEntry is one append-only row of a corporation's trade ledger, living at

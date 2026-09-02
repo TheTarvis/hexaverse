@@ -166,6 +166,27 @@ export function FleetRoster({
                       </span>
                     )}
                   </span>
+                  {/* add-fuel-as-cargo tasks.md 8.1/8.2 — fleet-roster ADDED
+                      "The Roster Row Shows Held Fuel and an Estimated
+                      Range" / "... a Persistent Stranded Indication". Both
+                      figures are rendered VERBATIM off the served roster —
+                      this row derives/computes neither. */}
+                  {f.roster && (
+                    <span className="flex items-center gap-2 pl-3.5 font-mono text-[10px] text-zinc-500">
+                      <span data-testid={`fleet-fuel-${f.id}`}>{f.roster.cargo?.fuel ?? 0}t fuel</span>
+                      <span data-testid={`fleet-range-${f.id}`}>
+                        {f.roster.estimatedRange ?? 0} range
+                      </span>
+                      {f.roster.stranded && (
+                        <span
+                          data-testid={`fleet-stranded-${f.id}`}
+                          className="ml-auto rounded-full border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-amber-300"
+                        >
+                          Stranded
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </button>
 
                 <div className="mt-1.5 flex flex-wrap gap-1 pl-3.5">

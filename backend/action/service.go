@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"hexaverse/common"
 
@@ -45,27 +46,54 @@ type Service struct {
 	clock     common.WorldTime
 	publisher common.PubSubInterface // nil disables completion fan-out (tests)
 	resolvers map[string]registered
+	// cancelProducers holds a per-type ActorStateFunc for the GENERIC
+	// action-cancel route (POST /v1/actions/:actionId/cancel) — the one
+	// discard path with no verb-package call site to compute its own effect
+	// (add-fuel-as-cargo tasks.md 2.5/3.1). A verb's OWN endpoints already
+	// hold the actor in memory and pass a static ActorState map directly to
+	// Cancel; they never populate or consult this table.
+	cancelProducers map[string]ActorStateFunc
 }
 
 func NewService() *Service {
 	return &Service{
-		dao:       NewDao(),
-		clock:     common.WorldClock(),
-		publisher: common.PubSub(),
-		resolvers: map[string]registered{},
+		dao:             NewDao(),
+		clock:           common.WorldClock(),
+		publisher:       common.PubSub(),
+		resolvers:       map[string]registered{},
+		cancelProducers: map[string]ActorStateFunc{},
 	}
 }
 
 // NewServiceWith injects deps for tests. Pass a nil publisher to skip completion
 // fan-out.
 func NewServiceWith(dao Dao, clock common.WorldTime, publisher common.PubSubInterface) *Service {
-	return &Service{dao: dao, clock: clock, publisher: publisher, resolvers: map[string]registered{}}
+	return &Service{
+		dao: dao, clock: clock, publisher: publisher,
+		resolvers: map[string]registered{}, cancelProducers: map[string]ActorStateFunc{},
+	}
 }
 
 // RegisterResolver wires a verb's per-type effect and its (static) kind. Called
 // once at startup — fleet registers "burn", mine will register "mine", etc.
 func (s *Service) RegisterResolver(actionType string, kind Kind, fn ResolveFunc) {
 	s.resolvers[actionType] = registered{kind: kind, fn: fn}
+}
+
+// RegisterCancelProducer wires a verb's per-type ActorStateFunc for the
+// generic action-cancel route (add-fuel-as-cargo tasks.md 2.5: "the trigger
+// is universal ... a future discard path inherits the refund automatically").
+// Called once at startup, alongside RegisterResolver.
+func (s *Service) RegisterCancelProducer(actionType string, fn ActorStateFunc) {
+	s.cancelProducers[actionType] = fn
+}
+
+// producerFor looks up a registered cancel producer by action type — the
+// callback CancelWithProducer invokes once it has read the running action's
+// own Type inside its transaction.
+func (s *Service) producerFor(actionType string) (ActorStateFunc, bool) {
+	fn, ok := s.cancelProducers[actionType]
+	return fn, ok
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*Action, error) {
@@ -110,7 +138,18 @@ func (s *Service) Commit(ctx context.Context, spec CommitSpec) (*Action, error) 
 		Eta:             spec.Eta,
 		Status:          StatusRunning,
 	}
-	if err := s.dao.Commit(ctx, a, spec.ActorState); err != nil {
+	if spec.ActorStateFunc != nil {
+		// add-fuel-as-cargo RULING 1: a transaction-scoped producer wins over
+		// (and, per CommitSpec's own contract, is used IN PLACE OF) any
+		// static ActorState map.
+		tc, ok := s.dao.(transactionalCommitter)
+		if !ok {
+			return nil, fmt.Errorf("action: CommitSpec.ActorStateFunc requires a transactional Dao")
+		}
+		if err := tc.CommitWithProducer(ctx, a, spec.ActorStateFunc); err != nil {
+			return nil, err
+		}
+	} else if err := s.dao.Commit(ctx, a, spec.ActorState); err != nil {
 		return nil, err
 	}
 	log.Info().Ctx(ctx).Str("actionId", a.Id).Str("type", a.Type).Str("actor", a.Actor).
@@ -118,7 +157,20 @@ func (s *Service) Commit(ctx context.Context, spec CommitSpec) (*Action, error) 
 	return &a, nil
 }
 
+// Cancel flips a running action to cancelled and releases the slot. When the
+// caller supplies no static actorState (the generic action-cancel route —
+// see action/handler.go's Cancel), a registered per-type cancel producer, if
+// any, computes the actor-doc merge from that SAME transaction's own read
+// (add-fuel-as-cargo tasks.md 2.5). A caller that already holds the actor in
+// memory (fleet's own cut-drive/stop/cancel endpoints) always supplies its
+// own non-nil actorState and is therefore never routed through a producer —
+// its own computation wins, exactly as before this capability existed.
 func (s *Service) Cancel(ctx context.Context, id string, actorState map[string]interface{}) (*Action, error) {
+	if actorState == nil {
+		if tc, ok := s.dao.(transactionalCanceler); ok {
+			return tc.CancelWithProducer(ctx, id, nil, s.producerFor)
+		}
+	}
 	return s.dao.Cancel(ctx, id, actorState)
 }
 

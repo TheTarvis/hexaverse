@@ -32,6 +32,7 @@ import type { Quote } from '@/lib/types/market'
 import { formatEta as etaLabel } from '@/lib/eta'
 import { FOG_TREATMENT } from './board-palette'
 import { SellSection } from './SellSection'
+import { RefuelSection } from './RefuelSection'
 import { BalanceReadout } from './BalanceReadout'
 import type { BoardSelection } from './board-selection'
 
@@ -73,6 +74,16 @@ export interface FactsPanelProps {
   // Set after a "price changed" rejection: the price the player HAD expected, so
   // the re-priced offer can show what moved rather than freezing a stale one.
   sellRepricedFrom?: number | null
+  // Commit a refuel from the docked-at station (add-fuel-as-cargo tasks.md
+  // 8.4; board-view ADDED "Refuel Offer on the Docked Fleet"). The panel
+  // owns the chosen tonnage; the container owns the operation key. Reuses
+  // the SAME `stationQuotes !== null` gating signal as the sell offer — an
+  // empty quotes array still means "docked, nothing to sell, but fuel is
+  // still always for sale" — rather than a new prop.
+  onRefuel?: (tons: number) => void
+  // The most recent refuel's cost, if one just settled — threaded to the
+  // balance readout exactly as `lastSaleProceeds` is.
+  lastRefuelCost?: number | null
   // The corporation's credit balance, from session data.
   credits?: number | null
   lastSaleProceeds?: number | null
@@ -101,6 +112,8 @@ export function FactsPanel({
   stationQuotes = null,
   onSell,
   sellRepricedFrom = null,
+  onRefuel,
+  lastRefuelCost = null,
   credits = null,
   lastSaleProceeds = null,
   saleFailure = null,
@@ -144,6 +157,7 @@ export function FactsPanel({
             <BalanceReadout
               credits={credits}
               lastDelta={lastSaleProceeds}
+              lastRefuelCost={lastRefuelCost}
               failure={saleFailure}
             />
           </div>
@@ -180,6 +194,15 @@ export function FactsPanel({
               pending={pending || burning || mining}
               onSell={onSell}
               repricedFrom={sellRepricedFrom}
+            />
+          )}
+          {stationQuotes !== null && onRefuel && activeFleet.roster && (
+            <RefuelSection
+              roster={activeFleet.roster}
+              pricePerTon={activeFleet.roster.fuelPricePerTon ?? 0}
+              balance={credits}
+              pending={pending || burning || mining}
+              onRefuel={onRefuel}
             />
           )}
         </section>
@@ -235,13 +258,30 @@ const RESOURCE_ACCENT: Record<ResourceKind, { dot: string; meter: string }> = {
   exotic: { dot: 'bg-fuchsia-400', meter: 'bg-fuchsia-400/80' },
 }
 
+// `fuel` (add-fuel-as-cargo) rides the SAME `roster.cargo` map a mined
+// resource does, but is deliberately NOT a `ResourceKind` (`system-interior`
+// reserves the name from generation) — so it has no `RESOURCE_ACCENT` entry.
+// PRODUCTION DEFECT this capability's own SDET found (FactsPanel.test.tsx:
+// "does not crash when a docked fleet's cargo includes fuel"):
+// `RESOURCE_ACCENT[kind]` indexed with `kind: 'fuel'` is `undefined`, so the
+// old `.meter`/`.dot` access threw for ANY fleet holding fuel — which, after
+// spawn's starting fuel, is every fleet immediately. `accentFor` closes that
+// gap with its own named accent, falling back to a neutral tone for any
+// future non-`ResourceKind` cargo entry rather than throwing.
+const FUEL_ACCENT = { dot: 'bg-cyan-300', meter: 'bg-cyan-300/80' }
+const DEFAULT_ACCENT = { dot: 'bg-zinc-400', meter: 'bg-zinc-400/80' }
+function accentFor(kind: string): { dot: string; meter: string } {
+  if (kind === 'fuel') return FUEL_ACCENT
+  return RESOURCE_ACCENT[kind as ResourceKind] ?? DEFAULT_ACCENT
+}
+
 // HoldReadout — the fleet's cargo picture: used/total capacity over a
 // stacked fill meter (one colour-coded segment per kind), tons by kind with
 // matching dots, and the free hold remainder — straight off the owner-only
 // roster block the fleet read serves.
 function HoldReadout({ roster }: { roster: FleetRoster }) {
   const entries = Object.entries(roster.cargo ?? {}).filter(([, tons]) => tons > 0) as [
-    ResourceKind,
+    string,
     number,
   ][]
   const used = roster.cargoCapacity - roster.freeHold
@@ -257,7 +297,7 @@ function HoldReadout({ roster }: { roster: FleetRoster }) {
         {entries.map(([kind, tons]) => (
           <div
             key={kind}
-            className={RESOURCE_ACCENT[kind].meter}
+            className={accentFor(kind).meter}
             style={{ width: `${(tons / roster.cargoCapacity) * 100}%` }}
           />
         ))}
@@ -271,7 +311,7 @@ function HoldReadout({ roster }: { roster: FleetRoster }) {
               className="flex items-center justify-between font-mono text-xs text-zinc-300"
             >
               <span className="flex items-center gap-1.5 capitalize">
-                <span className={`size-1.5 rounded-full ${RESOURCE_ACCENT[kind].dot}`} />
+                <span className={`size-1.5 rounded-full ${accentFor(kind).dot}`} />
                 {kind}
               </span>
               <span>{formatTons(tons)}t</span>

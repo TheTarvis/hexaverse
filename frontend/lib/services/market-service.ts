@@ -8,7 +8,14 @@
 // endpoint cannot be used to probe for where corporations woke up).
 
 import { apiClient } from '../api-client'
-import type { MarketBoard, SellRequest, SellResult, Station } from '../types/market'
+import type {
+  MarketBoard,
+  RefuelRequest,
+  RefuelResult,
+  SellRequest,
+  SellResult,
+  Station,
+} from '../types/market'
 
 class MarketService {
   // GET /v1/market/board — every visible station's live quotes.
@@ -36,6 +43,14 @@ class MarketService {
   // balance, with no action id and no ETA to wait on.
   async sell(fleetId: string, request: SellRequest): Promise<SellResult> {
     const response = await apiClient.post<SellResult>(`/v1/fleets/${fleetId}/sell`, request)
+    return response.data
+  }
+
+  // POST /v1/fleets/:fleetId/refuel — settle a fuel purchase from a docked
+  // fleet's own station. No featureId/systemId in the body: the server
+  // resolves the station from the fleet's own system only.
+  async refuel(fleetId: string, request: RefuelRequest): Promise<RefuelResult> {
+    const response = await apiClient.post<RefuelResult>(`/v1/fleets/${fleetId}/refuel`, request)
     return response.data
   }
 }

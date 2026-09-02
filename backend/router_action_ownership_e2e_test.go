@@ -55,8 +55,22 @@ type victimActionFixture struct {
 // the whole test, then reads the claimed movement-slot id straight off the
 // fleet document (never through the action endpoints, which are the subject
 // under test).
+//
+// REVISION (SDET, cause: this change (add-fuel-as-cargo) legitimately
+// breaking a pre-existing fixture, not a defect in either the fixture's or
+// this test's original intent): a burn this distant now has a real,
+// non-trivial fuel cost under commit-time affordability validation, and a
+// freshly spawned fleet's starting-fuel grant is sized against a
+// HOME-STATION-distance default order (corporation-spawn's own flagship
+// guarantee), not an arbitrary 1e7-unit point. This test's six scenarios
+// are about action-ownership authorization, not fuel, and only need SOME
+// still-running burn to exist — so the fixture seeds ample fuel directly
+// (the same direct-Firestore-write technique the fuel suite itself uses
+// for setup) rather than changing the target distance the "far in the
+// future ETA" comment above depends on.
 func commitRunningBurn(t *testing.T, router http.Handler, fdao fleet.Dao, adao action.Dao, ctx context.Context, token, fleetId string) string {
 	t.Helper()
+	setFleetFuel(t, fleetId, 10_000_000.0)
 	w := doJSON(t, router, http.MethodPost, "/v1/fleets/"+fleetId+"/orders", token,
 		map[string]any{"point": map[string]any{"x": 1.0e7, "y": 0.0, "z": 0.0}}, nil)
 	if w.Code != http.StatusOK {

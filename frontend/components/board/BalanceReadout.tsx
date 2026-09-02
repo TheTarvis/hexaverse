@@ -14,12 +14,22 @@ export interface BalanceReadoutProps {
   // The most recent sale's proceeds, if one just settled — shown briefly as a
   // delta so the change is legible rather than the number silently ticking up.
   lastDelta?: number | null
+  // The most recent refuel's cost, if one just settled (add-fuel-as-cargo
+  // tasks.md 8.6; board-view MODIFIED "Credit Balance Readout"). A refuel
+  // SPENDS credits — the opposite sign of a sale's proceeds — so it gets its
+  // own prop rather than overloading `lastDelta`.
+  lastRefuelCost?: number | null
   // A failed sale's player-facing message. Announced through the same live
   // region, so a failure is never conveyed by visual change alone.
   failure?: string | null
 }
 
-export function BalanceReadout({ credits, lastDelta = null, failure = null }: BalanceReadoutProps) {
+export function BalanceReadout({
+  credits,
+  lastDelta = null,
+  lastRefuelCost = null,
+  failure = null,
+}: BalanceReadoutProps) {
   // The live region's text. Kept in state (rather than derived) so a repeated
   // identical announcement still re-fires for assistive technology.
   const [announcement, setAnnouncement] = useState('')
@@ -31,11 +41,18 @@ export function BalanceReadout({ credits, lastDelta = null, failure = null }: Ba
       setAnnouncement(`${failure} (${seq.current})`)
       return
     }
+    if (lastRefuelCost && credits !== null && credits !== undefined) {
+      seq.current += 1
+      setAnnouncement(
+        `Refueled for ${lastRefuelCost} credits. Balance ${credits} credits. (${seq.current})`,
+      )
+      return
+    }
     if (lastDelta && credits !== null && credits !== undefined) {
       seq.current += 1
       setAnnouncement(`Sold for ${lastDelta} credits. Balance ${credits} credits. (${seq.current})`)
     }
-  }, [lastDelta, failure, credits])
+  }, [lastDelta, lastRefuelCost, failure, credits])
 
   return (
     <div data-testid="balance-readout" className="flex items-baseline gap-2">
@@ -49,6 +66,11 @@ export function BalanceReadout({ credits, lastDelta = null, failure = null }: Ba
       {lastDelta ? (
         <span data-testid="balance-delta" className="font-mono text-xs text-emerald-400 tabular-nums">
           +{lastDelta}
+        </span>
+      ) : null}
+      {lastRefuelCost ? (
+        <span data-testid="balance-refuel-cost" className="font-mono text-xs text-amber-400 tabular-nums">
+          -{lastRefuelCost}
         </span>
       ) : null}
 

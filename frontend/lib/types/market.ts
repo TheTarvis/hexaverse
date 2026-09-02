@@ -113,3 +113,26 @@ export interface SellResult {
   balance: number
   worldTime: number
 }
+
+// POST /v1/fleets/:fleetId/refuel (add-fuel-as-cargo, `fuel-purchase`'s new
+// verb, modelled on `sell`). NO featureId/systemId/corporationId — the
+// server resolves the selling station from the acting fleet's own system
+// only (fuel-purchase "Refuel Resolves the Station From the Acting Fleet's
+// Own System, Never a Client-Supplied Identifier").
+export interface RefuelRequest {
+  tons: number
+  // Same idempotency anchor as `SellRequest.operationKey` — one per
+  // user-initiated attempt, reused across transport retries of THAT attempt.
+  operationKey: string
+}
+
+// A settled refuel. Instant, like a sale: no action id, no ETA. Unlike a
+// sale there is no per-portion fill breakdown (fuel-purchase "A Single
+// Global Fuel Price, Unlimited Station Supply" — one price, one fill) and no
+// slippage guard (the price cannot move between preview and commit).
+export interface RefuelResult {
+  cost: number
+  cargo: Record<string, number>
+  balance: number
+  worldTime: number
+}

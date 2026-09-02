@@ -184,6 +184,10 @@ type Service struct {
 	// post-construction accessor a wiring change can silently omit is exactly
 	// what left Jump unreachable in production — twice).
 	graph GraphSource
+	// fuelParams holds the fuel-currency tuning knobs (add-fuel-as-cargo).
+	// Sourced from DefaultFuelParams() at construction; tests override via
+	// WithFuelParams.
+	fuelParams FuelParams
 }
 
 // NewServiceWith wires a fleet Service from explicit dependencies — the
@@ -206,6 +210,7 @@ func NewServiceWith(dao Dao, bodies BodySource, graph GraphSource, actions actio
 	return &Service{
 		dao: dao, bodies: bodies, graph: graph, actions: actions, clock: clock,
 		params: DefaultMovementParams(), classStats: DefaultClassStats(),
+		fuelParams: DefaultFuelParams(),
 	}
 }
 
@@ -214,6 +219,13 @@ func NewServiceWith(dao Dao, bodies BodySource, graph GraphSource, actions actio
 // for a dependency not available at NewServiceWith's call site.
 func (s *Service) WithBodies(bodies BodySource) *Service {
 	s.bodies = bodies
+	return s
+}
+
+// WithFuelParams overrides the fuel-currency tuning knobs — the seam a test
+// uses to induce a deterministic affordability boundary.
+func (s *Service) WithFuelParams(p FuelParams) *Service {
+	s.fuelParams = p
 	return s
 }
 
@@ -521,11 +533,45 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	}
 	burnState := space.ShipState{Mode: space.ModeBurn, Burn: &sol.Burn}
 
+	// Fuel affordability (add-fuel-as-cargo, fleet-movement "A Burn Commit
+	// Is Rejected When Its Fuel Cost Exceeds Available Fuel, Debited At
+	// Commit Never At Resolve"). Hull count is read ONCE, here, from the
+	// roster as it stands at commit. The discard refund of any PRIOR,
+	// not-yet-arrived burn this order supersedes is precomputed entirely in
+	// memory and checked BEFORE that prior action is ever cancelled — a
+	// rejected re-target must leave the prior burn running and fuel
+	// unchanged (task 2.1), which holds only because the cancel-and-refund
+	// transaction below is never even attempted for an unaffordable
+	// replacement.
+	//
+	// fuelTrackingEngaged(f): a fleet whose Cargo is genuinely nil has never
+	// been touched by any cargo-mutating verb (every REAL fleet document —
+	// SeedFleet — initializes a non-nil, empty Cargo map from the instant it
+	// exists) — mirroring effectiveRoster's own "no stored Ships" migration
+	// fallback in this same package, this is the one case fuel pricing
+	// treats as "not yet engaged" rather than "holds zero", so a document
+	// that predates cargo tracking entirely is never rejected for lacking a
+	// currency it was never given the chance to hold.
+	hullCount := len(effectiveRoster(*f))
+	newCost := FuelCostTons(&sol.Burn, hullCount, s.fuelParams)
+	refund := priorBurnRefund(f, now)
+	currentFuel := f.Cargo["fuel"]
+	fuelActive := fuelTrackingEngaged(f)
+	if fuelActive && currentFuel+refund < newCost {
+		return nil, ErrInsufficientFuel
+	}
+
 	// Re-task: release the current slot before claiming a new one (a running
 	// action while ordering is the norm mid-burn). ErrNotRunning means it
-	// already resolved — the slot is free, so proceed.
+	// already resolved — the slot is free, so proceed. The refund (if any)
+	// is credited in THIS cancellation, so the subsequent commit's own
+	// transactional read already reflects it.
 	if f.ActiveActionId != "" {
-		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, nil); err != nil && !errors.Is(err, action.ErrNotRunning) {
+		cancelState := map[string]interface{}{"updatedAt": int64(now)}
+		if fuelActive && refund != 0 {
+			cancelState["cargo"] = map[string]interface{}{"fuel": currentFuel + refund}
+		}
+		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, cancelState); err != nil && !errors.Is(err, action.ErrNotRunning) {
 			return nil, err
 		}
 	}
@@ -537,8 +583,25 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 		Scope:           f.SystemId,
 		Params:          map[string]interface{}{"state": EncodeKinematicState(burnState)},
 		Eta:             sol.Burn.ArriveMs,
-		ActorState: map[string]interface{}{
-			"state": EncodeKinematicState(burnState), "attachedTo": "", "updatedAt": int64(now),
+		ActorStateFunc: func(actorData map[string]interface{}) (map[string]interface{}, error) {
+			merge := map[string]interface{}{
+				"state": EncodeKinematicState(burnState), "attachedTo": "", "updatedAt": int64(now),
+			}
+			if !fuelActive {
+				return merge, nil
+			}
+			// The TRANSACTIONAL read, never a stale pre-transaction snapshot
+			// (action-dispatch "A transaction-scoped ActorState producer
+			// computes its merge from the transactional read, not a stale
+			// snapshot") — this is what keeps a concurrent, unserialized
+			// refuel from ever being lost to a racing burn debit.
+			fuel := readCargoFuel(actorData)
+			if fuel < newCost {
+				return nil, ErrInsufficientFuel
+			}
+			merge["cargo"] = map[string]interface{}{"fuel": fuel - newCost}
+			merge["burnFuelCostTons"] = newCost
+			return merge, nil
 		},
 	})
 	if err != nil {
@@ -551,9 +614,83 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	f.AttachedTo = ""
 	f.ActiveActionId = a.Id
 	f.UpdatedAt = now
+	if fuelActive {
+		f.BurnFuelCostTons = newCost
+		f.Cargo["fuel"] = currentFuel + refund - newCost
+		f.StrandingWarning = s.evaluateStrandingWarning(ctx, bt, f.SystemId, sol, hullCount, f.Cargo["fuel"])
+	}
 	log.Info().Ctx(ctx).Str("fleetId", id).Str("actionId", a.Id).
 		Int64("arriveMs", int64(sol.Burn.ArriveMs)).Msg("Fleet ordered to burn")
 	return f, nil
+}
+
+// fuelTrackingEngaged reports whether a fleet document participates in the
+// fuel-currency system at all. A fleet whose Cargo is genuinely nil has
+// never been touched by ANY cargo-mutating verb — SeedFleet always
+// initializes Cargo to a non-nil, empty map, so this is never true of a
+// real, spawned hull; it is true only of a fleet document that predates
+// this capability entirely (or a hand-built test fixture that never
+// constructs a Cargo field), mirroring effectiveRoster's own "no stored
+// Ships" migration fallback (roster.go).
+func fuelTrackingEngaged(f *Fleet) bool {
+	return f.Cargo != nil
+}
+
+// priorBurnRefund computes, from f's own in-memory fields as loaded at the
+// top of the calling verb, the closed-form discard refund a currently
+// running, not-yet-arrived burn would yield if discarded right now
+// (fleet-movement "Discarding a Running Burn Refunds Its Unspent Fuel,
+// Closed-Form"). Returns 0 when there is no active burn to discard —
+// including when the active action is some OTHER movement-channel verb
+// (e.g. a co-resident mine while docked), which is never a burn to refund.
+// Computed and checked BEFORE any mutation: task 2.1's own ordering
+// requirement is that a rejected replacement never leaves the prior burn
+// cancelled-and-refunded with nothing stored in its place, which holds only
+// if this is evaluated before the prior action's own cancel transaction is
+// ever opened.
+func priorBurnRefund(f *Fleet, now common.WorldMillis) float64 {
+	if f.ActiveActionId == "" || f.State.Mode != space.ModeBurn || f.State.Burn == nil {
+		return 0
+	}
+	return DiscardRefundTons(f.BurnFuelCostTons, f.State.Burn.DepartMs, f.State.Burn.ArriveMs, now)
+}
+
+// evaluateStrandingWarning re-runs the shared floor-priced reachability
+// evaluation (ReachableAtFloor) from a freshly committed burn's own
+// resulting position and arrival time (fleet-movement "A Burn Commit Warns,
+// But Does Not Block, When It Would Leave the Fleet Unable to Reach a
+// Station or Gate"). Best-effort and non-blocking by construction: a scan
+// failure is logged and never blocks or fails a commit that has already
+// succeeded — the warning is advisory, never load-bearing.
+//
+// A burn whose OWN destination is itself a station or lane-gate body counts
+// as reachable at zero cost on that candidate's account, checked directly
+// against sol.Burn.Target.BodyId before any solve runs (fleet-movement's own
+// text: "a burn whose own destination is a station or lane gate carries no
+// stranding warning on that candidate's account"). This is deliberately NOT
+// folded into reachableAtFloor's solve loop: that loop solves a candidate
+// burn FROM the committed burn's resulting position back TO the candidate,
+// and space.SolveBurn solves against a MOVING target — for an orbiting host,
+// that candidate solve chases where the host will be at the CANDIDATE burn's
+// own (new) arrival, not where this burn already put the fleet. That is not
+// the near-zero arc space.ErrArcTooShort exists to catch; only a direct
+// identity check against the burn's own already-committed destination
+// reflects "the fleet just arrived here" correctly.
+func (s *Service) evaluateStrandingWarning(ctx context.Context, bt *system.BodyTable, systemID string, sol space.SolveResult, hullCount int, remainingFuel float64) bool {
+	if destID := sol.Burn.Target.BodyId; destID != "" {
+		for _, candidateId := range s.candidateHosts(ctx, bt, systemID) {
+			if candidateId == destID {
+				return false
+			}
+		}
+	}
+	starClearance := space.StarClearanceRadius(bt.StarSize())
+	reachable, err := s.reachableAtFloor(ctx, bt, systemID, sol.Burn.Intercept, sol.Burn.ArriveMs, hullCount, remainingFuel, starClearance)
+	if err != nil {
+		log.Warn().Ctx(ctx).Err(err).Msg("fleet: stranding-warning reachability scan failed; omitting warning")
+		return false
+	}
+	return !reachable
 }
 
 // CutDrive converts an active burn to a drift at its live position and
@@ -592,10 +729,25 @@ func (s *Service) CutDrive(ctx context.Context, id string) (*Fleet, error) {
 	}
 	newState := space.ShipState{Mode: space.ModeDrift, Drift: &drift}
 
+	// Cutting a burn credits its unspent fuel (fleet-movement "Cutting a
+	// burn credits its unspent fuel"; "Discarding a Running Burn Refunds
+	// Its Unspent Fuel, Closed-Form") — computed from f's own in-memory
+	// fields, BEFORE the cancel, and folded into the SAME cancel call that
+	// stores the drift transition. See fuelTrackingEngaged's own doc
+	// comment (service.go, OrderTo) for why a genuinely nil Cargo skips
+	// this entirely.
+	refund := priorBurnRefund(f, now)
+	currentFuel := f.Cargo["fuel"]
+	fuelActive := fuelTrackingEngaged(f)
+	cancelState := map[string]interface{}{
+		"state": EncodeKinematicState(newState), "updatedAt": int64(now),
+	}
+	if fuelActive && refund != 0 {
+		cancelState["cargo"] = map[string]interface{}{"fuel": currentFuel + refund}
+	}
+
 	if f.ActiveActionId != "" {
-		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, map[string]interface{}{
-			"state": EncodeKinematicState(newState), "updatedAt": int64(now),
-		}); err != nil && !errors.Is(err, action.ErrNotRunning) {
+		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, cancelState); err != nil && !errors.Is(err, action.ErrNotRunning) {
 			return nil, err
 		}
 	}
@@ -604,6 +756,10 @@ func (s *Service) CutDrive(ctx context.Context, id string) (*Fleet, error) {
 	f.AttachedTo = ""
 	f.ActiveActionId = ""
 	f.UpdatedAt = now
+	if fuelActive {
+		f.BurnFuelCostTons = 0
+		f.Cargo["fuel"] = currentFuel + refund
+	}
 	return f, nil
 }
 
@@ -659,18 +815,37 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 
 	f.AttachedTo = ""
 
+	// The discard refund of any PRIOR, not-yet-arrived burn stop-in-place
+	// supersedes — computed once, in memory, shared by BOTH branches below
+	// (fleet-movement "A stop-in-place order that supersedes an active burn
+	// refunds it before charging the stop", "Stop-in-place's free,
+	// below-the-floor branch still refunds a preceding running burn": the
+	// FREE branch owes this refund exactly as the burn branch does, even
+	// though it charges no new delta-v of its own).
+	refund := priorBurnRefund(f, now)
+	currentFuel := f.Cargo["fuel"]
+	fuelActive := fuelTrackingEngaged(f)
+
 	if vel.Length() <= space.StopInPlaceSpeedFloor {
 		newState := space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint, Point: pos}}
+		cancelState := map[string]interface{}{
+			"state": EncodeKinematicState(newState), "attachedTo": "", "updatedAt": int64(now),
+		}
+		if fuelActive && refund != 0 {
+			cancelState["cargo"] = map[string]interface{}{"fuel": currentFuel + refund}
+		}
 		if f.ActiveActionId != "" {
-			if _, err := s.actions.Cancel(ctx, f.ActiveActionId, map[string]interface{}{
-				"state": EncodeKinematicState(newState), "attachedTo": "", "updatedAt": int64(now),
-			}); err != nil && !errors.Is(err, action.ErrNotRunning) {
+			if _, err := s.actions.Cancel(ctx, f.ActiveActionId, cancelState); err != nil && !errors.Is(err, action.ErrNotRunning) {
 				return nil, err
 			}
 		}
 		f.State = newState
 		f.ActiveActionId = ""
 		f.UpdatedAt = now
+		if fuelActive {
+			f.BurnFuelCostTons = 0
+			f.Cargo["fuel"] = currentFuel + refund
+		}
 		return f, nil
 	}
 
@@ -689,8 +864,23 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 	}
 	newState := space.ShipState{Mode: space.ModeBurn, Burn: &sol.Burn}
 
+	// Fuel affordability — Stop's own committed-burn branch prices at
+	// defaultAccel (a pre-existing inconsistency with an ordinary order's
+	// roster-derived ceiling, flagged in design.md and NOT fixed here), but
+	// is otherwise gated exactly like OrderTo's commit (task 2.1): checked,
+	// and rejected if unaffordable, BEFORE the prior action is cancelled.
+	hullCount := len(effectiveRoster(*f))
+	newCost := FuelCostTons(&sol.Burn, hullCount, s.fuelParams)
+	if fuelActive && currentFuel+refund < newCost {
+		return nil, ErrInsufficientFuel
+	}
+
 	if f.ActiveActionId != "" {
-		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, nil); err != nil && !errors.Is(err, action.ErrNotRunning) {
+		cancelState := map[string]interface{}{"updatedAt": int64(now)}
+		if fuelActive && refund != 0 {
+			cancelState["cargo"] = map[string]interface{}{"fuel": currentFuel + refund}
+		}
+		if _, err := s.actions.Cancel(ctx, f.ActiveActionId, cancelState); err != nil && !errors.Is(err, action.ErrNotRunning) {
 			return nil, err
 		}
 	}
@@ -701,8 +891,20 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 		Scope:           f.SystemId,
 		Params:          map[string]interface{}{"state": EncodeKinematicState(newState)},
 		Eta:             sol.Burn.ArriveMs,
-		ActorState: map[string]interface{}{
-			"state": EncodeKinematicState(newState), "attachedTo": "", "updatedAt": int64(now),
+		ActorStateFunc: func(actorData map[string]interface{}) (map[string]interface{}, error) {
+			merge := map[string]interface{}{
+				"state": EncodeKinematicState(newState), "attachedTo": "", "updatedAt": int64(now),
+			}
+			if !fuelActive {
+				return merge, nil
+			}
+			fuel := readCargoFuel(actorData)
+			if fuel < newCost {
+				return nil, ErrInsufficientFuel
+			}
+			merge["cargo"] = map[string]interface{}{"fuel": fuel - newCost}
+			merge["burnFuelCostTons"] = newCost
+			return merge, nil
 		},
 	})
 	if err != nil {
@@ -711,6 +913,11 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 	f.State = newState
 	f.ActiveActionId = a.Id
 	f.UpdatedAt = now
+	if fuelActive {
+		f.BurnFuelCostTons = newCost
+		f.Cargo["fuel"] = currentFuel + refund - newCost
+		f.StrandingWarning = s.evaluateStrandingWarning(ctx, bt, f.SystemId, sol, hullCount, f.Cargo["fuel"])
+	}
 	return f, nil
 }
 
@@ -1047,6 +1254,51 @@ func (s *Service) resolveDue(ctx context.Context, f *Fleet) (*Fleet, error) {
 		return nil, err
 	}
 	return s.load(ctx, f.Id)
+}
+
+// FuelPricePerTon serves the configured global fuel price (fuel-purchase "A
+// Single Global Fuel Price, Unlimited Station Supply, No Station-Side
+// Write"; fleet-movement "Fleet Read Serves the Configured Fuel Price,
+// Never Duplicated Client-Side") — one value, read from the server, backs
+// both the refuel offer's client-side preview and the settlement's charged
+// cost, so the two can never diverge.
+func (s *Service) FuelPricePerTon() float64 { return s.fuelParams.PricePerTon }
+
+// FuelStatus computes the acceleration-floor-priced estimated maximum range
+// and the persistent stranded indication for an owning corporation's own
+// fleet read (fleet-movement "Fleet Read Reports an Estimated Maximum Range
+// From Current Fuel", "A Fleet's Read Reports a Persistent Stranded
+// Indication, Computed at the Acceleration Floor") — re-running the SAME
+// floor-priced reachability evaluation the commit-time warning uses, fresh
+// on every read, never a cached commit-time result.
+//
+// A fleet mid-jump has no in-system position to evaluate reachability from;
+// jump itself costs no delta-v and, once committed, always succeeds — such
+// a fleet's estimated range is still reported (from held fuel alone) but it
+// never reads as stranded while in transit.
+func (s *Service) FuelStatus(ctx context.Context, f *Fleet) (estimatedRange float64, stranded bool, err error) {
+	hullCount := len(effectiveRoster(*f))
+	fuelTons := f.Cargo["fuel"]
+	estimatedRange = EstimatedRangeTons(fuelTons, hullCount, s.fuelParams)
+
+	bt, err := s.bodiesFor(ctx, f.SystemId)
+	if err != nil {
+		return 0, false, err
+	}
+	now := s.clock.Now()
+	pos, err := s.Position(ctx, f, bt)
+	if err != nil {
+		if errors.Is(err, ErrFleetInTransit) {
+			return estimatedRange, false, nil
+		}
+		return 0, false, err
+	}
+	starClearance := space.StarClearanceRadius(bt.StarSize())
+	reachable, err := s.reachableAtFloor(ctx, bt, f.SystemId, pos, now, hullCount, fuelTons, starClearance)
+	if err != nil {
+		return 0, false, err
+	}
+	return estimatedRange, !reachable, nil
 }
 
 // --- internals -------------------------------------------------------------

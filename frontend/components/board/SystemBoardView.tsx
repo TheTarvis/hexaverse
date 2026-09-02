@@ -29,10 +29,11 @@ import { toast } from '@/lib/toast'
 import { jumpErrorCopy, jumpErrorReason } from '@/lib/jump-copy'
 import { useSystemBoard } from '@/hooks/use-system-board'
 import { useCutDrive, useJump, useMine, useMyFleets, useOrder, useStop } from '@/hooks/use-fleets'
-import { useMarketBoard, useSell, useStation } from '@/hooks/use-market'
+import { useMarketBoard, useRefuel, useSell, useStation } from '@/hooks/use-market'
 import { useCorporationOptional } from '@/components/corporation-provider'
 import { newOperationKey } from '@/lib/services/market-service'
 import { isPriceChanged, saleErrorCopy } from '@/lib/market-copy'
+import { refuelErrorCopy, refuelErrorReason } from '@/lib/refuel-copy'
 import { MarketBoardPanel } from '@/components/market/MarketBoardPanel'
 import { useRunningMine } from '@/hooks/use-actions'
 import type { ResourceKind } from '@/lib/types/system-board'
@@ -148,10 +149,16 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     return venue?.quotes ?? null
   }, [station, boardQuery.data])
   const sell = useSell(systemId)
+  const refuel = useRefuel(activeFleet?.id ?? '')
+  // The synchronous double-submit guard `commitRefuel` below checks — see
+  // its own comment for why `refuel.isPending` alone (a render-cycle away)
+  // cannot close this race.
+  const refuelCommitRef = useRef(false)
   const corporation = useCorporationOptional()
   const [lastSaleProceeds, setLastSaleProceeds] = useState<number | null>(null)
   const [saleFailure, setSaleFailure] = useState<string | null>(null)
   const [sellRepricedFrom, setSellRepricedFrom] = useState<number | null>(null)
+  const [lastRefuelCost, setLastRefuelCost] = useState<number | null>(null)
   // Cancelling a running mine is a roster-panel command (FleetRoster owns its
   // own `useCancelAction` call, per fleet-roster ADDED "The Roster Row Is the
   // Fleet Command Surface" superseding the removed board-side control) — this
@@ -162,9 +169,12 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     stop.isPending ||
     jump.isPending ||
     mine.isPending ||
-    // The sell control's double-submit guard: disabled from commit until the
-    // sale settles or fails, so a double-click cannot become two sales.
-    sell.isPending
+    // The sell/refuel controls' double-submit guard: disabled from commit
+    // until the trade settles or fails, so a double-click cannot become two
+    // trades. Refuel is this game's first credit SINK — the same discipline
+    // matters here just as much as it does for sell's proceeds.
+    sell.isPending ||
+    refuel.isPending
 
   // The RUNNING mine (add-mine-ui): the movement channel's busy signal. Its
   // eta gates the roster panel's commands (fleet-roster/board-view) and joins
@@ -258,7 +268,20 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
     order.mutate(
       { fleetId: fleet.id, request: { bodyId: targetBodyId } },
       {
-        onSuccess: () => toast.success('Course laid in'),
+        // A stranding warning (add-fuel-as-cargo tasks.md 8.3; fleet-roster
+        // ADDED "A Burn Commit's Stranding Warning Is Surfaced to the
+        // Player") is a NON-BLOCKING notice alongside the order's own
+        // success feedback — never the error channel, and never suppressing
+        // the success toast. The order succeeded; the complaint is that
+        // stranding happens invisibly, not that it happens at all.
+        onSuccess: (committed) => {
+          toast.success('Course laid in')
+          if (committed.strandingWarning) {
+            toast.warning(
+              'This burn will leave the fleet unable to reach a station or gate on the fuel it has.',
+            )
+          }
+        },
         onError: (e) => toast.error(e.message || 'Order failed'),
       },
     )
@@ -362,6 +385,47 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
       },
     )
   }
+  // commitRefuel — the fuel-purchase verb's commit (add-fuel-as-cargo
+  // tasks.md 8.5–8.7; board-view ADDED "Refuel Commit" / "Refuel Control
+  // Guards Against Double-Submit"). One fresh operation key per
+  // user-initiated attempt, minted here (never inside the mutation, so a
+  // react-query-level retry of the SAME attempt would still carry it) —
+  // this is the game's first credit SINK, so a missed guard double-charges
+  // the player, not a venue. Unlike sell, a refuel rejection carries no
+  // price-changed slippage refresh: the fuel price is a single global
+  // constant that never moves between preview and commit.
+  //
+  // `refuelCommitRef` is the ACTUAL guard the requirement's "disabled from
+  // the moment of commit" language demands: `refuel.isPending` (threaded
+  // into `pending` above) only reaches the DOM's `disabled` attribute on
+  // the next render, so two clicks landing in the same tick (a real
+  // double-click, not a test harness's manually-awaited one) both reach
+  // this function before either mutate() call's pending state has
+  // committed to a render. A ref is checked-and-set synchronously, with no
+  // render in between, so the second invocation is a no-op — it never
+  // mints a second operation key or calls mutate() a second time. Reset in
+  // `onSettled` (success or failure alike), matching "until the request
+  // settles or fails".
+  const commitRefuel = (tons: number) => {
+    if (!activeFleet) return
+    if (refuelCommitRef.current) return
+    refuelCommitRef.current = true
+    refuel.mutate(
+      { fleetId: activeFleet.id, request: { tons, operationKey: newOperationKey() } },
+      {
+        onSuccess: (res) => {
+          setLastRefuelCost(res.cost)
+          toast.success(`Refueled for ${res.cost} cr`)
+        },
+        onError: (e) => {
+          toast.error(refuelErrorCopy(refuelErrorReason(e)))
+        },
+        onSettled: () => {
+          refuelCommitRef.current = false
+        },
+      },
+    )
+  }
 
   // A selected lane-gate body is 'feature'-shaped now (`selectGate` above),
   // so BoardOverlay's gate-glyph selection ring (`selectedGateId`) and its
@@ -460,6 +524,8 @@ export function SystemBoardView({ systemId }: SystemBoardViewProps) {
           stationQuotes={dockedAtStation ? stationQuotes : null}
           onSell={commitSell}
           sellRepricedFrom={sellRepricedFrom}
+          onRefuel={commitRefuel}
+          lastRefuelCost={lastRefuelCost}
           credits={corporation?.credits ?? null}
           lastSaleProceeds={lastSaleProceeds}
           saleFailure={saleFailure}

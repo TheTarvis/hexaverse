@@ -66,7 +66,13 @@ var RegisteredTopLevelCollections = []string{
 // subcollections hanging off each of its documents.
 var RegisteredSubcollections = map[string][]string{
 	// backend/charts/dao.go, backend/sightings/dao.go, backend/corporations/credits.go
-	"corporations": {"charts", "chartedLanes", "sightings", "ledger", "reconciliation"},
+	// "fuelGrants" is the openspec change add-fuel-as-cargo's starting-fuel
+	// idempotency anchor (corporations/{corpId}/fuelGrants/{fleetId},
+	// corporation-spawn's "Spawn Asset Healing") — registered ahead of the
+	// production write landing (test infrastructure only, backend/CLAUDE.md's
+	// registry rule) so the root suite's UnregisteredCollections guard doesn't
+	// fail the very first green run that creates one.
+	"corporations": {"charts", "chartedLanes", "sightings", "ledger", "reconciliation", "fuelGrants"},
 	// backend/action/dao.go — deltas/{scope}/entries/{actionId}
 	"deltas": {"entries"},
 	// backend/galaxy/dao.go

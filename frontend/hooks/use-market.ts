@@ -16,8 +16,15 @@ import {
 } from '@tanstack/react-query'
 
 import { queryKeys } from '@/lib/query-keys'
-import { marketService } from '@/lib/services/market-service'
-import type { MarketBoard, SellRequest, SellResult, Station } from '@/lib/types/market'
+import { marketService, newOperationKey } from '@/lib/services/market-service'
+import type {
+  MarketBoard,
+  RefuelRequest,
+  RefuelResult,
+  SellRequest,
+  SellResult,
+  Station,
+} from '@/lib/types/market'
 
 // The poll cadence used before the first board response arrives and tells us the
 // server's own stated cadence. Matches market.Params.BoardRefreshCadence's
@@ -75,6 +82,43 @@ export function useSell(
       void qc.invalidateQueries({ queryKey: queryKeys.market.board() })
       void qc.invalidateQueries({ queryKey: queryKeys.market.station(systemId) })
       // The balance rides the corporation record.
+      void qc.invalidateQueries({ queryKey: queryKeys.corporations.me() })
+    },
+  })
+}
+
+// useRefuel — the instant fuel-purchase verb (add-fuel-as-cargo tasks.md
+// 8.5/8.7; `fuel-purchase`'s new verb, modelled on `useSell`).
+//
+// The mutation variables accept EITHER shape a caller may already hold:
+//   - `{ fleetId, request }` — a caller (the board container, mirroring
+//     `useSell`'s own `{ fleetId, request }` vars exactly) that has already
+//     minted its own per-attempt operation key.
+//   - `{ tons }` — a caller bound to one fleet at the hook's own call site
+//     (`useRefuel(fleetId)`) that wants the hook to mint that key itself.
+// Either way exactly ONE operation key is minted per `.mutate()` call, never
+// per underlying transport-retry attempt (the double-submit guard this
+// capability's own SDET brief calls out for precise, mechanism-level
+// coverage — see `hooks/use-refuel.test.tsx`).
+export type RefuelVariables = { tons: number } | { fleetId: string; request: RefuelRequest }
+
+export function useRefuel(fleetId: string): UseMutationResult<RefuelResult, Error, RefuelVariables> {
+  const qc = useQueryClient()
+  return useMutation<RefuelResult, Error, RefuelVariables>({
+    mutationFn: (vars) => {
+      if ('request' in vars) {
+        return marketService.refuel(vars.fleetId, vars.request)
+      }
+      return marketService.refuel(fleetId, { tons: vars.tons, operationKey: newOperationKey() })
+    },
+    onSuccess: (_result, vars) => {
+      const targetFleetId = 'fleetId' in vars ? vars.fleetId : fleetId
+      // Fuel is cargo (the hold shrank in free tons), and the range/stranded
+      // figures are re-derived server-side from the new fuel level — the
+      // fleet read is stale on all three counts. The balance rides the
+      // corporation record, exactly as a sale's proceeds do.
+      void qc.invalidateQueries({ queryKey: queryKeys.fleets.mine() })
+      void qc.invalidateQueries({ queryKey: queryKeys.fleets.detail(targetFleetId) })
       void qc.invalidateQueries({ queryKey: queryKeys.corporations.me() })
     },
   })

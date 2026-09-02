@@ -141,3 +141,95 @@ func (s *Service) PrepareCargoDebitInTx(
 	}
 	return impl.PrepareCargoDebitInTx(tx, fleetID, kind, tons)
 }
+
+// FuelCreditPlan is a validated, staged fuel credit: mirrors CargoDebitPlan's
+// own two-phase shape (Firestore requires every read before every write in a
+// transaction) — the primitive corporation-spawn's starting-fuel grant and
+// the refuel verb both compose inside the ONE transaction each of THEM owns.
+type FuelCreditPlan struct {
+	ref            *firestore.DocumentRef
+	newFuel        float64
+	freeHoldBefore float64
+	// Fleet is the transactionally-read fleet, BEFORE this credit — so a
+	// caller can re-evaluate its own preconditions (docked state, free
+	// hold) against the SAME read this plan was validated from, and so a
+	// replayed idempotent operation can report the already-settled state
+	// without applying a second credit (mirrors CargoDebitPlan.Fleet /
+	// market.settle's own cargoPlan.Fleet.Cargo replay pattern).
+	Fleet Fleet
+}
+
+// PrepareFuelCreditInTx is the READ half: it re-reads the fleet inside the
+// caller's transaction and stages a credit of tons onto cargo.fuel, creating
+// the entry if absent. No free-hold ceiling is enforced here — that
+// precondition differs by caller (spawn's starting grant is unconditional;
+// the refuel verb enforces it itself, using FreeHold() below, since only
+// refuel's own requirement rejects an over-capacity request rather than
+// clamping it).
+func (dao *DaoImpl) PrepareFuelCreditInTx(
+	_ context.Context, tx *firestore.Transaction, fleetID string, tons float64,
+) (*FuelCreditPlan, error) {
+	ref := dao.db.Collection(firestoreCollection).Doc(fleetID)
+	snap, err := tx.Get(ref)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("reading fleet for fuel credit: %w", err)
+	}
+	var f Fleet
+	if err := snap.DataTo(&f); err != nil {
+		return nil, fmt.Errorf("decoding fleet: %w", err)
+	}
+	return &FuelCreditPlan{
+		ref: ref, Fleet: f,
+		freeHoldBefore: FreeHold(f, DefaultClassStats()),
+		newFuel:        f.Cargo["fuel"] + tons,
+	}, nil
+}
+
+// FreeHold is the fleet's free hold BEFORE this credit applies (capacity
+// minus the sum of every held cargo kind, including any fuel already
+// aboard) — the figure a caller enforces its own "within free hold"
+// precondition against.
+func (p *FuelCreditPlan) FreeHold() float64 { return p.freeHoldBefore }
+
+// NewFuelTons is the fleet's cargo.fuel tonnage AFTER this plan applies.
+func (p *FuelCreditPlan) NewFuelTons() float64 { return p.newFuel }
+
+// DockedAt reports whether the transactionally-read fleet is docked to
+// featureID (mirrors CargoDebitPlan.DockedAt).
+func (p *FuelCreditPlan) DockedAt(featureID string) bool {
+	host, docked := p.Fleet.DockedTo()
+	return docked && host == featureID
+}
+
+// Apply is the WRITE half: it stages the credited cargo.fuel value.
+//
+// Set+MergeAll, not Update: Firestore's merge semantics touch only the leaf
+// path explicitly present in the data (cargo.fuel), leaving every OTHER held
+// cargo kind untouched — unlike CargoDebitPlan.Apply's Update, which
+// deliberately replaces the whole cargo map because a debit already
+// recomputed every kind's post-debit value.
+func (p *FuelCreditPlan) Apply(tx *firestore.Transaction) error {
+	if err := tx.Set(p.ref, map[string]interface{}{
+		"cargo": map[string]interface{}{"fuel": p.newFuel},
+	}, firestore.MergeAll); err != nil {
+		return fmt.Errorf("crediting fuel: %w", err)
+	}
+	return nil
+}
+
+// PrepareFuelCreditInTx on the service delegates to the DAO (backend/
+// CLAUDE.md: cross-domain calls go through services, never another domain's
+// DAO) — the seam corporations' starting-fuel grant and the refuel package's
+// settlement transaction both call.
+func (s *Service) PrepareFuelCreditInTx(
+	ctx context.Context, tx *firestore.Transaction, fleetID string, tons float64,
+) (*FuelCreditPlan, error) {
+	impl, ok := s.dao.(*DaoImpl)
+	if !ok {
+		return nil, errors.New("fleet: fuel credit requires the Firestore-backed DAO")
+	}
+	return impl.PrepareFuelCreditInTx(ctx, tx, fleetID, tons)
+}

@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -172,7 +173,7 @@ func (h *Handler) Order(c *gin.Context) {
 		return
 	}
 	f, err := h.svc.OrderTo(c.Request.Context(), fleetId, req)
-	h.respond(c, f, err)
+	h.respondWithStrandingWarning(c, f, err)
 }
 
 func (h *Handler) Cancel(c *gin.Context) {
@@ -203,7 +204,7 @@ func (h *Handler) Stop(c *gin.Context) {
 		return
 	}
 	f, err := h.svc.Stop(c.Request.Context(), fleetId)
-	h.respond(c, f, err)
+	h.respondWithStrandingWarning(c, f, err)
 }
 
 // Jump handles POST /v1/fleets/:fleetId/jump {laneId} (fleet-movement "Lane
@@ -238,6 +239,36 @@ func (h *Handler) Scan(c *gin.Context) {
 	h.respond(c, f, err)
 }
 
+// orderStrandingWarningDTO wraps the ordinary fleetDTO with the burn-
+// commit-response-only `strandingWarning` field (add-fuel-as-cargo,
+// fleet-movement "A Burn Commit Warns, But Does Not Block, When It Would
+// Leave the Fleet Unable to Reach a Station or Gate"). Deliberately NOT on
+// fleetDTO itself — the persistent, per-read signal is Roster.Stranded;
+// this one-shot field exists only on the response of the commit that
+// created the condition, never on an ordinary read (json:",omitempty" on a
+// bool omits it entirely when false).
+type orderStrandingWarningDTO struct {
+	fleetDTO
+	StrandingWarning bool `json:"strandingWarning,omitempty"`
+}
+
+// respondWithStrandingWarning is Order/Stop's own response path: identical
+// to respond's error mapping, but on success it adds the transient,
+// commit-response-only stranding-warning field Fleet.StrandingWarning
+// carries (never persisted, never present on an ordinary read).
+func (h *Handler) respondWithStrandingWarning(c *gin.Context, f *Fleet, err error) {
+	if err != nil {
+		h.respond(c, nil, err)
+		return
+	}
+	dto, posErr := h.toDTO(c, f)
+	if posErr != nil {
+		h.respond(c, nil, posErr)
+		return
+	}
+	c.JSON(http.StatusOK, orderStrandingWarningDTO{fleetDTO: dto, StrandingWarning: f.StrandingWarning})
+}
+
 func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 	switch {
 	case errors.Is(err, ErrNotFound):
@@ -257,6 +288,12 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 	case errors.Is(err, disclosure.ErrScanOutOfRange), errors.Is(err, disclosure.ErrScanOccluded):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, action.ErrActiveActionExists):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrInsufficientFuel):
+		// A named reason distinct from the persistent stranded indication
+		// (fleet-movement "A Burn Commit Is Rejected When Its Fuel Cost
+		// Exceeds Available Fuel..."): this specific commit is unaffordable,
+		// never "this fleet cannot move to anything reachable at all".
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrDestinationNotReady):
 		// A distinguishable, retryable rejection — never the bodyless 5xx
@@ -319,21 +356,43 @@ type rosterDTO struct {
 	CargoCapacity float64            `json:"cargoCapacity"`
 	FreeHold      float64            `json:"freeHold"`
 	MiningRate    float64            `json:"miningRate"`
+	// EstimatedRange, Stranded, and FuelPricePerTon are add-fuel-as-cargo's
+	// own owner-only fields (fleet-movement "Fleet Read Reports an
+	// Estimated Maximum Range From Current Fuel", "A Fleet's Read Reports a
+	// Persistent Stranded Indication, Computed at the Acceleration Floor",
+	// "Fleet Read Serves the Configured Fuel Price, Never Duplicated
+	// Client-Side"). A foreign fleet never carries a rosterDTO at all, so
+	// there is no foreign-fleet response for these fields to appear on.
+	EstimatedRange  float64 `json:"estimatedRange"`
+	Stranded        bool    `json:"stranded"`
+	FuelPricePerTon float64 `json:"fuelPricePerTon"`
+}
+
+// fuelStatusSource is the optional capability the handler probes for via a
+// type assertion, rather than widening ServiceInterface (which
+// handler_test.go's hand-written fakeFleetSvc would then also have to grow
+// to keep satisfying) — implemented by the concrete *Service.
+type fuelStatusSource interface {
+	FuelStatus(ctx context.Context, f *Fleet) (estimatedRange float64, stranded bool, err error)
+	FuelPricePerTon() float64
 }
 
 // rosterFieldsFor builds the owner-only roster/cargo DTO, or nil for a
 // foreign fleet.
-func rosterFieldsFor(f *Fleet, own bool) *rosterDTO {
+func rosterFieldsFor(f *Fleet, own bool, estimatedRange float64, stranded bool, fuelPricePerTon float64) *rosterDTO {
 	if !own {
 		return nil
 	}
 	stats := DefaultClassStats()
 	return &rosterDTO{
-		Ships:         effectiveRoster(*f),
-		Cargo:         f.Cargo,
-		CargoCapacity: DerivedCapacity(*f, stats),
-		FreeHold:      FreeHold(*f, stats),
-		MiningRate:    DerivedMiningRate(*f, stats),
+		Ships:           effectiveRoster(*f),
+		Cargo:           f.Cargo,
+		CargoCapacity:   DerivedCapacity(*f, stats),
+		FreeHold:        FreeHold(*f, stats),
+		MiningRate:      DerivedMiningRate(*f, stats),
+		EstimatedRange:  estimatedRange,
+		Stranded:        stranded,
+		FuelPricePerTon: fuelPricePerTon,
 	}
 }
 
@@ -379,6 +438,26 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 		return fleetDTO{}, err
 	}
 
+	// Owner-only fuel status (add-fuel-as-cargo) — probed via an optional
+	// capability so ServiceInterface's own contract (satisfied by
+	// handler_test.go's hand-written fake) need not grow a method that fake
+	// has no reason to implement. A foreign fleet never reaches this at all
+	// (own is false), and a lookup failure degrades to the zero values
+	// rather than failing the whole read — a fuel-status computation error
+	// must never take down an otherwise-servable fleet read.
+	var estimatedRange, fuelPricePerTon float64
+	var stranded bool
+	if own {
+		if fs, ok := h.svc.(fuelStatusSource); ok {
+			fuelPricePerTon = fs.FuelPricePerTon()
+			if r, s, ferr := fs.FuelStatus(c.Request.Context(), f); ferr == nil {
+				estimatedRange, stranded = r, s
+			} else {
+				log.Warn().Ctx(c).Err(ferr).Str("fleetId", f.Id).Msg("fuel-status computation failed; degrading read")
+			}
+		}
+	}
+
 	return fleetDTO{
 		Id:            f.Id,
 		CorporationId: f.CorporationId,
@@ -390,6 +469,6 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 		Position:      pos,
 		Own:           own,
 		WorldTime:     h.clock.Now(),
-		Roster:        rosterFieldsFor(f, own),
+		Roster:        rosterFieldsFor(f, own, estimatedRange, stranded, fuelPricePerTon),
 	}, nil
 }

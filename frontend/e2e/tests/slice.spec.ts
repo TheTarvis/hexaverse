@@ -104,10 +104,39 @@ async function clickGlyph(page: Page, testId: string): Promise<void> {
   await page.getByTestId(testId).dispatchEvent('click')
 }
 
-// Reads the used-tons figure off the hold readout ("12 / 200t" → 12).
+// Reads the used-tons figure off the hold readout ("12 / 200t" → 12). Total
+// hold occupancy is a MOVING TARGET once fuel shares the cargo pool
+// (add-fuel-as-cargo: fuel occupies the same `roster.cargo` map a mined
+// resource does, and every burn spends some) — this is still the right way
+// to prove SOMETHING occupies the hold (the starting-fuel-grant sanity check
+// below), but it must never anchor a "mined N more tons" assertion, because a
+// burn between the baseline read and the mine commit changes the total for a
+// reason that has nothing to do with mining. See `holdKindTons` for that.
 async function holdUsed(page: Page): Promise<number> {
   const text = await page.getByTestId('hold-capacity').innerText()
   return Number(text.split('/')[0].trim())
+}
+
+// Reads ONE resource kind's own tons off the hold readout's per-kind row
+// (`hold-{kind}`, e.g. "metals ... 5t"). The row only renders once that
+// kind's tons are > 0 (FactsPanel.tsx's `entries` filter), so a kind with
+// nothing mined yet legitimately reads 0 rather than failing.
+async function holdKindTons(page: Page, kind: string): Promise<number> {
+  const row = page.getByTestId(`hold-${kind}`)
+  if ((await row.count()) === 0) return 0
+  const text = await row.innerText()
+  const match = text.match(/([\d.]+)\s*t\b/)
+  return match ? Number(match[1]) : 0
+}
+
+// The kind MineSection has pre-selected (the docked lode's richest resource,
+// `mine-kind-{kind}` with `aria-pressed="true"`) — read off the DOM rather
+// than assumed, so this spec proves the mined tonnage against whichever kind
+// the panel actually committed, not a guess.
+async function selectedMineKind(page: Page): Promise<string> {
+  const pressed = page.locator('[data-testid^="mine-kind-"][aria-pressed="true"]')
+  const testId = (await pressed.first().getAttribute('data-testid'))!
+  return testId.replace('mine-kind-', '')
 }
 
 test.describe('the vertical slice', () => {
@@ -129,9 +158,20 @@ test.describe('the vertical slice', () => {
     await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 20_000 })
     await expect(page.getByTestId('board-overlay')).toBeVisible({ timeout: 15_000 })
 
-    // The hull carries an empty hold from spawn (the roster block on the read).
+    // The hull's hold is NOT empty from spawn any more: add-fuel-as-cargo
+    // (tasks.md 5) grants starting fuel at spawn, and fuel occupies the
+    // same cargo pool as mined ore (fleet-movement "Fleet Cargo Pool").
+    // Capture the served baseline (fleet.FuelParams.StartingFuelTons —
+    // 100 by default) rather than hard-coding it, so the mining deltas
+    // this journey actually exists to prove (below) stay pinned exactly
+    // without this spec also re-pinning a tuning constant that isn't its
+    // concern.
     await expect(page.getByTestId('hold-readout')).toBeVisible({ timeout: 15_000 })
-    expect(await holdUsed(page)).toBe(0)
+    const startingHold = await holdUsed(page)
+    expect(
+      startingHold,
+      'a freshly spawned hull should hold its starting-fuel grant, not an empty hold',
+    ).toBeGreaterThan(0)
 
     // 2. NO SCAN — system-interior's unfogged interim read (tasks.md 7.7)
     //    ships every feature, resources included, from the very first board
@@ -186,33 +226,51 @@ test.describe('the vertical slice', () => {
     await page.getByTestId(`fleet-cmd-burn-${fleetId}`).click()
     await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText('Docked', { timeout: 180_000 })
 
-    // 5. MINE a minimum-size run (5t at 0.001 t/ms = 5s) and watch the hold
-    //    fill at the eta — no navigation, the refetch rules land it. The
-    //    offer anchors to the docked state on the fleet card ("Mine Offer on
-    //    the Docked Fleet") — no board click involved.
+    // 5. MINE a minimum-size run (5t at 0.001 t/ms = 5s) and watch the MINED
+    //    RESOURCE — not the aggregate hold — fill at the eta. Total hold
+    //    occupancy is not a valid baseline any more (add-fuel-as-cargo: this
+    //    same journey's own burn to the lode already spent fuel out of the
+    //    same cargo pool, so `startingHold + 5` cannot hold — the pool
+    //    shrank from fuel burn and grew from mining in between, and this
+    //    spec has no business pinning the burn's fuel cost). What THIS
+    //    slice proves is the mined tonnage itself arriving and persisting —
+    //    so it is asserted directly on the mined kind's own hold row.
+    //    SDET NOTE (post-handoff test revision — cause: provably misread the
+    //    spec, adjudicated 2026-09-02): the prior assertion read
+    //    `holdUsed(page)` (aggregate) against `startingHold + 5`, which
+    //    assumed hold only grows; fuel consumption by the leg-1 burn falsified
+    //    that assumption. Fixed to assert the mined kind's own tonnage.
     await expect(page.getByTestId('mine-section')).toBeVisible({ timeout: 10_000 })
+    const mineKind = await selectedMineKind(page)
+    const mineKindBefore = await holdKindTons(page, mineKind)
     await page.getByTestId('mine-tons-input').fill('5')
     await page.getByTestId('mine-button').click()
     await expect(page.getByTestId('mine-countdown')).toBeVisible({ timeout: 10_000 })
     await expect
-      .poll(() => holdUsed(page), { timeout: 45_000, message: 'the hold fills at the run’s eta' })
-      .toBe(5)
+      .poll(() => holdKindTons(page, mineKind), {
+        timeout: 45_000,
+        message: 'the mined resource fills at the run’s eta',
+      })
+      .toBe(mineKindBefore + 5)
 
     // 6. PERSISTED: reload — the hold readout re-derives from a fresh
     //    Firestore read (the same read a returning fleet would issue).
     await page.reload()
     await expect(page.getByTestId('hold-readout')).toBeVisible({ timeout: 15_000 })
-    expect(await holdUsed(page)).toBe(5)
+    expect(await holdKindTons(page, mineKind)).toBe(mineKindBefore + 5)
 
-    // 7. Mine AGAIN — the lode's ledger and the hold both accumulate
-    //    (exactly-once deltas: 5 + 5, never 5 or 15). The offer is already
-    //    back on the fleet card (still docked, channel free again).
+    // 7. Mine AGAIN — the lode's ledger and the mined resource both
+    //    accumulate (exactly-once deltas: 5 + 5, never 5 or 15). The offer is
+    //    already back on the fleet card (still docked, channel free again).
     await expect(page.getByTestId('mine-section')).toBeVisible({ timeout: 10_000 })
     await page.getByTestId('mine-tons-input').fill('5')
     await page.getByTestId('mine-button').click()
     await expect
-      .poll(() => holdUsed(page), { timeout: 45_000, message: 'the second run accumulates' })
-      .toBe(10)
+      .poll(() => holdKindTons(page, mineKind), {
+        timeout: 45_000,
+        message: 'the second run accumulates',
+      })
+      .toBe(mineKindBefore + 10)
 
     // 8. DEPART — select the home system's nearest lane-gate body, BURN +
     //    dock to it (board-view "Burn Command Targets a Selected Lane-Gate

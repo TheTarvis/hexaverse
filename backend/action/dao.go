@@ -76,6 +76,22 @@ type Dao interface {
 	FoldDeltas(ctx context.Context, scope string, upTo common.WorldMillis) (float64, error)
 }
 
+// transactionalCommitter is implemented by a Dao capable of invoking an
+// ActorStateFunc producer inside its own commit transaction (add-fuel-as-
+// cargo RULING 1). Deliberately NOT folded into the Dao interface: a
+// hand-written test Dao implementing only the base Commit method must keep
+// satisfying Dao unchanged. Service.Commit probes for this via a type
+// assertion when CommitSpec.ActorStateFunc is supplied.
+type transactionalCommitter interface {
+	CommitWithProducer(ctx context.Context, a Action, producer ActorStateFunc) error
+}
+
+// transactionalCanceler is CancelWithProducer's own optional-capability
+// interface, mirroring transactionalCommitter for the cancel path.
+type transactionalCanceler interface {
+	CancelWithProducer(ctx context.Context, id string, actorState map[string]interface{}, producerFor func(actionType string) (ActorStateFunc, bool)) (*Action, error)
+}
+
 type DaoImpl struct {
 	db    common.FirestoreService
 	clock common.WorldTime
@@ -160,7 +176,13 @@ func (dao *DaoImpl) List(ctx context.Context, actor string, statuses ...Status) 
 	return out, nil
 }
 
-func (dao *DaoImpl) Commit(ctx context.Context, a Action, actorState map[string]interface{}) error {
+// commitTx is Commit/CommitWithProducer's shared shape: read the actor doc,
+// check the slot, resolve the fields to merge (either the caller's static
+// map, or — add-fuel-as-cargo RULING 1 — a transaction-scoped producer's own
+// computation from that SAME read), then create the action and merge the
+// actor doc. A resolve error (the producer's veto) aborts before either
+// write, so an unaffordable commit persists nothing at all.
+func (dao *DaoImpl) commitTx(ctx context.Context, a Action, resolve func(actorData map[string]interface{}) (map[string]interface{}, error)) error {
 	return dao.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		actorRef := dao.db.Collection(a.ActorCollection).Doc(a.Actor)
 		actorSnap, err := tx.Get(actorRef)
@@ -170,16 +192,37 @@ func (dao *DaoImpl) Commit(ctx context.Context, a Action, actorState map[string]
 		if active, _ := actorSnap.Data()[slotField(a)].(string); active != "" {
 			return ErrActiveActionExists
 		}
+		merged, err := resolve(actorSnap.Data())
+		if err != nil {
+			return err
+		}
 		if err := tx.Create(dao.actionRef(a.Id), a); err != nil {
 			return fmt.Errorf("creating action: %w", err)
 		}
-		return tx.Set(actorRef, mergeActorState(slotField(a), a.Id, actorState), firestore.MergeAll)
+		return tx.Set(actorRef, mergeActorState(slotField(a), a.Id, merged), firestore.MergeAll)
 	})
 }
 
-func (dao *DaoImpl) Cancel(ctx context.Context, id string, actorState map[string]interface{}) (*Action, error) {
+func (dao *DaoImpl) Commit(ctx context.Context, a Action, actorState map[string]interface{}) error {
+	return dao.commitTx(ctx, a, func(map[string]interface{}) (map[string]interface{}, error) {
+		return actorState, nil
+	})
+}
+
+// CommitWithProducer is Commit's transaction-scoped-producer variant
+// (add-fuel-as-cargo, RULING 1) — NOT part of the Dao interface (an optional
+// capability a caller probes for via the transactionalCommitter interface),
+// so a hand-written test Dao that only implements the base Commit method
+// still satisfies Dao unchanged.
+func (dao *DaoImpl) CommitWithProducer(ctx context.Context, a Action, producer ActorStateFunc) error {
+	return dao.commitTx(ctx, a, producer)
+}
+
+// cancelTx is Cancel/CancelWithProducer's shared shape.
+func (dao *DaoImpl) cancelTx(ctx context.Context, id string, resolve func(a Action, actorData map[string]interface{}) (map[string]interface{}, error)) (*Action, error) {
 	var out *Action
 	err := dao.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		out = nil // reset on retry
 		ref := dao.actionRef(id)
 		snap, err := tx.Get(ref)
 		if err != nil {
@@ -196,20 +239,47 @@ func (dao *DaoImpl) Cancel(ctx context.Context, id string, actorState map[string
 			return ErrNotRunning
 		}
 		actorRef := dao.db.Collection(a.ActorCollection).Doc(a.Actor)
-		if _, err := tx.Get(actorRef); err != nil { // read-before-write
+		actorSnap, err := tx.Get(actorRef)
+		if err != nil {
+			return err
+		}
+		merged, err := resolve(a, actorSnap.Data())
+		if err != nil {
 			return err
 		}
 		a.Status = StatusCancelled
 		if err := tx.Update(ref, []firestore.Update{{Path: "status", Value: string(StatusCancelled)}}); err != nil {
 			return err
 		}
-		if err := tx.Set(actorRef, mergeActorState(slotField(a), "", actorState), firestore.MergeAll); err != nil {
+		if err := tx.Set(actorRef, mergeActorState(slotField(a), "", merged), firestore.MergeAll); err != nil {
 			return err
 		}
 		out = &a
 		return nil
 	})
 	return out, err
+}
+
+func (dao *DaoImpl) Cancel(ctx context.Context, id string, actorState map[string]interface{}) (*Action, error) {
+	return dao.cancelTx(ctx, id, func(Action, map[string]interface{}) (map[string]interface{}, error) {
+		return actorState, nil
+	})
+}
+
+// CancelWithProducer is Cancel's transaction-scoped-producer variant — the
+// generic action-cancel route's (POST /v1/actions/:actionId/cancel) own
+// mechanism for a per-type discard effect (add-fuel-as-cargo tasks.md 2.5:
+// "the trigger is universal ... a future discard path inherits the refund
+// automatically"). producerFor resolves the running action's OWN type to a
+// registered producer; when none is registered, this behaves identically to
+// Cancel(actorState). NOT part of the Dao interface — see CommitWithProducer.
+func (dao *DaoImpl) CancelWithProducer(ctx context.Context, id string, actorState map[string]interface{}, producerFor func(actionType string) (ActorStateFunc, bool)) (*Action, error) {
+	return dao.cancelTx(ctx, id, func(a Action, actorData map[string]interface{}) (map[string]interface{}, error) {
+		if fn, ok := producerFor(a.Type); ok {
+			return fn(actorData)
+		}
+		return actorState, nil
+	})
 }
 
 func (dao *DaoImpl) Acknowledge(ctx context.Context, id string, at common.WorldMillis) (*Action, error) {

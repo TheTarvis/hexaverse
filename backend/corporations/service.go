@@ -12,6 +12,7 @@ import (
 	"hexaverse/galaxy"
 	"hexaverse/space"
 
+	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -59,6 +60,12 @@ type FleetSource interface {
 	// Decision 16, Open Question 3), without corporations depending on the
 	// system package directly.
 	HomeGeometry(ctx context.Context, systemID string) (extent, starSize float64, err error)
+	// PrepareFuelCreditInTx stages a credit of tons onto a fleet's cargo.fuel
+	// inside the CALLER's own transaction (add-fuel-as-cargo) — the
+	// primitive corporation-spawn's starting-fuel grant composes with its
+	// own atomic marker create (CreditStore.GrantStartingFuel), mirroring
+	// PrepareCreditInTx/CreditPlan's own two-phase shape.
+	PrepareFuelCreditInTx(ctx context.Context, tx *firestore.Transaction, fleetID string, tons float64) (*fleet.FuelCreditPlan, error)
 }
 
 // FogSource writes the initial observations and reads other corps' explored sets
@@ -116,6 +123,9 @@ type Service struct {
 	// corporations importing market would cycle. router.go is the one place the
 	// two meet.
 	startingCredits int64
+	// fuelParams holds add-fuel-as-cargo's tuning knobs — StartingFuelTons is
+	// the constant ensureStartingFuel grants.
+	fuelParams fleet.FuelParams
 }
 
 // NewService wires the corporation domain. The galaxy/fleet/fog services are the
@@ -130,13 +140,14 @@ func NewService(graph GraphSource, fleets FleetSource, fog FogSource) *Service {
 		panic(err)
 	}
 	return &Service{
-		dao:     NewDao(),
-		graph:   graph,
-		fleets:  fleets,
-		fog:     fog,
-		clock:   common.WorldClock(),
-		params:  params,
-		credits: NewCreditStore(),
+		dao:        NewDao(),
+		graph:      graph,
+		fleets:     fleets,
+		fog:        fog,
+		clock:      common.WorldClock(),
+		params:     params,
+		credits:    NewCreditStore(),
+		fuelParams: fleet.DefaultFuelParams(),
 	}
 }
 
@@ -170,13 +181,21 @@ func (s *Service) Credits() *CreditStore { return s.credits }
 
 func NewServiceWith(dao Dao, graph GraphSource, fleets FleetSource, fog FogSource, clock common.WorldTime) *Service {
 	return &Service{
-		dao:    dao,
-		graph:  graph,
-		fleets: fleets,
-		fog:    fog,
-		clock:  clock,
-		params: DefaultSpawnParams(),
+		dao:        dao,
+		graph:      graph,
+		fleets:     fleets,
+		fog:        fog,
+		clock:      clock,
+		params:     DefaultSpawnParams(),
+		fuelParams: fleet.DefaultFuelParams(),
 	}
+}
+
+// WithFuelParams overrides add-fuel-as-cargo's tuning knobs — the seam a
+// test uses to induce a deterministic starting-fuel-grant boundary.
+func (s *Service) WithFuelParams(p fleet.FuelParams) *Service {
+	s.fuelParams = p
+	return s
 }
 
 func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResult, error) {
@@ -311,6 +330,9 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*Sp
 	if err := s.ensureOpeningGrant(ctx, corp, now); err != nil {
 		return nil, err
 	}
+	if err := s.ensureStartingFuel(ctx, corp, hull); err != nil {
+		return nil, err
+	}
 	if err := s.markAssetsComplete(ctx, corp, now); err != nil {
 		return nil, err
 	}
@@ -330,14 +352,31 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*Sp
 // The assets-complete marker short-circuits at entry reading NOTHING but the
 // marker already on the corp doc in hand: a healed corp's every later read costs
 // zero extra reads and zero writes.
+//
+// add-fuel-as-cargo's starting-fuel grant is a FOURTH healed asset, added
+// after AssetsCompleteAt started being stamped (#0011) — a corp that
+// completed spawn healing before this capability existed would otherwise
+// NEVER receive it, since the marker above already reads as "done" for it
+// (corporation-spawn "A corp with hull, fog, station, and balance but no
+// starting-fuel grant yet gets it credited on retry"). ensureStartingFuel is
+// independently idempotent on its own create-if-absent marker
+// (corporations/{corpId}/fuelGrants/{fleetId}), so re-running it here for an
+// already-complete corp costs one extra read and is a genuine no-op once
+// granted — it never re-grants, and it never re-runs the heavier hull/fog/
+// station/balance steps ensureSpawnAssets performs.
 func (s *Service) healAssets(ctx context.Context, corp *Corporation) error {
-	if corp.AssetsCompleteAt != 0 {
-		return nil
-	}
-	if _, err := s.ensureSpawnAssets(ctx, corp); err != nil {
+	if corp.AssetsCompleteAt == 0 {
+		_, err := s.ensureSpawnAssets(ctx, corp)
 		return err
 	}
-	return nil
+	fleets, err := s.fleets.ListForCorp(ctx, corp.Id)
+	if err != nil {
+		return err
+	}
+	if len(fleets) == 0 {
+		return nil // nothing to grant fuel to — degrade rather than fail an otherwise-complete read
+	}
+	return s.ensureStartingFuel(ctx, corp, &fleets[0])
 }
 
 // ensureStation provisions the home system's NPC station, idempotently per
@@ -371,6 +410,22 @@ func (s *Service) ensureOpeningGrant(ctx context.Context, corp *Corporation, now
 		return err
 	}
 	return nil
+}
+
+// ensureStartingFuel grants FuelParams.StartingFuelTons to the corp's hull
+// exactly once (add-fuel-as-cargo, corporation-spawn "Spawn Asset Healing" /
+// "Starting Fuel Is a Configured Constant, Guarded By a Reachability
+// Sample") — never solved at spawn time. "Already granted" is decided ONLY
+// by the create-if-absent marker document CreditStore.GrantStartingFuel
+// anchors on, never by the fleet's current fuel level being zero (which
+// would re-grant forever to a hull that legitimately burned its tank dry —
+// the same anti-pattern ensureOpeningGrant's own doc comment guards
+// against).
+func (s *Service) ensureStartingFuel(ctx context.Context, corp *Corporation, hull *fleet.Fleet) error {
+	if s.credits == nil || s.fleets == nil || hull == nil || s.fuelParams.StartingFuelTons <= 0 {
+		return nil
+	}
+	return s.credits.GrantStartingFuel(ctx, corp.Id, hull.Id, s.fuelParams.StartingFuelTons, s.fleets)
 }
 
 // markAssetsComplete stamps the short-circuit marker once every derived asset is

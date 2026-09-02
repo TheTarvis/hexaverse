@@ -151,6 +151,40 @@ describe('ApiClient', () => {
       expect(response.data).toEqual({ data: 'success' })
     })
 
+    // SDET-added (add-fuel-as-cargo tasks.md 8.7; board-view "Sell Control
+    // Guards Against Double-Submit" / "Refuel Control Guards Against
+    // Double-Submit" — both scenarios titled "A transport-level retry of
+    // the same attempt yields exactly one [sale|refuel]"). Neither
+    // requirement is testable end-to-end without a live backend (there is
+    // no real "lost response" to induce), but the MECHANISM both depend on
+    // is entirely inside this client, generic to any POST, and IS
+    // precisely testable here: a 401 retry resends the exact same request
+    // body it was given — never re-serialized from a mutated source — so a
+    // caller-supplied idempotency key embedded in that body (sell's/
+    // refuel's `operationKey`) rides the retry unchanged, by construction,
+    // with no per-verb retry logic required anywhere else in the app.
+    it('resends the identical request body byte-for-byte on a 401 retry — what a caller-supplied idempotency key (e.g. sell/refuel’s operationKey) rides unchanged', async () => {
+      ;(auth as any).currentUser = mockUser
+      mockUser.getIdTokenResult.mockResolvedValue({
+        token: 'expired-token',
+        expirationTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      })
+      mockUser.getIdToken.mockResolvedValueOnce('fresh-token')
+
+      ;(fetch as any)
+        .mockResolvedValueOnce(mockErrorResponse({ error: 'Token expired' }, 401, 'Unauthorized'))
+        .mockResolvedValueOnce(mockJsonResponse({ ok: true }))
+
+      const body = { tons: 10, operationKey: 'idempotency-key-abc123' }
+      await client.post('/fleets/f1/refuel', body)
+
+      expect(fetch).toHaveBeenCalledTimes(2)
+      const firstBody = (fetch as any).mock.calls[0][1].body
+      const retryBody = (fetch as any).mock.calls[1][1].body
+      expect(retryBody).toBe(firstBody) // the SAME already-serialized string, not re-built
+      expect(JSON.parse(retryBody)).toEqual(body)
+    })
+
     it('should throw error if retry also fails', async () => {
       ;(auth as any).currentUser = mockUser
       // Initial token fetch via getIdTokenResult

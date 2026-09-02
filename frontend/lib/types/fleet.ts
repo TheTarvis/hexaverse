@@ -106,11 +106,23 @@ export interface JumpTransit {
 export interface FleetRoster {
   ships: { class: string }[]
   // Tons held, by resource kind. Kinds the fleet holds none of are absent.
+  // `fuel` rides this SAME map (add-fuel-as-cargo — fuel is a reserved cargo
+  // kind, not a `ResourceKind`; see `lib/types/system-board.ts`), never a
+  // separate field.
   cargo: Record<string, number> | null
   cargoCapacity: number
   freeHold: number
   // Summed extraction rate (tons/world-ms) — the mine ETA preview's divisor.
   miningRate: number
+  // add-fuel-as-cargo (fleet-movement "Fleet Read Reports an Estimated
+  // Maximum Range From Current Fuel" / "... Persistent Stranded Indication"
+  // / "... Serves the Configured Fuel Price"). Always served on a real
+  // owner-only read; declared OPTIONAL here (not on the wire) only so the
+  // fixtures this repo already had before this capability landed keep
+  // type-checking without every one of them being touched.
+  estimatedRange?: number
+  stranded?: boolean
+  fuelPricePerTon?: number
 }
 
 export interface Fleet {
@@ -140,6 +152,12 @@ export interface Fleet {
   // Owner-only roster/cargo/derived-stats block.
   roster?: FleetRoster
   worldTime: number
+  // add-fuel-as-cargo (fleet-roster "A Burn Commit's Stranding Warning Is
+  // Surfaced to the Player") — ONE-SHOT, present only on a burn commit's
+  // response naming the condition, never on an ordinary fleet read (which
+  // carries the roster's `stranded` field instead — the persistent
+  // indication).
+  strandingWarning?: boolean
 }
 
 // OrderRequest — the burn-order verb's body: exactly one of a body id or an

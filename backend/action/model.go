@@ -153,7 +153,30 @@ type CommitSpec struct {
 	// ActorState is merged onto the actor doc in the same transaction that claims
 	// the slot — so the fleet flips to burn and reserves its slot atomically.
 	ActorState map[string]interface{}
+	// ActorStateFunc, when non-nil, is invoked INSIDE Commit's own transaction,
+	// after the actor document has already been read for the slot check, with
+	// that same transactional read's field map (add-fuel-as-cargo, RULING 1;
+	// design.md's "transaction-scoped ActorState producer" — "A transaction-
+	// scoped ActorState producer computes its merge from the transactional
+	// read, not a stale snapshot"). It returns the fields to merge onto the
+	// actor doc, or a named error that aborts the commit ENTIRELY: no action
+	// created, no slot claimed, no actor-state mutation persisted ("A
+	// transaction-scoped producer's error aborts the commit entirely"). When
+	// supplied, it is used IN PLACE OF the static ActorState map above.
+	ActorStateFunc ActorStateFunc
 }
+
+// ActorStateFunc computes an actor-doc merge from that actor's own live,
+// transactional field data — CommitSpec.ActorStateFunc's shape, and (since
+// add-fuel-as-cargo) also the per-type producer a verb registers via
+// RegisterCancelProducer for the generic action-cancel route
+// (POST /v1/actions/:actionId/cancel) — the one discard path with no
+// verb-package call site to compute its own effect from data already held
+// in memory. Both directions share the same contract: the producer receives
+// the actor's TRANSACTIONAL field data (never a value captured before the
+// transaction opened) and can veto the whole operation by returning an
+// error.
+type ActorStateFunc func(actorData map[string]interface{}) (map[string]interface{}, error)
 
 // Resolution is the transactional surface a resolver receives. Reads are issued
 // inside the resolve transaction; the resolver must not perform its own writes —

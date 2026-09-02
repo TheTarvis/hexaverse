@@ -25,6 +25,12 @@ const (
 	// reconciliationDocId is that subcollection's one doc — the interior/meta
 	// singleton shape this codebase already uses.
 	reconciliationDocId = "state"
+	// fuelGrantsSubcollection holds one create-if-absent marker doc per
+	// fleet a corporation's starting-fuel grant has already reached
+	// (add-fuel-as-cargo) — the atomic "already granted" anchor, mirroring
+	// the ledger subcollection's own doc-id-is-the-idempotency-anchor
+	// scheme, at corporations/{corpId}/fuelGrants/{fleetId}.
+	fuelGrantsSubcollection = "fuelGrants"
 )
 
 // LedgerPageSize is the ledger read's page size. The ledger is unbounded over a
@@ -321,6 +327,45 @@ func (s *CreditStore) ApplyCredit(
 	AuditCreditAttempt(ctx, entry.AccountId, corpID, operationKey, nil)
 	ObserveMinted(ctx, corpID, out.Amount, out.WorldTime)
 	return &out, nil
+}
+
+// GrantStartingFuel grants tons of starting fuel to a fleet exactly once,
+// atomically anchored on a create-if-absent marker document at
+// corporations/{corpId}/fuelGrants/{fleetId} (add-fuel-as-cargo,
+// corporation-spawn "Starting Fuel Is a Configured Constant, Guarded By a
+// Reachability Sample") — NEVER on the fleet's current fuel level, which
+// would re-grant forever to a hull that legitimately burned its tank dry.
+// The marker read and the fuel credit land in ONE transaction (mirroring
+// PrepareCreditInTx/CreditPlan's own two-phase shape): a concurrent second
+// caller that also observes the marker absent races this one on the SAME
+// transactional read, and Firestore's optimistic-concurrency retry ensures
+// only one of the two ever actually applies the credit — exactly the
+// "Concurrent bootstrap reads for one account heal exactly once" guarantee
+// the opening credit grant already relies on.
+func (s *CreditStore) GrantStartingFuel(ctx context.Context, corpID, fleetID string, tons float64, fleets FleetSource) error {
+	if corpID == "" || fleetID == "" || tons <= 0 || fleets == nil {
+		return nil
+	}
+	markerRef := s.corpRef(corpID).Collection(fuelGrantsSubcollection).Doc(fleetID)
+	return s.db.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		markerSnap, err := tx.Get(markerRef)
+		if err != nil && status.Code(err) != codes.NotFound {
+			return fmt.Errorf("reading fuel grant marker: %w", err)
+		}
+		if markerSnap != nil && markerSnap.Exists() {
+			return nil // already granted — idempotent no-op
+		}
+		plan, err := fleets.PrepareFuelCreditInTx(ctx, tx, fleetID, tons)
+		if err != nil {
+			return err
+		}
+		if err := tx.Create(markerRef, map[string]interface{}{
+			"fleetId": fleetID, "tons": tons,
+		}); err != nil {
+			return fmt.Errorf("creating fuel grant marker: %w", err)
+		}
+		return plan.Apply(tx)
+	})
 }
 
 // latestEntryInTx reads the single most recent entry under the compound

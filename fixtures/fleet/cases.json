@@ -14,5 +14,66 @@
     { "name": "negative", "input": "-3", "wantErr": "ErrAccelBelowFloor" },
     { "name": "below the disclosure floor but finite and positive", "input": "0.1", "wantErr": "ErrAccelBelowFloor" },
     { "name": "above the fleet's ceiling", "input": "999", "wantErr": "ErrAccelAboveCeiling" }
+  ],
+  "_fuelCostAndRefundMeta": {
+    "purpose": "openspec change add-fuel-as-cargo, tasks.md 2.7 — golden cases for the burn fuel-cost conversion (fleet-movement 'A Burn's Fuel Cost Scales With Roster Hull Count, Never Loaded Mass') and the closed-form discard refund ('Discarding a Running Burn Refunds Its Unspent Fuel, Closed-Form'). A new family alongside commandedAccelRejection in this same file (tasks.md 2.7 names 'a new fixtures/fleet/ (or equivalent) family' — this IS that family, additive to the pre-existing key above, not a replacement).",
+    "costFormula": "costTons = (accel * flightSeconds) * hullCount / deltaVPerTon, where flightSeconds = (arriveMs - departMs) / 1000 and deltaVPerTon = FuelParams.DeltaVPerTon (5.0, the placeholder value fleet-movement's own requirement text pins).",
+    "refundFormula": "refundTons = storedDebitedCostTons * (flightDurationMs - tauMs) / flightDurationMs, where flightDurationMs = arriveMs - departMs (the burn's own stored window) and tauMs = the discard instant minus departMs — task 2.6's stored debited-cost-in-tons field is the refund's only input besides the timing, never a re-derivation from hull count/roster at discard time.",
+    "crossTargetSafety": "every value below is exact rational arithmetic on round inputs (no sqrt, no float64 accumulation edge) — chosen deliberately so this table needs no per-architecture variant, unlike commandedAccelRejection's NaN-propagation cases above."
+  },
+  "fuelCost": [
+    {
+      "name": "single hull, ceiling-ish accel, round flight time",
+      "accel": 8,
+      "flightSeconds": 10,
+      "hullCount": 1,
+      "deltaVPerTon": 5,
+      "deltaV": 80,
+      "costTons": 16
+    },
+    {
+      "name": "ten hulls, identical burn — cost scales linearly with hull count, never with loaded mass",
+      "accel": 8,
+      "flightSeconds": 10,
+      "hullCount": 10,
+      "deltaVPerTon": 5,
+      "deltaV": 80,
+      "costTons": 160
+    },
+    {
+      "name": "floor-priced (disclosure.MinCommandedAccel), single hull",
+      "accel": 1,
+      "flightSeconds": 100,
+      "hullCount": 1,
+      "deltaVPerTon": 5,
+      "deltaV": 100,
+      "costTons": 20
+    }
+  ],
+  "discardRefund": [
+    {
+      "name": "cut near-zero elapsed — refunds nearly the full stored cost",
+      "storedDebitedCostTons": 16,
+      "flightDurationMs": 10000,
+      "tauMs": 100,
+      "unspentFraction": 0.99,
+      "refundTons": 15.84
+    },
+    {
+      "name": "cut near-full elapsed — refunds almost nothing",
+      "storedDebitedCostTons": 16,
+      "flightDurationMs": 10000,
+      "tauMs": 9900,
+      "unspentFraction": 0.01,
+      "refundTons": 0.16
+    },
+    {
+      "name": "cut at the exact midpoint",
+      "storedDebitedCostTons": 20,
+      "flightDurationMs": 5000,
+      "tauMs": 2500,
+      "unspentFraction": 0.5,
+      "refundTons": 10
+    }
   ]
 }

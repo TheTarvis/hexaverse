@@ -18,6 +18,7 @@ import (
 	"hexaverse/market"
 	"hexaverse/middlewares"
 	"hexaverse/mine"
+	refuelpkg "hexaverse/refuel"
 	"hexaverse/sightings"
 	"hexaverse/sse"
 	"hexaverse/stations"
@@ -137,8 +138,17 @@ func SetupRouter() *gin.Engine {
 		WithMinVisibilityTier(marketParams.MinVisibilityTier)
 	systemSvc.WithStations(stationSvc)
 
+	// add-fuel-as-cargo's tuning knobs — ONE source of truth shared by the
+	// fleet service (burn-commit pricing, the estimated-range/stranded
+	// read, the served price), spawn healing's starting-fuel grant, and the
+	// refuel verb's own settlement price, so a future retune never drifts
+	// between them.
+	fuelParams := fleet.DefaultFuelParams()
+	fleetSvc.WithFuelParams(fuelParams)
+
 	corpSvc := corporations.NewService(galaxySvc, fleetSvc, fogSvc).
-		WithMarket(stationSvc, marketParams.StartingCredits)
+		WithMarket(stationSvc, marketParams.StartingCredits).
+		WithFuelParams(fuelParams)
 	corpHandler := corporations.NewHandler(corpSvc)
 
 	authorized := v1.Group("/")
@@ -205,6 +215,16 @@ func SetupRouter() *gin.Engine {
 		corpSvc.Credits(), fogSvc, clock, common.NewFirestoreService(),
 	)
 	market.NewHandler(marketSvc, clock).RegisterRoutes(authorized, corpWriteQuota)
+
+	// fuel-purchase (add-fuel-as-cargo, section 6): the instant refuel verb,
+	// modelled on market's own architecture. It composes fleet's and
+	// corporations' transaction-scoped primitives inside the ONE
+	// transaction it opens itself — never their DAOs — and rides the SAME
+	// per-corporation write quota instance sell does (request-authorization
+	// "A corporation exceeding its quota via refuel requests is rejected
+	// the same way as via sale requests").
+	refuelSvc := refuelpkg.NewService(fuelParams, fleetSvc, corpSvc.Credits(), clock, common.NewFirestoreService())
+	refuelpkg.NewHandler(refuelSvc, clock).RegisterRoutes(authorized, corpWriteQuota)
 
 	// The sighting pile (§3 of replace-observation-with-sightings): the read
 	// side of the persisted, immutable historical-claim store. Minting is the

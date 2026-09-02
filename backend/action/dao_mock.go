@@ -164,3 +164,80 @@ func (mr *MockDaoMockRecorder) ResolveOne(ctx, id, resolve any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveOne", reflect.TypeOf((*MockDao)(nil).ResolveOne), ctx, id, resolve)
 }
+
+// MocktransactionalCommitter is a mock of transactionalCommitter interface.
+type MocktransactionalCommitter struct {
+	ctrl     *gomock.Controller
+	recorder *MocktransactionalCommitterMockRecorder
+	isgomock struct{}
+}
+
+// MocktransactionalCommitterMockRecorder is the mock recorder for MocktransactionalCommitter.
+type MocktransactionalCommitterMockRecorder struct {
+	mock *MocktransactionalCommitter
+}
+
+// NewMocktransactionalCommitter creates a new mock instance.
+func NewMocktransactionalCommitter(ctrl *gomock.Controller) *MocktransactionalCommitter {
+	mock := &MocktransactionalCommitter{ctrl: ctrl}
+	mock.recorder = &MocktransactionalCommitterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MocktransactionalCommitter) EXPECT() *MocktransactionalCommitterMockRecorder {
+	return m.recorder
+}
+
+// CommitWithProducer mocks base method.
+func (m *MocktransactionalCommitter) CommitWithProducer(ctx context.Context, a Action, producer ActorStateFunc) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CommitWithProducer", ctx, a, producer)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CommitWithProducer indicates an expected call of CommitWithProducer.
+func (mr *MocktransactionalCommitterMockRecorder) CommitWithProducer(ctx, a, producer any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitWithProducer", reflect.TypeOf((*MocktransactionalCommitter)(nil).CommitWithProducer), ctx, a, producer)
+}
+
+// MocktransactionalCanceler is a mock of transactionalCanceler interface.
+type MocktransactionalCanceler struct {
+	ctrl     *gomock.Controller
+	recorder *MocktransactionalCancelerMockRecorder
+	isgomock struct{}
+}
+
+// MocktransactionalCancelerMockRecorder is the mock recorder for MocktransactionalCanceler.
+type MocktransactionalCancelerMockRecorder struct {
+	mock *MocktransactionalCanceler
+}
+
+// NewMocktransactionalCanceler creates a new mock instance.
+func NewMocktransactionalCanceler(ctrl *gomock.Controller) *MocktransactionalCanceler {
+	mock := &MocktransactionalCanceler{ctrl: ctrl}
+	mock.recorder = &MocktransactionalCancelerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MocktransactionalCanceler) EXPECT() *MocktransactionalCancelerMockRecorder {
+	return m.recorder
+}
+
+// CancelWithProducer mocks base method.
+func (m *MocktransactionalCanceler) CancelWithProducer(ctx context.Context, id string, actorState map[string]any, producerFor func(string) (ActorStateFunc, bool)) (*Action, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CancelWithProducer", ctx, id, actorState, producerFor)
+	ret0, _ := ret[0].(*Action)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CancelWithProducer indicates an expected call of CancelWithProducer.
+func (mr *MocktransactionalCancelerMockRecorder) CancelWithProducer(ctx, id, actorState, producerFor any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelWithProducer", reflect.TypeOf((*MocktransactionalCanceler)(nil).CancelWithProducer), ctx, id, actorState, producerFor)
+}

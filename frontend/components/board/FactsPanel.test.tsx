@@ -278,6 +278,35 @@ describe('FactsPanel', () => {
     expect(screen.getByTestId('hold-free')).toHaveTextContent('188t')
   })
 
+  // PRODUCTION DEFECT FOUND BY THIS SDET (add-fuel-as-cargo — fleet-movement
+  // MODIFIED "Fleet Cargo Pool": "Fuel occupies cargo capacity exactly like
+  // a mined resource"): `HoldReadout`'s per-kind meter/list
+  // (`RESOURCE_ACCENT[kind]`, this file) is keyed on `ResourceKind` alone
+  // (metals/volatiles/water/organics/research/exotic) — `fuel` is
+  // deliberately NOT a `ResourceKind` (fuel-as-cargo's own decision;
+  // `system-interior` reserves the name from generation), yet
+  // `fleet-movement` requires it to occupy the SAME `roster.cargo` map a
+  // fleet's hold already renders through this exact component. A fleet
+  // that holds ANY fuel today crashes this whole panel
+  // (`RESOURCE_ACCENT['fuel']` is `undefined`, so `.meter`/`.dot` throw) —
+  // not merely omits a fuel row. Reported to the orchestrator/developer as
+  // a production defect this SDET found while authoring the refuel
+  // surface's red-phase suite; NOT invented-around here. This test is the
+  // failing reproduction — it must go green (no crash) once the hold
+  // readout is made fuel-aware (e.g. its own accent entry, or fuel
+  // rendered outside the per-`ResourceKind` accent map — an implementation
+  // choice this SDET does not prescribe).
+  it('does not crash when a docked fleet’s cargo includes fuel (fleet-movement "Fleet Cargo Pool")', () => {
+    const fueled: Fleet = {
+      ...dockedMiner,
+      roster: { ...dockedMiner.roster!, cargo: { metals: 12, fuel: 40 } },
+    }
+    expect(() =>
+      render(<FactsPanel {...base} selection={null} activeFleet={fueled} />),
+    ).not.toThrow()
+    expect(screen.getByTestId('hold-readout')).toBeInTheDocument()
+  })
+
   it('shows a running mine as a countdown, blocking a fresh offer', () => {
     render(
       <FactsPanel
@@ -369,6 +398,136 @@ describe('FactsPanel', () => {
       />,
     )
     expect(screen.getByTestId('sell-repriced')).toHaveTextContent(/12.*10/)
+  })
+
+  // --- refuel (add-fuel-as-cargo tasks.md 8.4; board-view ADDED "Refuel
+  // Offer on the Docked Fleet") — FactsPanel's ONLY job is the GATING wire:
+  // "docked at a station" (independent of whether that station's market
+  // has anything sellable at all) plus the onRefuel commit hand-off.
+  // RefuelSection's OWN internal behaviour (default tonnage, clamping, the
+  // live price preview) is pinned in isolation by RefuelSection.test.tsx.
+  //
+  // CONTRACT ASSUMED BY THIS SDET: the gating signal FactsPanel already
+  // receives for "is this fleet docked at THIS station" is `stationQuotes`
+  // being non-null (SystemBoardView.tsx already computes
+  // `stationQuotes={dockedAtStation ? stationQuotes : null}` — it is null
+  // whenever the fleet is not docked there, regardless of whether the
+  // station's market has any live quotes). Refuel reuses that SAME signal
+  // (an EMPTY quotes array, `[]`, still means "docked, nothing to sell,
+  // but fuel is still always for sale") rather than a new prop — a station
+  // with nothing for sale must still offer refuel. The served fuel price
+  // and free hold come straight off `activeFleet.roster` (extended with a
+  // new `fuelPricePerTon` field — see FleetRoster.test.tsx's own contract
+  // note), never a new top-level prop. `onRefuel` and `lastRefuelCost` are
+  // the two genuinely NEW props this capability adds to `FactsPanelProps`.
+  const dockedRefueler: Fleet = {
+    ...dockedMiner,
+    attachedTo: 'station-1',
+    roster: { ...dockedMiner.roster!, fuelPricePerTon: 10 },
+  }
+
+  // Scenario: Refuel is offered while docked at a station — INCLUDING when
+  // that station's market has nothing tradable at all (an empty quotes
+  // array), proving the offer is anchored to "docked", never to "the
+  // market has something for sale".
+  it('offers refuel whenever docked at a station, even when the station’s market has nothing tradable', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={dockedRefueler}
+        stationQuotes={[]}
+        onRefuel={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('refuel-section')).toBeInTheDocument()
+  })
+
+  // Scenario: Refuel is not offered when merely co-located, not docked.
+  it('does not offer refuel when the fleet is not docked at a station (stationQuotes null)', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={dockedRefueler}
+        stationQuotes={null}
+        onRefuel={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('refuel-section')).not.toBeInTheDocument()
+  })
+
+  it('offers refuel beside the sell section when both apply', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={{ ...dockedRefueler, attachedTo: 'p1' }}
+        stationQuotes={quotes}
+        onSell={vi.fn()}
+        onRefuel={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('sell-section')).toBeInTheDocument()
+    expect(screen.getByTestId('refuel-section')).toBeInTheDocument()
+  })
+
+  it('commits a refuel through the onRefuel prop, carrying the panel-chosen tonnage', () => {
+    const onRefuel = vi.fn()
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={dockedRefueler}
+        stationQuotes={[]}
+        onRefuel={onRefuel}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('refuel-button'))
+    // The panel's own default tonnage (RefuelSection.test.tsx pins the
+    // exact default derivation) — this only proves the wiring hands
+    // WHATEVER tonnage the section holds back to the container, unaltered.
+    expect(onRefuel).toHaveBeenCalledWith(expect.any(Number))
+  })
+
+  // fleet-movement "Fleet Read Serves the Configured Fuel Price, Never
+  // Duplicated Client-Side" — the preview must reflect the ROSTER's served
+  // price, proving FactsPanel reads it off `activeFleet.roster` rather than
+  // any constant of its own.
+  it('previews the refuel cost from the roster’s served fuel price, not a client constant', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={{
+          ...dockedRefueler,
+          roster: { ...dockedRefueler.roster!, freeHold: 100, fuelPricePerTon: 37 },
+        }}
+        stationQuotes={[]}
+        onRefuel={vi.fn()}
+      />,
+    )
+    fireEvent.change(screen.getByTestId('refuel-tons-input'), { target: { value: '2' } })
+    expect(screen.getByTestId('refuel-cost-preview')).toHaveTextContent('74')
+  })
+
+  // board-view MODIFIED "Credit Balance Readout" — "The balance visibly
+  // updates when a refuel resolves". FactsPanel's own half: threading
+  // `lastRefuelCost` through to BalanceReadout (BalanceReadout.test.tsx
+  // pins that widget's own rendering/announcement in isolation).
+  it('threads lastRefuelCost through to the balance readout', () => {
+    render(
+      <FactsPanel
+        {...base}
+        selection={null}
+        activeFleet={dockedRefueler}
+        stationQuotes={[]}
+        onRefuel={vi.fn()}
+        credits={860}
+        lastRefuelCost={140}
+      />,
+    )
+    expect(screen.getByTestId('balance-refuel-cost')).toHaveTextContent('140')
   })
 
   // --- selection facts (informational only — no move/scan/depart verb here

@@ -7,6 +7,7 @@ import (
 
 	"hexaverse/action"
 	"hexaverse/charts"
+	"hexaverse/common"
 	"hexaverse/disclosure"
 	"hexaverse/sightings"
 	"hexaverse/space"
@@ -42,6 +43,54 @@ func RegisterResolvers(a *action.Service, bodies BodySource) {
 	// KindMutating's ledger-delta bookkeeping (LedgerKey, exactly-once
 	// Delta doc), which jump has no use for.
 	a.RegisterResolver(jumpType, action.KindKinematic, JumpResolver)
+
+	// The generic action-cancel route's (POST /v1/actions/:actionId/cancel)
+	// own per-type discard producer (add-fuel-as-cargo tasks.md 2.5): the
+	// ONE discard path with no fleet-package call site in hand to compute
+	// its own refund from data already loaded in memory. Every OTHER
+	// discard path (cut-drive, a superseding order/stop, POST
+	// /v1/fleets/:fleetId/cancel) already computes and merges this refund
+	// directly (service.go's priorBurnRefund), so action.Service.Cancel
+	// never routes THOSE calls through a producer at all (they always
+	// supply a non-nil actorState) — see action/service.go's own Cancel
+	// doc comment.
+	a.RegisterCancelProducer(burnType, burnCancelRefundProducer)
+}
+
+// burnCancelRefundProducer computes the transaction-scoped ActorState merge
+// for a generic cancel against a running "burn"-type action — reading the
+// actor's OWN transactional field data (the same read action.Commit's slot
+// check already performs), never a stale pre-transaction snapshot. Touches
+// ONLY cargo.fuel: the generic cancel route deliberately leaves State/
+// AttachedTo untouched (action/handler.go's own doc comment — "Verbs with
+// motion state ... cancel through their own endpoint so they can settle a
+// coast"), so this producer must not invent a state transition the route
+// has never made.
+func burnCancelRefundProducer(actorData map[string]interface{}) (map[string]interface{}, error) {
+	stateRaw, _ := actorData["state"].(map[string]interface{})
+	if stateRaw == nil {
+		return map[string]interface{}{}, nil
+	}
+	mode, _ := stateRaw["mode"].(string)
+	if mode != "burn" {
+		return map[string]interface{}{}, nil
+	}
+	value, _ := stateRaw["value"].(map[string]interface{})
+	if value == nil {
+		return map[string]interface{}{}, nil
+	}
+	departMs := asWorldMillis(value["departMs"])
+	arriveMs := asWorldMillis(value["arriveMs"])
+	storedCost := asFloat64(actorData["burnFuelCostTons"])
+	now := common.WorldClock().Now()
+	refund := DiscardRefundTons(storedCost, departMs, arriveMs, now)
+	if refund <= 0 {
+		return map[string]interface{}{}, nil
+	}
+	currentFuel := readCargoFuel(actorData)
+	return map[string]interface{}{
+		"cargo": map[string]interface{}{"fuel": currentFuel + refund},
+	}, nil
 }
 
 // ShipSource resolves every fleet currently in a system — the resolving
