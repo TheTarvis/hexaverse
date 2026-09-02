@@ -119,20 +119,36 @@ buyer-adverse direction, the mirror image of `goods-sale`'s seller-adverse
 floor (`goods-sale`'s "Rounding Rule Preserves Reconciliation") — before
 that cost is compared against the requester's balance or debited, so a
 fractional cost never lets the buyer pay less than the tonnage is actually
-worth. A refuel whose full requested tonnage's cost, after rounding, would
-be zero whole credits SHALL be rejected with a distinguishable reason,
-crediting no fuel, debiting no credits, and appending no ledger entry —
-matching `goods-sale`'s "A Sale Whose Proceeds Round To Zero Is Rejected"
-precedent; accepting such a request would either append a ledger entry
+worth, and only **after** the requested tonnage has already been validated
+as positive, finite, and within the fleet's free hold (`fuel-purchase`'s
+"Positive Finite Tonnage Within the Fleet's Free Hold") — cost is never
+computed from a not-yet-validated tonnage. **Unlike `goods-sale`'s
+floor-rounded proceeds, rounding a refuel's cost UP against a positive
+tonnage and a strictly positive price can never itself produce zero whole
+credits** (`ceil(tons × price) ≥ 1` whenever `tons > 0` and `price > 0`):
+the reject-if-zero guard below is therefore a **misconfiguration guard**,
+not a live gameplay path a player can trigger with a legitimate tonnage
+and a sane, positive configured price — it exists to fail safely if
+`FuelParams.PricePerTon` is ever misconfigured at or below zero, not to
+catch a dust purchase the way `goods-sale`'s floor-rounded "rounds to
+zero" case genuinely can. IF `FuelParams.PricePerTon` is configured at or
+below zero, THEN every refuel request SHALL be rejected with a
+distinguishable reason, crediting no fuel, debiting no credits, and
+appending no ledger entry, rather than settling at a zero or negative
+cost — accepting such a request would either append a ledger entry
 `corporation-credits`' "No amount recorded for a credit mutation SHALL
 ever be zero" forbids, or silently skip the ledger and mint fuel for free.
-The computation SHALL be overflow-safe: the system SHALL reject, with a
-distinguishable reason, a cost computation that would overflow the
-balance's integer type or produce a non-finite intermediate, crediting no
-fuel and debiting no credits. Every ledger entry a settled refuel appends
-SHALL carry a strictly negative signed amount (a refuel is a debit — see
-`corporation-credits`'s "Append-Only Trade Ledger"), never zero and never
-positive.
+The computation SHALL also be overflow-safe, **on the same
+misconfiguration footing**: because tonnage is already bounded to a
+positive value within the fleet's free hold before cost is computed, an
+overflowing cost is reachable only if `FuelParams.PricePerTon` is itself
+configured large enough that even a free-hold-bounded tonnage overflows —
+the system SHALL reject, with a distinguishable reason, a cost computation
+that would overflow the balance's integer type or produce a non-finite
+intermediate, crediting no fuel and debiting no credits. Every ledger
+entry a settled refuel appends SHALL carry a strictly negative signed
+amount (a refuel is a debit — see `corporation-credits`'s "Append-Only
+Trade Ledger"), never zero and never positive.
 
 #### Scenario: Fractional cost rounds up against the buyer
 - **WHEN** a refuel's exact cost (tonnage × `FuelParams.PricePerTon`) is a
@@ -140,22 +156,24 @@ positive.
 - **THEN** the charged and debited cost is that value rounded up to the
   next whole credit, never rounded down
 
-#### Scenario: A dust refuel whose cost would round to zero is rejected
-- **WHEN** a refuel's requested tonnage's cost, after rounding up, would
-  still be zero whole credits
-- **THEN** the refuel is rejected with a distinguishable reason, no fuel is
-  credited, no credits are debited, and no ledger entry is appended
+#### Scenario: A misconfigured non-positive price rejects every refuel, rather than settling for free
+- **WHEN** `FuelParams.PricePerTon` is configured at or below zero
+- **THEN** every refuel request is rejected with a distinguishable reason,
+  crediting no fuel and debiting no credits, rather than computing and
+  settling a zero or negative cost
 
-#### Scenario: Repeated dust refuels append no ledger rows
-- **WHEN** a caller submits many refuel requests whose cost each rounds to
-  zero
-- **THEN** the corporation's ledger entry count is unchanged from before
-  the first such request
+#### Scenario: The reject-zero guard is unreachable under a correctly configured, positive price
+- **WHEN** `FuelParams.PricePerTon` is any strictly positive value and a
+  refuel's requested tonnage has already been validated as positive and
+  within the fleet's free hold
+- **THEN** the rounded-up cost is always at least one whole credit, so this
+  guard's rejection path is never exercised by ordinary play — it exists
+  solely as a defense against a misconfigured, non-positive price constant
 
-#### Scenario: An overflowing cost computation is rejected, not wrapped
-- **WHEN** a refuel's requested tonnage and the configured price would
-  produce a cost outside the balance's integer range, or a non-finite
-  intermediate
+#### Scenario: A misconfigured price causing an overflowing cost computation is rejected, not wrapped
+- **WHEN** a refuel's already free-hold-bounded tonnage and a misconfigured
+  `FuelParams.PricePerTon` would together produce a cost outside the
+  balance's integer range, or a non-finite intermediate
 - **THEN** the refuel is rejected with a distinguishable reason, and no
   fuel, balance, or ledger state changes
 
@@ -273,17 +291,20 @@ indistinguishable, following `goods-sale`'s identical rule.
 A refuel SHALL settle synchronously within its triggering request —
 creating no `action-dispatch` action, claiming no movement or sensor
 channel slot, and computing no ETA. It SHALL proceed even while the
-refueling fleet has a running scan on the independent sensor channel, and
-even while it holds a running mine action on the movement channel (a
-docked fleet's mine run does not block a co-resident instant verb, per
-`fleet-movement`'s "Releasing a Co-Resident Verb's Slot Leaves Motion
-Untouched").
+refueling fleet has a running scan on the independent sensor channel,
+following `goods-sale`'s identical "Instant, Not an Action" precedent.
+(A docked fleet with a running **mine** action is not a case this
+requirement needs to address: `fuel-purchase`'s docked-to-station
+precondition requires attachment to a station, while a running mine
+requires attachment to the mined feature for the run's whole duration —
+the two are mutually exclusive by attachment, so "a docked fleet with a
+running mine refuels" is not a reachable configuration.)
 
 #### Scenario: A settled refuel's response carries no action
 - **WHEN** a refuel settles
 - **THEN** the response includes no action id and no ETA
 
-#### Scenario: A docked fleet with a running mine can still refuel
-- **WHEN** a docked fleet with a running mine action submits a refuel
-- **THEN** the refuel is accepted normally, unaffected by the running
-  mine
+#### Scenario: A fleet with a running scan can still refuel
+- **WHEN** a docked fleet with a running scan on the sensor channel submits
+  a refuel
+- **THEN** the refuel is accepted normally, unaffected by the running scan

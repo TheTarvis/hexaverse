@@ -10,10 +10,11 @@ completes the missing steps without creating a second hull, duplicating
 fog writes, provisioning a second station, re-granting a second opening
 balance, or re-crediting a second starting-fuel grant. The starting-fuel
 grant's idempotency anchor SHALL be a distinguishable, per-fleet grant
-marker, checked and set atomically (a create-if-absent write, so two
-concurrent healing calls cannot both observe it absent) in the same write
-that credits the fuel — analogous to the credit ledger's
-`"spawn:" + corpId` entry the opening balance grant already anchors on,
+marker — a create-if-absent document at `corporations/{corpId}/fuelGrants/
+{fleetId}` — checked and set atomically (so two concurrent healing calls
+cannot both observe it absent) in the same write that credits the fuel —
+analogous to the credit ledger's `"spawn:" + corpId` entry the opening
+balance grant already anchors on,
 and required for the same reason: `/v1/corporations/me` is explicitly
 exempt from the per-corporation write quota, so two concurrent bootstrap
 reads for one account are cheap to trigger and must still heal exactly
@@ -153,7 +154,18 @@ configured starting-fuel constant SHALL afford the fuel-priced burn
 its home system's station. A constant that fails the sample for any
 sampled account is a tuning defect in the constant's value, to be
 corrected by moving the constant — never a spec change to this
-requirement.
+requirement. **This guard deliberately prices the reachability check at
+the fleet's `DerivedAccelCeiling`, the one carve-out from
+`fleet-movement`'s floor-pricing rule for every other reachability
+judgment this change defines** ("A Burn Commit Warns...", "Fleet Read
+Reports an Estimated Maximum Range..."): an order that omits an explicit
+commanded acceleration defaults to the fleet's ceiling ("An omitted
+commanded acceleration defaults to the fleet's ceiling"), so the ceiling —
+not the floor — is what a fresh corporation's actual, unmodified default
+spawn-to-station order would cost. A floor-priced guard here would certify
+a starting-fuel constant under which that default first order is
+unaffordable, reopening exactly the spawn-time deadlock this requirement
+exists to prevent.
 
 #### Scenario: A seeded hull can reach its home station on its starting fuel
 - **WHEN** a fresh corporation's starting hull, seeded at its deterministic

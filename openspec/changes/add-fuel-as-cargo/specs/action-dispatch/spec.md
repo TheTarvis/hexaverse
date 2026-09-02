@@ -26,7 +26,16 @@ A transaction-scoped producer closes this by computing its merged fields
 from the same transactional read the slot check already performs, so the
 affordability check and the mutation it authorizes are never evaluated
 against a snapshot that could be stale by the time the transaction
-commits.
+commits. A transaction-scoped producer MAY instead return a named error in
+place of a fields map; when it does, the commit SHALL abort entirely — no
+action is created, no slot is claimed, and no actor-state mutation is
+persisted — and that error SHALL be surfaced to the caller as the commit's
+own rejection reason. This is what lets a producer enforce a precondition
+that can only be evaluated against the transactional read itself (e.g. an
+affordability check against the very field it is about to debit): the
+static `ActorState` map form has no failure path at all, so a caller that
+needs to reject a commit based on the transactional read's contents
+requires the producer form to be able to fail, not merely compute.
 
 #### Scenario: Committing an unregistered type fails
 - **WHEN** `Commit` is called with a type for which no resolver has been
@@ -68,3 +77,11 @@ commits.
 - **THEN** the actor's final value for that field reflects both mutations'
   effects — neither transaction's write is silently overwritten by the
   other's stale, pre-transaction computation of the resulting value
+
+#### Scenario: A transaction-scoped producer's error aborts the commit entirely
+- **WHEN** a commit spec's transaction-scoped `ActorState` producer
+  evaluates the transactional read and returns a named error instead of a
+  fields map (for example, because that read shows the mutation the
+  producer was about to compute is no longer affordable)
+- **THEN** the commit fails with that error, no action is created, no slot
+  is claimed, and no actor-state mutation is persisted

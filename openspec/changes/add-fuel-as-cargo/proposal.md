@@ -171,9 +171,13 @@ proposal for the corrected fold design.
   supply** (no station-side write; the settlement transaction touches only
   the buying corporation's balance and the fleet's cargo pool) — **cost
   arithmetic that rounds up, against the buyer** (the mirror image of
-  `goods-sale`'s seller-adverse floor — a dust refuel that would floor to
-  zero credits would otherwise mint free fuel), is rejected outright if it
-  would round to zero, and is overflow-safe — and **all-or-nothing fill**
+  `goods-sale`'s seller-adverse floor; unlike `goods-sale`'s floor, rounding
+  up a positive tonnage's cost against a strictly positive price can never
+  itself produce zero credits, so the requirement's reject-if-zero and
+  overflow guards are **misconfiguration guards** — reachable only if
+  `FuelParams.PricePerTon` is itself configured non-positive or absurdly
+  large, never by an ordinary dust-sized player request) — and
+  **all-or-nothing fill**
   — a request costing more than the requester's balance is rejected in
   full, never partially filled the way `goods-sale`'s demand-entry fold
   partially fills a sale. Fuel is **not sellable back**:
@@ -185,9 +189,12 @@ proposal for the corrected fold design.
   space-view`): a fuel/range readout on the roster row, a persistent
   stranded indication distinct from idle, the commit stranding warning
   rendered as a non-blocking notice, and a refuel control beside the
-  existing sell control on the board's docked-fleet panel. Commit-time
-  rejection with no way to buy fuel would brick every corporation the
-  moment its starting tank empties, so this cannot wait.
+  existing sell control on the board's docked-fleet panel, **guarded
+  against double-submit exactly as the sell control already is** — this is
+  the game's first credit *sink*, so a missed guard's double-charge would
+  land on the player, not the venue. Commit-time rejection with no way to
+  buy fuel would brick every corporation the moment its starting tank
+  empties, so this cannot wait.
 - Housekeeping deltas: `corporation-credits`' ledger entry-kind enumeration
   gains `fuel purchase`; `request-authorization`'s per-corporation write
   quota and its client-supplied-corporation-id guard both name `refuel`
@@ -285,6 +292,15 @@ proposal for the corrected fold design.
   `hold`/`release` verbs and their fuel-denominated upkeep move to
   `add-stationkeep-hold-verb`, sequenced immediately after this one (see
   Why).
+- **This change MUST archive before `add-stationkeep-hold-verb`.** Both
+  changes MODIFY `fleet-movement`'s "Fleet Cargo Pool" requirement —
+  `add-stationkeep-hold-verb`'s delta is authored against what this change
+  leaves in `openspec/specs/fleet-movement/spec.md` after it archives (it
+  widens this change's own fuel-mutating-verb enumeration to add
+  station-keeping settlement as a fifth entry). Archiving in the reverse
+  order would apply `add-stationkeep-hold-verb`'s delta against pre-fuel
+  text and silently drop this change's own scenarios;
+  `openspec validate --strict` catches neither ordering.
 - No migrations, no backwards compatibility, no deprecation windows (solo
   toy) — the burn-commit affordability rejection and the new fuel field
   land outright, with no dual-write or flag-guarded rollout.

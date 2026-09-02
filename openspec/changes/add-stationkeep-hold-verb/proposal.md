@@ -48,12 +48,32 @@ burn past its arrival IS its settled park." Reads stay pure and closed-
 form; `cargo.fuel`'s **stored** value is never itself a function of
 elapsed time — it changes only at discrete settlement events (`hold`
 commit computes and stores the dry instant but debits nothing yet;
-`release`, called before the dry instant, settles the accrued upkeep in
-one closed-form debit; the automatic fold past the dry instant settles the
-remainder to exactly zero on the write that first observes it). This is
-what keeps `FreeHold` and its four consumers reading a pure, time-
-independent value with no world-time parameter threaded through any of
-their signatures.
+`release`, called before the dry instant, settles the accrued upkeep —
+converting the elapsed `WorldMillis` duration to seconds before
+multiplying by the per-second upkeep rate, then converting that Δv figure
+to tons by `FuelParams.DeltaVPerTon` — in one closed-form debit; **any
+other verb's mid-hold `fuel` mutation that leaves the hold open** — e.g. a
+refuel while docked beside the held body — settles that same accrual,
+then restamps the hold and recomputes the dry instant against the
+post-mutation fuel level, since the obvious "dock, hold, refuel" sequence
+is reachable and an earlier draft of this change wrongly asserted it was
+not; **a burn committed from an open hold** settles that same accrual but,
+unlike a mid-hold mutation, never restamps — the burn replaces the park
+outright, so there is no hold left to restamp; an earlier draft left this
+path undefined, which either silently forgave the accrued upkeep or, had
+it been folded into the mid-hold-mutation path instead, could have
+restamped a park the burn's own commit was about to overwrite anyway; the
+automatic fold past the dry instant settles the remainder to exactly zero
+on the write that first observes it). Every fuel-reading decision (the
+burn-commit affordability check, `FreeHold`'s four call sites,
+`fuel-purchase`'s free-hold precondition, the estimated-maximum-range
+read, and the persistent stranded indication) settles a past-dry-instant
+hold in the same transaction or read before evaluating against the
+result, so none of them ever decides against the stale, over-reported
+figure a passed-but-unobserved dry instant would otherwise still show.
+This is what keeps `FreeHold` and its four consumers reading a pure,
+time-independent value with no world-time parameter threaded through any
+of their signatures.
 
 ## What Changes
 
@@ -77,12 +97,31 @@ their signatures.
   persisted state beyond the two fields above.
 - `cargo.fuel`'s **stored** value is never decremented merely by elapsed
   hold time. It changes only at discrete settlement events: `hold` commit
-  (computes and stores the dry instant, debits nothing), `release` before
-  the dry instant (debits exactly the upkeep accrued between hold-start and
-  release, closed-form, then re-circularizes), and the automatic
+  (computes and stores the dry instant, debits nothing; rejected by name
+  whenever the fuel held at hold-start would compute a dry instant equal
+  to the hold's start time — which, given the formula's ceiling, is
+  exactly when that fuel is zero — since persisting it would store a value
+  `space-kinematics`'s own decode requirement rejects, bricking the
+  fleet), `release` before the dry instant (debits exactly the upkeep
+  accrued between hold-start and release — the elapsed `WorldMillis`
+  duration converted to seconds before multiplying by the per-second
+  upkeep rate, then **converted from Δv to tons by
+  `FuelParams.DeltaVPerTon`** — an earlier draft of this change omitted
+  the Δv-to-tons conversion (a 5× overcharge at today's placeholder value)
+  and a later draft omitted the milliseconds-to-seconds conversion (a
+  further 1000× overcharge on top of that) — closed-form, then
+  re-circularizes), any other verb's mid-hold `fuel` mutation that leaves
+  the hold open (settles-restamps-recomputes, per the Why above), a burn
+  committed from an open hold (settles that same accrual but never
+  restamps, since the burn replaces the park outright — an earlier draft
+  left this path undefined, which either silently forgave the accrual or,
+  folded into the mutation path above, could have restamped a park a
+  burn's own commit was about to overwrite), and the automatic
   past-dry-instant fold (settles the remainder to exactly zero, persisted
   on the write that first observes it, never negative) — this is what
-  keeps `fleet.FreeHold` and its four consumers pure.
+  keeps `fleet.FreeHold` and its four consumers pure, **provided every one
+  of them settles a past-dry-instant hold before reading, which this
+  change requires explicitly** rather than leaving as an assumption.
   No hull-count multiplier applies to upkeep (station-keeping is a
   per-fleet positional hold, not a burn — `decisions.md`'s hull-count
   ruling was scoped specifically to burns, and this change does not extend
@@ -108,16 +147,35 @@ their signatures.
   upkeep settlement, the ownership-check and cargo-pool widenings),
   `space-kinematics` (the new persisted park fields, the past-dry-instant
   fold), `request-authorization` (the mutating-endpoint ownership-seam
-  enumeration widened to `hold`/`release`).
+  enumeration widened to `hold`/`release`), `mine-extraction` (retiring
+  the `freeHoldAtResolve == freeHoldAtCommit` equality claim "Resolve
+  Clamps Yield to Reality" pre-registered as reachable once a future verb
+  could mutate cargo while a fleet is docked to a mined feature — this
+  change is that verb).
 - Affected code (once implemented): `backend/space/` (`Park`'s two new
   fields, `EncodePark`/`DecodePark`, the new fold in `StateAt`),
   `backend/fleet/` (the `hold`/`release` handlers, upkeep settlement,
-  force-demotion), `backend/middlewares/` or router wiring (ownership
-  checks on the two new routes), a widened `fixtures/space/` (or
-  `fixtures/polar/`) case family for the two new `Park` fields' codec
-  round-trip.
+  force-demotion, and the burn-commit settle-and-drop path for a burn
+  ordered from an open hold), `backend/mine/` (no behavioral change
+  required, but its resolve clamp now runs against a `freeHoldAtResolve`
+  that a station-keeping settlement landing mid-run can widen relative to
+  `freeHoldAtCommit`), `backend/refuel/` (the settle-restamp-recompute
+  step a refuel landing mid-hold must perform, per "Station-Keeping
+  Upkeep Is Settled at Discrete Events..."), `backend/middlewares/` or
+  router wiring (ownership checks on the two new routes), a widened
+  `fixtures/space/` (or `fixtures/polar/`) case family for the two new
+  `Park` fields' codec round-trip.
 - No migrations, no backwards compatibility (solo toy) — lands outright.
-- Depends on `add-fuel-as-cargo` (chain link 7) having archived first:
-  `fuel` as a cargo kind, `FuelParams.DeltaVPerTon`, and the fuel-cost
-  conversion this change reuses (without the hull-count multiplier) are
-  all that change's own additions.
+- **This change MUST archive after `add-fuel-as-cargo` (chain link 7) has
+  already archived.** Both changes MODIFY `fleet-movement`'s "Fleet Cargo
+  Pool" requirement, and this change's MODIFIED delta is authored against
+  what `add-fuel-as-cargo` leaves in `openspec/specs/fleet-movement/
+  spec.md` after it archives — `fuel` as a cargo kind, `FuelParams.
+  DeltaVPerTon`, the fuel-cost conversion this change reuses (without the
+  hull-count multiplier), and the exact wording of "Fleet Cargo Pool"'s
+  burn-debit/refund/refuel-credit/spawn-grant enumeration (including its
+  in-capability cross-references to "A Burn Commit Is Rejected..." and
+  "Discarding a Running Burn Refunds...") are all that change's own
+  additions. Archiving this change first would apply its delta against
+  pre-fuel text and silently drop `add-fuel-as-cargo`'s own scenarios;
+  `openspec validate --strict` catches neither ordering.

@@ -42,7 +42,8 @@ after that design was written.
 | 4 | `migrate-fleet-to-continuous-burns` | Fleets fly curves; cut drive / stop in place | ✅ `1f1c88a`…`55c46fb` |
 | 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ✅ `8f4dd65`…`99747e2` |
 | 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | ✅ `5fd28b5`…`fbbb316` |
-| 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ⬜ |
+| 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | 📝 spec CLEAR-pending, 0/53 |
+| 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | 📝 spec CLEAR-pending, 0/26 |
 | — | `add-stationkeep-hold-verb` | *(unplanned insert)* `hold`/`release` verbs + their fuel-denominated upkeep, carved out of link 7's own panel review | ⬜ |
 | 8 | `build-production-space-view` | The renderer; `board-view` retired | ⬜ |
 | 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | ⬜ |
@@ -475,6 +476,47 @@ introduction of fuel should not also have to get right in the same breath.
 Ships the verb and its upkeep currency together, exactly as the standing
 "ship the verb with the currency, or ship neither" principle requires —
 only the timing moves, by one link.
+
+**Split into two changes 2026-09-02.** `add-fuel-as-cargo` keeps fuel-as-cargo,
+burn pricing and the commit-time affordability gate, the closed-form discard
+refund, the stranding warning, the new `fuel-purchase` capability, spawn starting
+fuel, and the client surface. `add-stationkeep-hold-verb` takes the `hold`/`release`
+verbs **and** their fuel-denominated upkeep — together, one link later.
+
+The carve-out was forced by a review finding, not by size: the station-keep half was
+the only part needing a `space-kinematics` delta, a codec widening and a new fold,
+and its first design folded `cargo["fuel"]` itself — which would have made
+`fleet.FreeHold` time-dependent and silently broken `mine`'s resolve clamp, `mine`'s
+commit gate, the fleet read, and `fuel-purchase`'s own free-hold check. The corrected
+design stores a dry instant on the park and folds *that*, mirroring "a burn past its
+arrival IS its settled park". **`add-fuel-as-cargo` MUST archive first** — both
+changes modify `fleet-movement`'s *Fleet Cargo Pool*, and the reverse order silently
+drops a scenario that `--strict` does not catch.
+
+**Three adversary rounds; the findings that matter were arithmetic, not prose.**
+
+- **Δv rises with commanded acceleration** — `Δv = 2·√(a·L)`, so maximum range is at
+  MINIMUM acceleration. Two requirements computed range at the acceleration ceiling,
+  which is the fleet's *shortest* reach, and labelled it the maximum. `decisions.md`
+  already said this ("silent running is cheap in fuel and expensive in time"); the
+  spec contradicted a settled ruling in the same directory and four readers missed it.
+  Consequence now recorded: **fuel bounds speed, not reachability** — a nearly-dry
+  fleet can always crawl, which weakens the supply-line pressure and partly defuses
+  the stranding alarm.
+- **`release` was a 5× overcharge, then a 1000× one.** It debited Δv into a
+  tons-denominated field; the repair divided by `DeltaVPerTon` and still multiplied a
+  per-second rate by a `WorldMillis` elapsed. Caught by dimensional analysis both
+  times, and by a round-trip invariant: a release at exactly the dry instant must
+  debit exactly the fuel held at hold start.
+- **The corrected dry-instant formula lived only in design.md and tasks.md**, both of
+  which move to `changes/archive/` — so post-archive the normative spec would again
+  have permitted the 25× inversion, with every scenario passing. The repair had fixed
+  the prose people read and left the artifact that survives.
+
+Two more worth remembering: a **mid-hold refuel** was reachable (dock → hold → refuel,
+all three preconditions hold) and the stale dry instant would have destroyed the whole
+purchase; and `hold` at zero fuel wrote a park **its own codec requirement rejects**,
+bricking exactly the stranded fleets link 7 exists to make discoverable.
 
 ## Link 8 — `build-production-space-view`
 

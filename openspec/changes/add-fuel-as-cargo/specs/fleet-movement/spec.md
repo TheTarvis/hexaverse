@@ -48,6 +48,79 @@ SHALL mutate a fleet's `fuel` entry.
 - **THEN** neither ever names `fuel` as the credited or debited kind —
   fuel moves only through the verbs this requirement enumerates for it
 
+### Requirement: Cut Drive Converts the Burn to a Drift and Goes Dark
+
+The system SHALL, on a cut-drive order against a fleet with an active burn
+that has not yet arrived, replace the stored burn with a drift anchored at
+the burn's position at the cut instant, carrying velocity equal to the
+burn's tangent at that instant scaled by the burn's speed at that instant,
+epoched at the cut instant. Cut drive SHALL be free (no delta-v charged for
+the act of cutting itself), instant (no ETA, no committed action), and
+SHALL cancel the running movement action, releasing its slot with no
+further delta. The system SHALL reject a cut-drive order against a burn
+that has already reached or passed its arrival time, with its own named
+reason, and SHALL reject a cut-drive order against a fleet that is not
+actively burning (parked, drifting, or in lane transit), with its own
+named reason. A burning fleet's `attachedTo` was already cleared at that
+burn's commit ("In-System Burn Order to a Body or a Point"), so cut drive
+leaves it empty and performs no further mutation of that field. **Since
+this change, cutting a burn is not itself a no-cargo-effect event**: the
+discarded burn's unspent, already-debited fuel cost is refunded per
+"Discarding a Running Burn Refunds Its Unspent Fuel, Closed-Form" — a
+cargo effect of the *discard*, not of the cut charging any new delta-v.
+
+#### Scenario: Cutting a mid-burn fleet converts it to a drift
+
+- **WHEN** cut drive is ordered against a fleet mid-burn, strictly before its
+  arrival time
+- **THEN** the fleet's state becomes a drift anchored at the burn's position
+  at the cut instant, with velocity equal to the burn's tangent at that
+  instant scaled by its speed
+- **AND** the running movement action is cancelled with no delta
+
+#### Scenario: Emission stops the same instant the drive is cut
+
+- **WHEN** a fleet's emission state is read immediately before and
+  immediately after a cut-drive order
+- **THEN** it reports emitting before the cut and not emitting after it,
+  with no intervening instant reported as ambiguous
+
+#### Scenario: Cutting an already-arrived burn resolves the arrival instead
+
+- **WHEN** cut drive is ordered against a fleet whose active burn has already
+  reached or passed its arrival time but has not yet been resolved
+- **THEN** the order is rejected with its own named reason, and the arrival
+  is resolved (settled with its effects) rather than converted to a drift
+
+#### Scenario: Cutting a parked, drifting, or in-transit fleet is rejected by name
+
+- **WHEN** cut drive is ordered against a fleet that is parked, already
+  drifting, or in lane transit
+- **THEN** the order is rejected with its own named reason, distinct from
+  the already-arrived rejection, and no state change occurs
+
+#### Scenario: Cut drive charges no delta-v
+
+- **WHEN** a burn is cut
+- **THEN** no delta-v is debited for the act of cutting itself, and the
+  discarded burn's unspent fuel is refunded per "Discarding a Running Burn
+  Refunds Its Unspent Fuel, Closed-Form" — that refund is a cargo effect of
+  the discard, not evidence that cutting charged any new delta-v
+
+#### Scenario: A cut fleet is immediately re-orderable
+
+- **WHEN** a fleet has just been converted to a drift by cut drive
+- **THEN** it accepts a new burn order immediately, with no cooldown or
+  intervening state
+
+#### Scenario: Cutting a burn credits its unspent fuel
+
+- **WHEN** a running burn with a nonzero already-debited fuel cost is cut
+  before its arrival time
+- **THEN** the fleet's `fuel` cargo is credited with the unspent-fraction
+  refund "Discarding a Running Burn Refunds Its Unspent Fuel, Closed-Form"
+  defines, even though the cut itself charges no new delta-v
+
 ## ADDED Requirements
 
 ### Requirement: A Burn's Fuel Cost Scales With Roster Hull Count, Never Loaded Mass
@@ -121,7 +194,14 @@ Commit With an Atomically Claimed Slot") — a precondition satisfied only
 by a pre-transaction read SHALL never be sufficient to commit or to debit,
 closing the race between a burn's fuel debit and a concurrent, unserialized
 instant mutation of the same fleet's `fuel` (e.g. a refuel) that neither
-claims nor is blocked by any channel slot. A commit whose fuel cost exceeds
+claims nor is blocked by any channel slot. This affordability check SHALL
+be enforced by the transaction-scoped `ActorState` producer's failure path
+(`action-dispatch`'s "A transaction-scoped producer's error aborts the
+commit entirely"): the producer, evaluating the transactional re-read,
+SHALL return a named error rather than a debited fields map when the cost
+is unaffordable, so the rejection is enforced inside the same transaction
+that performs the re-read, never merely computed from it and rejected by a
+caller that could race past it. A commit whose fuel cost exceeds
 available fuel SHALL be rejected with its own named reason, distinct from
 every other commit rejection this capability defines — including the
 persistent stranded condition "A Fleet's Read Reports a Persistent
@@ -135,7 +215,18 @@ the burn — never at the burn's resolve — so that a fleet's fuel balance
 always reflects every committed-but-unresolved burn's full planned cost,
 and a burn, once committed, can never later fail to resolve for lack of
 fuel: the affordability check happens exactly once, at the moment the
-fleet still has full discretion over whether to commit.
+fleet still has full discretion over whether to commit. **A rejected
+commit SHALL leave the fleet's prior movement state and `fuel` cargo
+exactly as they were before the rejected order was submitted** — this
+applies identically when the rejected commit was itself an attempt to
+replace an active, not-yet-arrived burn ("A new order replaces an active
+one"): the prior burn's discard refund ("Discarding a Running Burn Refunds
+Its Unspent Fuel, Closed-Form") and the prior action's cancellation SHALL
+take effect only inside the same transaction that stores the replacement
+burn, never before that transaction is known to succeed — a fleet SHALL
+NOT have its running burn cancelled, or its unspent fuel refunded, only to
+have the replacement re-target rejected for its own unaffordability,
+leaving the fleet drifting with no active order.
 
 #### Scenario: An unaffordable burn is rejected and nothing is stored or debited
 - **WHEN** a burn's computed fuel cost exceeds the fleet's currently held
@@ -181,6 +272,14 @@ fleet still has full discretion over whether to commit.
   "A Fleet's Read Reports a Persistent Stranded Indication, Computed at
   the Acceleration Floor"
 
+#### Scenario: A rejected re-target leaves the prior burn running and fuel unchanged
+- **WHEN** a fleet mid-burn toward one target is re-ordered to a different
+  target whose fuel cost exceeds the fleet's currently held `fuel`
+- **THEN** the commit is rejected, the fleet's original burn remains active
+  and unaffected (never cancelled), and the fleet's `fuel` cargo is
+  unchanged — the prior burn's discard refund is never credited, because
+  the transaction that would have cancelled and refunded it never commits
+
 ### Requirement: A Burn Commit Warns, But Does Not Block, When It Would Leave the Fleet Unable to Reach a Station or Gate
 The system SHALL, on an otherwise-accepted burn commit (per "A Burn Commit
 Is Rejected When Its Fuel Cost Exceeds Available Fuel, Debited At Commit
@@ -214,7 +313,16 @@ Target Runs a Fixed Number of Rounds") — so the honest cost is N ×
 `SolveRounds` fixed-round iterations, N being the candidate count, not a
 single closed-form solve and not merely N. A system with more
 stations/gates costs proportionally more to evaluate, though N is bounded
-by that system's realistic body count, never unbounded.
+by that system's realistic body count, never unbounded. A candidate solve
+that fails with `space.ErrArcTooShort` SHALL count as **reachable at zero
+cost**: that error occurs precisely when the candidate burn's curve would
+be shorter than `space.MinArcLength`, which is exactly what happens when
+the fleet's resulting park already sits at (or arrives at) that
+candidate's own insertion standoff — the single most routine configuration
+in the game, a fleet parked at or burning to its own refuelling point —
+and treating it as unreachable would false-alarm against exactly that
+case. A candidate solve that fails with any other named `space` error
+SHALL count as unreachable, contributing nothing to the affordable set.
 
 #### Scenario: A burn that leaves the fleet unable to reach any station or gate, even at the acceleration floor, is still accepted, with a warning
 - **WHEN** a burn commit's post-debit remaining fuel would not afford a
@@ -240,13 +348,20 @@ by that system's realistic body count, never unbounded.
   Fuel Cost Exceeds Available Fuel, Debited At Commit Never At Resolve"
   would otherwise accept
 
-#### Scenario: Estimated range is computed at the silent-running floor, not the acceleration ceiling
+#### Scenario: A candidate reachable only below the acceleration ceiling still suppresses the warning
 - **WHEN** the fleet's post-debit remaining fuel would afford a burn to a
   candidate station or gate only at an acceleration below its
   `DerivedAccelCeiling`, and specifically at or above
   `disclosure.MinCommandedAccel`
 - **THEN** that candidate counts as reachable and suppresses the warning —
   reachability is never evaluated only at the ceiling
+
+#### Scenario: A candidate too close to solve counts as reachable at zero cost
+- **WHEN** a candidate station or gate body's floor-priced solve fails with
+  `space.ErrArcTooShort` (the fleet's resulting park already sits at, or
+  arrives at, that candidate's own insertion standoff)
+- **THEN** that candidate counts as reachable at zero cost, and the warning
+  is not fired on its account
 
 ### Requirement: A Fleet's Read Reports a Persistent Stranded Indication, Computed at the Acceleration Floor
 The system SHALL include, on the fleet read endpoints ("Fleet Read
@@ -265,7 +380,15 @@ exists because "A Burn Commit Warns..." fires only once, at the instant a
 commit creates the condition; a player who misses that one-shot warning,
 or who inspects a fleet's condition later without having witnessed the
 triggering commit, would otherwise have no way to discover a stranded
-fleet except by attempting burns and watching them fail.
+fleet except by attempting burns and watching them fail. This indication
+SHALL reuse "A Burn Commit Warns..."'s own candidate-evaluation rule for a
+`space.SolveBurn` failure: a candidate that fails with `space.ErrArcTooShort`
+counts as reachable at zero cost (the fleet is already at, or arriving at,
+that candidate's own insertion standoff — the routine case of a fleet
+parked at its home station), and a candidate that fails with any other
+named `space` error counts as unreachable — a docked fleet with a full
+tank SHALL NEVER read as stranded merely because solving a burn back to its
+own dock is geometrically too short to solve.
 
 #### Scenario: A fleet unable to afford any floor-priced burn to a station or gate reads as stranded
 - **WHEN** an owning corporation reads a fleet whose currently held `fuel`
@@ -288,21 +411,34 @@ fleet except by attempting burns and watching them fail.
 - **THEN** the stranded indication reads false, distinguishable from any
   representation of "idle"
 
-#### Scenario: A foreign fleet's stranded indication is not disclosed
-- **WHEN** a requester lists or fetches a fleet belonging to another
-  corporation
-- **THEN** no stranded-indication field is present, following the same
-  omission this capability's cargo, roster, and estimated-range fields
-  already receive
+#### Scenario: A docked fleet with a full tank never reads as stranded merely because its own dock is too close to solve
+- **WHEN** an owning corporation reads a fleet docked at a station, whose
+  only candidate for the floor-priced reachability solve is that same
+  station and whose solve fails with `space.ErrArcTooShort`
+- **THEN** that candidate counts as reachable at zero cost and the fleet
+  does not read as stranded, regardless of its held `fuel`
 
 ### Requirement: Discarding a Running Burn Refunds Its Unspent Fuel, Closed-Form
 The system SHALL, whenever a running, not-yet-arrived burn is discarded
-before its stored arrival time — by a cut-drive order (see "Cut Drive
-Converts the Burn to a Drift and Goes Dark"), or by a new movement-channel
-order superseding it before arrival (see "In-System Burn Order to a Body
-or a Point"'s "A new order replaces an active one" and "Stop In Place
-Commits a Velocity-Nulling Burn") — credit the fleet's `fuel` cargo with
-the unspent portion of that burn's already-debited cost. The burn's fuel
+before its stored arrival time — by **any** means this capability defines,
+never an enumerated subset: a cut-drive order (see "Cut Drive Converts the
+Burn to a Drift and Goes Dark"), a new movement-channel order superseding
+it before arrival (an ordinary re-target — see "In-System Burn Order to a
+Body or a Point"'s "A new order replaces an active one" — or either branch
+of "Stop In Place Commits a Velocity-Nulling Burn," **including its free,
+below-the-speed-floor branch**), or a cancellation
+(`POST /v1/fleets/:fleetId/cancel` or `POST /v1/actions/:actionId/cancel`)
+— credit the fleet's `fuel` cargo with the unspent portion of that burn's
+already-debited cost. This trigger is deliberately universal rather than
+enumerated: a discard path this requirement's own text failed to name
+would otherwise silently drop a fully-debited burn's unspent refund, which
+is exactly the shape of bug stop-in-place's free branch exposed — that
+branch converts the fleet to a `point` park with no delta-v charge for the
+stop *itself*, but if it discards an active burn to do so (possible when
+the fleet's live speed happens to be at or below the floor while a burn is
+still running), that burn's own already-debited cost is refunded exactly
+as it would be by any other discard, never silently forfeited because the
+stop that discarded it was itself free. The burn's fuel
 cost in tons, as computed and debited at its own original commit per "A
 Burn's Fuel Cost Scales With Roster Hull Count, Never Loaded Mass," SHALL
 be stored on the burn record itself at commit time — this is new persisted
@@ -343,6 +479,14 @@ rejection applies).
 - **THEN** the prior burn's unspent fuel is refunded before the new
   stopping burn's own fuel cost is debited
 
+#### Scenario: Stop-in-place's free, below-the-floor branch still refunds a preceding running burn
+- **WHEN** stop-in-place is ordered against a fleet whose live speed is at
+  or below the configured stop-in-place speed floor while it holds an
+  active, not-yet-arrived burn
+- **THEN** the fleet's `fuel` cargo is credited with that burn's unspent
+  portion, computed from its own stored debited-cost field, even though the
+  stop itself charges no new delta-v and creates no new committed action
+
 #### Scenario: The refund is symmetric with the original debit's stored cost, not a re-derivation from the roster at discard time
 - **WHEN** a fleet's roster changes between a burn's commit and its
   discard (a hull is lost or gained between the two)
@@ -382,12 +526,6 @@ Computed Only in the Authoritative Implementation."
 - **WHEN** a fleet holds zero `fuel`
 - **THEN** its reported estimated range is exactly zero
 
-#### Scenario: A foreign fleet's estimated range is not disclosed
-- **WHEN** a requester lists or fetches a fleet belonging to another
-  corporation
-- **THEN** no estimated range field is present, following the same
-  omission this capability's cargo and roster fields already receive
-
 #### Scenario: The reported range is computed at the acceleration floor, not the ceiling
 - **WHEN** a fleet's estimated range is computed for a fleet whose
   `DerivedAccelCeiling` is strictly greater than
@@ -408,17 +546,17 @@ the settlement actually charges. No client-side constant duplicating this
 price SHALL be maintained; a client-side preview SHALL read this served
 field on every render, following `fleet-movement`'s existing precedent of
 serving another capability's data on the fleet DTO ("Fleet Read Serves the
-Attached Gate's Lane Id").
+Attached Gate's Lane Id"). This field is served under the same
+owning-corporation-only visibility every other field "Fleet Read Surfaces
+Roster, Cargo, and Derived Capacity" defines already carries — a foreign
+fleet is omitted from a list read and 404s on a direct fetch per "Fleet
+Read Endpoints Serve Own Fleets In Full and Foreign Fleets As Contacts",
+so there is no foreign-fleet response for this field, or any other, to
+appear on.
 
 #### Scenario: The served fuel price matches the settlement's charged rate
-- **WHEN** a fleet read's served fuel price is compared against the unit
-  price a refuel settlement for that same fleet actually charges
+- **WHEN** an owning corporation's fleet read's served fuel price is
+  compared against the unit price a refuel settlement for that same fleet
+  actually charges
 - **THEN** the two are identical, because both derive from the same
   configured `FuelParams.PricePerTon` value
-
-#### Scenario: A foreign fleet's read still serves the fuel price
-- **WHEN** any fleet, owned or foreign, is read via the fleet read
-  endpoints
-- **THEN** the served fuel price field is present and identical regardless
-  of the reading corporation's relationship to the fleet, since the price
-  is a global constant, not fleet- or ownership-scoped data

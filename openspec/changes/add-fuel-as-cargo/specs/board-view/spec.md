@@ -121,3 +121,33 @@ its commit.
 - **THEN** an error toast surfaces player-facing, actionable copy mapped
   from the server's distinguishable rejection reason, never the raw
   sentinel-error string verbatim
+
+### Requirement: Refuel Control Guards Against Double-Submit
+The refuel control SHALL be disabled from the moment of commit until the
+request settles or fails, so a double-click or repeated-Enter cannot
+submit two refuels — mirroring the sell control's identical guard ("Sell
+Control Guards Against Double-Submit") for the game's second credit-
+mutating route. Exactly one operation key SHALL be generated per
+user-initiated refuel attempt; that same key SHALL be reused across
+transport-level retries of that one attempt (so a network retry dedups
+against the original, per `fuel-purchase`'s "Idempotent By Operation Key"),
+while a freshly initiated refuel attempt SHALL always generate a new key
+— unlike the sell control, a refuel attempt is never re-priced between
+preview and commit, since the fuel price is a single global constant that
+never moves.
+
+#### Scenario: A double-click yields exactly one refuel
+- **WHEN** the refuel control is double-clicked in rapid succession
+- **THEN** exactly one refuel request is submitted, using one operation key
+
+#### Scenario: A transport-level retry of the same attempt yields exactly one refuel
+- **WHEN** the refuel command's request is retried at the transport layer
+  after a lost response, without the player initiating a new attempt
+- **THEN** the retry reuses the same operation key as the original attempt,
+  and the settlement remains a single refuel
+
+#### Scenario: A fresh attempt after a completed refuel is a second, independent refuel
+- **WHEN** a player completes one refuel and then initiates a new refuel
+  command
+- **THEN** the new attempt generates a new operation key, distinct from the
+  completed refuel's key

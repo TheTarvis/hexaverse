@@ -130,6 +130,19 @@ spec deltas.
   more cheaply than a ceiling-priced stop implies, so the genuinely-dead
   population is smaller than an earlier draft of this change assumed —
   see Risks.
+- **The one deliberate carve-out from this rule:** `corporation-spawn`'s
+  "Starting Fuel Is a Configured Constant, Guarded By a Reachability
+  Sample" prices its spawn-to-home-station reachability guarantee at the
+  fleet's `DerivedAccelCeiling`, not the floor. This is not an
+  inconsistency — a burn order that omits an explicit commanded
+  acceleration defaults to the ceiling ("An omitted commanded acceleration
+  defaults to the fleet's ceiling"), so the ceiling is what a fresh
+  corporation's actual, unmodified first order costs. A floor-priced guard
+  would certify a starting-fuel constant under which that real default
+  order is unaffordable, reopening the exact spawn-time deadlock §0.3
+  exists to prevent — at `DerivedAccelCeiling = 8` vs `MinCommandedAccel =
+  1.0`, a floor-priced guard would understate the default order's true
+  cost by `√8 ≈ 2.83×`.
 
 ### Decision: Fuel price scales with roster hull count, never with loaded mass
 See proposal.md's guardrail paragraph for the full argument. The
@@ -226,6 +239,22 @@ Three separate signals, deliberately different in strength and lifetime:
   station/gate count (not its full body count — the candidate set is
   explicitly bounded to stations and lane gates only). `tasks.md` sizes
   this work against the honest cost.
+- **Correction, caught by this change's own adversary review: a
+  `space.SolveBurn` failure was left unhandled, and it fires on the most
+  routine configuration in the game.** `space.BuildCurve` rejects a curve
+  shorter than `space.MinArcLength` with `space.ErrArcTooShort` — exactly
+  what happens when the fleet's resulting park already sits at (or arrives
+  at) the very candidate being evaluated, i.e. a fleet parked at, or
+  burning to, its own home station. Left unhandled, this reads as "cannot
+  solve a burn to this candidate" and the candidate is dropped from the
+  affordable set — so the stranding warning fires against a fleet burning
+  *to* its own refuelling point, and the persistent stranded indicator
+  reads a docked, full-tank fleet as permanently stranded. Both
+  requirements now state the rule explicitly: an `ErrArcTooShort` failure
+  counts as reachable at zero cost (the fleet is already there); any other
+  named `space` error counts as unreachable. Getting this backwards is the
+  single easiest way to make this change's flagship credibility
+  requirement cry wolf at the one place it must never fire.
 - **Rejection copy distinguishes two different player questions.** A
   commit rejected because *this specific burn's* fuel cost exceeds
   available fuel ("A Burn Commit Is Rejected When Its Fuel Cost Exceeds
@@ -283,11 +312,25 @@ ledger, i.e. an unaudited free grant of fuel. The fix: refuel's cost
 rounds **up** to the nearest whole credit — the buyer-adverse direction,
 the mirror image of `goods-sale`'s seller-adverse floor, since here the
 buyer (not a venue with limited supply) is the one who could otherwise
-extract value from the rounding. A refuel whose full requested tonnage
-would still cost zero whole credits (only possible if `PricePerTon` itself
-rounds a nonzero tonnage to zero, which a sane configured price avoids, but
-the rule is stated regardless) is rejected outright, and the computation
-SHALL be overflow-safe, mirroring `goods-sale`'s identical guarantees.
+extract value from the rounding.
+- **Correction to an earlier draft, caught by this change's own adversary
+  review:** rounding UP a positive tonnage's cost against a strictly
+  positive price can **never** itself produce zero whole credits
+  (`ceil(tons × price) ≥ 1` for any `tons > 0`, `price > 0`) — this is the
+  opposite situation from `goods-sale`'s floor-rounded proceeds, where a
+  genuine dust sale really can round to zero. An earlier draft stated the
+  reject-if-zero and overflow guards as if they were live gameplay paths a
+  dust-sized request could trigger; they cannot be, once tonnage is
+  already validated as positive and bounded by the fleet's free hold
+  *before* cost is computed. Both guards are **misconfiguration guards**:
+  the reject-if-zero guard fires only if `FuelParams.PricePerTon` is
+  itself configured at or below zero, and the overflow guard fires only if
+  that same constant is configured large enough that even a
+  free-hold-bounded tonnage overflows the balance's integer type. Framing
+  them as reachable gameplay paths invites an implementer who cannot
+  produce a failing test to "fix" the rounding back to floor, silently
+  reopening the free-fuel hole this Decision exists to close — stating
+  them honestly as misconfiguration guards removes that incentive.
 - Alternative considered: floor, like `goods-sale`. Rejected for the
   reason above — flooring is seller-adverse, which is correct when the
   *venue* sets a price against a *seller's* tonnage, but refuel has no
@@ -318,21 +361,25 @@ fix, not a spec change. The grant rides `corporation-spawn`'s existing
 idempotent asset-healing pass, alongside the opening credit grant.
 - **Corroborated by this change's own panel review (DBA):** neither the
   starting-fuel grant marker's atomicity, nor its exact anchor, was named
-  precisely enough in an earlier draft. The anchor is explicitly **not**
-  "current fuel equals zero" (which would re-grant forever to a hull that
-  legitimately burned its tank dry — mirroring the existing credit-balance
-  anti-pattern `corporation-spawn` already guards against) but a
-  distinguishable, per-fleet grant marker recorded **in the same write
-  that credits the fuel**, and that marker's check-and-set SHALL be atomic
-  by construction — mirroring the opening credit grant's own
-  `"spawn:" + corpId` ledger-document id, a create-if-absent anchor,
-  since `/v1/corporations/me` is explicitly exempt from the
-  per-corporation write quota and concurrent healing calls are therefore
-  cheap to trigger. `corporation-spawn`'s existing *Concurrent bootstrap
-  reads for one account heal exactly once* scenario — which already
-  enumerates the station, the ledger entry, and the balance as the three
-  assets a concurrent double-healing must not duplicate — widens to name
-  the starting-fuel grant as a fourth.
+  precisely enough in an earlier draft — this is why an implementer would
+  otherwise reach for `Fleet.UpdatedAt` (re-stamped by unrelated writes) as
+  a proxy, a silent-corruption bug no formula-level test would catch. The
+  anchor is explicitly **not** "current fuel equals zero" (which would
+  re-grant forever to a hull that legitimately burned its tank dry —
+  mirroring the existing credit-balance anti-pattern `corporation-spawn`
+  already guards against) but a **named, create-if-absent document at
+  `corporations/{corpId}/fuelGrants/{fleetId}`**, written in the same
+  transaction that credits the fuel; its existence alone is the "already
+  granted" signal, and that check-and-set is atomic by construction —
+  mirroring the opening credit grant's own `"spawn:" + corpId`
+  ledger-document id, a create-if-absent anchor, since
+  `/v1/corporations/me` is explicitly exempt from the per-corporation write
+  quota and concurrent healing calls are therefore cheap to trigger.
+  `corporation-spawn`'s existing *Concurrent bootstrap reads for one
+  account heal exactly once* scenario — which already enumerates the
+  station, the ledger entry, and the balance as the three assets a
+  concurrent double-healing must not duplicate — widens to name the
+  starting-fuel grant as a fourth.
 
 ### Decision: `fuel-purchase` is a new capability, modelled on `goods-sale`
 Ownership-404-first, station-resolved-from-own-system, and
@@ -462,3 +509,14 @@ amount.
   hold" read** is out of scope here entirely — see
   `add-stationkeep-hold-verb`'s own design.md, since that whole surface is
   carved out of this change.
+- **`ceil(tons × price) ≥ 1` holds for reals, but not for IEEE-754.** A
+  hand-crafted, denormal `tons` value (e.g. `5e-324`) against a
+  misconfigured sub-unit `FuelParams.PricePerTon` can underflow the
+  `tons × price` product to `0.0` before the ceiling ever runs, and "Cost
+  Arithmetic Rounds Against the Buyer, Is Overflow-Safe, and Is Never
+  Zero" rejects only on `price ≤ 0`, not on a computed-zero cost. Not a
+  live gameplay path — it requires both a hand-crafted denormal tonnage
+  and a misconfigured price — and the failure mode is a forbidden
+  zero-amount ledger entry (caught by `corporation-credits`'s existing
+  reject-zero-entry rule), never free fuel at any reachable scale.
+  Recorded rather than fixed here.
