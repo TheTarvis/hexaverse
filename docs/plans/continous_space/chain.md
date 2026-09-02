@@ -4,10 +4,9 @@ The ordered set of OpenSpec changes that carries the game from the polar
 lattice to the continuous-space system map. `README.md` is the model,
 `decisions.md` is the settled rulings; this is the sequencing.
 
-**Status (2026-09-01):** links 1–4 landed, plus one unplanned insert. Link 5
-is **in implementation** — its spec is complete and adversary-clean, and
-sections 1–5 of its 9 have shipped; sections 6–9 (carry-overs, housekeeping,
-validation, cleanup) remain. Links 6–9 unstarted. All three chain-gating
+**Status (2026-09-02):** links 1–5 landed, plus one unplanned insert. Link 5
+is **done and archived** — 90/90 tasks, all ten sections, three adversary
+rounds. Links 6–9 unstarted. All three chain-gating
 design decisions are settled — see *Open decisions gating the chain* below.
 Two lattice-era changes
 (`add-station-exchange`, `revise-scan-instant-and-emission`) were removed from
@@ -41,7 +40,7 @@ after that design was written.
 | 3 | `add-orbital-system-bodies` | Interiors emit real orbits; lane gates become bodies | ✅ `e00e79e` |
 | — | `pin-system-generation-determinism` | *(unplanned insert)* generation pinned byte-identical across build targets | ✅ `b64be39` |
 | 4 | `migrate-fleet-to-continuous-burns` | Fleets fly curves; cut drive / stop in place | ✅ `1f1c88a`…`55c46fb` |
-| 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | 🔄 §1–5 of 9 (`8f4dd65`…`d18c255`) |
+| 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ✅ `8f4dd65`…`99747e2` |
 | 6 | `re-express-economy-positions` | Mine/sell/dock re-anchored to bodies | ⬜ |
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ⬜ |
 | 8 | `build-production-space-view` | The renderer; `board-view` retired | ⬜ |
@@ -179,10 +178,36 @@ prove itself against already exists.
 
 ## Link 5 — `replace-observation-with-sightings`
 
-**In implementation (2026-09-01).** Spec complete and adversary-clean after
-three rounds — 16 deltas, 191 scenarios, three new capabilities
-(`galaxy-knowledge`, `sighting-records`, `focused-scan`). Sections 1–5 of 9
-have shipped; §6–§9 (carry-overs, housekeeping, validation, cleanup) remain.
+**Landed and archived 2026-09-02** (`8f4dd65`…`99747e2`), 90/90 tasks across
+ten sections — 16 deltas, three new capabilities (`galaxy-knowledge`,
+`sighting-records`, `focused-scan`), +45 requirements, 13 modified, 12
+removed. The spec went through **three** adversary rounds, not one: resuming
+it expired the prior verdict, and re-attacking the resumed content found 3
+blockers, 7 majors and 4 minors, then 1 blocker and 2 majors in the text
+those repairs introduced.
+
+Two defects it surfaced are worth remembering, both invisible to a green
+suite and both the same species as link 4's four:
+
+- **`EnsureLaneHorizon` had been wired inside every body-table build**, not
+  on the jump path. Two of those builds run inside Firestore transactions,
+  where a nested transaction is refused before any RPC — so the call was not
+  merely unwired there, it was *unwirable*. It also made the interior read
+  silently grow the galaxy, an unenumerated trigger, and `ensureBlocksIn`
+  short-circuits when everything is materialized, so it was inert on exactly
+  the frontier branch it exists for. A §10 was opened to hoist it.
+- **The trading station was absent from every interior read**, for every
+  requester including its owner, because `StationContinuousOrbit` and
+  `StationSize` had zero production callers since link 3 and
+  `applyContinuousCascade` therefore dropped the station. M11's
+  dock-then-sell loop was unreachable through the UI. This is blocker 5, the
+  third instance of "a derivation built, unit-tested, and never called."
+
+The lesson link 5 keeps re-teaching: a storage-boundary guard applied to an
+in-process construction converts a producer bug into a silent omission that
+looks, in the log, exactly like data rot. The fix splits the degradation
+signal by population — spliced bodies fail loudly, stored ones still degrade
+quietly.
 
 What has landed so far: **the galaxy is traversable again** — a player can
 spawn, fly to a lane gate, and jump using only the UI, proven by a Playwright

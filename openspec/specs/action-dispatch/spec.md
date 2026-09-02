@@ -184,29 +184,6 @@ cancel through their own domain endpoint instead, e.g.
   running
 - **THEN** the response is `409 Conflict`
 
-### Requirement: No Caller-Identity Binding on Action Endpoints
-The system SHALL, for `GET /v1/actions?actor=<id>`,
-`GET /v1/actions/:actionId`, `POST /v1/actions/:actionId/acknowledge`, and
-`POST /v1/actions/:actionId/cancel`, accept any `actor` query value or
-`actionId` path value from any authenticated caller, without verifying that
-the caller's own corporation/account owns that actor or that action.
-(Suspected authorization defect — see retrofit report item 1; specced here
-as the current, observable behavior, not an endorsement.)
-
-#### Scenario: Any authenticated caller can read another actor's inbox
-- **WHEN** an authenticated account calls `GET /v1/actions?actor=<id>` naming
-  an actor (e.g. a fleet) it does not own
-- **THEN** the full list of that actor's actions — including target and ETA
-  detail — is returned, with no check that the caller owns that actor
-
-#### Scenario: Any authenticated caller can acknowledge or cancel another actor's action
-- **WHEN** an authenticated account calls
-  `POST /v1/actions/:actionId/acknowledge` or
-  `POST /v1/actions/:actionId/cancel` naming an action whose actor it does
-  not own
-- **THEN** the action is acknowledged or cancelled, with no check that the
-  caller owns the action's underlying actor
-
 ### Requirement: Scheduled Sweep as a Liveness Floor
 The system SHALL serve `POST /v1/push/action-sweep` (OIDC-verified,
 scheduler-triggered) resolving every due action across all scopes/actors,
@@ -313,3 +290,56 @@ subject to this allowlist.
 - **WHEN** a commit spec's `ActorState` carries the actor's movement-state
   struct while its `Params` are all allowlisted
 - **THEN** the commit succeeds
+
+### Requirement: Action Endpoints Are Restricted to the Owning Corporation
+The system SHALL, for `GET /v1/actions?actor=<id>`,
+`GET /v1/actions/:actionId`, `POST /v1/actions/:actionId/acknowledge`, and
+`POST /v1/actions/:actionId/cancel`, resolve the named actor's (for the two
+action-id-scoped endpoints, that action's own actor's) owning corporation
+and compare it against `common.ActorCorp(c)` before serving or acting,
+responding `404 Not Found` — not `403` — when they do not match or when the
+requester has no corporation, matching the absence semantics
+`fleet-movement`'s own movement-endpoint closure uses for the identical
+reason: a foreign actor is indistinguishable from a nonexistent one, and a
+`403` would itself confirm the actor exists (design.md Decision 21). This
+closes the sibling half of the authorization defect `fleet-movement`'s five
+movement-command endpoints close in the same change — closing only those
+five would leave a bypass to the same movement-channel slot through this
+capability's own cancel endpoint.
+
+#### Scenario: A foreign corp cannot list another actor's inbox
+- **WHEN** an authenticated account whose corporation does not own actor F
+  calls `GET /v1/actions?actor=F`
+- **THEN** the response is `404 Not Found` and no action belonging to F is
+  returned
+
+#### Scenario: A foreign corp cannot fetch a single action by id
+- **WHEN** an authenticated account whose corporation does not own action
+  A's underlying actor calls `GET /v1/actions/A`
+- **THEN** the response is `404 Not Found`
+
+#### Scenario: A foreign corp cannot acknowledge another actor's action
+- **WHEN** an authenticated account whose corporation does not own action
+  A's underlying actor calls `POST /v1/actions/A/acknowledge`
+- **THEN** the response is `404 Not Found` and action A's acknowledgment
+  state is unchanged
+
+#### Scenario: A foreign corp cannot cancel another actor's action
+- **WHEN** an authenticated account whose corporation does not own action
+  A's underlying actor calls `POST /v1/actions/A/cancel`
+- **THEN** the response is `404 Not Found` and action A continues running,
+  unaffected
+
+#### Scenario: A corpless requester is rejected the same way
+- **WHEN** an authenticated but corpless account calls any of these four
+  endpoints against an existing actor or action
+- **THEN** the response is `404 Not Found`
+
+#### Scenario: The owning corporation's own requests still succeed
+- **WHEN** an authenticated account whose corporation owns actor F calls
+  `GET /v1/actions?actor=F`, or owns action A's underlying actor and calls
+  `GET /v1/actions/A`, `POST /v1/actions/A/acknowledge`, or
+  `POST /v1/actions/A/cancel`
+- **THEN** each call succeeds exactly as it did before this ownership check
+  was added
+

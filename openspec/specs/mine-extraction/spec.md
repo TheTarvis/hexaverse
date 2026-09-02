@@ -11,14 +11,20 @@ unauthenticated request — before any other precondition check, creating no
 action and applying no lode delta or cargo credit. Existence is hidden: a
 foreign or unknown fleet returns `404 Not Found`, matching the fog
 convention `fleet-movement`'s read endpoints already use for foreign fleets
-outside coverage. This endpoint intentionally departs from
-`fleet-movement`'s "Command Endpoints Enforce No Fleet Ownership" baseline
-(orders/cancel/scan currently accept any authenticated caller): mine is a
-brand-new endpoint, and claiming a foreign fleet's movement slot to mine is
-a resource-griefing surface (locks the victim in place, forces cargo into
-its hold, can consume a contested lode on its behalf), not a reversible
-reposition, so this change closes the gap at the source instead of
-inheriting it (see design.md Decision 10).
+outside coverage. This requirement predates `fleet-movement`'s own
+ownership check and is the same rule, stated independently: at the time
+mine shipped, the sibling movement-command endpoints
+(orders/cancel/cut-drive/stop/jump) accepted any authenticated caller
+regardless of ownership — a gap `fleet-movement`'s "Movement Command
+Endpoints Enforce No Fleet Ownership" recorded as open — and mine closed
+the gap at its own endpoint rather than inheriting it, because claiming a
+foreign fleet's movement slot to mine is a resource-griefing surface (locks
+the victim in place, forces cargo into its hold, can consume a contested
+lode on its behalf), not a reversible reposition (see design.md Decision
+10). `replace-observation-with-sightings` subsequently closes that sibling
+gap too, under `fleet-movement`'s "Fleet Command Endpoints Are Restricted
+to the Owning Corporation"; mine's own ownership check, stated here, is
+unchanged by that later change.
 
 #### Scenario: An unauthenticated mine request is rejected
 - **WHEN** `POST /v1/fleets/:fleetId/mine` is called with no valid Firebase
@@ -447,3 +453,4 @@ state of its own to settle on cancel).
   `POST /v1/actions/:actionId/cancel` still releases the slot with no
   delta or cargo credit — the fleet is recoverable without data loss,
   never permanently stuck
+

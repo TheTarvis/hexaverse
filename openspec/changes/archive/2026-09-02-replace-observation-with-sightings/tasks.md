@@ -900,7 +900,7 @@
       registration prevents is real too. Note also for task 8.3: run it as
       `go test -p 1 ./...` and record both results, so a red parallel run
       is attributed to that defect and not to this change.
-- [ ] 7.6 **Post-archive step — do after `openspec archive
+- [x] 7.6 **Post-archive step — do after `openspec archive
       replace-observation-with-sightings` succeeds, not before:** delete
       `openspec/specs/observation-fog-and-scan/` by hand. This change carries
       no `specs/observation-fog-and-scan/` delta (see proposal.md's

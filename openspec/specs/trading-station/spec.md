@@ -158,28 +158,6 @@ availability — only a fresh dock order or a fresh interior read does.
 - **THEN** the fleet's position still resolves correctly, computed from the
   station's deterministic orbit, without a station-store read
 
-### Requirement: Station Excluded From the Fog/Scan Feature Source
-The station SHALL be excluded from `observation.InteriorSource` (the
-feature list `system.Service`'s fog source projects for line-of-sight and
-scan-reveal purposes): it SHALL contribute no occluder geometry to a
-scan's line-of-sight computation, and no scan resolution SHALL ever mint a
-feature-level observation for it. A station's visibility is governed
-entirely by its own graph-tier rule (see "Home Station Visible On First
-Board Read, No Scan Required"), never by anything sensed or remembered.
-
-#### Scenario: A scan never mints a station observation
-- **WHEN** a scan resolves in a system carrying a station, with the
-  station well within the scan's line-of-sight radius
-- **THEN** no feature-level observation is minted for the station, and the
-  scan's line-of-sight computation is unaffected by the station's presence
-
-#### Scenario: A station never occludes a scan's line of sight
-- **WHEN** a scan's line-of-sight computation is evaluated in a system
-  carrying a station positioned between the scanning fleet and another
-  feature
-- **THEN** the station contributes no occlusion — line of sight is
-  evaluated exactly as if the station were absent
-
 ### Requirement: Station Id Is the Home System's Id; Feature Id Is System-Scoped and Separate
 A station's identity for every cross-capability purpose — the
 `market-price-board` and `goods-sale` "venue" key, and the direct
@@ -205,31 +183,6 @@ its own system.
   order or resolve it in its own system's interior
 - **THEN** that same feature id string carries no meaning outside that one
   system, and no capability resolves a venue or station by feature id alone
-
-### Requirement: Home Station Visible On First Board Read, No Scan Required
-The system SHALL include a system's station in that system's board read
-whenever the requester's graph-tier knowledge of that system is at least a
-configured minimum visibility tier (`market.Params.MinVisibilityTier`,
-defaulted to `rumored` — the same tier `market-price-board` gates on),
-independent of sensor coverage or any scan. Since spawn always sets a
-corporation's home system to at least `explored`, a freshly spawned
-corporation sees its home station on the very first board read regardless
-of where its rim-ring hull was placed.
-
-#### Scenario: A freshly spawned corporation's first read shows its home station
-- **WHEN** a freshly spawned corporation reads its home system's board for
-  the first time, having performed no scan
-- **THEN** the home station appears in the response
-
-#### Scenario: A system at exactly the configured minimum tier includes its station
-- **WHEN** a requester's graph tier for a station-bearing system is exactly
-  the configured minimum visibility tier
-- **THEN** that system's station is included in the board read
-
-#### Scenario: A system below the configured minimum tier omits its station
-- **WHEN** a requester's graph tier for a station-bearing system is below
-  the configured minimum visibility tier (e.g., merely `starVisible`)
-- **THEN** that system's station is omitted from the board read
 
 ### Requirement: Station Existence Hidden Below the Visibility Gate
 A direct station read for a system whose requester tier is below the
@@ -356,4 +309,37 @@ resolve within `space`'s bounded resolution depth.
   `space.Position`
 - **THEN** resolution succeeds with no error, the chain (station → parent
   body → star) being well within the resolver's bounded recursion depth
+
+### Requirement: Home Station Visible On the Direct Station Read, No Scan Required
+The system SHALL include a system's station in a **direct** station read
+(`GET /v1/systems/:systemId/station`) whenever the requester's graph-tier
+knowledge of that system is at least a configured minimum visibility tier
+(`market.Params.MinVisibilityTier`, defaulted to `rumored` — the same tier
+`market-price-board` gates on), independent of sensor coverage or any
+scan. This gate applies to the direct station-read endpoint alone: the
+system-interior/board read (`GET /v1/systems/:systemId`) serves a system's
+station unconditionally to every authenticated requester, per
+`system-interior`'s "Bodies Are Public; Ships Are Disclosed" — a station is
+a body spliced into that interior, not a second disclosure surface with
+its own tier rule. Since spawn always sets a corporation's home system to
+at least `explored`, a freshly spawned corporation sees its home station on
+the very first direct station read regardless of where its rim-ring hull
+was placed.
+
+#### Scenario: A freshly spawned corporation's first direct station read shows its home station
+- **WHEN** a freshly spawned corporation reads its home system's station
+  directly for the first time, having performed no scan
+- **THEN** the home station appears in the response
+
+#### Scenario: A system at exactly the configured minimum tier includes its station on a direct read
+- **WHEN** a requester's graph tier for a station-bearing system is exactly
+  the configured minimum visibility tier
+- **THEN** a direct station read for that system includes the station
+
+#### Scenario: The board read serves the station regardless of tier
+- **WHEN** a requester's graph tier for a station-bearing system is below
+  the configured minimum visibility tier (e.g., merely `starVisible`)
+- **THEN** the system-interior/board read for that system still includes
+  the station in full, because body disclosure on that read is
+  unconditional and computes no tier gate
 
