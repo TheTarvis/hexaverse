@@ -505,8 +505,14 @@ to an `action-dispatch` delta and answers OQ-9.
 belt into the `BodyTable`, ids `{beltId}#{k}`, derived and never persisted.
 `fleet/service.go:1120-1127`'s `resolveScanHost` accepts **any** `bt.Body(hostId)`,
 so a belt member is an accepted scan host today. `system/handler.go:124-155`
-serves features and lane gates only, so no read publishes a member id — which
-makes the new scan-target read the **first** surface that would.
+serves features and lane gates only, so no read **enumerates** member ids —
+which makes the new scan-target read the first surface that would offer them as
+selectable bodies. (Precisely: a member id is not entirely off the wire today —
+`fleetDTO.AttachedTo` (`fleet/handler.go:389`) serves one for a fleet docked at
+a member, a case `mine-extraction` specifies at length. That is a fleet echoing
+back the host it occupies, not a list of bodies to pick from, so the "first to
+publish member ids" framing overstated; the exclusion rule below does not
+depend on it.)
 
 That collides with two settled things: `build-production-space-view`'s *Belt
 Members Render as Decorative Detail, Never as Separate Pickable Bodies* ("no
@@ -580,25 +586,56 @@ missing the ordered field — so an unconditional order would silently return ze
 running actions and break `useRunningScan`, the hook this change exists to give
 a consumer.
 
-### Decision 20 — The swept host's raw id is the ordinary label, and the name path stays
+### Decision 20 — The swept host is labelled by its raw id, because no wire surface serves a name
 
-`system.Feature.Name` is set in exactly two places: `system/generator.go:64`
-(the star, which is never a scan host) and `stations/service.go:238` (the
-trading station). Planets, moons, belts, and lane gates carry no name; a fleet
-host has none at all. So the log's "host is named" path is inducible only
-against a station, and most rows will render `feat-planet-3`.
+An earlier draft specified the host "by name when the interior read supplies
+one, and by its raw id otherwise". **That premise was false at the wire
+boundary**, and the correction is worth recording because the mistake was made
+by reading the domain struct instead of the response struct.
 
-**Decision.** Keep the name clause and make the fallback's status explicit
-rather than dropping it: the client's body type carries the optional served
-`name` (task 4.2a), and the raw host id is specified as a **legitimate label,
-the ordinary case** — no placeholder, no empty cell, no degraded-state
-indication. Alternative considered and rejected: dropping the name clause for a
-"type + id" label rule. It reads better for a body in the open system but has no
-source anywhere else — a log row carries only the record's `hostId`, so a row
-for another system's sweep has neither a name nor a type, and the rule would
-need its own fallback to the bare id regardless. That trades one honest fallback
-for two. The name path also stays true to the wire, which does serve names for
-some hosts and may serve more later.
+`system.Feature` does carry `Name` (`system/model.go:135`,
+`json:"name,omitempty"`). But the interior response serializes `fogFeatureDTO`
+(`backend/system/fog.go:28-56`), which has **no name field at all**, and
+`projectUnfogged` (`:78-89`) copies none. Neither `build-production-space-view`'s
+`system-interior` delta nor `serve-orbital-elements-and-burn-preview` mentions
+`name` among the response's enumerated fields. There is no alternative source
+either: `stations/model.go` serves no name, and `fleetDTO`
+(`fleet/handler.go:384-407`) has none — so the scan control's fleet targets had
+no name source either. **No wire surface in this codebase serves a name for a
+body or for a fleet.**
+
+**Decision.** Drop the name clause outright. The raw host id is the label — not
+a fallback, since there is nothing to fall back from — and it is specified as a
+legitimate label: no placeholder, no empty cell, no degraded styling. The
+system column keeps its genuine fallback (`GET /v1/galaxy` does serve a system
+`name`, `galaxy/handler.go:124`), and the spec now draws that contrast
+explicitly so the asymmetry reads as deliberate.
+
+**Alternative considered and rejected: add the producer.** Serving
+`Feature.Name` on `fogFeatureDTO` is a two-line change, and it was rejected on
+what it would produce, not on cost. `Feature.Name` is set in exactly two places
+— `system/generator.go:64` (the star) and `stations/service.go:238` (the
+trading station) — and the star can never be a scan host, because
+`disclosure.Occluded` clamps its projection parameter to `[0,1]`
+(`disclosure/occlusion.go:38-45`), so a sightline whose endpoint *is* the star
+centre has closest-approach distance zero and is always occluded. A producer
+would therefore label exactly one body type in the entire game and leave every
+planet, moon, belt, lane gate, and fleet unlabelled: inconsistent labelling
+rather than better labelling, plus a client branch exercised by one fixture.
+Naming every body is a real feature (generated body names) and belongs in its
+own change, where the generator, the DTO, and the label rule move together.
+
+**Alternative considered and rejected: a "type + id" label.** Rejected in
+round 2 and still rejected, for the reason that survives this correction
+unchanged: a log row carries only the record's `hostId` and spans every system
+the corporation ever swept, so a row for another system's sweep has no interior
+read and therefore no type either. It would need its own fallback to the bare
+id regardless — two rules where one suffices.
+
+**Audit consequence.** This slipped past a producer-side orphan audit that
+listed the fields it checked. Task 9.2 is restated to **derive** its list from
+the change's own tasks and type diff, and 9.2a to verify each field against the
+**DTO struct and a real response body** rather than the domain struct.
 
 ## Risks / Trade-offs
 

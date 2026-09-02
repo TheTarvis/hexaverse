@@ -80,13 +80,17 @@ a client a foreign fleet's id in the first place.
 one SHALL be rejected identically to an unresolvable `hostId`** — the same
 named error, the same response shape, no field distinguishing the two. A belt
 is one body on every surface this game serves: its members are derived at
-body-table build time, never persisted, and are published by no read — the
-interior read serves features and lane gates only. Serving them here would make
-this endpoint the first surface to hand a client member ids, contradicting
-`system-space-view`'s *Belt Members Render as Decorative Detail, Never as
-Separate Pickable Bodies* (no member carries its own hit target, selection, or
-facts display) and offering a target list in which one belt appears as many
-entries the client has no name, mark, or facts surface for. A fleet parked at a
+body-table build time and never persisted, and **no read enumerates them** —
+the interior read serves features and lane gates only. (A member id can already
+reach the wire in one narrow way: a fleet docked at a member has that member id
+in its served `attachedTo`, which `mine-extraction` explicitly contemplates. That
+is an echo of a host the fleet already occupies, not a catalogue of bodies to
+choose from.) Serving them here would make this endpoint the first surface to
+offer member ids as **selectable bodies**, contradicting `system-space-view`'s
+*Belt Members Render as Decorative Detail, Never as Separate Pickable Bodies*
+(no member carries its own hit target, selection, or facts display) and offering
+a target list in which one belt appears as many entries the client has no name,
+mark, or facts surface for. A fleet parked at a
 belt is the canonical mining position, so this is the ordinary case rather than
 a corner of one. The belt feature itself remains an eligible host on its own
 terms; only its members are excluded.

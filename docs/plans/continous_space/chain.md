@@ -71,11 +71,11 @@ after that design was written.
 | 5 | `replace-observation-with-sightings` | Disclosure wired into every read; `observation` deleted | ✅ `8f4dd65`…`99747e2` |
 | 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | ✅ `5fd28b5`…`fbbb316` |
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ✅ `41e3c46` |
-| 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | 📝 spec CLEAR-pending, 0/26 |
-| 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | 📝 spec, 0/37 |
-| 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | 📝 spec, 0/94 |
-| 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | ⬜ |
-| 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | ⬜ |
+| 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | 🔨 spec final (4 adversary rounds), 0/57 |
+| 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | 📝 spec final, 0/42 |
+| 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | 📝 spec final, 0/106 |
+| 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | 📝 spec final (3 adversary rounds), 0/105 |
+| 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | 📝 spec, 0/80 |
 
 Downstream and off the critical path: `add-station-exchange` (M12) gets
 re-proposed after link 6; `add-cargo-transfer` (the rescue verb

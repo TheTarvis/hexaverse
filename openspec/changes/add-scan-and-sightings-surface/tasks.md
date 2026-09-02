@@ -62,8 +62,16 @@
       fizzling scan, then **read the action back from the store** and over
       `GET /v1/actions`, and assert both carry the resolver's reason code. Do
       not assert on the returned `ResolveResult` — that assertion already passes
-      against a field no document holds (`action-dispatch` — *A resolver's
-      reason code is persisted on the action and served*)
+      against a field no document holds. **Check first whether this is already
+      green.** `add-stationkeep-hold-verb` is landing concurrently and its
+      working-tree test `backend/stationkeep_mine_and_burn_e2e_test.go` already
+      asserts `act["reasonCode"] == "clean"` read back through
+      `GET /v1/actions/:id`; if `action.DaoImpl.ResolveOne` persists
+      `reasonCode` by the time this change starts, verify that assertion and
+      3.10's served assertion hold and mark 3.10 done — an already-green test
+      here is a neighbouring change having landed the fix, not a failure of the
+      red phase (`action-dispatch` — *A resolver's reason code is persisted on
+      the action and served*)
 - [ ] 1.13 Write the failing Go tests for the settled-inbox read: more settled
       actions than the bound, served most-recently-settled first and truncated
       to the newest rather than to an arbitrary subset; a fixture large enough
@@ -214,7 +222,12 @@
       identifying whether the failure was range or occlusion", and shipped code
       violates it. Without it, section 6's five-way fizzle copy map renders its
       unrecognized-code fallback for every fizzle, and task 9.2's orphan audit
-      passes anyway — the field has a named consumer and no producer
+      passes anyway — the field has a named consumer and no producer.
+      **Check first whether this is already done.** `add-stationkeep-hold-verb`
+      is landing concurrently and asserts the persisted code read back through
+      the inbox without carrying a dao task of its own; if `ResolveOne` already
+      writes `reasonCode` when this change starts, verify the read-back and the
+      served assertion and mark this task done rather than reapplying it
       (`action-dispatch` — *A resolver's reason code is persisted on the action
       and served*)
 - [ ] 3.11 Correct `action/model.go:203-206`'s comment on
@@ -227,22 +240,15 @@
 
 ## 4. Client plumbing
 
-- [ ] 4.1 Add the `Sighting` and sighting-page types (`id`, `actionId`,
-      `systemId`, `asOf`, `hostId`, `cleanSweep`, and the composition payload)
-      to `frontend/lib/types/`
+- [ ] 4.1 Add the `Sighting` and sighting-page types (`id`, `systemId`, `asOf`,
+      `hostId`, `cleanSweep`, and the composition payload) to
+      `frontend/lib/types/`. Deliberately **omit** the served `actionId`: it is
+      on the response, but nothing in this change reads it — the row↔ghost match
+      is on the sighting's `id`, and the settled report addresses its action by
+      the inbox's own id — so carrying it would create exactly the
+      consumer-less field 9.2 exists to forbid
 - [ ] 4.2 Add the scan-target types (host id, kind, sweep duration — and no
       world time; see 3.7)
-- [ ] 4.2a Carry the interior read's optional `name` on the space view's own
-      body type (the type `build-production-space-view` task 10.3 generates
-      against the recorded wire sample), and add it there if that generation
-      omitted it — `system.Feature.Name` is `json:"name,omitempty"` and is set
-      in exactly two places (`system/generator.go`'s star and
-      `stations/service.go`'s trading station), so the field is absent from
-      most bodies and the type it lands on must make it optional. This is the
-      only name source the scan control (5.1) and the log (8.3) have; the raw
-      id fallback is the ordinary rendering, not an error path
-      (`sighting-log` — *A host with no served name falls back to its id, as an
-      ordinary row*)
 - [ ] 4.3 Widen `frontend/lib/types/action.ts`'s `GameAction` with the served
       `reasonCode`, `resolvedAt`, and `acknowledgedAt` fields section 6
       consumes; all three are already on the backend's `Action` and absent from
@@ -279,11 +285,13 @@
 ## 5. The scan control — target list, commit, guard
 
 - [ ] 5.1 Build the scan control in the space view's fleet panel, listing exactly
-      the served targets, each labelled body-or-own-fleet and showing its served
-      sweep duration, resolving body names from the interior read (4.2a) and
-      fleet names from the own-fleets read — and rendering the raw host id
-      where neither supplies a name, which is the ordinary case for a planet, a
-      moon, a belt, and a lane gate, never a placeholder or an error state
+      the served targets, each labelled by the served host **kind** plus its raw
+      host id, and showing its served sweep duration. Resolve no name from
+      anywhere: no wire surface serves one — the interior read's feature DTO
+      (`backend/system/fog.go`'s `fogFeatureDTO`) has no `name` field, the
+      station read serves none, and `fleetDTO` has none — so the id is the
+      label, presented as a legitimate one and never as a placeholder or an
+      error state
 - [ ] 5.2 Assert in test that a body present in the interior read but absent from
       the served target set is not offered, and that no range or occlusion
       predicate is evaluated client-side
@@ -390,14 +398,16 @@
 - [ ] 8.2 Render a composition row (system, `asOf`, swept host, hull count, hull
       types) and a clean-sweep row (system, `asOf`, swept host, clean-sweep
       marker, no composition)
-- [ ] 8.3 Name the swept host from the open system's interior read when it
-      supplies a name for that host id (4.2a), and fall back to the raw host id
-      otherwise — a row for another system's sweep has no name source at all,
-      mirroring the system column's own fallback. Assert **both** paths, and
-      note that the named path is inducible only against a host the server
-      actually names, which today is the trading station: every other body type
-      carries no name, so the id fallback is what most rows render and must be
-      presented as a legitimate label
+- [ ] 8.3 Render the swept host as its raw host id on every row, with no name
+      lookup and no fallback branch — nothing serves a host name (see 5.1), so
+      a name path here would be a branch no response can take. Assert a single
+      path across a planet, a moon, a belt, a lane gate, a station, a fleet, and
+      a row for another system's sweep, and assert the host column carries no
+      placeholder, empty cell, or degraded-state styling. Note the contrast the
+      spec draws: the **system** column does keep a real fallback, because
+      `GET /v1/galaxy` does serve a system `name`
+      (`sighting-log` — *The swept host is shown as its raw id, whatever the
+      host is*)
 - [ ] 8.4 Assert no row displays an owner, corporation, or fleet identity for the
       sighted target
 - [ ] 8.5 Resolve the system name from the loaded galaxy data, falling back to the
@@ -429,21 +439,38 @@
 
 - [ ] 9.1 Confirm `useRunningScan` now has a production consumer, and that no
       second running-scan hook was introduced alongside it
-- [ ] 9.2 Confirm every field this change adds to or newly consumes on the wire
-      has a named consumer in the client: the sighting `id` (row key and
-      row↔ghost matching), the target `kind` (the target list's label), the
-      target duration (the target list's price), the action `reasonCode` (the
-      fizzle copy), `resolvedAt` (most-recently-settled ordering), and
-      `acknowledgedAt` (report suppression). Confirm too that the scan-target
-      read serves **no** world time — the field cut in 3.7, and the one this
-      audit was written to catch
-- [ ] 9.2a Run the audit in the other direction for every field named in 9.2:
-      confirm each has a **producer** as well as a consumer, by observing it on
-      a real response body rather than on a struct definition or a mock.
-      `reasonCode` is why this task exists — it had a named consumer, a struct
+- [ ] 9.2 Build the audit list by **derivation, not recall**: walk this change's
+      own tasks in sections 3–8 and enumerate every field it adds to a client
+      type or newly consumes from a wire response — whatever the walk turns up,
+      including fields added after this task was written. A hardcoded list
+      cannot catch a field it does not name, which is exactly how a `name`
+      field with neither producer nor consumer survived an earlier draft of
+      this very audit. Mechanically: diff the client types this change touches
+      (`frontend/lib/types/`) against their pre-change state, and grep the
+      change's own task text for each added field name; the two must agree, and
+      any field in the type diff that no task names is itself a finding. The
+      list at the time of writing is the sighting `id` (row key and row↔ghost
+      matching), the target `kind` (the target list's label), the target
+      duration (the target list's price), the action `reasonCode` (the fizzle
+      copy), `resolvedAt` (most-recently-settled ordering), and
+      `acknowledgedAt` (report suppression) — treat it as a floor to check the
+      derivation against, never as the audit itself
+- [ ] 9.2a Check every field the 9.2 derivation produced in **both** directions,
+      and fail the audit on either half:
+      (a) a **named production consumer** — a specific component or hook that
+      reads it, not merely a type declaring it; and
+      (b) a **producer that actually serves it**, verified against the
+      **response DTO struct and a real response body**, never against the
+      domain/Firestore struct and never against a mock or fixture the client
+      authored. The DTO/domain distinction is the whole point: `system.Feature`
+      carries `Name`, `fogFeatureDTO` does not, and only the latter is the
+      wire. `reasonCode` is why half (b) exists — it had a consumer, a struct
       field, a Firestore tag, a doc comment asserting it was written, and green
-      tests, and reached no document and no wire (3.10). A field-with-consumer
-      audit passes on exactly that
+      tests, and reached no document and no wire (3.10). A field failing (a) is
+      dropped from the client type; a field failing (b) either gains a producer
+      task or is dropped from the spec that promised it
+- [ ] 9.2b Confirm the scan-target read serves **no** world time — the field cut
+      in 3.7, and the one this audit was originally written to catch
 - [ ] 9.3 Confirm no field was added to `fleetDTO` for the sweep window, and that
       the window is read only from the action inbox
 - [ ] 9.4 Confirm no client module computes a range or occlusion predicate; any

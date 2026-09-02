@@ -8,27 +8,24 @@ instant the light left, which is not the order the claims were filed, so a
 client re-sort would silently assert a different ordering than the one the
 server's pagination is built on.
 
-Each row SHALL show the record's system, its `asOf`, and the host that was
-swept — the host by name when the open system's interior read supplies a name
-for that host id, and by its raw host id otherwise, mirroring the system
-column's own fallback (*An Unknown System Name Falls Back to Its Id*). No
-other name source is available: the log's rows span every system the
-corporation has ever swept, and only the open system's bodies are loaded, so a
-row for another system's sweep has no name to resolve and SHALL show the raw
-host id rather than an empty cell.
+Each row SHALL show the record's system, its `asOf`, and the **raw host id** of
+the host that was swept. The raw id is the label, not a fallback from one: no
+wire surface in this codebase serves a name for a body or for a fleet, so there
+is nothing for the row to prefer and nothing for it to fall back from. The row
+SHALL NOT present the id as degraded — no placeholder text, no empty cell, no
+"unknown host", no styling that marks it as missing information.
 
-**The raw host id is the ordinary case, not the exception.** The interior read
-serves a name for a body only where one was generated, which today is the star
-and a trading station and nothing else — a planet, a moon, a belt, and a lane
-gate all carry no name, and a fleet host carries none either. The fallback is
-therefore what most rows render, and it SHALL be presented as a legitimate
-label rather than as a degraded or error state: no placeholder text, no empty
-cell, no "unknown host". The name path stays specified because the wire does
-serve names for some hosts and may serve more later. A row for a record that names a target SHALL
-show that target's hull count and the hull types present. A row for a
-clean-sweep record SHALL instead show a clean-sweep marker and no composition,
-because the sweep found nothing masked at that host — itself a filed claim, not
-an absence of one.
+This is deliberately **unlike** the system column (*An Unknown System Name Falls
+Back to Its Id*), and the difference is the reason both rules are stated. A
+system's name is served, and is only occasionally unresolvable, so that column
+genuinely falls back. A host's name is served by nothing, so a host column with
+a name path would specify a branch that no response can take and no test can
+induce without mocking a shape the server does not produce.
+
+A row for a record that names a target SHALL show that target's hull count and
+the hull types present. A row for a clean-sweep record SHALL instead show a
+clean-sweep marker and no composition, because the sweep found nothing masked
+at that host — itself a filed claim, not an absence of one.
 
 #### Scenario: Rows render in the served order
 - **WHEN** the pile read returns records
@@ -40,21 +37,13 @@ an absence of one.
 - **THEN** its row shows the record's system, `asOf`, swept host, hull count,
   and hull types
 
-#### Scenario: A host the interior read names is shown by that name
-- **GIVEN** a record whose swept host id is one the open system's interior read
-  supplies a name for, such as its trading station
-- **WHEN** its row is shown
-- **THEN** the swept host is shown by that name
-
-#### Scenario: A host with no served name falls back to its id, as an ordinary row
-- **GIVEN** a record whose swept host id has no name in the open system's
-  interior read — a planet, a moon, a belt, a lane gate, a fleet, a sweep in
-  another system, or a host no longer served
-- **WHEN** its row is shown
-- **THEN** the swept host is shown as the raw host id, and the row renders
-  normally
-- **AND** the row carries no placeholder, empty cell, or degraded-state
-  indication on account of the missing name
+#### Scenario: The swept host is shown as its raw id, whatever the host is
+- **GIVEN** records whose swept hosts are a planet, a moon, a belt, a lane gate,
+  a trading station, a fleet, and a host in a system other than the open one
+- **WHEN** their rows are shown
+- **THEN** every row shows the swept host as its raw host id
+- **AND** no row carries a placeholder, an empty cell, or a degraded-state
+  indication on the host column
 
 #### Scenario: A clean-sweep row shows the clean-sweep marker
 - **WHEN** a served record is a clean sweep
@@ -206,8 +195,9 @@ reading it against is a log they will not open.
 
 ### Requirement: A Log Row and Its Ghost Address the Same Record By Its Served Id
 WHEN a log row whose record has a ghost drawn in the open system is selected,
-the system SHALL highlight that ghost in the scene; WHEN a ghost is activated
-in the scene, the system SHALL highlight its row. Both directions SHALL match
+the system SHALL highlight that ghost in the scene; WHEN a ghost whose record
+has a row loaded in the log is activated in the scene, the system SHALL
+highlight that row. Both directions SHALL match
 on the record's served `id` and on nothing else — never on position, `asOf`,
 host, or composition, any of which two records can legitimately share.
 
@@ -226,12 +216,26 @@ region may be unavailable, in which case no ghost is drawn at all (*The Scan
 Surface Remains Usable While the Canvas Is Unavailable*) while the log stays
 fully readable.
 
+**The other direction has its own missing case, for the opposite reason.** WHEN
+a ghost is activated whose record has **no row currently loaded**, the ghost's
+own highlight SHALL still apply in the scene, no row SHALL be highlighted, and
+the log SHALL NOT page further to find it. The two surfaces read the same pile
+through different windows: the ghost layer reads it filtered to the open system
+and draws one bounded page (*A Sighting Ghost Renders at Its Frozen Position,
+Never a Predicted One*), while the log reads it unfiltered and pages on demand,
+so a corporation that has swept other systems more recently can have a drawn
+ghost whose record sits below every page the log has loaded — and the log may
+not be open at all. Paging to close that gap would let a scene interaction
+issue an unbounded run of reads, so the scene interaction SHALL remain complete
+in itself.
+
 #### Scenario: Selecting a row highlights its ghost
 - **WHEN** a row whose record has a ghost drawn in the open system is selected
 - **THEN** that record's ghost is highlighted in the scene
 
-#### Scenario: Activating a ghost highlights its row
-- **WHEN** a ghost is activated in the scene
+#### Scenario: Activating a ghost highlights its loaded row
+- **WHEN** a ghost whose record has a row among the pages the log has loaded is
+  activated in the scene
 - **THEN** the log row for that record is highlighted
 
 #### Scenario: Two records with identical contents highlight independently
@@ -239,6 +243,13 @@ fully readable.
   composition are identical
 - **WHEN** each row is selected in turn
 - **THEN** each highlights its own ghost, matched by the record's served `id`
+
+#### Scenario: Activating a ghost whose row is not loaded highlights the ghost alone
+- **GIVEN** a ghost drawn for a record that lies below every page of the pile
+  the log has loaded, or the log is not open
+- **WHEN** that ghost is activated in the scene
+- **THEN** the ghost is highlighted in the scene and no row is highlighted
+- **AND** no further page of the pile is requested
 
 #### Scenario: A row with no ghost says so, whatever the reason
 - **WHEN** a row is selected whose record has no ghost drawn — a clean sweep, a
