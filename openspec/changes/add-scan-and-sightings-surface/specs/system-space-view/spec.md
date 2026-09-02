@@ -86,6 +86,13 @@ NOT display raw server text: a host that is out of range, a host the star now
 occludes, a host that no longer resolves, a fleet already running a sweep, and
 a fleet in lane transit SHALL each read as its own statement of what happened.
 
+A rejection carrying a reason this client has no specific copy for SHALL be
+shown as a generic, non-technical fallback message rather than as blank text
+or as the raw server string — the same fallback `docked-fleet-actions`'
+*Rejection Reasons Map to Player-Facing Copy, Not Raw Server Text* and this
+change's own settled-sweep report both already require, so a reason added
+server-side later without a copy update degrades instead of showing nothing.
+
 A rejection SHALL be presented as the sweep no longer being possible, with the
 target list refetched, never as an application error — bodies move between the
 target read and the commit, so a listed target going stale is ordinary and
@@ -105,6 +112,12 @@ expected, not a fault.
 - **WHEN** the commit is submitted
 - **THEN** the control states that the sweep is no longer possible against that
   host, refetches the target list, and shows no application-error state
+
+#### Scenario: An unmapped commit rejection reason renders safely
+- **WHEN** a focused-scan commit is rejected with a reason this client has no
+  specific copy for
+- **THEN** a generic, non-technical fallback message is shown
+- **AND** neither the raw server reason string nor a blank message is shown
 
 #### Scenario: No raw server text reaches the player
 - **WHEN** any focused-scan commit is rejected
@@ -189,31 +202,60 @@ control SHALL show it as settling rather than counting below zero.
 - **THEN** it presents the sweep as settling, and shows no negative or
   ever-growing countdown
 
-### Requirement: A Running Sweep Self-Schedules the Refetch That Settles It, Then Reads the Pile
-The system SHALL treat a running sweep's ETA as a refetch trigger for the open
-view, on the same self-scheduling mechanism *Realtime Refetch Rules While the
-Space View Is Open* already applies to a running mine, burn, and jump, using the
-same cushion after the ETA — because a sweep resolves only when a read of its
-system settles it, so without this the player's sweep does not land while they
-watch.
+### Requirement: A Running Sweep Self-Schedules the Refetch That Settles It, Then Reads the Inbox and the Pile
+WHILE any of the requesting corporation's own fleets in the open system has a
+running focused scan, the system SHALL treat **each** such sweep's ETA as a
+refetch trigger for the open view — one scheduled refetch per such ETA — on the
+same self-scheduling mechanism *Realtime Refetch Rules While the Space View Is
+Open* already applies to a running mine, burn, and jump, using the same cushion
+after the ETA. Without this a sweep does not land while the player watches: a
+sweep resolves only when some read folds it, or when the periodic liveness
+sweep does — a cadence measured in minutes, which is not a player-facing
+latency. The trigger is anchored to
+the corporation's own fleets rather than to the acting fleet alone: a
+corporation may have several fleets sweeping one system, and anchoring to the
+selected one would leave every other fleet's sweep unsettled and its records
+unread for as long as that selection held.
 
-After the interior refetch that follows the sweep's ETA has **completed**, and
-only then, the system SHALL refetch the corporation's sighting pile. The
-ordering is load-bearing: reading the pile settles nothing and mints nothing, so
-a pile read issued concurrently with the settling interior read can return
-before the sweep's records exist, and the player would see an empty result for a
-sweep that succeeded.
+After the interior refetch that follows a sweep's ETA has **completed**, and
+only then, the system SHALL refetch both the corporation's sighting pile for
+the open system and the **action inbox for the fleet whose sweep was due**. The
+inbox refetch is not optional bookkeeping: the running window, the cancel
+affordance's action id, the settled sweep's outcome, its reason code, and its
+acknowledged state are all carried by the inbox and by nothing else, so without
+it a settled sweep reads as perpetually settling (*A Running Sweep's Window and
+Cancel Come From the Action Inbox*) and its outcome report never appears at all
+(*A Settled Sweep Reports Its Outcome, Including Each Fizzle Reason, in Player
+Copy*).
 
-#### Scenario: A running sweep schedules the refetch that settles it
-- **WHEN** the acting fleet has a running sweep with a known ETA
-- **THEN** a refetch of the system interior is scheduled to fire after that ETA,
-  on the same cushion the view's other ETA refetches use
+The ordering is load-bearing: reading the pile and reading the inbox each
+settle nothing and mint nothing, so either one issued concurrently with the
+settling interior read can return before the sweep has resolved — the player
+would see an empty result, and a still-running action, for a sweep that
+succeeded.
 
-#### Scenario: The pile is refetched only after the settling read completes
+#### Scenario: Each own fleet's running sweep schedules the refetch that settles it
+- **GIVEN** two of the corporation's own fleets in the open system, each with a
+  running sweep with a known ETA, only one of which is the acting fleet
+- **WHEN** the view schedules its refetches
+- **THEN** a refetch of the system interior is scheduled after each of those
+  two ETAs, on the same cushion the view's other ETA refetches use, neither of
+  them skipped for not being the acting fleet's
+
+#### Scenario: The pile and the inbox are refetched only after the settling read completes
 - **GIVEN** a running sweep whose ETA has just passed
 - **WHEN** the scheduled interior refetch is issued
-- **THEN** the sighting-pile refetch is issued only after that interior refetch
-  has completed, never concurrently with it
+- **THEN** the sighting-pile refetch and the scan's action-inbox refetch are
+  issued only after that interior refetch has completed, never concurrently
+  with it
+
+#### Scenario: The settling sweep resolves to a report without user action
+- **GIVEN** the space view is open with a running sweep whose ETA has just
+  passed, presented as settling
+- **WHEN** the scheduled refetches run
+- **THEN** the action inbox is re-read, the sweep is no longer presented as
+  settling, and its settled outcome is reported
+- **AND** none of this requires navigation, reload, or manual refresh
 
 #### Scenario: A sweep that settles while the view is open lands without user action
 - **GIVEN** the space view is open with a running sweep
@@ -221,15 +263,26 @@ sweep that succeeded.
 - **THEN** the sweep's minted records are present in the corporation's pile as
   read by this view, with no navigation, reload, or manual refresh
 
-#### Scenario: No sweep refetch is scheduled when no sweep is running
-- **WHEN** the acting fleet has no running sweep
+#### Scenario: A non-acting fleet's sweep still lands
+- **GIVEN** two of the corporation's own fleets in the open system, where the
+  fleet with a running sweep is not the acting fleet
+- **WHEN** that sweep's ETA passes and the scheduled refetches run
+- **THEN** its minted records are present in the pile as read by this view, and
+  its ghosts are drawn, without the player selecting that fleet
+
+#### Scenario: No sweep refetch is scheduled when no own fleet is sweeping
+- **WHEN** no own fleet in the open system has a running sweep
 - **THEN** no sweep-driven refetch is scheduled, and the view's other refetch
   rules are unchanged
 
 ### Requirement: A Settled Sweep Reports Its Outcome, Including Each Fizzle Reason, in Player Copy
-The system SHALL report the acting fleet's most recently settled, unacknowledged
-focused scan. A sweep that minted records SHALL be reported as having filed
-them, with an affordance that opens the sighting log. A sweep that fizzled SHALL
+The system SHALL report the acting fleet's most recently settled,
+unacknowledged focused scan — the one with the greatest resolved-at world time
+among that fleet's settled, unacknowledged scans, its ETA breaking a tie. The
+ordering SHALL be stated in terms of those served fields and SHALL NOT rely on
+the order the inbox happens to return, which carries no ordering guarantee at
+all. A sweep that minted records SHALL be reported as having filed them, with
+an affordance that opens the sighting log. A sweep that fizzled SHALL
 be reported with copy specific to its served reason code — the scanning fleet
 being out of range at pulse-reach, the star having occluded the host at
 pulse-reach, the scanning fleet having left the host's system, the scanning
@@ -242,6 +295,19 @@ text. A reason code this client does not recognize SHALL be reported as a sweep
 that returned nothing, never as a blank report or as raw text. Dismissing the
 report SHALL acknowledge that action, so a later refetch does not report the
 same settled sweep again.
+
+#### Scenario: The reported sweep is the one with the greatest resolved-at time
+- **GIVEN** the acting fleet has two settled, unacknowledged scans with
+  different resolved-at world times, served in an arbitrary order
+- **WHEN** the report is shown
+- **THEN** it reports the scan with the greater resolved-at world time,
+  whichever order the inbox listed them in
+
+#### Scenario: Equal resolved-at times are broken by ETA
+- **GIVEN** the acting fleet has two settled, unacknowledged scans with equal
+  resolved-at world times and different ETAs
+- **WHEN** the report is shown
+- **THEN** it reports the one with the later ETA, deterministically
 
 #### Scenario: A sweep that minted records reports and links to the log
 - **WHEN** a settled, unacknowledged sweep minted records
@@ -265,10 +331,16 @@ same settled sweep again.
 - **AND** a subsequent refetch does not report the same settled sweep again
 
 ### Requirement: A Sighting Ghost Renders at Its Frozen Position, Never a Predicted One
-The system SHALL draw, for every record in the corporation's sighting pile whose
-system is the open system and which names a target, a ghost mark at that
-record's stored position, visually distinct from a live contact and from an own
-fleet, and labelled with the record's `asOf`. The system SHALL NOT advance a
+The system SHALL draw a ghost mark for every target-naming record served by a
+read of the corporation's sighting pile **filtered server-side to the open
+system** (`sighting-records`' *The Pile Read Filters To One System On
+Request*), at that record's stored position, visually distinct from a live
+contact and from an own fleet, and labelled with the record's `asOf`. The
+source is that filtered read and not a client-side scan of an unfiltered
+pile: the pile spans every system the corporation has ever swept, never
+expires, and is served a bounded page at a time, so filtering client-side
+would silently omit this system's older records as soon as the pile outgrew
+the pages the client happened to have fetched. The system SHALL NOT advance a
 ghost by the record's stored velocity, by an orbital prediction, or by any other
 extrapolation: a sighting freezes position and velocity rather than orbital
 elements, so any forward integration would draw the target at a place no sweep
@@ -280,15 +352,22 @@ heading-and-speed readout on the ghost's facts surface — its only consumer —
 mirroring the rule a live contact's served velocity already follows.
 
 A clean-sweep record SHALL draw no ghost. It names no target and carries no
-position, and its zero position is one *A Non-Star Position at the Origin Is
-Omitted From the Scene, Not Drawn Atop the Star* already requires to be omitted
-rather than drawn on the star.
+position at all, so there is nothing to draw and nowhere to draw it; *A Ghost
+at the Origin Is Omitted From the Scene, Not Drawn Atop the Star* independently
+forbids drawing its zero position on the star, should a record ever reach the
+layer with the clean-sweep marker lost.
 
 #### Scenario: A ghost renders at the record's stored position
-- **WHEN** the pile carries a target-naming record whose system is the open
-  system
+- **WHEN** the system-filtered pile read serves a target-naming record for the
+  open system
 - **THEN** a ghost mark is drawn at that record's stored position, labelled with
   its `asOf`
+
+#### Scenario: The ghost layer reads the pile filtered by system
+- **WHEN** the ghost layer sources its records
+- **THEN** the pile read it issues names the open system as its filter, and no
+  client-side filtering of an unfiltered pile is used to decide which records
+  belong to this system
 
 #### Scenario: A ghost does not move as world time advances
 - **GIVEN** a rendered ghost
@@ -312,8 +391,75 @@ rather than drawn on the star.
   its account
 
 #### Scenario: A record for another system draws no ghost here
-- **WHEN** the pile carries a record whose system is not the open system
-- **THEN** no ghost mark is drawn for it in this system's scene
+- **WHEN** a record whose system is not the open system exists in the
+  corporation's pile
+- **THEN** no ghost mark is drawn for it in this system's scene, and the
+  filtered read does not serve it
+
+### Requirement: A Ghost at the Origin Is Omitted From the Scene, Not Drawn Atop the Star
+The system SHALL treat a sighting record's stored position of exactly the
+origin `(0,0,0)` as invalid, omit that record's ghost from the rendered scene,
+and log a diagnostic entry naming the omitted record — never drawing it
+superimposed on the star.
+
+This restates, for a ghost, the rule *A Non-Star Position at the Origin Is
+Omitted From the Scene, Not Drawn Atop the Star* already applies to a body's,
+a fleet's, and a contact's position. A ghost is a fourth mark class that
+enumeration does not name, so without this requirement a target-naming record
+whose stored position happens to be the origin — which is not the clean-sweep
+case, that record naming no target at all — would be drawn on top of the star,
+which is exactly the outcome that rule exists to prevent. A ghost's position is
+served, never resolved from elements, so this is a validity check on a stored
+value and never a licence to move a ghost (*A Sighting Ghost Renders at Its
+Frozen Position, Never a Predicted One*).
+
+#### Scenario: A target-naming record stored at the origin draws no ghost
+- **WHEN** the filtered pile read serves a target-naming record for the open
+  system whose stored position is exactly `(0,0,0)`
+- **THEN** no ghost is drawn for it and a diagnostic entry naming the omitted
+  record is logged
+- **AND** nothing is drawn superimposed on the star on its account
+
+#### Scenario: A ghost at any other position renders normally
+- **WHEN** a target-naming record's stored position is anything other than
+  exactly `(0,0,0)`
+- **THEN** its ghost renders normally, unaffected by this requirement
+
+### Requirement: A Ghost Is Not a Member of the Space View's Selection, and a Burn Never Consumes One
+The system SHALL NOT admit a ghost mark to the space view's single selection
+(*Toggle-to-Deselect Single Selection Among a Body, a Lane Gate, or a Point*):
+selecting a ghost SHALL NOT become a body, gate, or point selection, SHALL NOT
+replace or clear an existing selection, and SHALL NOT supply a burn's target.
+A ghost highlight for cross-reading with the sighting log (`sighting-log`'s *A
+Log Row and Its Ghost Address the Same Record By Its Served Id*) is a separate,
+additional state, held alongside the space view's own selection rather than
+inside it.
+
+The picking rule is exhaustive: a click that resolves against the pick plane
+over no body or lane-gate mark **selects that point**, and a burn commands
+against a selected point uniformly. A ghost is drawn in that same plane at a
+position where the sweep found something masked, which is precisely the place a
+player is most likely to click — so without this rule, clicking a ghost to read
+it silently arms a burn to the coordinate a foreign fleet occupied at some past
+`asOf`. That is a commanded manoeuvre produced by an inspection gesture, and a
+frozen sighting is the worst possible source for a burn target.
+
+#### Scenario: Selecting a ghost leaves the view's selection untouched
+- **GIVEN** a body is the space view's current selection and a ghost is drawn
+- **WHEN** the player selects that ghost
+- **THEN** the space view's selection is still that body, and the ghost is not
+  a member of the selection
+
+#### Scenario: A ghost selection never supplies a burn target
+- **GIVEN** a ghost is selected for cross-highlighting and the space view's own
+  selection is empty
+- **WHEN** the burn command surface is inspected
+- **THEN** it offers no target, and the ghost's position is not proposed as one
+
+#### Scenario: A click on a ghost does not become a point selection
+- **WHEN** the player clicks a ghost mark drawn over no body or lane-gate mark
+- **THEN** no point selection is created at that position, and no burn is armed
+  against it
 
 ### Requirement: A Ghost Is Never Suppressed By, Merged With, or Linked To a Live Contact
 The system SHALL render ghosts and live contacts independently. It SHALL NOT

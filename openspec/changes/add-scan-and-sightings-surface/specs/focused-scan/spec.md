@@ -3,19 +3,24 @@
 ### Requirement: Eligible Scan Targets Are Served Per Fleet, To Their Owner Alone
 The system SHALL serve, at `GET /v1/fleets/:fleetId/scan-targets`, the set of
 hosts against which a focused-scan commit by that fleet would be accepted at
-the world time the read is answered, together with that world time, and SHALL
-serve it only to the corporation that owns the named fleet. A request naming a
-fleet owned by another corporation, naming a fleet that does not exist, or made
-by a requester with no corporation at all SHALL be answered `404 Not Found`
+the world time the read is answered, and SHALL serve it only to the
+corporation that owns the named fleet. A request naming a fleet owned by
+another corporation, naming a fleet that does not exist, or made by a
+requester with no corporation at all SHALL be answered `404 Not Found`
 with an empty body — indistinguishable from one another, and never a `403` or
 a body naming the fleet, its owner, or the reason — exactly as that fleet's own
 command endpoints already answer, because a distinguishable response would
 itself confirm the fleet id exists.
 
-WHILE the named fleet is in lane transit, the system SHALL answer with an empty
-target set rather than an error: a scan commit is rejected in that state, so
-there is nothing to list, and an error would be indistinguishable from the
-ownership rejection above.
+WHILE the named fleet is in lane transit, and WHILE it already has a running
+focused scan, the system SHALL answer with an empty target set rather than an
+error: a scan commit is rejected in both of those states (*A Focused Sweep
+Commits On the Sensor Channel*: a scanner in lane transit is rejected, and a
+second sweep is rejected while one is running), so there is nothing to list,
+and an error would be indistinguishable from the ownership rejection above.
+The set is empty rather than full in the running-sweep case because this
+capability's whole contract is that a served target is one a commit would
+accept, and while the sensor channel is claimed no commit is accepted at all.
 
 #### Scenario: An owner reads its own fleet's eligible targets
 - **GIVEN** a fleet whose system contains a body within focused-scan range with
@@ -24,7 +29,6 @@ ownership rejection above.
 - **THEN** the response lists both hosts, each carrying its host id, whether it
   is a body or an own fleet, and the sweep duration a commit against it would
   cost
-- **AND** the response carries the world time the set was computed at
 
 #### Scenario: Another corporation's fleet id is rejected as nonexistent
 - **WHEN** a requester reads scan targets for a fleet owned by a different
@@ -39,6 +43,12 @@ ownership rejection above.
 
 #### Scenario: A fleet in lane transit has an empty target set
 - **GIVEN** a fleet in lane transit
+- **WHEN** its owner reads its scan targets
+- **THEN** the response is successful and its target set is empty
+
+#### Scenario: A fleet already running a sweep has an empty target set
+- **GIVEN** a fleet with a running focused scan on its sensor channel, and a
+  body within focused-scan range with a clear sightline
 - **WHEN** its owner reads its scan targets
 - **THEN** the response is successful and its target set is empty
 
@@ -65,6 +75,15 @@ appear whatever its range or sightline, because an entry for it would disclose
 its presence, range, and occlusion state — the same disclosure `focused-scan`'s
 identical-rejection rule exists to prevent — and no surface in this model hands
 a client a foreign fleet's id in the first place.
+
+**The reading fleet itself SHALL never appear in its own set.** It satisfies
+every geometric predicate trivially — the distance from a fleet to itself is
+zero, so the range test passes, and a zero-length sightline is never occluded —
+so without this rule the set would list the scanner as a target of itself. A
+sweep aimed at one's own hull discloses nothing: its own composition is
+already served in full to its owner, so the sweep would spend sensor-channel
+time and exposure to learn nothing. The commit rejects it too (*A Fleet Is
+Never a Host For Its Own Sweep*); the list and the commit agree.
 
 #### Scenario: A host beyond focused-scan range is absent
 - **GIVEN** a body farther from the fleet than the named focused-scan range
@@ -104,8 +123,47 @@ a client a foreign fleet's id in the first place.
 - **THEN** it is absent from the served set, and no entry, count, or field
   reflects its presence
 
+#### Scenario: The reading fleet is absent from its own target list
+- **GIVEN** a fleet whose owner reads its scan targets
+- **WHEN** the served set is inspected
+- **THEN** that same fleet's own id is absent from it, though it trivially
+  satisfies the range test at distance zero and is never self-occluded
+
 #### Scenario: An own fleet in lane transit is absent
 - **GIVEN** a second fleet owned by the same corporation that is in lane transit
 - **WHEN** the reading fleet's scan targets are read
 - **THEN** that fleet is absent from the served set, matching the commit's own
   rejection of it as a host
+
+### Requirement: A Fleet Is Never a Host For Its Own Sweep
+The system SHALL reject a focused-scan commit whose `hostId` names the
+scanning fleet itself, creating no action and claiming no sensor-channel slot,
+and SHALL reject it identically to a `hostId` that does not resolve at all —
+same named error, same response shape, no field distinguishing the two — so
+this client needs no copy for a rejection its own target list can never
+produce.
+
+Without this rule a self-sweep is *accepted*: host resolution finds the
+scanner among its own system's fleets, it is owned by the scanning
+corporation and is not in lane transit, the range test passes at distance
+zero, and a zero-length sightline is never occluded. What it buys is nothing —
+a corporation already reads its own fleet's composition in full — while
+costing the sensor channel for the sweep's duration and unmasking the scanner
+(*A Sweep Unmasks Its Scanner*). Rejecting it at commit is what makes the
+served target list's omission of the scanner (*A Served Scan Target Is One a
+Commit Would Accept, Priced at the Duration a Commit Would Freeze*) an
+agreement between the two surfaces rather than a disagreement.
+
+#### Scenario: A fleet sweeping itself is rejected
+- **GIVEN** a fleet not in lane transit
+- **WHEN** it commits a focused scan whose `hostId` is its own fleet id
+- **THEN** the commit is rejected with the same named error and response shape
+  as an unresolvable `hostId`, no scan action is created, and no
+  sensor-channel slot is claimed
+
+#### Scenario: A self-sweep is rejected even at zero range with a clear sightline
+- **GIVEN** a fleet whose own position trivially satisfies the focused-scan
+  range test and whose zero-length sightline is not occluded
+- **WHEN** it commits a focused scan against its own fleet id
+- **THEN** the commit is still rejected, and neither the range test nor the
+  occlusion test is what admits it

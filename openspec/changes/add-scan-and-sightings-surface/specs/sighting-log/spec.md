@@ -9,10 +9,17 @@ client re-sort would silently assert a different ordering than the one the
 server's pagination is built on.
 
 Each row SHALL show the record's system, its `asOf`, and the host that was
-swept. A row for a record that names a target SHALL show that target's hull
-count and the hull types present. A row for a clean-sweep record SHALL instead
-show a clean-sweep marker and no composition, because the sweep found nothing
-masked at that host — itself a filed claim, not an absence of one.
+swept — the host by name when the open system's interior read supplies a name
+for that host id, and by its raw host id otherwise, mirroring the system
+column's own fallback (*An Unknown System Name Falls Back to Its Id*). No
+other name source is available: the log's rows span every system the
+corporation has ever swept, and only the open system's bodies are loaded, so a
+row for another system's sweep has no name to resolve and SHALL show the raw
+host id rather than an empty cell. A row for a record that names a target SHALL
+show that target's hull count and the hull types present. A row for a
+clean-sweep record SHALL instead show a clean-sweep marker and no composition,
+because the sweep found nothing masked at that host — itself a filed claim, not
+an absence of one.
 
 #### Scenario: Rows render in the served order
 - **WHEN** the pile read returns records
@@ -23,6 +30,19 @@ masked at that host — itself a filed claim, not an absence of one.
 - **WHEN** a served record names a target
 - **THEN** its row shows the record's system, `asOf`, swept host, hull count,
   and hull types
+
+#### Scenario: A host in the open system is named
+- **GIVEN** a record whose swept host id has a name in the open system's
+  interior read
+- **WHEN** its row is shown
+- **THEN** the swept host is shown by that name
+
+#### Scenario: A host with no loaded name falls back to its id
+- **GIVEN** a record whose swept host id has no name in the open system's
+  interior read — a sweep in another system, or a host no longer served
+- **WHEN** its row is shown
+- **THEN** the swept host is shown as the raw host id, and the row renders
+  normally
 
 #### Scenario: A clean-sweep row shows the clean-sweep marker
 - **WHEN** a served record is a clean sweep
@@ -83,14 +103,28 @@ SHALL append its rows to those already shown rather than replacing them.
 ### Requirement: The Log Reads on Mount, After a Sweep Settles, and on Explicit Refresh — Never on a Timer
 The system SHALL read the pile when the log mounts, after the space view's
 post-sweep settle refetch has completed (*A Running Sweep Self-Schedules the
-Refetch That Settles It, Then Reads the Pile*), and when the player explicitly
-refreshes. It SHALL NOT poll the pile on a timer.
+Refetch That Settles It, Then Reads the Inbox and the Pile*), and when the
+player explicitly refreshes. It SHALL NOT poll the pile on a timer.
 
-Polling would buy nothing: a sighting is minted only by the reading
-corporation's own resolving sweep (`sighting-records`'s *A Sighting Is Minted
-Only By a Resolving Sweep*), so the pile cannot change except as an effect of an
-action this same client committed and is already tracking. No other player's
-activity, and no passage of time, can add a record to it.
+**The mount read obeys the same ordering as the post-ETA one.** IF the log
+mounts while any of the corporation's own fleets in the open system has a sweep
+whose ETA has already passed and which has not yet settled, THEN the log's
+first pile read SHALL be issued only after the space view's interior read that
+settles that sweep has completed. This is the likelier form of the same race
+the post-ETA ordering guards: a sweep whose ETA passed while the view was
+closed settles on the *open*, and a mount-time pile read issued alongside that
+opening interior read returns before the records exist — showing an empty log
+for a sweep that worked, with nothing scheduled to correct it.
+
+A timer poll is refused for a narrower reason than "nothing else can change the
+pile", which is false: `action`'s resolve fold is keyed on an action's scope
+and its actor, not on the reading corporation, so another corporation's read of
+the same system settles your due sweep, and the periodic action sweep settles
+it on a cadence with no reader at all. What is true is that every record so
+minted is the effect of a sweep **this corporation committed**, whose ETA this
+view already knows and already schedules a refetch for. A poll would therefore
+re-read the pile repeatedly to catch records that arrive only at instants the
+client can name in advance.
 
 #### Scenario: The log does not poll while open
 - **GIVEN** the log is open with no sweep running
@@ -101,6 +135,13 @@ activity, and no passage of time, can add a record to it.
 #### Scenario: The log refetches after a sweep settles
 - **WHEN** the space view's post-sweep settle refetch completes
 - **THEN** the pile is read again and any newly minted records appear
+
+#### Scenario: A mount during an unsettled past-ETA sweep reads the pile after the settling read
+- **GIVEN** an own fleet in the open system has a sweep whose ETA has passed
+  and which has not yet settled
+- **WHEN** the log mounts and the space view's interior read settles that sweep
+- **THEN** the log's first pile read is issued only after that interior read
+  has completed, and the settled sweep's records are present in it
 
 #### Scenario: An explicit refresh reads the pile
 - **WHEN** the player invokes the log's refresh affordance

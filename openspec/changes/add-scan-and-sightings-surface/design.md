@@ -76,6 +76,43 @@ enrolment — and serve that identifier as the record's `id`. One change fixes
 both halves: the record becomes addressable, and the cursor stops leaking
 because there is no longer a target id anywhere in it.
 
+**The identifier's class is specified, not left to the implementer, and this
+is the strongest argument in the change.** The identifier *is* the Firestore
+document path. `sightings.MintWrites` returns `action.DocWrite`s that
+`action/dao.go` applies with `tx.Set(ref, w.Data, firestore.MergeAll)`, so two
+records that collide on the identifier are **one document**: the later mint
+merges over the earlier, no error is raised, no duplicate appears, and one of
+two filed claims is gone. That is undetectable data loss, in a pile that never
+expires and has no repair path (`sighting-records`' *A Sighting Is Immutable
+and Never Expires* forbids the update and delete verbs that would fix it).
+
+An earlier draft of tasks.md said "fixed-length, integer-only", which was only
+ever about float determinism — and SHA-256 satisfies float determinism
+trivially. But "integer-only" steers directly at the two derivations that fail
+catastrophically:
+
+- **A 32-bit non-cryptographic hash** (FNV-1a is the obvious reach) birthday-
+  collides at roughly 10^5 records. A single corporation's pile reaching six
+  figures over a long game is unremarkable, and the failure is silent.
+- **`hash/maphash`** (the other obvious reach for a fast, integer, stdlib
+  hash) is **randomly seeded per process**. It passes *A retried resolve
+  converges instead of duplicating* in a single-process test and mints two
+  documents the moment a retry lands on a different Cloud Run instance —
+  green in CI, wrong in production, which is the exact failure mode this
+  chain has been repeatedly caught by.
+
+The spec therefore mandates a **collision-resistant digest, rendered at no
+fewer than 128 bits, depending on no per-process, per-instance, or randomly
+seeded value**, and pins cross-process stability and non-invertibility with
+their own scenarios.
+
+**The 128-bit floor is this spec author's decision, not an inherited ruling.**
+No entry in `decisions.md` and no upstream handoff prices identifier width;
+128 bits is chosen as the smallest width at which birthday collisions are not
+a design consideration at any pile size this game can produce. Travis may
+revisit it — the requirement's shape (a digest whose width is named) survives
+any change to the number.
+
 **Why this and not a second identifier.** The alternative was to keep the
 document id and serve a separate digest as `id`. That leaves the cursor leaking,
 gives the record two identities that must be kept in step, and makes the fix
@@ -147,10 +184,16 @@ affordance is counted:
    explicitly bars the fleet-level cancel from touching the sensor channel. So
    the control needs the **action id**, which only the inbox carries. A DTO field
    would give the window and still force the inbox read.
-2. The inbox already carries everything the window does. `focused-scan` pins the
-   depart time to the commit world time and the arrive time to the action's ETA,
-   so `committedAt` and `eta` on the action **are** the window, by requirement,
-   not by coincidence.
+2. The inbox already carries everything the window does — near enough that no
+   surface can tell, though *not* "by requirement", as an earlier draft of this
+   decision claimed. `fleet.Scan` reads the clock once for `ScanWindow.DepartMs`
+   and `action.Commit` takes a **second, independent** `s.clock.Now()` for
+   `CommittedAt`, so the two are equal only because nothing happens between
+   them, not because any rule pins them together; and the arrive time and the
+   ETA are the same stored value. The conclusion stands — the inbox's
+   `committedAt`/`eta` are a faithful window and the DTO field would add
+   nothing — but it rests on two clock reads a microsecond apart, not on a
+   requirement.
 3. The inbox is also where the settled sweep's `reasonCode` and `outcome` live,
    which the outcome report needs.
 4. Adding `scan` to `fleetDTO` would be a second source of one truth, and — since
@@ -172,6 +215,20 @@ The predicates stay server-side, per the ruling — the client never mirrors a
 `disclosure` predicate. The spec pins that with a scenario: a body present in the
 interior read but absent from the served target set is not offered.
 
+**The scan-target read serves no world time — and an earlier draft of this
+change served one.** The requirement, a scenario, and two tasks all carried a
+world time on the scan-target response, and **nothing consumed it**: the only
+client requirement that measures against a served world time is the running
+sweep's countdown, which measures against the *action inbox's* own served world
+time, from the read that carries the ETA it counts to. It is worth recording
+plainly that this change — whose stated goal is "the minimum surface that has a
+**named consumer** for every field added", written in direct response to five
+built-and-never-called derivations — was itself about to ship a served field
+with no consumer, and that its own orphan audit (task 9.2) enumerated five
+fields and omitted the only genuinely new one, the field the audit existed to
+catch. The clause is deleted from the requirement, the scenario, and both
+tasks; the audit now names the *absence* explicitly.
+
 **Ineligible hosts are absent, with no reason field.** Serving "too far" or
 "the star is in the way" per body would be more legible, but nothing in the
 rulings decides it and inventing the shape would add a field with a speculative
@@ -186,12 +243,26 @@ player copy, and the offer refreshes in-flow.
 
 `sighting-records` currently says: *WHEN a corporation reads its sighting pile
 **or a system's interior** THEN no new sighting record is created as a side
-effect of that read.* But `system/handler.go` calls
-`actions.ResolveDue(ctx, systemID)` on the interior read, a scan action's
-`Scope` **is** its system id, and the fleet reads settle only movement-channel
-dues (`fleet.Get` checks `State.Burn` and `Jump`, never `Scan`). So the interior
-read is in fact the only player-reachable surface that resolves a due sweep, and
-the live scenario is already false against shipped code.
+effect of that read.* But `system/handler.go:97` calls
+`actions.ResolveDue(ctx, systemID)` on the interior read and a scan action's
+`Scope` **is** its system id, so that scenario is already false against shipped
+code.
+
+**Two corrections to an earlier draft of this decision, neither of which
+changes the conclusion.**
+
+1. The interior read is *not* "the only surface that resolves a due sweep."
+   `fleet.Get`'s entry condition does check `State.Burn` and `Jump` — but once
+   it enters, `resolveDue` calls `action.ResolveActive(ctx, f.Id)`, which
+   resolves **every** due action for that actor, scan included. So a fleet read
+   for a fleet with a due burn also settles that fleet's due sweep. The interior
+   read is the *reliable* trigger, not the only one.
+2. `ResolveDue` keys on `scope`, not on the reading corporation
+   (`action/service.go:193`), and `POST /v1/push/action-sweep` calls
+   `ResolveAllDue` on a ~15-minute cadence. So another corporation's read of the
+   same system settles your due sweep and mints into your pile, and so does the
+   passage of time with no reader at all. The MODIFIED requirement is worded to
+   permit all of these rather than to name one.
 
 This change is the first client to depend on that mechanism, so it is the right
 place to state it correctly rather than build on a scenario the implementation
@@ -207,31 +278,72 @@ reader would have to rediscover it.
 
 ### Decision 6 — The pile is never polled
 
-A sighting is minted **only** by the reading corporation's own resolving sweep.
-No other player's activity and no passage of time can add a record to a
-corporation's pile. So the log reads on mount, after the settle refetch that
-follows its own sweep's ETA, and on explicit refresh — and a timer poll would
-be pure cost. This also means no new cadence constant is invented; the settle
-refetch reuses the existing named ETA cushion (`ETA_CUSHION_MS`) that
-`use-board-realtime.ts` already applies to a running mine.
+The log reads on mount, after the settle refetch that follows a sweep's ETA,
+and on explicit refresh. A timer poll would be pure cost. No new cadence
+constant is invented; the settle refetch reuses the existing named ETA cushion
+(`ETA_CUSHION_MS`) that `use-board-realtime.ts` already applies to a running
+mine.
 
-### Decision 7 — Refetch ordering: settle first, then read the pile
+**The reason is narrower than an earlier draft claimed, and the draft's version
+was false.** It said "no other player's activity and no passage of time can add
+a record to a corporation's pile." Both halves are wrong against the code:
+`action.ResolveDue` keys on an action's **scope**, not on the reading
+corporation (`action/service.go:193`), and `system/handler.go:97` calls it on
+**every** requester's interior read — so another corporation reading the same
+system settles your due scan and mints into your pile. And
+`POST /v1/push/action-sweep` calls `ResolveAllDue` on a ~15-minute Cloud
+Scheduler cadence, so time alone mints.
 
-The interior refetch is what resolves the due sweep; the pile read resolves
-nothing. Issued concurrently, the pile read can return before the records exist
-and the player sees an empty result for a sweep that worked. The spec therefore
-requires the pile refetch to be issued only after the interior refetch has
-**completed** — an ordering constraint, and a testable one.
+What is actually true, and is enough: every record that appears is the effect
+of a sweep **this corporation committed**, whose ETA this view already knows and
+already schedules a refetch for. The client is not waiting on an event it cannot
+predict; it is waiting on an instant it can name. A poll would re-read the pile
+repeatedly to catch records that arrive only at instants already scheduled for.
 
-### Decision 8 — A clean-sweep record draws no ghost
+### Decision 7 — Refetch ordering: settle first, then read the inbox and the pile — on the mount path too
+
+The interior refetch is what resolves the due sweep; the pile read and the
+action-inbox read each resolve nothing. Issued concurrently, either can return
+before the records exist and before the action has flipped to `done`, so the
+player sees an empty result and a still-running sweep for a sweep that worked.
+The spec therefore requires both follower reads to be issued only after the
+interior refetch has **completed** — an ordering constraint, and a testable one.
+
+**The same ordering governs the mount path, where the hazard is likelier.** An
+earlier draft fixed the ordering only after a *scheduled* post-ETA refetch,
+which is the case where the view was open the whole time. The commoner case is
+a sweep whose ETA passed while the view was closed: on open, `GetInterior`
+settles it, and a log or ghost-layer mount read issued alongside that opening
+interior read races it — with nothing scheduled afterwards to correct the empty
+result, because the ETA is already in the past. `sighting-log`'s *The Log Reads
+on Mount, After a Sweep Settles, and on Explicit Refresh — Never on a Timer*
+carries the mount-path ordering and its own scenario.
+
+**The inbox refetch is part of this ordering, not an afterthought.** Nothing
+else on the wire carries the running window, the cancel action id, the settled
+`outcome`, the `reasonCode`, or `acknowledgedAt`. Without an inbox refetch
+after settlement, *A past-ETA sweep reads as settling* holds forever and *A
+Settled Sweep Reports Its Outcome* never fires — taking all five fizzle copies
+with it, which is the headline half of this change.
+
+### Decision 8 — A clean-sweep record draws no ghost, and the origin rule is restated for ghosts
 
 A clean-sweep record carries no target and no position; its `Position` is the
-zero value. `system-space-view`'s *A Non-Star Position at the Origin Is Omitted
-From the Scene* already requires a non-star zero position to be omitted rather
-than drawn on the star, so drawing a clean-sweep mark at its stored position is
-already forbidden. Drawing it at the *host* instead would be a new invention. It
-appears in the log, which is where a claim of "nothing was masked here at time
-T" is legible anyway.
+zero value. It draws no ghost. Drawing it at the *host* instead would be a new
+invention. It appears in the log, which is where a claim of "nothing was masked
+here at time T" is legible anyway.
+
+**A citation correction.** An earlier draft justified this by saying 8a-2's *A
+Non-Star Position at the Origin Is Omitted From the Scene, Not Drawn Atop the
+Star* "already requires" a zero-position ghost to be omitted. It does not. That
+requirement enumerates its subjects — "a **body's**, **fleet's**, or
+**contact's** served or resolved position" — and a ghost is a fourth mark
+class it does not name. This change may not MODIFY it (Decision 10), so it is
+restated for ghosts in this change's own ADDED requirement, *A Ghost at the
+Origin Is Omitted From the Scene, Not Drawn Atop the Star*. The case that
+escapes without it is not the clean sweep — that record has no position at all
+— but a target-naming record whose stored position happens to be exactly the
+origin, which would be drawn on top of the star.
 
 ### Decision 9 — The log is its own capability; the ghosts are not
 
@@ -260,9 +372,17 @@ rather than edited:
   this change is what finally makes a scan control exist to be listed.
 - *Realtime Refetch Rules While the Space View Is Open* enumerates three refetch
   triggers. This change adds *A Running Sweep Self-Schedules the Refetch That
-  Settles It, Then Reads the Pile* as a fourth, stated as its own requirement
-  because it also carries the settle-then-pile ordering, which is not a refetch
-  rule at all.
+  Settles It, Then Reads the Inbox and the Pile* as a fourth, stated as its own
+  requirement because it also carries the settle-then-followers ordering, which
+  is not a refetch rule at all.
+- *A Non-Star Position at the Origin Is Omitted From the Scene, Not Drawn Atop
+  the Star* enumerates body, fleet, and contact. This change adds *A Ghost at
+  the Origin Is Omitted From the Scene, Not Drawn Atop the Star* rather than
+  widening that enumeration (Decision 8).
+- *Toggle-to-Deselect Single Selection Among a Body, a Lane Gate, or a Point*
+  already excludes fleets and contacts from the selection set by name. This
+  change adds *A Ghost Is Not a Member of the Space View's Selection, and a Burn
+  Never Consumes One* rather than editing that exclusion list (Decision 12).
 
 A future change that wants one merged requirement can MODIFY freely once both
 are live.
@@ -275,6 +395,97 @@ exists with no client consumer. Without it, the settled-sweep report would
 either reappear on every refetch forever or be dismissed into component state
 that resets on remount. Using acknowledge gives that endpoint its first
 consumer and makes the dismissal survive a refetch.
+
+### Decision 12 — A ghost is outside the selection set, and its highlight is separate state
+
+8a-2's picking rule is **exhaustive**: a click resolving against the pick plane
+over no body or lane-gate mark **selects that point**, and *Burn Command Targets
+Any Selected Body, Lane Gate, or Point Uniformly* means a selected point is a
+burn target. A ghost is drawn in that same plane, at the place a sweep found
+something masked — which is precisely where a curious player clicks. Without a
+rule, clicking a ghost to read it silently arms a burn to the coordinate a
+foreign fleet occupied at some past `asOf`.
+
+**Decision.** A ghost is not a member of the space view's selection. The
+row↔ghost highlight (`sighting-log`) is a **separate, additional** state held
+alongside that selection, which a burn never consumes. This mirrors the
+treatment 8a-2 already gives own fleets and foreign contacts, which are drawn
+and never selectable, with the acting fleet chosen from the roster instead.
+
+### Decision 13 — A fleet may not sweep itself: excluded from the list AND rejected at commit
+
+Verified against the code: `resolveScanHost` iterates `dao.ListBySystem`, which
+contains the scanner itself; the scanner passes the owner check trivially;
+`disclosure.WithinRange(from, from, r)` passes at distance zero; and
+`disclosure.Occluded` early-returns `false` for a zero-length segment
+(`occlusion.go:35`). **A fleet can commit a focused scan against itself today,
+and it succeeds** — spending sensor-channel time and unmasking itself to learn
+composition it already reads in full.
+
+`focused-scan`'s new list requirement says a served target is one a commit would
+accept, so leaving the commit as-is would *mandate* listing the acting fleet in
+its own target list. Excluding it from the list alone would leave the commit
+accepting a host the list can no longer offer.
+
+**Decision.** Exclude it on both sides: absent from the served set, and rejected
+at commit through the same `ErrScanHostUnresolved` every other unresolvable host
+returns. The identical-rejection shape means this needs no new player-facing
+copy, because no client surface can produce the rejection.
+
+### Decision 14 — The ghost layer's pile read is filtered server-side by system
+
+`GET /v1/sightings` accepts `limit` and `cursor` only. `sightings.Dao.List`
+orders by `asOf` descending across every system, `PageMax` is 50, and a record
+never expires. So "every record in the pile whose system is the open system" is
+not a read a client can perform: it can only page the whole pile and hope the
+system it is drawing has not fallen past the last page it fetched. The failure
+is silent and grows with play time — ghosts quietly stop appearing.
+
+**Decision.** Add an optional `systemId` filter to the pile read and make the
+ghost layer's source that filtered read. The alternative — "load N pages and
+hope" — was rejected: it puts an unstated bound on correctness, and the bound
+is exactly the thing that erodes.
+
+**A residual bound remains, deliberately.** The filtered read is still paged at
+`PageMax`, so the ghost layer draws the newest page of *this system's* records
+rather than all of them. That is a bound on a bounded thing — the newest 50
+sightings in one system — instead of a bound that silently degrades with total
+pile size, which is the defect being fixed. Whether ghosts should page, or the
+pile should ever expire, is not decided here and is not invented here.
+
+The cost is one composite index (`systemId asc, asOf desc, __name__ desc`) in
+`firestore-indexes.tf`, which Travis must `terraform apply`. Note that the
+emulator auto-indexes, so the tests pass without it and only production fails —
+the same trap `credit-reconcile` and the action inbox's indexes already carry.
+
+### Decision 15 — A fleet with a claimed sensor slot has an empty target set
+
+The target list's contract is that a served entry is one a commit would accept.
+While a fleet already has a running sweep, the sensor channel is claimed and
+*every* commit is rejected (`focused-scan`'s *A second sweep is rejected while
+one is running*), so the honest answer is an empty set — the same answer lane
+transit already gets, for the same reason. It costs nothing at the surface: the
+client withholds the commit control entirely while a sweep runs, and a
+successful cancel invalidates the target-list query, so a fresh read returns the
+real set immediately.
+
+### Decision 16 — "Most recently settled" is ordered by served fields, and the settled-inbox read must be bounded
+
+"The acting fleet's most recently settled, unacknowledged focused scan" named no
+ordering field, and there is none to fall back on: `action.Dao.List` applies
+**no ordering and no limit** — it is a `Where("actor", ==)` plus an optional
+status equality, iterated to exhaustion. So the inbox's arrival order is
+whatever Firestore returns, and "most recent" was undefined.
+
+**Decision.** Order by the greatest served `resolvedAt` world time, with the
+action's `eta` breaking a tie — both already stored and served, neither newly
+added. The requirement states the ordering in terms of those fields and forbids
+relying on the response's order.
+
+The same finding exposes a second problem: `GET /v1/actions?actor=&status=done`
+returns **every action that fleet has ever completed**, unbounded, and this
+change would be its first caller. A bound (`limit`, a `type` filter, or both) is
+carried as a task; see the Risks section for what that leaves unspecified.
 
 ## Risks / Trade-offs
 
@@ -305,6 +516,22 @@ consumer and makes the dismissal survive a refetch.
   by the system's body count (five to seven planets, some moons, a station, a
   gate per lane). It is not a new class of cost — the interior read already
   resolves every body's position — but it is per-request and owner-scoped.
+- **The settled-inbox bound is a task with no requirement behind it.** Task 3.8
+  bounds `GET /v1/actions?actor=&status=done`, which today returns every action
+  an actor ever completed. That endpoint belongs to `action-dispatch`, and this
+  change writes no delta against that capability, so the bound's exact shape
+  (`limit`, `type`, or both) is decided by the implementer rather than by a
+  scenario. This is a deliberate, recorded gap: the alternative was for this
+  change to spec a neighbouring capability's read surface on its way past.
+  Flagged for Travis — if the bound should be a requirement, it belongs in an
+  `action-dispatch` delta, here or in a follow-up.
+- **The per-own-fleet inbox read is N reads, not one.** Re-anchoring the settle
+  refetch to every own fleet in the open system (Decision 7 / MAJOR 5) means one
+  `GET /v1/actions?actor=<fleetId>&status=running` per own fleet in that system,
+  because the inbox is actor-scoped and has no multi-actor form. N is small — the
+  fleets one corporation has in one system — and the reads are already how the
+  acting fleet's window is fetched, but it is a per-fleet fan-out rather than a
+  single query, and it is worth knowing before it surprises someone.
 - **`useRunningScan`'s doc comment is lattice-era prose** ("the frozen params
   (origin system + aim target) and eta let the board draw the committed beam").
   The hook is being adopted, not rewritten; its comment must be repointed or it
@@ -360,3 +587,17 @@ be answered by inventing a value.
    invents no cadence: the settle refetch reuses the existing named ETA cushion
    and the pile is not polled at all (Decision 6). If the baseline cadence
    changes, nothing here needs to change with it.
+8. **Is 128 bits the right floor for the sighting identifier?** The floor is
+   this change's own decision (Decision 1), not an inherited ruling — no entry
+   in `decisions.md` prices identifier width. 128 bits is chosen as the smallest
+   width at which birthday collisions stop being a design consideration at any
+   pile size this game can produce, and the requirement's shape survives any
+   change to the number. Travis may set it higher or lower; what must not
+   change is that the width is *named* and the derivation is unseeded.
+9. **Should the settled-action inbox's bound be a requirement, and whose?**
+   `GET /v1/actions?actor=&status=done` is unbounded and unordered
+   (`action.Dao.List` applies neither), and this change is its first caller. The
+   bound is carried here as a task (3.8) rather than as a scenario, because the
+   endpoint belongs to `action-dispatch` and this change writes no delta against
+   that capability. If the bound should be specified rather than implemented,
+   it wants an `action-dispatch` delta — here or in a follow-up.

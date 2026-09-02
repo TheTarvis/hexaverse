@@ -38,6 +38,14 @@ every sighting is a glimpse, and attribution stays inferential.
 - **THEN** its `id` does not contain the target's id as a substring
 - **AND** the response still contains no field identifying the target by id
 
+#### Scenario: A record's id is not a reversible encoding of its target
+- **GIVEN** a sighting record minted for a target, and full knowledge of how
+  the identifier is derived
+- **WHEN** the served `id` is inverted, decoded, or otherwise transformed by
+  any means short of guessing the target id and re-deriving it
+- **THEN** the target's id is not recovered — the identifier is a digest, not
+  an encoding of its inputs
+
 #### Scenario: Two sweeps against the same target share no identifier
 - **GIVEN** two focused scans, resolved at different times, that each mint a
   record for the same target
@@ -51,6 +59,45 @@ every sighting is a glimpse, and attribution stays inferential.
 - **THEN** that cursor contains no sighted target's id, as a substring or in any
   recoverable encoding
 
+### Requirement: The Pile Read Filters To One System On Request
+The system SHALL accept, on the sighting-pile read, an optional system
+identifier, and SHALL then serve only that corporation's records whose system
+is the named one — ordered, bounded, and paged exactly as the unfiltered read
+is (*The Pile Is Paginated and Bounded Per Read*), with a continuation cursor
+that continues the filtered sequence rather than the whole pile's. A read that
+names no system SHALL be unchanged: the whole pile, newest pulse-reach first.
+
+The filter is a required read, not a convenience. A pile is unbounded — a
+sighting never expires — and it spans every system the corporation has ever
+swept, while its consumer in a system view needs exactly one system's records.
+Without a server-side filter that consumer can only page the whole pile
+hoping the system it wants is not beyond the last page it fetched, which is
+a display that silently omits records as the pile grows.
+
+#### Scenario: A filtered read returns only the named system's records
+- **GIVEN** a corporation with records in two different systems
+- **WHEN** its pile is read naming one of those systems
+- **THEN** every returned record's system is the named one, and no record from
+  the other system appears
+
+#### Scenario: A filtered read is bounded and paged like any other
+- **GIVEN** a corporation with more records in one system than the named page
+  maximum
+- **WHEN** its pile is read naming that system
+- **THEN** the response contains no more records than that maximum, ordered by
+  `asOf` most recent first, and carries a continuation cursor
+- **AND** continuing with that cursor returns further records of that same
+  system
+
+#### Scenario: A filtered read for a system with no records is empty, not an error
+- **WHEN** a corporation's pile is read naming a system it has never swept
+- **THEN** the response is successful and carries no records
+
+#### Scenario: An unfiltered read is unchanged
+- **WHEN** a corporation's pile is read naming no system
+- **THEN** the response carries records from every system it has swept, newest
+  pulse-reach first
+
 ## MODIFIED Requirements
 
 ### Requirement: A Sighting Is Minted Only By a Resolving Sweep
@@ -63,8 +110,10 @@ a committed, resolved sweep files a claim.
 
 A read MAY, however, **settle a sweep whose ETA has already passed**, through
 the action spine's opportunistic resolve fold that reads already run — and
-this is the only way a sweep lands for a player who is merely looking at the
-screen. The records that then appear are the *sweep's* effect: they are
+that fold, not a scheduler, is how a sweep lands for a player who is merely
+looking at the screen. Which read runs it is not narrowed by this rule: any
+read that folds the sweep's scope or its actor may settle it, including one
+issued by a different corporation entirely. The records that then appear are the *sweep's* effect: they are
 attributed to the sweep's action, stamped at the sweep's pulse-reach, and
 identical to the records the periodic sweep job would have produced had it
 resolved the action first. The read contributes nothing to them but the moment
@@ -114,6 +163,26 @@ the client as the record's `id` (*A Sighting Record Is Addressable On the Wire
 Without Naming Its Target*) and is echoed inside the pile's continuation
 cursor, so an identifier built by concatenating the target's id publishes,
 through both of those surfaces, the very id this capability keeps off the wire.
+
+The identifier SHALL be a **collision-resistant digest** over those same
+inputs, rendered at **no fewer than 128 bits**, and SHALL depend on no
+per-process, per-instance, or randomly seeded value. Its class is mandated
+rather than left to the implementer because the identifier *is* the document
+path: two records colliding on it are one document, the later mint silently
+overwriting the earlier through the same merge write every resolver's effect
+is applied with, and the loss is undetectable — no error, no duplicate, one
+record where two claims were filed, in a pile that never expires. A
+process-seeded or instance-seeded derivation fails differently and worse: it
+satisfies *A retried resolve converges instead of duplicating* inside one
+process and mints two documents when the retry lands on another instance.
+
+#### Scenario: The identifier is stable across processes and instances
+- **GIVEN** the same resolving action id and the same target id
+- **WHEN** the identifier is derived in one process and again in a separate
+  process or on a separate instance
+- **THEN** both derivations produce the same identifier
+- **AND** no per-process, per-instance, or randomly seeded value participates
+  in it
 
 #### Scenario: A sighting's document id is deterministic
 - **WHEN** a focused scan resolves and mints a sighting for a target
