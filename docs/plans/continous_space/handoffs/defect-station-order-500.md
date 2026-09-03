@@ -69,3 +69,26 @@ recorded in `arriveInOrbitAround` (`backend/stationkeep_e2e_helpers_test.go`) so
 red is understood in seconds rather than re-derived.
 
 **Residual risk until fixed: ~2% per station-targeted order.**
+
+## ESCALATED 2026-09-02 — this now blocks the quality gate, not just a test
+
+When first recorded this was latent: ~2% per station-targeted order, invisible unless you
+were unlucky. It is no longer latent. The suite has grown to ~1984 tests, a large and
+growing share of which arrange a fleet by ordering a burn to a station, so a full
+`/check` run now hits it **more often than not** — it took out the 8a-1 gate run at
+`stationkeep_hold_verb_e2e_test.go:216`, in a test's *arrangement*, with nothing wrong in
+either the test or the change under gate.
+
+That changes the scoping calculus. It was reasonable to defer a latent 2%; it is not
+reasonable to leave a defect that makes the project's own gate unreliable, because a gate
+that is red for a known-irrelevant reason trains everyone to ignore red gates. This chain
+has already catalogued what that costs (`README.md`, Lesson two).
+
+**It still cannot be fixed by an agent alone**, and that has not changed: the repair is a
+gameplay decision about where a fleet parks. Either the insertion standoff clamps outward
+to the clearance radius — keeping a reachable body reachable at every orbital phase, at the
+cost of changing park positions near the star — or rejection is kept and the reason becomes
+reason-bearing and distinguishable. The first unblocks the gate; the second does not.
+
+**Recommended priority: next, ahead of further chain links.** It is cheap relative to what
+it is costing, and every additional e2e test makes a full green run less likely.

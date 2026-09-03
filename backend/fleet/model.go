@@ -1,6 +1,8 @@
 package fleet
 
 import (
+	"math"
+
 	"hexaverse/common"
 	"hexaverse/space"
 )
@@ -175,6 +177,42 @@ type OrderRequest struct {
 	// the roster-derived ceiling is chain link 4 section 4's own job
 	// (ClassStats.Accel / DerivedAccelCeiling do not exist yet).
 	Accel *float64 `json:"accel,omitempty"`
+	// MaxFuelTons is the requester's optional quoted fuel cap (fleet-movement
+	// "A Burn Commit Is Rejected When Its Solved Fuel Cost Exceeds the
+	// Requester's Quoted Cap"): present, a solved cost strictly greater than
+	// it rejects the commit before any channel claim, fuel debit, or burn
+	// store; absent, no cap is applied and the commit behaves exactly as it
+	// did before this field existed.
+	//
+	// A POINTER, not a plain float64, and that is load-bearing rather than
+	// stylistic: ABSENCE MUST BE DISTINGUISHABLE FROM ZERO. A cap of exactly
+	// `0` is a PRESENT cap — the caller asserting the order must cost nothing
+	// — and rejects any strictly positive solved cost. A plain float64 makes
+	// `{"maxFuelTons": 0}` and a body omitting the key entirely decode
+	// identically, which turns a defensive caller's strictest possible cap
+	// into no cap at all: the exact failure the cap exists to prevent,
+	// reached by the exact value such a caller is most likely to send.
+	MaxFuelTons *float64 `json:"maxFuelTons,omitempty"`
+}
+
+// validateFuelCap rejects a negative or non-finite quoted cap as an INVALID
+// REQUEST rather than treating it as absent (fleet-movement "A malformed cap
+// is an invalid request, not an absent cap") — treating it as absent would
+// commit the order uncapped, which is the outcome the cap exists to prevent.
+// A cap of exactly zero is valid and is honoured as a cap.
+//
+// (A non-finite cap sent as a JSON number out of float64's range — `1e400` —
+// never reaches here: encoding/json fails the bind first, and the handler
+// answers the same 400. This covers the values that DO decode.)
+func (r OrderRequest) validateFuelCap() error {
+	if r.MaxFuelTons == nil {
+		return nil
+	}
+	v := *r.MaxFuelTons
+	if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+		return ErrInvalidFuelCap
+	}
+	return nil
 }
 
 // JumpRequest is the body of POST /v1/fleets/:id/jump — a single-hop lane

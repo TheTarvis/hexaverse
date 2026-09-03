@@ -146,24 +146,39 @@ func (h *Handler) GetInterior(c *gin.Context) {
 	c.JSON(http.StatusOK, interiorDTO{
 		SystemId:  gen.Interior.SystemId,
 		Radius:    gen.Interior.Radius,
+		Extent:    gen.Interior.Extent,
 		Character: gen.Interior.Character,
 		StarClass: gen.Interior.StarClass,
 		Features:  features,
 		LaneGates: gates,
 		Contacts:  contacts,
 		WorldTime: now,
+		Scale:     h.clock.Scale(),
 	})
 }
 
 // --- Wire DTO --------------------------------------------------------------
 
 type interiorDTO struct {
-	SystemId  string             `json:"systemId"`
-	Radius    int                `json:"radius"`
-	Character string             `json:"character"`
-	StarClass string             `json:"starClass"`
-	Features  []fogFeatureDTO    `json:"features"`
-	LaneGates []LaneGate         `json:"laneGates"`
+	SystemId string `json:"systemId"`
+	// Radius is the LATTICE ring count. Kept exactly as it was; the change
+	// that stops reading it (`build-production-space-view`) is the change
+	// that removes it.
+	Radius int `json:"radius"`
+	// Extent is the interior's CONTINUOUS star-frame upper bound over every
+	// generated body's orbital radius (SystemInterior.Extent), served
+	// ALONGSIDE — never in place of — the lattice Radius
+	// (serve-orbital-elements-and-burn-preview, system-interior "The read
+	// carries the interior's continuous extent"). It is the system-sized
+	// number a client scales a camera, clamps a pan bound, or bounds a pick
+	// radius with, and it is the one that survives the lattice's removal.
+	// Never `omitempty`: a system whose stored Extent is genuinely zero must
+	// read as zero, not as absent.
+	Extent    float64         `json:"extent"`
+	Character string          `json:"character"`
+	StarClass string          `json:"starClass"`
+	Features  []fogFeatureDTO `json:"features"`
+	LaneGates []LaneGate      `json:"laneGates"`
 	// Contacts is the requester corporation's own live disclosure of
 	// foreign ship presence (system-interior "Foreign Presence Is Served As
 	// System Contacts") — a top-level array alongside Features/LaneGates,
@@ -172,6 +187,14 @@ type interiorDTO struct {
 	// corpless requester, or a requester with no fleet of its own present).
 	Contacts  []contactDTO       `json:"contacts"`
 	WorldTime common.WorldMillis `json:"worldTime"`
+	// Scale is the simulation clock's time-warp factor — world-milliseconds
+	// advanced per wall-clock millisecond — read from the SAME clock that
+	// produced WorldTime (system-interior "The read carries the world
+	// clock's scale alongside its world time"). Served UNCONDITIONALLY and
+	// without `omitempty`: a float64 with `omitempty` disappears at exactly
+	// the value every world runs at today, which is the shape that ships
+	// correct-and-absent and leaves a client hardcoding 1.
+	Scale float64 `json:"scale"`
 }
 
 // contactDTO is disclosure.Contact's wire shape: camelCase field names,

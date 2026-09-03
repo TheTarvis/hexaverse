@@ -220,3 +220,36 @@ The pattern behind both: an instruction repeated across many delegations is neve
 re-derived by the people following it. Lesson five was a prohibition that outlived its
 cause; this is a command that never worked. Both survived because they were *inherited*,
 and both were caught by an agent doing the work rather than by a reviewer reading it.
+
+### Addendum — the suite timeout is now a treadmill, with numbers
+
+Measured on this machine, same command, same day:
+
+| point | root e2e package | whole `./...` | timeout in force |
+| --- | --- | --- | --- |
+| before link 7b | ~109 s (after the leak fix) | — | 15m |
+| link 7b landed | 1289 s (21.5 min) | 1284 s reported at the cap | 15m → **40m** |
+| link 8a-1 landed | 2397 s (40 min) | 2850 s (47.5 min) | 40m → **90m** |
+
+Two raises in one day, and 8a-2 (106 tasks) and 8b (105 tasks) are still unimplemented.
+Raising the number is not a fix: each raise widens the window in which a genuine hang is
+indistinguishable from a slow suite, which is precisely the confusion the
+"A TIMEOUT IS NOT AN ASSERTION FAILURE" banner exists to resolve. The banner keeps working;
+the thing it explains keeps getting worse.
+
+The growth is not mysterious. Nearly every new e2e test **provisions a fresh corporation**
+against the emulator — galaxy read, spawn, interior materialization, station provisioning —
+and the chain has added dozens of them. The cost is per-test, not per-suite.
+
+**Two structural fixes, for Travis to choose between.** Neither is something an agent should
+pick unilaterally, because both change how the suite is written:
+
+1. **Share spawn fixtures.** Most e2e tests need *a* corporation with *a* fleet, not a
+   uniquely-seeded one. A per-package spawned corp reused across tests that only read, with
+   fresh spawns reserved for tests that mutate ownership, would cut the dominant cost.
+   Risk: cross-test coupling, which the root `TestMain`'s wipe currently prevents by force.
+2. **Split the root package.** The slow leg is one package. Moving the e2e suite behind its
+   own target keeps `/check`'s default path fast and makes the long run explicit, at the
+   cost of a second command people must remember.
+
+Until one lands, expect a third raise.

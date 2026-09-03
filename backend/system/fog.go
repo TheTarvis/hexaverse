@@ -25,6 +25,14 @@ import (
 // ship ADDITIVELY alongside the pre-existing lattice fields (Footprint,
 // Band, Live) — never replacing them, since the live board is still the
 // only playable view until link 8's renderer migration.
+//
+// OrbitElements (serve-orbital-elements-and-burn-preview, tasks.md 2.1) is
+// additive in the same way and under a DISTINCT key. The LATTICE half of
+// this DTO — Orbit, ParentId, Fixed, Footprint, Band, Live, AsOf (and
+// LaneGate.Cell on the sibling type) — is deliberately left untouched here
+// and is removed by `build-production-space-view`, the change that stops
+// reading them. Removing them here would break the live lattice view and
+// turn a purely additive change into a migration.
 type fogFeatureDTO struct {
 	Id        string       `json:"id"`
 	Type      FeatureType  `json:"type"`
@@ -54,9 +62,56 @@ type fogFeatureDTO struct {
 	Space space.Vec3 `json:"space"`
 	// Size is the body's physical radius (Feature.Size).
 	Size float64 `json:"size"`
+	// OrbitElements is the body's continuous orbital element set
+	// (serve-orbital-elements-and-burn-preview, system-interior "A non-star
+	// body's read carries its full orbital element set"). Populated from the
+	// STORED Feature.Space — elements are stored data, not a resolution
+	// result, so they are served in full even when the body's continuous
+	// position could not be resolved and `Space` is left zero-valued. Omitted
+	// entirely for the star, which carries no element set.
+	OrbitElements *orbitElementsDTO `json:"orbitElements,omitempty"`
 }
 
 const bandVisible = "visible"
+
+// orbitElementsDTO is a body's CONTINUOUS orbital element set on the wire —
+// the six fields space.EncodeOrbit already persists, under the exact names it
+// persists them by (system-interior "Interior Read Endpoint").
+//
+// The key it ships under is `orbitElements`, NEVER `orbit`: `orbit` is
+// already occupied on this response by the LATTICE orbit
+// ({ring, angle0, period, dir}), a different object with different fields and
+// a different meaning, and the `space` key is already occupied by the body's
+// resolved continuous position. Serving the element set under either name
+// would redefine a field a caller already reads — and since the two objects
+// share no field name, every stale reader would read `undefined` for every
+// field rather than throwing (design.md Decision 1 of
+// serve-orbital-elements-and-burn-preview).
+//
+// space.Orbit itself carries no json tags (backend/space is storage- and
+// wire-agnostic by design), so this DTO — not the domain type — is what
+// crosses the boundary.
+type orbitElementsDTO struct {
+	ParentId    string             `json:"parentId"`
+	Radius      float64            `json:"radius"`
+	PeriodMs    common.WorldMillis `json:"periodMs"`
+	Phase       space.SubTurns     `json:"phase"`
+	Inclination space.SubTurns     `json:"inclination"`
+	Node        space.SubTurns     `json:"node"`
+}
+
+// orbitElementsOf shapes a stored/derived element set for the wire, or nil
+// for a body that has none — the star, which is parentless and positioned at
+// the origin (system-interior "The star SHALL carry no orbitElements").
+func orbitElementsOf(o *space.Orbit) *orbitElementsDTO {
+	if o == nil {
+		return nil
+	}
+	return &orbitElementsDTO{
+		ParentId: o.ParentId, Radius: o.Radius, PeriodMs: o.PeriodMs,
+		Phase: o.Phase, Inclination: o.Inclination, Node: o.Node,
+	}
+}
 
 // projectUnfogged serves a materialized interior's every feature in full —
 // geometry, composition, and threat detail — with no band assignment and no
@@ -82,6 +137,7 @@ func projectUnfogged(gen *GeneratedInterior) []fogFeatureDTO {
 			Id: f.Id, Type: f.Type, Orbit: f.Orbit, ParentId: f.ParentId,
 			Fixed: f.Fixed, Footprint: f.Footprint, Band: bandVisible, Live: true,
 			Resources: f.Resources, Effects: f.Effects, Size: f.Size,
+			OrbitElements: orbitElementsOf(f.Space),
 		})
 	}
 	return out

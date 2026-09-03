@@ -228,6 +228,56 @@ func stationKeepRateFor(bt *system.BodyTable, bodyId string) float64 {
 	return rate
 }
 
+// StationKeepUpkeepRate is the READ-SIDE station-keeping upkeep rate for a
+// fleet, in FUEL TONS PER SECOND — what an `orbit` park would cost were the
+// player to hold, and what a `stationkeep` park is costing now
+// (serve-orbital-elements-and-burn-preview, fleet-movement "Fleet Read Serves
+// the Station-Keeping Upkeep Rate in Fuel Tons"). ok is false for a fleet
+// whose effective state resolves to anything without a host body — a burn, a
+// drift, a `point` park, or a fleet in lane transit — which is what makes the
+// wire field's ABSENCE the answer to "no rate" rather than a zero.
+//
+// TONS, NEVER DELTA-V. space.StationKeepRate yields a delta-v rate; the
+// conversion by FuelParams.DeltaVPerTon is rule-bearing — it is the same
+// conversion this capability records being got backwards once already, at a
+// 5x error — and DeltaVPerTon is not on the wire, so a client asked to apply
+// it would have to duplicate the constant as well as the rule. The hull-count
+// multiplier is deliberately NOT applied: this is the rate the park charges,
+// not a fleet-sized burn price.
+//
+// Purely derived: it settles nothing, debits nothing, and restamps nothing
+// ("Serving this rate SHALL NOT alter, settle, or debit anything"). The
+// effective state is read through the same space.StateAt fold every other
+// answer to "what is this fleet doing" goes through, so a released hold reads
+// as the orbit it became.
+func (s *Service) StationKeepUpkeepRate(ctx context.Context, f *Fleet) (tonsPerSecond float64, ok bool, err error) {
+	if f == nil || f.Jump != nil {
+		return 0, false, nil
+	}
+	bt, err := s.bodiesFor(ctx, f.SystemId)
+	if err != nil {
+		return 0, false, err
+	}
+	eff, err := space.StateAt(bt, f.State, s.clock.Now())
+	if err != nil {
+		return 0, false, fmt.Errorf("fleet: folding state for the station-keeping upkeep rate: %w", err)
+	}
+	if eff.Mode != space.ModeParked || eff.Park == nil {
+		return 0, false, nil
+	}
+	p := *eff.Park
+	if p.Kind != space.ParkOrbit && p.Kind != space.ParkStationkeep {
+		return 0, false, nil // a `point` park has no host body to charge a rate
+	}
+	if p.BodyId == "" {
+		return 0, false, nil
+	}
+	if s.fuelParams.DeltaVPerTon <= 0 {
+		return 0, false, nil
+	}
+	return stationKeepRateFor(bt, p.BodyId) / s.fuelParams.DeltaVPerTon, true, nil
+}
+
 // --- the verbs --------------------------------------------------------------
 
 // Hold serves POST /v1/fleets/:fleetId/hold — an INSTANT verb (no action, no

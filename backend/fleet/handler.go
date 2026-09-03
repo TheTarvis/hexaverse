@@ -41,6 +41,7 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 		g.GET("", h.List)
 		g.GET("/:fleetId", h.Get)
 		g.POST("/:fleetId/orders", h.Order)
+		g.POST("/:fleetId/orders/preview", h.OrderPreview)
 		g.POST("/:fleetId/cancel", h.Cancel)
 		g.POST("/:fleetId/cut-drive", h.CutDrive)
 		g.POST("/:fleetId/stop", h.Stop)
@@ -93,7 +94,14 @@ func (h *Handler) List(c *gin.Context) {
 	var err error
 	if common.OptionalQueryParam(c, "mine") == "true" {
 		if requesterCid == "" {
-			c.JSON(http.StatusOK, gin.H{"fleets": []fleetDTO{}, "worldTime": h.clock.Now()})
+			// The scale rides this branch's own hand-built literal too: it
+			// is a fleet read carrying a worldTime, and a client hits it
+			// during the wake-up flow (fleet-movement "Fleet Reads Serve the
+			// Simulation Clock's Scale Alongside Their World Time" — served
+			// unconditionally, on every list form).
+			c.JSON(http.StatusOK, gin.H{
+				"fleets": []fleetDTO{}, "worldTime": h.clock.Now(), "scale": h.clock.Scale(),
+			})
 			return
 		}
 		fleets, err = h.svc.ListForCorp(ctx, requesterCid)
@@ -122,7 +130,7 @@ func (h *Handler) List(c *gin.Context) {
 		}
 		out = append(out, dto)
 	}
-	c.JSON(http.StatusOK, gin.H{"fleets": out, "worldTime": h.clock.Now()})
+	c.JSON(http.StatusOK, gin.H{"fleets": out, "worldTime": h.clock.Now(), "scale": h.clock.Scale()})
 }
 
 // commandedFleetId resolves the fleet a command endpoint names, but ONLY for
@@ -145,6 +153,26 @@ func (h *Handler) List(c *gin.Context) {
 // resolution — ErrScanHostUnresolved also maps to 404, so a check made any
 // later would pass for the wrong reason while the foreign scan still ran.
 //
+// THE CHECK RUNS AHEAD OF THE SETTLEMENT SEAM (fleet-movement "A foreign
+// preview is refused before anything is settled"). The authorization read is
+// Service.LoadUnsettled — a bare stored read that resolves no due arrival and
+// folds no expired hold — because Get, which this used to call, WRITES when an
+// arrival is due. Ordering the ownership check after that write would let an
+// unauthorized caller trigger a state-mutating write on a victim's fleet, and
+// would make the 404 observably slower when that fleet has an arrival due than
+// when it does not: a timing side channel disclosing the victim's kinematic
+// state through a response this endpoint set otherwise renders
+// indistinguishable from a nonexistent fleet's.
+//
+// Once the caller IS authorized, the settling read runs exactly as it did
+// before, so no verb's pre-settled preconditions change: this reorders the
+// authorization against the settlement, it does not remove the settlement.
+// The non-settling load is probed for by type assertion rather than added to
+// ServiceInterface, the same way fuelStatusSource is (a hand-written fake in
+// handler_test.go satisfies that interface and has no reason to grow a
+// method); a service that cannot answer it falls back to the settling read,
+// which is the pre-existing behaviour.
+//
 // Returns the fleet id and true when the command may proceed; on false the
 // response is already written.
 func (h *Handler) commandedFleetId(c *gin.Context) (string, bool) {
@@ -152,7 +180,16 @@ func (h *Handler) commandedFleetId(c *gin.Context) (string, bool) {
 	if fleetId == "" {
 		return "", false // RequiredHttpParam already aborted with 400
 	}
-	f, err := h.svc.Get(c.Request.Context(), fleetId)
+	ctx := c.Request.Context()
+
+	loader, canLoadUnsettled := h.svc.(unsettledFleetLoader)
+	var f *Fleet
+	var err error
+	if canLoadUnsettled {
+		f, err = loader.LoadUnsettled(ctx, fleetId)
+	} else {
+		f, err = h.svc.Get(ctx, fleetId)
+	}
 	if err != nil {
 		h.respond(c, nil, err)
 		return "", false
@@ -161,7 +198,24 @@ func (h *Handler) commandedFleetId(c *gin.Context) (string, bool) {
 		h.respond(c, nil, ErrNotFound)
 		return "", false
 	}
+	// Authorized — now run the settling read the command surface has always
+	// run, so a due arrival is resolved before the verb evaluates its
+	// preconditions.
+	if canLoadUnsettled {
+		if _, err := h.svc.Get(ctx, fleetId); err != nil {
+			h.respond(c, nil, err)
+			return "", false
+		}
+	}
 	return fleetId, true
+}
+
+// unsettledFleetLoader is the non-settling authorization read, probed for by
+// type assertion rather than widened onto ServiceInterface (see
+// commandedFleetId, and fuelStatusSource for the same pattern) — implemented
+// by the concrete *Service.
+type unsettledFleetLoader interface {
+	LoadUnsettled(ctx context.Context, id string) (*Fleet, error)
 }
 
 func (h *Handler) Order(c *gin.Context) {
@@ -176,6 +230,93 @@ func (h *Handler) Order(c *gin.Context) {
 	}
 	f, err := h.svc.OrderTo(c.Request.Context(), fleetId, req)
 	h.respondWithStrandingWarning(c, f, err)
+}
+
+// OrderPreview handles POST /v1/fleets/:fleetId/orders/preview — the solved
+// burn, with no action created, no channel claimed, no fuel debited and no
+// burn stored (fleet-movement "Burn Order Preview Solves Without
+// Committing").
+//
+// Ownership-gated through the same commandedFleetId seam every other fleet
+// command uses, and for a sharper reason than most: the response is solved
+// from the fleet's live position, velocity, roster-derived acceleration and
+// held fuel, so an unchecked preview would disclose all four to a foreign
+// corporation — none of which this capability discloses to a foreign
+// requester by any other path. That seam now runs its ownership check BEFORE
+// the settlement, so a foreign or corpless requester's preview reaches no
+// settlement, no solve, and no write of any kind.
+//
+// The request shape is OrderRequest, as `orders` — a laneId is rejected by
+// PreviewOrder with its own named reason rather than ignored.
+func (h *Handler) OrderPreview(c *gin.Context) {
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
+	var req OrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	src, ok := h.svc.(burnPreviewSource)
+	if !ok {
+		log.Error().Ctx(c).Str("fleetId", fleetId).Msg("fleet service cannot solve a burn preview")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	preview, err := src.PreviewOrder(c.Request.Context(), fleetId, req)
+	if err != nil {
+		// Routed through the SAME error mapping the commit uses, so a
+		// rejection shared with the commit path is observably identical —
+		// same status, same body, same named reason.
+		h.respond(c, nil, err)
+		return
+	}
+	c.JSON(http.StatusOK, burnPreviewDTO{
+		ControlPoints: []space.Vec3{
+			preview.Curve.P0, preview.Curve.C1, preview.Curve.C2,
+			preview.Curve.C3, preview.Curve.C4, preview.Curve.P5,
+		},
+		DepartMs:         preview.DepartMs,
+		ArriveMs:         preview.ArriveMs,
+		DeltaV:           preview.DeltaV,
+		FuelCostTons:     preview.FuelCostTons,
+		Affordable:       preview.Affordable,
+		StrandingWarning: preview.StrandingWarning,
+	})
+}
+
+// burnPreviewSource is the burn-preview solve, probed for by type assertion
+// rather than widened onto ServiceInterface (the same pattern
+// fuelStatusSource and unsettledFleetLoader use) — implemented by the
+// concrete *Service.
+type burnPreviewSource interface {
+	PreviewOrder(ctx context.Context, id string, req OrderRequest) (*BurnPreview, error)
+}
+
+// burnPreviewDTO is the preview response: the solved transfer curve, its
+// world-time window, its price in both currencies, and the two advisories.
+//
+// ControlPoints is the curve's six points in order (P0, C1, C2, C3, C4, P5),
+// as a flat array rather than six named keys — a client evaluates the quintic
+// by index, and an array is what it wants. Each point carries this wire's
+// existing Vec3 shape, the same one `position` and a body's `space` already
+// use.
+//
+// Affordable is served UNCONDITIONALLY (no `omitempty`): its false value is
+// the whole point of an unaffordable preview, and a bool that disappears when
+// false would leave a client unable to tell "affordable" from "not reported".
+// StrandingWarning is likewise explicit here, unlike the commit response's
+// one-shot `strandingWarning` — this is a quote, and the absence of a warning
+// is itself information a quote must state.
+type burnPreviewDTO struct {
+	ControlPoints    []space.Vec3       `json:"controlPoints"`
+	DepartMs         common.WorldMillis `json:"departMs"`
+	ArriveMs         common.WorldMillis `json:"arriveMs"`
+	DeltaV           float64            `json:"deltaV"`
+	FuelCostTons     float64            `json:"fuelCostTons"`
+	Affordable       bool               `json:"affordable"`
+	StrandingWarning bool               `json:"strandingWarning"`
 }
 
 func (h *Handler) Cancel(c *gin.Context) {
@@ -304,6 +445,38 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatus(http.StatusNotFound)
 	case errors.Is(err, ErrEmptyOrder), errors.Is(err, ErrAmbiguousOrder):
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrInvalidFuelCap):
+		// A negative or non-finite maxFuelTons is a MALFORMED REQUEST, not a
+		// state conflict and not a quoted-cap rejection (fleet-movement "A
+		// malformed cap is an invalid request, not an absent cap"): 400, the
+		// same status a cap out of float64's range already gets from the
+		// JSON bind itself.
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrQuotedCapExceeded):
+		// The quoted-cap rejection, carrying the TRUE solved cost so the
+		// caller can re-quote without a second round trip (fleet-movement
+		// "The quoted-cap rejection carries the true solved cost"). 409, this
+		// capability's status for a rejection the request cannot be
+		// rewritten out of by fixing its syntax — the same one
+		// ErrInsufficientFuel uses, from which its REASON, not its status,
+		// is what distinguishes it.
+		body := gin.H{"error": err.Error()}
+		var capErr *QuotedCapExceededError
+		if errors.As(err, &capErr) {
+			body["fuelCostTons"] = capErr.SolvedFuelTons
+			body["maxFuelTons"] = capErr.Cap
+		}
+		c.AbortWithStatusJSON(http.StatusConflict, body)
+	case errors.Is(err, ErrPreviewLaneTarget):
+		// A preview naming a laneId: its own named reason, distinct from the
+		// empty-target one (fleet-movement "A preview rejects a lane id").
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrPreviewChannelHeld):
+		// The preview path's own refusal for a movement channel held by a
+		// running mine — 409, this capability's state-precondition status,
+		// with a reason distinct from every other rejection this switch
+		// serves.
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrAccelBelowFloor), errors.Is(err, ErrAccelAboveCeiling):
 		// DRIFT REPAIR (add-stationkeep-hold-verb task 5.2; write-up:
 		// docs/plans/continous_space/handoffs/drift-fleet-wrong-state-500.md).
@@ -428,6 +601,17 @@ type fleetDTO struct {
 	Position  space.Vec3         `json:"position"`
 	Own       bool               `json:"own"`
 	WorldTime common.WorldMillis `json:"worldTime"`
+	// Scale is the simulation clock's time-warp factor — world-milliseconds
+	// advanced per wall-clock millisecond — read from the SAME clock that
+	// produced WorldTime (fleet-movement "Fleet Reads Serve the Simulation
+	// Clock's Scale Alongside Their World Time"). Served unconditionally, at
+	// any scale including exactly 1, so a client never has to distinguish
+	// "scale 1" from "scale absent". Every surface that renders a fleet
+	// countdown or a live fleet position WITHOUT an interior read alongside
+	// it — the galaxy view's lane crawl, the shared roster, and the
+	// per-system view whenever its interior read has failed — reads its
+	// clock from here and nowhere else.
+	Scale float64 `json:"scale"`
 	// Roster is the owner-only ships/cargo/derived-capacity surface (#0010
 	// "Fleet Read Surfaces Roster, Cargo, and Derived Capacity"). nil for a
 	// foreign fleet — omitted from the JSON entirely (`omitempty`).
@@ -452,6 +636,19 @@ type rosterDTO struct {
 	EstimatedRange  float64 `json:"estimatedRange"`
 	Stranded        bool    `json:"stranded"`
 	FuelPricePerTon float64 `json:"fuelPricePerTon"`
+	// StationKeepUpkeepTonsPerSecond is the fleet's station-keeping upkeep
+	// rate in FUEL TONS PER SECOND (fleet-movement "Fleet Read Serves the
+	// Station-Keeping Upkeep Rate in Fuel Tons") — what an `orbit` park would
+	// cost were the player to hold, and what a `stationkeep` park is costing
+	// now. A POINTER with `omitempty`, so a fleet with no host body (a burn,
+	// a drift, a `point` park) carries no such key at all rather than a zero
+	// a client would have to interpret.
+	//
+	// Tons, never delta-v: FuelParams.DeltaVPerTon is not on the wire and
+	// never will be, so the conversion — which is rule-bearing — has no
+	// client-side route. A foreign fleet carries no rosterDTO at all, so
+	// there is no foreign response for this to appear on.
+	StationKeepUpkeepTonsPerSecond *float64 `json:"stationKeepUpkeepTonsPerSecond,omitempty"`
 }
 
 // fuelStatusSource is the optional capability the handler probes for via a
@@ -463,22 +660,30 @@ type fuelStatusSource interface {
 	FuelPricePerTon() float64
 }
 
+// stationKeepRateSource is the owner-only station-keeping upkeep rate, probed
+// for the same way and for the same reason as fuelStatusSource — implemented
+// by the concrete *Service.
+type stationKeepRateSource interface {
+	StationKeepUpkeepRate(ctx context.Context, f *Fleet) (tonsPerSecond float64, ok bool, err error)
+}
+
 // rosterFieldsFor builds the owner-only roster/cargo DTO, or nil for a
 // foreign fleet.
-func rosterFieldsFor(f *Fleet, own bool, estimatedRange float64, stranded bool, fuelPricePerTon float64) *rosterDTO {
+func rosterFieldsFor(f *Fleet, own bool, estimatedRange float64, stranded bool, fuelPricePerTon float64, upkeepTonsPerSecond *float64) *rosterDTO {
 	if !own {
 		return nil
 	}
 	stats := DefaultClassStats()
 	return &rosterDTO{
-		Ships:           effectiveRoster(*f),
-		Cargo:           f.Cargo,
-		CargoCapacity:   DerivedCapacity(*f, stats),
-		FreeHold:        FreeHold(*f, stats),
-		MiningRate:      DerivedMiningRate(*f, stats),
-		EstimatedRange:  estimatedRange,
-		Stranded:        stranded,
-		FuelPricePerTon: fuelPricePerTon,
+		Ships:                          effectiveRoster(*f),
+		Cargo:                          f.Cargo,
+		CargoCapacity:                  DerivedCapacity(*f, stats),
+		FreeHold:                       FreeHold(*f, stats),
+		MiningRate:                     DerivedMiningRate(*f, stats),
+		EstimatedRange:                 estimatedRange,
+		Stranded:                       stranded,
+		FuelPricePerTon:                fuelPricePerTon,
+		StationKeepUpkeepTonsPerSecond: upkeepTonsPerSecond,
 	}
 }
 
@@ -533,7 +738,21 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 	// must never take down an otherwise-servable fleet read.
 	var estimatedRange, fuelPricePerTon float64
 	var stranded bool
+	var upkeepTonsPerSecond *float64
 	if own {
+		// The station-keeping upkeep rate (serve-orbital-elements-and-burn-
+		// preview), probed and degraded exactly as the fuel status below is:
+		// a rate the body table cannot answer must never take down an
+		// otherwise-servable fleet read, and its absence is already the
+		// wire's answer for "no host body".
+		if sk, ok := h.svc.(stationKeepRateSource); ok {
+			if rate, has, rerr := sk.StationKeepUpkeepRate(c.Request.Context(), f); rerr != nil {
+				log.Warn().Ctx(c).Err(rerr).Str("fleetId", f.Id).
+					Msg("station-keeping upkeep rate computation failed; omitting it from the read")
+			} else if has {
+				upkeepTonsPerSecond = &rate
+			}
+		}
 		if fs, ok := h.svc.(fuelStatusSource); ok {
 			fuelPricePerTon = fs.FuelPricePerTon()
 			if r, s, ferr := fs.FuelStatus(c.Request.Context(), f); ferr == nil {
@@ -555,6 +774,7 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 		Position:      pos,
 		Own:           own,
 		WorldTime:     h.clock.Now(),
-		Roster:        rosterFieldsFor(f, own, estimatedRange, stranded, fuelPricePerTon),
+		Scale:         h.clock.Scale(),
+		Roster:        rosterFieldsFor(f, own, estimatedRange, stranded, fuelPricePerTon, upkeepTonsPerSecond),
 	}, nil
 }

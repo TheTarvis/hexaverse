@@ -101,7 +101,66 @@ var (
 	// action is committed and the fleet remains attached to the originating
 	// gate — mapped by the handler to 503.
 	ErrDestinationNotReady = errors.New("fleet: destination's lane horizon could not be materialized")
+	// ErrInvalidFuelCap rejects a negative or non-finite OrderRequest
+	// .MaxFuelTons as a malformed request — never as an absent cap
+	// (fleet-movement "A malformed cap is an invalid request, not an absent
+	// cap").
+	ErrInvalidFuelCap = errors.New("fleet: maxFuelTons must be a finite, non-negative number")
+	// ErrQuotedCapExceeded is the burn commit's own quoted-cap rejection —
+	// DISTINCT from ErrInsufficientFuel, which answers "this fleet cannot
+	// pay" where this one answers "this cost is higher than the one the
+	// requester agreed to" (fleet-movement "A Burn Commit Is Rejected When
+	// Its Solved Fuel Cost Exceeds the Requester's Quoted Cap"). A fleet with
+	// ample fuel can hit this one, and a fleet with a generous cap can hit
+	// the other, so a caller must be able to tell them apart.
+	//
+	// Raised as a QuotedCapExceededError, which carries the true solved cost;
+	// this sentinel is what errors.Is matches on.
+	ErrQuotedCapExceeded = errors.New("fleet: solved fuel cost exceeds the requested maxFuelTons cap")
+	// ErrPreviewLaneTarget rejects a preview naming a laneId. A jump has no
+	// variable curve or delta-v to preview — it costs no delta-v and its ETA
+	// is a direct function of lane length and the fleet's lane rate — so this
+	// is its OWN named reason, deliberately distinct from ErrEmptyOrder,
+	// which is what a laneId-only request would otherwise fall through to
+	// (fleet-movement "A preview rejects a lane id").
+	ErrPreviewLaneTarget = errors.New("fleet: a laneId names a jump, which has no burn to preview")
+	// ErrPreviewChannelHeld refuses a preview for a fleet whose MOVEMENT
+	// channel is already claimed by a non-burn verb — a running mine. It is
+	// the PREVIEW PATH'S OWN reason and is deliberately not derived from any
+	// commit rejection, because the commit path has none: OrderTo's re-task
+	// branch cancels whatever holds the slot without inspecting its type, so
+	// a burn ordered against a mining fleet is accepted today and the run is
+	// destroyed (an open defect recorded in
+	// docs/plans/continous_space/handoffs/defect-burn-cancels-running-mine.md,
+	// which this additive change leaves exactly as it is). A preview cannot
+	// mirror a commit that proceeds by cancelling a run, since a preview
+	// never writes; refusing is the conservative choice while the defect
+	// stands, so no player is handed a quote for an order whose commit would
+	// silently destroy a committed run (fleet-movement "A preview against a
+	// fleet mid-mine is refused, cancels nothing, and writes nothing").
+	ErrPreviewChannelHeld = errors.New("fleet: preview unavailable while the movement channel is held by another run")
 )
+
+// QuotedCapExceededError is ErrQuotedCapExceeded carrying the order's TRUE
+// solved fuel cost, so the requester can re-quote against the real figure
+// without a second round trip (fleet-movement "The quoted-cap rejection
+// carries the true solved cost").
+//
+// Its Error() text is fixed and carries neither figure: the rejection reason
+// a caller reads must be the same string whether the cap was 0 or half the
+// cost (fleet-movement "A cap of exactly zero is a present cap, not an absent
+// one" pins that the two are the same rejection). The numbers ride the
+// response body's own fields.
+type QuotedCapExceededError struct {
+	Cap            float64
+	SolvedFuelTons float64
+}
+
+func (e *QuotedCapExceededError) Error() string { return ErrQuotedCapExceeded.Error() }
+
+// Unwrap makes errors.Is(err, ErrQuotedCapExceeded) match, so every caller
+// that only needs the reason can stay sentinel-shaped.
+func (e *QuotedCapExceededError) Unwrap() error { return ErrQuotedCapExceeded }
 
 // BodySource resolves a system's body table — the space.Bodies implementation
 // every burn solve, position read, and resolve folds through (design.md
@@ -475,12 +534,90 @@ func (s *Service) settleIfDue(ctx context.Context, f *Fleet, bt *system.BodyTabl
 	return settled, true, nil
 }
 
-// OrderTo solves and commits an in-system burn to a body id or an explicit
-// point (design.md Decision 4; fleet-movement "In-System Burn Order to a
-// Body or a Point"). Committing a burn clears AttachedTo immediately — a
-// body-targeted burn only re-attaches once BurnResolver settles the arrival
-// (tasks.md 3.1's pinned invariant).
-func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fleet, error) {
+// orderSolve is everything solveOrder derives for one in-system burn order,
+// before any decision is taken about it: the settled fleet it departs from,
+// the table it was solved against, the instant it was solved at, the solved
+// burn itself, and the whole fuel arithmetic — priced but not yet judged.
+//
+// It exists so the COMMIT (OrderTo) and the PREVIEW (PreviewOrder) share one
+// solve and cannot drift (serve-orbital-elements-and-burn-preview tasks.md
+// 3.1; fleet-movement "A preview returns the same curve, ETA, and cost a
+// commit would produce"). Nothing here rejects: every rejection either
+// happened inside solveOrder — and is therefore shared verbatim — or is the
+// caller's own (the commit's insufficient-fuel and quoted-cap rejections; the
+// preview reports affordability instead of rejecting on it).
+type orderSolve struct {
+	// Fleet is the SETTLED fleet the burn departs from — after the fold-first
+	// due-arrival settlement, never the raw stored document.
+	Fleet  *Fleet
+	Bodies *system.BodyTable
+	// Now is the world instant the burn was solved and priced at, read AFTER
+	// any settle-first write so the two agree.
+	Now    common.WorldMillis
+	Result space.SolveResult
+	// HullCount is the roster hull count read ONCE, at solve time.
+	HullCount int
+	// FuelCostTons is this order's solved cost — the figure both the commit's
+	// affordability check and the preview's quote are taken from.
+	FuelCostTons float64
+	// Refund is the closed-form discard refund a running, not-yet-arrived
+	// burn this order would supersede yields; zero when there is none.
+	Refund      float64
+	CurrentFuel float64
+	FuelActive  bool
+	// OpenHoldUpkeep prices an open station-keeping hold this order would
+	// end. In memory only — a commit's authoritative debit is computed inside
+	// its own transaction, from its own re-read.
+	OpenHoldUpkeep float64
+}
+
+// Affordable reports whether the fleet can pay this order's solved cost out
+// of what it holds, once a superseded burn's refund is credited and an open
+// hold's accrued upkeep is settled — the exact predicate the commit rejects
+// on (ErrInsufficientFuel) and the preview merely REPORTS (fleet-movement "A
+// preview reports an unaffordable target as such").
+func (o *orderSolve) Affordable() bool {
+	if !o.FuelActive {
+		return true
+	}
+	return o.CurrentFuel+o.Refund-o.OpenHoldUpkeep >= o.FuelCostTons
+}
+
+// RemainingFuel is what the fleet would hold after this order, clamped at
+// zero — the same arithmetic the commit performs on its returned struct, so
+// the preview's stranding evaluation runs against the same remainder.
+func (o *orderSolve) RemainingFuel() float64 {
+	remaining := o.CurrentFuel + o.Refund - o.OpenHoldUpkeep - o.FuelCostTons
+	if remaining < 0 {
+		remaining = 0
+	}
+	return remaining
+}
+
+// solveOrder is the solve half of an in-system burn order, shared verbatim by
+// the commit and the preview (tasks.md 3.1). It performs, in this order:
+// target resolution, the load, the lane-transit refusal, body-table
+// resolution, the fold-first due-arrival settlement, optionally the
+// settle-first expired-hold write, the departure position and tangent,
+// commanded-acceleration validation, space.SolveBurn, and the fuel pricing.
+//
+// EVERY REJECTION IT RETURNS IS SHARED BY BOTH CALLERS, which is what makes
+// "a preview is refused wherever the commit would be refused" a property of
+// construction rather than of two maintained lists. That deliberately
+// includes the star: a star target is excluded solely by space.BuildCurve's
+// endpoint-clearance guard inside SolveBurn, and NO destination-identity
+// check exists on either path (design.md Decision 3 — an identity check would
+// also miss a non-star target sitting inside the same clearance radius).
+//
+// settleExpiredHold is the ONE behavioural difference between the two
+// callers, and it is a WRITE, not a solve: a commit settles a past-dry-instant
+// station-keeping hold durably first, because its decision reads `cargo.fuel`
+// and its own transaction would otherwise discard that settlement
+// (fleet-movement "Every Decision Reading Fuel Settles a Past-Dry-Instant
+// Hold First"). A preview passes false: it "SHALL create no action, claim no
+// channel slot, debit no fuel, and store no burn", and an upkeep settlement
+// debits fuel.
+func (s *Service) solveOrder(ctx context.Context, id string, req OrderRequest, settleExpiredHold bool) (*orderSolve, error) {
 	var target space.Target
 	switch {
 	case req.BodyId != "" && req.Point != nil:
@@ -522,10 +659,12 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	// (fleet-movement "Every Decision Reading Fuel Settles a Past-Dry-Instant
 	// Hold First"). The commit's own re-read guards the window between the
 	// two transactions; see its ActorStateFunc below.
-	if f, err = s.settleExpiredHoldFirst(ctx, f); err != nil {
-		return nil, err
+	if settleExpiredHold {
+		if f, err = s.settleExpiredHoldFirst(ctx, f); err != nil {
+			return nil, err
+		}
+		fireSettleFirstSeam(id)
 	}
-	fireSettleFirstSeam(id)
 
 	// Read AFTER the settle-first write, so the burn is solved and priced at
 	// the instant the deciding transaction actually runs at.
@@ -577,7 +716,6 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	if err != nil {
 		return nil, fmt.Errorf("fleet: solving burn: %w", err)
 	}
-	burnState := space.ShipState{Mode: space.ModeBurn, Burn: &sol.Burn}
 
 	// Fuel affordability (add-fuel-as-cargo, fleet-movement "A Burn Commit
 	// Is Rejected When Its Fuel Cost Exceeds Available Fuel, Debited At
@@ -612,8 +750,57 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	// its OWN re-read.
 	holdRate := s.holdRateFor(bt, f)
 	openHoldUpkeep := s.openHoldUpkeep(f, holdRate, now)
-	if fuelActive && currentFuel+refund-openHoldUpkeep < newCost {
+
+	return &orderSolve{
+		Fleet: f, Bodies: bt, Now: now, Result: sol,
+		HullCount: hullCount, FuelCostTons: newCost, Refund: refund,
+		CurrentFuel: currentFuel, FuelActive: fuelActive,
+		OpenHoldUpkeep: openHoldUpkeep,
+	}, nil
+}
+
+// OrderTo solves and commits an in-system burn to a body id or an explicit
+// point (design.md Decision 4; fleet-movement "In-System Burn Order to a
+// Body or a Point"). Committing a burn clears AttachedTo immediately — a
+// body-targeted burn only re-attaches once BurnResolver settles the arrival
+// (tasks.md 3.1's pinned invariant).
+//
+// The solve is solveOrder's, shared with the preview; everything below the
+// solve is the commit's own — the affordability rejection, the requester's
+// optional quoted-fuel cap, the re-task cancel/refund, and the commit
+// transaction.
+func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fleet, error) {
+	// A malformed cap is an invalid request, rejected before anything is
+	// solved or settled (fleet-movement "A malformed cap is an invalid
+	// request, not an absent cap").
+	if err := req.validateFuelCap(); err != nil {
+		return nil, err
+	}
+
+	solved, err := s.solveOrder(ctx, id, req, true)
+	if err != nil {
+		return nil, err
+	}
+	f, bt, now := solved.Fleet, solved.Bodies, solved.Now
+	sol := solved.Result
+	burnState := space.ShipState{Mode: space.ModeBurn, Burn: &sol.Burn}
+	hullCount, newCost := solved.HullCount, solved.FuelCostTons
+	refund, currentFuel, fuelActive := solved.Refund, solved.CurrentFuel, solved.FuelActive
+	openHoldUpkeep := solved.OpenHoldUpkeep
+
+	if fuelActive && !solved.Affordable() {
 		return nil, ErrInsufficientFuel
+	}
+
+	// The requester's own quoted cap (fleet-movement "A Burn Commit Is
+	// Rejected When Its Solved Fuel Cost Exceeds the Requester's Quoted
+	// Cap"), evaluated BEFORE the channel claim, the fuel debit, and the burn
+	// store — and carrying the true solved cost, so the caller can re-quote
+	// without a second round trip. Absent, no cap is applied and the path
+	// below is exactly what it was before this field existed; a cap of
+	// exactly 0 is a PRESENT cap, which is why MaxFuelTons is a pointer.
+	if quoted := req.MaxFuelTons; quoted != nil && newCost > *quoted {
+		return nil, &QuotedCapExceededError{Cap: *quoted, SolvedFuelTons: newCost}
 	}
 
 	// settledUpkeep is the hold-ending upkeep the commit transaction's own
@@ -702,6 +889,114 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 	log.Info().Ctx(ctx).Str("fleetId", id).Str("actionId", a.Id).
 		Int64("arriveMs", int64(sol.Burn.ArriveMs)).Msg("Fleet ordered to burn")
 	return f, nil
+}
+
+// --- the burn-order PREVIEW -------------------------------------------------
+//
+// The solve half of an in-system burn order, served without committing it
+// (serve-orbital-elements-and-burn-preview, fleet-movement "Burn Order
+// Preview Solves Without Committing"). It lives beside OrderTo, its sibling
+// over the same solveOrder, because the whole point of the pair is that they
+// cannot drift.
+//
+// It exists because space.SolveBurn had no HTTP surface at all: the only way
+// to solve a burn was to commit it, so a pre-commit quote was unreachable
+// without a client-side kinematics mirror that space-kinematics'
+// sole-authority requirement forbids.
+
+// BurnPreview is one solved-but-uncommitted burn: everything a client needs
+// to draw the proposed transfer and price the decision, and nothing that
+// implies the order was taken.
+type BurnPreview struct {
+	// Curve is the solved transfer's six control points, DepartMs/ArriveMs
+	// its world-time window — the same figures the committed burn would
+	// carry, because they come from the same space.SolveBurn call.
+	Curve    space.Curve
+	DepartMs common.WorldMillis
+	ArriveMs common.WorldMillis
+	// DeltaV is the burn's delta-v price and FuelCostTons its cost in fuel
+	// tons at the fleet's current roster hull count.
+	DeltaV       float64
+	FuelCostTons float64
+	// Affordable reports whether the fleet could pay for this order right now
+	// — REPORTED, never a rejection. An unaffordable target is served in
+	// full: the preview exists precisely so a player can discover a target is
+	// out of reach before committing, and rejecting would leave them with no
+	// arrival time, no delta-v and no fuel figure to plan a refuel or a
+	// nearer target against.
+	Affordable bool
+	// StrandingWarning is the same advisory a commit's response carries: the
+	// resulting park would leave the fleet unable to reach any station or
+	// lane-gate body in the destination system at the acceleration floor.
+	StrandingWarning bool
+}
+
+// PreviewOrder solves the burn OrderTo would solve for the same target from
+// the same fleet state, and returns it without creating an action, claiming a
+// channel slot, debiting fuel, or storing a burn.
+//
+// It shares solveOrder with the commit, so the returned curve, window,
+// delta-v and fuel cost are the commit's own by construction, and every
+// rejection below the laneId/channel guards is the commit's own too
+// (fleet-movement "A preview returns the same curve, ETA, and cost a commit
+// would produce", "A preview is refused wherever the commit would be
+// refused"). Two refusal sets deliberately differ, both stated in the
+// requirement:
+//
+//   - INSUFFICIENT FUEL IS NOT A REJECTION HERE. It is reported through
+//     Affordable.
+//   - A MOVEMENT CHANNEL HELD BY A RUNNING MINE REFUSES, with this path's own
+//     reason (ErrPreviewChannelHeld), even though the commit path does not
+//     refuse — see that sentinel's own doc comment.
+//
+// Its only permitted persisted effect is the settlement of an ALREADY-DUE
+// arrival, which solveOrder performs through the same fold-first seam every
+// other door onto a fleet runs. Solving from an unsettled state would
+// disagree with the commit that immediately follows the preview in precisely
+// the case the parity guarantee exists for: a fleet that just arrived
+// somewhere and is being re-tasked. Beyond that settlement, an arbitrary
+// number of previews of a fleet with nothing due write nothing at all.
+func (s *Service) PreviewOrder(ctx context.Context, id string, req OrderRequest) (*BurnPreview, error) {
+	// A laneId names a jump. Rejected FIRST, by its own reason, before the
+	// fleet is even loaded — "no solve is attempted" — and deliberately not
+	// by falling through to ErrEmptyOrder, which is what a laneId-only
+	// OrderRequest does on the commit path.
+	if req.LaneId != "" {
+		return nil, ErrPreviewLaneTarget
+	}
+
+	solved, err := s.solveOrder(ctx, id, req, false)
+	if err != nil {
+		return nil, err
+	}
+
+	// The movement channel, checked AFTER the fold-first settlement — a due
+	// arrival's own settlement releases the slot, so a fleet that has merely
+	// arrived must not be refused. A running BURN still holds the slot and is
+	// explicitly previewable ("re-targeting mid-flight ... is the
+	// highest-stakes order in the game, so forbidding its preview while
+	// permitting its commit would remove the quote from the decision that
+	// most needs one"), so the refusal is scoped to a slot held while the
+	// fleet is not itself burning: today that is a mine.
+	f := solved.Fleet
+	if f.ActiveActionId != "" && f.State.Mode != space.ModeBurn {
+		return nil, ErrPreviewChannelHeld
+	}
+
+	burn := solved.Result.Burn
+	return &BurnPreview{
+		Curve:        burn.Curve,
+		DepartMs:     burn.DepartMs,
+		ArriveMs:     burn.ArriveMs,
+		DeltaV:       burn.DeltaV(),
+		FuelCostTons: solved.FuelCostTons,
+		Affordable:   solved.Affordable(),
+		// Evaluated from the burn's own resulting position and arrival, at the
+		// fuel the fleet WOULD hold once this order was paid for — the same
+		// inputs the commit hands evaluateStrandingWarning, so the two agree.
+		StrandingWarning: s.evaluateStrandingWarning(
+			ctx, solved.Bodies, f.SystemId, solved.Result, solved.HullCount, solved.RemainingFuel()),
+	}, nil
 }
 
 // fuelTrackingEngaged reports whether a fleet document participates in the
@@ -1537,6 +1832,26 @@ func (s *Service) FuelStatus(ctx context.Context, f *Fleet) (estimatedRange floa
 		return 0, false, err
 	}
 	return estimatedRange, !reachable, nil
+}
+
+// LoadUnsettled reads a fleet's stored document and SETTLES NOTHING — no due
+// arrival resolved, no expired hold folded, no write of any kind
+// (serve-orbital-elements-and-burn-preview, fleet-movement "A foreign preview
+// is refused before anything is settled").
+//
+// It exists so the HTTP command surface can answer "who owns this fleet?"
+// BEFORE it triggers any settlement. Get, the method every command endpoint
+// resolved through until now, opportunistically resolves a due arrival and
+// WRITES — so an unauthorized caller naming a victim's fleet could trigger a
+// state-mutating write on it, and could time the 404 to learn whether that
+// victim had an arrival due. The ownership check is meaningless as a
+// disclosure boundary if reaching it already had an effect.
+//
+// This is the authorization read only. Once a caller is authorized, the
+// command surface still resolves through Get exactly as before, so every
+// verb's pre-settled preconditions are unchanged.
+func (s *Service) LoadUnsettled(ctx context.Context, id string) (*Fleet, error) {
+	return s.load(ctx, id)
 }
 
 // --- internals -------------------------------------------------------------

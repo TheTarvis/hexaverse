@@ -40,6 +40,19 @@ type LaneGate struct {
 	// itself, which has no body table to resolve them from.
 	Space space.Vec3 `json:"space"`
 	Size  float64    `json:"size"`
+	// OrbitElements is the gate body's continuous orbital element set
+	// (serve-orbital-elements-and-burn-preview, system-interior "A lane-gate
+	// body's read carries its full orbital element set"). Read from the
+	// system's OWN body table — which already derives it once, at table
+	// construction (bodies.go's gateOrbit) — never re-derived at read time:
+	// gateOrbit stays a generation-time function with one caller. Filled by
+	// the same degradable fillGateGeometry pass that resolves Space/Size, so
+	// a gate whose body is unresolvable degrades exactly as it does today
+	// (nil elements) rather than failing the read.
+	//
+	// Additive alongside the LATTICE `Cell`, which `build-production-space-
+	// view` is the change that removes.
+	OrbitElements *orbitElementsDTO `json:"orbitElements,omitempty"`
 }
 
 // fillGateGeometry additively populates gates' Space/Size fields from a
@@ -60,6 +73,10 @@ func fillGateGeometry(gates []LaneGate, bt *BodyTable, now common.WorldMillis) {
 		if !ok {
 			continue
 		}
+		// Elements first, and independently of the position resolve: they are
+		// the table's own stored derivation, not a resolution result, so a
+		// gate whose live position cannot be folded still ships them.
+		gates[i].OrbitElements = orbitElementsOf(body.Orbit)
 		pos, err := space.Position(bt, gateId(gates[i].DestSystemId), now)
 		if err != nil {
 			continue
