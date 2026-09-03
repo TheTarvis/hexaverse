@@ -731,6 +731,99 @@ its own sibling requirement forbids. The delta therefore carries a MODIFIED
 block for that requirement — repointing the companion from `cell` to `id`,
 with all four of its live scenario headings reproduced verbatim.
 
+### Decision 16: The fan-in is four reads plus the session, and the offers are anchored on the station
+
+**Taken, correcting Decision 5's scope rather than reopening it.** Decision 5
+settled *which fleet read* drives the view; nobody then asked what else the
+view has to read. The requirement said "two independent reads" while tasks
+7.5/7.6 and *Credit Balance Readout* demand a station, its venue quotes, and a
+balance. The developer followed the tasks exactly and mounted the fleet panel
+with `station={null} stationQuotes={null} credits={null}`, which is a faithful
+implementation of a spec that never told it where those came from.
+
+The fan-in is now:
+
+| Read | Endpoint | Drives | Failure |
+|---|---|---|---|
+| Interior | `GET /v1/systems/:id` | the scene, resource kinds | canvas error + retry |
+| Own fleets | `GET /v1/fleets?mine=true` | every command | fleet-panel error + retry |
+| Station | `GET /v1/systems/:id/station` | the sell and refuel offers | offers withdrawn, attributed, retriable |
+| Price board | `GET /v1/market/board` | the sell offer's picker and proceeds | sell withdrawn; refuel survives |
+| Corporation session | the layout's existing read | the balance readout | readout unavailable; no verb withdrawn |
+
+Three things this shape deliberately fixes:
+
+- **"Resolved to no station" is not a failure.** `useStation` sets
+  `retry: false` precisely because a 404 is the ordinary answer for an
+  unstationed system. Treating it as an error would put a retriable error
+  banner on every system a player visits that has no station.
+- **Refuel does not depend on the price board.** Its cost comes from the fuel
+  price served on the fleet's own read (`fleet-movement`), so a board outage
+  takes sell and leaves refuel — a distinction worth specifying, because the
+  cheap implementation gates both on one loading flag.
+- **The offers anchor on the station's `featureId`, not on `attachedTo` being
+  set.** `sellOffered = docked && hasCargo` offers the verb at a rocky body,
+  where the commit has no station to name; the requirement always said "docked
+  to a station" and the code always said "docked", and only the composition
+  can tell them apart.
+
+**Alternatives considered.** *Read the balance in this view.* Rejected: the
+corporation session read already exists at the layout, is cached, and a second
+reader would race it. *Read the station's position from the station response.*
+Rejected and forbidden in the requirement text: the station DTO still carries a
+lattice `ring`/`angle0`/`period`/`dir` orbit, and task 10.11's grep looks for
+`@/lib/board` **imports**, so consuming it would re-tether this view to the
+lattice through a wire field with every gate green — the exact hole the
+proposal already records for the top-level `radius`.
+
+### Decision 17: The roster's command surface is scoped by mounting view, not retired
+
+**Taken.** `fleet-roster`'s command-surface requirement is live and this change
+did not touch it, while `system-space-view` and `docked-fleet-actions` place
+the same verbs on their own panels. The code obeys both, so a burning fleet in
+the space view renders two live "Cut drive" buttons — a UX defect for the
+player and a hard `strict mode violation` for Playwright's `getByTestId`.
+
+Three ways out, and why this one:
+
+- *Retire the roster's command surface outright.* Rejected: the galaxy view
+  mounts no command panel, so the roster is the only surface its fleets have.
+  Retiring it strands every non-jump verb there.
+- *Give the two surfaces distinct test ids.* Rejected: it satisfies the
+  automated check and leaves the player looking at two "Cut drive" buttons for
+  one fleet. Unambiguous to a selector is not the same as correct.
+- *Scope ownership by mounting view.* Taken. The roster declares nothing; the
+  **mounting view** declares who owns the commands. The galaxy view keeps them,
+  the space view takes them, and within one view a verb has exactly one
+  control. It also gives the requirement a place to forbid the dead control the
+  SDET found: `rosterCommandVisibility` returns `burn: true` unconditionally
+  while `SystemSpaceView` supplies no `onBurn`, so today's roster "Burn" button
+  does nothing when clicked. A view that owns the roster's commands must supply
+  every handler; a roster that has no handler must render no control.
+
+The knock-on is small but real: `docked-fleet-actions`'s *Running Mine Gates
+the Fleet Panel's Commands* named "the fleet roster panel's" commands, which on
+the space view will no longer exist. It now names whatever surface the mounting
+view offers them on — and the space view's own `burn-button` and jump control
+must join the gate, which they are not in today.
+
+### Decision 18: An interior-read failure is specified as command-set *parity*, not as a presence list
+
+**Taken.** *A failed interior read leaves the fleet-state-anchored commands
+usable* listed sell, refuel, hold, release, cut drive, stop **and** jump for
+one fleet "attached to a body". No fleet is docked at a station and attached to
+a lane gate and burning at once, so the conjunction was unsatisfiable and the
+first test written from it could not pass.
+
+The requirement's real content is that an interior-read failure changes
+**nothing** about which fleet-state-anchored commands are offered. That is a
+parity claim over two renders of the same fixture, not a presence list: three
+fixtures (docked at a station, gate-attached, under way), each rendered with a
+healthy and with a failed interior read, asserting the offered set is
+identical, plus a per-fixture vacuity guard so "identical" cannot be satisfied
+by offering nothing. Strictly stronger than the list it replaces, and — unlike
+the list — achievable.
+
 ## Inherited rulings, recorded for continuity
 
 These are not decisions taken by this change. They were ruled upstream

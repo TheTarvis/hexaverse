@@ -43,7 +43,7 @@ each other, or the scan surface being deferred out of the chain a second time.
 ## What Changes
 
 - **ADD `system-space-view`** (new capability): the continuous-R³ per-system
-  route — data fan-in over two independently-failing reads, single selection
+  route — data fan-in over four independently-failing reads, single selection
   among a body/lane-gate/point, own-fleet position/curve/ghost rendering,
   foreign-contact rendering, the server-solved burn preview and its failure
   states, the quote-locked burn commit and its outcome reporting, one unified
@@ -63,6 +63,64 @@ each other, or the scan surface being deferred out of the chain a second time.
   at its served position and its served `velocity` is **displayed** rather
   than integrated — one named consumer for a field that would otherwise ship
   unread.
+- **The fan-in is four reads, not two.** An earlier draft of this change
+  listed the interior and the own-fleets reads and stopped there, while its
+  own tasks 7.5/7.6 (sell offer, sell commit) and *Credit Balance Readout*
+  cannot be satisfied without a **station**, a **market-board**, and a
+  **corporation-balance** source. The developer implemented every task as
+  written, so `SystemSpaceView.tsx` mounts the fleet panel with
+  `station={null} stationQuotes={null} credits={null}`: the balance readout is
+  a permanent em dash, `commitSell` returns early on `!station` — a sell
+  control that renders and does nothing when clicked — and
+  `sellOffered = docked && hasCargo` / `refuelOffered = docked` offer both
+  verbs while docked to *any* body, contradicting this change's own
+  requirement text, which scopes them to a station. Every panel-level test
+  passes, because the panel is handed a station prop; only the composition can
+  see it. The fan-in now names the station read
+  (`GET /v1/systems/:systemId/station`) and the market price board
+  (`GET /v1/market/board`) as this view's own reads, takes the balance from
+  the ambient corporation session rather than a fifth read, and **widens the
+  failure model from two reads to four plus the session**: a failed station
+  read withdraws sell and refuel with an attributed retry (a station read that
+  merely resolves to *no* station is not a failure and shows no error); a
+  failed board read withdraws sell but not refuel, whose price comes from the
+  fleet's own read; an unavailable balance withdraws a readout, never a verb.
+  The sell and refuel offers are re-anchored on the station's board feature id
+  rather than on bare attachment. The view consumes only the station's
+  identity — never the station response's surviving lattice `orbit` object,
+  which task 10.11's import grep would not have caught.
+- **MODIFIED `fleet-roster`'s command-surface requirement, scoped by mounting
+  view** (RENAMED to *The Roster Row Is the Fleet Command Surface Where the
+  Mounting View Provides None, Jump Gated by Attachment Alone*). Two
+  capabilities owned the same verbs: the roster's requirement is live and was
+  unmodified by this change, while `system-space-view` and
+  `docked-fleet-actions` put burn, cut drive, stop, and jump on their own
+  panels. The code follows both, so `FleetRoster`, `FleetActionsPanel`, and
+  `SpaceCommandPanel` all emit `fleet-cmd-cut-drive-{id}` and
+  `fleet-cmd-stop-{id}` — a burning fleet renders **two live "Cut drive"
+  buttons**, which is a hard error in Playwright's strict mode. The roster is
+  **scoped, not retired**: the galaxy view mounts no command panel and keeps
+  the roster's commands, the space view owns them and its roster rows render
+  selection and status only, and within any one view each verb resolves to
+  exactly one control. Retiring the surface outright would strand the galaxy
+  view; distinct test ids alone would leave two live controls for one fleet on
+  one screen. The same requirement now forbids a **dead** control:
+  `rosterCommandVisibility` returns `burn: true` unconditionally while
+  `SystemSpaceView` passes no `onBurn`, so the roster's "Burn" button is a
+  no-op today. Consequently `docked-fleet-actions`'s *Running Mine Gates the
+  Fleet Panel's Commands* now names the surfaces that actually hold the verbs
+  rather than "the roster panel's", and the space view's `burn-button` and
+  jump control join the gate.
+- **Reworded one unsatisfiable scenario.** *A failed interior read leaves the
+  fleet-state-anchored commands usable* read as demanding sell, refuel, hold,
+  release, cut drive, stop **and** jump simultaneously for one fleet "attached
+  to a body" — no fleet can be docked at a station and attached to a gate and
+  burning at once, so no honest implementation satisfied it. It is now a
+  **parity** claim: three fixtures (docked at a station, gate-attached,
+  burning), each rendered twice — healthy versus failed interior read — with
+  the offered command set identical across both and a per-fixture vacuity
+  guard. That is strictly stronger than the presence list it replaces, because
+  it fails against a command offered in neither state.
 - **ADD `docked-fleet-actions`** (new capability): the fleet panel's
   own-state-anchored command surface — mine, sell, and refuel offers and
   commits, double-submit guards on all three, the station-keeping hold/release
@@ -225,7 +283,8 @@ each other, or the scan surface being deferred out of the chain a second time.
 - **Affected specs**: `system-space-view` (new), `docked-fleet-actions`
   (new), `board-view` (retired — no delta in this change; hand-deleted
   post-archive), `system-interior` (*Interior Read Endpoint* REMOVED, re-ADDED
-  as *Interior Read Serves Continuous Bodies*), `galaxy-view`, `fleet-roster`,
+  as *Interior Read Serves Continuous Bodies*), `galaxy-view`, `fleet-roster`
+  (two requirements MODIFIED, one of them RENAMED),
   `cross-stack-determinism`.
 - **Affected code**: `frontend/components/board/*` is replaced by new
   `frontend/components/space/*` + `frontend/lib/space/*` (render math lives
@@ -241,7 +300,12 @@ each other, or the scan surface being deferred out of the chain a second time.
   from the interior read DTO, including the top-level `radius`; `.claude/scripts/check-mirror-map.sh` gains a
   case-insensitive collision comparison and a recursive, `.tsx`-inclusive
   TypeScript scan; `frontend/lib/services/fleet-service.ts`
-  gains `preview`, `hold` and `release` with hooks over them; and
+  gains `preview`, `hold` and `release` with hooks over them;
+  `frontend/components/fleet/FleetRoster.tsx` and
+  `frontend/components/fleet/roster-commands.ts` gain the command-surface
+  scoping and lose the unconditionally-offered dead Burn control, with
+  `frontend/components/galaxy/GalaxyView.tsx` declaring roster ownership and
+  `frontend/components/space/SystemSpaceView.tsx` declaring its own; and
   `frontend/hooks/use-board-realtime.ts` is deleted.
 - **Sequencing**: archives after `serve-orbital-elements-and-burn-preview`
   (this change's `system-interior` re-ADDED body is authored against that

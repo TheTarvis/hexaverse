@@ -119,11 +119,16 @@ word "hold" but name unrelated concepts.
 
 ### Requirement: Sell Offer on the Docked Fleet
 The system SHALL offer the sell verb on the acting fleet's panel section
-whenever the acting fleet's effective state is `docked` to a station and
-the fleet's cargo pool holds at least one kind of tonnage — anchored to the
-fleet's docked state, requiring no space-view selection, mirroring
-*Mine Offer on the Docked Fleet*'s anchoring rationale (a fleet can only
-sell what it is docked to and currently holds). The offer SHALL present a
+whenever the acting fleet's effective state is `docked` **to the station the
+mounting view read for the open system** — that is, whenever the fleet's
+`attachedTo` is that station's board feature id, not merely whenever the
+fleet is attached to some body — and the fleet's cargo pool holds at least
+one kind of tonnage; anchored to the fleet's docked state, requiring no
+space-view selection, mirroring *Mine Offer on the Docked Fleet*'s anchoring
+rationale (a fleet can only sell what it is docked to and currently holds).
+A fleet docked to an ordinary body has no station to sell to and SHALL NOT
+be offered the verb: offering it would render a control whose commit has no
+station to name and therefore does nothing when activated. The offer SHALL present a
 resource-kind picker limited to kinds the fleet currently holds AND that
 the station is configured to buy (excluding a kind with no configured floor
 for the station's region, so the picker never offers a guaranteed-fail
@@ -148,6 +153,12 @@ a total the settlement won't honor.
 - **WHEN** the acting fleet is parked at or near a station's position but
   its effective state is not `docked` to it
 - **THEN** the sell verb is not offered
+
+#### Scenario: Sell is not offered while docked to a body that is not the station
+- **WHEN** the acting fleet's effective state is `docked` to an ordinary
+  body of the open system, with cargo aboard
+- **THEN** the sell verb is not offered, the fleet having no station to sell
+  to
 
 #### Scenario: Sell is not offered when the cargo pool is empty
 - **WHEN** the acting fleet is docked to a station but its cargo pool holds
@@ -269,10 +280,14 @@ SHALL always generate a new key.
 ### Requirement: Refuel Offer on the Docked Fleet
 The system SHALL offer the refuel verb on the acting fleet's panel
 section, beside the sell control, whenever the acting fleet's effective
-state is `docked` to a station — anchored to the fleet's docked state
-alone, requiring no space-view selection and no minimum held-fuel or
-free-hold precondition to be *offered* (those are commit-time
-preconditions; see `fuel-purchase`). The offer SHALL present a tonnage
+state is `docked` **to the station the mounting view read for the open
+system** — that is, whenever the fleet's `attachedTo` is that station's
+board feature id, not merely whenever the fleet is attached to some body —
+anchored to the fleet's docked state alone, requiring no space-view
+selection and no minimum held-fuel or free-hold precondition to be
+*offered* (those are commit-time preconditions; see `fuel-purchase`). A
+fleet docked to an ordinary body has no station to buy fuel from and SHALL
+NOT be offered the verb. The offer SHALL present a tonnage
 input defaulting to `min(the fleet's full free hold, the requester's
 current credit balance ÷ the served fuel price)` — so the default action
 is not usually an unaffordable request — constrained to a positive value
@@ -293,12 +308,25 @@ charged cost can never diverge.
   near a station but its effective state is not `docked` to it
 - **THEN** the refuel verb is not offered
 
+#### Scenario: Refuel is not offered while docked to a body that is not the station
+- **WHEN** the acting fleet's effective state is `docked` to an ordinary
+  body of the open system
+- **THEN** the refuel verb is not offered, the fleet having no station to
+  buy fuel from
+
 #### Scenario: The default tonnage is capped by affordability, not only by free hold
 - **WHEN** the refuel offer is shown for a fleet whose free hold is larger
   than what the requester's current credit balance could pay for at the
   served fuel price
 - **THEN** the default tonnage is the affordable amount
   (`balance ÷ price`), not the fleet's full free hold
+
+#### Scenario: An unavailable credit balance falls the default back to free hold
+- **WHEN** the refuel offer is shown while the requester's credit balance is
+  unavailable (`system-space-view`'s *System Space View Route and Data
+  Fan-In*)
+- **THEN** the default tonnage is the fleet's full free hold, and the refuel
+  verb is still offered
 
 #### Scenario: Tonnage input clamps to the fleet's free hold
 - **WHEN** a tonnage greater than the fleet's current free hold is entered
@@ -485,16 +513,27 @@ unactionable — the player's actual remedy is to refuel above the reserve.
 ### Requirement: Credit Balance Readout
 The system SHALL show, for the requester's own corporation, a credit
 balance readout on the fleet panel, sourced from the corporation's own
-session data (see `corporation-spawn`'s balance-bearing session bootstrap),
+session data (see `corporation-spawn`'s balance-bearing session bootstrap)
+and supplied to the panel by the mounting view
+(`system-space-view`'s *System Space View Route and Data Fan-In*),
 reflecting the post-settlement balance after a sale or a refuel resolves
 via this panel's own sale-commit or refuel-commit response, without
 requiring navigation, and SHALL announce a balance change to assistive
 technology (an `aria-live` region or equivalent) at the moment it updates,
-not solely as a visual change.
+not solely as a visual change. IF the session balance is unavailable, THEN
+the readout SHALL show an explicit unavailable indication and SHALL NOT show
+a figure — never a placeholder that a mounting view supplying no balance at
+all would render indistinguishably and permanently.
 
 #### Scenario: The panel shows the current credit balance
 - **WHEN** the fleet panel renders for an authenticated, spawned requester
 - **THEN** the requester's current credit balance is shown
+
+#### Scenario: An unavailable balance reads as unavailable, not as a figure
+- **WHEN** the fleet panel renders while the corporation session balance is
+  unavailable
+- **THEN** the readout shows an explicit unavailable indication rather than a
+  number
 
 #### Scenario: The balance visibly updates when a sale resolves
 - **WHEN** a sale settles from this panel's sell commit
@@ -545,19 +584,23 @@ for distinguishing outcomes, never displayed to the player verbatim.
 
 ### Requirement: Running Mine Gates the Fleet Panel's Commands
 The system SHALL, while the acting fleet has a running mine action whose
-ETA has not yet passed, disable the fleet roster panel's burn, cut-drive,
-stop, and jump commands (`fleet-roster`'s "The Roster Row Is the Fleet
-Command Surface, Jump Gated by Attachment Alone"; `system-space-view`'s
-*Jump Commit*) and show a countdown to the run's ETA; and a cancel-mine
-control SHALL be offered that cancels the run via the generic action
-cancel endpoint, leaving the fleet's kinematic state and attachment
-untouched. Once the ETA passes, the gating SHALL lift without requiring
-navigation.
+ETA has not yet passed, disable that fleet's burn, cut-drive, stop, and jump
+commands **wherever the mounting view offers them** — on the system space
+view that is `system-space-view`'s command panel (burn and jump) and this
+capability's own fleet panel (cut drive and stop), the roster rendering no
+commands there at all (`fleet-roster`'s "The Roster Row Is the Fleet Command
+Surface Where the Mounting View Provides None, Jump Gated by Attachment
+Alone"; `system-space-view`'s *Jump Commit*) — and show a countdown to the
+run's ETA; and a cancel-mine control SHALL be offered that cancels the run
+via the generic action cancel endpoint, leaving the fleet's kinematic state
+and attachment untouched. Once the ETA passes, the gating SHALL lift without
+requiring navigation.
 
 #### Scenario: Burn, cut-drive, stop, and jump are disabled while a mine is running
 - **WHEN** the acting fleet has a running mine whose ETA is in the future
-- **THEN** the roster panel's burn, cut-drive, stop, and jump commands are
-  unavailable and a countdown to the mine's ETA is shown
+- **THEN** every control the mounting view offers for that fleet's burn,
+  cut-drive, stop, and jump commands is unavailable and a countdown to the
+  mine's ETA is shown
 
 #### Scenario: A running mine can be cancelled
 - **WHEN** the cancel-mine control is invoked during a running mine

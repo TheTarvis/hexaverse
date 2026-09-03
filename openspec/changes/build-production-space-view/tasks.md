@@ -1,6 +1,6 @@
 ## 1. Frontend — `lib/space` render math, and the guard that polices it
 
-- [ ] 1.1 Widen `cross-stack-determinism`'s anti-mirror requirement itself to
+- [x] 1.1 Widen `cross-stack-determinism`'s anti-mirror requirement itself to
       say the name comparison and the `sharedNames` match are
       case-insensitive, and that a collision is resolved by renaming the
       TypeScript rather than by widening the allowlist. Without this the check
@@ -8,7 +8,7 @@
       agent "fixing" it back to case-sensitive would be following the spec
       (`cross-stack-determinism`: "A lower-camel twin of an authoritative Go
       export fails the check")
-- [ ] 1.2 Make `check-mirror-map.sh`'s anti-mirror comparison
+- [x] 1.2 Make `check-mirror-map.sh`'s anti-mirror comparison
       **case-insensitive** on both sides, and match `sharedNames`
       case-insensitively too, so `ArcParam`/`arcParam`, `Speed`/`speed` and
       `StateAt`/`stateAt` collide. In the same edit, fix the scan's **reach**:
@@ -23,7 +23,7 @@
       export fails the check", "A declaration form the extractor has no rule
       for fails the check rather than passing" — a code-is-wrong fix to a
       check too weak to enforce a live requirement)
-- [ ] 1.3 Add a regression case to the check's own coverage: a TypeScript file
+- [x] 1.3 Add a regression case to the check's own coverage: a TypeScript file
       declaring a lower-camel twin of an existing `backend/space` export must
       make the check exit non-zero. Place that regression twin in a
       **subdirectory** of `frontend/lib/space/` (and add a second in a `.tsx`
@@ -34,7 +34,7 @@
       authoritative Go export fails the check", "A twin in a subdirectory or a
       .tsx file fails the check", "An unexported Go function counts as an
       authoritative name")
-- [ ] 1.4 Create `frontend/lib/space/` with exactly four kinds of pure
+- [x] 1.4 Create `frontend/lib/space/` with exactly four kinds of pure
       function: a position from a served orbital element set; a position from
       a served park or drift; a served quintic Bézier evaluated at a
       parameter `u`; and screen projection/formatting. No arc-length
@@ -42,7 +42,7 @@
       park (`system-space-view`: "Own-Fleet Position, Burn Curve, and Arrival
       Ghost Render Continuously", "A burning fleet's mark advances by curve
       parameter, not by arc length")
-- [ ] 1.5 Name every `lib/space` export subject-prefixed and draw-scoped —
+- [x] 1.5 Name every `lib/space` export subject-prefixed and draw-scoped —
       `drawOrbitPosition`, `bezierPointAt`, `vecAdd`, `projectToScreen` — and
       keep `fixtures/space/mirror-map.json`'s `sharedNames` **empty**. Under
       1.2's case-insensitive comparison the bare names collide with
@@ -62,17 +62,17 @@
       `sharedNames` stays empty, and it is the door that must stay empty
       (`cross-stack-determinism`: "A lower-camel twin of an authoritative Go
       export fails the check")
-- [ ] 1.6 Implement the burning-fleet mark at
+- [x] 1.6 Implement the burning-fleet mark at
       `u = (now − departMs) / (arriveMs − departMs)` clamped to [0, 1], and
       the past-arrival freeze at the served intercept with no client-side
       settle (`system-space-view`: "A burn past its served arrival freezes at
       the intercept until a refetch")
-- [ ] 1.7 Port nothing from `frontend/app/spike/space-3d/sim.ts` that computes
+- [x] 1.7 Port nothing from `frontend/app/spike/space-3d/sim.ts` that computes
       `arcTable`, `arcParam`, `burnProgress`, `burnSpeed`, `resolveShip`, or
       `stationKeepRate`; record in the module header that these six are
       deliberately absent (`system-space-view`: "No displayed value is
       derived from a drawn position")
-- [ ] 1.8 Deterministic unit tests for every `lib/space` function against
+- [x] 1.8 Deterministic unit tests for every `lib/space` function against
       known inputs — no `Date.now`, no `Math.random` — and an assertion that
       no exported function takes an unsolved origin/target/acceleration triple
 
@@ -100,6 +100,23 @@
       (`system-space-view`: "System Space View Route and Data Fan-In", "The
       own-fleets read is the corporation-scoped one", "An arrived fleet reads
       as arrived on both the canvas and the roster")
+- [ ] 2.2b Read the open system's station (`GET /v1/systems/:systemId/station`
+      via `useStation`) and the market price board (`GET /v1/market/board` via
+      `useMarketBoard`), select from the board only the venue quotes whose
+      system id is that station's, and take the requester's credit balance
+      from the ambient corporation session (`useCorporationOptional`) — then
+      **pass all three into `FleetActionsPanel`**. The panel is mounted today
+      with `station={null} stationQuotes={null} credits={null}`
+      (`frontend/components/space/SystemSpaceView.tsx`), which is why the
+      balance is a permanent em dash and `commitSell` returns early on
+      `!station` — a sell control that renders and does nothing when clicked.
+      Consume only the station's `systemId` and `featureId`: the station
+      response still carries a lattice `orbit` object (`ring`/`angle0`/
+      `period`/`dir`), and task 10.11's grep looks for `@/lib/board` imports,
+      so reading it here would pass every gate silently
+      (`system-space-view`: "System Space View Route and Data Fan-In", "The
+      view reads the open system's station and the market board", "The
+      station-anchored controls are driven by the view's own reads")
 - [ ] 2.3 Drive the view's clock from `useWorldTime(serverWorldTime, { scale })`
       with the **served** world-clock scale from the interior read, and fall
       back to the **own-fleets read's** served scale whenever the interior read
@@ -126,17 +143,31 @@
       fleet-state-anchored commands usable", "A failed interior read
       withdraws the mine offer without misreporting the body", "A failed
       own-fleets read shows a retriable error in the fleet panel")
-- [ ] 2.6 Render every body and lane gate from its served position and size,
+- [ ] 2.5b The station, market-board, and session-balance failure paths: a
+      failed station read withdraws the sell and refuel offers and attributes
+      their absence to the failed read with a retry (never "nothing to trade
+      with here"), while a station read that simply resolves to no station
+      shows no error at all; a failed market-board read withdraws sell but
+      leaves refuel, whose cost preview comes from the fleet's own served fuel
+      price; an unavailable session balance withdraws the readout but no verb.
+      None of the three touches the canvas, the roster, or any command
+      anchored to the acting fleet's own served state (`system-space-view`: "A
+      failed station read withdraws the station-anchored offers without
+      misreporting the system", "A system with no station shows no station
+      error", "A failed market-board read withdraws the sell offer but not the
+      refuel offer", "An unresolved credit balance withdraws the readout, not
+      the verbs")
+- [x] 2.6 Render every body and lane gate from its served position and size,
       advancing continuously from its served `orbitElements`
       (`system-space-view`: "An idle fleet renders at its live position,
       advancing with world time")
-- [ ] 2.7 Render each own fleet at its drawn position; while burning, render
+- [x] 2.7 Render each own fleet at its drawn position; while burning, render
       its full served curve and an arrival ghost at the target's position at
       `arriveMs` (`system-space-view`: "A burning fleet renders its curve and
       an arrival ghost")
-- [ ] 2.8 Omit a fleet reporting no position (`system-space-view`: "A fleet
+- [x] 2.8 Omit a fleet reporting no position (`system-space-view`: "A fleet
       with no reported position is omitted from the scene")
-- [ ] 2.9 Render the interior read's `contacts` **frozen at their served
+- [x] 2.9 Render the interior read's `contacts` **frozen at their served
       positions** — never integrated forward from the served `velocity` —
       distinguishing emitting and scanning contacts, with no identity; and
       display the served `velocity` as a heading-and-speed readout on the
@@ -144,15 +175,15 @@
       (`system-space-view`: "Foreign Contacts Render at Their Served
       Position", "A contact does not drift between reads", "A contact's
       served velocity is displayed, not integrated")
-- [ ] 2.10 Omit and log any non-star body, fleet, or contact resolving to the
+- [x] 2.10 Omit and log any non-star body, fleet, or contact resolving to the
       exact origin, and render the star there normally (`system-space-view`:
       "A Non-Star Position at the Origin Is Omitted From the Scene, Not Drawn
       Atop the Star")
-- [ ] 2.11 Render belt members as an undifferentiated decorative field with no
+- [x] 2.11 Render belt members as an undifferentiated decorative field with no
       individual hit target and no per-member facts (`system-space-view`:
       "Belt Members Render as Decorative Detail, Never as Separate Pickable
       Bodies")
-- [ ] 2.12 Assert by test that no displayed value — arrival, remaining
+- [x] 2.12 Assert by test that no displayed value — arrival, remaining
       duration, delta-v, fuel cost, distance, affordability, stranding — is
       computed from a drawn position (`system-space-view`: "No displayed value
       is derived from a drawn position")
@@ -168,16 +199,16 @@
 
 ## 3. Frontend — selection and picking
 
-- [ ] 3.1 Single selection among body/lane-gate/point with toggle-to-deselect,
+- [x] 3.1 Single selection among body/lane-gate/point with toggle-to-deselect,
       replacement across kinds, and pick-radius-miss clearing; no fleet or
       contact is ever a member of the selection set (`system-space-view`:
       "Toggle-to-Deselect Single Selection Among a Body, a Lane Gate, or a
       Point")
-- [ ] 3.2 Picking: body, lane-gate, and point resolution, generous hit
+- [x] 3.2 Picking: body, lane-gate, and point resolution, generous hit
       targets, and documented draw-order precedence for overlapping marks
       (`system-space-view`: "Space View Picking Resolves to the Body, Lane
       Gate, or Point Under the Pointer")
-- [ ] 3.2b Draw a **visible selected mark for a picked point in empty space**,
+- [x] 3.2b Draw a **visible selected mark for a picked point in empty space**,
       at the position it was picked at. A point in vacuum has no body mark to
       highlight and no intrinsic outline, so without this an implementer can
       ship an invisible point selection and still satisfy every other
@@ -185,15 +216,15 @@
       live `board-view` guaranteed this for a bare cell, with its own
       scenario, and it was thinned out of the port (`system-space-view`: "A
       selected point in empty space is visibly marked")
-- [ ] 3.3 Off-screen affordance for every body and lane gate whose mark is
+- [x] 3.3 Off-screen affordance for every body and lane gate whose mark is
       outside the viewport, operable by pointer and by touch, selecting and
       reframing; offered only for off-screen marks (`system-space-view`:
       "Off-Screen Bodies and Lane Gates Are Reachable by Pointer and Touch")
-- [ ] 3.4 Keyboard-operable body and lane-gate selection in the defined tab
+- [x] 3.4 Keyboard-operable body and lane-gate selection in the defined tab
       order, with focus surviving animation frames and a visible focus
       indicator (`system-space-view`: "Body, Lane-Gate, and Point Selection Is
       Keyboard-Operable")
-- [ ] 3.5 Keyboard-reachable control that selects the point at the camera's
+- [x] 3.5 Keyboard-reachable control that selects the point at the camera's
       current pan target, producing a selection indistinguishable from a
       clicked point — and reachable to a **legal** target, which requires
       task 5.5's keyboard pan: at default framing the pan target is the star,
@@ -203,14 +234,14 @@
 
 ## 4. Frontend — preview, quote lock, and the burn/jump commands
 
-- [ ] 4.1 Add the missing client seam for the preview endpoint before any
+- [x] 4.1 Add the missing client seam for the preview endpoint before any
       component calls it: a `preview(fleetId, request)` method on
       `frontend/lib/services/fleet-service.ts` (which today has `listMine`,
       `get`, `order`, `cutDrive`, `stop`, `jump`, `mine` and nothing else) and
       a hook over it. `frontend/CLAUDE.md` fixes component → hook → service →
       `apiClient`, and `/check` runs a raw-`fetch` validator, so a component
       calling the route directly fails the gate (design.md Decision 14)
-- [ ] 4.2 Request `POST /v1/fleets/:fleetId/orders/preview` on selection
+- [x] 4.2 Request `POST /v1/fleets/:fleetId/orders/preview` on selection
       change whenever a commit would be accepted — **including while the
       acting fleet is burning** — and render its curve and figures as a
       distinct overlay; suppress it while a running mine holds the movement
@@ -218,7 +249,7 @@
       a target shows a preview curve and its figures", "A burning fleet's
       re-target is previewed", "No preview is requested while a mine holds the
       movement channel")
-- [ ] 4.3 Refresh the preview on a **single named client-side interval
+- [x] 4.3 Refresh the preview on a **single named client-side interval
       constant, defined in exactly one module** — exactly one request per
       elapsed interval, none between; clear it on selection change, clear, or
       commit; render an unaffordable preview distinctly. The endpoint reads
@@ -230,38 +261,38 @@
       interval while shown", "The refresh interval is defined in exactly one
       place", "Clearing the selection clears the preview", "An unaffordable
       preview is shown as such")
-- [ ] 4.4 Preview failure states: a no-quote state with a retry for a failed
+- [x] 4.4 Preview failure states: a no-quote state with a retry for a failed
       first request, and a stale marking with a retry for a failed refresh,
       cleared by a later success (`system-space-view`: "A failed first preview
       shows a no-quote state, not empty figures", "A failed first preview
       offers a retry", "A failed refresh marks the shown figures stale", "A
       later successful refresh clears the stale marking")
-- [ ] 4.5 Keep the burn committable without a current quote, labelled as
+- [x] 4.5 Keep the burn committable without a current quote, labelled as
       uncapped, and never derive a cap from a stale figure
       (`system-space-view`: "The burn stays committable without a quote,
       labelled as uncapped", "A stale figure never becomes a cap")
-- [ ] 4.6 Send `maxFuelTons` derived from the current preview's fuel cost by
+- [x] 4.6 Send `maxFuelTons` derived from the current preview's fuel cost by
       one named client-side allowance factor, defined in exactly one place,
       and display the resulting ceiling alongside the point cost
       (`system-space-view`: "A commit with a current preview carries a cap",
       "The ceiling the player agrees to is the one displayed")
-- [ ] 4.7 On a cap rejection, request a fresh preview and present the new
+- [x] 4.7 On a cap rejection, request a fresh preview and present the new
       figures for re-confirmation without committing and without an automatic
       retry (`system-space-view`: "A cap rejection re-quotes in flow instead
       of failing the interaction")
-- [ ] 4.8 Report every burn commit's outcome: success feedback carrying the
+- [x] 4.8 Report every burn commit's outcome: success feedback carrying the
       served arrival time, and mapped error copy on failure, including the
       no-distinguishable-reason fallback (`system-space-view`: "Burn Commit
       Reports Its Outcome")
-- [ ] 4.9 Surface actual-versus-previewed arrival time and delta-v when they
+- [x] 4.9 Surface actual-versus-previewed arrival time and delta-v when they
       differ, including on an uncapped commit (`system-space-view`: "A
       Commit's Actual Result Is Never Silently Swapped for the Previewed One")
-- [ ] 4.10 Unify the burn command path across body/lane-gate/point selections —
+- [x] 4.10 Unify the burn command path across body/lane-gate/point selections —
       one submit path, no kind-specific branch or refusal copy
       (`system-space-view`: "Burn Command Targets Any Selected Body, Lane
       Gate, or Point Uniformly", "No kind-specific selection branch survives
       the unification")
-- [ ] 4.11 Jump commit sourcing `laneId` from **one** source only — the acting
+- [x] 4.11 Jump commit sourcing `laneId` from **one** source only — the acting
       fleet's own read (`fleet-movement`: "Fleet Read Serves the Attached
       Gate's Lane Id") — for a fleet attached to a gate in this system or any
       other, never from the interior read's gate list, `GET /v1/galaxy`'s
@@ -279,12 +310,12 @@
 
 ## 5. Frontend — camera
 
-- [ ] 5.1 Orbit/pan/zoom camera: primary-drag orbit, secondary-drag pan, wheel
+- [x] 5.1 Orbit/pan/zoom camera: primary-drag orbit, secondary-drag pan, wheel
       zoom dollying toward the pan target, click-versus-gesture
       disambiguation at the 8px threshold, and gestures beginning over a mark
       still moving the camera (`system-space-view`: "Space View Camera Orbit,
       Pan, and Zoom")
-- [ ] 5.1b Scale the default distance, the zoom clamps, the pan bound, and the
+- [x] 5.1b Scale the default distance, the zoom clamps, the pan bound, and the
       maximum pick radius off the interior read's served continuous `extent`
       — one configured multiplier each, never an absolute scene constant and
       never the lattice `radius`, which section 9 removes and link 9 deletes
@@ -292,22 +323,22 @@
       so a camera scaled off a lattice-derived wire field would pass it
       silently (`system-space-view`: "The framing scales with the system's
       served extent")
-- [ ] 5.1c Clamp the pan target to the configured bound and pin it with a test
+- [x] 5.1c Clamp the pan target to the configured bound and pin it with a test
       that drives the pan repeatedly in one direction, by drag and by
       keyboard, and asserts it stops — the live `board-view` camera had this
       scenario and it was thinned out of the port (`system-space-view`: "Pan
       clamps at the configured bound")
-- [ ] 5.2 Camera state persists across selection change and realtime refetch;
+- [x] 5.2 Camera state persists across selection change and realtime refetch;
       resets to default framing with no transition on `systemId` change
       (`system-space-view`: "Camera state survives a selection change and a
       realtime refetch", "Camera resets when the system changes")
-- [ ] 5.3 Picking stays correct after camera movement, including a
+- [x] 5.3 Picking stays correct after camera movement, including a
       point-in-space click and a beyond-pick-radius click that still clears
       the selection (`system-space-view`: "Picking survives camera movement",
       "A point-in-space click resolves correctly after camera movement", "A
       click beyond the pick radius still clears the selection after camera
       movement")
-- [ ] 5.4 Touch pinch-zoom keeping the pan target fixed on screen (never
+- [x] 5.4 Touch pinch-zoom keeping the pan target fixed on screen (never
       anchoring on the pinch midpoint), single-finger orbit, and the
       stationary-tap selection path with its threshold pinned at **exactly**
       8 CSS pixels resolving as an orbit — both boundaries were live in
@@ -315,7 +346,7 @@
       View Camera Touch Pinch-Zoom", "Pinch zoom keeps the centred point fixed
       on screen", "Movement exactly at the tap threshold resolves as an
       orbit")
-- [ ] 5.5 Keyboard-operable camera: arrow-key orbit, **a dedicated pan input
+- [x] 5.5 Keyboard-operable camera: arrow-key orbit, **a dedicated pan input
       distinct from the orbit input**, dedicated zoom keys, tab order before
       body and gate hit targets, off-screen-focus reframing, and a
       distinguishable at-limit state on all three axes. Keyboard pan is not
@@ -327,25 +358,25 @@
       Keyboard-Operable", "Pan keys translate the camera's target", "A
       keyboard-only player can pan to a point away from the star", "Keyboard
       input at a clamp is distinguishable from no input")
-- [ ] 5.6 Manual recenter, keyboard-reachable, a no-op at default framing
+- [x] 5.6 Manual recenter, keyboard-reachable, a no-op at default framing
       (`system-space-view`: "Space View Camera Manual Recenter")
-- [ ] 5.7 Camera controls unrendered and non-intercepting while the canvas is
+- [x] 5.7 Camera controls unrendered and non-intercepting while the canvas is
       unavailable (`system-space-view`: "Camera Controls Are Inert While the
       Space View Is Unavailable")
 
 ## 6. Frontend — renderer availability and accessibility
 
-- [ ] 6.1 Unsupported-context state: named user-actionable cause, retry
+- [x] 6.1 Unsupported-context state: named user-actionable cause, retry
       affordance, canvas-region containment of thrown errors, and the
       container remaining present (`system-space-view`: "Renderer
       Unavailability Is an Explicit State")
-- [ ] 6.2 Keep the roster and `docked-fleet-actions` panel usable while the
+- [x] 6.2 Keep the roster and `docked-fleet-actions` panel usable while the
       canvas is unavailable, with the enumeration that actually ships: mine,
       sell, refuel, hold, release, cancel-mine, **cut drive**, **stop in
       place**, and jump — replacing `board-view`'s "today: scan", a control
       the client never had (`system-space-view`: "Surrounding panels remain
       usable", "A burn can be ended while the canvas is unavailable")
-- [ ] 6.3 Disable or hide canvas-only controls, and suppress the
+- [x] 6.3 Disable or hide canvas-only controls, and suppress the
       select-a-target prompt, while the canvas is unavailable
       (`system-space-view`: "A canvas-only control is disabled while the
       canvas is unavailable", "Burn target selection is unreachable without
@@ -359,50 +390,50 @@
       state is independent of the interior data read", "A failed interior read
       takes precedence over the unsupported state", "A failed own-fleets read
       does not suppress the unsupported state")
-- [ ] 6.5 Interrupted-context recovery without navigation: retry that releases
+- [x] 6.5 Interrupted-context recovery without navigation: retry that releases
       prior resources, duplicate-attempt prevention, second-loss no-op,
       in-flight selection and typed input survival, first-frame liveness, and
       distinguishable-by-cause diagnostic logging (`system-space-view`: "Lost
       Rendering Context Recovers Without Navigation")
-- [ ] 6.6 Live-region announcement of the state change, keyboard-operable
+- [x] 6.6 Live-region announcement of the state change, keyboard-operable
       retry, and focus preservation across the canvas region's transitions
       (`system-space-view`: "Renderer Unavailability States Are Accessible")
-- [ ] 6.7 Reduced-motion handling: freeze decorative animation while positions
+- [x] 6.7 Reduced-motion handling: freeze decorative animation while positions
       and orbital advance stay live (`system-space-view`: "Space View Respects
       Reduced-Motion Preference")
 
 ## 7. Frontend — `docked-fleet-actions`
 
-- [ ] 7.1 Mine offer anchored to the acting fleet's docked state, with the
+- [x] 7.1 Mine offer anchored to the acting fleet's docked state, with the
       not-docked and no-visible-resources cases and the free-hold clamp
       (`docked-fleet-actions`: "Mine Offer on the Docked Fleet")
-- [ ] 7.2 Mine ETA preview from the served mining rate, tracking the tonnage
+- [x] 7.2 Mine ETA preview from the served mining rate, tracking the tonnage
       input, and the committed countdown using the server's ETA
       (`docked-fleet-actions`: "Mine ETA Preview From the Served Mining Rate")
-- [ ] 7.3 Mine commit, arming the countdown on success and toasting the reason
+- [x] 7.3 Mine commit, arming the countdown on success and toasting the reason
       on failure (`docked-fleet-actions`: "Mine Commit")
-- [ ] 7.4 Cargo hold readout showing contents and capacity, filling visibly
+- [x] 7.4 Cargo hold readout showing contents and capacity, filling visibly
       when a mine run resolves (`docked-fleet-actions`: "Fleet Panel Cargo
       Hold Readout")
-- [ ] 7.5 Sell offer: kind and floor filtering, held-tonnage clamp, proceeds
+- [x] 7.5 Sell offer: kind and floor filtering, held-tonnage clamp, proceeds
       preview pinned to `fixtures/market/cases.json`, and the split-fill
       preview matching the settlement fold (`docked-fleet-actions`: "Sell
       Offer on the Docked Fleet")
-- [ ] 7.6 Sell commit including the price-changed refresh flow and a fresh
+- [x] 7.6 Sell commit including the price-changed refresh flow and a fresh
       operation key per re-priced attempt (`docked-fleet-actions`: "Sell
       Commit")
-- [ ] 7.7 Refuel offer: affordability-capped default tonnage, free-hold clamp,
+- [x] 7.7 Refuel offer: affordability-capped default tonnage, free-hold clamp,
       and a cost preview from the served fuel price
       (`docked-fleet-actions`: "Refuel Offer on the Docked Fleet")
-- [ ] 7.8 Refuel commit, including the all-or-nothing unaffordable rejection
+- [x] 7.8 Refuel commit, including the all-or-nothing unaffordable rejection
       (`docked-fleet-actions`: "Refuel Commit")
-- [ ] 7.9 Add the missing client seams for the station-keeping verbs before
+- [x] 7.9 Add the missing client seams for the station-keeping verbs before
       the control uses them: `hold(fleetId)` and `release(fleetId)` on
       `frontend/lib/services/fleet-service.ts` and hooks over them.
       `add-stationkeep-hold-verb` shipped both verbs server-side with no
       client at all, so this change is the only thing that can give them one
       (design.md Decision 14)
-- [ ] 7.10 Station-keeping hold/release control offered by effective park mode,
+- [x] 7.10 Station-keeping hold/release control offered by effective park mode,
       committing instantly via `/hold` and `/release`, with the
       **at-or-below-reserve** rejection toasted. Map that reason to copy
       naming the reserve as the boundary, never "no fuel":
@@ -414,7 +445,7 @@
       release and the panel reflects orbit", "No control is offered while
       burning, drifting, or point-parked", "A hold at or below the reserve is
       rejected and toasted, not silently accepted")
-- [ ] 7.11 Upkeep readout taken **only** from the fleet read's served
+- [x] 7.11 Upkeep readout taken **only** from the fleet read's served
       upkeep-rate field, with no client-side derivation from a body's radius,
       period, or orbital elements anywhere in the view — rendered on **both**
       park modes the field is served for: as the live drain while
@@ -425,27 +456,74 @@
       the served upkeep rate while holding", "The Hold control prices the hold
       before it is taken", "The drain readout is never derived from orbital
       elements")
-- [ ] 7.12 No client-side prediction of the dry-instant force-demotion; the
+- [x] 7.12 No client-side prediction of the dry-instant force-demotion; the
       panel changes only when a refetch lands it (`docked-fleet-actions`:
       "Reaching the dry instant is reflected only on the next refetch")
-- [ ] 7.13 Credit balance readout with accessible live-region updates on sale
+- [x] 7.13 Credit balance readout with accessible live-region updates on sale
       and refuel resolution, and announced errors (`docked-fleet-actions`:
       "Credit Balance Readout")
-- [ ] 7.14 Central rejection-copy mapping, consumed by every command in this
+- [x] 7.14 Central rejection-copy mapping, consumed by every command in this
       capability and by `system-space-view`'s burn and jump commands, with a
       safe fallback for an unmapped reason (`docked-fleet-actions`: "Rejection
       Reasons Map to Player-Facing Copy, Not Raw Server Text")
-- [ ] 7.15 Running-mine gating of the roster's burn, cut-drive, stop, and jump
+- [x] 7.15 Running-mine gating of the roster's burn, cut-drive, stop, and jump
       commands, with a cancel-mine control (`docked-fleet-actions`: "Running
       Mine Gates the Fleet Panel's Commands")
 
+- [ ] 7.16 Anchor the sell and refuel offers on the **station** rather than on
+      bare attachment: today `sellOffered = docked && hasCargo` and
+      `refuelOffered = docked` with `docked = !!fleet?.attachedTo`
+      (`frontend/components/space/FleetActionsPanel.tsx`), so both verbs are
+      offered while docked to any body. Offer them only when the acting
+      fleet's `attachedTo` is the read station's `featureId`
+      (`docked-fleet-actions`: "Sell is not offered while docked to a body
+      that is not the station", "Refuel is not offered while docked to a body
+      that is not the station")
+- [ ] 7.17 Credit-balance unavailability: show an explicit unavailable
+      indication rather than a figure, keep the sell and refuel verbs
+      invokable, and fall the refuel default tonnage back to the fleet's full
+      free hold (`docked-fleet-actions`: "An unavailable balance reads as
+      unavailable, not as a figure", "An unavailable credit balance falls the
+      default back to free hold")
+- [ ] 7.18 Scope the roster's command surface by mounting view. Give
+      `FleetRoster` an explicit declaration of who owns the fleet commands;
+      the **galaxy view** keeps them (it mounts no command panel and
+      `galaxy-view`'s *Jump Commit* lives on its own surface), the **space
+      view** withholds them and the roster there renders selection and status
+      only. This closes the confirmed duplicate: `FleetRoster`,
+      `FleetActionsPanel`, and `SpaceCommandPanel` all emit
+      `fleet-cmd-cut-drive-{id}` / `fleet-cmd-stop-{id}` / `fleet-cmd-jump-{id}`
+      today, so a burning fleet renders two live "Cut drive" buttons — a hard
+      error in Playwright's strict mode, not a warning. Delete the space
+      view's `isChartedGate={() => false}` stub while doing it: it suppresses
+      the roster's jump only by asserting a falsehood the live requirement
+      forbids (`fleet-roster`: "The roster renders no commands on a view that
+      owns them itself", "A verb offered by the mounting view is not also
+      offered by the roster"; `system-space-view`: "The roster on this view
+      renders no fleet commands")
+- [ ] 7.19 Kill the dead Burn control: `rosterCommandVisibility` returns
+      `burn: true` unconditionally while `SystemSpaceView` passes no `onBurn`,
+      so the roster's "Burn" button is a no-op under the player's hand. A
+      roster row SHALL render a command only where the mounting view supplies
+      the means to commit it — and where the roster does own the commands, the
+      mounting view SHALL supply every one of them (`fleet-roster`: "No
+      command control is rendered without a means to commit it", "Burn is
+      always available")
+- [ ] 7.20 Re-point the running-mine gate at the surfaces that now own the
+      verbs: with the roster's controls withheld on the space view, gate
+      `SpaceCommandPanel`'s `burn-button` and its jump control on the running
+      mine as well — today only the roster's buttons and the actions panel's
+      cut-drive/stop are gated, so a running mine would leave burn and jump
+      live (`docked-fleet-actions`: "Burn, cut-drive, stop, and jump are
+      disabled while a mine is running")
+
 ## 8. The shared submit guard, and the confirmed sell double-submit defect
 
-- [ ] 8.1 Add one shared synchronous submit guard
+- [x] 8.1 Add one shared synchronous submit guard
       (`frontend/hooks/use-submit-guard.ts`): a ref checked-and-set at the top
       of the handler, released in `onSettled`, taking effect within the same
       invocation rather than a render later (design.md Decision 8)
-- [ ] 8.2 Fix `commitSell`'s **confirmed** defect: guard before
+- [x] 8.2 Fix `commitSell`'s **confirmed** defect: guard before
       `newOperationKey()` and before `sell.mutate(...)`, so a second
       activation in the same tick mints no key and issues no request. The
       requirement (`docked-fleet-actions`: "Sell Control Guards Against
@@ -453,11 +531,11 @@
       code-is-wrong fix, and it carries no spec delta restating it
       (`docked-fleet-actions`: "Two activations in one tick submit one sale
       and mint one key")
-- [ ] 8.3 Apply the same guard to the mine commit
+- [x] 8.3 Apply the same guard to the mine commit
       (`docked-fleet-actions`: "Mine Control Guards Against Double-Submit")
       and to the burn and jump commits (`system-space-view`: "Burn and Jump
       Commit Controls Guard Against Double-Submit")
-- [ ] 8.4 Migrate the refuel commit's hand-rolled `useRef` guard onto the
+- [x] 8.4 Migrate the refuel commit's hand-rolled `useRef` guard onto the
       shared hook, with its existing scenarios as the regression
       (`docked-fleet-actions`: "Refuel Control Guards Against Double-Submit")
 - [ ] 8.5 Playwright scenarios for sell, mine, refuel, and burn that fire two
@@ -486,7 +564,7 @@ scale **present**, and `serve-orbital-elements-and-burn-preview` delivers all
 four additively. This is an ordering change only: there is still no flag, no
 dual path, and no coexistence in what ships (design.md Decision 11).
 
-- [ ] 9.1 Drop the lattice `Radius` from `system.interiorDTO` — the continuous
+- [x] 9.1 Drop the lattice `Radius` from `system.interiorDTO` — the continuous
       `extent` the sibling change added is its successor, and leaving both
       would let a consumer keep scaling continuous space off the lattice
       number — and drop `Footprint`, `Orbit` (the lattice object), `ParentId`,
@@ -537,12 +615,12 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       copies die with 10.1 (`system-space-view`: *Burn Command Targets Any
       Selected Body, Lane Gate, or Point Uniformly* > "Commanding a burn
       toward a selected lane-gate body submits an order")
-- [ ] 9.2 Remove `projectUnfogged`'s population of the dropped fields and the
+- [x] 9.2 Remove `projectUnfogged`'s population of the dropped fields and the
       `bandVisible` constant, and confirm `system.Feature`'s own lattice
       fields stay untouched — they are `delete-the-lattice`'s to remove, not
       this change's (`system-interior`: "Lattice-only fields are absent from
       the response")
-- [ ] 9.3 Confirm the surviving response still satisfies every unchanged
+- [x] 9.3 Confirm the surviving response still satisfies every unchanged
       scenario: the `404` paths, continuous position and size on every body
       including gates, the full element set on non-star bodies and gates, the
       star's absent element set, and element-completeness for a body whose
@@ -555,7 +633,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       is still element-complete", "The read carries the interior's continuous
       extent", "The read carries the world clock's scale alongside its world
       time")
-- [ ] 9.4 `grep` `backend/` for every remaining production reader of the
+- [x] 9.4 `grep` `backend/` for every remaining production reader of the
       dropped fields and remove or repoint it before deleting the
       serialization; re-record the interior-read fixtures and handler tests
       against the new shape rather than relaxing their assertions
@@ -593,7 +671,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       `frontend/hooks/use-system-board.ts`'s lattice shapes, replacing them
       with the space view's own types generated against the sibling change's
       recorded wire sample
-- [ ] 10.4 Cut `frontend/lib/types/action.ts`'s `import type { Cell, Target }
+- [x] 10.4 Cut `frontend/lib/types/action.ts`'s `import type { Cell, Target }
       from '@/lib/board'` and the `params.origin`/`params.target` fields typed
       by them — both are already dead against the live wire (a burn's
       `action.Params` carries only `state`, and nothing in the frontend reads
@@ -616,7 +694,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       already the navigation target; only the copy that calls it a "board"
       changes (`galaxy-view`: "Entering a system navigates to its board";
       `fleet-roster`: "A fleet in the currently open board is marked 'here'")
-- [ ] 10.10 Repoint `galaxy-view`'s *Jump Commit* rejection-copy citation from
+- [x] 10.10 Repoint `galaxy-view`'s *Jump Commit* rejection-copy citation from
       `board-view` to `docked-fleet-actions` in the shared copy module, so the
       code and the spec name the same source (`galaxy-view`: "A failed jump
       commit toasts the reason", "A jump against a fleet the requester does
@@ -639,16 +717,28 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       a lane gate → jump — entirely through the new view (proposal's Exit
       criterion). The gate step SHALL exercise the off-screen affordance, not
       a hand-set camera position
-- [ ] 11.3 `bash .claude/scripts/check-mirror-map.sh` green with the
+- [x] 11.3 `bash .claude/scripts/check-mirror-map.sh` green with the
       case-insensitive comparison in place, and its new regression case red
       when a lower-camel twin is introduced
 - [ ] 11.4 `python3 .claude/skills/code-quality-checks/check.py` and
       `bash .claude/scripts/check.sh --backend --frontend --lint --test` green
-- [ ] 11.5 `openspec validate build-production-space-view --strict` green, and
-      `openspec diff` reviewed against the live text of every capability this
-      change touches: `galaxy-view`, `fleet-roster` and
+- [ ] 11.5 `openspec validate build-production-space-view --strict` green,
+      `python3 .claude/scripts/openspec-reconcile.py build-production-space-view`
+      green, and `openspec diff` reviewed against the live text of every
+      capability this change touches: `galaxy-view`, `fleet-roster` and
       `cross-stack-determinism` (MODIFIED), and `system-interior` (one
-      requirement REMOVED and re-ADDED under a new name)
+      requirement REMOVED and re-ADDED under a new name). `fleet-roster`
+      carries a RENAMED block as well as MODIFIED ones — the archiver applies
+      the rename first, so the reconcile gate is the one that proves the
+      MODIFIED block still reproduces all seven live scenario headings
+- [ ] 11.6 A composition-level test that renders the space view against the
+      real fan-in and asserts what only the composition can see: the balance
+      readout shows a figure, the sell control commits against a station, and
+      each fleet verb resolves to exactly one control on screen. Panel-level
+      tests pass against a panel handed a station prop, so they cannot observe
+      any of it (`system-space-view`: "The station-anchored controls are
+      driven by the view's own reads"; `fleet-roster`: "A verb offered by the
+      mounting view is not also offered by the roster")
 
 ## 12. Archive rehearsal — before the real archive
 
