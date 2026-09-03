@@ -71,8 +71,8 @@ after that design was written.
 | 6 | `re-express-economy-positions` | Belt members become minable; target ids validated | ✅ `5fd28b5`…`fbbb316` |
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ✅ `41e3c46` |
 | 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | ✅ `ca7e5d2` |
-| 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | 📝 spec final, 0/42 |
-| 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | 📝 spec final, 0/106 |
+| 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | ✅ `3913952` |
+| 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | 📝 spec final, 0/106 — **next** |
 | 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | 📝 spec final (3 adversary rounds), 0/105 |
 | 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | 📝 spec, 0/80 |
 
