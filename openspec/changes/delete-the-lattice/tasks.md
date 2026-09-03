@@ -296,6 +296,59 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       Rename or remove each hit. `queryKeys.market.board()` is the **market
       price board** and is not lattice — it stays; state that exception in the
       commit rather than leaving the next reader to rediscover it
+- [ ] 6.3b **The two surviving lattice tethers under `frontend/app/spike/`,
+      each with live importers.** `build-production-space-view` tasks 10.5 and
+      10.6 were narrowed to stop short of both, because cutting either breaks a
+      spike that is not lattice work and that no change owns:
+      - `frontend/app/spike/hex-board/mock-system.ts` — genuine lattice
+        (axial hex coordinates, `hexDistance`, `ringOf`, ring-banded `Tile`s).
+        Importers: `frontend/app/spike/audio/page.tsx` (`type Character`) and
+        `frontend/app/spike/audio/synth.ts` (`hashSeed`, `type Character`).
+        `audio/` is the seeded ambient-engine spike; neither imported name is
+        lattice (`Character` is the region-character union, `hashSeed` a
+        string→32-bit hash).
+      - `frontend/app/spike/space-3d/` (`sim.ts`, `SpaceView.tsx`, `page.tsx`,
+        and their tests) — **not lattice at all**: it is the continuous-space
+        PoC this chain was derived from (`sim.ts:4`, "off the lattice entirely
+        — no rings, no slots, no cells") and the named carve-out in
+        `space-kinematics`' Purpose. Importers: `frontend/app/spike/intel/`
+        (`intel.ts`, `intel.test.ts`, `IntelView.tsx`, `IntelView.test.tsx`,
+        `page.tsx`) and `frontend/app/spike/stealth/` (`stealth.ts`,
+        `stealth.test.ts`, `StealthView.tsx`, `StealthView.test.tsx`,
+        `page.tsx`) — ten files, two disclosure experiments, neither lattice.
+
+      **What this change does unconditionally, whichever way OQ-5 is ruled:**
+      rewrite the comment at `frontend/app/spike/space-3d/sim.ts:21-22`, which
+      names `backend/polar` and `frontend/lib/polar` as the mirror pair it is
+      shaped after. Those two paths do not exist after section 5 and task 6.2,
+      and the citation is caught by task 6.3's frontend sweep and again by task
+      10.1's whole-tree sweep, which allows `frontend/lib/polar` hits only under
+      `openspec/changes/archive/` and `docs/`. Likewise account for the three
+      `lattice` mentions in `space-3d` (`page.tsx:3`, `page.tsx:219`,
+      `sim.ts:4`) against task 10.2's case-insensitive sweep: they are
+      anti-lattice prose that stops meaning anything once the lattice is gone,
+      so rewrite them rather than widening 10.2's allow-list. Both are moot if
+      OQ-5 is ruled "delete".
+
+      **What this change does not decide:** whether either tether is deleted.
+      That is **OQ-5 in design.md** — the choice is per-tether, either migrate
+      the importer to a continuous equivalent (for `hex-board`, inline the two
+      names into `audio/`; for `space-3d`, there is no continuous equivalent to
+      migrate to, since it *is* the continuous one) or delete the dependent
+      spike as well. Deleting a live experiment of Travis's is not this
+      change's call to make. **Do not delete either path on this change's own
+      authority.**
+
+      **How the deletion is verified if and when OQ-5 authorizes it**, in the
+      same form as 5.2/6.2/7.1: after `rm`, each of
+      `grep -rn 'hex-board' frontend --include='*.ts' --include='*.tsx' | grep -v node_modules`
+      and
+      `grep -rn 'space-3d' frontend .claude --include='*.ts' --include='*.tsx' --include='*.sh' | grep -v node_modules`
+      SHALL return nothing, `cd frontend && npm run lint && npx vitest run`
+      SHALL stay green, and — for `space-3d` only — task 13.1's Purpose edit
+      and task 8.9's site-18 clause both flip from "leave it" to "remove it",
+      because the carve-out then names a path that no longer exists
+
 - [ ] 6.4 `cd frontend && npm run lint && npx vitest run` green, and
       `cd frontend && npm run e2e` green
 
@@ -424,10 +477,16 @@ names the file and states its verification.
       `pin-system-generation-determinism`'s sharpest finding, repeated
 - [ ] 8.8 `check.py`: rewrite `run_mirror_map_check`'s docstring (site 10),
       which describes the board pair specifically
-- [ ] 8.9 `check-mirror-map.sh`: rewrite the header comment (site 17), delete
-      the stale `frontend/app/spike/space-3d` carve-out comment (site 18 —
-      `build-production-space-view` task 10.6 deleted that spike), and update the
-      final `PASS:` message's package enumeration (site 20)
+- [ ] 8.9 `check-mirror-map.sh`: rewrite the header comment (site 17) and
+      update the final `PASS:` message's package enumeration (site 20).
+      **Site 18 — the `frontend/app/spike/space-3d` carve-out comment at
+      `:181` — is left in place.** Its premise was that
+      `build-production-space-view` task 10.6 deleted that spike; 10.6 was
+      narrowed and deletes nothing (task 6.3b), so the comment still describes
+      a directory that exists and an exemption that is still live. Delete it
+      only if OQ-5 is ruled "delete `space-3d`", in which case 6.3b's
+      verification grep covers it. Deleting a true carve-out note is how an
+      exemption becomes folklore
 - [ ] 8.10 `check-frontend-tests.sh`: delete the `components/board/webgl/`
       GL-plumbing carve-out and its comment (site 21). Verified by
       `grep -rn 'components/board' .claude/` returning nothing
@@ -522,7 +581,9 @@ names the file and states its verification.
       character and `\b` does not fire inside CamelCase — so
       `backend/system/lattice_identity_test.go` (a whole file) and
       `MatchesLatticeIdentitySweep` (cited from three files) both survive a
-      word-bounded sweep
+      word-bounded sweep. If `frontend/app/spike/space-3d/` survives OQ-5, its
+      three anti-lattice comments are handled by task 6.3b — rewritten there,
+      not exempted here
 - [ ] 10.3 Confirm the three wording-only deltas landed and have no code to
       change, so they are not mistaken later for unimplemented work:
       `session-wakeup` (*Successful Spawn Hands Off to the Home Board*),
@@ -678,12 +739,16 @@ every stale citation has already been removed.
       remove the sentences that name `board-tactical-math`, `backend/board`,
       `backend/polar`, `frontend/lib/board` and `frontend/lib/polar` as "the
       lattice every shipped consumer" and as future deletion material.
-      `build-production-space-view` task 13.1 edits two **other** sentences in
-      the same Purpose (the `space-3d` carve-out and the `board-view` move
-      preview) and does not reach these. **Do not delete the spike carve-out
-      sentence** — *Every Rule-Bearing Value of This Capability Is Computed Only
-      in the Authoritative Implementation* requires the exemption to be stated
-      in the Purpose alongside a named path
+      `build-production-space-view` task 13.1 edits one **other** sentence in
+      the same Purpose (the `board-view` move preview) and does not reach
+      these; it deliberately leaves the `space-3d` carve-out sentence alone,
+      since that spike is no longer deleted. **Do not delete the spike
+      carve-out sentence here either** — *Every Rule-Bearing Value of This
+      Capability Is Computed Only in the Authoritative Implementation* requires
+      the exemption to be stated in the Purpose alongside a named path, and
+      after task 6.3b that named path still exists. If OQ-5 is ruled "delete
+      `space-3d`", the sentence must be repointed at a surviving spike, never
+      simply dropped
 - [ ] 13.2 Hand-edit `openspec/specs/system-interior/spec.md`'s `## Purpose` and
       its `## Notes for future maintainers` section, both of which describe a
       polar board;

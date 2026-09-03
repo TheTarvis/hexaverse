@@ -78,13 +78,13 @@
 
 ## 2. Frontend — route, data fan-in, and scene rendering
 
-- [ ] 2.1 **Replace** `app/systems/[systemId]/page.tsx` — the route already
+- [x] 2.1 **Replace** `app/systems/[systemId]/page.tsx` — the route already
       exists and renders `components/board/SystemBoardView`; this is a
       rewrite of a live file, not a new one — with a thin `'use client'`
       shell over `components/space/SystemSpaceView`, the WebGL canvas
       dynamically imported with SSR disabled, and its existing
       `page.test.tsx` rewritten against the new shell (design.md Decision 7)
-- [ ] 2.1b **In the same commit as 2.1**, deal with the four e2e suites that
+- [x] 2.1b **In the same commit as 2.1**, deal with the four e2e suites that
       drive `/systems/:systemId` through board test ids —
       `jump-commit.spec.ts`, `slice.spec.ts`, `refuel-commit.spec.ts`,
       `new-user.spec.ts`: either rewrite them against the new view's test ids
@@ -94,13 +94,13 @@
       an e2e leg that is expected to be red for eighty tasks is an e2e leg
       that reports nothing. Do not leave them failing silently (design.md
       Decision 11's amendment)
-- [ ] 2.2 Read the interior (`GET /v1/systems/:systemId`) and the requester's
+- [x] 2.2 Read the interior (`GET /v1/systems/:systemId`) and the requester's
       own fleets via `GET /v1/fleets?mine=true`, filtered to this system on
       the client; issue no `systemId`-scoped fleet list request from this view
       (`system-space-view`: "System Space View Route and Data Fan-In", "The
       own-fleets read is the corporation-scoped one", "An arrived fleet reads
       as arrived on both the canvas and the roster")
-- [ ] 2.2b Read the open system's station (`GET /v1/systems/:systemId/station`
+- [x] 2.2b Read the open system's station (`GET /v1/systems/:systemId/station`
       via `useStation`) and the market price board (`GET /v1/market/board` via
       `useMarketBoard`), select from the board only the venue quotes whose
       system id is that station's, and take the requester's credit balance
@@ -117,7 +117,7 @@
       (`system-space-view`: "System Space View Route and Data Fan-In", "The
       view reads the open system's station and the market board", "The
       station-anchored controls are driven by the view's own reads")
-- [ ] 2.3 Drive the view's clock from `useWorldTime(serverWorldTime, { scale })`
+- [x] 2.3 Drive the view's clock from `useWorldTime(serverWorldTime, { scale })`
       with the **served** world-clock scale from the interior read, and fall
       back to the **own-fleets read's** served scale whenever the interior read
       has failed — the state in which the roster and the fleet-anchored
@@ -127,10 +127,10 @@
       is a real server flag, and under continuous space a mis-scaled clock
       draws every orbit and burn mark visibly wrong (`system-space-view`:
       "Live world time is projected at the served scale, not an assumed one")
-- [ ] 2.4 Loading state, and its persistence through the first rendered frame
+- [x] 2.4 Loading state, and its persistence through the first rendered frame
       (`system-space-view`: "Loading state before data arrives", "Loading
       persists through first frame after data arrives")
-- [ ] 2.5 Independent error paths: an interior-read failure shows a retriable
+- [x] 2.5 Independent error paths: an interior-read failure shows a retriable
       error in the canvas region while the roster and the
       `docked-fleet-actions` panel stay mounted with every
       fleet-state-anchored command still invokable — and with the mine offer
@@ -143,7 +143,7 @@
       fleet-state-anchored commands usable", "A failed interior read
       withdraws the mine offer without misreporting the body", "A failed
       own-fleets read shows a retriable error in the fleet panel")
-- [ ] 2.5b The station, market-board, and session-balance failure paths: a
+- [x] 2.5b The station, market-board, and session-balance failure paths: a
       failed station read withdraws the sell and refuel offers and attributes
       their absence to the failed read with a retry (never "nothing to trade
       with here"), while a station read that simply resolves to no station
@@ -187,12 +187,12 @@
       duration, delta-v, fuel cost, distance, affordability, stranding — is
       computed from a drawn position (`system-space-view`: "No displayed value
       is derived from a drawn position")
-- [ ] 2.13 Implement realtime refetch: mine-ETA and burn/jump-arrival
+- [x] 2.13 Implement realtime refetch: mine-ETA and burn/jump-arrival
       self-scheduled refetches, live-channel subscription with reconnect
       resync, and a constant baseline poll, with animation between refetches
       making no request (`system-space-view`: "Realtime Refetch Rules While
       the Space View Is Open")
-- [ ] 2.14 Announce landed resolutions — burn arrival and its attachment, jump
+- [x] 2.14 Announce landed resolutions — burn arrival and its attachment, jump
       arrival, mine completion — through a polite live region, and announce
       nothing before a resolution lands (`system-space-view`: "A Landed
       Resolution Is Announced to Assistive Technology")
@@ -300,11 +300,11 @@
       test that jump still commits with the interior read failed (design.md
       Decision 12; `system-space-view`: "Jump Commit", "Jump still commits
       when the interior read has failed")
-- [ ] 4.12 Departure hand-off scoped to the **acting** fleet only, preserving
+- [x] 4.12 Departure hand-off scoped to the **acting** fleet only, preserving
       selection and typed input when a non-acting fleet departs, and not
       firing for a fleet already in transit when the view opened
       (`system-space-view`: "Departure Hand-Off to the Galaxy View")
-- [ ] 4.13 Fleet roster cross-navigation to another system's space view and to
+- [x] 4.13 Fleet roster cross-navigation to another system's space view and to
       the galaxy for a fleet with no position (`system-space-view`: "Fleet
       Roster Cross-Navigation")
 
@@ -383,7 +383,7 @@
       the canvas") — and confirm jump stays invokable in this state, since its
       lane comes from the acting fleet's own attachment, not from a canvas
       selection
-- [ ] 6.4 Error-state precedence: unsupported state independent of the data
+- [x] 6.4 Error-state precedence: unsupported state independent of the data
       reads, a failed interior read taking precedence in the canvas region
       with the panel still usable, and a failed own-fleets read not
       suppressing the unsupported state (`system-space-view`: "The unsupported
@@ -470,7 +470,7 @@
       commands, with a cancel-mine control (`docked-fleet-actions`: "Running
       Mine Gates the Fleet Panel's Commands")
 
-- [ ] 7.16 Anchor the sell and refuel offers on the **station** rather than on
+- [x] 7.16 Anchor the sell and refuel offers on the **station** rather than on
       bare attachment: today `sellOffered = docked && hasCargo` and
       `refuelOffered = docked` with `docked = !!fleet?.attachedTo`
       (`frontend/components/space/FleetActionsPanel.tsx`), so both verbs are
@@ -479,13 +479,13 @@
       (`docked-fleet-actions`: "Sell is not offered while docked to a body
       that is not the station", "Refuel is not offered while docked to a body
       that is not the station")
-- [ ] 7.17 Credit-balance unavailability: show an explicit unavailable
+- [x] 7.17 Credit-balance unavailability: show an explicit unavailable
       indication rather than a figure, keep the sell and refuel verbs
       invokable, and fall the refuel default tonnage back to the fleet's full
       free hold (`docked-fleet-actions`: "An unavailable balance reads as
       unavailable, not as a figure", "An unavailable credit balance falls the
       default back to free hold")
-- [ ] 7.18 Scope the roster's command surface by mounting view. Give
+- [x] 7.18 Scope the roster's command surface by mounting view. Give
       `FleetRoster` an explicit declaration of who owns the fleet commands;
       the **galaxy view** keeps them (it mounts no command panel and
       `galaxy-view`'s *Jump Commit* lives on its own surface), the **space
@@ -501,7 +501,7 @@
       owns them itself", "A verb offered by the mounting view is not also
       offered by the roster"; `system-space-view`: "The roster on this view
       renders no fleet commands")
-- [ ] 7.19 Kill the dead Burn control: `rosterCommandVisibility` returns
+- [x] 7.19 Kill the dead Burn control: `rosterCommandVisibility` returns
       `burn: true` unconditionally while `SystemSpaceView` passes no `onBurn`,
       so the roster's "Burn" button is a no-op under the player's hand. A
       roster row SHALL render a command only where the mounting view supplies
@@ -509,7 +509,7 @@
       mounting view SHALL supply every one of them (`fleet-roster`: "No
       command control is rendered without a means to commit it", "Burn is
       always available")
-- [ ] 7.20 Re-point the running-mine gate at the surfaces that now own the
+- [x] 7.20 Re-point the running-mine gate at the surfaces that now own the
       verbs: with the roster's controls withheld on the space view, gate
       `SpaceCommandPanel`'s `burn-button` and its jump control on the running
       mine as well — today only the roster's buttons and the actions panel's
@@ -578,7 +578,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       `system.Feature` domain model, never on `fogFeatureDTO`, so there is
       nothing to preserve.) (`system-interior`: "Lattice-only fields are
       absent from the response")
-- [ ] 9.1b Add an `id` field (JSON key `id`) to `system.LaneGate` and populate
+- [x] 9.1b Add an `id` field (JSON key `id`) to `system.LaneGate` and populate
       it from the body table's own `gateId(destSystemId)` — the SAME function
       that names the gate body in that table, never a second concatenation at
       the handler. This is the one ADDITION inside an otherwise subtractive
@@ -591,7 +591,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       zero-value (`system-interior`: *Lane-Gate Bodies Carry Their Body Id*,
       and MODIFIED *Lane-Gate Bodies Carry Their Lane Id*, whose `cell`
       companion 9.1 removes)
-- [ ] 9.1c Pin the EQUALITY, not the presence: a test that burns a fleet to a
+- [x] 9.1c Pin the EQUALITY, not the presence: a test that burns a fleet to a
       lane gate, settles the arrival, and asserts `fleet.AttachedTo` is
       byte-equal to the `id` the interior read served for that same gate — a
       test asserting only "an id is present" would pass against any string.
@@ -602,7 +602,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       Bodies Carry Their Body Id* > "The served gate body id is the id a
       fleet attaches to", "Every lane-gate body carries a non-empty,
       distinct id")
-- [ ] 9.1d The space view SHALL name the served `id` and add no client copy of
+- [x] 9.1d The space view SHALL name the served `id` and add no client copy of
       the server's gate-id naming convention: no `"gate-" + destSystemId`
       concatenation and no `startsWith("gate-")` test may appear in
       `frontend/app/systems/` or the new space-view components. Verified by
@@ -640,7 +640,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
 
 ## 10. Removal and de-latticing
 
-- [ ] 10.1 Delete `frontend/components/board/` in full — `SystemBoardView`,
+- [x] 10.1 Delete `frontend/components/board/` in full — `SystemBoardView`,
       `BoardStage`, `BoardCanvas`, `BoardOverlay`, `FactsPanel`,
       `BalanceReadout`, `SellSection`, `RefuelSection`, `BoardCameraControls`,
       `BoardTuning`, `board-camera`, `board-frame`, `board-pack`,
@@ -648,7 +648,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       `glyph-geometry`, `use-board-gestures`, `use-board-projection`, the
       `webgl/` subtree, and every corresponding test — once sections 1–8 cover
       every surviving requirement
-- [ ] 10.2 Delete `frontend/hooks/use-board-realtime.ts` and
+- [x] 10.2 Delete `frontend/hooks/use-board-realtime.ts` and
       `use-board-realtime.test.tsx`, **carrying `ETA_CUSHION_MS` out of the
       file first** rather than dropping it with the rest. Define it as a
       single exported named constant in a new `frontend/lib/realtime.ts` —
@@ -667,7 +667,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       it in a comment, which is fixed in the same edit), so 10.1 orphans it and
       `hooks/` is outside every other deletion task's scope — it survives as
       dead code unless named (design.md Decision 14)
-- [ ] 10.3 Delete `frontend/lib/types/system-board.ts` and
+- [x] 10.3 Delete `frontend/lib/types/system-board.ts` and
       `frontend/hooks/use-system-board.ts`'s lattice shapes, replacing them
       with the space view's own types generated against the sibling change's
       recorded wire sample
@@ -678,17 +678,46 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       either)
 - [ ] 10.5 Delete `frontend/app/spike/webgl-board/` (`page.tsx`,
       `mock-board.ts`, and their tests) — a tuning bench for the renderer
-      being deleted — and `frontend/app/spike/hex-board/mock-system.ts`
-- [ ] 10.6 Delete `frontend/app/spike/space-3d/` (`sim.ts`, `SpaceView.tsx`,
-      `page.tsx`, and their tests); its production successor now exists
-- [ ] 10.7 Delete the two lattice e2e suites,
+      being deleted. **The scope of this task stops there.**
+      `frontend/app/spike/hex-board/mock-system.ts` is genuine lattice code
+      (axial hex coordinates, `hexDistance`, `ringOf`, ring-banded `Tile`s) but
+      is **not** deleted here, because it has a live importer outside the
+      lattice: `frontend/app/spike/audio/page.tsx` imports `type Character` and
+      `frontend/app/spike/audio/synth.ts` imports `hashSeed` and
+      `type Character` from it. `audio/` is the seeded ambient-engine spike — a
+      separate experiment that no change in this chain owns, and that no task
+      in any change deletes. Neither imported name is lattice: `Character` is
+      the region-character union (`star_rich|normal|dead|barrier`) and
+      `hashSeed` is a string→32-bit hash. Deleting the file breaks a
+      non-lattice spike; deleting `audio/` is scope this change does not have.
+      The file is handed to `delete-the-lattice` task 6.3b, under that change's
+      OQ-5. **This is a recorded survival, not an oversight**
+- [ ] 10.6 **Delete nothing under `frontend/app/spike/space-3d/`.** The
+      earlier instruction to delete it because "its production successor now
+      exists" is withdrawn: `sim.ts` and `SpaceView.tsx` have live importers in
+      two separate, non-lattice experiments — `intel/` (`intel.ts`,
+      `intel.test.ts`, `IntelView.tsx`, `IntelView.test.tsx`, `page.tsx`) and
+      `stealth/` (`stealth.ts`, `stealth.test.ts`, `StealthView.tsx`,
+      `StealthView.test.tsx`, `page.tsx`) — ten files in all, and
+      `stealth/stealth.ts` additionally reuses `intel/intel.ts`. Both are
+      disclosure experiments, not lattice work, and no task in any change
+      deletes either. `space-3d` is itself the continuous-space PoC this whole
+      chain was derived from — the opposite of lattice (`sim.ts:4`: "off the
+      lattice entirely — no rings, no slots, no cells") — and is the named
+      carve-out in `space-kinematics`' Purpose. Verify the tether rather than
+      asserting it: `grep -rn "space-3d" frontend/app --include='*.ts'
+      --include='*.tsx' | grep -v node_modules` SHALL name only those ten
+      files plus `space-3d`'s own files, and nothing outside
+      `frontend/app/spike/`. Handed to `delete-the-lattice` task 6.3b, under
+      that change's OQ-5. **This is a recorded survival, not an oversight**
+- [x] 10.7 Delete the two lattice e2e suites,
       `frontend/e2e/tests/board.spec.ts` and
       `frontend/e2e/tests/board-camera.spec.ts`
-- [ ] 10.8 Rewrite the four remaining e2e suites that use board test ids —
+- [x] 10.8 Rewrite the four remaining e2e suites that use board test ids —
       `jump-commit.spec.ts`, `slice.spec.ts`, `refuel-commit.spec.ts`,
       `new-user.spec.ts` — plus `renderer-availability.spec.ts`, against the
       space view's own test ids
-- [ ] 10.9 Update `galaxy-view`'s "Enter system" navigation target and
+- [x] 10.9 Update `galaxy-view`'s "Enter system" navigation target and
       `fleet-roster`'s "here"-status **wording** to the new terminology. The
       route itself is unchanged — `/systems/:systemId` already exists and is
       already the navigation target; only the copy that calls it a "board"
@@ -703,14 +732,14 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       reason still toasts safely", "A gate absent from the fetched galaxy
       graph still commits", "The jump command is offered for a gate absent
       from the graph")
-- [ ] 10.11 `grep` the whole frontend tree for any surviving import of
+- [x] 10.11 `grep` the whole frontend tree for any surviving import of
       `@/lib/board` or `@/lib/polar` from a non-deleted path; there SHALL be
       none once this section completes — this is `delete-the-lattice`'s
       precondition, and the grep is the evidence
 
 ## 11. Validation and the journey
 
-- [ ] 11.1 Component and unit tests for every requirement in sections 1–8,
+- [x] 11.1 Component and unit tests for every requirement in sections 1–8,
       following each requirement's own scenarios
 - [ ] 11.2 Playwright journey against the real stack: spawn → see the home
       system rendered → burn to a body → dock → mine → sell → refuel → fly to
@@ -722,7 +751,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       when a lower-camel twin is introduced
 - [ ] 11.4 `python3 .claude/skills/code-quality-checks/check.py` and
       `bash .claude/scripts/check.sh --backend --frontend --lint --test` green
-- [ ] 11.5 `openspec validate build-production-space-view --strict` green,
+- [x] 11.5 `openspec validate build-production-space-view --strict` green,
       `python3 .claude/scripts/openspec-reconcile.py build-production-space-view`
       green, and `openspec diff` reviewed against the live text of every
       capability this change touches: `galaxy-view`, `fleet-roster` and
@@ -731,7 +760,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       carries a RENAMED block as well as MODIFIED ones — the archiver applies
       the rename first, so the reconcile gate is the one that proves the
       MODIFIED block still reproduces all seven live scenario headings
-- [ ] 11.6 A composition-level test that renders the space view against the
+- [x] 11.6 A composition-level test that renders the space view against the
       real fan-in and asserts what only the composition can see: the balance
       readout shows a figure, the sell control commits against a station, and
       each fleet verb resolves to exactly one control on screen. Panel-level
@@ -787,15 +816,18 @@ block, or a directory removal). The `## Purpose` edits run **before** the
 which every stale citation has already been removed.
 
 - [ ] 13.1 Hand-edit `openspec/specs/space-kinematics/spec.md`'s `## Purpose`:
-      repoint the `frontend/app/spike/space-3d` carve-out sentence at the
-      spike paths that remain (`audio/`, `intel/`, `hex-board/`, `stealth/`) —
-      **not** simply delete it, because *Every Rule-Bearing Value of This
-      Capability Is Computed Only in the Authoritative Implementation*
-      requires the exemption to be "stated in the capability's Purpose
-      alongside the named path", and deleting the only such statement leaves
-      that clause unsatisfied. Also remove the sentence citing `board-view`'s
-      *Move Preview From the Acting Fleet's Live Position*, which the served
-      burn preview supersedes
+      remove the sentence citing `board-view`'s *Move Preview From the Acting
+      Fleet's Live Position*, which the served burn preview supersedes.
+      **Leave the `frontend/app/spike/space-3d` carve-out sentence exactly as
+      written.** An earlier draft of this task repointed it at "the spike paths
+      that remain", on the premise that task 10.6 deleted `space-3d`. 10.6 no
+      longer deletes it — `intel/` and `stealth/` import it — so the sentence
+      is still true as written, and *Every Rule-Bearing Value of This
+      Capability Is Computed Only in the Authoritative Implementation* requires
+      the exemption to be "stated in the capability's Purpose alongside the
+      named path". Repointing it would name spikes whose conditions that clause
+      has not been checked against; deleting it would leave the clause
+      unsatisfied. Neither is done
 - [ ] 13.2 Hand-edit the three other stale `## Purpose` sections:
       `system-interior` ("a single star system's tactical polar board" and its
       fog-of-war sentence), `fleet-movement` (its `board-tactical-math`
@@ -817,10 +849,12 @@ which every stale citation has already been removed.
       Authoritative Implementation* **unedited**, and confirm by reading it
       that no edit is due: it is written generically over
       `frontend/app/spike/`, names no specific spike, and stays true while
-      `audio/`, `intel/`, `hex-board/` and `stealth/` remain there. An earlier
-      draft proposed hand-editing it on the premise that it "names the
-      now-deleted spike path"; it does not. Only the `## Purpose` sentence
-      names `space-3d`, and 13.1 covers that
+      `space-3d/`, `audio/`, `intel/`, `hex-board/` and `stealth/` remain
+      there — and after 10.5/10.6 all five do. An earlier draft proposed
+      hand-editing it on the premise that it "names the now-deleted spike
+      path"; it does not, and as of 10.6 this change deletes no spike but
+      `webgl-board/`. Only the `## Purpose` sentence names `space-3d`, and
+      13.1 now deliberately leaves that sentence alone
 - [ ] 13.5 After `openspec archive build-production-space-view --yes`
       succeeds and 13.1–13.4 are done, delete `openspec/specs/board-view/` by
       hand (design.md Decision 9; `polar-lattice-math` and

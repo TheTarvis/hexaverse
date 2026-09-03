@@ -287,8 +287,11 @@ leaves a check that passes forever:
 
 **`.claude/scripts/check-mirror-map.sh`**
 17. `:5–11` — the header comment describing both mirrored pairs.
-18. `:181` — the `frontend/app/spike/space-3d` carve-out comment, stale once
-    `build-production-space-view` deletes that spike.
+18. `:181` — the `frontend/app/spike/space-3d` carve-out comment. **Not
+    stale, and not removed** (task 8.9): its premise was that
+    `build-production-space-view` task 10.6 deleted that spike, and 10.6 was
+    narrowed to delete nothing there (OQ-5). Listed so the site is accounted
+    for, not so it is edited.
 19. `:335–345` — `check_mirror board` and `check_mirror polar`, the function's
     only two call sites.
 20. `:376` — the `PASS:` message enumerating the checked packages.
@@ -394,9 +397,12 @@ requirement elsewhere, or governs a computation that ceases to exist:
   today. If enrolling `market` surfaces an uncovered shared function, the
   coverage inventory absorbs it — no new fixture family is in scope here.
 - **`space-kinematics`'s exemption clause requires a spike path in its
-  Purpose.** `build-production-space-view` task 13.1 repoints it at the spikes
-  that survive. This change deletes no spike, so that clause stays satisfied —
-  but section 12's Purpose edit must not remove the sentence.
+  Purpose.** The named path is `frontend/app/spike/space-3d`, and it survives:
+  `build-production-space-view` task 10.6 was narrowed to delete no spike at
+  all, so its task 13.1 now leaves that sentence untouched. This change deletes
+  no spike either (OQ-5 is Travis's to rule), so the clause stays satisfied —
+  but task 13.1's Purpose edit must not remove the sentence, and task 8.9 must
+  not remove the matching carve-out comment in `check-mirror-map.sh`.
 
 ## Migration Plan
 
@@ -441,3 +447,31 @@ Left for Travis. Not answered by fiat.
   Marking either `superseded` is a judgement about the `docs/specs/` numbered
   series, which is Travis's own artifact, not the spec team's. Task 9.4 records
   the state and asks rather than deciding.
+- **OQ-5 — the two lattice tethers under `frontend/app/spike/` that still have
+  live importers.** `build-production-space-view` tasks 10.5/10.6 were narrowed
+  to stop at them; task 6.3b here records them and cuts neither.
+  1. `frontend/app/spike/hex-board/mock-system.ts` **is** lattice, and is
+     imported by `frontend/app/spike/audio/page.tsx` and
+     `frontend/app/spike/audio/synth.ts` for exactly two non-lattice names —
+     `type Character` (the region-character union) and `hashSeed`. `audio/` is
+     the seeded ambient-engine spike.
+  2. `frontend/app/spike/space-3d/` is **not** lattice — it is the
+     continuous-space PoC this chain came from, and the path
+     `space-kinematics`' Purpose names as its exemption — but it is a lattice-
+     era artifact reached only by the deletion sweeps, and it is imported by
+     ten files across `frontend/app/spike/intel/` and
+     `frontend/app/spike/stealth/`, two disclosure experiments.
+
+  The decision each needs, **per tether**, is: migrate the importer to a
+  continuous equivalent (for `hex-board`, that means inlining the two names
+  into `audio/` and deleting the file; for `space-3d` there is no equivalent to
+  migrate to, since it *is* the continuous one), or delete the dependent spike
+  as well. Deleting an experiment of Travis's is not an agent's call, and no
+  change in the chain owns `audio/`, `intel/` or `stealth/`. **Travis: for each
+  tether, migrate the importer or delete the dependent spike — or say both stay
+  and the lattice-deletion goal accepts a named, recorded exception under
+  `frontend/app/spike/`.** Whichever way it goes, task 6.3b already fixes
+  `space-3d/sim.ts`'s citation of `backend/polar` / `frontend/lib/polar`, which
+  fails the sweeps regardless; and a ruling of "delete `space-3d`" additionally
+  flips task 13.1's Purpose edit and task 8.9's site-18 clause from "leave it"
+  to "repoint it".
