@@ -145,7 +145,6 @@ func (h *Handler) GetInterior(c *gin.Context) {
 
 	c.JSON(http.StatusOK, interiorDTO{
 		SystemId:  gen.Interior.SystemId,
-		Radius:    gen.Interior.Radius,
 		Extent:    gen.Interior.Extent,
 		Character: gen.Interior.Character,
 		StarClass: gen.Interior.StarClass,
@@ -161,15 +160,12 @@ func (h *Handler) GetInterior(c *gin.Context) {
 
 type interiorDTO struct {
 	SystemId string `json:"systemId"`
-	// Radius is the LATTICE ring count. Kept exactly as it was; the change
-	// that stops reading it (`build-production-space-view`) is the change
-	// that removes it.
-	Radius int `json:"radius"`
 	// Extent is the interior's CONTINUOUS star-frame upper bound over every
-	// generated body's orbital radius (SystemInterior.Extent), served
-	// ALONGSIDE — never in place of — the lattice Radius
-	// (serve-orbital-elements-and-burn-preview, system-interior "The read
-	// carries the interior's continuous extent"). It is the system-sized
+	// generated body's orbital radius (SystemInterior.Extent). It REPLACED
+	// the lattice ring count `radius`, which openspec
+	// build-production-space-view removed (tasks.md 9.1): serving both would
+	// leave a consumer free to keep scaling continuous space off the lattice
+	// number. It is the system-sized
 	// number a client scales a camera, clamps a pan bound, or bounds a pick
 	// radius with, and it is the one that survives the lattice's removal.
 	// Never `omitempty`: a system whose stored Extent is genuinely zero must

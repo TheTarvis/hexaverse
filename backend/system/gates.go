@@ -4,23 +4,32 @@ import (
 	"context"
 	"sort"
 
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/galaxy"
 	"hexaverse/space"
 )
 
-// LaneGate is a charted lane's fixed gate cell on this system's board — the
-// cell where the lane toward DestSystemId meets the gate ring, the inner edge
-// of the outer band (#0008 Decision #10; radial placement refined
-// 2026-07-14). The bearing is projected deterministically
-// (board.LaneGateCell), so the server and every client agree on it, and it is
-// the SAME projection the fleet uses to compute a departure gate
-// (fleet/travel.go), so the rendered glyph and the cell a fleet actually
-// burns to are one cell.
+// LaneGate is a charted lane's gate BODY in this system — a body like any
+// other, with a continuous position, a size and an orbital element set,
+// which is what a fleet burns to and attaches at. Its lattice `cell` is
+// gone (openspec build-production-space-view, tasks.md 9.1): the gate's
+// place in the world is `Space`/`OrbitElements`, resolved through the same
+// body table every other continuous position folds through.
 type LaneGate struct {
-	DestSystemId string     `json:"destSystemId"`
-	Cell         board.Cell `json:"cell"`
+	// Id is this gate BODY's id in the system's own body table — the string
+	// a burn order names as its `bodyId` and the string `fleet.AttachedTo`
+	// reports once that burn settles (openspec build-production-space-view
+	// tasks.md 9.1b; system-interior *Lane-Gate Bodies Carry Their Body
+	// Id*). Once the lattice `cell` is gone this is the ONLY identity a
+	// client has for a gate, which is why it is served rather than left for
+	// every consumer to reconstruct from the naming convention.
+	//
+	// Populated from gateId — the SAME function that names the gate body in
+	// the body table — here at construction, never in the degradable
+	// fillGateGeometry pass: like LaneId it is a pure function of known
+	// system ids with no missing-data case, so it must never zero-value.
+	Id           string `json:"id"`
+	DestSystemId string `json:"destSystemId"`
 	// LaneId is this crossing's lane id, derived purely from the unordered
 	// pair of system ids (galaxy.LaneIdBetween — replace-observation-with-
 	// sightings tasks.md 4.11, system-interior "Lane-Gate Bodies Carry Their
@@ -32,7 +41,7 @@ type LaneGate struct {
 	// knowledge, exactly as the gate body itself is.
 	LaneId string `json:"laneId"`
 	// Space/Size are the gate body's continuous position and physical
-	// radius, additive alongside Cell (replace-observation-with-sightings
+	// radius (replace-observation-with-sightings
 	// design.md Decisions 5/26; tasks.md 4.7 — "every body, bodies and gate
 	// bodies alike, carries a continuous position and size"). Zero-valued
 	// when no body table was available to resolve them (GetInterior's own
@@ -50,8 +59,10 @@ type LaneGate struct {
 	// a gate whose body is unresolvable degrades exactly as it does today
 	// (nil elements) rather than failing the read.
 	//
-	// Additive alongside the LATTICE `Cell`, which `build-production-space-
-	// view` is the change that removes.
+	// The LATTICE `Cell` this once sat alongside is gone (openspec
+	// build-production-space-view, tasks.md 9.1): a gate's place in the
+	// world is its continuous position, size and element set, like any
+	// other body's.
 	OrbitElements *orbitElementsDTO `json:"orbitElements,omitempty"`
 }
 
@@ -125,13 +136,15 @@ func (s *Service) LaneGates(ctx context.Context, systemID string, radius int) ([
 		default:
 			continue
 		}
-		nc, ok := coords[nb]
-		if !ok {
+		// The neighbour must still be a system in the live galaxy; its
+		// coordinates no longer matter here, now that a gate's place in the
+		// world is its continuous orbit rather than a projected lattice cell.
+		if _, ok := coords[nb]; !ok {
 			continue
 		}
 		gates = append(gates, LaneGate{
+			Id:           gateId(nb),
 			DestSystemId: nb,
-			Cell:         board.LaneGateCell(self.Coords.X, self.Coords.Y, nc.X, nc.Y, radius),
 			LaneId:       galaxy.LaneIdBetween(systemID, nb),
 		})
 	}

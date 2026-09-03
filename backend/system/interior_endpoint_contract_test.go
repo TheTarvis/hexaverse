@@ -67,7 +67,7 @@ func TestGetInterior_Scenario_NoLiveGalaxy404s(t *testing.T) {
 	}
 }
 
-// The base contract restated: radius, character, star class, features,
+// The base contract restated: extent, character, star class, features,
 // charted lane gates, and current world time all ship on a successful read.
 func TestGetInterior_Scenario_ServesTheBaseFieldSet(t *testing.T) {
 	gen := &GeneratedInterior{
@@ -76,7 +76,7 @@ func TestGetInterior_Scenario_ServesTheBaseFieldSet(t *testing.T) {
 			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
 		},
 	}
-	gates := []LaneGate{{DestSystemId: "sys-neighbor", Cell: board.Cell{Ring: 16, Slot: 0}}}
+	gates := []LaneGate{{DestSystemId: "sys-neighbor", LaneId: "lane_s1_sys-neighbor"}}
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -91,7 +91,7 @@ func TestGetInterior_Scenario_ServesTheBaseFieldSet(t *testing.T) {
 
 	var body struct {
 		SystemId  string             `json:"systemId"`
-		Radius    int                `json:"radius"`
+		Extent    float64            `json:"extent"`
 		Character string             `json:"character"`
 		StarClass string             `json:"starClass"`
 		Features  []json.RawMessage  `json:"features"`
@@ -104,9 +104,10 @@ func TestGetInterior_Scenario_ServesTheBaseFieldSet(t *testing.T) {
 	if body.SystemId != "s1" {
 		t.Errorf("systemId = %q, want s1", body.SystemId)
 	}
-	if body.Radius != 16 {
-		t.Errorf("radius = %d, want 16", body.Radius)
-	}
+	// The lattice ring count is gone from the wire (openspec
+	// build-production-space-view, tasks.md 9.1); the continuous `extent` is
+	// its successor and is asserted by
+	// interior_wire_lattice_removal_test.go's own key-set pins.
 	if body.Character != "star-rich" {
 		t.Errorf("character = %q, want star-rich", body.Character)
 	}

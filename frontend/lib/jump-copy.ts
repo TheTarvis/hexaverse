@@ -1,10 +1,12 @@
 // Player-facing copy for the jump command's server rejection reasons
-// (replace-observation-with-sightings tasks.md 4.16; board-view "Jump
+// (replace-observation-with-sightings tasks.md 4.16; `galaxy-view` "Jump
 // Commit" — "on failure an error toast whose copy is mapped from the
 // server's distinguishable rejection reason ... never the raw reason
-// string"; board-view "Rejection Reasons Map to Player-Facing Copy, Not Raw
-// Server Text" — the pre-existing sell-endpoint mapping this extends to the
-// jump command). Same seam and precedent as `lib/market-copy.ts`.
+// string"; `docked-fleet-actions` "Rejection Reasons Map to Player-Facing
+// Copy, Not Raw Server Text" — the shared rejection-copy requirement, which
+// openspec build-production-space-view moved off the retired `board-view`
+// capability, so the code and the spec name the same source (tasks.md
+// 10.10). Same seam and precedent as `lib/market-copy.ts`.
 //
 // The server reports a distinguishable reason for every rejection so the
 // CLIENT can say something useful. Raw reason strings are diagnostics, not

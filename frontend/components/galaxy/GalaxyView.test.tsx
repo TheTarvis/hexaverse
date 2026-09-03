@@ -437,7 +437,29 @@ describe('GalaxyView', () => {
 
     fireEvent.click(screen.getByTestId('fleet-cmd-burn-fleet_1'))
 
-    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Open the system board to choose a target')
+    // SDET, 2026-09-03 — tasks.md 10.9 ("retire the 'board' wording"). This
+    // used to pin the sentence verbatim: 'Open the system board to choose a
+    // target'. The lattice board is deleted by section 10, so a toast that
+    // still calls the destination a "board" sends the player looking for a
+    // surface that no longer exists.
+    //
+    // The assertion is deliberately shape-not-sentence: the exact wording is
+    // a product-copy decision, not this SDET's to legislate. What IS pinned
+    // is what the requirement actually claims — the copy names the space
+    // view a player is being sent to, and no longer names the retired board.
+    // Both halves are load-bearing: dropping the word "board" while saying
+    // nothing useful would satisfy a bare negative check.
+    const copy = vi.mocked(toast.error).mock.calls.at(-1)?.[0] ?? ''
+    expect(copy, 'the burn refusal must tell the player where to go').toBeTruthy()
+    expect(
+      copy,
+      `player-facing copy still calls the destination a "board": ${JSON.stringify(copy)} ` +
+        '(tasks.md 10.9 — the lattice board is deleted by section 10)',
+    ).not.toMatch(/board/i)
+    expect(
+      copy,
+      `the refusal must name the surface that can take a target: ${JSON.stringify(copy)}`,
+    ).toMatch(/system view|space view|system’s view|system's view/i)
     expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0')
   })
 

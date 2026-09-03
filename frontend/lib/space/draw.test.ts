@@ -19,6 +19,8 @@ import { fileURLToPath } from 'node:url'
 //                                                 orbit/stationkeep; absolute
 //                                                 for a point park)
 //   drawDriftPosition(drift, worldTimeMs)      -> DrawVec3  (absolute)
+//     where DrawDrift is { anchor, velocityPerSecond, epochMs } — see the
+//     unit note below.
 //   bezierPointAt(controlPoints, u)            -> DrawVec3
 //   burnDrawParam(departMs, arriveMs, nowMs)   -> number in [0, 1]
 //   isDrawOrigin(p)                            -> boolean   (exact 0,0,0)
@@ -39,6 +41,36 @@ import { fileURLToPath } from 'node:url'
 // server says it is. Verified: the convention reproduces every body and gate
 // in the sample to <= 2e-13 absolute, so the 1e-6 tolerance below is ~7
 // orders of magnitude of headroom and still catches any real error.
+//
+// THE DRIFT VELOCITY'S UNIT (revised 2026-09-03, SDET; cause: the developer
+// disputed the handed-off assertion and the orchestrator ruled in the
+// developer's favour). As handed off, this file pinned
+// `anchor + velocity x (t - epochMs)` with the elapsed term in MILLISECONDS,
+// while `space.Drift` (backend/space/drift.go) serves a velocity per SECOND
+// and evaluates `Anchor.Add(Velocity.Scale(float64(t-EpochMs)/1000))`. The
+// developer made the handed-off test pass by documenting the function as
+// unit-agnostic and dividing by 1000 at the single call site. The ruling:
+// make the unit UNAMBIGUOUS rather than conventional — a function whose
+// correctness depends on every future caller remembering to divide by 1000
+// is one careless call from a 1000x rendering error.
+//
+// The resolution pinned below does BOTH halves the ruling offered, in one
+// move: the function takes the wire's own unit (a per-SECOND velocity and a
+// world-time MILLISECOND stamp, exactly the two fields the server serves and
+// exactly what `space.Drift.Position` consumes), AND the unit is carried in
+// the field name — `velocityPerSecond`, not `velocity` — so a caller that
+// hands it a per-millisecond rate fails to compile rather than rendering a
+// fleet 1000x too far out. The /1000 lives inside the function, once.
+//
+// Why the unit went on the FIELD rather than on the time parameter (the
+// other option the ruling allowed): every other function in this module
+// takes `worldTimeMs`, and a single dissenting `elapsedSeconds` parameter is
+// its own trap — it would also force each caller to compute `t - epochMs`
+// itself, restoring by hand the very subtraction this function exists to own.
+//
+// The `SDET-added` drift cases below are calibrated to DISCRIMINATE: a
+// millisecond reading of the same fixture lands 1000x away, far outside
+// every tolerance here.
 //
 // This is a TEST-side comparison only. `system-space-view` forbids production
 // code from comparing a drawn position to a served one; it does not forbid a
@@ -115,6 +147,38 @@ function drawAbsolute(id: string, t: number): DrawVec3 {
   return vecAdd(drawAbsolute(body.orbitElements.parentId, t), drawOrbitPosition(body.orbitElements, t))
 }
 
+// The three bodies the composition assertions below need, DISCOVERED from the
+// sample rather than pinned by id.
+//
+// SDET NOTE, 2026-09-03 (openspec change `build-production-space-view`, Job 2
+// of the SDET pass). These were `feat-moon-0` with parent `feat-body-3`, and
+// `feat-station` with parent `feat-body-1` — the ids and the parent links of
+// ONE recorded home system. The recorder
+// (`backend/orbit_elements_wire_e2e_test.go`) spawns a fresh corporation into
+// a different system every time it runs, so every re-recording reshuffled the
+// parent chain and red these two tests for a reason that has nothing to do
+// with the code under test. What the assertions are actually about is the
+// COMPOSITION — a grandchild draws onto its parent's drawn position, not onto
+// the star — and that property is expressible without naming anybody. The
+// recorder now refuses to record a sample that carries no such body, so
+// `grandchild` below can never quietly become undefined.
+
+/** A body whose own parent is itself parented — a moon, or a station on a planet. */
+const grandchild = wire.features.find((f) => {
+  const parentId = f.orbitElements?.parentId
+  if (!parentId) return false
+  const parent = byId.get(parentId)
+  return !!parent?.orbitElements?.parentId
+})
+
+/** The spawned home system's NPC trading post. */
+const station = wire.features.find((f) => f.type === 'station')
+
+/** A body that actually revolves — a non-zero period and a non-zero radius. */
+const revolving = wire.features.find(
+  (f) => (f.orbitElements?.periodMs ?? 0) > 0 && (f.orbitElements?.radius ?? 0) > 0,
+)
+
 function expectClose(got: DrawVec3, want: { X: number; Y: number; Z: number }, what: string) {
   expect(Math.abs(got.x - want.X), `${what}: x`).toBeLessThan(TOL)
   expect(Math.abs(got.y - want.Y), `${what}: y`).toBeLessThan(TOL)
@@ -152,21 +216,29 @@ describe('lib/space/draw — drawOrbitPosition against the recorded wire sample'
 
   it('SDET-added: a moon composes onto its parent planet rather than onto the star', () => {
     const t = wire.worldTime
-    const moon = byId.get('feat-moon-0')!
-    expect(moon.orbitElements!.parentId).toBe('feat-body-3')
-    // Drawn from the star alone (ignoring the parent) it would be ~125 units
-    // out of place; the composition is what this asserts.
+    expect(
+      grandchild,
+      'the recorded sample must carry a body whose parent is itself parented — the backend recorder refuses ' +
+        'to record one that does not, so an absent grandchild means the sample was hand-edited',
+    ).toBeDefined()
+    const moon = grandchild!
+    const parentId = moon.orbitElements!.parentId
+    // Its parent is a body in its own orbit, NOT the system's parentless root.
+    expect(byId.get(parentId)?.orbitElements?.parentId, `${moon.id}'s parent must itself be parented`).toBeTruthy()
     const local = drawOrbitPosition(moon.orbitElements!, t)
-    expectClose(vecAdd(drawAbsolute('feat-body-3', t), local), moon.space, 'moon composed onto parent')
+    expectClose(vecAdd(drawAbsolute(parentId, t), local), moon.space, `${moon.id} composed onto ${parentId}`)
+    // Drawn from the star alone (ignoring the parent) it lands well away from
+    // the served position; the composition is what this asserts.
     const wrong = Math.abs(local.x - moon.space.X) + Math.abs(local.z - moon.space.Z)
     expect(wrong, 'the local offset alone must NOT already equal the served absolute position').toBeGreaterThan(1)
   })
 
   it('SDET-added: the station composes onto its host planet', () => {
     const t = wire.worldTime
-    const station = byId.get('feat-station')!
-    expect(station.orbitElements!.parentId).toBe('feat-body-1')
-    expectClose(drawAbsolute('feat-station', t), station.space, 'station')
+    expect(station, 'every spawn home carries exactly one station body').toBeDefined()
+    const host = station!.orbitElements!.parentId
+    expect(host, 'the station orbits a host body, never nothing').toBeTruthy()
+    expectClose(drawAbsolute(station!.id, t), station!.space, `station on ${host}`)
   })
 
   it('Scenario: A lane-gate body\'s read carries its full orbital element set (a gate draws from its elements like any other body)', () => {
@@ -189,7 +261,8 @@ describe('lib/space/draw — drawOrbitPosition against the recorded wire sample'
   })
 
   it('SDET-added: advancing world time by exactly one period returns the same drawn position', () => {
-    const el = byId.get('feat-body-0')!.orbitElements!
+    expect(revolving, 'the sample must carry a body with a non-zero period and radius').toBeDefined()
+    const el = revolving!.orbitElements!
     const a = drawOrbitPosition(el, wire.worldTime)
     const b = drawOrbitPosition(el, wire.worldTime + el.periodMs)
     expect(Math.abs(a.x - b.x)).toBeLessThan(TOL)
@@ -198,7 +271,8 @@ describe('lib/space/draw — drawOrbitPosition against the recorded wire sample'
   })
 
   it('SDET-added: a half period moves the drawn position, so the evaluation is not frozen', () => {
-    const el = byId.get('feat-body-0')!.orbitElements!
+    expect(revolving, 'the sample must carry a body with a non-zero period and radius').toBeDefined()
+    const el = revolving!.orbitElements!
     const a = drawOrbitPosition(el, wire.worldTime)
     const b = drawOrbitPosition(el, wire.worldTime + Math.round(el.periodMs / 2))
     const moved = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
@@ -206,7 +280,8 @@ describe('lib/space/draw — drawOrbitPosition against the recorded wire sample'
   })
 
   it('SDET-added: a world time before the world epoch still draws a finite position', () => {
-    const el = byId.get('feat-body-0')!.orbitElements!
+    expect(revolving, 'the sample must carry a body with a non-zero period and radius').toBeDefined()
+    const el = revolving!.orbitElements!
     const p = drawOrbitPosition(el, -12345)
     expect(Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)).toBe(true)
     expect(Math.hypot(p.x, p.y, p.z)).toBeCloseTo(el.radius, 6)
@@ -274,13 +349,50 @@ describe('lib/space/draw — drawParkPosition and drawDriftPosition', () => {
     expect(drawParkPosition(park, 5_000_000)).toEqual({ x: 11, y: 12, z: 13 })
   })
 
-  it('SDET-added: a drift is anchor + velocity x elapsed, and is exactly the anchor at its epoch', () => {
-    const drift = { anchor: { x: 1, y: 2, z: 3 }, velocity: { x: 0.5, y: 0, z: -0.25 }, epochMs: 1000 }
+  it('SDET-added: a drift is anchor + velocityPerSecond x elapsed SECONDS, and is exactly the anchor at its epoch', () => {
+    const drift = {
+      anchor: { x: 1, y: 2, z: 3 },
+      velocityPerSecond: { x: 0.5, y: 0, z: -0.25 },
+      epochMs: 1000,
+    }
+    // At the epoch the elapsed term vanishes under either unit — the anchor
+    // case is a floor, not the discriminator.
     expect(drawDriftPosition(drift, 1000)).toEqual({ x: 1, y: 2, z: 3 })
-    const later = drawDriftPosition(drift, 1000 + 4)
+
+    // 4000 ms = 4 SECONDS after the epoch. Under the per-second contract:
+    //   x = 1 + 0.5x4 = 3,  y = 2,  z = 3 - 0.25x4 = 2.
+    // An implementation that read the elapsed term as milliseconds would put
+    // this at x = 2001, z = -997 — the 1000x error the unit name exists to
+    // make impossible.
+    const later = drawDriftPosition(drift, 1000 + 4000)
     expect(later.x).toBeCloseTo(3, 9)
     expect(later.y).toBeCloseTo(2, 9)
     expect(later.z).toBeCloseTo(2, 9)
+  })
+
+  it('SDET-added: a drift matches space.Drift.Position for the server\'s own units', () => {
+    // The same fixture backend/space/codec_state_test.go round-trips
+    // (Velocity {1.5, 0, -0.75} per second at a real world-ms epoch),
+    // evaluated by the server's formula: Anchor + Velocity x (t-epoch)/1000.
+    const epochMs = 1_700_000_000_000
+    const drift = {
+      anchor: { x: -10, y: 4, z: 7 },
+      velocityPerSecond: { x: 1.5, y: 0, z: -0.75 },
+      epochMs,
+    }
+    const at = drawDriftPosition(drift, epochMs + 2500) // 2.5 s
+    expect(at.x).toBeCloseTo(-10 + 1.5 * 2.5, 9)
+    expect(at.y).toBeCloseTo(4, 9)
+    expect(at.z).toBeCloseTo(7 - 0.75 * 2.5, 9)
+  })
+
+  it('SDET-added: the elapsed term is signed — a time before the epoch displaces backward', () => {
+    const drift = {
+      anchor: { x: 0, y: 0, z: 0 },
+      velocityPerSecond: { x: 2, y: 0, z: 0 },
+      epochMs: 10_000,
+    }
+    expect(drawDriftPosition(drift, 10_000 - 3000).x).toBeCloseTo(-6, 9)
   })
 })
 

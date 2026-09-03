@@ -49,11 +49,13 @@ setup('authenticate', async ({ page }) => {
   if (await page.getByTestId('wake-up-flow').isVisible()) {
     await page.getByTestId('wake-name-input').fill('E2E Lineage')
     await page.getByTestId('wake-submit').click()
-    // Spawn drops the player onto their home system's board (#0009 → #0007); an
+    // Spawn drops the player onto their home system's SPACE VIEW (#0009 →
+    // #0007, retestid'd by openspec build-production-space-view tasks.md
+    // 10.1/10.8 — `system-board-view` died with `components/board/`); an
     // already-woken account would instead show the galaxy. Either proves the
     // woken session is ready to save.
     await expect(
-      page.getByTestId('system-board-view').or(page.getByTestId('galaxy-view')),
+      page.getByTestId('space-view').or(page.getByTestId('galaxy-view')),
     ).toBeVisible({ timeout: 30_000 })
   }
 

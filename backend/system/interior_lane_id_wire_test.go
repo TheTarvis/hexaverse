@@ -21,8 +21,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"hexaverse/board"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,8 +30,8 @@ import (
 func TestGetInterior_Scenario_LaneGateBodyCarriesNonEmptyLaneIdOnTheWire(t *testing.T) {
 	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1", Radius: 16}}
 	gates := []LaneGate{
-		{DestSystemId: "sys-neighbor-a", Cell: board.Cell{Ring: 16, Slot: 0}, LaneId: "lane_0_0_10_0"},
-		{DestSystemId: "sys-neighbor-b", Cell: board.Cell{Ring: 16, Slot: 48}, LaneId: "lane_0_0_0_10"},
+		{DestSystemId: "sys-neighbor-a", LaneId: "lane_0_0_10_0"},
+		{DestSystemId: "sys-neighbor-b", LaneId: "lane_0_0_0_10"},
 	}
 
 	gin.SetMode(gin.TestMode)

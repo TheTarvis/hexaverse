@@ -1,27 +1,39 @@
 package main
 
-// Additive-wire guard for openspec change replace-observation-with-sightings,
-// tasks.md 8.1 — "the interior read continues to serve features[].footprint,
-// features[].band (constant \"visible\"), features[].live (constant true), and
-// laneGates[].cell unchanged alongside the new space/size/contacts fields —
-// the live board is the only playable view until a later link deletes these."
-// (system-interior: "Interior Read Endpoint" — "Pre-existing wire fields are
-// unchanged"; the same requirement's "A materialized system's read carries
-// every body's continuous position and size" is the ALONGSIDE half asserted
-// here too, since "additive" is a claim about the two field sets TOGETHER and
-// is not provable by testing either one alone.)
+// Wire guard for the system interior read, at the REAL router.
 //
-// WHY AT THIS LEVEL, AGAINST THE REAL ROUTER: the risk this guard exists for
-// is a tidy-up — someone deleting `Band`/`Live`/`Footprint` from
-// system/fog.go's DTO, or `Cell` from system.LaneGate, on the reasonable-
-// sounding grounds that continuous space has superseded the lattice. Every
-// handler-level test in `system` builds its interior from a hand-written
-// fixture, so a field dropped from the DTO can only be caught by asserting on
-// the SERIALIZED response of a REAL, generated, materialized interior. This
-// test therefore drives SetupRouter() itself — the production composition,
-// real Firestore emulator, real Firebase Auth emulator token, real generated
-// system — and asserts on the raw JSON object keys, not on a Go struct that
-// would silently decode a missing field as a zero value.
+// HISTORY, and what this file now asserts. It began (openspec change
+// replace-observation-with-sightings, tasks.md 8.1) as the ADDITIVE guard for
+// link 8a-1: the interior read had to keep serving features[].footprint,
+// features[].band, features[].live and laneGates[].cell alongside the new
+// space/size/contacts fields, because the lattice board was the only playable
+// view "until a later link deletes these". Link 8a-2 —
+// build-production-space-view, tasks.md 9.1 — IS that later link. It deletes
+// every one of those fields, and it retires the requirement that carried the
+// scenario this test was named for: `system-interior`'s *Interior Read
+// Endpoint* > "Pre-existing wire fields are unchanged" is REMOVED, re-added as
+// *Interior Read Serves Continuous Bodies*, whose *Lattice-only fields are
+// absent from the response* asserts the exact opposite.
+//
+// The four presence assertions were therefore RETARGETED, not weakened: the
+// same real-router, real-generated-system, key-presence guard now pins the
+// lattice fields ABSENT (system-interior: "Lattice-only fields are absent from
+// the response") and the continuous fields PRESENT AND RESOLVED
+// (system-interior: "A materialized system's read carries every body's
+// continuous position and size"), plus the served lane-gate `id` that 9.1b
+// added in the same section (system-interior: "Every lane-gate body carries a
+// non-empty, distinct id"). Nothing else in the file changed.
+//
+// WHY AT THIS LEVEL, AGAINST THE REAL ROUTER: every handler-level test in
+// `system` builds its interior from a hand-written fixture, so a field that
+// survives serialization only for a three-body fixture — or a continuous
+// position that resolves only for one — is invisible there. This test drives
+// SetupRouter() itself: the production composition, real Firestore emulator,
+// real Firebase Auth emulator token, real generated system, and assertions on
+// the raw JSON object keys rather than on a Go struct that would silently
+// decode a missing field as a zero value. The absence half needs that same
+// level for the mirror-image reason: a lattice field re-added to the DTO by a
+// merge would be served here and nowhere a fixture-driven test could see it.
 //
 // Non-vacuity: the feature and lane-gate counts are asserted non-zero before
 // anything else, so an empty response can never satisfy a per-element loop.
@@ -32,7 +44,6 @@ import (
 	"sort"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/space"
 )
 
@@ -48,7 +59,7 @@ type rawInterior struct {
 	Contacts *[]json.RawMessage `json:"contacts"`
 }
 
-func TestInteriorRead_Scenario_PreExistingWireFieldsAreUnchanged(t *testing.T) {
+func TestInteriorRead_Scenario_ContinuousBodiesServedAndLatticeFieldsAbsent(t *testing.T) {
 	requireE2EEmulators(t)
 	ensureFirebaseInitialized(t)
 
@@ -85,51 +96,31 @@ func TestInteriorRead_Scenario_PreExistingWireFieldsAreUnchanged(t *testing.T) {
 			"Body: %s", homeId, w.Body.String())
 	}
 	if len(body.LaneGates) == 0 {
-		t.Fatalf("the interior read for %q served ZERO lane gates — the laneGates[].cell assertions below would "+
+		t.Fatalf("the interior read for %q served ZERO lane gates — the laneGates[] assertions below would "+
 			"be vacuous. Body: %s", homeId, w.Body.String())
 	}
 
-	// --- features[]: the pre-existing lattice fields, unchanged -------------
+	// --- features[]: the continuous fields, and no lattice ------------------
 	anyNonZeroSpace := false
 	starSize := 0.0
 	for i, f := range body.Features {
 		id := rawString(t, f["id"])
-		for _, key := range []string{"footprint", "band", "live"} {
-			if _, ok := f[key]; !ok {
-				t.Errorf("system-interior \"Pre-existing wire fields are unchanged\": feature #%d (%q) carries NO "+
-					"%q key. The live board is the only playable view until a later link deletes these fields — "+
-					"dropping one is a broken game, not a tidy-up. Keys served: %v", i, id, key, jsonKeys(f))
-				continue
-			}
-		}
-		// The two constants, by value — a field kept but emptied is the same
-		// regression as a field deleted.
-		if band := rawString(t, f["band"]); band != "visible" {
-			t.Errorf("feature %q: band = %q, want the constant \"visible\"", id, band)
-		}
-		var live bool
-		if raw, ok := f["live"]; ok {
-			if err := json.Unmarshal(raw, &live); err != nil {
-				t.Errorf("feature %q: live is not a bool (%s): %v", id, raw, err)
-			} else if !live {
-				t.Errorf("feature %q: live = false, want the constant true", id)
-			}
-		}
-		var footprint []board.Cell
-		if raw, ok := f["footprint"]; ok {
-			if err := json.Unmarshal(raw, &footprint); err != nil {
-				t.Errorf("feature %q: footprint does not decode as []board.Cell (%s): %v", id, raw, err)
-			} else if len(footprint) == 0 {
-				t.Errorf("feature %q: footprint is empty — the lattice footprint is what the live board draws "+
-					"from, so an empty one is a body the player cannot see", id)
+		// RETARGETED (was: footprint/band/live must be PRESENT). 9.1 deleted
+		// them; a field that reappears here is a merge that undid the
+		// removal, and only a serialized real response can see it.
+		for _, key := range []string{"footprint", "band", "live", "orbit", "parentId", "fixed", "asOf"} {
+			if _, ok := f[key]; ok {
+				t.Errorf("system-interior \"Lattice-only fields are absent from the response\": feature #%d (%q) "+
+					"still carries the lattice key %q. The continuous position/size/orbitElements set is the "+
+					"body's only placement now. Keys served: %v", i, id, key, jsonKeys(f))
 			}
 		}
 
-		// --- ALONGSIDE: the new continuous fields, on the same object -------
+		// --- the continuous fields, on the same object ---------------------
 		for _, key := range []string{"space", "size"} {
 			if _, ok := f[key]; !ok {
 				t.Errorf("system-interior \"A materialized system's read carries every body's continuous position "+
-					"and size\": feature #%d (%q) carries no %q key alongside its lattice footprint", i, id, key)
+					"and size\": feature #%d (%q) carries no %q key. Keys served: %v", i, id, key, jsonKeys(f))
 			}
 		}
 		var pos space.Vec3
@@ -144,43 +135,55 @@ func TestInteriorRead_Scenario_PreExistingWireFieldsAreUnchanged(t *testing.T) {
 			}
 		}
 	}
-	// The additive claim is about BOTH sets being real at once: if `space` were
-	// present but never resolved, every body would sit at the origin and the
-	// "alongside" half would be a lie told with a zero value.
+	// Presence alone proves nothing: if `space` were served but never
+	// resolved, every body would sit at the origin and the key would be a lie
+	// told with a zero value — which, now that the lattice footprint is gone,
+	// is a system with every body stacked on its star.
 	if !anyNonZeroSpace {
-		t.Errorf("every feature's `space` is the zero vector — the continuous position is on the wire but was "+
-			"never resolved, so the new fields are not in fact serving alongside the lattice ones")
+		t.Errorf("every feature's `space` is the zero vector — the continuous position is on the wire but was " +
+			"never resolved, and it is now the ONLY placement a client has")
 	}
 	if starSize <= 0 {
-		t.Errorf("the star feature's `size` = %v, want a positive radius (the new size field must carry a real "+
+		t.Errorf("the star feature's `size` = %v, want a positive radius (the size field must carry a real "+
 			"value, not a placeholder zero)", starSize)
 	}
 
-	// --- laneGates[]: the pre-existing cell, unchanged ----------------------
+	// --- laneGates[]: no cell, and the served body id -----------------------
+	//
+	// RETARGETED (was: every gate must carry `cell`). 9.1 deleted it and 9.1b
+	// put the served body `id` in its place as the gate's only identity, so
+	// the two are asserted together: the field that went and the field that
+	// replaced it.
+	gateIds := map[string]int{}
 	for i, g := range body.LaneGates {
 		dest := rawString(t, g["destSystemId"])
-		if _, ok := g["cell"]; !ok {
-			t.Errorf("system-interior \"Pre-existing wire fields are unchanged\": lane gate #%d (to %q) carries "+
-				"NO `cell` key — the live board draws every gate from it. Keys served: %v", i, dest, jsonKeys(g))
-			continue
+		if _, ok := g["cell"]; ok {
+			t.Errorf("system-interior \"Lattice-only fields are absent from the response\": lane gate #%d (to %q) "+
+				"still carries a `cell`. A gate is placed by `space`/`orbitElements` like any other body. "+
+				"Keys served: %v", i, dest, jsonKeys(g))
 		}
-		var cell board.Cell
-		if err := json.Unmarshal(g["cell"], &cell); err != nil {
-			t.Errorf("lane gate to %q: cell does not decode as a board.Cell (%s): %v", dest, g["cell"], err)
-			continue
-		}
-		if cell.Ring <= 0 {
-			t.Errorf("lane gate to %q: cell = %+v, want a gate-ring cell (board.GateRing(radius) is >= 1, never "+
-				"the core cell) — a zeroed cell is a dropped field wearing a zero value", dest, cell)
-		}
-		for _, key := range []string{"laneId", "space", "size"} {
+		for _, key := range []string{"id", "laneId", "space", "size"} {
 			if _, ok := g[key]; !ok {
-				t.Errorf("lane gate #%d (to %q) carries no %q key alongside its cell", i, dest, key)
+				t.Errorf("lane gate #%d (to %q) carries no %q key. Keys served: %v", i, dest, key, jsonKeys(g))
 			}
 		}
 		if laneId := rawString(t, g["laneId"]); laneId == "" {
 			t.Errorf("lane gate to %q: laneId is empty — it is a pure function of two known system ids and must "+
 				"never zero-value", dest)
+		}
+		gateId := rawString(t, g["id"])
+		if gateId == "" {
+			t.Errorf("system-interior \"Every lane-gate body carries a non-empty, distinct id\": lane gate #%d "+
+				"(to %q) has an empty `id` — with `cell` gone this is the only identity a client has for the "+
+				"gate, and the string a burn order must name", i, dest)
+			continue
+		}
+		gateIds[gateId]++
+	}
+	for id, n := range gateIds {
+		if n > 1 {
+			t.Errorf("system-interior \"Every lane-gate body carries a non-empty, distinct id\": %d lane gates "+
+				"share the id %q", n, id)
 		}
 	}
 

@@ -152,3 +152,53 @@ const realGetContext = HTMLCanvasElement.prototype.getContext
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (realGetContext as any)?.call(this, contextId, ...args)
 }
+// PointerEvent polyfill (openspec build-production-space-view). jsdom ships
+// no `PointerEvent` constructor, so Testing Library's `fireEvent.pointerDown`
+// falls back to a bare `Event` — which silently DROPS `clientX`/`clientY`,
+// `button` and `pointerId`. Every pointer-driven assertion in a suite then
+// runs against coordinate-less events, and a 4-pixel press becomes
+// indistinguishable from a 40-pixel drag: the click/gesture threshold, the
+// pick position, and the primary/secondary button split all stop being
+// observable. This is an ENVIRONMENT gap, not a product behaviour — the
+// polyfill below is the smallest thing that makes a fired pointer event
+// carry what a browser's would.
+if (typeof window !== 'undefined' && typeof window.PointerEvent === 'undefined') {
+  class PointerEventPolyfill extends MouseEvent {
+    readonly pointerId: number
+    readonly width: number
+    readonly height: number
+    readonly pressure: number
+    readonly tangentialPressure: number
+    readonly tiltX: number
+    readonly tiltY: number
+    readonly twist: number
+    readonly pointerType: string
+    readonly isPrimary: boolean
+
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init)
+      this.pointerId = init.pointerId ?? 0
+      this.width = init.width ?? 1
+      this.height = init.height ?? 1
+      this.pressure = init.pressure ?? 0
+      this.tangentialPressure = init.tangentialPressure ?? 0
+      this.tiltX = init.tiltX ?? 0
+      this.tiltY = init.tiltY ?? 0
+      this.twist = init.twist ?? 0
+      this.pointerType = init.pointerType ?? 'mouse'
+      this.isPrimary = init.isPrimary ?? true
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(window as any).PointerEvent = PointerEventPolyfill
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(globalThis as any).PointerEvent = PointerEventPolyfill
+  for (const name of ['setPointerCapture', 'releasePointerCapture', 'hasPointerCapture'] as const) {
+    if (!(name in Element.prototype)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(Element.prototype as any)[name] = function () {
+        return name === 'hasPointerCapture' ? false : undefined
+      }
+    }
+  }
+}

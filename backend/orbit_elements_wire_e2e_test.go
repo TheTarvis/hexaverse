@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"hexaverse/charts"
@@ -318,9 +319,16 @@ func TestInteriorWire_Scenario_TheReadCarriesTheInteriorsContinuousExtent(t *tes
 		t.Errorf("extent = %v, want the value the interior's stored document holds (%v)",
 			extent, gen.Interior.Extent)
 	}
-	if _, ok := got.top["radius"]; !ok {
-		t.Error("the interior read no longer carries the lattice `radius` — `extent` is served ALONGSIDE " +
-			"it, never in place of it")
+	// RETARGETED 2026-09-03 (build-production-space-view, tasks.md 9.1). This
+	// was "`extent` is served ALONGSIDE `radius`, never in place of it" — the
+	// additive guarantee of the change that introduced `extent`. 9.1 deletes
+	// the lattice `radius` outright, so `extent` IS its replacement now, and
+	// the assertion that still has meaning is the mirror image: the lattice
+	// number must not come back to be scaled off
+	// (system-interior: "Lattice-only fields are absent from the response").
+	if _, ok := got.top["radius"]; ok {
+		t.Error("the interior read still carries the lattice `radius` — `extent` replaced it, and a consumer " +
+			"that finds both will scale continuous space off the lattice number")
 	}
 }
 
@@ -363,10 +371,54 @@ func TestInteriorWire_Scenario_TheReadCarriesTheWorldClocksScale(t *testing.T) {
 // a REAL payload rather than a paraphrase of design.md.
 const goldenWireDir = "testdata/serve-orbital-elements-and-burn-preview"
 
-// TestGoldenWireSample_RecordOneInteriorReadAndOnePreviewResponse records both
-// payloads. It is a RECORDER, not an assertion of shape — but it fails when
-// either payload is missing the fields the recording exists to publish, so it
-// cannot silently record a pre-change response and call it a contract.
+// recordGoldenEnv gates the one destructive act in this file. See the test
+// below.
+const recordGoldenEnv = "RECORD_GOLDEN_WIRE"
+
+// latticeFeatureKeys / latticeGateKeys are the fields build-production-space-
+// view's tasks.md 9.1 removed from the interior read. A committed sample that
+// still advertises one is not a stale-but-harmless file: `frontend/lib/types/
+// system-space.ts` is typed BY READING this sample, so a lattice key here is a
+// lattice key back in the client's type.
+var (
+	latticeTopKeys     = []string{"radius"}
+	latticeFeatureKeys = []string{"footprint", "orbit", "parentId", "fixed", "band", "live", "asOf"}
+	latticeGateKeys    = []string{"cell"}
+)
+
+// TestGoldenWireSample_RecordOneInteriorReadAndOnePreviewResponse asserts the
+// committed golden samples ARE the contract the current wire serves, and
+// re-records them on request.
+//
+// SDET NOTE, 2026-09-03 — WHY THIS IS NOT A PLAIN RECORDER ANY MORE. As
+// written for tasks.md 1.12 it wrote both files to their committed paths
+// BEFORE its assertions ran, and it wrote them on every single run. Two
+// distinct defects came out of that:
+//
+//  1. A FAILING RUN MUTATED A COMMITTED FIXTURE. `writeGolden` ran first and
+//     the shape assertions second, so a run that failed still left the
+//     recorded payload on disk. It happened twice during
+//     build-production-space-view's implementation and both files had to be
+//     restored from git.
+//  2. A PASSING RUN MUTATED IT TOO, NONDETERMINISTICALLY. Each run spawns a
+//     fresh corporation into a different home system, so the sample's bodies,
+//     their parent chain and its numbers all change. `go test ./...` is not
+//     allowed to rewrite a committed file, and it certainly is not allowed to
+//     rewrite one that a downstream suite pins assertions against:
+//     `frontend/lib/space/draw.test.ts` evaluates the served elements of every
+//     body in this sample and composes a moon and a station onto their
+//     parents.
+//
+// So: the assertions run FIRST, on the in-memory payloads; the write happens
+// only after they all pass; it goes to a temp path and is promoted by rename;
+// and promotion happens only when RECORD_GOLDEN_WIRE is set in the
+// environment. A default run therefore leaves the committed samples
+// byte-identical while still failing if the live wire has drifted away from
+// them — which is the check this file previously did not have, and which is
+// how the samples went stale in the first place.
+//
+// TO RE-RECORD:  RECORD_GOLDEN_WIRE=1 ENV=TEST go test . -run TestGoldenWireSample
+// then re-run `cd frontend && npx vitest run lib/space/draw.test.ts`.
 func TestGoldenWireSample_RecordOneInteriorReadAndOnePreviewResponse(t *testing.T) {
 	requireE2EEmulators(t)
 	ensureFirebaseInitialized(t)
@@ -375,49 +427,196 @@ func TestGoldenWireSample_RecordOneInteriorReadAndOnePreviewResponse(t *testing.
 	sp := spawnFuelCorp(t, router, "SDET Golden Wire Sample Corp")
 	setFleetFuel(t, sp.fleetId, 1_000_000)
 
-	if err := os.MkdirAll(goldenWireDir, 0o755); err != nil {
-		t.Fatalf("creating %s: %v", goldenWireDir, err)
-	}
-
 	iw := doJSON(t, router, http.MethodGet, "/v1/systems/"+sp.homeId, sp.token, nil, nil)
 	if iw.Code != http.StatusOK {
 		t.Fatalf("GET /v1/systems/%s: status = %d", sp.homeId, iw.Code)
 	}
-	writeGolden(t, filepath.Join(goldenWireDir, "interior-read.json"), iw.Body.Bytes())
-
 	pw := postPreview(t, router, sp.token, sp.fleetId, pointOrder())
 	if pw.Code != http.StatusOK {
 		t.Fatalf("POST %s: status = %d, body = %s — there is no preview payload to record",
 			previewPath(sp.fleetId), pw.Code, pw.Body.String())
 	}
-	writeGolden(t, filepath.Join(goldenWireDir, "preview-response.json"), pw.Body.Bytes())
 
-	// The recording must actually carry this change's own additions, or the
-	// sample is a paraphrase of the PREVIOUS contract with a new filename.
-	var interior map[string]json.RawMessage
-	if err := json.Unmarshal(iw.Body.Bytes(), &interior); err != nil {
-		t.Fatalf("decoding the recorded interior read: %v", err)
-	}
-	for _, k := range []string{"extent", "scale", "features", "laneGates", "worldTime", "radius"} {
-		if _, ok := interior[k]; !ok {
-			t.Errorf("the recorded interior sample carries no `%s` — a golden payload missing this "+
-				"change's own additions is not a contract for build-production-space-view to type "+
-				"against", k)
+	recording := os.Getenv(recordGoldenEnv) != ""
+	committedPath := filepath.Join(goldenWireDir, "interior-read.json")
+
+	// --- 1. the LIVE payload is fit to be the contract ----------------------
+	//
+	// This half runs in BOTH modes: an unfit live response must never be
+	// promoted to a committed sample, whatever the environment says.
+	assertGoldenInteriorFitness(t, "the live interior read", iw.Body.Bytes())
+
+	// --- 2. the COMMITTED sample has not drifted from the live wire ---------
+	//
+	// Skipped while recording, and only then: re-recording is the ACT of
+	// repairing drift, so holding the outgoing file to the standard the
+	// incoming one is about to meet would make a stale sample unfixable.
+	//
+	// The top-level key SET is compared, not the values: the values are a
+	// different system every run, but the shape is the DTO's and is fixed. A
+	// field added to or removed from `system.interiorDTO` without re-recording
+	// fails here — the drift that let the committed sample keep advertising
+	// `radius`, `footprint`, `band`, `live` and `cell` for a whole link after
+	// they were deleted.
+	if !recording {
+		committed, err := os.ReadFile(committedPath)
+		if err != nil {
+			t.Fatalf("reading the committed golden sample %s: %v — it is a checked-in contract, not an output; "+
+				"re-record it with %s=1 rather than leaving it absent", committedPath, err, recordGoldenEnv)
+		}
+		assertGoldenInteriorFitness(t, "the committed sample "+committedPath, committed)
+		if live, want := topLevelKeys(t, iw.Body.Bytes()), topLevelKeys(t, committed); !equalStrings(live, want) {
+			t.Errorf("the committed golden sample's top-level key set has drifted from the live wire:\n"+
+				"  live      = %v\n  committed = %v\nRe-record with %s=1 and re-pin any frontend suite that "+
+				"reads the sample.", live, want, recordGoldenEnv)
 		}
 	}
+
+	// --- 3. record, only now, and only when asked ---------------------------
+	if t.Failed() {
+		t.Fatalf("NOT recording: the assertions above failed, and a failing run must never overwrite a "+
+			"committed fixture (set %s=1 only once they pass)", recordGoldenEnv)
+	}
+	if !recording {
+		t.Logf("committed golden samples verified against the live wire; not re-recording (set %s=1 to "+
+			"re-record)", recordGoldenEnv)
+		return
+	}
+	if err := os.MkdirAll(goldenWireDir, 0o755); err != nil {
+		t.Fatalf("creating %s: %v", goldenWireDir, err)
+	}
+	writeGolden(t, committedPath, iw.Body.Bytes())
+	writeGolden(t, filepath.Join(goldenWireDir, "preview-response.json"), pw.Body.Bytes())
+}
+
+// assertGoldenInteriorFitness is the whole standard a payload must meet to be
+// this repo's interior-read contract. It runs against BOTH the live response
+// and the committed file, so "the wire is fine but the file is stale" and "the
+// file is fine but the wire regressed" are separately diagnosable.
+func assertGoldenInteriorFitness(t *testing.T, label string, raw []byte) {
+	t.Helper()
+
+	var interior map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &interior); err != nil {
+		t.Fatalf("%s: does not decode as a JSON object: %v", label, err)
+	}
+	for _, k := range []string{"extent", "scale", "features", "laneGates", "worldTime"} {
+		if _, ok := interior[k]; !ok {
+			t.Errorf("%s carries no `%s` — a payload missing it is not a contract for the space view to type "+
+				"against", label, k)
+		}
+	}
+	for _, k := range latticeTopKeys {
+		if _, ok := interior[k]; ok {
+			t.Errorf("%s still carries the lattice top-level key `%s` (system-interior: \"Lattice-only fields "+
+				"are absent from the response\")", label, k)
+		}
+	}
+
 	var features []map[string]json.RawMessage
 	_ = json.Unmarshal(interior["features"], &features)
-	sawElements := false
+	if len(features) == 0 {
+		t.Fatalf("%s carries no features", label)
+	}
+	// The parent chain, by id — `frontend/lib/space/draw.test.ts` composes a
+	// GRANDCHILD body (a moon on its planet, the station on its host) onto its
+	// parent's own drawn position, and that assertion is only worth anything
+	// if the sample actually contains one. A recording of a system with no
+	// such body silently guts it, so the fitness gate names it here rather
+	// than letting the TypeScript suite discover it.
+	parentOf := map[string]string{}
+	sawElements, sawStation := false, false
 	for _, f := range features {
-		if _, ok := f["orbitElements"]; ok {
+		id := rawString(t, f["id"])
+		for _, k := range latticeFeatureKeys {
+			if _, ok := f[k]; ok {
+				t.Errorf("%s: feature %q still carries the lattice key `%s`", label, id, k)
+			}
+		}
+		if el, ok := f["orbitElements"]; ok {
 			sawElements = true
+			var e struct {
+				ParentId string `json:"parentId"`
+			}
+			_ = json.Unmarshal(el, &e)
+			parentOf[id] = e.ParentId
+		}
+		if rawString(t, f["type"]) == "station" {
+			sawStation = true
 		}
 	}
 	if !sawElements {
-		t.Error("the recorded interior sample carries no `orbitElements` on any feature body")
+		t.Errorf("%s carries no `orbitElements` on any feature body", label)
+	}
+	if !sawStation {
+		t.Errorf("%s carries no station body — the space view's station-anchored controls and the sample-driven "+
+			"composition test both need one", label)
+	}
+	grandchildren := 0
+	for _, parent := range parentOf {
+		if parent == "" {
+			continue
+		}
+		if gp, ok := parentOf[parent]; ok && gp != "" {
+			grandchildren++
+		}
+	}
+	if grandchildren == 0 {
+		t.Errorf("%s carries no body whose parent is itself parented (a moon or a station on a planet). "+
+			"frontend/lib/space/draw.test.ts asserts that such a body composes onto its parent rather than "+
+			"onto the star; a sample without one turns that assertion into a tautology. Re-record until the "+
+			"spawned system has one.", label)
+	}
+
+	var gates []map[string]json.RawMessage
+	_ = json.Unmarshal(interior["laneGates"], &gates)
+	if len(gates) == 0 {
+		t.Errorf("%s carries no lane gates", label)
+	}
+	for i, g := range gates {
+		for _, k := range latticeGateKeys {
+			if _, ok := g[k]; ok {
+				t.Errorf("%s: lane gate #%d still carries the lattice key `%s`", label, i, k)
+			}
+		}
+		if rawString(t, g["id"]) == "" {
+			t.Errorf("%s: lane gate #%d carries no non-empty `id` (system-interior: \"Every lane-gate body "+
+				"carries a non-empty, distinct id\") — a client typed against this sample gets an optional or "+
+				"absent gate id, which is how `SpaceLaneGate.id` came to be optional in the first place", label, i)
+		}
 	}
 }
 
+func topLevelKeys(t *testing.T, raw []byte) []string {
+	t.Helper()
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("decoding a payload for its key set: %v", err)
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// writeGolden writes through a temp file in the SAME directory and promotes it
+// by rename, so an interrupted or failing write can never leave a committed
+// fixture half-overwritten. Callers must already have decided the payload is
+// fit to be recorded.
 func writeGolden(t *testing.T, path string, raw []byte) {
 	t.Helper()
 	var pretty json.RawMessage = raw
@@ -425,8 +624,23 @@ func writeGolden(t *testing.T, path string, raw []byte) {
 	if err != nil {
 		buf = raw
 	}
-	if err := os.WriteFile(path, append(buf, '\n'), 0o644); err != nil {
-		t.Fatalf("writing %s: %v", path, err)
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".golden-*.tmp")
+	if err != nil {
+		t.Fatalf("creating a temp file beside %s: %v", path, err)
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(append(buf, '\n')); err != nil {
+		tmp.Close()
+		t.Fatalf("writing %s: %v", tmp.Name(), err)
+	}
+	if err := tmp.Close(); err != nil {
+		t.Fatalf("closing %s: %v", tmp.Name(), err)
+	}
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+		t.Fatalf("chmod %s: %v", tmp.Name(), err)
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		t.Fatalf("promoting %s to %s: %v", tmp.Name(), path, err)
 	}
 	t.Logf("recorded golden wire sample: %s (%d bytes)", path, len(buf))
 }

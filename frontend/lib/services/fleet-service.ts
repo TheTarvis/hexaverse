@@ -10,6 +10,7 @@
 
 import { apiClient } from '../api-client'
 import type {
+  BurnPreview,
   Fleet,
   FleetList,
   JumpRequest,
@@ -17,6 +18,19 @@ import type {
   MineRequest,
   OrderRequest,
 } from '../types/fleet'
+
+// An order/preview body carries EXACTLY the keys it means. A key present
+// with an `undefined` value is dropped rather than serialized: the server
+// rejects a request naming both a body and a point (`fleet-movement`:
+// *Order Request Validation*), and a `maxFuelTons` of 0 is a real cap, so
+// "no cap" must reach the wire as an ABSENT key, never as zero.
+function orderBody(request: OrderRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(request)) {
+    if (value !== undefined) body[key] = value
+  }
+  return body
+}
 
 class FleetService {
   // GET /v1/fleets?mine=true — the requester's own fleets across systems (a
@@ -38,7 +52,36 @@ class FleetService {
   // Body or a Point"). The server solves; the response is the fleet now
   // burning, detached (`attachedTo` cleared at commit).
   async order(fleetId: string, request: OrderRequest): Promise<Fleet> {
-    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/orders`, request)
+    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/orders`, orderBody(request))
+    return response.data
+  }
+
+  // POST /v1/fleets/:id/orders/preview {bodyId|point, accel?} — the
+  // server-solved burn preview: the same solve the commit would run, with
+  // nothing committed and no channel claimed
+  // (serve-orbital-elements-and-burn-preview). The client never solves a
+  // burn itself, so this seam is the ONLY source of a curve, an arrival, a
+  // delta-v or a fuel cost the view may display.
+  async preview(fleetId: string, request: OrderRequest): Promise<BurnPreview> {
+    const response = await apiClient.post<BurnPreview>(
+      `/v1/fleets/${fleetId}/orders/preview`,
+      orderBody(request),
+    )
+    return response.data
+  }
+
+  // POST /v1/fleets/:id/hold — begin a station-keeping hold on the fleet's
+  // current orbit park. Instant: no action, no ETA (add-stationkeep-hold-
+  // verb). Rejected at or below the station-keeping fuel reserve.
+  async hold(fleetId: string): Promise<Fleet> {
+    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/hold`, {})
+    return response.data
+  }
+
+  // POST /v1/fleets/:id/release — end a station-keeping hold, re-circularizing
+  // at the held offset's planar radius. Instant, and free.
+  async release(fleetId: string): Promise<Fleet> {
+    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/release`, {})
     return response.data
   }
 

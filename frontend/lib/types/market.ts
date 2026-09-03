@@ -5,7 +5,7 @@
 // and prices are information and transmit galaxy-wide with zero travel time;
 // goods exist only in a fleet's hold, and a trade settles only where they are.
 
-import type { ResourceKind } from '@/lib/types/system-board'
+import type { ResourceKind } from '@/lib/types/system-space'
 
 // Where a demand entry came from. The floor is modelled as an ENTRY, not a
 // separate field or a fallback branch — which is what lets a future player

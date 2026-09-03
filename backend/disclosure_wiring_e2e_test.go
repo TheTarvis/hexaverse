@@ -183,9 +183,22 @@ func firstNonStarNonGateBody(t *testing.T, bt *system.BodyTable) string {
 
 // Scenario: An authenticated, spawned requester receives every body in full
 // / A materialized system's read carries every body's continuous position
-// and size / Pre-existing wire fields are unchanged (system-interior).
-// tasks.md 4.6, 4.7, 8.1.
-func TestInterior_Scenario_BodiesPublicWithAdditiveSpaceAndSize(t *testing.T) {
+// and size (system-interior). tasks.md 4.6, 4.7.
+//
+// RETARGETED 2026-09-03 (build-production-space-view, tasks.md 9.1). This test
+// also carried three inline "Pre-existing wire fields are unchanged"
+// assertions — band == "visible", live == true, and a footprint key on every
+// feature — plus a laneGates[].cell loop. That scenario belonged to link
+// 8a-1's additive guarantee and its requirement, `system-interior`'s *Interior
+// Read Endpoint*, is REMOVED by this change; the fields themselves are gone
+// from the DTO. The four assertions were DELETED rather than retargeted here:
+// their successor, *Lattice-only fields are absent from the response*, is
+// asserted at this same real-router level in
+// interior_continuous_wire_e2e_test.go, and duplicating it in a disclosure
+// test would put a wire-shape guard in a file about who-sees-whom. What
+// survives below is what this file is actually for plus the continuous
+// position/size half, which is unaffected by the removal.
+func TestInterior_Scenario_BodiesPublicWithSpaceAndSize(t *testing.T) {
 	requireE2EEmulators(t)
 	ensureFirebaseInitialized(t)
 	router := SetupRouter()
@@ -198,40 +211,15 @@ func TestInterior_Scenario_BodiesPublicWithAdditiveSpaceAndSize(t *testing.T) {
 	}
 	for _, f := range features {
 		id, _ := f["id"].(string)
-		if band, _ := f["band"].(string); band != "visible" {
-			t.Errorf("feature %q: band = %v, want the pre-existing constant \"visible\" (Pre-existing wire fields "+
-				"are unchanged)", id, f["band"])
-		}
-		if live, _ := f["live"].(bool); !live {
-			t.Errorf("feature %q: live = %v, want the pre-existing constant true", id, f["live"])
-		}
-		if _, ok := f["footprint"]; !ok {
-			t.Errorf("feature %q: no \"footprint\" key — the pre-existing lattice footprint must still ship "+
-				"alongside the new continuous fields, never replaced by them", id)
-		}
 		if _, ok := f["space"]; !ok {
-			t.Errorf("feature %q: no \"space\" key — every body must carry a continuous position additively "+
-				"alongside its footprint/band/live (system-interior \"A materialized system's read carries every "+
-				"body's continuous position and size\")", id)
+			t.Errorf("feature %q: no \"space\" key — every body must carry a continuous position "+
+				"(system-interior \"A materialized system's read carries every body's continuous position and "+
+				"size\")", id)
 			continue
 		}
 		size, ok := f["size"].(float64)
 		if !ok || size <= 0 {
 			t.Errorf("feature %q: size = %v, want a strictly positive continuous size", id, f["size"])
-		}
-	}
-
-	// Task 8.1's own naming: laneGates[].cell is a second pre-existing wire
-	// field this section must not disturb.
-	laneGates, _ := body["laneGates"].([]any)
-	for i, raw := range laneGates {
-		lg, ok := raw.(map[string]any)
-		if !ok {
-			t.Errorf("laneGates[%d] is not an object: %#v", i, raw)
-			continue
-		}
-		if _, ok := lg["cell"]; !ok {
-			t.Errorf("laneGates[%d] has no \"cell\" key (Pre-existing wire fields are unchanged): %+v", i, lg)
 		}
 	}
 }

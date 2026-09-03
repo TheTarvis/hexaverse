@@ -11,7 +11,7 @@
 import type { FailureCause } from './guard-machine'
 
 export interface RenderFailureRecord {
-  surface: 'board' | 'galaxy'
+  surface: 'board' | 'galaxy' | 'space'
   cause: FailureCause
   detail?: string
 }

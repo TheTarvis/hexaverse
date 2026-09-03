@@ -1,18 +1,29 @@
 'use client'
 
-// FleetRoster — the fleet command surface (fleet-roster ADDED "One Row Per
-// Owned Fleet, Derived From Kinematic State" / "The Roster Row Is the Fleet
-// Command Surface"; board-view ADDED "Running Mine Gates the Fleet Panel's
-// Commands"; migrate-fleet-to-continuous-burns, tasks.md 8.5, 8.8, 8.9).
+// FleetRoster — the fleet roster, and CONDITIONALLY the fleet command
+// surface (fleet-roster: "One Row Per Owned Fleet, Derived From Kinematic
+// State" / "The Roster Row Is the Fleet Command Surface Where the Mounting
+// View Provides None, Jump Gated by Attachment Alone"; docked-fleet-actions:
+// "Running Mine Gates the Fleet Panel's Commands").
 //
-// Mounted on BOTH canvases (the galaxy and a system board) so the answer
-// never depends on which view you're standing in. One row per own fleet:
-// where it is, what it's doing, a live countdown on whatever order is
-// running, and the commands its kinematic state and attachment make valid —
-// burn, cut-drive, stop, jump. The ORDER TARGET (a body id or point) is the
-// mounting view's concern (design.md Decision 12: "Targets are named by body
-// id from the interior read"); this panel only hands the fleet back on a
-// command click.
+// Mounted on BOTH canvases (the galaxy and a system's space view) so where a
+// fleet is and what it's doing never depends on which view you're standing
+// in. One row per own fleet: where it is, what it's doing, and a live
+// countdown on whatever order is running.
+//
+// WHO OWNS THE COMMANDS IS DECLARED BY THE MOUNTING VIEW, not assumed here
+// (`commandOwner`, openspec build-production-space-view tasks.md 7.18/7.19).
+// The galaxy view mounts no command panel, so it declares `roster` and
+// supplies a handler for every command a row can then offer. The system
+// space view mounts `system-space-view`'s command panel AND the
+// `docked-fleet-actions` panel, both of which emit these very verbs, so it
+// declares `view` and its rows render selection and status only — otherwise
+// one burning fleet renders two live "Cut drive" buttons, which is a defect
+// under the player's hand and a hard error under Playwright's strict mode.
+//
+// The ORDER TARGET (a body id or point) is the mounting view's concern
+// (design.md Decision 12: "Targets are named by body id from the interior
+// read"); this panel only hands the fleet back on a command click.
 //
 // It owns its reads (useMyFleets for the fleets, useGalaxy for system names)
 // so a view mounts it with one line; the world clock comes in as a prop
@@ -45,21 +56,36 @@ const TONE_DOT: Record<StatusTone, string> = {
 const CMD_BUTTON =
   'rounded-md border border-zinc-700/60 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-zinc-300 hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-700/60 disabled:hover:text-zinc-300'
 
+/**
+ * Who renders the fleet verbs on this mounting view. `'roster'` — the view
+ * mounts no command surface of its own, so the rows carry the commands and
+ * the view supplies a handler for every one of them. `'view'` — the view
+ * owns the commands on its own panels, so the rows carry none at all.
+ */
+export type RosterCommandOwner = 'roster' | 'view'
+
 export interface FleetRosterProps {
   // The live world clock of the mounting view — the countdown's input.
   worldTime: number
+  /**
+   * The mounting view's declaration of who owns the fleet commands. Defaults
+   * to `'roster'` — the historical behaviour, and the galaxy view's.
+   */
+  commandOwner?: RosterCommandOwner
   // True when the given body id is a lane gate whose lane the corporation
-  // has charted — the jump command's gate (design.md, the SystemBoard wire
-  // shape names no gate body id directly; the mounting view resolves this).
-  isChartedGate: IsChartedGate
+  // has charted — the jump command's gate. Only consulted where the roster
+  // owns the commands; a view that owns them itself passes nothing, rather
+  // than a `() => false` stub asserting a falsehood the requirement forbids.
+  isChartedGate?: IsChartedGate
   // The fleet the view is currently commanding, highlighted in the list.
   activeFleetId?: string | null
-  // The system whose board is open, if any — its fleets read as "here".
+  // The system currently open, if any — its fleets read as "here".
   currentSystemId?: string | null
   // Clicked a row (not a command button). The view decides what that means.
   onSelect?: (fleet: Fleet) => void
   // Command callbacks — the mounting view composes the order target (body id
   // or point) and the laneId for jump; this panel only hands back the fleet.
+  // A view declaring `commandOwner="roster"` supplies all four.
   onBurn?: (fleet: Fleet) => void
   onCutDrive?: (fleet: Fleet) => void
   onStop?: (fleet: Fleet) => void
@@ -68,9 +94,12 @@ export interface FleetRosterProps {
   enabled?: boolean
 }
 
+const NEVER_CHARTED: IsChartedGate = () => false
+
 export function FleetRoster({
   worldTime,
-  isChartedGate,
+  commandOwner = 'roster',
+  isChartedGate = NEVER_CHARTED,
   activeFleetId,
   currentSystemId,
   onSelect,
@@ -134,6 +163,11 @@ export function FleetRoster({
             const status = rosterRowStatus(f, worldTime, nameOf, runningMine)
             const visibility = rosterCommandVisibility(f, worldTime, isChartedGate)
             const mineGate = rosterMineGate(worldTime, runningMine)
+            // The mounting view's declaration, applied at the one place it
+            // means anything: a view that owns the verbs renders them on its
+            // own surfaces, so this row renders none — not even the
+            // cancel-mine control, which its panel owns too.
+            const rowOwnsCommands = commandOwner === 'roster'
             const active = f.id === activeFleetId
             const here = !!currentSystemId && f.systemId === currentSystemId
 
@@ -189,70 +223,72 @@ export function FleetRoster({
                   )}
                 </button>
 
-                <div className="mt-1.5 flex flex-wrap gap-1 pl-3.5">
-                  {visibility.burn && (
-                    <button
-                      type="button"
-                      data-testid={`fleet-cmd-burn-${f.id}`}
-                      disabled={mineGate.gated}
-                      onClick={() => onBurn?.(f)}
-                      className={CMD_BUTTON}
-                    >
-                      Burn
-                    </button>
-                  )}
-                  {visibility.cutDrive && (
-                    <button
-                      type="button"
-                      data-testid={`fleet-cmd-cut-drive-${f.id}`}
-                      disabled={mineGate.gated}
-                      onClick={() => onCutDrive?.(f)}
-                      className={CMD_BUTTON}
-                    >
-                      Cut drive
-                    </button>
-                  )}
-                  {visibility.stop && (
-                    <button
-                      type="button"
-                      data-testid={`fleet-cmd-stop-${f.id}`}
-                      disabled={mineGate.gated}
-                      onClick={() => onStop?.(f)}
-                      className={CMD_BUTTON}
-                    >
-                      Stop
-                    </button>
-                  )}
-                  {visibility.jump && (
-                    <button
-                      type="button"
-                      data-testid={`fleet-cmd-jump-${f.id}`}
-                      disabled={mineGate.gated}
-                      onClick={() => onJump?.(f)}
-                      className={CMD_BUTTON}
-                    >
-                      Jump
-                    </button>
-                  )}
-                  {mineGate.gated && runningMine && (
-                    <button
-                      type="button"
-                      data-testid={`fleet-cmd-cancel-mine-${f.id}`}
-                      onClick={() =>
-                        cancelAction.mutate(
-                          { actionId: runningMine.id, fleetId: f.id },
-                          {
-                            onSuccess: () => toast.success('Mining cancelled'),
-                            onError: (e) => toast.error(e.message || 'Cancel failed'),
-                          },
-                        )
-                      }
-                      className={CMD_BUTTON}
-                    >
-                      Cancel mine
-                    </button>
-                  )}
-                </div>
+                {rowOwnsCommands && (
+                  <div className="mt-1.5 flex flex-wrap gap-1 pl-3.5">
+                    {visibility.burn && (
+                      <button
+                        type="button"
+                        data-testid={`fleet-cmd-burn-${f.id}`}
+                        disabled={mineGate.gated}
+                        onClick={() => onBurn?.(f)}
+                        className={CMD_BUTTON}
+                      >
+                        Burn
+                      </button>
+                    )}
+                    {visibility.cutDrive && (
+                      <button
+                        type="button"
+                        data-testid={`fleet-cmd-cut-drive-${f.id}`}
+                        disabled={mineGate.gated}
+                        onClick={() => onCutDrive?.(f)}
+                        className={CMD_BUTTON}
+                      >
+                        Cut drive
+                      </button>
+                    )}
+                    {visibility.stop && (
+                      <button
+                        type="button"
+                        data-testid={`fleet-cmd-stop-${f.id}`}
+                        disabled={mineGate.gated}
+                        onClick={() => onStop?.(f)}
+                        className={CMD_BUTTON}
+                      >
+                        Stop
+                      </button>
+                    )}
+                    {visibility.jump && (
+                      <button
+                        type="button"
+                        data-testid={`fleet-cmd-jump-${f.id}`}
+                        disabled={mineGate.gated}
+                        onClick={() => onJump?.(f)}
+                        className={CMD_BUTTON}
+                      >
+                        Jump
+                      </button>
+                    )}
+                    {mineGate.gated && runningMine && (
+                      <button
+                        type="button"
+                        data-testid={`fleet-cmd-cancel-mine-${f.id}`}
+                        onClick={() =>
+                          cancelAction.mutate(
+                            { actionId: runningMine.id, fleetId: f.id },
+                            {
+                              onSuccess: () => toast.success('Mining cancelled'),
+                              onError: (e) => toast.error(e.message || 'Cancel failed'),
+                            },
+                          )
+                        }
+                        className={CMD_BUTTON}
+                      >
+                        Cancel mine
+                      </button>
+                    )}
+                  </div>
+                )}
               </li>
             )
           })}

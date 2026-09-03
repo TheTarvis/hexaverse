@@ -1,66 +1,58 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
+import {
+  burnToSelectionAndDock,
+  captureInteriors,
+  digits,
+  selectBody,
+  stationFeatureId,
+  wakeNewCorp,
+} from '../helpers/space-view'
 
 /**
- * Refuel commit, wire to click — openspec change add-fuel-as-cargo,
- * tasks.md 8.4–8.7 (board-view ADDED "Refuel Offer on the Docked Fleet" /
- * "Refuel Commit" / "Refuel Control Guards Against Double-Submit"; MODIFIED
- * "Credit Balance Readout"; fleet-roster ADDED "The Roster Row Shows Held
- * Fuel and an Estimated Range").
+ * Refuel commit, wire to click, plus the double-submit guard.
  *
- * WRITTEN, NOT EXECUTED — per this SDET's brief: Playwright boots its own
- * isolated stack and must never run concurrently with the backend
- * emulator's own test suite (shared emulator project). This file is the RED
- * handoff's Playwright half; run it in CI or a dedicated local slot via:
+ * ORIGINALLY written for `add-fuel-as-cargo` tasks.md 8.4–8.7. REWRITTEN
+ * against the continuous-space view for `build-production-space-view`
+ * tasks.md 2.1b / 10.8 (`docked-fleet-actions`: *Refuel Offer on the Docked
+ * Fleet*, *Refuel Commit*, *Refuel Control Guards Against Double-Submit*;
+ * *Credit Balance Readout*).
  *
- *   bash scripts/dev/with-test-emulators.sh \
- *     'cd frontend && npx playwright test refuel-commit.spec.ts --reporter=line'
+ * THE ASSERTION THIS FILE EXISTS FOR IS PRESERVED EXACTLY. The double-click
+ * reproduction below failed 4/4 against a real production defect: it is
+ * asserted on the WIRE (how many POSTs left the browser), not on the
+ * resulting UI, because a UI that deduped visually while sending twice looks
+ * identical — and because a server that deduped by operation key would hide
+ * a client that sent two. Nothing about that changed in the rewrite; only
+ * the surfaces it drives did.
  *
- * WHY THIS EXISTS ALONGSIDE THE VITEST SUITES: `SystemBoardView.test.tsx`
- * mocks `useRefuel`/`useStation`/`useMarketBoard` entirely — it can prove
- * the CLIENT wiring is correct given a station/price/roster it invents, but
- * it cannot prove the server actually SERVES a `fuelPricePerTon` the
- * preview reads, or that a real double-click against a REAL in-flight
- * mutation only ever reaches the server once. `hooks/use-refuel.test.tsx`
- * proves the double-submit MECHANISM against a mocked transport. Neither
- * can fail if the seam between server and client breaks (a served price
- * field renamed, a real network round-trip's timing differing from a
- * synchronous mock). This spec closes that seam, on the actual wire,
- * against the actual (test-stack) backend.
+ * WHY THIS EXISTS ALONGSIDE THE VITEST SUITES: `FleetActionsPanel.test.tsx`
+ * mocks `useRefuel` entirely — it can prove the CLIENT wiring is correct
+ * given a station/price/roster it invents, but it cannot prove the server
+ * actually SERVES a `roster.fuelPricePerTon` the preview reads, or that a
+ * real double-click against a REAL in-flight mutation only ever reaches the
+ * server once. `hooks/use-submit-guard.test.tsx` proves the guard MECHANISM
+ * against a synchronous fake. Neither can fail if the seam between server and
+ * client breaks (a served price field renamed, a real round trip's timing
+ * differing from a synchronous mock). This spec closes that seam, on the
+ * actual wire, against the actual (test-stack) backend.
  *
- * PRECONDITION THIS SPEC DEPENDS ON, NOT YET LANDED (corporation-spawn
- * ADDED "Spawn Asset Healing" — the starting-fuel grant, tasks.md 5.1/5.2):
- * a fresh corporation must spawn holding enough fuel to reach its home
- * station under `DerivedAccelCeiling` (the documented spawn-time carve-out
- * from this change's floor-pricing rule). Until that lands, this journey's
- * OWN burn-to-home-station leg will itself be unaffordable and the spec
- * will fail long before it reaches the refuel assertions — that is a
- * legitimate, expected red for a different reason than the ones commented
- * inline below, not a flaw in this spec.
- *
- * data-testid / wire contract THIS SDET ASSUMES (see this SDET's coverage
- * table / handoff report for the full cross-reference to each Vitest
- * suite's own contract note):
- *   - `refuel-section`, `refuel-tons-input`, `refuel-cost-preview`,
- *     `refuel-button` (RefuelSection.tsx, new).
- *   - `fleet-fuel-{id}`, `fleet-range-{id}` (FleetRoster.tsx).
- *   - `balance-value`, `balance-refuel-cost` (BalanceReadout.tsx).
- *   - `POST /v1/fleets/:fleetId/refuel` with body `{ tons, operationKey }`.
- *   - the fleet read (`GET /v1/fleets?mine=true` or `GET /v1/fleets/:id`)
- *     serves `roster.fuelPricePerTon`.
+ * ONE ASSERTION MOVED, and why it is not a weakening. The lattice-era file
+ * ended on `balance-refuel-cost`, a testid that lived on
+ * `components/board/BalanceReadout.tsx` and dies with `components/board/`
+ * (tasks.md 10.1). Its substance — "the refuel's cost is visible to the
+ * player without navigation" — is asserted here on the two figures the
+ * `docked-fleet-actions` scenarios actually name: held fuel RISES and the
+ * credit balance FALLS (*The balance visibly updates when a refuel
+ * resolves*). Those are strictly harder to fake than a cost label.
  */
 const cfg = resolveE2EConfig()
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-// Mirrors jump-commit.spec.ts's own generous, wall-clock-driven timeout
-// note: the test stack runs the world at real-time scale, and this journey
-// burns all the way to the home station under its own power.
-test.setTimeout(600_000)
-
-async function clickGlyph(page: Page, testId: string): Promise<void> {
-  await page.getByTestId(testId).dispatchEvent('click')
-}
+// The test stack runs the world at real-time scale and this journey burns all
+// the way to the home station under its own power.
+test.setTimeout(900_000)
 
 test.describe('refuel commit — wire to click, double-submit guard', () => {
   test('a docked fleet refuels for the server-served price, and a rapid double-click still settles exactly once', async ({
@@ -68,90 +60,63 @@ test.describe('refuel commit — wire to click, double-submit guard', () => {
   }) => {
     test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
 
-    // 1. Sign up and wake onto the home board — spawn's starting-fuel grant
+    const interiors = captureInteriors(page)
+
+    // 1. Sign up and wake onto the home system — spawn's starting-fuel grant
     //    (corporation-spawn ADDED "Spawn Asset Healing") is what makes the
     //    very next step possible at all.
-    const email = `e2e+refuel-${Date.now()}@hexaverse.test`
-    const password = 'e2ePassword123!'
-    await page.goto('/login?signUp=true')
-    await page.getByTestId('login-email').fill(email)
-    await page.getByTestId('login-password').fill(password)
-    await page.getByTestId('login-confirm-password').fill(password)
-    await page.getByTestId('login-submit').click()
-    await expect(page.getByTestId('wake-up-flow')).toBeVisible({ timeout: 15_000 })
-    await page.getByTestId('wake-name-input').fill('E2E Refueler')
-    await page.getByTestId('wake-submit').click()
-    await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 20_000 })
-    await expect(page.getByTestId('board-overlay')).toBeVisible({ timeout: 15_000 })
-
-    const roster = page.getByTestId('fleet-roster')
-    await expect(roster).toBeVisible({ timeout: 15_000 })
-    const rows = roster.locator('[data-testid^="fleet-row-"]')
-    await expect(rows).toHaveCount(1, { timeout: 15_000 })
-    const fleetId = (await rows.first().getAttribute('data-testid'))!.replace('fleet-row-', '')
+    const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Refueler', 'refuel')
 
     // The roster shows a held-fuel/range readout from the very first read
     // (fleet-roster ADDED "The Roster Row Shows Held Fuel and an Estimated
-    // Range") — a fresh, un-spent starting grant, so both figures are
-    // strictly positive before anything is burned.
-    await expect(page.getByTestId(`fleet-fuel-${fleetId}`)).toBeVisible()
+    // Range") — a fresh, un-spent starting grant, so both are present before
+    // anything is burned.
+    await expect(page.getByTestId(`fleet-fuel-${fleetId}`)).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId(`fleet-range-${fleetId}`)).toBeVisible()
 
-    // 2. Burn to the home station and dock — the same "under way" guard
-    //    slice.spec.ts/jump-commit.spec.ts use, so a swallowed click can't
-    //    silently pass by waiting only on the eventual docked state.
+    // 2. Burn to the home station and dock.
     //
-    // SDET NOTE (post-handoff test revision — cause: provably misread the
-    // production wire, adjudicated 2026-09-02): this used to look for
-    // `[data-station="true"]`, an attribute that BoardOverlay.tsx never
-    // emits (no such marker exists on any feature glyph), so the "fall back
-    // to any feature glyph" branch always fired — silently picking whatever
-    // feature happened to draw first (a belt, in practice), never the
-    // station. The journey then genuinely docked at that body, so
-    // `stationQuotes` stayed null server-side (SystemBoardView.tsx's
-    // `dockedAtStation` correctly compares `attachedTo` to the station's own
-    // `featureId`) and `refuel-section` correctly never rendered — a fixture
-    // defect, not a production gap: the gate itself is proven by
-    // FactsPanel.test.tsx's "offers refuel whenever docked at a station"
-    // unit test. Fixed to target the station via the accessible name
-    // BoardOverlay.tsx already serves for every glyph (`aria-label={f.type}
-    // {f.id}`) rather than an attribute nothing writes.
-    const stationGlyph = page.getByRole('button', { name: /^station\b/ })
-    await expect(
-      stationGlyph,
-      'the home system should carry exactly one station-typed feature glyph',
-    ).toHaveCount(1)
-    const targetTestId = (await stationGlyph.getAttribute('data-testid'))!
-    await clickGlyph(page, targetTestId)
-    await page.getByTestId(`fleet-cmd-burn-${fleetId}`).click()
-    await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText(/under way/i, {
-      timeout: 15_000,
-    })
-    await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText('Docked', {
-      timeout: 300_000,
-    })
+    //    SDET NOTE, carried forward from the lattice-era file because the
+    //    lesson survives the rewrite: this leg once selected the station by
+    //    an attribute (`[data-station="true"]`) that the overlay never
+    //    emitted, so a fallback branch silently docked at whatever body drew
+    //    first — usually a belt — and `refuel-section` correctly never
+    //    appeared. A fixture defect that read as a production gap. The
+    //    station is therefore identified here from the SERVED interior read's
+    //    own `type: "station"`, never from a rendered attribute and never
+    //    from a guessed id.
+    const home = interiors.get(homeSystemId)
+    expect(home, `no interior read for ${homeSystemId} was captured off the wire`).toBeTruthy()
+    const stationId = stationFeatureId(home!)
+    expect(
+      stationId,
+      `the home system's interior read carried no body of type "station" (home ${homeSystemId}): ` +
+        `every spawn home is provisioned with exactly one (stations M11), so a miss here is a ` +
+        `regression, not a seed`,
+    ).toBeTruthy()
+
+    await selectBody(page, stationId!)
+    await burnToSelectionAndDock(page, fleetId, 600_000)
 
     // 3. Scenario: Refuel is offered while docked at a station.
-    await expect(page.getByTestId('refuel-section')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('refuel-section')).toBeVisible({ timeout: 20_000 })
 
-    // Scenario: Fleet Read Serves the Configured Fuel Price, Never
-    // Duplicated Client-Side — the preview must move when the tonnage does,
-    // by whatever price the server actually served (no fixed expectation on
-    // the number itself, since this SDET does not know the tuned
-    // `FuelParams.PricePerTon`; the ASSERTION is that it reacts, proving a
-    // real served value drives it rather than a frozen placeholder).
-    const before = await page.getByTestId('refuel-cost-preview').textContent()
+    // Scenario: Fleet Read Serves the Configured Fuel Price, Never Duplicated
+    // Client-Side — the preview must move when the tonnage does, by whatever
+    // price the server actually served. No fixed expectation on the number
+    // itself (this SDET does not know the tuned `FuelParams.PricePerTon`);
+    // the assertion is that it REACTS, proving a real served value drives it
+    // rather than a frozen placeholder.
     await page.getByTestId('refuel-tons-input').fill('1')
     const oneTon = await page.getByTestId('refuel-cost-preview').textContent()
     await page.getByTestId('refuel-tons-input').fill('2')
     const twoTons = await page.getByTestId('refuel-cost-preview').textContent()
+    expect(oneTon, 'the cost preview rendered nothing at all').toBeTruthy()
     expect(twoTons, 'doubling the tonnage must change the previewed cost').not.toBe(oneTon)
-    expect(before).not.toBe(undefined)
 
-    // 4. Scenario: A double-click yields exactly one refuel — asserted on
-    //    the WIRE (the only place this guarantee actually matters), not on
-    //    the resulting UI state alone, which could look identical whether
-    //    one or two requests were sent if the server itself deduped.
+    // 4. Scenario: A double-click yields exactly one refuel — asserted on the
+    //    WIRE, the only place this guarantee actually matters. THE
+    //    REPRODUCTION: this failed 4/4 against a real defect.
     const refuelRequests: { operationKey?: string }[] = []
     page.on('request', (req) => {
       if (req.method() === 'POST' && /\/v1\/fleets\/[^/]+\/refuel$/.test(req.url())) {
@@ -163,20 +128,34 @@ test.describe('refuel commit — wire to click, double-submit guard', () => {
       }
     })
 
+    const fuelBefore = await digits(page, 'hold-fuel')
+    const balanceBefore = await digits(page, 'balance-value')
+    expect(
+      Number.isFinite(balanceBefore),
+      'the credit balance readout shows no number — `docked-fleet-actions` *Credit Balance ' +
+        'Readout*: "the requester\'s current credit balance is shown"',
+    ).toBe(true)
+
     await page.getByTestId('refuel-tons-input').fill('1')
     const refuelButton = page.getByTestId('refuel-button')
-    // Two rapid clicks, deliberately not awaited independently — the guard
+    // Two rapid clicks, deliberately NOT awaited independently — the guard
     // under test is exactly "can a fast double-click reach the network
-    // twice", so serializing the clicks with an `await` between them would
-    // defeat the point.
+    // twice", so serializing them with an `await` between would defeat the
+    // point.
     await Promise.all([refuelButton.click(), refuelButton.click()])
 
-    await expect(page.getByTestId('balance-refuel-cost')).toBeVisible({ timeout: 15_000 })
+    // Scenario: The balance visibly updates when a refuel resolves; and
+    // Scenario: A refuel updates held fuel, estimated range, and the balance
+    // without navigation.
+    await expect.poll(() => digits(page, 'hold-fuel'), { timeout: 30_000 }).toBeGreaterThan(fuelBefore)
+    await expect
+      .poll(() => digits(page, 'balance-value'), { timeout: 30_000 })
+      .toBeLessThan(balanceBefore)
 
     expect(
       refuelRequests.length,
-      `expected exactly one /refuel request from a rapid double-click, got ${refuelRequests.length}: ` +
-        JSON.stringify(refuelRequests),
+      `expected exactly one /refuel request from a rapid double-click, got ` +
+        `${refuelRequests.length}: ${JSON.stringify(refuelRequests)}`,
     ).toBe(1)
 
     // 5. Scenario: A fresh attempt after a completed refuel is a second,
@@ -184,10 +163,10 @@ test.describe('refuel commit — wire to click, double-submit guard', () => {
     const firstKey = refuelRequests[0]?.operationKey
     await page.getByTestId('refuel-tons-input').fill('1')
     await refuelButton.click()
-    await expect.poll(() => refuelRequests.length, { timeout: 15_000 }).toBe(2)
+    await expect.poll(() => refuelRequests.length, { timeout: 20_000 }).toBe(2)
     const secondKey = refuelRequests[1]?.operationKey
-    expect(firstKey).toBeTruthy()
+    expect(firstKey, 'a refuel must carry a client-minted operation key').toBeTruthy()
     expect(secondKey).toBeTruthy()
-    expect(secondKey).not.toBe(firstKey)
+    expect(secondKey, 'a second attempt must not reuse the first attempt\'s key').not.toBe(firstKey)
   })
 })

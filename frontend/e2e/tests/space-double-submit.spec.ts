@@ -1,5 +1,16 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
+import type { ServedInterior } from '../helpers/space-view'
+import {
+  bodyIdsMatching,
+  captureInteriors,
+  digits,
+  holdKindTons,
+  mineableBodyId,
+  selectBody,
+  selectFirstBodyMatching,
+  stationFeatureId,
+} from '../helpers/space-view'
 
 /**
  * RED-PHASE SUITE — openspec change `build-production-space-view`,
@@ -107,7 +118,8 @@ async function signUpAndWake(page: Page, tag: string): Promise<string> {
   await expect(page.getByTestId('wake-up-flow')).toBeVisible({ timeout: 15_000 })
   await page.getByTestId('wake-name-input').fill(`E2E ${tag}`)
   await page.getByTestId('wake-submit').click()
-  await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 20_000 })
+  // 60s — see `wakeNewCorp` in ../helpers/space-view.ts for why.
+  await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 60_000 })
   await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 20_000 })
 
   const rows = page.getByTestId('fleet-roster').locator('[data-testid^="fleet-row-"]')
@@ -115,16 +127,54 @@ async function signUpAndWake(page: Page, tag: string): Promise<string> {
   return (await rows.first().getAttribute('data-testid'))!.replace('fleet-row-', '')
 }
 
-/** Burn the acting fleet to a body by id and wait for it to dock there. */
-async function burnToBodyAndDock(page: Page, fleetId: string, bodyTestId: string): Promise<void> {
-  const hit = page.getByTestId(bodyTestId)
-  if (await hit.isVisible()) {
-    await hit.click()
-  } else {
-    // An off-screen mark is reached through its own affordance, never by a
-    // hand-set camera position.
-    await page.getByTestId(bodyTestId.replace('body-hit-', 'offscreen-')).click()
-  }
+/**
+ * Burn the acting fleet to the first body matching `prefix` and wait for it to
+ * dock there.
+ *
+ * Selection goes through the shared `selectBody` helper: an off-screen mark is
+ * reached through its own affordance (never a hand-set camera position), and
+ * an on-screen one through its keyboard hit target. See that helper for why a
+ * `click()` cannot be used against a scene that animates every frame — the
+ * failure that used to strand this suite here. The one real pointer pick in
+ * the e2e suite lives in `space-journey.spec.ts`; the double-submit guards
+ * asserted below are about the COMMAND controls, which are ordinary buttons
+ * and are still clicked as such.
+ */
+async function burnToBodyAndDock(page: Page, fleetId: string, prefix: string): Promise<void> {
+  await selectFirstBodyMatching(page, prefix)
+  await page.getByTestId('burn-button').click()
+  const row = page.getByTestId(`fleet-row-${fleetId}`)
+  await expect(row).toContainText(/under way/i, { timeout: 20_000 })
+  await expect(row).toContainText(/docked/i, { timeout: 600_000 })
+}
+
+/**
+ * The smallest mine run the server accepts (`mine.defaultMinRunTons`, 5t).
+ *
+ * SDET, 2026-09-03: these tests asked for 1 ton, which `mine`'s
+ * MinRunTons floor rejects outright — the command toasted "That command could
+ * not be completed" and `mine-countdown` never appeared. The defect was
+ * invisible until the selection helper started working, because the suite
+ * never reached the mine control before. It is a TEST defect, not a
+ * production one: the floor is a named, deliberate bound (Decision #18), and
+ * a run below it SHOULD be refused.
+ */
+const MIN_RUN_TONS = '5'
+
+/**
+ * Burn to a body the SERVED interior read says actually carries ore, and dock.
+ */
+async function burnToMineableBodyAndDock(
+  page: Page,
+  fleetId: string,
+  interiors: Map<string, ServedInterior>,
+): Promise<void> {
+  const homeId = new URL(page.url()).pathname.split('/').pop()!
+  const home = interiors.get(homeId)
+  expect(home, `no interior read for ${homeId} was captured off the wire`).toBeTruthy()
+  const lodeId = mineableBodyId(home!, stationFeatureId(home!) ?? undefined)
+  expect(lodeId, `the home system's interior read carried no mineable body (home ${homeId})`).toBeTruthy()
+  await selectBody(page, lodeId!)
   await page.getByTestId('burn-button').click()
   const row = page.getByTestId(`fleet-row-${fleetId}`)
   await expect(row).toContainText(/under way/i, { timeout: 20_000 })
@@ -137,10 +187,13 @@ test.describe('space view — synchronous double-submit guards', () => {
     const orders = recordPosts(page, /\/v1\/fleets\/[^/]+\/orders$/)
     const fleetId = await signUpAndWake(page, 'burnguard')
 
-    // Any body will do; the guard is about the control, not the target.
-    const anyBody = page.locator('[data-testid^="body-hit-feat-"]').first()
-    await expect(anyBody).toBeAttached({ timeout: 20_000 })
-    await anyBody.click()
+    // Any body will do; the guard is about the control, not the target. Two
+    // are captured because the release check below needs a genuinely NEW
+    // command, and an order to the body the fleet is already docked at is not
+    // reliably one.
+    const bodyIds = await bodyIdsMatching(page, 'feat-body-')
+    expect(bodyIds.length, 'a generated system carries several ordinary bodies').toBeGreaterThan(1)
+    await selectBody(page, bodyIds[0])
     await expect(page.getByTestId('burn-button')).toBeEnabled()
 
     await doubleActivateInOneTick(page.getByTestId('burn-button'))
@@ -156,7 +209,7 @@ test.describe('space view — synchronous double-submit guards', () => {
     // Scenario: The guard releases when the request settles or fails — a
     // later, genuinely new command goes through.
     await expect(page.getByTestId(`fleet-row-${fleetId}`)).toContainText(/docked/i, { timeout: 600_000 })
-    await anyBody.click()
+    await selectBody(page, bodyIds[1])
     await page.getByTestId('burn-button').click()
     await expect.poll(() => orders.length, { timeout: 20_000 }).toBe(2)
   })
@@ -164,16 +217,19 @@ test.describe('space view — synchronous double-submit guards', () => {
   test('Scenario: Two activations in one tick submit one mine run', async ({ page }) => {
     test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
     const mines = recordPosts(page, /\/v1\/fleets\/[^/]+\/mine$/)
+    const interiors = captureInteriors(page)
     const fleetId = await signUpAndWake(page, 'mineguard')
 
     // Dock at a resource-bearing body — the mine offer is anchored to the
-    // fleet's docked state, never to a selection.
-    const oreBody = page.locator('[data-testid^="body-hit-feat-body-"]').first()
-    const bodyTestId = (await oreBody.getAttribute('data-testid'))!
-    await burnToBodyAndDock(page, fleetId, bodyTestId)
+    // fleet's docked state, never to a selection — and take that body off the
+    // SERVED interior read rather than off whichever mark happens to be drawn
+    // first. Which of a generated system's bodies carries ore is a property of
+    // the seed, and a run against a barren one fails for a reason that has
+    // nothing to do with the double-submit guard under test.
+    await burnToMineableBodyAndDock(page, fleetId, interiors)
 
     await expect(page.getByTestId('mine-section')).toBeVisible({ timeout: 20_000 })
-    await page.getByTestId('mine-tons-input').fill('1')
+    await page.getByTestId('mine-tons-input').fill(MIN_RUN_TONS)
     await doubleActivateInOneTick(page.getByTestId('mine-button'))
 
     await expect(page.getByTestId('mine-countdown')).toBeVisible({ timeout: 20_000 })
@@ -189,19 +245,36 @@ test.describe('space view — synchronous double-submit guards', () => {
     // `sell.mutate(...)` unconditionally; the only protection is
     // `disabled={!committable}` driven by an async React-Query pending flip.
     const sales = recordPosts(page, /\/v1\/fleets\/[^/]+\/sell$/)
+    const interiors = captureInteriors(page)
     const fleetId = await signUpAndWake(page, 'sellguard')
 
     // Mine something, then dock at the home station and sell it.
-    const oreBody = page.locator('[data-testid^="body-hit-feat-body-"]').first()
-    await burnToBodyAndDock(page, fleetId, (await oreBody.getAttribute('data-testid'))!)
-    await page.getByTestId('mine-tons-input').fill('1')
+    await burnToMineableBodyAndDock(page, fleetId, interiors)
+    await page.getByTestId('mine-tons-input').fill(MIN_RUN_TONS)
+    const mineKind = await page.getByTestId('mine-kind-select').inputValue()
     await page.getByTestId('mine-button').click()
+    // The run must be seen to START before it can be waited out: `toBeHidden`
+    // is satisfied by an element that does not exist yet, so waiting only on
+    // it returns the instant the click is dispatched and the fleet leaves for
+    // the station with an empty hold — which is how this test came to click a
+    // permanently disabled Sell button.
+    await expect(page.getByTestId('mine-countdown')).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('mine-countdown')).toBeHidden({ timeout: 600_000 })
+    // POLLED, not read once: the hold fills on the eta-scheduled refetch that
+    // follows the run's completion, so the tonnage lands a moment after the
+    // countdown disappears (`slice.spec.ts` polls the same readout for the
+    // same reason).
+    await expect
+      .poll(() => holdKindTons(page, mineKind), {
+        timeout: 60_000,
+        message: 'there is nothing to sell unless the mine run actually delivered',
+      })
+      .toBeGreaterThan(0)
 
-    const station = page.locator('[data-testid^="body-hit-feat-station"]').first()
-    await burnToBodyAndDock(page, fleetId, (await station.getAttribute('data-testid'))!)
+    await burnToBodyAndDock(page, fleetId, 'feat-station')
     await expect(page.getByTestId('sell-section')).toBeVisible({ timeout: 20_000 })
     await page.getByTestId('sell-tons-input').fill('1')
+    const balanceBeforeSale = await digits(page, 'balance-value')
 
     await doubleActivateInOneTick(page.getByTestId('sell-button'))
 
@@ -219,6 +292,19 @@ test.describe('space view — synchronous double-submit guards', () => {
 
     // Scenario: A fresh attempt after a completed sale is a second,
     // independent sale — a NEW key.
+    //
+    // "AFTER A COMPLETED SALE" is load-bearing, and the wait below is what
+    // makes it true. `sales.length > 0` proves only that the request LEFT the
+    // browser; the guard is still held until the mutation settles, and a
+    // second activation inside that window is SUPPOSED to be swallowed — that
+    // is the guard doing its job, not the release failing. The credited
+    // balance is the first observable proof the sale completed. (Measured:
+    // clicking straight after the request was seen loses the second sale
+    // every time, and reads as a production defect when it is a missing wait.)
+    await expect
+      .poll(() => digits(page, 'balance-value'), { timeout: 30_000 })
+      .toBeGreaterThan(balanceBeforeSale)
+
     await page.getByTestId('sell-tons-input').fill('1')
     await page.getByTestId('sell-button').click()
     await expect.poll(() => sales.length, { timeout: 20_000 }).toBe(2)
@@ -234,8 +320,7 @@ test.describe('space view — synchronous double-submit guards', () => {
     const refuels = recordPosts(page, /\/v1\/fleets\/[^/]+\/refuel$/)
     const fleetId = await signUpAndWake(page, 'refuelguard')
 
-    const station = page.locator('[data-testid^="body-hit-feat-station"]').first()
-    await burnToBodyAndDock(page, fleetId, (await station.getAttribute('data-testid'))!)
+    await burnToBodyAndDock(page, fleetId, 'feat-station')
     await expect(page.getByTestId('refuel-section')).toBeVisible({ timeout: 20_000 })
     await page.getByTestId('refuel-tons-input').fill('1')
 
@@ -252,14 +337,22 @@ test.describe('space view — synchronous double-submit guards', () => {
   test('Scenario: A double-click yields exactly one jump order', async ({ page }) => {
     test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
     const jumps = recordPosts(page, /\/v1\/fleets\/[^/]+\/jump$/)
+    const interiors = captureInteriors(page)
     const fleetId = await signUpAndWake(page, 'jumpguard')
 
-    // Reach a lane gate through its OFF-SCREEN affordance — a gate sits at a
-    // characteristic radius along its bearing, so at any framing that shows
-    // the inner system it is normally off screen.
-    const gateAffordance = page.locator('[data-testid^="offscreen-gate-"]').first()
-    await expect(gateAffordance).toBeVisible({ timeout: 20_000 })
-    await gateAffordance.click()
+    // Reach a lane gate by the id the interior read SERVED, and let
+    // `selectBody` take whichever affordance exists. A rim gate is normally
+    // off screen at the default framing, but not always — a seed whose gates
+    // all sit inside the first frame renders no off-screen affordance at all,
+    // and a suite that waited for one failed there for a reason that has
+    // nothing to do with the jump guard under test. (The off-screen
+    // affordance is exercised deliberately by `space-journey.spec.ts`, which
+    // is where tasks.md 11.2 requires it.)
+    const homeId = new URL(page.url()).pathname.split('/').pop()!
+    const gate = (interiors.get(homeId)?.laneGates ?? [])[0]
+    expect(gate?.id, `the interior read for ${homeId} served no lane-gate body id`).toBeTruthy()
+    await selectBody(page, gate.id!)
+    await expect(page.getByTestId('gate-facts')).toBeVisible({ timeout: 20_000 })
     await page.getByTestId('burn-button').click()
     const row = page.getByTestId(`fleet-row-${fleetId}`)
     await expect(row).toContainText(/under way/i, { timeout: 20_000 })

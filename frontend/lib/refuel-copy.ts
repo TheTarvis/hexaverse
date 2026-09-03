@@ -1,6 +1,8 @@
 // Player-facing copy for the refuel verb's server rejection reasons
 // (add-fuel-as-cargo; `fuel-purchase`'s own rejections, task 6.9 "Rejections
-// Report a Distinguishable Reason"; board-view "Refuel Commit" — a failed
+// Report a Distinguishable Reason"; `docked-fleet-actions` "Refuel Commit"
+// — the capability openspec build-production-space-view moved this
+// requirement to when `board-view` retired; a failed
 // refuel toasts player-facing copy, never the raw sentinel string). Same
 // seam and precedent as `lib/market-copy.ts` (sell) and `lib/jump-copy.ts`
 // (jump).

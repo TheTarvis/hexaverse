@@ -38,6 +38,13 @@ const COPY: ReadonlyArray<readonly [needle: string, copy: string]> = [
   ['already used with different parameters', 'That sale was already submitted with different details.'],
   ['unresolved ledger divergence', 'Your account is under review and cannot trade right now.'],
   ['operation key', 'Something went wrong submitting that sale. Please try again.'],
+
+  // The per-corporation write quota (a 429). It had no mapping until
+  // openspec build-production-space-view, so a quota-rejected sale toasted
+  // the generic line and told the player nothing about waiting
+  // (`docked-fleet-actions`: "A distinguishable server reason renders as
+  // player-facing copy"). `lib/refuel-copy.ts` already carried this needle.
+  ['quota', "You've hit your trading limit for now. Try again later."],
 ]
 
 // saleErrorCopy maps a server rejection reason to player-facing text.

@@ -19,7 +19,7 @@ import type { FailureCause, GuardStatus } from './guard-machine'
 export interface RendererStateNoticeProps {
   status: Extract<GuardStatus, 'unsupported' | 'interrupted'>
   cause: FailureCause | null
-  surface: 'board' | 'galaxy'
+  surface: 'board' | 'galaxy' | 'space'
   retrying: boolean
   onRetry?: () => void
   // True iff focus was inside the canvas region at the moment this notice
@@ -35,9 +35,10 @@ const CAUSE_COPY: Record<FailureCause, string> = {
 
 const FALLBACK_COPY = 'The renderer is unavailable.'
 
-const SURFACE_LABEL: Record<'board' | 'galaxy', string> = {
+const SURFACE_LABEL: Record<'board' | 'galaxy' | 'space', string> = {
   board: 'board',
   galaxy: 'galaxy view',
+  space: 'system space view',
 }
 
 export function RendererStateNotice({
@@ -88,7 +89,11 @@ export function RendererStateNotice({
       >
         {causeText}
       </p>
-      <span className="sr-only">{liveMessage}</span>
+      {/* The state change, announced. `data-testid` names it so a view can
+          assert its own wiring reaches assistive technology. */}
+      <span className="sr-only" data-testid="renderer-live-region" aria-live="polite">
+        {liveMessage}
+      </span>
       {onRetry && (
         <Button
           type="button"

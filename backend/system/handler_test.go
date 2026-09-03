@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
 
 	"github.com/gin-gonic/gin"
@@ -70,8 +69,8 @@ func (sysTestClock) Scale() float64                        { return 1 }
 func TestGetInterior_Scenario_NoLaneGateOmittedForLackOfCharting(t *testing.T) {
 	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1", Radius: 16}}
 	gates := []LaneGate{
-		{DestSystemId: "sys-known", Cell: board.Cell{Ring: 16, Slot: 0}},
-		{DestSystemId: "sys-dark", Cell: board.Cell{Ring: 16, Slot: 48}},
+		{DestSystemId: "sys-known", LaneId: "lane_s1_sys-known"},
+		{DestSystemId: "sys-dark", LaneId: "lane_s1_sys-dark"},
 	}
 
 	gin.SetMode(gin.TestMode)

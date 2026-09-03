@@ -20,7 +20,11 @@ import { recordRendererFailure, type RecordFn } from './record-renderer-failure'
 
 export interface RenderGuardOptions {
   canvas: HTMLCanvasElement | null
-  surface: 'board' | 'galaxy'
+  // 'space' is the continuous-space system view (openspec
+  // build-production-space-view). It is its own surface identity, never
+  // 'board': reusing the retired view's name would mis-attribute every
+  // recorded renderer failure to a view that no longer exists.
+  surface: 'board' | 'galaxy' | 'space'
   onSuspend?: () => void
   onResume?: () => void
   onRetry?: () => Promise<boolean>

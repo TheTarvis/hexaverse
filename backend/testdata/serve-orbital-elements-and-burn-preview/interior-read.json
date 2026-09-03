@@ -1,522 +1,342 @@
 {
-  "systemId": "sys_-7_17",
-  "radius": 16,
+  "systemId": "sys_-1_-1",
   "extent": 658.7081316032265,
   "character": "normal",
-  "starClass": "M",
+  "starClass": "B",
   "features": [
     {
       "id": "feat-belt-0",
       "type": "belt",
-      "orbit": {
-        "ring": 3,
-        "angle0": 19,
-        "period": 108000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 3,
-          "slot": 8
-        },
-        {
-          "ring": 3,
-          "slot": 9
-        },
-        {
-          "ring": 3,
-          "slot": 10
-        },
-        {
-          "ring": 3,
-          "slot": 11
-        },
-        {
-          "ring": 3,
-          "slot": 12
-        },
-        {
-          "ring": 3,
-          "slot": 13
-        },
-        {
-          "ring": 3,
-          "slot": 14
-        },
-        {
-          "ring": 3,
-          "slot": 15
-        },
-        {
-          "ring": 3,
-          "slot": 16
-        },
-        {
-          "ring": 3,
-          "slot": 17
-        },
-        {
-          "ring": 3,
-          "slot": 18
-        },
-        {
-          "ring": 3,
-          "slot": 19
-        },
-        {
-          "ring": 3,
-          "slot": 20
-        },
-        {
-          "ring": 3,
-          "slot": 21
-        },
-        {
-          "ring": 3,
-          "slot": 22
-        },
-        {
-          "ring": 3,
-          "slot": 23
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "resources": [
         {
-          "kind": "metals",
-          "richness": 0.3195360846400526
+          "kind": "water",
+          "richness": 0.534805817222519
         }
       ],
       "space": {
-        "X": -31.528282070390865,
-        "Y": 1.3079151523465793,
-        "Z": 31.6045021928363
+        "X": 75.17587775241059,
+        "Y": 7.603030876996264,
+        "Z": -277.6916911666256
       },
       "size": 0.9,
       "orbitElements": {
         "parentId": "feat-star",
-        "radius": 44.660807999999996,
-        "periodMs": 47192,
-        "phase": 618097,
-        "inclination": 517477,
-        "node": 259477
+        "radius": 287.7879323692057,
+        "periodMs": 771932,
+        "phase": 422967,
+        "inclination": 509520,
+        "node": 356742
       }
     },
     {
       "id": "feat-body-0",
       "type": "rocky",
-      "orbit": {
-        "ring": 1,
-        "angle0": 1,
-        "period": 36000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 1,
-          "slot": 1
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "resources": [
         {
           "kind": "metals",
-          "richness": 0.29842421972569816
+          "richness": 0.32527548019573593
         }
       ],
       "space": {
-        "X": 17.998549692004563,
-        "Y": -3.1843397544807743,
-        "Z": -15.553526587641656
+        "X": 34.05830315781705,
+        "Y": -5.932248505747889,
+        "Z": -11.100786721502239
       },
-      "size": 1.7607462208572227,
+      "size": 1.811260416240256,
       "orbitElements": {
         "parentId": "feat-star",
-        "radius": 24,
-        "periodMs": 18591,
-        "phase": 373097,
-        "inclination": 500434,
-        "node": 205958
+        "radius": 36.309599999999996,
+        "periodMs": 34595,
+        "phase": 562716,
+        "inclination": 495247,
+        "node": 266663
       }
     },
     {
       "id": "feat-body-1",
       "type": "rocky",
-      "orbit": {
-        "ring": 4,
-        "angle0": 5,
-        "period": 144000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 4,
-          "slot": 5
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "resources": [
         {
           "kind": "metals",
-          "richness": 0.28433848778262333
+          "richness": 0.5193593822457339
         }
       ],
       "space": {
-        "X": -34.30411967572656,
-        "Y": -0.569087488979469,
-        "Z": -42.901227858550364
+        "X": -7.11113506928839,
+        "Y": -2.131565150152218,
+        "Z": 44.03948182313068
       },
-      "size": 2.188615067169396,
+      "size": 2.0665036472438696,
       "orbitElements": {
         "parentId": "feat-star",
-        "radius": 54.932793839999995,
-        "periodMs": 64376,
-        "phase": 868948,
-        "inclination": 509362,
-        "node": 130256
+        "radius": 44.660807999999996,
+        "periodMs": 47192,
+        "phase": 944369,
+        "inclination": 496262,
+        "node": 765466
       }
     },
     {
       "id": "feat-body-2",
       "type": "rocky",
-      "orbit": {
-        "ring": 5,
-        "angle0": 17,
-        "period": 180000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 5,
-          "slot": 17
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "resources": [
         {
           "kind": "metals",
-          "richness": 0.33356202155586107
+          "richness": 0.3257626979486602
         }
       ],
       "space": {
-        "X": -63.60806751639355,
-        "Y": 5.6581190378367365,
-        "Z": -22.075877946516133
+        "X": -33.05037620445978,
+        "Y": 4.951683471419928,
+        "Z": 43.59776717459833
       },
-      "size": 2.1846993163569968,
+      "size": 2.2373420337075975,
       "orbitElements": {
         "parentId": "feat-star",
-        "radius": 67.56733642319999,
-        "periodMs": 87817,
-        "phase": 927335,
-        "inclination": 495532,
-        "node": 139847
+        "radius": 54.932793839999995,
+        "periodMs": 64376,
+        "phase": 298451,
+        "inclination": 499004,
+        "node": 1000582
       }
     },
     {
       "id": "feat-body-3",
-      "type": "gas_giant",
-      "orbit": {
-        "ring": 8,
-        "angle0": 43,
-        "period": 288000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 8,
-          "slot": 43
-        }
-      ],
-      "band": "visible",
-      "live": true,
+      "type": "rocky",
       "resources": [
         {
-          "kind": "volatiles",
-          "richness": 0.5746640286924306
+          "kind": "metals",
+          "richness": 0.48201310496722005
         }
       ],
       "space": {
-        "X": 124.91659587500338,
-        "Y": 0.5508987672188057,
-        "Z": -14.301599352058458
+        "X": -63.72305592708939,
+        "Y": -1.1403835744626063,
+        "Z": 22.436947652076526
       },
-      "size": 3.8866590150067144,
+      "size": 2.2096013098403917,
       "orbitElements": {
         "parentId": "feat-star",
-        "radius": 125.73382662783088,
-        "periodMs": 222920,
-        "phase": 814964,
-        "inclination": 510954,
-        "node": 514401
+        "radius": 67.56733642319999,
+        "periodMs": 87817,
+        "phase": 345343,
+        "inclination": 496188,
+        "node": 484389
       }
     },
     {
       "id": "feat-body-4",
       "type": "gas_giant",
-      "orbit": {
-        "ring": 9,
-        "angle0": 62,
-        "period": 324000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 9,
-          "slot": 62
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "resources": [
         {
           "kind": "volatiles",
-          "richness": 0.2614187795158829
+          "richness": 0.3990982952628409
         }
       ],
       "space": {
-        "X": -80.73434873706114,
-        "Y": 3.6335135222221933,
-        "Z": -131.8567074090163
+        "X": -90.7253183404626,
+        "Y": 15.017822607500841,
+        "Z": 44.641307387936806
       },
-      "size": 3.626436837174199,
+      "size": 3.843980117919154,
+      "orbitElements": {
+        "parentId": "feat-star",
+        "radius": 102.22262327465926,
+        "periodMs": 163415,
+        "phase": 366552,
+        "inclination": 499318,
+        "node": 157123
+      }
+    },
+    {
+      "id": "feat-body-5",
+      "type": "ice",
+      "resources": [
+        {
+          "kind": "organics",
+          "richness": 0.39942204076461535
+        }
+      ],
+      "space": {
+        "X": 24.7597971741479,
+        "Y": 10.130832390349896,
+        "Z": -152.3211983088178
+      },
+      "size": 1.9254567351185736,
       "orbitElements": {
         "parentId": "feat-star",
         "radius": 154.65260675223197,
         "periodMs": 304093,
-        "phase": 914774,
-        "inclination": 508587,
-        "node": 212462
+        "phase": 691159,
+        "inclination": 502600,
+        "node": 376862
+      }
+    },
+    {
+      "id": "feat-body-6",
+      "type": "gas_giant",
+      "resources": [
+        {
+          "kind": "volatiles",
+          "richness": 0.36569724727913344
+        }
+      ],
+      "space": {
+        "X": -216.7340527691651,
+        "Y": 18.483115504787264,
+        "Z": -86.18888645730766
+      },
+      "size": 3.6719055489059143,
+      "orbitElements": {
+        "parentId": "feat-star",
+        "radius": 233.97392875545177,
+        "periodMs": 565876,
+        "phase": 608058,
+        "inclination": 510057,
+        "node": 261165
       }
     },
     {
       "id": "feat-extra-0",
       "type": "rocky",
-      "orbit": {
-        "ring": 8,
-        "angle0": 9,
-        "period": 288000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 8,
-          "slot": 9
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "resources": [
         {
-          "kind": "organics",
-          "richness": 0.259344235211669
+          "kind": "water",
+          "richness": 0.5020312905136882
         }
       ],
       "space": {
-        "X": 122.32837810276288,
-        "Y": 4.434819145816684,
-        "Z": -28.724474727465516
+        "X": -126.55343717183788,
+        "Y": 7.533299500814142,
+        "Z": -88.57147234795877
       },
-      "size": 2.1129651946728036,
+      "size": 1.70366320950052,
       "orbitElements": {
         "parentId": "feat-star",
-        "radius": 125.73382662783088,
-        "periodMs": 222920,
-        "phase": 12874,
-        "inclination": 518396,
-        "node": 741446
+        "radius": 154.65260675223197,
+        "periodMs": 304093,
+        "phase": 673360,
+        "inclination": 504451,
+        "node": 172108
       }
     },
     {
       "id": "feat-hazard-0",
-      "type": "nebula",
-      "orbit": {
-        "ring": 14,
-        "angle0": 40,
-        "period": 504000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 14,
-          "slot": 40
-        }
-      ],
-      "band": "visible",
-      "live": true,
+      "type": "gravity_well",
       "effects": {
-        "scanMod": 0.4,
-        "moveMod": 0.8
+        "scanMod": 0.8,
+        "moveMod": 0.5
       },
       "space": {
-        "X": 78.13962258403211,
-        "Y": -20.492268074557845,
-        "Z": -427.8346848497216
+        "X": 21.826534654609844,
+        "Y": -1.8935480120873438,
+        "Z": -19.785026178831195
       },
-      "size": 2.254300523250096,
+      "size": 1.7410046087253048,
       "orbitElements": {
         "parentId": "feat-star",
-        "radius": 435.39436288137125,
-        "periodMs": 1436463,
-        "phase": 959344,
-        "inclination": 503229,
-        "node": 880085
+        "radius": 29.52,
+        "periodMs": 25360,
+        "phase": 358877,
+        "inclination": 491923,
+        "node": 345755
       }
     },
     {
       "id": "feat-moon-0",
       "type": "moon",
-      "parentId": "feat-body-3",
-      "footprint": [
-        {
-          "ring": 0,
-          "slot": 0
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "resources": [
         {
           "kind": "volatiles",
-          "richness": 0.2039629657038472
+          "richness": 0.25807401855500983
         }
       ],
       "space": {
-        "X": 114.174530795487,
-        "Y": 0.49229135179238365,
-        "Z": -1.2257640314209457
+        "X": -94.74924337848044,
+        "Y": 16.170603436730016,
+        "Z": 25.601602260690086
       },
-      "size": 0.8618547327278767,
+      "size": 0.7943025322067948,
       "orbitElements": {
-        "parentId": "feat-body-3",
-        "radius": 16.922554958815752,
-        "periodMs": 20230,
-        "phase": 202491,
-        "inclination": 519569,
-        "node": 880718
+        "parentId": "feat-body-4",
+        "radius": 19.49439015933379,
+        "periodMs": 22544,
+        "phase": 1046922,
+        "inclination": 512969,
+        "node": 574877
       }
     },
     {
       "id": "feat-moon-1",
       "type": "moon",
-      "parentId": "feat-body-4",
-      "footprint": [
-        {
-          "ring": 0,
-          "slot": 0
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "resources": [
         {
-          "kind": "water",
-          "richness": 0.3090012296006757
+          "kind": "volatiles",
+          "richness": 0.4356597887070804
         }
       ],
       "space": {
-        "X": -62.535922330348214,
-        "Y": 2.3439460059509623,
-        "Z": -126.95739812624382
+        "X": -232.04928968821315,
+        "Y": 16.21195227630754,
+        "Z": -95.27837260001856
       },
-      "size": 0.6987278623956712,
+      "size": 0.7268823371878678,
       "orbitElements": {
-        "parentId": "feat-body-4",
-        "radius": 18.890445720200177,
-        "periodMs": 22001,
-        "phase": 57154,
-        "inclination": 510216,
-        "node": 410735
+        "parentId": "feat-body-6",
+        "radius": 17.953646499680914,
+        "periodMs": 21158,
+        "phase": 934994,
+        "inclination": 495685,
+        "node": 999738
       }
     },
     {
       "id": "feat-special-0",
-      "type": "anomaly",
-      "orbit": {
-        "ring": 11,
-        "angle0": 65,
-        "period": 396000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 11,
-          "slot": 65
-        }
-      ],
-      "band": "visible",
-      "live": true,
+      "type": "ruin",
       "resources": [
         {
-          "kind": "exotic",
-          "richness": 0.7198467753869449
+          "kind": "research",
+          "richness": 0.44430768616225597
         }
       ],
       "space": {
-        "X": 122.32077885929763,
-        "Y": -12.237923151339412,
-        "Z": 199.07701935044616
+        "X": 227.38673712973394,
+        "Y": -6.281918769840179,
+        "Z": -54.76868276053064
       },
-      "size": 0.8998944650293277,
+      "size": 1.0349482641963819,
       "orbitElements": {
         "parentId": "feat-star",
         "radius": 233.97392875545177,
         "periodMs": 565876,
-        "phase": 4296,
-        "inclination": 500084,
-        "node": 231403
+        "phase": 313196,
+        "inclination": 516098,
+        "node": 388283
       }
     },
     {
       "id": "feat-star",
       "type": "star",
-      "fixed": true,
-      "footprint": [
-        {
-          "ring": 0,
-          "slot": 0
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "space": {
         "X": 0,
         "Y": 0,
         "Z": 0
       },
-      "size": 5.2
+      "size": 7
     },
     {
       "id": "feat-station",
       "type": "station",
-      "orbit": {
-        "ring": 2,
-        "angle0": 10,
-        "period": 72000,
-        "dir": -1
-      },
-      "footprint": [
-        {
-          "ring": 2,
-          "slot": 10
-        }
-      ],
-      "band": "visible",
-      "live": true,
       "space": {
-        "X": -25.38796342426852,
-        "Y": -0.5690874889794685,
-        "Z": -38.373297017693176
+        "X": -215.5568331853171,
+        "Y": 18.483115504787264,
+        "Z": -71.73675325658589
       },
       "size": 0.9,
       "orbitElements": {
-        "parentId": "feat-body-1",
-        "radius": 10,
-        "periodMs": 14000,
+        "parentId": "feat-body-6",
+        "radius": 14.5,
+        "periodMs": 18050,
         "phase": 0,
         "inclination": 524288,
         "node": 0
@@ -525,73 +345,83 @@
   ],
   "laneGates": [
     {
-      "destSystemId": "sys_-6_16",
-      "cell": {
-        "ring": 13,
-        "slot": 92
-      },
-      "laneId": "lane_-7_17_-6_16",
+      "id": "gate-sys_-1_-2",
+      "destSystemId": "sys_-1_-2",
+      "laneId": "lane_-1_-2_-1_-1",
       "space": {
-        "X": 694.2263652645378,
+        "X": -285.1750236905493,
         "Y": 0,
-        "Z": -207.5196399530588
+        "Z": -666.100482703438
       },
       "size": 1.2,
       "orbitElements": {
         "parentId": "feat-star",
         "radius": 724.5789447635493,
         "periodMs": 0,
-        "phase": 1000101,
+        "phase": 718924,
         "inclination": 0,
         "node": 0
       }
     },
     {
-      "destSystemId": "sys_-7_18",
-      "cell": {
-        "ring": 13,
-        "slot": 19
-      },
-      "laneId": "lane_-7_17_-7_18",
+      "id": "gate-sys_-1_0",
+      "destSystemId": "sys_-1_0",
+      "laneId": "lane_-1_-1_-1_0",
       "space": {
-        "X": 241.04715544982778,
+        "X": 601.0723891647416,
         "Y": 0,
-        "Z": 683.3087999171423
+        "Z": 404.6314745276843
       },
       "size": 1.2,
       "orbitElements": {
         "parentId": "feat-star",
         "radius": 724.5789447635493,
         "periodMs": 0,
-        "phase": 205547,
+        "phase": 98880,
         "inclination": 0,
         "node": 0
       }
     },
     {
-      "destSystemId": "sys_-8_17",
-      "cell": {
-        "ring": 13,
-        "slot": 50
-      },
-      "laneId": "lane_-8_17_-7_17",
+      "id": "gate-sys_-2_0",
+      "destSystemId": "sys_-2_0",
+      "laneId": "lane_-2_0_-1_-1",
       "space": {
-        "X": -716.8677935234309,
+        "X": -585.0604846481897,
         "Y": 0,
-        "Z": -105.42871432160348
+        "Z": 427.4562860666386
       },
       "size": 1.2,
       "orbitElements": {
         "parentId": "feat-star",
         "radius": 724.5789447635493,
         "periodMs": 0,
-        "phase": 548657,
+        "phase": 418986,
+        "inclination": 0,
+        "node": 0
+      }
+    },
+    {
+      "id": "gate-sys_0_-1",
+      "destSystemId": "sys_0_-1",
+      "laneId": "lane_-1_-1_0_-1",
+      "space": {
+        "X": 719.5783126074975,
+        "Y": 0,
+        "Z": -84.98058142661381
+      },
+      "size": 1.2,
+      "orbitElements": {
+        "parentId": "feat-star",
+        "radius": 724.5789447635493,
+        "periodMs": 0,
+        "phase": 1028958,
         "inclination": 0,
         "node": 0
       }
     }
   ],
   "contacts": [],
-  "worldTime": 21175110953,
+  "worldTime": 21198908471,
   "scale": 1
 }

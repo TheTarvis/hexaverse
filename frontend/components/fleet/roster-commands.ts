@@ -16,10 +16,11 @@ export interface RosterCommandVisibility {
 }
 
 // isChartedGate: true when the given body id is a lane gate whose lane the
-// corporation has charted. Injected rather than resolved here — the
-// SystemBoard wire shape (`lib/types/system-board.ts`'s `LaneGate`) does not
-// currently name a gate's body id, so how a caller answers this question is
-// a wiring decision left to the component composing this function.
+// corporation has charted. Injected rather than resolved here — how a caller
+// answers it is a wiring decision left to the component composing this
+// function. Consulted only where the mounting view declares that the roster
+// owns the fleet commands; the system space view declares that it owns them
+// itself and passes nothing (`FleetRoster`'s `commandOwner`).
 export type IsChartedGate = (bodyId: string) => boolean
 
 export function rosterCommandVisibility(

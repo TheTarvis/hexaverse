@@ -77,6 +77,27 @@ export function useJump(): UseMutationResult<Fleet, Error, { fleetId: string; la
   })
 }
 
+// useHold / useRelease — the station-keeping verbs
+// (add-stationkeep-hold-verb). Both settle SYNCHRONOUSLY: no action, no ETA,
+// so there is nothing to schedule a refetch against — the response IS the
+// fleet in its new park mode. Both shipped server-side with no client at
+// all; this change is the first thing to give them one.
+export function useHold(): UseMutationResult<Fleet, Error, string> {
+  const qc = useQueryClient()
+  return useMutation<Fleet, Error, string>({
+    mutationFn: (fleetId) => fleetService.hold(fleetId),
+    onSuccess: (fleet) => invalidateFleet(qc, fleet),
+  })
+}
+
+export function useRelease(): UseMutationResult<Fleet, Error, string> {
+  const qc = useQueryClient()
+  return useMutation<Fleet, Error, string>({
+    mutationFn: (fleetId) => fleetService.release(fleetId),
+    onSuccess: (fleet) => invalidateFleet(qc, fleet),
+  })
+}
+
 // useMine — the extraction verb: commit a run against the docked-at
 // feature. Rides the movement channel (a 409 names the occupying action),
 // so success refreshes the fleet reads (the claimed slot), the interior

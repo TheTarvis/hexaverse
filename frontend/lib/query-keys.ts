@@ -44,14 +44,21 @@ export const queryKeys = {
     // any more — only `mine`/`detail`). `inSystem` is kept as a key SHAPE
     // only, for `use-actions.ts`/`use-market.ts`'s existing invalidations
     // against a query nothing currently produces; `mine()` (below) is the
-    // key that replaced it as the live fleet read, and `use-board-realtime.ts`
-    // invalidates it on every realtime rule.
+    // key that replaced it as the live fleet read, and the space view's own
+    // realtime rules (`components/space/SystemSpaceView.tsx`, over
+    // `lib/realtime.ts`'s constants) refetch through it.
     all: ['fleets'] as const,
     inSystem: (systemId: string) => [...queryKeys.fleets.all, 'in-system', systemId] as const,
     detail: (id: string) => [...queryKeys.fleets.all, 'detail', id] as const,
     // The requester's own fleets across systems (transit included) — the
     // roster panel and the galaxy/board views' fleet source.
     mine: () => [...queryKeys.fleets.all, 'mine'] as const,
+    // The server-solved burn quote for one acting fleet against one
+    // selection (build-production-space-view). Keyed by the SELECTION as
+    // well as the fleet, so replacing the target cannot present the
+    // previous target's figures as the current quote.
+    burnPreview: (fleetId: string, selection: string) =>
+      [...queryKeys.fleets.all, 'burn-preview', fleetId, selection] as const,
   },
 
   actions: {

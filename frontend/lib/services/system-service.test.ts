@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { systemService } from './system-service'
 import { apiClient } from '../api-client'
-import type { SystemBoard } from '../types/system-board'
+import type { SystemSpace } from '../types/system-space'
+
+// Repointed from `getSystemBoard` to `getSystemSpace` (openspec change
+// `build-production-space-view`, tasks.md 10.1/10.3): the lattice interior
+// read and the `SystemBoard` shape it returned are both gone. The two cases
+// are the ones the deleted file asserted — the path, and the id encoded into
+// it — against the surviving continuous read.
 
 vi.mock('../api-client', () => ({
   apiClient: { get: vi.fn() },
@@ -12,36 +18,35 @@ const mockGet = vi.mocked(apiClient.get)
 // apiClient.get resolves an ApiResponse<T> (data + status + headers).
 const ok = <T>(data: T) => ({ data, status: 200, headers: new Headers() })
 
-const board: SystemBoard = {
+const space: SystemSpace = {
   systemId: 'sys-7',
-  radius: 16,
+  extent: 658.7081316032265,
   character: 'star_rich',
   starClass: 'G',
   worldTime: 123456,
+  scale: 1,
   laneGates: [],
-  features: [
-    { id: 'f-star', type: 'star', fixed: true, footprint: [{ ring: 0, slot: 0 }], band: 'visible', live: true },
-  ],
+  features: [{ id: 'f-star', type: 'star', space: { X: 0, Y: 0, Z: 0 }, size: 5.2 }],
 }
 
-describe('systemService.getSystemBoard', () => {
+describe('systemService.getSystemSpace', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('reads GET /v1/systems/:id and returns the fogged interior', async () => {
-    mockGet.mockResolvedValue(ok(board))
+  it('reads GET /v1/systems/:id and returns the fogged continuous interior', async () => {
+    mockGet.mockResolvedValue(ok(space))
 
-    const result = await systemService.getSystemBoard('sys-7')
+    const result = await systemService.getSystemSpace('sys-7')
 
     expect(mockGet).toHaveBeenCalledWith('/v1/systems/sys-7')
-    expect(result).toEqual(board)
+    expect(result).toEqual(space)
   })
 
   it('encodes the system id into the path', async () => {
-    mockGet.mockResolvedValue(ok(board))
+    mockGet.mockResolvedValue(ok(space))
 
-    await systemService.getSystemBoard('sys-42')
+    await systemService.getSystemSpace('sys-42')
 
     expect(mockGet).toHaveBeenCalledWith('/v1/systems/sys-42')
   })

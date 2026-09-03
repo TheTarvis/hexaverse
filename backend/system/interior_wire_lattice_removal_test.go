@@ -101,8 +101,15 @@ func TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse(t *testing.T) {
 				}
 			}
 		}
+		// `id` joins the survivor set as of tasks.md 9.1b (adjudicated
+		// 2026-09-03, AFTER this file's red handoff): the gate body id is
+		// the string a burn order names and the string fleet.AttachedTo
+		// reports, and once `cell` is gone it is the ONLY identity a client
+		// has for a gate. It is served, never re-derived client-side —
+		// interior_gate_body_id_e2e_test.go pins the equality that makes
+		// this key load-bearing rather than decorative.
 		assertKeySet(t, "LaneGate", keys, []string{
-			"destSystemId", "laneId", "space", "size", "orbitElements",
+			"id", "destSystemId", "laneId", "space", "size", "orbitElements",
 		})
 	})
 

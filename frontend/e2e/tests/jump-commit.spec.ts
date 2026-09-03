@@ -1,37 +1,52 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
+import {
+  burnToSelectionAndDock,
+  captureInteriors,
+  capturePosts,
+  selectBody,
+  wakeNewCorp,
+} from '../helpers/space-view'
 
 /**
- * Jump commit, wire to click — openspec change
- * replace-observation-with-sightings, tasks.md 8.8:
+ * Jump commit, wire to click.
  *
- *   "End-to-end frontend test covering the full wire-to-click path task 4.11
- *    wires: read a materialized system's interior, take the served `laneId` off
- *    an attached lane-gate body, and invoke the jump command with it —
- *    asserting the jump order is actually submitted (not a no-op or a
- *    client-side refusal), closing the gap a per-scenario unit test on either
- *    half alone would miss."
- *
- * (board-view: "Jump Commit" — "Invoking jump submits the attached gate's
- * lane".)
+ * ORIGINALLY written for `replace-observation-with-sightings` tasks.md 8.8
+ * (board-view "Jump Commit": "Invoking jump submits the attached gate's
+ * lane"). REWRITTEN against the continuous-space view for
+ * `build-production-space-view` tasks.md 2.1b / 10.8 — the lattice board and
+ * every id this suite drove (`board-overlay`, `gate-glyph-*`,
+ * `fleet-cmd-burn-*`) are gone. The JOURNEY and every assertion's SUBSTANCE
+ * are preserved verbatim in intent; only the surfaces changed.
  *
  * WHY THIS EXISTS ALONGSIDE THE TESTS THAT ALREADY TOUCH JUMP:
- *  - `components/board/SystemBoardView.test.tsx` renders the real component and
- *    fires a real click, but `useSystemBoard` is mocked: the `laneId` it clicks
- *    with comes from a hand-written fixture literal, so it cannot fail if the
- *    SERVER stops sending one, or sends a different one.
- *  - `backend/lane_id_traversal_e2e_test.go` proves the server serves a usable
- *    laneId and accepts it back — but it constructs the jump request itself, so
- *    it cannot fail if the CLIENT never reads the served field.
- *  Neither can fail when the seam BETWEEN them breaks. This test closes it: the
- *  laneId asserted on the outgoing request is read out of the server's own
- *  interior-read response, captured off the wire during the same session.
+ *  - `components/space/SystemSpaceView.test.tsx` renders the real component
+ *    and fires a real click, but `useSystemSpace` is mocked: the `laneId` it
+ *    clicks with comes from a hand-written fixture literal, so it cannot fail
+ *    if the SERVER stops sending one, or sends a different one.
+ *  - `backend/lane_id_traversal_e2e_test.go` proves the server serves a
+ *    usable laneId and accepts it back — but it constructs the jump request
+ *    itself, so it cannot fail if the CLIENT never reads the served field.
+ *  Neither can fail when the seam BETWEEN them breaks. This test closes it:
+ *  the laneId asserted on the outgoing request is read out of the server's
+ *  own interior-read response, captured off the wire during the same session.
  *
- * It is deliberately NARROWER and faster than `slice.spec.ts` (which also ends
- * in a jump, after two mining runs): this one goes wake → gate → burn → dock →
- * jump, and its assertion is on the REQUEST BODY, not merely on the roster
- * status afterward. A jump that submitted the WRONG lane id would still flip the
- * row to "In transit"; only the request-body assertion catches that.
+ * WHAT THE REWRITE ADDS, and why it belongs here rather than in a new file.
+ * `system-interior`'s *Lane-Gate Bodies Carry Their Body Id* (tasks.md
+ * 9.1b–9.1d) makes the gate's `id` a SERVED string precisely so no client
+ * rebuilds `"gate-" + destSystemId`. That claim has exactly the same shape as
+ * this suite's original one — "the value on the wire out is the value the
+ * server sent in" — and exactly the same blind spot if left to either side's
+ * own tests. So the burn leg now asserts the ORDER's `bodyId` against the
+ * served gate `id`, alongside the jump leg's laneId assertion. Together they
+ * pin both halves of a gate's identity across one real round trip.
+ *
+ * It is deliberately NARROWER and faster than `slice.spec.ts` (which also
+ * ends in a jump, after two mining runs): this one goes wake → gate → burn →
+ * dock → jump, and its assertions are on the REQUEST BODIES, not merely on
+ * the roster status afterward. A jump that submitted the WRONG lane id would
+ * still flip the row to "In transit"; only the request-body assertion catches
+ * that.
  *
  * Local-only: drives the auth emulator's signup path, like slice.spec.ts.
  */
@@ -41,19 +56,9 @@ test.use({ storageState: { cookies: [], origins: [] } })
 
 // The burn to the nearest lane gate rides the real world clock at scale 1
 // (see slice.spec.ts's wall-clock note) — left generous rather than guessed
-// tight.
-test.setTimeout(600_000)
-
-// Orbiting glyphs animate every frame, so Playwright's stability check never
-// settles on them; dispatchEvent needs neither stability nor hit-testing.
-async function clickGlyph(page: Page, testId: string): Promise<void> {
-  await page.getByTestId(testId).dispatchEvent('click')
-}
-
-interface ServedGate {
-  destSystemId: string
-  laneId?: string
-}
+// tight. A gate sits at the system's rim, so this is the longest single burn
+// any suite here commits.
+test.setTimeout(900_000)
 
 test.describe('jump commit — wire to click', () => {
   test('submits the jump order naming the laneId the interior read itself served', async ({
@@ -61,122 +66,97 @@ test.describe('jump commit — wire to click', () => {
   }) => {
     test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
 
-    // Every lane gate the SERVER served, per system, captured straight off the
-    // wire. This is the "wire" end of the path under test — nothing here is a
-    // fixture, and nothing re-derives the id client-side.
-    const servedGates = new Map<string, ServedGate[]>()
-    page.on('response', async (res) => {
-      const url = new URL(res.url())
-      const m = /^\/v1\/systems\/([^/]+)$/.exec(url.pathname)
-      if (!m || res.request().method() !== 'GET' || !res.ok()) return
-      try {
-        const body = (await res.json()) as { laneGates?: ServedGate[] }
-        if (Array.isArray(body.laneGates)) servedGates.set(m[1], body.laneGates)
-      } catch {
-        // A non-JSON or already-consumed body is not this test's concern; the
-        // assertions below fail loudly if nothing was ever captured.
-      }
-    })
+    // The wire end of the path under test. Nothing below is a fixture, and
+    // nothing re-derives a served id client-side.
+    const interiors = captureInteriors(page)
+    const orders = capturePosts<{ bodyId?: string }>(page, /\/v1\/fleets\/[^/]+\/orders$/)
 
-    // 1. Sign up and wake onto the home board.
-    const email = `e2e+jumpcommit-${Date.now()}@hexaverse.test`
-    const password = 'e2ePassword123!'
-    await page.goto('/login?signUp=true')
-    await page.getByTestId('login-email').fill(email)
-    await page.getByTestId('login-password').fill(password)
-    await page.getByTestId('login-confirm-password').fill(password)
-    await page.getByTestId('login-submit').click()
-    await expect(page.getByTestId('wake-up-flow')).toBeVisible({ timeout: 15_000 })
-    await page.getByTestId('wake-name-input').fill('E2E Jumper')
-    await page.getByTestId('wake-submit').click()
-    await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 20_000 })
-    await expect(page.getByTestId('board-overlay')).toBeVisible({ timeout: 15_000 })
+    // 1. Sign up and wake onto the home system's space view.
+    const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Jumper', 'jumpcommit')
 
-    const homeSystemId = new URL(page.url()).pathname.split('/').pop()!
-    expect(homeSystemId, 'the wake flow should land on a system route').toBeTruthy()
-
-    const roster = page.getByTestId('fleet-roster')
-    await expect(roster).toBeVisible({ timeout: 15_000 })
-    const rows = roster.locator('[data-testid^="fleet-row-"]')
-    await expect(rows).toHaveCount(1, { timeout: 15_000 })
-    const fleetId = (await rows.first().getAttribute('data-testid'))!.replace('fleet-row-', '')
-
-    // 2. The gate bodies are on the board unfiltered from the first load
-    //    (system-interior "Bodies Are Public; Ships Are Disclosed"). Pick the
-    //    nearest one and remember WHICH gate, so the served laneId asserted
-    //    below is that same gate's.
-    const gates = page.locator('[data-testid^="gate-glyph-"]')
-    await expect(
-      gates.first(),
-      'a fresh corporation’s home board should show at least one lane-gate body',
-    ).toBeVisible({ timeout: 15_000 })
-
-    let gateDestId = ''
-    let best = Number.POSITIVE_INFINITY
-    for (const glyph of await gates.all()) {
-      const id = (await glyph.getAttribute('data-testid'))!.replace('gate-glyph-', '')
-      const box = await glyph.boundingBox()
-      if (!box) continue
-      const d = Math.hypot(box.x, box.y)
-      if (d < best) {
-        best = d
-        gateDestId = id
-      }
-    }
-    expect(gateDestId, 'a nearest lane-gate body should have been picked').not.toBe('')
-
-    // The served laneId for THAT gate — read from the captured interior
-    // response, never re-derived here. This is the value the click must carry.
-    const homeGates = servedGates.get(homeSystemId) ?? []
+    // 2. The gate bodies ship unfiltered from the first read
+    //    (`system-interior`: "Bodies Are Public; Ships Are Disclosed"), so a
+    //    corporation that has charted nothing still sees its home gates.
+    const home = interiors.get(homeSystemId)
     expect(
-      homeGates.length,
-      `no interior read for ${homeSystemId} was captured off the wire, or it carried no laneGates — ` +
-        `the wire half of this path never happened, so the assertions below would be vacuous`,
+      home,
+      `no interior read for ${homeSystemId} was captured off the wire — the wire half of this ` +
+        `path never happened, so every assertion below would be vacuous`,
+    ).toBeTruthy()
+    const gates = home!.laneGates ?? []
+    expect(
+      gates.length,
+      `the home system's interior read carried ZERO lane gates (home ${homeSystemId}). The ` +
+        `backend's own traversability test hard-fails a spawn like this, so a zero here is a ` +
+        `real regression, not a seed.`,
     ).toBeGreaterThan(0)
-    const servedLaneId = homeGates.find((g) => g.destSystemId === gateDestId)?.laneId
+
+    const gate = gates[0]
+    // `system-interior` *Lane-Gate Bodies Carry Their Body Id* > "Every
+    // lane-gate body carries a non-empty, distinct id". Without it a client
+    // has no way to name this gate in a burn order that does not reimplement
+    // the server's own naming convention — which is the fourth copy the
+    // requirement exists to prevent (design.md Decision 15).
     expect(
-      servedLaneId,
-      `the interior read for ${homeSystemId} served no laneId on the gate toward ${gateDestId} ` +
-        `(system-interior "Lane-Gate Bodies Carry Their Lane Id"): served gates were ` +
-        `${JSON.stringify(homeGates)}`,
+      gate.id,
+      `the interior read for ${homeSystemId} served no body \`id\` on the gate toward ` +
+        `${gate.destSystemId}: ${JSON.stringify(gate)}`,
+    ).toBeTruthy()
+    expect(
+      gate.laneId,
+      `the interior read for ${homeSystemId} served no \`laneId\` on the gate toward ` +
+        `${gate.destSystemId} (system-interior "Lane-Gate Bodies Carry Their Lane Id"): ` +
+        `${JSON.stringify(gate)}`,
     ).toBeTruthy()
 
-    // 3. Burn to that gate and dock. "Under way" first: the fleet is already
-    //    parked at spawn, so waiting only for a docked state could pass on a
-    //    click that was silently swallowed (slice.spec.ts's own false-positive
-    //    guard, same reasoning).
-    await clickGlyph(page, `gate-glyph-${gateDestId}`)
-    await page.getByTestId(`fleet-cmd-burn-${fleetId}`).click()
-    await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText(/under way/i, {
-      timeout: 15_000,
-    })
-    await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText('Docked', {
-      timeout: 300_000,
-    })
+    // 3. Select that gate and burn to it. A rim gate is normally OFF SCREEN
+    //    at the default framing, so `selectBody` takes whichever affordance
+    //    exists — both are player paths.
+    await selectBody(page, gate.id!)
+    await expect(
+      page.getByTestId('gate-facts'),
+      'a selected lane-gate body presents its destination',
+    ).toBeVisible({ timeout: 20_000 })
+
+    await burnToSelectionAndDock(page, fleetId, 900_000)
+
+    // Scenario: A burn order naming the served gate body id targets that gate
+    // (`system-interior`: *Lane-Gate Bodies Carry Their Body Id*; tasks.md
+    // 9.1d — "no client copy of the server's gate-id naming convention").
+    expect(orders.length, 'the burn click submitted no order at all').toBeGreaterThan(0)
+    expect(
+      orders[orders.length - 1]?.bodyId,
+      `the burn order named bodyId=${JSON.stringify(orders[orders.length - 1]?.bodyId)}, but the ` +
+        `interior read served this gate's id as ${JSON.stringify(gate.id)}. The client must pass ` +
+        `the SERVED id straight through — a reconstructed "gate-"+destSystemId would pass today ` +
+        `and break silently the day the server's convention changes.`,
+    ).toBe(gate.id)
 
     // 4. Scenario: Invoking jump submits the attached gate's lane.
-    //    The jump command is offered on attachment alone, and the click must
-    //    put the SERVED laneId on the wire — not a client-side refusal, not a
-    //    no-op, not some other lane.
-    await expect(page.getByTestId(`fleet-cmd-jump-${fleetId}`)).toBeVisible({ timeout: 15_000 })
+    //    The command is offered on attachment alone — no charted-lane
+    //    precondition, no canvas selection — and the click must put the
+    //    SERVED laneId on the wire: not a client-side refusal, not a no-op,
+    //    not some other lane.
+    const jumpButton = page.getByTestId(`fleet-cmd-jump-${fleetId}`)
+    await expect(jumpButton).toBeVisible({ timeout: 20_000 })
     const jumpRequest = page.waitForRequest(
       (req) => req.method() === 'POST' && /\/v1\/fleets\/[^/]+\/jump$/.test(req.url()),
-      { timeout: 15_000 },
+      { timeout: 20_000 },
     )
-    await page.getByTestId(`fleet-cmd-jump-${fleetId}`).click()
+    await jumpButton.click()
 
     const req = await jumpRequest
-    expect(req.url(), 'the jump must be submitted for the fleet whose row was clicked').toContain(
+    expect(req.url(), 'the jump must be submitted for the fleet whose command was clicked').toContain(
       `/v1/fleets/${fleetId}/jump`,
     )
     const sent = req.postDataJSON() as { laneId?: string }
     expect(
       sent.laneId,
-      `board-view "Jump Commit": the jump request carried laneId=${JSON.stringify(sent.laneId)}, ` +
-        `but the interior read served ${JSON.stringify(servedLaneId)} for the attached gate toward ` +
-        `${gateDestId}. The click must pass the served value straight through, with no second lookup ` +
-        `and no client-side re-derivation.`,
-    ).toBe(servedLaneId)
+      `docked-fleet-actions "Jump Commit": the jump request carried laneId=` +
+        `${JSON.stringify(sent.laneId)}, but the interior read served ${JSON.stringify(gate.laneId)} ` +
+        `for the attached gate toward ${gate.destSystemId}. The click must pass the served value ` +
+        `straight through, with no second lookup and no client-side re-derivation.`,
+    ).toBe(gate.laneId)
 
     // …and the server accepted it: a submitted-but-rejected order is not a
     // committed jump.
@@ -188,9 +168,11 @@ test.describe('jump commit — wire to click', () => {
         `served on the same session's interior read`,
     ).toBeLessThan(400)
 
-    // The observable consequence on the board the player is looking at.
-    await expect(roster.getByTestId(`fleet-row-${fleetId}`)).toContainText(/in transit/i, {
-      timeout: 15_000,
+    // The observable consequence on the view the player is looking at. The
+    // departure hand-off may carry them to the galaxy, so this is asserted
+    // wherever the row now lives rather than inside the system view.
+    await expect(page.getByTestId(`fleet-row-${fleetId}`)).toContainText(/in transit/i, {
+      timeout: 30_000,
     })
   })
 })

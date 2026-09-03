@@ -1,5 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
+import {
+  captureInteriors,
+  mineableBodyId,
+  pickAnyOnScreenBodyByPointer,
+  selectBody,
+  selectFirstBodyMatching,
+  stationFeatureId,
+} from '../helpers/space-view'
 
 /**
  * RED-PHASE SUITE — openspec change `build-production-space-view`,
@@ -57,6 +65,11 @@ test.describe('the continuous-space slice, end to end through the new view', () 
   }) => {
     test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
 
+    // Every target this journey names comes off the SERVED interior read.
+    // Recorded before the first navigation, so the home system's own read is
+    // captured as it arrives.
+    const interiors = captureInteriors(page)
+
     // ---------------------------------------------------------- 1. spawn
     const email = `e2e+journey-${Date.now()}@hexaverse.test`
     const password = 'e2ePassword123!'
@@ -68,7 +81,8 @@ test.describe('the continuous-space slice, end to end through the new view', () 
     await expect(page.getByTestId('wake-up-flow')).toBeVisible({ timeout: 15_000 })
     await page.getByTestId('wake-name-input').fill('E2E Journey')
     await page.getByTestId('wake-submit').click()
-    await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 20_000 })
+    // 60s — see `wakeNewCorp` in ../helpers/space-view.ts for why.
+    await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 60_000 })
 
     // --------------------------------- 2. see the home system, in R3 space
     await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 20_000 })
@@ -90,10 +104,30 @@ test.describe('the continuous-space slice, end to end through the new view', () 
     const fleetId = (await rows.first().getAttribute('data-testid'))!.replace('fleet-row-', '')
     const row = page.getByTestId(`fleet-row-${fleetId}`)
 
-    // ------------------------------------------- 3. burn to a body, dock
-    const oreBody = page.locator('[data-testid^="body-hit-feat-body-"]').first()
-    await expect(oreBody).toBeAttached({ timeout: 20_000 })
-    await oreBody.click()
+    // ------------------------------- 3. pick a body with the POINTER, then
+    //                                     burn to an ore body and dock
+    //
+    // The first act is the suite's only real POINTER pick: pointerdown /
+    // pointerup on a mark, through `SpaceStage`'s own picking seam, with the
+    // view's `data-selection` asserted to name the body that was picked.
+    // Every other selection in these suites goes through the keyboard hit
+    // target (see `selectBody`'s note on why `click()` cannot settle against
+    // an animating scene), so without this step pointer picking would be
+    // covered only below the browser. It is deliberately a step of its own
+    // rather than the burn target: which bodies are on screen at the default
+    // framing is a property of the seed, and the mining leg below needs a
+    // body that actually carries ore.
+    await pickAnyOnScreenBodyByPointer(page)
+
+    // The mine leg needs a body that actually carries ore, and the served
+    // interior read is what says which one does — not whichever mark happens
+    // to be drawn first.
+    const homeId = new URL(page.url()).pathname.split('/').pop()!
+    const home = interiors.get(homeId)
+    expect(home, `no interior read for ${homeId} was captured off the wire`).toBeTruthy()
+    const lodeId = mineableBodyId(home!, stationFeatureId(home!) ?? undefined)
+    expect(lodeId, `the home system served no mineable body (home ${homeId})`).toBeTruthy()
+    await selectBody(page, lodeId!)
     // The preview quotes the order BEFORE it is committed, and the ceiling
     // the player agrees to is displayed alongside the point cost.
     await expect(page.getByTestId('preview-panel')).toBeVisible({ timeout: 30_000 })
@@ -109,7 +143,10 @@ test.describe('the continuous-space slice, end to end through the new view', () 
     // ---------------------------------------------------------- 4. mine
     await expect(page.getByTestId('mine-section')).toBeVisible({ timeout: 20_000 })
     const metalsBefore = (await page.getByTestId('hold-readout').textContent()) ?? ''
-    await page.getByTestId('mine-tons-input').fill('1')
+    // 5t is `mine.defaultMinRunTons` — the server refuses a smaller run
+    // outright (Decision #18's named floor), so asking for 1 tests nothing but
+    // the rejection path.
+    await page.getByTestId('mine-tons-input').fill('5')
     await page.getByTestId('mine-button').click()
     await expect(page.getByTestId('mine-countdown')).toBeVisible({ timeout: 20_000 })
     // The run resolves without user action (the ETA self-scheduled refetch)
@@ -122,13 +159,11 @@ test.describe('the continuous-space slice, end to end through the new view', () 
       .not.toBe(metalsBefore)
 
     // ----------------------------------- 5. burn to the home station, sell
-    const station = page.locator('[data-testid^="body-hit-feat-station"]').first()
-    await expect(station, 'the home system carries exactly one station body').toHaveCount(1)
-    if (await station.isVisible()) {
-      await station.click()
-    } else {
-      await page.locator('[data-testid^="offscreen-feat-station"]').first().click()
-    }
+    await expect(
+      page.locator('[data-testid^="body-hit-feat-station"]'),
+      'the home system carries exactly one station body',
+    ).toHaveCount(1)
+    await selectFirstBodyMatching(page, 'feat-station')
     await page.getByTestId('burn-button').click()
     await expect(row).toContainText(/under way/i, { timeout: 20_000 })
     await expect(row).toContainText(/docked/i, { timeout: 600_000 })
@@ -158,7 +193,11 @@ test.describe('the continuous-space slice, end to end through the new view', () 
     const gateAffordance = page.locator('[data-testid^="offscreen-gate-"]').first()
     await expect(
       gateAffordance,
-      'a gate is normally off screen; reaching one is the last step of the exit criterion',
+      'tasks.md 11.2 requires this leg to go through the OFF-SCREEN affordance, not a hand-set ' +
+        'camera: a gate sits at a characteristic radius along its bearing, so at a framing that ' +
+        'shows the inner system it is off screen and the affordance is the only way a player ' +
+        'finds it. No affordance here means either the view stopped offering one or this seed ' +
+        'drew every gate inside the first frame — check which before touching this line.',
     ).toBeVisible({ timeout: 20_000 })
     const gateTestId = (await gateAffordance.getAttribute('data-testid'))!
     await gateAffordance.click()

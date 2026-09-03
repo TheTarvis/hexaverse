@@ -21,7 +21,7 @@
 // derivation that needs more than "is this still burning" (an ArriveMs
 // comparison) is a server question, not a client one.
 
-import type { ResourceKind } from '@/lib/types/system-board'
+import type { ResourceKind } from '@/lib/types/system-space'
 
 // Vec3 — a bare `space.Vec3`, the position/velocity/anchor primitive
 // throughout `state`. Untagged (space carries no json tags).
@@ -107,7 +107,7 @@ export interface FleetRoster {
   ships: { class: string }[]
   // Tons held, by resource kind. Kinds the fleet holds none of are absent.
   // `fuel` rides this SAME map (add-fuel-as-cargo — fuel is a reserved cargo
-  // kind, not a `ResourceKind`; see `lib/types/system-board.ts`), never a
+  // kind, not a `ResourceKind`; see `lib/types/system-space.ts`), never a
   // separate field.
   cargo: Record<string, number> | null
   cargoCapacity: number
@@ -123,6 +123,11 @@ export interface FleetRoster {
   estimatedRange?: number
   stranded?: boolean
   fuelPricePerTon?: number
+  // add-stationkeep-hold-verb: the station-keeping upkeep rate this fleet
+  // would pay (or is paying), served on BOTH park modes so the hold can be
+  // priced before it is taken. Never derived client-side from a body's
+  // orbital elements — `space.StationKeepRate` is rule-bearing.
+  stationKeepRateTonsPerSecond?: number
 }
 
 export interface Fleet {
@@ -152,6 +157,10 @@ export interface Fleet {
   // Owner-only roster/cargo/derived-stats block.
   roster?: FleetRoster
   worldTime: number
+  // The world clock's rate at the moment of the read. The space view falls
+  // back to this when the interior read — its usual source — has failed, so
+  // a mis-scaled clock never draws every orbit and burn mark wrong.
+  scale?: number
   // add-fuel-as-cargo (fleet-roster "A Burn Commit's Stranding Warning Is
   // Surfaced to the Player") — ONE-SHOT, present only on a burn commit's
   // response naming the condition, never on an ordinary fleet read (which
@@ -168,6 +177,28 @@ export interface OrderRequest {
   bodyId?: string
   point?: Vec3
   accel?: number
+  // The quoted fuel ceiling the player agreed to (serve-orbital-elements-
+  // and-burn-preview). ABSENT means uncapped; a present 0 is a real cap that
+  // rejects any positive cost, so an omitted cap must never serialize as
+  // zero (`system-space-view`: *The burn stays committable without a quote,
+  // labelled as uncapped*).
+  maxFuelTons?: number
+}
+
+// BurnPreview — `POST /v1/fleets/:id/orders/preview`'s response: the
+// server-solved curve and its figures, with nothing committed. Typed
+// against the recorded wire sample
+// (`backend/testdata/serve-orbital-elements-and-burn-preview/
+// preview-response.json`), so the key names are the served ones. `Curve`'s
+// control points are `space.Vec3`, hence the untagged capitalized keys.
+export interface BurnPreview {
+  controlPoints: Vec3[]
+  departMs: number
+  arriveMs: number
+  deltaV: number
+  fuelCostTons: number
+  affordable: boolean
+  strandingWarning: boolean
 }
 
 // JumpRequest — the jump verb's body: the lane to cross, valid only from a

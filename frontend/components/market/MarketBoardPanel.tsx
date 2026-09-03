@@ -15,7 +15,7 @@ import { Badge } from '@/components/catalyst/badge'
 import { Text } from '@/components/catalyst/text'
 import { bestPriceFor } from '@/lib/market/fold'
 import type { MarketBoard, VenueQuotes } from '@/lib/types/market'
-import type { ResourceKind } from '@/lib/types/system-board'
+import type { ResourceKind } from '@/lib/types/system-space'
 
 export interface MarketBoardPanelProps {
   board: MarketBoard | undefined

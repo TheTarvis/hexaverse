@@ -203,14 +203,19 @@ anti_mirror() {
     GO_NAMES=$(for f in "$GO_DIR"/*.go; do
         [[ "$f" == *_test.go ]] && continue
         grep -hE '^func ' "$f" || true
-    done | sed -E 's/^func (\([^)]*\) )?//; s/[([].*$//; s/[[:space:]]*$//' | grep -v '^$' | sort -u)
+    done | sed -E 's/^func (\([^)]*\) )?//; s/[([].*$//; s/[[:space:]]*$//' | { grep -v '^$' || true; } | sort -u)
 
     local TS_NAMES=""
     local UNRECOGNIZED=""
     local f
-    for f in "$TS_DIR"/*.ts; do
+    # RECURSIVE, .tsx-inclusive scan (openspec build-production-space-view
+    # tasks.md 1.2; cross-stack-determinism: "A twin in a subdirectory or a
+    # .tsx file fails the check"). The previous `for f in "$TS_DIR"/*.ts`
+    # glob saw one directory level and no .tsx file, so a mirror one folder
+    # down — or in a component — was a silent pass for the exact regression
+    # this check exists to catch.
+    while IFS= read -r f; do
         [[ -e "$f" ]] || continue
-        [[ "$f" == *.test.ts ]] && continue
         local rel="${f#"$REPO_ROOT"/}"
         local lineno=0
         local classDepth=-1 braceDepth=0
@@ -306,7 +311,8 @@ anti_mirror() {
                 UNRECOGNIZED+=$'\n'"$rel:$lineno: $trimmed"
             fi
         done <"$f"
-    done
+    done < <(find "$TS_DIR" -type f \( -name '*.ts' -o -name '*.tsx' \) \
+        ! -name '*.test.ts' ! -name '*.test.tsx' | sort)
 
     if [[ -n "$UNRECOGNIZED" ]]; then
         echo "FAIL: $LABEL anti-mirror: unrecognized top-level TypeScript declaration form(s) (extend the extractor before trusting this check):"
@@ -315,16 +321,40 @@ anti_mirror() {
         return
     fi
 
-    TS_NAMES=$(echo "$TS_NAMES" | grep -v '^$' | sort -u)
-    GO_NAMES=$(echo "$GO_NAMES" | grep -v '^$' | sort -u)
+    # `|| true` on both: with a TypeScript directory that exists but declares
+    # nothing (the state `frontend/lib/space` was in while it held only a test
+    # file), `grep -v '^$'` finds no line and exits 1, which under this
+    # script's `set -euo pipefail` aborted the whole check BEFORE any
+    # anti-mirror pass ran — the guard silently not running at all.
+    TS_NAMES=$({ echo "$TS_NAMES" | grep -v '^$' || true; } | sort -u)
+    GO_NAMES=$({ echo "$GO_NAMES" | grep -v '^$' || true; } | sort -u)
+
+    # CASE-INSENSITIVE collision comparison, on both sides and on the
+    # `sharedNames` allowlist (openspec build-production-space-view tasks.md
+    # 1.2; cross-stack-determinism: "A lower-camel twin of an authoritative
+    # Go export fails the check"). Go exports in TitleCase and TypeScript
+    # declares in camelCase, so a case-sensitive `comm -12` never collides on
+    # the mirror this check exists to catch. A collision is resolved by
+    # RENAMING the TypeScript to a subject-prefixed, draw-scoped name, never
+    # by widening the allowlist.
+    local GO_LOWER TS_LOWER SHARED_LOWER
+    GO_LOWER=$(echo "$GO_NAMES" | tr '[:upper:]' '[:lower:]' | sort -u)
+    TS_LOWER=$(echo "$TS_NAMES" | tr '[:upper:]' '[:lower:]' | sort -u)
+    SHARED_LOWER=$({ echo "$SHARED" | grep -v '^$' || true; } | tr '[:upper:]' '[:lower:]' | sort -u)
 
     local COLLIDING
-    COLLIDING=$(comm -12 <(echo "$GO_NAMES") <(echo "$TS_NAMES"))
+    COLLIDING=$({ comm -12 <(echo "$GO_LOWER") <(echo "$TS_LOWER") | grep -v '^$' || true; })
     local UNALLOWED
-    UNALLOWED=$(comm -23 <(echo "$COLLIDING" | grep -v '^$') <(echo "$SHARED"))
+    UNALLOWED=$(comm -23 <(echo "$COLLIDING") <(echo "$SHARED_LOWER"))
     if [[ -n "$UNALLOWED" ]]; then
-        echo "FAIL: $LABEL anti-mirror: function name(s) declared in BOTH ${GO_DIR#"$REPO_ROOT"/} and ${TS_DIR#"$REPO_ROOT"/} — a TypeScript mirror of an authoritative Go function, forbidden by design unless added to ${MAP#"$REPO_ROOT"/}'s sharedNames allowlist (it is not):"
-        echo "$UNALLOWED" | sed 's/^/        /'
+        echo "FAIL: $LABEL anti-mirror: function name(s) declared in BOTH ${GO_DIR#"$REPO_ROOT"/} and ${TS_DIR#"$REPO_ROOT"/} (compared case-insensitively) — a TypeScript mirror of an authoritative Go function, forbidden by design unless added to ${MAP#"$REPO_ROOT"/}'s sharedNames allowlist (it is not):"
+        local name goSpellings tsSpellings
+        while IFS= read -r name; do
+            [[ -z "$name" ]] && continue
+            goSpellings=$(echo "$GO_NAMES" | grep -ix "$name" | tr '\n' ' ')
+            tsSpellings=$(echo "$TS_NAMES" | grep -ix "$name" | tr '\n' ' ')
+            echo "        $name  (Go: ${goSpellings% } / TypeScript: ${tsSpellings% })"
+        done <<<"$UNALLOWED"
         FAIL=1
         return
     fi

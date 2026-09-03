@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/galaxy"
 )
 
@@ -40,20 +39,16 @@ func TestLaneGates_ProjectsEachLaneToItsRimTile(t *testing.T) {
 	if gates[0].DestSystemId != "sys-e" || gates[1].DestSystemId != "sys-n" {
 		t.Fatalf("unexpected order: %+v", gates)
 	}
-	// Each gate is the same projection the fleet uses to burn to the gate.
-	wantE := board.LaneGateCell(0, 0, 10, 0, 16)
-	wantN := board.LaneGateCell(0, 0, 0, 10, 16)
-	if gates[0].Cell != wantE {
-		t.Errorf("east gate = %+v, want %+v", gates[0].Cell, wantE)
-	}
-	if gates[1].Cell != wantN {
-		t.Errorf("north gate = %+v, want %+v", gates[1].Cell, wantN)
-	}
-	// Both gates sit on the gate ring — the inner edge of the outer band.
-	wantRing := board.GateRing(16)
+	// The lattice `cell` these two assertions pinned is gone from the wire
+	// (openspec build-production-space-view, tasks.md 9.1): a gate's place in
+	// the world is its continuous position and orbital elements, filled by
+	// fillGateGeometry from the body table, and asserted there. What survives
+	// here is the derivation this constructor still owns outright — one gate
+	// per touching lane, deterministically ordered, each carrying the lane id
+	// a jump names.
 	for _, g := range gates {
-		if g.Cell.Ring != wantRing {
-			t.Errorf("gate %s at ring %d, want %d", g.DestSystemId, g.Cell.Ring, wantRing)
+		if g.LaneId == "" {
+			t.Errorf("gate %s carries no lane id", g.DestSystemId)
 		}
 	}
 }

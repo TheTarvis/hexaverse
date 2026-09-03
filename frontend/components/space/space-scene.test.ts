@@ -71,6 +71,9 @@ const BELT = {
   orbitElements: { parentId: 'feat-star', radius: 44.66, periodMs: 47192, phase: 618097, inclination: 517477, node: 259477 },
 }
 const GATE = {
+  // The SERVED gate body id (tasks.md 9.1b). `space-scene` must name this
+  // string for the gate mark's id, never rebuild it from destSystemId.
+  id: 'gate-sys_-6_16',
   destSystemId: 'sys_-6_16',
   laneId: 'lane_-7_17_-6_16',
   space: { X: 694.22, Y: 0, Z: -207.51 },
@@ -172,6 +175,19 @@ describe('space-scene — bodies, gates and the star', () => {
     const gate = s.marks.find((m) => m.kind === 'gate')
     expect(gate, 'the lane gate must be in the scene').toBeDefined()
     expect(gate!.pickable).toBe(true)
+  })
+
+  // SDET-added (2026-09-03, with tasks.md 9.1b's served gate `id`): the gate
+  // mark's id is the SERVED string, byte for byte. Presence of *an* id is
+  // worthless — this is the id a burn order names and the id `attachedTo`
+  // reports, so a scene that substituted `destSystemId` (a SYSTEM id, not a
+  // body id) or rebuilt the server's `"gate-" + dest` convention would ship
+  // a command that targets nothing. The server-side half of the same
+  // equality is pinned in backend/interior_gate_body_id_e2e_test.go.
+  it('SDET-added: a gate mark carries the served body id verbatim, not the destination system id', () => {
+    const gate = build().marks.find((m) => m.kind === 'gate')!
+    expect(gate.id).toBe(GATE.id)
+    expect(gate.id).not.toBe(GATE.destSystemId)
   })
 
   // Scenario: The star at the origin renders normally

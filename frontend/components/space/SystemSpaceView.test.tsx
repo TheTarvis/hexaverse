@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render as rtlRender, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 
 // RED-PHASE SUITE — openspec change `build-production-space-view`,
@@ -46,20 +47,149 @@ const useSystemSpace = vi.fn()
 const useMyFleets = vi.fn()
 const useRunningMine = vi.fn()
 
+// HARNESS NOTE (revised 2026-09-03, orchestrator-adjudicated — the developer
+// disputed this file as unsatisfiable by an honest implementation, and the
+// dispute was upheld). What was wrong was the HARNESS, not the assertions:
+// this file asserts the composed view — `FleetRoster` and
+// `FleetActionsPanel` mounted for real, which is precisely what the
+// `fleet-roster`/`sell-section`/`refuel-section`/`stationkeep-control`/
+// `mine-unavailable` assertions below are FOR — but supplied no
+// QueryClientProvider, mocked `@/hooks/use-actions` without `importActual`
+// (leaving `useCancelAction` undefined for the roster), and left
+// `@/hooks/use-market` and `@/hooks/use-galaxy` unmocked (the latter reaching
+// for an AccountProvider that no test mounts). The only implementation that
+// could have gone green against that harness was one that inlined stub
+// markup for the roster and the panel — a green suite over a view no player
+// can use. Every assertion in this file is unchanged; only the mock surface
+// and the provider wrapper below are new.
+//
+// The mocking rule applied here: DATA SOURCES are mocked (each read/mutation
+// hook is a seam this file drives), COMPOSITION is not (no child component of
+// the view is stubbed except `SpaceStage`, whose seam is WebGL).
+
+// Stable, inert mutation results. Stable identity matters: these objects are
+// returned on every render, and a fresh object each time can retrigger an
+// effect that depends on one.
+// The station, its venue quotes and the corporation's credit balance — the
+// three server-served facts the docked panel needs and cannot invent. Hoisted
+// so the module mocks above can read them.
+const market = vi.hoisted(() => ({
+  station: {
+    systemId: 'sys_-7_17',
+    featureId: 'feat-station',
+    createdAt: 0,
+    orbit: { ring: 2, angle0: 10, period: 72_000, dir: -1 },
+  } as Record<string, unknown> | undefined,
+  board: {
+    worldTime: 21_175_110_953,
+    refreshCadenceMs: 30_000,
+    venues: [
+      {
+        venue: 'sys_-7_17',
+        systemId: 'sys_-7_17',
+        quotes: [
+          {
+            kind: 'metals',
+            entries: [
+              { unitPrice: 12, source: 'request', remainingQuantity: 4, requestId: 'r1' },
+              { unitPrice: 5, source: 'floor', unlimited: true },
+            ],
+          },
+        ],
+      },
+    ],
+  } as Record<string, unknown> | undefined,
+  corporation: { id: 'corp-1', name: 'SDET Corp', credits: 1250 } as Record<string, unknown> | null,
+}))
+
+const mutations = vi.hoisted(() => {
+  const make = () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(async () => undefined),
+    reset: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+  })
+  return {
+    order: make(),
+    jump: make(),
+    cutDrive: make(),
+    stop: make(),
+    mine: make(),
+    hold: make(),
+    release: make(),
+    sell: make(),
+    refuel: make(),
+    cancelAction: make(),
+  }
+})
+
 vi.mock('@/hooks/use-system-space', () => ({ useSystemSpace: (id: string) => useSystemSpace(id) }))
 vi.mock('@/hooks/use-fleets', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@/hooks/use-fleets')
   return {
     ...actual,
     useMyFleets: () => useMyFleets(),
-    useOrder: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-    useJump: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-    useCutDrive: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-    useStop: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-    useMine: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+    useOrder: () => mutations.order,
+    useJump: () => mutations.jump,
+    useCutDrive: () => mutations.cutDrive,
+    useStop: () => mutations.stop,
+    useMine: () => mutations.mine,
+    useHold: () => mutations.hold,
+    useRelease: () => mutations.release,
   }
 })
-vi.mock('@/hooks/use-actions', () => ({ useRunningMine: () => useRunningMine() }))
+// `...actual` is load-bearing: the roster calls `useCancelAction`, and a
+// bare object mock left it `undefined` — a TypeError inside the roster that
+// no assertion in this file is about.
+vi.mock('@/hooks/use-actions', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@/hooks/use-actions')
+  return {
+    ...actual,
+    // Shaped as the REAL hook is — a React Query result, `{ data }` — not as
+    // a bare action. A mock that misreports its module's own contract forces
+    // the implementation to accept both shapes forever.
+    useRunningMine: () => useRunningMine(),
+    useCancelAction: () => mutations.cancelAction,
+  }
+})
+// The market verbs the docked panel offers. Nothing in THIS file drives a
+// sale or a refuel to completion (`FleetActionsPanel.test.tsx` owns those);
+// here they need only exist so the panel mounts and its sections render.
+vi.mock('@/hooks/use-market', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@/hooks/use-market')
+  return {
+    ...actual,
+    useMarketBoard: () => ({ data: market.board, isLoading: false, isError: false }),
+    useStation: () => ({ data: market.station, isLoading: false, isError: false, refetch: vi.fn() }),
+    useSell: () => mutations.sell,
+    useRefuel: () => mutations.refuel,
+  }
+})
+// The corporation's own session data — where the credit balance comes from
+// (`docked-fleet-actions`: *Credit Balance Readout*, "sourced from the
+// corporation's own session data").
+vi.mock('@/components/corporation-provider', () => ({
+  useCorporationOptional: () => market.corporation,
+  useCorporation: () => market.corporation,
+}))
+// The roster resolves system NAMES through the galaxy read. Mocked rather
+// than provided, because the real hook reaches for `useAccountContext` and
+// this file mounts no AccountProvider — the roster's naming behaviour is
+// `FleetRoster.test.tsx`'s subject, not this file's.
+vi.mock('@/hooks/use-galaxy', () => ({
+  useGalaxy: () => ({ data: undefined, isLoading: false, isError: false, isStartArea: false }),
+}))
+vi.mock('@/components/account-provider', () => ({
+  useAccountContext: () => ({ user: { uid: 'u1' }, authLoading: false, isAdmin: false }),
+}))
+vi.mock('@/hooks/use-burn-preview', () => ({
+  useBurnPreview: () => ({ data: undefined, isLoading: false, isError: false, isFetching: false }),
+}))
+vi.mock('@/lib/toast', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}))
 
 // The stage is mocked AT ITS SEAM so this file can drive the two signals the
 // view arbitrates on — renderer availability and first-frame — without a
@@ -115,9 +245,21 @@ const INTERIOR = {
       resources: [{ kind: 'metals', richness: 0.3 }],
       orbitElements: { parentId: 'feat-star', radius: 24, periodMs: 18591, phase: 373097, inclination: 500434, node: 205958 },
     },
+    {
+      id: 'feat-station',
+      type: 'station',
+      space: { X: -22, Y: 0, Z: 9 },
+      size: 0.6,
+      resources: [],
+      orbitElements: { parentId: 'feat-star', radius: 32, periodMs: 72000, phase: 10, inclination: 0, node: 0 },
+    },
   ],
   laneGates: [
     {
+      // The SERVED gate body id (tasks.md 9.1b, adjudicated after this
+      // file's red handoff). It is what a burn order names and what
+      // `attachedTo` reports — never reconstructed client-side.
+      id: 'gate-sys_-6_16',
       destSystemId: 'sys_-6_16',
       laneId: 'lane_-7_17_-6_16',
       space: { X: 694, Y: 0, Z: -207 },
@@ -157,6 +299,33 @@ function dockedFleet(over: Record<string, unknown> = {}) {
   }
 }
 
+/** The home station body, as both the interior read and the station read name it. */
+const STATION = { featureId: 'feat-station' }
+
+/** The same hull, mid-burn toward `feat-body-0`. */
+function burningFleet(over: Record<string, unknown> = {}) {
+  return dockedFleet({
+    attachedTo: undefined,
+    state: {
+      Mode: 0,
+      Park: null,
+      Drift: null,
+      Burn: {
+        Origin: { X: 0, Y: 0, Z: 0 },
+        Target: { BodyId: 'feat-body-0', Point: null },
+        Intercept: { X: 18, Y: -3, Z: -15 },
+        Curve: [],
+        Length: 1,
+        DepartMs: T0 - 1_000,
+        ArriveMs: T0 + 120_000,
+        Accel: 1,
+        InsertionPhase: 0,
+      },
+    },
+    ...over,
+  })
+}
+
 function setReads(
   interior: Partial<{ data: unknown; isLoading: boolean; isError: boolean; error: unknown }> = {},
   fleets: Partial<{ data: unknown; isLoading: boolean; isError: boolean }> = {},
@@ -180,11 +349,21 @@ function setReads(
 
 beforeEach(() => {
   vi.clearAllMocks()
-  useRunningMine.mockReturnValue(null)
+  useRunningMine.mockReturnValue({ data: null })
   stage.available = true
   stage.firstFrame = true
   setReads()
 })
+
+// Every read and mutation the composed tree makes is mocked above, so the
+// client below never fetches; it exists because React Query's `useQueryClient`
+// (the roster's running-mine cache sweep) throws without a provider.
+function render(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  const wrap = (node: React.ReactElement) => <QueryClientProvider client={qc}>{node}</QueryClientProvider>
+  const rendered = rtlRender(wrap(ui))
+  return { ...rendered, rerender: (node: React.ReactElement) => rendered.rerender(wrap(node)) }
+}
 
 const view = (systemId = SYSTEM_ID) => render(<SystemSpaceView systemId={systemId} />)
 
@@ -234,18 +413,152 @@ describe('SystemSpaceView — the data fan-in', () => {
 
   // Scenario: A failed interior read leaves the fleet-state-anchored
   // commands usable
+  //
+  // REVISED 2026-09-03 (SDET, post-handoff — cause: this test as handed off
+  // was self-contradictory and no honest implementation could satisfy it).
+  // It asserted `fleet-cmd-jump-fleet_1` for a fleet attached to an ORDINARY
+  // body — a fleet with no lane to jump down — while the SDET-added case at
+  // the bottom of this file asserts that exactly such a fleet is NOT offered
+  // jump. Jump is anchored to the acting fleet's own served `laneId` (it is
+  // present iff the fleet is attached to a gate body), so the gate-attached
+  // fixture is what the scenario's "attached to a body" means for its jump
+  // clause.
+  //
+  // The assertion is STRENGTHENED rather than relaxed: instead of listing
+  // ids that happen to be present when the read fails, it renders the SAME
+  // fleet twice — once with a healthy interior read, once with a failed one
+  // — and demands the command set be IDENTICAL. That is the requirement's
+  // actual claim ("the interior failure withdraws nothing that fleet state
+  // alone grants"), and unlike a bare presence list it fails against an
+  // implementation that offers a command in neither state.
   it('Scenario: A failed interior read leaves the fleet-state-anchored commands usable', () => {
-    setReads({ data: undefined, isError: true, error: new Error('nope') })
+    // No single fleet can be docked at a station AND attached to a gate AND
+    // mid-burn at once, so the seven commands the scenario lists are
+    // exercised across the three states that make each of them meaningful.
+    // Each state is rendered TWICE — once with a healthy interior read, once
+    // with a failed one — and the command set must be identical, which is
+    // the requirement's actual claim.
+    const cases: { what: string; fleet: Record<string, unknown>; expect: string[] }[] = [
+      {
+        what: 'docked at the station, cargo aboard',
+        fleet: dockedFleet({ attachedTo: STATION.featureId }),
+        expect: ['sell-section', 'refuel-section', 'stationkeep-control'],
+      },
+      {
+        what: 'attached to a lane-gate body, carrying its served laneId',
+        fleet: dockedFleet({ attachedTo: 'gate-sys_-6_16', laneId: 'lane_-7_17_-6_16' }),
+        expect: ['fleet-cmd-jump-fleet_1'],
+      },
+      {
+        what: 'under way',
+        fleet: burningFleet(),
+        expect: ['fleet-cmd-cut-drive-fleet_1', 'fleet-cmd-stop-fleet_1'],
+      },
+    ]
+    const ALWAYS = ['fleet-roster', 'space-fleet-panel']
+    const ALL = [
+      ...ALWAYS,
+      'sell-section',
+      'refuel-section',
+      'stationkeep-control',
+      'fleet-cmd-cut-drive-fleet_1',
+      'fleet-cmd-stop-fleet_1',
+      'fleet-cmd-jump-fleet_1',
+    ]
+    // `queryAllByTestId`, not `queryByTestId`: the composed view currently
+    // renders cut-drive/stop/jump on BOTH the roster row and the actions
+    // panel, so the singular query raises "found multiple elements" and
+    // masks the parity question this test is asking. The duplication itself
+    // is reported separately (see the SDET-added case below).
+    const present = () => ALL.filter((id) => screen.queryAllByTestId(id).length > 0)
+
+    for (const c of cases) {
+      setReads({}, { data: [c.fleet] })
+      const healthy = render(<SystemSpaceView systemId={SYSTEM_ID} />)
+      const whenHealthy = present()
+      healthy.unmount()
+
+      setReads({ data: undefined, isError: true, error: new Error('nope') }, { data: [c.fleet] })
+      const failed = render(<SystemSpaceView systemId={SYSTEM_ID} />)
+      const whenFailed = present()
+      failed.unmount()
+
+      // Vacuity guard: this state must actually offer the commands it is
+      // here to exercise, or "identical" is satisfied by offering none.
+      for (const id of [...ALWAYS, ...c.expect]) {
+        expect(whenHealthy, `${c.what}: ${id} must be offered with a healthy read`).toContain(id)
+      }
+      expect(
+        whenFailed,
+        `${c.what}: a failed interior read must withdraw no command anchored to the fleet's own served state`,
+      ).toEqual(whenHealthy)
+    }
+  })
+
+  it('SDET-added: each fleet command resolves to exactly one control in the composed view', () => {
+    // NOT an adjudication of WHICH surface should own these verbs — that is a
+    // spec question, reported to the orchestrator: `fleet-roster`'s *The
+    // Roster Row Is the Fleet Command Surface, Jump Gated by Attachment
+    // Alone* is still in force and unmodified by this change, while
+    // `system-space-view`/`docked-fleet-actions` place the same verbs on the
+    // command and actions panels. Both readings can satisfy THIS assertion:
+    // drop one surface, or give the two surfaces distinct test ids.
+    //
+    // What it pins is the property every e2e selector in this change depends
+    // on, and which a player also depends on: one visible control per verb.
+    // Two live "Cut drive" buttons for one fleet is a UI defect regardless of
+    // which spec wins, and it makes `getByTestId` ambiguous in Playwright's
+    // strict mode — where it is a hard error, not a warning.
+    setReads({}, { data: [burningFleet()] })
     view()
-    expect(screen.getByTestId('fleet-roster')).toBeInTheDocument()
-    expect(screen.getByTestId('space-fleet-panel')).toBeInTheDocument()
-    // Every command anchored to the acting fleet's OWN served state.
+    for (const id of ['fleet-cmd-cut-drive-fleet_1', 'fleet-cmd-stop-fleet_1']) {
+      expect(screen.queryAllByTestId(id).length, `${id} is rendered by two surfaces at once`).toBe(1)
+    }
+  })
+
+  // The composition seam nothing else can see: `FleetActionsPanel.test.tsx`
+  // proves the panel offers sell and shows a balance GIVEN a station and a
+  // credit figure; only this file can prove the VIEW actually goes and gets
+  // them. A view that hands the panel `station={null}` / `credits={null}`
+  // renders a sell control that silently does nothing when clicked and a
+  // balance readout that is a permanent em dash — both of which pass every
+  // panel-level test.
+  //
+  // Scenario: Sell is offered while docked at a station with cargo aboard
+  // Scenario: The panel shows the current credit balance
+  it('Scenario: The panel shows the current credit balance (the view sources it, not the panel)', () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    view()
+    const balance = screen.getByTestId('balance-value')
+    expect(
+      balance.textContent,
+      "the balance readout must show the corporation's served credit balance, not a placeholder — " +
+        'the view has to read it for the panel to have one',
+    ).toMatch(/1[,.]?250/)
+  })
+
+  it('SDET-added: sell is offered against the station the view read, not against any docked body', () => {
+    // `docked-fleet-actions`: the sell verb is offered "whenever the acting
+    // fleet's effective state is `docked` to a station", and the commit is
+    // submitted "against the acting fleet's docked station". A panel handed
+    // no station cannot do the second, so offering the first is a control
+    // that fails silently under the player's hand.
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    const atStation = render(<SystemSpaceView systemId={SYSTEM_ID} />)
     expect(screen.getByTestId('sell-section')).toBeInTheDocument()
-    expect(screen.getByTestId('refuel-section')).toBeInTheDocument()
-    expect(screen.getByTestId('stationkeep-control')).toBeInTheDocument()
-    expect(screen.getByTestId('fleet-cmd-cut-drive-fleet_1')).toBeInTheDocument()
-    expect(screen.getByTestId('fleet-cmd-stop-fleet_1')).toBeInTheDocument()
-    expect(screen.getByTestId('fleet-cmd-jump-fleet_1')).toBeInTheDocument()
+    // ...and the proceeds preview is live, which requires the venue quotes
+    // the view must also have read.
+    screen.getByTestId('sell-proceeds-preview')
+    atStation.unmount()
+
+    // The same fleet, same cargo, docked to an ordinary rocky body: there is
+    // no station to sell to.
+    setReads({}, { data: [dockedFleet({ attachedTo: 'feat-body-0' })] })
+    view()
+    expect(
+      screen.queryByTestId('sell-section'),
+      'a fleet docked to a planet has no station to sell to',
+    ).toBeNull()
   })
 
   // Scenario: A failed interior read withdraws the mine offer without
@@ -404,7 +717,7 @@ describe('SystemSpaceView — realtime refetch rules', () => {
   it('Scenario: A running mine self-schedules a refetch at its ETA', async () => {
     vi.useFakeTimers()
     try {
-      useRunningMine.mockReturnValue({ id: 'act_1', eta: T0 + 5_000, type: 'mine' })
+      useRunningMine.mockReturnValue({ data: { id: 'act_1', eta: T0 + 5_000, type: 'mine' } })
       setReads()
       view()
       interiorRefetch.mockClear()
@@ -593,6 +906,14 @@ describe('SystemSpaceView — a gate-targeted burn ends in a jumpable attachment
 
 describe('SystemSpaceView — roster cross-navigation', () => {
   // Scenario: Selecting a fleet in another system navigates there
+  //
+  // Spec: 0011/S3 — "A row takes you to its fleet, whatever tier it's on".
+  // The marker moved here from the deleted
+  // `components/board/SystemBoardView.test.tsx` (openspec change
+  // `build-production-space-view`, tasks.md 10.1): the docs/specs scenario
+  // names "that system's board opens", and this view is the board's
+  // successor, so the cross-navigation assertion below IS 0011/S3's
+  // coverage under the new view's name.
   it('Scenario: Selecting a fleet in another system navigates there', async () => {
     setReads({}, { data: [dockedFleet(), dockedFleet({ id: 'far', systemId: 'sys_-6_16' })] })
     view()
@@ -633,7 +954,7 @@ describe('SystemSpaceView — landed resolutions are announced', () => {
 
   // Scenario: A pending resolution is not announced before it lands
   it('Scenario: A pending resolution is not announced before it lands', () => {
-    useRunningMine.mockReturnValue({ id: 'act_1', eta: T0 + 60_000, type: 'mine' })
+    useRunningMine.mockReturnValue({ data: { id: 'act_1', eta: T0 + 60_000, type: 'mine' } })
     const burning = dockedFleet({
       attachedTo: undefined,
       state: {
@@ -672,9 +993,9 @@ describe('SystemSpaceView — landed resolutions are announced', () => {
 
   // Scenario: A mine completion is announced
   it('Scenario: A mine completion is announced', async () => {
-    useRunningMine.mockReturnValue({ id: 'act_1', eta: T0 + 1_000, type: 'mine' })
+    useRunningMine.mockReturnValue({ data: { id: 'act_1', eta: T0 + 1_000, type: 'mine' } })
     const { rerender } = render(<SystemSpaceView systemId={SYSTEM_ID} />)
-    useRunningMine.mockReturnValue(null)
+    useRunningMine.mockReturnValue({ data: null })
     setReads({}, { data: [dockedFleet({ roster: { ...dockedFleet().roster, cargo: { fuel: 12, metals: 9 } } })] })
     rerender(<SystemSpaceView systemId={SYSTEM_ID} />)
     await waitFor(() => expect(announcer().textContent ?? '').toMatch(/min\w*.*(complete|finished)/i))

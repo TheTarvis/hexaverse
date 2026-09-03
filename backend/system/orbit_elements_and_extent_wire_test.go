@@ -414,19 +414,13 @@ func TestGetInterior_Scenario_TheReadCarriesTheInteriorsContinuousExtent(t *test
 		t.Errorf("extent = %v, want the value the interior's stored document holds (%v)", got, interior.Extent)
 	}
 
-	// "alongside — and distinct from — the lattice `radius` it already serves"
-	radiusRaw, ok := top["radius"]
-	if !ok {
-		t.Fatal("the interior read no longer carries the lattice `radius`; `extent` is served ALONGSIDE it, " +
-			"never in place of it (removing `radius` is build-production-space-view's)")
-	}
-	var radius float64
-	if err := json.Unmarshal(radiusRaw, &radius); err != nil {
-		t.Fatalf("decoding `radius`: %v", err)
-	}
-	if radius == got {
-		t.Errorf("extent (%v) and radius (%v) are the same number — `extent` must be the CONTINUOUS "+
-			"star-frame bound, distinct from the lattice ring count", got, radius)
+	// `extent` was served ALONGSIDE the lattice `radius` while both existed.
+	// openspec build-production-space-view (tasks.md 9.1) removed `radius`:
+	// `extent` is its successor, and serving both would leave a consumer free
+	// to keep scaling continuous space off the lattice number.
+	if _, ok := top["radius"]; ok {
+		t.Error("the interior read still carries the lattice `radius`; the continuous `extent` is its " +
+			"successor and the lattice number must not survive alongside it")
 	}
 }
 
@@ -482,66 +476,18 @@ func TestGetInterior_Scenario_TheScaleIsServedEvenOnAnUnwarpedWorld(t *testing.T
 	}
 }
 
-// --- Scenario: Pre-existing wire fields are unchanged ----------------------
+// --- Scenario: Pre-existing wire fields are unchanged (REMOVED) ------------
 //
-// Plus tasks.md 1.2's transition guard, which deliberately has NO `####
-// Scenario:` of its own (design.md Decision 8): the lattice `orbit` key still
-// carries {ring, angle0, period, dir} and is NOT the continuous element set.
-
-func TestGetInterior_Scenario_PreExistingWireFieldsAreUnchanged(t *testing.T) {
-	_, feats, gates, _ := wireInteriorRead(t, scaledClock{now: 5_000, scale: 1}, true)
-
-	latticeOrbits := 0
-	for _, f := range feats {
-		id := rawString(t, f, "id")
-		for _, k := range []string{"footprint", "band", "live"} {
-			if _, ok := f[k]; !ok {
-				t.Errorf("feature %s no longer carries the pre-existing `%s` field. This response is "+
-					"ADDITIVE over its prior shape, never a replacement of it", id, k)
-			}
-		}
-		if band := rawString(t, f, "band"); band != bandVisible {
-			t.Errorf("feature %s band = %q, want %q — exactly as before this change", id, band, bandVisible)
-		}
-		var live bool
-		if err := json.Unmarshal(f["live"], &live); err == nil && !live {
-			t.Errorf("feature %s live = false, want true — exactly as before this change", id)
-		}
-		if raw, ok := f["orbit"]; ok {
-			// tasks.md 1.2: the lattice `orbit` key keeps its LATTICE shape.
-			var lattice map[string]json.RawMessage
-			if err := json.Unmarshal(raw, &lattice); err != nil {
-				t.Fatalf("feature %s: `orbit` is not an object: %v", id, err)
-			}
-			for _, k := range []string{"ring", "angle0", "dir"} {
-				if _, ok := lattice[k]; !ok {
-					t.Errorf("feature %s: the lattice `orbit` key has lost its `%s` field — `orbit` and "+
-						"`orbitElements` are DISTINCT keys with distinct meanings, and retyping `orbit` "+
-						"silently breaks every stale reader (design.md Decision 1)", id, k)
-				}
-			}
-			for _, k := range []string{"parentId", "radius", "periodMs", "phase", "inclination", "node"} {
-				if _, ok := lattice[k]; ok {
-					t.Errorf("feature %s: the lattice `orbit` key carries the CONTINUOUS element field "+
-						"`%s` — the element set ships under `orbitElements` and SHALL NOT be served "+
-						"under `orbit`", id, k)
-				}
-			}
-			latticeOrbits++
-		}
-	}
-	if latticeOrbits == 0 {
-		t.Fatal("no feature in the response carried a lattice `orbit` object at all — the lattice-key " +
-			"guard above never ran, and `parentId`/`fixed`/`orbit` may already have been dropped")
-	}
-
-	for _, g := range gates {
-		dest := rawString(t, g, "destSystemId")
-		if _, ok := g["cell"]; !ok {
-			t.Errorf("lane gate -> %s no longer carries its lattice `cell`", dest)
-		}
-	}
-}
+// `TestGetInterior_Scenario_PreExistingWireFieldsAreUnchanged` lived here and
+// asserted that the lattice half of the interior wire — `footprint`, `band`,
+// `live`, the lattice `orbit` object, and a lane gate's `cell` — was still
+// served. Its scenario is REMOVED by openspec build-production-space-view
+// (system-interior's *Interior Read Endpoint* is retired and re-added as
+// *Interior Read Serves Continuous Bodies*), and tasks.md 9.1 is the task
+// that drops those fields. The test is deleted rather than relaxed: it
+// asserted the presence of exactly what this change removes, so there is
+// nothing left of it to keep. `interior_wire_lattice_removal_test.go` is its
+// successor and asserts the inverse.
 
 // --- Scenario: A materialized system's read carries every body's continuous
 //               position and size ------------------------------------------
@@ -560,7 +506,10 @@ func TestGetInterior_Scenario_EveryBodyCarriesAContinuousPositionAndSize(t *test
 	}
 	for _, g := range gates {
 		dest := rawString(t, g, "destSystemId")
-		for _, k := range []string{"space", "size", "cell"} {
+		// `cell` was in this list until build-production-space-view removed
+		// the lattice from this wire (tasks.md 9.1); the continuous pair is
+		// what every body, gate bodies included, carries now.
+		for _, k := range []string{"space", "size"} {
 			if _, ok := g[k]; !ok {
 				t.Errorf("lane gate -> %s carries no `%s`", dest, k)
 			}

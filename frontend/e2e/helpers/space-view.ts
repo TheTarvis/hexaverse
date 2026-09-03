@@ -1,0 +1,424 @@
+import { expect, type Locator, type Page } from '@playwright/test'
+
+/**
+ * Shared drivers for the continuous-space system view
+ * (`components/space/SystemSpaceView`), used by every e2e suite rewritten
+ * off the retired lattice board under openspec change
+ * `build-production-space-view`, tasks.md 2.1b / 10.8.
+ *
+ * WHY A HELPER AND NOT FIVE COPIES. Five suites shared one lattice contract
+ * (`board-overlay`, `feature-glyph-*`, `gate-glyph-*`, `fleet-cmd-burn-*`)
+ * and five copies of the wake-up flow. The test ids changed; the journeys
+ * did not. Keeping the drivers in one place means the NEXT view change edits
+ * one file, and — more importantly here — means every suite selects bodies
+ * the same way: off the SERVED interior read, never off a client-side
+ * reconstruction of an id.
+ *
+ * THE ONE RULE THIS FILE ENFORCES. `system-interior`'s *Lane-Gate Bodies
+ * Carry Their Body Id* (tasks.md 9.1b–9.1d) makes the gate's `id` a served
+ * string. No helper here builds `"gate-" + destSystemId`: `captureInterior`
+ * records what the server actually sent, and every selector is keyed on
+ * that. A suite that rebuilt the convention would keep passing after the
+ * server changed it — which is the whole failure mode the served id exists
+ * to prevent.
+ */
+
+/** A lane-gate body exactly as the interior read serves it. */
+export interface ServedGate {
+  /** The gate body's own id — served (9.1b), never reconstructed here. */
+  id?: string
+  destSystemId: string
+  laneId?: string
+}
+
+export interface ServedResource {
+  kind: string
+  richness: number
+}
+
+export interface ServedFeature {
+  id: string
+  type: string
+  resources?: ServedResource[]
+}
+
+export interface ServedInterior {
+  systemId: string
+  features: ServedFeature[]
+  laneGates: ServedGate[]
+}
+
+/**
+ * Records every `GET /v1/systems/:id` body this session receives, keyed by
+ * system id. This is the "wire" end of every wire-to-click assertion below:
+ * nothing in these suites is a fixture, and nothing re-derives a served id.
+ *
+ * Call before the first navigation.
+ */
+export function captureInteriors(page: Page): Map<string, ServedInterior> {
+  const seen = new Map<string, ServedInterior>()
+  page.on('response', async (res) => {
+    const url = new URL(res.url())
+    const m = /^\/v1\/systems\/([^/]+)$/.exec(url.pathname)
+    if (!m || res.request().method() !== 'GET' || !res.ok()) return
+    try {
+      const body = (await res.json()) as ServedInterior
+      if (Array.isArray(body.features) || Array.isArray(body.laneGates)) seen.set(m[1], body)
+    } catch {
+      // A non-JSON or already-consumed body is not a suite's concern; every
+      // caller below fails loudly if nothing was ever captured.
+    }
+  })
+  return seen
+}
+
+/** Records the JSON body of every POST matching `pathPattern`. */
+export function capturePosts<T>(page: Page, pathPattern: RegExp): T[] {
+  const bodies: T[] = []
+  page.on('request', (req) => {
+    if (req.method() !== 'POST' || !pathPattern.test(req.url())) return
+    try {
+      bodies.push(req.postDataJSON() as T)
+    } catch {
+      bodies.push({} as T)
+    }
+  })
+  return bodies
+}
+
+export interface WokenCorp {
+  email: string
+  password: string
+  homeSystemId: string
+  fleetId: string
+}
+
+/**
+ * Signs up a brand-new account, names the lineage, and waits for the space
+ * view's FIRST RENDERED FRAME on the home system — the state every journey
+ * below starts from.
+ *
+ * The first-frame wait is not decoration: the loading placeholder holds
+ * through it by design (`system-space-view`: "Loading persists through first
+ * frame after data arrives"), so a suite that clicked as soon as the route
+ * settled would be clicking at a placeholder.
+ */
+export async function wakeNewCorp(page: Page, name: string, tag: string): Promise<WokenCorp> {
+  const email = `e2e+${tag}-${Date.now()}@hexaverse.test`
+  const password = 'e2ePassword123!'
+
+  await page.goto('/login?signUp=true')
+  await page.getByTestId('login-email').fill(email)
+  await page.getByTestId('login-password').fill(password)
+  await page.getByTestId('login-confirm-password').fill(password)
+  await page.getByTestId('login-submit').click()
+
+  await expect(page.getByTestId('wake-up-flow')).toBeVisible({ timeout: 15_000 })
+  await page.getByTestId('wake-name-input').fill(name)
+  await page.getByTestId('wake-submit').click()
+  // 60s, not 20s: spawn is a multi-domain write (corp + pointer txn, hull,
+  // fog, station, opening grant) and on a cold test backend the FIRST spawn of
+  // a run routinely takes longer than 20s. Three suites lost runs to that
+  // budget while asserting nothing about latency. Widening a wait for a state
+  // that always eventually arrives removes flake without weakening anything;
+  // the assertion is still "the wake lands on a system route".
+  await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 60_000 })
+
+  const homeSystemId = new URL(page.url()).pathname.split('/').pop()!
+  await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('space-canvas-region')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('space-loading')).toBeHidden({ timeout: 60_000 })
+
+  const rows = page.getByTestId('fleet-roster').locator('[data-testid^="fleet-row-"]')
+  await expect(rows, 'a fresh spawn has exactly one hull').toHaveCount(1, { timeout: 20_000 })
+  const fleetId = (await rows.first().getAttribute('data-testid'))!.replace('fleet-row-', '')
+
+  return { email, password, homeSystemId, fleetId }
+}
+
+/**
+ * Selects a body by its SERVED id, whether it is on screen or reachable only
+ * through the off-screen affordance.
+ *
+ * Both paths are legitimate player paths (`system-space-view`: *Off-Screen
+ * Marks Are Reachable*), and which one applies depends on the seed's
+ * geometry — a lane gate at a system's rim is essentially never on screen at
+ * the default framing, while an inner planet essentially always is. A suite
+ * that only handled the on-screen case would be seed-dependent and flake.
+ *
+ * HOW THE ON-SCREEN CASE ACTIVATES, and why it is not a click (SDET, 2026-09-03).
+ * Two earlier strategies both failed against a scene that animates every
+ * frame, and neither failure was a production defect:
+ *
+ *   - `locator.click()` never got past Playwright's actionability check. A
+ *     mark orbits its parent on every animation frame, so the element is
+ *     never "stable" (observed: 708 and 674 consecutive position samples with
+ *     no two alike), and on the rare frame it settled, a sibling mark drawn
+ *     over it intercepted the pointer event.
+ *   - `dispatchEvent('click')` needs neither, but selects nothing: the
+ *     picking seam resolves a pick from pointerdown + pointerup on the region
+ *     (`SpaceStage.tsx`'s `handlePointerDown`/`finishGesture`), and the
+ *     `body-hit-*` element carries no `onClick` at all — it is the KEYBOARD
+ *     hit target, activated by Enter or Space
+ *     (`SpaceStage.interaction.test.tsx`: *Enter/Space selects the focused
+ *     body or gate*).
+ *
+ * So the on-screen path focuses the hit target and presses Enter. That is not
+ * a workaround: it is the player path `system-space-view`'s *Body, Lane-Gate,
+ * and Point Selection Is Keyboard-Operable* specifies, it needs no stability
+ * and no hit-testing, and the requirement itself demands the result be
+ * "identical to a pointer click" — so every assertion downstream of a
+ * selection is asserting the same thing either way. `selectBodyByPointer`
+ * below keeps a genuine pointer gesture in the e2e suite so that identity is
+ * not merely assumed.
+ */
+export async function selectBody(page: Page, bodyId: string): Promise<void> {
+  const hit = page.getByTestId(`body-hit-${bodyId}`)
+  const offscreen = page.getByTestId(`offscreen-${bodyId}`)
+  await expect
+    .poll(async () => (await hit.count()) + (await offscreen.count()), {
+      timeout: 30_000,
+      message: `neither an on-screen hit target nor an off-screen affordance exists for ${bodyId}`,
+    })
+    .toBeGreaterThan(0)
+
+  // IDEMPOTENT, and it has to be: selection TOGGLES
+  // (`space-selection.toggleSelection`), so activating a mark that is already
+  // selected DESELECTS it. A journey that picks a body and then asks for the
+  // same body by id — which happens whenever the first pickable mark and the
+  // first mineable body are the same feature — would otherwise clear its own
+  // selection and read as "nothing got selected".
+  if ((await page.getByTestId('space-canvas-region').getAttribute('data-selection')) === bodyId) {
+    await expectSelectionLanded(page)
+    return
+  }
+
+  if (await offscreen.count()) {
+    await offscreen.first().click()
+  } else {
+    await hit.first().focus()
+    await hit.first().press('Enter')
+  }
+  await expectSelectionLanded(page)
+}
+
+/**
+ * Selects an on-screen body by a REAL pointer gesture through the production
+ * picking seam — pointerdown then pointerup on the mark's hit target — rather
+ * than by the keyboard.
+ *
+ * WHY THIS EXISTS. With `selectBody` on the keyboard path, pointer picking
+ * would otherwise be exercised only below the browser: in
+ * `components/space/space-selection.test.ts` (the pure `resolvePick`) and in
+ * `components/space/SpaceStage.interaction.test.tsx` (jsdom `fireEvent`
+ * pointerdown/pointerup against the real component). Those cover the picking
+ * REQUIREMENT thoroughly, but neither can see the browser-level wiring: that
+ * the hit target really sits under the drawn mark in a real layout, that the
+ * region really receives the bubbled pointerdown, and that the host's
+ * pointerup listener is really bound. One e2e pointer selection covers that
+ * seam; re-testing pick geometry through the browser would not.
+ *
+ * The events are DISPATCHED rather than driven through `page.mouse` on
+ * purpose: a real mouse press needs the mark to still be under the recorded
+ * coordinates when the press lands, which an orbiting body is not. Dispatch
+ * still goes through `handlePointerDown` -> `bodyIdUnder(e.target)` ->
+ * `finishGesture` — the production path — with no synthetic selection API.
+ */
+export async function selectBodyByPointer(page: Page, bodyId: string): Promise<void> {
+  const hit = page.getByTestId(`body-hit-${bodyId}`)
+  await expect(hit, `${bodyId} must be drawn to be picked by pointer`).toHaveCount(1, {
+    timeout: 30_000,
+  })
+  const region = page.getByTestId('space-canvas-region')
+  const press = { pointerId: 1, isPrimary: true, button: 0, clientX: 0, clientY: 0 }
+
+  // RETRIED, and never blindly repeated. `SpaceStage.handlePointerDown` drops
+  // the press outright while the renderer reports itself unavailable
+  // (`if (!available || isControl(e.target)) return`), which is still briefly
+  // true just after the loading placeholder clears — a gesture fired in that
+  // window selects nothing and there is no event to wait on. A second gesture
+  // on an ALREADY-selected mark would toggle it back off (`toggleSelection`),
+  // so the press is re-fired only while the view's own `data-selection` says
+  // the mark is not selected. Verified against the live view: a dispatched
+  // pointerdown/pointerup pair on a hit target selects exactly that body.
+  await expect
+    .poll(
+      async () => {
+        const current = await region.getAttribute('data-selection')
+        if (current === bodyId) return current
+        await hit.dispatchEvent('pointerdown', { ...press, buttons: 1 })
+        await hit.dispatchEvent('pointerup', { ...press, buttons: 0 })
+        return await region.getAttribute('data-selection')
+      },
+      {
+        timeout: 30_000,
+        message: `a pointer press on ${bodyId}'s hit target did not select it`,
+      },
+    )
+    .toBe(bodyId)
+  await expectSelectionLanded(page)
+}
+
+/**
+ * Picks, by a real pointer gesture, the first body mark that is CURRENTLY ON
+ * SCREEN — i.e. one for which the view offers no off-screen affordance — and
+ * asserts the view's own selection state names exactly that body.
+ *
+ * Returns the id it picked. This is the suite's one browser-level proof that
+ * pointer picking reaches the right entity; see `selectBodyByPointer`.
+ */
+export async function pickAnyOnScreenBodyByPointer(page: Page): Promise<string> {
+  let bodyId = ''
+  await expect
+    .poll(
+      async () => {
+        const marks = await page.locator('[data-testid^="body-hit-feat-"]').all()
+        for (const mark of marks) {
+          const id = await mark.getAttribute('data-body-id')
+          if (!id) continue
+          if ((await page.getByTestId(`offscreen-${id}`).count()) > 0) continue
+          bodyId = id
+          return true
+        }
+        return false
+      },
+      {
+        timeout: 30_000,
+        message:
+          'the default framing must put at least one pickable body on screen — a view whose every mark is ' +
+          'off-screen at first paint is a defect, not a test-harness problem',
+      },
+    )
+    .toBe(true)
+
+  // `selectBodyByPointer` asserts the view's own `data-selection` names this
+  // body — not merely that something got selected.
+  await selectBodyByPointer(page, bodyId)
+  return bodyId
+}
+
+/**
+ * Selects the first mark whose test id starts with `body-hit-<prefix>`,
+ * reading the body id the server served off the element's own
+ * `data-body-id` rather than parsing the test id.
+ *
+ * For suites that want "any ore body" or "the station" without having
+ * captured the interior read.
+ */
+export async function selectFirstBodyMatching(page: Page, prefix: string): Promise<string> {
+  const mark = page.locator(`[data-testid^="body-hit-${prefix}"]`).first()
+  const offscreen = page.locator(`[data-testid^="offscreen-${prefix}"]`).first()
+  await expect
+    .poll(async () => (await mark.count()) + (await offscreen.count()), {
+      timeout: 30_000,
+      message: `no mark or off-screen affordance matching ${prefix}`,
+    })
+    .toBeGreaterThan(0)
+
+  if (await mark.count()) {
+    const bodyId = (await mark.getAttribute('data-body-id'))!
+    await selectBody(page, bodyId)
+    return bodyId
+  }
+  const testId = (await offscreen.getAttribute('data-testid'))!
+  const bodyId = testId.replace('offscreen-', '')
+  await selectBody(page, bodyId)
+  return bodyId
+}
+
+/**
+ * The SERVED body ids of every mark whose test id starts with
+ * `body-hit-<prefix>`, in the view's own draw order.
+ *
+ * Read off each element's `data-body-id`, never parsed out of the test id, so
+ * a suite cannot accidentally reconstruct an id the server owns.
+ */
+export async function bodyIdsMatching(page: Page, prefix: string): Promise<string[]> {
+  const marks = page.locator(`[data-testid^="body-hit-${prefix}"]`)
+  await expect(marks.first(), `no mark matching ${prefix}`).toBeAttached({ timeout: 30_000 })
+  const ids: string[] = []
+  for (const mark of await marks.all()) {
+    const id = await mark.getAttribute('data-body-id')
+    if (id) ids.push(id)
+  }
+  return ids
+}
+
+/** The selection landed: a facts panel for the selected entity is up. */
+async function expectSelectionLanded(page: Page): Promise<void> {
+  await expect(page.locator('[data-testid$="-facts"]').first()).toBeVisible({ timeout: 20_000 })
+}
+
+/**
+ * Commits a burn toward the current selection and waits out the flight.
+ *
+ * The `Under way` wait is a FALSE-POSITIVE GUARD, carried over verbatim in
+ * intent from every lattice-era suite: the fleet is usually already `Docked`
+ * when this is called, so waiting only on the eventual docked state would
+ * pass even if the burn click were silently swallowed. A burn commit clears
+ * `attachedTo` immediately and the row reads `Under way` while it runs —
+ * that transition is the only proof an order was actually submitted.
+ */
+export async function burnToSelectionAndDock(
+  page: Page,
+  fleetId: string,
+  flightTimeoutMs = 600_000,
+): Promise<void> {
+  const row = page.getByTestId(`fleet-row-${fleetId}`)
+  await expect(page.getByTestId('preview-panel')).toBeVisible({ timeout: 60_000 })
+  await page.getByTestId('burn-button').click()
+  await expect(row, 'the burn must actually be under way, not merely end docked').toContainText(
+    /under way/i,
+    { timeout: 30_000 },
+  )
+  await expect(row).toContainText(/docked/i, { timeout: flightTimeoutMs })
+}
+
+/** The first numeric run in a readout ("1,250 cr" -> 1250, "12 / 200 t" -> 12). */
+export async function digits(page: Page, testId: string): Promise<number> {
+  const text = (await page.getByTestId(testId).textContent()) ?? ''
+  const m = text.replace(/,/g, '').match(/-?\d+(\.\d+)?/)
+  return m ? Number(m[0]) : NaN
+}
+
+/**
+ * One resource kind's own tonnage off the hold readout's per-kind row
+ * (`hold-{kind}` renders "metals 5 t"). A kind with nothing aboard renders
+ * no row at all, which legitimately reads 0 rather than failing.
+ *
+ * Never use the AGGREGATE (`hold-capacity`) to prove a mining delta: fuel
+ * shares the same cargo pool and every burn spends some, so the total moves
+ * for reasons that have nothing to do with mining.
+ */
+export async function holdKindTons(page: Page, kind: string): Promise<number> {
+  const row: Locator = page.getByTestId(`hold-${kind}`)
+  if ((await row.count()) === 0) return 0
+  const text = await row.innerText()
+  const match = text.match(/([\d.]+)\s*t\b/)
+  return match ? Number(match[1]) : 0
+}
+
+/**
+ * The served id of a mineable, non-star, non-station, non-moon body in the
+ * given system's captured interior read.
+ *
+ * Moons are excluded deliberately: the generator marks them mineable (they
+ * carry resources) but the server's own burn solve rejects them as a target
+ * (`space.BuildCurve`'s endpoint-clearance guard), so a moon can be neither
+ * docked at nor mined. Known product gap, surfaced to Travis 2026-08-25 and
+ * unchanged by this migration.
+ */
+export function mineableBodyId(interior: ServedInterior, stationFeatureId?: string): string | null {
+  for (const f of interior.features ?? []) {
+    if (f.type === 'star' || f.id === stationFeatureId) continue
+    if (f.id.startsWith('feat-moon-')) continue
+    if ((f.resources ?? []).length === 0) continue
+    return f.id
+  }
+  return null
+}
+
+/** The station body in a captured interior read, by served type. */
+export function stationFeatureId(interior: ServedInterior): string | null {
+  return (interior.features ?? []).find((f) => f.type === 'station')?.id ?? null
+}

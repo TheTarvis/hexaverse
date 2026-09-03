@@ -267,17 +267,17 @@ export function GalaxyView() {
     }
   }, [graphReady, wakeFocus, galaxy])
 
-  // Roster commands that need no board selection — cut-drive/stop act on the
-  // fleet's current state alone. Burn needs a target named by body id "from
-  // the interior read" (design.md Decision 12), which only exists once a
-  // system board is open; from the galaxy tier there is nothing to target,
-  // so it sends the player there instead of guessing. Jump is withheld by
-  // `isChartedGate` below (the same backend gap SystemBoardView documents).
+  // Roster commands that need no in-system selection — cut-drive/stop act on
+  // the fleet's current state alone. Burn needs a target named by body id
+  // "from the interior read" (design.md Decision 12), which only exists once
+  // a system's space view is open; from the galaxy tier there is nothing to
+  // target, so it sends the player there instead of guessing. Jump is
+  // withheld by `isChartedGate` below.
   const cutDrive = useCutDrive()
   const stop = useStop()
   const handleBurn = useCallback(
     (fleet: Fleet) => {
-      toast.error('Open the system board to choose a target')
+      toast.error('Open the system view to choose a target')
       router.push(`/systems/${fleet.systemId}`)
     },
     [router],
@@ -464,8 +464,14 @@ export function GalaxyView() {
             onRecenter={handleRecenter}
             available={canvasAvailable}
           />
+          {/* This view mounts no command panel of its own, so the roster
+              rows ARE the fleet command surface here — declared explicitly
+              (fleet-roster: "The Roster Row Is the Fleet Command Surface
+              Where the Mounting View Provides None"), and every command a
+              row can offer is supplied below. */}
           <FleetRoster
             worldTime={worldTime}
+            commandOwner="roster"
             isChartedGate={isGateBody}
             activeFleetId={activeFleetId}
             onSelect={(f) => {
