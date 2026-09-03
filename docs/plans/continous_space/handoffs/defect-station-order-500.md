@@ -92,3 +92,35 @@ reason-bearing and distinguishable. The first unblocks the gate; the second does
 
 **Recommended priority: next, ahead of further chain links.** It is cheap relative to what
 it is costing, and every additional e2e test makes a full green run less likely.
+
+## WIDENED 2026-09-03 — this is a family, not one sentinel
+
+Link 8a-2's SDET hit a second member on the same path:
+
+```
+POST /v1/fleets/:id/orders        -> 500
+POST /v1/fleets/:id/orders/preview -> 500
+fleet: solving burn: space: curve length below the configured minimum
+```
+
+So at least **three** `space` solver sentinels escape `fleet.Service.OrderTo` into
+`respond`'s default arm as a bodyless 500: `ErrEndpointInsideClearance` (this document),
+`ErrCutAfterArrival` (fixed in link 7b), and now the minimum-curve-length guard, which
+fires when the target is very close to the fleet.
+
+Two consequences beyond the bad status code:
+
+1. **A user-caused geometry condition is reported as a server fault.** Ordering a burn to
+   something very near you, or to a body whose standoff dips inside the star clearance, are
+   both ordinary player actions.
+2. **It breaks a requirement 8a-1 just shipped.** *A preview is refused wherever the commit
+   would be refused* cannot hold while both sides answer 500 — the preview endpoint exists
+   precisely so a player can discover a refusal without committing, and a 500 tells them
+   nothing about which refusal it is.
+
+It also makes `TestPreview_Scenario_RefusedForAFleetInLaneTransit` intermittently red,
+seed-dependent, in a file nobody in that pass had touched.
+
+**This strengthens the escalation above.** The corrective change should sweep every `space`
+sentinel reaching `respond`, not map them one at a time as each is discovered — three have
+been found by accident, one per link.
