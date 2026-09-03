@@ -50,10 +50,11 @@ one.
   feature's continuous phase is collected
 - **THEN** the collected phases occupy every quadrant of `[0, SubTurn)`,
   not only a sub-arc of it
-- **AND** the greatest common divisor of the collected phases is `1`, so the
-  draw is not confined to a coarse sub-lattice of the turn — a generator
-  drawing only multiples of some `SubTurn/k` covers every quadrant while
-  leaving almost every phase unreachable, which is the continuous
+- **AND** the greatest common divisor of the pairwise differences of the
+  collected phases is `1`, so the draw is not confined to a coarse
+  sub-lattice of the turn at any offset — a generator drawing
+  `c + k·(SubTurn/16)` covers every quadrant and has gcd `1` whenever `c` is
+  odd, while leaving almost every phase unreachable, which is the continuous
   restatement of the very defect the retired every-slot-is-reached scenario
   existed to catch
 
@@ -345,7 +346,7 @@ lattice happened to store it. Restructured as REMOVED + ADDED rather than
 MODIFIED because its scenario "A feature's continuous side matches its own
 lattice direction" compares against a field that no longer exists; the
 archiver refuses a MODIFIED block that omits a live scenario.
-**Migration**: None. Five of its six scenarios survive in the ADDED
+**Migration**: None. Six of its seven scenarios survive in the ADDED
 requirement, two of them with their bodies re-sourced from `Dir` to the
 direction roll. The dropped scenario has no successor because it asserted
 agreement between two representations, and only one representation remains.

@@ -5,11 +5,18 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 (proposal's *Precondition*).
 
 - [ ] 1.1 Re-run `build-production-space-view` task 10.11's grep against the
-      real tree, not its checkbox: `grep -rn "@/lib/board\|@/lib/polar" frontend
-      --include='*.ts' --include='*.tsx' | grep -v node_modules | grep -v
-      '^frontend/lib/board/' | grep -v '^frontend/lib/polar/'`. It SHALL return
-      nothing. Record the output (including "no matches") in the commit message
-      — the grep is the evidence, and an unrecorded grep is an assumption
+      real tree, restricted to IMPORTS **from a non-deleted path** (the
+      predecessor's own wording), since the only import hits today are the
+      two doomed directories importing each other and two further surviving
+      hits are prose about the deletion rather than dependencies on it:
+      `grep -rnE "from '@/lib/(board|polar)'|require\('@/lib/(board|polar)'\)" frontend --include='*.ts' --include='*.tsx' | grep -v node_modules | grep -v '^frontend/lib/board/' | grep -v '^frontend/lib/polar/'`.
+      It SHALL return nothing. The excluded hits are `frontend/lib/board/`'s
+      own 14 imports of `@/lib/polar`; both directories are deleted together
+      by task 6.2, so an importer inside them is not a surviving dependency.
+      The two prose hits —
+      `frontend/components/space/SystemSpaceView.tsx:29` and
+      `frontend/lib/types/action.ts:5` — are rewritten by task 6.3, not by
+      the predecessor. Record the output in the commit message.
 - [ ] 1.2 Confirm all four predecessors are archived, in order, by listing
       `openspec/changes/archive/` for `add-fuel-as-cargo`,
       `add-stationkeep-hold-verb`, `serve-orbital-elements-and-burn-preview`,
@@ -40,6 +47,12 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       backend/system` returning nothing outside deleted code
       (`system-interior`: *Every Generated Body Carries a Continuous Orbital
       Element Set and a Size*)
+- [ ] 2.1b Delete `SystemInterior.Radius` (`system/model.go:190`, tagged
+      `json:"radius" firestore:"radius"`) — the top-level lattice cell radius
+      8a-2's own comment at `model.go:195-199` defers to this change by name.
+      `SystemInterior.Extent` is its continuous successor and is already
+      persisted. Verified by `grep -rn 'Interior\.Radius\|si\.Radius'
+      backend/` returning nothing
 - [ ] 2.2 Delete `system.PeriodFor` and the `dao.go` read-time refill of
       `f.Orbit.Period`. Verified by `grep -rn 'PeriodFor' backend/` returning
       nothing (`system-interior`: REMOVED *Orbital Period Read from Live
@@ -72,9 +85,11 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       Placement Is Independent Of The Continuous Stream*)
 - [ ] 2.7 Remove `LaneGate.Cell` and `LaneGates`' `radius` parameter; the gate's
       position comes from the body table via `fillGateGeometry` alone. Update
-      the one production caller, `fleet/fuel.go`'s `gs.LaneGates(ctx, systemID,
-      s.params.BoardRadius)` (`system-interior`: MODIFIED *Lane Gate
-      Projection*)
+      **both** production callers — `fleet/fuel.go:126` and
+      `system/handler.go:115` (`h.svc.LaneGates(ctx, systemID,
+      gen.Interior.Radius)`), the latter of which is the last reader of
+      `SystemInterior.Radius` (task 2.1b) — (`system-interior`: MODIFIED *Lane
+      Gate Projection*)
 - [ ] 2.8 Delete `system/fog_source.go`'s `occlusionRadius2` and its
       `board.StarOcclusionRadius2`/`board.PlanetOcclusionRadius2` constants.
       Verified before deleting by `grep -rn 'occlusionRadius2' backend/ | grep -v
@@ -117,9 +132,17 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       phase, and assert **both** legs (`system-interior`: *Interior Generation
       Is Lazy and Deterministic* › "Generated phases span the whole turn"):
       (a) the collected phases occupy every quadrant of `[0, SubTurn)`; and
-      (b) `gcd` of the collected phases is `1`. Leg (b) is not optional
-      decoration. `SubTurn` is `1<<20 = 1048576`, so leg (a) alone is four
-      buckets over a million values: a generator drawing
+      (b) the greatest common divisor of the **pairwise differences** of the
+      collected phases is `1`, so the draw is not confined to a coarse
+      sub-lattice of the turn at any offset. Leg (b) is not optional
+      decoration, and it must be computed over pairwise differences, not over
+      the raw phases: the gcd of the raw phases is fooled by a shifted
+      lattice — a generator drawing `phase = 1 + r.Intn(16)*65536` has gcd 1
+      (the set contains 1) while still occupying only 16 of over a million
+      values, the coarse-sub-lattice-at-an-offset defect the pairwise-
+      difference form catches and the raw-value form does not. `SubTurn` is
+      `1<<20 = 1048576`, so leg (a) alone is four buckets over a million
+      values: a generator drawing
       `phase = wrapSubTurnFraction(float64(r.Intn(16))/16)` passes it while
       leaving 99.999% of phases unreachable — the continuous restatement of
       exactly the defect the retired every-slot-is-reached scenario caught.
@@ -185,7 +208,15 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       guard asserting a package is not imported is subsumed by the package not
       existing, and can never fail again). Delete
       `stations/orbit_guard_test.go` and the lattice half of
-      `stations/placement_test.go`
+      `stations/placement_test.go`. Delete
+      `TestInteriorRead_NoLatticeFieldTypeSurvivesOnTheWireDTOs`
+      (`system/interior_wire_lattice_removal_test.go:192-223`) and the
+      `"hexaverse/board"`/`"hexaverse/polar"` string literals it matches on —
+      a reflection guard that no DTO field is a `board`/`polar` type,
+      unfailable once those packages are gone (Decision 6). **Keep
+      `TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse` in the same
+      file**: it asserts json tag names on the wire, which remains
+      falsifiable
 - [ ] 3.5 Add the positive test the removed lattice guard leaves behind: a
       fleet parked at a position coincident with the station's live continuous
       position, with no matching `attachedTo`, is not docked and every
@@ -208,7 +239,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 - [ ] 4.2 Delete `common.GameTuning.OrbitBasePeriod` and
       `common.GameTuning.OrbitPeriod`, and the `board.Schedule` /
       `board-tactical-math` comment at `common/tuning.go:143`. Verified by
-      `grep -rn 'OrbitBasePeriod\|OrbitPeriod(' backend/` returning nothing
+      `grep -rn 'OrbitBasePeriod\|OrbitPeriod' backend/` returning nothing
 - [ ] 4.2b Delete **two further dead lattice knobs** that no `lattice`-word
       sweep finds, each in both `common.GameTuning` and its `fleet.Params`
       twin, with their assignments in `DefaultTuning()` and
@@ -228,7 +259,11 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       MsPerTile/LaneMsPerDistance") and `market/params.go:14,18` (which cites
       `MsPerTile` and `OrbitBasePeriod` as its hot-retune exemplars). Delete
       the `MsPerTile` legs of `common/tuning_test.go:22-26,43-44` and the
-      comment at `fleet/roster_test.go:170`. Verified by
+      comment at `fleet/roster_test.go:170`. Also repoint
+      `fleet/params.go:11-14` (its `MovementParams` doc cites
+      `common.GameTuning.OrbitPeriod` as the live coast-period source) and
+      `fleet/resolver_test.go:23` (cites `common.Tuning().OrbitPeriod` as
+      "the same period a body on that ring has"). Verified by
       `grep -rn 'MsPerTile\|InterceptHorizon' backend/` returning nothing
 - [ ] 4.3 Delete `fleet.Params.BoardRadius` and its assignment, now that
       `LaneGates` takes no radius (task 2.7). Verified by `grep -rn 'BoardRadius'
@@ -272,9 +307,10 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       with a `board.Orbit{Ring, Angle0, Period, Dir}`, at the continuous
       movement-state struct (› "Actor state carrying a domain struct still
       commits")
-- [ ] 4.5 Repoint `backend/mine/integration_test.go` and
-      `backend/interior_additive_wire_e2e_test.go` off `board`, keeping every
-      continuous assertion
+- [ ] 4.5 Repoint `backend/mine/integration_test.go` off `board`, keeping
+      every continuous assertion. `backend/interior_additive_wire_e2e_test.go`
+      no longer exists — 8a-2 removed it, and no backend-root e2e test imports
+      `board` today — so there is no second file to repoint here
 - [ ] 4.6 `cd backend && go build ./... && go test ./... -p 1` green
 
 ## 5. Delete `backend/board` and `backend/polar`
@@ -295,7 +331,15 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       frontend --include='*.ts' --include='*.tsx' | grep -v node_modules`.
       Rename or remove each hit. `queryKeys.market.board()` is the **market
       price board** and is not lattice — it stays; state that exception in the
-      commit rather than leaving the next reader to rediscover it
+      commit rather than leaving the next reader to rediscover it.
+      `queryKeys.systemBoard` (the per-system interior read's key namespace —
+      `lib/query-keys.ts`, `hooks/use-system-space.ts:21`,
+      `hooks/use-fleets.ts:32,115`, and their three test files) IS lattice
+      vocabulary on the continuous view: rename it to `queryKeys.systemSpace`
+      in the factory and every reader, and update
+      `lib/query-keys.test.ts`'s five assertions and the two `it()` titles at
+      `:19` and `:28` that name the prefix. It is a pure rename with no
+      wire or cache-shape consequence beyond the key string itself.
 - [ ] 6.3b **The two surviving lattice tethers under `frontend/app/spike/`,
       each with live importers.** `build-production-space-view` tasks 10.5 and
       10.6 were narrowed to stop short of both, because cutting either breaks a
@@ -327,8 +371,13 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `lattice` mentions in `space-3d` (`page.tsx:3`, `page.tsx:219`,
       `sim.ts:4`) against task 10.2's case-insensitive sweep: they are
       anti-lattice prose that stops meaning anything once the lattice is gone,
-      so rewrite them rather than widening 10.2's allow-list. Both are moot if
-      OQ-5 is ruled "delete".
+      so rewrite them rather than widening 10.2's allow-list. Also rewrite the
+      two comments at `frontend/app/spike/space-3d/page.tsx:13` and
+      `frontend/app/spike/space-3d/page.test.tsx:7`, left behind by 8a-2's
+      deletion of the `webgl-board` spike bench: each still names that bench,
+      which no longer exists — the same species as the `sim.ts:21-22`
+      citation above, a comment naming a thing that no longer exists. All are
+      moot if OQ-5 is ruled "delete".
 
       **What this change does not decide:** whether either tether is deleted.
       That is **OQ-5 in design.md** — the choice is per-tether, either migrate
@@ -402,14 +451,24 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       over its surviving `continuousLine` component alone, dropping
       `latticeProjection` and `latticeDrawCount` from the serialization and
       recomputing `interiorElementsSweep`'s digest and `serialization` string
-      (design.md Decision 3). **Before committing the re-recorded file**, assert
-      it reproduces byte-for-byte under `GOARCH=arm64` and under
-      `GOARCH=amd64 GOAMD64=v1`. If the two disagree, **stop and report** — do
-      not commit a one-architecture recording (design.md OQ-1; this is the exact
-      failure `pin-system-generation-determinism` existed to end)
+      (design.md Decision 3), by running the family's regeneration with
+      `UPDATE_FIXTURES=1` (`system/fixtures_test.go:711`) — the mechanism that
+      actually rewrites the file; "re-record" alone names no command. **Before
+      committing the re-recorded file**, assert it reproduces byte-for-byte
+      under `GOARCH=arm64` and under `GOARCH=amd64 GOAMD64=v1`. If the two
+      disagree, **stop and report** — do not commit a one-architecture
+      recording (design.md OQ-1; this is the exact failure
+      `pin-system-generation-determinism` existed to end). The durable check
+      against a future divergence is the standing `./system/` cross-target
+      leg (`check.py:1078-1102`, `.gitlab-ci.yml:342`), which this task's
+      byte-for-byte assertion is a one-time rehearsal of, not a replacement
+      for
 - [ ] 7.6 Update `fixtures/system/cases.json`'s `_meta.generatedOn` and
-      `_meta.serialization` to describe the new recording honestly, including
-      the architecture it was recorded on
+      `_meta.serialization` to describe the new recording honestly, naming
+      **both** build targets (`GOARCH=arm64` and `GOARCH=amd64 GOAMD64=v1`)
+      the byte-for-byte check in 7.5 ran against — recording only one leaves a
+      one-architecture recording indistinguishable from a two-architecture one
+      after the fact
 - [ ] 7.6b Run the surviving-`sqrt` audit the retired board-audit scenario is
       replaced by: enumerate every runtime `sqrt` on a rule-bearing path in
       `backend/` (at minimum `system.keplerPeriodMs` and `space`'s flight-time
@@ -551,7 +610,7 @@ names the file and states its verification.
       the `board/` bullet rather than deleting it silently, so a reader learns
       the lattice was removed rather than that it was never there
 - [ ] 9.6 Update `docs/plans/continous_space/chain.md`'s link 9 row and section
-      to reflect what this change actually turned out to be (a nine-capability
+      to reflect what this change actually turned out to be (a ten-capability
       change with a generator-output consequence, not the four-line deletion the
       original entry predicted)
 
@@ -571,11 +630,46 @@ names the file and states its verification.
       `grep -rnE '"board"|"polar"|\(board |[( ]polar[) ]|\./board/|\./polar/' .claude .gitlab-ci.yml infra`
       and require it to return nothing. Without this leg the section-8 tasks
       are self-attested
+- [ ] 10.1c Sweep for SYMBOL citations of the deleted packages, which 10.1's
+      path patterns and 10.1b's `.claude` scope both miss:
+      `grep -rnE '\b(board|polar)\.[A-Za-z]' backend --include='*.go'` and
+      `grep -rnE '\b(board|polar)\.[A-Za-z]' frontend --include='*.ts' --include='*.tsx' | grep -v node_modules`.
+      Hits naming the **market price board** are the price board, not the
+      lattice, and stay: `backend/market`'s `board.Venues` /
+      `board.RefreshCadenceMs` (today only in
+      `market/board_integration_test.go`, eight hits) and the frontend's
+      `board.venues` on the price-board DTO
+      (`frontend/components/market/MarketBoardPanel.tsx:213,218`). So do the
+      incidental matches where `board.` is a filename rather than a package
+      qualifier — `docs/plans/hex-board.md` (`app/spike/hex-board/mock-system.ts:3,6`)
+      and `lib/types/system-board.ts` (`lib/types/system-space.ts:12`).
+      Every other hit names a symbol of a package that no longer exists:
+      rewrite it — including
+      `frontend/app/spike/hex-board/mock-system.ts:235` ("mirrors
+      board.GateRing"), which task 6.3b's space-3d comment sweep does not
+      reach.
+
+      One further hit is predecessor debris rather than a lattice symbol:
+      `frontend/components/galaxy/GalaxyView.test.tsx:504` cites
+      `board.laneGates` on the `SystemBoardDTO` that
+      `build-production-space-view` already deleted, inside a comment block
+      (`:498-512`) that also names the deleted `SystemBoardView` and its
+      test file. No other sweep reaches it — 6.3's `systemBoard` pattern is
+      case-sensitive and misses `SystemBoardView`. Rewrite the block to name
+      `SystemSpaceView` and its live data source. Confirmed sites at
+      authoring:
+      `backend/action/params_validator.go:7,15` (production),
+      `backend/space/{params.go:41,burn.go:11,helpers_test.go:79,params_test.go:28,63}`
+      (a package no other task touches), `backend/fleet/resolver.go:26`,
+      `backend/fleet/model.go:162`.
 - [ ] 10.2 `grep -rni 'lattice' backend frontend .claude fixtures
       --exclude-dir=node_modules` SHALL return only the deliberate wire-contract
       guard `build-production-space-view` added (`system-interior`: "Lattice-only
-      fields are absent from the response") and its implementing test
-      (design.md Decision 6). Anything else is a leftover. **The pattern is
+      fields are absent from the response") and its implementing test function,
+      `TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse` alone — not
+      the rest of `interior_wire_lattice_removal_test.go`, whose sibling
+      function task 3.4 deletes (design.md Decision 6). Anything else is a
+      leftover. **The pattern is
       deliberately unanchored**: `\blattice\b` misses the two shapes that
       matter most, because both GNU and BSD `grep` treat `_` as a word
       character and `\b` does not fire inside CamelCase — so
@@ -619,7 +713,11 @@ names the file and states its verification.
       every live scenario heading character-for-character or the archiver
       refuses, and there is no scenario-level `RENAMED` mechanism. It joins
       Decision 1's three residual lattice-vocabulary titles as recorded, not
-      forgotten
+      forgotten. Two further residual uses of "board feature id" survive in
+      `docked-fleet-actions`'s *Sell Offer on the Docked Fleet* (`:155`) and
+      *Refuel Offer on the Docked Fleet* (`:316`); like the *board read
+      serves the station* scenario heading they are recorded here as
+      accepted vocabulary residue, not forgotten
 - [ ] 10.4 `python3 .claude/skills/code-quality-checks/check.py` fully green
 
 ## 11. Validation
@@ -642,13 +740,25 @@ names the file and states its verification.
       `**Reason**` actually exists and actually carries the obligation claimed.
       A REMOVED whose stated successor does not exist is a silent loss with a
       paper trail, which is worse than one without
-- [ ] 11.4 Confirm every `MODIFIED` block reproduces every scenario the
-      **post-predecessor** spec will have, not only the live one: link 9's
+- [ ] 11.4 Confirm every `MODIFIED` block reproduces every scenario the spec
+      will have once every predecessor still ahead of this change in the
+      archive order has landed, not only the live one. `build-production-
+      space-view` archived at `7a2e837` before this task was last revised:
       `cross-stack-determinism` › *Shared Board Math Is Pinned By a
-      Cross-Language Golden Fixture* must carry all fourteen scenarios
-      `build-production-space-view` leaves behind, three of which are not in the
-      live spec today. `openspec-reconcile.py` compares against the live spec
-      only and cannot see this
+      Cross-Language Golden Fixture* is already live with all fourteen
+      scenarios that predecessor left behind, and
+      `openspec-reconcile.py delete-the-lattice` exits 0 against the current
+      tree. The one predecessor still unarchived is `add-scan-and-sightings-
+      surface`, and it is confirmed safe: it MODIFIES `action-dispatch`'s
+      *Exactly-Once Resolution* and *Inbox by Actor Query Param*, while link
+      9's own `action-dispatch` delta MODIFIES only *Commit Rejects
+      Non-Primitive Action Parameters*, and its `system-space-view` delta is
+      `## ADDED Requirements` only — it does not touch the *System Space View
+      Route and Data Fan-In* requirement link 9's own `system-space-view`
+      delta MODIFIES (task B1 / `specs/system-space-view/spec.md`). No
+      cross-change scenario drift exists to guard here; this task's job going
+      forward is to re-run `openspec-reconcile.py` and re-check that
+      predecessor's deltas if either side changes before archive
 - [ ] 11.5 `cd backend && go test ./... -p 1`, `cd frontend && npx vitest run`,
       `cd frontend && npm run e2e`, and
       `bash .claude/scripts/check.sh --backend --frontend --lint --test` all

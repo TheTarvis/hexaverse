@@ -31,11 +31,10 @@ The frontend grep is necessary and **not sufficient**. This change carries
 three more preconditions of its own, each verified in section 1:
 
 - **the backend importers**, which `build-production-space-view` explicitly does
-  not remove and records by name in its design: `system/generator.go`,
-  `system/model.go`, `system/service.go`, `system/gates.go`, `system/fog.go`,
-  `system/fog_source.go`, `stations/placement.go`, `stations/service.go` (eight
-  for `board`; `system/generator.go` and `system/service.go` also import
-  `polar`);
+  not remove and records by name in its design: `system/fog_source.go`,
+  `system/generator.go`, `system/model.go`, `system/service.go`,
+  `stations/placement.go`, `stations/service.go` (six for `board`;
+  `system/generator.go` and `system/service.go` also import `polar`);
 - **the four predecessors are archived, in order** — `add-fuel-as-cargo` (done),
   `add-stationkeep-hold-verb`, `serve-orbital-elements-and-burn-preview`,
   `build-production-space-view`, `add-scan-and-sightings-surface`;
@@ -78,7 +77,7 @@ three more preconditions of its own, each verified in section 1:
 - **Retire the `board-tactical-math` capability** — a post-archive hand-delete
   of `openspec/specs/board-tactical-math/`, because a capability cannot be
   retired through `REMOVED` deltas.
-- **Drop every lattice citation from the eight capabilities that merely mention
+- **Drop every lattice citation from the nine capabilities that merely mention
   it**, and re-express (never silently drop) the six requirements whose lattice
   half was load-bearing.
 - **De-enrol `board` and `polar` from every enforcement list, changed-file
@@ -108,7 +107,7 @@ three more preconditions of its own, each verified in section 1:
   but it applies in full to the six `REMOVED` + `ADDED` pairs below, and
   task 11.2 runs that diff mechanically.
 
-**Modified (eight), because they merely cite the lattice:**
+**Modified (nine), because they merely cite the lattice:**
 
 | Capability | Why it is modified, not retired |
 | --- | --- |
@@ -120,6 +119,7 @@ three more preconditions of its own, each verified in section 1:
 | `galaxy-generation` | The skeleton's ring ordinal is defined partly by what it is *not* ("never itself a lattice ring"). |
 | `world-clock` | Its domain enumeration names `board` — and `observation`, a package link 5 deleted and this sweep also catches. **This one is not wording-only:** the delta also *widens* the enumeration, adding `space`, `disclosure` and `charts` (see below). |
 | `mine-extraction` | Two references to "the containing system's board" as the read that resolves a due mine. |
+| `system-space-view` | *System Space View Route and Data Fan-In* SHALL NOT read, render, or scale anything from the station response's lattice `orbit` object — a live requirement in a capability `build-production-space-view`/8a-2 created after this change was authored, forbidding a wire field this change deletes (`Station.Orbit`). |
 
 **`world-clock`'s widening, declared rather than smuggled.** *Scaled World
 Time* enumerates the domains forbidden from reading `time.Now()` directly. The
@@ -153,7 +153,7 @@ assuming it.
 - **Affected specs:** `board-tactical-math` (RETIRED),
   `cross-stack-determinism`, `system-interior`, `trading-station`,
   `session-wakeup`, `action-dispatch`, `galaxy-generation`, `world-clock`,
-  `mine-extraction`.
+  `mine-extraction`, `system-space-view`.
 - **Affected code:** `backend/board` (deleted), `backend/polar` (deleted),
   `backend/system`, `backend/stations`, `backend/common`, `backend/fleet`,
   `backend/corporations`, `backend/market`, `backend/action`, `backend/mine`,

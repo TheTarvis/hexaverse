@@ -292,9 +292,9 @@ leaves a check that passes forever:
     `build-production-space-view` task 10.6 deleted that spike, and 10.6 was
     narrowed to delete nothing there (OQ-5). Listed so the site is accounted
     for, not so it is edited.
-19. `:335–345` — `check_mirror board` and `check_mirror polar`, the function's
-    only two call sites.
-20. `:376` — the `PASS:` message enumerating the checked packages.
+19. `:365` and `:371` — `check_mirror "board"` and `check_mirror "polar"`, the
+    function's only two call sites.
+20. `:406` — the `PASS:` message enumerating the checked packages.
 
 **`.claude/scripts/check-frontend-tests.sh`**
 21. `:118,126` — the `components/board/webgl/` GL-plumbing carve-out, dead once
