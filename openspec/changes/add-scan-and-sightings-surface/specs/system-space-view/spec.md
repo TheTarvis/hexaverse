@@ -19,9 +19,11 @@ which a burn consumes and which accepts points in vacuum a sweep can never
 name.
 
 IF the served target set is empty, THEN the control SHALL state that no host is
-in range rather than rendering an empty list. IF the scan-target read fails,
-THEN the control SHALL show a retriable error and offer no targets, rather than
-falling back to any locally derived list.
+in range, except while the acting fleet's own served state explains the empty
+set — in lane transit, or already sweeping — in which case the control SHALL
+state that instead, rather than rendering an empty list. IF the scan-target
+read fails, THEN the control SHALL show a retriable error and offer no targets,
+rather than falling back to any locally derived list.
 
 #### Scenario: Served targets are listed with their kind and duration
 - **WHEN** the scan-target read returns a body and an own fleet
@@ -38,6 +40,13 @@ falling back to any locally derived list.
 #### Scenario: An empty target set is stated, not shown as an empty list
 - **WHEN** the scan-target read returns no targets
 - **THEN** the control states that no host is in range
+
+#### Scenario: An empty target set explained by transit or a running sweep states that instead
+- **GIVEN** the acting fleet is in lane transit, or already has a running
+  focused scan
+- **WHEN** the scan-target read returns an empty set
+- **THEN** the control states that reason, rather than stating that no host is
+  in range
 
 #### Scenario: A failed target read is retriable and offers nothing
 - **WHEN** the scan-target read fails
@@ -159,8 +168,11 @@ failure.
 WHILE the acting fleet has a running focused scan, the system SHALL read that
 sweep from the owning corporation's action inbox — the running action of type
 `scan` for that fleet — and SHALL show a countdown from that action's committed
-time to its ETA, measured against the world time the read served. The window
-SHALL NOT be sourced from the fleet read, which serves no sweep window at all.
+time to its ETA, measured against **this view's projected world time**
+(*Own-Fleet Position, Burn Curve, and Arrival Ghost Render Continuously*'s
+scale-correct projection), the inbox supplying the ETA and the committed time
+only. The window SHALL NOT be sourced from the fleet read, which serves no
+sweep window at all.
 
 The system SHALL offer a cancel affordance that cancels that action by its own
 id through the generic action cancel endpoint, never through the fleet-level
@@ -175,8 +187,9 @@ control SHALL show it as settling rather than counting below zero.
 #### Scenario: The countdown spans the action's committed window
 - **GIVEN** a running scan action with a committed time and an ETA
 - **WHEN** the control is shown
-- **THEN** it counts down from the served world time to that ETA, using the
-  action's own committed time and ETA
+- **THEN** it counts down to that ETA against the view's scale-correct
+  projected world time, using the action's own committed time and ETA, and no
+  world time the inbox served
 
 #### Scenario: The window is not taken from the fleet read
 - **WHEN** the running sweep is displayed
@@ -197,7 +210,7 @@ control SHALL show it as settling rather than counting below zero.
 - **THEN** no scan commit control is offered for that fleet
 
 #### Scenario: A past-ETA sweep reads as settling, not as a negative countdown
-- **GIVEN** a running scan action whose ETA is at or before the served world time
+- **GIVEN** a running scan action whose ETA is at or before the view's projected world time
 - **WHEN** the control is shown
 - **THEN** it presents the sweep as settling, and shows no negative or
   ever-growing countdown
@@ -218,15 +231,24 @@ selected one would leave every other fleet's sweep unsettled and its records
 unread for as long as that selection held.
 
 After the interior refetch that follows a sweep's ETA has **completed**, and
-only then, the system SHALL refetch both the corporation's sighting pile for
-the open system and the **action inbox for the fleet whose sweep was due**. The
-inbox refetch is not optional bookkeeping: the running window, the cancel
-affordance's action id, the settled sweep's outcome, its reason code, and its
-acknowledged state are all carried by the inbox and by nothing else, so without
-it a settled sweep reads as perpetually settling (*A Running Sweep's Window and
-Cancel Come From the Action Inbox*) and its outcome report never appears at all
-(*A Settled Sweep Reports Its Outcome, Including Each Fizzle Reason, in Player
-Copy*).
+only then, the system SHALL refetch the corporation's sighting pile for the
+open system and **both of that fleet's action-inbox reads — the
+running-status read that carries the sweep's window and cancel id, and the
+settled-status read that carries its outcome, reason code, and acknowledged
+state**. Refetching one and not the other leaves the sweep counting down
+forever or its outcome unreported, indistinguishably from not refetching at
+all: the running window, the cancel affordance's action id, the settled
+sweep's outcome, its reason code, and its acknowledged state are all carried
+by the inbox and by nothing else, so without both reads a settled sweep reads
+as perpetually settling (*A Running Sweep's Window and Cancel Come From the
+Action Inbox*) and its outcome report never appears at all (*A Settled Sweep
+Reports Its Outcome, Including Each Fizzle Reason, in Player Copy*).
+
+IF that interior refetch fails, or completes without the sweep having
+settled, THEN the system SHALL re-attempt the interior refetch on the view's
+baseline refetch cadence and SHALL re-issue the follower reads after each
+such attempt, until the sweep is served as settled — the sweep's ETA is
+already past, so no further ETA-scheduled trigger exists to correct it.
 
 The ordering is load-bearing: reading the pile and reading the inbox each
 settle nothing and mint nothing, so either one issued concurrently with the
@@ -248,6 +270,23 @@ succeeded.
 - **THEN** the sighting-pile refetch and the scan's action-inbox refetch are
   issued only after that interior refetch has completed, never concurrently
   with it
+
+#### Scenario: Both inbox reads are refetched, not one
+- **GIVEN** a sweep whose ETA has just passed
+- **WHEN** the post-settle refetches run
+- **THEN** both the running-status and the settled-status inbox reads for that
+  fleet are re-issued, and the sweep is neither still presented as running nor
+  left without its outcome report
+
+#### Scenario: A failed post-ETA interior refetch still lands the outcome report without user action
+- **GIVEN** a running sweep's ETA has passed, and the scheduled interior
+  refetch that follows it fails, or completes without the sweep having
+  settled
+- **WHEN** the view's baseline refetch cadence re-attempts the interior
+  refetch
+- **THEN** the interior refetch is retried until the sweep settles, the inbox
+  and pile follower reads are re-issued after each attempt, and the settled
+  outcome is reported with no navigation, reload, or manual refresh
 
 #### Scenario: The settling sweep resolves to a report without user action
 - **GIVEN** the space view is open with a running sweep whose ETA has just
@@ -286,14 +325,29 @@ an affordance that opens the sighting log. A sweep that fizzled SHALL
 be reported with copy specific to its served reason code — the scanning fleet
 being out of range at pulse-reach, the star having occluded the host at
 pulse-reach, the scanning fleet having left the host's system, the scanning
-fleet being in lane transit, and the host no longer resolving — each reading as
-its own statement, since a fizzle mints nothing and is otherwise
-indistinguishable to the player from a sweep that never ran.
+fleet being in lane transit, the host no longer resolving, and a sweep a
+racing resolver had already settled — each reading as its own statement,
+since a fizzle mints nothing and is otherwise indistinguishable to the player
+from a sweep that never ran.
+
+The report SHALL source that scan from the acting fleet's **type-filtered**
+settled inbox read — `type=scan&status=done` (`action-dispatch`'s *Inbox by
+Actor Query Param*) — never from the type-agnostic settled read. That read is
+bounded, and a fleet's settled mines, burns, jumps, holds, and releases share
+the bound with its scans: on a type-agnostic page an unacknowledged sweep is
+displaced by the fleet's ordinary work and the report simply never appears,
+with no error and nothing to retry.
+
+A settled scan carrying **no** served reason code SHALL be reported as having
+filed records; one carrying **any** reason code SHALL be reported as a fizzle.
+The client SHALL NOT parse the action's `outcome` text to make this decision —
+`outcome` is prose for a human reading the store directly, not a discriminator
+this surface is entitled to branch on.
 
 This copy depends on the reason code being **served**, which requires
 `action-dispatch`'s *Exactly-Once Resolution* to persist it on the resolved
 action — until it does, every fizzle carries no reason code at all and this
-whole five-way mapping renders its unrecognized-code fallback, indistinguishably
+whole six-way mapping renders its unrecognized-code fallback, indistinguishably
 from correct behaviour.
 
 The system SHALL NOT display the raw reason code or the action's raw outcome
@@ -315,6 +369,20 @@ same settled sweep again.
 - **WHEN** the report is shown
 - **THEN** it reports the one with the later ETA, deterministically
 
+#### Scenario: A fleet's other settled actions cannot displace its scan report
+- **GIVEN** the acting fleet has one unacknowledged settled scan and more
+  settled actions of other types than the inbox read's bound
+- **WHEN** the report is shown
+- **THEN** the settled scan is still reported, the read it folds having been
+  filtered to `type=scan`
+
+#### Scenario: Filed-vs-fizzled is decided by reasonCode presence, never by outcome text
+- **GIVEN** a settled scan action
+- **WHEN** the report determines whether the sweep filed records or fizzled
+- **THEN** the action's served reason code being absent is treated as filed
+  records, and any served reason code is treated as a fizzle
+- **AND** the action's raw `outcome` text is never parsed to make that decision
+
 #### Scenario: A sweep that minted records reports and links to the log
 - **WHEN** a settled, unacknowledged sweep minted records
 - **THEN** the view reports that the sweep filed records
@@ -323,8 +391,9 @@ same settled sweep again.
 #### Scenario: Each served fizzle reason reads as its own statement
 - **WHEN** a settled sweep carries a reason code for being out of range at
   pulse-reach, for the star occluding the host, for the scanner having left the
-  system, for the scanner being in lane transit, or for the host not resolving
-- **THEN** the report shown differs for each of those five reasons
+  system, for the scanner being in lane transit, for the host not resolving, or
+  for a racing resolver having already settled the sweep
+- **THEN** the report shown differs for each of those six reasons
 
 #### Scenario: An unrecognized reason code degrades to a generic report
 - **WHEN** a settled sweep carries a reason code this client does not recognize
@@ -337,7 +406,8 @@ same settled sweep again.
 - **AND** a subsequent refetch does not report the same settled sweep again
 
 ### Requirement: A Sighting Ghost Renders at Its Frozen Position, Never a Predicted One
-The system SHALL draw a ghost mark for every target-naming record served by a
+The system SHALL draw a ghost mark (a sighting ghost is a distinct mark from
+the burn's arrival ghost 8a-2 draws) for every target-naming record served by a
 read of the corporation's sighting pile **filtered server-side to the open
 system** (`sighting-records`' *The Pile Read Filters To One System On
 Request*), at that record's stored position, visually distinct from a live
@@ -531,10 +601,12 @@ withholds.
 The focused-scan control — its served target list, its commit, its running
 countdown, its cancel, and its settled-sweep report — is anchored to the acting
 fleet's own served state and to a server-served target list rather than to a
-canvas selection, and SHALL therefore remain invokable through the fleet panel
-while the view's canvas region shows its unsupported or interrupted state
-(*Renderer Unavailability Is an Explicit State*, *Lost Rendering Context
-Recovers Without Navigation*), without requiring a selection on the canvas. The
+canvas selection, and SHALL therefore remain invokable through the
+`docked-fleet-actions` fleet panel — the same panel *Renderer Unavailability
+Is an Explicit State* already requires to stay mounted and usable — while the
+view's canvas region shows its unsupported or interrupted state (*Renderer
+Unavailability Is an Explicit State*, *Lost Rendering Context Recovers
+Without Navigation*), without requiring a selection on the canvas. The
 affordance that opens the sighting log SHALL likewise remain reachable.
 
 Ghost marks are canvas-only. WHILE the canvas region is unavailable they SHALL
@@ -560,3 +632,69 @@ simply be absent, with no error attributed to them and no fallback rendering.
   pile carries records for the open system
 - **THEN** no ghost marks are drawn, no error is attributed to them, and no
   fallback rendering is substituted
+
+### Requirement: The Sweep Surface's Reads Fail Independently, Like Every Other Read This View Issues
+The scan-target read, **both of a fleet's action-inbox reads** (the
+running-status read and the settled-status read), and the system-filtered
+sighting-pile read are reads this view issues itself, and SHALL obey *System
+Space View Route and Data Fan-In*'s independence rule: no one of them failing
+SHALL disable another's surface, and each absence SHALL be attributed to its
+failed read rather than presented as a fact about the world — *System Space
+View Route and Data Fan-In*'s count of four names the reads that requirement
+enumerates; these are additional reads this capability's later requirements
+add, and they do not edit that enumeration.
+
+IF the **running-status** inbox read for a fleet fails, THEN the system SHALL
+NOT present that fleet as having no running sweep: it SHALL show that the
+sweep's state could not be read, offer a retry, and SHALL NOT offer the scan
+commit control for that fleet while its sweep state is unknown — a commit
+offered on an unread inbox is a commit the server rejects for a sweep already
+running.
+
+IF the **settled-status** inbox read for a fleet fails, THEN the system SHALL
+NOT present that fleet as having nothing to report: it SHALL show that the
+sweep's outcome could not be read, offer a retry, and SHALL continue to offer
+the commit control whenever the running-status read shows no running sweep — a
+missing outcome withdraws a report, never a verb.
+
+IF the ghost layer's pile read fails, THEN the system SHALL show that this system's
+sightings could not be read, with a retry, and SHALL NOT render an empty scene as
+"no sightings here".
+
+#### Scenario: A failed inbox read withholds the commit control rather than re-offering it
+- **GIVEN** the acting fleet has a running sweep and its action-inbox read fails
+- **WHEN** the scan control is shown
+- **THEN** it states that the sweep's state could not be read and offers a retry
+- **AND** no scan commit control is offered for that fleet
+
+#### Scenario: A failed settled read withholds the report, not the verb
+- **GIVEN** the acting fleet's running-status inbox read shows no running sweep
+  and its settled-status inbox read fails
+- **WHEN** the scan control is shown
+- **THEN** it states that the sweep's outcome could not be read and offers a
+  retry, and the scan commit control is still offered
+
+#### Scenario: A failed ghost pile read is not an empty system
+- **WHEN** the system-filtered pile read fails
+- **THEN** the view states that this system's sightings could not be read and offers
+  a retry, and no ghost absence is presented as "no sightings in this system"
+
+### Requirement: A Settled Sweep and the Scan Controls Are Reachable and Announced
+WHEN a refetch lands the acting fleet's sweep as settled, the system SHALL announce
+the outcome through a polite live region, naming whether records were filed or the
+sweep returned nothing — the same treatment *A Landed Resolution Is Announced to
+Assistive Technology* gives a burn arrival, a jump arrival, and a mine completion,
+and for the same reason: the sweep settles without user action.
+
+The scan control's target list, its commit, its cancel, the report's dismiss
+affordance, and the affordance that opens the sighting log SHALL each be reachable
+via Tab and activatable via Enter or Space, showing a visible focus indicator.
+
+#### Scenario: A settled sweep is announced
+- **WHEN** a refetch lands a settled sweep for the acting fleet
+- **THEN** a polite live-region announcement names its outcome
+
+#### Scenario: The sweep can be commanded and cancelled from the keyboard alone
+- **WHEN** a keyboard-only player tabs through the fleet panel
+- **THEN** the target list, the commit control, the cancel affordance, and the
+  sighting-log affordance are each reachable and activatable with Enter or Space

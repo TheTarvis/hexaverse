@@ -227,9 +227,10 @@ interior read but absent from the served target set is not offered.
 **The scan-target read serves no world time — and an earlier draft of this
 change served one.** The requirement, a scenario, and two tasks all carried a
 world time on the scan-target response, and **nothing consumed it**: the only
-client requirement that measures against a served world time is the running
-sweep's countdown, which measures against the *action inbox's* own served world
-time, from the read that carries the ETA it counts to. It is worth recording
+client requirement that measures against a *served* world time is none: the
+running sweep's countdown measures against this view's projected world time,
+the inbox supplying only the ETA it counts to and the committed time it
+counts from. It is worth recording
 plainly that this change — whose stated goal is "the minimum surface that has a
 **named consumer** for every field added", written in direct response to five
 built-and-never-called derivations — was itself about to ship a served field
@@ -335,7 +336,7 @@ carries the mount-path ordering and its own scenario.
 else on the wire carries the running window, the cancel action id, the settled
 `outcome`, the `reasonCode`, or `acknowledgedAt`. Without an inbox refetch
 after settlement, *A past-ETA sweep reads as settling* holds forever and *A
-Settled Sweep Reports Its Outcome* never fires — taking all five fizzle copies
+Settled Sweep Reports Its Outcome* never fires — taking all six fizzle copies
 with it, which is the headline half of this change.
 
 ### Decision 8 — A clean-sweep record draws no ghost, and the origin rule is restated for ghosts
@@ -372,7 +373,7 @@ served `id`.
 `build-production-space-view` archives, and this change archives after it. A
 MODIFIED block against a capability with no live spec cannot be validated,
 cannot be reconciled by `.claude/scripts/openspec-reconcile.py`, and would be
-refused. Two of 8a-2's requirements are therefore **extended by addition**
+refused. Six of 8a-2's requirements are therefore **extended by addition**
 rather than edited:
 
 - *Renderer Unavailability Is an Explicit State* enumerates the verbs that stay
@@ -395,6 +396,15 @@ rather than edited:
   already excludes fleets and contacts from the selection set by name. This
   change adds *A Ghost Is Not a Member of the Space View's Selection, and a Burn
   Never Consumes One* rather than editing that exclusion list (Decision 12).
+- *System Space View Route and Data Fan-In* enumerates the four reads this
+  view issues itself and requires each to fail independently. This change
+  adds *The Sweep Surface's Reads Fail Independently, Like Every Other Read
+  This View Issues* — four more such reads — rather than editing that count.
+- *A Landed Resolution Is Announced to Assistive Technology* enumerates the
+  transitions this view announces through a polite live region (a burn
+  arrival, a jump arrival, a mine completion). This change adds *A Settled
+  Sweep and the Scan Controls Are Reachable and Announced* as a further one,
+  rather than widening that enumeration.
 
 A future change that wants one merged requirement can MODIFY freely once both
 are live.
@@ -535,34 +545,46 @@ Alternative considered and rejected: serving members with a "belt member" kind
 so the client could group them — that is per-member lodes and a wire-size
 question by another name, both of which OQ-4 closed.
 
-### Decision 18 — `reasonCode` is persisted in the resolve transaction
+**The resulting asymmetry — a member id is mineable (`mine-extraction`) and
+appears in a docked fleet's served `attachedTo`, yet is unscannable — is
+intended, not an oversight this change failed to close.** Mining and docking
+read a member id the fleet already occupies; scanning would publish it as a
+*selectable* body to a client with no name, mark, or facts surface for one,
+which is exactly what OQ-4 forecloses. The two verbs are allowed to disagree
+about a member id because they disagree about what publishing it would mean.
 
-`action/dao.go:334-339` is the resolve transaction's only write to the action
-document, and it sets `status`, `outcome`, and `resolvedAt` — not `reasonCode`.
-`ResolveOne` is the only applier. `Action.ReasonCode` is `omitempty`, so
-`GET /v1/actions` serves the key **absent, always**. The five-way fizzle copy
-this change specifies would therefore render its unrecognized-code fallback for
-every fizzle, and task 9.2's orphan audit would still pass — the field has a
-named consumer, it just has no producer.
+### Decision 18 — `reasonCode`'s persistence is specified as a requirement, not left as an accident of landing order
+
+`action/dao.go:335-339` **was** the resolve transaction's only write to the
+action document, and it set `status`, `outcome`, and `resolvedAt` — not
+`reasonCode` — **until `add-stationkeep-hold-verb` landed the fix**, concurrently
+with this change's drafting. `ResolveOne` was the only applier. Before that fix,
+`Action.ReasonCode` being `omitempty` meant `GET /v1/actions` served the key
+**absent, always**: this change's five-way fizzle copy would have rendered its
+unrecognized-code fallback for every fizzle, and task 9.2's orphan audit would
+still have passed — the field had a named consumer, it just had no producer.
 
 Two things hid this, and both are recorded so they are not rediscovered:
-`action/model.go:203-206` documents `ResolveResult.ReasonCode` as "the
+`action/model.go:203-206` documented `ResolveResult.ReasonCode` as "the
 structured classifier **mirrored onto `Action.ReasonCode` at the same status
-flip**", which the code does not do — the same failure shape as `encodeCursor`'s
-"opaque wire shape" comment; and `fleet/scan_resolver_test.go:280,371` assert
-`res.ReasonCode != ""` on the resolver's **return value**, never on the stored
-action, so the suite is green while the field is dropped.
+flip**", which the code did not do at the time — the same failure shape as
+`encodeCursor`'s "opaque wire shape" comment; and `fleet/scan_resolver_test.go:
+280,371` assert `res.ReasonCode != ""` on the resolver's **return value**,
+never on the stored action, so the suite stayed green while the field was
+dropped.
 
-This is also a **live requirement violation**, not merely a gap in this change:
-`openspec/specs/focused-scan/spec.md:237-241` and `:264-266` already require
+It was also a **live requirement violation**, not merely a gap in this change:
+`openspec/specs/focused-scan/spec.md:237-241` and `:264-266` already required
 that the resolved action carry a reason code.
 
-**Decision.** Add `reasonCode` to the existing `tx.Update` and mirror it onto
-the returned in-memory action, specified as an `action-dispatch` MODIFIED
-delta on *Exactly-Once Resolution*, and assert it by **reading the action back
-from the store** — never from the `ResolveResult`, which is precisely the
-assertion that already passes. Writing an empty string for verbs that set no
-code is harmless; `omitempty` keeps it off the wire.
+**Decision.** Specify the persistence as an `action-dispatch` MODIFIED delta on
+*Exactly-Once Resolution* regardless of which change lands the write first —
+this change depends on the persistence as a requirement, not as a fact it
+happens to have inherited — and assert it by **reading the action back from
+the store**, never from the `ResolveResult`, which is precisely the assertion
+that already passed while the field was silently dropped. Tasks 3.10 and 3.11
+are now **verify-only**: confirm the persisted write and the corrected comment
+are present, and re-apply either only if it has regressed.
 
 ### Decision 19 — The settled inbox is ordered as well as bounded, and it needs an index
 
@@ -598,8 +620,8 @@ by reading the domain struct instead of the response struct.
 
 `system.Feature` does carry `Name` (`system/model.go:135`,
 `json:"name,omitempty"`). But the interior response serializes `fogFeatureDTO`
-(`backend/system/fog.go:28-56`), which has **no name field at all**, and
-`projectUnfogged` (`:78-89`) copies none. Neither `build-production-space-view`'s
+(`backend/system/fog.go:25-46`), which has **no name field at all**, and
+`projectUnfogged` (`:105-115`) copies none. Neither `build-production-space-view`'s
 `system-interior` delta nor `serve-orbital-elements-and-burn-preview` mentions
 `name` among the response's enumerated fields. There is no alternative source
 either: `stations/model.go` serves no name, and `fleetDTO`
@@ -642,9 +664,10 @@ the change's own tasks and type diff, and 9.2a to verify each field against the
 
 ## Risks / Trade-offs
 
-- **The fizzle is the common case for a naive player.** Five reason codes exist
-  (`outOfRange`, `occluded`, `leftSystem`, `laneTransit`, `hostUnresolved`) and
-  three of them fire when the player did something reasonable — the scanner
+- **The fizzle is the common case for a naive player.** Six reason codes exist
+  (`outOfRange`, `occluded`, `leftSystem`, `laneTransit`, `hostUnresolved`, and
+  the racing-resolver `alreadySettled`) and three of them fire when the player
+  did something reasonable — the scanner
   drifted, the host orbited behind the star. Mapping each to distinct copy is
   mandatory in the spec for that reason: a fizzle mints nothing and is otherwise
   indistinguishable from a sweep that never ran.
@@ -752,3 +775,27 @@ be answered by inventing a value.
    Query Param* to require ordering **and** a bound on the `done` path. A bare
    bound was not merely under-specified but wrong — an arbitrary subset of an
    unordered query. Nothing here remains open.
+10. **Should a commit rejection carry a structured `reasonCode` instead of the
+    client keying on the server's error string?** Round 4's adversary review
+    (finding A3) noted that this client's rejection copy — like
+    `docked-fleet-actions`' before it — keys on the served `{"error": "..."}`
+    prose through `commandErrorReason` and a needle-matched copy map, so a
+    server-side wording change silently degrades a mapped rejection to the
+    generic fallback with no test on either side failing. That is the shape
+    this codebase already ships elsewhere and is out of scope for this change
+    to redesign; it is recorded here as a candidate for a future
+    `reasonCode`-on-rejection change, not decided or invented by this one.
+11. **Should a second corporation's fleet ever be staged into a fresh
+    corporation's home system, so a Playwright journey can reach a
+    target-naming sighting (a ghost) without relying on the self-sweep fixture
+    task 10.2b seeds directly?** Round 4's adversary review (the Playwright
+    mandate finding) observed that a single corporation's only route to a
+    ghost, before this change closes the self-sighting defect (M3), was that
+    defect itself — and after it closes, a single-corporation journey can
+    reach a clean-sweep record but never a target-naming one, because spawn
+    separation guarantees no second corporation shares a system. Task 10.2b
+    seeds a target-naming record directly into the test corporation's pile
+    through the Firestore emulator rather than staging a second corporation's
+    fleet (a second signup plus a multi-lane transit — expensive). Whether a
+    genuine two-corporation ghost journey is wanted as a later Playwright
+    addition is Travis's call, not decided or invented here.

@@ -52,6 +52,16 @@ clothes.*
   so the commit is now rejected identically to an unresolvable host, and the
   scanner is absent from its own served target list. Both halves are needed:
   the list's contract is that a served entry is one a commit would accept.
+- **ADD to `focused-scan`**: a resolving sweep never files a sighting of its
+  own scanner, **whatever host it swept**. A fleet docked at a body it then
+  sweeps is masked beneath that host along with everything else, and
+  `chainBeneath` mints without an owner filter — so today's shipped resolver
+  files a sighting naming the scanner, at its own position, with its own
+  composition: a claim about a fleet whose every field its owner already
+  reads in full, drawn in that owner's own scene as a ghost of itself. This
+  closes that live defect: the scanner is excluded from the minted set, and a
+  sweep whose only masked ship was the scanner mints a single clean-sweep
+  record instead.
 - **MODIFY `sighting-records`**: a sighting's document identifier stops being
   `{actionId}_{targetId}` and becomes an opaque deterministic identifier from
   which the target's id cannot be recovered, and that identifier is served as
@@ -85,7 +95,7 @@ clothes.*
   `POST /v1/actions/:actionId/cancel` requires — the self-scheduled refetch
   that settles a due sweep for **any** of the corporation's own fleets in the
   open system and then reads the inbox and the pile in that order, the settled
-  sweep's outcome in player copy including all five served fizzle reason codes,
+  sweep's outcome in player copy including all six served fizzle reason codes,
   sighting **ghosts drawn at their frozen position**, the rules that a ghost is
   never suppressed by or linked to a live contact, is never a member of the
   view's selection (so clicking one cannot silently arm a burn), and is omitted
@@ -104,29 +114,36 @@ clothes.*
 - **MODIFY `action-dispatch`** (two requirements, both closing live defects
   this change's own requirements now depend on):
   - *Exactly-Once Resolution* SHALL record the resolver's **reason code**
-    alongside its outcome and resolve timestamp. **It does not today**:
-    `ResolveOne`'s single `tx.Update` writes `status`, `outcome`, and
-    `resolvedAt` and nothing else, so `Action.ReasonCode` — `omitempty` — is
-    served absent, always. `openspec/specs/focused-scan/spec.md` already
-    requires that "the resolved action carries a reason code identifying
-    whether the failure was range or occlusion", so **shipped code violates a
-    live requirement**, and without the fix this change's five-way fizzle copy
-    map renders its unrecognized-code fallback for every fizzle while the
-    orphan audit still passes. Two things kept this hidden:
-    `action/model.go:203-206` documents the field as "mirrored onto
-    `Action.ReasonCode` at the same status flip", which is false, and
+    alongside its outcome and resolve timestamp. **It was not persisted until
+    `add-stationkeep-hold-verb` landed it**, concurrently with this change's
+    drafting: `ResolveOne`'s single `tx.Update` used to write `status`,
+    `outcome`, and `resolvedAt` and nothing else, so `Action.ReasonCode` —
+    `omitempty` — was served absent, always. `openspec/specs/focused-scan/
+    spec.md` already required that "the resolved action carries a reason code
+    identifying whether the failure was range or occlusion", so **shipped code
+    violated a live requirement**, and without the fix this change's five-way
+    fizzle copy map would have rendered its unrecognized-code fallback for
+    every fizzle while the orphan audit still passed. Two things kept this
+    hidden: `action/model.go:203-206` documented the field as "mirrored onto
+    `Action.ReasonCode` at the same status flip", which was false, and
     `fleet/scan_resolver_test.go:280,371` assert on the resolver's **return
-    value** rather than the stored action.
+    value** rather than the stored action. This delta makes the persistence a
+    requirement rather than an accident of landing order.
   - *Inbox by Actor Query Param* SHALL serve a `done`-filtered read **ordered by
-    resolve timestamp and bounded**. `action.Dao.List` applies no ordering and
-    no limit, and a bare limit over an unordered query returns an arbitrary
-    subset — the settled-sweep report would fold "greatest `resolvedAt`" over
-    that subset and could report a stale sweep, or none, while the newest stays
+    resolve timestamp and bounded**, and SHALL accept an optional `type` filter
+    that composes with `status` — the settled-sweep report reads
+    `type=scan&status=done` so a fleet's mines, burns, jumps, holds, and
+    releases cannot displace its unacknowledged scan off a type-agnostic
+    bounded page. `action.Dao.List` applies no ordering and no limit, and a
+    bare limit over an unordered query returns an arbitrary subset — the
+    settled-sweep report would fold "greatest `resolvedAt`" over that subset
+    and could report a stale sweep, or none, while the newest stays
     unacknowledged and a dismissal acknowledges the wrong action. This answers
     the change's own OQ-9, which asked whether the bound wanted a delta rather
-    than a bare task. The ordering applies only on the `done` path:
-    `resolvedAt` is `omitempty` and absent on a running action's document, so an
-    unconditional order would drop every running action.
+    than a bare task. The ordering and bound apply on the `done` path whether or
+    not `type` is also given: `resolvedAt` is `omitempty` and absent on a
+    running action's document, so an unconditional order would drop every
+    running action.
 
 No capability is retired by this change, so it needs no post-archive
 hand-delete.
@@ -138,19 +155,29 @@ hand-delete.
   before this change), `sighting-log` (new), `action-dispatch`.
 - Affected code: `backend/sightings/` (mint doc-id derivation, wire `id`, the
   `systemId` filter on the pile read), `backend/action/` (persisting
-  `reasonCode` in `ResolveOne`'s resolve transaction; ordering and bounding
-  `Dao.List`'s `done` path), `infra/terraform/firestore-indexes.tf` (**two**
-  composite indexes — `(systemId asc, asOf desc, __name__ desc)` on
-  `sightings` and `(actor asc, status asc, resolvedAt desc)` on `actions`;
-  **Travis must `terraform apply`**, and note the emulator auto-indexes so the
-  tests pass without either and only production fails),
+  `reasonCode` in `ResolveOne`'s resolve transaction; ordering, bounding, and
+  the `type` filter on `Dao.List`'s `done` path), `infra/terraform/
+  firestore-indexes.tf` (**three** composite indexes — `(systemId asc, asOf
+  desc, __name__ desc)` on `sightings`, `(actor asc, status asc, resolvedAt
+  desc)` on `actions`, and `(actor asc, type asc, status asc, resolvedAt
+  desc)` on `actions`; **Travis must `terraform apply`** all three in one
+  apply, and note the emulator auto-indexes so the tests pass without any of
+  them and only production fails),
   `backend/fleet/` (the scan-target read, its handler, the self-sweep
-  rejection, and the belt-member rejection),
+  rejection, the belt-member rejection, and the resolver change that excludes
+  the scanner from a sweep's own minted records),
+  `backend/disclosure/` (`sighting.go`'s self-scanner exclusion),
   `frontend/lib/services/` (fleet `scan`, `scanTargets`; a new sighting
   service; the action inbox's done-status read and acknowledge),
   `frontend/lib/query-keys.ts`, `frontend/hooks/` (`useRunningScan`'s first
   consumer, a settled-sweep hook, a sightings hook),
   `frontend/components/space/` (the scan control, the ghost layer, the log),
   `frontend/e2e/`.
+- This change also **mounts** a control onto `docked-fleet-actions`'s fleet
+  panel (the scan control's host, per *The Scan Surface Remains Usable While
+  the Canvas Is Unavailable*) without carrying any `docked-fleet-actions`
+  delta: the panel's own requirements are unchanged, and the mount is a
+  placement decision recorded in `system-space-view`'s own requirement text,
+  not a behavior this change adds to that capability.
 - Sequencing: archives after `build-production-space-view` and before
   `delete-the-lattice`.

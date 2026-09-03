@@ -81,6 +81,17 @@
 - [ ] 1.14 Verify every test written in section 1 is red **for the right reason**
       in a scratch copy with the missing symbols stubbed, not merely red because
       a symbol does not compile
+- [ ] 1.15 Write the failing Go test for the self-scanner exclusion: a fleet
+      docked at a belt with no other ship attached beneath it commits a
+      focused scan against that belt; after the sweep resolves, **read the
+      pile back** and assert no minted record names the scanning fleet as its
+      target and that exactly one clean-sweep record was minted for that host.
+      This is currently GREEN-WRONG: `chainBeneath` walks attachments with no
+      owner filter, so the scanner — masked beneath the host it swept — mints
+      a sighting of itself (`focused-scan` — *A Sweep Never Files a Claim
+      Against Its Own Scanner*). Write a second case with one other ship
+      beneath the same host: exactly one record is minted, naming that ship
+      and not the scanner, and **no** clean-sweep record accompanies it
 
 ## 2. Backend — the sighting record's identity and the pile read
 
@@ -173,29 +184,36 @@
       so a foreign or nonexistent fleet answers `404` with an empty body
 - [ ] 3.7 Serve the target set and **no world time**: no client requirement
       measures anything against a scan-target read's world time — the running
-      sweep's countdown measures against the action inbox's own served world
-      time — so serving one here would be this chain's signature defect
-      committed inside the change whose goal is a named consumer for every
-      field added
+      sweep's countdown measures against the view's own scale-correct
+      projected world time, the inbox supplying only the ETA and the
+      committed time — so serving one here would be this chain's signature
+      defect committed inside the change whose goal is a named consumer for
+      every field added
 - [ ] 3.8 Order **and** bound the settled-action inbox read the outcome report
       consumes: add `OrderBy("resolvedAt", Desc)` plus a named limit to
-      `action.Dao.List`'s `done`-status path, so
-      `GET /v1/actions?actor=&status=done` serves the most recently settled
-      actions rather than every action that fleet ever completed. A bare limit
-      is **not** sufficient and is worse than none: the query today is
-      `Where("actor","==")` plus an optional status with no `OrderBy`, so a
-      limit over an unordered query returns an **arbitrary subset** — the
-      report would fold "greatest `resolvedAt`" over that subset and could show
-      a stale sweep, or none, while the newest stays unacknowledged forever and
-      a dismissal acknowledges the wrong action. Both ordering scenarios still
-      pass under a bare limit, because a two-action fixture is under any bound
+      `action.Dao.List`'s `done`-status path, and accept an optional `type`
+      equality filter that composes with `status` (`type=scan&status=done` is
+      the settled-sweep report's own read), so
+      `GET /v1/actions?actor=&status=done[&type=scan]` serves the most
+      recently settled actions — of that type when named — rather than every
+      action that fleet ever completed. A bare limit is **not** sufficient and
+      is worse than none: the query today is `Where("actor","==")` plus an
+      optional status with no `OrderBy`, so a limit over an unordered query
+      returns an **arbitrary subset** — the report would fold "greatest
+      `resolvedAt`" over that subset and could show a stale sweep, or none,
+      while the newest stays unacknowledged forever and a dismissal
+      acknowledges the wrong action. Both ordering scenarios still pass under
+      a bare limit, because a two-action fixture is under any bound
       (`action-dispatch` — *A settled-status read is bounded, and its bound
-      keeps the newest*)
-- [ ] 3.8a Apply the ordering **only on the `done` path**, and add the
-      composite index `(actor ASC, status ASC, resolvedAt DESC)` for the
-      `actions` collection to `infra/terraform/firestore-indexes.tf` — which
-      today carries only `(actor, status, eta ASC)` — and record that Travis
-      must `terraform apply`. Two traps: the emulator auto-indexes, so the
+      keeps the newest*, *A type-and-status filtered read composes both
+      filters, ordered and bounded*)
+- [ ] 3.8a Apply the ordering **only on the `done` path**, and add **both**
+      composite indexes it needs to `infra/terraform/firestore-indexes.tf` —
+      which today carries only `(actor, status, eta ASC)` —
+      `(actor ASC, status ASC, resolvedAt DESC)` for the status-only path and
+      `(actor ASC, type ASC, status ASC, resolvedAt DESC)` for the
+      `type`-and-status path, and record that Travis must `terraform apply`
+      both in the same apply. Two traps: the emulator auto-indexes, so the
       tests stay green and only production 500s (the same trap Decision 14
       already flags for the sightings index); and `resolvedAt` is
       `firestore:"...,omitempty"` and therefore **absent** on a running action's
@@ -230,13 +248,31 @@
       served assertion and mark this task done rather than reapplying it
       (`action-dispatch` — *A resolver's reason code is persisted on the action
       and served*)
-- [ ] 3.11 Correct `action/model.go:203-206`'s comment on
-      `ResolveResult.ReasonCode`, which documents the field as "the structured
-      classifier **mirrored onto `Action.ReasonCode` at the same status flip**"
-      — an assertion the code does not implement, and the reason this survived
-      review. Once 3.10 lands the comment becomes true; if 3.10 is ever
-      reverted the comment must go with it. Same failure shape as
-      `encodeCursor`'s "opaque wire shape" comment
+- [ ] 3.11 **Verify-only.** `add-stationkeep-hold-verb` landed 3.10's
+      persistence concurrently with this change's drafting, which made
+      `action/model.go:203-206`'s comment on `ResolveResult.ReasonCode` — "the
+      structured classifier **mirrored onto `Action.ReasonCode` at the same
+      status flip**" — true. Confirm the comment still matches the code; make
+      no edit if it does. Re-correct it only if 3.10's persistence has
+      regressed, in which case the comment must go with it (same failure shape
+      as `encodeCursor`'s "opaque wire shape" comment)
+- [ ] 3.12 Exclude the scanning fleet from the set of ships a resolving sweep
+      mints records for, in `disclosure.FocusedScan`/`sighting.go` or
+      `fleet/resolver.go` (whichever owns the chain-walk after 3.1's
+      extraction) — `chainBeneath` mints without an owner filter, so a fleet
+      masked beneath the very host it swept is minted a sighting of itself
+      today. If the scanner is the only ship the chain resolves beneath the
+      host, mint the single clean-sweep record instead of an empty result
+      (`focused-scan` — *A Sweep Never Files a Claim Against Its Own
+      Scanner*). Do NOT keep the current behaviour
+- [ ] 3.13 Give `fleet/resolver.go`'s "scan already settled" no-op path
+      (`f.Scan == nil`, ~lines 140-150) its own named reason code (e.g.
+      `alreadySettled`) rather than returning an outcome with no reason code
+      at all — the client's filed-vs-fizzled rule (*A Settled Sweep Reports
+      Its Outcome, Including Each Fizzle Reason, in Player Copy*) treats **any**
+      served reason code as a fizzle and its absence as filed records, so a
+      no-mint path with no code would misreport as having filed records over
+      an empty log. Persist and serve it through the same 3.10 write
 
 ## 4. Client plumbing
 
@@ -259,8 +295,8 @@
       omitting it for the corporation-wide log
 - [ ] 4.5 Add `fleetService.scan(fleetId, hostId)` and
       `fleetService.scanTargets(fleetId)`
-- [ ] 4.6 Add `actionService.listSettled(actorId)` over
-      `GET /v1/actions?actor=&status=done` and
+- [ ] 4.6 Add `actionService.listSettled(actorId, { type })` over
+      `GET /v1/actions?actor=&status=done&type=scan` and
       `actionService.acknowledge(actionId)` over
       `POST /v1/actions/:actionId/acknowledge`
 - [ ] 4.7 Add `queryKeys.sightings` (the corp pile, cursor-keyed pages, with the
@@ -296,7 +332,9 @@
       the served target set is not offered, and that no range or occlusion
       predicate is evaluated client-side
 - [ ] 5.3 Render the explicit "no host in range" state for an empty served set,
-      and a retriable error offering no targets for a failed target read
+      and a retriable error offering no targets for a failed target read, and
+      the transit/already-sweeping variants of the empty state, which state
+      that reason instead of "no host in range"
 - [ ] 5.4 Keep the scan control's target independent of the space view's
       body/gate/point selection — a burn's selection is not a sweep's target
 - [ ] 5.5 State the sweep's exposure on the control — detectable for the sweep's
@@ -315,16 +353,27 @@
       and refetch the target list in-flow, never as an application-error state
 - [ ] 5.10 Guard the commit control against double-submit **synchronously, within
       the submitting invocation**, not via a pending-state flip that lands on a
-      later render; release the guard when the request settles or fails
+      later render; release the guard when the request settles or fails.
+      **Adopt `frontend/hooks/use-submit-guard.ts`'s `useSubmitGuard` rather
+      than writing a second guard** — it is the ref-based, render-independent
+      shared guard 8a-2 shipped and sell/mine/refuel/burn/jump already consume;
+      a second implementation of this shape is exactly the duplication task 9.1
+      forbids for `useRunningScan`
 - [ ] 5.11 Test the guard with two activations inside one tick, with no awaited
       step and no render between them, and assert exactly one request left the
       client — the shape `use-refuel.test.tsx` failed to use
+- [ ] 5.12 Make the scan control keyboard-operable: the target list, the commit
+      control, the cancel affordance, the report's dismiss affordance, and the
+      log affordance each Tab-reachable, Enter/Space-activatable, with a visible
+      focus indicator (`system-space-view` — *A Settled Sweep and the Scan
+      Controls Are Reachable and Announced*)
 
 ## 6. The running sweep — countdown, cancel, settle, outcome
 
-- [ ] 6.1 Show the running sweep from `useRunningScan`, counting down from the
-      served world time to the action's ETA using the action's own committed time
-      and ETA; assert in test that no fleet-read field is consulted for the window
+- [ ] 6.1 Show the running sweep from `useRunningScan`, counting down to the
+      action's ETA against **the view's scale-correct projected world time**
+      (the inbox supplying only the ETA and committed time); assert in test
+      that no fleet-read field and no scale-1 assumption is used
 - [ ] 6.2 Withhold the commit control while a sweep is running
 - [ ] 6.3 Present a past-ETA running sweep as settling, never as a negative or
       growing countdown
@@ -337,9 +386,10 @@
       source), reusing the existing named ETA cushion — no new constant; assert
       that a non-acting fleet's sweep is scheduled too
 - [ ] 6.7 After the post-ETA interior refetch **has completed**, and only then,
-      refetch (a) the system-filtered sighting pile and (b) the **action inbox
-      for the fleet whose sweep was due**; assert the ordering in test, not just
-      that all three fire
+      refetch (a) the system-filtered sighting pile and (b) **both of that
+      fleet's action-inbox reads, the running-status and the settled-status
+      one**; assert the ordering in test, not just that all three fire, and
+      assert both inbox reads are re-issued
 - [ ] 6.8 Assert the inbox refetch specifically: without it a settled sweep
       reads as settling forever and no outcome report is ever produced, because
       the running window, the outcome, the `reasonCode`, and `acknowledgedAt`
@@ -350,14 +400,27 @@
       rules are unchanged
 - [ ] 6.10 Report the most recently settled, unacknowledged sweep — selected by
       the greatest served `resolvedAt`, ETA breaking a tie, never by the inbox's
-      arrival order, which carries no ordering guarantee — as records filed,
-      with an affordance that opens the sighting log
+      arrival order, which carries no ordering guarantee — folding the
+      **type-filtered** settled-inbox read (`type=scan&status=done`), never the
+      type-agnostic one, as records filed, with an affordance that opens the
+      sighting log
 - [ ] 6.11 Map each of the five served fizzle reason codes (`outOfRange`,
       `occluded`, `leftSystem`, `laneTransit`, `hostUnresolved`) to distinct
-      player copy, and an unrecognized code to "the sweep returned nothing";
-      never display the raw code or the action's raw outcome text
+      player copy, plus 3.13's `alreadySettled` code to its own copy (a racing
+      resolver already settled this sweep — distinct from the five, and never
+      folded into the generic fallback), and any other unrecognized code to
+      "the sweep returned nothing"; never display the raw code or the action's
+      raw outcome text
 - [ ] 6.12 Acknowledge the action when the report is dismissed, and assert that a
       subsequent refetch does not report the same settled sweep again
+- [ ] 6.13 Announce a landed settled sweep through a polite live region, naming
+      whether records were filed or the sweep returned nothing — the same
+      treatment 8a-2 gives a burn arrival, a jump arrival, and a mine completion
+- [ ] 6.14 Render the failed-inbox states: a failed running-status read shows
+      that the sweep's state could not be read, offers a retry, and withholds
+      the commit control; a failed settled-status read shows that the outcome
+      could not be read, offers a retry, and leaves the commit control offered
+      (*The Sweep Surface's Reads Fail Independently…*)
 
 ## 7. Ghosts in the scene
 
@@ -390,6 +453,9 @@
       and the log affordance invokable while the canvas region shows its
       unsupported or interrupted state; ghost marks are simply absent then, with
       no error attributed to them and no fallback rendering
+- [ ] 7.9 Render the ghost layer's failed-read state: a failed system-filtered
+      pile read states that this system's sightings could not be read and offers
+      a retry; assert an empty scene is never presented as "no sightings here"
 
 ## 8. The sighting log
 
@@ -483,22 +549,74 @@
 
 - [ ] 10.1 Turn every red test from section 1 green; add the client unit tests
       for sections 5–8 covering every scenario in the four spec deltas
-- [ ] 10.2 Playwright: the scan journey against the real stack — commit a sweep
-      from the space view, watch the countdown, let it settle, see the record
-      appear in the log and its ghost in the scene, with no navigation or reload
+- [ ] 10.2a Playwright: the scan journey against the real stack, ending in a
+      **clean-sweep** record — commit a sweep from the space view against the
+      served target with the largest `durationMs` (the served list is the
+      fixture; a freshly spawned fleet with an empty list is itself a product
+      finding, not a reason to skip), watch the countdown, let it settle, and
+      see the settled report and its log row, with no navigation or reload.
+      This leg draws no ghost: a fresh corporation's own fleet is the only
+      other ship in reach, and 3.12 excludes the scanner from its own sweep's
+      minted set, so the ordinary journey mints a clean sweep, not a
+      target-naming record (finding M3 closes the self-sighting behaviour a
+      single-corporation journey would otherwise have relied on for a ghost)
+- [ ] 10.2b Playwright: the ghost leg, using a **seeded fixture** rather than a
+      live sweep — a target-naming record cannot be produced by a single
+      corporation's own journey once 3.12 lands (M3), and staging a second
+      corporation's fleet into the same system is a second signup plus a
+      multi-lane transit (design.md Open Question 11 records this as deferred
+      for Travis). Seed a target-naming sighting document directly into the
+      test corporation's pile through the Firestore emulator, at the
+      digest-derived document path (2.1's derivation, for a fixed action id
+      and target id), naming a host in the open system. Assert: the ghost
+      renders in the scene at the record's stored position; its `asOf` label
+      is shown; selecting the log row highlights the ghost; and activating the
+      ghost highlights the log row — both directions of the row↔ghost match
+- [ ] 10.2c Add the Firestore-emulator fixture-seeding helper 10.2b depends on:
+      write a sighting document at the path 2.1's digest derivation produces
+      for a chosen `(actionId, targetId)` pair, with the record's other fields
+      set directly (position, velocity, hull count, hull types, `systemId`,
+      `asOf`), the swept **`hostId`** (a host in the open system, so the log
+      row's host column renders), and the clean-sweep marker explicitly
+      unset, so the record is target-naming — a declared test fixture, not a
+      route the product serves
 - [ ] 10.3 Playwright: double-click the scan commit control for real and assert
       exactly one sweep was committed — the leg `use-refuel.test.tsx`'s hand-held
       harness could not have caught
 - [ ] 10.4 Playwright: cancel a running sweep and confirm the target list returns
       and a new sweep can be committed immediately
-- [ ] 10.5 Playwright: a fizzling sweep (scanner drifts out of range before
-      pulse-reach) reports its own copy and files no record
+- [ ] 10.5 Playwright: a **lane-transit** fizzle, not a range or occlusion one
+      — the only fizzle a real-time browser gesture can arrange. A sweep's
+      pulse-reach is at most ~2.5 s after commit (`roundTripMs`'s ~4.9 s max
+      duration halved) and no player-path motion covers a meaningful fraction
+      of the 48-unit focused-scan range in that window, so `outOfRange` and
+      `occluded` are not arrangeable against the real stack and stay
+      unit-tested only (section 1). Arrange the lane-transit fizzle instead:
+      fly the fleet to a lane gate and dock (the journey already does this
+      leg); open the scan control and commit a sweep against the gate body the
+      fleet is attached to (always a served target — distance ≈ 0, in range,
+      never occluded); **immediately** commit the jump (it claims only the
+      movement channel, so both commands are live); let the sweep's ETA pass
+      while the fleet is in transit or has already arrived. Assert the report
+      shows `laneTransit` or `leftSystem` copy — accept either, since which
+      one fires depends on whether the sweep is folded before or after the
+      jump settles — that it is not the generic unmapped-reason fallback, and
+      that no record was filed (the log stays empty or unchanged)
 - [ ] 10.6 Playwright: the scan control and the log affordance remain usable with
       the canvas region in its unsupported state
-- [ ] 10.7 Playwright: close the space view with a sweep running, reopen it after
-      its ETA has passed, and confirm the sweep's record is in the log and its
-      ghost in the scene on first render — the mount-path ordering (8.8), not
-      the post-ETA one
+- [ ] 10.7 Playwright: close the space view with a sweep running, reopen it
+      after its ETA has passed, and confirm on **first render** — the
+      mount-path ordering (8.8), not the post-ETA one, and with no second read
+      and no reload — that the settled sweep's record is in the log and its
+      report is shown. The ordinary single-fleet sweep this journey commits
+      mints a **clean-sweep** record (3.12 excludes the scanner from its own
+      sweep's minted set), so no ghost is expected from this leg on its own.
+      Reusing 10.2c's seeded target-naming fixture (the same digest-derived
+      document this journey does not otherwise produce), assert that when
+      that fixture is present in the pile at reopen, its ghost is **also**
+      drawn on first render, on the same one-read mount ordering — proving the
+      ghost layer's mount-path ordering (8.8) without inventing a second
+      fixture
 - [ ] 10.8 Run `python3 .claude/skills/code-quality-checks/check.py` and clear
       every finding, including the data-testid and test-file-coverage validators
       for the new components

@@ -63,18 +63,24 @@ detect it.
   reason code is served for it
 
 ### Requirement: Inbox by Actor Query Param
-The system SHALL serve `GET /v1/actions?actor=<id>&status=<status>` listing
-an actor's actions, optionally filtered to one status, and
-`GET /v1/actions/:actionId` for a single action — every response including
-the current world time.
+The system SHALL serve `GET /v1/actions?actor=<id>&status=<status>&type=<type>`
+listing an actor's actions, optionally filtered to one status and,
+independently, to one action **type**, and `GET /v1/actions/:actionId` for a
+single action — every response including the current world time. The `type`
+filter is an equality match on the action's own type value and composes with
+the `status` filter rather than replacing it: a consumer that wants only its
+settled scans among a fleet's mines, burns, jumps, holds, and releases reads
+`type=scan&status=done`.
 
 A read filtered to the `done` status SHALL be **ordered by resolve timestamp,
-most recently settled first, and bounded to a named maximum**. An actor's
-settled actions accumulate for the life of the game and are never deleted, so
-an unordered, unbounded read grows without limit and — worse — any bound
-applied to an unordered read returns an **arbitrary subset**: a consumer
-asking for "the most recently settled action" would fold that subset and can
-report a stale one, or none, while the newest stays unread indefinitely.
+most recently settled first, and bounded to a named maximum**, whether or not
+a `type` filter is also applied. An actor's settled actions accumulate for the
+life of the game and are never deleted, so an unordered, unbounded read grows
+without limit and — worse — any bound applied to an unordered read returns an
+**arbitrary subset**: a consumer asking for "the most recently settled action"
+— or "the most recently settled action of one type" — would fold that subset
+and can report a stale one, or none, while the newest stays unread
+indefinitely.
 
 The ordering SHALL apply only where the resolve timestamp exists. A running
 action carries none, so a read not filtered to `done` SHALL NOT drop actions
@@ -107,3 +113,11 @@ for want of that field.
 - **WHEN** its inbox is read filtered to the `running` status
 - **THEN** that action is served, and no ordering on a field it does not carry
   omits it
+
+#### Scenario: A type-and-status filtered read composes both filters, ordered and bounded
+- **GIVEN** an actor with settled actions of more than one type, including
+  several settled scans
+- **WHEN** its inbox is read filtered to `type=scan&status=done`
+- **THEN** only that actor's settled scan actions are served, most recently
+  settled first, bounded to the same named maximum a type-agnostic settled
+  read applies
