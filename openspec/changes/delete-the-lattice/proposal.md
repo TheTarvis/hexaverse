@@ -62,7 +62,14 @@ three more preconditions of its own, each verified in section 1:
   `ErrStationRingOutOfRange`, and `FeatureOf`'s ring check — the tether
   `build-production-space-view`'s design deferred to this change *by name*
   (a station could still vanish from a system for a lattice reason with nothing
-  on the wire to hint at it).
+  on the wire to hint at it) — **and `Station.Orbit` itself**, which is
+  `system.Orbit`-typed and therefore cannot outlive it. **BREAKING** wire
+  change: that field is served, not merely stored — `GET
+  /v1/systems/:systemId/station` returns the station document as-is — so `orbit`
+  leaves the station read and the client's `Station` type together. No successor
+  field is added to that endpoint; the station's continuous position is already
+  served on the interior read as the station body's own element set, and is
+  re-derived, never persisted.
 - **Rename `common.GameTuning.BoardRadius`** to a name with no board in it, and
   delete `OrbitBasePeriod` / `OrbitPeriod` and `fleet.Params.BoardRadius`.
   `BoardRadius` is **not** pure deletion material: `SystemInterior.Extent =

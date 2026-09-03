@@ -597,9 +597,12 @@ instruction, and its drawn mark SHALL continue to show the selected state.
 #### Scenario: Commanding a burn toward a selected lane-gate body submits an order
 - **GIVEN** a lane-gate body is the current selection
 - **WHEN** the burn command is invoked
-- **THEN** a burn order is submitted naming that gate body's body id — the
-  same id that fleet's `attachedTo` reports once it arrives — exactly as
-  for a selected planet or belt
+- **THEN** a burn order is submitted naming the `id` the interior read
+  served for that gate body — the same id that fleet's `attachedTo` reports
+  once it arrives (`system-interior`'s *Lane-Gate Bodies Carry Their Body
+  Id*) — read from the response, never reconstructed on the client from a
+  destination system id and a naming convention, exactly as for a selected
+  planet or belt
 
 #### Scenario: Commanding a burn toward a selected point in space submits an order
 - **GIVEN** a point in empty space is the current selection

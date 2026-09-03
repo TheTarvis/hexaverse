@@ -495,11 +495,48 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       `extent`, `character`, `starClass`, `worldTime`, `scale`, `features`,
       `laneGates` and `contacts`; a feature body's `id`, `type`, `resources`,
       `effects`, `space`, `size` and `orbitElements`; and a lane-gate body's
-      `destSystemId`, `laneId`, `space`, `size` and `orbitElements`. (An
-      earlier draft also listed `ownerCorpId` as surviving; it is on the
+      `id` (added by 9.1b below), `destSystemId`, `laneId`, `space`, `size`
+      and `orbitElements`. (An earlier draft also listed `ownerCorpId` as surviving; it is on the
       `system.Feature` domain model, never on `fogFeatureDTO`, so there is
       nothing to preserve.) (`system-interior`: "Lattice-only fields are
       absent from the response")
+- [ ] 9.1b Add an `id` field (JSON key `id`) to `system.LaneGate` and populate
+      it from the body table's own `gateId(destSystemId)` — the SAME function
+      that names the gate body in that table, never a second concatenation at
+      the handler. This is the one ADDITION inside an otherwise subtractive
+      section: the gate body id is the string a burn order must name and the
+      string `fleet.AttachedTo` reports, and once `cell` is gone it is the
+      only identity a client has for a gate. Populate it where `laneId` is
+      populated — at construction in `LaneGates`, never in the degradable
+      `fillGateGeometry` pass — since like `laneId` it is a pure function of
+      known system ids with no missing-data case, so it must never
+      zero-value (`system-interior`: *Lane-Gate Bodies Carry Their Body Id*,
+      and MODIFIED *Lane-Gate Bodies Carry Their Lane Id*, whose `cell`
+      companion 9.1 removes)
+- [ ] 9.1c Pin the EQUALITY, not the presence: a test that burns a fleet to a
+      lane gate, settles the arrival, and asserts `fleet.AttachedTo` is
+      byte-equal to the `id` the interior read served for that same gate — a
+      test asserting only "an id is present" would pass against any string.
+      In the same pass, update
+      `system/interior_wire_lattice_removal_test.go`'s `LaneGate` key-set
+      assertion (it pins exactly `destSystemId`, `laneId`, `space`, `size`,
+      `orbitElements` today) to include `id` (`system-interior`: *Lane-Gate
+      Bodies Carry Their Body Id* > "The served gate body id is the id a
+      fleet attaches to", "Every lane-gate body carries a non-empty,
+      distinct id")
+- [ ] 9.1d The space view SHALL name the served `id` and add no client copy of
+      the server's gate-id naming convention: no `"gate-" + destSystemId`
+      concatenation and no `startsWith("gate-")` test may appear in
+      `frontend/app/systems/` or the new space-view components. Verified by
+      grepping the new surfaces for the literal `gate-` and finding nothing.
+      SCOPE NOTE: `GalaxyView.tsx:342`'s own `isGateBody` prefix test is NOT
+      retired here — the galaxy view issues no interior read, so the served
+      `id` is not reachable from it; its successor is `fleet-movement`'s
+      *Fleet Read Serves the Attached Gate's Lane Id* on the fleet's own read,
+      and swapping it is a separate change. The `frontend/components/board/`
+      copies die with 10.1 (`system-space-view`: *Burn Command Targets Any
+      Selected Body, Lane Gate, or Point Uniformly* > "Commanding a burn
+      toward a selected lane-gate body submits an order")
 - [ ] 9.2 Remove `projectUnfogged`'s population of the dropped fields and the
       `bandVisible` constant, and confirm `system.Feature`'s own lattice
       fields stay untouched — they are `delete-the-lattice`'s to remove, not

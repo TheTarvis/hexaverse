@@ -133,3 +133,100 @@ with them.
 - **THEN** the response carries no top-level lattice `radius`, no body
   carries `footprint`, `orbit`, a top-level `parentId`, `fixed`, `band`,
   `live`, or `asOf`, and no lane-gate body carries `cell`
+
+### Requirement: Lane-Gate Bodies Carry Their Body Id
+The system SHALL serve, for every lane-gate body in a materialized system's
+interior read, that gate body's own body id under the wire key `id` — the
+same key every other body in this response carries. That value SHALL be
+identical to the id the server reports in a fleet's `attachedTo` once that
+fleet arrives attached to that gate, and identical to the id a burn order
+must name to target that gate, so one served string is the gate's identity
+across the interior read, the burn command, and the fleet read. Like
+`destSystemId` and `laneId`, it SHALL be served regardless of the
+requester's charted knowledge.
+
+This id SHALL be served rather than left for a client to reconstruct. The
+server builds it by a naming convention — a fixed prefix joined to the
+destination system id — that `backend/system` does not export, and that is
+already mirrored independently by three backend packages (`backend/charts`,
+`backend/fleet`'s handler, and `backend/fleet`'s fuel estimator each hold
+their own copy of the prefix). A client copy would be a fourth, sitting on
+the far side of the wire where no Go test can reach it and pinned by no
+cross-stack fixture. A later change SHALL NOT withdraw this field in favour
+of a client-side reconstruction of that convention (design.md Decision 15).
+
+#### Scenario: The served gate body id is the id a fleet attaches to
+- **GIVEN** a lane-gate body served with an `id` in a system interior read
+- **WHEN** a fleet burns to that gate and arrives attached to it
+- **THEN** that fleet's own read reports an `attachedTo` string exactly
+  equal to the `id` served for that gate body — equality, not merely the
+  presence of some id on each side
+
+#### Scenario: A burn order naming the served gate body id targets that gate
+- **WHEN** a burn order names, as its target, the `id` a lane-gate body was
+  served with
+- **THEN** the server resolves it as that gate body and accepts the order,
+  requiring no separately-derived identifier from the client
+
+#### Scenario: A fresh corporation with no charted lanes still receives the gate body id
+- **GIVEN** a corporation with no charted lanes
+- **WHEN** it reads a materialized system's interior
+- **THEN** every lane-gate body in the response carries its `id`, unfiltered
+  by the corporation's charted knowledge
+
+#### Scenario: Every lane-gate body carries a non-empty, distinct id
+- **WHEN** an authenticated requester reads a materialized system's interior
+  that has two or more lane gates
+- **THEN** every lane-gate body carries a non-empty `id`, and no two bodies
+  in that response share one
+
+## MODIFIED Requirements
+
+### Requirement: Lane-Gate Bodies Carry Their Lane Id
+The system SHALL serve, for every lane-gate body in a materialized
+system's interior read, the stable id of the lane it serves (wire field
+`laneId`), alongside — never replacing — that gate body's `destSystemId`
+and its body `id` (per *Lane-Gate Bodies Carry Their Body Id*), so a client
+can commit a jump (`POST /v1/fleets/:fleetId/jump {laneId}`) by passing this
+value straight through, with no second lookup and no client-side
+re-derivation of the id. This id SHALL be the same id the jump endpoint
+accepts, and SHALL match the id the server derives for the same crossing on
+either endpoint (`galaxy.LaneIdBetween`, order-independent over the
+unordered system-pair, is the single derivation both gate attachment and
+travel arrival already agree on). This field SHALL be served regardless of
+the requester's charted knowledge, exactly as the gate body itself is served
+regardless of charted knowledge under "Bodies Are Public; Ships Are
+Disclosed": a fresh corporation with no charted lanes still receives a
+usable `laneId` on every gate body it reads.
+
+The `cell` this requirement previously named as a companion field is
+withdrawn with the rest of the polar lattice (see *Interior Read Serves
+Continuous Bodies*, which mandates that a lane-gate body carry no `cell`).
+A gate body's position is now its continuous `space`, and its identity is
+its `id`.
+
+#### Scenario: A materialized system's read carries each lane-gate body's lane id
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** every lane-gate body in the response carries a **non-empty**
+  `laneId` field alongside its `destSystemId` and its body `id`
+
+#### Scenario: The served lane id is the one the jump endpoint accepts
+- **GIVEN** a lane-gate body's `laneId` from a system interior read
+- **WHEN** that value is passed as `POST /v1/fleets/:fleetId/jump`'s
+  `laneId` for a fleet attached to that gate
+- **THEN** the server accepts it as naming that lane, with no additional
+  lookup required of the client
+
+#### Scenario: The served lane id matches the server's own derivation for the same crossing
+- **GIVEN** a lane between two systems
+- **WHEN** its id is derived via `galaxy.LaneIdBetween` for the crossing
+  from either system's own gate-attachment or travel-arrival write
+- **THEN** the id served on the corresponding lane-gate body in either
+  system's interior read is identical to it
+
+#### Scenario: A fresh corporation with no charted lanes still receives a usable lane id
+- **GIVEN** a corporation with no charted lanes
+- **WHEN** it reads a materialized system's interior
+- **THEN** every lane-gate body in the response still carries its `laneId`,
+  unfiltered by the corporation's charted knowledge

@@ -126,6 +126,47 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
     setFleets([])
   })
 
+  // RED-PHASE ADDITION — openspec change `build-production-space-view`.
+  // `fleet-roster`'s *Active and Here Highlighting* is MODIFIED by that
+  // change (its wording retires the retired lattice view's "board"), and its
+  // two scenarios had NO test at all: the behaviour is implemented in
+  // `FleetRoster.tsx` (`data-active`, the "here" badge) and was never
+  // asserted. A MODIFIED requirement with unasserted scenarios is exactly
+  // the shape a copy edit can silently break.
+  describe('Active and Here Highlighting', () => {
+    // Scenario: The active fleet's row is marked
+    it('Scenario: The active fleet\'s row is marked', () => {
+      setFleets([fleet('f1', 'sys-0', parkState()), fleet('f2', 'sys-0', parkState())])
+      render(<FleetRoster worldTime={0} isChartedGate={() => false} activeFleetId="f2" />)
+      expect(screen.getByTestId('fleet-row-f2')).toHaveAttribute('data-active', 'true')
+      expect(
+        screen.getByTestId('fleet-row-f1'),
+        'exactly one row is the commanding one',
+      ).toHaveAttribute('data-active', 'false')
+      // ...and the distinction is visible, not attribute-only.
+      expect(screen.getByTestId('fleet-row-f2').className).not.toBe(
+        screen.getByTestId('fleet-row-f1').className,
+      )
+    })
+
+    // Scenario: A fleet in the currently open board is marked "here"
+    it('Scenario: A fleet in the currently open board is marked "here"', () => {
+      setFleets([fleet('here-1', 'sys-0', parkState()), fleet('away-1', 'sys-9', parkState())])
+      render(<FleetRoster worldTime={0} isChartedGate={() => false} currentSystemId="sys-0" />)
+      expect(screen.getByTestId('fleet-row-here-1')).toHaveTextContent(/here/i)
+      expect(
+        screen.getByTestId('fleet-row-away-1'),
+        'a fleet in another system is not "here"',
+      ).not.toHaveTextContent(/here/i)
+    })
+
+    it('SDET-added: with no system open, no row is marked "here"', () => {
+      setFleets([fleet('f1', 'sys-0', parkState())])
+      render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+      expect(screen.getByTestId('fleet-row-f1')).not.toHaveTextContent(/here/i)
+    })
+  })
+
   // Scenario: Burn is always available
   it('always offers burn, regardless of kinematic state', () => {
     const burning = fleet('f1', 'sys-0', burnState(90_000))

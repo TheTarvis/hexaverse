@@ -143,6 +143,40 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       a station omitted from an interior read for a lattice reason with nothing
       on the wire to hint at it (`trading-station`: REMOVED *A Station Orbit
       Outside the Live Board Radius Is Omitted, Never Panicked*)
+- [ ] 3.2b Delete `stations.Station.Orbit` — the `system.Orbit`-typed field at
+      `stations/model.go:35`, tagged `json:"orbit"` and `firestore:"orbit"`.
+      It is **served**, not merely stored: `GET /v1/systems/:systemId/station`
+      marshals the whole `Station` struct (`stations/handler.go`, `c.JSON(...,
+      st)`), so this is a WIRE removal, and `system.Orbit` is the lattice type
+      task 2.1 deletes — leaving the field would fail `backend` compilation.
+      Remove with it: the `Orbit: DeriveOrbit(...)` assignment at
+      `stations/service.go:114`, the `st.Orbit.Ring`/`st.Orbit.Dir` fields on
+      the provisioning log line at `service.go:131-132`, and every `st.Orbit`
+      read inside `FeatureOf` (covered by 3.2). **No successor field is added
+      to this endpoint.** The station's continuous orbit is
+      `system.StationContinuousOrbit`, derived at interior-splice time from
+      (galaxy seed, system id, skeleton) and never persisted on the station
+      document; it reaches a client on the interior read alone, as the
+      station body's `space`/`size`/`orbitElements` — so a client needing the
+      station's position reads `GET /v1/systems/:systemId`, exactly as it does
+      for every other body. Verified by `grep -rn '\.Orbit\b'
+      backend/stations/` returning nothing and `cd backend && go build ./...`
+      clean (`trading-station`: REMOVED *Deterministic, Non-Core,
+      Off-Gate-Ring, Prograde, Orbiting Placement*, whose Migration already
+      names "the stored `orbit` field"; and REMOVED *A Station Orbit Outside
+      the Live Board Radius Is Omitted, Never Panicked*)
+- [ ] 3.2c Delete the CLIENT half of the same field, which no other sweep in
+      this change reaches: `frontend/lib/types/market.ts:67`'s
+      `orbit: { ring, angle0, period, dir }` on the `Station` interface (a
+      REQUIRED property, so leaving it makes every `Station` literal a lie),
+      and the `orbit:` line in `market-service.test.ts`'s `station` fixture.
+      Task 6.3's sweep grep (`ring\b.*slot\b`) does NOT match this shape —
+      the field names ring/angle0, never slot — which is why it is named here
+      rather than left to the sweep. Verified by `grep -rn 'angle0' frontend
+      --include='*.ts' --include='*.tsx' | grep -v node_modules` returning
+      nothing, and `cd frontend && npm run lint && npx vitest run` green.
+      No production frontend module reads `station.orbit` today, so this is a
+      type-and-fixture deletion with no rendering consequence
 - [ ] 3.3 Delete `stations.Service`'s `gateRing: common.Tuning().BoardRadius`
       fields and the `system.PeriodFor(orbit.Ring)` refill
 - [ ] 3.4 Delete `backend/stations/lattice_symbols_absent_test.go`,

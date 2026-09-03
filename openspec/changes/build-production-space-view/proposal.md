@@ -134,6 +134,16 @@ each other, or the scan surface being deferred out of the chain a second time.
   MODIFIED block because two of the old requirement's scenarios assert the
   removed fields survive, and `openspec archive` refuses a MODIFIED block that
   sheds a scenario the current spec carries (design.md Decision 10).
+- **ADDED `system-interior`'s *Lane-Gate Bodies Carry Their Body Id*: the
+  lane-gate DTO gains `id`.** The one addition inside an otherwise subtractive
+  wire edit. Once `cell` is gone the gate body has no identity on the wire,
+  yet the burn command must name exactly the id `fleet.attachedTo` reports —
+  a string built by an unexported server convention already hand-mirrored in
+  three backend packages. Serving it stops a fourth copy landing on the
+  client, where no Go test can reach it (design.md Decision 15). **MODIFIED
+  `system-interior`'s *Lane-Gate Bodies Carry Their Lane Id*** in the same
+  delta, because it names `cell` as `laneId`'s companion field and this
+  change deletes `cell`; the companion becomes `id`.
 - **MODIFIED `galaxy-view`'s *Jump Commit*** to cite `docked-fleet-actions`'s
   rejection-copy requirement instead of `board-view`'s. The citation sits
   inside a requirement body, so it is delta-reachable and is fixed now rather

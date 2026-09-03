@@ -679,6 +679,58 @@ as a separate change today. `maxFuelTons` rides `order`'s existing request
 type, and the served upkeep rate rides the existing fleet read type, so those
 two need type widening rather than new seams.
 
+### Decision 15: The lane-gate body's `id` is SERVED, not reconstructed on the client
+
+**Taken.** Section 9 removes `cell` from the lane-gate DTO, leaving it
+`destSystemId`, `laneId`, `space`, `size`, `orbitElements` — and no id. But
+*Burn Command Targets Any Selected Body, Lane Gate, or Point Uniformly*
+requires a burn toward a selected gate to submit **that gate body's body id**,
+the same string `fleet.AttachedTo` reports on arrival. With no `id` on the
+wire, the only way a client can produce it is to re-implement the server's
+naming convention: `"gate-" + destSystemId` (`backend/system/bodies.go`'s
+unexported `gateId`).
+
+The alternative — let the client concatenate — was rejected. That convention
+is already mirrored by hand in three backend packages, each with a comment
+admitting it is a mirror of a function `backend/system` does not export:
+
+- `backend/charts/service.go:102` — `const gateBodyPrefix = "gate-"`
+- `backend/fleet/handler.go:694` — `const gateBodyPrefix = "gate-"`
+- `backend/fleet/fuel.go:95` — `const gateBodyIdPrefix = "gate-"`
+
+plus two bare literals at `backend/fleet/service.go:1478` and
+`backend/fleet/resolver.go:341`. Every one of those is at least reachable by a
+Go compiler and a Go test. A client copy is not: it is on the far side of the
+wire, pinned by no entry in `fixtures/` and no cross-stack golden, and it
+would be the copy that drifts silently the day the convention changes. Two
+such copies already exist in the doomed `frontend/components/board/`
+(`SystemBoardView.tsx:197`) and one in the surviving
+`frontend/components/galaxy/GalaxyView.tsx:342`; adding a third to the new
+space view would carry the pattern across the migration rather than ending it
+with the lattice.
+
+Serving the id costs one string on a DTO that is losing five fields in the
+same edit, and it makes the burn requirement's equality claim
+(`interior.laneGates[i].id == fleet.attachedTo`) a property the wire itself
+states rather than one two independent derivations happen to agree on. Pinned
+as `system-interior`'s ADDED *Lane-Gate Bodies Carry Their Body Id*, whose
+scenario asserts that **equality** rather than mere presence — an id-is-present
+assertion passes against any string.
+
+**Scope note, so a later change does not "simplify" this back:** the field is
+served *because* the convention is unexported and unpinned. If a future change
+exports and fixture-pins the naming convention, that is a different world; in
+this one, the id is data, not a formula.
+
+**Also fixed here, because this change is what breaks it:** the live
+requirement *Lane-Gate Bodies Carry Their Lane Id* says `laneId` is served
+"alongside — never replacing — that gate body's existing `destSystemId` and
+`cell` fields", and one of its scenarios asserts that companionship. Section 9
+deletes `cell`. Left alone, this change archives a spec that mandates a field
+its own sibling requirement forbids. The delta therefore carries a MODIFIED
+block for that requirement — repointing the companion from `cell` to `id`,
+with all four of its live scenario headings reproduced verbatim.
+
 ## Inherited rulings, recorded for continuity
 
 These are not decisions taken by this change. They were ruled upstream

@@ -227,9 +227,18 @@ matches its system's dominant convention"). The off-the-gate-ring clause has
 no continuous successor because it has no continuous meaning: a lane gate is
 an ordinary body at a derived bearing, not a ring, so there is no ring for a
 station to collide with.
-**Migration**: None. `stations.DeriveOrbit`, `system.Orbit` and the stored
-`orbit` field are deleted outright; no interior or station document is
-rewritten and no compatibility path is kept (solo toy, no live users). The
+**Migration**: None. `stations.DeriveOrbit`, `system.Orbit`, and the station
+document's `orbit` field are deleted outright; no interior or station document
+is rewritten and no compatibility path is kept (solo toy, no live users). That
+`orbit` field is **served as well as stored** — `GET /v1/systems/:systemId/
+station` returns the station document as-is — so its deletion is a wire
+removal, and it takes the client's mirror of the same shape with it. No
+successor field is added to that endpoint: the station's continuous position
+reaches a client on the interior read, as the station body's continuous
+element set (`system-interior`'s "Interior Read Serves Continuous Bodies"),
+which is where every other body's position is already read from. The
+continuous orbit itself is never persisted at all — it is re-derived per read
+per "A Station's Continuous Orbit Is Derived, Never Rolled". The
 open defect `docs/defects/2026-08-26-station-on-gate-ring.md` — a station
 derivable onto the real lane-gate ring — is dissolved rather than fixed, and
 this change closes it as such.
