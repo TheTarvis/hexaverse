@@ -1,11 +1,15 @@
 # System Interior Specification
 
 ## Purpose
-Materializes and serves a single star system's tactical polar board: the
-detail layer (belts, moons, hazards, anomalies, resource richness) that
+Materializes and serves a single star system's interior in continuous space:
+the detail layer (belts, moons, hazards, anomalies, resource richness) that
 extends the free galaxy-tier skeleton (`galaxy-generation`) into a full
-per-system interior, generated lazily on first read and then persisted, fog
-of war applied per requester.
+per-system body table — every body's continuous position, size, and orbital
+elements, plus the system's own extent and its lane-gate bodies — generated
+lazily on first read and then persisted. There is no lattice on this wire: no
+ring, no slot, no cell, no footprint. Foreign presence in the served read is
+disclosed per requester by `proximity-disclosure`, which owns that decision
+entirely.
 ## Requirements
 ### Requirement: Lazy, Deterministic Interior Generation
 The system SHALL generate a system's interior deterministically from the
@@ -881,136 +885,6 @@ requirement demands of a host.
   nothing were masked at it — the ship's masked state is a fact about the
   ship, never about the body hosting it
 
-### Requirement: Interior Read Endpoint
-The system SHALL serve `GET /v1/systems/:systemId`, returning the system's
-radius, character, star class, current world time, every body (including
-each lane-gate body, unfiltered by any charted-knowledge gate — see "Bodies
-Are Public; Ships Are Disclosed"), and a `contacts` array reflecting the
-requester's own live disclosure of foreign ship presence in that system
-(see "Foreign Presence Is Served As System Contacts"). Every field already
-served before this change — a body's lattice footprint, its lattice `orbit`
-object (`ring`/`angle0`/`period`/`dir`), its `parentId`, its `fixed` flag,
-its `band` value (always `"visible"`), its `live` value (always `true`), its
-`asOf` stamp, and a lane-gate body's lattice `cell` — SHALL continue to be
-served unchanged, with unchanged meaning: this response is additive over its
-prior shape, not a replacement of it, never removing a field a caller already
-reads and never redefining one.
-
-Every non-star body, and every lane-gate body, SHALL additionally carry its
-continuous orbital element set under the wire key `orbitElements`, an object
-carrying `parentId`, `radius`, `periodMs`, `phase`, `inclination`, and `node`
-— the same element set "Interiors Emit Continuous Orbital Elements For Every
-Body" already generates and persists for a feature body, and the same one the
-system's body table already derives for a lane-gate body, each now serialized
-rather than held server-side only, so a client can evaluate that body's
-position at any world time from the served elements alone without a further
-read per rendered frame.
-
-The element set SHALL be served under the key `orbitElements` and SHALL NOT
-be served under the key `orbit`: `orbit` is already occupied on this response
-by the lattice orbit, a different object with different fields and a different
-meaning, and this response's separate `space` key is already occupied by the
-body's resolved continuous position. Serving the element set under either name
-would redefine a field a caller already reads.
-
-This response SHALL additionally carry the simulation clock's **scale** — the
-number of world-milliseconds the world advances per wall-clock millisecond —
-alongside the `worldTime` it already serves, so a client extrapolating live
-world time between reads projects at the world's real rate rather than at an
-assumed one. The scale SHALL be the scale of the same clock the response's
-`worldTime` was read from.
-
-This response SHALL additionally carry the interior's continuous **`extent`**
-— the star-frame upper bound over every generated body's orbital radius,
-already generated and persisted on the interior document ("Interiors Emit
-Continuous Orbital Elements For Every Body") and already resolved on the
-system's body table, serialized here rather than held server-side only. One
-float, purely additive. It is served because a client that must scale a
-camera, clamp a pan bound, or bound a pick radius to this system otherwise
-has exactly one system-sized number on this wire — the **lattice** `radius`
-— and would scale continuous space off a lattice-derived field. The
-`extent` is the continuous quantity that survives the lattice's removal;
-the `radius` is not. Serving it is what makes a consumer's later
-independence from `radius` a pure deletion rather than a re-derivation.
-
-The star SHALL carry no `orbitElements` (it is parentless and positioned at
-the origin). Every other body reaching this response carries a complete
-element set by construction — a body whose stored element set is missing or
-undecodable is omitted from the response entirely rather than served
-partially (see "Interior Feature Decode Validates Its Orbital Element Set,
-Omitting Rather Than Failing", "A Feature Omission Cascades to a Fixpoint
-Through the Parent Chain", and "A Spliced Body Is Complete or Omitted, and
-Its Incompleteness Is Loud") — so there is no partially-populated
-`orbitElements` case on this wire.
-
-#### Scenario: Unknown or ungenerated system
-- **WHEN** `GET /v1/systems/:systemId` is called for a system id absent
-  from the live galaxy
-- **THEN** the response is `404 Not Found`
-
-#### Scenario: No live galaxy
-- **WHEN** `GET /v1/systems/:systemId` is called and no galaxy has been
-  generated
-- **THEN** the response is `404 Not Found`
-
-#### Scenario: A materialized system's read carries every body's continuous position and size
-- **WHEN** an authenticated requester reads a materialized system's
-  interior
-- **THEN** every body in the response, including each lane-gate body,
-  carries a continuous position and a size, alongside its pre-existing
-  lattice placement (a feature body's `footprint`, a lane-gate body's
-  `cell`)
-
-#### Scenario: Pre-existing wire fields are unchanged
-- **WHEN** an authenticated requester reads a materialized system's
-  interior
-- **THEN** every feature body's `band` value is `"visible"`, its `live`
-  value is `true`, and its lattice footprint is still present, and every
-  lane-gate body still carries its lattice `cell` — exactly as before this
-  change
-
-#### Scenario: A non-star body's read carries its full orbital element set
-- **WHEN** an authenticated requester reads a materialized system's
-  interior
-- **THEN** every non-star feature body in the response carries an
-  `orbitElements` object with `parentId`, `radius`, `periodMs`, `phase`,
-  `inclination`, and `node`, each equal to the value that body's stored
-  element set holds
-
-#### Scenario: A lane-gate body's read carries its full orbital element set
-- **WHEN** an authenticated requester reads a materialized system's
-  interior
-- **THEN** every lane-gate body in the response carries an `orbitElements`
-  object with the same six fields, equal to the element set the system's
-  body table derived for that gate
-
-#### Scenario: The star carries no orbital element set
-- **WHEN** an authenticated requester reads a materialized system's
-  interior
-- **THEN** the star's response entry carries no `orbitElements` key
-
-#### Scenario: The read carries the interior's continuous extent
-- **WHEN** an authenticated requester reads a materialized system's
-  interior
-- **THEN** the response carries a continuous `extent` equal to the value
-  that interior's stored document holds, alongside — and distinct from —
-  the lattice `radius` it already serves
-
-#### Scenario: The read carries the world clock's scale alongside its world time
-- **WHEN** an authenticated requester reads a materialized system's
-  interior on a world whose simulation clock runs at a scale other than 1
-- **THEN** the response carries that clock's scale alongside its
-  `worldTime`, so a client can project live world time at the world's own
-  rate
-
-#### Scenario: A body served without a resolvable continuous position is still element-complete
-- **WHEN** a body's continuous position could not be resolved for this read
-  (no body table was available) and it is therefore served with a
-  zero-valued `space` position
-- **THEN** its `orbitElements` object is still served in full from its
-  stored element set, since the elements are stored data and not a
-  resolution result
-
 ### Requirement: Foreign Presence Is Served As System Contacts
 The system SHALL, on the interior read, compute the requester
 corporation's live disclosure of foreign ship presence in that system as
@@ -1063,25 +937,31 @@ NOT drop it.
 ### Requirement: Lane-Gate Bodies Carry Their Lane Id
 The system SHALL serve, for every lane-gate body in a materialized
 system's interior read, the stable id of the lane it serves (wire field
-`laneId`), alongside — never replacing — that gate body's existing
-`destSystemId` and `cell` fields, so a client can commit a jump
-(`POST /v1/fleets/:fleetId/jump {laneId}`) by passing this value straight
-through, with no second lookup and no client-side re-derivation of the id.
-This id SHALL be the same id the jump endpoint accepts, and SHALL match
-the id the server derives for the same crossing on either endpoint
-(`galaxy.LaneIdBetween`, order-independent over the unordered system-pair,
-is the single derivation both gate attachment and travel arrival already
-agree on). This field SHALL be served regardless of the requester's
-charted knowledge, exactly as the gate body itself is served regardless of
-charted knowledge under "Bodies Are Public; Ships Are Disclosed": a fresh
-corporation with no charted lanes still receives a usable `laneId` on
-every gate body it reads.
+`laneId`), alongside — never replacing — that gate body's `destSystemId`
+and its body `id` (per *Lane-Gate Bodies Carry Their Body Id*), so a client
+can commit a jump (`POST /v1/fleets/:fleetId/jump {laneId}`) by passing this
+value straight through, with no second lookup and no client-side
+re-derivation of the id. This id SHALL be the same id the jump endpoint
+accepts, and SHALL match the id the server derives for the same crossing on
+either endpoint (`galaxy.LaneIdBetween`, order-independent over the
+unordered system-pair, is the single derivation both gate attachment and
+travel arrival already agree on). This field SHALL be served regardless of
+the requester's charted knowledge, exactly as the gate body itself is served
+regardless of charted knowledge under "Bodies Are Public; Ships Are
+Disclosed": a fresh corporation with no charted lanes still receives a
+usable `laneId` on every gate body it reads.
+
+The `cell` this requirement previously named as a companion field is
+withdrawn with the rest of the polar lattice (see *Interior Read Serves
+Continuous Bodies*, which mandates that a lane-gate body carry no `cell`).
+A gate body's position is now its continuous `space`, and its identity is
+its `id`.
 
 #### Scenario: A materialized system's read carries each lane-gate body's lane id
 - **WHEN** an authenticated requester reads a materialized system's
   interior
 - **THEN** every lane-gate body in the response carries a **non-empty**
-  `laneId` field alongside its `destSystemId` and `cell`
+  `laneId` field alongside its `destSystemId` and its body `id`
 
 #### Scenario: The served lane id is the one the jump endpoint accepts
 - **GIVEN** a lane-gate body's `laneId` from a system interior read
@@ -1156,6 +1036,169 @@ an accidental absence.
   (metals, volatiles, water, organics, research, exotic)
 - **THEN** all six are present and unchanged, since none of them collides
   with the reserved `fuel` name
+
+### Requirement: Interior Read Serves Continuous Bodies
+The system SHALL serve `GET /v1/systems/:systemId`, returning the system's
+continuous `extent` — the star-frame upper bound over every generated body's
+orbital radius — its character, star class, current world time, every body
+(including each lane-gate body, unfiltered by any charted-knowledge gate —
+see "Bodies Are Public; Ships Are Disclosed"), and a `contacts` array
+reflecting the requester's own live disclosure of foreign ship presence in
+that system (see "Foreign Presence Is Served As System Contacts"). The
+`extent` is this response's only system-sized scalar: it is what a client
+scales a camera, a pan bound, and a pick radius against, and it replaces the
+lattice `radius` this requirement's predecessor served.
+
+Every non-star body, and every lane-gate body, SHALL carry its continuous
+orbital element set under the wire key `orbitElements`, an object carrying
+`parentId`, `radius`, `periodMs`, `phase`, `inclination`, and `node`, so a
+client can evaluate that body's position at any world time from the served
+elements alone without a further read per rendered frame. The star SHALL
+carry no `orbitElements` (it is parentless and positioned at the origin).
+Every other body reaching this response carries a complete element set by
+construction — a body whose stored element set is missing or undecodable is
+omitted from the response entirely rather than served partially (see
+"Interior Feature Decode Validates Its Orbital Element Set, Omitting Rather
+Than Failing", "A Feature Omission Cascades to a Fixpoint Through the Parent
+Chain", and "A Spliced Body Is Complete or Omitted, and Its Incompleteness Is
+Loud") — so there is no partially-populated `orbitElements` case on this wire.
+
+This response SHALL carry the simulation clock's **scale** — the number of
+world-milliseconds the world advances per wall-clock millisecond — alongside
+the `worldTime` it serves, taken from the same clock, so a client
+extrapolating live world time between reads projects at the world's own rate
+rather than at an assumed rate of 1.
+
+This response SHALL NOT carry any polar-lattice placement field. Specifically,
+the response SHALL carry no top-level lattice `radius` (the continuous
+`extent` above is its successor, and the two are different quantities in
+different units — serving both would leave a consumer free to scale
+continuous space off the lattice one); a body SHALL carry no `footprint`, no
+`orbit` object (the lattice orbit `{ring, angle0, period, dir}`), no
+`parentId` at the top level of the body (the continuous parent is
+`orbitElements.parentId`), no `fixed` flag, no `band` value, no `live` value,
+and no `asOf` stamp; and a lane-gate body SHALL carry no `cell`. These fields
+described a position on the polar ring-and-slot board
+and a visibility banding that no longer exists — `band` has been constant
+`"visible"`, `live` constant `true`, and `asOf` constant absent since bodies
+became public — and this capability's continuous-space consumer reads none of
+them. Their removal is what allows `backend/board` and `backend/polar` to be
+deleted: while this response promised them, a caller could still be reading
+them.
+
+This is a deliberate removal of fields previously served, not an additive
+change; the additivity clause this requirement previously carried is withdrawn
+with them.
+
+#### Scenario: Unknown or ungenerated system
+- **WHEN** `GET /v1/systems/:systemId` is called for a system id absent
+  from the live galaxy
+- **THEN** the response is `404 Not Found`
+
+#### Scenario: No live galaxy
+- **WHEN** `GET /v1/systems/:systemId` is called and no galaxy has been
+  generated
+- **THEN** the response is `404 Not Found`
+
+#### Scenario: A materialized system's read carries every body's continuous position and size
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** every body in the response, including each lane-gate body,
+  carries a continuous position and a size
+
+#### Scenario: A non-star body's read carries its full orbital element set
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** every non-star feature body in the response carries an
+  `orbitElements` object with `parentId`, `radius`, `periodMs`, `phase`,
+  `inclination`, and `node`, each equal to the value that body's stored
+  element set holds
+
+#### Scenario: A lane-gate body's read carries its full orbital element set
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** every lane-gate body in the response carries an `orbitElements`
+  object with the same six fields, equal to the element set the system's
+  body table derived for that gate
+
+#### Scenario: The star carries no orbital element set
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** the star's response entry carries no `orbitElements` key
+
+#### Scenario: The read carries the interior's continuous extent
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** the response carries a continuous `extent` equal to the value
+  that interior's stored document holds
+
+#### Scenario: The read carries the world clock's scale alongside its world time
+- **WHEN** an authenticated requester reads a materialized system's
+  interior on a world whose simulation clock runs at a scale other than 1
+- **THEN** the response carries that clock's scale alongside its
+  `worldTime`, so a client can project live world time at the world's own
+  rate
+
+#### Scenario: A body served without a resolvable continuous position is still element-complete
+- **WHEN** a body's continuous position could not be resolved for this read
+  (no body table was available) and it is therefore served with a
+  zero-valued `space` position
+- **THEN** its `orbitElements` object is still served in full from its
+  stored element set, since the elements are stored data and not a
+  resolution result
+
+#### Scenario: Lattice-only fields are absent from the response
+- **WHEN** an authenticated requester reads a materialized system's
+  interior
+- **THEN** the response carries no top-level lattice `radius`, no body
+  carries `footprint`, `orbit`, a top-level `parentId`, `fixed`, `band`,
+  `live`, or `asOf`, and no lane-gate body carries `cell`
+
+### Requirement: Lane-Gate Bodies Carry Their Body Id
+The system SHALL serve, for every lane-gate body in a materialized system's
+interior read, that gate body's own body id under the wire key `id` — the
+same key every other body in this response carries. That value SHALL be
+identical to the id the server reports in a fleet's `attachedTo` once that
+fleet arrives attached to that gate, and identical to the id a burn order
+must name to target that gate, so one served string is the gate's identity
+across the interior read, the burn command, and the fleet read. Like
+`destSystemId` and `laneId`, it SHALL be served regardless of the
+requester's charted knowledge.
+
+This id SHALL be served rather than left for a client to reconstruct. The
+server builds it by a naming convention — a fixed prefix joined to the
+destination system id — that `backend/system` does not export, and that is
+already mirrored independently by three backend packages (`backend/charts`,
+`backend/fleet`'s handler, and `backend/fleet`'s fuel estimator each hold
+their own copy of the prefix). A client copy would be a fourth, sitting on
+the far side of the wire where no Go test can reach it and pinned by no
+cross-stack fixture. A later change SHALL NOT withdraw this field in favour
+of a client-side reconstruction of that convention (design.md Decision 15).
+
+#### Scenario: The served gate body id is the id a fleet attaches to
+- **GIVEN** a lane-gate body served with an `id` in a system interior read
+- **WHEN** a fleet burns to that gate and arrives attached to it
+- **THEN** that fleet's own read reports an `attachedTo` string exactly
+  equal to the `id` served for that gate body — equality, not merely the
+  presence of some id on each side
+
+#### Scenario: A burn order naming the served gate body id targets that gate
+- **WHEN** a burn order names, as its target, the `id` a lane-gate body was
+  served with
+- **THEN** the server resolves it as that gate body and accepts the order,
+  requiring no separately-derived identifier from the client
+
+#### Scenario: A fresh corporation with no charted lanes still receives the gate body id
+- **GIVEN** a corporation with no charted lanes
+- **WHEN** it reads a materialized system's interior
+- **THEN** every lane-gate body in the response carries its `id`, unfiltered
+  by the corporation's charted knowledge
+
+#### Scenario: Every lane-gate body carries a non-empty, distinct id
+- **WHEN** an authenticated requester reads a materialized system's interior
+  that has two or more lane gates
+- **THEN** every lane-gate body carries a non-empty `id`, and no two bodies
+  in that response share one
 
 ## Notes for future maintainers
 

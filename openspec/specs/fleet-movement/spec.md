@@ -6,8 +6,8 @@ its one movement-state field (coast, burn, docked, lane transit, lane
 hold), in-system burns, cross-system graph-tier trips, and the sensor scan
 verb it carries. Movement and scanning commit through the `action-dispatch`
 spine on two independent single-slot channels (movement, sensor) and read
-back through `board-tactical-math`'s effective-state fold, so a completed
-order is never observed frozen mid-flight.
+back through `space-kinematics`'s effective-state fold (`space.StateAt`), so a
+completed order is never observed frozen mid-flight.
 ## Requirements
 ### Requirement: Effective Position Resolution
 

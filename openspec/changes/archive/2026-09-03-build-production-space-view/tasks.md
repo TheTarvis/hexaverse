@@ -538,7 +538,7 @@
 - [x] 8.4 Migrate the refuel commit's hand-rolled `useRef` guard onto the
       shared hook, with its existing scenarios as the regression
       (`docked-fleet-actions`: "Refuel Control Guards Against Double-Submit")
-- [ ] 8.5 Playwright scenarios for sell, mine, refuel, and burn that fire two
+- [x] 8.5 Playwright scenarios for sell, mine, refuel, and burn that fire two
       activations with **no `await` between them**, asserting exactly one
       request and one operation key leaves the client. A unit test whose
       harness holds the mutation promise open cannot observe this failure —
@@ -676,7 +676,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       by them — both are already dead against the live wire (a burn's
       `action.Params` carries only `state`, and nothing in the frontend reads
       either)
-- [ ] 10.5 Delete `frontend/app/spike/webgl-board/` (`page.tsx`,
+- [x] 10.5 Delete `frontend/app/spike/webgl-board/` (`page.tsx`,
       `mock-board.ts`, and their tests) — a tuning bench for the renderer
       being deleted. **The scope of this task stops there.**
       `frontend/app/spike/hex-board/mock-system.ts` is genuine lattice code
@@ -692,7 +692,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
       non-lattice spike; deleting `audio/` is scope this change does not have.
       The file is handed to `delete-the-lattice` task 6.3b, under that change's
       OQ-5. **This is a recorded survival, not an oversight**
-- [ ] 10.6 **Delete nothing under `frontend/app/spike/space-3d/`.** The
+- [x] 10.6 **Delete nothing under `frontend/app/spike/space-3d/`.** The
       earlier instruction to delete it because "its production successor now
       exists" is withdrawn: `sim.ts` and `SpaceView.tsx` have live importers in
       two separate, non-lattice experiments — `intel/` (`intel.ts`,
@@ -741,7 +741,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
 
 - [x] 11.1 Component and unit tests for every requirement in sections 1–8,
       following each requirement's own scenarios
-- [ ] 11.2 Playwright journey against the real stack: spawn → see the home
+- [x] 11.2 Playwright journey against the real stack: spawn → see the home
       system rendered → burn to a body → dock → mine → sell → refuel → fly to
       a lane gate → jump — entirely through the new view (proposal's Exit
       criterion). The gate step SHALL exercise the off-screen affordance, not
@@ -749,7 +749,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
 - [x] 11.3 `bash .claude/scripts/check-mirror-map.sh` green with the
       case-insensitive comparison in place, and its new regression case red
       when a lower-camel twin is introduced
-- [ ] 11.4 `python3 .claude/skills/code-quality-checks/check.py` and
+- [x] 11.4 `python3 .claude/skills/code-quality-checks/check.py` and
       `bash .claude/scripts/check.sh --backend --frontend --lint --test` green
 - [x] 11.5 `openspec validate build-production-space-view --strict` green,
       `python3 .claude/scripts/openspec-reconcile.py build-production-space-view`
@@ -775,7 +775,7 @@ dual path, and no coexistence in what ships (design.md Decision 11).
 reports this change valid either way. The archiver is the gate, and it is the
 archiver that must be rehearsed.
 
-- [ ] 12.1 Copy `openspec/` to a scratch directory and, **in that copy,
+- [x] 12.1 Copy `openspec/` to a scratch directory and, **in that copy,
       archive the predecessors first** — `add-stationkeep-hold-verb`, then
       `serve-orbital-elements-and-burn-preview` — so the rehearsal runs
       against the tree this change will actually meet; against an unarchived
@@ -789,7 +789,7 @@ archiver that must be rehearsed.
       "Pre-existing wire fields are unchanged" gone from the file — the
       retirement and re-add landed, rather than a MODIFIED block having
       silently shed it
-- [ ] 12.1b Re-run the **re-ADD audit** mechanically against the live
+- [x] 12.1b Re-run the **re-ADD audit** mechanically against the live
       `openspec/specs/board-view/spec.md` before archiving: for every
       requirement this change re-ADDs under `system-space-view` or
       `docked-fleet-actions`, diff the requirement body and the scenario list
@@ -802,7 +802,7 @@ archiver that must be rehearsed.
       **not** see a re-ADD under a new capability and neither does
       `openspec-reconcile.py`. This structure is exactly what removes that
       protection, so the audit is the only thing standing in for it
-- [ ] 12.2 In the same rehearsal copy, delete `openspec/specs/board-view/` and
+- [x] 12.2 In the same rehearsal copy, delete `openspec/specs/board-view/` and
       `grep` every surviving spec for the literal `board-view`; there SHALL be
       no remaining citation. `--strict` does not catch a dangling
       cross-reference to a retired capability, so this grep is the only guard
@@ -815,7 +815,7 @@ block, or a directory removal). The `## Purpose` edits run **before** the
 `board-view` deletion and its grep, so that grep runs against a tree from
 which every stale citation has already been removed.
 
-- [ ] 13.1 Hand-edit `openspec/specs/space-kinematics/spec.md`'s `## Purpose`:
+- [x] 13.1 Hand-edit `openspec/specs/space-kinematics/spec.md`'s `## Purpose`:
       remove the sentence citing `board-view`'s *Move Preview From the Acting
       Fleet's Live Position*, which the served burn preview supersedes.
       **Leave the `frontend/app/spike/space-3d` carve-out sentence exactly as
@@ -828,13 +828,13 @@ which every stale citation has already been removed.
       named path". Repointing it would name spikes whose conditions that clause
       has not been checked against; deleting it would leave the clause
       unsatisfied. Neither is done
-- [ ] 13.2 Hand-edit the three other stale `## Purpose` sections:
+- [x] 13.2 Hand-edit the three other stale `## Purpose` sections:
       `system-interior` ("a single star system's tactical polar board" and its
       fog-of-war sentence), `fleet-movement` (its `board-tactical-math`
       effective-state-fold sentence and its reference to the deleted
       `observation-fog-and-scan`), and `fleet-roster` ("the system board
       view")
-- [ ] 13.3 Write a real `## Purpose` for **both** new capabilities. The
+- [x] 13.3 Write a real `## Purpose` for **both** new capabilities. The
       archiver creates a new capability spec carrying literally `TBD - created
       by archiving change build-production-space-view. Update Purpose after
       archive.`, and link 4 shipped with exactly this left undone. Both
@@ -844,7 +844,7 @@ which every stale citation has already been removed.
       hold/release controls act on an **orbiting** fleet, the credit readout
       is **corporation**-scoped, and its rejection-copy mapping is a
       **shared** module three capabilities consume (design.md Decision 13)
-- [ ] 13.4 Leave `space-kinematics`'s exemption clause inside *Every
+- [x] 13.4 Leave `space-kinematics`'s exemption clause inside *Every
       Rule-Bearing Value of This Capability Is Computed Only in the
       Authoritative Implementation* **unedited**, and confirm by reading it
       that no edit is due: it is written generically over
@@ -855,7 +855,7 @@ which every stale citation has already been removed.
       path"; it does not, and as of 10.6 this change deletes no spike but
       `webgl-board/`. Only the `## Purpose` sentence names `space-3d`, and
       13.1 now deliberately leaves that sentence alone
-- [ ] 13.5 After `openspec archive build-production-space-view --yes`
+- [x] 13.5 After `openspec archive build-production-space-view --yes`
       succeeds and 13.1–13.4 are done, delete `openspec/specs/board-view/` by
       hand (design.md Decision 9; `polar-lattice-math` and
       `observation-fog-and-scan` are the confirmed-absent precedents), then

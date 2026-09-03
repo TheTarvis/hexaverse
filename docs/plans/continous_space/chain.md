@@ -4,12 +4,17 @@ The ordered set of OpenSpec changes that carries the game from the polar
 lattice to the continuous-space system map. `README.md` is the model,
 `decisions.md` is the settled rulings; this is the sequencing.
 
-**Status (2026-09-02):** links 1–6 landed, plus one unplanned insert. Links 5
+**Status (2026-09-03):** links 1–8a landed, plus one unplanned insert. Links 5
 and 6 are **done and archived** (90/90 and 33/33). Link 7 was split in two by its
 own panel review — both are now **done and archived**: `add-fuel-as-cargo`
 (53 tasks, `41e3c46`) and `add-stationkeep-hold-verb` (59 tasks, `ca7e5d2`).
+Link 8a was split the same way — both halves are **done and archived**:
+`serve-orbital-elements-and-burn-preview` (37 tasks, `3913952`) and
+`build-production-space-view` (117 tasks, `1b6c7c0`; `board-view` retired).
+**The game is playable in R³ and the lattice is unreferenced.** 8b and 9
+remain.
 
-That change is worth a note. Its review loop ran one round past the nominal
+Link 7b is worth a note. Its review loop ran one round past the nominal
 cap of three, deliberately — every round's blockers were bred by the previous
 round's repairs, and round 3 found that re-issuing `hold` after each dry
 instant bought **indefinite free station-keeping**, the exact behaviour the
@@ -72,9 +77,9 @@ after that design was written.
 | 7 | `add-fuel-as-cargo` | Δv priced in cargo mass; the first credit sink | ✅ `41e3c46` |
 | 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | ✅ `ca7e5d2` |
 | 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | ✅ `3913952` |
-| 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | 📝 spec final, 0/106 — **next** |
-| 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | 📝 spec final (3 adversary rounds), 0/105 |
-| 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | 📝 spec, 0/80 |
+| 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | ✅ `1b6c7c0` |
+| 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | 📝 spec final (3 adversary rounds), 0/105 — **next** |
+| 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | 📝 spec, 0/96 |
 
 Downstream and off the critical path: `add-station-exchange` (M12) gets
 re-proposed after link 6; `add-cargo-transfer` (the rescue verb
@@ -547,6 +552,71 @@ purchase; and `hold` at zero fuel wrote a park **its own codec requirement rejec
 bricking exactly the stranded fleets link 7 exists to make discoverable.
 
 ## Link 8 — `build-production-space-view`
+
+**8a-2 landed and archived 2026-09-03** (`1b6c7c0` implementation, archive
+commit following), 117/117 tasks — it grew from the 94 the split predicted
+to 106 at spec-final and 117 by the time it landed, all of it repair rather
+than scope. Vitest 1393/1393, Playwright 15/15 (a second run 16/16), root
+backend e2e 1997/1998 with the one failure being the recorded
+`defect-station-order-500.md` geometry lottery (re-run standalone 4/4).
+Archive rehearsed on a scratch copy first (+47 ~6 −1 → 1, zero dropped
+scenarios), then performed; `openspec/specs/board-view/` hand-deleted
+afterwards as planned; `openspec validate --all --strict` 33/33.
+
+Five things worth remembering from it:
+
+- **The fan-in was four reads, not two.** The first spec listed the interior
+  and own-fleets reads and stopped; its own sell tasks could not be satisfied
+  without a station read, a market-board read, and the corporation balance.
+  The developer implemented every task as written and shipped a sell control
+  that rendered and did nothing when clicked — every panel-level test green,
+  because the panel was handed a station prop; only the composition could
+  see it.
+- **Retiring a capability removes the archiver's dropped-scenario guard.**
+  A mechanical diff of the 31 requirements re-ADDed from `board-view`
+  against their live originals found **six** silently dropped clauses
+  (`handoffs/README.md`, *Lesson four*). Link 9 retires capabilities too.
+- **The station-order 500 is a family, not one sentinel** — a third `space`
+  solver sentinel (minimum curve length) was found escaping `OrderTo` as a
+  bodyless 500, breaking 8a-1's *a preview is refused wherever the commit
+  would be refused* (`handoffs/defect-station-order-500.md`, widened). And
+  spawn itself 500s ~2 in 43 on a Firestore transaction lock timeout, with
+  the wake form silently resetting (`handoffs/defect-spawn-lock-timeout.md`).
+  Both open, both Travis's call, both now on the gate's critical path.
+- **One production tightening outside any task, recorded here rather than
+  hidden:** `SpaceLaneGate.id` in `frontend/lib/types/system-space.ts` went
+  from optional to required during the closeout — the wire has served a
+  non-empty gate id since task 9.1b, so the now-dead guards in
+  `space-scene.ts` and `SystemSpaceView.tsx` were removed with it. It
+  implements *Lane-Gate Bodies Carry Their Body Id* more strictly, not
+  differently.
+- **Task 11.4 (the full `/check` run) was checked on the strength of two
+  partial-but-green full runs** — one reaped during the trailing best-effort
+  e2e stage, one with the known station-order flake — rather than a single
+  uninterrupted invocation. Recorded so nobody reads that checkbox as
+  stronger evidence than it is.
+
+**Gating policy from here (Travis, 2026-09-03):** the root backend e2e
+package takes 40+ minutes and grows with every spawned corporation. It runs
+**once per change, at archive time only** — no per-commit runs, no confirming
+reruns, and its timeout stays at 90m (if it overruns, report and stop rather
+than raise). Per-commit gates are the affected Go packages' unit tests,
+`go vet`, the frontend suite, lint, `check.py --files-only`, and the
+Playwright journey for any new player-facing verb. A build tag for that
+package and `t.Parallel` for corp-owning tests are Travis's decisions in
+flight; agents do not make them.
+
+**Open question for Travis — the archiver's `TBD` purposes.** Twelve
+capability specs carry a `## Purpose` reading "TBD - created by archiving"
+(`proximity-disclosure`, `system-body-table`, `request-authorization`,
+`session-wakeup`, `realtime-sse`, `galaxy-knowledge`, `world-clock`,
+`fuel-purchase`, `sighting-records`, `account-identity`, `focused-scan`,
+`mine-extraction`). Every link that creates a capability adds one, because
+the archiver writes the placeholder and deltas cannot reach a Purpose. This
+recurs per link and wants **one small change of its own** — a dozen Purpose
+paragraphs, no requirements — rather than a post-archive hand-edit task in
+every change. Not started; Travis to say whether it is worth a change or a
+one-off hand edit.
 
 The renderer, last — the only part with visual-regression risk tests will not
 catch. Graduates the PoC's grammar (ring = live position, ghost = position at

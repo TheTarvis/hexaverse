@@ -32,12 +32,6 @@ any name declared on both sides. The one carve-out is
 from, which stays alive by that path as the feel bench and is not a mirror,
 not authoritative, and not asserted against the fixture family.
 
-The single largest stated cost of that decision is that a client-computed move
-preview cannot show an ETA or Δv digit: `board-view`'s *Move Preview From the
-Acting Fleet's Live Position* is written assuming the client computes a preview
-end to end, and must become a server-quoted preview or be amended when a
-consumer migrates.
-
 **What remains open beyond this change** is recorded in `add-space-kinematics`'s
 design.md — see its **Migration Plan** for the eight-step consumer sequencing
 (this capability is step 1; the green build-target matrix is its gate, and

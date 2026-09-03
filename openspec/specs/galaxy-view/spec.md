@@ -81,14 +81,15 @@ is selected.
 
 ### Requirement: Drill-In Navigation to the System Board
 The system SHALL offer an "Enter system" action on a selected system when
-authenticated, navigating to that system's hex board route, and SHALL NOT
-offer it on the frozen start area (a read-only showcase with no board to
-enter).
+authenticated, navigating to that system's space-view route (the
+continuous-space `/systems/:systemId` view — `system-space-view`), and
+SHALL NOT offer it on the frozen start area (a read-only showcase with no
+space view to enter).
 
 #### Scenario: Entering a system navigates to its board
 - **WHEN** "Enter system" is invoked for a selected system while
   authenticated
-- **THEN** the view navigates to that system's board route
+- **THEN** the view navigates to that system's space-view route
 
 #### Scenario: No drill-in on the start area
 - **WHEN** viewing the frozen start area
@@ -478,9 +479,9 @@ Command Endpoints Are Restricted to the Owning Corporation*), and
 therefore falls to the generic fallback copy rather than to a mapped
 reason. On success it SHALL show a success toast, and on failure an
 error toast whose copy is mapped from the server's distinguishable
-rejection reason (`board-view`: *Rejection Reasons Map to Player-Facing
-Copy, Not Raw Server Text*), never the raw reason string, leaving the
-fleet's row unchanged.
+rejection reason (`docked-fleet-actions`: *Rejection Reasons Map to
+Player-Facing Copy, Not Raw Server Text*), never the raw reason string,
+leaving the fleet's row unchanged.
 
 #### Scenario: A gate absent from the fetched galaxy graph still commits
 - **GIVEN** a fetched galaxy graph whose `links[]` is empty and a fleet
