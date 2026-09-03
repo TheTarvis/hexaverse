@@ -65,10 +65,16 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 - [ ] 2.4 Rewrite `generator.go`: drop `board.Schedule`, `board.Canon`,
       `board.RingCells`, the `sched polar.Schedule` parameter threaded through
       `orbitFeature`/`orbitFor`/`beltFeature`/`hazardFeature`, and the
-      `Angle0` slot draw. The non-skeleton star-parented feature's orbital
-      index stays an integer draw in `[1, params.Radius]` with no board meaning
-      (`system-interior`: *Continuous Orbital Radii Ascend With the Skeleton
-      Ordinal and Are Separated*)
+      `Angle0` slot draw. **`orbitFor` does not merely lose a parameter — it
+      returns `system.Orbit` (`generator.go:221`), the type task 2.1 deletes,
+      so the function ceases to exist entirely**, as does `orbitFeature`'s
+      `Orbit`/`Footprint` construction (C8: describing this as "drop a
+      parameter" understates the deletion and leaves an implementer expecting
+      a function that is no longer there to repoint). The non-skeleton
+      star-parented feature's orbital index stays an integer draw in
+      `[1, params.Radius]` with no board meaning (`system-interior`:
+      *Continuous Orbital Radii Ascend With the Skeleton Ordinal and Are
+      Separated*)
 - [ ] 2.5 Re-source `continuousStarParented`'s `retrograde` input: it currently
       reads `f.Orbit.Dir < 0`. Pass the direction the `diskOrCaptured` /
       `DominantOrbitDirection` roll already produced directly instead, so the
@@ -91,11 +97,18 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `SystemInterior.Radius` (task 2.1b) — (`system-interior`: MODIFIED *Lane
       Gate Projection*)
 - [ ] 2.8 Delete `system/fog_source.go`'s `occlusionRadius2` and its
-      `board.StarOcclusionRadius2`/`board.PlanetOcclusionRadius2` constants.
-      Verified before deleting by `grep -rn 'occlusionRadius2' backend/ | grep -v
-      _test.go` returning nothing — this is the ninth "built, unit-tested, never
-      called" instance the chain has found, and it is pure deletion material,
-      not a repair
+      `board.StarOcclusionRadius2`/`board.PlanetOcclusionRadius2` constants,
+      and its one test caller, `system/fog_source_test.go:44` (which does not
+      compile after the deletion unless repointed or removed with it). The
+      stated grep for "no production caller" must exclude the definition
+      itself and match only call sites:
+      `grep -rn 'occlusionRadius2(' backend/ | grep -v _test.go | grep -v
+      '^backend/system/fog_source.go:25'` returning nothing — the bare
+      `grep -rn 'occlusionRadius2' backend/ | grep -v _test.go` form always
+      returns at least the definition line and the doc comments above it, so
+      it can never pass as written. This is the ninth "built, unit-tested,
+      never called" instance the chain has found, and it is pure deletion
+      material, not a repair
 - [ ] 2.9 Delete `system/fog.go`'s `fogFeatureDTO` lattice fields if
       `build-production-space-view` task 9.1 left any, and the vestigial
       `type BoardFog interface{}` / `Handler.fog` / `Handler.WithFog` in
@@ -127,6 +140,32 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       itself warns about (every capture-plausible body turns prograde and every
       test still passes). Same treatment for the retrograde legs of
       `continuous_test.go` and `lattice_identity_test.go`
+- [ ] 2.10c **(moved from task 7.5 — C6: this family goes red the instant
+      2.4/2.5/2.6 land, so it must be re-recorded inside this same section-2
+      commit, not deferred to section 7)** Re-record
+      `fixtures/system/cases.json`'s `interiorElements` family over its
+      surviving `continuousLine` component alone, dropping
+      `latticeProjection` and `latticeDrawCount` from the serialization and
+      recomputing `interiorElementsSweep`'s digest and `serialization` string
+      (design.md Decision 3), by running the family's regeneration with
+      `UPDATE_FIXTURES=1` (`system/fixtures_test.go:711`) — the mechanism that
+      actually rewrites the file; "re-record" alone names no command. **Before
+      committing the re-recorded file**, assert it reproduces byte-for-byte
+      under `GOARCH=arm64` and under `GOARCH=amd64 GOAMD64=v1`. If the two
+      disagree, **stop and report** — do not commit a one-architecture
+      recording (design.md OQ-1; this is the exact failure
+      `pin-system-generation-determinism` existed to end). The durable check
+      against a future divergence is the standing `./system/` cross-target
+      leg (`check.py:1078-1102`, `.gitlab-ci.yml:342`), which this task's
+      byte-for-byte assertion is a one-time rehearsal of, not a replacement
+      for
+- [ ] 2.10d **(moved from task 7.6, for the same reason as 2.10c)** Update
+      `fixtures/system/cases.json`'s `_meta.generatedOn` and
+      `_meta.serialization` to describe the new recording honestly, naming
+      **both** build targets (`GOARCH=arm64` and `GOARCH=amd64 GOAMD64=v1`)
+      the byte-for-byte check in 2.10c ran against — recording only one
+      leaves a one-architecture recording indistinguishable from a
+      two-architecture one after the fact
 - [ ] 2.11 Add the test the removed slot-coverage scenario leaves behind:
       generate interiors across many seeds, collect every feature's continuous
       phase, and assert **both** legs (`system-interior`: *Interior Generation
@@ -149,13 +188,28 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       Today's generator is fine; it is the **spec** that would permit the
       regression. Without this task, deleting the slot-coverage scenario
       removes reachability coverage instead of relocating it
-- [ ] 2.12 `cd backend && go test ./system/ -short -count=1` green
+- [ ] 2.12 `cd backend && go test ./system/ -short -count=1` green — **cannot go green before 2.10c/2.10d land** (C6): `interiorElements` is red from the moment 2.4/2.5/2.6 change the generator's draw until the fixture is re-recorded
 
 ## 3. Backend — remove the lattice tier from `backend/stations`
 
-- [ ] 3.1 Delete `stations.DeriveOrbit` and its `mix64` helper if nothing else
-      uses it, and every `board` import from `stations/placement.go`. Verified
-      by `grep -rn 'DeriveOrbit' backend/` returning nothing
+- [ ] 3.1 `backend/stations/placement.go` is 88 lines and contains exactly
+      two functions, `DeriveOrbit` (`:41`) and `mix64` (`:83`), both deleted,
+      and `mix64` has no other user in the package — **`rm
+      backend/stations/placement.go`** rather than leaving a
+      header-comment-only file. This grep's own three further hits, beyond
+      the file itself, are in scope and must be repaired in the same task:
+      `backend/stations/service_test.go:90` (`want := DeriveOrbit(...)`, a
+      genuine call site that stops compiling — repoint or delete the
+      assertion), `backend/system/generator.go:135` (a comment: "the same
+      source stations.DeriveOrbit already uses" — rewrite), and
+      `backend/system/station_continuous.go:6-9` (a comment naming
+      `stations.DeriveOrbit` as "the LATTICE derivation, which this change
+      does not touch" and stating it "dies at link 8-9" — that link is this
+      one; the production code in that file makes no call to `DeriveOrbit` or
+      to any `board`/`polar` symbol, so the fix is comment-only, but the file
+      is production code and belongs in this task's scope, not left for
+      task 10.2 to discover as prose). Verified by
+      `grep -rn 'DeriveOrbit' backend/` returning nothing
       (`trading-station`: REMOVED *Deterministic, Non-Core, Off-Gate-Ring,
       Prograde, Orbiting Placement*)
 - [ ] 3.2 Delete `stations.ErrStationRingOutOfRange` and the ring check,
@@ -192,23 +246,41 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       this change reaches: `frontend/lib/types/market.ts:67`'s
       `orbit: { ring, angle0, period, dir }` on the `Station` interface (a
       REQUIRED property, so leaving it makes every `Station` literal a lie),
-      and the `orbit:` line in `market-service.test.ts`'s `station` fixture.
-      Task 6.3's sweep grep (`ring\b.*slot\b`) does NOT match this shape —
-      the field names ring/angle0, never slot — which is why it is named here
-      rather than left to the sweep. Verified by `grep -rn 'angle0' frontend
+      and every `orbit:` literal built against it — `market-service.test.ts`'s
+      `station` fixture, and three further `Station`-literal sites the task's
+      own verification grep already returns but no enumeration named:
+      `frontend/components/space/FleetActionsPanel.test.tsx:91`,
+      `frontend/components/space/SystemSpaceView.test.tsx:81`, and
+      `frontend/hooks/use-market.test.tsx:41`. Task 6.3's sweep grep
+      (`ring\b.*slot\b`) does NOT match this shape — the field names
+      ring/angle0, never slot — which is why it is named here rather than
+      left to the sweep. Verified by `grep -rn 'angle0' frontend
       --include='*.ts' --include='*.tsx' | grep -v node_modules` returning
-      nothing, and `cd frontend && npm run lint && npx vitest run` green.
+      nothing once section 6 deletes `frontend/lib/board` (which holds 17
+      further `angle0` hits across four files until then); at task time the correct assertion
+      is that the grep returns only `frontend/lib/board/` paths. Also
+      confirmed by `cd frontend && npm run lint && npx vitest run` green —
+      `orbit` is a REQUIRED property today, so leaving any of these four
+      literals behind is an excess-property lint error, not a silent pass.
       No production frontend module reads `station.orbit` today, so this is a
       type-and-fixture deletion with no rendering consequence
 - [ ] 3.3 Delete `stations.Service`'s `gateRing: common.Tuning().BoardRadius`
       fields and the `system.PeriodFor(orbit.Ring)` refill
 - [ ] 3.4 Delete `backend/stations/lattice_symbols_absent_test.go`,
-      `backend/mine/lattice_symbols_absent_test.go`, and
-      `backend/market/lattice_symbols_absent_test.go` (design.md Decision 6: a
+      `backend/mine/lattice_symbols_absent_test.go`,
+      `backend/market/lattice_symbols_absent_test.go`, and
+      `backend/fleet/lattice_symbols_absent_test.go` (design.md Decision 6: a
       guard asserting a package is not imported is subsumed by the package not
-      existing, and can never fail again). Delete
-      `stations/orbit_guard_test.go` and the lattice half of
-      `stations/placement_test.go`. Delete
+      existing, and can never fail again — the `fleet` copy is the same
+      species as its three siblings and was previously caught only by task
+      10.2's sweep, where it looked like prose to repoint rather than a file
+      to delete). Delete `stations/orbit_guard_test.go`,
+      `stations/no_lattice_dock_predicate_test.go` (Decision 6 again: its own
+      header records that the package implements no dock predicate at all, so
+      the guard it carries — "Docking to the station involves no lattice
+      predicate" — is unfailable once the lattice is gone; task 3.5's new
+      positive test is its replacement, not this file repointed), and the
+      lattice half of `stations/placement_test.go`. Delete
       `TestInteriorRead_NoLatticeFieldTypeSurvivesOnTheWireDTOs`
       (`system/interior_wire_lattice_removal_test.go:192-223`) and the
       `"hexaverse/board"`/`"hexaverse/polar"` string literals it matches on —
@@ -225,7 +297,9 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       docking"). Without this task, deleting 3.4's guard removes coverage
       instead of relocating it
 - [ ] 3.6 `cd backend && go test ./stations/ ./mine/ ./market/ -short -count=1`
-      green
+      green — depends on 2.10c/2.10d (C6): `mine`'s and `market`'s own fixture
+      suites are independent, but the package build depends on `system`
+      compiling, which does not settle green until the re-record lands
 
 ## 4. Backend — tuning, fleet params, and the last test importers
 
@@ -311,7 +385,10 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       every continuous assertion. `backend/interior_additive_wire_e2e_test.go`
       no longer exists — 8a-2 removed it, and no backend-root e2e test imports
       `board` today — so there is no second file to repoint here
-- [ ] 4.6 `cd backend && go build ./... && go test ./... -p 1` green
+- [ ] 4.6 `cd backend && go build ./... && go test ./... -p 1` green — **cannot
+      go green before 2.10c/2.10d land** (C6): this run includes `./system/`,
+      whose `interiorElements` fixture is red until the re-record from the
+      generator rewrite is committed
 
 ## 5. Delete `backend/board` and `backend/polar`
 
@@ -319,7 +396,8 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 - [ ] 5.2 Verified by `cd backend && go build ./... && go vet ./...` clean, and
       `grep -rn 'hexaverse/board\|hexaverse/polar' backend/` returning nothing
       (including string literals in comments and test prose)
-- [ ] 5.3 `cd backend && go test ./... -p 1` green
+- [ ] 5.3 `cd backend && go test ./... -p 1` green — same dependency on
+      2.10c/2.10d as 4.6 (C6)
 
 ## 6. Delete `frontend/lib/board` and `frontend/lib/polar`
 
@@ -334,7 +412,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       commit rather than leaving the next reader to rediscover it.
       `queryKeys.systemBoard` (the per-system interior read's key namespace —
       `lib/query-keys.ts`, `hooks/use-system-space.ts:21`,
-      `hooks/use-fleets.ts:32,115`, and their three test files) IS lattice
+      `hooks/use-fleets.ts:32,140`, and their three test files) IS lattice
       vocabulary on the continuous view: rename it to `queryKeys.systemSpace`
       in the factory and every reader, and update
       `lib/query-keys.test.ts`'s five assertions and the two `it()` titles at
@@ -403,11 +481,64 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 
 ## 7. Fixtures, mirror maps, and the deviation register
 
-- [ ] 7.1 `rm -rf fixtures/board fixtures/polar`. Verified by
-      `grep -rn 'fixtures/board\|fixtures/polar' . --exclude-dir=node_modules
-      --exclude-dir=.git --exclude-dir=archive` returning nothing outside
-      `docs/plans/` and `openspec/changes/archive/`, which are historical record
-      and stay
+- [ ] 7.1 `rm -rf fixtures/board fixtures/polar`. The stated verification
+      grep excludes only `docs/plans/` and `openspec/changes/archive/`, but
+      the citation survives in fifteen further sites this task must also
+      repoint (a sixteenth, `openspec/specs/system-interior/spec.md:1085`, is
+      handled separately by the new MODIFIED delta — see task 10.1's note and
+      C11):
+      - **Four `anti_mirror`-mode mirror maps**, whose `$comment` blocks name
+        `fixtures/board/mirror-map.json` and `fixtures/polar/mirror-map.json`
+        as the pair they are the inverse of — `fixtures/space/mirror-map.json:9-10`,
+        `fixtures/galaxy/mirror-map.json:17-18`,
+        `fixtures/fleet/mirror-map.json:13-14`,
+        `fixtures/disclosure/mirror-map.json:26-27`. These **cannot be
+        caught by a later failure**: `anti_mirror` mode reads only
+        `.sharedNames` and never `.$comment`, so a stale citation here is
+        permanently silent (the same species as design.md site 32) — they
+        must be repaired by hand in this task, not left for a sweep to find.
+      - `fixtures/market/cases.json:2`'s `_comment` ("Mirrors
+        fixtures/board/cases.json's precedent").
+      - `backend/space/turn_table_record_test.go:17-19,75`,
+        `backend/space/fixtures_test.go:220`,
+        `backend/system/fixtures_test.go:68`,
+        `backend/market/fixtures_test.go:14` — Go doc comments citing
+        `backend/board`/`backend/polar`/`fixtures/board` as precedent.
+      - `frontend/lib/market/fold.ts:6`, `frontend/lib/market/fold.test.ts:9`
+        — the TS-side mirror of the same precedent comment.
+      - `docs/specs/0004-movement-board.md:161` (`implemented`, live —
+        rewrite), `docs/specs/0006-scan-and-fog.md:293,474` and
+        `docs/specs/0008-movement-galaxy.md:380` (both `superseded`, so
+        recorded rather than rewritten per OQ-4/task 9.4 — **`0008`'s
+        `:380` line reads "`backend/board/ship.go` carries the
+        `laneTransit`" and contains neither `fixtures/board` nor
+        `fixtures/polar`; it is task 10.1's site, listed here only because
+        it rides the same OQ-4 ruling as its two neighbours, not because
+        this task's own grep returns it**), and
+        `docs/openspec-retrofit-report.md:13` (lists `board-tactical-math`
+        among capabilities — historical record of a report, not a live
+        enforcement site; record rather than rewrite).
+      - `backend/space/table.go:47` — `turnTableMeta`'s doc comment citing
+        `fixtures/polar/cases.json`'s `_meta.generatedOn` shape as the
+        provenance envelope it matches. Same species as the four Go doc
+        comments above; repoint at `fixtures/space/turn-table.json`'s own
+        `_meta` shape, which is what it actually describes.
+
+      Verified by `grep -rn 'fixtures/board\|fixtures/polar' . --exclude-dir=node_modules
+      --exclude-dir=.git` returning hits only under `docs/plans/`,
+      `docs/handoffs/`, `docs/defects/`, `docs/specs/` (the superseded
+      numbered specs this task records rather than rewrites),
+      `openspec/changes/archive/` and this
+      change's own folder — the same allow-list task 10.1 uses, because those
+      five directories are historical record and this change's own text
+      necessarily names what it deletes. (The `--exclude-dir=archive` form
+      used previously is dropped: it is redundant with the
+      `openspec/changes/archive/` clause and misleadingly excludes any
+      directory named `archive` anywhere, which is not what this task means.)
+      Run at this point in the sequence it also returns
+      `openspec/specs/cross-stack-determinism/spec.md` and
+      `openspec/specs/board-tactical-math/spec.md`, which sections 12–13
+      clear; those two are expected here and are not residue.
 - [ ] 7.2 Create `fixtures/market/mirror-map.json` for the
       `backend/market` ↔ `frontend/lib/market` pair (design.md Decision 4),
       naming `FoldSale`/`foldSale`, `FirstTonPrice`/`firstTonPrice` and
@@ -447,28 +578,14 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `bash .claude/scripts/check-mirror-map.sh` exits 2 naming it, then revert.
       A check that has never been observed to fail has not been shown to check
       anything
-- [ ] 7.5 Re-record `fixtures/system/cases.json`'s `interiorElements` family
-      over its surviving `continuousLine` component alone, dropping
-      `latticeProjection` and `latticeDrawCount` from the serialization and
-      recomputing `interiorElementsSweep`'s digest and `serialization` string
-      (design.md Decision 3), by running the family's regeneration with
-      `UPDATE_FIXTURES=1` (`system/fixtures_test.go:711`) — the mechanism that
-      actually rewrites the file; "re-record" alone names no command. **Before
-      committing the re-recorded file**, assert it reproduces byte-for-byte
-      under `GOARCH=arm64` and under `GOARCH=amd64 GOAMD64=v1`. If the two
-      disagree, **stop and report** — do not commit a one-architecture
-      recording (design.md OQ-1; this is the exact failure
-      `pin-system-generation-determinism` existed to end). The durable check
-      against a future divergence is the standing `./system/` cross-target
-      leg (`check.py:1078-1102`, `.gitlab-ci.yml:342`), which this task's
-      byte-for-byte assertion is a one-time rehearsal of, not a replacement
-      for
-- [ ] 7.6 Update `fixtures/system/cases.json`'s `_meta.generatedOn` and
-      `_meta.serialization` to describe the new recording honestly, naming
-      **both** build targets (`GOARCH=arm64` and `GOARCH=amd64 GOAMD64=v1`)
-      the byte-for-byte check in 7.5 ran against — recording only one leaves a
-      one-architecture recording indistinguishable from a two-architecture one
-      after the fact
+- [ ] 7.5 **Moved to task 2.10c (C6).** The `interiorElements` family goes
+      red the instant the generator rewrite (2.4/2.5/2.6) lands, so it is
+      re-recorded inside that same section-2 commit rather than deferred
+      here — see 2.10c for the full task text and acceptance evidence. This
+      entry stays in section 7's numbering only so every existing citation of
+      "task 7.5" continues to resolve; it carries no independent work.
+- [ ] 7.6 **Moved to task 2.10d (C6),** for the same reason as 7.5. See 2.10d
+      for the full task text.
 - [ ] 7.6b Run the surviving-`sqrt` audit the retired board-audit scenario is
       replaced by: enumerate every runtime `sqrt` on a rule-bearing path in
       `backend/` (at minimum `system.keplerPeriodMs` and `space`'s flight-time
@@ -518,10 +635,24 @@ names the file and states its verification.
       `check-transcendental.sh`'s `RULE_BEARING_GO_PACKAGES` (site 15) **in the
       same commit** — `test_check_determinism_lists.py` fails if the two
       disagree, which is the point
-- [ ] 8.5 `check.py`: remove the `frontend/lib/board` and `frontend/lib/polar`
-      clauses from `check_transcendental`'s seam-file predicate (site 7), and
-      `check-transcendental.sh`'s matching `frontend/lib/(board|polar)` path
-      predicate and its `board-tactical-math`-citing comment (sites 14, 16)
+- [ ] 8.5 **REPOINT, do not remove, the TypeScript leg of the transcendental
+      lint (C9 ruling).** `check.py:258-259`'s
+      `frontend/lib/board`/`frontend/lib/polar` seam-file predicate clauses
+      become one `frontend/lib/market` clause; `check-transcendental.sh:88`'s
+      matching `frontend/lib/(board|polar)/.*\.ts$` path predicate becomes
+      `frontend/lib/market/.*\.ts$`; and `:44-46`'s comment (which cites
+      `board-tactical-math` and calls `board`/`polar` "the two board-math
+      mirrors") is rewritten to name `frontend/lib/market` as the surviving
+      TS rule-bearing surface instead. **Deleting these clauses outright, as
+      the original task text said, would leave no TypeScript file anywhere
+      determinism-governed** — `check-transcendental.sh` would fall to its
+      `else` branch for every `.ts` input — while `frontend/lib/market`
+      (`foldSale`, `firstTonPrice`, `capacity`) is a rule-bearing TS mirror
+      about to be enrolled in `check_mirror` by task 7.3. Decision 4's
+      argument against leaving a working check with zero call sites applies
+      here just as much as it does to `check_mirror` itself. This is also
+      what makes task 8.14's docstring repoint literally true rather than a
+      claim about a seam that no longer exists
 - [ ] 8.6 `check.py`: remove `./board/ ./polar/` from both
       `run_determinism_cross_target` command strings and from the four result
       messages (site 9), and rewrite its docstring, which cites the retired
@@ -546,9 +677,25 @@ names the file and states its verification.
       only if OQ-5 is ruled "delete `space-3d`", in which case 6.3b's
       verification grep covers it. Deleting a true carve-out note is how an
       exemption becomes folklore
-- [ ] 8.10 `check-frontend-tests.sh`: delete the `components/board/webgl/`
-      GL-plumbing carve-out and its comment (site 21). Verified by
-      `grep -rn 'components/board' .claude/` returning nothing
+- [ ] 8.10 `check-frontend-tests.sh`: **REPOINT, do not delete, the
+      `components/board/webgl/` GL-plumbing carve-out (C7 ruling)** —
+      `:126` (the predicate: `/components/board/webgl/.*\.(ts|tsx)$` →
+      `/components/space/webgl/.*\.(ts|tsx)$`), `:118` (the same path inside
+      the exemption comment's pairing rule), and `:114` (see below). The
+      rest of the comment block (`:115-117,119-125` — the tautology rationale
+      and the pairing rule's substance) is policy, not lattice vocabulary,
+      and stays unedited — `frontend/components/space/webgl/`
+      exists and inherits that exact policy, and every module in it already
+      has a test, so repointing breaks nothing. Deleting a live carve-out
+      note is how an exemption becomes folklore, the same reasoning task 8.9
+      uses to keep site 18. `:114`'s example symbol `createLattice` is
+      lattice vocabulary from the deleted renderer, not policy: rewrite it
+      to `SpaceWorld` — the only symbol `frontend/components/space/webgl/`
+      exports — because task 10.2's `grep -rni 'lattice' … .claude` sweep
+      returns this line and admits no exemption for it. Verified by
+      `grep -rn 'components/board' .claude/` returning nothing **and**
+      `grep -rn 'components/space/webgl' .claude/` returning the repointed
+      predicate and comment
 - [ ] 8.11 `test_check_determinism_lists.py`: rewrite the docstring's "STATE OF
       THE TREE" paragraph (site 13), which enumerates the current list contents
       including `board` and `polar`. Then run it standalone and confirm it
@@ -563,20 +710,32 @@ names the file and states its verification.
       the leg survives for `./space/ ./system/` — and repoint the prose at the
       packages the leg actually runs
 - [ ] 8.14 `check.py:250` (site 31): `check_transcendental`'s docstring cites
-      "the TS **board-math** mirror". Repoint it at the surviving TS seam. This
-      is a third, separate docstring from sites 8 and 10
-- [ ] 8.15 `fixtures/system/mirror-map.json` (site 32): delete the
-      `generateWithStreams` (line 60) and `clampRing` (line 71) coverage
-      entries and the `generateWithStreams` /
+      "the TS **board-math** mirror". Repoint it at `frontend/lib/market`
+      (C9 ruling — the same repoint task 8.5 makes to the predicate itself,
+      so this docstring describes a seam that actually exists rather than
+      one 8.5 has just deleted). This is a third, separate docstring from
+      sites 8 and 10
+- [ ] 8.15 `fixtures/system/mirror-map.json` (site 32): **re-derive the whole
+      `coverage` array against the post-change Go surface, rather than
+      deleting only the two named entries** (C8) — `orbitFor` (line 63) is a
+      third entry that must be removed, not repointed, because 2.4 deletes
+      the function outright (it returned `system.Orbit`, the type task 2.1
+      deletes) rather than merely dropping its lattice parameter; a
+      `note: "indirect: called by orbitFeature, beltFeature, and
+      hazardFeature"` pointing at a function that no longer exists is the
+      same silently-inert species as the two entries already named. Delete
+      the `generateWithStreams` (line 60), `clampRing` (line 71), and
+      `orbitFor` (line 63) coverage entries and the `generateWithStreams` /
       `TestInteriorElementsSweep_MatchesLatticeIdentitySweep` mentions inside
       the `newRand` and `Generate` notes (lines 58-59); repoint the
-      `orbitFeature` / `orbitFor` / `beltFeature` / `hazardFeature` notes off
-      lattice placement. **Nothing will fail if you skip this:** this map runs
-      in `anti_mirror` mode, which reads only `.sharedNames` (`[]`) and never
-      inspects `.coverage`, so a stale entry naming a deleted symbol passes
-      forever. That is exactly the silently-inert record Goal 2 forbids, so it
-      must be repaired by hand and verified by
-      `grep -n 'clampRing\|generateWithStreams\|Lattice' fixtures/system/mirror-map.json`
+      `orbitFeature` / `beltFeature` / `hazardFeature` notes off lattice
+      placement (they survive, since 2.4 keeps those three functions, only
+      re-sourcing what they call). **Nothing will fail if you skip this:**
+      this map runs in `anti_mirror` mode, which reads only `.sharedNames`
+      (`[]`) and never inspects `.coverage`, so a stale entry naming a
+      deleted symbol passes forever. That is exactly the silently-inert
+      record Goal 2 forbids, so it must be repaired by hand and verified by
+      `grep -n 'clampRing\|generateWithStreams\|Lattice\|"orbitFor"' fixtures/system/mirror-map.json`
       returning nothing
 ## 9. Defect docs, project docs, and the numbered spec series
 
@@ -593,7 +752,20 @@ names the file and states its verification.
       through `space.PhaseIndexOf`, on the **Go build-target** axis rather than
       the language seam. Confirm `fixtures/system/cases.json`'s `gateOrbitSweep`
       exercises near-tie bearings; if it does not, file that as a new open
-      defect rather than closing the old one silently
+      defect rather than closing the old one silently. **Predicted outcome:
+      it does not, and a new defect must be filed** (C13) —
+      `gateOrbitSweep` draws two independent `galaxy.Coords` uniformly from
+      `[-2000, 2000]³` boxes, so the probability any drawn bearing lands
+      within one ULP of an exact tie between adjacent sub-turn phase indices
+      is effectively zero; the `gateOrbit` **hand** family's own tie case
+      ("an exact tie ... resolves to the documented lower index") is an
+      **exact** tie, deterministic on both build targets by construction, not
+      the near-tie this successor question asks about. So
+      `space.PhaseIndexOf`'s cross-build-target near-tie behaviour is not
+      covered today, and `cross-stack-determinism`'s "Authority does not
+      cover a same-side cross-target disagreement" applies — expect this task
+      to end in a new `docs/defects/` entry and a deviation-register line,
+      not a closure
       (`cross-stack-determinism`: *Inexact Arithmetic Is Rule-Bearing Only
       Through a Discretized, Tie-Broken Choice* › "Authority does not cover a
       same-side cross-target disagreement")
@@ -618,7 +790,9 @@ names the file and states its verification.
 
 - [ ] 10.1 `grep -rn 'backend/board\|backend/polar\|frontend/lib/board\|frontend/lib/polar\|fixtures/board\|fixtures/polar\|board-tactical-math\|polar-lattice-math' . --exclude-dir=node_modules --exclude-dir=.git`
       SHALL return hits only under `openspec/changes/archive/`,
-      `docs/plans/`, `docs/handoffs/` and `docs/defects/` — all historical
+      `docs/plans/`, `docs/handoffs/`, `docs/defects/` and `docs/specs/`
+      (the superseded numbered specs this task records rather than rewrites,
+      per OQ-4/task 9.4) — all historical
       record, which stays. Every other hit is fixed or removed
 - [ ] 10.1b Run a **second, bare-token** sweep, because the enforcement lists
       do not spell the packages as paths and 10.1's path patterns miss all of
@@ -628,8 +802,16 @@ names the file and states its verification.
       and `.gitlab-ci.yml` are the exact sites section 8 de-enrols, and 10.1
       cannot confirm any of them. Run
       `grep -rnE '"board"|"polar"|\(board |[( ]polar[) ]|\./board/|\./polar/' .claude .gitlab-ci.yml infra`
-      and require it to return nothing. Without this leg the section-8 tasks
-      are self-attested
+      and require it to return nothing. **This pattern itself misses two of
+      the sites section 8 de-enrols (C15) — do not trust a clean run of it as
+      proof those two are gone; verify them by reading the file instead:**
+      `.gitlab-ci.yml:371`'s `(cd board && "$QEMU" ...)` matches none of
+      `"board"`, `(board `, or `./board/` (task 8.2's job), and
+      `infra/docker/test-runner.Dockerfile:5`'s bare, unquoted, unparenthesized
+      word `board` in prose (task 8.13's job) matches none of the pattern's
+      alternatives either. Without this leg the section-8 tasks are
+      self-attested; with it, these two sites still are, and must be checked
+      by hand
 - [ ] 10.1c Sweep for SYMBOL citations of the deleted packages, which 10.1's
       path patterns and 10.1b's `.claude` scope both miss:
       `grep -rnE '\b(board|polar)\.[A-Za-z]' backend --include='*.go'` and
@@ -677,7 +859,104 @@ names the file and states its verification.
       `MatchesLatticeIdentitySweep` (cited from three files) both survive a
       word-bounded sweep. If `frontend/app/spike/space-3d/` survives OQ-5, its
       three anti-lattice comments are handled by task 6.3b — rewritten there,
-      not exempted here
+      not exempted here.
+
+      **C12 — the hit list, derived mechanically, not enumerated by hand.**
+      Running the sweep now (excluding `backend/board`, `backend/polar`,
+      `frontend/lib/board`, `frontend/lib/polar`, deleted outright by
+      sections 5–6, and the 21 files task 2.10's own grep already owns)
+      returns the files below. **No new exemptions beyond the one
+      wire-contract guard named above** — every one of these gets a
+      one-word disposition, `rewrite` (drop the word, keep the behaviour;
+      these are all comments or test-only prose, never a code-behaviour
+      change) unless marked `delete` or `covered` (already fully handled by
+      a named task; re-run this sweep against it rather than re-doing that
+      task's work):
+
+      Backend — `rewrite` unless noted:
+      `backend/disclosure/purity_test.go`, `backend/disclosure/world.go`,
+      `backend/disclosure_wiring_e2e_test.go`, `backend/fleet/dao_test.go`,
+      `backend/fleet/handler.go`, `backend/fleet/integration_test.go`,
+      `backend/fleet/jump_deletion_test.go`,
+      `backend/fleet/list_stale_arrival_integration_test.go`,
+      `backend/fleet/routing_deletion_test.go`,
+      `backend/fleet/service_test.go`,
+      `backend/fleet/stale_arrival_integration_test.go`,
+      `backend/fleet/star_destination_identity_absent_test.go`,
+      `backend/galaxy/model.go`, `backend/space/turn_test.go`,
+      `backend/interior_continuous_wire_e2e_test.go`,
+      `backend/interior_gate_body_id_e2e_test.go`,
+      `backend/orbit_elements_wire_e2e_test.go`,
+      `backend/system/bodies.go`,
+      `backend/system/orbit_elements_and_extent_wire_test.go`;
+      `backend/fleet/lattice_symbols_absent_test.go` — **delete** (task 3.4);
+      `backend/system/gates.go` — **covered** (task 2.7 deletes `LaneGate.Cell`;
+      four surviving comments at `:14,23,62,141` still need the word dropped,
+      confirm they land in the same commit); `backend/system/continuous.go` —
+      **covered** (this is where `continuousStarParented` actually lives:
+      its `r2 == nil` early return is task 2.6's target and its
+      `f.Orbit.Dir < 0` read is task 2.5's; the surrounding doc comments
+      — `:25-28,75-77,238,243-249` — must be rewritten in the same commit,
+      not left as a second pass); `backend/system/station_continuous.go` —
+      **covered** (task 3.1); `backend/system/gates_deletion_test.go` —
+      **covered** (task 2.9 handles its `BoardFog` symbol; the separate
+      `lattice`-word comment at `:12` still needs the word dropped in the
+      same commit).
+
+      **C12 addendum (MAJOR-4 — the mechanical derivation was short by 13
+      files):** `backend/common/tuning_test.go` (`:39,74`) and
+      `frontend/components/fleet/FleetRoster.test.tsx` (`:131`) —
+      **rewrite**; neither is reached by any other task's line citations.
+      `backend/system/fog.go` — **covered** (task 2.9; surviving comments at
+      `:16,19,22,23,55` still need the word dropped in the same commit);
+      `backend/system/generator.go` — **covered** (task 2.4; `:44,46,47,71,72,
+      120,121,124`); `backend/system/handler.go` — **covered** (task 2.7;
+      `:165,167,170`); `backend/system/model.go` — **covered** (tasks 2.1/2.1b;
+      `:126,130,198`); `backend/system/service.go` — **rewrite** (`:227`, named
+      by no other task). Already-covered-but-unlisted, named here so a
+      re-run of this sweep is not mistaken for new work:
+      `frontend/lib/types/action.ts:5` (task 6.3),
+      `fixtures/system/mirror-map.json:59,60,71` (task 8.15),
+      `.claude/scripts/check-mirror-map.sh:9-10` (task 8.9, design site 17),
+      `.claude/skills/code-quality-checks/check.py:1055` (task 8.6, design
+      site 8), `backend/fleet/resolver_test.go:22` (adjacent to the `:23`
+      citation task 4.2 already owns), and the `stations`/`mine`/`market`
+      copies of `lattice_symbols_absent_test.go` plus
+      `stations/{orbit_guard,no_lattice_dock_predicate}_test.go` and
+      `stations/placement.go` (tasks 3.1/3.4). `.claude/scripts/check-frontend-tests.sh`
+      — **covered** (task 8.10's `:114` `createLattice` rewrite; MAJOR-3).
+
+      Frontend — `rewrite`:
+      `frontend/components/space/space-camera.ts`,
+      `frontend/components/space/space-camera.test.ts`,
+      `frontend/e2e/helpers/space-view.ts`,
+      `frontend/e2e/tests/jump-commit.spec.ts`,
+      `frontend/e2e/tests/new-user.spec.ts`,
+      `frontend/e2e/tests/refuel-commit.spec.ts`,
+      `frontend/e2e/tests/slice.spec.ts`,
+      `frontend/e2e/tests/space-journey.spec.ts`,
+      `frontend/hooks/use-system-space.ts:12`,
+      `frontend/lib/services/system-service.ts`,
+      `frontend/lib/services/system-service.test.ts`,
+      `frontend/lib/types/system-space.ts:8`,
+      `frontend/components/space/SystemSpaceView.tsx:28` (the "THE STATION'S
+      LATTICE `orbit` IS NEVER READ HERE" comment — task 1.1 already flags
+      this file's neighbouring line 29 as a prose hit task 6.3 rewrites; this
+      is the same comment block, drop the word in the same pass);
+      `frontend/components/galaxy/GalaxyView.test.tsx:442,457` — **two
+      further hits distinct from the `:504` `board.laneGates` citation
+      task 10.1c and the round-4 minor already repoint**: SDET commentary
+      reading "the lattice board is deleted by section 10" — accurate, but
+      the word still has to go, since Goal 1 forbids the word describing a
+      representation the game no longer has, true statement or not.
+
+      `fixtures/system/cases.json` — **covered** (task 2.10c's re-record
+      drops the `latticeProjection`/`latticeDrawCount` components that
+      account for essentially all ~242 hits; re-run this sweep against the
+      re-recorded file rather than assuming it, since a residual key name or
+      `note` string in the surviving `continuousLine` component would not be
+      caught by 2.10c's own byte-identity check, which only proves the two
+      architectures agree with each other, not that the word is gone).
 - [ ] 10.3 Confirm the three wording-only deltas landed and have no code to
       change, so they are not mistaken later for unimplemented work:
       `session-wakeup` (*Successful Spawn Hands Off to the Home Board*),
@@ -758,7 +1037,16 @@ names the file and states its verification.
       delta MODIFIES (task B1 / `specs/system-space-view/spec.md`). No
       cross-change scenario drift exists to guard here; this task's job going
       forward is to re-run `openspec-reconcile.py` and re-check that
-      predecessor's deltas if either side changes before archive
+      predecessor's deltas if either side changes before archive. **Also
+      confirm** (C11) the new `system-interior` › *Interior Read Serves
+      Continuous Bodies* `MODIFIED` block reproduces all ten of that live
+      requirement's scenario headings byte-identically, dropping only the
+      body's "Their removal is what allows `backend/board` and
+      `backend/polar` to be deleted" sentence and nothing else — this
+      requirement is `build-production-space-view`'s, deliberately
+      unmodified by this change everywhere else per the proposal's
+      "Deliberately untouched" list, so this is the one place the sweep must
+      be exact rather than assumed
 - [ ] 11.5 `cd backend && go test ./... -p 1`, `cd frontend && npx vitest run`,
       `cd frontend && npm run e2e`, and
       `bash .claude/scripts/check.sh --backend --frontend --lint --test` all
@@ -831,12 +1119,10 @@ archiver that must be rehearsed.
         code
       - `backend/stations/no_lattice_dock_predicate_test.go:3` — cites
         *trading-station*'s "Docking to the station involves no lattice
-        predicate", a scenario this change retires. **This file is named in no
-        other task**, still compiles and still passes, so nothing else surfaces
-        it; delete it under Decision 6 (its own header records that the package
-        implements no dock predicate at all) or repoint it at *Station Is a
-        Dockable, Non-Mineable Body* › "Position coincidence without attachment
-        is not docking"
+        predicate", a scenario this change retires. This file is now named by
+        task 3.4 (deleted under Decision 6); this leg confirms the deletion
+        actually landed rather than leaving a dangling citation this sweep
+        would otherwise be the only thing to catch
 
 ## 13. Post-archive manual steps
 

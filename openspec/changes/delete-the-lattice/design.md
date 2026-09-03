@@ -210,6 +210,16 @@ The exact new name is left to the implementer within the constraint that it
 contains no "board" and no "ring"; the task states the constraint rather than
 inventing a value.
 
+**Recorded, not fixed (C10):** once the tuning knob is renamed,
+`system.GenerationParams.Radius` is the only survivor still calling an
+inclusive orbital *index* a "radius" — the same naming defect Decision 5
+exists to correct on the tuning side. It is not lattice vocabulary, so it is
+out of this change's declared scope (Goal 1 governs the lattice, not every
+misleading name in `system`), and task 4.3b's surviving guard
+(`system.DefaultParams().Radius == common.Tuning().<new name>`) cites it by
+name, so renaming it here would touch a test this change already depends on
+for an unrelated reason. A cheap follow-up, not a blocker.
+
 ### Decision 6: A negative guard survives if it can still fail
 
 Several requirements and tests assert the *absence* of the lattice. After the
@@ -403,6 +413,21 @@ requirement elsewhere, or governs a computation that ceases to exist:
   no spike either (OQ-5 is Travis's to rule), so the clause stays satisfied —
   but task 13.1's Purpose edit must not remove the sentence, and task 8.9 must
   not remove the matching carve-out comment in `check-mirror-map.sh`.
+- **Recorded, not fixed (C14): `mirror_trigger`'s coverage stays incomplete
+  for packages this change never reaches.** Task 8.7 correctly adds
+  `backend/market`/`frontend/lib/market` to `mirror_trigger`
+  (`check.py:1502-1514`) alongside the `backend/board`/`backend/polar`/
+  `frontend/lib/{board,polar}` clauses it removes — but `backend/space`,
+  `backend/fleet`, `backend/galaxy`, and `backend/disclosure` all carry their
+  own `anti_mirror` maps that `check-mirror-map.sh` runs, and none of them
+  has ever fired `mirror_trigger`. A changed-file run that touches only one
+  of those four packages silently skips the mirror-map check today, before
+  and after this change. Same species as
+  `pin-system-generation-determinism`'s sharpest finding, one level out;
+  out of this change's declared scope (it names `board`/`polar`
+  de-enrolment and the `market` enrolment, not a general audit of
+  `mirror_trigger`'s completeness), and recorded here so it is not
+  re-discovered a fourth time.
 
 ## Migration Plan
 

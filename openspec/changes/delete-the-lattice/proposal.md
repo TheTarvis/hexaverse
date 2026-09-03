@@ -144,9 +144,17 @@ assuming it.
   Purpose sentences that change explicitly does *not* reach.
 - `system-interior`'s *Interior Read Serves Continuous Bodies* (added by
   `build-production-space-view`) keeps its "Lattice-only fields are absent from
-  the response" scenario. That guard is expressed on the **wire**, which still
-  exists, so it can still fail; it is not the unfailable kind this change
-  retires elsewhere (design.md Decision 6).
+  the response" scenario **unedited**. That guard is expressed on the
+  **wire**, which still exists, so it can still fail; it is not the
+  unfailable kind this change retires elsewhere (design.md Decision 6).
+  **The requirement's body is not untouched, however (C11):** it names
+  `backend/board` and `backend/polar` by path as the reason their removal
+  is safe — a live requirement citing two packages this very change deletes,
+  which would be a forward reference to already-completed work the moment
+  this change archives, and a hit task 10.1's sweep of `openspec/specs/`
+  would otherwise return. A MODIFIED block drops that one sentence and
+  reproduces the requirement's body and all ten scenario headings otherwise
+  verbatim — see `specs/system-interior/spec.md`.
 
 ## Impact
 
