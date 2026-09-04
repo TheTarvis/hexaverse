@@ -18,7 +18,7 @@ export function useSystemSpace(
   options?: Omit<UseQueryOptions<SystemSpace, Error>, 'queryKey' | 'queryFn'>,
 ): UseQueryResult<SystemSpace, Error> {
   return useQuery<SystemSpace, Error>({
-    queryKey: queryKeys.systemBoard.detail(systemId),
+    queryKey: queryKeys.systemSpace.detail(systemId),
     queryFn: () => systemService.getSystemSpace(systemId),
     enabled: !!systemId && (options?.enabled ?? true),
     ...options,

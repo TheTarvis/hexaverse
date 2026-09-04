@@ -2,8 +2,9 @@
 // Mirrors backend action/handler.go `actionDTO`: the generic Action plus
 // worldTime on every read. The live consumer is the running-mine countdown.
 //
-// `params.origin`/`params.target` were typed by `@/lib/board`'s lattice
-// `Cell`/`Target` and are gone (openspec build-production-space-view,
+// `params.origin`/`params.target` were typed by the deleted pre-continuous
+// `Cell`/`Target` coordinate pair and are gone (openspec
+// build-production-space-view,
 // tasks.md 10.4): both were already dead against the live wire — a burn's
 // `action.Params` carries only `state`, and nothing on the client read
 // either. `params` stays an open record, which is what every real reader

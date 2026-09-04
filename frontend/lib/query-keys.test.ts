@@ -16,17 +16,17 @@ describe('queryKeys', () => {
     expect(queryKeys.galaxy.startArea()).toEqual(['galaxy', 'start-area'])
   })
 
-  it('builds per-system board detail keys under the systemBoard prefix', () => {
-    expect(queryKeys.systemBoard.all).toEqual(['systemBoard'])
-    expect(queryKeys.systemBoard.detail('sys-7')).toEqual(['systemBoard', 'detail', 'sys-7'])
-    // Distinct id → distinct key, so two open boards cache independently.
-    expect(queryKeys.systemBoard.detail('sys-8')).not.toEqual(queryKeys.systemBoard.detail('sys-7'))
+  it('builds per-system interior detail keys under the systemSpace prefix', () => {
+    expect(queryKeys.systemSpace.all).toEqual(['systemSpace'])
+    expect(queryKeys.systemSpace.detail('sys-7')).toEqual(['systemSpace', 'detail', 'sys-7'])
+    // Distinct id → distinct key, so two open systems cache independently.
+    expect(queryKeys.systemSpace.detail('sys-8')).not.toEqual(queryKeys.systemSpace.detail('sys-7'))
     // Nested under `all` so a broad invalidation cascades.
-    expect(queryKeys.systemBoard.detail('sys-7').slice(0, 1)).toEqual(queryKeys.systemBoard.all)
+    expect(queryKeys.systemSpace.detail('sys-7').slice(0, 1)).toEqual(queryKeys.systemSpace.all)
   })
 
-  it('keeps the system health probe separate from the systemBoard read', () => {
+  it('keeps the system health probe separate from the systemSpace read', () => {
     expect(queryKeys.system.all).toEqual(['system'])
-    expect(queryKeys.system.all).not.toEqual(queryKeys.systemBoard.all)
+    expect(queryKeys.system.all).not.toEqual(queryKeys.systemSpace.all)
   })
 })

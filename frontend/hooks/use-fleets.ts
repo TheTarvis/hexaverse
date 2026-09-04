@@ -29,7 +29,7 @@ export function useMyFleets(
 function invalidateFleet(qc: ReturnType<typeof useQueryClient>, fleet: Fleet): void {
   void qc.invalidateQueries({ queryKey: queryKeys.fleets.mine() })
   void qc.invalidateQueries({ queryKey: queryKeys.fleets.detail(fleet.id) })
-  void qc.invalidateQueries({ queryKey: queryKeys.systemBoard.detail(fleet.systemId) })
+  void qc.invalidateQueries({ queryKey: queryKeys.systemSpace.detail(fleet.systemId) })
 }
 
 // add-scan-and-sightings-surface (F4, link8b-adversary-r8): cut drive, stop,
@@ -137,7 +137,7 @@ export function useMine(
     onSuccess: (_, { fleetId }) => {
       void qc.invalidateQueries({ queryKey: queryKeys.fleets.mine() })
       void qc.invalidateQueries({ queryKey: queryKeys.fleets.detail(fleetId) })
-      void qc.invalidateQueries({ queryKey: queryKeys.systemBoard.detail(systemId) })
+      void qc.invalidateQueries({ queryKey: queryKeys.systemSpace.detail(systemId) })
       void qc.invalidateQueries({ queryKey: queryKeys.actions.running(fleetId) })
     },
   })

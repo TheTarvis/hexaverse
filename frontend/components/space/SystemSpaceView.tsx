@@ -25,10 +25,9 @@
 // 404s a system with no visible station — the ordinary answer — so that case
 // shows no error and no retry, while any other failure does.
 //
-// THE STATION'S LATTICE `orbit` IS NEVER READ HERE. It still rides the wire
-// (`lib/types/market.ts`), and task 10.11's grep looks for `@/lib/board`
-// imports, so reading it would pass every gate silently. Only `systemId` and
-// `featureId` are consumed.
+// THE STATION READ SUPPLIES ONLY `systemId` AND `featureId`. A station's
+// position is never taken from the station document; it comes from the
+// interior read's body table, exactly as every other body's does.
 //
 // THE CLOCK IS PROJECTED AT THE SERVED SCALE, never an assumed 1 — and when
 // the interior read has failed, at the FLEET read's served scale, because

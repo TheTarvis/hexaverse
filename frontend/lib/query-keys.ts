@@ -30,12 +30,12 @@ export const queryKeys = {
     startArea: () => [...queryKeys.galaxy.all, 'start-area'] as const,
   },
 
-  systemBoard: {
-    // The fogged interior read for one system (#0007). Distinct from `system`
-    // (the health probe). Verbs invalidate `detail(id)` and self-schedule its
-    // ETA refetch (#0005 client rules).
-    all: ['systemBoard'] as const,
-    detail: (id: string) => [...queryKeys.systemBoard.all, 'detail', id] as const,
+  systemSpace: {
+    // The fogged continuous-space interior read for one system. Distinct
+    // from `system` (the health probe). Verbs invalidate `detail(id)` and
+    // self-schedule its ETA refetch (#0005 client rules).
+    all: ['systemSpace'] as const,
+    detail: (id: string) => [...queryKeys.systemSpace.all, 'detail', id] as const,
   },
 
   fleets: {

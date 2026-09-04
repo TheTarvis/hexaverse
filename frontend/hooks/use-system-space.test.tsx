@@ -44,7 +44,7 @@ describe('useSystemSpace', () => {
     const { result } = renderHook(() => useSystemSpace('sys_-7_17'), { wrapper: Wrapper })
     await waitFor(() => expect(result.current.data).toEqual(INTERIOR))
     expect(mockGet).toHaveBeenCalledWith('sys_-7_17')
-    expect(qc.getQueryData(queryKeys.systemBoard.detail('sys_-7_17'))).toEqual(INTERIOR)
+    expect(qc.getQueryData(queryKeys.systemSpace.detail('sys_-7_17'))).toEqual(INTERIOR)
   })
 
   it('issues no request until a system id is known', async () => {

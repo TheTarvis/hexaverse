@@ -100,7 +100,7 @@ describe('useOrder — fleet-movement "In-System Burn Order to a Body or a Point
     const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
     expect(keys).toContainEqual(queryKeys.fleets.mine())
     expect(keys).toContainEqual(queryKeys.fleets.detail('fleet_1'))
-    expect(keys).toContainEqual(queryKeys.systemBoard.detail('sys-0'))
+    expect(keys).toContainEqual(queryKeys.systemSpace.detail('sys-0'))
   })
 })
 
@@ -173,7 +173,7 @@ describe('useMine', () => {
     const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
     expect(keys).toContainEqual(queryKeys.fleets.mine())
     expect(keys).toContainEqual(queryKeys.fleets.detail('fleet_1'))
-    expect(keys).toContainEqual(queryKeys.systemBoard.detail('sys-0'))
+    expect(keys).toContainEqual(queryKeys.systemSpace.detail('sys-0'))
     expect(keys).toContainEqual(queryKeys.actions.running('fleet_1'))
   })
 })
