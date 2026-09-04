@@ -20,7 +20,7 @@ package system
 // `starSizeForClass`, and `beltMemberOrbit` are exhaustive (their domains are
 // small integer/string enumerations); `interiorElements` is the pinned
 // 80-case sweep this change's fix directly touches, reusing
-// lattice_identity_test.go's own skeleton/region/seed cross (see
+// the shared 80-case skeleton/region/seed cross (see
 // generate_streams_test.go's interiorElementsSkeletons/-Regions, duplicated
 // there rather than imported so this file's compile-ability never depends
 // on that file's task-3.6 edit). `keplerPeriodMs`, `gateOrbit`, and

@@ -6,8 +6,8 @@ package main
 // replace-observation-with-sightings, tasks.md 8.1) as the ADDITIVE guard for
 // link 8a-1: the interior read had to keep serving features[].footprint,
 // features[].band, features[].live and laneGates[].cell alongside the new
-// space/size/contacts fields, because the lattice board was the only playable
-// view "until a later link deletes these". Link 8a-2 —
+// space/size/contacts fields, because the discrete board was the only
+// playable view "until a later link deletes these". Link 8a-2 —
 // build-production-space-view, tasks.md 9.1 — IS that later link. It deletes
 // every one of those fields, and it retires the requirement that carried the
 // scenario this test was named for: `system-interior`'s *Interior Read
@@ -16,9 +16,9 @@ package main
 // absent from the response* asserts the exact opposite.
 //
 // The four presence assertions were therefore RETARGETED, not weakened: the
-// same real-router, real-generated-system, key-presence guard now pins the
-// lattice fields ABSENT (system-interior: "Lattice-only fields are absent from
-// the response") and the continuous fields PRESENT AND RESOLVED
+// same real-router, real-generated-system, key-presence guard now pins those
+// fields ABSENT (system-interior: "Lattice-only fields are absent from the
+// response") and the continuous fields PRESENT AND RESOLVED
 // (system-interior: "A materialized system's read carries every body's
 // continuous position and size"), plus the served lane-gate `id` that 9.1b
 // added in the same section (system-interior: "Every lane-gate body carries a
@@ -32,8 +32,9 @@ package main
 // real Firebase Auth emulator token, real generated system, and assertions on
 // the raw JSON object keys rather than on a Go struct that would silently
 // decode a missing field as a zero value. The absence half needs that same
-// level for the mirror-image reason: a lattice field re-added to the DTO by a
-// merge would be served here and nowhere a fixture-driven test could see it.
+// level for the mirror-image reason: one of those fields re-added to the DTO
+// by a merge would be served here and nowhere a fixture-driven test could see
+// it.
 //
 // Non-vacuity: the feature and lane-gate counts are asserted non-zero before
 // anything else, so an empty response can never satisfy a per-element loop.
@@ -59,7 +60,7 @@ type rawInterior struct {
 	Contacts *[]json.RawMessage `json:"contacts"`
 }
 
-func TestInteriorRead_Scenario_ContinuousBodiesServedAndLatticeFieldsAbsent(t *testing.T) {
+func TestInteriorRead_Scenario_ContinuousBodiesServedAndRetiredFieldsAbsent(t *testing.T) {
 	requireE2EEmulators(t)
 	ensureFirebaseInitialized(t)
 
@@ -100,7 +101,7 @@ func TestInteriorRead_Scenario_ContinuousBodiesServedAndLatticeFieldsAbsent(t *t
 			"be vacuous. Body: %s", homeId, w.Body.String())
 	}
 
-	// --- features[]: the continuous fields, and no lattice ------------------
+	// --- features[]: the continuous fields, and none of the retired ones ----
 	anyNonZeroSpace := false
 	starSize := 0.0
 	for i, f := range body.Features {
@@ -111,7 +112,7 @@ func TestInteriorRead_Scenario_ContinuousBodiesServedAndLatticeFieldsAbsent(t *t
 		for _, key := range []string{"footprint", "band", "live", "orbit", "parentId", "fixed", "asOf"} {
 			if _, ok := f[key]; ok {
 				t.Errorf("system-interior \"Lattice-only fields are absent from the response\": feature #%d (%q) "+
-					"still carries the lattice key %q. The continuous position/size/orbitElements set is the "+
+					"still carries the retired key %q. The continuous position/size/orbitElements set is the "+
 					"body's only placement now. Keys served: %v", i, id, key, jsonKeys(f))
 			}
 		}
@@ -137,7 +138,7 @@ func TestInteriorRead_Scenario_ContinuousBodiesServedAndLatticeFieldsAbsent(t *t
 	}
 	// Presence alone proves nothing: if `space` were served but never
 	// resolved, every body would sit at the origin and the key would be a lie
-	// told with a zero value — which, now that the lattice footprint is gone,
+	// told with a zero value — which, now that the discrete footprint is gone,
 	// is a system with every body stacked on its star.
 	if !anyNonZeroSpace {
 		t.Errorf("every feature's `space` is the zero vector — the continuous position is on the wire but was " +

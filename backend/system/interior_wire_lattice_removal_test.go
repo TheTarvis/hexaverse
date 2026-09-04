@@ -22,7 +22,7 @@ import (
 //
 // This test compiles both BEFORE and AFTER the removal: it names no field
 // identifier, only json tag strings. Before the removal it fails, listing the
-// surviving lattice keys. After it passes, and it then keeps passing only
+// surviving retired keys. After it passes, and it then keeps passing only
 // while nothing reintroduces one.
 //
 // VACUITY NOTE: the assertions are EXACT SET EQUALITY, not "does not
@@ -69,8 +69,8 @@ func assertKeySet(t *testing.T, what string, got, want []string) {
 
 // Scenario: Lattice-only fields are absent from the response
 func TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse(t *testing.T) {
-	// The lattice keys this change deletes, named exactly as the requirement
-	// and tasks.md 9.1 name them.
+	// The keys that change deletes, named exactly as the requirement and
+	// tasks.md 9.1 name them.
 	removedFromBody := []string{"footprint", "orbit", "parentId", "fixed", "band", "live", "asOf"}
 	removedFromGate := []string{"cell"}
 	removedFromResponse := []string{"radius"}
@@ -80,7 +80,7 @@ func TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse(t *testing.T) {
 		for _, k := range removedFromBody {
 			for _, got := range keys {
 				if got == k {
-					t.Errorf("a feature body still serves the lattice key %q; %v", k, keys)
+					t.Errorf("a feature body still serves the retired key %q; %v", k, keys)
 				}
 			}
 		}
@@ -97,7 +97,7 @@ func TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse(t *testing.T) {
 		for _, k := range removedFromGate {
 			for _, got := range keys {
 				if got == k {
-					t.Errorf("a lane-gate body still serves the lattice key %q; %v", k, keys)
+					t.Errorf("a lane-gate body still serves the retired key %q; %v", k, keys)
 				}
 			}
 		}
@@ -118,9 +118,9 @@ func TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse(t *testing.T) {
 		for _, k := range removedFromResponse {
 			for _, got := range keys {
 				if got == k {
-					t.Errorf("the interior response still serves the lattice key %q — the continuous "+
+					t.Errorf("the interior response still serves the retired key %q — the continuous "+
 						"`extent` is its successor, and serving both leaves a consumer free to scale "+
-						"continuous space off the lattice number; keys: %v", k, keys)
+						"continuous space off the retired ordinal; keys: %v", k, keys)
 				}
 			}
 		}
@@ -142,7 +142,7 @@ func TestInteriorRead_ContinuousFieldsSurviveTheRemoval(t *testing.T) {
 	t.Run("Scenario: The read carries the interior's continuous extent", func(t *testing.T) {
 		if !hasKey(jsonKeys(t, interiorDTO{}), "extent") {
 			t.Fatal("the interior response must still carry the continuous `extent` — it is what a " +
-				"client scales its camera, pan bound and pick radius against once the lattice " +
+				"client scales its camera, pan bound and pick radius against once the discrete " +
 				"`radius` is gone")
 		}
 	})

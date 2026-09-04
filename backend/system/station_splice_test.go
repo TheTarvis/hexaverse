@@ -11,7 +11,7 @@ import (
 // Loud" (openspec change replace-observation-with-sightings, tasks.md 10.9/
 // 10.14). TestSpliceStation_AppendsTheStationWhenOneExists previously
 // constructed &Service{stations: src} with NO galaxySvc and asserted only
-// that a lattice Orbit was attached — an unreachable production
+// that a discrete orbit object was attached — an unreachable production
 // configuration (system.NewService always wires galaxySvc) that no longer
 // reflects what "the station is appended" must mean now that appending an
 // INCOMPLETE spliced body (no continuous orbital element set, no positive
@@ -19,7 +19,7 @@ import (
 // a fake galaxySvc (oneBodySkeletonGalaxy, already used by
 // splice_completeness_test.go / spliced_body_complete_or_loud_test.go in this
 // package) and assert the appended station is COMPLETE — non-nil Space and a
-// strictly positive Size — rather than merely present with a lattice Orbit.
+// strictly positive Size — rather than merely present with a discrete orbit.
 
 // fakeStationSource stands in for the station store: it either yields a station
 // feature, yields none, or fails — the three cases the splice must handle.
@@ -78,7 +78,7 @@ func TestSpliceStation_AppendsTheStationWhenOneExists(t *testing.T) {
 	// system-interior "A Spliced Body Is Complete or Omitted, and Its
 	// Incompleteness Is Loud": the appended station must be COMPLETE — a
 	// non-nil continuous orbital element set and a strictly positive Size —
-	// not merely carrying a lattice Orbit, which alone is not enough to
+	// not merely carrying a discrete orbit, which alone is not enough to
 	// survive applyContinuousCascade's completeness contract.
 	if last.Space == nil {
 		t.Error("spliced station carries no continuous orbital element set (Space)")

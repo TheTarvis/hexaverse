@@ -103,10 +103,10 @@ func TestGetInterior_Scenario_ServesTheBaseFieldSet(t *testing.T) {
 	if body.SystemId != "s1" {
 		t.Errorf("systemId = %q, want s1", body.SystemId)
 	}
-	// The lattice ring count is gone from the wire (openspec
+	// The discrete ring count is gone from the wire (openspec
 	// build-production-space-view, tasks.md 9.1); the continuous `extent` is
 	// its successor and is asserted by
-	// interior_wire_lattice_removal_test.go's own key-set pins.
+	// the interior wire-removal suite's own key-set pins.
 	if body.Character != "star-rich" {
 		t.Errorf("character = %q, want star-rich", body.Character)
 	}

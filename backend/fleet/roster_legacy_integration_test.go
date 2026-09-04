@@ -35,7 +35,7 @@ func TestFleetDao_Scenario_PreExistingFleetNoStoredRosterDecodesToOneSeedHullThr
 	//
 	// The kinematic State itself is an ordinary modern space.ShipState (any
 	// valid one) — migrate-fleet-to-continuous-burns' Migration Plan is
-	// explicit that a PRE-CAPABILITY stored state (the old board.MovementState
+	// explicit that a PRE-CAPABILITY stored state (the old discrete movement-state
 	// shape) is not, and will not be made to, decode into a space.ShipState;
 	// that is a deliberately separate concern (fail-closed on a disposable
 	// document, not carried forward) from THIS scenario, which is purely

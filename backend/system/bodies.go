@@ -11,8 +11,7 @@ package system
 // This package's own interior handler is now a real consumer (Contacts,
 // contacts.go — replace-observation-with-sightings tasks.md 4.4/4.5/4.7):
 // every body's continuous position/size and the requester's live disclosure
-// union both resolve through this table. `mine`/`market`/`stations` still
-// resolve through `board`; the lattice's own deletion is a later link.
+// union both resolve through this table.
 
 import (
 	"context"

@@ -21,7 +21,7 @@ package fleet
 // like a red test that isn't: ErrCoreDestination is already absent from this
 // package. This is a durable pin against its reintroduction alongside the
 // preview handler, in the same shape as this package's own
-// lattice_symbols_absent_test.go.
+// this package's other absent-symbol guards.
 
 import (
 	"os"

@@ -159,8 +159,8 @@ type Fleet struct {
 
 // DockedTo reports the id of the host this fleet is attached to, and whether
 // it is attached at all (design.md Decision 13; mirrors mine/market's
-// pre-migration `eff.Mode == board.ModeDocked` check, now a one-line
-// re-point for link 6 to build on).
+// pre-migration docked-mode check, now a one-line re-point for link 6 to
+// build on).
 func (f Fleet) DockedTo() (string, bool) { return f.AttachedTo, f.AttachedTo != "" }
 
 // OrderRequest is the body of POST /v1/fleets/:id/orders — a burn ordered to

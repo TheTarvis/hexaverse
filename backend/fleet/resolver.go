@@ -23,7 +23,7 @@ import (
 //
 // The path-swept ambient reveal this resolver used to also mint
 // (RegisterResolversWithAmbient/AmbientRecorder/BurnResolverWithAmbient) has
-// no successor after Decision 4 (a burn's path is no longer a []board.Cell to
+// no successor after Decision 4 (a burn's path is no longer a list of cells to
 // sweep) — deleted here rather than carried forward broken; link 4 section 7
 // deletes the observation-side reveal writer it fed.
 func RegisterResolvers(a *action.Service, bodies BodySource) {

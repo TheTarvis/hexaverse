@@ -93,7 +93,7 @@ func testBodyTable(t *testing.T, systemID string, starSize float64, extras ...sy
 // freshParkedFleet returns a free-flying (AttachedTo empty) fleet parked at
 // the origin — the section-3 tests' own stand-in for service_test.go's
 // coastFleetAtCentre(), which cannot be reused here: it constructs the OLD
-// board.MovementState-typed State and will not compile once Fleet.State
+// discrete movement-state-typed State and will not compile once Fleet.State
 // becomes space.ShipState (tasks.md 3.2), and service_test.go is a
 // pre-existing file this SDET pass must not modify.
 // Parked well outside any star clearance this fixture family's star sizes

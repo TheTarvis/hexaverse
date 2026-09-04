@@ -118,11 +118,11 @@ func newSvc(t *testing.T, clk *fakeClock) (*Service, *MockDao, *fakeActions, *go
 	return NewServiceWith(dao, stubBodySourceFixed{bt: bodies}, fakeGraphUnused{}, fa, clk), dao, fa, ctrl
 }
 
-// --- OrderTo happy path (successor of the lattice-era
+// --- OrderTo happy path (successor of the pre-continuous
 // TestOrderTo_Cell_BurnPathAndEta / TestOrderTo_Feature_InterceptMeetsBodyAndDocks
 // / TestOrderTo_MotionOffReduction — collapsed into one point case and one body
 // case, since space.SolveBurn has no separate "static vs moving body" code
-// path the way board.OrbState's motion-off reduction did: every body target
+// path the way the retired orbit-state's motion-off reduction did: every body target
 // resolves through the same intercept solve regardless of whether it moves.) ---
 
 func TestOrderTo_Scenario_PointTargetCommitsABurnWithARealEta(t *testing.T) {
@@ -262,7 +262,7 @@ func TestOrderTo_Scenario_AmbiguousOrderRejected(t *testing.T) {
 	}
 }
 
-// --- Get() opportunistic arrival resolve (successor of the lattice-era
+// --- Get() opportunistic arrival resolve (successor of the pre-continuous
 // TestGet_ArrivalDocksAfterEta / TestGet_ArrivalCoastsWhenNoDock — the real
 // settle logic now lives entirely in BurnResolver (resolver_test.go), so at
 // the Service level the only thing left to pin is the DELEGATION: a due
@@ -323,7 +323,7 @@ func TestGet_Scenario_NotYetDueBurnIsNotResolved(t *testing.T) {
 }
 
 // --- Cancel delegates to CutDrive for a burning fleet (thin-passthrough
-// successor of the lattice-era TestCancel_MidBurnResumesCoast — CutDrive's
+// successor of the pre-continuous TestCancel_MidBurnResumesCoast — CutDrive's
 // own conversion arithmetic is pinned directly by attached_to_test.go's
 // TestCutDrive_Scenario_LeavesAttachedToCleared; this only pins that Cancel
 // routes a burning fleet through it rather than some other path). ---
@@ -361,9 +361,9 @@ func TestCancel_Scenario_MidBurnConvertsToADrift(t *testing.T) {
 //
 // Reason: this test pinned FleetsForCorp's no-op return purely so the method
 // had a caller to justify keeping it. FleetsForCorp implemented
-// observation.FleetSource (the lattice-hop ambient-coverage dependency
+// observation.FleetSource (the hop-distance ambient-coverage dependency
 // inversion); that interface is deleted (7.1, confirmed absent by
-// observation/lattice_live_half_absent_test.go) and FleetsForCorp has zero
+// observation's own absent-symbol guard) and FleetsForCorp has zero
 // production callers left (grep confirms — no handler, no service, no other
 // package references it). Its return type, []struct{}, cannot carry any
 // information; the assertion "len(got) != 0" is a tautology once you accept

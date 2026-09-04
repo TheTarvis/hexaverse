@@ -27,7 +27,7 @@ func TestDefaultSpawnParams(t *testing.T) {
 	// tasks.md 3.9): "the starting hull coasts one ring inside the
 	// lane-gate ring" — SpawnParams.RimRing no longer exists. A fleet's
 	// spawn position is now a continuous space.Vec3 (homeSpawnPosition,
-	// spawn_position.go), not a board.Cell derived from RimRing. Successor
+	// spawn_position.go), not a discrete cell derived from RimRing. Successor
 	// coverage: spawn_position_test.go's TestHomeSpawnPosition_Scenario_*
 	// (not to be touched by this pass).
 }

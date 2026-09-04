@@ -49,13 +49,13 @@ type fogFeatureDTO struct {
 // the six fields space.EncodeOrbit already persists, under the exact names it
 // persists them by (system-interior "Interior Read Endpoint").
 //
-// The key it ships under is `orbitElements`, NEVER `orbit`: `orbit` is
-// already occupied on this response by the LATTICE orbit
+// The key it ships under is `orbitElements`, NEVER `orbit`: `orbit` was
+// already occupied on this response by the RETIRED discrete orbit object
 // ({ring, angle0, period, dir}), a different object with different fields and
 // a different meaning, and the `space` key is already occupied by the body's
 // resolved continuous position. Serving the element set under either name
-// would redefine a field a caller already reads — and since the two objects
-// share no field name, every stale reader would read `undefined` for every
+// would have redefined a field a caller already read — and since the two
+// objects share no field name, every stale reader would read `undefined` for every
 // field rather than throwing (design.md Decision 1 of
 // serve-orbital-elements-and-burn-preview).
 //

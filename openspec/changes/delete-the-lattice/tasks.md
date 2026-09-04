@@ -1124,14 +1124,14 @@ names the file and states its verification.
       `note` string in the surviving `continuousLine` component would not be
       caught by 2.10c's own byte-identity check, which only proves the two
       architectures agree with each other, not that the word is gone).
-- [ ] 10.3 Confirm the three wording-only deltas landed and have no code to
+- [x] 10.3 Confirm the three wording-only deltas landed and have no code to
       change, so they are not mistaken later for unimplemented work:
       `session-wakeup` (*Successful Spawn Hands Off to the Home Board*),
       `galaxy-generation` (*Per-System Body Skeleton*), and `mine-extraction`
       (*Ledger Key Is System-And-Kind-Qualified, Channel Scope Is Per-System*).
       Each names a route or an example that the code already satisfies; verify
       that by grep rather than by assumption
-- [ ] 10.3b `world-clock`'s *Scaled World Time* is **not** wording-only and
+- [x] 10.3b `world-clock`'s *Scaled World Time* is **not** wording-only and
       must not be checked off as such. Beyond dropping `board` and
       `observation` (both deleted packages), the delta **widens** the
       forbidden-`time.Now()` enumeration by adding `space`, `disclosure` and
@@ -1143,7 +1143,7 @@ names the file and states its verification.
       --include='*.go' | grep -v _test.go` SHALL return only the doc-comment
       mention at `space/vec.go:10` and no call site. A hit that is a real call
       means the widened requirement ships already violated
-- [ ] 10.3c Confirm the two extra `trading-station` `MODIFIED` blocks landed
+- [x] 10.3c Confirm the two extra `trading-station` `MODIFIED` blocks landed
       and are wording-only: *A Station's Continuous Orbit Is Derived, Never
       Rolled* drops "never read from a lattice `Dir` (the station carries
       none)" — a clause that becomes unfalsifiable once `Orbit.Dir` no longer

@@ -39,7 +39,7 @@ func TestLaneGates_ProjectsEachLaneToItsRimTile(t *testing.T) {
 	if gates[0].DestSystemId != "sys-e" || gates[1].DestSystemId != "sys-n" {
 		t.Fatalf("unexpected order: %+v", gates)
 	}
-	// The lattice `cell` these two assertions pinned is gone from the wire
+	// The discrete `cell` these two assertions pinned is gone from the wire
 	// (openspec build-production-space-view, tasks.md 9.1): a gate's place in
 	// the world is its continuous position and orbital elements, filled by
 	// fillGateGeometry from the body table, and asserted there. What survives

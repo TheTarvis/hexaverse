@@ -8,8 +8,7 @@ import (
 )
 
 // Target names a burn's destination as exactly one of a body identity or an
-// explicit point (mirroring board.Target's exactly-one-of-two-fields idiom,
-// backend/board/ship.go) — the caller is never required to supply a
+// explicit point — the caller is never required to supply a
 // precomputed target position (space-kinematics: "Targeting Names a Body or
 // an Explicit Point, Never Requires a Precomputed Position").
 type Target struct {

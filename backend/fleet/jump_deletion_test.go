@@ -11,7 +11,7 @@ package fleet
 // impossible to omit").
 //
 // This mirrors the established source-grep pattern
-// (lattice_symbols_absent_test.go / routing_deletion_test.go): pinning an
+// (this package's other absent-symbol guards / routing_deletion_test.go): pinning an
 // ABSENCE rather than a behavior, specifically because a behavioral test
 // exercising Jump's construction seam (WithGraph/WithTierSource) would need
 // to keep calling symbols this very task deletes — see the SDET handoff
@@ -69,7 +69,7 @@ func productionSources(t *testing.T) []string {
 	return files
 }
 
-// deletedChartingSymbols are the lattice-permission-era identifiers design.md
+// deletedChartingSymbols are the charting-permission-era identifiers design.md
 // Decision 2/22 names for deletion from fleet/service.go.
 var deletedChartingSymbols = []string{
 	"ErrLaneNotCharted",

@@ -144,12 +144,12 @@ type interiorDTO struct {
 	SystemId string `json:"systemId"`
 	// Extent is the interior's CONTINUOUS star-frame upper bound over every
 	// generated body's orbital radius (SystemInterior.Extent). It REPLACED
-	// the lattice ring count `radius`, which openspec
+	// the discrete ring count `radius`, which openspec
 	// build-production-space-view removed (tasks.md 9.1): serving both would
-	// leave a consumer free to keep scaling continuous space off the lattice
-	// number. It is the system-sized
-	// number a client scales a camera, clamps a pan bound, or bounds a pick
-	// radius with, and it is the one that survives the lattice's removal.
+	// have left a consumer free to keep scaling continuous space off the
+	// retired ordinal. It is the system-sized number a client scales a
+	// camera, clamps a pan bound, or bounds a pick radius with, and it is
+	// the one that survived.
 	// Never `omitempty`: a system whose stored Extent is genuinely zero must
 	// read as zero, not as absent.
 	Extent    float64         `json:"extent"`

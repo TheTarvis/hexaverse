@@ -1,7 +1,7 @@
 package fleet
 
-// RED-phase tests for tasks.md 3.8 — `fleet.SeedFleet` re-pointed from `at
-// board.Cell` to a `space` park: deterministic from the account id,
+// RED-phase tests for tasks.md 3.8 — `fleet.SeedFleet` re-pointed from a
+// discrete cell to a `space` park: deterministic from the account id,
 // idempotent per account (a healed retry reproduces the same position,
 // never a second fleet), rejecting a position inside the system star's
 // clearance radius (fleet-movement: "Spawn Fleet Seeding Places a Park").

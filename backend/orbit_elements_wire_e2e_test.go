@@ -322,13 +322,13 @@ func TestInteriorWire_Scenario_TheReadCarriesTheInteriorsContinuousExtent(t *tes
 	// RETARGETED 2026-09-03 (build-production-space-view, tasks.md 9.1). This
 	// was "`extent` is served ALONGSIDE `radius`, never in place of it" — the
 	// additive guarantee of the change that introduced `extent`. 9.1 deletes
-	// the lattice `radius` outright, so `extent` IS its replacement now, and
-	// the assertion that still has meaning is the mirror image: the lattice
-	// number must not come back to be scaled off
+	// the retired `radius` outright, so `extent` IS its replacement now, and
+	// the assertion that still has meaning is the mirror image: the retired
+	// ordinal must not come back to be scaled off
 	// (system-interior: "Lattice-only fields are absent from the response").
 	if _, ok := got.top["radius"]; ok {
-		t.Error("the interior read still carries the lattice `radius` — `extent` replaced it, and a consumer " +
-			"that finds both will scale continuous space off the lattice number")
+		t.Error("the interior read still carries the retired `radius` — `extent` replaced it, and a consumer " +
+			"that finds both will scale continuous space off the retired ordinal")
 	}
 }
 
@@ -375,15 +375,15 @@ const goldenWireDir = "testdata/serve-orbital-elements-and-burn-preview"
 // below.
 const recordGoldenEnv = "RECORD_GOLDEN_WIRE"
 
-// latticeFeatureKeys / latticeGateKeys are the fields build-production-space-
+// retiredFeatureKeys / retiredGateKeys are the fields build-production-space-
 // view's tasks.md 9.1 removed from the interior read. A committed sample that
 // still advertises one is not a stale-but-harmless file: `frontend/lib/types/
-// system-space.ts` is typed BY READING this sample, so a lattice key here is a
-// lattice key back in the client's type.
+// system-space.ts` is typed BY READING this sample, so a retired key here is a
+// retired key back in the client's type.
 var (
-	latticeTopKeys     = []string{"radius"}
-	latticeFeatureKeys = []string{"footprint", "orbit", "parentId", "fixed", "band", "live", "asOf"}
-	latticeGateKeys    = []string{"cell"}
+	retiredTopKeys     = []string{"radius"}
+	retiredFeatureKeys = []string{"footprint", "orbit", "parentId", "fixed", "band", "live", "asOf"}
+	retiredGateKeys    = []string{"cell"}
 )
 
 // TestGoldenWireSample_RecordOneInteriorReadAndOnePreviewResponse asserts the
@@ -506,9 +506,9 @@ func assertGoldenInteriorFitness(t *testing.T, label string, raw []byte) {
 				"against", label, k)
 		}
 	}
-	for _, k := range latticeTopKeys {
+	for _, k := range retiredTopKeys {
 		if _, ok := interior[k]; ok {
-			t.Errorf("%s still carries the lattice top-level key `%s` (system-interior: \"Lattice-only fields "+
+			t.Errorf("%s still carries the retired top-level key `%s` (system-interior: \"Lattice-only fields "+
 				"are absent from the response\")", label, k)
 		}
 	}
@@ -528,9 +528,9 @@ func assertGoldenInteriorFitness(t *testing.T, label string, raw []byte) {
 	sawElements, sawStation := false, false
 	for _, f := range features {
 		id := rawString(t, f["id"])
-		for _, k := range latticeFeatureKeys {
+		for _, k := range retiredFeatureKeys {
 			if _, ok := f[k]; ok {
-				t.Errorf("%s: feature %q still carries the lattice key `%s`", label, id, k)
+				t.Errorf("%s: feature %q still carries the retired key `%s`", label, id, k)
 			}
 		}
 		if el, ok := f["orbitElements"]; ok {
@@ -574,9 +574,9 @@ func assertGoldenInteriorFitness(t *testing.T, label string, raw []byte) {
 		t.Errorf("%s carries no lane gates", label)
 	}
 	for i, g := range gates {
-		for _, k := range latticeGateKeys {
+		for _, k := range retiredGateKeys {
 			if _, ok := g[k]; ok {
-				t.Errorf("%s: lane gate #%d still carries the lattice key `%s`", label, i, k)
+				t.Errorf("%s: lane gate #%d still carries the retired key `%s`", label, i, k)
 			}
 		}
 		if rawString(t, g["id"]) == "" {

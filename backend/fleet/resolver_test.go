@@ -12,7 +12,7 @@ import (
 // DELETED (migrate-fleet-to-continuous-burns, design.md Decision 21A, task
 // 6.5): this file used to test BurnResolverWithAmbient/AmbientRecorder — the
 // path-swept ambient reveal a resolved move used to also mint. Decision 4
-// deletes it outright: a burn's path is no longer a []board.Cell to sweep,
+// deletes it outright: a burn's path is no longer a list of cells to sweep,
 // and observation's ambient-reveal write it fed is itself REMOVED (design.md
 // Decision 11). There is no successor to migrate to; link 5
 // (replace-observation-with-sightings) is where a reveal mechanism next

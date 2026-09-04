@@ -3,9 +3,9 @@
     "generatedOn": {
       "goarch": "arm64 — the committed bytes are the arm64 recording. Independently re-recorded under GOARCH=amd64 GOAMD64=v1: the two recordings are byte-for-byte identical across every family (185537 bytes), differing only in this stamp. Both targets assert the committed file clean."
     },
-    "buildTargetMatrix": "GOARCH=arm64 and GOARCH=amd64 with GOAMD64=v1 — this recording was produced on BOTH and compared, per openspec delete-the-lattice tasks 2.10c/2.10d, not recorded on one and assumed for the other",
+    "buildTargetMatrix": "GOARCH=arm64 and GOARCH=amd64 with GOAMD64=v1 — this recording was produced on BOTH and compared, per openspec link 9 tasks 2.10c/2.10d, not recorded on one and assumed for the other",
     "jsRuntimeLeg": "none — backend/system is Go-sole-authority with no TypeScript mirror by design (design.md Decision 5); this family is asserted only across the Go build-target matrix",
-    "serialization": "every recorded float OUTPUT value is strconv.FormatFloat(v, 'b', -1, 64); inputs are plain JSON numbers/strings. The interiorElements family is serialized over its continuousLine component alone; its former latticeProjection and latticeDrawCount components were deleted with the placement tier they measured (delete-the-lattice task 2.10c)"
+    "serialization": "every recorded float OUTPUT value is strconv.FormatFloat(v, 'b', -1, 64); inputs are plain JSON numbers/strings. The interiorElements family is serialized over its continuousLine component alone; its two former components, a projection of the retired discrete placement tier and that tier's RNG word count, were deleted with the tier they measured (openspec link 9, tasks.md 2.10c)"
   },
   "continuousRadius": [
     {

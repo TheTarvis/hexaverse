@@ -34,7 +34,7 @@ func NewHandlerWith(svc ServiceInterface, clock common.WorldTime) *Handler {
 // GET /route is deleted with no successor here (routing is chain link 4
 // section 5's own concern). POST /scan is back — the focused-scan verb
 // (replace-observation-with-sightings §5, task 5.2), on the sensor channel,
-// distinct from the lattice-era radial scan link 4 deleted.
+// distinct from the pre-continuous radial scan link 4 deleted.
 func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	g := authorized.Group("/fleets")
 	{

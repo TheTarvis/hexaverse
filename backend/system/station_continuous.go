@@ -54,8 +54,9 @@ func StationContinuousOrbit(galaxySeed int64, systemId string, skeleton galaxy.S
 
 // inclinationForDominant reads the station's inclination side from the
 // system's dominant orbital direction (design.md Decisions 6, 17) — the
-// station has no lattice Dir of its own, so, like a moon, it takes its side
-// from DominantOrbitDirection directly. No jitter: the station's placement
+// station is not a generated body and rolls no side of its own, so, like a
+// moon, it takes its side from DominantOrbitDirection directly. No jitter:
+// the station's placement
 // is exact by construction, not a generated body among many.
 func inclinationForDominant(systemSeed int64) space.SubTurns {
 	if DominantOrbitDirection(systemSeed) < 0 {

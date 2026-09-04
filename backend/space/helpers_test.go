@@ -76,8 +76,7 @@
 //	func (c Curve) ArcParam(frac float64) (u float64, steps int) // fixed six-step binary search; steps is always 6
 //
 // Target — shared by Burn/BuildCurve/SolveBurn (tasks.md 1.8, "Targeting
-// Names a Body or an Explicit Point"), mirroring board.Target's
-// exactly-one-of-two-fields idiom (backend/board/ship.go):
+// Names a Body or an Explicit Point"), an exactly-one-of-two-fields shape:
 //
 //	type Target struct {
 //	    BodyId string // non-empty => body target
@@ -152,8 +151,8 @@
 //	func StarClearanceRadius(starSize float64) float64
 //	const MinArcLength float64 = <placeholder, space/params.go> // referenced symbolically only, never a hardcoded number in this suite
 //
-// ShipState / StateAt — state.go (tasks.md 1.10), mirroring
-// backend/board/ship.go's StateAt(priorState, t, schedule) MovementState shape:
+// ShipState / StateAt — state.go (tasks.md 1.10). StateAt folds a prior
+// state and a world time into the state that is actually in effect:
 //
 //	type ShipMode int
 //	const ( ModeBurn ShipMode = iota; ModeParked )

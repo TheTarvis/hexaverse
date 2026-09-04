@@ -22,10 +22,10 @@ import (
 // continuousSeed derives the second RNG stream's seed from the per-system
 // seed via a salted splitmix64 finalizer, distinct from
 // DominantOrbitDirection's and stations.mix64's own entry constants
-// (design.md Decision 11). Sharing the generator's own lattice stream would
-// couple every lattice placement to continuous-draw ORDER; this keeps the
-// two streams independent so inserting or removing a continuous draw can
-// never perturb the lattice board.
+// (design.md Decision 11). Sharing the generator's primary stream would
+// couple which bodies exist to continuous-draw ORDER; this keeps the two
+// streams independent, so inserting or removing a continuous draw can never
+// perturb the set of bodies a system generates.
 func continuousSeed(systemSeed int64) int64 {
 	x := uint64(systemSeed) ^ continuousStreamSalt
 	x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9
@@ -72,10 +72,11 @@ func unitFraction(u uint64) float64 {
 // (design.md Decision 2): BaseOrbitRadius * RadiusGrowth^idx, evaluated as
 // idx explicit float64(...)-guarded multiplies — a fixed trip count bounded
 // by the caller's own domain (params.Radius in production; an exhaustive
-// [0,64] fixture sweep). The index is NEVER the clamped lattice ring: it is
-// the raw, un-clamped skeleton ring for a skeleton major body, or the
-// feature's own already-drawn lattice ring for every other star-parented
-// feature. Never called for a body-parented feature (moon, station).
+// [0,64] fixture sweep). The index is the RAW, un-clamped skeleton ordinal
+// for a skeleton major body, or the feature's own drawn orbital index for
+// every other star-parented feature — never a value clamped into some
+// narrower range first, which is design.md Decision 2's central finding.
+// Never called for a body-parented feature (moon, station).
 func ContinuousRadius(idx int) float64 {
 	r := BaseOrbitRadius
 	for i := 0; i < idx; i++ {

@@ -24,8 +24,8 @@ import (
 // pre-existing, already-tested behavior of a DIFFERENT package extends
 // correctly to this new domain type once it exists, mirroring
 // backend/action/commit_params_validator_test.go's own
-// TestCommit_Scenario_DomainStructInParamsIsRejected pattern exactly
-// (substituting space.Vec3 for board.Cell). It uses action.NewServiceWith +
+// TestCommit_Scenario_DomainStructInParamsIsRejected pattern exactly, with
+// space.Vec3 as the rejected domain struct. It uses action.NewServiceWith +
 // a real common.WorldTime (frozen scale) + action's own generated MockDao,
 // never action's private test-only fakeClock.
 
@@ -60,10 +60,9 @@ func TestCodec_Scenario_VecRoundTripsThroughEncodeDecode(t *testing.T) {
 
 // SDET-added: DecodeVec must accept the shapes a Firestore round trip and a
 // JSON HTTP body decode actually produce, not only the in-memory []float64
-// EncodeVec itself returns — mirroring board.DecodeCell's own reasoning
-// (backend/board/params.go) that an in-memory literal, a Firestore
+// EncodeVec itself returns. An in-memory literal, a Firestore
 // []interface{}, and a JSON []interface{} of float64s are three different
-// shapes for the same logical value.
+// shapes for the same logical value, and the decoder must take all three.
 func TestCodec_DecodeVec_AcceptsFirestoreAndJSONShapes(t *testing.T) {
 	want := Vec3{X: 1, Y: 2, Z: 3}
 	cases := map[string]any{

@@ -9,7 +9,7 @@ package system
 // Seam, Never a Response".)
 //
 // Mirrors fleet's own established source-grep pattern
-// (lattice_symbols_absent_test.go / routing_deletion_test.go / this
+// (fleet's own absent-symbol guards / routing_deletion_test.go / this
 // package's own grep_helpers_test.go convention): pins an ABSENCE, immune to
 // however the eventual seam gets reshaped, as the durable regression net
 // alongside the BEHAVIORAL test in handler_test.go

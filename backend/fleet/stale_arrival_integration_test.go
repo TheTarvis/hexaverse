@@ -18,8 +18,8 @@ import (
 // the authoritative settle, the doc still says burn. A verb that trusted the
 // stored state acted from a position the ship left long ago, visibly
 // teleporting it back to its old intercept — the 2026-07-14 frozen-ship bug
-// family these were written red against, migrated here from the lattice's
-// board.Cell/board.StateAt shape to space.Vec3/space.StateAt (design.md
+// family these were written red against, migrated here from the retired
+// discrete cell/state-fold shape to space.Vec3/space.StateAt (design.md
 // Decision 4).
 //
 // The harness is the emulator integration stack (real Firestore, real action
@@ -83,7 +83,7 @@ func staleArrivalFixture(t *testing.T, ctx context.Context, svc *Service, dao Da
 
 // Spec: 0004/S1
 // Spec: fleet-movement "Effective Position Resolution" / "In-System Burn
-// Order to a Body or a Point" (migrated from the lattice-era 0004/S1).
+// Order to a Body or a Point" (migrated from the pre-continuous 0004/S1).
 func TestIntegration_OrderAfterUnsettledArrival_DepartsFromLivePosition(t *testing.T) {
 	bodies := testBodyTable(t, "sys-0", 6.0)
 	svc, dao, clk, ctx := newStaleArrivalSvc(t, bodies)
@@ -106,7 +106,7 @@ func TestIntegration_OrderAfterUnsettledArrival_DepartsFromLivePosition(t *testi
 
 // Spec: 0004/S2
 // Spec: fleet-movement "Cut Drive Converts the Burn to a Drift and Goes
-// Dark" (migrated from the lattice-era 0004/S2).
+// Dark" (migrated from the pre-continuous 0004/S2).
 func TestIntegration_CancelAfterUnsettledArrival_HoldsAtLivePosition(t *testing.T) {
 	bodies := testBodyTable(t, "sys-0", 6.0)
 	svc, dao, clk, ctx := newStaleArrivalSvc(t, bodies)

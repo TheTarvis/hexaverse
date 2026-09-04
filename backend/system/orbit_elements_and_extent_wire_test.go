@@ -5,7 +5,7 @@ package system
 // contract: `orbitElements` on every non-star feature body and every lane-gate
 // body, the star carrying none, the interior's continuous `extent`, the
 // simulation clock's `scale`, and the non-regression guard over every
-// pre-existing lattice field.
+// pre-existing discrete-position field.
 //
 // WHY AT THIS LEVEL. Every scenario here is a claim about the SERIALIZED
 // interior response, so each one asserts on the raw JSON object keys of a
@@ -414,13 +414,13 @@ func TestGetInterior_Scenario_TheReadCarriesTheInteriorsContinuousExtent(t *test
 		t.Errorf("extent = %v, want the value the interior's stored document holds (%v)", got, interior.Extent)
 	}
 
-	// `extent` was served ALONGSIDE the lattice `radius` while both existed.
+	// `extent` was served ALONGSIDE the discrete `radius` while both existed.
 	// openspec build-production-space-view (tasks.md 9.1) removed `radius`:
 	// `extent` is its successor, and serving both would leave a consumer free
-	// to keep scaling continuous space off the lattice number.
+	// to keep scaling continuous space off the retired ordinal.
 	if _, ok := top["radius"]; ok {
-		t.Error("the interior read still carries the lattice `radius`; the continuous `extent` is its " +
-			"successor and the lattice number must not survive alongside it")
+		t.Error("the interior read still carries the retired `radius`; the continuous `extent` is its " +
+			"successor and the retired ordinal must not survive alongside it")
 	}
 }
 
@@ -479,15 +479,15 @@ func TestGetInterior_Scenario_TheScaleIsServedEvenOnAnUnwarpedWorld(t *testing.T
 // --- Scenario: Pre-existing wire fields are unchanged (REMOVED) ------------
 //
 // `TestGetInterior_Scenario_PreExistingWireFieldsAreUnchanged` lived here and
-// asserted that the lattice half of the interior wire — `footprint`, `band`,
-// `live`, the lattice `orbit` object, and a lane gate's `cell` — was still
+// asserted that the discrete half of the interior wire — `footprint`, `band`,
+// `live`, the discrete `orbit` object, and a lane gate's `cell` — was still
 // served. Its scenario is REMOVED by openspec build-production-space-view
 // (system-interior's *Interior Read Endpoint* is retired and re-added as
 // *Interior Read Serves Continuous Bodies*), and tasks.md 9.1 is the task
 // that drops those fields. The test is deleted rather than relaxed: it
 // asserted the presence of exactly what this change removes, so there is
-// nothing left of it to keep. `interior_wire_lattice_removal_test.go` is its
-// successor and asserts the inverse.
+// nothing left of it to keep. The interior wire-removal suite in this package
+// is its successor and asserts the inverse.
 
 // --- Scenario: A materialized system's read carries every body's continuous
 //               position and size ------------------------------------------
@@ -507,8 +507,8 @@ func TestGetInterior_Scenario_EveryBodyCarriesAContinuousPositionAndSize(t *test
 	for _, g := range gates {
 		dest := rawString(t, g, "destSystemId")
 		// `cell` was in this list until build-production-space-view removed
-		// the lattice from this wire (tasks.md 9.1); the continuous pair is
-		// what every body, gate bodies included, carries now.
+		// the discrete position from this wire (tasks.md 9.1); the continuous
+		// pair is what every body, gate bodies included, carries now.
 		for _, k := range []string{"space", "size"} {
 			if _, ok := g[k]; !ok {
 				t.Errorf("lane gate -> %s carries no `%s`", dest, k)

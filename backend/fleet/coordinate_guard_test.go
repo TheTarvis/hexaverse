@@ -12,9 +12,9 @@ import (
 // `fleet.ErrRingOutOfRange` is named explicitly as deleted-with-no-successor
 // behaviour): this file used to pin fleet-movement's now-REMOVED requirement
 // "Board Coordinates Outside the Live Schedule Are Rejected, Never Panicked"
-// — a `board.Cell`-typed stored coast orbit whose ring exceeded
-// `board.ProductionSchedule().MaxRing`. There is no ring anymore (Decision
-// 4: a fleet's stored state is a `space.ShipState`, never a board cell), so
+// — a stored coast orbit whose ring index exceeded the live schedule's
+// maximum. There is no ring anymore (Decision 4: a fleet's stored state is a
+// `space.ShipState`, and the coordinate system that had rings is gone), so
 // that scenario has no successor to migrate to.
 //
 // Its replacement — "Undecodable Stored Kinematic State Is Rejected, Never

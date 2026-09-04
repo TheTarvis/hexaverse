@@ -140,11 +140,11 @@ var digestConstRe = regexp.MustCompile(`(?m)^\s*(?:const\s+(\w*[Dd]igest\w*)\s*=
 // Scenario: A hand-copied digest constant in a test file is a violation.
 //
 // Scans every _test.go file in backend/system (not just
-// lattice_identity_test.go by name) for a source-level constant assignment
+// a since-deleted file by name) for a source-level constant assignment
 // whose value looks like a hex digest — the requirement's own wording ("A
 // hand-copied digest constant... in that same test file") is about the
 // SHAPE of the violation, not about one named file, so this test does not
-// hard-code "lattice_identity_test.go" as the only place such a thing could
+// hard-code one filename as the only place such a thing could
 // reappear.
 func TestSystemTestFiles_Scenario_NoHandCopiedDigestConstant(t *testing.T) {
 	entries, err := os.ReadDir(".")
@@ -182,9 +182,9 @@ func TestSystemTestFiles_Scenario_NoHandCopiedDigestConstant(t *testing.T) {
 	}
 }
 
-// TestLatticeIdentityTest_Scenario_RetiredConstantAndComparisonAreDeleted
+// A companion guard
 // (DELETED) was the RETIREMENT half of the scenario above: it read
-// lattice_identity_test.go AS A FILE and asserted that a specific
+// a since-deleted test file AS A FILE and asserted that a specific
 // hand-copied golden-master digest constant, and the comparison that read
 // it, were both gone from it — pinning that a package's cross-target
 // regression baseline had migrated from a private test constant to

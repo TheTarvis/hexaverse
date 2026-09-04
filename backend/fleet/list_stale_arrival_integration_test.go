@@ -27,7 +27,7 @@ package fleet
 // ListInSystem is deliberately NOT given the same assertion here: its own
 // doc comment already states, correctly, "Read-only: it never settles a due
 // arrival" as its contract, and nothing in link 4's UI reads it any more
-// (the board's own fleet layer was retired along with the lattice board —
+// (the board's own fleet layer was retired along with the discrete board —
 // see CLAUDE.md's renderer-migration note). Extending this fixture to cover
 // it too would be asserting a scenario nothing currently depends on.
 //

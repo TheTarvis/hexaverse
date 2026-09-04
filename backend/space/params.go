@@ -7,9 +7,8 @@ import (
 	"hexaverse/common"
 )
 
-// The Firestore / action.Params codec (design.md Decision 4) — the
-// continuous-space analogue of backend/board/params.go: the one place a
-// space.Vec3 or space.SubTurns is allowed to cross into an untyped
+// The Firestore / action.Params codec (design.md Decision 4) — the one place
+// a space.Vec3 or space.SubTurns is allowed to cross into an untyped
 // map[string]any. A Vec3 encodes as []float64{x, y, z} and a SubTurns as an
 // int64, matching action.Commit's existing ErrNonPrimitiveParam validator's
 // allowlist exactly — no change to the action spine.
@@ -38,9 +37,9 @@ func EncodeVec(v Vec3) []float64 {
 // DecodeVec accepts the numeric-slice shapes a stored vector can arrive as
 // — an in-memory []float64 (EncodeVec's own output, or a unit-test
 // literal), a []interface{} of float64s (a JSON HTTP body decode), or a
-// []any of int64s (a Firestore round trip) — mirroring board.decodeInt's
-// reasoning that an in-memory literal, a Firestore round trip, and a JSON
-// decode disagree on shape. It rejects a non-finite or out-of-extent
+// []any of int64s (a Firestore round trip): an in-memory literal, a Firestore
+// round trip, and a JSON decode disagree on shape, and the decoder must take
+// all three. It rejects a non-finite or out-of-extent
 // component with a named, countable error before any decoded value reaches
 // a downstream computation, returning the zero Vec3 on failure (never a
 // partially-decoded value a caller might use).

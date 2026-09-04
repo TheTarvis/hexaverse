@@ -34,9 +34,10 @@ func TestSetTuning_IsObservedByLaterReads(t *testing.T) {
 // (replace-observation-with-sightings task 7.1, orchestrator-adjudicated): it
 // pinned a knob nothing reads. The focused scan prices its own duration from
 // fleet/params.go's roundTripMs (ScanBaseDurationMs + ceil(k·d), design.md
-// Decision 8) and never consults common.Tuning(); Tuning().ScanDuration is the
-// deleted lattice-era 360° sweep's flat constant, and 7.1 deletes the field
-// itself. An assertion over a constant no behaviour reads protects nothing.
+// Decision 8) and never consults common.Tuning(); Tuning().ScanDuration was
+// the deleted 360-degree radial sweep's flat constant, and 7.1 deletes the
+// field itself. An assertion over a constant no behaviour reads protects
+// nothing.
 func TestDefaultTuning_PacingIsPositive(t *testing.T) {
 	d := DefaultTuning()
 	if d.LaneMsPerDistance <= 0 {

@@ -143,10 +143,11 @@ func TestNoSquareRootOnADisclosurePath(t *testing.T) {
 // Rounding does not remove a knife edge, it relocates it onto the rounding
 // boundary — and the shipped arithmetic is already bit-reproducible, so
 // rounding would strictly degrade a guarantee that is already in hand. The
-// one exact variant, quantizing positions onto an integer lattice, is
-// rejected because it is a lattice: a finer one than the hex grid, but the
-// same object the pivot exists to leave, reintroduced at the layer that
-// most directly decides what a player sees.
+// one exact variant, quantizing positions onto an integer grid, is rejected
+// precisely BECAUSE it is a grid: a finer one than the discrete board this
+// codebase has since deleted, but the same object the pivot to continuous
+// space exists to leave, reintroduced at the layer that most directly
+// decides what a player sees.
 func TestNoRoundingOfAPositionOnADisclosurePath(t *testing.T) {
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, ".", productionFilesOnly, 0)

@@ -13,7 +13,7 @@ package fleet
 // its two routes, and WithFog/AudienceFog, ahead of this section's own
 // checklist catching up to it — handler.go's RegisterRoutes doc comment
 // already lists only the surviving endpoint set, and a source grep finds
-// none of these symbols. This mirrors lattice_symbols_absent_test.go's own
+// none of these symbols. This mirrors this package's other absent-symbol guards'
 // documented pattern exactly (same commit, same reason): pinning an absence
 // that already holds, against a future regression that would otherwise
 // compile clean and go unnoticed (e.g. porting board-derived route helpers
@@ -74,7 +74,7 @@ func TestHandler_Scenario_RouteEndpointIsGone(t *testing.T) {
 // TestHandler_Scenario_ScanEndpointIsGone (DELETED —
 // replace-observation-with-sightings tasks.md 5.2) used to prove
 // POST /v1/fleets/:fleetId/scan stayed 404 forever, per design.md Decision
-// 21A's lattice-era deletion. That absence is REMOVED by
+// 21A's pre-continuous deletion. That absence is REMOVED by
 // replace-observation-with-sightings' own focused-scan verb: chain link 5
 // deliberately resurrects POST /v1/fleets/:fleetId/scan under new,
 // unrelated semantics (specs/focused-scan/spec.md "A Focused Sweep Commits

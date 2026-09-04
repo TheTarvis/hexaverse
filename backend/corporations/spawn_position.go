@@ -8,7 +8,7 @@ import (
 // homeSpawnPosition derives the starting hull's continuous spawn park
 // (migrate-fleet-to-continuous-burns, design.md Decision 16, Open Question
 // 3), replacing rimCell/SpawnParams.RimRing (tasks.md 3.9) now that a fleet's
-// position is a space.Vec3, never a board.Cell.
+// position is a space.Vec3, never a discrete cell.
 //
 // design.md's Open Question 3 leaves the exact geometric target open ("a
 // ParkOrbit around the star vs. docked at the home station... is a feel

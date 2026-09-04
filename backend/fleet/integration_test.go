@@ -15,10 +15,10 @@ import (
 // a real generated galaxy + system interior + BodyTable, a seeded fleet
 // ordered to a real orbiting body, and an offline arrival resolved purely by
 // advancing the clock (no scheduler) — migrated from the pre-continuous-space
-// lattice version (migrate-fleet-to-continuous-burns, design.md Decision 4/16):
-// SeedFleet takes a continuous `space.Vec3` park instead of a `board.Cell`,
-// OrderTo names a body id instead of a `board.Target`, and arrival settles
-// into a `space.ParkOrbit` (AttachedTo set) instead of `board.ModeDocked`.
+// discrete-board version (migrate-fleet-to-continuous-burns, design.md Decision 4/16):
+// SeedFleet takes a continuous `space.Vec3` park instead of a discrete cell,
+// OrderTo names a body id instead of a discrete target, and arrival settles
+// into a `space.ParkOrbit` (AttachedTo set) instead of a docked mode.
 func TestIntegration_OrderMoveArrive(t *testing.T) {
 	fs, client := common.SetupFirestoreTestDAO(t)
 	ctx := context.Background()
@@ -46,7 +46,7 @@ func TestIntegration_OrderMoveArrive(t *testing.T) {
 
 	// Pick a real orbiting (non-star) body to intercept + dock — Space is the
 	// decoded continuous orbital element set system.GetOrCreateInterior
-	// populates (system/model.go), the successor to the lattice-era `Orbit`
+	// populates (system/model.go), the successor to the retired `Orbit`
 	// field this test used to key on.
 	var targetID string
 	for _, f := range interior.Features {

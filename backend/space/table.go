@@ -8,10 +8,10 @@ import (
 	_ "embed"
 )
 
-// The pinned two-level turn table (design.md Decision 3, the second
+// The pinned two-level turn table (design.md Decision 3) — this capability's
 // instance of cross-stack-determinism's "Pinned Constant Tables Are
-// Recorded, Asserted, Never Recomputed" — the first is backend/board's
-// coordinate table). coarse[1024] holds {cos, sin} at i * SubTurn/1024 for
+// Recorded, Asserted, Never Recomputed", and the only surviving one.
+// coarse[1024] holds {cos, sin} at i * SubTurn/1024 for
 // i in [0,1024); fine[1024] holds {cos, sin} at j * SubTurn/2^20 for j in
 // [0,1024). Any sub-turn angle's cosine/sine is reconstructed from these two
 // levels by the angle-addition identity (CosSin, below) — sin/cos of a
@@ -80,8 +80,7 @@ var (
 
 // loadTurnTable parses the embedded table exactly once. It panics on a
 // malformed or mis-sized embed — a programmer error (a corrupted commit),
-// never a runtime condition production code should recover from, matching
-// backend/board/table.go's loadTable precedent.
+// never a runtime condition production code should recover from.
 func loadTurnTable() {
 	var f turnTableFile
 	if err := json.Unmarshal(turnTableRaw, &f); err != nil {

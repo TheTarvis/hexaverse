@@ -8,7 +8,7 @@ package main
 //   - "The served gate body id is the id a fleet attaches to"
 //
 // WHY THIS TEST EXISTS AT ALL, AND WHY IT IS AN E2E RATHER THAN A UNIT TEST.
-// `interior_wire_lattice_removal_test.go` pins that the gate DTO carries an
+// the interior wire-removal suite pins that the gate DTO carries an
 // `id` key. Presence is worthless on its own: a handler that served
 // `id: "x"` for every gate would satisfy it. The requirement is an
 // IDENTITY claim — the served id is the string a burn order names and the

@@ -120,8 +120,8 @@ func subTurnsApart(a, b SubTurns) int64 {
 //
 // The swept set is every 1021st index (1021 is prime and coprime with both
 // table levels' sizes, so the walk visits all eight octants, every coarse
-// bracket, and a non-repeating spread of fine indices rather than a lattice
-// aligned to either level).
+// bracket, and a non-repeating spread of fine indices rather than a regular
+// grid aligned to either level).
 const roundTripStride SubTurns = 1021
 
 // The exact leg: radius 1, inclination 0, node 0 — LocalPosition's (X, Z) IS

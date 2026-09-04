@@ -1,7 +1,7 @@
 {
   "$comment": [
     "Mirror map + coverage inventory for the backend/market <-> frontend/lib/market",
-    "pair (openspec delete-the-lattice, design.md Decision 4; cross-stack-determinism's",
+    "pair (openspec link 9, design.md Decision 4; cross-stack-determinism's",
     "'Shared Board Math Is Pinned By a Cross-Language Golden Fixture'). This is the",
     "capability's ONLY mirrored-pair instance after the board and polar pairs were",
     "deleted, and it is what keeps check_mirror from losing its last call site.",

@@ -26,10 +26,10 @@
 // injected interfaces below and writes nothing at all — purity_test.go
 // asserts both structurally rather than by convention.
 //
-// This capability has NO CONSUMER by design. It is authored ahead of the
-// sighting model so that the model inherits these invariants rather than
-// rediscovering them; backend/observation still runs the live lattice game
-// and is untouched by this change.
+// This capability was authored with NO CONSUMER by design, ahead of the
+// sighting model, so that the model would inherit these invariants rather
+// than rediscovering them. (At the time it was written, the shipped
+// visibility model was the one this capability has since replaced.)
 package disclosure
 
 import (
