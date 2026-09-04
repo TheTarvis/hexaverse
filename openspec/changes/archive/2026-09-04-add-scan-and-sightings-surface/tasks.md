@@ -689,7 +689,7 @@
 - [x] 10.8 Run `python3 .claude/skills/code-quality-checks/check.py` and clear
       every finding, including the data-testid and test-file-coverage validators
       for the new components
-- [ ] 10.9 Re-run `openspec validate add-scan-and-sightings-surface --strict` and
+- [x] 10.9 Re-run `openspec validate add-scan-and-sightings-surface --strict` and
       `python3 .claude/scripts/openspec-reconcile.py add-scan-and-sightings-surface`
       immediately before archiving, after `build-production-space-view` has
       archived, and rehearse `openspec archive` on a scratch copy

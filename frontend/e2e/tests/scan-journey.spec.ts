@@ -343,6 +343,63 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     const stationId = home!.features.find((f) => f.type === 'station')?.id
     expect(stationId, 'this freshly generated home system served no station feature').toBeTruthy()
 
+    // REVISED 2026-09-04 (test-dispute adjudicated: a genuine arrangement
+    // defect, not a spec misread or a product defect — the diagnosis in
+    // link8b-impl-contract's own gate record). The served scan-target list
+    // is refetched ONLY on a small, closed set of triggers
+    // (`system-space-view` "Realtime Refetch Rules While the Space View Is
+    // Open"): mount, an attachment change, a landed burn/jump, an
+    // acting-fleet change, an SSE reconnect, and a 20s baseline poll
+    // (`BOARD_POLL_MS`, `lib/realtime.ts`). Committing a burn is not one of
+    // them — `useOrder`'s own `onSuccess` (`hooks/use-fleets.ts`)
+    // invalidates only the fleet reads, never `scanTargets` — so the page
+    // the control shows for the ENTIRE burn, right up until it lands, is
+    // exactly whatever was last fetched, absent a poll tick landing in
+    // between. The FIRST scan-targets read — fired the instant this
+    // fleet's `ScanControl` mounts, right after spawn, long before the
+    // station is even selected — is captured below and asserted empty: a
+    // freshly spawned fleet at its unattached point park has nothing in
+    // focused-scan range yet (the same convention `burnToSelectionAndDock`'s
+    // own comment above, and OQ12, both already rely on). That is an
+    // already-resolved fact at the moment we read it, not a live sample
+    // that has to land in a lucky window.
+    //
+    // The ORIGINAL leg instead waited on the RENDERED "No host is in
+    // range" text with a 20-SECOND timeout — the exact width of
+    // `BOARD_POLL_MS` — so on any run where the preceding steps (spawn,
+    // select, preview, commit) had already burned through most of that
+    // poll's own 20s cycle before reaching this line, the poll's very next
+    // tick could land WHILE Playwright was still polling for the text,
+    // silently replacing the still-correct empty page with a fresh
+    // (already in-range) one mid-wait. Two passing runs (42.8s, 21.8s) and
+    // one failing run against byte-identical production code is exactly
+    // that signature: not every run's cumulative overhead crosses a poll
+    // tick before this assertion, but some do — a race against the SUITE'S
+    // OWN wall-clock overhead, never against the burn's progress as such.
+    //
+    // The fix below does not try to catch a luckier millisecond. It reads
+    // the pre-burn response directly — already resolved, no live wait
+    // involved — as the proof the empty state genuinely existed while
+    // under way (nothing between here and the burn commit can have
+    // refetched it, per the trigger list above), then checks the DOM with
+    // a SHORT timeout (5s — a quarter of the 20s poll, and generous for a
+    // render flush of data already sitting in the query cache) purely to
+    // confirm the empty state is what actually painted, never to wait out
+    // a race.
+    await expect
+      .poll(() => scanTargetsByFleet.has(fleetId), {
+        timeout: 30_000,
+        message: `no scan-targets response was captured for fleet ${fleetId} before the burn — cannot prove the empty state was genuine`,
+      })
+      .toBe(true)
+    const preBurnTargets = scanTargetsByFleet.get(fleetId) ?? []
+    expect(
+      preBurnTargets,
+      'a freshly spawned fleet at its unattached point park must have nothing in focused-scan range yet — this ' +
+        'is the page the control keeps showing for the whole burn, since committing a burn is not one of the ' +
+        "scan-target list's own refetch triggers",
+    ).toHaveLength(0)
+
     // Select the station and commit the burn, WITHOUT waiting for it to
     // land — `burnToSelectionAndDock` waits all the way to "Docked", which
     // is exactly the arrangement this leg exists to avoid.
@@ -356,9 +413,12 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     )
 
     // MID-BURN: the scan control is open and legitimately empty — the
-    // fleet is travelling, not yet at the station.
+    // pre-burn page captured above is still the cache entry (burn-commit
+    // triggers no scan-target refetch of its own), so the DOM's next paint
+    // after "Under way" lands must reflect it — a short timeout, not a
+    // long one, is what proves that (see the comment above `preBurnTargets`).
     await expect(page.getByTestId('scan-control')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByText('No host is in range to sweep.')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText('No host is in range to sweep.')).toBeVisible({ timeout: 5_000 })
 
     // Let the burn land — no further page interaction of any kind.
     await expect(row).toContainText(/docked/i, { timeout: 600_000 })

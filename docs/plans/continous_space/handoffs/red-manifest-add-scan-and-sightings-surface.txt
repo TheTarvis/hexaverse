@@ -1,5 +1,5 @@
 # red-suite handoff manifest for add-scan-and-sightings-surface
-# recorded 2026-09-04T02:08:58Z
+# recorded 2026-09-04T12:55:35Z
 # verify with: bash .claude/scripts/openspec-red-manifest.sh verify add-scan-and-sightings-surface
 2597a1c19cac0077913c52fd014a7491dde2be945a66713cb6d6623c464c7dc2  backend/action_settled_inbox_and_reasoncode_e2e_test.go
 b951cdd8c005923ac03f32914e77274ad5a626209246a96cc6e03fc0ef8a45eb  backend/fleet/scan_resolver_already_settled_reasoncode_test.go
@@ -25,8 +25,8 @@ c2afd902f9da0f2b3cbf4c5f37962253fb2f74eb96289f84e74cc1f4519d59ba  frontend/compo
 4546693f407c0c0c8dcfdc8a5475a3251995aa22483dd62457b4de8d3068e83e  frontend/components/space/SystemSpaceView.sighting-log-no-ghost-reasons.test.tsx
 af79a2a16734d70764d36830fe4725ab7d8d94436a5d2ae080eefb0ddb2ea1fc  frontend/components/space/space-scene.sightings.test.ts
 5ab08161338af6cd05581ba0b66c9ee3428c11da2c989a49d1448b657cb63655  frontend/e2e/helpers/scan-fixtures.ts
-c14a07d329843b065d9d19bbfd1ee1e777723b772cc7a41e14eca7feb0154671  frontend/e2e/tests/scan-journey.spec.ts
-650e701f4b4dcb51caaab9acabf40a607591b6d5067bf55200fa62c149641268  frontend/e2e/tests/scan-lane-transit-fizzle.spec.ts
+bcdf93105f8e2d6a2b70786eb76d37df9907826d77be0360ce91f446e7dfbb3f  frontend/e2e/tests/scan-journey.spec.ts
+1faabfc29cae4393a521872c06de19381efbea0d4d0849ada5be8708a7e05240  frontend/e2e/tests/scan-lane-transit-fizzle.spec.ts
 d47dd7c1d18b916172f3c4a375bed94d4e28846a3bf6ee767e97c2ef5954deb0  frontend/e2e/tests/space-journey.spec.ts
 2e40f01cf3fa14ca8ea96884e9c097dff32f8c392fd000c62e75efd59b0d86ca  frontend/hooks/use-fleets.test.tsx
 40e94359f958e8c5b180f7f9dca75560642291a07fb87ff4b3643d688f98ae01  frontend/hooks/use-scan-double-submit.test.tsx

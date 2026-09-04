@@ -141,7 +141,7 @@ verification; no scratch artifacts remain in the tree.
 | | An empty target set is stated, not shown as an empty list | `ScanControl.test.tsx::"An empty target set is stated..."` | vitest component | compile-red |
 | | An empty target set explained by transit or a running sweep states that instead | `ScanControl.test.tsx::"An empty set while a sweep is already running states that..."` | vitest component | compile-red |
 | | A failed target read is retriable and offers nothing | `ScanControl.test.tsx::"A failed target read is retriable and offers nothing"` | vitest component | compile-red |
-| | A landed arrival refetches the target list | `SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx::"F5: re-issues a REAL network scan-targets read once the acting fleet lands and attaches, with no user action"` + `scan-journey.spec.ts::"opening the scan control mid-burn shows 'no host in range'; the docked host appears with no user action once the burn lands"` (task 10.2d) | vitest component + Playwright | **REVISED 2026-09-03 (link8b-adversary-r8, ruling F5) — now already-green.** The vitest was rewritten per the adversary's own finding that a mocked-hook version "satisfies it without ever exercising the invalidation wiring... and wiring is exactly what broke": it now drives the REAL `useScanTargets`/`useRunningScan`/`useCancelAction` against a REAL `QueryClient`, mocking only `fleetService.scanTargets` at the network boundary, and asserts a genuine SECOND call count. Verified passing (not tautological — a fixture bug during authoring produced a real failure, confirming the harness is sensitive) against the now-landed production wiring. The Playwright leg (10.2d) opens the control mid-burn (unlike 10.2a, which docks first) and confirms the same behaviour end to end; written, not run by the SDET per instruction. |
+| | A landed arrival refetches the target list | `SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx::"F5: re-issues a REAL network scan-targets read once the acting fleet lands and attaches, with no user action"` + `scan-journey.spec.ts::"opening the scan control mid-burn shows 'no host in range'; the docked host appears with no user action once the burn lands"` (task 10.2d) | vitest component + Playwright | **REVISED 2026-09-03 (link8b-adversary-r8, ruling F5) — now already-green.** The vitest was rewritten per the adversary's own finding that a mocked-hook version "satisfies it without ever exercising the invalidation wiring... and wiring is exactly what broke": it now drives the REAL `useScanTargets`/`useRunningScan`/`useCancelAction` against a REAL `QueryClient`, mocking only `fleetService.scanTargets` at the network boundary, and asserts a genuine SECOND call count. Verified passing (not tautological — a fixture bug during authoring produced a real failure, confirming the harness is sensitive) against the now-landed production wiring. The Playwright leg (10.2d) opens the control mid-burn (unlike 10.2a, which docks first) and confirms the same behaviour end to end. **REVISED 2026-09-04 (journey-gate finding, adjudicated as a test-arrangement defect, not a product defect — see "2026-09-04 follow-up" below): rewritten to prove the empty state off the already-resolved pre-burn network response rather than off a 20-second DOM wait that raced the view's own 20s baseline poll. Confirmed green twice in direct runs (25.2s, 21.8s).** |
 | | Changing the acting fleet refetches the list | `SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx::"F2: an A -> B -> A re-selection issues a NEW network read for A, never A's earlier page"` | vitest component | **REVISED 2026-09-03 (link8b-adversary-r8, ruling F2) — now already-green.** The adversary showed the ORIGINAL reasoning ("a different cache entry by construction") was false — a key change serves whatever is cached under the new key, so an A->B->A toggle could re-serve A's stale page. Production now sets `staleTime: 0` and `refetchOnMount: 'always'` on `useScanTargets` (`hooks/use-scan.ts`); this test drives a real A->B->A roster re-selection against a REAL QueryClient and confirms a genuine second network call for A. Verified passing, not tautological. |
 | | A failed refetch drops the stale list rather than restating it | `SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx::"F1: a failed refetch shows the retriable error, never the stale 'no host is in range' claim"` | vitest component | **NEW scenario, added 2026-09-03 (link8b-adversary-r8, ruling F1 — BLOCKER).** The adversary showed the spec said nothing about a refetch that FAILS on top of an already-cached empty page, so the exact reported bug (a stale "no host is in range" claim rendered on the authority of a read the client had already invalidated) could survive the F5 fix entirely. Verified already-green: `ScanControl.tsx`'s `scanTargets.isError` branch is checked BEFORE the empty-list branch, so a failed refetch shows the retriable error, never the stale claim — confirmed via a real induced rejection against the real QueryClient, not asserted from memory of React Query's semantics. |
 | A Sweep's Cost Is Presented as Time and Exposure, Not Time Alone | The control states the exposure before a commit | `ScanControl.test.tsx::"The control states the exposure before a commit"` | vitest component | compile-red |
@@ -359,6 +359,53 @@ Received: "focused scanthe sweep filed records.dismiss"
   ❯ components/space/ScanControl.test.tsx:212:7
 Tests  1 failed | 20 passed (21)
 ```
+
+### 2026-09-04 follow-up — journey-gate red leg fixed (user-authorized extra revision round)
+
+`scan-journey.spec.ts:332` ("opening the scan control mid-burn shows 'no host
+is in range'; the docked host appears with no user action once the burn
+lands") failed once at the journey gate
+(`add-scan-and-sightings-surface-journey.md`) after passing twice earlier
+against byte-identical production code — the signature of a test-side race,
+not a regression. Diagnosis, confirmed by reading the production wiring
+directly (not re-derived from scratch):
+
+- The served scan-target list refetches only on a closed set of triggers
+  (`system-space-view`'s own "Realtime Refetch Rules..."): mount, an
+  attachment change, a landed burn/jump, an acting-fleet change, an SSE
+  reconnect, and a 20-second baseline poll (`BOARD_POLL_MS`,
+  `frontend/lib/realtime.ts`). Committing a burn is not one of them —
+  `useOrder`'s `onSuccess` (`frontend/hooks/use-fleets.ts`) invalidates only
+  the fleet reads, never `scanTargets`.
+- The original assertion waited on the RENDERED "No host is in range" text
+  with a 20-second timeout — exactly `BOARD_POLL_MS`'s own width — so on any
+  run where the preceding steps had already burned through most of that
+  poll's cycle, the poll's next tick could land mid-wait and silently
+  replace the still-correct empty page with a fresh, already-in-range one.
+  This is a race against the SUITE's own cumulative wall-clock overhead, not
+  against the burn's progress, and not a product defect: the served list the
+  control shows is correct at every instant it is read.
+
+**Fix (test-only, `frontend/e2e/tests/scan-journey.spec.ts`):** the leg now
+captures and asserts the FIRST scan-targets network response (fired at
+`ScanControl`'s mount, right after spawn, well before the station is even
+selected) as the proof the empty state genuinely existed — an
+already-resolved fact, read synchronously, with no live wait involved. The
+subsequent DOM check for "No host is in range" is bounded to a short 5s
+timeout (a quarter of `BOARD_POLL_MS`, generous for a render flush of data
+already in the query cache) rather than 20s, so it can no longer span an
+entire poll cycle. The scenario's full strength is unchanged: the leg still
+proves the empty state while under way and the docked host appearing with no
+user action once the burn lands.
+
+Confirmed green twice in direct runs against the local test stack
+(`cd frontend && npm run e2e -- e2e/tests/scan-journey.spec.ts`): 25.2s and
+21.8s for this leg, all 5 tests in the file passing both times. No other test
+in the file was touched. **Cause logged per the TDD protocol's two
+permitted causes: the test's own premise was provably false (a documented,
+established arrangement defect — the same class as the two prior
+test-dispute revisions already logged in this file), not a spec change and
+not a developer dispute.**
 
 ## Suite commands
 
