@@ -1309,7 +1309,7 @@ archiver that must be rehearsed.
       Degrades* and `cross-stack-determinism`'s *Rule-Bearing Values Cross the
       Seam*, both already repaired by this change's deltas — so this leg's job
       is to catch the ones the predecessors introduce)
-- [ ] 12.5b **Leg two — against the whole real repo**, because requirement
+- [x] 12.5b **Leg two — against the whole real repo**, because requirement
       titles are cited far outside `openspec/specs/`:
       `grep -F -f /tmp/retired-titles.txt -rn . --exclude-dir=node_modules
       --exclude-dir=.git --exclude-dir=archive --exclude-dir=handoffs
@@ -1344,7 +1344,7 @@ outside a `### Requirement:` block. The `## Purpose` edits run **before** the
 directory deletion and its grep, so that grep runs against a tree from which
 every stale citation has already been removed.
 
-- [ ] 13.1 Hand-edit `openspec/specs/space-kinematics/spec.md`'s `## Purpose`:
+- [x] 13.1 Hand-edit `openspec/specs/space-kinematics/spec.md`'s `## Purpose`:
       remove the sentences that name `board-tactical-math`, `backend/board`,
       `backend/polar`, `frontend/lib/board` and `frontend/lib/polar` as "the
       lattice every shipped consumer" and as future deletion material.
@@ -1358,19 +1358,19 @@ every stale citation has already been removed.
       after task 6.3b that named path still exists. If OQ-5 is ruled "delete
       `space-3d`", the sentence must be repointed at a surviving spike, never
       simply dropped
-- [ ] 13.2 Hand-edit `openspec/specs/system-interior/spec.md`'s `## Purpose` and
+- [x] 13.2 Hand-edit `openspec/specs/system-interior/spec.md`'s `## Purpose` and
       its `## Notes for future maintainers` section, both of which describe a
       polar board;
       `openspec/specs/trading-station/spec.md`'s `## Purpose`, which describes
       the station as a board feature on a ring; and
       `openspec/specs/cross-stack-determinism/spec.md`'s `## Purpose`, which
       names the board pair as the capability's subject
-- [ ] 13.3 After `openspec archive delete-the-lattice --yes` succeeds and
+- [x] 13.3 After `openspec archive delete-the-lattice --yes` succeeds and
       13.1–13.2 are done, **delete `openspec/specs/board-tactical-math/` by
       hand** — a capability cannot be retired through `REMOVED` deltas
       (`polar-lattice-math`, `observation-fog-and-scan` and `board-view` are the
       confirmed precedents). Then re-run 12.4's and 12.5's greps against the
       real tree
-- [ ] 13.4 Confirm `openspec list --specs` no longer lists
+- [x] 13.4 Confirm `openspec list --specs` no longer lists
       `board-tactical-math`, and `openspec validate --strict` passes for every
       remaining spec

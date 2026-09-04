@@ -12,9 +12,9 @@ clock instance's configured epoch (the fixed world epoch for the
 process-wide singleton; an arbitrary instant for an injected test clock, per
 the "Injectable for Tests" requirement). This clock is the sole time source
 for every persisted **gameplay/simulation** timestamp (a fleet's departure,
-an action's ETA, an observation's `asOf`, a corporation's
-`createdAt`/`diedAt`) in the galaxy, system, board, fleet, action,
-observation, and corporations domains. This is an architectural constraint
+an action's ETA, a sighting's `asOf`, a corporation's
+`createdAt`/`diedAt`) in the galaxy, system, space, disclosure, fleet,
+action, charts, and corporations domains. This is an architectural constraint
 on consumers of the clock, verified by code review / convention rather than
 by the clock itself or by any runtime check: code in those domains SHALL
 NOT read wall-clock time (`time.Now()`) directly. Administrative/audit
@@ -39,8 +39,8 @@ intentionally wall-clock `time.Time` and out of scope for this contract.
   singleton, the clock's epoch is the fixed world epoch)
 
 #### Scenario: Simulation domains read only the world clock
-- **WHEN** any source file in the galaxy, system, board, fleet, action,
-  observation, or corporations domains needs the current time or reads a
+- **WHEN** any source file in the galaxy, system, space, disclosure, fleet,
+  action, charts, or corporations domains needs the current time or reads a
   persisted gameplay timestamp
 - **THEN** it obtains that time through the world clock (`WorldClock()` /
   `FromWall`), expressed in `WorldMillis`

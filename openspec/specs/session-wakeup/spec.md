@@ -198,12 +198,13 @@ The system SHALL, on a successful wake-up submission, cause the wake gate
 to re-evaluate so the newly woken corporation and its first fleet become
 visible without a manual reload, record the new home system's id as a
 wake-focus hint for `galaxy-view`'s later use, and navigate directly to
-that home system's hex board route — never to the galaxy view first.
+that home system's space-view route (`system-space-view`) — never to the
+galaxy view first.
 
 #### Scenario: A successful spawn routes to the new home system's board
 - **WHEN** the wake-up flow's spawn call succeeds with a home system id
 - **THEN** the wake gate re-evaluates so the new corporation and fleet
-  appear, and the app navigates to that home system's board route
+  appear, and the app navigates to that home system's space-view route
 
 #### Scenario: The wake-focus hint is recorded for the galaxy view
 - **WHEN** a successful spawn returns a home system id
@@ -226,7 +227,8 @@ that home system's hex board route — never to the galaxy view first.
 - **THEN** the resubmission rides `corporation-spawn`'s idempotent-spawn
   guarantee (the same corporation and home system already created), and —
   being well-formed — the gate re-evaluates, the wake-focus hint is
-  recorded, and the player is routed to the home board normally
+  recorded, and the player is routed to the home system's space view
+  normally
 
 #### Scenario: Resubmitting after a client-side timeout does not mint a second hull
 - **WHEN** the wake-up flow's spawn call times out client-side after the

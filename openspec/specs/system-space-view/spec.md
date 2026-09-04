@@ -50,10 +50,10 @@ makes:
 - **The open system's station**, read through
   `GET /v1/systems/:systemId/station` (`trading-station`'s *Home Station
   Visible On the Direct Station Read, No Scan Required*). This view SHALL
-  consume only the station's identity — its system id and its board feature id
-  — and SHALL NOT read, render, or scale anything from the station response's
-  lattice `orbit` object; the station's drawn position comes from the interior
-  read's body for it, exactly as every other body's does.
+  consume only the station's identity — its system id and its feature id —
+  and SHALL NOT derive its drawn position from the station response at all;
+  the station's drawn position comes from the interior read's body for it,
+  exactly as every other body's does.
 - **The market price board**, read through `GET /v1/market/board`
   (`market-price-board`'s *One Read Returns Every Visible Station's Quotes*),
   from which this view SHALL select the venue quotes whose system id is the

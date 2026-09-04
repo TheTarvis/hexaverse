@@ -238,7 +238,7 @@ remaining), and never by system id alone (two features in one system would
 then share a ledger). The mine action's `scope` — the read-resolution
 query key (`ResolveDue(systemId)`) and the SSE completion channel — SHALL
 remain the containing `systemId` and SHALL NOT be set to the ledger key, so
-a completed mine resolves on the same board read and broadcasts on the
+a completed mine resolves on the same system read and broadcasts on the
 same system channel as a burn or scan; the per-feature, per-kind
 granularity lives only in the ledger key, decoupled from the action scope
 (see the `action-dispatch` capability's "Ledger Key Decoupled From Channel
@@ -274,7 +274,7 @@ Scope").
   Firestore document id for the ledger's parent document
 
 #### Scenario: A completed mine resolves and pushes on the system scope
-- **WHEN** a mine run's ETA passes and the containing system's board is
+- **WHEN** a mine run's ETA passes and the containing system's interior is
   read or its channel is subscribed
 - **THEN** the due mine is resolved by the system-scoped read
   (`ResolveDue(systemId)`) and its completion event is delivered on the

@@ -10,13 +10,13 @@ that carries all of it across the persistence boundary. No Firestore and no
 clock dependency — every function is a pure function of its inputs, so the
 family can be pinned by a golden fixture (`/fixtures/space/cases.json`).
 
-**This capability has zero consumers as of the change that introduced it**
-(`add-space-kinematics`, 2026-08-27). It adds a package, touches no stored
-data, adds no endpoint, and deletes nothing. `board-tactical-math` (over
-`backend/board` / `backend/polar`, mirrored in `frontend/lib/board` /
-`frontend/lib/polar`) remains the lattice every shipped consumer — `system`,
-`fleet`, `observation`, `market`, `mine`, `stations`, and the renderer —
-actually uses. Nothing below is live in the game yet.
+**This capability is now the game's only spatial authority.** It was introduced
+with zero consumers (`add-space-kinematics`, 2026-08-27) alongside the discrete
+tactical lattice every shipped consumer then used; that lattice and its
+capability were deleted outright by `delete-the-lattice` (2026-09-04), the last
+link of the continuous-space chain. `system`, `fleet`, `disclosure`, `market`,
+`mine`, `stations` and the renderer all read positions from this capability
+now, and there is no second spatial representation to reconcile against.
 
 **Go is this capability's sole authority, and there is no TypeScript mirror**
 (design.md Decision 1). `backend/space` computes every rule-bearing value:
@@ -35,8 +35,8 @@ not authoritative, and not asserted against the fixture family.
 **What remains open beyond this change** is recorded in `add-space-kinematics`'s
 design.md — see its **Migration Plan** for the eight-step consumer sequencing
 (this capability is step 1; the green build-target matrix is its gate, and
-steps 2–8 each land as their own change, ending in the deletion of
-`backend/board`, `backend/polar`, and their fixtures), and its **Open
+steps 2–8 each land as their own change, ending in the deletion of the
+lattice packages and their fixtures — completed 2026-09-04), and its **Open
 Questions** for what is deliberately unanswered:
 
 - **The determinism call is reversible.** Decision 1 is an architect's call

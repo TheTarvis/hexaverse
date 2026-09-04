@@ -11,60 +11,6 @@ ring, no slot, no cell, no footprint. Foreign presence in the served read is
 disclosed per requester by `proximity-disclosure`, which owns that decision
 entirely.
 ## Requirements
-### Requirement: Lazy, Deterministic Interior Generation
-The system SHALL generate a system's interior deterministically from the
-per-system seed (`galaxy.SystemSeed(gallaxySeed, systemId)`), the system's
-graph-tier region (as its character dial), and its galaxy-tier skeleton: a
-fixed star feature at the centre, one orbiting feature per skeleton body
-(extending, never contradicting, the skeleton), and additional detail
-(extra small bodies, belts, moons on gas giants, anomalies/ruins, hazards)
-whose counts and resource richness are dialed by the region's character.
-Every generated angular position SHALL be drawn from the placement ring's
-configured slot count under the interior's own schedule (per
-`board-tactical-math`'s Slot Schedule Shape), never from a fixed per-ring
-count derived from the ring index — so every slot on a ring is a reachable
-placement and no ring carries an unplaceable arc. A system's trading
-station, when one exists, is NOT part of this deterministic generation: it
-is provisioned independently by the `trading-station` capability (as a
-spawn asset-healing step, not interior materialization), so this
-requirement's determinism and create-if-absent guarantees make no claim
-about a station's presence, position, or timing — a system may materialize
-its interior with no station, gain one later at spawn, or (for a non-home
-system) never carry one.
-
-#### Scenario: First read materializes the interior
-- **WHEN** `GetOrCreateInterior` is called for a system with no stored
-  interior
-- **THEN** a new interior is generated from that system's seed, region, and
-  skeleton and persisted
-- **AND** the returned interior includes a star feature and one orbiting
-  feature per skeleton body
-
-#### Scenario: Subsequent reads return the stored interior unchanged
-- **WHEN** `GetOrCreateInterior` is called for a system whose interior is
-  already stored
-- **THEN** the stored interior and features are returned without
-  regenerating
-
-#### Scenario: A denser character produces more detail
-- **WHEN** interiors are generated for a `star_rich` system and a `dead`
-  system from the same generator
-- **THEN** the `star_rich` interior's extra-planet, belt, special, and
-  hazard counts are configured higher than the `dead` interior's (per
-  `DefaultParams().ByCharacter`)
-
-#### Scenario: System not found
-- **WHEN** `GetOrCreateInterior` is called with a system id absent from the
-  live galaxy
-- **THEN** the call fails with `ErrNotFound`
-
-#### Scenario: Placement reaches every slot on a ring whose slot count exceeds six times its ring index
-- **WHEN** interiors are generated across many seeds and the slots occupied
-  on a ring whose configured slot count is strictly greater than six times
-  its ring index (e.g. ring 3 with 24 slots, ring 5 with 48) are collected
-- **THEN** occupied slots appear at or above six times that ring index, not
-  only below it — the draw spans the ring's full configured slot count
-
 ### Requirement: Coherent Orbital Direction
 The system SHALL roll one dominant orbital direction per system from the
 per-system seed (so both directions occur across the galaxy's systems) and
@@ -107,46 +53,17 @@ double-writing.
 - **THEN** the losing caller reads and returns the already-persisted
   interior instead of erroring or overwriting it
 
-### Requirement: Orbital Period Read from Live Tuning
-The system SHALL NOT persist a feature's orbital period; every read SHALL
-fill it from the live tuning function `PeriodFor(ring)` at read time, so
-retuning orbit pacing changes the pace of every already-materialized system
-on its next read, while the generator's random ring, start angle, and
-direction stay fixed at generation time. `PeriodFor` SHALL remain linear in
-ring index alone (`period = base × ring`), independent of how many angular
-slots that ring carries. Because the polar lattice's slot schedule does not
-assign a uniform slot count per ring (per `board-tactical-math`'s Slot
-Schedule Shape), the world-time required to advance by one slot is NOT
-uniform across ring bands even where two rings' assigned periods are close
-in value — a ring carrying more slots than a neighbouring ring completes
-each individual slot-step faster for the same period. This non-uniformity
-is an accepted consequence of keeping the orbital period law linear in ring
-index; it is not retuned by this requirement and SHALL NOT be treated as a
-defect.
-
-#### Scenario: A retune changes an existing feature's period on next read
-- **WHEN** a feature's interior was generated under one orbital-period
-  tuning and the tuning is subsequently changed
-- **THEN** the next read of that feature reflects the new period, with its
-  stored ring, angle0, and direction unchanged
-
-#### Scenario: Equal-period rings with different slot counts advance slots at different rates
-- **WHEN** two features sit on different rings whose configured slot counts
-  differ, and each is assigned the period `PeriodFor(ring)` for its own ring
-- **THEN** the world-time required for each feature to advance by one slot
-  differs between the two rings, even where the two rings' assigned periods
-  are close in value
-- **AND** this difference is accepted as a consequence of keeping the
-  orbital period linear in ring index, not treated as a defect to correct
-
 ### Requirement: Lane Gate Projection
-The system SHALL compute, for a given system and board radius, one lane
-gate per lane touching that system: the cell on the outer rim where the
-lane departs toward its neighbour, bearing-projected from the two systems'
-galaxy coordinates via the same projection the fleet domain uses to compute
-a departure gate, so the rendered gate and the cell a fleet actually departs
-from are the same cell. Gates SHALL be returned in a deterministic order
-(sorted by destination system id).
+The system SHALL compute, for a given system, exactly one lane gate per
+lane touching that system, each naming its destination system id and that
+crossing's lane id. Gates SHALL be returned in a deterministic order
+(sorted by destination system id). A gate's continuous position and size
+are the gate body's, resolved from the system's body table
+(`system-body-table`: "Lane Gates Are Derived Fresh At Every Build, Never
+Persisted" and "A Gate's Bearing Is Derived From the Galaxy Layout, Never
+Runtime Trigonometry"); this requirement governs only the gate set's
+completeness, identity, and order, and SHALL compute no position of its
+own.
 
 #### Scenario: Every incident lane produces one gate
 - **WHEN** lane gates are computed for a system touched by N lanes
@@ -157,67 +74,6 @@ from are the same cell. Gates SHALL be returned in a deterministic order
 - **WHEN** lane gates are requested for a system id not present in the live
   galaxy
 - **THEN** the call fails with `ErrNotFound`
-
-### Requirement: Interior Feature Decode Validates Ring Against the Live Schedule
-The system SHALL validate every decoded interior feature's ring against
-the live schedule's maximum ring at the interior read boundary, before any
-lattice computation consumes it, omitting and recording any feature that
-fails this check rather than failing the read, so that a reduction of the
-configured board radius cannot turn one bad stored feature into a
-permanent failure of every corporation's read of that system.
-
-#### Scenario: A stored feature outside the live board radius is rejected at the boundary
-- **WHEN** an interior is read whose stored feature carries a ring
-  exceeding the live schedule's maximum ring
-- **THEN** that feature is omitted from the read and the rejection is
-  recorded with the offending feature id and ring, no lattice computation
-  is performed on that coordinate, and the remaining features are served
-  normally
-
-### Requirement: Interiors Emit Continuous Orbital Elements For Every Body
-The system SHALL generate, alongside a feature's existing lattice ring/slot
-placement, a continuous orbital element set (`space.Orbit`) and a physical
-size for every feature the interior generator produces, deterministically
-from the per-system seed on a stream independent of the lattice draw
-sequence. The star SHALL carry no orbital element set (it is parentless,
-positioned at the origin). Every non-star feature SHALL name, as its
-orbit's parent, another body present in the same interior. Every angle
-(phase, inclination, node) SHALL be an integer sub-turn value in
-`[0, SubTurn)`. Every feature SHALL carry a strictly positive size.
-
-#### Scenario: Continuous elements are reproducible from the per-system seed
-- **WHEN** an interior is generated twice from the same per-system seed,
-  region, and skeleton
-- **THEN** every feature's continuous orbital element set and size are
-  identical between the two generations
-
-#### Scenario: The star carries no orbital element set
-- **WHEN** an interior is generated
-- **THEN** the star feature's continuous orbit is absent (nil), consistent
-  with its lattice `Fixed` placement at the centre
-
-#### Scenario: Every non-star feature names a parent present in the same interior
-- **WHEN** an interior is generated
-- **THEN** every feature other than the star carries a continuous orbit
-  whose parent id resolves to another feature generated in that same
-  interior
-
-#### Scenario: Every angle is an integer sub-turn within range
-- **WHEN** any feature's continuous phase, inclination, or node is inspected
-- **THEN** each is an integer value in `[0, SubTurn)`, never a
-  floating-point radian or degree
-
-#### Scenario: Every feature has a strictly positive size
-- **WHEN** an interior is generated
-- **THEN** every feature's size, including the star's, is strictly greater
-  than zero
-
-#### Scenario: Adding continuous elements leaves every lattice placement unchanged
-- **WHEN** an interior is generated across a swept set of seeds, with the
-  continuous element draws present and again with them absent
-- **THEN** every feature's lattice ring, start angle, direction, footprint,
-  resources, effects, id, and generation order are identical between the
-  two runs, for every seed
 
 ### Requirement: Feature Size Is Drawn From a Per-Type Band With a Pinned, Exported Ceiling
 The system SHALL draw every generated non-star feature's size from a band keyed on
@@ -246,89 +102,6 @@ unrecognized class, every entry of which satisfies the clearance invariant below
 #### Scenario: The star's size is a pure function of its class
 - **WHEN** two interiors with the same star class are generated from different seeds
 - **THEN** both stars carry the identical size, drawn from no RNG stream
-
-### Requirement: Orbital Radii Ascend With the Skeleton Ordinal and Are Separated
-The system SHALL derive a feature's continuous orbital radius as the
-geometric law `ContinuousRadius(idx) = BaseOrbitRadius × RadiusGrowth^idx`
-of a per-family **orbital index** `idx`, never a new random draw. The
-orbital index SHALL be exactly one of the following, which is the complete
-enumeration — no star-parented feature falls outside it, and a
-body-parented feature never has one:
-
-- for a skeleton major body, its raw, un-clamped skeleton ring
-  (`galaxy.Body.Ring`), in `[0, MaxRings)`;
-- for every other star-parented generated feature (an extra body, a belt,
-  an anomaly, a ruin, a hazard), the lattice ring that same feature's own
-  generator line already drew, in `[1, params.Radius]`;
-- **undefined** for a body-parented feature (a moon, or the station) — such
-  a feature's local radius SHALL instead follow its own governing law (a
-  named band anchored on its parent, or a type-keyed ceiling) and SHALL
-  NEVER be derived through `ContinuousRadius`.
-
-`ContinuousRadius`'s total domain is the integer interval
-`[0, max(MaxRings − 1, params.Radius)]`, which invariant 5 below constrains to
-`[0, params.Radius]`, and `SystemInterior.Extent = ContinuousRadius(params.Radius)`
-SHALL be a genuine upper bound over every star-parented feature's
-continuous radius in that interior.
-
-Strict ascent and a configured minimum spacing multiple
-(`MinOrbitSpacing = RadiusGrowth`, exactly — no larger multiple is
-assertable, since adjacent skeleton ordinals differ by at least 1) SHALL
-bind **skeleton major bodies only**, in raw-ring ordinal order: successive
-skeleton bodies' continuous radii SHALL be strictly increasing, each at
-least `MinOrbitSpacing` times its predecessor's. No ascent or separation
-SHALL be required, or asserted, between a skeleton major and any other
-feature family, or between two non-skeleton features — a detail feature
-MAY share a skeleton major's orbital index and land on the identical
-radius at a different phase, which is a legal co-orbital pair, not a
-defect. A system with a single skeleton body SHALL still receive a valid,
-strictly positive continuous radius with no adjacent-radius comparison
-performed.
-
-Because the function that places a raw ring onto the lattice board
-(`clampRing`) is monotonically non-decreasing, the continuous radius
-ordering derived from raw-ring order SHALL never contradict the lattice
-ring ordering derived from clamped-ring order — it SHALL only resolve ties
-the lattice ordering leaves ambiguous, never reverse a lattice-ring
-comparison the two representations both express. The largest radius any
-generated feature can receive SHALL be strictly less than the
-orbital-element codec's configured coordinate extent.
-
-#### Scenario: Successive skeleton radii strictly ascend
-- **WHEN** an interior's skeleton bodies are generated in raw-ring-ascending
-  order
-- **THEN** their continuous orbital radii are strictly increasing, in the
-  same order as their ring ordinals
-
-#### Scenario: Each successive radius meets the configured minimum spacing
-- **WHEN** two skeleton bodies occupy adjacent generated ordinals
-- **THEN** the outer body's continuous radius is at least
-  `MinOrbitSpacing` (`= RadiusGrowth`) times the inner body's radius
-
-#### Scenario: A single-body system still receives a valid radius
-- **WHEN** a system's skeleton has exactly one body
-- **THEN** that body's continuous radius is strictly positive and no
-  adjacent-radius comparison is performed
-
-#### Scenario: Two skeleton bodies mapped to the same lattice ring still receive distinct continuous radii
-- **WHEN** a skeleton contains two bodies at raw ring ordinals 0 and 1, both
-  of which the lattice board's `clampRing` maps to the identical clamped
-  ring
-- **THEN** the two bodies' continuous orbital radii are strictly different,
-  the ordinal-1 body's strictly greater than the ordinal-0 body's
-
-#### Scenario: A detail feature may share a skeleton major's orbital index
-- **WHEN** a non-skeleton star-parented feature's own generator-drawn
-  lattice ring equals a skeleton major's raw ring
-- **THEN** the two features' continuous orbital radii are identical, which
-  is a legal co-orbital pair and is not rejected by strict ascent or the
-  minimum spacing multiple, since neither binds outside skeleton majors
-
-#### Scenario: The largest generated radius stays inside the codec's extent
-- **WHEN** a feature is generated at the maximum configured skeleton ring
-- **THEN** its continuous radius is strictly less than the orbital-element
-  codec's configured coordinate extent, so it can never fail encoding on
-  that ground
 
 ### Requirement: A Body-Parented Child's Local Radius Clears Its Parent Within a Named Band
 A body-parented feature that is not the trading station (i.e. a moon) SHALL
@@ -414,79 +187,6 @@ test rather than a silent assumption:
   configured `Radius` are compared against each other's live values
 - **THEN** `MaxRings - 1` is less than or equal to `Radius`, so every skeleton
   major's continuous radius is at most `SystemInterior.Extent`
-
-### Requirement: A Retrograde Orbit Is Expressed By Inclination, Never By a Non-Positive Period
-The system SHALL express every generated orbiting feature's continuous
-period as strictly positive; a non-positive period SHALL NOT be used to
-encode retrograde motion. Retrograde motion SHALL be expressed solely by
-inclination: a prograde feature's inclination SHALL lie in
-`[0, MaxInclinationJitter]`, and a retrograde feature's inclination SHALL
-lie in `[SubTurn/2 − MaxInclinationJitter, SubTurn/2]`, with the configured
-`MaxInclinationJitter` strictly less than `SubTurn/8`, so no generated
-inclination can reach the quarter-turn boundary from either side.
-
-A feature that already carries a lattice orbital direction — every
-skeleton-derived body, belt, hazard, and capture-plausible detail feature
-(extra body, anomaly, ruin) alike — SHALL take its prograde/retrograde side
-from that same feature's own already-drawn lattice direction (the sign of
-its lattice `Dir`), never re-rolling that side on the continuous stream;
-only the inclination's jitter magnitude within its band is drawn from the
-continuous stream. A feature that carries no lattice orbital direction (a
-moon, or the station) SHALL take its side from the system's
-`DominantOrbitDirection` instead.
-
-#### Scenario: Every generated orbiting feature has a strictly positive period
-- **WHEN** an interior is generated
-- **THEN** every feature with a continuous orbit (every feature but the
-  star) carries a strictly positive continuous period
-
-#### Scenario: Every generated inclination lies within its configured band
-- **WHEN** any orbiting feature's continuous inclination is inspected
-- **THEN** it lies in `[0, MaxInclinationJitter]` or in
-  `[SubTurn/2 − MaxInclinationJitter, SubTurn/2]`, and never strictly
-  between the two bands
-
-#### Scenario: A retrograde feature sweeps against a prograde one at the same node
-- **WHEN** a retrograde feature's own local orbital offset and local
-  velocity, and a prograde feature's own local orbital offset and local
-  velocity, both sharing the same node, are each evaluated at corresponding
-  phase indices
-- **THEN** the vertical component of `cross(localOffset, localVelocity)` is
-  non-zero for each of the two features, and opposite in sign between the
-  two, evidencing reversed sweep direction — no assertion is made that
-  either feature's out-of-plane offset is exactly zero
-
-#### Scenario: A feature's continuous side matches its own lattice direction
-- **WHEN** any feature carrying a lattice orbital direction has its
-  continuous inclination inspected
-- **THEN** its side (prograde or retrograde) agrees with the sign of that
-  same feature's lattice `Dir`, for a disk-born feature and a
-  capture-plausible detail feature alike
-
-#### Scenario: A moon or the station takes its side from the system's dominant direction
-- **WHEN** a moon's or the station's continuous inclination is inspected
-- **THEN** its side matches the system's `DominantOrbitDirection`,
-  independent of any capture-chance roll
-
-#### Scenario: Zero retrograde chance yields fully prograde detail features
-- **WHEN** an interior is generated with `RetrogradeChance` 0, in a system
-  whose dominant orbital direction is negative and again in one whose
-  dominant orbital direction is positive
-- **THEN** every capture-plausible detail feature's lattice direction equals
-  its own system's dominant direction, and its continuous inclination falls
-  on the same side as that system's disk-born features — the side the sign
-  of its own lattice `Dir` names, which for a negative dominant direction is
-  the `[SubTurn/2 − MaxInclinationJitter, SubTurn/2]` band and not the
-  `[0, MaxInclinationJitter]` band
-
-#### Scenario: Certain retrograde chance inverts every capture-plausible feature's inclination
-- **WHEN** an interior is generated with `RetrogradeChance` 1, in a system
-  whose dominant orbital direction is negative and again in one whose
-  dominant orbital direction is positive
-- **THEN** every capture-plausible detail feature's lattice direction is the
-  negation of its own system's dominant direction, and its continuous
-  inclination falls on the band opposite that system's disk-born features,
-  while skeleton bodies, belts, and hazards remain on the disk's own side
 
 ### Requirement: A Body-Parented Orbit's Continuous Period Follows a Named Law of Its Radius, Fixed at Generation Time
 The system SHALL compute a feature's continuous period once, at generation
@@ -794,56 +494,6 @@ are not pinned by this requirement.
   compiled package's output
 - **AND** `backend/system` carries no entry in the capability's deviation register
 
-### Requirement: Lattice Placement Is Independent Of The Continuous Stream
-The interior generator SHALL derive its lattice-tier placement output —
-every generated feature's id, type, ring, angular position, direction,
-parent id, footprint cells, resource kind and richness, and effects, in
-generation order — as a function of the per-system seed alone, unaffected by
-whether the generator also draws continuous orbital elements for the same
-interior, or by the value of the continuous seed it draws them from when it
-does. The continuous stream SHALL independently vary its own output with its
-own seed, so that a lattice output identical across two runs is evidence of
-correct stream separation rather than of a continuous stream that produces
-no output at all. The generator SHALL additionally pin, per recorded case,
-the number of words it consumes from the lattice stream, because a
-continuous element drawn from the lattice stream after the last lattice
-draw shifts no output and is therefore invisible to a present-versus-absent
-comparison.
-
-#### Scenario: Lattice placement is unchanged whether continuous draws are present or absent
-- **WHEN** an interior is generated across a swept set of seeds, with the
-  continuous element draws present and again with them absent
-- **THEN** every feature's lattice ring, start angle, direction, footprint,
-  resources, effects, id, type, parent id, and generation order are
-  identical between the two runs, for every seed
-- **AND** this assertion is inherited from `add-orbital-system-bodies`'s own
-  "Adding continuous elements leaves every lattice placement unchanged"
-  scenario, which shares the same WHEN/THEN against a differently-named
-  requirement; the two are intentionally paired, not independently derived,
-  and a future editor changing one SHALL check the other
-
-#### Scenario: The lattice stream's word consumption is pinned per case
-- **WHEN** an interior is generated for a recorded case with an instrumented
-  lattice stream that counts every word drawn from it
-- **THEN** the number of lattice-stream words consumed equals the count
-  recorded for that case in the `interiorElements` fixture family
-- **AND** the instrumented run's lattice-tier projection is byte-identical to
-  the uninstrumented run's, so the instrument cannot alter what it measures
-
-#### Scenario: Differing continuous seeds leave the lattice projection unchanged
-- **WHEN** the generator is invoked twice with the same lattice seed and two
-  different continuous seeds
-- **THEN** the lattice-tier projection (ids, type, ring, angular position,
-  direction, parent id, footprint, resources, effects, in generation order)
-  is identical between the two runs
-
-#### Scenario: Differing continuous seeds produce differing continuous elements
-- **WHEN** the generator is invoked twice with the same lattice seed and two
-  different continuous seeds
-- **THEN** the continuous orbital elements (space position, size, width) of
-  at least one feature differ between the two runs, demonstrating the
-  continuous stream is live rather than accidentally disconnected
-
 ### Requirement: Bodies Are Public; Ships Are Disclosed
 The system SHALL serve every body of a materialized system's interior —
 geometry, composition, threat detail, and (for a lane-gate body) its
@@ -1082,8 +732,6 @@ described a position on the polar ring-and-slot board
 and a visibility banding that no longer exists — `band` has been constant
 `"visible"`, `live` constant `true`, and `asOf` constant absent since bodies
 became public — and this capability's continuous-space consumer reads none of
-them. Their removal is what allows `backend/board` and `backend/polar` to be
-deleted: while this response promised them, a caller could still be reading
 them.
 
 This is a deliberate removal of fields previously served, not an additive
@@ -1200,21 +848,248 @@ of a client-side reconstruction of that convention (design.md Decision 15).
 - **THEN** every lane-gate body carries a non-empty `id`, and no two bodies
   in that response share one
 
+### Requirement: Interior Generation Is Lazy and Deterministic
+The system SHALL generate a system's interior deterministically from the
+per-system seed (`galaxy.SystemSeed(gallaxySeed, systemId)`), the system's
+graph-tier region (as its character dial), and its galaxy-tier skeleton: a
+fixed star feature at the centre, one orbiting feature per skeleton body
+(extending, never contradicting, the skeleton), and additional detail
+(extra small bodies, belts, moons on gas giants, anomalies/ruins, hazards)
+whose counts and resource richness are dialed by the region's character.
+Every generated angular position SHALL be a continuous phase drawn over the
+whole turn — an integer sub-turn value in `[0, SubTurn)` — so no arc of any
+orbit is unreachable. A system's trading station, when one exists, is NOT
+part of this deterministic generation: it is provisioned independently by
+the `trading-station` capability (as a spawn asset-healing step, not
+interior materialization), so this requirement's determinism and
+create-if-absent guarantees make no claim about a station's presence,
+position, or timing — a system may materialize its interior with no
+station, gain one later at spawn, or (for a non-home system) never carry
+one.
+
+#### Scenario: First read materializes the interior
+- **WHEN** `GetOrCreateInterior` is called for a system with no stored
+  interior
+- **THEN** a new interior is generated from that system's seed, region, and
+  skeleton and persisted
+- **AND** the returned interior includes a star feature and one orbiting
+  feature per skeleton body
+
+#### Scenario: Subsequent reads return the stored interior unchanged
+- **WHEN** `GetOrCreateInterior` is called for a system whose interior is
+  already stored
+- **THEN** the stored interior and features are returned without
+  regenerating
+
+#### Scenario: A denser character produces more detail
+- **WHEN** interiors are generated for a `star_rich` system and a `dead`
+  system from the same generator
+- **THEN** the `star_rich` interior's extra-planet, belt, special, and
+  hazard counts are configured higher than the `dead` interior's (per
+  `DefaultParams().ByCharacter`)
+
+#### Scenario: System not found
+- **WHEN** `GetOrCreateInterior` is called with a system id absent from the
+  live galaxy
+- **THEN** the call fails with `ErrNotFound`
+
+#### Scenario: Generated phases span the whole turn
+- **WHEN** interiors are generated across many seeds and every generated
+  feature's continuous phase is collected
+- **THEN** the collected phases occupy every quadrant of `[0, SubTurn)`,
+  not only a sub-arc of it
+- **AND** the greatest common divisor of the pairwise differences of the
+  collected phases is `1`, so the draw is not confined to a coarse
+  sub-lattice of the turn at any offset — a generator drawing
+  `c + k·(SubTurn/16)` covers every quadrant and has gcd `1` whenever `c` is
+  odd, while leaving almost every phase unreachable, which is the continuous
+  restatement of the very defect the retired every-slot-is-reached scenario
+  existed to catch
+
+### Requirement: Every Generated Body Carries a Continuous Orbital Element Set and a Size
+The system SHALL generate a continuous orbital element set (`space.Orbit`)
+and a physical size for every feature the interior generator produces,
+deterministically from the per-system seed. The star SHALL carry no orbital
+element set (it is parentless, positioned at the origin). Every non-star
+feature SHALL name, as its orbit's parent, another body present in the same
+interior. Every angle (phase, inclination, node) SHALL be an integer
+sub-turn value in `[0, SubTurn)`. Every feature SHALL carry a strictly
+positive size.
+
+#### Scenario: Continuous elements are reproducible from the per-system seed
+- **WHEN** an interior is generated twice from the same per-system seed,
+  region, and skeleton
+- **THEN** every feature's continuous orbital element set and size are
+  identical between the two generations
+
+#### Scenario: The star carries no orbital element set
+- **WHEN** an interior is generated
+- **THEN** the star feature's continuous orbit is absent (nil), consistent
+  with its fixed placement at the origin
+
+#### Scenario: Every non-star feature names a parent present in the same interior
+- **WHEN** an interior is generated
+- **THEN** every feature other than the star carries a continuous orbit
+  whose parent id resolves to another feature generated in that same
+  interior
+
+#### Scenario: Every angle is an integer sub-turn within range
+- **WHEN** any feature's continuous phase, inclination, or node is inspected
+- **THEN** each is an integer value in `[0, SubTurn)`, never a
+  floating-point radian or degree
+
+#### Scenario: Every feature has a strictly positive size
+- **WHEN** an interior is generated
+- **THEN** every feature's size, including the star's, is strictly greater
+  than zero
+
+### Requirement: Continuous Orbital Radii Ascend With the Skeleton Ordinal and Are Separated
+The system SHALL derive a feature's continuous orbital radius as the
+geometric law `ContinuousRadius(idx) = BaseOrbitRadius × RadiusGrowth^idx`
+of a per-family **orbital index** `idx`, never a new random draw. The
+orbital index SHALL be exactly one of the following, which is the complete
+enumeration — no star-parented feature falls outside it, and a
+body-parented feature never has one:
+
+- for a skeleton major body, its raw, un-clamped skeleton ring
+  (`galaxy.Body.Ring`), in `[0, MaxRings)`;
+- for every other star-parented generated feature (an extra body, a belt,
+  an anomaly, a ruin, a hazard), an orbital index that same feature's own
+  generator line draws, in `[1, GenerationParams.Radius]`;
+- **undefined** for a body-parented feature (a moon, or the station) — such
+  a feature's local radius SHALL instead follow its own governing law (a
+  named band anchored on its parent, or a type-keyed ceiling) and SHALL
+  NEVER be derived through `ContinuousRadius`.
+
+`ContinuousRadius`'s total domain is the integer interval
+`[0, max(MaxRings − 1, GenerationParams.Radius)]`, which
+`Generated Orbits Satisfy Their Cross-Capability and Internal Clearance
+Invariants`' invariant 5 constrains to `[0, GenerationParams.Radius]`, and
+`SystemInterior.Extent = ContinuousRadius(GenerationParams.Radius)` SHALL
+be a genuine upper bound over every star-parented feature's continuous
+radius in that interior.
+
+Strict ascent and a configured minimum spacing multiple
+(`MinOrbitSpacing = RadiusGrowth`, exactly — no larger multiple is
+assertable, since adjacent skeleton ordinals differ by at least 1) SHALL
+bind **skeleton major bodies only**, in raw-ring ordinal order: successive
+skeleton bodies' continuous radii SHALL be strictly increasing, each at
+least `MinOrbitSpacing` times its predecessor's. No ascent or separation
+SHALL be required, or asserted, between a skeleton major and any other
+feature family, or between two non-skeleton features — a detail feature
+MAY share a skeleton major's orbital index and land on the identical
+radius at a different phase, which is a legal co-orbital pair, not a
+defect. A system with a single skeleton body SHALL still receive a valid,
+strictly positive continuous radius with no adjacent-radius comparison
+performed. The largest radius any generated feature can receive SHALL be
+strictly less than the orbital-element codec's configured coordinate
+extent.
+
+#### Scenario: Successive skeleton radii strictly ascend
+- **WHEN** an interior's skeleton bodies are generated in raw-ring-ascending
+  order
+- **THEN** their continuous orbital radii are strictly increasing, in the
+  same order as their ring ordinals
+
+#### Scenario: Each successive radius meets the configured minimum spacing
+- **WHEN** two skeleton bodies occupy adjacent generated ordinals
+- **THEN** the outer body's continuous radius is at least
+  `MinOrbitSpacing` (`= RadiusGrowth`) times the inner body's radius
+
+#### Scenario: A single-body system still receives a valid radius
+- **WHEN** a system's skeleton has exactly one body
+- **THEN** that body's continuous radius is strictly positive and no
+  adjacent-radius comparison is performed
+
+#### Scenario: A detail feature may share a skeleton major's orbital index
+- **WHEN** a non-skeleton star-parented feature's own generator-drawn
+  orbital index equals a skeleton major's raw ring
+- **THEN** the two features' continuous orbital radii are identical, which
+  is a legal co-orbital pair and is not rejected by strict ascent or the
+  minimum spacing multiple, since neither binds outside skeleton majors
+
+#### Scenario: The largest generated radius stays inside the codec's extent
+- **WHEN** a feature is generated at the maximum configured skeleton ring
+- **THEN** its continuous radius is strictly less than the orbital-element
+  codec's configured coordinate extent, so it can never fail encoding on
+  that ground
+
+### Requirement: Retrograde Motion Is Expressed By Inclination, Never By a Non-Positive Period
+The system SHALL express every generated orbiting feature's continuous
+period as strictly positive; a non-positive period SHALL NOT be used to
+encode retrograde motion. Retrograde motion SHALL be expressed solely by
+inclination: a prograde feature's inclination SHALL lie in
+`[0, MaxInclinationJitter]`, and a retrograde feature's inclination SHALL
+lie in `[SubTurn/2 − MaxInclinationJitter, SubTurn/2]`, with the configured
+`MaxInclinationJitter` strictly less than `SubTurn/8`, so no generated
+inclination can reach the quarter-turn boundary from either side.
+
+A feature's prograde/retrograde side SHALL be decided exactly once, by the
+orbital-direction roll `Coherent Orbital Direction` governs — the system's
+`DominantOrbitDirection` for every disk-born feature (skeleton-derived
+bodies, belts, hazards), and that direction inverted with the tuned
+`RetrogradeChance` probability for a capture-plausible detail feature (an
+extra body, an anomaly, a ruin). That single decided side SHALL select the
+inclination band; only the jitter magnitude within the selected band is
+drawn from the continuous stream, and the side SHALL NOT be re-rolled on
+that stream. A feature that carries no orbital-direction roll of its own (a
+moon, or the station) SHALL take its side from the system's
+`DominantOrbitDirection`.
+
+#### Scenario: Every generated orbiting feature has a strictly positive period
+- **WHEN** an interior is generated
+- **THEN** every feature with a continuous orbit (every feature but the
+  star) carries a strictly positive continuous period
+
+#### Scenario: Every generated inclination lies within its configured band
+- **WHEN** any orbiting feature's continuous inclination is inspected
+- **THEN** it lies in `[0, MaxInclinationJitter]` or in
+  `[SubTurn/2 − MaxInclinationJitter, SubTurn/2]`, and never strictly
+  between the two bands
+
+#### Scenario: A retrograde feature sweeps against a prograde one at the same node
+- **WHEN** a retrograde feature's own local orbital offset and local
+  velocity, and a prograde feature's own local orbital offset and local
+  velocity, both sharing the same node, are each evaluated at corresponding
+  phase indices
+- **THEN** the vertical component of `cross(localOffset, localVelocity)` is
+  non-zero for each of the two features, and opposite in sign between the
+  two, evidencing reversed sweep direction — no assertion is made that
+  either feature's out-of-plane offset is exactly zero
+
+#### Scenario: A moon or the station takes its side from the system's dominant direction
+- **WHEN** a moon's or the station's continuous inclination is inspected
+- **THEN** its side matches the system's `DominantOrbitDirection`,
+  independent of any capture-chance roll
+
+#### Scenario: Zero retrograde chance yields fully prograde detail features
+- **WHEN** an interior is generated with `RetrogradeChance` 0, in a system
+  whose dominant orbital direction is negative and again in one whose
+  dominant orbital direction is positive
+- **THEN** every capture-plausible detail feature's continuous inclination
+  falls on the same side as that system's disk-born features — the side
+  that system's `DominantOrbitDirection` names, which for a negative
+  dominant direction is the `[SubTurn/2 − MaxInclinationJitter, SubTurn/2]`
+  band and not the `[0, MaxInclinationJitter]` band
+
+#### Scenario: Certain retrograde chance inverts every capture-plausible feature's inclination
+- **WHEN** an interior is generated with `RetrogradeChance` 1, in a system
+  whose dominant orbital direction is negative and again in one whose
+  dominant orbital direction is positive
+- **THEN** every capture-plausible detail feature's continuous inclination
+  falls on the band opposite that system's disk-born features, while
+  skeleton bodies, belts, and hazards remain on the disk's own side
+
 ## Notes for future maintainers
 
-- `system.Features` implements `observation.InteriorSource`, and occlusion
-  is a **radius, not a boolean**: each feature carries an
-  `OcclusionRadius2` (a squared radial-unit radius in `board.LineOfSight`
-  table units), assigned by `occlusionRadius2(FeatureType)`. `FeatureStar`
-  gets `board.StarOcclusionRadius2` (one radial unit squared);
-  `FeatureRocky`, `FeatureGasGiant` and `FeatureIce` get
-  `board.PlanetOcclusionRadius2` (half a radial unit squared); every other
-  type — belts, moons, hazards, anomalies, ruins, and the station (which is
-  excluded from this source entirely) — gets zero, and a zero-radius
-  feature contributes no occluder at all. Because the star's shadow is now
-  a real width rather than a single blocked cell, it reaches across the
-  core: the far side of the inner system is genuinely dark from a given
-  vantage. Which types qualify and at what radius is **this domain's
-  rule**; `observation` stays purely geometric and never learns what a gas
-  giant is. This underlies scan resolution in `focused-scan` (the verb)
-  and `sighting-records` (its product), not this capability directly.
+- **Occlusion is no longer this capability's rule.** It once was: the interior
+  fed a fog source that assigned each feature type a squared occlusion radius
+  in lattice table units, so a star's shadow had a real width and the far side
+  of the inner system was genuinely dark. That table, the lattice line-of-sight
+  it indexed, and the `observation` capability that consumed it were all
+  deleted across the continuous-space chain, ending with `delete-the-lattice`
+  (2026-09-04). Occlusion in R³ is now `proximity-disclosure`'s alone — star-only,
+  computed from continuous positions — and this capability serves body data
+  without any notion of what blocks sight of what. What a gas giant *is*
+  remains this domain's knowledge; what it hides is not, and no longer was even
+  before the geometry changed.
