@@ -724,7 +724,7 @@ names the file and states its verification.
       THE TREE" paragraph (site 13), which enumerates the current list contents
       including `board` and `polar`. Then run it standalone and confirm it
       passes: `python3 .claude/skills/code-quality-checks/test_check_determinism_lists.py`
-- [ ] 8.12 Prove the de-enrolment did not silently disable a check: run
+- [x] 8.12 Prove the de-enrolment did not silently disable a check: run
       `python3 .claude/skills/code-quality-checks/check.py --backend-tests` and
       confirm the determinism cross-target matrix **still runs** and still names
       `./space/ ./system/ ./galaxy/`, rather than silently skipping
