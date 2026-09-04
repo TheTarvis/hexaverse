@@ -275,14 +275,14 @@ leaves a check that passes forever:
 6. `:223` — `DETERMINISM_GO_PACKAGES` (the transcendental lint's scope gate).
 7. `:258–259` — the seam-file predicate matching `frontend/lib/board` and
    `frontend/lib/polar`.
-8. `:1052–1055` — `run_determinism_cross_target`'s docstring, which cites
+8. `:1081–1084` — `run_determinism_cross_target`'s docstring, which cites
    `polar-lattice-math` (a capability retired two changes ago).
-9. `:1078–1102` — the two `go test ./board/ ./polar/ ./space/ ./system/
+9. `:1107–1131` — the two `go test ./board/ ./polar/ ./space/ ./system/
    ./galaxy/` command strings and the four result messages naming them.
-10. `:1161–1162` — `run_mirror_map_check`'s docstring.
-11. `:1484–1492` — `determinism_trigger`, the changed-file predicate gating
+10. `:1190–1191` — `run_mirror_map_check`'s docstring.
+11. `:1519–1527` — `determinism_trigger`, the changed-file predicate gating
     site 9.
-12. `:1502–1514` — `mirror_trigger`, the changed-file predicate gating the
+12. `:1537–1549` — `mirror_trigger`, the changed-file predicate gating the
     mirror-map check.
 
 **`.claude/skills/code-quality-checks/test_check_determinism_lists.py`**
@@ -352,6 +352,10 @@ comparable against the report that produced it:
     therefore **cannot fail**, which makes it precisely the silently-inert
     record Goal 2 forbids. Repair it by hand; nothing will surface it.
 
+These line numbers were derived at `1bc5e46`; re-derive them by symbol
+(`grep -n 'run_determinism_cross_target\|mirror_trigger\|determinism_trigger' check.py`)
+rather than trusting them if `check.py` has changed since.
+
 ## `board-tactical-math` — the supersession map
 
 All 22 requirements retire. Nothing is re-ADDed. Each is superseded by a live
@@ -416,7 +420,7 @@ requirement elsewhere, or governs a computation that ceases to exist:
 - **Recorded, not fixed (C14): `mirror_trigger`'s coverage stays incomplete
   for packages this change never reaches.** Task 8.7 correctly adds
   `backend/market`/`frontend/lib/market` to `mirror_trigger`
-  (`check.py:1502-1514`) alongside the `backend/board`/`backend/polar`/
+  (`check.py:1537-1549`) alongside the `backend/board`/`backend/polar`/
   `frontend/lib/{board,polar}` clauses it removes — but `backend/space`,
   `backend/fleet`, `backend/galaxy`, and `backend/disclosure` all carry their
   own `anti_mirror` maps that `check-mirror-map.sh` runs, and none of them

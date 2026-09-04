@@ -324,9 +324,19 @@ func TestGenerate_Scenario_ZeroRetrogradeChanceYieldsFullyPrograde(t *testing.T)
 			if !isCapturePlausibleId(f.Id) {
 				continue
 			}
-			if f.Orbit != nil && (f.Orbit.Dir < 0) != diskIsRetrograde {
-				t.Fatalf("seed %d: capture-plausible feature %s has lattice Dir=%d against dominant dir=%d at RetrogradeChance=0", seed, f.Id, f.Orbit.Dir, sysDir)
-			}
+			// SDET (task 2.10b, delete-the-lattice): this leg previously also
+			// asserted f.Orbit.Dir against diskIsRetrograde — the LATTICE
+			// side of the same guarantee. That assertion is dropped, not
+			// repointed: with system.Orbit deleted (task 2.1), the roll task
+			// 2.5 re-sources continuousStarParented's retrograde input from
+			// (DominantOrbitDirection/diskOrCaptured) directly, with no
+			// second, lattice-side representation left to compare against.
+			// The surviving assertion below already reads its expectation
+			// from DominantOrbitDirection alone — it does not read f.Orbit —
+			// so it is unaffected by that deletion and, on its own, still
+			// fails if continuousStarParented's retrograde input silently
+			// becomes always-false (proven in a scratch copy; see the SDET
+			// coverage report for delete-the-lattice, task 2.10b).
 			if f.Space == nil {
 				continue
 			}
@@ -370,11 +380,14 @@ func TestGenerate_Scenario_CertainRetrogradeChanceInvertsCapturePlausibleFeature
 		}
 		diskIsRetrograde := sysDir < 0
 		for _, f := range gen.Features {
+			// SDET (task 2.10b, delete-the-lattice): both cases below
+			// previously also asserted f.Orbit.Dir against the expected
+			// direction — see the ZeroRetrogradeChance test above for why
+			// that lattice-side leg is dropped, not repointed, and why the
+			// surviving continuous-side assertions are unaffected by
+			// system.Orbit's deletion.
 			switch {
 			case isCapturePlausibleId(f.Id):
-				if f.Orbit != nil && (f.Orbit.Dir < 0) != !diskIsRetrograde {
-					t.Fatalf("seed %d: capture-plausible feature %s did not invert against dominant dir=%d at RetrogradeChance=1", seed, f.Id, sysDir)
-				}
 				if f.Space == nil {
 					continue
 				}
@@ -385,11 +398,7 @@ func TestGenerate_Scenario_CertainRetrogradeChanceInvertsCapturePlausibleFeature
 				}
 			case strings.HasPrefix(f.Id, "feat-body-"), strings.HasPrefix(f.Id, "feat-belt-"), strings.HasPrefix(f.Id, "feat-hazard-"):
 				// Disk-born: always the dominant direction, unaffected by
-				// RetrogradeChance — same band as the disk itself, on both
-				// lattice Dir and continuous inclination.
-				if f.Orbit != nil && (f.Orbit.Dir < 0) != diskIsRetrograde {
-					t.Fatalf("seed %d: disk-born feature %s ignored the dominant direction at RetrogradeChance=1", seed, f.Id)
-				}
+				// RetrogradeChance — same band as the disk itself.
 				if f.Space != nil && isRetrogradeInclination(f.Space.Inclination) != diskIsRetrograde {
 					t.Fatalf("seed %d (dominant dir=%d): disk-born feature %s continuous inclination %v left its own system's disk side at RetrogradeChance=1", seed, sysDir, f.Id, f.Space.Inclination)
 				}

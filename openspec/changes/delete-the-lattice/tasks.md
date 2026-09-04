@@ -17,7 +17,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `frontend/components/space/SystemSpaceView.tsx:29` and
       `frontend/lib/types/action.ts:5` — are rewritten by task 6.3, not by
       the predecessor. Record the output in the commit message.
-- [ ] 1.2 Confirm all four predecessors are archived, in order, by listing
+- [ ] 1.2 Confirm all five predecessors are archived, in order, by listing
       `openspec/changes/archive/` for `add-fuel-as-cargo`,
       `add-stationkeep-hold-verb`, `serve-orbital-elements-and-burn-preview`,
       `build-production-space-view`, `add-scan-and-sightings-surface`, and
@@ -30,9 +30,12 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       not complete
 - [ ] 1.4 Record the backend precondition as a baseline rather than a
       requirement: `cd backend && grep -rln '"hexaverse/board"\|"hexaverse/polar"'
-      --include='*.go' .` SHALL list exactly the files sections 2–5 remove.
-      Anything on that list not named in those sections is an unplanned importer
-      and must be reported before proceeding
+      --include='*.go' .` SHALL list exactly the files sections 2–5 remove,
+      plus one expected exception: `backend/action/commit_params_validator_continuous_test.go`
+      is a RED-phase file of this change and is therefore a `hexaverse/board`
+      importer that sections 2–5 do not name; it is removed by its own GREEN
+      rewrite. Anything else on that list not named in those sections is an
+      unplanned importer and must be reported before proceeding
 - [ ] 1.5 Confirm the suite is green *before* any deletion, so a later failure
       is attributable: `cd backend && go test ./... -p 1` (the `-p 1` is
       mandatory — the root `TestMain` wipes the shared emulator project and
@@ -130,6 +133,23 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       catches all nine, so nothing is silently lost — but this chain's failure
       mode is agents trusting an enumeration over a query, so re-run the grep
       rather than reading the list above
+
+      **Ruling G (r7 addendum) — one file in that 21-file list is not yours.**
+      `generator_continuous_test.go` is recorded in
+      `red-manifest-delete-the-lattice.txt` and has already been revised by the
+      SDET (task 2.10b), and every file in that manifest is SDET-owned. A
+      developer who finds a manifest-recorded file in their own task's
+      mechanically-derived file list **halts that leg and reports it to the
+      orchestrator** rather than editing it — this is the same seam that
+      produced this repo's *integrity check finds altered tests* BLOCKER, and
+      this is the one place in section 2 where a developer's derived list and
+      the red manifest overlap. Its three surviving prose lines (`:327,339,383`,
+      which task 10.2's sweep keeps deliberately visible) are cleared by a
+      pre-authorized **comment-only** SDET pass at the acceptance gate: no
+      assertion, test name, or failure-message string changes, the manifest is
+      re-recorded, and the cause is logged in `link9-red-coverage.md`. If
+      clearing a line would require touching anything but a comment, the SDET
+      halts and reports instead
 - [ ] 2.10b `generator_continuous_test.go` is **re-sourced, not trimmed.** Its
       retrograde assertions read `f.Orbit.Dir` to check that a body's
       continuous inclination matches its lattice direction. Deleting the
@@ -156,7 +176,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       recording (design.md OQ-1; this is the exact failure
       `pin-system-generation-determinism` existed to end). The durable check
       against a future divergence is the standing `./system/` cross-target
-      leg (`check.py:1078-1102`, `.gitlab-ci.yml:342`), which this task's
+      leg (`check.py:1107-1131`, `.gitlab-ci.yml:342`), which this task's
       byte-for-byte assertion is a one-time rehearsal of, not a replacement
       for
 - [ ] 2.10d **(moved from task 7.6, for the same reason as 2.10c)** Update
@@ -788,12 +808,46 @@ names the file and states its verification.
 
 ## 10. Whole-tree sweep
 
-- [ ] 10.1 `grep -rn 'backend/board\|backend/polar\|frontend/lib/board\|frontend/lib/polar\|fixtures/board\|fixtures/polar\|board-tactical-math\|polar-lattice-math' . --exclude-dir=node_modules --exclude-dir=.git`
-      SHALL return hits only under `openspec/changes/archive/`,
-      `docs/plans/`, `docs/handoffs/`, `docs/defects/` and `docs/specs/`
-      (the superseded numbered specs this task records rather than rewrites,
-      per OQ-4/task 9.4) — all historical
-      record, which stays. Every other hit is fixed or removed
+- [ ] 10.1 Whole-tree sweep. Run this pipeline **exactly as written** — it is
+      byte-identical to `link9-acceptance-greps.sh`'s 10.1 leg, and r7's
+      addendum ruling E requires harness and task to agree character for
+      character. Do not re-derive it, re-order the filters, or tidy them:
+
+      ```
+      grep -I -rn 'backend/board\|backend/polar\|frontend/lib/board\|frontend/lib/polar\|fixtures/board\|fixtures/polar\|board-tactical-math\|polar-lattice-math' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude-dir=.next-e2e \
+        | grep -v '^./openspec/changes/archive/' | grep -v '^./docs/plans/' \
+        | grep -v '^./docs/handoffs/' | grep -v '^./docs/defects/' | grep -v '^./docs/specs/' \
+        | grep -v '^./openspec/changes/delete-the-lattice/' \
+        | grep -v 'commit_params_validator_continuous_test.go'
+      ```
+
+      The remainder SHALL be **empty**. Every filter above carries its reason,
+      so that a later reader can neither mistake one for unexplained slack nor
+      "restore" one the orchestrator deliberately struck:
+      - `^./openspec/changes/archive/`, `^./docs/plans/`, `^./docs/handoffs/`,
+        `^./docs/defects/`, `^./docs/specs/` — historical record, which stays
+        (`docs/specs/` being the superseded numbered specs this change records
+        rather than rewrites, per OQ-4/task 9.4).
+      - `--exclude-dir=.next --exclude-dir=.next-e2e` — gitignored Next.js build
+        output is not source; no source edit can ever clear a compiled bundle
+        (59 hits between this leg and 10.2's) (ruling D).
+      - `^./openspec/changes/delete-the-lattice/` — a **PATH** exclusion of this
+        change's own folder, which cannot describe a deletion without naming the
+        deleted paths (ruling C). **Pre-archive only**: it is dead once
+        `openspec archive` moves the folder under the already-allow-listed
+        `openspec/changes/archive/`. It replaced a `grep -v 'delete-the-lattice'`
+        *content* filter whose 79-line reach was invisible; measured identical at
+        file granularity, so this is a strict narrowing.
+      - `commit_params_validator_continuous_test.go` — this change's own RED
+        file, whose prose says `backend/board` is deleted by this change; it goes
+        with that file's GREEN rewrite, not before.
+
+      **Deliberately ABSENT from this leg — do not re-add** (ruling B): no
+      blanket `delete-the-lattice` *content* filter; no `sub-lattice` filter
+      (0 lines here — 10.1 matches paths, and a line naming a deleted path is
+      residue whatever else it says); no
+      `TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse` filter
+      (0 lines here). **Do not widen** beyond the filters printed above.
 - [ ] 10.1b Run a **second, bare-token** sweep, because the enforcement lists
       do not spell the packages as paths and 10.1's path patterns miss all of
       them: `check.py`'s `DETERMINISM_GO_PACKAGES = ("board", "polar", …)`,
@@ -844,15 +898,26 @@ names the file and states its verification.
       `backend/space/{params.go:41,burn.go:11,helpers_test.go:79,params_test.go:28,63}`
       (a package no other task touches), `backend/fleet/resolver.go:26`,
       `backend/fleet/model.go:162`.
-- [ ] 10.2 `grep -rni 'lattice' backend frontend .claude fixtures
-      --exclude-dir=node_modules` SHALL return only the deliberate wire-contract
-      guard `build-production-space-view` added (`system-interior`: "Lattice-only
-      fields are absent from the response") and its implementing test function,
-      `TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse` alone — not
-      the rest of `interior_wire_lattice_removal_test.go`, whose sibling
-      function task 3.4 deletes (design.md Decision 6). Anything else is a
-      leftover. **The pattern is
-      deliberately unanchored**: `\blattice\b` misses the two shapes that
+- [ ] 10.2 Case-insensitive `lattice` sweep. Run this pipeline **exactly as
+      written** — it is byte-identical to `link9-acceptance-greps.sh`'s 10.2
+      leg, and r7's addendum ruling E requires harness and task to agree
+      character for character. Do not re-derive it, re-order the filters, or
+      tidy them:
+
+      ```
+      grep -I -rni 'lattice' backend frontend .claude fixtures --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.next-e2e \
+        | grep -v 'TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse' \
+        | grep -v 'sub-lattice' \
+        | grep -Ev 'RED-phase .*delete-the-lattice'
+      ```
+
+      The remainder SHALL be **empty**. The word's one deliberate survivor in
+      the tree is the wire-contract guard `build-production-space-view` added
+      (`system-interior`: "Lattice-only fields are absent from the response")
+      and its implementing test function — not the rest of
+      `interior_wire_lattice_removal_test.go`, whose sibling function task 3.4
+      deletes (design.md Decision 6). Anything else is a leftover. **The pattern
+      is deliberately unanchored**: `\blattice\b` misses the two shapes that
       matter most, because both GNU and BSD `grep` treat `_` as a word
       character and `\b` does not fire inside CamelCase — so
       `backend/system/lattice_identity_test.go` (a whole file) and
@@ -861,6 +926,41 @@ names the file and states its verification.
       three anti-lattice comments are handled by task 6.3b — rewritten there,
       not exempted here.
 
+      Every filter above carries its reason, so that a later reader can neither
+      mistake one for unexplained slack nor "restore" one the orchestrator
+      deliberately struck:
+      - `--exclude-dir=.next --exclude-dir=.next-e2e` — gitignored Next.js build
+        output is not source; no source edit can ever clear a compiled bundle
+        (59 hits between this leg and 10.1's) (ruling D).
+      - `TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse` — the one
+        deliberate wire-contract guard, this sweep's single expected survivor.
+      - `sub-lattice` — load-bearing mathematics in
+        `backend/system/phase_reachability_test.go`: task 2.11's replacement
+        coverage asserts the continuous phase draw is not confined to a coarse
+        sub-lattice **of the turn** — a lattice of real numbers, not the deleted
+        board. Renaming it would make the test's own failure message lie.
+      - `-Ev 'RED-phase .*delete-the-lattice'` — the red-manifest **header form**
+        only: the change id contains the swept word, so every RED file fails this
+        sweep by obeying the convention. It covers all four RED headers and
+        matches nothing else in the tree.
+
+      **Deliberately ABSENT from this leg — do not re-add** (ruling B): no
+      blanket `delete-the-lattice` *content* filter. It would hide six prose
+      lines in **tracked** files — `backend/system/{fog.go:22, model.go:130,
+      interior_wire_lattice_removal_test.go:209,
+      generator_continuous_test.go:327,339,383}` — which sit on code this change
+      deletes and therefore MUST stay under the gate to prove they vanished.
+      Nor a `commit_params_validator_continuous_test.go` filter: after the
+      SDET's comment rewording that file's only surviving `lattice` hit is its
+      RED header, already covered above, so the filter removes 0 lines. **Do not
+      widen** beyond the filters printed above.
+
+      **Three of those six lines are SDET work, not developer work** (ruling G):
+      `generator_continuous_test.go:327,339,383` sit inside a manifest-recorded
+      RED file, and clearing them is a pre-authorized comment-only SDET pass —
+      the operative halt-and-report clause for developers is recorded at task
+      2.10, where the developer whose file list contains that file will read it
+      before acting.
       **C12 — the hit list, derived mechanically, not enumerated by hand.**
       Running the sweep now (excluding `backend/board`, `backend/polar`,
       `frontend/lib/board`, `frontend/lib/polar`, deleted outright by
@@ -918,7 +1018,7 @@ names the file and states its verification.
       `frontend/lib/types/action.ts:5` (task 6.3),
       `fixtures/system/mirror-map.json:59,60,71` (task 8.15),
       `.claude/scripts/check-mirror-map.sh:9-10` (task 8.9, design site 17),
-      `.claude/skills/code-quality-checks/check.py:1055` (task 8.6, design
+      `.claude/skills/code-quality-checks/check.py:1084` (task 8.6, design
       site 8), `backend/fleet/resolver_test.go:22` (adjacent to the `:23`
       citation task 4.2 already owns), and the `stations`/`mine`/`market`
       copies of `lattice_symbols_absent_test.go` plus
@@ -1058,14 +1158,17 @@ names the file and states its verification.
 retirement in section 13 happens. The archiver is the gate, and it is the
 archiver that must be rehearsed.
 
-- [ ] 12.1 Copy `openspec/` to a scratch directory and, **in that copy, archive
-      the predecessors first, in order** — `add-stationkeep-hold-verb`, then
-      `serve-orbital-elements-and-burn-preview`, then
-      `build-production-space-view`, then `add-scan-and-sightings-surface` —
-      applying `build-production-space-view`'s own post-archive hand-steps
-      (its tasks 13.1–13.5, including the `board-view` directory deletion) so
-      the rehearsal runs against the tree this change will actually meet.
-      Against an unarchived tree it rehearses a shape that never ships
+- [ ] 12.1 Copy `openspec/` to a scratch directory. **All four predecessors —
+      `add-stationkeep-hold-verb`, `serve-orbital-elements-and-burn-preview`,
+      `build-production-space-view`, `add-scan-and-sightings-surface` — are
+      already archived as of `3088748`, and `build-production-space-view`'s
+      post-archive hand-steps (its tasks 13.1–13.5, including the `board-view`
+      directory deletion) are already applied**, so the live tree is the tree
+      this change will meet and the copy needs no pre-archiving. Confirm that
+      before rehearsing, by task 1.2's listing and task 1.3's `board-view`
+      grep; if either fails, archive whatever is outstanding **in the copy**,
+      in the order above, before running 12.2. Rehearsing against an
+      unarchived tree rehearses a shape that never ships.
 - [ ] 12.2 In that copy, run `openspec archive delete-the-lattice --yes` and
       confirm it succeeds even though `board-tactical-math` has no delta
       directory

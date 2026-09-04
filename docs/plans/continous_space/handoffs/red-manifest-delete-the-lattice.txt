@@ -1,0 +1,8 @@
+# red-suite handoff manifest for delete-the-lattice
+# recorded 2026-09-04T13:53:58Z
+# verify with: bash .claude/scripts/openspec-red-manifest.sh verify delete-the-lattice
+f1f97771074069943b930065a4fe2451879417bd35297b1f688c1da539cce6fc  backend/action/commit_params_validator_continuous_test.go
+a618414f14c6bef6f48ac2e11076d70df2b90010919f97759013477e168cf669  backend/fleet/jump_parked_at_target_gate_not_attached_test.go
+9ffde291dc5edac22206841a5bd83a9de67b501d71550b5c1e8474ef7cea829f  backend/refuel/parked_at_station_not_attached_test.go
+9bba5a7f7fa213178064e6f2c24779688529166501be4e191f17b26cdfbe23b6  backend/system/generator_continuous_test.go
+045dd19ed2d56dd5198c96931acf37f22b2d062d1e62c2a4ff486e0e5a34d859  backend/system/phase_reachability_test.go
