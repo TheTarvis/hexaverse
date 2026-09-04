@@ -3,10 +3,10 @@ import { expect, type Locator, type Page } from '@playwright/test'
 /**
  * Shared drivers for the continuous-space system view
  * (`components/space/SystemSpaceView`), used by every e2e suite rewritten
- * off the retired lattice board under openspec change
+ * off the retired board view under openspec change
  * `build-production-space-view`, tasks.md 2.1b / 10.8.
  *
- * WHY A HELPER AND NOT FIVE COPIES. Five suites shared one lattice contract
+ * WHY A HELPER AND NOT FIVE COPIES. Five suites shared one board-view contract
  * (`board-overlay`, `feature-glyph-*`, `gate-glyph-*`, `fleet-cmd-burn-*`)
  * and five copies of the wake-up flow. The test ids changed; the journeys
  * did not. Keeping the drivers in one place means the NEXT view change edits
@@ -353,7 +353,7 @@ async function expectSelectionLanded(page: Page): Promise<void> {
  * Commits a burn toward the current selection and waits out the flight.
  *
  * The `Under way` wait is a FALSE-POSITIVE GUARD, carried over verbatim in
- * intent from every lattice-era suite: the fleet is usually already `Docked`
+ * intent from every board-era suite: the fleet is usually already `Docked`
  * when this is called, so waiting only on the eventual docked state would
  * pass even if the burn click were silently swallowed. A burn commit clears
  * `attachedTo` immediately and the row reads `Under way` while it runs —

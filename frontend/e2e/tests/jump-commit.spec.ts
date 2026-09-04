@@ -14,7 +14,7 @@ import {
  * ORIGINALLY written for `replace-observation-with-sightings` tasks.md 8.8
  * (board-view "Jump Commit": "Invoking jump submits the attached gate's
  * lane"). REWRITTEN against the continuous-space view for
- * `build-production-space-view` tasks.md 2.1b / 10.8 — the lattice board and
+ * `build-production-space-view` tasks.md 2.1b / 10.8 — the board view and
  * every id this suite drove (`board-overlay`, `gate-glyph-*`,
  * `fleet-cmd-burn-*`) are gone. The JOURNEY and every assertion's SUBSTANCE
  * are preserved verbatim in intent; only the surfaces changed.

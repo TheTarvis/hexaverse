@@ -37,7 +37,7 @@ import {
  * differing from a synchronous mock). This spec closes that seam, on the
  * actual wire, against the actual (test-stack) backend.
  *
- * ONE ASSERTION MOVED, and why it is not a weakening. The lattice-era file
+ * ONE ASSERTION MOVED, and why it is not a weakening. The board-era file
  * ended on `balance-refuel-cost`, a testid that lived on
  * `components/board/BalanceReadout.tsx` and dies with `components/board/`
  * (tasks.md 10.1). Its substance — "the refuel's cost is visible to the
@@ -76,7 +76,7 @@ test.describe('refuel commit — wire to click, double-submit guard', () => {
 
     // 2. Burn to the home station and dock.
     //
-    //    SDET NOTE, carried forward from the lattice-era file because the
+    //    SDET NOTE, carried forward from the board-era file because the
     //    lesson survives the rewrite: this leg once selected the station by
     //    an attribute (`[data-station="true"]`) that the overlay never
     //    emitted, so a fallback branch silently docked at whatever body drew

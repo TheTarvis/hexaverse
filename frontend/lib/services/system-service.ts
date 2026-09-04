@@ -7,8 +7,8 @@
 //
 // There is no wire→renderer adaptation (cf. galaxy-service's `adaptGalaxy`):
 // the space view's scene builder reads the served continuous positions,
-// sizes and orbital elements directly. The lattice `getSystemBoard` twin is
-// gone with the lattice board itself (openspec build-production-space-view,
+// sizes and orbital elements directly. The `getSystemBoard` twin is
+// gone with the board view itself (openspec build-production-space-view,
 // tasks.md 10.1/10.3).
 
 import { apiClient } from '../api-client'

@@ -439,7 +439,7 @@ describe('GalaxyView', () => {
 
     // SDET, 2026-09-03 — tasks.md 10.9 ("retire the 'board' wording"). This
     // used to pin the sentence verbatim: 'Open the system board to choose a
-    // target'. The lattice board is deleted by section 10, so a toast that
+    // target'. The board view is deleted by this change, so a toast that
     // still calls the destination a "board" sends the player looking for a
     // surface that no longer exists.
     //
@@ -454,7 +454,7 @@ describe('GalaxyView', () => {
     expect(
       copy,
       `player-facing copy still calls the destination a "board": ${JSON.stringify(copy)} ` +
-        '(tasks.md 10.9 — the lattice board is deleted by section 10)',
+        '(tasks.md 10.9 — the board view is deleted by this change)',
     ).not.toMatch(/board/i)
     expect(
       copy,

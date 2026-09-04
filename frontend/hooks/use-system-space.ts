@@ -9,7 +9,7 @@ import type { SystemSpace } from '@/lib/types/system-space'
 // (openspec change `build-production-space-view`, `system-interior`:
 // *Interior Read Serves Continuous Bodies*). The successor to
 // `useSystemBoard`: same endpoint, same cache key, a wire shape with no
-// lattice left in it.
+// discrete-grid vocabulary left in it.
 //
 // Disabled until a non-empty system id is known, so a bare drill-in route
 // never fires a `/v1/systems/` read.

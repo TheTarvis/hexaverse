@@ -56,7 +56,7 @@ async function pickFarLode(page: Page, interior: ServedInterior, excludeId?: str
  *     inner system it is off screen; panning blind until one happens to enter
  *     the viewport is not a path a player can be expected to find.
  *   - every leg goes through the SPACE VIEW's own surfaces. No API call is
- *     made by the test, and no lattice test id appears anywhere in it.
+ *     made by the test, and no retired-board test id appears anywhere in it.
  *
  * WHAT WOULD MAKE THIS VACUOUS, and how each is closed:
  *   - Waiting only on the eventual docked state would pass even if the burn
@@ -117,7 +117,7 @@ test.describe('the continuous-space slice, end to end through the new view', () 
     // The renderer came up: neither unavailable state is showing.
     await expect(page.getByTestId('renderer-unsupported')).toHaveCount(0)
     await expect(page.getByTestId('renderer-interrupted')).toHaveCount(0)
-    // The scene actually has bodies in it, and no lattice remains.
+    // The scene actually has bodies in it, and no retired-board surface remains.
     await expect(page.locator('[data-testid^="body-hit-feat-"]').first()).toBeAttached({
       timeout: 20_000,
     })

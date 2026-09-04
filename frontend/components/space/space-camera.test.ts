@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 //
 // THE CONTRACT: `frontend/components/space/space-camera.ts` is the PURE
 // camera model — no React, no DOM — mirroring the shape
-// `components/board/board-camera.ts` already established for the lattice
+// `components/board/board-camera.ts` already established for the board
 // view it replaces. Every gesture is a pure `(camera, input) -> camera`.
 // It is NOT in `lib/space/`, whose name guard admits only draw math
 // (tasks.md 1.4/1.5).

@@ -3,7 +3,7 @@
 // Orbit, Pan, and Zoom*, *...Touch Pinch-Zoom*, *...Is Keyboard-Operable*,
 // *...Manual Recenter*). Every gesture is `(camera, input) -> camera`, so
 // the whole camera is testable without a canvas, exactly as
-// `components/board/board-camera.ts` was for the lattice view this replaces.
+// `components/board/board-camera.ts` was for the board view this replaces.
 //
 // IT LIVES HERE, NOT IN `lib/space/`. That directory admits only pure draw
 // math and its name guard polices it (tasks.md 1.4/1.5); a camera is view
@@ -13,7 +13,7 @@
 // default framing, the zoom clamps, the pan bound, the keyboard pan step
 // and the maximum pick radius are each ONE configured multiplier applied to
 // the interior read's own `extent` — never an absolute scene constant, and
-// never the lattice `radius`, whose producer link 9 deletes
+// never the retired board `radius`, whose producer is gone
 // (`system-space-view`: *The framing scales with the system's served
 // extent*). Their VALUES are design.md OQ-2, open for playtesting; their
 // SHAPE is the requirement.

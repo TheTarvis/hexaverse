@@ -4,7 +4,7 @@ import { apiClient } from '../api-client'
 import type { SystemSpace } from '../types/system-space'
 
 // Repointed from `getSystemBoard` to `getSystemSpace` (openspec change
-// `build-production-space-view`, tasks.md 10.1/10.3): the lattice interior
+// `build-production-space-view`, tasks.md 10.1/10.3): the board-era interior
 // read and the `SystemBoard` shape it returned are both gone. The two cases
 // are the ones the deleted file asserted — the path, and the id encoded into
 // it — against the surviving continuous read.

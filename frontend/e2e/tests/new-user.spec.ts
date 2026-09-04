@@ -15,7 +15,7 @@ import { emulatorSignIn } from '../helpers/firebase-emulator'
  * task 2.1 replaces `/systems/:systemId`'s view outright, so
  * `system-board-view` and `board-overlay` — the two ids step 3 asserted on —
  * no longer exist. Every assertion's SUBSTANCE is preserved; two are
- * strengthened, both for the same reason: the lattice board was mounted the
+ * strengthened, both for the same reason: the board view was mounted the
  * moment its data arrived, while the space view holds a placeholder until its
  * renderer has produced a first frame (`system-space-view`: "Loading persists
  * through first frame after data arrives"). "The view is up" therefore now
@@ -86,7 +86,7 @@ test.describe('new user first activities', () => {
     await expect(page.locator('[data-testid^="body-hit-"]').first()).toBeAttached({
       timeout: 30_000,
     })
-    // The retired lattice leaves nothing behind on the route it used to own.
+    // The retired board view leaves nothing behind on the route it used to own.
     await expect(page.getByTestId('board-overlay')).toHaveCount(0)
     await expect(page.getByTestId('system-board-view')).toHaveCount(0)
 

@@ -262,7 +262,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       Off-Gate-Ring, Prograde, Orbiting Placement*, whose Migration already
       names "the stored `orbit` field"; and REMOVED *A Station Orbit Outside
       the Live Board Radius Is Omitted, Never Panicked*)
-- [ ] 3.2c Delete the CLIENT half of the same field, which no other sweep in
+- [x] 3.2c Delete the CLIENT half of the same field, which no other sweep in
       this change reaches: `frontend/lib/types/market.ts:67`'s
       `orbit: { ring, angle0, period, dir }` on the `Station` interface (a
       REQUIRED property, so leaving it makes every `Station` literal a lie),
@@ -421,7 +421,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 
 ## 6. Delete `frontend/lib/board` and `frontend/lib/polar`
 
-- [ ] 6.1 Re-run task 1.1's grep — it must still return nothing after sections
+- [x] 6.1 Re-run task 1.1's grep — it must still return nothing after sections
       2–5, since a backend change can add a frontend type import
 - [x] 6.2 `rm -rf frontend/lib/board frontend/lib/polar`
 - [x] 6.3 Sweep the frontend for surviving lattice vocabulary that is not an

@@ -129,7 +129,7 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
 
   // RED-PHASE ADDITION — openspec change `build-production-space-view`.
   // `fleet-roster`'s *Active and Here Highlighting* is MODIFIED by that
-  // change (its wording retires the retired lattice view's "board"), and its
+  // change (its wording retires the deleted board view's "board"), and its
   // two scenarios had NO test at all: the behaviour is implemented in
   // `FleetRoster.tsx` (`data-active`, the "here" badge) and was never
   // asserted. A MODIFIED requirement with unasserted scenarios is exactly

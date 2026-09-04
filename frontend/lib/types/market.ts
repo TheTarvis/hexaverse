@@ -66,7 +66,7 @@ export interface Station {
   ownerCorpId?: string
   // No orbit rides this read. A station's position reaches the client on the
   // interior read alone, as the station body's own space/size/orbitElements,
-  // exactly as every other body's does (openspec delete-the-lattice 3.2b/3.2c).
+  // exactly as every other body's does (openspec link 9, tasks.md 3.2b/3.2c).
   // How a burn order names the station within its own system. System-scoped
   // and NOT globally unique — never use it as a venue key.
   featureId: string

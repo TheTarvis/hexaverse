@@ -26,7 +26,7 @@ import {
  * REWRITTEN for `build-production-space-view` tasks.md 2.1b / 10.8. Cause:
  * task 2.1 replaces `/systems/:systemId` outright, and every id this suite
  * drove — `board-overlay`, `feature-glyph-*[data-mineable]`, `gate-glyph-*`,
- * `fleet-cmd-burn-*`, `mine-kind-*` — belonged to the lattice board that
+ * `fleet-cmd-burn-*`, `mine-kind-*` — belonged to the board view that
  * section 10 deletes. THE ECONOMIC SLICE IS PRESERVED IN FULL, and one leg
  * is ADDED: the sale. `docked-fleet-actions` now owns sell alongside mine and
  * refuel, and a "mine → sell" slice that never sells proves half a loop.
@@ -38,7 +38,7 @@ import {
  *     cargo pool and every burn spends some, so `startingHold + 5` cannot
  *     hold: the pool shrank from fuel burn and grew from mining in between.
  *     Every mining assertion below reads the MINED KIND'S OWN row.
- *     (Post-handoff revision adjudicated 2026-09-02 on the lattice-era file;
+ *     (Post-handoff revision adjudicated 2026-09-02 on the board-era file;
  *     the reasoning survives the port unchanged.)
  *  2. THE "UNDER WAY" FALSE-POSITIVE GUARD before every docked assertion.
  *     The fleet is already `Docked` when each burn leg begins, so waiting
@@ -155,7 +155,7 @@ test.describe('the vertical slice', () => {
       .toBe(before + 10)
 
     // 7. SELL at the home station — the half of the economic loop the
-    //    lattice-era slice never reached (`docked-fleet-actions`: *Sell
+    //    board-era slice never reached (`docked-fleet-actions`: *Sell
     //    Commit*, "the fleet's cargo and the requester's credit balance both
     //    reflect the sale's effect without a page navigation").
     expect(stationId, `the home system's interior read carried no station body`).toBeTruthy()

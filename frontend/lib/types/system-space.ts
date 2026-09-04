@@ -5,8 +5,8 @@
 // interior-read.json`), not against a reading of the spec — so every key
 // name here is one the server actually writes.
 //
-// THE LATTICE IS GONE. There is no `radius`, no `footprint`, no lattice
-// `orbit` object, no `cell` on a lane gate: a body's place in the world is
+// THE DISCRETE GRID IS GONE. There is no `radius`, no `footprint`, no
+// discrete `orbit` object, no `cell` on a lane gate: a body's place in the world is
 // its continuous `space` position, its `size`, and its `orbitElements`, and
 // the system's own scale is the continuous `extent`. This type is what
 // replaces `lib/types/system-board.ts`.
