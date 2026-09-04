@@ -15,17 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// BoardFog previously restricted the interior read's lane gates to the
-// requester's charted neighbours. Removed as of replace-observation-with-
-// sightings design.md Decision 5: standing next to a physical gate and
-// reading the sign on it is how a corporation finds the roads, so every
-// lane-gate body now ships unfiltered to every authenticated requester
-// (system-interior "Bodies Are Public; Ships Are Disclosed" — "No body is
-// omitted for lack of stored knowledge"). The interface is kept, now with no
-// required methods, purely so WithFog keeps a stable wiring seam; nothing
-// reads it any more.
-type BoardFog interface{}
-
 // DueActions is the #0005 read-fold seam: resolving a scope's due actions.
 // The interior read runs it first, so a verb that completed while nobody was
 // reading (a scan on a quiet board) settles — slot released, effects minted —
@@ -38,7 +27,6 @@ type DueActions interface {
 type Handler struct {
 	svc      ServiceInterface
 	clock    common.WorldTime
-	fog      BoardFog
 	actions  DueActions
 	contacts ContactsSource
 }
@@ -49,12 +37,6 @@ func NewHandler() *Handler {
 
 func NewHandlerWith(svc ServiceInterface, clock common.WorldTime) *Handler {
 	return &Handler{svc: svc, clock: clock}
-}
-
-// WithFog wires the per-Corporation board fog into the interior read.
-func (h *Handler) WithFog(fog BoardFog) *Handler {
-	h.fog = fog
-	return h
 }
 
 // WithActions wires the #0005 read-fold into the interior read.

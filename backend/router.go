@@ -171,7 +171,7 @@ func SetupRouter() *gin.Engine {
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
 	corpHandler.RegisterRoutes(authorized, strictLimit)
 	galaxy.NewHandler().WithFog(galaxyFogAdapter{fogSvc}).RegisterRoutes(authorized)
-	system.NewHandlerWith(systemSvc, clock).WithFog(fogSvc).WithActions(actionSvc).WithContacts(systemSvc).RegisterRoutes(authorized)
+	system.NewHandlerWith(systemSvc, clock).WithActions(actionSvc).WithContacts(systemSvc).RegisterRoutes(authorized)
 
 	// The action inbox authorizes through the actor→corporation seam
 	// (action-dispatch "Action Endpoints Are Restricted to the Owning

@@ -4,7 +4,7 @@ Nothing in sections 2–13 may start until every task here passes. If 1.1 or 1.3
 is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 (proposal's *Precondition*).
 
-- [ ] 1.1 Re-run `build-production-space-view` task 10.11's grep against the
+- [x] 1.1 Re-run `build-production-space-view` task 10.11's grep against the
       real tree, restricted to IMPORTS **from a non-deleted path** (the
       predecessor's own wording), since the only import hits today are the
       two doomed directories importing each other and two further surviving
@@ -23,7 +23,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `build-production-space-view`, `add-scan-and-sightings-surface`, and
       confirm `openspec/changes/` contains no directory but `archive/` and this
       one
-- [ ] 1.3 Confirm `openspec/specs/board-view/` does **not** exist (retired by
+- [x] 1.3 Confirm `openspec/specs/board-view/` does **not** exist (retired by
       `build-production-space-view` task 13.5) and that
       `grep -rn "board-view" openspec/specs/` returns nothing. A surviving
       `board-view` citation means that change's own dangling-reference sweep did
@@ -112,7 +112,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       it can never pass as written. This is the ninth "built, unit-tested,
       never called" instance the chain has found, and it is pure deletion
       material, not a repair
-- [ ] 2.9 Delete `system/fog.go`'s `fogFeatureDTO` lattice fields if
+- [x] 2.9 Delete `system/fog.go`'s `fogFeatureDTO` lattice fields if
       `build-production-space-view` task 9.1 left any, and the vestigial
       `type BoardFog interface{}` / `Handler.fog` / `Handler.WithFog` in
       `handler.go` — an empty interface with no method and no implementation,
@@ -423,8 +423,8 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 
 - [ ] 6.1 Re-run task 1.1's grep — it must still return nothing after sections
       2–5, since a backend change can add a frontend type import
-- [ ] 6.2 `rm -rf frontend/lib/board frontend/lib/polar`
-- [ ] 6.3 Sweep the frontend for surviving lattice vocabulary that is not an
+- [x] 6.2 `rm -rf frontend/lib/board frontend/lib/polar`
+- [x] 6.3 Sweep the frontend for surviving lattice vocabulary that is not an
       import: `grep -rn 'systemBoard\|lib/board\|lib/polar\|ring\b.*slot\b'
       frontend --include='*.ts' --include='*.tsx' | grep -v node_modules`.
       Rename or remove each hit. `queryKeys.market.board()` is the **market

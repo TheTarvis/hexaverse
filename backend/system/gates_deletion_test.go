@@ -2,7 +2,7 @@ package system
 
 // RED-phase test for openspec change replace-observation-with-sightings,
 // tasks.md 1.3 — "Delete system/gates.go's chartedGates, system/handler.go's
-// BoardFog.SystemTiers tier lookup and its call site — every lane-gate body
+// fog-seam SystemTiers tier lookup and its call site — every lane-gate body
 // ships unfiltered to every authenticated requester, closing blocker 2."
 // (design.md Decision 5; system-interior: "Bodies Are Public; Ships Are
 // Disclosed"; system-body-table: "The Body Table Is an Unfiltered Internal

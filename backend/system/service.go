@@ -38,12 +38,11 @@ type ServiceInterface interface {
 // Never a Response": bodies_test.go's assertNoHandlerReferences greps every
 // handler.go in the repo for the literal substring "BodyTable", so the
 // interior handler must never spell the type even in a variable
-// declaration). A separate handler-level seam, exactly like
-// BoardFog/DueActions in handler.go, so that this package's own
-// pre-existing ServiceInterface fakes (fog_test.go and friends) need not
-// grow this method just to keep compiling. Satisfied structurally by
-// *Service (contacts.go), wired at the composition root (router.go)
-// alongside WithFog/WithActions.
+// declaration). A separate handler-level seam, exactly like DueActions in
+// handler.go, so that this package's own pre-existing ServiceInterface fakes
+// (fog_test.go and friends) need not grow this method just to keep
+// compiling. Satisfied structurally by *Service (contacts.go), wired at the
+// composition root (router.go) alongside WithActions.
 type ContactsSource interface {
 	InteriorReadExtras(ctx context.Context, systemID, requesterCorpId string, features []fogFeatureDTO, gates []LaneGate, now common.WorldMillis) (InteriorExtras, error)
 }

@@ -21,8 +21,8 @@ package system
 // the worst case for the doomed projection — because that is exactly where
 // today's behavior and the interim requirement diverge.
 //
-// Reuses fakeSysSvc/fakeBoardFog/sysTestClock from handler_test.go (same
-// package, same test binary).
+// Reuses fakeSysSvc/sysTestClock from handler_test.go (same package, same
+// test binary).
 
 import (
 	"encoding/json"
@@ -82,7 +82,6 @@ func spawnedInteriorRequest(t *testing.T, gen *GeneratedInterior) interimBody {
 		c.Set(common.CorpIdKey, "corp-user1")
 	})
 	NewHandlerWith(&fakeSysSvc{gen: gen}, sysTestClock{}).
-		WithFog(fakeBoardFog{}).
 		RegisterRoutes(r.Group("/"))
 
 	w := httptest.NewRecorder()
@@ -109,7 +108,6 @@ func corplessInteriorRequest(t *testing.T, gen *GeneratedInterior) interimBody {
 		// deliberately no CorpIdKey — common.ActorCorp(c) resolves ""
 	})
 	NewHandlerWith(&fakeSysSvc{gen: gen}, sysTestClock{}).
-		WithFog(fakeBoardFog{}).
 		RegisterRoutes(r.Group("/"))
 
 	w := httptest.NewRecorder()
