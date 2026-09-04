@@ -88,7 +88,7 @@ const ORE_BODY = {
 const BARREN_BODY = { id: 'feat-body-9', type: 'rocky', resources: [] }
 const STATION_BODY = { id: 'feat-station', type: 'station', resources: [] }
 
-const STATION = { systemId: 'sys_-7_17', featureId: 'feat-station', createdAt: 0, orbit: { ring: 2, angle0: 10, period: 72000, dir: -1 } }
+const STATION = { systemId: 'sys_-7_17', featureId: 'feat-station', createdAt: 0 }
 
 const QUOTES = {
   venue: 'sys_-7_17',

@@ -234,26 +234,19 @@ func inclinationFor(retrograde bool, jitterFrac float64) space.SubTurns {
 // continuousStarParented draws and attaches a star-parented feature's
 // continuous element set and size, from the continuous stream r2
 // (design.md Decisions 1-4, 17). orbitalIndex is the per-family index
-// ContinuousRadius consumes (see its own doc for the three sources). The
-// inclination's SIDE is read from the feature's own already-drawn lattice
-// direction (f.Orbit.Dir), never re-rolled — only the jitter MAGNITUDE
-// comes from the continuous stream, which is what keeps the two
-// representations from silently disagreeing on retrograde/prograde.
-func continuousStarParented(f *Feature, orbitalIndex int, r2 *rand.Rand) {
-	// NIL-GUARD serving TestGenerate_Scenario_LatticePlacementUnchangedWhetherContinuousDrawsPresentOrAbsent
-	// (generate_streams_test.go / system-interior: "Lattice Placement Is
-	// Independent Of The Continuous Stream"): r2 == nil means "generate no
-	// continuous elements" (openspec pin-system-generation-determinism,
-	// design.md Decision 2, point 2). This early return is what makes
-	// "absent" well-defined — no continuous value ever feeds back into a
-	// lattice field, so this guard must not be deleted as dead code.
-	if r2 == nil {
-		return
-	}
+// ContinuousRadius consumes (see its own doc for the three sources).
+//
+// dir is the body's orbital side (+1 prograde in the system's disk, -1
+// against it), decided ONCE by the caller on the PRIMARY stream — either
+// straight from DominantOrbitDirection for a disk-born body, or from
+// diskOrCaptured's roll for a capture-plausible one — and passed in rather
+// than re-rolled here. Only the inclination jitter's MAGNITUDE comes from the
+// continuous stream. That split is what keeps the side a property of which
+// bodies the system generated, not of how big they turned out.
+func continuousStarParented(f *Feature, orbitalIndex, dir int, r2 *rand.Rand) {
 	radius := ContinuousRadius(orbitalIndex)
 	period := keplerPeriodMs(radius)
-	retrograde := f.Orbit != nil && f.Orbit.Dir < 0
-	incl := inclinationFor(retrograde, r2.Float64())
+	incl := inclinationFor(dir < 0, r2.Float64())
 	phase := wrapSubTurnFraction(r2.Float64())
 	node := wrapSubTurnFraction(r2.Float64())
 	f.Space = &space.Orbit{

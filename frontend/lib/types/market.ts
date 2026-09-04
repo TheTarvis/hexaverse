@@ -64,14 +64,11 @@ export interface Station {
   // Absent for an NPC station. Present from day one so player ownership is a
   // value change later, never a schema retrofit.
   ownerCorpId?: string
-  orbit: {
-    ring: number
-    angle0: number
-    period: number
-    dir: number
-  }
-  // How a burn order names the station within its own system's board. System-
-  // scoped and NOT globally unique — never use it as a venue key.
+  // No orbit rides this read. A station's position reaches the client on the
+  // interior read alone, as the station body's own space/size/orbitElements,
+  // exactly as every other body's does (openspec delete-the-lattice 3.2b/3.2c).
+  // How a burn order names the station within its own system. System-scoped
+  // and NOT globally unique — never use it as a venue key.
   featureId: string
   createdAt: number
 }

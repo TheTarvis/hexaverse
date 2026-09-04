@@ -234,33 +234,84 @@ func TestGenerate_Scenario_EveryGeneratedInclinationLiesWithinItsBand(t *testing
 	}
 }
 
-// featureLatticeDir returns the lattice-drawn direction of a feature that
-// carries one (skeleton body, extra body, belt, anomaly, ruin, hazard), and
-// ok=false for a feature with no lattice Orbit (moon, station).
-func featureLatticeDir(f Feature) (dir int, ok bool) {
-	if f.Orbit == nil {
-		return 0, false
-	}
-	return f.Orbit.Dir, true
-}
+// diskBornPrefixes are the id families whose orbital side is the system's
+// dominant direction outright, with no capture roll of their own: skeleton
+// major bodies, belts, and hazards. Used only as a fail-closed fixture guard
+// below — the assertion itself filters on "not capture-plausible", so a
+// disk-born family added later is covered automatically rather than silently
+// skipped.
+var diskBornPrefixes = []string{"feat-body-", "feat-belt-", "feat-hazard-"}
 
-// Scenario: A feature's continuous side matches its own lattice direction.
-func TestGenerate_Scenario_ContinuousSideMatchesOwnLatticeDirection(t *testing.T) {
+// TestGenerate_DiskBornFeatureSideFollowsDominantDirection is SDET-added
+// (task 2.10b, link 9 of docs/plans/continous_space/chain.md) —
+// deliberately NOT named with a `Scenario_` segment, because it is not a
+// spec scenario and must never be greppable as one.
+//
+// The scenario that used to stand here is retired with NO successor, and
+// system-interior's REMOVED block for "A Retrograde Orbit Is Expressed By
+// Inclination, Never By a Non-Positive Period" says so in as many words
+// (that block carries the retired scenario's title, which this comment
+// therefore does not repeat): it asserted agreement between two
+// representations of one fact, and only one representation remains, so there
+// is nothing left for it to agree with. It is not repointed, and it must not
+// be reinvented under a scenario name.
+//
+// What survives it is substance, not a scenario. The retired test was the
+// only sweep tying a DISK-BORN body's inclination band to
+// DominantOrbitDirection at the DEFAULT RetrogradeChance and across every
+// skeleton and region dial. The guarantee belongs to the ADDED requirement
+// "Retrograde Motion Is Expressed By Inclination, Never By a Non-Positive
+// Period" — "the system's DominantOrbitDirection for every disk-born feature
+// (skeleton-derived bodies, belts, hazards)". Its SCENARIO-level coverage is
+// TestGenerate_Scenario_CertainRetrogradeChanceInvertsCapturePlausibleFeatures
+// below, which asserts the same anchoring but under one skeleton, one region,
+// and only at the knob's extreme; generator_test.go's
+// TestGenerate_DiskBornFeaturesShareDominantDirection asserts only that
+// disk-born features agree with EACH OTHER, which a hard-coded side would
+// satisfy. This probe re-sources the retired test onto the direction roll
+// that task 2.5 makes the sole source of the side, and keeps its wider
+// default-params sweep.
+func TestGenerate_DiskBornFeatureSideFollowsDominantDirection(t *testing.T) {
+	seenSign := map[int]bool{}
+	seenFamily := map[string]bool{}
 	for _, gen := range sweptInteriors(700, 4) {
+		sysDir := DominantOrbitDirection(gen.Interior.Seed)
+		seenSign[sysDir] = true
+		diskIsRetrograde := sysDir < 0
 		for _, f := range gen.Features {
-			dir, ok := featureLatticeDir(f)
-			if !ok || f.Space == nil {
+			// Star-parented and disk-born only. A moon is excluded by the
+			// parent filter (it takes the same dominant direction, but by its
+			// own generator path, under its own scenario test above); a
+			// capture-plausible detail feature is excluded because its side
+			// is diskOrCaptured's per-feature roll on the primary stream,
+			// which is not reconstructible from outside the generator — the
+			// RetrogradeChance=0 and =1 scenarios below pin that half.
+			if f.Space == nil || f.Space.ParentId != "feat-star" || isCapturePlausibleId(f.Id) {
 				continue
 			}
-			wantRetrograde := dir < 0
-			gotRetrograde := isRetrogradeInclination(f.Space.Inclination)
-			gotPrograde := isProgradeInclination(f.Space.Inclination)
-			if wantRetrograde && !gotRetrograde {
-				t.Errorf("feature %s: lattice Dir=%d (retrograde) but continuous inclination %v is not in the retrograde band", f.Id, dir, f.Space.Inclination)
+			for _, p := range diskBornPrefixes {
+				if strings.HasPrefix(f.Id, p) {
+					seenFamily[p] = true
+				}
 			}
-			if !wantRetrograde && !gotPrograde {
-				t.Errorf("feature %s: lattice Dir=%d (prograde) but continuous inclination %v is not in the prograde band", f.Id, dir, f.Space.Inclination)
+			// The side must land on ITS OWN system's disk band — retrograde
+			// when that system's dominant direction is negative, prograde
+			// when it is positive — never a fixed absolute band.
+			if isRetrogradeInclination(f.Space.Inclination) != diskIsRetrograde {
+				t.Fatalf("seed %d (dominant dir=%d): disk-born feature %s continuous inclination %v does not sit on its own system's disk side", gen.Interior.Seed, sysDir, f.Id, f.Space.Inclination)
 			}
+		}
+	}
+	// Fail closed. Without these two guards the test is satisfiable by a
+	// generator that hard-coded one side: a single-sign sweep would never
+	// exercise the retrograde band, and a sweep that happened to generate no
+	// belts or hazards would leave those families' side plumbing unasserted.
+	if !seenSign[1] || !seenSign[-1] {
+		t.Fatalf("fixture: the swept interiors must hit both signs of DominantOrbitDirection (saw +1=%v, -1=%v) — a single-sign sweep passes against a generator that always draws prograde", seenSign[1], seenSign[-1])
+	}
+	for _, p := range diskBornPrefixes {
+		if !seenFamily[p] {
+			t.Fatalf("fixture: the swept interiors generated no %s* feature — that disk-born family's side is untested", p)
 		}
 	}
 }
@@ -283,7 +334,7 @@ func TestGenerate_Scenario_MoonTakesSideFromDominantDirection(t *testing.T) {
 	}
 }
 
-// captureplausibleTypes are the detail-feature families whose lattice
+// captureplausibleTypes are the detail-feature families whose orbital
 // direction is a coin flip against RetrogradeChance (diskOrCaptured) —
 // extra bodies (feat-extra-*) and specials (feat-special-*: anomaly/ruin).
 // Skeleton bodies, belts, and hazards always draw the disk's own convention
@@ -297,10 +348,10 @@ func isCapturePlausibleId(id string) bool {
 // "Prograde" here means the side of a system's OWN disk, not a fixed
 // absolute band: design.md Decision 17 (and the spec's own wording — "falls
 // on the same side as that system's disk-born features") pins the
-// continuous inclination's side to the ABSOLUTE sign of the feature's
-// lattice Dir, and DominantOrbitDirection is a per-system coin flip that can
-// land negative. At a negative dominant direction, RetrogradeChance=0
-// correctly places every capture-plausible feature (Dir=sysDir=-1) in the
+// continuous inclination's side to the ABSOLUTE sign of the feature's own
+// direction roll, and DominantOrbitDirection is a per-system coin flip that
+// can land negative. At a negative dominant direction, RetrogradeChance=0
+// correctly places every capture-plausible feature (roll=sysDir=-1) in the
 // [SubTurn/2-MaxInclinationJitter, SubTurn/2] band — the disk's own band for
 // that system, not the [0, MaxInclinationJitter] absolute-prograde band. The
 // swept seed ranges below are confirmed (fixture check, not incidental) to
@@ -324,19 +375,20 @@ func TestGenerate_Scenario_ZeroRetrogradeChanceYieldsFullyPrograde(t *testing.T)
 			if !isCapturePlausibleId(f.Id) {
 				continue
 			}
-			// SDET (task 2.10b, delete-the-lattice): this leg previously also
-			// asserted f.Orbit.Dir against diskIsRetrograde — the LATTICE
-			// side of the same guarantee. That assertion is dropped, not
-			// repointed: with system.Orbit deleted (task 2.1), the roll task
-			// 2.5 re-sources continuousStarParented's retrograde input from
-			// (DominantOrbitDirection/diskOrCaptured) directly, with no
-			// second, lattice-side representation left to compare against.
-			// The surviving assertion below already reads its expectation
-			// from DominantOrbitDirection alone — it does not read f.Orbit —
-			// so it is unaffected by that deletion and, on its own, still
-			// fails if continuousStarParented's retrograde input silently
-			// becomes always-false (proven in a scratch copy; see the SDET
-			// coverage report for delete-the-lattice, task 2.10b).
+			// SDET (task 2.10b, link 9): this leg once carried a second
+			// assertion against the retired board-era direction field — the
+			// other side of the same guarantee. That assertion is dropped,
+			// not repointed: task 2.5 re-sources continuousStarParented's
+			// retrograde input from (DominantOrbitDirection/diskOrCaptured)
+			// directly, and the field it would have compared against is
+			// deleted (task 2.1), so no second representation of the side
+			// remains. The surviving assertion below already reads its
+			// expectation from DominantOrbitDirection alone, so it is
+			// unaffected by that deletion and, on its own, still fails if
+			// continuousStarParented's retrograde input silently becomes
+			// always-false (proven by stub in a scratch copy; see the SDET
+			// coverage report at docs/plans/continous_space/handoffs/
+			// link9-red-coverage.md, task 2.10b).
 			if f.Space == nil {
 				continue
 			}
@@ -358,9 +410,9 @@ func TestGenerate_Scenario_ZeroRetrogradeChanceYieldsFullyPrograde(t *testing.T)
 // feature's inclination, while skeleton bodies/belts/hazards still draw the
 // disk's own convention.
 //
-// Same absolute-Dir/relative-band distinction as the RetrogradeChance=0
+// Same absolute-roll/relative-band distinction as the RetrogradeChance=0
 // scenario above: at RetrogradeChance=1 a capture-plausible feature's
-// lattice Dir is the NEGATION of its own system's dominant direction, so its
+// direction roll is the NEGATION of its system's dominant direction, so its
 // continuous side lands on the band OPPOSITE that system's own disk side —
 // not a fixed absolute "always retrograde" band, which is unsatisfiable
 // whenever sysDir is negative (disk-born features share that same negative
@@ -380,12 +432,11 @@ func TestGenerate_Scenario_CertainRetrogradeChanceInvertsCapturePlausibleFeature
 		}
 		diskIsRetrograde := sysDir < 0
 		for _, f := range gen.Features {
-			// SDET (task 2.10b, delete-the-lattice): both cases below
-			// previously also asserted f.Orbit.Dir against the expected
-			// direction — see the ZeroRetrogradeChance test above for why
-			// that lattice-side leg is dropped, not repointed, and why the
-			// surviving continuous-side assertions are unaffected by
-			// system.Orbit's deletion.
+			// SDET (task 2.10b, link 9): both cases below once carried a
+			// second assertion against the retired board-era direction
+			// field — see the ZeroRetrogradeChance test above for why that
+			// leg is dropped, not repointed, and why the surviving
+			// continuous-side assertions are unaffected by its deletion.
 			switch {
 			case isCapturePlausibleId(f.Id):
 				if f.Space == nil {

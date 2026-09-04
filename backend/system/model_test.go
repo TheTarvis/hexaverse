@@ -2,33 +2,18 @@ package system
 
 import "testing"
 
-// The orbital law and the feature taxonomy — the two things every other domain
-// reads this model for.
-
-func TestPeriodFor_IsMonotonicInRing(t *testing.T) {
-	// One orbital law, shared by planets and coasting ships alike: an outer ring
-	// takes longer to come round than an inner one.
-	prev := PeriodFor(1)
-	for ring := 2; ring <= 16; ring++ {
-		got := PeriodFor(ring)
-		if got <= prev {
-			t.Errorf("ring %d period %d is not longer than ring %d's %d", ring, got, ring-1, prev)
-		}
-		prev = got
-	}
-}
-
-func TestOrbit_PeriodIsNotPersisted(t *testing.T) {
-	// Period carries `firestore:"-"` on purpose: it is derived from live tuning on
-	// every read, so retuning orbit pacing re-paces systems that already exist.
-	// Storing it would freeze every materialized system at its generation-time
-	// pace. This asserts the intent stays documented where it can be checked.
-	var o Orbit
-	o.Period = PeriodFor(4)
-	if o.Period == 0 {
-		t.Fatal("PeriodFor returned 0")
-	}
-}
+// The feature taxonomy and the band partition — what every other domain reads
+// this model for.
+//
+// Two tests were DELETED from here. They pinned a single global orbital law
+// — one revolution priced as a base constant times a discrete index, read
+// live from tuning on every read and deliberately never persisted — and both
+// go with that law. A body's period is now a Keplerian function of its own
+// continuous radius, drawn at generation time and persisted with the rest of
+// its element set. The monotonicity property survives in a truer form
+// (continuous_test.go's Kepler-law tests assert period grows with radius),
+// and there is no unpersisted field left for the second test to be about
+// (authorized deletion; cause = the requirement they pinned was removed).
 
 func TestFeatureStation_IsItsOwnType(t *testing.T) {
 	// The station is the one feature family that is neither generated nor stored

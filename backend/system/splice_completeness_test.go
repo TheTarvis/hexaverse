@@ -28,10 +28,10 @@ package system
 // which TestSpliceCompleteness_Scenario_TheCheckIsGenericOverAnyFutureSplicedFamily
 // demonstrates non-vacuously below.
 //
-// EXPECTED TO BE RED TODAY: stationFeatureFixture() (station_splice_test.go,
+// WAS RED WHEN WRITTEN: stationFeatureFixture() (station_splice_test.go,
 // this package) is shaped exactly like stations.FeatureOf's real production
-// output — Id/Type/Name/Orbit(lattice)/Footprint/OwnerCorpId only, no Space,
-// no SpaceDoc, no Size. Today's spliceStation (system/service.go:171-184)
+// output — Id/Type/Name/OwnerCorpId only, no Space, no SpaceDoc, no Size.
+// Today's spliceStation (system/service.go)
 // appends whatever StationSource.StationFeature returns verbatim, with no
 // completion step, so applyContinuousCascade's own (correct) decode-failure
 // guard drops it — the exact mechanism behind the three failing e2e subtests
@@ -43,7 +43,6 @@ import (
 	"context"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/galaxy"
 	"hexaverse/space"
 )
@@ -119,13 +118,13 @@ func minimalStarOnlyInterior(systemId string) *GeneratedInterior {
 	return &GeneratedInterior{
 		Interior: SystemInterior{SystemId: systemId},
 		Features: []Feature{
-			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
+			{Id: "feat-star", Type: FeatureStar},
 			// A decode-clean, already-decoded (Space set directly, mirroring
 			// Generate()'s own in-memory convention — SpaceDoc is only how a
 			// STORED, re-read feature carries this) non-star body, so
 			// StationContinuousOrbit's single-body-skeleton parent choice
 			// ("feat-body-0") has something real to resolve against.
-			{Id: "feat-body-0", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 3, Slot: 0}},
+			{Id: "feat-body-0", Type: FeatureRocky,
 				Space: &space.Orbit{ParentId: "feat-star", Radius: 20, PeriodMs: 100_000}},
 		},
 	}
@@ -208,11 +207,9 @@ func TestSpliceCompleteness_Scenario_StationSourceFeatureSurvivesCascadeWithVali
 // spliceCompletenessViolations names the station.
 func TestSpliceCompleteness_Scenario_TheCheckIsGenericOverAnyFutureSplicedFamily(t *testing.T) {
 	hypotheticalFamily := &Feature{
-		Id:        "feat-hypothetical-outpost",
-		Type:      FeatureType("outpost"),
-		Name:      "Hypothetical Future Outpost",
-		Orbit:     &Orbit{Ring: 4, Angle0: 0, Period: PeriodFor(4), Dir: 1},
-		Footprint: []board.Cell{{Ring: 4, Slot: 0}},
+		Id:   "feat-hypothetical-outpost",
+		Type: FeatureType("outpost"),
+		Name: "Hypothetical Future Outpost",
 		// Space/SpaceDoc/Size deliberately unset — the same omission shape
 		// as today's real stations.FeatureOf output.
 	}
@@ -241,13 +238,11 @@ func TestSpliceCompleteness_Scenario_TheCheckIsGenericOverAnyFutureSplicedFamily
 // passing when asked to judge against a parent that isn't there.
 func TestSpliceCompleteness_Scenario_DoesNotConfuseALegitimateParentDropWithAProducerBug(t *testing.T) {
 	complete := &Feature{
-		Id:        "feat-station",
-		Type:      FeatureStation,
-		Name:      "Trading Station",
-		Orbit:     &Orbit{Ring: 6, Angle0: 3, Period: PeriodFor(6), Dir: 1},
-		Footprint: []board.Cell{{Ring: 6, Slot: 3}},
-		Space:     &space.Orbit{ParentId: "feat-body-missing", Radius: 5, PeriodMs: 100_000},
-		Size:      StationSize,
+		Id:    "feat-station",
+		Type:  FeatureStation,
+		Name:  "Trading Station",
+		Space: &space.Orbit{ParentId: "feat-body-missing", Radius: 5, PeriodMs: 100_000},
+		Size:  StationSize,
 	}
 	svc := &Service{stations: &fakeStationSourceGeneric{feat: complete}, galaxySvc: oneBodySkeletonGalaxy()}
 	// No "feat-body-missing" in this interior — the station's declared

@@ -28,8 +28,9 @@ type GenerationParams struct {
 	// always orbit prograde and ignore this knob.
 	RetrogradeChance float64 `json:"retrogradeChance" firestore:"retrogradeChance"`
 
-	// Orbital periods are NOT here: they're pacing, not generation, and are read
-	// live from common.Tuning().OrbitBasePeriod via PeriodFor (see model.go).
+	// Orbital periods are NOT here: a body's period is a Keplerian function of
+	// its own continuous radius (keplerPeriodMs, continuous.go), drawn at
+	// generation time and persisted with the rest of its element set.
 
 	// ByCharacter is keyed by the #0001 region string (plain string, not a named
 	// type — Firestore only serializes string-keyed maps).

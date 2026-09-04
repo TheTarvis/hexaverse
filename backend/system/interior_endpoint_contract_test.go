@@ -26,7 +26,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/galaxy"
 
@@ -73,7 +72,7 @@ func TestGetInterior_Scenario_ServesTheBaseFieldSet(t *testing.T) {
 	gen := &GeneratedInterior{
 		Interior: SystemInterior{SystemId: "s1", Character: "star-rich", StarClass: "G"},
 		Features: []Feature{
-			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
+			{Id: "feat-star", Type: FeatureStar},
 		},
 	}
 	gates := []LaneGate{{DestSystemId: "sys-neighbor", LaneId: "lane_s1_sys-neighbor"}}

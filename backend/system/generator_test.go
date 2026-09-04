@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/galaxy"
 )
 
@@ -28,27 +27,35 @@ func TestGenerate_Deterministic(t *testing.T) {
 	}
 }
 
-func TestGenerate_StarAtCentreFixed(t *testing.T) {
+func TestGenerate_StarIsTheParentlessBodyGeneratedFirst(t *testing.T) {
 	g := Generate(1, "normal", sampleSkeleton(), DefaultParams())
 	star := g.Features[0]
-	if star.Type != FeatureStar || !star.Fixed {
-		t.Fatalf("expected fixed star first, got %+v", star)
+	if star.Type != FeatureStar {
+		t.Fatalf("expected the star first, got %+v", star)
 	}
-	if len(star.Footprint) != 1 || star.Footprint[0] != (board.Cell{Ring: 0, Slot: 0}) {
-		t.Fatalf("star not at centre: %+v", star.Footprint)
+	// The star is the ONE parentless body: it carries no orbital element set
+	// at all, which is what "at the centre" means once position is continuous.
+	if star.Space != nil {
+		t.Fatalf("the star carries an orbital element set (%+v); it is the frame every other body orbits in", star.Space)
+	}
+	if star.Size <= 0 {
+		t.Fatalf("star size = %v, want a positive radius from its class", star.Size)
 	}
 }
 
 func TestGenerate_SkeletonBodiesPresent(t *testing.T) {
 	sk := sampleSkeleton()
 	g := Generate(7, "normal", sk, DefaultParams())
-	// Each skeleton body must appear as an orbit feature at its (clamped) ring.
+	// Each skeleton body must appear as a star-parented feature.
 	bodyFeatures := 0
 	for _, f := range g.Features {
 		if len(f.Id) >= 9 && f.Id[:9] == "feat-body" {
 			bodyFeatures++
-			if f.Orbit == nil {
-				t.Fatalf("skeleton body %s has no orbit", f.Id)
+			if f.Space == nil {
+				t.Fatalf("skeleton body %s has no orbital element set", f.Id)
+			}
+			if f.Space.ParentId != "feat-star" {
+				t.Fatalf("skeleton body %s orbits %q, want the star", f.Id, f.Space.ParentId)
 			}
 		}
 	}
@@ -63,8 +70,11 @@ func TestGenerate_EveryNonStarFeatureHasPosition(t *testing.T) {
 		if f.Type == FeatureStar {
 			continue
 		}
-		if f.Orbit == nil && f.ParentId == "" && !f.Fixed {
-			t.Fatalf("feature %s (%s) has no position (orbit/parent/fixed)", f.Id, f.Type)
+		if f.Space == nil {
+			t.Fatalf("feature %s (%s) has no position (no orbital element set)", f.Id, f.Type)
+		}
+		if f.Space.ParentId == "" {
+			t.Fatalf("feature %s (%s) names no parent; only the star is parentless", f.Id, f.Type)
 		}
 	}
 }
@@ -78,8 +88,11 @@ func TestGenerate_HasBeltAndMoonRidesGiant(t *testing.T) {
 		switch f.Type {
 		case FeatureBelt:
 			belts++
-			if len(f.Footprint) < 2 {
-				t.Fatalf("belt %s should be a multi-cell arc, got %d cells", f.Id, len(f.Footprint))
+			// A belt is an EXTENDED object, not a point body: its radial
+			// thickness is what makes it one. (This is the continuous
+			// successor of the old multi-cell-arc assertion.)
+			if !(f.Width > 0) {
+				t.Fatalf("belt %s has width %v, want a positive radial thickness", f.Id, f.Width)
 			}
 		case FeatureGasGiant:
 			giantIDs[f.Id] = true
@@ -94,8 +107,8 @@ func TestGenerate_HasBeltAndMoonRidesGiant(t *testing.T) {
 		t.Fatal("expected at least one moon (skeleton has a gas giant)")
 	}
 	for _, f := range g.Features {
-		if f.Type == FeatureMoon && !giantIDs[f.ParentId] {
-			t.Fatalf("moon %s rides non-giant parent %q", f.Id, f.ParentId)
+		if f.Type == FeatureMoon && (f.Space == nil || !giantIDs[f.Space.ParentId]) {
+			t.Fatalf("moon %s rides non-giant parent %+v", f.Id, f.Space)
 		}
 	}
 }
@@ -106,18 +119,18 @@ func TestGenerate_DiskBornFeaturesShareDominantDirection(t *testing.T) {
 	// capture-plausible detail does.
 	for seed := int64(0); seed < 40; seed++ {
 		g := Generate(seed, "star_rich", sampleSkeleton(), DefaultParams())
-		dirs := map[int]bool{}
+		dirs := map[bool]bool{}
 		for _, f := range g.Features {
-			if f.Orbit == nil {
+			if f.Space == nil || f.Space.ParentId != "feat-star" {
 				continue
 			}
 			switch f.Type {
 			case FeatureRocky, FeatureGasGiant, FeatureIce:
 				if len(f.Id) >= 9 && f.Id[:9] == "feat-body" {
-					dirs[f.Orbit.Dir] = true
+					dirs[isRetrogradeInclination(f.Space.Inclination)] = true
 				}
 			case FeatureBelt, FeatureGravityWell, FeatureRadiation, FeatureNebula, FeatureDebris:
-				dirs[f.Orbit.Dir] = true
+				dirs[isRetrogradeInclination(f.Space.Inclination)] = true
 			}
 		}
 		if len(dirs) != 1 {
@@ -129,17 +142,17 @@ func TestGenerate_DiskBornFeaturesShareDominantDirection(t *testing.T) {
 func TestGenerate_DominantDirectionVariesAcrossSystems(t *testing.T) {
 	// Half the galaxy's disks spin each way (viewed top-down): across a seed
 	// sweep both dominant directions must occur.
-	seen := map[int]bool{}
+	seen := map[bool]bool{}
 	for seed := int64(0); seed < 40; seed++ {
 		g := Generate(seed, "normal", sampleSkeleton(), DefaultParams())
 		for _, f := range g.Features {
-			if f.Orbit != nil && len(f.Id) >= 9 && f.Id[:9] == "feat-body" {
-				seen[f.Orbit.Dir] = true
+			if f.Space != nil && len(f.Id) >= 9 && f.Id[:9] == "feat-body" {
+				seen[isRetrogradeInclination(f.Space.Inclination)] = true
 				break
 			}
 		}
 	}
-	if !seen[1] || !seen[-1] {
+	if !seen[true] || !seen[false] {
 		t.Fatalf("dominant direction never varied across 40 seeds: %v", seen)
 	}
 }
@@ -152,10 +165,10 @@ func TestGenerate_RetrogradeChanceKnob(t *testing.T) {
 		zero := DefaultParams()
 		zero.RetrogradeChance = 0
 		g := Generate(seed, "star_rich", sampleSkeleton(), zero)
-		dirs := map[int]bool{}
+		dirs := map[bool]bool{}
 		for _, f := range g.Features {
-			if f.Orbit != nil {
-				dirs[f.Orbit.Dir] = true
+			if f.Space != nil && f.Space.ParentId == "feat-star" {
+				dirs[isRetrogradeInclination(f.Space.Inclination)] = true
 			}
 		}
 		if len(dirs) != 1 {
@@ -165,25 +178,27 @@ func TestGenerate_RetrogradeChanceKnob(t *testing.T) {
 		always := DefaultParams()
 		always.RetrogradeChance = 1
 		g = Generate(seed, "star_rich", sampleSkeleton(), always)
-		var sysDir int
+		// The disk's own side, read off a disk-born skeleton major.
+		var diskRetrograde bool
 		for _, f := range g.Features {
-			if f.Orbit != nil && len(f.Id) >= 9 && f.Id[:9] == "feat-body" {
-				sysDir = f.Orbit.Dir
+			if f.Space != nil && len(f.Id) >= 9 && f.Id[:9] == "feat-body" {
+				diskRetrograde = isRetrogradeInclination(f.Space.Inclination)
 				break
 			}
 		}
 		for _, f := range g.Features {
-			if f.Orbit == nil {
+			if f.Space == nil || f.Space.ParentId != "feat-star" {
 				continue
 			}
+			against := isRetrogradeInclination(f.Space.Inclination) != diskRetrograde
 			switch f.Type {
 			case FeatureAnomaly, FeatureRuin:
-				if f.Orbit.Dir != -sysDir {
-					t.Fatalf("seed %d: %s should be retrograde at chance 1, got dir %d (sysDir %d)", seed, f.Id, f.Orbit.Dir, sysDir)
+				if !against {
+					t.Fatalf("seed %d: %s should run against the disk at chance 1, got inclination %d (disk retrograde=%v)", seed, f.Id, f.Space.Inclination, diskRetrograde)
 				}
 			}
-			if len(f.Id) >= 10 && f.Id[:10] == "feat-extra" && f.Orbit.Dir != -sysDir {
-				t.Fatalf("seed %d: %s should be retrograde at chance 1, got dir %d (sysDir %d)", seed, f.Id, f.Orbit.Dir, sysDir)
+			if len(f.Id) >= 10 && f.Id[:10] == "feat-extra" && !against {
+				t.Fatalf("seed %d: %s should run against the disk at chance 1, got inclination %d (disk retrograde=%v)", seed, f.Id, f.Space.Inclination, diskRetrograde)
 			}
 		}
 	}
@@ -214,10 +229,12 @@ func TestGenerate_BandRadialGradient(t *testing.T) {
 	for seed := int64(0); seed < 40; seed++ {
 		g := Generate(seed, "star_rich", sampleSkeleton(), params)
 		for _, f := range g.Features {
-			if f.Orbit == nil || len(f.Resources) == 0 {
+			// Star-parented bodies only: a moon's radius is measured against
+			// its parent, not the star, so it names no radial band.
+			if f.Space == nil || f.Space.ParentId != "feat-star" || len(f.Resources) == 0 {
 				continue
 			}
-			band := bandForRing(f.Orbit.Ring, params)
+			band := bandForRadius(f.Space.Radius, params)
 			for _, res := range f.Resources {
 				if band == BandInner && res.Kind == ResourceMetals {
 					innerMetals++
@@ -245,4 +262,20 @@ func avgRichness(g GeneratedInterior) float64 {
 		return 0
 	}
 	return sum / float64(n)
+}
+
+// bandForRadius is bandForRing's continuous reading, for a STAR-parented
+// body: ContinuousRadius is strictly increasing in the orbital index, so the
+// band boundaries the generator drew against (InnerMaxRing, MidMaxRing) map
+// to radius thresholds without needing the index itself, which is no longer
+// stored on anything.
+func bandForRadius(radius float64, p GenerationParams) Band {
+	switch {
+	case radius <= ContinuousRadius(p.InnerMaxRing):
+		return BandInner
+	case radius <= ContinuousRadius(p.MidMaxRing):
+		return BandMid
+	default:
+		return BandOuter
+	}
 }

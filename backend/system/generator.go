@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"hexaverse/board"
 	"hexaverse/galaxy"
-	"hexaverse/polar"
 	"hexaverse/space"
 )
 
@@ -18,37 +16,18 @@ func newRand(seed int64) *rand.Rand { return rand.New(rand.NewSource(seed)) }
 // small bodies, belts, moons, anomalies/ruins, hazards — never contradicting it
 // (same seed derivation, skeleton bodies present in the interior).
 //
-// Placement is onto the pinned production slot schedule at this system's own
-// radius (design.md Decision 3: system.Generate is one of the two callers that
-// hold a per-system radius rather than defaulting to
-// board.ProductionSchedule()) — board.Schedule(params.Radius), resolved once
-// here and threaded to every placement helper.
-//
-// Delegates to generateWithStreams (openspec pin-system-generation-
-// determinism, design.md Decision 2 / tasks.md 3.1) with both RNG streams
-// live — production always generates with continuous elements present.
+// Two RNG streams, both always live: r is the primary stream (which bodies
+// exist, what they are made of), r2 the continuous stream (each body's orbital
+// element set and size). They were split so a body's continuous draw could not
+// perturb which bodies got generated (openspec pin-system-generation-
+// determinism, design.md Decision 2); the split survives that reason, because
+// the two streams still answer two different questions and mixing them would
+// make a size retune move a lode.
 func Generate(seed int64, region string, skeleton galaxy.Skeleton, params GenerationParams) GeneratedInterior {
-	return generateWithStreams(seed, newRand(seed), newRand(continuousSeed(seed)), region, skeleton, params)
-}
+	r := newRand(seed)
+	r2 := newRand(continuousSeed(seed))
 
-// generateWithStreams is Generate's extracted body, taking both RNG streams
-// as parameters rather than deriving them from seed internally (openspec
-// pin-system-generation-determinism, design.md Decision 2 / tasks.md 3.1).
-// Streams, not seeds, because both a nil-stream mode (below) and a counting
-// stream (generate_streams_test.go) need to *construct* a *rand.Rand, and
-// neither should require a test-only knob in production code. seed stays a
-// parameter because DominantOrbitDirection(seed) and Interior.Seed consume
-// it directly, independent of r/r2.
-//
-// r2 == nil means "generate no continuous elements" — the mode
-// TestGenerate_Scenario_LatticePlacementUnchangedWhetherContinuousDrawsPresentOrAbsent
-// (generate_streams_test.go) compares against a live-r2 run to prove the
-// lattice tier never depends on the continuous stream (system-interior:
-// "Lattice Placement Is Independent Of The Continuous Stream"). production
-// code (Generate, above) never passes nil.
-func generateWithStreams(seed int64, r, r2 *rand.Rand, region string, skeleton galaxy.Skeleton, params GenerationParams) GeneratedInterior {
 	dial := params.dialFor(region)
-	sched := board.Schedule(params.Radius)
 
 	// The disk's dominant spin: every disk-born body (skeleton majors, belts,
 	// hazards) orbits prograde in it; only capture-plausible detail may rarely run
@@ -57,28 +36,26 @@ func generateWithStreams(seed int64, r, r2 *rand.Rand, region string, skeleton g
 
 	features := make([]Feature, 0, 16)
 
-	// Star at the centre — fixed, no orbit, no continuous element set (it is
-	// the one parentless body); its size comes from its class alone, never
-	// drawn (design.md Decision 4).
+	// Star at the centre — the one parentless body, carrying no orbital
+	// element set at all; its size comes from its class alone, never drawn
+	// (design.md Decision 4).
 	features = append(features, Feature{
 		Id: "feat-star", Type: FeatureStar, Name: "Star (" + skeleton.StarClass + ")",
-		Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}},
 		Size: StarSize(skeleton.StarClass),
 	})
 
-	// Skeleton major bodies → orbit features at their rings (extends #0001).
-	// The continuous orbital index is the RAW, un-clamped skeleton ring
-	// (b.Ring), never the clamped lattice ring `ring` — design.md Decision 2's
-	// central finding: two skeleton bodies can clamp to the identical lattice
-	// ring while remaining distinct raw ordinals.
+	// Skeleton major bodies → star-parented features at their skeleton
+	// ordinals (extends #0001). The orbital index is the RAW skeleton ordinal
+	// b.Ring: it is what ContinuousRadius consumes, and design.md Decision 2's
+	// central finding is that two skeleton bodies sharing a coarse index must
+	// still receive strictly different continuous radii.
 	var giantIDs []string
 	for i, b := range skeleton.Bodies {
-		ring := clampRing(b.Ring, params.Radius)
 		ft := featureTypeForBody(b.Type)
 		id := fmt.Sprintf("feat-body-%d", i)
-		f := orbitFeature(id, ft, ring, sysDir, r, sched)
-		f.Resources = resourcesFor(bandForRing(ring, params), ft, dial.RichnessMult, r)
-		continuousStarParented(&f, b.Ring, r2)
+		f := orbitFeature(id, ft)
+		f.Resources = resourcesFor(bandForRing(b.Ring, params), ft, dial.RichnessMult, r)
+		continuousStarParented(&f, b.Ring, sysDir, r2)
 		features = append(features, f)
 		if ft == FeatureGasGiant {
 			giantIDs = append(giantIDs, id)
@@ -87,24 +64,29 @@ func generateWithStreams(seed int64, r, r2 *rand.Rand, region string, skeleton g
 
 	// --- Detail, dialed by character -------------------------------------
 
-	// Extra small/dark bodies.
+	// Extra small/dark bodies. The orbital index is an integer draw in
+	// [1, params.Radius] — an ordinal ContinuousRadius consumes and a band
+	// boundary reads, with no geometry of its own.
 	for i := 0; i < dial.ExtraPlanets; i++ {
 		ring := 1 + r.Intn(params.Radius)
 		ft := FeatureRocky
 		if bandForRing(ring, params) == BandOuter {
 			ft = FeatureIce
 		}
-		id := fmt.Sprintf("feat-extra-%d", i)
-		f := orbitFeature(id, ft, ring, diskOrCaptured(sysDir, params.RetrogradeChance, r), r, sched)
+		// The side is decided ONCE, here, on the primary stream, and is then
+		// the sole source of the body's inclination side (see
+		// continuousStarParented).
+		dir := diskOrCaptured(sysDir, params.RetrogradeChance, r)
+		f := orbitFeature(fmt.Sprintf("feat-extra-%d", i), ft)
 		f.Resources = resourcesFor(bandForRing(ring, params), ft, dial.RichnessMult, r)
-		continuousStarParented(&f, ring, r2)
+		continuousStarParented(&f, ring, dir, r2)
 		features = append(features, f)
 	}
 
-	// Belts as ring arcs (metals inner, ice outer).
+	// Belts (metals inner, ice outer).
 	for i := 0; i < dial.Belts; i++ {
 		ring := 2 + r.Intn(params.Radius-2)
-		features = append(features, beltFeature(fmt.Sprintf("feat-belt-%d", i), ring, sysDir, r, params, dial, sched, r2))
+		features = append(features, beltFeature(fmt.Sprintf("feat-belt-%d", i), ring, sysDir, r, params, dial, r2))
 	}
 
 	// Moons riding gas giants — body-parented, so ContinuousRadius never
@@ -113,45 +95,32 @@ func generateWithStreams(seed int64, r, r2 *rand.Rand, region string, skeleton g
 	// continuous size.
 	for i, gid := range giantIDs {
 		m := Feature{
-			Id: fmt.Sprintf("feat-moon-%d", i), Type: FeatureMoon, ParentId: gid,
-			Footprint: []board.Cell{{Ring: 0, Slot: 0}}, // computed relative to parent at render time
+			Id: fmt.Sprintf("feat-moon-%d", i), Type: FeatureMoon,
 			Resources: resourcesFor(BandOuter, FeatureMoon, dial.RichnessMult, r),
 		}
-		// NIL-GUARD serving TestGenerate_Scenario_LatticePlacementUnchangedWhetherContinuousDrawsPresentOrAbsent
-		// (generate_streams_test.go / system-interior: "Lattice Placement Is
-		// Independent Of The Continuous Stream"). Only the Space/Size block
-		// below is skipped when r2 == nil — the resourcesFor draw above and
-		// the append below consume the LATTICE stream (r) and MUST run
-		// identically in both modes, or absent-mode would diverge from
-		// present-mode on the lattice tier itself (design.md Decision 2,
-		// point 2). Do not narrow this loop to skip moons entirely — that
-		// silently guts the primary assertion instead of fixing the skip.
-		if r2 != nil {
-			parentSize := featureSizeById(features, gid)
-			localRadius := MoonOrbitLocalRadius(space.Body{Id: gid, Size: parentSize}, r2.Float64())
-			period := space.InsertionPeriod(localRadius)
-			// Moons carry no lattice Dir at all — their side comes from the
-			// system's dominant direction directly (design.md Decision 17), the
-			// same source stations.DeriveOrbit already uses.
-			incl := inclinationFor(sysDir < 0, r2.Float64())
-			m.Space = &space.Orbit{
-				ParentId: gid, Radius: localRadius, PeriodMs: period,
-				Phase: wrapSubTurnFraction(r2.Float64()), Inclination: incl, Node: wrapSubTurnFraction(r2.Float64()),
-			}
-			m.Size = drawFeatureSize(FeatureMoon, r2)
+		parentSize := featureSizeById(features, gid)
+		localRadius := MoonOrbitLocalRadius(space.Body{Id: gid, Size: parentSize}, r2.Float64())
+		period := space.InsertionPeriod(localRadius)
+		// A moon's side comes from the system's dominant direction directly
+		// (design.md Decision 17) — it is disk-born around its parent.
+		incl := inclinationFor(sysDir < 0, r2.Float64())
+		m.Space = &space.Orbit{
+			ParentId: gid, Radius: localRadius, PeriodMs: period,
+			Phase: wrapSubTurnFraction(r2.Float64()), Inclination: incl, Node: wrapSubTurnFraction(r2.Float64()),
 		}
+		m.Size = drawFeatureSize(FeatureMoon, r2)
 		features = append(features, m)
 	}
 
 	// Mid-band anomalies / ruins.
 	for i := 0; i < dial.Specials; i++ {
 		ring := params.InnerMaxRing + 1 + r.Intn(maxInt(1, params.MidMaxRing-params.InnerMaxRing))
-		ring = clampRing(ring, params.Radius)
 		ft := FeatureAnomaly
 		if r.Float64() < 0.5 {
 			ft = FeatureRuin
 		}
-		f := orbitFeature(fmt.Sprintf("feat-special-%d", i), ft, ring, diskOrCaptured(sysDir, params.RetrogradeChance, r), r, sched)
+		dir := diskOrCaptured(sysDir, params.RetrogradeChance, r)
+		f := orbitFeature(fmt.Sprintf("feat-special-%d", i), ft)
 		if ft == FeatureAnomaly {
 			// The float64() conversion is load-bearing: it forces the
 			// intermediate rounding that inhibits FMA contraction on arm64.
@@ -163,13 +132,13 @@ func generateWithStreams(seed int64, r, r2 *rand.Rand, region string, skeleton g
 			// Same load-bearing float64() guard as the anomaly branch above.
 			f.Resources = []Resource{{Kind: ResourceResearch, Richness: 0.3 + float64(0.5*r.Float64()*dial.RichnessMult)}}
 		}
-		continuousStarParented(&f, ring, r2)
+		continuousStarParented(&f, ring, dir, r2)
 		features = append(features, f)
 	}
 
 	// Hazards (features with effects payloads).
 	for i := 0; i < dial.Hazards; i++ {
-		features = append(features, hazardFeature(fmt.Sprintf("feat-hazard-%d", i), sysDir, r, params, sched, r2))
+		features = append(features, hazardFeature(fmt.Sprintf("feat-hazard-%d", i), sysDir, r, params, r2))
 	}
 
 	return GeneratedInterior{
@@ -202,28 +171,13 @@ func featureSizeById(features []Feature, id string) float64 {
 
 // --- Feature builders ------------------------------------------------------
 
-func orbitFeature(id string, ft FeatureType, ring, dir int, r *rand.Rand, sched polar.Schedule) Feature {
-	orb := orbitFor(ring, dir, r, sched)
-	return Feature{
-		Id: id, Type: ft, Orbit: &orb,
-		Footprint: []board.Cell{board.Canon(board.Cell{Ring: ring, Slot: orb.Angle0}, sched)},
-	}
-}
-
-// orbitFor rolls a body's orbit. Ring/Angle0/Dir are the generator's dice and are
-// persisted; Period is filled from live tuning here only so an in-memory interior
-// (the just-generated one) matches a re-read one — see PeriodFor. Dir is not a
-// per-body coin flip: the caller resolves it from the system's dominant
-// direction (plus, for capture-plausible detail, diskOrCaptured). Angle0 draws
-// from the LIVE schedule's slot count for the ring (never a fixed 6×ring — see
-// design.md Decision 2's hazard).
-func orbitFor(ring, dir int, r *rand.Rand, sched polar.Schedule) Orbit {
-	return Orbit{
-		Ring:   ring,
-		Angle0: r.Intn(sched.Slots(ring)),
-		Period: PeriodFor(ring),
-		Dir:    dir,
-	}
+// orbitFeature builds a star-parented body's identity. Its POSITION is not set
+// here: the caller attaches it through continuousStarParented, which draws the
+// whole orbital element set from the continuous stream. This function exists
+// so the three families that share that shape (skeleton majors, extra bodies,
+// specials) read the same way at their call sites.
+func orbitFeature(id string, ft FeatureType) Feature {
+	return Feature{Id: id, Type: ft}
 }
 
 // DominantOrbitDirection is a system's disk spin (+1 / −1), a PURE function of
@@ -260,22 +214,13 @@ func diskOrCaptured(sysDir int, retrogradeChance float64, r *rand.Rand) int {
 	return sysDir
 }
 
-func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams, dial CharacterDial, sched polar.Schedule, r2 *rand.Rand) Feature {
-	all := board.RingCells(ring, sched)
-	// An arc: a contiguous run covering ~40–70% of the ring.
-	arcLen := maxInt(1, len(all)*(4+r.Intn(4))/10)
-	start := r.Intn(len(all))
-	arc := make([]board.Cell, 0, arcLen)
-	for i := 0; i < arcLen; i++ {
-		arc = append(arc, all[(start+i)%len(all)])
-	}
+func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams, dial CharacterDial, r2 *rand.Rand) Feature {
 	kind := ResourceMetals
 	if bandForRing(ring, params) == BandOuter {
 		kind = ResourceWater
 	}
-	orb := orbitFor(ring, dir, r, sched)
 	f := Feature{
-		Id: id, Type: FeatureBelt, Orbit: &orb, Footprint: arc,
+		Id: id, Type: FeatureBelt,
 		// The float64() conversion is load-bearing: it forces the
 		// intermediate rounding that inhibits FMA contraction on arm64.
 		// Assigning the product to a local does NOT — gc fuses across
@@ -283,24 +228,16 @@ func beltFeature(id string, ring, dir int, r *rand.Rand, params GenerationParams
 		// pin-system-generation-determinism, design.md Decision 1).
 		Resources: []Resource{{Kind: kind, Richness: 0.3 + float64(0.5*r.Float64()*dial.RichnessMult)}},
 	}
-	continuousStarParented(&f, ring, r2)
+	continuousStarParented(&f, ring, dir, r2)
 	// Width is the belt's full radial thickness, persisted at generation
 	// time rather than re-derived on read (design.md Decision 5): a later
 	// retune of BeltWidthFraction must never retroactively move an
 	// already-materialized belt's members.
-	//
-	// NIL-GUARD serving TestGenerate_Scenario_LatticePlacementUnchangedWhetherContinuousDrawsPresentOrAbsent
-	// (generate_streams_test.go): continuousStarParented leaves f.Space nil
-	// when r2 == nil (continuous draws absent), and this line panics on nil
-	// otherwise — the one non-obvious guard site, found by running it
-	// (design.md Decision 2, point 2).
-	if f.Space != nil {
-		f.Width = float64(BeltWidthFraction * f.Space.Radius)
-	}
+	f.Width = float64(BeltWidthFraction * f.Space.Radius)
 	return f
 }
 
-func hazardFeature(id string, dir int, r *rand.Rand, params GenerationParams, sched polar.Schedule, r2 *rand.Rand) Feature {
+func hazardFeature(id string, dir int, r *rand.Rand, params GenerationParams, r2 *rand.Rand) Feature {
 	ring := 1 + r.Intn(params.Radius)
 	band := bandForRing(ring, params)
 	var ft FeatureType
@@ -315,13 +252,8 @@ func hazardFeature(id string, dir int, r *rand.Rand, params GenerationParams, sc
 	default:
 		ft, eff = FeatureDebris, Effects{MoveMod: 0.7}
 	}
-	orb := orbitFor(ring, dir, r, sched)
-	f := Feature{
-		Id: id, Type: ft, Orbit: &orb,
-		Footprint: []board.Cell{board.Canon(board.Cell{Ring: ring, Slot: orb.Angle0}, sched)},
-		Effects:   &eff,
-	}
-	continuousStarParented(&f, ring, r2)
+	f := Feature{Id: id, Type: ft, Effects: &eff}
+	continuousStarParented(&f, ring, dir, r2)
 	return f
 }
 
@@ -374,16 +306,6 @@ func featureTypeForBody(t galaxy.BodyType) FeatureType {
 	default: // rocky, molten, oceanic, barren → rocky (feature family has no sub-rock types)
 		return FeatureRocky
 	}
-}
-
-func clampRing(ring, radius int) int {
-	if ring < 1 {
-		return 1
-	}
-	if ring > radius {
-		return radius
-	}
-	return ring
 }
 
 func maxInt(a, b int) int {

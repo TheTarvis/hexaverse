@@ -5,8 +5,8 @@ package action
 // MODIFIED "Commit Rejects Non-Primitive Action Parameters".
 //
 // commit_params_validator_test.go (unmodified by the SDET; a developer-owned
-// mechanical repoint per tasks.md 4.4) imports "hexaverse/board" and asserts
-// against board.Cell / board.EncodeCell / board.MovementState /
+// mechanical repoint per tasks.md 4.4) imports the `board` package and
+// asserts against board.Cell / board.EncodeCell / board.MovementState /
 // board.Orbit — all board-package vocabulary this change deletes. Rather than
 // edit that file directly (test immutability; the file's own repoint is a
 // developer task, since it also has to physically delete the `board` import

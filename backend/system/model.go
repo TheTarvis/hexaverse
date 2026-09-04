@@ -1,7 +1,6 @@
 package system
 
 import (
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/space"
 )
@@ -91,64 +90,27 @@ type Effects struct {
 	Block   bool    `json:"block,omitempty" firestore:"block,omitempty"`
 }
 
-// Orbit holds a feature's orbital elements. Its live hex is a pure function of
-// (Orbit, worldTime); with motion off/slow the board reads static (#0003
-// Decision #5). Angle0 is the ring-position index at the world epoch; Period is
-// world-milliseconds for a full revolution; Dir is +1 / −1.
-//
-// Period is NOT persisted (`firestore:"-"`): it is a pure function of Ring and
-// common.Tuning().OrbitPeriod, so it is filled from live tuning on every read
-// (see PeriodFor and the DAO). Storing it would freeze the pace of every system
-// at the moment it was generated — retuning orbits would then only reach systems
-// nobody had visited yet. Ring/Angle0/Dir stay stored: they're the generator's
-// dice, not a pacing knob.
-type Orbit struct {
-	Ring   int                `json:"ring" firestore:"ring"`
-	Angle0 int                `json:"angle0" firestore:"angle0"`
-	Period common.WorldMillis `json:"period" firestore:"-"`
-	Dir    int                `json:"dir" firestore:"dir"`
-}
-
-// PeriodFor is a body's orbital period on a ring, read live from tuning. The
-// generator and the DAO both go through it, so an in-memory interior and a re-read
-// one always agree. It is the SAME law a coasting fleet obeys — a planet and a
-// ship on ring N share a period because they share the physics.
-func PeriodFor(ring int) common.WorldMillis {
-	return common.Tuning().OrbitPeriod(ring)
-}
-
-// Feature is one stored object on the board. Position is exactly one of:
-// Orbit (orbits the star), ParentId (rides another feature — moons, a planet's
-// gravity well), or Fixed (the star at centre). Footprint is the feature's
-// epoch cell(s): a single anchor cell for point bodies, a cell-set for fields
-// (belt arcs, nebulae). Live cell(s) are computed, never stored per tick.
-//
-// Orbit/ParentId/Fixed/Footprint are the LATTICE half of this feature's
-// position — the continuous half (Space/Size/Width below) coexists beside
-// them, additively, for the length of the nine-link continuous-space chain
-// (openspec add-orbital-system-bodies design.md, "Option A"). Nothing here
-// is deleted until link 9 (delete-the-lattice), which is where Orbit,
-// ParentId, Fixed, and Footprint themselves are removed from this struct.
+// Feature is one stored object in a system's interior. Its position is its
+// continuous orbital element set (Space/Size/Width below): a star-parented
+// body orbits the star, a body-parented one (a moon, a planet's gravity well)
+// names its parent in Space.ParentId, and the star itself is the one
+// parentless body and carries no element set at all.
 type Feature struct {
-	Id        string       `json:"id" firestore:"id"`
-	Type      FeatureType  `json:"type" firestore:"type"`
-	Name      string       `json:"name,omitempty" firestore:"name,omitempty"`
-	Orbit     *Orbit       `json:"orbit,omitempty" firestore:"orbit,omitempty"`
-	ParentId  string       `json:"parentId,omitempty" firestore:"parentId,omitempty"`
-	Fixed     bool         `json:"fixed,omitempty" firestore:"fixed,omitempty"`
-	Footprint []board.Cell `json:"footprint" firestore:"footprint"`
-	Resources []Resource   `json:"resources,omitempty" firestore:"resources,omitempty"`
-	Effects   *Effects     `json:"effects,omitempty" firestore:"effects,omitempty"`
+	Id        string      `json:"id" firestore:"id"`
+	Type      FeatureType `json:"type" firestore:"type"`
+	Name      string      `json:"name,omitempty" firestore:"name,omitempty"`
+	Resources []Resource  `json:"resources,omitempty" firestore:"resources,omitempty"`
+	Effects   *Effects    `json:"effects,omitempty" firestore:"effects,omitempty"`
 	// OwnerCorpId is DTO-only (`firestore:"-"` — never persisted, no schema
 	// change): it is populated solely on the station feature spliced into a read
 	// from the station store, which is the one feature family that has an owner.
 	// Generated features leave it empty, and nothing in this package writes it.
 	OwnerCorpId string `json:"ownerCorpId,omitempty" firestore:"-"`
 
-	// --- continuous half (add-orbital-system-bodies) -----------------------
+	// --- orbital element set (add-orbital-system-bodies) -------------------
 	//
-	// Space is the in-memory, decoded orbital element set — the continuous
-	// analogue of Orbit/ParentId/Fixed above. `firestore:"-"`: the DAO never
+	// Space is the in-memory, decoded orbital element set. `firestore:"-"`:
+	// the DAO never
 	// serializes this field directly; SpaceDoc is what crosses the
 	// persistence boundary (space.EncodeOrbit on write, space.DecodeOrbit on
 	// read — design.md Decision 12). Nil for the star (parentless, no

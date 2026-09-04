@@ -76,7 +76,7 @@ func testBodyTable(t *testing.T, systemID string, starSize float64, extras ...sy
 
 	interior := system.SystemInterior{SystemId: systemID, Extent: 200}
 	feats := append([]system.Feature{
-		{Id: "feat-star", Type: system.FeatureStar, Fixed: true, Size: starSize},
+		{Id: "feat-star", Type: system.FeatureStar, Size: starSize},
 	}, extras...)
 
 	dao.EXPECT().GetInterior(gomock.Any(), gomock.Any(), systemID).Return(&interior, nil).AnyTimes()

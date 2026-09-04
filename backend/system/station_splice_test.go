@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-
-	"hexaverse/board"
 )
 
 // TEST REVISION 2026-09-01 (SDET, authorized): spec changed — system-interior
@@ -40,13 +38,12 @@ func (f *fakeStationSource) StationFeature(context.Context, string) (*Feature, e
 
 func stationFeatureFixture() *Feature {
 	return &Feature{
-		Id:    "feat-station",
-		Type:  FeatureStation,
-		Name:  "Trading Station",
-		Orbit: &Orbit{Ring: 6, Angle0: 3, Period: PeriodFor(6), Dir: 1},
+		Id:   "feat-station",
+		Type: FeatureStation,
+		Name: "Trading Station",
+
 		// A station has an owner; every generated feature leaves this empty.
 		OwnerCorpId: "",
-		Footprint:   []board.Cell{{Ring: 6, Slot: 3}},
 	}
 }
 
@@ -54,9 +51,8 @@ func interiorFixture() *GeneratedInterior {
 	return &GeneratedInterior{
 		Interior: SystemInterior{SystemId: "sys-1"},
 		Features: []Feature{
-			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-			{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Dir: 1},
-				Footprint: []board.Cell{{Ring: 3, Slot: 0}}},
+			{Id: "feat-star", Type: FeatureStar},
+			{Id: "feat-body-0", Type: FeatureRocky},
 		},
 	}
 }

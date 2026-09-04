@@ -35,7 +35,6 @@ import (
 	"strings"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/galaxy"
 	"hexaverse/space"
 )
@@ -55,11 +54,11 @@ func validSpaceDoc(parentId string, radius float64) map[string]any {
 // never reads as parentless.
 func TestReadInterior_Scenario_NoSpaceDocAtAllIsTreatedAsDecodeFailure(t *testing.T) {
 	feats := []Feature{
-		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-		{Id: "feat-body-0", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 3, Slot: 0}},
-			Orbit: &Orbit{Ring: 3, Dir: 1}, SpaceDoc: nil /* no SpaceDoc key at all */},
-		{Id: "feat-body-1", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 5, Slot: 0}},
-			Orbit: &Orbit{Ring: 5, Dir: 1}, SpaceDoc: validSpaceDoc("feat-star", ContinuousRadius(5))},
+		{Id: "feat-star", Type: FeatureStar},
+		{Id: "feat-body-0", Type: FeatureRocky,
+			SpaceDoc: nil /* no SpaceDoc key at all */},
+		{Id: "feat-body-1", Type: FeatureRocky,
+			SpaceDoc: validSpaceDoc("feat-star", ContinuousRadius(5))},
 	}
 	interior := extentOK()
 
@@ -101,11 +100,11 @@ func TestReadInterior_Scenario_MalformedSpaceDocIsOmittedNotFatal(t *testing.T) 
 		"phase": int64(0), "inclination": int64(0), "node": int64(0),
 	}
 	feats := []Feature{
-		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-		{Id: "feat-body-bad", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 3, Slot: 0}},
-			Orbit: &Orbit{Ring: 3, Dir: 1}, SpaceDoc: malformed},
-		{Id: "feat-body-good", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 5, Slot: 0}},
-			Orbit: &Orbit{Ring: 5, Dir: 1}, SpaceDoc: validSpaceDoc("feat-star", ContinuousRadius(5))},
+		{Id: "feat-star", Type: FeatureStar},
+		{Id: "feat-body-bad", Type: FeatureRocky,
+			SpaceDoc: malformed},
+		{Id: "feat-body-good", Type: FeatureRocky,
+			SpaceDoc: validSpaceDoc("feat-star", ContinuousRadius(5))},
 	}
 	interior := extentOK()
 	dao := newFakeDao(t, interior, feats)
@@ -148,17 +147,15 @@ func TestReadInterior_Scenario_MalformedSpaceDocIsOmittedNotFatal(t *testing.T) 
 func TestGetOrCreateInterior_Scenario_OmittingGasGiantAlsoOmitsMoons(t *testing.T) {
 	malformedGiant := map[string]any{"parentId": "feat-star", "periodMs": int64(1000)} // missing radius
 	feats := []Feature{
-		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-		{Id: "feat-body-0", Type: FeatureGasGiant, Footprint: []board.Cell{{Ring: 7, Slot: 0}},
-			Orbit: &Orbit{Ring: 7, Dir: 1}, SpaceDoc: malformedGiant},
-		{Id: "feat-moon-0", Type: FeatureMoon, ParentId: "feat-body-0",
-			Footprint: []board.Cell{{Ring: 0, Slot: 0}},
-			SpaceDoc:  validSpaceDoc("feat-body-0", 10)},
-		{Id: "feat-moon-1", Type: FeatureMoon, ParentId: "feat-body-0",
-			Footprint: []board.Cell{{Ring: 0, Slot: 0}},
-			SpaceDoc:  validSpaceDoc("feat-body-0", 15)},
-		{Id: "feat-body-1", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 3, Slot: 0}},
-			Orbit: &Orbit{Ring: 3, Dir: 1}, SpaceDoc: validSpaceDoc("feat-star", ContinuousRadius(3))},
+		{Id: "feat-star", Type: FeatureStar},
+		{Id: "feat-body-0", Type: FeatureGasGiant,
+			SpaceDoc: malformedGiant},
+		{Id: "feat-moon-0", Type: FeatureMoon,
+			SpaceDoc: validSpaceDoc("feat-body-0", 10)},
+		{Id: "feat-moon-1", Type: FeatureMoon,
+			SpaceDoc: validSpaceDoc("feat-body-0", 15)},
+		{Id: "feat-body-1", Type: FeatureRocky,
+			SpaceDoc: validSpaceDoc("feat-star", ContinuousRadius(3))},
 	}
 	interior := extentOK()
 	dao := newFakeDao(t, interior, feats)
@@ -200,17 +197,16 @@ func TestGetOrCreateInterior_Scenario_OmittingGasGiantAlsoOmitsMoons(t *testing.
 func TestGetOrCreateInterior_Scenario_OmittingStationParentAlsoOmitsStation(t *testing.T) {
 	malformedParent := map[string]any{"parentId": "feat-star"} // missing radius AND periodMs
 	feats := []Feature{
-		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-		{Id: "feat-body-0", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 3, Slot: 0}},
-			Orbit: &Orbit{Ring: 3, Dir: 1}, SpaceDoc: malformedParent},
+		{Id: "feat-star", Type: FeatureStar},
+		{Id: "feat-body-0", Type: FeatureRocky,
+			SpaceDoc: malformedParent},
 	}
 	interior := extentOK()
 	dao := newFakeDao(t, interior, feats)
 
 	station := &Feature{
-		Id: "feat-station", Type: FeatureStation, ParentId: "", // continuous parent is the skeleton body
-		Footprint: []board.Cell{{Ring: 6, Slot: 0}},
-		SpaceDoc:  validSpaceDoc("feat-body-0", 10.75),
+		Id: "feat-station", Type: FeatureStation, // continuous parent is the skeleton body
+		SpaceDoc: validSpaceDoc("feat-body-0", 10.75),
 	}
 	svc := NewServiceWith(dao, &fakeGalaxyDecode{meta: &galaxy.Galaxy{Id: "gal_1", Seed: 42}}, testClock()).
 		WithStations(&fakeStationSourceDecode{feat: station})
@@ -238,13 +234,13 @@ func TestGetOrCreateInterior_Scenario_OmittingStationParentAlsoOmitsStation(t *t
 // Scenario: A cyclic stored parent chain is dropped, not preserved.
 func TestGetOrCreateInterior_Scenario_CyclicStoredParentChainDropped(t *testing.T) {
 	feats := []Feature{
-		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-		{Id: "feat-a", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 3, Slot: 0}},
-			Orbit: &Orbit{Ring: 3, Dir: 1}, SpaceDoc: validSpaceDoc("feat-b", 40)},
-		{Id: "feat-b", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 5, Slot: 0}},
-			Orbit: &Orbit{Ring: 5, Dir: 1}, SpaceDoc: validSpaceDoc("feat-a", 60)},
-		{Id: "feat-c", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 7, Slot: 0}},
-			Orbit: &Orbit{Ring: 7, Dir: 1}, SpaceDoc: validSpaceDoc("feat-star", ContinuousRadius(7))},
+		{Id: "feat-star", Type: FeatureStar},
+		{Id: "feat-a", Type: FeatureRocky,
+			SpaceDoc: validSpaceDoc("feat-b", 40)},
+		{Id: "feat-b", Type: FeatureRocky,
+			SpaceDoc: validSpaceDoc("feat-a", 60)},
+		{Id: "feat-c", Type: FeatureRocky,
+			SpaceDoc: validSpaceDoc("feat-star", ContinuousRadius(7))},
 	}
 	interior := extentOK()
 	dao := newFakeDao(t, interior, feats)
@@ -279,9 +275,9 @@ func TestGetOrCreateInterior_Scenario_CyclicStoredParentChainDropped(t *testing.
 func TestGetOrCreateInterior_Scenario_DroppedBeltCascadesOutOfTheRead(t *testing.T) {
 	malformedBelt := map[string]any{"parentId": "feat-star"} // missing radius
 	feats := []Feature{
-		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-		{Id: "feat-belt-0", Type: FeatureBelt, Footprint: []board.Cell{{Ring: 4, Slot: 0}},
-			Orbit: &Orbit{Ring: 4, Dir: 1}, SpaceDoc: malformedBelt, Width: 5},
+		{Id: "feat-star", Type: FeatureStar},
+		{Id: "feat-belt-0", Type: FeatureBelt,
+			SpaceDoc: malformedBelt, Width: 5},
 	}
 	interior := extentOK()
 	dao := newFakeDao(t, interior, feats)
@@ -312,11 +308,11 @@ func TestGetOrCreateInterior_Scenario_DroppedBeltCascadesOutOfTheRead(t *testing
 // so it is hand-built rather than swept.
 func TestGetOrCreateInterior_Scenario_HandBuiltOverDeepChainDroppedByCascade(t *testing.T) {
 	feats := []Feature{
-		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-		{Id: "feat-p1", Footprint: []board.Cell{{Ring: 0, Slot: 0}}, SpaceDoc: validSpaceDoc("feat-star", 30)},
-		{Id: "feat-p2", Footprint: []board.Cell{{Ring: 0, Slot: 0}}, SpaceDoc: validSpaceDoc("feat-p1", 5)},
-		{Id: "feat-p3", Footprint: []board.Cell{{Ring: 0, Slot: 0}}, SpaceDoc: validSpaceDoc("feat-p2", 5)},
-		{Id: "feat-p4", Footprint: []board.Cell{{Ring: 0, Slot: 0}}, SpaceDoc: validSpaceDoc("feat-p3", 5)},
+		{Id: "feat-star", Type: FeatureStar},
+		{Id: "feat-p1", SpaceDoc: validSpaceDoc("feat-star", 30)},
+		{Id: "feat-p2", SpaceDoc: validSpaceDoc("feat-p1", 5)},
+		{Id: "feat-p3", SpaceDoc: validSpaceDoc("feat-p2", 5)},
+		{Id: "feat-p4", SpaceDoc: validSpaceDoc("feat-p3", 5)},
 	}
 	interior := extentOK()
 	dao := newFakeDao(t, interior, feats)

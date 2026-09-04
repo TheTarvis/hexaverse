@@ -44,7 +44,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 
 ## 2. Backend — remove the lattice tier from `backend/system`
 
-- [ ] 2.1 Delete `system.Orbit` and, from `system.Feature`, the fields `Orbit`,
+- [x] 2.1 Delete `system.Orbit` and, from `system.Feature`, the fields `Orbit`,
       `ParentId`, `Fixed`, and `Footprint`, together with their Firestore tags.
       Verified by `grep -rn 'Footprint\|\.Fixed\b\|f\.Orbit\|Orbit \*Orbit'
       backend/system` returning nothing outside deleted code
@@ -56,16 +56,16 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `SystemInterior.Extent` is its continuous successor and is already
       persisted. Verified by `grep -rn 'Interior\.Radius\|si\.Radius'
       backend/` returning nothing
-- [ ] 2.2 Delete `system.PeriodFor` and the `dao.go` read-time refill of
+- [x] 2.2 Delete `system.PeriodFor` and the `dao.go` read-time refill of
       `f.Orbit.Period`. Verified by `grep -rn 'PeriodFor' backend/` returning
       nothing (`system-interior`: REMOVED *Orbital Period Read from Live
       Tuning*)
-- [ ] 2.3 Delete `system.featureRingOK` and its `readInterior` call site, and
+- [x] 2.3 Delete `system.featureRingOK` and its `readInterior` call site, and
       `clampRing` with every caller. Verified by
       `grep -rn 'featureRingOK\|clampRing' backend/` returning nothing
       (`system-interior`: REMOVED *Interior Feature Decode Validates Ring
       Against the Live Schedule*)
-- [ ] 2.4 Rewrite `generator.go`: drop `board.Schedule`, `board.Canon`,
+- [x] 2.4 Rewrite `generator.go`: drop `board.Schedule`, `board.Canon`,
       `board.RingCells`, the `sched polar.Schedule` parameter threaded through
       `orbitFeature`/`orbitFor`/`beltFeature`/`hazardFeature`, and the
       `Angle0` slot draw. **`orbitFor` does not merely lose a parameter — it
@@ -78,7 +78,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `[1, params.Radius]` with no board meaning (`system-interior`:
       *Continuous Orbital Radii Ascend With the Skeleton Ordinal and Are
       Separated*)
-- [ ] 2.5 Re-source `continuousStarParented`'s `retrograde` input: it currently
+- [x] 2.5 Re-source `continuousStarParented`'s `retrograde` input: it currently
       reads `f.Orbit.Dir < 0`. Pass the direction the `diskOrCaptured` /
       `DominantOrbitDirection` roll already produced directly instead, so the
       side is still decided exactly once on the primary stream
@@ -87,7 +87,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       could silently change a rule rather than remove one — a `retrograde` that
       quietly becomes always-false makes every capture-plausible body prograde
       and every test still pass
-- [ ] 2.6 Delete `generateWithStreams`' `r2 == nil` mode and the instrumented
+- [x] 2.6 Delete `generateWithStreams`' `r2 == nil` mode and the instrumented
       lattice-stream word counter, and collapse `Generate`/`generateWithStreams`
       accordingly. Verified by `grep -rn 'r2 == nil\|latticeDrawCount'
       backend/system` returning nothing (`system-interior`: REMOVED *Lattice
@@ -118,7 +118,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `handler.go` — an empty interface with no method and no implementation,
       surviving only under a lattice name. Verified by `grep -rn 'BoardFog'
       backend/` returning nothing
-- [ ] 2.10 Remove the `"hexaverse/board"` and `"hexaverse/polar"` imports from
+- [x] 2.10 Remove the `"hexaverse/board"` and `"hexaverse/polar"` imports from
       every remaining `backend/system` file, production and test alike, and
       delete or rewrite the tests that exist only to exercise the lattice —
       keeping every assertion about continuous behaviour and dropping only
@@ -150,7 +150,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       re-recorded, and the cause is logged in `link9-red-coverage.md`. If
       clearing a line would require touching anything but a comment, the SDET
       halts and reports instead
-- [ ] 2.10b `generator_continuous_test.go` is **re-sourced, not trimmed.** Its
+- [x] 2.10b `generator_continuous_test.go` is **re-sourced, not trimmed.** Its
       retrograde assertions read `f.Orbit.Dir` to check that a body's
       continuous inclination matches its lattice direction. Deleting the
       comparison leaves the retrograde path asserted by nothing. Repoint each
@@ -160,7 +160,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       itself warns about (every capture-plausible body turns prograde and every
       test still passes). Same treatment for the retrograde legs of
       `continuous_test.go` and `lattice_identity_test.go`
-- [ ] 2.10c **(moved from task 7.5 — C6: this family goes red the instant
+- [x] 2.10c **(moved from task 7.5 — C6: this family goes red the instant
       2.4/2.5/2.6 land, so it must be re-recorded inside this same section-2
       commit, not deferred to section 7)** Re-record
       `fixtures/system/cases.json`'s `interiorElements` family over its
@@ -179,14 +179,14 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       leg (`check.py:1107-1131`, `.gitlab-ci.yml:342`), which this task's
       byte-for-byte assertion is a one-time rehearsal of, not a replacement
       for
-- [ ] 2.10d **(moved from task 7.6, for the same reason as 2.10c)** Update
+- [x] 2.10d **(moved from task 7.6, for the same reason as 2.10c)** Update
       `fixtures/system/cases.json`'s `_meta.generatedOn` and
       `_meta.serialization` to describe the new recording honestly, naming
       **both** build targets (`GOARCH=arm64` and `GOARCH=amd64 GOAMD64=v1`)
       the byte-for-byte check in 2.10c ran against — recording only one
       leaves a one-architecture recording indistinguishable from a
       two-architecture one after the fact
-- [ ] 2.11 Add the test the removed slot-coverage scenario leaves behind:
+- [x] 2.11 Add the test the removed slot-coverage scenario leaves behind:
       generate interiors across many seeds, collect every feature's continuous
       phase, and assert **both** legs (`system-interior`: *Interior Generation
       Is Lazy and Deterministic* › "Generated phases span the whole turn"):
@@ -208,11 +208,11 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       Today's generator is fine; it is the **spec** that would permit the
       regression. Without this task, deleting the slot-coverage scenario
       removes reachability coverage instead of relocating it
-- [ ] 2.12 `cd backend && go test ./system/ -short -count=1` green — **cannot go green before 2.10c/2.10d land** (C6): `interiorElements` is red from the moment 2.4/2.5/2.6 change the generator's draw until the fixture is re-recorded
+- [x] 2.12 `cd backend && go test ./system/ -short -count=1` green — **cannot go green before 2.10c/2.10d land** (C6): `interiorElements` is red from the moment 2.4/2.5/2.6 change the generator's draw until the fixture is re-recorded
 
 ## 3. Backend — remove the lattice tier from `backend/stations`
 
-- [ ] 3.1 `backend/stations/placement.go` is 88 lines and contains exactly
+- [x] 3.1 `backend/stations/placement.go` is 88 lines and contains exactly
       two functions, `DeriveOrbit` (`:41`) and `mix64` (`:83`), both deleted,
       and `mix64` has no other user in the package — **`rm
       backend/stations/placement.go`** rather than leaving a
@@ -232,7 +232,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `grep -rn 'DeriveOrbit' backend/` returning nothing
       (`trading-station`: REMOVED *Deterministic, Non-Core, Off-Gate-Ring,
       Prograde, Orbiting Placement*)
-- [ ] 3.2 Delete `stations.ErrStationRingOutOfRange` and the ring check,
+- [x] 3.2 Delete `stations.ErrStationRingOutOfRange` and the ring check,
       `board.ProductionSchedule()` lookup, `board.Canon` call and `Footprint`
       construction from `stations.FeatureOf`, leaving a station feature carrying
       only id, type, name and owner. **This is the tether
@@ -240,7 +240,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       a station omitted from an interior read for a lattice reason with nothing
       on the wire to hint at it (`trading-station`: REMOVED *A Station Orbit
       Outside the Live Board Radius Is Omitted, Never Panicked*)
-- [ ] 3.2b Delete `stations.Station.Orbit` — the `system.Orbit`-typed field at
+- [x] 3.2b Delete `stations.Station.Orbit` — the `system.Orbit`-typed field at
       `stations/model.go:35`, tagged `json:"orbit"` and `firestore:"orbit"`.
       It is **served**, not merely stored: `GET /v1/systems/:systemId/station`
       marshals the whole `Station` struct (`stations/handler.go`, `c.JSON(...,
@@ -284,9 +284,9 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       literals behind is an excess-property lint error, not a silent pass.
       No production frontend module reads `station.orbit` today, so this is a
       type-and-fixture deletion with no rendering consequence
-- [ ] 3.3 Delete `stations.Service`'s `gateRing: common.Tuning().BoardRadius`
+- [x] 3.3 Delete `stations.Service`'s `gateRing: common.Tuning().BoardRadius`
       fields and the `system.PeriodFor(orbit.Ring)` refill
-- [ ] 3.4 Delete `backend/stations/lattice_symbols_absent_test.go`,
+- [x] 3.4 Delete `backend/stations/lattice_symbols_absent_test.go`,
       `backend/mine/lattice_symbols_absent_test.go`,
       `backend/market/lattice_symbols_absent_test.go`, and
       `backend/fleet/lattice_symbols_absent_test.go` (design.md Decision 6: a
@@ -309,14 +309,14 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse` in the same
       file**: it asserts json tag names on the wire, which remains
       falsifiable
-- [ ] 3.5 Add the positive test the removed lattice guard leaves behind: a
+- [x] 3.5 Add the positive test the removed lattice guard leaves behind: a
       fleet parked at a position coincident with the station's live continuous
       position, with no matching `attachedTo`, is not docked and every
       dock-gated verb rejects it (`trading-station`: *Station Is a Dockable,
       Non-Mineable Body* › "Position coincidence without attachment is not
       docking"). Without this task, deleting 3.4's guard removes coverage
       instead of relocating it
-- [ ] 3.6 `cd backend && go test ./stations/ ./mine/ ./market/ -short -count=1`
+- [x] 3.6 `cd backend && go test ./stations/ ./mine/ ./market/ -short -count=1`
       green — depends on 2.10c/2.10d (C6): `mine`'s and `market`'s own fixture
       suites are independent, but the package build depends on `system`
       compiling, which does not settle green until the re-record lands
@@ -401,7 +401,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       with a `board.Orbit{Ring, Angle0, Period, Dir}`, at the continuous
       movement-state struct (› "Actor state carrying a domain struct still
       commits")
-- [ ] 4.5 Repoint `backend/mine/integration_test.go` off `board`, keeping
+- [x] 4.5 Repoint `backend/mine/integration_test.go` off `board`, keeping
       every continuous assertion. `backend/interior_additive_wire_e2e_test.go`
       no longer exists — 8a-2 removed it, and no backend-root e2e test imports
       `board` today — so there is no second file to repoint here
@@ -602,13 +602,13 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `bash .claude/scripts/check-mirror-map.sh` exits 2 naming it, then revert.
       A check that has never been observed to fail has not been shown to check
       anything
-- [ ] 7.5 **Moved to task 2.10c (C6).** The `interiorElements` family goes
+- [x] 7.5 **Moved to task 2.10c (C6).** The `interiorElements` family goes
       red the instant the generator rewrite (2.4/2.5/2.6) lands, so it is
       re-recorded inside that same section-2 commit rather than deferred
       here — see 2.10c for the full task text and acceptance evidence. This
       entry stays in section 7's numbering only so every existing citation of
       "task 7.5" continues to resolve; it carries no independent work.
-- [ ] 7.6 **Moved to task 2.10d (C6),** for the same reason as 7.5. See 2.10d
+- [x] 7.6 **Moved to task 2.10d (C6),** for the same reason as 7.5. See 2.10d
       for the full task text.
 - [ ] 7.6b Run the surviving-`sqrt` audit the retired board-audit scenario is
       replaced by: enumerate every runtime `sqrt` on a rule-bearing path in

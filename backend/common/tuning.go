@@ -29,12 +29,10 @@ import "sync"
 // already exists, so an admin page editing them would be lying to the operator.
 // They stay in their domain's params.go.
 //
-// The bake-in is what disqualifies them, not the subject matter. OrbitBasePeriod
-// reads like a generation dial and used to live in system.GenerationParams, but a
-// body's period is DERIVED at read (system.PeriodFor) rather than persisted on the
-// feature — so retuning it re-paces bodies in worlds that already exist, and it
-// earns its place here. Anything else that can be made derived-at-read is welcome
-// to follow it.
+// The bake-in is what disqualifies them, not the subject matter: a knob earns
+// its place here when retuning it re-paces worlds that already exist, and a
+// knob whose value is frozen into stored data at generation time never can.
+// Anything that can be made derived-at-read is welcome to move here.
 //
 // # Layering
 //

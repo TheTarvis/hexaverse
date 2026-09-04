@@ -10,6 +10,7 @@ import (
 	"hexaverse/charts"
 	"hexaverse/common"
 	"hexaverse/galaxy"
+	"hexaverse/system"
 
 	"cloud.google.com/go/firestore"
 )
@@ -85,11 +86,14 @@ func TestEnsureStation_ProvisionsExactlyOne(t *testing.T) {
 	if st.SystemId != sysID {
 		t.Errorf("systemId = %q, want %q", st.SystemId, sysID)
 	}
-	// The orbit must match the pure derivation, so a docked fleet can recompute
-	// it in-process without reading this store.
-	want := DeriveOrbit(testGalaxySeed, sysID, svc.gateRing)
-	if st.Orbit.Ring != want.Ring || st.Orbit.Angle0 != want.Angle0 || st.Orbit.Dir != want.Dir {
-		t.Errorf("stored orbit %+v does not match the derivation %+v", st.Orbit, want)
+	// The provisioned station carries the feature id a burn order names it by.
+	// It carries no ORBIT: the station's orbital element set is derived at
+	// interior-splice time (system.StationContinuousOrbit) from the galaxy
+	// seed, the system id and the system's own skeleton, and is never stored
+	// on this document — so there is nothing here for the old
+	// stored-orbit-matches-the-derivation assertion to compare.
+	if st.FeatureId != StationFeatureId {
+		t.Errorf("featureId = %q, want %q", st.FeatureId, StationFeatureId)
 	}
 }
 
@@ -197,7 +201,7 @@ func TestGetVisible_GateHidesExistenceBelowTheTier(t *testing.T) {
 	}
 }
 
-func TestStationFeature_ShapesAnOrbitingBoardFeature(t *testing.T) {
+func TestStationFeature_ShapesAnInteriorFeature(t *testing.T) {
 	svc, client, _ := newStationFixture(t, &fakeTiers{})
 	sysID := "sys-feature"
 	defer common.CleanupFirestoreTestData(t, client, stationCleanupPath(sysID))
@@ -214,16 +218,17 @@ func TestStationFeature_ShapesAnOrbitingBoardFeature(t *testing.T) {
 	if feat == nil {
 		t.Fatal("no station feature returned")
 	}
-	if feat.Orbit == nil {
-		t.Fatal("station feature carries no orbital elements — a docked fleet could not resolve its position")
+	// The feature carries identity, not position. Its orbital element set is
+	// attached later, at interior-splice time, by
+	// system.StationContinuousOrbit — this store derives none and holds none.
+	if feat.Id != StationFeatureId {
+		t.Errorf("feature id = %q, want %q", feat.Id, StationFeatureId)
 	}
-	// Period is never persisted (it is derived from live tuning), so the feature
-	// must refill it; a zero period would freeze the station at its epoch anchor.
-	if feat.Orbit.Period == 0 {
-		t.Error("station feature's orbital period is 0; it must be refilled from live tuning on read")
+	if feat.Type != system.FeatureStation {
+		t.Errorf("feature type = %q, want %q", feat.Type, system.FeatureStation)
 	}
-	if len(feat.Footprint) == 0 {
-		t.Error("station feature has no footprint hex")
+	if feat.Space != nil {
+		t.Error("the station store attached an orbital element set; deriving one is the interior splice's job, not this store's")
 	}
 }
 

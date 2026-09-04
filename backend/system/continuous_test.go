@@ -147,27 +147,23 @@ func TestContinuousRadius_Scenario_SingleBodyStillValid(t *testing.T) {
 	}
 }
 
-// Scenario: Two skeleton bodies mapped to the same lattice ring still
-// receive distinct continuous radii.
+// Scenario: Adjacent skeleton ordinals receive distinct continuous radii.
 //
 // This is THE collision regression test design.md calls the defect the
-// original text would have introduced 12.1% of the time: clampRing maps raw
-// ordinals 0 and 1 to the SAME lattice ring (both clamp to 1), so a
-// continuous-radius law keyed on the clamped ring would collide. Keyed on
-// the raw ordinal, it must not.
+// original text would have introduced 12.1% of the time. The generator used
+// to clamp a raw skeleton ordinal into a coarse placement index before
+// placing the body, and that clamp mapped ordinals 0 and 1 onto the SAME
+// index — so a continuous-radius law keyed on the clamped value would give
+// two distinct skeleton bodies the same orbit. ContinuousRadius is keyed on
+// the RAW ordinal, and the clamp is gone entirely, but the property the
+// clamp made non-obvious is the one that must hold: adjacent ordinals,
+// including the 0/1 pair that used to collide, are strictly separated.
 func TestContinuousRadius_Scenario_RawRingCollisionRegression(t *testing.T) {
-	const radius = 16 // system.DefaultParams().Radius under default tuning
-	clamp0 := clampRing(0, radius)
-	clamp1 := clampRing(1, radius)
-	if clamp0 != clamp1 {
-		t.Fatalf("fixture invalid: clampRing(0,%d)=%d and clampRing(1,%d)=%d do not collide; the regression this test guards against is not exercised", radius, clamp0, radius, clamp1)
-	}
-
 	r0 := ContinuousRadius(0)
 	r1 := ContinuousRadius(1)
 	if r0 == r1 {
-		t.Fatalf("ContinuousRadius(0)=%v equals ContinuousRadius(1)=%v — the raw-ring collision regression is back: "+
-			"two skeleton bodies whose lattice rings collide via clampRing must still receive strictly different continuous radii", r0, r1)
+		t.Fatalf("ContinuousRadius(0)=%v equals ContinuousRadius(1)=%v — the raw-ordinal collision regression is back: "+
+			"two skeleton bodies at adjacent ordinals must receive strictly different continuous radii", r0, r1)
 	}
 	if !(r1 > r0) {
 		t.Fatalf("ContinuousRadius(1)=%v is not strictly greater than ContinuousRadius(0)=%v", r1, r0)

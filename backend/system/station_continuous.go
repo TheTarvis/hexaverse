@@ -1,13 +1,12 @@
 package system
 
-// StationContinuousOrbit — the station's continuous orbit, re-expressed in
-// continuous terms without ever reading the materialized interior
-// (openspec add-orbital-system-bodies, design.md Decision 6). Sits beside
-// `stations.DeriveOrbit`, the LATTICE derivation, which this change does
-// not touch: `stations.DeriveOrbit`'s lattice form dies at link 8-9
-// (re-express-economy-positions), when docking itself moves off the
-// lattice. Until then both coexist, independently derived from the same
-// seed.
+// StationContinuousOrbit — the station's orbit, derived without ever reading
+// the materialized interior (openspec add-orbital-system-bodies, design.md
+// Decision 6). It is the station's ONLY derivation: the `stations` package
+// once carried a second, discrete one that this derivation coexisted with,
+// and that one is gone along with the coordinate system it was expressed
+// in. Nothing persists the result — the orbit is spliced onto the station
+// body at interior-read time, from (galaxy seed, system id, skeleton).
 
 import (
 	"fmt"

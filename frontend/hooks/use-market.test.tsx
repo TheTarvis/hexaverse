@@ -38,7 +38,6 @@ const board: MarketBoard = {
 
 const station: Station = {
   systemId: 'sys-1',
-  orbit: { ring: 6, angle0: 3, period: 60000, dir: 1 },
   featureId: 'feat-station',
   createdAt: 1000,
 }

@@ -78,7 +78,6 @@ const market = vi.hoisted(() => ({
     systemId: 'sys_-7_17',
     featureId: 'feat-station',
     createdAt: 0,
-    orbit: { ring: 2, angle0: 10, period: 72_000, dir: -1 },
   } as Record<string, unknown> | undefined,
   board: {
     worldTime: 21_175_110_953,

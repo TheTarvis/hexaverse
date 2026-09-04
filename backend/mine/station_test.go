@@ -35,9 +35,11 @@ func interiorWithStation() *system.GeneratedInterior {
 			{Kind: system.ResourceMetals, Richness: 0.5},
 		}},
 		{
-			Id:    testStationFeatureID,
-			Type:  system.FeatureStation,
-			Orbit: &system.Orbit{Ring: 6, Angle0: 3, Period: 60_000, Dir: 1},
+			Id:   testStationFeatureID,
+			Type: system.FeatureStation,
+			Space: &space.Orbit{
+				ParentId: "feat-star", Radius: 120, PeriodMs: 60_000,
+			},
 		},
 	}}
 }

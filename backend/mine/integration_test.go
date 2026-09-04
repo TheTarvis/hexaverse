@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"hexaverse/action"
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/fleet"
 	"hexaverse/space"
@@ -96,7 +95,7 @@ func beltFeature(id string, kinds ...system.ResourceKind) system.Feature {
 	for i, k := range kinds {
 		res[i] = system.Resource{Kind: k, Richness: 0.5}
 	}
-	return system.Feature{Id: id, Type: system.FeatureBelt, Footprint: []board.Cell{{Ring: 3, Slot: 0}}, Resources: res}
+	return system.Feature{Id: id, Type: system.FeatureBelt, Resources: res}
 }
 
 // mineTestStack wires a real fleet.Service + action.Service against the

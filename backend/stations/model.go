@@ -1,9 +1,6 @@
 package stations
 
-import (
-	"hexaverse/common"
-	"hexaverse/system"
-)
+import "hexaverse/common"
 
 // Station is an NPC (or, later, player-owned) trading post: the one place goods
 // convert to credits. Exactly one per spawn-home system (#0011) — stations exist
@@ -27,14 +24,16 @@ type Station struct {
 	// ownership is a value change later, never a schema retrofit — no verb in
 	// this version can set it.
 	OwnerCorpId string `json:"ownerCorpId,omitempty" firestore:"ownerCorpId,omitempty"`
-	// Orbit is the station's orbital elements. It ORBITS — it is not a fixed
-	// anchor (design.md Decision 4): every other board feature orbits or coasts,
-	// and fleet.Position already resolves any feature carrying orbital elements,
-	// so orbiting costs nothing at the seam that matters. Derived, never rolled:
-	// see DeriveOrbit.
-	Orbit system.Orbit `json:"orbit" firestore:"orbit"`
-	// FeatureId is how a burn order names the station within its own system's
-	// board. System-scoped and NOT globally unique — the same convention every
+	// The station's ORBIT is deliberately not a field here, and no successor
+	// replaces it. It orbits — it is not a fixed anchor (design.md Decision 4)
+	// — but its orbital element set is DERIVED at interior-splice time from
+	// (galaxy seed, system id, skeleton) by system.StationContinuousOrbit and
+	// never persisted on this document. A client that needs the station's
+	// position reads GET /v1/systems/:systemId, exactly as it does for every
+	// other body.
+	//
+	// FeatureId is how a burn order names the station within its own system.
+	// System-scoped and NOT globally unique — the same convention every
 	// other feature id follows — so it must never be used as a venue key outside
 	// its own system. Cross-capability identity is SystemId.
 	FeatureId string `json:"featureId" firestore:"featureId"`
@@ -65,8 +64,8 @@ type Station struct {
 type Request struct {
 	Id string `json:"id" firestore:"id"`
 	// Kind is the resource kind's STRING form (see WindowSpend's note).
-	Kind      string  `json:"kind" firestore:"kind"`
-	UnitPrice int64   `json:"unitPrice" firestore:"unitPrice"`
+	Kind      string `json:"kind" firestore:"kind"`
+	UnitPrice int64  `json:"unitPrice" firestore:"unitPrice"`
 	// RemainingQuantity is decremented at settlement, inside the station doc's
 	// own transaction, so concurrent sales can never oversell it.
 	RemainingQuantity float64 `json:"remainingQuantity" firestore:"remainingQuantity"`

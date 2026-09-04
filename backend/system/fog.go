@@ -13,15 +13,13 @@ import (
 // field (system-interior "Bodies Are Public; Ships Are Disclosed";
 // replace-observation-with-sightings design.md Decision 4).
 //
-// THE LATTICE IS GONE FROM THIS WIRE (openspec build-production-space-view,
-// tasks.md 9.1; system-interior "Interior Read Serves Continuous Bodies").
-// `Orbit` (the ring/angle0/period/dir object), `ParentId`, `Fixed`,
-// `Footprint`, `Band`, `Live` and `AsOf` were the lattice half of this DTO
-// and are removed: a body's place in the world is now its continuous
-// `Space` position, its `Size`, and its `OrbitElements`. `system.Feature`'s
-// OWN lattice fields are untouched — those are `delete-the-lattice`'s to
-// remove, not this change's. While this response promised lattice fields a
-// caller could still be reading them, which is what blocked that deletion.
+// A body's place in the world is its continuous `Space` position, its
+// `Size` and its `OrbitElements` — nothing else (system-interior "Interior
+// Read Serves Continuous Bodies"). The discrete position object this DTO
+// once carried alongside them, and the per-requester `band`/`live`/`asOf`
+// fields that went with it, are gone from the wire AND from
+// `system.Feature` itself, so there is no second representation left for a
+// caller to be reading.
 type fogFeatureDTO struct {
 	Id   string      `json:"id"`
 	Type FeatureType `json:"type"`

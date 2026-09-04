@@ -1,15 +1,14 @@
 package system
 
-// RED-phase tests for openspec change pin-system-generation-determinism —
-// the parts of cross-stack-determinism and system-interior that are NOT
-// about generateWithStreams's present/absent behavior (see
-// generate_streams_test.go and fixtures_test.go for those). These tests do
-// NOT depend on generateWithStreams existing and can run today; several of
-// them are EXPECTED TO FAIL RIGHT NOW because the production fix (design.md
-// Decision 1: four float64(...) conversions in generator.go) has not
-// landed yet, and one is expected to fail because lattice_identity_test.go
-// still carries the retired golden constant (task 3.6 has not run) and the
-// CI file has not been enrolled (task 6.1 has not run).
+// Originally the RED suite for openspec change
+// pin-system-generation-determinism — the parts of cross-stack-determinism
+// and system-interior about reproducing interior generation across Go build
+// targets. (The sibling scenarios about the retired second placement tier's
+// independence from the continuous stream went with that tier; the fixture
+// sweep they shared survives in generate_streams_test.go and
+// fixtures_test.go.) The production fix those tests were red against —
+// design.md Decision 1's four float64(...) conversions in generator.go — has
+// long since landed; this file is the standing regression guard for it.
 //
 // Covers:
 //   - system-interior › "Interior Generation Reproduces Across Build
@@ -183,31 +182,23 @@ func TestSystemTestFiles_Scenario_NoHandCopiedDigestConstant(t *testing.T) {
 	}
 }
 
-// Scenario: A retired test-file constant is replaced by a fixture family.
+// TestLatticeIdentityTest_Scenario_RetiredConstantAndComparisonAreDeleted
+// (DELETED) was the RETIREMENT half of the scenario above: it read
+// lattice_identity_test.go AS A FILE and asserted that a specific
+// hand-copied golden-master digest constant, and the comparison that read
+// it, were both gone from it — pinning that a package's cross-target
+// regression baseline had migrated from a private test constant to
+// fixtures/system/cases.json's interiorElements family.
 //
-// This is the RETIREMENT half specifically: lattice_identity_test.go's
-// wantLatticeDigest and its comparison Fatalf are named explicitly here
-// (unlike the scenario above, which is deliberately name-agnostic) because
-// the requirement's own wording names this exact migration ("a package's
-// cross-target or cross-run regression pinning is migrated from a constant
-// recorded in a _test.go file to a fixture family"): the constant AND the
-// comparison code that reads it must be deleted in the SAME change that
-// adds fixtures/system/cases.json's interiorElements family (task 3.6).
-func TestLatticeIdentityTest_Scenario_RetiredConstantAndComparisonAreDeleted(t *testing.T) {
-	raw, err := os.ReadFile("lattice_identity_test.go")
-	if err != nil {
-		t.Fatalf("read lattice_identity_test.go: %v", err)
-	}
-	src := string(raw)
-	if strings.Contains(src, "wantLatticeDigest") {
-		t.Error("lattice_identity_test.go still declares/references wantLatticeDigest — task 3.6 deletes both the " +
-			"constant and its comparison in the same commit that adds the interiorElements fixture family (fixtures_test.go); " +
-			"TestClampRing_StaysMonotonicNonDecreasing, in the same file, is unrelated and must stay")
-	}
-	if strings.Contains(src, "the second (continuous) RNG stream has perturbed the FIRST") {
-		t.Error("lattice_identity_test.go still carries the retired golden-master Fatalf message")
-	}
-}
+// That file no longer exists: it held only a projection of the retired
+// second placement tier and a monotonicity probe on a clamp that is also
+// gone, so it was deleted whole. A guard whose subject is a file is
+// SATISFIED by that file's deletion, not violated by it — but it cannot say
+// so, because os.ReadFile on a missing path is the same t.Fatalf as a
+// genuine violation. The name-agnostic half above survives and is the
+// stronger form anyway: it scans EVERY test file in this package for a
+// hand-copied digest constant, so nothing can reintroduce one under a
+// different filename.
 
 // --- "A Cross-Target Leg That Cannot Execute Reports Loudly, Not Silently" -
 
@@ -257,15 +248,13 @@ func TestGitlabCI_Scenario_ArmLegUnassertedMarkerIsGreppableAndNamesPackages(t *
 
 // Scenario: A degraded leg does not fail the pipeline by itself.
 //
-// SDET NOTE: verified (via a scratch copy with generateWithStreams
-// extracted, so the package compiles) that this test ALREADY PASSES against
-// today's unmodified .gitlab-ci.yml — task 6.1 only ADDS the marker/package
-// list/remedy text the test above checks for; it does not need to change
-// this property, since the existing skip line already has no trailing
-// `exit`. This is therefore a regression GUARD, not a new-behavior red
-// test, kept in this file — same category as lattice_identity_test.go's
-// pre-existing TestClampRing_StaysMonotonicNonDecreasing — so a future edit
-// to the fallback branch cannot silently turn the skip into a hard failure.
+// SDET NOTE: verified that this test ALREADY PASSED against the unmodified
+// .gitlab-ci.yml when it was written — task 6.1 only ADDED the
+// marker/package list/remedy text the test above checks for; it did not
+// need to change this property, since the existing skip line already has no
+// trailing `exit`. This is therefore a regression GUARD, not a
+// new-behavior red test, so a future edit to the fallback branch cannot
+// silently turn the skip into a hard failure.
 //
 // NOT FULLY AUTOMATABLE as a unit test: whether a GitLab CI job's overall exit
 // status is forced to fail is a property of the runner executing the YAML

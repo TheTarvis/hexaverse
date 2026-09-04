@@ -55,7 +55,6 @@ import (
 	"strings"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/galaxy"
 	"hexaverse/space"
 )
@@ -68,10 +67,9 @@ import (
 // itself rather than to the station's own healing path.
 func hypotheticalOutpost(id string) *Feature {
 	return &Feature{
-		Id:        id,
-		Type:      FeatureType("outpost"),
-		Name:      "Hypothetical Future Outpost",
-		Footprint: []board.Cell{{Ring: 4, Slot: 0}},
+		Id:   id,
+		Type: FeatureType("outpost"),
+		Name: "Hypothetical Future Outpost",
 	}
 }
 
@@ -193,11 +191,11 @@ func TestSplicedBody_Scenario_NonPositiveSizeIsOmittedAndLoggedAtErrorSeverity(t
 // SAME read so no difference in test setup can explain the gap.
 func TestSplicedBody_Scenario_SplicedOmissionIsLoggedLoudlierThanAStoredFeatureDecodeOmission(t *testing.T) {
 	badStoredFeature := Feature{
-		Id: "feat-stored-bad-decode", Type: FeatureRocky, Footprint: []board.Cell{{Ring: 3, Slot: 0}},
-		Orbit: &Orbit{Ring: 3, Dir: 1}, SpaceDoc: nil, // no SpaceDoc key at all -> stored decode failure
+		Id: "feat-stored-bad-decode", Type: FeatureRocky,
+		SpaceDoc: nil, // no SpaceDoc key at all -> stored decode failure
 	}
 	feats := []Feature{
-		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
+		{Id: "feat-star", Type: FeatureStar},
 		badStoredFeature,
 	}
 	interior := extentOK()
@@ -205,8 +203,7 @@ func TestSplicedBody_Scenario_SplicedOmissionIsLoggedLoudlierThanAStoredFeatureD
 
 	badSplicedStation := &Feature{
 		Id: "feat-spliced-bad-decode", Type: FeatureStation,
-		Footprint: []board.Cell{{Ring: 6, Slot: 0}},
-		Size:      StationSize, // positive: isolates the missing-Space defect
+		Size: StationSize, // positive: isolates the missing-Space defect
 		// No Space, no SpaceDoc. galaxySvc.GetLiveSystem below returns nil,
 		// so spliceStation's own self-heal degrades without setting Space
 		// (see spliceStation's documented degrade path), reproducing a

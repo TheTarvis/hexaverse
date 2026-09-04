@@ -29,13 +29,11 @@ package system
 // `inventory` entries (design.md Decision 5, Open Question 1) — this file
 // does not record them and must not claim to.
 //
-// RED STATE: fixtures/system/cases.json does not exist yet (this change has
-// not recorded it — Decision 3/7: recording happens only AFTER the fix
-// lands and lattice_identity_test.go's golden constant is deleted, never
-// before). TestFixtures_MatchGolden therefore fails with a file-not-found
-// error by design, independent of whether generateWithStreams exists yet.
-// The interiorElements family additionally fails to COMPILE until
-// generateWithStreams exists (same reason generate_streams_test.go does).
+// RECORDING: fixtures/system/cases.json is rewritten in place by
+// `UPDATE_FIXTURES=1 go test ./system/ -run TestFixtures -count=1`, and only
+// ever after the generation change it records has landed — never before.
+// A recording must reproduce byte-for-byte on both Go build targets
+// (GOARCH=arm64 and GOARCH=amd64 GOAMD64=v1) before it is committed.
 
 import (
 	"crypto/sha256"
@@ -65,9 +63,9 @@ const systemJSRuntimeLegStatement = "none — backend/system is Go-sole-authorit
 // --- canonical serialization -------------------------------------------------
 
 // num is a float64 recorded in its lossless binary-exponent form — the same
-// convention backend/space/fixtures_test.go and backend/polar/fixtures_test.go
-// use, so a last-ULP cross-target divergence is representable at all (a
-// decimal serialization cannot express it).
+// convention backend/space/fixtures_test.go uses, so a last-ULP cross-target
+// divergence is representable at all (a decimal serialization cannot express
+// it).
 type num string
 
 func fnum(v float64) num { return num(strconv.FormatFloat(v, 'b', -1, 64)) }
@@ -545,31 +543,27 @@ func sweepStationOrbit(n int) (int, string) {
 // --- family: interiorElements (the 80-case sweep this change's fix touches)
 
 type interiorElementsCase struct {
-	Note              string `json:"note"`
-	Seed              int64  `json:"seed"`
-	Region            string `json:"region"`
-	LatticeProjection string `json:"latticeProjection"`
-	ContinuousLine    string `json:"continuousLine"`
-	LatticeDrawCount  int64  `json:"latticeDrawCount"`
+	Note           string `json:"note"`
+	Seed           int64  `json:"seed"`
+	Region         string `json:"region"`
+	ContinuousLine string `json:"continuousLine"`
 }
 
-// computeInteriorElementsCase runs the INSTRUMENTED generator (design.md
-// Decision 2, point 5 / tasks.md 3.5): the recorded draw count and the
-// recorded projection come from the SAME instrumented run, and
-// generate_streams_test.go's TestGenerate_Scenario_
-// InstrumentedLatticeStreamMatchesUninstrumentedProjection is what proves
-// that instrumenting changes nothing about the projection this case also
-// records.
+// computeInteriorElementsCase records one case of the sweep: the canonical
+// rendering of every generated body's orbital element set, size and width.
+//
+// It used to record two further components — a projection of the retired
+// second placement tier, and the number of words the primary RNG stream
+// consumed under an instrumented run. Both measured that tier's independence
+// from the continuous stream, a requirement removed with the tier itself, so
+// this family is recorded over its surviving continuousLine component alone.
 func computeInteriorElementsCase(t testing.TB, in interiorElementsCaseInput) interiorElementsCase {
 	t.Helper()
-	var count int64
-	gen := generateWithStreams(in.Seed, newCountingRand(in.Seed, &count), newRand(continuousSeed(in.Seed)), in.Region, in.Skeleton, DefaultParams())
+	gen := Generate(in.Seed, in.Region, in.Skeleton, DefaultParams())
 	return interiorElementsCase{
-		Seed:              in.Seed,
-		Region:            in.Region,
-		LatticeProjection: projectionJSON(t, gen),
-		ContinuousLine:    continuousElementsLineOf(gen),
-		LatticeDrawCount:  count,
+		Seed:           in.Seed,
+		Region:         in.Region,
+		ContinuousLine: continuousElementsLineOf(gen),
 	}
 }
 
@@ -580,9 +574,9 @@ func recordInteriorElements(t testing.TB) ([]interiorElementsCase, int, string) 
 	sh := newSweepHash()
 	for i, in := range inputs {
 		c := computeInteriorElementsCase(t, in)
-		c.Note = "case " + strconv.Itoa(i) + " of the reused lattice-identity 80-case cross"
+		c.Note = "case " + strconv.Itoa(i) + " of the 80-case skeleton x region x seed cross"
 		out = append(out, c)
-		sh.line(sline(c.LatticeProjection, c.ContinuousLine, strconv.FormatInt(c.LatticeDrawCount, 10)))
+		sh.line(sline(c.ContinuousLine))
 	}
 	return out, sh.lines, sh.sum()
 }
@@ -660,8 +654,8 @@ func computeSystemFixtures(t testing.TB) systemFixtures {
 		},
 		InteriorElements: ieCases,
 		InteriorElementsSweep: exhaustiveSweep{
-			Domain:        "the reused lattice-identity 80-case cross (4 skeletons x 4 regions x 5 seeds)",
-			Serialization: "latticeProjection (canonical JSON),continuousLine (canonical JSON),latticeDrawCount",
+			Domain:        "the 80-case skeleton x region x seed cross (4 skeletons x 4 regions x 5 seeds)",
+			Serialization: "continuousLine (canonical JSON)",
 			Lines:         ieLines, Digest: ieDigest,
 		},
 

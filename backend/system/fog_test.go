@@ -30,7 +30,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/common"
 
 	"github.com/gin-gonic/gin"
@@ -47,12 +46,10 @@ func fullDisclosureInterior() *GeneratedInterior {
 	return &GeneratedInterior{
 		Interior: SystemInterior{SystemId: "s1"},
 		Features: []Feature{
-			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
-			{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Period: 0, Dir: 1},
-				Footprint: []board.Cell{{Ring: 3, Slot: 0}},
+			{Id: "feat-star", Type: FeatureStar},
+			{Id: "feat-body-0", Type: FeatureRocky,
 				Resources: []Resource{{Kind: ResourceMetals, Richness: 0.7}}},
-			{Id: "feat-belt-0", Type: FeatureBelt, Orbit: &Orbit{Ring: 8, Angle0: 1, Period: 0, Dir: 1},
-				Footprint: []board.Cell{{Ring: 8, Slot: 0}},
+			{Id: "feat-belt-0", Type: FeatureBelt,
 				Resources: []Resource{{Kind: ResourceVolatiles, Richness: 0.9}},
 				Effects:   &Effects{Block: true}},
 		},

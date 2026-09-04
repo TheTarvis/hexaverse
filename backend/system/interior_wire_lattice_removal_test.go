@@ -184,35 +184,6 @@ func TestInteriorRead_ContinuousFieldsSurviveTheRemoval(t *testing.T) {
 	})
 }
 
-// The `bandVisible` constant exists only to populate the removed `band`
-// field. tasks.md 9.2 removes it with the field; this pins that it goes,
-// rather than surviving as an unreferenced constant nothing sets.
-//
-// SDET-added.
-func TestInteriorRead_NoLatticeFieldTypeSurvivesOnTheWireDTOs(t *testing.T) {
-	for _, c := range []struct {
-		what string
-		v    any
-	}{
-		{"fogFeatureDTO", fogFeatureDTO{}},
-		{"LaneGate", LaneGate{}},
-		{"interiorDTO", interiorDTO{}},
-	} {
-		rt := reflect.TypeOf(c.v)
-		for i := 0; i < rt.NumField(); i++ {
-			ft := rt.Field(i).Type
-			for ft.Kind() == reflect.Ptr || ft.Kind() == reflect.Slice {
-				ft = ft.Elem()
-			}
-			if pkg := ft.PkgPath(); strings.HasSuffix(pkg, "hexaverse/board") || strings.HasSuffix(pkg, "hexaverse/polar") {
-				t.Errorf("%s.%s is a %s type — the interior wire DTOs must carry no lattice type once "+
-					"this change lands, or `delete-the-lattice` is not a pure deletion",
-					c.what, rt.Field(i).Name, pkg)
-			}
-		}
-	}
-}
-
 func hasKey(keys []string, want string) bool {
 	for _, k := range keys {
 		if k == want {

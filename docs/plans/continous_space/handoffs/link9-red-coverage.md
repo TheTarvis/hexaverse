@@ -154,6 +154,108 @@ three untouched files kept their original hashes byte-for-byte
 (`a618414f…`, `9ffde291…`, `9bba5a7f…`), which is itself the proof that this
 re-record moved exactly the two files listed above and nothing else.
 
+### 2.2 POST-HANDOFF TEST CHANGE — G5 unblock: the retired scenario's test re-sourced, plus the pre-authorized comment clearing (2026-09-04)
+
+**Cause (authorized): the orchestrator's blocking delegation at the G5 atomic
+commit, under tasks.md 2.10b + adversary ruling G (`link9-adversary-r8.md`).**
+`generator_continuous_test.go` is manifest-recorded, so the GO developer halted
+on it rather than editing it (ruling G's halt-and-report clause, working as
+designed). Two causes in one pass: (a) 2.10b's re-source, now that task 2.1 has
+actually deleted `Feature.Orbit` and the file no longer compiles
+(`:241,:244 f.Orbit undefined`); (b) ruling G's pre-authorized comment-only
+clearing.
+
+**Verdict on the developer's proposal: ACCEPTED, MODIFIED.** Its two premises
+verified true: a literal repoint is impossible (the second representation is
+gone), and outright deletion loses a real leg — the retired test was the only
+sweep tying a **disk-born** body's inclination band to `DominantOrbitDirection`
+at the **default** `RetrogradeChance` across all four skeletons and all four
+region dials. Modifications made, and why:
+
+1. **Not named as a scenario.** `system-interior`'s REMOVED block states the
+   retired scenario has **no successor**, and §3.2 of this report committed to
+   that reading. The replacement is therefore
+   `TestGenerate_DiskBornFeatureSideFollowsDominantDirection` — no `Scenario_`
+   segment, so no grep of scenario names can ever claim a spec scenario this
+   change deliberately retired. It is marked SDET-added in its own doc comment.
+2. **Two fail-closed fixture guards added** (the proposal had neither). Without
+   them the test is satisfiable by a hard-coded side: a sweep that happened to
+   hit only one sign of `DominantOrbitDirection` never exercises the retrograde
+   band, and a sweep that generated no belts or hazards leaves those families'
+   side plumbing unasserted. Both guards were proven load-bearing (below).
+3. **Filter is `!isCapturePlausibleId`, not a disk-born prefix allowlist**, so a
+   disk-born family added later is covered automatically rather than silently
+   skipped; the prefix list is used only by the fixture guard.
+4. **Overlap recorded honestly in the test's own comment**, since the proposal
+   overstated uniqueness: `TestGenerate_Scenario_CertainRetrogradeChanceInverts
+   CapturePlausibleFeatures` already anchors disk-born features to
+   `DominantOrbitDirection` (one skeleton, one region, knob extreme), and
+   `generator_test.go:TestGenerate_DiskBornFeaturesShareDominantDirection`
+   asserts only mutual agreement, which a hard-coded side satisfies. What this
+   probe adds is the wide default-params sweep and the guards — not a new
+   guarantee.
+
+**Falsification evidence (scratch copy at
+`$SCRATCH/repo/backend`, a full `cp -R` of `backend/` plus `fixtures/` and
+`.gitlab-ci.yml`; the working tree was never used for a stub, and no
+`git checkout`/`stash`/`restore` was run at any point):**
+
+| Stub (production code, scratch only) | Expected | Observed |
+| --- | --- | --- |
+| `continuousStarParented`: `inclinationFor(dir < 0, …)` → `inclinationFor(false, …)` (the exact "retrograde becomes always-false" 2.10b names) | assertion fires on a negative-dir system | `FAIL … generator_continuous_test.go:301: seed 701 (dominant dir=-1): disk-born feature feat-body-0 continuous inclination 3425 does not sit on its own system's disk side` |
+| same, but `inclinationFor(true, …)` (opposite hard-code) | assertion fires on a positive-dir system | `FAIL … seed 700 (dominant dir=1): disk-born feature feat-body-0 … 517824 …` |
+| always-false **plus** `DominantOrbitDirection` → `return 1` (single-sign galaxy — the vacuity hole) | the sign guard fires, not the assertion | `FAIL … fixture: the swept interiors must hit both signs of DominantOrbitDirection (saw +1=true, -1=false)` |
+| generator emits no belts (`for i := 0; i < 0*dial.Belts`) | the family guard fires | `FAIL … fixture: the swept interiors generated no feat-belt-* feature — that disk-born family's side is untested` |
+
+Unstubbed, the shipped file text passes (`--- PASS:
+TestGenerate_DiskBornFeatureSideFollowsDominantDirection`). Scratch production
+files were `cp`-restored and confirmed byte-identical (`diff -q`) after every
+stub; the third and fourth rows are why both guards stay.
+
+**What changed in each file.**
+
+| File | Change | Kind |
+| --- | --- | --- |
+| `backend/system/generator_continuous_test.go` | `featureLatticeDir` helper and `TestGenerate_Scenario_ContinuousSideMatchesOwnLatticeDirection` deleted; `diskBornPrefixes` + `TestGenerate_DiskBornFeatureSideFollowsDominantDirection` added in their place | 2.10b re-source |
+| " | ruling G's three prose sites cleared (`:327,339,383` pre-edit) — the two in-test SDET blocks no longer name `f.Orbit`/`system.Orbit` and no longer carry the change id | comment only |
+| " | **three further `lattice` prose hits the ruling did not enumerate** (`:286,301,363` pre-edit: `isCapturePlausibleId`'s doc, and the two scenario doc comments' "lattice Dir" → "direction roll") | comment only |
+| `backend/action/commit_params_validator_continuous_test.go` | `:8` — the literal import-path string `hexaverse/board` reworded away (task 5.2's grep matches it in comment prose too); one word moved across the line break to keep 80 columns, line count unchanged | comment only |
+
+The three extra hits are flagged for the orchestrator: after this pass
+`generator_continuous_test.go` contains **zero** case-insensitive `lattice`
+hits (`grep -nic lattice … → 0`), which leg 10.2 requires since this file's
+header names `add-orbital-system-bodies`, not a `RED-phase … delete-the-lattice`
+form, so no 10.2 filter reaches it. Clearing only the three enumerated lines
+would have left leg 10.2 unsatisfiable with the file locked to the SDET. No
+assertion, test name, or failure-message string was touched by the comment
+legs. `commit_params_validator_continuous_test.go`'s only surviving `lattice`
+hit is its `:3` RED header, which 10.2's `-Ev 'RED-phase .*delete-the-lattice'`
+covers, exactly as ruling B predicts.
+
+**Verification.** `cd backend && go build ./...` → clean; `go vet ./system/
+./action/` → clean; `gofmt -l` on both edited files → empty; `go test ./action/
+-short -count=1` → ok. `go test ./system/ -short -count=1` fails on exactly two
+tests, **both pre-existing G5 in-flight state, neither reachable from a test
+comment or from this file** (reported, not chased):
+
+1. `TestLatticeIdentityTest_Scenario_RetiredConstantAndComparisonAreDeleted`
+   (`system/cross_target_test.go:195`) — `t.Fatalf("read lattice_identity_test.go: …
+   no such file or directory")`. It is a meta-test that reads
+   `lattice_identity_test.go` as a **file**, and G5 deletes that file, so the
+   guard now fails on its own subject's disappearance. It is developer-owned
+   (`cross_target_test.go` is not in the red manifest) and needs deleting with
+   the file it guards, most likely under task 2.6/2.10's sweep.
+2. `TestFixtures_MatchGolden` — `interiorElements` / `interiorElementsSweep`
+   drifted; that is task 2.10c's re-record, still open.
+
+**Manifest re-recorded** with the same five paths →
+`recorded 5 file(s)`, then `verify delete-the-lattice` →
+`delete-the-lattice: all 5 test file(s) unchanged since handoff` (exit 0). The
+three files this pass did not touch kept their §2.1 hashes byte-for-byte
+(`a618414f…`, `9ffde291…`, `045dd19e…`), which proves the re-record moved
+exactly the two files listed above. Nothing was staged or committed: the GO
+developer commits G5 whole.
+
 ## 3. Genuine red-set detail
 
 ### 3.1 Task 2.11 — phase reachability

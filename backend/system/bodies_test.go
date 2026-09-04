@@ -16,7 +16,6 @@ import (
 	"sync"
 	"testing"
 
-	"hexaverse/board"
 	"hexaverse/common"
 	"hexaverse/galaxy"
 	"hexaverse/space"
@@ -114,14 +113,13 @@ func goodBodyTableInterior() (SystemInterior, []Feature) {
 	giantRadius := ContinuousRadius(7)
 	beltRadius := ContinuousRadius(4)
 	feats := []Feature{
-		{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}, Size: StarSize("G")},
-		{Id: "feat-body-0", Type: FeatureGasGiant, Footprint: []board.Cell{{Ring: 7, Slot: 0}},
-			Orbit: &Orbit{Ring: 7, Dir: 1}, Size: 4.0,
+		{Id: "feat-star", Type: FeatureStar, Size: StarSize("G")},
+		{Id: "feat-body-0", Type: FeatureGasGiant, Size: 4.0,
 			SpaceDoc: space.EncodeOrbit(space.Orbit{ParentId: "feat-star", Radius: giantRadius, PeriodMs: 400_000})},
-		{Id: "feat-moon-0", Type: FeatureMoon, ParentId: "feat-body-0", Footprint: []board.Cell{{Ring: 0, Slot: 0}}, Size: 0.7,
+		{Id: "feat-moon-0", Type: FeatureMoon, Size: 0.7,
 			SpaceDoc: space.EncodeOrbit(space.Orbit{ParentId: "feat-body-0", Radius: 15.0, PeriodMs: space.InsertionPeriod(15.0)})},
-		{Id: "feat-belt-0", Type: FeatureBelt, Footprint: []board.Cell{{Ring: 4, Slot: 0}, {Ring: 4, Slot: 1}},
-			Orbit: &Orbit{Ring: 4, Dir: 1}, Size: 0.9, Width: BeltWidthFraction * beltRadius,
+		{Id: "feat-belt-0", Type: FeatureBelt,
+			Size: 0.9, Width: BeltWidthFraction * beltRadius,
 			SpaceDoc: space.EncodeOrbit(space.Orbit{ParentId: "feat-star", Radius: beltRadius, PeriodMs: 200_000})},
 	}
 	return interior, feats
