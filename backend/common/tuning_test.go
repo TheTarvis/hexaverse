@@ -42,8 +42,8 @@ func TestDefaultTuning_PacingIsPositive(t *testing.T) {
 	if d.LaneMsPerDistance <= 0 {
 		t.Errorf("LaneMsPerDistance = %f, must be > 0 (else travel is free)", d.LaneMsPerDistance)
 	}
-	if d.BoardRadius <= 0 {
-		t.Errorf("BoardRadius = %d, must be > 0", d.BoardRadius)
+	if d.MaxOrbitalIndex <= 0 {
+		t.Errorf("MaxOrbitalIndex = %d, must be > 0", d.MaxOrbitalIndex)
 	}
 }
 

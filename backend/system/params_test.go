@@ -8,7 +8,7 @@ package system
 // authored in continuous_test.go (moved here 2026-08-28, no assertion
 // changed) — it is the exact test params.go's own DefaultParams() doc
 // comment names as the proof that Radius sourcing from
-// common.Tuning().BoardRadius still satisfies
+// common.Tuning().MaxOrbitalIndex still satisfies
 // `galaxy.DefaultParams().MaxRings - 1 <= Radius`, reading MaxRings LIVE
 // rather than a copied literal.
 

@@ -86,14 +86,26 @@ type GameTuning struct {
 	// (disclosure/params.go: PassiveRange, FocusedScanRange). The flat
 	// ScanDuration that used to sit here priced the deleted 360° radial sweep.
 
-	// ——— Board geometry (structural invariant, not pacing) ———
+	// ——— System extent (structural invariant, not pacing) ———
 
-	// BoardRadius is the cell/ring radius of every system board — the ring the lane
-	// gates sit on. It is a CROSS-DOMAIN INVARIANT: system generation, fleet gate
-	// placement, and the spawn rim ring must all agree, and before this struct
-	// existed the value 16 was written in three places with "must match" comments.
-	// It lives here so there is exactly one of it.
-	BoardRadius int
+	// MaxOrbitalIndex is the highest orbital index a generated system reaches:
+	// the star-parented shells a system's bodies are drawn into run over the
+	// INCLUSIVE range [0, MaxOrbitalIndex], so at the shipped value of 16 there
+	// are seventeen of them. It is an index, not a count and not a distance —
+	// `system.ContinuousRadius(idx)` turns it into the physical radius, and
+	// `SystemInterior.Extent = ContinuousRadius(MaxOrbitalIndex)` is the
+	// continuous upper bound every generated body sits inside.
+	//
+	// Read it as an inclusive maximum. A reader who mistakes it for a count and
+	// writes `r.Intn(MaxOrbitalIndex)` on an exclusive-bound reading silently
+	// loses the outermost shell.
+	//
+	// It stays a cross-domain invariant: `system.GenerationParams.Radius`
+	// sources from it, and `system/params.go`'s calibration invariant
+	// (`galaxy.DefaultParams().MaxRings - 1 <= Radius`) compares against it, so
+	// there is exactly one of it rather than the value 16 written in several
+	// places with "must match" comments.
+	MaxOrbitalIndex int
 }
 
 // DefaultTuning is the playtest baseline.
@@ -109,7 +121,7 @@ func DefaultTuning() GameTuning {
 		LaneMsPerDistance: 2_500, // 5s per unit of lane length (was 60_000)
 
 		// Geometry
-		BoardRadius: 16,
+		MaxOrbitalIndex: 16,
 	}
 }
 

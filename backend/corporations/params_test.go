@@ -32,43 +32,43 @@ func TestDefaultSpawnParams(t *testing.T) {
 	// (not to be touched by this pass).
 }
 
-// The one surviving wiring guard on the central generation-radius knob:
-// system generates every interior at the radius the knob names. This is the
-// ONLY live assertion that the knob still drives system generation, which is
-// precisely what keeps it alive (the knob is not deleted, only renamed —
-// SystemInterior.Extent = ContinuousRadius(params.Radius) reads it, so
-// deleting it would silently change every system's continuous extent).
+// The one surviving wiring guard on the central generation-index knob: system
+// generates every interior out to the index the knob names. This is the ONLY
+// live assertion that the knob still drives system generation, which is
+// precisely what keeps the knob alive — SystemInterior.Extent =
+// ContinuousRadius(params.Radius) reads it, so deleting it would silently
+// change every system's continuous extent.
 //
 // DELETED, not migrated: two former legs. (1) spawn resting the starting hull
-// on ring R-1 via SpawnParams.RimRing (migrate-fleet-to-continuous-burns,
-// design.md Decision 4/14, tasks.md 3.9) — RimRing is gone; a fleet's spawn
-// position is a continuous space.Vec3, its own invariant covered by
-// spawn_position_test.go. (2) fleet placing lane gates at ring R via
-// MovementParams.BoardRadius — that field is gone too; a lane gate is a body
-// with a continuous orbit, so fleet holds no radius to keep in lockstep.
-func TestBoardRadiusInvariant(t *testing.T) {
-	radius := common.Tuning().BoardRadius
+// one ring inside the gate ring via SpawnParams.RimRing
+// (migrate-fleet-to-continuous-burns, design.md Decision 4/14, tasks.md 3.9)
+// — RimRing is gone; a fleet's spawn position is a continuous space.Vec3, its
+// own invariant covered by spawn_position_test.go. (2) fleet placing lane
+// gates at that same index — that field is gone too; a lane gate is a body
+// with a continuous orbit, so fleet holds no index to keep in lockstep.
+func TestMaxOrbitalIndexInvariant(t *testing.T) {
+	maxIndex := common.Tuning().MaxOrbitalIndex
 
-	if got := system.DefaultParams().Radius; got != radius {
-		t.Errorf("system generation radius = %d, want %d (common.Tuning().BoardRadius)", got, radius)
+	if got := system.DefaultParams().Radius; got != maxIndex {
+		t.Errorf("system generation index = %d, want %d (common.Tuning().MaxOrbitalIndex)", got, maxIndex)
 	}
 }
 
 // Turning the central knob must move the surviving leg — this is the property
 // that makes a future admin page safe to point at the knob, and the
 // SetTuning-and-observe structure is what proves the wiring is live rather
-// than coincidental. (See TestBoardRadiusInvariant's DELETED note for the two
-// legs that no longer exist to track anything.)
-func TestBoardRadiusInvariant_TracksTuning(t *testing.T) {
+// than coincidental. (See TestMaxOrbitalIndexInvariant's DELETED note for the
+// two legs that no longer exist to track anything.)
+func TestMaxOrbitalIndexInvariant_TracksTuning(t *testing.T) {
 	original := common.Tuning()
 	t.Cleanup(func() { common.SetTuning(original) })
 
 	retuned := common.DefaultTuning()
-	retuned.BoardRadius = 20
+	retuned.MaxOrbitalIndex = 20
 	common.SetTuning(retuned)
 
 	if got := system.DefaultParams().Radius; got != 20 {
-		t.Errorf("system radius = %d, want 20 — it did not follow the central knob", got)
+		t.Errorf("system generation index = %d, want 20 — it did not follow the central knob", got)
 	}
 }
 

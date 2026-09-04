@@ -41,7 +41,7 @@ type GenerationParams struct {
 //
 // Radius is the one value here that is NOT free to tune in isolation — it's a
 // cross-domain invariant (fleet's lane gates sit on this ring; spawn's rim ring is
-// one inside it), so it sources from common.Tuning().BoardRadius. The rest are
+// one inside it), so it sources from common.Tuning().MaxOrbitalIndex. The rest are
 // generation dials: they bake into an interior at generate time, so retuning them
 // only affects systems materialized afterwards.
 //
@@ -55,7 +55,7 @@ type GenerationParams struct {
 // silently.
 func DefaultParams() GenerationParams {
 	return GenerationParams{
-		Radius:           common.Tuning().BoardRadius,
+		Radius:           common.Tuning().MaxOrbitalIndex,
 		InnerMaxRing:     5,
 		MidMaxRing:       11,
 		RetrogradeChance: 0.1,

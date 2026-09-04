@@ -323,7 +323,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 
 ## 4. Backend — tuning, fleet params, and the last test importers
 
-- [ ] 4.1 Rename `common.GameTuning.BoardRadius` to a name containing neither
+- [x] 4.1 Rename `common.GameTuning.BoardRadius` to a name containing neither
       "board" nor "ring" (design.md Decision 5; OQ-2 for the name). **Do not
       delete it** — `system.GenerationParams.Radius` sources from it and
       `SystemInterior.Extent = ContinuousRadius(params.Radius)` reads it, so
@@ -359,14 +359,14 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `fleet/resolver_test.go:23` (cites `common.Tuning().OrbitPeriod` as
       "the same period a body on that ring has"). Verified by
       `grep -rn 'MsPerTile\|InterceptHorizon' backend/` returning nothing
-- [ ] 4.3 Delete `fleet.Params.BoardRadius` and its assignment, now that
+- [x] 4.3 Delete `fleet.Params.BoardRadius` and its assignment, now that
       `LaneGates` takes no radius (task 2.7). Verified by `grep -rn 'BoardRadius'
       backend/` returning nothing. Beyond the production sites, that grep is
       only clean once the test readers are handled too:
       `backend/fleet/params_test.go:13-19`, `backend/common/tuning_test.go:52`,
       `backend/system/params_test.go:11` and — the one no task reached —
       `backend/corporations/params_test.go` (task 4.3b)
-- [ ] 4.3b **Rewrite, do not delete, `backend/corporations/params_test.go`'s
+- [x] 4.3b **Rewrite, do not delete, `backend/corporations/params_test.go`'s
       `TestBoardRadiusInvariant` and `TestBoardRadiusInvariant_TracksTuning`.**
       Both read `fleet.DefaultMovementParams().BoardRadius`, so both become
       compile errors the moment 4.1/4.3 land, and `backend/corporations` is
@@ -405,7 +405,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       every continuous assertion. `backend/interior_additive_wire_e2e_test.go`
       no longer exists — 8a-2 removed it, and no backend-root e2e test imports
       `board` today — so there is no second file to repoint here
-- [ ] 4.6 `cd backend && go build ./... && go test ./... -p 1` green — **cannot
+- [x] 4.6 `cd backend && go build ./... && go test ./... -p 1` green — **cannot
       go green before 2.10c/2.10d land** (C6): this run includes `./system/`,
       whose `interiorElements` fixture is red until the re-record from the
       generator rewrite is committed
