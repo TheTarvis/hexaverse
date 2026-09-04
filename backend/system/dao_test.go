@@ -43,10 +43,10 @@ func TestDao_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestDao_OrbitPeriod_RehydratedFromLiveTuning (DELETED) pinned that a
-// feature's orbital period was NOT persisted — it was refilled from live
-// tuning on every read, so retuning a global orbital law re-paced systems
-// that already existed. There is no global orbital law any more: a body's
+// A test was DELETED from here. It pinned that a feature's orbital period was
+// NOT persisted — it was refilled from live tuning on every read, so retuning
+// a global orbital law re-paced systems that already existed. There is no
+// global orbital law any more, and no knob to retune: a body's
 // period is a Keplerian function of its own continuous radius, drawn once at
 // generation time and persisted with the rest of its element set. The read
 // path no longer refills anything, so the property has no subject left

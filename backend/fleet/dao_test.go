@@ -52,11 +52,10 @@ func TestListByCorporation(t *testing.T) {
 
 // DELETED (migrate-fleet-to-continuous-burns, design.md Decision 4): this
 // file used to carry TestDao_CoastPeriod_RehydratedFromLiveTuning, pinning
-// that a stored `board.Orbit`'s coast Period is rehydrated from the LIVE
-// common.Tuning().OrbitPeriod(ring) on every read, rather than frozen at the
-// world-tuning pace in effect when the fleet last settled — because a
-// lattice coast stored only Ring/Angle0/Dir and derived its period from a
-// live, retunable, ring-indexed lookup.
+// that a stored coast's Period was rehydrated from a LIVE, retunable,
+// index-keyed world-tuning lookup on every read, rather than frozen at the
+// pace in effect when the fleet last settled — because the stored coast kept
+// only a discrete position and derived its period from that lookup.
 //
 // A space.Park (ParkOrbit/ParkStationkeep) has no successor lookup to
 // rehydrate: PeriodMs is computed ONCE at settle time from the park's own

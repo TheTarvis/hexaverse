@@ -42,44 +42,20 @@ func TestDefaultTuning_PacingIsPositive(t *testing.T) {
 	if d.LaneMsPerDistance <= 0 {
 		t.Errorf("LaneMsPerDistance = %f, must be > 0 (else travel is free)", d.LaneMsPerDistance)
 	}
-	if d.OrbitBasePeriod <= 0 {
-		t.Errorf("OrbitBasePeriod = %d, must be > 0 (orbit math divides by the period)", d.OrbitBasePeriod)
-	}
 	if d.BoardRadius <= 0 {
 		t.Errorf("BoardRadius = %d, must be > 0", d.BoardRadius)
 	}
 }
 
-// OrbitPeriod is the world's ONE orbital law, shared by system bodies and coasting
-// fleets — there is deliberately no second period for ships (there used to be, flat
-// and un-scaled by ring, which made rim ships cross hexes faster than inner ones).
-// These assertions pin the two properties that redundancy hid.
-func TestOrbitPeriod_ScalesWithRing(t *testing.T) {
-	d := DefaultTuning()
-
-	// Period grows with radius: the further out, the longer to come round.
-	if got, want := d.OrbitPeriod(1), d.OrbitBasePeriod; got != want {
-		t.Errorf("OrbitPeriod(1) = %d, want %d", got, want)
-	}
-	if got, want := d.OrbitPeriod(12), d.OrbitBasePeriod*12; got != want {
-		t.Errorf("OrbitPeriod(12) = %d, want %d (base × ring)", got, want)
-	}
-
-	// RETIRED 2026-08-26 (migrate-consumers-to-polar-board, tasks.md 1.8): this
-	// used to assert "the ring factor cancels against a ring's 6 × N cells, so
-	// the rate you SEE is uniform" — true only under the retired hex lattice,
-	// where every ring had exactly 6 × ring cells. Under the pinned polar
-	// Isotropic schedule that cancellation does NOT hold (ring 3 has 24 slots,
-	// not 18; ring 5 has 48, not 30) — see system-interior's "Equal-Period
-	// Rings With Different Slot Counts Advance Slots At Different Rates". The
-	// replacement lives in tuning_schedule_test.go (package common_test, since
-	// board/polar both import common and an internal test here cannot import
-	// either). Cause: spec-superseding migration change, not a developer
-	// dispute — logged per the SDET protocol's "test change with cause".
-
-	// The star has no orbit; callers short-circuit on ring 0 and must not divide by
-	// a period we pretended was meaningful.
-	if got := d.OrbitPeriod(0); got != 0 {
-		t.Errorf("OrbitPeriod(0) = %d, want 0 (the centre doesn't orbit)", got)
-	}
-}
+// A test was DELETED from here. It pinned a single world-wide orbital law: one revolution priced as a base constant times a discrete index, shared
+// by every body and every coasting ship, read live from this struct so an
+// operator could re-pace a running world with it.
+//
+// There is no such law. A body's period is a Keplerian function of its own
+// radius and is drawn once, at generation time; a parked ship's is computed
+// once, at settle time, from the park's own radius. Neither consults tuning,
+// so the knob and its accessor are gone and this test has no subject. The
+// property it protected — period grows with distance — survives in a truer
+// form in backend/system's Kepler-law tests, which assert it against the
+// actual law rather than against a linear stand-in (authorized deletion;
+// cause = the requirement it pinned was removed).

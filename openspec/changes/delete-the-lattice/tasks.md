@@ -330,7 +330,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       deleting it silently changes every system's continuous extent. Verify the
       extent is unchanged by asserting `Extent` for a fixed seed before and
       after the rename
-- [ ] 4.2 Delete `common.GameTuning.OrbitBasePeriod` and
+- [x] 4.2 Delete `common.GameTuning.OrbitBasePeriod` and
       `common.GameTuning.OrbitPeriod`, and the `board.Schedule` /
       `board-tactical-math` comment at `common/tuning.go:143`. Verified by
       `grep -rn 'OrbitBasePeriod\|OrbitPeriod' backend/` returning nothing
@@ -412,11 +412,11 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 
 ## 5. Delete `backend/board` and `backend/polar`
 
-- [ ] 5.1 `rm -rf backend/board backend/polar`
-- [ ] 5.2 Verified by `cd backend && go build ./... && go vet ./...` clean, and
+- [x] 5.1 `rm -rf backend/board backend/polar`
+- [x] 5.2 Verified by `cd backend && go build ./... && go vet ./...` clean, and
       `grep -rn 'hexaverse/board\|hexaverse/polar' backend/` returning nothing
       (including string literals in comments and test prose)
-- [ ] 5.3 `cd backend && go test ./... -p 1` green — same dependency on
+- [x] 5.3 `cd backend && go test ./... -p 1` green — same dependency on
       2.10c/2.10d as 4.6 (C6)
 
 ## 6. Delete `frontend/lib/board` and `frontend/lib/polar`

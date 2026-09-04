@@ -68,12 +68,14 @@ type GameTuning struct {
 	// between systems (#0008). A leg's time is length × this, frozen at commit.
 	LaneMsPerDistance float64
 
-	// ——— Orbits (everything on a board: bodies AND coasting fleets) ———
-
-	// OrbitBasePeriod is the world-ms for one revolution at ring 1. It is the
-	// world's ONE orbital law, applied through OrbitPeriod(ring) — see there for
-	// what it buys you and what it costs.
-	OrbitBasePeriod WorldMillis
+	// ——— Orbits: deliberately NOT here ———
+	//
+	// There is no global orbital knob. A body's period is a Keplerian function
+	// of its own radius (system.keplerPeriodMs), and a parked ship's is
+	// computed once at settle time from the park's own radius. Both are
+	// properties of where the thing IS, not pacing an operator dials — so
+	// there is nothing here to retune, and no world-wide law that could
+	// re-pace a system somebody already visited.
 
 	// ——— Sensing & intel: deliberately NOT here ———
 	//
@@ -106,56 +108,9 @@ func DefaultTuning() GameTuning {
 		// Movement
 		LaneMsPerDistance: 2_500, // 5s per unit of lane length (was 60_000)
 
-		// Orbits — one revolution at ring 1. Under the pinned banded slot
-		// schedule the per-cell cadence is NOT a uniform OrbitBasePeriod/6
-		// everywhere (see OrbitPeriod's doc comment) — it varies by ring band,
-		// fastest on the sparsest inner rings and slowest where a band has
-		// just doubled its slot count.
-		OrbitBasePeriod: 36000,
-
 		// Geometry
 		BoardRadius: 16,
 	}
-}
-
-// OrbitPeriod is the world's orbital law: one revolution on ring N takes
-// OrbitBasePeriod × N, so the further out you are the longer you take to come
-// round. It applies to EVERYTHING resting on a board — a planet and a coasting
-// fleet on the same ring keep the same period, because they're the same physics.
-// (There used to be a separate CoastPeriod for fleets, flat and un-scaled by ring,
-// which quietly meant a fleet at the rim crossed cells faster than one near the
-// star. It read as a second knob; it was really the same knob with a bug in it.)
-//
-// Two consequences worth knowing before you retune:
-//
-//   - The PERIOD law is linear in ring (OrbitBasePeriod × N) — that part is
-//     exactly what it looks like. But under the pinned banded slot schedule
-//     (board.Schedule; board-tactical-math, "The Production Slot Schedule Is
-//     Pinned to Isotropic") a ring's slot count is NOT 6 × N — it is constant
-//     within a band and only doubles at a handful of ring boundaries (2, 3, 5,
-//     9, 17). So the PER-SLOT cadence, period / Slots(ring), is uniform only
-//     WITHIN a band and drops by half at every doubling boundary: two rings
-//     with the same period (impossible here, since period scales with ring
-//     too) or, more to the point, two DIFFERENT rings can have wildly
-//     different per-cell rates once their slot counts diverge — a ring just
-//     past a doubling boundary advances its cells twice as slowly, cell for
-//     cell, as the ring just before it, even though both take longer overall
-//     to complete a full revolution than any inner ring. The old hex-era
-//     shortcut ("a ring has 6×N cells, so the ring factor cancels and the
-//     rate you see is uniform everywhere") is FALSE under this schedule and
-//     must not be re-derived from this comment.
-//   - A coasting fleet therefore DRIFTS. Parking beside a body no longer holds
-//     station beside it (bodies orbit either way; coast is always prograde) —
-//     docking is what holds station. That is the intended shape: coast = a free
-//     orbit at your radius, dock = attached to a body, riding it.
-//
-// Ring 0 (the star) has no orbit; the period there is meaningless and the callers
-// return the centre cell without consulting it.
-func (t GameTuning) OrbitPeriod(ring int) WorldMillis {
-	if ring <= 0 {
-		return 0
-	}
-	return t.OrbitBasePeriod * WorldMillis(ring)
 }
 
 var (
