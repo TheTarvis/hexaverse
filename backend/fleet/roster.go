@@ -33,9 +33,9 @@ type ClassStats struct {
 // Tuning-time "starting numbers" (design.md Open Questions) for the one
 // generalist ClassSeed hull this slice ships. MiningRate is tons per
 // world-ms (0.001 ⇒ roughly one ton per world-second at scale 1); a full
-// hold (200 tons) therefore takes ~200 world-seconds to fill — slower than
-// crossing a system board (MsPerTile=2500ms/hex), which is the intended
-// pacing: mining is the strategic, time-costly verb; movement is quick.
+// hold (200 tons) therefore takes ~200 world-seconds to fill — slower than a
+// typical in-system burn, which is the intended pacing: mining is the
+// strategic, time-costly verb; movement is quick.
 // HoldCapacity (200 tons) is sized against MineParams' default richness
 // curve (see mine.DefaultMineParams) so a typical mid-richness lode is
 // roughly one hold's worth.

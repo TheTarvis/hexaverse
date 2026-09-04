@@ -6,16 +6,14 @@ import (
 	"hexaverse/common"
 )
 
-// MovementParams holds the burn-tuning knobs (tuning is data). MsPerTile is the
-// world-ms cost to cross one hex; InterceptHorizon bounds the lead-solve search.
+// MovementParams holds the graph-tier travel knob (tuning is data).
 //
-// A coasting fleet's orbital period is NOT here: it's the world's shared orbital
-// law (common.GameTuning.OrbitPeriod), read live at settle time by coastState —
-// the same period the bodies on that ring have. Capturing it here would freeze
-// already-coasting fleets at the pace the resolver was registered with.
+// In-system movement is NOT here: a burn prices its own duration from the
+// continuous solve, so there is no per-step cost constant to capture. Capturing
+// a pacing knob here at all would freeze in-flight orders at the pace the
+// resolver was registered with, which is why only the lane knob — read at
+// commit and frozen with the ETA by design — lives in this struct.
 type MovementParams struct {
-	MsPerTile        common.WorldMillis
-	InterceptHorizon common.WorldMillis
 	// LaneMsPerDistance is the graph-tier drive speed (#0008): world-ms to cross
 	// one unit of 3D lane length between system coords. A leg's time is
 	// length × this, frozen at commit. The reserved lane.cost / relayModifier
@@ -31,8 +29,6 @@ type MovementParams struct {
 func DefaultMovementParams() MovementParams {
 	t := common.Tuning()
 	return MovementParams{
-		MsPerTile:         t.MsPerTile,
-		InterceptHorizon:  t.InterceptHorizon,
 		LaneMsPerDistance: t.LaneMsPerDistance,
 	}
 }

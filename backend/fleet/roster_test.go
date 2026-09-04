@@ -167,8 +167,8 @@ func TestDerivedLaneRate_SingleHullUsesThatClassRate(t *testing.T) {
 // seed class's configured lane rate must be the exact inverse of
 // LaneMsPerDistance, so this refactor moves no existing fleet's lane-jump
 // ETA. (The BurnRate half of that same guard is deleted with BurnRate
-// itself — DefaultMovementParams().MsPerTile has no successor to pin
-// against.)
+// itself — there is no in-system pacing constant left in MovementParams to
+// pin against.)
 func TestDerivedLaneRate_SeedClassValuePreservesGlobalConstants(t *testing.T) {
 	mp := DefaultMovementParams()
 	stats := DefaultClassStats()

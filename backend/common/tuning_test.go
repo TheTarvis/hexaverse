@@ -19,17 +19,16 @@ func TestSetTuning_IsObservedByLaterReads(t *testing.T) {
 	t.Cleanup(func() { SetTuning(original) })
 
 	fast := DefaultTuning()
-	fast.MsPerTile = 1_000
+	fast.LaneMsPerDistance = 1_000
 	SetTuning(fast)
 
-	if got := Tuning().MsPerTile; got != 1_000 {
-		t.Fatalf("after SetTuning, Tuning().MsPerTile = %d, want 1000", got)
+	if got := Tuning().LaneMsPerDistance; got != 1_000 {
+		t.Fatalf("after SetTuning, Tuning().LaneMsPerDistance = %f, want 1000", got)
 	}
 }
 
-// The pacing knobs must be positive — a zero MsPerTile would make burns
-// instantaneous (and a zero LaneMsPerDistance would make travel free), which is
-// the kind of thing an admin page could ship by accident.
+// The pacing knobs must be positive — a zero LaneMsPerDistance would make lane
+// travel free, which is the kind of thing an admin page could ship by accident.
 //
 // The ScanDuration assertion that used to sit here was REMOVED 2026-09-01
 // (replace-observation-with-sightings task 7.1, orchestrator-adjudicated): it
@@ -40,9 +39,6 @@ func TestSetTuning_IsObservedByLaterReads(t *testing.T) {
 // itself. An assertion over a constant no behaviour reads protects nothing.
 func TestDefaultTuning_PacingIsPositive(t *testing.T) {
 	d := DefaultTuning()
-	if d.MsPerTile <= 0 {
-		t.Errorf("MsPerTile = %d, must be > 0 (else burns are instant)", d.MsPerTile)
-	}
 	if d.LaneMsPerDistance <= 0 {
 		t.Errorf("LaneMsPerDistance = %f, must be > 0 (else travel is free)", d.LaneMsPerDistance)
 	}

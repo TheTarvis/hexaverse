@@ -334,7 +334,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `common.GameTuning.OrbitPeriod`, and the `board.Schedule` /
       `board-tactical-math` comment at `common/tuning.go:143`. Verified by
       `grep -rn 'OrbitBasePeriod\|OrbitPeriod' backend/` returning nothing
-- [ ] 4.2b Delete **two further dead lattice knobs** that no `lattice`-word
+- [x] 4.2b Delete **two further dead lattice knobs** that no `lattice`-word
       sweep finds, each in both `common.GameTuning` and its `fleet.Params`
       twin, with their assignments in `DefaultTuning()` and
       `DefaultMovementParams()`:
@@ -380,14 +380,14 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       task 4.1 depends on. The `_TracksTuning` test's `SetTuning`-and-observe
       structure is what proves the wiring is live rather than coincidental —
       keep it
-- [ ] 4.4 Delete `backend/common/tuning_schedule_test.go` (it exists to assert
+- [x] 4.4 Delete `backend/common/tuning_schedule_test.go` (it exists to assert
       the tuning radius against a board schedule) and repoint
       `backend/action/commit_params_validator_test.go`'s rejected non-primitive
       from a `board.Cell` to a `space.Vec3` (`action-dispatch`: *Commit Rejects
       Non-Primitive Action Parameters* › "A domain struct in params is rejected
       at commit"). The test must still be red for the right reason — confirm it
       fails when the validator's allowlist is widened
-- [ ] 4.4b Repoint the **acceptance** half of the same file, which task 4.4
+- [x] 4.4b Repoint the **acceptance** half of the same file, which task 4.4
       does not reach: `commit_params_validator_test.go:98-116` builds
       `board.EncodeCell(board.Cell{Ring: 4, Slot: 9})` and asserts the stored
       params carry `gotOrigin["ring"] == 4 && gotOrigin["slot"] == 9` against a

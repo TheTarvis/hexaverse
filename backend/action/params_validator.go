@@ -4,7 +4,7 @@ import "errors"
 
 // ErrNonPrimitiveParam is returned by Commit when spec.Params carries a value
 // outside the Firestore-native allowlist (design.md Decision 4, part 2). The
-// bug class this closes: a domain struct (board.Cell, board.Target, or
+// bug class this closes: a domain struct (space.Vec3, a park descriptor, or
 // anything future) silently round-trips differently in a same-process unit
 // test (the struct survives in memory) than it does through Firestore (it
 // serializes to a map the struct-typed reader never expected) — so the
@@ -12,7 +12,7 @@ import "errors"
 // Commit, makes the class of bug impossible rather than merely findable.
 //
 // This governs Params ONLY. ActorState is exempt — it legitimately carries
-// domain structs like board.MovementState, merged onto the actor doc by the
+// domain structs like space.ShipState, merged onto the actor doc by the
 // actor domain's own stored shapes.
 var ErrNonPrimitiveParam = errors.New("action: params value is not a Firestore-native primitive")
 

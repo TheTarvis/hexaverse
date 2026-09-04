@@ -19,11 +19,11 @@ import (
 // exists, and it will not be another sweep.
 //
 // It also carried TestCoastState_ObeysTheSharedOrbitalLaw, pinning that a
-// fleet settling on a lattice ring inherits the SAME live-tunable orbital
-// period a body on that ring has (common.Tuning().OrbitPeriod). That
-// property belongs to board.CoastAt/board.Orbit, which fleet no longer calls
-// at all — its board/polar coverage (if any) is the `board` package's own
-// suite's concern, not fleet's.
+// settled fleet inherited the same live-tunable orbital period the bodies
+// beside it had, from a single global knob. That knob and the shared-law
+// coast it drove are both gone: a fleet's motion is a continuous solve now,
+// and a body's period is its own Keplerian element, so the property has no
+// subject left to be true of.
 //
 // What replaces both, below: direct unit tests of the REAL, currently-shipped
 // `BurnResolver` (resolver.go) — settling a due burn through space.StateAt,

@@ -66,16 +66,9 @@ import "sync"
 type GameTuning struct {
 	// ——— Movement (fleet) ———
 
-	// MsPerTile is the world-ms cost to burn across one cell of a system board.
-	// This is the single biggest lever on how fast the game FEELS in-system.
-	MsPerTile WorldMillis
 	// LaneMsPerDistance is the world-ms to cross one unit of 3D lane length
 	// between systems (#0008). A leg's time is length × this, frozen at commit.
 	LaneMsPerDistance float64
-	// InterceptHorizon bounds the lead-solve search for a moving target. Not a
-	// "felt" duration — it's a search bound. Raise it only if intercepts against
-	// slow, distant targets start failing to find a solution.
-	InterceptHorizon WorldMillis
 
 	// ——— Orbits (everything on a board: bodies AND coasting fleets) ———
 
@@ -105,16 +98,15 @@ type GameTuning struct {
 
 // DefaultTuning is the playtest baseline.
 //
-// Retuned 2026-07-13 for pace: a cell of burn was one world-MINUTE (60s of real
-// time at scale 1), which made the slice feel sluggish to play. It is now 5s.
-// The RELATIVE cost of a cell vs a lane is preserved — this is a uniform
-// speed-up, not a rebalance.
+// Retuned 2026-07-13 for pace: in-system movement was priced at one world-MINUTE
+// per step (60s of real time at scale 1), which made the slice feel sluggish to
+// play, and lane travel was uniformly sped up with it. In-system movement is
+// priced by its own burn solve now; LaneMsPerDistance is what survives of that
+// retune.
 func DefaultTuning() GameTuning {
 	return GameTuning{
 		// Movement
-		MsPerTile:         2_500,      // 5s per cell  (was 60_000 — one world-minute)
-		LaneMsPerDistance: 2_500,      // 5s per unit of lane length (was 60_000)
-		InterceptHorizon:  86_400_000, // one world-day of lead search
+		LaneMsPerDistance: 2_500, // 5s per unit of lane length (was 60_000)
 
 		// Orbits — one revolution at ring 1. Under the pinned banded slot
 		// schedule the per-cell cadence is NOT a uniform OrbitBasePeriod/6

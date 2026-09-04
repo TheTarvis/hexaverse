@@ -16,8 +16,8 @@ type ShipClass string
 const (
 	// ClassSeed is the one generalist hull SeedFleet places. Its per-class stats
 	// (params.go) are configured to be value-preserving for a single-ship
-	// roster against today's global MsPerTile/LaneMsPerDistance ("Derived Fleet
-	// Speed"'s value-preservation scenario).
+	// roster against today's global LaneMsPerDistance ("Derived Fleet Speed"'s
+	// value-preservation scenario).
 	ClassSeed ShipClass = "seed"
 )
 
