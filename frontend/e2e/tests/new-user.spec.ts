@@ -12,9 +12,16 @@ import { emulatorSignIn } from '../helpers/firebase-emulator'
  *   charted (still zero lanes — see below).
  *
  * REWRITTEN for `build-production-space-view` tasks.md 2.1b / 10.8. Cause:
- * task 2.1 replaces `/systems/:systemId`'s view outright, so
- * `system-board-view` and `board-overlay` — the two ids step 3 asserted on —
- * no longer exist. Every assertion's SUBSTANCE is preserved; two are
+ * task 2.1 replaced `/systems/:systemId`'s view outright, so the two retired
+ * ids step 3 once asserted on no longer exist — and neither does anything
+ * that could emit them. Step 3 asserted their ABSENCE for a while afterwards;
+ * those two lines were deleted 2026-09-04 by orchestrator ruling, with the
+ * same species in `space-journey.spec.ts`, because an assertion no code path
+ * can falsify has not been shown to test anything. Note that step 3's
+ * `renderer-unsupported` / `renderer-interrupted` checks below are NOT the
+ * same species and must not be swept with them: `RendererStateNotice.tsx`
+ * emits both, so a failed WebGL bring-up turns them red.
+ * Every assertion's SUBSTANCE is preserved; two are
  * strengthened, both for the same reason: the board view was mounted the
  * moment its data arrived, while the space view holds a placeholder until its
  * renderer has produced a first frame (`system-space-view`: "Loading persists
@@ -24,8 +31,8 @@ import { emulatorSignIn } from '../helpers/firebase-emulator'
  * what a mounted-but-black canvas would fail.
  *
  * data-testid contract this spec assumes:
- *   - `space-view` — the view container (replaces `system-board-view`)
- *   - `space-canvas-region` — the rendering region (replaces `board-overlay`)
+ *   - `space-view` — the view container
+ *   - `space-canvas-region` — the rendering region
  *   - `space-loading` — the placeholder that must GIVE WAY
  *   - `fleet-roster` / `fleet-row-{fleetId}` — unchanged
  *   - `burn-button` — the burn commit, now on the command panel rather than
@@ -86,9 +93,6 @@ test.describe('new user first activities', () => {
     await expect(page.locator('[data-testid^="body-hit-"]').first()).toBeAttached({
       timeout: 30_000,
     })
-    // The retired board view leaves nothing behind on the route it used to own.
-    await expect(page.getByTestId('board-overlay')).toHaveCount(0)
-    await expect(page.getByTestId('system-board-view')).toHaveCount(0)
 
     // 4. The hull is on station in home and COMMANDABLE. A fresh spawn has
     //    exactly one hull, so exactly one row is expected.

@@ -117,12 +117,10 @@ test.describe('the continuous-space slice, end to end through the new view', () 
     // The renderer came up: neither unavailable state is showing.
     await expect(page.getByTestId('renderer-unsupported')).toHaveCount(0)
     await expect(page.getByTestId('renderer-interrupted')).toHaveCount(0)
-    // The scene actually has bodies in it, and no retired-board surface remains.
+    // The scene actually has bodies in it.
     await expect(page.locator('[data-testid^="body-hit-feat-"]').first()).toBeAttached({
       timeout: 20_000,
     })
-    await expect(page.getByTestId('board-overlay')).toHaveCount(0)
-    await expect(page.getByTestId('board-lattice')).toHaveCount(0)
 
     const rows = page.getByTestId('fleet-roster').locator('[data-testid^="fleet-row-"]')
     await expect(rows).toHaveCount(1, { timeout: 15_000 })
