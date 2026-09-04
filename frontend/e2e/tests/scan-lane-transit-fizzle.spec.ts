@@ -186,23 +186,47 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
         'run cannot prove a mid-sweep fizzle',
     ).toBe(true)
 
-    // 6. Wait for the jump to land. This page (the galaxy view, since step
-    //    3 navigated here) mounts the same corp-wide `FleetRoster` the
-    //    space view does, so no further navigation is needed to observe
-    //    it.
-    //
-    // A due JUMP is settled ONLY by `GET /v1/fleets/:id` (`fleet.Get` ->
-    //    `resolveDue`); `ListForCorp` (the roster's own `listMine`, the
-    //    only read any frontend code path calls here) settles due BURNS
-    //    only. So the roster row NEVER stops reading "In transit" on its
-    //    own — outside the ~15-minute liveness sweep, a jump never lands in
-    //    the UI at all (a real product gap, recorded for Travis). Arrange
-    //    around it: wait for the roster's own ETA countdown — computed
-    //    client-side off `fleet.jump.arriveMs`, independent of resolution —
-    //    to actually reach zero, then settle the jump directly with the
-    //    exact read `fleet.Get` performs on any other trigger (an
-    //    authenticated `GET /v1/fleets/:id`), and assert ITS response, not
-    //    the roster's, shows the fleet arrived.
+    // 5b. Force a fresh fleets read — ADDED 2026-09-04 (this round's finding:
+    //    a genuine arrangement defect, not a spec misread; test-dispute
+    //    self-adjudicated per this round's remit — see the report). Step 6's
+    //    ORIGINAL comment here claimed navigating to the galaxy view in step
+    //    3 was enough for its `FleetRoster` to observe the jump, with "no
+    //    further navigation needed" — that premise is false, and not for the
+    //    reason it guarded against (a jumping fleet dropped from the roster's
+    //    list). The jump above was committed via a RAW API call, which never
+    //    touches the React Query cache. The galaxy view's `useMyFleets`
+    //    (`hooks/use-fleets.ts`) fetched ONCE, on mount in step 3 — BEFORE
+    //    the jump existed — and nothing was ever going to refetch it: the
+    //    query client's default `staleTime` is 60s
+    //    (`lib/query-client.ts`), `refetchOnWindowFocus` is off, `useMyFleets`
+    //    sets no `refetchInterval`, and the galaxy view subscribes to no SSE
+    //    channel at all (only `SystemSpaceView.tsx`, the space view, does).
+    //    So the roster was rendering the pre-jump snapshot (`Docked`, no
+    //    `fleet.jump`) forever — `remainingMs` stays `undefined`
+    //    (`roster-status.ts`), so `FleetRoster.tsx`'s `fleet-row-eta-*`
+    //    testid never renders at all. That is the "element(s) not found"
+    //    this leg failed with twice, at the full 900s budget, not a slow
+    //    countdown. A reload gives `useMyFleets` its first read of the
+    //    post-jump fleet; from there the roster's own client-side world
+    //    clock (`useWorldTime`, extrapolating off the wall clock at scale 1)
+    //    carries the ETA down to "now" on its own, with no further read
+    //    needed — this is the same forced-refetch technique
+    //    `scan-journey.spec.ts` already uses for an out-of-band state change.
+    await page.reload()
+    await expect(page.getByTestId('galaxy-view')).toBeVisible({ timeout: 30_000 })
+
+    // 6. Wait for the jump to land. A due JUMP is settled ONLY by
+    //    `GET /v1/fleets/:id` (`fleet.Get` -> `resolveDue`); `ListForCorp`
+    //    (the roster's own `listMine`, the only read any frontend code path
+    //    calls here) settles due BURNS only. So the roster row NEVER stops
+    //    reading "In transit" on its own — outside the ~15-minute liveness
+    //    sweep, a jump never lands in the UI at all (a real product gap,
+    //    recorded for Travis). Arrange around it: wait for the roster's own
+    //    ETA countdown — computed client-side off `fleet.jump.arriveMs`,
+    //    independent of resolution — to actually reach zero, then settle the
+    //    jump directly with the exact read `fleet.Get` performs on any other
+    //    trigger (an authenticated `GET /v1/fleets/:id`), and assert ITS
+    //    response, not the roster's, shows the fleet arrived.
     await expect(
       page.getByTestId(`fleet-row-eta-${fleetId}`),
       "the jump's own ETA must actually count down to zero before forcing settlement means anything",
