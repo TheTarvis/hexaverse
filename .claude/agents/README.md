@@ -39,10 +39,10 @@ The crew practices strict TDD: the SDET writes every scenario's test first (conf
 
 | Agent | Role |
 |---|---|
-| `openspec-sdet` | FIRST: turns every scenario into failing automated tests (Go tests, Playwright) with a coverage table; LAST: integrity check that no test was altered |
-| `openspec-nextjs-dev` | Makes the SDET's frontend tests pass; test-first for its own units; never edits tests; checks off tasks.md |
-| `openspec-golang-dev` | Makes the SDET's backend tests pass; same TDD contract; stops on spec conflicts and test disputes |
-| `openspec-qa` | Executes the scenario acceptance matrix against the running system; SHIP / RETURN TO DEV verdict |
+| `openspec-sdet` | FIRST: turns every scenario into failing unit/integration tests with a coverage table (end-to-end-only rows are `Playwright, deferred`); AFTER the build: integrity check that no test was altered; AT THE ARCHIVE GATE: writes and runs the one Playwright journey per change |
+| `openspec-nextjs-dev` | Makes the SDET's frontend tests pass; test-first for its own units; never edits tests; per-task gate is vitest + tsc, never Playwright; checks off tasks.md |
+| `openspec-golang-dev` | Makes the SDET's backend tests pass; same TDD contract; per-task gate is `go test -short` + the touched package's emulator tests, never the full suite; stops on spec conflicts and test disputes |
+| `openspec-qa` | Verifies the scenario acceptance matrix against test evidence, drives live only what evidence can't reach, marks journey-only rows BLOCKED until it runs; SHIP / RETURN TO DEV verdict |
 
 Security and DBA return in phase 2 for implementation audits.
 
@@ -63,10 +63,15 @@ Phase 1 — Spec
                               └───────────── confirmed findings (max 3 rounds) ────────┘
 
 Phase 2 — Implementation (on request, strict TDD)
-  architect kickoff → sdet (RED: failing tests from scenarios)
-                    → nextjs-dev + golang-dev (GREEN: make tests pass, never edit them)
-                    → sdet integrity check → qa + security/dba audits → openspec archive
+  architect kickoff (impl contract) → sdet (RED: failing unit/integration tests; e2e-only rows deferred)
+                    → nextjs-dev + golang-dev (GREEN: make tests pass, never edit them; tier 1-2 gate only)
+                    → sdet integrity check → qa (evidence-based) + security/dba audits
+                    → JOURNEY: tree locked, one Playwright spec + full backend suite, run once
+                      (red → one batched revision round → one rerun)
+                    → openspec archive
 ```
+
+Test tiers, their commands, and when each runs are defined once in `docs/testing-tiers.md`; the team's durable state (panel reports, adversary rounds with verdict commits, rulings, impl contracts, coverage tables, journey records) lives in `docs/plans/continous_space/handoffs/` per its README. Delegations cite both and never paste commands or findings.
 
 Role separation is absolute: reviewers and the adversary never edit specs, the writer never judges its own work, the SDET never touches production code, developers never touch tests, QA never fixes.
 
@@ -84,6 +89,7 @@ Quickest entry — the `/team` command (defined in `.claude/commands/team.md`) l
 /team docs/idea.md --greenfield            # bootstrap a net-new app
 /team                                      # report current state and ask
 /team docs/payment-redesign.md --workflow  # same pipeline as a deterministic multi-agent Workflow
+/team --chain docs/plans/billing/chain.md  # implement authored changes in archive order, one fresh orchestrator per link
 ```
 
 The `--workflow` variant runs `.claude/workflows/openspec-team.js` — the same pipeline with script-enforced structure: the panel fans out in parallel, the adversary repair loop is hard-capped at 3 rounds, Phase 2 only runs with `implement: true`, and `openspec archive` only ever runs with an explicit `archive: true`. The orchestrator agent (default) is better when the run needs judgment calls mid-flight; the workflow is better for big changes where you want maximum parallelism and predictable gates.
@@ -138,6 +144,15 @@ Each agent loads canonical knowledge from `.claude/skills/` (a "Backing skills" 
 | `spec-threat-modeling` | STRIDE per requirement, deny paths, stack traps, implementation audit | security |
 | `reliability-review` | Failure inventory, thresholds not adjectives, idempotency, rollout safety | reliability |
 | `postgres-safe-migrations` | Constraints table, expand-migrate-contract, lock hazards, backfills | dba, golang-dev |
+
+## Helper scripts
+
+Two gates the CLI does not give you, both in `.claude/scripts/`:
+
+| Script | What it catches |
+|---|---|
+| `openspec-reconcile.py [change-id...]` | What `openspec archive` will **refuse**: a `## MODIFIED` block that omits a scenario the live spec still has. `validate --strict` doesn't check this, so a change can be strict-valid for days and still abort at archive time. Run before presenting a change and again before archiving; exit 1 = archive would fail. |
+| `openspec-red-manifest.sh record\|verify <change-id> [paths...]` | The SDET's red-handoff baseline. Committing a red suite would turn `main` red, so this records content hashes of the test files instead (`docs/plans/continous_space/handoffs/red-manifest-<id>.txt`, override with `RED_MANIFEST_DIR`); `verify` reports any test modified, deleted, or added since the handoff — the integrity check's evidence. |
 
 ## Prerequisites
 

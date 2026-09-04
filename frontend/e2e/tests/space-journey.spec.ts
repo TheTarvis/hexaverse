@@ -7,7 +7,32 @@ import {
   selectBody,
   selectFirstBodyMatching,
   stationFeatureId,
+  type ServedInterior,
 } from '../helpers/space-view'
+
+/**
+ * Prefers a mineable body CONFIRMED off-screen at the default framing —
+ * the same technique `scan-lane-transit-fizzle.spec.ts`'s `pickFarGate` and
+ * `jump-commit.spec.ts`'s own gate pick already use: farther from the
+ * view's centre means a longer burn — long enough to actually observe
+ * "Under way" before it docks. Test-dispute adjudicated 2026-09-03 (run 9;
+ * this leg was flaky in every earlier run too): `mineableBodyId` picks the
+ * FIRST served candidate, which can legitimately sit close enough to spawn
+ * that the burn settles before this leg's own "must observe Under way"
+ * guard ever samples it — the guard itself is not weakened; the target is
+ * hardened instead. Falls back to `mineableBodyId`'s own pick if NONE of
+ * the candidates are confirmed off-screen, so this can never leave the
+ * arrangement with no target at all.
+ */
+async function pickFarLode(page: Page, interior: ServedInterior, excludeId?: string): Promise<string> {
+  for (const f of interior.features ?? []) {
+    if (f.type === 'star' || f.id === excludeId) continue
+    if (f.id.startsWith('feat-moon-')) continue
+    if ((f.resources ?? []).length === 0) continue
+    if ((await page.getByTestId(`offscreen-${f.id}`).count()) > 0) return f.id
+  }
+  return mineableBodyId(interior, excludeId)!
+}
 
 /**
  * RED-PHASE SUITE — openspec change `build-production-space-view`,
@@ -125,9 +150,12 @@ test.describe('the continuous-space slice, end to end through the new view', () 
     const homeId = new URL(page.url()).pathname.split('/').pop()!
     const home = interiors.get(homeId)
     expect(home, `no interior read for ${homeId} was captured off the wire`).toBeTruthy()
-    const lodeId = mineableBodyId(home!, stationFeatureId(home!) ?? undefined)
-    expect(lodeId, `the home system served no mineable body (home ${homeId})`).toBeTruthy()
-    await selectBody(page, lodeId!)
+    expect(
+      mineableBodyId(home!, stationFeatureId(home!) ?? undefined),
+      `the home system served no mineable body (home ${homeId})`,
+    ).toBeTruthy()
+    const lodeId = await pickFarLode(page, home!, stationFeatureId(home!) ?? undefined)
+    await selectBody(page, lodeId)
     // The preview quotes the order BEFORE it is committed, and the ceiling
     // the player agrees to is displayed alongside the point cost.
     await expect(page.getByTestId('preview-panel')).toBeVisible({ timeout: 30_000 })

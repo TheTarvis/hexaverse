@@ -79,6 +79,28 @@ func (t *BodyTable) Extent() float64 { return t.extent }
 // (link 5's job, not this one's).
 func (t *BodyTable) Ids() []string { return t.ids }
 
+// EligibleIds returns, in Ids's own stable, deterministic order, every id
+// for which keep returns true. This is the sanctioned way for a consumer
+// outside this package to project the table into a response WITHOUT itself
+// enumerating the raw, unfiltered seam (Ids's own doc comment: "a consumer
+// needing positions for a response must project this table through a
+// disclosure filter first") — the traversal over every id stays inside the
+// package that owns the table; only ids the caller's own filter admits ever
+// leave this call. Added for fleet.Service.ScanTargets
+// (add-scan-and-sightings-surface), whose own package carries a structural
+// guard (fleet/body_source_test.go) forbidding a literal Ids() call in its
+// non-test source — the guard's own intent, not merely its letter, is
+// satisfied here: nothing unfiltered ever reaches fleet at all.
+func (t *BodyTable) EligibleIds(keep func(id string) bool) []string {
+	out := make([]string, 0, len(t.ids))
+	for _, id := range t.ids {
+		if keep(id) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 var _ space.Bodies = (*BodyTable)(nil)
 
 // asDisclosureWorld builds the base disclosure.World a BodyTable carries

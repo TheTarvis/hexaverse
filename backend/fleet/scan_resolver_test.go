@@ -64,9 +64,19 @@ package fleet
 //
 // EXPECTED RED TODAY: compile error — ScanResolver, ShipSource, ScanWindow,
 // Fleet.Scan do not exist.
+//
+// REVISED 2026-09-03 (add-scan-and-sightings-surface, per the orchestrator's
+// adjudication that this file's doc-id expectations are the SDET's
+// revision, not the Go developer's — the spec changed the derivation, task
+// 2.1). `wantScanSightingDocId` below independently computes design.md
+// Decision 1's opaque SHA-256 digest, replacing the retired
+// {actionId}_{targetId} literal this file used to assert. No other
+// assertion in this file changed.
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"testing"
 
 	"hexaverse/action"
@@ -109,6 +119,16 @@ func scanningFleet(id, corpId, originSystem, hostId string, scannerPos space.Vec
 		StateDoc: EncodeKinematicState(state),
 		Scan:     &ScanWindow{HostId: hostId, DepartMs: cwm(depart), ArriveMs: cwm(arrive), Range: rng},
 	}
+}
+
+// wantScanSightingDocId independently computes the document id design.md
+// Decision 1 mandates over (actionId, targetId) — mirrors
+// backend/sightings/mint.go's derivation (task 2.1) without importing that
+// package, exactly as this file's other fixtures avoid importing fleet's
+// sibling packages where a local computation suffices.
+func wantScanSightingDocId(actionId, targetId string) string {
+	sum := sha256.Sum256([]byte("sighting/v1\x00" + actionId + "\x00" + targetId))
+	return hex.EncodeToString(sum[:16])
 }
 
 // Scenario: A resolving sweep mints sightings for the chain masked at its
@@ -160,9 +180,13 @@ func TestScanResolver_Scenario_MintsSightingsForTheChainMaskedAtItsHost(t *testi
 			t.Errorf("write %q is marked cleanSweep=true; the host was NOT empty", docID)
 		}
 	}
-	for _, want := range []string{"action_scan_1_carrier-1", "action_scan_1_ship-1"} {
+	for _, want := range []string{
+		wantScanSightingDocId("action_scan_1", "carrier-1"),
+		wantScanSightingDocId("action_scan_1", "ship-1"),
+	} {
 		if !seen[want] {
-			t.Errorf("expected a mint write at deterministic doc id %q (action id + target id); got %v", want, seen)
+			t.Errorf("expected a mint write at deterministic doc id %q (design.md Decision 1: the digest over "+
+				"the action id and the target id); got %v", want, seen)
 		}
 	}
 	if got := releasedScanSlot(res); !got {

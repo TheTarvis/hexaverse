@@ -32,6 +32,19 @@ function invalidateFleet(qc: ReturnType<typeof useQueryClient>, fleet: Fleet): v
   void qc.invalidateQueries({ queryKey: queryKeys.systemBoard.detail(fleet.systemId) })
 }
 
+// add-scan-and-sightings-surface (F4, link8b-adversary-r8): cut drive, stop,
+// hold and release each rewrite the fleet's served kinematic state
+// (park-mode flip, burn->drift, `attachedTo` cleared) with NO scheduled ETA
+// to land later — cut drive in particular RETIRES the only scheduled
+// trigger the fleet had (its burn's arrival never lands), so without this
+// nothing ever refetches that fleet's scan-target list again. Deliberately
+// NOT wired into `useOrder`/`useJump`: those commits land LATER, through
+// the ETA-scheduled refetch, and invalidating at commit time would price a
+// target list against a position the fleet has not reached yet.
+function invalidateScanTargets(qc: ReturnType<typeof useQueryClient>, fleetId: string): void {
+  void qc.invalidateQueries({ queryKey: queryKeys.fleets.scanTargets(fleetId) })
+}
+
 // useOrder — commit a burn to a body id or an explicit point (fleet-movement
 // "In-System Burn Order to a Body or a Point"), the roster's burn command.
 export function useOrder(): UseMutationResult<
@@ -52,7 +65,10 @@ export function useCutDrive(): UseMutationResult<Fleet, Error, string> {
   const qc = useQueryClient()
   return useMutation<Fleet, Error, string>({
     mutationFn: (fleetId) => fleetService.cutDrive(fleetId),
-    onSuccess: (fleet) => invalidateFleet(qc, fleet),
+    onSuccess: (fleet) => {
+      invalidateFleet(qc, fleet)
+      invalidateScanTargets(qc, fleet.id)
+    },
   })
 }
 
@@ -63,7 +79,10 @@ export function useStop(): UseMutationResult<Fleet, Error, string> {
   const qc = useQueryClient()
   return useMutation<Fleet, Error, string>({
     mutationFn: (fleetId) => fleetService.stop(fleetId),
-    onSuccess: (fleet) => invalidateFleet(qc, fleet),
+    onSuccess: (fleet) => {
+      invalidateFleet(qc, fleet)
+      invalidateScanTargets(qc, fleet.id)
+    },
   })
 }
 
@@ -86,7 +105,10 @@ export function useHold(): UseMutationResult<Fleet, Error, string> {
   const qc = useQueryClient()
   return useMutation<Fleet, Error, string>({
     mutationFn: (fleetId) => fleetService.hold(fleetId),
-    onSuccess: (fleet) => invalidateFleet(qc, fleet),
+    onSuccess: (fleet) => {
+      invalidateFleet(qc, fleet)
+      invalidateScanTargets(qc, fleet.id)
+    },
   })
 }
 
@@ -94,7 +116,10 @@ export function useRelease(): UseMutationResult<Fleet, Error, string> {
   const qc = useQueryClient()
   return useMutation<Fleet, Error, string>({
     mutationFn: (fleetId) => fleetService.release(fleetId),
-    onSuccess: (fleet) => invalidateFleet(qc, fleet),
+    onSuccess: (fleet) => {
+      invalidateFleet(qc, fleet)
+      invalidateScanTargets(qc, fleet.id)
+    },
   })
 }
 

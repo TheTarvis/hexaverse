@@ -36,7 +36,7 @@ type fakeDao struct {
 
 func (f *fakeDao) Get(ctx context.Context, cid, id string) (*Sighting, error) { return nil, nil }
 
-func (f *fakeDao) List(ctx context.Context, cid string, limit int, cursor string) ([]Sighting, string, error) {
+func (f *fakeDao) List(ctx context.Context, cid string, limit int, cursor string, systemId ...string) ([]Sighting, string, error) {
 	f.gotLimit = limit
 	f.gotCursor = cursor
 	return f.toReturn, f.cursorOut, nil

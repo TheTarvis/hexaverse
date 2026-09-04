@@ -25,6 +25,28 @@ class ActionService {
     )
     return response.data
   }
+
+  // GET /v1/actions?actor=&status=done&type= — the bounded, ordered settled
+  // inbox (add-scan-and-sightings-surface, `action-dispatch`'s *Inbox by
+  // Actor Query Param*). The settled sweep report's own read is
+  // `{type: 'scan'}` — the TYPE-FILTERED read, never the type-agnostic one,
+  // so a fleet's other settled work cannot displace an unacknowledged scan.
+  async listSettled(actorId: string, options: { type?: string } = {}): Promise<GameAction[]> {
+    const query = new URLSearchParams({ actor: actorId, status: 'done' })
+    if (options.type) query.set('type', options.type)
+    const response = await apiClient.get<ActionList>(`/v1/actions?${query.toString()}`)
+    return response.data.actions ?? []
+  }
+
+  // POST /v1/actions/:id/acknowledge — marks a settled action's report as
+  // read, so a later refetch does not report the same settled sweep again.
+  async acknowledge(actionId: string): Promise<GameAction> {
+    const response = await apiClient.post<GameAction>(
+      `/v1/actions/${encodeURIComponent(actionId)}/acknowledge`,
+      {},
+    )
+    return response.data
+  }
 }
 
 export const actionService = new ActionService()

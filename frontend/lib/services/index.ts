@@ -20,3 +20,6 @@ export { actionService } from './action-service'
 export { default as ActionService } from './action-service'
 
 export { marketService, newOperationKey } from './market-service'
+
+export { sightingService } from './sighting-service'
+export { default as SightingService } from './sighting-service'

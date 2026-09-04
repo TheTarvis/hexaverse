@@ -33,8 +33,13 @@ type Dao interface {
 	// List returns a page of cid's sighting pile ordered by AsOf descending
 	// (newest pulse-reach first), bounded to limit records. cursor is opaque:
 	// pass "" for the first page, and the returned nextCursor (empty once the
-	// pile is exhausted) for the next.
-	List(ctx context.Context, cid string, limit int, cursor string) ([]Sighting, string, error)
+	// pile is exhausted) for the next. systemId is variadic so every
+	// pre-existing 4-argument call site keeps compiling unchanged; only its
+	// first element is consulted, and a non-empty one restricts the page to
+	// records whose SystemId matches — composed with the same ordering,
+	// bound, and cursor shape as the unfiltered read (sighting-records "The
+	// Pile Read Filters To One System On Request").
+	List(ctx context.Context, cid string, limit int, cursor string, systemId ...string) ([]Sighting, string, error)
 }
 
 type DaoImpl struct {
@@ -62,15 +67,20 @@ func (dao *DaoImpl) Get(ctx context.Context, cid, id string) (*Sighting, error) 
 	if err := snap.DataTo(&s); err != nil {
 		return nil, err
 	}
+	s.Id = snap.Ref.ID
 	return &s, nil
 }
 
-func (dao *DaoImpl) List(ctx context.Context, cid string, limit int, cursor string) ([]Sighting, string, error) {
+func (dao *DaoImpl) List(ctx context.Context, cid string, limit int, cursor string, systemId ...string) ([]Sighting, string, error) {
 	if limit <= 0 {
 		limit = PageMax
 	}
 
-	q := dao.collection(cid).
+	q := dao.collection(cid).Query
+	if len(systemId) > 0 && systemId[0] != "" {
+		q = q.Where("systemId", "==", systemId[0])
+	}
+	q = q.
 		OrderBy("asOf", firestore.Desc).
 		OrderBy(firestore.DocumentID, firestore.Desc).
 		Limit(limit + 1) // fetch one extra to detect whether a further page exists
@@ -109,6 +119,7 @@ func (dao *DaoImpl) List(ctx context.Context, cid string, limit int, cursor stri
 		if err := doc.DataTo(&s); err != nil {
 			return nil, "", err
 		}
+		s.Id = doc.Ref.ID
 		out = append(out, s)
 	}
 

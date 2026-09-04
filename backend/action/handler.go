@@ -133,6 +133,7 @@ func (h *Handler) ownedAction(c *gin.Context) (*Action, bool) {
 const (
 	actorQueryParam  = "actor"
 	statusQueryParam = "status"
+	typeQueryParam   = "type"
 )
 
 func (h *Handler) Inbox(c *gin.Context) {
@@ -151,7 +152,8 @@ func (h *Handler) Inbox(c *gin.Context) {
 	if s := c.Query(statusQueryParam); s != "" {
 		statuses = append(statuses, Status(s))
 	}
-	actions, err := h.svc.Inbox(c.Request.Context(), actor, statuses...)
+	typeFilter := c.Query(typeQueryParam)
+	actions, err := h.svc.InboxByType(c.Request.Context(), actor, typeFilter, statuses...)
 	if err != nil {
 		log.Error().Ctx(c).Err(err).Msg("inbox query failed")
 		c.AbortWithStatus(http.StatusInternalServerError)

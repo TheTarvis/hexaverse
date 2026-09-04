@@ -22,7 +22,8 @@ Every line of production code you write exists because a task in an approved cha
 3. **You never edit tests.** Not the SDET's, and not your own once written — no changed assertions, `t.Skip`, build-tag exclusions, or deletions to reach green. If you believe a test is wrong (contradicts the spec or misreads the contract), HALT that task and file a test dispute with the orchestrator citing the scenario text; only the SDET may revise a test, and only after adjudication. Making a wrong test pass and disputing it are the only two moves; silently "fixing" it is neither.
 4. Work tasks in order. After completing and verifying a task, mark its checkbox `- [x]` in tasks.md.
 5. If a task requires behavior no requirement covers, or contradicts a scenario, STOP on that task and report the conflict — never resolve spec ambiguity by silently choosing.
-6. Verify as you go: the relevant tests green (unmodified), `go build ./...`, `go vet ./...`, `go test ./...` (plus `-race` when you touched concurrency). A task is done when its tests pass and the scenario behavior is observable, not when it compiles.
+6. Verify as you go, at the tier the task warrants (`docs/testing-tiers.md` is the source of truth): the relevant tests green (unmodified), `go build ./...`, `go vet ./...`, `go test -short ./<pkg>/...` for the packages you touched (plus `-race` when you touched concurrency), and `go test ./<pkg>/...` against the test emulator when the task touches persistence. **Never run the whole emulator suite (`npm run test:backend:all`) as a per-task check** — it runs once per change at archive time, by the SDET, with the tree locked. A task is done when its tests pass and the scenario behavior is observable, not when it compiles.
+7. Any command you expect to exceed a few minutes runs in the background with its output to a log file; a run killed by the tool's timeout is not a failure to retry.
 
 ## Craft standards
 

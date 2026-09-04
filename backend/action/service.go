@@ -108,9 +108,21 @@ func (s *Service) Get(ctx context.Context, id string) (*Action, error) {
 }
 
 // Inbox lists an actor's actions, optionally filtered by status — the check-in
-// surface (done-but-unacknowledged needs no timer).
+// surface (done-but-unacknowledged needs no timer). This is the untyped form:
+// its own signature is load-bearing (fleet.actionHistory's structural
+// interface match), so a type filter is exposed separately, through
+// InboxByType, rather than widening this one.
 func (s *Service) Inbox(ctx context.Context, actor string, statuses ...Status) ([]Action, error) {
-	return s.dao.List(ctx, actor, statuses...)
+	return s.dao.List(ctx, actor, "", statuses...)
+}
+
+// InboxByType lists an actor's actions filtered independently by type
+// (typeFilter == "" behaves exactly like Inbox) and, optionally, by status —
+// the `GET /v1/actions?actor=&status=&type=` read (action-dispatch "Inbox by
+// Actor Query Param" — "an actor's actions... filtered to one status and,
+// independently, to one action type").
+func (s *Service) InboxByType(ctx context.Context, actor, typeFilter string, statuses ...Status) ([]Action, error) {
+	return s.dao.List(ctx, actor, typeFilter, statuses...)
 }
 
 // Commit validates the type, freezes the action, and claims the actor's single

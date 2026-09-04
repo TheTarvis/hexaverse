@@ -60,10 +60,12 @@ export default defineConfig({
   globalTeardown: './e2e/setup/global-teardown.ts',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  // Retries absorb transient dev-server flake (next dev occasionally serves a
+  // CI retries absorb transient dev-server flake (next dev occasionally serves a
   // blank shell under sustained load) without masking real bugs — a genuinely
-  // broken test fails all attempts.
-  retries: 2,
+  // broken test fails all attempts. Locally retries are zero: the journey runs
+  // once per change (docs/testing-tiers.md), and a hung test should fail in one
+  // minute, not three — hexaverse lost a 30-minute silence to a retried hang.
+  retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: process.env.CI
     ? [['github'], ['html', { open: 'never' }]]

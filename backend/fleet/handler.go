@@ -47,6 +47,7 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 		g.POST("/:fleetId/stop", h.Stop)
 		g.POST("/:fleetId/jump", h.Jump)
 		g.POST("/:fleetId/scan", h.Scan)
+		g.GET("/:fleetId/scan-targets", h.ScanTargets)
 		g.POST("/:fleetId/hold", h.Hold)
 		g.POST("/:fleetId/release", h.Release)
 	}
@@ -380,6 +381,30 @@ func (h *Handler) Scan(c *gin.Context) {
 	}
 	f, err := h.svc.Scan(c.Request.Context(), fleetId, req.HostId)
 	h.respond(c, f, err)
+}
+
+// ScanTargets handles GET /v1/fleets/:fleetId/scan-targets (focused-scan
+// "Eligible Scan Targets Are Served Per Fleet, To Their Owner Alone"). Gated
+// through commandedFleetId exactly like every command endpoint — including
+// its opportunistic settling read — so a foreign fleet, a nonexistent
+// fleet, and a corpless requester all answer 404 with an EMPTY body,
+// byte-identical to one another (link8b-impl-contract.md §1.1). The
+// envelope is always `{"targets": [...]}`, an array never null, and carries
+// no world time (task 3.7/9.2b).
+func (h *Handler) ScanTargets(c *gin.Context) {
+	fleetId, ok := h.commandedFleetId(c)
+	if !ok {
+		return
+	}
+	targets, err := h.svc.ScanTargets(c.Request.Context(), fleetId)
+	if err != nil {
+		h.respond(c, nil, err)
+		return
+	}
+	if targets == nil {
+		targets = []ScanTarget{}
+	}
+	c.JSON(http.StatusOK, gin.H{"targets": targets})
 }
 
 // Hold handles POST /v1/fleets/:fleetId/hold (fleet-movement

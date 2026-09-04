@@ -46,6 +46,14 @@ func (f *fakeFleetSvc) Jump(context.Context, string, string) (*Fleet, error) {
 func (f *fakeFleetSvc) Scan(context.Context, string, string) (*Fleet, error) {
 	return f.fleet, nil
 }
+
+// ScanTargets: mechanical fixture addition keeping this hand fake satisfying
+// the ServiceInterface add-scan-and-sightings-surface widened, mirroring the
+// established Hold/Release precedent below. No scenario in this file
+// asserts through it.
+func (f *fakeFleetSvc) ScanTargets(context.Context, string) ([]ScanTarget, error) {
+	return nil, nil
+}
 func (f *fakeFleetSvc) Cancel(context.Context, string) (*Fleet, error) { return f.fleet, nil }
 
 // Hold/Release: mechanical fixture additions keeping this hand fake

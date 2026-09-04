@@ -18,6 +18,7 @@ import type {
   MineRequest,
   OrderRequest,
 } from '../types/fleet'
+import type { ScanTarget, ScanTargetList } from '../types/scan'
 
 // An order/preview body carries EXACTLY the keys it means. A key present
 // with an `undefined` value is dropped rather than serialized: the server
@@ -113,6 +114,22 @@ class FleetService {
   // apiClient surfaces as the thrown error's message.
   async mine(fleetId: string, request: MineRequest): Promise<MineCommit> {
     const response = await apiClient.post<MineCommit>(`/v1/fleets/${fleetId}/mine`, request)
+    return response.data
+  }
+
+  // GET /v1/fleets/:id/scan-targets — the server-served focused-scan target
+  // list (add-scan-and-sightings-surface, `focused-scan`): host id, kind
+  // ('body' | 'fleet'), and the sweep duration it would price at. NEVER
+  // mirrored or approximated client-side.
+  async scanTargets(fleetId: string): Promise<ScanTarget[]> {
+    const response = await apiClient.get<ScanTargetList>(`/v1/fleets/${fleetId}/scan-targets`)
+    return response.data.targets ?? []
+  }
+
+  // POST /v1/fleets/:id/scan {hostId} — commit a focused scan against a
+  // listed target's served host id and nothing else.
+  async scan(fleetId: string, hostId: string): Promise<Fleet> {
+    const response = await apiClient.post<Fleet>(`/v1/fleets/${fleetId}/scan`, { hostId })
     return response.data
   }
 }

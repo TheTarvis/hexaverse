@@ -658,6 +658,73 @@ longer will. If previews read as laggy in play, reversing means building
 - **Touches:** `board-view` (its surviving mine/sell/camera surface folds
   into or alongside the new view), `galaxy-view`.
 
+## Link 8b — `add-scan-and-sightings-surface`
+
+**Landed 2026-09-03** (`IMPL_HASH` implementation, `ARCH_HASH` archive),
+ALL_TASKS tasks. The focused scan's whole player-facing half and the
+sightings display, together, as ruled: a scan control fed by a new
+owner-scoped `GET /v1/fleets/:id/scan-targets`, the running sweep's countdown
+and cancel off the action inbox, the settled report with six fizzle copies,
+sighting ghosts at their frozen positions, and the sighting log. Vitest
+VITEST_N, Playwright PW_N, root backend e2e ROOT_E2E. QA 156 PASS / 1
+BLOCKED (Playwright-only) / 0 FAIL after one MAJOR was fixed; security CLEAR.
+
+**Ten adversary rounds, not three.** Rounds 1–3 were before the resume;
+round 4 re-attacked the resumed change against the `system-space-view` spec
+8a-2 had just made live (1 blocker, 6 majors); rounds 5–7 found only residue
+of each previous round's repairs; rounds 8–10 were mid-build spot-checks on
+clauses the Playwright journey forced. The lesson the last three teach is
+that **a clause naming a window must name every way the window ends** — each
+one shipped with an exit missing (a failed refetch keeping a stale empty list;
+a re-selected fleet served from cache; a settled sweep not refetching; a
+pending commit with no failure exit) and each needed one re-verify to close.
+
+**The journey found what nothing else could, four times over.** The unit
+suite, the wire-level e2e tests and QA's live matrix were all green while a
+human at the screen would have been stuck:
+
+- the scan-target list was read once at mount and never again, so a fleet
+  that then docked showed the departure point's empty list (no requirement
+  tied the read to the fleet's kinematic state — rounds 8–9);
+- after a sweep settled, the empty set cached while the sensor channel was
+  held survived as "no host is in range" (round 9);
+- after an accepted commit, two unordered invalidations let that same empty
+  set land before the running read (round 10);
+- the sighting log decided "this row has a mark" from a list of reasons
+  instead of from what the scene drew — QA's one FAIL.
+
+Nine Playwright runs in all; the last was 6/6 on the two scan specs. Test-side
+misreadings the runs exposed were as many as product ones: a helper that could
+not tell "never captured" from "captured empty"; the farthest served host
+picked for a docked fleet (a boundary host that drifts out between list and
+commit); a report assertion that expected "clean" copy when the spec says a
+clean-sweep record is a filed record; a drawer left open over the control with
+an untimed scroll (a 30-minute silence); and a lane-transit fizzle that a
+human cannot arrange through the UI (the jump takes ~7 s to land, the sweep
+lasts ~3 s), now arranged through the API with the assertion still in the UI.
+
+**Three findings for Travis, none fixed here:**
+
+- **A jump never lands in the UI** (`handoffs/defect-jump-never-lands-in-ui.md`).
+  Only `GET /v1/fleets/:id` settles a due jump; the roster read settles burns
+  only, and no client path calls the per-fleet read — so a jumped fleet reads
+  "In transit" until the 15-minute sweep, forever on a local stack. Link 5's
+  journey asserted "In transit" and stopped. Pre-existing, player-facing, and
+  the highest-priority item this link surfaced.
+- **A freshly spawned fleet has nothing in focused-scan range** (design.md
+  OQ 12): its first scan needs a burn first. Spawn placement or the range is
+  the dial.
+- **`DepartMs` and `CommittedAt` are two clock reads ~50 ms apart** (the
+  SDET's duration test caught it; design.md Decision 3 records that no rule
+  pins them). A `CommittedAt` override on `action.CommitSpec` would unify
+  them.
+
+Also recorded: rejection copy keyed on server error strings (a future
+`reasonCode`-on-rejection change), a belt member that is dockable and
+mineable but never a scan host (`decisions.md`, 2026-09-03), and three
+composite Firestore indexes Travis must `terraform apply` — the emulator
+auto-indexes, so only production fails without them.
+
 ## Link 9 — `delete-the-lattice`
 
 `backend/board`, `backend/polar`, `frontend/lib/board`, `frontend/lib/polar`,

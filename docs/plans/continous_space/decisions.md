@@ -520,3 +520,28 @@ being wrong.
 **Still open.** Whether a fleet can be attacked while docked at a gate — the
 other half of the 2026-08-27 lane-gate entry's open question. That is a combat
 question and stays deferred with combat.
+
+## 2026-09-03 — A belt member is dockable and mineable, but never a scan host
+
+**Decision.** Derived belt members (`{beltId}#{k}`, synthesized into the body
+table and never persisted) stay valid attachment hosts and valid mine targets —
+`mine-extraction` resolves a member to its parent belt's single lode, and a
+fleet docked at one echoes the member id back in its own `attachedTo` — but a
+member is **never** served in a fleet's scan-target list and a scan commit
+naming one is rejected identically to an unresolvable host. The belt feature
+itself is the scan host. Ruled in link 8b (`add-scan-and-sightings-surface`,
+design.md Decision 17), recorded here because no requirement states the
+asymmetry as intended and link 8b's architect flagged that a reader will find
+it and assume a bug.
+
+**Why.** The scan-target read is the first wire surface that would *enumerate*
+bodies to pick from. Serving eight members per belt there would make one belt
+appear as nine entries the client has no name, mark, or facts surface for — and
+would reopen per-member lodes and the wire-size question link 6 and link 8's
+OQ-4 closed ("one body, members decorative and unpickable"). Attachment and
+mining address a host the fleet already occupies; a target list is a catalogue.
+The asymmetry is between echoing an id and offering one.
+
+**Forecloses.** Nothing permanent: if a later change makes members pickable in
+the space view, the scan list follows it, and link 6's deferred per-member
+lodes come back with it — the two must move together.

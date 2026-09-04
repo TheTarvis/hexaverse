@@ -14,8 +14,20 @@ package sightings
 //	MintWrites(cid, actionId string, records []Sighting) []action.DocWrite
 //
 // building one action.DocWrite per record at:
-//   - corporations/{cid}/sightings/{actionId}_{targetId}   (composition record)
-//   - corporations/{cid}/sightings/{actionId}_clean         (clean-sweep record)
+//   - corporations/{cid}/sightings/{digest}   (composition record)
+//   - corporations/{cid}/sightings/{digest}   (clean-sweep record, empty target component)
+//
+// REVISED 2026-09-03 (add-scan-and-sightings-surface, per the orchestrator's
+// adjudication that this file's doc-id expectations are the SDET's revision,
+// not the Go developer's — the spec changed the derivation). The document id
+// is no longer {actionId}_{targetId}/{actionId}_clean: it is the opaque
+// SHA-256 digest design.md Decision 1 mandates —
+// hex(sha256("sighting/v1\x00"+actionId+"\x00"+targetId)[:16]), with an
+// empty targetId component for a clean sweep. `wantDocId` below computes the
+// SAME derivation independently (never by calling MintWrites itself), so
+// this file's own expectations do not become tautological. Every other
+// assertion in this file — exactly-once convergence, no-clock-read, distinct
+// paths never colliding — is UNCHANGED.
 //
 // so that action's own resolve-transaction machinery (action/dao.go's
 // ResolveOne: `tx.Set(ref, w.Data, firestore.MergeAll)`) applies it
@@ -42,6 +54,8 @@ package sightings
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -56,13 +70,22 @@ import (
 	"github.com/google/uuid"
 )
 
+// wantDocId independently computes the document id design.md Decision 1
+// mandates, over (actionId, targetId) — an empty targetId for a clean sweep
+// — so this file's expectations are never tautological against MintWrites'
+// own output. Mirrors backend/sightings/mint.go's derivation (task 2.1).
+func wantDocId(actionId, targetId string) string {
+	sum := sha256.Sum256([]byte("sighting/v1\x00" + actionId + "\x00" + targetId))
+	return hex.EncodeToString(sum[:16])
+}
+
 // Scenario: A sighting's document id is deterministic
 func TestMintWrites_Scenario_DocumentIdIsDeterministic(t *testing.T) {
 	rec := Sighting{
 		SystemId: "sys-1", TargetId: "fleet_victim", AsOf: 1000,
 		Position: space.Vec3{X: 1}, HostId: "gate-sys-2",
 	}
-	want := "corporations/corp-1/sightings/action_abc_fleet_victim"
+	want := "corporations/corp-1/sightings/" + wantDocId("action_abc", "fleet_victim")
 
 	for i := 0; i < 2; i++ {
 		writes := MintWrites("corp-1", "action_abc", []Sighting{rec})
@@ -71,8 +94,8 @@ func TestMintWrites_Scenario_DocumentIdIsDeterministic(t *testing.T) {
 		}
 		got := strings.Join(writes[0].Path, "/")
 		if got != want {
-			t.Errorf("run %d: doc path = %q, want %q (design.md Decision 13: "+
-				"corporations/{cid}/sightings/{actionId}_{targetId})", i, got, want)
+			t.Errorf("run %d: doc path = %q, want %q (design.md Decision 1: the opaque SHA-256 digest over "+
+				"(actionId, targetId))", i, got, want)
 		}
 	}
 }
@@ -86,10 +109,11 @@ func TestMintWrites_Scenario_CleanSweepDocId(t *testing.T) {
 	if len(writes) != 1 {
 		t.Fatalf("MintWrites returned %d writes, want 1", len(writes))
 	}
-	want := "corporations/corp-1/sightings/action_xyz_clean"
+	want := "corporations/corp-1/sightings/" + wantDocId("action_xyz", "")
 	got := strings.Join(writes[0].Path, "/")
 	if got != want {
-		t.Errorf("clean-sweep doc path = %q, want %q (design.md Decision 13)", got, want)
+		t.Errorf("clean-sweep doc path = %q, want %q (design.md Decision 1: the digest over the action id alone, "+
+			"empty target component)", got, want)
 	}
 }
 

@@ -10,6 +10,19 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Query parameter names for GET /v1/sightings. Named constants rather than
+// literal strings passed to c.Query(), mirroring action.Handler's own
+// convention (backend/action/handler.go) for the same reason: these are all
+// optional filters with no distinct 400 contract of their own, so wrapping
+// them in common.OptionalQueryParam(c, name) would add nothing a named
+// constant doesn't already give — a single place the query-string
+// vocabulary is spelled.
+const (
+	limitQueryParam    = "limit"
+	cursorQueryParam   = "cursor"
+	systemIdQueryParam = "systemId"
+)
+
 // Handler serves the sighting pile's read endpoint.
 type Handler struct {
 	svc *Service
@@ -24,8 +37,9 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 }
 
 // List serves the caller's own corporation's sighting pile, newest
-// pulse-reach first, bounded to a page (query params: limit, cursor).
-// GET /v1/sightings
+// pulse-reach first, bounded to a page (query params: limit, cursor,
+// systemId — an optional equality filter to one system; absent, the whole
+// pile). GET /v1/sightings
 //
 // A corpless requester's pile is empty — this change's own delta leaves that
 // case unpinned by any scenario (tasks.md 7.7 item 1); the empty-response
@@ -39,14 +53,15 @@ func (h *Handler) List(c *gin.Context) {
 	}
 
 	limit := 0
-	if v := c.Query("limit"); v != "" {
+	if v := c.Query(limitQueryParam); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			limit = n
 		}
 	}
-	cursor := c.Query("cursor")
+	cursor := c.Query(cursorQueryParam)
+	systemId := c.Query(systemIdQueryParam)
 
-	records, nextCursor, err := h.svc.List(c.Request.Context(), cid, limit, cursor)
+	records, nextCursor, err := h.svc.List(c.Request.Context(), cid, limit, cursor, systemId)
 	if err != nil {
 		log.Error().Ctx(c).Err(err).Msg("Failed to read sighting pile")
 		c.AbortWithStatus(http.StatusInternalServerError)

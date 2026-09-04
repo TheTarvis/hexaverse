@@ -66,11 +66,22 @@ func NewServiceWithDao(dao Dao) *Service { return &Service{dao: dao} }  // for t
 ## Testing
 
 - Unit tests next to the file (`service_test.go`). Use `gomock` for the DAO.
-- Integration tests use the Firestore emulator via `common.SetupFirestoreTestDAO(t)`.
+- Integration tests use the Firestore emulator via `common.SetupFirestoreTestDAO(t)`, which skips under `-short`.
 - New collections must be added to the registry in `common/firestore_test_helpers.go` — `RegisteredTopLevelCollections` and `RegisteredSubcollections` — so emulator state doesn't leak between tests. Cleaning a parent (e.g. `"corporations"`) also clears its registered subcollections; Firestore does not cascade, so anything unregistered is orphaned forever and every later test pays to read it.
 - The registry is enforced, not trusted: the root package's `TestMain` (`backend/e2e_main_test.go`) runs `common.UnregisteredCollections` after the suite and fails the run on anything Firestore holds that the registry doesn't name.
 - The root `hexaverse` package's e2e suite wipes and re-seeds the test emulator project once in `TestMain` (guarded on `ENV=TEST` + a non-real project id + loopback emulator hosts). It therefore needs no pre-seeded galaxy — but don't run it at the same time as the frontend Playwright suite; they share one emulator project.
-- Run: `go test -short ./...` (unit), `go test ./...` (full, needs emulators).
+- Because that root-package `TestMain` wipes the shared emulator project, the full suite runs with `-p 1` (`npm run test:backend:all`); package-level tests (`go test ./<pkg>/...`) seed documents under names unique to the test file and clean only those.
+
+### Test tiers (see `docs/testing-tiers.md` — the source of truth)
+
+| When | Run |
+| --- | --- |
+| Per task | `go vet ./... && go test -short ./<pkg>/...` for the packages you touched |
+| Per task that touches persistence | `go test ./<pkg>/...` with the test emulator up (`npm run firebase:emulators:test`) |
+| Per commit | `bash .claude/scripts/check.sh --backend` |
+| Once per change, at archive time | `npm run test:backend:all` (the whole emulator suite; minutes, and grows with every test) |
+
+Never run the full suite as a per-task check or as a "confirming rerun", and never raise its `-timeout` to make it pass — an overrun is a growing suite; report it.
 
 ## Errors
 

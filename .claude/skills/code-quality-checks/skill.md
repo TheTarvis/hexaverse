@@ -69,11 +69,12 @@ This skill provides automated validation of code quality standards by:
 #### 9. Frontend Tests — `--frontend-tests`
 `cd frontend && npx vitest run`
 
-#### 10. Frontend E2E — `--e2e`
-`cd frontend && npm run e2e` (Playwright; routes through `scripts/dev/with-test-emulators.sh`, which reuses a running test emulator or cold-starts a throwaway one, then boots the suite's own isolated frontend/backend). In `--run-all`/default it's **best-effort**: runs only when a test emulator is already up (probes the firebase.test.json Firestore port :9100), otherwise skipped with a warning to keep routine checks fast. With explicit `--e2e` it always runs.
+#### 10. Frontend E2E — `--e2e` (tier 4, explicit only)
+`cd frontend && npm run e2e` (Playwright; routes through `scripts/dev/with-test-emulators.sh`, which reuses a running test emulator or cold-starts a throwaway one, then boots the suite's own isolated frontend/backend). **Never part of `--run-all`/default**, even when a test emulator is listening — the journey runs once per change at archive time (`docs/testing-tiers.md`).
 
-#### 11. Backend Tests — `--backend-tests`
-Generates mocks (`go generate ./...`), then `npm run test:backend:all` (gotestsum, full suite via the test-emulator wrapper)
+#### 11. Backend Tests — default vs `--backend-tests`
+- Default / `--run-all`: `go vet ./...` + `go test -short -count=1 ./...` (tier 1; emulator tests skip under `-short`; seconds).
+- `--backend-tests` (tier 3, explicit only): generates mocks (`go generate ./...`), then `npm run test:backend:all` (gotestsum, the full emulator suite with a `-timeout` budget; minutes, grows with every test). Once per change, at archive time.
 
 #### 12. Agent Lint / Tests — `--agent-lint` / `--agent-tests`
 `uv run ruff check` + `ruff format --check` + `pyright` / `uv run pytest tests/ -v` in `claude-agent/`

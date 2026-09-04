@@ -31,6 +31,16 @@ token audience the suite relies on (see the shared-project note below).
 `npm run e2e:ui` is the one command that does **not** auto-start an emulator
 (interactive mode) — have one running for it.
 
+## When it runs, and what a spec is
+
+This suite is **tier 4** in `docs/testing-tiers.md`: it runs once per change at
+archive time, never as a per-task check and never as a confirming rerun. A
+change contributes **one journey spec** that walks its whole slice in order and
+asserts at every step; per-scenario and edge-case coverage lives in vitest.
+Fixtures are provisioned once per spec file (`test.beforeAll`), not per test.
+Retries are zero locally (two in CI) so a hung test fails in one minute. Never
+raise a timeout to get a run green — report the overrun instead.
+
 ## What a run does
 
 `playwright.config.ts` + `e2e/setup/` wire up a self-contained stack:

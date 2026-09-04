@@ -131,9 +131,9 @@ func (mr *MockDaoMockRecorder) Get(ctx, id any) *gomock.Call {
 }
 
 // List mocks base method.
-func (m *MockDao) List(ctx context.Context, actor string, statuses ...Status) ([]Action, error) {
+func (m *MockDao) List(ctx context.Context, actor, typeFilter string, statuses ...Status) ([]Action, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, actor}
+	varargs := []any{ctx, actor, typeFilter}
 	for _, a := range statuses {
 		varargs = append(varargs, a)
 	}
@@ -144,9 +144,9 @@ func (m *MockDao) List(ctx context.Context, actor string, statuses ...Status) ([
 }
 
 // List indicates an expected call of List.
-func (mr *MockDaoMockRecorder) List(ctx, actor any, statuses ...any) *gomock.Call {
+func (mr *MockDaoMockRecorder) List(ctx, actor, typeFilter any, statuses ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, actor}, statuses...)
+	varargs := append([]any{ctx, actor, typeFilter}, statuses...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockDao)(nil).List), varargs...)
 }
 

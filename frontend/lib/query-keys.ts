@@ -59,6 +59,24 @@ export const queryKeys = {
     // previous target's figures as the current quote.
     burnPreview: (fleetId: string, selection: string) =>
       [...queryKeys.fleets.all, 'burn-preview', fleetId, selection] as const,
+    // The server-served focused-scan target list for one fleet
+    // (add-scan-and-sightings-surface, `focused-scan`). Invalidated on a
+    // successful scan commit and on a successful cancel (task 4.9) — the
+    // set of eligible hosts changes the instant the sensor slot frees up.
+    scanTargets: (fleetId: string) => [...queryKeys.fleets.all, 'scan-targets', fleetId] as const,
+    // A CLIENT-ONLY marker, never fetched (add-scan-and-sightings-surface,
+    // link8b-adversary-r10 P1/P3): the world-clock instant a scan commit
+    // was ACCEPTED, keyed by fleetId, written via `qc.setQueryData` and
+    // read reactively via `useQuery({enabled: false})`. Backed by the
+    // query cache (not `useState`) specifically so it survives a remount
+    // of the control while the pending window is open (P3) — the same
+    // `QueryClient` persists across a component remount, `useState` does
+    // not. `ScanControl` derives "committed, awaiting its window" by
+    // comparing this marker against the running-status read's own
+    // `dataUpdatedAt`/`errorUpdatedAt`: once either advances past the
+    // marker, a FRESH read has landed and the window is over — no
+    // separate imperative clearing step needed.
+    scanCommitPending: (fleetId: string) => [...queryKeys.fleets.all, 'scan-commit-pending', fleetId] as const,
   },
 
   actions: {
@@ -67,6 +85,23 @@ export const queryKeys = {
     // mutation invalidates it; past-eta entries hide client-side (worldTime).
     all: ['actions'] as const,
     running: (actorId: string) => [...queryKeys.actions.all, 'running', actorId] as const,
+    // The type-filtered settled inbox (add-scan-and-sightings-surface,
+    // task 4.7): `GET /v1/actions?actor=&status=done&type=scan`, the settled
+    // sweep report's own read. Keyed separately from `running` so the two
+    // reads — window-and-cancel vs. outcome-and-acknowledge — never share a
+    // cache entry.
+    settled: (actorId: string) => [...queryKeys.actions.all, 'settled', actorId] as const,
+  },
+
+  sightings: {
+    // The corporation's sighting pile (add-scan-and-sightings-surface,
+    // `sighting-records`). `pile(systemId)` is keyed by its OPTIONAL
+    // systemId filter — `null` for the log's unfiltered read, a system id
+    // for the ghost layer's filtered read — so the two NEVER share a cache
+    // entry (task 4.7): a system-filtered page and the corp-wide log page
+    // are different queries, not the same one read two ways.
+    all: ['sightings'] as const,
+    pile: (systemId: string | null) => [...queryKeys.sightings.all, 'pile', systemId ?? 'all'] as const,
   },
 
   market: {

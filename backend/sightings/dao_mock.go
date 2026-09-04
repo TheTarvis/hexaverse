@@ -56,9 +56,13 @@ func (mr *MockDaoMockRecorder) Get(ctx, cid, id any) *gomock.Call {
 }
 
 // List mocks base method.
-func (m *MockDao) List(ctx context.Context, cid string, limit int, cursor string) ([]Sighting, string, error) {
+func (m *MockDao) List(ctx context.Context, cid string, limit int, cursor string, systemId ...string) ([]Sighting, string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List", ctx, cid, limit, cursor)
+	varargs := []any{ctx, cid, limit, cursor}
+	for _, a := range systemId {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "List", varargs...)
 	ret0, _ := ret[0].([]Sighting)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(error)
@@ -66,7 +70,8 @@ func (m *MockDao) List(ctx context.Context, cid string, limit int, cursor string
 }
 
 // List indicates an expected call of List.
-func (mr *MockDaoMockRecorder) List(ctx, cid, limit, cursor any) *gomock.Call {
+func (mr *MockDaoMockRecorder) List(ctx, cid, limit, cursor any, systemId ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockDao)(nil).List), ctx, cid, limit, cursor)
+	varargs := append([]any{ctx, cid, limit, cursor}, systemId...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockDao)(nil).List), varargs...)
 }

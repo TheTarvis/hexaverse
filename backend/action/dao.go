@@ -50,8 +50,14 @@ func ledgerKeyOf(a Action) string {
 // the one place the layering bends, deliberately.
 type Dao interface {
 	Get(ctx context.Context, id string) (*Action, error)
-	// List backs the inbox: actions for an actor, optionally filtered by status.
-	List(ctx context.Context, actor string, statuses ...Status) ([]Action, error)
+	// List backs the inbox: actions for an actor, optionally filtered by
+	// status and, independently, by type (typeFilter == "" means every
+	// type). When the caller names exactly the `done` status, the result is
+	// ordered by resolvedAt descending and bounded to SettledPageMax — never
+	// applied on any other status filter, since a running action carries no
+	// resolvedAt and an unconditional OrderBy would drop it
+	// (action-dispatch "Inbox by Actor Query Param").
+	List(ctx context.Context, actor string, typeFilter string, statuses ...Status) ([]Action, error)
 
 	// Commit stores the action and claims the actor's single slot in one
 	// transaction, rejecting a second active action with ErrActiveActionExists.
@@ -145,10 +151,23 @@ func (dao *DaoImpl) Get(ctx context.Context, id string) (*Action, error) {
 	return &a, nil
 }
 
-func (dao *DaoImpl) List(ctx context.Context, actor string, statuses ...Status) ([]Action, error) {
+func (dao *DaoImpl) List(ctx context.Context, actor string, typeFilter string, statuses ...Status) ([]Action, error) {
 	q := dao.db.Collection(actionsCollection).Where("actor", "==", actor)
+	if typeFilter != "" {
+		q = q.Where("type", "==", typeFilter)
+	}
+	settledOnly := len(statuses) == 1 && statuses[0] == StatusDone
 	if len(statuses) == 1 {
 		q = q.Where("status", "==", string(statuses[0]))
+	}
+	if settledOnly {
+		// Ordering and the bound apply ONLY on this path: resolvedAt is
+		// firestore:"resolvedAt,omitempty" and therefore absent from a
+		// running action's document, so an unconditional OrderBy would
+		// exclude every running action from any other status read
+		// (action-dispatch "A running-status read is unaffected by the
+		// settled ordering").
+		q = q.OrderBy("resolvedAt", firestore.Desc).Limit(SettledPageMax)
 	}
 	iter := q.Documents(ctx)
 	defer iter.Stop()

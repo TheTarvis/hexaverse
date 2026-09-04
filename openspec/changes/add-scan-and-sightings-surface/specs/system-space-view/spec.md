@@ -20,10 +20,49 @@ name.
 
 IF the served target set is empty, THEN the control SHALL state that no host is
 in range, except while the acting fleet's own served state explains the empty
-set — in lane transit, or already sweeping — in which case the control SHALL
-state that instead, rather than rendering an empty list. IF the scan-target
-read fails, THEN the control SHALL show a retriable error and offer no targets,
-rather than falling back to any locally derived list.
+set — in lane transit, already sweeping, or having just had a scan commit
+accepted whose running-status inbox read has neither reflected it nor failed
+(*A Focused Scan Commits Against a Listed Target and Reports Its Rejection in
+Player Copy*) — in which case the control SHALL state that instead, rather than
+rendering an empty list. IF the scan-target read fails, THEN the control
+SHALL show a retriable error and offer no targets, rather than falling back
+to any locally derived list.
+
+WHILE a triggered refetch of the scan-target read is in flight, the control
+SHALL present the list as being re-read rather than stating that no host is in
+range on the authority of the superseded set. The set served while the sensor
+channel was held is empty by construction, and the instant the post-settle
+running-status inbox read lands ahead of the scan-target read is precisely when
+that empty set would otherwise be reported as a fact about the world.
+
+The scan-target read SHALL be refetched whenever the acting fleet's served
+kinematic state changes: on every landed resolution of that fleet's own burn
+or jump, on every accepted instant fleet verb that rewrites its stored
+kinematic state — cut drive, stop in place, a station-keeping hold, and a
+station-keeping release — on a change of its attachment, on a successful scan
+commit or cancel, on the settlement of that fleet's own sweep (the post-settle
+follower reads *A Running Sweep Self-Schedules the Refetch That Settles It,
+Then Reads the Inbox and the Pile* issues SHALL include a fresh scan-target
+read, so the empty set served while the channel was held is never re-offered
+as "no host is in range"), and when the acting fleet selection changes —
+riding every
+refetch rule *Realtime Refetch Rules While the Space View Is Open* applies to
+the fleet read, including its live-subscription refetch, its reconnect
+resync, and its constant baseline poll, so that a landed resolution observed
+by any of those paths refetches this read too, and so that a fleet whose
+surroundings change with no discrete event of its own does not hold one list
+for the session — so the list reflects the fleet's current position rather
+than the position it held when the view opened. Cut drive cancels the
+running movement action, so the arrival trigger it would otherwise have
+fired is retired with it. A list read once at mount and never again would
+offer a docked fleet the targets of a departure point it has already left.
+
+IF a refetch of the scan-target read fails, THEN the control SHALL present the
+failed-read state of the rule above — a retriable error, offering no targets —
+and SHALL NOT continue to display the previously served list, whose fleet
+state the trigger has already declared stale. An empty list retained across a
+failed refetch would state "no host is in range" on the authority of a read
+the client has itself invalidated.
 
 #### Scenario: Served targets are listed with their kind and duration
 - **WHEN** the scan-target read returns a body and an own fleet
@@ -52,6 +91,44 @@ rather than falling back to any locally derived list.
 - **WHEN** the scan-target read fails
 - **THEN** the control shows a retriable error, offers no targets, and does not
   substitute a locally derived list
+
+#### Scenario: A landed arrival refetches the target list
+- **GIVEN** the scan control is open with the scan-target read having returned an
+  empty set while the acting fleet was under way with nothing in range
+- **WHEN** the fleet's burn lands
+- **THEN** the scan-target read is re-issued and the control offers the hosts now
+  in range, including the host the fleet attached to
+- **AND** none of this requires navigation, reload, or manual refresh
+
+#### Scenario: A failed refetch drops the stale list rather than restating it
+- **GIVEN** the scan-target read returned an empty set and the acting fleet's
+  burn has since landed
+- **WHEN** the triggered refetch fails
+- **THEN** the control shows the retriable error and offers no targets, and does
+  not state that no host is in range
+
+#### Scenario: A settled sweep refetches the target list
+- **GIVEN** the acting fleet's sweep was committed, so its cached scan-target
+  set is the empty set served while the sensor channel was held
+- **WHEN** the sweep's ETA passes and the view's scheduled refetches run
+- **THEN** a fresh scan-target read is issued and the control offers the hosts
+  now in range, never the held-channel empty set, and does not state that no
+  host is in range
+- **AND** none of this requires navigation, reload, or manual refresh
+
+#### Scenario: An empty set awaiting its triggered refetch is not reported as no host in range
+- **GIVEN** the acting fleet's sweep has settled and the post-settle
+  running-status inbox read has landed showing no running sweep, while the
+  triggered scan-target refetch is still in flight
+- **WHEN** the control is shown
+- **THEN** it presents the target list as being re-read, and does not state that
+  no host is in range
+
+#### Scenario: Changing the acting fleet refetches the list
+- **WHEN** the player selects a different own fleet as the acting fleet
+- **THEN** a scan-target read is issued for the newly selected fleet, and the
+  control lists that read's targets, never the previous fleet's and never a page
+  cached for this fleet under an earlier selection
 
 ### Requirement: A Sweep's Cost Is Presented as Time and Exposure, Not Time Alone
 The system SHALL state, on the scan control before a commit and again while a
@@ -107,6 +184,41 @@ target list refetched, never as an application error — bodies move between the
 target read and the commit, so a listed target going stale is ordinary and
 expected, not a fault.
 
+Between an accepted commit and the running-status inbox read that carries the
+new sweep, the control SHALL present the sweep as committed and awaiting its
+window — never the target list, never the empty-set copy, never a fresh
+commit control, and no cancel affordance, whose action id arrives only with
+that read — so an accepted commit is never followed, however briefly, by a
+statement that no host is in range. The window ends at the first
+running-status read that **reflects the commit**: one carrying the sweep as
+running, which the countdown then replaces with no user action; or one
+showing no running sweep at all, which means the sweep settled before the
+read landed and SHALL hand the control to its settled-sweep report rather
+than holding the pending presentation.
+
+When the window ends that way, the system SHALL issue that fleet's
+post-settle follower reads — its settled-status inbox read, the open
+system's sighting-pile read, and a fresh scan-target read (*A Running Sweep
+Self-Schedules the Refetch That Settles It, Then Reads the Inbox and the
+Pile*) — because no ETA-scheduled trigger for them can exist on this path:
+the client never read a running sweep to schedule one. Without them the
+sweep's outcome is never reported, its records never drawn, and the empty
+set served while the sensor channel was held is re-offered as "no host is
+in range" one instant after the window that forbade it.
+
+IF that read fails, THEN the pending presentation SHALL end and the
+failed-running-read state of *The Sweep Surface's Reads Fail Independently,
+Like Every Other Read This View Issues* SHALL be shown instead — the
+sweep's state could not be read, with a retry and no commit control — never
+an unbounded "awaiting its window", which would leave a committed sweep
+unreportable and unretriable for as long as the read kept failing.
+
+This presentation is a property of the window, not of one mount: it SHALL
+persist across a remount or a re-selection of the control while the window is
+open. WHILE the running-status inbox read is in flight, the control SHALL NOT
+present that fleet as having no running sweep on the authority of a page read
+before the commit.
+
 #### Scenario: A commit sends the served host id
 - **WHEN** the player commits a focused scan against a listed target
 - **THEN** the request carries that entry's served host id as its host
@@ -114,6 +226,37 @@ expected, not a fault.
 #### Scenario: An accepted commit shows the running sweep
 - **WHEN** a focused-scan commit is accepted
 - **THEN** the control shows the running sweep in place of the target list
+
+#### Scenario: An accepted commit is never followed by the empty-set copy
+- **GIVEN** a scan commit has been accepted and the running-status inbox read
+  that carries it has not yet landed, while the post-commit scan-target
+  refetch has already returned the held-channel empty set
+- **WHEN** the control is shown
+- **THEN** it presents the sweep as committed and awaiting its window, offers
+  no commit control, and does not state that no host is in range
+- **AND** the countdown appears once the running-status read lands, with no
+  user action
+- **AND** no cancel affordance is offered while the window is open, and no
+  fleet-level cancel request is issued in its place
+
+#### Scenario: A failed running-status read ends the pending state rather than hanging it
+- **GIVEN** a scan commit has been accepted and the running-status inbox read
+  that would carry it fails
+- **WHEN** the control is shown
+- **THEN** it states that the sweep's state could not be read and offers a
+  retry, offers no commit control, and does not remain in the committed-and-
+  awaiting-window presentation
+
+#### Scenario: A sweep that settles inside the commit round trip still reports
+- **GIVEN** a scan commit has been accepted and the first running-status read
+  to land shows no running sweep, the sweep having settled before it landed
+- **WHEN** the pending presentation ends
+- **THEN** that fleet's settled-status inbox read, the open system's
+  sighting-pile read, and a fresh scan-target read are each issued
+- **AND** the settled sweep's outcome is reported, and the control does not
+  state that no host is in range on the empty set served while the sensor
+  channel was held
+- **AND** none of this requires navigation, reload, or manual refresh
 
 #### Scenario: A target that went stale between the list and the commit reads as no longer possible
 - **GIVEN** a listed target that the server rejects at commit because it is now
@@ -160,9 +303,12 @@ failure.
   yet been updated by a render
 
 #### Scenario: The guard releases when the request settles or fails
-- **WHEN** a scan commit settles or fails and the player then initiates a new
-  sweep
+- **GIVEN** a scan commit that was rejected or failed
+- **WHEN** it settles and the player then initiates a new sweep
 - **THEN** the guard has been released and the new attempt submits normally
+- **AND** after an *accepted* commit the guard's release does not re-offer the
+  commit control, which the committed-and-awaiting-window state withholds until
+  the running-status read lands and the running sweep withholds thereafter
 
 ### Requirement: A Running Sweep's Window and Cancel Come From the Action Inbox
 WHILE the acting fleet has a running focused scan, the system SHALL read that
@@ -203,7 +349,9 @@ control SHALL show it as settling rather than counting below zero.
 
 #### Scenario: A cancelled sweep returns the control to its target list
 - **WHEN** a running sweep is cancelled successfully
-- **THEN** the countdown clears and the served target list is offered again
+- **THEN** the countdown clears and a fresh scan-target read is issued, whose
+  targets the control offers — never the empty set served while the sweep held
+  the sensor channel
 
 #### Scenario: The commit control is withheld while a sweep runs
 - **WHEN** the acting fleet has a running sweep
@@ -232,17 +380,25 @@ unread for as long as that selection held.
 
 After the interior refetch that follows a sweep's ETA has **completed**, and
 only then, the system SHALL refetch the corporation's sighting pile for the
-open system and **both of that fleet's action-inbox reads — the
+open system, **both of that fleet's action-inbox reads — the
 running-status read that carries the sweep's window and cancel id, and the
 settled-status read that carries its outcome, reason code, and acknowledged
-state**. Refetching one and not the other leaves the sweep counting down
-forever or its outcome unreported, indistinguishably from not refetching at
-all: the running window, the cancel affordance's action id, the settled
-sweep's outcome, its reason code, and its acknowledged state are all carried
-by the inbox and by nothing else, so without both reads a settled sweep reads
-as perpetually settling (*A Running Sweep's Window and Cancel Come From the
-Action Inbox*) and its outcome report never appears at all (*A Settled Sweep
-Reports Its Outcome, Including Each Fizzle Reason, in Player Copy*).
+state** — and, when that fleet is the acting fleet, **its scan-target read**:
+the target list has exactly one consumer, and a non-acting fleet's list is
+refetched when it is selected (*Changing the acting fleet refetches the list*)
+rather than while nothing reads it. Refetching one and not the
+others leaves the sweep counting down forever, its outcome unreported, or its
+target list stuck at the empty set the sensor channel held while the sweep
+ran, indistinguishably from not refetching at all: the running window, the
+cancel affordance's action id, the settled sweep's outcome, its reason code,
+and its acknowledged state are all carried by the inbox and by nothing else,
+so without both inbox reads a settled sweep reads as perpetually settling
+(*A Running Sweep's Window and Cancel Come From the Action Inbox*) and its
+outcome report never appears at all (*A Settled Sweep Reports Its Outcome,
+Including Each Fizzle Reason, in Player Copy*); and without the scan-target
+read the target list served while the channel was held is never replaced
+(*The Focused-Scan Target List Comes From the Server, Never From a Client
+Predicate*).
 
 IF that interior refetch fails, or completes without the sweep having
 settled, THEN the system SHALL re-attempt the interior refetch on the view's
@@ -267,9 +423,12 @@ succeeded.
 #### Scenario: The pile and the inbox are refetched only after the settling read completes
 - **GIVEN** a running sweep whose ETA has just passed
 - **WHEN** the scheduled interior refetch is issued
-- **THEN** the sighting-pile refetch and the scan's action-inbox refetch are
-  issued only after that interior refetch has completed, never concurrently
-  with it
+- **THEN** the sighting-pile refetch, the scan's action-inbox refetches, and the
+  scan-target refetch are each issued only after that interior refetch has
+  completed, never concurrently with it
+- **AND** no scan-target read is issued before that settlement, since a read
+  answered while the sensor channel is still claimed serves the empty set by
+  construction and would be cached as the fresh one
 
 #### Scenario: Both inbox reads are refetched, not one
 - **GIVEN** a sweep whose ETA has just passed

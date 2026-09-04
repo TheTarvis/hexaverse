@@ -56,9 +56,9 @@ Semantic elements over div-with-onClick; keyboard operability for every interact
 
 ## Test-driven workflow
 
-- The SDET's scenario suite (Playwright/contract tests) exists before your code: run the tests for your task red, implement to green, refactor with them green. For units below its reach (component logic, form validation helpers, hooks), write your own test first and watch it fail before implementing.
+- The SDET's scenario suite (vitest component/hook tests and contract tests) exists before your code: run the tests for your task red, implement to green, refactor with them green. For units below its reach (component logic, form validation helpers, hooks), write your own test first and watch it fail before implementing. Playwright is **not** part of the red suite — the SDET writes one journey spec per change after every task is checked (`docs/testing-tiers.md`).
 - **Tests are immutable to implementers**: never edit assertions, `test.skip`/`.only`, or delete a test to reach green — including your own once written. A test you believe wrong is a dispute for the orchestrator (cite the scenario text); only the SDET revises tests, post-adjudication.
 
 ## Verification before checking off a task
 
-Relevant tests green and untouched · `tsc --noEmit` (or repo script) clean · lint clean · the scenario's flow exercised against a running dev server · error and empty states actually reachable (throw/return empty in dev to see them) · no console errors on the touched routes.
+Relevant vitest tests green and untouched · `tsc --noEmit` (or repo script) clean · lint clean · the scenario's flow exercised against a running dev server · error and empty states actually reachable (throw/return empty in dev to see them) · no console errors on the touched routes. **Never the Playwright suite per task** — it runs once per change at archive time (`docs/testing-tiers.md`).

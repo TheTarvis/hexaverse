@@ -38,6 +38,11 @@ const MARK_COLOR: Record<string, number> = {
   fleet: 0x4ade80,
   contact: 0xfbbf24,
   ghost: 0x94a3b8,
+  // add-scan-and-sightings-surface: a SIGHTING ghost — a frozen record from
+  // the corporation's own pile — is a DIFFERENT mark class from `ghost`
+  // above (a burn's arrival preview). Distinct from a contact's amber and a
+  // fleet's green so the register reads as its own thing at a glance.
+  sighting: 0xe879f9,
   'point-selection': 0xf472b6,
 }
 

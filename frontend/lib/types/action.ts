@@ -25,6 +25,19 @@ export interface GameAction {
   eta: number
   status: ActionStatus
   outcome?: string
+  // Widened by add-scan-and-sightings-surface (task 4.3): the resolver's
+  // structured classifier (`outOfRange`, `occluded`, `leftSystem`,
+  // `laneTransit`, `hostUnresolved`, `alreadySettled`, ...), served ONLY
+  // when the resolver set one (`json:"reasonCode,omitempty"` server-side).
+  // ANY served code is a fizzle; its absence is filed records — the client
+  // never parses `outcome` prose to make that call.
+  reasonCode?: string
+  // When this action settled, in world milliseconds — the settled-report's
+  // own tie-break key (greatest `resolvedAt` wins; ETA breaks a tie).
+  resolvedAt?: number
+  // Set once the player has dismissed this action's settled report, so a
+  // later refetch does not report the same sweep again.
+  acknowledgedAt?: number
   worldTime: number
 }
 

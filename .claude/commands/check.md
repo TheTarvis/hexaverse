@@ -3,19 +3,19 @@
 Run automated code quality validation on files that have been modified, or run full test/lint suites.
 
 **Usage:**
-- `/check` - Run ALL checks by default (file checks + lint + tests on changed files)
+- `/check` - The per-commit gate (file checks + lint + unit tests). Never boots a stack: the full backend emulator suite and Playwright are `--backend-tests` / `--e2e` only, run once per change at archive time (`docs/testing-tiers.md`)
 - `/check --files-only` - Check only changed files, skip test/lint suites
 - `/check --all ./frontend/components` - Check all files in a directory
 - `/check --base main` - Check files changed since main branch
 - `/check --lint` - Run ONLY frontend linting (ESLint + TypeScript)
 - `/check --frontend-tests` - Run ONLY frontend tests (Vitest)
-- `/check --e2e` - Run ONLY frontend E2E tests (Playwright via `npm run e2e`, which auto-starts a test emulator if none is running and boots its own isolated frontend/backend). Also runs as part of default `/check` / `--run-all` when a test emulator is already up (skipped with a warning otherwise, to keep routine checks fast)
-- `/check --backend-tests` - Run ONLY backend tests (gotestsum via the test-emulator wrapper)
+- `/check --e2e` - Run ONLY the Playwright journey (tier 4; `npm run e2e` auto-starts a test emulator if none is running and boots its own isolated frontend/backend). Explicit only — never part of the default run
+- `/check --backend-tests` - Run ONLY the full backend emulator suite (tier 3; gotestsum via the test-emulator wrapper, with a `-timeout` budget that is never raised). Explicit only — the default run uses `go test -short`
 - `/check --agent-tests` - Run ONLY agent/Python tests (pytest via uv)
 - `/check --agent-lint` - Run ONLY agent/Python linting (ruff + pyright via uv)
 - `/check --npm-audit` - Run ONLY npm audit on frontend prod deps (mirrors CI)
 - `/check --govulncheck` - Run ONLY govulncheck on the backend Go module (mirrors CI)
-- `/check --run-all` - Explicitly run all checks (same as default `/check`)
+- `/check --run-all` - Explicitly run the per-commit gate (same as default `/check`; still excludes `--backend-tests` and `--e2e`)
 - `/check --fast` - Skip the Python harness; run the minimal bash gate instead (`bash .claude/scripts/check.sh` — go vet, go test -short, tsc, ESLint, vitest; ~15-30s)
 
 ## Steps
@@ -37,7 +37,7 @@ Run automated code quality validation on files that have been modified, or run f
    - If the failure looks like an unsubstituted `{{PLACEHOLDER}}` (e.g. `go.mod:1: usage: module module/path`), say so explicitly and point the user at `bash bootstrap/init.sh`.
 
 The harness automatically:
-- **DEFAULT BEHAVIOR**: runs all checks (file validation + lint + tests) when no flags are specified
+- **DEFAULT BEHAVIOR**: runs the per-commit gate (file validation + lint + unit tests) when no flags are specified; stack-booting suites only on their explicit flags
 - Detects changed files via git (staged, unstaged, untracked)
 - Filters files by type (e.g., only frontend .tsx files for data-testid checks)
 - Reports detailed results with actionable error messages

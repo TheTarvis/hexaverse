@@ -68,13 +68,19 @@ conventions for that codebase. **Read the relevant one before working there.**
   from Flywheel and are **not yet adapted** to hexaverse.
 - `firebase.json`, `firebase.test.json` — emulator and deploy config
   (test emulators: Firestore 9100, Auth 10109, Pub/Sub 9106).
+- `docs/` — project docs. `docs/testing-tiers.md` is the single definition of
+  every test suite, its cost, and when it runs (per-commit gate vs. archive
+  gate); `docs/plans/continous_space/handoffs/` is the OpenSpec team's durable per-change state
+  (panel reports, adversary rounds, rulings, impl contracts, coverage tables,
+  journey records — see its README).
 
 ## Commands
 
 Quality gate — `/check` runs the full harness (changed-file validators:
 data-testid, test-file coverage, param helpers, raw-fetch, color compliance;
-plus lint, vitest, Go tests, agent lint/tests, npm audit, govulncheck, and
-best-effort e2e):
+plus lint, vitest, `go vet` + `go test -short`, agent lint/tests, npm audit,
+govulncheck). It never boots a stack: the full emulator suite and Playwright
+are `--backend-tests` / `--e2e` only (tiers 3 and 4 in `docs/testing-tiers.md`):
 
 ```bash
 python3 .claude/skills/code-quality-checks/check.py   # flags: --files-only --lint --backend-tests --e2e ... (see /check)
@@ -175,6 +181,38 @@ npm run dev:frontend
 (`cd frontend && npm run e2e`) needs none of these — it boots its own
 isolated stack (test emulators, `ENV=test` backend on :9012, frontend on
 :3110).
+
+## Spec-driven development (OpenSpec)
+
+Behavior is specified before it is built, in [OpenSpec](https://openspec.dev/)
+format under `openspec/`: `specs/<capability>/spec.md` is what the code does
+today, `changes/<change-id>/` (proposal, design, spec deltas, tasks) is what
+is about to change, and `openspec archive` folds a shipped change back into
+`specs/`. The CLI is `@fission-ai/openspec` (`npm i -g`); agents install it
+themselves if missing.
+
+- `/opsx:propose | explore | apply | update | sync | archive` — the single-agent
+  workflow: one change at a time, driven in this session.
+- `/team <design doc | request | change-id> [--implement] [--brownfield
+  <caps>] [--greenfield] [--workflow]` — the multi-agent team in
+  `.claude/agents/` (analyst, spec writer, specialist review panel,
+  validator, adversary, and an optional strict-TDD implementation crew).
+  `--workflow` runs the same pipeline as the deterministic `openspec-team`
+  Workflow. Read `.claude/agents/README.md` first.
+- `python3 .claude/scripts/openspec-reconcile.py` before archiving — catches
+  the MODIFIED-block omissions that `validate --strict` misses and
+  `archive` refuses.
+- `/team --chain docs/plans/<chain>/chain.md` implements already-authored
+  changes in archive order, one fresh orchestrator per link, verifying each
+  link's adversary verdict by diff before building it.
+- Testing during implementation follows `docs/testing-tiers.md`: the
+  per-commit gate never boots a stack; the Playwright journey and the full
+  emulator suite run once per change, at archive time, with the tree locked.
+
+Format rules live in `.claude/skills/openspec-conventions/`; the team's
+operating rules (spec-first, no vibe coding, adversary is non-skippable)
+in `.claude/skills/openspec-team-workflow/`.
+
 
 ## User profile
 

@@ -61,19 +61,44 @@ Launch selected reviewers **in parallel, each with the same inputs**: design doc
 
 - **Phase 1 → user**: validator PASS (`--strict`) + adversary "no material findings" (or round-cap with open items listed). Present spec; stop unless end-to-end delivery was requested.
 - **Phase 1 → Phase 2**: user approval (explicit, or prior end-to-end mandate).
-- **Kickoff → Build (red gate)**: SDET red handoff delivered — coverage table accounts for **every scenario** (automated or reasoned), every test confirmed failing for the right reason. Developers do not start before this gate.
-- **Build → Verify (green gate)**: all tasks checked or explicitly blocked; the SDET suite fully green.
-- **Verify → Archive**: SDET integrity check clean (no test modified/skipped/deleted since red handoff) + QA verdict SHIP + security/dba implementation audits clear + zero unchecked tasks. Then `openspec archive <id> --yes`.
+- **Kickoff → Build (red gate)**: impl contract in `docs/plans/continous_space/handoffs/`; SDET red handoff delivered — coverage table in `docs/plans/continous_space/handoffs/<id>-red-coverage.md` accounts for **every scenario** (`assertion-red` / `compile-red` / `already-green` / `Playwright, deferred` / `reasoned-not-automated`), every written test confirmed failing for the right reason, red manifest recorded. The red suite is unit and integration only. Developers do not start before this gate.
+- **Build → Verify (green gate)**: all tasks checked or explicitly blocked; the SDET suite fully green at tiers 1 and 2.
+- **Verify → Journey**: SDET integrity check clean (manifest verify) + QA matrix with every row PASS or BLOCKED-awaiting-journey + security/dba implementation audits clear + zero unchecked tasks. Any FAIL is one batched dev round and one re-verification, not a loop.
+- **Journey → Archive**: tree locked; journey spec written; tier 4 and tier 3 run once each and green — or red once, one batched revision round, and green on the single rerun. `docs/plans/continous_space/handoffs/<id>-journey.md` written with the suite budget line. QA's BLOCKED rows closed from it. `openspec-reconcile.py` clean. Then `openspec archive <id> --yes`.
 - A gate that can't be evaluated (QA BLOCKED, validator can't run) halts the pipeline with a report — never waved through.
 
 ## Delegation prompt requirements
 
-Subagents start with zero context. Every delegation includes: the design doc **path** (not a summary — summaries launder ambiguity), the change-id and its folder path, the agent's phase-appropriate task, what to return (findings format / files written / verdict), and for revision passes: the consolidated findings verbatim. Never paraphrase one agent's findings to another — paraphrase drops the quoted evidence the fix depends on.
+Subagents start with zero context. Every delegation includes: the design doc **path** (not a summary — summaries launder ambiguity), the change-id and its folder path, the agent's phase-appropriate task, what to return (findings format / files written / verdict), and for revision passes: the **path** to the findings file in `docs/plans/continous_space/handoffs/` — the reviewer's own report or the consolidated set with every accepted finding restated in full. Never paraphrase one agent's findings to another — paraphrase drops the quoted evidence the fix depends on.
+
+Delegations never carry test commands, suite timeouts, or standing prohibitions copied from a previous delegation. They cite `docs/testing-tiers.md` for the former. A prohibition names its cause ("do not regenerate X *because* defect D is open") so the agent can check whether the cause still holds — an inherited rule is never re-derived by the agent following it, and hexaverse carried one four days past the fix that dissolved it.
+
+## Handoff files are the state
+
+`docs/plans/continous_space/handoffs/README.md` names the file each phase writes. The orchestrator's context is a cache of those files, not the source: a fresh orchestrator resuming a change reads `<id>-rulings.md`, the latest `<id>-adversary-r<N>.md`, `<id>-impl-contract.md`, `<id>-red-coverage.md`, and `red-manifest-<id>.txt`, and continues from the right stage. This is what makes a long chain affordable — the orchestrator can be dropped between links instead of carrying every link's transcript.
+
+Consolidation discards findings unless every accepted finding is restated in full; when a reviewer's own report was never persisted and the artifact has since changed, the recovery is to re-run the reviewer against the current artifact, not to reconstruct what it said.
+
+## Verdict expiry and re-attack scope
+
+An adversary verdict records the commit it was issued at (`<id>-adversary-r<N>.md`). It is current while `git diff <verdict-sha> -- openspec/specs/<touched capabilities> openspec/changes/<id>` is empty. When it is not, the re-attack scope is **that diff** — the clauses whose live targets or delta text changed — plus a verification that prior findings stayed fixed. Not a full re-attack. The common trigger is archiving a predecessor change whose deltas landed in the specs this change targets.
+
+## Chains (`/team --chain <chain doc>`)
+
+A chain doc (`docs/plans/<chain>/chain.md`) lists changes in archive order with what each delivers and its state. Running a chain means, per link:
+
+1. Confirm the link's adversary verdict is current by diff; re-attack only the diff if not.
+2. Phase 2 through the journey and archive, as above.
+3. Record the archive commit in the chain doc's state column, plus what the link taught.
+4. Move to the next link with a **fresh orchestrator** reading the chain doc and the handoff files — never one orchestrator carrying every link.
+
+Links are sized to 20–40 tasks; a link that grows past that under panel review is split before authoring continues (hexaverse's links grew from 47 to 131 tasks, and every adversary round and dev pass re-read all of it). Archiving link N is the moment link N+1's verdict most likely expires; check by diff before implementing it, not by re-running the whole harden phase.
 
 ## Parallelism map
 
-- Parallel-safe: panel reviewers (read-only) · nextjs-dev + golang-dev AFTER the SDET's red handoff · QA + security/dba implementation audits (after the SDET integrity check).
-- Sequential by necessity: analyst → writer → panel → writer revision → validator → adversary · architect kickoff (contract) → SDET red suite → dev work → SDET integrity check → QA/audits.
+- Parallel-safe: panel reviewers (read-only) · nextjs-dev + golang-dev AFTER the SDET's red handoff · QA + security/dba implementation audits (after the SDET integrity check) · the SDET writing the journey spec while QA verifies the matrix.
+- Sequential by necessity: analyst → writer → panel → writer revision → validator → adversary · architect kickoff (contract) → SDET red suite → dev work → SDET integrity check → QA/audits → journey → archive.
+- **Exclusive by necessity: the journey run.** Nothing edits the tree while tier 3 or tier 4 runs, and the two never run concurrently (one emulator project). A developer editing during a run produced hot-reload reds that cost hexaverse a full cycle.
 - One writer at a time per change — two writer instances editing one change folder race on tasks.md and deltas.
 
 ## Failure playbook
@@ -84,7 +109,11 @@ Subagents start with zero context. Every delegation includes: the design doc **p
 | Dev disputes a test | halt that task; adjudicate against the spec's scenario text. Dev is right → SDET (only the SDET) revises the test, logged with cause. Dev is wrong → dev implements to the test as written. Never let the dev "resolve" it in code+test simultaneously |
 | Spec changes mid-build (from any route) | revised scenarios go to the SDET first — tests update to the new spec red/green cycle before dev work resumes on the affected tasks |
 | Integrity check finds altered/skipped tests | BLOCKER: treat the associated tasks as falsely complete; restore tests via SDET, return tasks to the responsible dev; report the violation to the user — never quietly fix and pass |
-| QA FAIL | route to owning dev with QA's repro verbatim; re-verify FAILed rows + capability siblings |
+| QA FAIL | batch every FAIL from the pass into one round to the owning devs with QA's repro verbatim; one re-verification of FAILed rows + capability siblings |
+| Journey red | collect **every** finding from the run — test-side misreadings and product defects alike — into one batched revision round (writer for spec gaps → adversary spot-check of revised clauses only → SDET → dev), then one rerun. Never a round per red leg; never a raised timeout |
+| Suite overruns its timeout | report the wall time and stop; raising the budget is not a fix (a growing suite hides a real hang). Fixture sharing or a package split is the user's decision, filed as a follow-up |
+| Foreground command killed by the tool timeout | not a test failure — do not rerun in the foreground; rerun once in the background with a log file |
+| Adversary rounds converge to residue only | convergence, not another full attack: verify residue, rule MAJOR/MINOR forward as a follow-up change at the cap, BLOCKERs stop the run for the user |
 | Validator BLOCKED (content missing, e.g. requirement without scenario) | writer, not validator, supplies content |
 | CLI absent | scaffold per `openspec-conventions`, validate manually, tell the user to install `@fission-ai/openspec` |
 | Two in-flight changes touch one requirement | surface to user — sequencing changes is a product decision, not yours |

@@ -79,6 +79,16 @@ export interface SpaceStageProps {
   onSelect?: (selection: SpaceSelection | null) => void
   onAvailabilityChange?: (available: boolean) => void
   onFirstFrame?: () => void
+  /**
+   * The currently highlighted sighting ghost's RECORD id (never a mark id) —
+   * add-scan-and-sightings-surface, `system-space-view`: *A Log Row and Its
+   * Ghost Address the Same Record By Its Served Id*. A ghost is highlighted,
+   * never selected: this is separate, additional state, held alongside
+   * `selection` rather than inside it.
+   */
+  highlightedGhostId?: string | null
+  /** Activating a ghost reports its record id here — never a selection. */
+  onHighlightGhost?: (recordId: string | null) => void
 }
 
 const CAMERA_CONTROL_ATTR = 'data-space-camera-control'
@@ -111,6 +121,8 @@ export function SpaceStage({
   onSelect,
   onAvailabilityChange,
   onFirstFrame,
+  highlightedGhostId = null,
+  onHighlightGhost,
 }: SpaceStageProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState(true)
@@ -118,6 +130,7 @@ export function SpaceStage({
   const [drawWorldTime, setDrawWorldTime] = useState(worldTime)
   const [focusedMarkId, setFocusedMarkId] = useState<string | null>(null)
   const [hoveredContactId, setHoveredContactId] = useState<string | null>(null)
+  const [hoveredGhostId, setHoveredGhostId] = useState<string | null>(null)
 
   // A new system is a new view: the framing resets, with no transition, and
   // nothing else resets it. Adjusted during render (never in an effect) so a
@@ -352,12 +365,16 @@ export function SpaceStage({
           selection={selection}
           focusedMarkId={focusedMarkId}
           hoveredContactId={hoveredContactId}
+          hoveredGhostId={hoveredGhostId}
+          highlightedGhostId={highlightedGhostId}
           onFocusMark={(id, position) => {
             setFocusedMarkId(id)
             if (position) reframeOn(position)
           }}
           onBlurMark={() => setFocusedMarkId(null)}
           onHoverContact={setHoveredContactId}
+          onHoverGhost={setHoveredGhostId}
+          onHighlightGhost={onHighlightGhost}
           onSelect={(next) => onSelect?.(next)}
           onCamera={setCamera}
           onRecenter={recenter}
@@ -425,9 +442,13 @@ interface SpaceLayersProps {
   selection: SpaceSelection | null
   focusedMarkId: string | null
   hoveredContactId: string | null
+  hoveredGhostId: string | null
+  highlightedGhostId: string | null
   onFocusMark: (id: string, reframeTo: DrawVec3 | null) => void
   onBlurMark: () => void
   onHoverContact: (id: string | null) => void
+  onHoverGhost: (id: string | null) => void
+  onHighlightGhost?: (recordId: string | null) => void
   onSelect: (selection: SpaceSelection | null) => void
   onCamera: (next: (prev: SpaceCamera) => SpaceCamera) => void
   onRecenter: () => void
@@ -443,9 +464,13 @@ function SpaceLayers({
   selection,
   focusedMarkId,
   hoveredContactId,
+  hoveredGhostId,
+  highlightedGhostId,
   onFocusMark,
   onBlurMark,
   onHoverContact,
+  onHoverGhost,
+  onHighlightGhost,
   onSelect,
   onCamera,
   onRecenter,
@@ -463,6 +488,7 @@ function SpaceLayers({
   const gates = pickables.filter((p) => p.mark.kind === 'gate')
   const offScreen = pickables.filter((p) => !p.screen.onScreen)
   const contacts = projected.filter((p) => p.mark.kind === 'contact')
+  const sightings = projected.filter((p) => p.mark.kind === 'sighting')
 
   const panAtLimit = (right: number, up: number): boolean => {
     const next = panBySteps(camera, right, up, extent)
@@ -601,6 +627,52 @@ function SpaceLayers({
             data-testid="contact-facts"
             className="absolute right-4 top-4 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
           >
+            <div>Bearing {heading.toFixed(0)}°</div>
+            <div>Speed {speed.toFixed(2)}</div>
+          </div>
+        )
+      })()}
+
+      {/* --- sighting ghosts: frozen, never selected. `data-space-
+              affordance` is the WHOLE mechanism that keeps activating one
+              from ever becoming a point selection or arming a burn
+              (system-space-view "A Ghost Is Not a Member of the Space
+              View's Selection, and a Burn Never Consumes One") — without it
+              a pointerdown here bubbles to the region and the exhaustive
+              picking rule treats it as empty space. --- */}
+      <div className="pointer-events-none absolute inset-0">
+        {sightings.map(({ mark, screen }) => (
+          <button
+            key={mark.id}
+            type="button"
+            {...{ [AFFORDANCE_ATTR]: '' }}
+            data-testid={`sighting-mark-${mark.recordId}`}
+            data-highlighted={highlightedGhostId === mark.recordId ? 'true' : 'false'}
+            aria-label={`Sighting at ${mark.recordId}`}
+            className="pointer-events-auto absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-fuchsia-400/70 bg-fuchsia-400/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+            style={{ left: `${screen.x || 0}px`, top: `${screen.y || 0}px` }}
+            onPointerOver={() => onHoverGhost(mark.id)}
+            onPointerOut={() => onHoverGhost(null)}
+            onFocus={() => onHoverGhost(mark.id)}
+            onBlur={() => onHoverGhost(null)}
+            onClick={() => onHighlightGhost?.(mark.recordId ?? null)}
+          >
+            {mark.asOf !== undefined && <span className="sr-only">Observed at {mark.asOf}</span>}
+          </button>
+        ))}
+      </div>
+      {(() => {
+        const shown = sightings.find(({ mark }) => mark.id === hoveredGhostId)
+        if (!shown) return null
+        const v = shown.mark.velocity
+        const speed = v ? Math.hypot(v.x, v.y, v.z) : 0
+        const heading = v ? ((Math.atan2(v.x, -v.z) * 180) / Math.PI + 360) % 360 : 0
+        return (
+          <div
+            data-testid="sighting-facts"
+            className="absolute right-4 top-16 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
+          >
+            <div>Observed at {shown.mark.asOf ?? '—'}</div>
             <div>Bearing {heading.toFixed(0)}°</div>
             <div>Speed {speed.toFixed(2)}</div>
           </div>

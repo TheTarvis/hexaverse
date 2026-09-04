@@ -38,12 +38,19 @@ package main
 // PINNED FIRESTORE SCHEMA (the document backend/sightings/model.go and
 // dao.go must decode into a Sighting for this test, and dao_test.go's
 // TestDao_Scenario_* tests, to agree): a document at
-// corporations/{cid}/sightings/{actionId}_{targetId} (design.md Decision 13)
-// with fields corporationId, actionId, systemId, targetId, asOf (int64),
-// hostId — see sightings/mint_test.go for the fuller payload shape
-// (position/velocity/emitting/hullCount/hullTypes) MintWrites itself must
-// also produce; this fixture only sets the subset this test's assertions
-// need.
+// corporations/{cid}/sightings/{digest} — the opaque SHA-256 digest over
+// (actionId, targetId) add-scan-and-sightings-surface's design.md Decision 1
+// mandates in place of the retired {actionId}_{targetId} scheme (see
+// sightingDocId below) — with fields corporationId, actionId, systemId,
+// targetId, asOf (int64), hostId — see sightings/mint_test.go for the fuller
+// payload shape (position/velocity/emitting/hullCount/hullTypes) MintWrites
+// itself must also produce; this fixture only sets the subset this test's
+// assertions need.
+//
+// REVISED 2026-09-03 (add-scan-and-sightings-surface, per the orchestrator's
+// adjudication that this is the SDET's revision, not the Go developer's):
+// only the document-id derivation changed, to track design.md Decision 1's
+// digest. Every other assertion in this file is unchanged.
 //
 // This test deliberately makes NO assumption about the response envelope's
 // exact key names (e.g. whether records are wrapped under "sightings" or
@@ -52,12 +59,16 @@ package main
 // own record's identifying (non-target) fields, a foreign corporation's
 // read must contain NONE of another corp's data, and NEITHER corp's read
 // may ever contain the sighted target's raw id — not as a "targetId" key,
-// and not smuggled in via the record's own Firestore document id (which
-// task 3.3's {actionId}_{targetId} scheme embeds verbatim), since either
-// would be exactly the dereferenceable handle Decision 16 forbids.
+// and not smuggled in via the record's own Firestore document id (the
+// opaque SHA-256 digest add-scan-and-sightings-surface's design.md
+// Decision 1 mandates, over the retired {actionId}_{targetId} scheme that
+// embedded it verbatim), since either would be exactly the dereferenceable
+// handle Decision 16 forbids.
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"strings"
 	"testing"
@@ -66,13 +77,26 @@ import (
 	"github.com/google/uuid"
 )
 
+// sightingDocId computes the opaque, deterministic document id
+// add-scan-and-sightings-surface's design.md Decision 1 / architect
+// implementation contract §1.3 mandates in place of the retired
+// {actionId}_{targetId} scheme: hex(sha256("sighting/v1\x00"+actionId+
+// "\x00"+targetId)[:16]). Mirrors backend/sightings/mint.go's own
+// derivation (task 2.1) so this router-level fixture and the production
+// MintWrites agree on a path without this file importing hexaverse/sightings
+// at all (see the file's own doc comment for why that import is avoided).
+func sightingDocId(actionId, targetId string) string {
+	sum := sha256.Sum256([]byte("sighting/v1\x00" + actionId + "\x00" + targetId))
+	return hex.EncodeToString(sum[:16])
+}
+
 // seedSightingFixture writes one sighting document directly via the raw
 // production Firestore client, using this file's own pinned schema (see
 // file doc comment) rather than sightings.MintWrites — see that same
 // comment for why this file avoids importing hexaverse/sightings at all.
 func seedSightingFixture(t *testing.T, client *firestore.Client, cid, actionId, targetId string, data map[string]interface{}) {
 	t.Helper()
-	docId := actionId + "_" + targetId
+	docId := sightingDocId(actionId, targetId)
 	ref := client.Collection("corporations").Doc(cid).Collection("sightings").Doc(docId)
 	if _, err := ref.Set(context.Background(), data, firestore.MergeAll); err != nil {
 		t.Fatalf("seeding sighting fixture at corporations/%s/sightings/%s: %v", cid, docId, err)
@@ -153,8 +177,8 @@ func TestRouter_Scenario_SightingPileReadIsCorpScopedAndHidesTheTargetId(t *test
 		if containsAll(body, secretTargetId) {
 			t.Errorf("sighting-records \"The target id is stored but never serialized to the client\": "+
 				"GET /v1/sightings' response body contains the literal target id %q — via a \"targetId\" field, "+
-				"or smuggled in through the record's own document id (task 3.3's "+
-				"{actionId}_{targetId} scheme). Body: %s", secretTargetId, body)
+				"or smuggled in through the record's own document id (the digest, add-scan-and-sightings-surface's "+
+				"design.md Decision 1). Body: %s", secretTargetId, body)
 		}
 	})
 

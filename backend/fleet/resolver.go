@@ -141,9 +141,16 @@ func ScanResolver(ships ShipSource, bodies BodySource) action.ResolveFunc {
 			return action.ResolveResult{}, err
 		}
 
-		// Already settled (a racing read got here first) — no-op.
+		// Already settled (a racing read got here first) — no-op. Carries
+		// its own reason code, distinct from every geometry/system/transit/
+		// host-resolution code below: a consumer that treats ANY served
+		// reason code as a fizzle (system-space-view "A Settled Sweep
+		// Reports Its Outcome") would otherwise misreport this no-mint
+		// resolution as having filed records over an empty log
+		// (focused-scan "A sweep already settled by a racing read carries
+		// its own reason code").
 		if f.Scan == nil {
-			return action.ResolveResult{Outcome: "scan already settled"}, nil
+			return action.ResolveResult{Outcome: "scan already settled", ReasonCode: "alreadySettled"}, nil
 		}
 		window := *f.Scan
 		pulseReach := window.DepartMs + (window.ArriveMs-window.DepartMs)/2
@@ -206,6 +213,19 @@ func ScanResolver(ships ShipSource, bodies BodySource) action.ResolveFunc {
 				Id: raw.Id, State: shipState, InLaneTransit: raw.Jump != nil,
 			}
 		}
+		// A sweep never files a claim against its own scanner (focused-scan
+		// "A Sweep Never Files a Claim Against Its Own Scanner"): the
+		// scanner satisfies chainBeneath trivially whenever it is itself
+		// masked at the swept host (docked there, or docked to a carrier
+		// docked there), and disclosure.FocusedScan mints from whatever
+		// ships map it is handed with no owner/identity filter of its own.
+		// Deleting the scanner's OWN entry here — never from Attachments,
+		// which must keep walking the real chain structure — makes
+		// FocusedScan's existing "ok" lookup skip it exactly like any other
+		// id absent from the caller's ship set, and its existing
+		// len(out)==0 clean-sweep fallback fires for free when the scanner
+		// was the only thing masked at the host.
+		delete(shipMap, r.Action.Actor)
 
 		// Attachments (attachments.go) is the shared adapter both the
 		// interior read's contact union (fleet.FleetsInSystem) and this

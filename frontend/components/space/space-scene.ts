@@ -30,9 +30,17 @@ import {
   type DrawVec3,
 } from '@/lib/space/draw'
 import type { Burn, Drift, Park, Vec3 } from '@/lib/types/fleet'
+import type { Sighting } from '@/lib/types/sighting'
 import type { SystemSpace } from '@/lib/types/system-space'
 import type { SpaceSelection } from './space-selection'
 
+// 'sighting' — a SIGHTING GHOST (add-scan-and-sightings-surface), the mark
+// a target-naming pile record draws. NOT THE SAME MARK CLASS as 'ghost'
+// below, which is a BURN's arrival preview — a completely different thing
+// this file already drew before this change existed
+// (link8b-impl-contract.md §1.9: the single most likely silent defect in
+// this change's client half). A sighting ghost is highlighted, never
+// selected — it is never a member of `selection` and never pickable.
 export type SceneMarkKind =
   | 'star'
   | 'body'
@@ -41,6 +49,7 @@ export type SceneMarkKind =
   | 'fleet'
   | 'contact'
   | 'ghost'
+  | 'sighting'
   | 'point-selection'
 
 export interface SceneMark {
@@ -54,11 +63,22 @@ export interface SceneMark {
   emitting?: boolean
   scanning?: boolean
   /**
-   * Contacts only — the SERVED velocity, carried so the facts surface can
-   * DISPLAY a heading and speed. It is never integrated: a contact does not
-   * drift between reads.
+   * Contacts and sighting ghosts only — the SERVED velocity, carried so the
+   * facts surface can DISPLAY a heading and speed. It is never integrated:
+   * neither a contact nor a sighting drifts between reads.
    */
   velocity?: DrawVec3
+  /** Sighting ghosts only — the record's `asOf`, for its label. */
+  asOf?: number
+  /**
+   * Sighting ghosts only — the record's SERVED `id`, carried separately
+   * from `mark.id` (which is `sighting-${record.id}`, mirroring
+   * `contact-${index}`). The DOM test id and the row<->ghost cross-
+   * highlight both address a ghost by THIS field — a single prefix over
+   * the record id (link8b-impl-contract.md §1.9: `sighting-mark-${record.id}`)
+   * — never by re-deriving it from `mark.id`.
+   */
+  recordId?: string
 }
 
 export interface SceneCurve {
@@ -117,6 +137,14 @@ export interface SceneInput {
   selection: SpaceSelection | null
   /** The diagnostic sink the origin rule requires — injected, so it is assertable. */
   log: (message: string, detail?: unknown) => void
+  /**
+   * The corporation's sighting pile, ALREADY filtered server-side to the
+   * open system (add-scan-and-sightings-surface, `sighting-records`: *The
+   * Pile Read Filters To One System On Request*). This function performs NO
+   * systemId filtering of its own — it draws whatever it is handed, exactly
+   * as it does for every other mark class. Defaults to `[]`.
+   */
+  sightings?: Sighting[]
 }
 
 const FLEET_MARK_RADIUS = 0.6
@@ -180,7 +208,7 @@ function selectionMatches(selection: SpaceSelection | null, bodyId: string): boo
 }
 
 export function buildSceneModel(input: SceneInput): SceneModel {
-  const { interior, fleets, worldTimeMs, reducedMotion, selection, log } = input
+  const { interior, fleets, worldTimeMs, reducedMotion, selection, log, sightings } = input
   const marks: SceneMark[] = []
   const curves: SceneCurve[] = []
   const beltFields: SceneBeltField[] = []
@@ -324,6 +352,40 @@ export function buildSceneModel(input: SceneInput): SceneModel {
       ...(toDraw(contact.velocity) ? { velocity: toDraw(contact.velocity) as DrawVec3 } : {}),
     })
   })
+
+  // --- sighting ghosts -------------------------------------------------
+  // add-scan-and-sightings-surface, `system-space-view`: *A Sighting Ghost
+  // Renders at Its Frozen Position, Never a Predicted One*. NO systemId
+  // filtering here (the caller's job — see `SceneInput.sightings`'s own
+  // doc comment); NO velocity integration (the stored velocity is carried
+  // on the mark for DISPLAY only); a clean-sweep record draws nothing at
+  // all (it names no target and carries no position); an origin position
+  // is omitted through the SAME sink every other mark class uses.
+  for (const record of sightings ?? []) {
+    if (record.cleanSweep) continue
+    const position = toDraw(record.position)
+    if (!position) continue
+    if (isDrawOrigin(position)) {
+      omitOrigin(record.id, 'sighting')
+      continue
+    }
+    marks.push({
+      id: `sighting-${record.id}`,
+      kind: 'sighting',
+      position,
+      radius: CONTACT_MARK_RADIUS,
+      // A sighting ghost is highlighted, never selected: it is never
+      // pickable through the space view's exhaustive picking rule, and
+      // `selected` stays permanently false — it holds no member of
+      // `selection` at all (`system-space-view`: *A Ghost Is Not a Member
+      // of the Space View's Selection...*).
+      pickable: false,
+      selected: false,
+      asOf: record.asOf,
+      recordId: record.id,
+      ...(toDraw(record.velocity) ? { velocity: toDraw(record.velocity) as DrawVec3 } : {}),
+    })
+  }
 
   // --- a selected bare point is VISIBLY marked -----------------------------
   // A point in vacuum has no body mark to highlight and no intrinsic

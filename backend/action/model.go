@@ -42,6 +42,16 @@ const (
 	SlotSensor   = "activeScanId"
 )
 
+// SettledPageMax is the named ceiling on a single `status=done` inbox read
+// (action-dispatch "Inbox by Actor Query Param" — "A settled-status read is
+// bounded, and its bound keeps the newest"; link8b-impl-contract.md §1.4).
+// An actor's settled actions accumulate for the life of the game and are
+// never deleted, so this bound composes with `OrderBy("resolvedAt", Desc)`
+// — never applied alone, since a bound over an unordered query returns an
+// arbitrary subset rather than the newest one. 50 matches sightings.PageMax,
+// this repo's only other named page ceiling.
+const SettledPageMax = 50
+
 // Action is the generic async entity every verb rides (#0005). The lifecycle,
 // commit-time ETA, cancel, and inbox are shared here; per-type behaviour is
 // confined to Params (frozen at commit) and the resolver registered for Type.

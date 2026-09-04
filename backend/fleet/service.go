@@ -226,6 +226,11 @@ type ServiceInterface interface {
 	// a deterministic spawn-park derivation needs (corporations' own
 	// homeSpawnPosition, design.md Open Question 3).
 	HomeGeometry(ctx context.Context, systemID string) (extent, starSize float64, err error)
+	// ScanTargets serves the set of hosts a focused-scan commit by id would
+	// accept right now, priced at the duration that commit would freeze
+	// (focused-scan "Eligible Scan Targets Are Served Per Fleet, To Their
+	// Owner Alone").
+	ScanTargets(ctx context.Context, id string) ([]ScanTarget, error)
 }
 
 type Service struct {
@@ -1599,20 +1604,17 @@ func (s *Service) Scan(ctx context.Context, id, hostId string) (*Fleet, error) {
 		return nil, err
 	}
 
-	hostPos, err := s.resolveScanHost(ctx, f, bt, hostId, now)
+	hostPos, err := s.scanHostPosition(ctx, f, bt, hostId, now)
 	if err != nil {
 		return nil, err
 	}
 
-	if !disclosure.WithinRange(from, hostPos, disclosure.FocusedScanRange) {
-		return nil, disclosure.ErrScanOutOfRange
-	}
 	starPos, err := space.Position(bt, bt.StarId(), now)
 	if err != nil {
 		return nil, fmt.Errorf("fleet: resolving star position for scan occlusion: %w", err)
 	}
-	if disclosure.Occluded(from, hostPos, starPos, bt.StarSize()) {
-		return nil, disclosure.ErrScanOccluded
+	if err := scanGeometry(from, hostPos, starPos, bt.StarSize()); err != nil {
+		return nil, err
 	}
 
 	d := hostPos.Sub(from).Length()
@@ -1643,14 +1645,29 @@ func (s *Service) Scan(ctx context.Context, id, hostId string) (*Fleet, error) {
 	return f, nil
 }
 
-// resolveScanHost resolves hostId to a live position at commit time: a body
+// scanHostPosition resolves hostId to a live position at commit time: a body
 // in the scanning fleet's own system, or a fleet owned by the SAME
 // corporation present in that system. A hostId naming a body/fleet in a
 // different system, a fleet owned by a different corporation, a fleet in
-// lane transit, or nothing at all is rejected through the exact same
-// ErrScanHostUnresolved — no distinguishing field (focused-scan "A Foreign
-// Fleet's Id Is Rejected Identically To An Unresolvable One").
-func (s *Service) resolveScanHost(ctx context.Context, scanner *Fleet, bt *system.BodyTable, hostId string, now common.WorldMillis) (space.Vec3, error) {
+// lane transit, the SCANNING FLEET ITSELF, a derived belt member, or nothing
+// at all is rejected through the exact same ErrScanHostUnresolved — no
+// distinguishing field (focused-scan "A Foreign Fleet's Id Is Rejected
+// Identically To An Unresolvable One", "A Fleet Is Never a Host For Its Own
+// Sweep", "A commit naming a belt member is rejected as unresolvable").
+//
+// The self and belt-member checks run BEFORE the body-table lookup,
+// deliberately: the table resolves every synthesized belt-member id
+// (`{beltId}#{k}`) just like any other body, so a check placed after that
+// lookup would never run for a belt member (link8b-impl-contract.md §2,
+// task 3.4).
+//
+// Shared by Scan (the commit) and ScanTargets (the list) — one
+// implementation of host resolution, so the two can never silently drift
+// (link8b-impl-contract.md §1.11, task 3.1).
+func (s *Service) scanHostPosition(ctx context.Context, scanner *Fleet, bt *system.BodyTable, hostId string, now common.WorldMillis) (space.Vec3, error) {
+	if hostId == scanner.Id || system.IsDerivedBeltMember(hostId) {
+		return space.Vec3{}, ErrScanHostUnresolved
+	}
 	if _, ok := bt.Body(hostId); ok {
 		pos, err := space.Position(bt, hostId, now)
 		if err != nil {
@@ -1678,6 +1695,22 @@ func (s *Service) resolveScanHost(ctx context.Context, scanner *Fleet, bt *syste
 		return pos, nil
 	}
 	return space.Vec3{}, ErrScanHostUnresolved
+}
+
+// scanGeometry applies the two live-position tests a focused-scan commit and
+// the scan-target list both apply unchanged: FocusedScanRange (inclusive at
+// the boundary) and star occlusion (strict — a sightline exactly tangent to
+// the star is clear). Shared by Scan and ScanTargets so the two never apply
+// two implementations of the same predicates (link8b-impl-contract.md
+// §1.11, task 3.1).
+func scanGeometry(from, hostPos, starPos space.Vec3, starSize float64) error {
+	if !disclosure.WithinRange(from, hostPos, disclosure.FocusedScanRange) {
+		return disclosure.ErrScanOutOfRange
+	}
+	if disclosure.Occluded(from, hostPos, starPos, starSize) {
+		return disclosure.ErrScanOccluded
+	}
+	return nil
 }
 
 // Cancel releases the fleet's active movement-channel action, if any.

@@ -705,11 +705,11 @@ def run_frontend_e2e(required: bool = True) -> dict:
     or emulator management is duplicated here, so wrapper changes are picked up
     automatically.
 
-    `required` (explicit `--e2e`): always run — ensure-test-emulators.sh starts a
-    persistent test emulator first (or reuses one), so the wrapper and later runs
-    attach to it instead of cold-starting a throwaway set every time. Best-effort
-    (`--run-all`/default `/check`): only run when a test emulator is already up, so
-    a routine `/check` isn't slowed by a multi-minute cold-started e2e run.
+    Only runs on explicit `--e2e` (tier 4 in docs/testing-tiers.md) — never as part
+    of `--run-all`/default `/check`. `required=False` is kept for callers that want
+    the old best-effort probe (run only if a test emulator is already listening).
+    The default check is deliberately stack-free: keeping a persistent emulator up
+    to save cold starts must not turn every routine `/check` into an e2e run.
     """
     print_header("Running Frontend E2E Tests (Playwright)")
 
@@ -791,8 +791,37 @@ def generate_backend_mocks() -> dict:
         return {"passed": False, "reason": f"Error: {e}"}
 
 
+def run_backend_unit_tests() -> dict:
+    """Run the backend unit tier only: `go vet` + `go test -short ./...` (tier 1).
+
+    Emulator-backed tests skip under -short, so this never needs a stack and
+    finishes in seconds. The full suite is `--backend-tests` (tier 3).
+    """
+    print_header("Running Backend Unit Tests (go test -short)")
+
+    backend_dir = Path.cwd() / "backend"
+    if not backend_dir.exists():
+        print_warning("Backend directory not found, skipping")
+        return {"passed": True, "skipped": True}
+
+    try:
+        vet = run_command("go vet ./...", cwd=backend_dir, check=False)
+        if vet.returncode != 0:
+            print_error("go vet failed")
+            return {"passed": False, "reason": "go vet failures (see output above)", "output": vet.stdout}
+        result = run_command("go test -short -count=1 ./...", cwd=backend_dir, check=False)
+        if result.returncode == 0:
+            print_success("Backend unit tests passed")
+            return {"passed": True, "output": result.stdout}
+        print_error("Backend unit tests failed")
+        return {"passed": False, "reason": "Unit test failures (see output above)", "output": result.stdout}
+    except Exception as e:
+        print_error(f"Failed to run backend unit tests: {e}")
+        return {"passed": False, "reason": f"Error: {e}"}
+
+
 def run_backend_tests_suite() -> dict:
-    """Run backend test suite (gotestsum)."""
+    """Run the FULL backend test suite against the emulator (tier 3, gotestsum)."""
     print_header("Running Backend Tests")
 
     project_root = Path.cwd()
@@ -1363,12 +1392,12 @@ def main():
     parser.add_argument(
         "--backend-tests",
         action="store_true",
-        help="Run backend tests (gotestsum)"
+        help="Run the FULL backend suite against the emulator (tier 3; minutes). Never part of the default run, which uses go test -short."
     )
     parser.add_argument(
         "--e2e",
         action="store_true",
-        help="Run frontend E2E tests (Playwright via `npm run e2e`, which auto-starts a test emulator). Always runs when set; also runs in --run-all when a test emulator is already up."
+        help="Run the Playwright journey (tier 4 via `npm run e2e`, which auto-starts a test emulator). Only runs when set — never part of --run-all/default."
     )
     parser.add_argument(
         "--agent-tests",
@@ -1393,7 +1422,7 @@ def main():
     parser.add_argument(
         "--run-all",
         action="store_true",
-        help="Run all checks including lint and tests (DEFAULT BEHAVIOR)"
+        help="Run the per-commit gate: file checks + lint + unit tests (DEFAULT BEHAVIOR). Excludes --backend-tests and --e2e, which boot a stack."
     )
     parser.add_argument(
         "--files-only",
@@ -1475,8 +1504,14 @@ def main():
     if args.frontend_tests or run_all_checks:
         results["frontend_tests"] = run_frontend_tests()
 
-    if args.backend_tests or run_all_checks:
+    # Stack-booting suites (tiers 3 and 4 in docs/testing-tiers.md) run ONLY on
+    # their explicit flags. The default /check is the per-commit gate and must
+    # stay stack-free: the full emulator suite grows with every test and the
+    # Playwright journey runs once per change, at archive time.
+    if args.backend_tests:
         results["backend_tests_suite"] = run_backend_tests_suite()
+    elif run_all_checks:
+        results["backend_tests_unit"] = run_backend_unit_tests()
 
     # Determinism cross-target matrix: runs alongside the native-arch board
     # tests (not an opt-in extra step — openspec cross-stack-determinism).
@@ -1523,11 +1558,8 @@ def main():
     # satisfy is a check that cannot fire.
     results["determinism_lists"] = run_determinism_lists_check()
 
-    # E2E runs in --run-all/default too, but best-effort: it needs the local dev
-    # stack and takes minutes, so when the stack is down it's skipped (not failed)
-    # unless explicitly requested via --e2e.
-    if args.e2e or run_all_checks:
-        results["frontend_e2e"] = run_frontend_e2e(required=args.e2e)
+    if args.e2e:
+        results["frontend_e2e"] = run_frontend_e2e(required=True)
 
     if args.agent_lint or run_all_checks:
         results["agent_lint"] = run_agent_lint()

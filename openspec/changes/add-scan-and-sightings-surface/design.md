@@ -799,3 +799,6 @@ be answered by inventing a value.
     fleet (a second signup plus a multi-lane transit — expensive). Whether a
     genuine two-corporation ghost journey is wanted as a later Playwright
     addition is Travis's call, not decided or invented here.
+12. **A freshly spawned fleet typically has no host within focused-scan
+    range; whether spawn placement or the range should change so a first
+    scan is possible without a burn is Travis's call.**

@@ -9,6 +9,7 @@ package system
 
 import (
 	"fmt"
+	"strings"
 
 	"hexaverse/space"
 )
@@ -68,4 +69,15 @@ func beltMemberOrbit(belt Feature, k int) space.Body {
 			Node:        belt.Space.Node,
 		},
 	}
+}
+
+// IsDerivedBeltMember reports whether bodyId is a belt member id
+// beltMemberOrbit synthesizes ("%s#%d") rather than a persisted feature or
+// gate id. Exported from system, not open-coded in fleet, because this
+// format is the one place `"%s#%d"` is written (link8b-impl-contract.md
+// §1.11) — a predicate living anywhere else would be a second copy of it.
+// The definition is the contract's literal substring test, not a stricter
+// "beltId#<digits>" match.
+func IsDerivedBeltMember(bodyId string) bool {
+	return strings.Contains(bodyId, "#")
 }

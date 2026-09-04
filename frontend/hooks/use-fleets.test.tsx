@@ -14,10 +14,12 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   useCutDrive,
+  useHold,
   useJump,
   useMine,
   useMyFleets,
   useOrder,
+  useRelease,
   useStop,
 } from './use-fleets'
 import { fleetService } from '@/lib/services'
@@ -32,6 +34,8 @@ vi.mock('@/lib/services', () => ({
     stop: vi.fn(),
     jump: vi.fn(),
     mine: vi.fn(),
+    hold: vi.fn(),
+    release: vi.fn(),
   },
 }))
 
@@ -171,5 +175,90 @@ describe('useMine', () => {
     expect(keys).toContainEqual(queryKeys.fleets.detail('fleet_1'))
     expect(keys).toContainEqual(queryKeys.systemBoard.detail('sys-0'))
     expect(keys).toContainEqual(queryKeys.actions.running('fleet_1'))
+  })
+})
+
+
+// --- add-scan-and-sightings-surface, tasks.md 4.9 (F4, link8b-adversary-
+// r8): cut drive, stop, hold and release each rewrite the fleet's served
+// kinematic state with NO scheduled ETA to land later, so each must ALSO
+// invalidate that fleet's scan-target list — never asserted by an SDET
+// suite (this hook carries no pinned shape at all, per this file's own
+// header comment), so it gets its own test here.
+describe('useCutDrive / useStop / useHold / useRelease — each also invalidates the acting fleet\'s scan-target list (F4)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('useCutDrive invalidates queryKeys.fleets.scanTargets(fleetId)', async () => {
+    mockService.cutDrive.mockResolvedValue(parkedFleet)
+    const { Wrapper, qc } = createWrapper()
+    const invalidate = vi.spyOn(qc, 'invalidateQueries')
+
+    const { result } = renderHook(() => useCutDrive(), { wrapper: Wrapper })
+    result.current.mutate('fleet_1')
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(queryKeys.fleets.scanTargets('fleet_1'))
+  })
+
+  it('useStop invalidates queryKeys.fleets.scanTargets(fleetId)', async () => {
+    mockService.stop.mockResolvedValue(parkedFleet)
+    const { Wrapper, qc } = createWrapper()
+    const invalidate = vi.spyOn(qc, 'invalidateQueries')
+
+    const { result } = renderHook(() => useStop(), { wrapper: Wrapper })
+    result.current.mutate('fleet_1')
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(queryKeys.fleets.scanTargets('fleet_1'))
+  })
+
+  it('useHold invalidates the fleet read and queryKeys.fleets.scanTargets(fleetId)', async () => {
+    mockService.hold.mockResolvedValue(parkedFleet)
+    const { Wrapper, qc } = createWrapper()
+    const invalidate = vi.spyOn(qc, 'invalidateQueries')
+
+    const { result } = renderHook(() => useHold(), { wrapper: Wrapper })
+    result.current.mutate('fleet_1')
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(mockService.hold).toHaveBeenCalledWith('fleet_1')
+    const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(queryKeys.fleets.mine())
+    expect(keys).toContainEqual(queryKeys.fleets.scanTargets('fleet_1'))
+  })
+
+  it('useRelease invalidates the fleet read and queryKeys.fleets.scanTargets(fleetId)', async () => {
+    mockService.release.mockResolvedValue(parkedFleet)
+    const { Wrapper, qc } = createWrapper()
+    const invalidate = vi.spyOn(qc, 'invalidateQueries')
+
+    const { result } = renderHook(() => useRelease(), { wrapper: Wrapper })
+    result.current.mutate('fleet_1')
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(mockService.release).toHaveBeenCalledWith('fleet_1')
+    const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).toContainEqual(queryKeys.fleets.mine())
+    expect(keys).toContainEqual(queryKeys.fleets.scanTargets('fleet_1'))
+  })
+
+  it('useOrder and useJump do NOT invalidate scan-targets at commit time (they land later, via the ETA-scheduled refetch)', async () => {
+    mockService.order.mockResolvedValue({ ...parkedFleet, attachedTo: undefined })
+    mockService.jump.mockResolvedValue({ ...parkedFleet, attachedTo: undefined })
+    const { Wrapper, qc } = createWrapper()
+    const invalidate = vi.spyOn(qc, 'invalidateQueries')
+
+    const order = renderHook(() => useOrder(), { wrapper: Wrapper })
+    order.result.current.mutate({ fleetId: 'fleet_1', request: { bodyId: 'body-1' } })
+    await waitFor(() => expect(order.result.current.isSuccess).toBe(true))
+
+    const jump = renderHook(() => useJump(), { wrapper: Wrapper })
+    jump.result.current.mutate({ fleetId: 'fleet_1', laneId: 'lane-1' })
+    await waitFor(() => expect(jump.result.current.isSuccess).toBe(true))
+
+    const keys = invalidate.mock.calls.map(([arg]) => (arg as { queryKey: unknown[] }).queryKey)
+    expect(keys).not.toContainEqual(queryKeys.fleets.scanTargets('fleet_1'))
   })
 })

@@ -106,7 +106,7 @@ func (d *stubActionDao) Get(_ context.Context, id string) (*Action, error) {
 	return &a, nil
 }
 
-func (d *stubActionDao) List(_ context.Context, actor string, statuses ...Status) ([]Action, error) {
+func (d *stubActionDao) List(_ context.Context, actor string, typeFilter string, statuses ...Status) ([]Action, error) {
 	d.listCalls++
 	if d.listErr != nil {
 		return nil, d.listErr
@@ -114,6 +114,9 @@ func (d *stubActionDao) List(_ context.Context, actor string, statuses ...Status
 	out := []Action{}
 	for _, a := range d.stored {
 		if a.Actor != actor {
+			continue
+		}
+		if typeFilter != "" && a.Type != typeFilter {
 			continue
 		}
 		if len(statuses) > 0 && !containsHandlerTestStatus(statuses, a.Status) {

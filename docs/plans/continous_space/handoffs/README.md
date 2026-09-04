@@ -23,6 +23,11 @@ They are dated working documents, not living specification. Where one disagrees 
 | `link8-rulings.md` | Link 8's twelve open questions and their rulings, **including the 8a/8b split** — read this before touching link 8's naming. |
 | `link8a-panel-consolidated.md` | 8a's panel, deduped into H1–H7 with rulings. Its "Architect M1–M7 and L1–L5 accepted" line is the cautionary case in *Lesson three* below. |
 | `drift-sell-double-submit.md` | Confirmed drift: the shipped sell control never had the guard its live requirement demands. Routed into 8a-2. |
+| `link8b-impl-contract.md` | The implementation contract handed to link 8b's developers — wire shapes, the sighting-id digest, sequencing, the lane-transit fizzle that replaced an unarrangeable range fizzle. |
+| `link8b-adversary-r4.md` … `-r8.md` | Link 8b's rounds 4–8: round 4 re-attacked the resumed change against the now-live `system-space-view` spec (1 blocker, 6 majors); rounds 5–7 found only residue of each previous repair; round 8 was a mid-build spot-check on the scan-target refetch clause a Playwright journey forced (2 blockers, 4 majors — a failed refetch keeping a stale empty list; a re-selected fleet served from cache). Each carries the orchestrator's rulings. |
+| `link8b-red-coverage.md` | Link 8b's SDET coverage table — 157 scenarios, every one accounted for, with the commands that show each red group. |
+| `link9-adversary-r2.md`, `-r3.md` | Link 9's rounds 2–3 after the 8a-2 archive expired its verdict: a live requirement forbidding a wire field the change deletes, `SystemInterior.Radius` handed over by name and deleted by no task, a precondition grep that could never pass; then the repaired grep tripping on the directories the change deletes. Round 4 was CLEAR. |
+| `defect-jump-never-lands-in-ui.md` | **Open, player-facing:** only `GET /v1/fleets/:id` settles a due jump and no client path calls it, so a jumped fleet reads "In transit" until the 15-minute sweep — never, on a local stack. Found by link 8b's fizzle journey. |
 
 ## The one lesson these keep re-teaching
 
@@ -253,3 +258,95 @@ pick unilaterally, because both change how the suite is written:
    cost of a second command people must remember.
 
 Until one lands, expect a third raise.
+
+## Lesson seven — one working tree, two changes, and a `git checkout --`
+
+On 2026-09-03 link 9's SDET, proving a red test in a scratch stub, ran
+`git checkout -- backend/fleet/service.go` to revert the stub. The file also carried link
+8b's **uncommitted** implementation — the extracted host-eligibility helper and the
+self/belt-member exclusions — and the checkout erased it silently. The SDET noticed,
+rebuilt a labelled "STOPGAP" reconstruction so the package compiled, and reported it.
+The reconstruction passed the package tests. It had also **reverted the host resolver to
+its pre-change form with no self-exclusion and no belt-member exclusion** — two of the
+change's rejection scenarios gone, green build throughout. Only the original author, from
+its own record of the edits, could restore the file verbatim; it did, and the by-name e2e
+group (16/16) and a fresh full Playwright run had to be repeated.
+
+Three rules fall out, all cheap:
+
+1. **Never run a destructive git command in a shared working tree** (`checkout --`,
+   `restore`, `stash`, `reset`, `clean`). Back a file up with `cp` before a scratch edit
+   and restore from the copy. A worktree (`git worktree add`) is the right tool for a
+   scratch proof that needs a clean tree.
+2. **A reconstruction of someone else's uncommitted code is never a fix.** It is a
+   second, divergent implementation with a green build — the species this chain has
+   catalogued since lesson one. Report the loss; the author restores.
+3. **Two changes in one tree is the orchestrator's risk to manage.** Snapshot the staging
+   list for the change being committed before the other change's agents start writing,
+   and exclude the other change's files by name at commit time.
+
+## How this directory is used by the team (Volt convention)
+
+Every finding, ruling, contract, and baseline the team produces while working a
+change is written here, named by change-id. This directory is what lets a fresh
+session resume a change without re-deriving it, and what lets a long chain drop
+the orchestrator between links.
+
+They are dated working documents, not living specification. Where one disagrees
+with `openspec/specs/`, the spec wins.
+
+### Why files, not relayed prose
+
+- **Consolidation silently discards findings.** Hexaverse lost nine architect
+  findings to a summary that named them and did not restate them; the reviewer
+  reports were never written down, and the artifact had changed by the time
+  anyone noticed. A summary that names findings it does not restate is not a
+  record of them.
+- **Relayed instructions go stale.** A command that never worked and a
+  prohibition whose cause had been fixed both survived across dozens of
+  delegations because each prompt inherited them from the last. A file is
+  re-read; a paste is trusted.
+- **Delegations pass paths.** An orchestrator hands a subagent the path to a
+  findings file, never a paraphrase of it — paraphrase drops the quoted
+  evidence the fix depends on.
+
+### Files per change
+
+All names are prefixed by the change-id so a directory of many changes stays
+greppable.
+
+| File | Written by | Holds |
+| --- | --- | --- |
+| `<change-id>-panel-<reviewer>.md` | each panel reviewer | that reviewer's own findings, verbatim, before consolidation |
+| `<change-id>-panel-consolidated.md` | orchestrator | the deduped, tie-broken findings sent to the writer, **every accepted finding restated in full** |
+| `<change-id>-adversary-r<N>.md` | adversary, then orchestrator | round N's findings, each with the orchestrator's binding ruling, and the **commit hash the verdict was issued at** |
+| `<change-id>-rulings.md` | orchestrator | open questions and their rulings, including any reversal with its reasoning |
+| `<change-id>-impl-contract.md` | architect at kickoff | wire shapes, identifiers, sequencing — everything the spec deliberately leaves open, settled so the SDET can write both sides against one shape |
+| `<change-id>-red-coverage.md` | SDET at red handoff | the coverage table: every scenario → test → level → status (`assertion-red`, `compile-red`, `already-green`, `Playwright, deferred`, `reasoned-not-automated`) |
+| `red-manifest-<change-id>.txt` | `openspec-red-manifest.sh record` | content hashes of the red suite at handoff; the integrity check's baseline |
+| `<change-id>-journey.md` | SDET after the archive-gate run | the journey run's outcome, the batched findings if it went red, and the **suite budget line**: wall time of tiers 3 and 4 |
+| `defect-<slug>.md` | anyone | a pre-existing defect found during the change and deliberately not fixed in it — repro, evidence, whose call it is |
+| `drift-<slug>.md` | anyone | confirmed code-vs-spec drift, with file:line and the spec passage, awaiting adjudication |
+
+### Verdict expiry is a diff, not a calendar
+
+An adversary verdict names the commit it was issued at. The verdict is current
+while this is empty:
+
+```bash
+git diff <verdict-sha> -- openspec/specs/<every capability the change touches> openspec/changes/<change-id>
+```
+
+When it is not empty, the re-attack scope is **that diff**, not the whole
+change. Archiving the previous link in a chain is the common cause: the live
+specs the next link targets just changed underneath it. Hexaverse ran four full
+re-attack rounds after a resume where three found only residue of the previous
+round's repairs.
+
+### Chain records
+
+A multi-change chain keeps its sequencing document (`chain.md`: the ordered
+links, what each delivers, its state, and what each one taught) under
+`docs/plans/<chain>/`. That document is the input to `/team --chain`. The
+per-change files above stay here so one convention serves single changes and
+chains alike.

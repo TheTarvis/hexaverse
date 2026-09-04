@@ -36,6 +36,14 @@ const PageMax = 50
 // masked at the swept host — but still names the host and the sweep
 // (specs/sighting-records/spec.md — "A Clean Sweep Is a Record").
 type Sighting struct {
+	// Id is the record's own document identifier — the opaque digest
+	// documentId derives over (ActionId, TargetId) (sighting-records "A
+	// Sighting Record Is Addressable On the Wire Without Naming Its Target").
+	// It is the document path itself, never a stored field: firestore:"-"
+	// keeps a round-trip from ever writing it back as a second copy that
+	// could disagree with the path. Populated on read, in Dao.Get and
+	// Dao.List, from each snapshot's own document id.
+	Id string `json:"id" firestore:"-"`
 	// CorporationId is the minting corporation — the pile this record lives in.
 	CorporationId string `json:"corporationId" firestore:"corporationId"`
 	// ActionId is the resolving focused-scan action's own id.

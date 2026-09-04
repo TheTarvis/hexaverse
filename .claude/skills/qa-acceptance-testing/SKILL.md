@@ -17,10 +17,12 @@ Source: every `#### Scenario:` in `openspec/changes/<id>/specs/**` — not tasks
 - MODIFIED requirements: test ALL their scenarios, not just new ones — the modification may have broken retained behavior.
 - Read design.md/project.md for how to run the system; getting it running is your first task, and failing to is a BLOCKED verdict with exact error output, not a silent skip.
 
-## Execute against the real system
+## Verify against evidence, then drive what evidence can't reach
 
-- Drive the actual interface the scenario implies: browser for UI scenarios, curl/httpie for API scenarios, real requests with real responses. Check persisted effects where THEN names them (query the DB via the repo's tooling).
-- **Verdicts**: PASS (observed = expected, evidence attached) · FAIL (mismatch, evidence attached) · BLOCKED (couldn't execute — say exactly what's missing) · INSPECTED (verified only by reading code — a last resort, never silently upgraded to PASS).
+- **Evidence first.** For each row, locate the SDET's test for it in `docs/plans/continous_space/handoffs/<change-id>-red-coverage.md`, run it at its tier (`docs/testing-tiers.md`), and read its assertion against the quoted THEN. A passing test that asserts the THEN through the real seam the scenario names is PASS evidence. It is **not** evidence when the test mocks that seam, when it is a tautology (asserts the literal it built), or when it has never been observed red — drive those rows live.
+- **Rows marked `Playwright, deferred` are BLOCKED**, with the note "awaits the journey". They are not failures and you do not drive them; the journey (one spec per change, run once at archive time by the SDET) is their evidence, and its result closes them.
+- **Drive live** only the rows without adequate test evidence and the exploratory charters: browser for UI scenarios, curl/httpie for API scenarios, real requests with real responses. Check persisted effects where THEN names them (query the DB via the repo's tooling). Never run tier 3 or tier 4 yourself, and never drive a whole matrix live — that boots the stack per row and idles the crew behind one emulator.
+- **Verdicts**: PASS (evidence attached — the asserting test and its run, or the observed live behavior) · FAIL (mismatch, evidence attached) · BLOCKED (couldn't verify — say exactly what's missing) · INSPECTED (verified only by reading code — a last resort, never silently upgraded to PASS).
 - Evidence standards: the command/request you sent and the verbatim response; for UI, what was on screen (text you observed). Evidence is what makes your FAIL unarguable and your PASS auditable.
 - Test failure scenarios by actually inducing the failure: wrong password, malformed payload, deleted resource ID, killed dependency container if the harness allows. "Couldn't induce it" → BLOCKED with the reason, which is itself a testability finding.
 
@@ -57,4 +59,4 @@ Anything broken files as a finding even without a covering scenario — tagged *
 - Matrix summary: n PASS / n FAIL / n BLOCKED / n INSPECTED, plus exploratory findings and spec gaps.
 - Cross-check tasks.md: a `- [x]` task whose scenario FAILs is its own finding (false completion claim).
 - One-line verdict: **SHIP** (all PASS, no BLOCKER/MAJOR exploratory findings) · **RETURN TO DEV** (any FAIL) · **BLOCKED** (can't verify). There is no "mostly passing" — a FAIL either blocks or the spec writer must downgrade the scenario, explicitly, in the spec.
-- Re-verification rounds: re-run every previously-FAILED row AND its capability's siblings (fixes regress neighbors); spot-check, don't re-run, distant PASSes.
+- Re-verification rounds: re-run every previously-FAILED row AND its capability's siblings (fixes regress neighbors); spot-check, don't re-run, distant PASSes. After the journey runs, close its BLOCKED rows from `docs/plans/continous_space/handoffs/<change-id>-journey.md` — one re-verification, not a round per red leg.

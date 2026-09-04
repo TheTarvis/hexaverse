@@ -88,10 +88,14 @@ Delete any operation section (`## ADDED ...` etc.) with no entries.
 - [ ] 1.1 SMALL-VERIFIABLE-TASK
 - [ ] 1.2 SMALL-VERIFIABLE-TASK
 
-## 2. Validation
+## N. Verification
 
-- [ ] 2.1 TESTS-COVERING-SCENARIOS
+- [ ] N.1 Per-commit gate green: `bash .claude/scripts/check.sh` and `python3 .claude/skills/code-quality-checks/check.py --files-only` (tiers 0-1, `docs/testing-tiers.md`)
+- [ ] N.2 Journey spec written after every task above is checked; tier 4 then tier 3 run once each with the tree locked — **archive time only**, never per task
+- [ ] N.3 `docs/plans/continous_space/handoffs/<change-id>-journey.md` written with the suite budget line
 ```
+
+The closing Verification group is standard: the spec writer includes it in every tasks.md so the archive-gate work is a task the developers cannot mistake for a per-task check.
 
 ## changes/CHANGE-ID/design.md (optional — cross-cutting/complex changes only)
 
