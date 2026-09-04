@@ -6,15 +6,17 @@ package action
 //
 // commit_params_validator_test.go (unmodified by the SDET; a developer-owned
 // mechanical repoint per tasks.md 4.4) imports the `board` package and
-// asserts against board.Cell / board.EncodeCell / board.MovementState /
-// board.Orbit — all board-package vocabulary this change deletes. Rather than
-// edit that file directly (test immutability; the file's own repoint is a
-// developer task, since it also has to physically delete the `board` import
-// the moment `backend/board` is deleted, in the SAME commit as G4/G6 per the
-// implementation contract), this file carries the CONTINUOUS-space successor
-// of each of its four scenarios — proven red-for-the-right-reason exactly
-// like the original was — so the developer's mechanical repoint has a
-// pre-verified target to land, rather than reinventing the fixture shape.
+// asserts against four of its exported types: the discrete cell coordinate,
+// the Firestore-native encoder that renders that coordinate primitive, the
+// movement-state struct and the orbital-state struct — all vocabulary of a
+// package this change deletes. Rather than edit that file directly (test
+// immutability; the file's own repoint is a developer task, since it also
+// has to physically delete the `board` import the moment `backend/board` is
+// deleted, in the SAME commit as G4/G6 per the implementation contract),
+// this file carries the CONTINUOUS-space successor of each of its four
+// scenarios — proven red-for-the-right-reason exactly like the original
+// was — so the developer's mechanical repoint has a pre-verified target to
+// land, rather than reinventing the fixture shape.
 //
 // SDET-OWNED REVISION, to land with the developer's deletion (README lesson
 // six / this change's red-manifest note): once `backend/board` is deleted
@@ -33,8 +35,8 @@ package action
 // Every one of the four scenarios below is ALREADY GREEN against today's
 // tree (space.Vec3/space.EncodeVec/space.DecodeVec/space.ShipState already
 // exist; action.Commit's validator already rejects any non-allowlisted
-// struct generically, not `board.Cell` by name) — this is a deletion
-// change's coverage-relocation, not new production behaviour. Each
+// struct generically, not the deleted coordinate type by name) — this is a
+// deletion change's coverage-relocation, not new production behaviour. Each
 // rejection case's red-for-the-right-reason proof is therefore the same
 // falsification form task 2.11 uses: confirm it goes red against a
 // scratch-widened allowlist, recorded in the coverage report rather than

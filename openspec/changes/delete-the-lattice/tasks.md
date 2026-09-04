@@ -821,6 +821,7 @@ names the file and states its verification.
       grep -I -rn 'backend/board\|backend/polar\|frontend/lib/board\|frontend/lib/polar\|fixtures/board\|fixtures/polar\|board-tactical-math\|polar-lattice-math' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude-dir=.next-e2e \
         | grep -v '^./openspec/changes/archive/' | grep -v '^./docs/plans/' \
         | grep -v '^./docs/handoffs/' | grep -v '^./docs/defects/' | grep -v '^./docs/specs/' \
+        | grep -v '^./docs/openspec-retrofit-report.md' \
         | grep -v '^./openspec/changes/delete-the-lattice/' \
         | grep -v 'commit_params_validator_continuous_test.go'
       ```
@@ -832,6 +833,20 @@ names the file and states its verification.
         `^./docs/defects/`, `^./docs/specs/` — historical record, which stays
         (`docs/specs/` being the superseded numbered specs this change records
         rather than rewrites, per OQ-4/task 9.4).
+      - `^./docs/openspec-retrofit-report.md` — the same historical-record
+        ruling as the five directories above, reaching one **file** rather than
+        a directory. Its `:13` lists `board-tactical-math` among the
+        capabilities a dated 2026-07-15 workflow run produced, and **task 7.1
+        already rules on this exact line** ("historical record of a report, not
+        a live enforcement site; record rather than rewrite"); without this
+        filter two tasks disagree about one line — 7.1 protects it while 10.1
+        fails it — the same species as round 8's MAJOR-1. The decisive
+        argument: that line's neighbours in the same list are already-retired
+        capabilities (`observation-fog-and-scan`, `hex-board-view`), so
+        rewriting only the `board-tactical-math` entry would make the dated
+        record *less* honest, not more. A report of what a workflow run
+        produced on a date is a historical fact, not a live citation. Removes
+        exactly 1 line, that one.
       - `--exclude-dir=.next --exclude-dir=.next-e2e` — gitignored Next.js build
         output is not source; no source edit can ever clear a compiled bundle
         (59 hits between this leg and 10.2's) (ruling D).
@@ -946,6 +961,7 @@ names the file and states its verification.
       ```
       grep -I -rni 'lattice' backend frontend .claude fixtures --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.next-e2e \
         | grep -v 'TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse' \
+        | grep -v 'Lattice-only fields' \
         | grep -v 'sub-lattice' \
         | grep -Ev 'RED-phase .*delete-the-lattice'
       ```
@@ -973,6 +989,30 @@ names the file and states its verification.
         (59 hits between this leg and 10.1's) (ruling D).
       - `TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse` — the one
         deliberate wire-contract guard, this sweep's single expected survivor.
+      - `Lattice-only fields` — the **scenario heading** that guard's test
+        function is named after: `#### Scenario: Lattice-only fields are absent
+        from the response`, which lives inside the requirement *Interior Read
+        Serves Continuous Bodies* — a requirement this change **MODIFIES
+        without renaming**, so that scenario name deliberately survives into
+        `openspec/specs/` after archive. This is **the same exemption as the
+        test-function-name filter one line up**: 10.2 already exempts the
+        function *name*, and simply never covered the scenario *string* the
+        function is named after. The hits it removes are verbatim citations of
+        that heading from tests **following this repo's scenario-traceability
+        convention** — tracing to a scenario that still exists, not leaving
+        residue behind deleted code. **The filter is the heading's distinctive
+        prefix rather than the whole heading, deliberately**: three of the
+        citations wrap mid-phrase across two source lines
+        (`backend/interior_continuous_wire_e2e_test.go:15,20`,
+        `backend/orbit_elements_wire_e2e_test.go:511`), and a line-oriented
+        grep sees only a fragment of each, so a full-heading filter would leave
+        those three behind while a shorter pattern than this one would start
+        matching prose about lattice fields generally. Removes exactly 12 lines
+        at authoring, every one a citation of that scenario. The alternative —
+        renaming the scenario — would touch a MODIFIED requirement the proposal
+        protects and force re-running the 11.2 and 11.4 audits, to remove a word
+        from a heading that correctly describes a guard this change deliberately
+        keeps.
       - `sub-lattice` — load-bearing mathematics in
         `backend/system/phase_reachability_test.go`: task 2.11's replacement
         coverage asserts the continuous phase draw is not confined to a coarse

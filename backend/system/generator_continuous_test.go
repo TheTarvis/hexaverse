@@ -5,9 +5,15 @@ package system
 // generation pass (as opposed to continuous_test.go's pure-law unit tests).
 //
 // Covers system-interior's:
-//   - "Interiors Emit Continuous Orbital Elements For Every Body"
-//   - "A Retrograde Orbit Is Expressed By Inclination, Never By a
-//     Non-Positive Period" (the Generate()-level scenarios)
+//   - "Every Generated Body Carries a Continuous Orbital Element Set and a
+//     Size" — the successor of the retired continuous-elements requirement
+//     this file originally cited, whose title is not repeated here because a
+//     verbatim retired title reads to the repo-wide dangling-citation sweep
+//     exactly like a live one
+//   - "Retrograde Motion Is Expressed By Inclination, Never By a
+//     Non-Positive Period" (the Generate()-level scenarios) — likewise the
+//     successor of the retired requirement that phrased the same guarantee
+//     in terms of a non-positive period
 //   - "A Body-Parented Orbit's Continuous Period Follows a Named Law..."
 //     (the Generate()-level scenarios)
 //   - "A Generated Parent Chain Never Exceeds the Resolver's Depth Bound"
@@ -82,7 +88,8 @@ func toBodies(gen GeneratedInterior) bodiesFromInterior {
 	return out
 }
 
-// --- "Interiors Emit Continuous Orbital Elements For Every Body" ----------
+// --- "Every Generated Body Carries a Continuous Orbital Element Set and a
+// --- Size" -----------------------------------------------------------------
 
 // Scenario: Continuous elements are reproducible from the per-system seed.
 func TestGenerate_Scenario_ContinuousElementsReproducibleFromSeed(t *testing.T) {
@@ -248,10 +255,11 @@ var diskBornPrefixes = []string{"feat-body-", "feat-belt-", "feat-hazard-"}
 // spec scenario and must never be greppable as one.
 //
 // The scenario that used to stand here is retired with NO successor, and
-// system-interior's REMOVED block for "A Retrograde Orbit Is Expressed By
-// Inclination, Never By a Non-Positive Period" says so in as many words
-// (that block carries the retired scenario's title, which this comment
-// therefore does not repeat): it asserted agreement between two
+// system-interior's REMOVED block for the retired non-positive-period
+// phrasing of the retrograde requirement — the predecessor of the ADDED
+// requirement named below — says so in as many words (that block carries
+// both the retired requirement title and the retired scenario's title, which
+// this comment therefore does not repeat): it asserted agreement between two
 // representations of one fact, and only one representation remains, so there
 // is nothing left for it to agree with. It is not repointed, and it must not
 // be reinvented under a scenario name.

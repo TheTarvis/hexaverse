@@ -3,7 +3,11 @@ package system
 // RED-phase test for openspec change delete-the-lattice, task 2.11 — the
 // replacement coverage for the retired ring-slot scenario "Placement reaches
 // every slot on a ring whose slot count exceeds six times its ring index"
-// (system-interior's REMOVED "Lazy, Deterministic Interior Generation").
+// — a scenario that stood under the discrete ring-and-slot interior-
+// generation requirement this change retires (recorded in system-interior's
+// REMOVED block; its title is deliberately not repeated here, because a
+// verbatim retired title is indistinguishable from a live citation to the
+// repo-wide dangling-citation sweep).
 // The surviving requirement is system-interior's ADDED "Interior Generation
 // Is Lazy and Deterministic" › "Generated phases span the whole turn":
 //

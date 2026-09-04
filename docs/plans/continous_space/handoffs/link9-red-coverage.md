@@ -256,6 +256,100 @@ three files this pass did not touch kept their §2.1 hashes byte-for-byte
 exactly the two files listed above. Nothing was staged or committed: the GO
 developer commits G5 whole.
 
+### 2.3 POST-HANDOFF TEST CHANGE — comment-only clearing of the 10.1c symbol citations and the 12.5b retired-title citations (2026-09-04)
+
+**Cause.** Orchestrator-directed comment-clearing pass on red-manifest-owned
+files, in the same class as §2.1 and §2.2: a task's repo-wide grep cannot
+distinguish a historical citation in RED-phase comment prose from a live
+dependency, and every file it lands on is SDET-owned, so the GO developer
+correctly halted rather than editing. Not a code-is-red cause; no assertion,
+test name, or failure-message string was touched.
+
+**Task 10.1c (symbol citations of the deleted packages).**
+`backend/action/commit_params_validator_continuous_test.go:9,10,36` named
+`board.Cell`, `board.EncodeCell`, `board.MovementState` and `board.Orbit` as
+symbols, which 10.1c's `\b(board|polar)\.[A-Za-z]` matches. This is a
+different pattern from the quoted import-path string `"hexaverse/board"` that
+§2.1 cleared — that one is genuinely gone; these were symbol citations in
+prose. The header now describes the four types the predecessor file asserts
+against (discrete cell coordinate, its Firestore-native encoder, movement
+state, orbital state) instead of naming them, and the same history is
+preserved: *why* the successors live in a separate file, and *when* the
+predecessor's four cases get deleted. The file's `backend/board` prose is
+deliberately left alone — task 10.1 carries an explicit filter for this file,
+deferring it to the GREEN rewrite.
+
+**Task 12.5b (retired requirement titles).** The retired-title list was
+rebuilt from scratch per task 12.5 (`board-tactical-math`'s 22 requirement
+titles + the 11 `REMOVED` titles across `system-interior` (7),
+`trading-station` (3) and `cross-stack-determinism` (1) = 33 lines), and
+12.5b's `grep -F -f` was run against the whole real repo with the task's own
+`--exclude-dir` set. It returned exactly **three** `backend/**` lines, both
+files red-manifest-owned:
+
+| Site | Retired title cited | Rewrite |
+| --- | --- | --- |
+| `backend/system/phase_reachability_test.go:6` | *Lazy, Deterministic Interior Generation* | described as "the discrete ring-and-slot interior-generation requirement this change retires (recorded in system-interior's REMOVED block)" |
+| `backend/system/generator_continuous_test.go:8` | *Interiors Emit Continuous Orbital Elements For Every Body* | repointed to its live successor *Every Generated Body Carries a Continuous Orbital Element Set and a Size*, with the predecessor described rather than quoted |
+| `backend/system/generator_continuous_test.go:85` | same title, as a section banner | same repoint |
+
+Two further verbatim retired-title citations were cleared **beyond** the
+sweep's output, because they are the same class of defect and survive only by
+a line-wrapping accident that a line-oriented `grep -F` cannot see:
+`generator_continuous_test.go:9-10` (*A Retrograde Orbit Is Expressed By
+Inclination, Never By a Non-Positive Period*, wrapped mid-title in the header
+list — repointed to the live successor *Retrograde Motion Is Expressed By
+Inclination, Never By a Non-Positive Period*) and `:251-252` (the same retired
+title, wrapped, inside the SDET block on
+`TestGenerate_DiskBornFeatureSideFollowsDominantDirection`).
+
+**Load-bearing meaning preserved verbatim.** The no-successor record lives in
+`generator_continuous_test.go`'s `TestGenerate_DiskBornFeatureSideFollows
+DominantDirection` block — *that* is the test deliberately not named
+`Scenario_`, and its block still says, unchanged, that the scenario which used
+to stand there is retired with NO successor, is not repointed, and must not be
+reinvented under a scenario name; only the quoted retired requirement title
+became a description. `phase_reachability_test.go` is a different case and was
+not treated as no-successor: its test IS named
+`TestInteriorGeneration_Scenario_GeneratedPhasesSpanTheWholeTurn`, mapping to
+the live ADDED requirement *Interior Generation Is Lazy and Deterministic* ›
+"Generated phases span the whole turn", and its header still records which
+retired ring-slot scenario it replaces.
+
+**Verification (all four required measurements, `/usr/bin/grep` throughout).**
+
+| Check | Result |
+| --- | --- |
+| `cd backend && go build ./... && go vet ./system/ ./action/` | clean |
+| `go test ./system/ ./action/ -short -count=1` | `ok hexaverse/system 0.535s`, `ok hexaverse/action 0.492s` |
+| 10.1c pattern vs `commit_params_validator_continuous_test.go` | no hits (exit 1) |
+| 12.5b `grep -F -f` vs `backend/**` | no hits (exit 1) |
+| 10.2 full pipeline, before vs after | 12 lines both times, `diff` empty — unchanged at its current value |
+| `gofmt -l` on all three edited files | empty |
+
+The 12 surviving 10.2 lines are all in developer-owned files not yet cleared
+(`orbit_elements_wire_e2e_test.go`, `disclosure_wiring_e2e_test.go`,
+`interior_wire_lattice_removal_test.go`, `interior_continuous_wire_e2e_test.go`)
+and are untouched by this pass. `openspec/**` hits from 12.5b are sections
+12–13's job, not the SDET's. `tasks.md` was not read for edit and not written;
+no tree-writing git command was run at any point (§1's incident).
+
+**What changed in each file.**
+
+| File | Change | Kind |
+| --- | --- | --- |
+| `backend/action/commit_params_validator_continuous_test.go` | `:9,10,36` — four `board.*` symbol citations replaced by type descriptions; two paragraphs rewrapped to 80 columns | comment only |
+| `backend/system/generator_continuous_test.go` | `:8`, `:9-10`, `:85`, `:251-252` — retired requirement titles repointed to their live successors or described | comment only |
+| `backend/system/phase_reachability_test.go` | `:6` — retired requirement title described rather than quoted | comment only |
+
+**Manifest re-recorded** with the same five paths → `recorded 5 file(s)`, then
+`verify delete-the-lattice` → `delete-the-lattice: all 5 test file(s)
+unchanged since handoff` (exit 0). The two files this pass did not touch kept
+their §2.2 hashes byte-for-byte (`a618414f…`, `9ffde291…`), which proves the
+re-record moved exactly the three files listed above. Nothing was staged or
+committed.
+
+
 ## 3. Genuine red-set detail
 
 ### 3.1 Task 2.11 — phase reachability
@@ -647,6 +741,67 @@ to the content filter it replaced at file granularity (all 81 removed lines are
 under `openspec/changes/delete-the-lattice/`, none elsewhere), so it is a strict
 narrowing; and the `.next`/`.next-e2e` exclusions are the *only* difference
 between the old and new leg-10.1 outputs (199 → 182).
+
+### 4.5 The 10.1 / 10.2 filter set, WIDENED by orchestrator ruling — 2026-09-04
+
+Two filters were added, one per leg, by the orchestrator's 2026-09-04 widening
+ruling; the spec writer landed them in `tasks.md` 10.1/10.2 and
+`link9-acceptance-greps.sh` was re-synced so harness and task are byte-identical
+again (verified programmatically: both pipelines normalize to the same token
+sequence, modulo the harness's `out="$( … 2>/dev/null )"` wrapper). §4.4's table
+is superseded by this one only in the two rows below and in the totals; every
+other filter, and every deliberate non-exemption, stands unchanged. Each leg now
+carries **four** exemptions.
+
+| Leg | Added filter | Cause | Blast radius (re-measured 2026-09-04) |
+| --- | --- | --- | --- |
+| 10.1 | `grep -v '^./docs/openspec-retrofit-report.md'` | its `:13` lists `board-tactical-math` among the capabilities a **dated** 2026-07-15 workflow run produced, and task 7.1 already rules that line "record rather than rewrite" — two tasks were disagreeing about one line. Decisive: that entry's neighbours in the same list are already-retired capabilities (`observation-fog-and-scan`, `hex-board-view`), so rewriting only this entry would make the dated record *less* honest | 1 line |
+| 10.2 | `grep -v 'Lattice-only fields'` | the heading of a scenario that **deliberately survives**: it lives in *Interior Read Serves Continuous Bodies*, which this change MODIFIES without renaming, so the name persists into `openspec/specs/` after archive and the tests citing it are obeying the traceability convention. Same exemption as the already-listed `TestInteriorRead_…` function name, one level up | 12 lines across 4 files |
+
+**Do not narrow `Lattice-only fields` to the full heading.** The prefix is
+deliberate: three of the twelve citations wrap mid-phrase across source lines
+(`interior_continuous_wire_e2e_test.go:15,20` and
+`orbit_elements_wire_e2e_test.go:511`), so a line-oriented grep never sees the
+whole heading on one line and a full-heading filter would leave three lines of
+false residue. That reasoning is recorded in the harness comment block too.
+
+**All radii re-measured after the G5 deletions and §2.3's comment pass** (the
+§4.4 numbers were taken at `c74766f` + the RED suite and no longer hold):
+
+| Leg | Filter | Removes |
+| --- | --- | --- |
+| 10.1 | `--exclude-dir=.next --exclude-dir=.next-e2e` | 16 |
+| 10.1 | `^./docs/openspec-retrofit-report.md` | 1 |
+| 10.1 | `^./openspec/changes/delete-the-lattice/` | 83 |
+| 10.1 | `commit_params_validator_continuous_test.go` | 2 (both its `backend/board` prose lines) |
+| 10.2 | `--exclude-dir=.next --exclude-dir=.next-e2e` | 42 |
+| 10.2 | `TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse` | 1 |
+| 10.2 | `Lattice-only fields` | 12 |
+| 10.2 | `sub-lattice` | 7 |
+| 10.2 | `RED-phase .*delete-the-lattice` | 4 |
+
+**Totals now: 10.1 = 24 hits, 10.2 = 0 hits** (was 182 / 592 at the re-handoff,
+when none of the surface had been deleted). Leg 10.2 **PASSES**. Leg 10.1 still
+reports FAIL, and correctly so: all 24 of its hits are the documented
+pre-archive sequencing exception — this change's own not-yet-archived spec
+surface under `openspec/specs/` (`cross-stack-determinism` 13,
+`space-kinematics` 4, `board-tactical-math` 3, `system-interior` 3,
+`trading-station` 1), cleared by `openspec archive` plus tasks 13.1–13.3. The
+remainder **outside** `openspec/specs/` is empty, which is what 10.1 requires
+pre-archive.
+
+**Ruling B's six tracked prose lines are now all gone, and gone the right way** —
+`fog.go:22` and `model.go:130` vanished with the code G5 deleted,
+`interior_wire_lattice_removal_test.go:209` went with task 3.4's sibling
+function, and `generator_continuous_test.go:327,339,383` were rewritten as
+comment prose under §2.2 (orchestrator-authorized, logged there). §4.4's
+"visible in leg 10.2's output today" sentence and its developer note are
+therefore discharged. The prohibition itself stands: re-adding a blanket
+`delete-the-lattice` content filter would blind the leg to the next such line.
+
+Legs 10.1c (both) also PASS as of this run — the last backend symbol citation
+was cleared by §2.3.
+
 
 ## 5. Full scenario coverage table
 

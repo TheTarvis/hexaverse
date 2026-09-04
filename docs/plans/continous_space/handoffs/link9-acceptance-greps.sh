@@ -232,18 +232,22 @@ record_nonempty "8.10 leg 2: components/space/webgl repointed carve-out" \
 # parts A-E, in link9-adversary-r7.md). MAJOR-2's original three-exemption text
 # is NOT what these legs implement: measurement showed it was too broad in one
 # place and too narrow in another. tasks.md 10.1/10.2 are being rewritten to the
-# exact filter set below, so harness and task stay byte-consistent. Three
-# exemptions per leg, each with its cause and its measured blast radius at
-# c74766f + this change's RED suite:
+# exact filter set below, so harness and task stay byte-consistent. FOUR
+# exemptions per leg since the orchestrator's 2026-09-04 widening ruling (one
+# added to each leg; both recorded below and both landed in tasks.md 10.1/10.2),
+# each with its cause and its blast radius RE-MEASURED against the working tree
+# of 2026-09-04 after the G5 deletions and the SDET's third comment-clearing
+# pass (link9-red-coverage.md §2.3) — the earlier radii were measured at
+# c74766f + the RED suite and no longer hold:
 #
 #   10.1:
 #     (i)   --exclude-dir=.next --exclude-dir=.next-e2e — gitignored Next.js
 #           build output is not source; the sweep's subject is source residue and
 #           no source edit can ever clear a compiled bundle (ruling D).
-#           Removes 17 lines.
+#           Removes 16 lines.
 #     (ii)  '^./openspec/changes/delete-the-lattice/' — a PATH exclusion of this
 #           change's own folder, which cannot describe a deletion without naming
-#           the deleted paths (ruling C). Removes 81 lines. PRE-ARCHIVE ONLY:
+#           the deleted paths (ruling C). Removes 83 lines. PRE-ARCHIVE ONLY:
 #           after `openspec archive` the folder moves under
 #           openspec/changes/archive/, which the allow-list above already covers,
 #           and this filter becomes dead. It REPLACED a `grep -v
@@ -251,19 +255,48 @@ record_nonempty "8.10 leg 2: components/space/webgl repointed carve-out" \
 #           invisible; measured identical at file granularity, so this is a
 #           strict narrowing, not a behaviour change.
 #     (iii) 'commit_params_validator_continuous_test.go' — this change's own RED
-#           file, whose :13/:20 prose says `backend/board` is deleted by this
-#           change; removed with that file's GREEN rewrite, not before. Removes
-#           exactly 2 lines, both of them that prose.
+#           file, whose prose says `backend/board` is deleted by this change;
+#           removed with that file's GREEN rewrite, not before. Removes exactly
+#           2 lines, both of them that prose.
+#     (iv)  '^./docs/openspec-retrofit-report.md' — ADDED by the orchestrator's
+#           2026-09-04 widening ruling. Its :13 lists `board-tactical-math`
+#           among the capabilities a DATED 2026-07-15 workflow run produced, and
+#           task 7.1 already rules that line "record rather than rewrite", so two
+#           tasks were disagreeing about one line. Decisive detail: that entry's
+#           neighbours in the same list are ALREADY-RETIRED capabilities
+#           (observation-fog-and-scan, hex-board-view), so rewriting only this
+#           entry would make the dated record LESS honest, not more. Removes
+#           exactly 1 line.
 #   10.2:
 #     (i)   --exclude-dir=.next --exclude-dir=.next-e2e — same cause (ruling D).
 #           Removes 42 lines.
-#     (ii)  'sub-lattice' — LOAD-BEARING MATHEMATICS in
+#     (ii)  'Lattice-only fields' — ADDED by the orchestrator's 2026-09-04
+#           widening ruling. It is the heading of a scenario that DELIBERATELY
+#           SURVIVES this change: it lives in `Interior Read Serves Continuous
+#           Bodies`, which this change MODIFIES WITHOUT RENAMING, so the name
+#           persists into openspec/specs/ after archive and the tests citing it
+#           are obeying the traceability convention, not leaving residue. This is
+#           the same exemption as the already-listed
+#           TestInteriorRead_... function name, one level up.
+#           Removes 12 lines across four files
+#           (backend/system/interior_wire_lattice_removal_test.go,
+#           backend/interior_continuous_wire_e2e_test.go,
+#           backend/orbit_elements_wire_e2e_test.go,
+#           backend/disclosure_wiring_e2e_test.go).
+#           DO NOT "IMPROVE" THIS TO THE FULL HEADING. The prefix is deliberate:
+#           three of the twelve citations WRAP MID-PHRASE across source lines
+#           (interior_continuous_wire_e2e_test.go:15,20 and
+#           orbit_elements_wire_e2e_test.go:511), so a line-oriented grep never
+#           sees the whole heading on one line and a full-heading filter would
+#           leave three lines of false residue. Narrowing it back re-breaks the
+#           leg.
+#     (iii) 'sub-lattice' — LOAD-BEARING MATHEMATICS in
 #           backend/system/phase_reachability_test.go: task 2.11's replacement
 #           coverage asserts the continuous phase draw is not confined to a
 #           coarse sub-lattice OF THE TURN — a lattice of real numbers, nothing
 #           to do with the deleted board. Renaming it would make the test's own
 #           failure message lie. Removes 7 lines, ALL in that one file.
-#     (iii) -Ev 'RED-phase .*delete-the-lattice' — the red-manifest HEADER FORM
+#     (iv)  -Ev 'RED-phase .*delete-the-lattice' — the red-manifest HEADER FORM
 #           and nothing else. The change id CONTAINS the swept word and the
 #           manifest convention heads every RED test with the id it belongs to,
 #           so every RED file fails the sweep by OBEYING the convention. Removes
@@ -282,8 +315,13 @@ record_nonempty "8.10 leg 2: components/space/webgl repointed carve-out" \
 #     generator_continuous_test.go:327,339,383}. They sit on code this change
 #     deletes, so they must genuinely VANISH with the implementation; under a
 #     blanket id filter the gate goes blind on exactly the residue class Goal 2
-#     exists to kill. All six ARE visible in 10.2's output today and are part of
-#     its expected-red baseline — verify they are gone at the gate.
+#     exists to kill. STATUS 2026-09-04: all six are now GONE from 10.2's
+#     output, and gone the right way — fog.go:22 and model.go:130 vanished with
+#     the code G5 deleted, interior_wire_lattice_removal_test.go:209 went with
+#     task 3.4's sibling function, and generator_continuous_test.go:327,339,383
+#     were rewritten as comment prose under §2.2 of link9-red-coverage.md. The
+#     prohibition stands regardless: re-adding the blanket id filter would blind
+#     the leg to the NEXT such line.
 #   - No `TestInteriorRead_...` filter on 10.1: tasks.md 10.1 does not grant it
 #     and it matches 0 lines of this leg's pattern set (deviation upheld, r7).
 #   - No `sub-lattice` filter on 10.1: it removes 0 lines there — 10.1's patterns
@@ -291,7 +329,7 @@ record_nonempty "8.10 leg 2: components/space/webgl repointed carve-out" \
 #     says. Dropping a zero-effect filter is narrowing, never slack.
 #   - No `commit_params_validator_continuous_test.go` filter on 10.2: after
 #     ruling A's rewording that file's only surviving `lattice` hit is its
-#     header, already covered by 10.2 (iii). Removes 0 lines, so it is not
+#     header, already covered by 10.2 (iv). Removes 0 lines, so it is not
 #     carried.
 #
 # Ruling A closed, by REWORDING the comments rather than exempting them, the
@@ -306,17 +344,24 @@ record_nonempty "8.10 leg 2: components/space/webgl repointed carve-out" \
 #
 # DO NOT WIDEN these filters. The REMAINDER of both sweeps is still required
 # EMPTY: a wholesale waiver of 10.2 is exactly how the silently-inert residue
-# Goal 2 exists to kill would reach the archive. Measured at this re-handoff,
-# with the filters above and nothing else: 10.1 = 182 hits, 10.2 = 592 hits —
-# every one of them the not-yet-deleted surface (expected RED; see
-# link9-red-coverage.md). Re-measure and re-record these two numbers here if you
-# ever change a filter.
+# Goal 2 exists to kill would reach the archive. Measured 2026-09-04 with the
+# filter set above and nothing else, after the G5 deletions and the SDET's third
+# comment-clearing pass: 10.1 = 24 hits, 10.2 = 0 hits. All 24 of 10.1's are the
+# documented pre-archive sequencing exception — this change's own not-yet-
+# archived spec surface under openspec/specs/ (cross-stack-determinism 13,
+# space-kinematics 4, board-tactical-math 3, system-interior 3,
+# trading-station 1), cleared by `openspec archive` plus tasks 13.1-13.3. The
+# remainder OUTSIDE openspec/specs/ is empty, which is what 10.1 requires
+# pre-archive. (Earlier readings, for contrast: 182 and 592 at the re-handoff,
+# when none of the surface had been deleted yet.) Re-measure and re-record these
+# numbers here if you ever change a filter.
 out="$(grep -I -rn 'backend/board\|backend/polar\|frontend/lib/board\|frontend/lib/polar\|fixtures/board\|fixtures/polar\|board-tactical-math\|polar-lattice-math' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude-dir=.next-e2e 2>/dev/null \
   | grep -v '^./openspec/changes/archive/' | grep -v '^./docs/plans/' \
   | grep -v '^./docs/handoffs/' | grep -v '^./docs/defects/' | grep -v '^./docs/specs/' \
+  | grep -v '^./docs/openspec-retrofit-report.md' \
   | grep -v '^./openspec/changes/delete-the-lattice/' \
   | grep -v 'commit_params_validator_continuous_test.go')"
-record_empty "10.1 whole-tree sweep, outside the historical-record allow-list (plus the three exemptions ruled in r7's addendum — see the block above)" "nothing" "$out"
+record_empty "10.1 whole-tree sweep, outside the historical-record allow-list (plus the four exemptions ruled in r7's addendum as widened 2026-09-04 — see the block above)" "nothing" "$out"
 
 out="$(grep -I -rnE '"board"|"polar"|\(board |[( ]polar[) ]|\./board/|\./polar/' .claude .gitlab-ci.yml infra 2>/dev/null)"
 record_empty "10.1b bare-token sweep of .claude/.gitlab-ci.yml/infra (C15: misses .gitlab-ci.yml:371 and infra/docker/test-runner.Dockerfile:5 — verify those two BY HAND, this leg cannot see them)" \
@@ -334,12 +379,14 @@ record_empty "10.1c leg 2: frontend symbol citations of board./polar. (excluding
   "nothing" "$out"
 
 # The 10.2 half of the exemption block above — read it before touching this leg,
-# including the six TRACKED prose lines that are deliberately still visible here.
+# including the six TRACKED prose lines ruling B refused to filter (all six now
+# genuinely gone; see the STATUS note in that block).
 out="$(grep -I -rni 'lattice' backend frontend .claude fixtures --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.next-e2e 2>/dev/null \
   | grep -v 'TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse' \
+  | grep -v 'Lattice-only fields' \
   | grep -v 'sub-lattice' \
   | grep -Ev 'RED-phase .*delete-the-lattice')"
-record_empty "10.2 case-insensitive 'lattice' sweep (excluding the one surviving wire-contract guard's test name, plus the three exemptions ruled in r7's addendum)" \
+record_empty "10.2 case-insensitive 'lattice' sweep (excluding the one surviving wire-contract guard's test name and its scenario heading, plus the four exemptions ruled in r7's addendum as widened 2026-09-04)" \
   "nothing but that one test function name (which itself must still appear exactly once, unchecked by this leg)" "$out"
 
 out="$(grep -I -rn 'time\.Now()' backend/space backend/disclosure backend/charts --include='*.go' 2>/dev/null | grep -v _test.go \
