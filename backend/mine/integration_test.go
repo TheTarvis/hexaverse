@@ -47,7 +47,7 @@ func (f *fakeIntegrationSystem) GetOrCreateInterior(_ context.Context, systemID 
 	}
 	return &system.GeneratedInterior{}, nil
 }
-func (f *fakeIntegrationSystem) LaneGates(context.Context, string, int) ([]system.LaneGate, error) {
+func (f *fakeIntegrationSystem) LaneGates(context.Context, string) ([]system.LaneGate, error) {
 	return nil, nil
 }
 

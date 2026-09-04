@@ -104,7 +104,7 @@ const gateBodyIdPrefix = "gate-"
 // the BodyTable method simply yields no gate candidates — degrading the
 // reachability scan to the station alone, never failing it.
 type gateSource interface {
-	LaneGates(ctx context.Context, systemID string, radius int) ([]system.LaneGate, error)
+	LaneGates(ctx context.Context, systemID string) ([]system.LaneGate, error)
 }
 
 // candidateHosts is the bounded candidate set a floor-priced reachability
@@ -123,7 +123,7 @@ func (s *Service) candidateHosts(ctx context.Context, bt *system.BodyTable, syst
 	if !ok {
 		return out
 	}
-	gates, err := gs.LaneGates(ctx, systemID, s.params.BoardRadius)
+	gates, err := gs.LaneGates(ctx, systemID)
 	if err != nil {
 		return out
 	}

@@ -175,7 +175,6 @@ func generateWithStreams(seed int64, r, r2 *rand.Rand, region string, skeleton g
 	return GeneratedInterior{
 		Interior: SystemInterior{
 			Seed:      seed,
-			Radius:    params.Radius,
 			Character: region,
 			StarClass: skeleton.StarClass,
 			Version:   1,

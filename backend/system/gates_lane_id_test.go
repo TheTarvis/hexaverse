@@ -61,7 +61,7 @@ func TestLaneGates_Scenario_EveryGateCarriesANonEmptyLaneId(t *testing.T) {
 	gx := &fakeGalaxy{live: laneIdGalaxy()}
 	svc := NewServiceWith(NewMockDao(nil), gx, testClock())
 
-	gates, err := svc.LaneGates(context.Background(), "sys_0_0", 16)
+	gates, err := svc.LaneGates(context.Background(), "sys_0_0")
 	if err != nil {
 		t.Fatalf("LaneGates: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestLaneGates_Scenario_ServedLaneIdMatchesGalaxyLaneIdBetween(t *testing.T)
 		t.Fatalf("galaxy.LaneIdBetween is not order-independent: forward=%q reverse=%q", want, reverse)
 	}
 
-	gatesFromOrigin, err := svc.LaneGates(context.Background(), "sys_0_0", 16)
+	gatesFromOrigin, err := svc.LaneGates(context.Background(), "sys_0_0")
 	if err != nil {
 		t.Fatalf("LaneGates(sys_0_0): %v", err)
 	}
@@ -113,7 +113,7 @@ func TestLaneGates_Scenario_ServedLaneIdMatchesGalaxyLaneIdBetween(t *testing.T)
 		t.Errorf("gate sys_0_0 -> sys_10_0: laneId = %q, want %q (galaxy.LaneIdBetween)", gotFromOrigin, want)
 	}
 
-	gatesFromNeighbor, err := svc.LaneGates(context.Background(), "sys_10_0", 16)
+	gatesFromNeighbor, err := svc.LaneGates(context.Background(), "sys_10_0")
 	if err != nil {
 		t.Fatalf("LaneGates(sys_10_0): %v", err)
 	}
@@ -144,7 +144,7 @@ func TestLaneGates_Scenario_LaneIdServedWithNoChartedKnowledgeInvolvedAtAll(t *t
 	// No corp id, no fog/tier state passed anywhere near this call — exactly
 	// what a freshly spawned corporation's very first read looks like from
 	// this function's point of view.
-	gates, err := svc.LaneGates(context.Background(), "sys_0_0", 16)
+	gates, err := svc.LaneGates(context.Background(), "sys_0_0")
 	if err != nil {
 		t.Fatalf("LaneGates: %v", err)
 	}

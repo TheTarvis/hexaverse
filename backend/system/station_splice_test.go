@@ -52,7 +52,7 @@ func stationFeatureFixture() *Feature {
 
 func interiorFixture() *GeneratedInterior {
 	return &GeneratedInterior{
-		Interior: SystemInterior{SystemId: "sys-1", Radius: 16},
+		Interior: SystemInterior{SystemId: "sys-1"},
 		Features: []Feature{
 			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
 			{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Dir: 1},

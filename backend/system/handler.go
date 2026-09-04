@@ -94,7 +94,7 @@ func (h *Handler) GetInterior(c *gin.Context) {
 
 	now := h.clock.Now()
 
-	gates, err := h.svc.LaneGates(ctx, systemID, gen.Interior.Radius)
+	gates, err := h.svc.LaneGates(ctx, systemID)
 	if err != nil {
 		log.Error().Ctx(c).Err(err).Str("systemId", systemID).Msg("Failed to compute lane gates")
 		c.AbortWithStatus(http.StatusInternalServerError)

@@ -110,7 +110,7 @@ func (s *stubStationBT) StationFeature(context.Context, string) (*Feature, error
 // feature is the one legitimate exception — see stubStationBT below — its
 // continuous orbit is recomputed fresh on every splice, never persisted.)
 func goodBodyTableInterior() (SystemInterior, []Feature) {
-	interior := SystemInterior{SystemId: "sys-bt", Radius: 16, Extent: ContinuousRadius(16), StarClass: "G"}
+	interior := SystemInterior{SystemId: "sys-bt", Extent: ContinuousRadius(16), StarClass: "G"}
 	giantRadius := ContinuousRadius(7)
 	beltRadius := ContinuousRadius(4)
 	feats := []Feature{

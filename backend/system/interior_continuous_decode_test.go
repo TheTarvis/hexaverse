@@ -11,13 +11,16 @@ package system
 //   - "A Feature Omission Cascades to a Fixpoint Through the Parent Chain"
 //
 // Follows the exact MockDao + captureLog pattern already established by
-// interior_decode_guard_test.go (the sibling, already-shipped ring-validation
-// guard) for continuity of convention.
+// interior_decode_guard_test.go (which carried the sibling, since-retired
+// ring-validation guard, and still holds this package's shared captureLog
+// helper) for continuity of convention.
 //
 // SDET-CHOSEN CONTRACT: the decode step (space.DecodeOrbit over each
-// feature's stored SpaceDoc) is assumed to run inside the SAME readInterior
-// loop the ring guard already runs in (design.md: "exactly as readInterior's
-// existing featureRingOK guard does"), populating Feature.Space on survivors;
+// feature's stored SpaceDoc) is assumed to run inside readInterior's own
+// per-feature loop (design.md: "exactly as readInterior's existing ring
+// guard does" — that ring guard has since been retired with the ring itself,
+// leaving this decode step as the loop's only guard), populating
+// Feature.Space on survivors;
 // the parent-chain FIXPOINT CASCADE is assumed to run in GetOrCreateInterior
 // AFTER spliceStation (tasks.md 4.9 states this explicitly: "run AFTER
 // spliceStation... the station is a candidate body in the cascade"). Both are
@@ -38,7 +41,7 @@ import (
 )
 
 func extentOK() SystemInterior {
-	return SystemInterior{SystemId: "sys-decode", Radius: 16, Extent: ContinuousRadius(16)}
+	return SystemInterior{SystemId: "sys-decode", Extent: ContinuousRadius(16)}
 }
 
 func validSpaceDoc(parentId string, radius float64) map[string]any {

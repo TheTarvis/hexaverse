@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"hexaverse/common"
-	"hexaverse/fleet"
 	"hexaverse/system"
 )
 
@@ -33,35 +32,33 @@ func TestDefaultSpawnParams(t *testing.T) {
 	// (not to be touched by this pass).
 }
 
-// The board-geometry invariant between system generation and fleet's lane-gate
-// ring, previously enforced (together with a third, now-deleted leg — see the
-// NOTE below) only by "must match" comments: system generates every interior
-// at radius R and fleet places lane gates on ring R. Both still derive from
-// common.Tuning().BoardRadius, so this asserts that half of the wiring still
-// holds — a regression here silently puts gates in the void.
+// The one surviving wiring guard on the central generation-radius knob:
+// system generates every interior at the radius the knob names. This is the
+// ONLY live assertion that the knob still drives system generation, which is
+// precisely what keeps it alive (the knob is not deleted, only renamed —
+// SystemInterior.Extent = ContinuousRadius(params.Radius) reads it, so
+// deleting it would silently change every system's continuous extent).
 //
-// DELETED, not migrated (migrate-fleet-to-continuous-burns, design.md
-// Decision 4/14, tasks.md 3.9): the third leg this test used to check — spawn
-// resting the starting hull on ring R-1 via SpawnParams.RimRing — no longer
-// has a meaning to assert. RimRing is gone; a fleet's spawn position is a
-// continuous space.Vec3 with no ring to be in lockstep with BoardRadius. Its
-// own invariant (never inside the star's clearance shell) is covered by
-// spawn_position_test.go.
+// DELETED, not migrated: two former legs. (1) spawn resting the starting hull
+// on ring R-1 via SpawnParams.RimRing (migrate-fleet-to-continuous-burns,
+// design.md Decision 4/14, tasks.md 3.9) — RimRing is gone; a fleet's spawn
+// position is a continuous space.Vec3, its own invariant covered by
+// spawn_position_test.go. (2) fleet placing lane gates at ring R via
+// MovementParams.BoardRadius — that field is gone too; a lane gate is a body
+// with a continuous orbit, so fleet holds no radius to keep in lockstep.
 func TestBoardRadiusInvariant(t *testing.T) {
 	radius := common.Tuning().BoardRadius
 
 	if got := system.DefaultParams().Radius; got != radius {
 		t.Errorf("system generation radius = %d, want %d (common.Tuning().BoardRadius)", got, radius)
 	}
-	if got := fleet.DefaultMovementParams().BoardRadius; got != radius {
-		t.Errorf("fleet gate ring = %d, want %d (common.Tuning().BoardRadius)", got, radius)
-	}
 }
 
-// Turning the central knob must move both remaining legs in lockstep — this is
-// the property that makes a future admin page safe to point at BoardRadius.
-// (See TestBoardRadiusInvariant's DELETED note: the spawn/RimRing leg no
-// longer exists to track anything.)
+// Turning the central knob must move the surviving leg — this is the property
+// that makes a future admin page safe to point at the knob, and the
+// SetTuning-and-observe structure is what proves the wiring is live rather
+// than coincidental. (See TestBoardRadiusInvariant's DELETED note for the two
+// legs that no longer exist to track anything.)
 func TestBoardRadiusInvariant_TracksTuning(t *testing.T) {
 	original := common.Tuning()
 	t.Cleanup(func() { common.SetTuning(original) })
@@ -72,9 +69,6 @@ func TestBoardRadiusInvariant_TracksTuning(t *testing.T) {
 
 	if got := system.DefaultParams().Radius; got != 20 {
 		t.Errorf("system radius = %d, want 20 — it did not follow the central knob", got)
-	}
-	if got := fleet.DefaultMovementParams().BoardRadius; got != 20 {
-		t.Errorf("fleet gate ring = %d, want 20 — it did not follow the central knob", got)
 	}
 }
 

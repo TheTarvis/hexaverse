@@ -67,7 +67,7 @@ func TestService_FastPath_ReturnsStored(t *testing.T) {
 	dao := NewMockDao(ctrl)
 
 	dao.EXPECT().GetInterior(gomock.Any(), "gal_1", "sys-0").
-		Return(&SystemInterior{SystemId: "sys-0", Radius: 16}, nil)
+		Return(&SystemInterior{SystemId: "sys-0"}, nil)
 	dao.EXPECT().ListFeatures(gomock.Any(), "gal_1", "sys-0").
 		Return([]Feature{{Id: "feat-star", Type: FeatureStar}}, nil)
 	// No CreateInterior — the fast path must not regenerate.

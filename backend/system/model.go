@@ -187,16 +187,15 @@ type Feature struct {
 type SystemInterior struct {
 	SystemId  string             `json:"systemId" firestore:"systemId"`
 	Seed      int64              `json:"seed" firestore:"seed"`
-	Radius    int                `json:"radius" firestore:"radius"`
 	Character string             `json:"character" firestore:"character"`
 	StarClass string             `json:"starClass" firestore:"starClass"`
 	Version   int                `json:"version" firestore:"version"`
 	CreatedAt common.WorldMillis `json:"createdAt" firestore:"createdAt"`
 	// Extent is the continuous upper bound over every generated body's
-	// star-frame radius (`= ContinuousRadius(Radius)`), persisted at
-	// generation time (design.md Decision 2). It is what a gate anchors on
-	// (Decision 7) and what survives link 9, when the lattice-only `Radius`
-	// above is deleted.
+	// star-frame radius (`= ContinuousRadius(GenerationParams.Radius)`),
+	// persisted at generation time (design.md Decision 2). It is what a gate
+	// anchors on (Decision 7), and it is the ONLY extent this doc carries:
+	// the generation-time orbital index it was computed from is not stored.
 	Extent float64 `json:"extent,omitempty" firestore:"extent,omitempty"`
 }
 

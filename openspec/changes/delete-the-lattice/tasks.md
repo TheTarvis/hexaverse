@@ -50,7 +50,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       backend/system` returning nothing outside deleted code
       (`system-interior`: *Every Generated Body Carries a Continuous Orbital
       Element Set and a Size*)
-- [ ] 2.1b Delete `SystemInterior.Radius` (`system/model.go:190`, tagged
+- [x] 2.1b Delete `SystemInterior.Radius` (`system/model.go:190`, tagged
       `json:"radius" firestore:"radius"`) — the top-level lattice cell radius
       8a-2's own comment at `model.go:195-199` defers to this change by name.
       `SystemInterior.Extent` is its continuous successor and is already
@@ -92,7 +92,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       accordingly. Verified by `grep -rn 'r2 == nil\|latticeDrawCount'
       backend/system` returning nothing (`system-interior`: REMOVED *Lattice
       Placement Is Independent Of The Continuous Stream*)
-- [ ] 2.7 Remove `LaneGate.Cell` and `LaneGates`' `radius` parameter; the gate's
+- [x] 2.7 Remove `LaneGate.Cell` and `LaneGates`' `radius` parameter; the gate's
       position comes from the body table via `fillGateGeometry` alone. Update
       **both** production callers — `fleet/fuel.go:126` and
       `system/handler.go:115` (`h.svc.LaneGates(ctx, systemID,

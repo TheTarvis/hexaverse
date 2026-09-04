@@ -23,7 +23,7 @@ type fakeSysSvc struct {
 func (f *fakeSysSvc) GetOrCreateInterior(context.Context, string) (*GeneratedInterior, error) {
 	return f.gen, f.err
 }
-func (f *fakeSysSvc) LaneGates(context.Context, string, int) ([]LaneGate, error) {
+func (f *fakeSysSvc) LaneGates(context.Context, string) ([]LaneGate, error) {
 	return f.gates, nil
 }
 
@@ -53,7 +53,7 @@ func (sysTestClock) Scale() float64                        { return 1 }
 // body — chartedGates' filtering is exactly what made a fresh corp's galaxy
 // untraversable (every gate invisible, nothing to jump to).
 func TestGetInterior_Scenario_NoLaneGateOmittedForLackOfCharting(t *testing.T) {
-	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1", Radius: 16}}
+	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1"}}
 	gates := []LaneGate{
 		{DestSystemId: "sys-known", LaneId: "lane_s1_sys-known"},
 		{DestSystemId: "sys-dark", LaneId: "lane_s1_sys-dark"},
@@ -116,7 +116,7 @@ func (f *fakeDueActions) ResolveDue(_ context.Context, scope string) ([]action.A
 // board settles — slot freed, reveal minted — on the very read the client's
 // poll/eta refetch issues, instead of waiting for another verb or the sweep.
 func TestGetInterior_RunsTheReadFold(t *testing.T) {
-	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1", Radius: 16}}
+	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1"}}
 	due := &fakeDueActions{}
 
 	gin.SetMode(gin.TestMode)

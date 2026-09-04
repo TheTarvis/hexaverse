@@ -45,7 +45,7 @@ import (
 // if it somehow shipped.
 func fullDisclosureInterior() *GeneratedInterior {
 	return &GeneratedInterior{
-		Interior: SystemInterior{SystemId: "s1", Radius: 16},
+		Interior: SystemInterior{SystemId: "s1"},
 		Features: []Feature{
 			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
 			{Id: "feat-body-0", Type: FeatureRocky, Orbit: &Orbit{Ring: 3, Angle0: 0, Period: 0, Dir: 1},

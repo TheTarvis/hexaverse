@@ -74,7 +74,7 @@ func testBodyTable(t *testing.T, systemID string, starSize float64, extras ...sy
 	ctrl := gomock.NewController(t)
 	dao := system.NewMockDao(ctrl)
 
-	interior := system.SystemInterior{SystemId: systemID, Radius: 16, Extent: 200}
+	interior := system.SystemInterior{SystemId: systemID, Extent: 200}
 	feats := append([]system.Feature{
 		{Id: "feat-star", Type: system.FeatureStar, Fixed: true, Size: starSize},
 	}, extras...)

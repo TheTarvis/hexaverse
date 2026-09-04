@@ -28,7 +28,7 @@ import (
 // id — asserted at the WIRE (JSON) level, through the real handler
 // (NewHandlerWith + RegisterRoutes), not merely the Go struct.
 func TestGetInterior_Scenario_LaneGateBodyCarriesNonEmptyLaneIdOnTheWire(t *testing.T) {
-	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1", Radius: 16}}
+	gen := &GeneratedInterior{Interior: SystemInterior{SystemId: "s1"}}
 	gates := []LaneGate{
 		{DestSystemId: "sys-neighbor-a", LaneId: "lane_0_0_10_0"},
 		{DestSystemId: "sys-neighbor-b", LaneId: "lane_0_0_0_10"},

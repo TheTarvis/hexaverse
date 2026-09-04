@@ -11,18 +11,17 @@ import (
 
 // LaneGate is a charted lane's gate BODY in this system — a body like any
 // other, with a continuous position, a size and an orbital element set,
-// which is what a fleet burns to and attaches at. Its lattice `cell` is
-// gone (openspec build-production-space-view, tasks.md 9.1): the gate's
-// place in the world is `Space`/`OrbitElements`, resolved through the same
-// body table every other continuous position folds through.
+// which is what a fleet burns to and attaches at. The gate's place in the
+// world is `Space`/`OrbitElements`, resolved through the same body table
+// every other continuous position folds through.
 type LaneGate struct {
 	// Id is this gate BODY's id in the system's own body table — the string
 	// a burn order names as its `bodyId` and the string `fleet.AttachedTo`
 	// reports once that burn settles (openspec build-production-space-view
 	// tasks.md 9.1b; system-interior *Lane-Gate Bodies Carry Their Body
-	// Id*). Once the lattice `cell` is gone this is the ONLY identity a
-	// client has for a gate, which is why it is served rather than left for
-	// every consumer to reconstruct from the naming convention.
+	// Id*). It is the ONLY identity a client has for a gate, which is why it
+	// is served rather than left for every consumer to reconstruct from the
+	// naming convention.
 	//
 	// Populated from gateId — the SAME function that names the gate body in
 	// the body table — here at construction, never in the degradable
@@ -58,11 +57,6 @@ type LaneGate struct {
 	// the same degradable fillGateGeometry pass that resolves Space/Size, so
 	// a gate whose body is unresolvable degrades exactly as it does today
 	// (nil elements) rather than failing the read.
-	//
-	// The LATTICE `Cell` this once sat alongside is gone (openspec
-	// build-production-space-view, tasks.md 9.1): a gate's place in the
-	// world is its continuous position, size and element set, like any
-	// other body's.
 	OrbitElements *orbitElementsDTO `json:"orbitElements,omitempty"`
 }
 
@@ -97,16 +91,18 @@ func fillGateGeometry(gates []LaneGate, bt *BodyTable, now common.WorldMillis) {
 	}
 }
 
-// LaneGates returns every lane gate on the given system's board: for each lane
-// touching the system, the gate tile where it departs toward its neighbour,
-// bearing-projected onto a board of the given radius. Unfiltered — every
-// lane-gate body ships to every authenticated requester regardless of stored
+// LaneGates returns every lane gate of the given system: for each lane
+// touching the system, the gate BODY it departs through, whose position and
+// size the caller resolves from the system's own body table
+// (fillGateGeometry). It takes no radius — a gate's place in the world is its
+// continuous orbit, so there is nothing left to project onto. Unfiltered —
+// every lane-gate body ships to every authenticated requester regardless of stored
 // map knowledge (replace-observation-with-sightings design.md Decision 5;
 // system-interior "Bodies Are Public; Ships Are Disclosed"): standing next to
 // a physical gate and reading the sign on it is how a corporation finds the
 // roads, and gating that would make a fresh corporation's galaxy
 // untraversable.
-func (s *Service) LaneGates(ctx context.Context, systemID string, radius int) ([]LaneGate, error) {
+func (s *Service) LaneGates(ctx context.Context, systemID string) ([]LaneGate, error) {
 	gal, err := s.galaxySvc.GetLive(ctx)
 	if err != nil {
 		return nil, err
@@ -138,7 +134,7 @@ func (s *Service) LaneGates(ctx context.Context, systemID string, radius int) ([
 		}
 		// The neighbour must still be a system in the live galaxy; its
 		// coordinates no longer matter here, now that a gate's place in the
-		// world is its continuous orbit rather than a projected lattice cell.
+		// world is its continuous orbit.
 		if _, ok := coords[nb]; !ok {
 			continue
 		}

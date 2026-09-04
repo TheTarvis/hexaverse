@@ -213,7 +213,7 @@ var ErrStationRingOutOfRange = errors.New("stations: station orbit ring exceeds 
 // BEFORE computing the footprint (stations holds no per-system interior, so
 // per design.md Decision 3 it defaults to the process-wide production
 // schedule) — this runs AHEAD of (and independently from) the interior's own
-// feature-decode guard (system.readInterior's featureRingOK, tasks.md 2.7),
+// per-feature decode guard (system.readInterior's own loop, tasks.md 2.7),
 // because the splice at GetOrCreateInterior happens after that guard already
 // ran on the generated/stored features; a station is not one of them. A
 // rejection is logged HERE (with the station's system id and the offending

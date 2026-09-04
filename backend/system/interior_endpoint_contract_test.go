@@ -71,7 +71,7 @@ func TestGetInterior_Scenario_NoLiveGalaxy404s(t *testing.T) {
 // charted lane gates, and current world time all ship on a successful read.
 func TestGetInterior_Scenario_ServesTheBaseFieldSet(t *testing.T) {
 	gen := &GeneratedInterior{
-		Interior: SystemInterior{SystemId: "s1", Radius: 16, Character: "star-rich", StarClass: "G"},
+		Interior: SystemInterior{SystemId: "s1", Character: "star-rich", StarClass: "G"},
 		Features: []Feature{
 			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
 		},

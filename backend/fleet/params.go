@@ -21,13 +21,6 @@ type MovementParams struct {
 	// length × this, frozen at commit. The reserved lane.cost / relayModifier
 	// hooks multiply in here later without restructuring.
 	LaneMsPerDistance float64
-	// BoardRadius is the cell/ring radius of every system board — where lane gates sit
-	// (ring == BoardRadius). It must match system.GenerationParams.Radius; both now
-	// source it from common.Tuning().BoardRadius, so the invariant holds by
-	// construction rather than by comment. The slice generates every interior at a
-	// fixed radius, so one constant is honest and spares an interior read to place
-	// a departure/entry gate.
-	BoardRadius int
 }
 
 // DefaultMovementParams sources the live pacing knobs from common.Tuning() — the
@@ -41,7 +34,6 @@ func DefaultMovementParams() MovementParams {
 		MsPerTile:         t.MsPerTile,
 		InterceptHorizon:  t.InterceptHorizon,
 		LaneMsPerDistance: t.LaneMsPerDistance,
-		BoardRadius:       t.BoardRadius,
 	}
 }
 

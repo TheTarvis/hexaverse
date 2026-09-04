@@ -117,7 +117,7 @@ func (f *fakeStationSourceGeneric) StationFeature(context.Context, string) (*Fea
 // the one under test is decode-clean.
 func minimalStarOnlyInterior(systemId string) *GeneratedInterior {
 	return &GeneratedInterior{
-		Interior: SystemInterior{SystemId: systemId, Radius: 16},
+		Interior: SystemInterior{SystemId: systemId},
 		Features: []Feature{
 			{Id: "feat-star", Type: FeatureStar, Fixed: true, Footprint: []board.Cell{{Ring: 0, Slot: 0}}},
 			// A decode-clean, already-decoded (Space set directly, mirroring

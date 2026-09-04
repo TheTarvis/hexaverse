@@ -28,7 +28,7 @@ func TestLaneGates_ProjectsEachLaneToItsRimTile(t *testing.T) {
 	gx := &fakeGalaxy{live: threeSystemGalaxy()}
 	svc := NewServiceWith(NewMockDao(nil), gx, testClock())
 
-	gates, err := svc.LaneGates(context.Background(), "sys-0", 16)
+	gates, err := svc.LaneGates(context.Background(), "sys-0")
 	if err != nil {
 		t.Fatalf("LaneGates: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestLaneGates_UnknownSystemNotFound(t *testing.T) {
 	gx := &fakeGalaxy{live: threeSystemGalaxy()}
 	svc := NewServiceWith(NewMockDao(nil), gx, testClock())
 
-	if _, err := svc.LaneGates(context.Background(), "sys-missing", 16); err != ErrNotFound {
+	if _, err := svc.LaneGates(context.Background(), "sys-missing"); err != ErrNotFound {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
 }
