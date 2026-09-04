@@ -856,6 +856,31 @@ names the file and states its verification.
         — confirm by inspection that every `openspec/specs/` hit is a line one of this
         change's deltas or tasks 13.1–13.2 removes, and re-confirm at task 13.4.
 
+      - **Not a filter — a standing exception to this change's deletion goal,
+        recorded so that an empty remainder is not read as total lattice
+        deletion.** `frontend/app/spike/hex-board/` survives this change by
+        orchestrator ruling on OQ-5
+        (`docs/plans/continous_space/handoffs/link9-rulings.md`, section
+        `## OQ-5`): its `mock-system.ts` is imported by
+        `frontend/app/spike/audio/synth.ts:20` (`hashSeed`, `type Character`)
+        and `frontend/app/spike/audio/page.tsx:17` (`type Character`) — two
+        non-lattice names in a lattice file — and `audio/` is owned by no change
+        in this chain. This is **the one place link 9 does not achieve total
+        lattice deletion, and that is a decision, not an oversight.** The
+        follow-up that would close it: inline `hashSeed` and `type Character`
+        into `audio/`, then delete `hex-board/`. **Add no filter for it** — the
+        surviving axial-hex code matches none of this leg's path patterns, so
+        this leg is empty whether the spike is there or not, which is exactly
+        why the exception has to be written down here rather than inferred from
+        a clean sweep. (Its one path-shaped citation,
+        `mock-system.ts:235`'s "mirrors `board.GateRing`", is still rewritten —
+        by task 10.1c.) `frontend/app/spike/space-3d/` also survives, but for a
+        different reason and it is **not** an exception to the goal: it is the
+        continuous-space PoC this chain came from and the path
+        `space-kinematics`' `## Purpose` names as its exemption — not lattice at
+        all, only a lattice-era artifact the sweeps happen to reach. Task 13.1
+        leaves that carve-out sentence intact.
+
       **Deliberately ABSENT from this leg — do not re-add** (ruling B): no
       blanket `delete-the-lattice` *content* filter; no `sub-lattice` filter
       (0 lines here — 10.1 matches paths, and a line naming a deleted path is
@@ -957,6 +982,34 @@ names the file and states its verification.
         only: the change id contains the swept word, so every RED file fails this
         sweep by obeying the convention. It covers all four RED headers and
         matches nothing else in the tree.
+
+      - **Not a filter — a standing exception to this change's deletion goal,
+        recorded so that an empty remainder is not read as total lattice
+        deletion.** `frontend/app/spike/hex-board/` survives this change by
+        orchestrator ruling on OQ-5
+        (`docs/plans/continous_space/handoffs/link9-rulings.md`, section
+        `## OQ-5`): its `mock-system.ts` is imported by
+        `frontend/app/spike/audio/synth.ts:20` (`hashSeed`, `type Character`)
+        and `frontend/app/spike/audio/page.tsx:17` (`type Character`) — two
+        non-lattice names in a lattice file — and `audio/` is owned by no change
+        in this chain. This is **the one place link 9 does not achieve total
+        lattice deletion, and that is a decision, not an oversight.** The
+        follow-up that would close it: inline `hashSeed` and `type Character`
+        into `audio/`, then delete `hex-board/`. **Add no filter for it, and do
+        not expect this leg to mention the spike again**: after task 6.3b's
+        comment sweep `frontend/app/spike/hex-board/mock-system.ts` no longer
+        contains the word `lattice` at all, so this grep passes over the
+        surviving axial-hex code silently. The sweep's own output will never
+        surface it, and without this entry a future reader has no way to tell
+        that code was **allowed** to remain rather than **missed** — a tolerated
+        hit and an accepted exception look identical in a grep, and only one of
+        them is a decision. `frontend/app/spike/space-3d/` also survives, but
+        for a different reason and it is **not** an exception to the goal: it is
+        the continuous-space PoC this chain came from and the path
+        `space-kinematics`' `## Purpose` names as its exemption — not lattice at
+        all, only a lattice-era artifact the sweeps happen to reach; its three
+        anti-lattice comments are rewritten by task 6.3b, as stated above, and
+        task 13.1 leaves that carve-out sentence intact.
 
       **Deliberately ABSENT from this leg — do not re-add** (ruling B): no
       blanket `delete-the-lattice` *content* filter. It would hide six prose
