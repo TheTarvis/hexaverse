@@ -1,0 +1,40 @@
+{
+  "$comment": [
+    "Mirror map + coverage inventory for the backend/market <-> frontend/lib/market",
+    "pair (openspec delete-the-lattice, design.md Decision 4; cross-stack-determinism's",
+    "'Shared Board Math Is Pinned By a Cross-Language Golden Fixture'). This is the",
+    "capability's ONLY mirrored-pair instance after the board and polar pairs were",
+    "deleted, and it is what keeps check_mirror from losing its last call site.",
+    "",
+    "Names EVERY top-level function defined in either mirror, whether or not exported",
+    "on either side, because check_mirror's rule-1 extractor enumerates every",
+    "'^func ' in backend/market -- receiver methods and unexported helpers included.",
+    "backend/market is an APPLICATION package, so goOnly is a whole-package census",
+    "and goes stale the moment anyone adds a service method, a handler or a private",
+    "helper. Regenerate it with the extractor, never by hand:",
+    "",
+    "  for f in backend/market/*.go; do case \"$f\" in *_test.go) continue;; esac; \\",
+    "    grep -hE '^func ' \"$f\"; done \\",
+    "  | sed -E 's/^func (\\([^)]*\\) )?//; s/[([].*$//; s/[[:space:]]*$//' \\",
+    "  | grep -v '^$' | sort -u",
+    "",
+    "coverage values: 'family:<name>' -- asserted by that fixture family (directly, or",
+    "indirectly as a callee of the family's function); 'inventory' -- no family",
+    "exercises it, tracked as a gap below. The legal family names are the non-empty",
+    "top-level keys of fixtures/market/cases.json: 'fold' and 'firstTonPrice'."
+  ],
+  "pairs": [
+    { "go": "FoldSale", "ts": "foldSale", "coverage": "family:fold" },
+    { "go": "FirstTonPrice", "ts": "firstTonPrice", "coverage": "family:firstTonPrice" },
+    { "go": "Capacity", "ts": "capacity", "coverage": "family:fold", "note": "indirect (the per-entry remaining-capacity helper FoldSale/foldSale consume on every portion; every fold case exercises it)" }
+  ],
+  "goOnly": [
+    "BudgetCheck", "DefaultParams", "DemandFor", "EpochAt", "FloorFor", "GetBoard",
+    "NewHandler", "NewService", "ObserveSale", "ProvisionRequests", "RegisterRoutes",
+    "Sell", "blendedUnitPrice", "checkGuards", "dockedTo", "ensureProvisioned",
+    "isContention", "mix64", "mixStation", "regionOf", "reject", "settle",
+    "unitFloat", "validateGuards", "venueQuotes"
+  ],
+  "tsOnly": ["bestPriceFor"],
+  "inventory": []
+}

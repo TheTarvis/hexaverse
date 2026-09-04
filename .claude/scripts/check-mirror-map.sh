@@ -2,15 +2,15 @@
 #
 # Mirror-map coverage check, over every cross-language mirror pair:
 #
-#   - backend/board  <-> frontend/lib/board    (openspec: cross-stack-determinism,
+#   - backend/market <-> frontend/lib/market   (openspec: cross-stack-determinism,
 #     requirement "Shared Board Math Is Pinned By a Cross-Language Golden
 #     Fixture", scenario "An uncovered mirrored function is caught by the
-#     coverage inventory check") — fixtures/board/mirror-map.json
-#   - backend/polar  <-> frontend/lib/polar  (openspec: polar-lattice-math,
-#     requirement "A New Cross-Language Fixture Family Pins the Lattice",
-#     same scenario) — fixtures/polar/mirror-map.json
+#     coverage inventory check") — fixtures/market/mirror-map.json. This is
+#     the capability's ONLY mirrored-pair instance: the sale fold, the
+#     first-ton price and the per-entry capacity helper are implemented on
+#     both sides and pinned by fixtures/market/cases.json.
 #
-# Two further invocations run in ANTI-MIRROR mode, over:
+# Five further invocations run in ANTI-MIRROR mode, over:
 #   - backend/space <-> frontend/lib/space (openspec: add-space-kinematics
 #     Decision 1 — Go is sole authority for continuous-space kinematics, no
 #     TypeScript mirror exists, now or ever)
@@ -362,17 +362,11 @@ anti_mirror() {
     echo "$LABEL (anti-mirror): no shared function names between ${GO_DIR#"$REPO_ROOT"/} and ${TS_DIR#"$REPO_ROOT"/}."
 }
 
-check_mirror "board" \
-    "$REPO_ROOT/fixtures/board/mirror-map.json" \
-    "$REPO_ROOT/fixtures/board/cases.json" \
-    "$REPO_ROOT/backend/board" \
-    "$REPO_ROOT/frontend/lib/board"
-
-check_mirror "polar" \
-    "$REPO_ROOT/fixtures/polar/mirror-map.json" \
-    "$REPO_ROOT/fixtures/polar/cases.json" \
-    "$REPO_ROOT/backend/polar" \
-    "$REPO_ROOT/frontend/lib/polar"
+check_mirror "market" \
+    "$REPO_ROOT/fixtures/market/mirror-map.json" \
+    "$REPO_ROOT/fixtures/market/cases.json" \
+    "$REPO_ROOT/backend/market" \
+    "$REPO_ROOT/frontend/lib/market"
 
 anti_mirror "space" \
     "$REPO_ROOT/fixtures/space/mirror-map.json" \
@@ -403,5 +397,5 @@ if [[ "$FAIL" -ne 0 ]]; then
     exit 2
 fi
 
-echo "PASS: all mirror maps complete — every mirrored pair fixture-covered or inventoried, and backend/space, backend/system, backend/fleet, backend/galaxy, and backend/disclosure carry no TypeScript mirror."
+echo "PASS: all mirror maps complete — backend/market is fixture-covered or inventoried, and backend/space, backend/system, backend/fleet, backend/galaxy, and backend/disclosure carry no TypeScript mirror."
 exit 0

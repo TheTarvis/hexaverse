@@ -563,7 +563,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `openspec/specs/cross-stack-determinism/spec.md` and
       `openspec/specs/board-tactical-math/spec.md`, which sections 12–13
       clear; those two are expected here and are not residue.
-- [ ] 7.2 Create `fixtures/market/mirror-map.json` for the
+- [x] 7.2 Create `fixtures/market/mirror-map.json` for the
       `backend/market` ↔ `frontend/lib/market` pair (design.md Decision 4),
       naming `FoldSale`/`foldSale`, `FirstTonPrice`/`firstTonPrice` and
       `Capacity`/`capacity` as pairs and `bestPriceFor` as `tsOnly`. The
@@ -576,7 +576,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       shared function this surfaces with no family goes to the map's coverage
       `inventory` with an `expectedChange`, not to a new fixture family —
       recording a new family is out of scope here
-- [ ] 7.2b Populate `goOnly` **mechanically, not by hand**: `check_mirror`'s
+- [x] 7.2b Populate `goOnly` **mechanically, not by hand**: `check_mirror`'s
       rule 1 extracts *every* top-level `^func ` in the Go directory — receiver
       methods and unexported functions included — and fails with `MISSING_GO`
       for each one absent from `pairs` + `goOnly`. `backend/market`'s non-test
@@ -590,7 +590,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `anti_mirror` checks only `.sharedNames`, so it passes trivially, leaves
       `check_mirror` with zero call sites anyway, and defeats Decision 4's
       entire purpose while `/check` reports green
-- [ ] 7.3 Replace `check_mirror board` and `check_mirror polar` in
+- [x] 7.3 Replace `check_mirror board` and `check_mirror polar` in
       `.claude/scripts/check-mirror-map.sh` with a single `check_mirror market`
       pass over `fixtures/market/mirror-map.json`,
       `fixtures/market/cases.json`, `backend/market`, `frontend/lib/market`
