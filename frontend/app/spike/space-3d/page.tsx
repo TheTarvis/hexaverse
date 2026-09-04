@@ -1,6 +1,6 @@
 'use client'
 
-// SPIKE — full-3D continuous space, off the lattice entirely. Route: /spike/space-3d
+// SPIKE — full-3D continuous space, with no cell grid at all. Route: /spike/space-3d
 //
 // The interaction PoC for the "no board, no cells" question: a seeded system
 // of inclined continuous orbits, a ship whose committed burn is a pure
@@ -10,8 +10,8 @@
 // arrivals insert into a rails parking orbit, and station-keeping an exact
 // offset costs a continuous fuel drain — the Option B parking economy. The
 // sim lives in ./sim (pure, fixture-able); ./SpaceView owns the GL scene.
-// Like the webgl-board bench, the GL world only mounts once the stage
-// measures — so jsdom exercises the HUD and command flow without a GL context.
+// The GL world only mounts once the stage measures — so jsdom exercises the
+// HUD and command flow without a GL context.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
@@ -216,7 +216,7 @@ export default function Space3dSpikePage() {
         <div>
           <Heading>SPIKE — continuous space</Heading>
           <Text>
-            System {system.name} · no lattice, positions in R³. Drag to tilt/orbit, right-drag to pan, wheel to zoom.
+            System {system.name} · continuous positions in R³. Drag to tilt/orbit, right-drag to pan, wheel to zoom.
             Click a body or empty space to plot a burn, then commit it.
           </Text>
         </div>

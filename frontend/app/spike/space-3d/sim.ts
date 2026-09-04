@@ -1,9 +1,9 @@
 // SPIKE — continuous-space sim core for /spike/space-3d.
 //
 // The question this spike answers: what does the game's kinematic contract
-// look like OFF the lattice entirely — no rings, no slots, no cells, just
-// continuous positions in R³. The load-bearing property carried over from
-// the board package is that a committed order stays a PURE FUNCTION OF TIME:
+// look like with no discrete cell grid at all — just continuous positions in
+// R³. The load-bearing property carried over from the pre-continuous
+// kinematics is that a committed order stays a PURE FUNCTION OF TIME:
 // the `StateAt`-style fold still works (a burn past its arrival IS its
 // settled parked state), so the no-scheduler / resolve-on-read architecture
 // survives the move to continuous space unchanged.
@@ -18,8 +18,8 @@
 // a continuous fuel drain — the parking economy.
 //
 // Pure math only — no three.js, no React. Deliberately shaped like something
-// that could grow a Go mirror + fixture family the way backend/polar ↔
-// frontend/lib/polar does today (fixed sample counts everywhere keep the
+// that could grow a Go mirror + fixture family the way backend/market ↔
+// frontend/lib/market does today (fixed sample counts everywhere keep the
 // float paths deterministic).
 
 export interface Vec3 {

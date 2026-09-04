@@ -6,7 +6,8 @@
 //
 // Cause for rewriting this whole file wholesale (not merely extending it):
 // the spec changed — fleet-roster's REMOVED "One Row Per Owned Fleet,
-// Derived From Effective State" named the five `board.MovementState` shapes
+// Derived From Effective State" named the five `MovementState` shapes the
+// deleted board package carried,
 // this file's fixtures (`coast`/`docked`/`laneTransit`) were built on; those
 // shapes no longer exist on `Fleet['state']` (design.md Decision 4).
 //

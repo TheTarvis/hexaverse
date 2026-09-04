@@ -3,7 +3,7 @@
 // continuous-burns, tasks.md 8.5). Replaces the deleted `fleet-status.ts`
 // (design.md Decision 12): status now derives from `space.ShipState`'s three
 // shapes (burn/park/drift) plus the fleet-owned `attachedTo`/`jump` fields,
-// never from `board.MovementState`.
+// never from the deleted board package's `MovementState`.
 //
 // Pure (no clock, no fetch): the caller passes the live world time in.
 //

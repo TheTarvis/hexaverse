@@ -110,7 +110,8 @@ const nameOf = (id: string) => (id === 'sys-0' ? 'Axion' : id === 'sys-1' ? 'Bor
 // doing". docs/specs/0011-fleet-roster.md's S1 predates
 // migrate-fleet-to-continuous-burns and named the old
 // `FleetRoster > lists every fleet with where it is and what it is doing` /
-// `fleetStatus > …` tests, both deleted with `board.MovementState`
+// `fleetStatus > …` tests, both deleted with the board package's
+// `MovementState`
 // (design.md Decision 4). The behaviour survives: `rosterRowStatus` is the
 // SAME single derivation every roster row runs through (component/fleet/
 // FleetRoster.tsx), and this describe block pins it producing a location

@@ -232,7 +232,8 @@ export function generateMockSystem(seed = 0x51a2c0de, character: Character = 'st
 
   // Lane exits: gate tiles where charted lanes leave the system (the graph↔board
   // seam). They sit on the gate ring — the inner edge of the outer band, 3 rings
-  // in from the rim (2026-07-14 decision; mirrors board.GateRing) — so a 3-ring
+  // in from the rim (2026-07-14 decision; mirrored the deleted board
+  // package's own gate-ring constant) — so a 3-ring
   // shell of outer dark sits outside them. You arrive via one (entry = laneExits[0])
   // and can depart via any. Spread ~evenly so they read as distinct directions.
   const gateRingIdx = Math.max(1, radius - 3)

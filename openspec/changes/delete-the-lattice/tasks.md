@@ -438,7 +438,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `lib/query-keys.test.ts`'s five assertions and the two `it()` titles at
       `:19` and `:28` that name the prefix. It is a pure rename with no
       wire or cache-shape consequence beyond the key string itself.
-- [ ] 6.3b **The two surviving lattice tethers under `frontend/app/spike/`,
+- [x] 6.3b **The two surviving lattice tethers under `frontend/app/spike/`,
       each with live importers.** `build-production-space-view` tasks 10.5 and
       10.6 were narrowed to stop short of both, because cutting either breaks a
       spike that is not lattice work and that no change owns:

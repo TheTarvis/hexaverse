@@ -4,7 +4,7 @@ import Space3dSpikePage from './page'
 
 // The spike page in jsdom: the stage never measures (clientWidth 0), so the
 // GL world never mounts — the HUD and the command flow render and are
-// exercised without a GL context, same trick as the webgl-board bench.
+// exercised without a GL context.
 describe('continuous-space spike page', () => {
   it('renders the stage, the readouts, and a ship parked in orbit with a full tank', () => {
     render(<Space3dSpikePage />)
