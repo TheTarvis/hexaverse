@@ -544,17 +544,21 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
         comments above; repoint at `fixtures/space/turn-table.json`'s own
         `_meta` shape, which is what it actually describes.
 
-      Verified by `grep -rn 'fixtures/board\|fixtures/polar' . --exclude-dir=node_modules
-      --exclude-dir=.git` returning hits only under `docs/plans/`,
+      Verified by `grep -I -rn 'fixtures/board\|fixtures/polar' . --exclude-dir=node_modules
+      --exclude-dir=.git --exclude-dir=.next --exclude-dir=.next-e2e` returning hits only under `docs/plans/`,
       `docs/handoffs/`, `docs/defects/`, `docs/specs/` (the superseded
       numbered specs this task records rather than rewrites),
       `openspec/changes/archive/` and this
-      change's own folder — the same allow-list task 10.1 uses, because those
-      five directories are historical record and this change's own text
-      necessarily names what it deletes. (The `--exclude-dir=archive` form
-      used previously is dropped: it is redundant with the
-      `openspec/changes/archive/` clause and misleadingly excludes any
-      directory named `archive` anywhere, which is not what this task means.)
+      change's own folder — the same allow-list task 10.1 uses, plus ruling
+      D's `.next`/`.next-e2e` exclusion and `-I`, for the same reason: the
+      sweep's subject is source residue, and 16 stale bundle copies of
+      `frontend/lib/market/fold.ts:6` sit under this pattern until something
+      rebuilds. The five allow-listed directories are historical record and
+      this change's own text necessarily names what it deletes. (The
+      `--exclude-dir=archive` form used previously is dropped: it is
+      redundant with the `openspec/changes/archive/` clause and
+      misleadingly excludes any directory named `archive` anywhere, which is
+      not what this task means.)
       Run at this point in the sequence it also returns
       `openspec/specs/cross-stack-determinism/spec.md` and
       `openspec/specs/board-tactical-math/spec.md`, which sections 12–13
@@ -841,6 +845,16 @@ names the file and states its verification.
       - `commit_params_validator_continuous_test.go` — this change's own RED
         file, whose prose says `backend/board` is deleted by this change; it goes
         with that file's GREEN rewrite, not before.
+      - **Not a filter — a sequencing exception, recorded so it is not mistaken for
+        residue.** Run at this point in the sequence this leg also returns the change's
+        own not-yet-archived spec surface under `openspec/specs/`
+        (`cross-stack-determinism`, `board-tactical-math`, `space-kinematics`,
+        `system-interior`, `trading-station` — 24 hits at authoring time). Every one is
+        cleared by `openspec archive` plus tasks 13.1–13.3, exactly as task 7.1 records
+        for the same two files. They are expected here and are **not** residue; the
+        remainder outside `openspec/specs/` SHALL be empty. Do not add a filter for them
+        — confirm by inspection that every `openspec/specs/` hit is a line one of this
+        change's deltas or tasks 13.1–13.2 removes, and re-confirm at task 13.4.
 
       **Deliberately ABSENT from this leg — do not re-add** (ruling B): no
       blanket `delete-the-lattice` *content* filter; no `sub-lattice` filter
@@ -1127,14 +1141,15 @@ names the file and states its verification.
       Cross-Language Golden Fixture* is already live with all fourteen
       scenarios that predecessor left behind, and
       `openspec-reconcile.py delete-the-lattice` exits 0 against the current
-      tree. The one predecessor still unarchived is `add-scan-and-sightings-
-      surface`, and it is confirmed safe: it MODIFIES `action-dispatch`'s
-      *Exactly-Once Resolution* and *Inbox by Actor Query Param*, while link
-      9's own `action-dispatch` delta MODIFIES only *Commit Rejects
-      Non-Primitive Action Parameters*, and its `system-space-view` delta is
-      `## ADDED Requirements` only — it does not touch the *System Space View
-      Route and Data Fan-In* requirement link 9's own `system-space-view`
-      delta MODIFIES (task B1 / `specs/system-space-view/spec.md`). No
+      tree. `add-scan-and-sightings-surface` was the last predecessor and
+      archived at `3088748`; its deltas are confirmed non-overlapping: it
+      MODIFIES `action-dispatch`'s *Exactly-Once Resolution* and *Inbox by
+      Actor Query Param*, while link 9's own `action-dispatch` delta MODIFIES
+      only *Commit Rejects Non-Primitive Action Parameters*, and its
+      `system-space-view` delta is `## ADDED Requirements` only — it does not
+      touch the *System Space View Route and Data Fan-In* requirement link 9's
+      own `system-space-view` delta MODIFIES (task B1 /
+      `specs/system-space-view/spec.md`). No
       cross-change scenario drift exists to guard here; this task's job going
       forward is to re-run `openspec-reconcile.py` and re-check that
       predecessor's deltas if either side changes before archive. **Also
@@ -1158,9 +1173,11 @@ names the file and states its verification.
 retirement in section 13 happens. The archiver is the gate, and it is the
 archiver that must be rehearsed.
 
-- [ ] 12.1 Copy `openspec/` to a scratch directory. **All four predecessors —
+- [ ] 12.1 Copy `openspec/` to a scratch directory. **All four predecessors
+      still ahead of this change at authoring time —
       `add-stationkeep-hold-verb`, `serve-orbital-elements-and-burn-preview`,
-      `build-production-space-view`, `add-scan-and-sightings-surface` — are
+      `build-production-space-view`, `add-scan-and-sightings-surface`
+      (`add-fuel-as-cargo` archived earlier; task 1.2 lists all five) — are
       already archived as of `3088748`, and `build-production-space-view`'s
       post-archive hand-steps (its tasks 13.1–13.5, including the `board-view`
       directory deletion) are already applied**, so the live tree is the tree

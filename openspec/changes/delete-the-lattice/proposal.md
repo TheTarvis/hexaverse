@@ -35,7 +35,7 @@ three more preconditions of its own, each verified in section 1:
   `system/generator.go`, `system/model.go`, `system/service.go`,
   `stations/placement.go`, `stations/service.go` (six for `board`;
   `system/generator.go` and `system/service.go` also import `polar`);
-- **the four predecessors are archived, in order** — `add-fuel-as-cargo` (done),
+- **the five predecessors are archived, in order** — `add-fuel-as-cargo` (done),
   `add-stationkeep-hold-verb`, `serve-orbital-elements-and-burn-preview`,
   `build-production-space-view`, `add-scan-and-sightings-surface`;
 - **`board-view` has already been retired** by `build-production-space-view`'s

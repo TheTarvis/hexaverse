@@ -195,8 +195,20 @@ out="$(grep -I -rn 'systemBoard\|lib/board\|lib/polar\|ring\b.*slot\b' frontend 
 record_empty "6.3 frontend lattice vocabulary sweep (systemBoard / lib/board / lib/polar / ring..slot)" "nothing" "$out"
 
 # --- Section 7: fixtures -------------------------------------------------------
+# --exclude-dir=.next --exclude-dir=.next-e2e — ruling D (adversary r8 MAJOR-1),
+# the same finding of fact that exempts them on legs 10.1/10.2, applied here
+# because this leg sweeps two of 10.1's eight patterns (fixtures/board,
+# fixtures/polar) and its subject is likewise SOURCE residue: gitignored Next.js
+# build output is not source, and no source edit can ever clear a compiled
+# bundle. Removes 16 lines — all of them stale bundle copies of the single
+# comment at frontend/lib/market/fold.ts:6, a comment task 7.1's own bullet
+# rewrites, but no task before 7.1 rebuilds the bundles, so without this
+# exclusion the leg prints 16 lines it can never not print. 7.1's exclusion set
+# is therefore task 10.1's five-directory allow-list PLUS ruling D. (`-I` was
+# already here and already suppresses the one binary hit,
+# .claude/skills/code-quality-checks/__pycache__/check.cpython-313.pyc.)
 
-out="$(grep -I -rn 'fixtures/board\|fixtures/polar' . --exclude-dir=node_modules --exclude-dir=.git 2>/dev/null \
+out="$(grep -I -rn 'fixtures/board\|fixtures/polar' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude-dir=.next-e2e 2>/dev/null \
   | grep -v '^./docs/plans/' | grep -v '^./docs/handoffs/' | grep -v '^./docs/defects/' \
   | grep -v '^./docs/specs/' | grep -v '^./openspec/changes/archive/' \
   | grep -v '^./openspec/changes/delete-the-lattice/')"
