@@ -4,15 +4,17 @@ The ordered set of OpenSpec changes that carries the game from the polar
 lattice to the continuous-space system map. `README.md` is the model,
 `decisions.md` is the settled rulings; this is the sequencing.
 
-**Status (2026-09-03):** links 1–8a landed, plus one unplanned insert. Links 5
+**Status (2026-09-04):** links 1–8b landed, plus one unplanned insert. Links 5
 and 6 are **done and archived** (90/90 and 33/33). Link 7 was split in two by its
 own panel review — both are now **done and archived**: `add-fuel-as-cargo`
 (53 tasks, `41e3c46`) and `add-stationkeep-hold-verb` (59 tasks, `ca7e5d2`).
 Link 8a was split the same way — both halves are **done and archived**:
 `serve-orbital-elements-and-burn-preview` (37 tasks, `3913952`) and
 `build-production-space-view` (117 tasks, `1b6c7c0`; `board-view` retired).
-**The game is playable in R³ and the lattice is unreferenced.** 8b and 9
-remain.
+Link 8b is **done and archived** (`add-scan-and-sightings-surface`, 119 tasks,
+`3088748`) — the focused scan has a player-facing surface and sightings are
+displayed. **The game is playable in R³ and the lattice is unreferenced.**
+Only link 9, the deletion, remains.
 
 Link 7b is worth a note. Its review loop ran one round past the nominal
 cap of three, deliberately — every round's blockers were bred by the previous
@@ -29,10 +31,9 @@ Link 8's 8a was split **again** by its panel — it was 131 tasks, not the 47 it
 claimed — into `serve-orbital-elements-and-burn-preview` (37, purely additive,
 so no coexistence period and no flag) then `build-production-space-view` (94).
 Neither is a deferral: 8a-2 cannot render or price without 8a-1, and 8a-1 is
-dead code until 8a-2 calls it. **Link 9 is blocked on 8b as well as 8a** —
-`add-scan-and-sightings-surface` is still unauthored, and its two halves (the
-scan command surface and the sightings display) must ship in the same change as
-each other. Link 8's twelve open questions are ruled
+dead code until 8a-2 calls it. Link 9 was blocked on 8b as well as 8a; 8b has
+now landed, its two halves (the scan command surface and the sightings display)
+having shipped in one change as required, so **link 9 is unblocked**. Link 8's twelve open questions are ruled
 (`handoffs/link8-rulings.md`). All three chain-gating
 design decisions are settled — see *Open decisions gating the chain* below.
 
@@ -78,7 +79,7 @@ after that design was written.
 | 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | ✅ `ca7e5d2` |
 | 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | ✅ `3913952` |
 | 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | ✅ `1b6c7c0` |
-| 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | 🔨 built `1bc5e46`, 118/119 — **journey red on one leg, not archived** |
+| 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | ✅ `1bc5e46`…`3088748` |
 | 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | 📝 spec, 0/96 |
 
 Downstream and off the critical path: `add-station-exchange` (M12) gets
@@ -660,31 +661,42 @@ longer will. If previews read as laggy in play, reversing means building
 
 ## Link 8b — `add-scan-and-sightings-surface`
 
-**Built 2026-09-04** (`1bc5e46` implementation, `73c3f51` journey fix +
-record) — **not archived.** 118 of 119 tasks; only 10.9, the pre-archive
-validation, is open, because the archive gate's journey is still red on one
-leg. The focused scan's whole player-facing half and the sightings display,
+**Landed 2026-09-04** (`1bc5e46` implementation, `3088748` archive), all 119
+tasks. The focused scan's whole player-facing half and the sightings display,
 together, as ruled: a scan control fed by a new owner-scoped
 `GET /v1/fleets/:id/scan-targets`, the running sweep's countdown and cancel
 off the action inbox, the settled report with six fizzle copies, sighting
 ghosts at their frozen positions, and the sighting log. Vitest 1534 across
-123 files, tier 3 2040 tests in 85m, Playwright 5 of 6 on the two scan specs.
+123 files, tier 3 2040 tests in 85m, Playwright 7/7 on the two scan specs plus
+the vertical slice (8.2m, clean emulators).
 QA 156 PASS / 1 BLOCKED (Playwright-only) / 0 FAIL after one MAJOR was fixed;
 security CLEAR. The full gate record is
 `handoffs/add-scan-and-sightings-surface-journey.md`.
 
-**What stopped it:** `scan-journey.spec.ts:332` asserts that mid-burn the
-control says "No host is in range to sweep." The captured error context shows
-the control rendering the Sweep button and the emission warning instead — the
-served list was **not** empty, so withholding that copy was correct. The test
-assumes nothing is in range while the fleet is still travelling, but partway
-along the burn to the home station the fleet is already within range of it.
-The same range dial as the recorded finding that a freshly spawned fleet has
-nothing in range (design.md OQ 12), seen from the other side. It passed in two
-earlier runs against identical production code. One SDET fix and a rerun of
-the two scan specs is all that stands between this and archive; the batched
-revision round had already been spent on the fizzle spec, and
-`docs/testing-tiers.md` forbids a second.
+**The gate took a second revision round, and Travis authorized it.**
+`docs/testing-tiers.md` allows the journey one batched round, and this change
+spent it on the fizzle spec above. A different leg then went red —
+`scan-journey.spec.ts:332`, the mid-burn "No host is in range to sweep."
+assertion — so the run halted and reported rather than looping, which is what
+the cap is for. Travis reviewed the halt and said to keep going; the extra
+round is recorded here because the next link should not read this section as
+precedent for looping on its own authority.
+
+That second round was worth having, because the first diagnosis was wrong. The
+captured error context showed the control rendering the Sweep button, so the
+served list was **not** empty and withholding the copy was correct — which
+read as the burn's own progress bringing the station into range partway along
+(the mirror of design.md OQ 12). The real cause was narrower and more
+embarrassing: the assertion's 20-second timeout was **exactly `BOARD_POLL_MS`**
+(`frontend/lib/realtime.ts`). Committing a burn is not one of the served
+list's refetch triggers, so the empty page stands until the next baseline poll
+— and a wait as wide as the poll's own cycle could span a tick that replaced
+the still-correct empty page with a fresh, already-in-range one, flipping the
+awaited text from about-to-appear to never-appearing. Two passes and one
+failure on byte-identical production code was the signature. The fix proves
+the empty state from the already-resolved mount read (a synchronous check, no
+wait) and leaves the DOM check a quarter of a poll cycle. **A timeout equal to
+a refresh interval is not a timeout, it is a race.**
 
 **Eleven adversary rounds, not three.** Round 11 was the `--chain` currency
 check on the resume: rounds 4–10's verdicts were all spent, but round 10's own

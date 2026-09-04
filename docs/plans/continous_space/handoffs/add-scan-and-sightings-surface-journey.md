@@ -1,8 +1,12 @@
 # Link 8b `add-scan-and-sightings-surface` — archive-gate journey record
 
-**Status: NOT ARCHIVED.** The tier-4 journey is red on one leg after its one batched
-revision round. Per `docs/testing-tiers.md` ("it runs once … then it runs once more. Never a
-revision loop per red leg") the run stops here and reports rather than looping.
+**Status: ARCHIVED** as `3088748`, after a **second, user-authorized revision round**.
+
+The run first halted here with the tier-4 journey red on one leg, its one batched round
+already spent — per `docs/testing-tiers.md` ("it runs once … then it runs once more. Never a
+revision loop per red leg"). Travis reviewed the halt and authorized one more round. The
+final section records what that round found; everything above it is the record as it stood
+at the halt, left unedited.
 
 Implementation commit: **`1bc5e46`** (113 files, +11138/−362). Tiers 0 and 1 green before it.
 
@@ -131,3 +135,55 @@ out of range. That is the SDET's call, not this record's.
   directions across runs.
 
 None is 8b's, and none was patched: this change's scope is the scan and sightings surface.
+
+
+---
+
+## The second round (user-authorized) — and the first diagnosis was wrong
+
+Travis authorized one round beyond the cap. It was worth having, because the halt's
+diagnosis was wrong.
+
+The halt reasoned: the control rendered the Sweep button, so the served list was not empty,
+so withholding the copy was correct, so the fleet must already be in range partway along the
+burn to the station — the mirror of design.md OQ 12. Plausible, and wrong.
+
+**The real cause: the assertion's 20-second timeout was exactly `BOARD_POLL_MS`**
+(`frontend/lib/realtime.ts`). The served scan-target list refetches only on a closed set of
+triggers — mount, attachment change, landed burn/jump, acting-fleet change, SSE reconnect,
+and the 20s baseline poll. **Committing a burn is not one of them** (`useOrder`'s `onSuccess`
+invalidates the fleet reads only), so the empty page legitimately stands until the next poll.
+A wait as wide as the poll's own cycle can therefore span a tick that replaces the
+still-correct empty page with a fresh, already-in-range one — flipping the awaited text from
+about-to-appear to never-appearing. Two passes and one failure on byte-identical production
+code is exactly that signature.
+
+Fix (`frontend/e2e/tests/scan-journey.spec.ts`, mid-burn leg only): prove the empty state
+from the **already-resolved** first `GET /scan-targets` response captured at mount — a
+synchronous check with no wait, so no timing risk — and leave the DOM check a quarter of a
+poll cycle rather than a whole one. The "docked host appears with no user action once the
+burn lands" half is untouched; it was never at risk, since the attachment-change trigger
+forces a fresh read at landing.
+
+**The lesson, and it generalises past this suite: a timeout equal to a refresh interval is
+not a timeout, it is a race.**
+
+### Final gate result
+
+Emulators reset to a clean project first, then:
+
+```
+✓ scan-journey.spec.ts:42   clean sweep                                   37.8s
+✓ scan-journey.spec.ts:260  seeded ghost cross-highlights with its row     2.6s
+✓ scan-journey.spec.ts:307  burn to the home station still docks normally 22.4s
+✓ scan-journey.spec.ts:332  mid-burn "no host in range" -> docked host    23.4s
+✓ scan-lane-transit-fizzle.spec.ts:99  laneTransit/leftSystem fizzle        4.8m
+✓ slice.spec.ts:80          the vertical slice                             1.8m
+7 passed (8.2m)
+```
+
+`openspec validate --strict` valid, `openspec-reconcile.py` OK, red manifest 33/33 unchanged.
+Archive rehearsed on a scratch copy (`+28, ~6, -0`) before the real run — every scenario
+heading preserved. All 119 tasks checked.
+
+The three flakes and the open findings listed above are unchanged and still open.
