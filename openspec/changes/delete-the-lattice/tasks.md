@@ -496,7 +496,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       and task 8.9's site-18 clause both flip from "leave it" to "remove it",
       because the carve-out then names a path that no longer exists
 
-- [ ] 6.4 `cd frontend && npm run lint && npx vitest run` green, and
+- [x] 6.4 `cd frontend && npm run lint && npx vitest run` green, and
       `cd frontend && npm run e2e` green
 
 ## 7. Fixtures, mirror maps, and the deviation register
@@ -1255,7 +1255,7 @@ names the file and states its verification.
       unmodified by this change everywhere else per the proposal's
       "Deliberately untouched" list, so this is the one place the sweep must
       be exact rather than assumed
-- [ ] 11.5 `cd backend && go test ./... -p 1`, `cd frontend && npx vitest run`,
+- [x] 11.5 `cd backend && go test ./... -p 1`, `cd frontend && npx vitest run`,
       `cd frontend && npm run e2e`, and
       `bash .claude/scripts/check.sh --backend --frontend --lint --test` all
       green
