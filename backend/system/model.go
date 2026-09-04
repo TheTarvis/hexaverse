@@ -43,10 +43,10 @@ const (
 	// system-interior "Bodies Are Public; Ships Are Disclosed"): the
 	// per-feature observation model that used to exclude it from a
 	// fog/scan feature source is gone along with that model, so there is
-	// nothing left to exclude it from. occlusionRadius2 still reports zero
-	// for it (proximity-disclosure's own occlusion rule occludes only by
-	// the star) — that is a fact about occlusion, not a survivor of the
-	// deleted fog/scan feature source.
+	// nothing left to exclude it from. It occludes nothing either:
+	// proximity-disclosure's occlusion rule occludes only by the star —
+	// that is a fact about occlusion, not a survivor of the deleted
+	// fog/scan feature source.
 	FeatureStation FeatureType = "station"
 )
 

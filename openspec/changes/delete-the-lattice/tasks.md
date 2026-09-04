@@ -17,7 +17,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `frontend/components/space/SystemSpaceView.tsx:29` and
       `frontend/lib/types/action.ts:5` — are rewritten by task 6.3, not by
       the predecessor. Record the output in the commit message.
-- [ ] 1.2 Confirm all five predecessors are archived, in order, by listing
+- [x] 1.2 Confirm all five predecessors are archived, in order, by listing
       `openspec/changes/archive/` for `add-fuel-as-cargo`,
       `add-stationkeep-hold-verb`, `serve-orbital-elements-and-burn-preview`,
       `build-production-space-view`, `add-scan-and-sightings-surface`, and
@@ -28,7 +28,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       `grep -rn "board-view" openspec/specs/` returns nothing. A surviving
       `board-view` citation means that change's own dangling-reference sweep did
       not complete
-- [ ] 1.4 Record the backend precondition as a baseline rather than a
+- [x] 1.4 Record the backend precondition as a baseline rather than a
       requirement: `cd backend && grep -rln '"hexaverse/board"\|"hexaverse/polar"'
       --include='*.go' .` SHALL list exactly the files sections 2–5 remove,
       plus one expected exception: `backend/action/commit_params_validator_continuous_test.go`
@@ -36,7 +36,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       importer that sections 2–5 do not name; it is removed by its own GREEN
       rewrite. Anything else on that list not named in those sections is an
       unplanned importer and must be reported before proceeding
-- [ ] 1.5 Confirm the suite is green *before* any deletion, so a later failure
+- [x] 1.5 Confirm the suite is green *before* any deletion, so a later failure
       is attributable: `cd backend && go test ./... -p 1` (the `-p 1` is
       mandatory — the root `TestMain` wipes the shared emulator project and
       parallel package runs self-race), `cd frontend && npx vitest run`, and
@@ -99,7 +99,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       gen.Interior.Radius)`), the latter of which is the last reader of
       `SystemInterior.Radius` (task 2.1b) — (`system-interior`: MODIFIED *Lane
       Gate Projection*)
-- [ ] 2.8 Delete `system/fog_source.go`'s `occlusionRadius2` and its
+- [x] 2.8 Delete `system/fog_source.go`'s `occlusionRadius2` and its
       `board.StarOcclusionRadius2`/`board.PlanetOcclusionRadius2` constants,
       and its one test caller, `system/fog_source_test.go:44` (which does not
       compile after the deletion unless repointed or removed with it). The

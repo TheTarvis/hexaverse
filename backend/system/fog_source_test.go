@@ -2,15 +2,17 @@ package system
 
 // migrate-fleet-to-continuous-burns tasks.md 7.7 (design.md Decision 11)
 // deletes fog_source.go's former reason to exist (see that file's own doc
-// comment). What remains — occlusionRadius2 and isAstronomical — are two
-// small, purely local helpers with no tie to observation at all, kept for a
-// future line-of-sight-aware read to reuse.
+// comment). What remains — isAstronomical — is a small, purely local helper
+// with no tie to observation at all. Its former sibling occlusionRadius2 has
+// since been deleted along with the retired coordinate table its squared
+// radii were expressed in, so the assertion that a station does not occlude
+// went with the function that answered it; occlusion now lives in
+// proximity-disclosure, in R³.
 //
-// These two tests were relocated intact (no assertion changed) from
-// station_splice_test.go, where they exercised these exact helpers
-// alongside the (still-there) spliceStation tests. interiorFixture and
-// stationFeatureFixture remain defined in station_splice_test.go (same
-// package, same test binary).
+// These tests were relocated intact from station_splice_test.go, where they
+// exercised these exact helpers alongside the (still-there) spliceStation
+// tests. interiorFixture and stationFeatureFixture remain defined in
+// station_splice_test.go (same package, same test binary).
 
 import "testing"
 
@@ -39,10 +41,6 @@ func TestFogSource_ExcludesTheStationEntirely(t *testing.T) {
 	}
 	if len(projected) != 2 {
 		t.Errorf("projected %d features, want the 2 generated ones", len(projected))
-	}
-	// And it must never be treated as an occluder even if it somehow appeared.
-	if occlusionRadius2(FeatureStation) != 0 {
-		t.Error("FeatureStation occludes line of sight; it must not")
 	}
 }
 
