@@ -220,7 +220,7 @@ def run_transcendental_check(file_path: str) -> Optional[dict]:
 # The Go packages whose outputs are rule-bearing (persisted values, solve
 # results, ETAs, disclosure decisions) — the transcendental lint's scope gate.
 # Must match check-transcendental.sh's own gate.
-DETERMINISM_GO_PACKAGES = ("board", "polar", "space", "disclosure", "fleet", "mine", "galaxy", "system", "corporations", "market")
+DETERMINISM_GO_PACKAGES = ("space", "disclosure", "fleet", "mine", "galaxy", "system", "corporations", "market")
 
 
 def print_deviation_register():
@@ -246,17 +246,17 @@ def print_deviation_register():
 
 def check_transcendental(files: List[str]) -> dict:
     """Cross-stack determinism lint (secondary, textual): transcendental /
-    sqrt / bare-Round calls in the rule-bearing Go packages and the TS
-    board-math mirror must carry a reviewed determinism:allow pragma or be
-    named in the deviation register. See openspec cross-stack-determinism."""
+    sqrt / bare-Round calls in the rule-bearing Go packages and in
+    frontend/lib/market — the one surviving TypeScript rule-bearing mirror —
+    must carry a reviewed determinism:allow pragma or be named in the
+    deviation register. See openspec cross-stack-determinism."""
     print_header("Checking Determinism Seam (transcendental lint)")
 
     seam_files = [
         f for f in files
         if (any(f.startswith(str(Path.cwd() / "backend" / pkg) + os.sep) for pkg in DETERMINISM_GO_PACKAGES)
             and f.endswith(".go"))
-        or (f.startswith(str(Path.cwd() / "frontend" / "lib" / "board") + os.sep) and f.endswith(".ts"))
-        or (f.startswith(str(Path.cwd() / "frontend" / "lib" / "polar") + os.sep) and f.endswith(".ts"))
+        or (f.startswith(str(Path.cwd() / "frontend" / "lib" / "market") + os.sep) and f.endswith(".ts"))
     ]
 
     if not seam_files:
@@ -1078,17 +1078,16 @@ def run_determinism_cross_target() -> dict:
     """Cross-build-target determinism checks (openspec cross-stack-determinism).
 
     Three legs, in the enforcement order the capability's design.md ranks them:
-    1. The differential fixture-suite run — the golden fixtures (board AND
-       polar; the polar suite's sweep digests re-enumerate the full bounded
-       domain, so this leg is an exhaustive cross-target diff for that
-       package, per openspec polar-lattice-math) must reproduce on
+    1. The differential fixture-suite run — the golden fixtures of
+       backend/space, backend/system and backend/galaxy (whose sweep digests
+       re-enumerate bounded domains, making this leg an exhaustive
+       cross-target diff for those families) must reproduce on
        GOARCH=amd64 GOAMD64=v1 (the non-contracting target; Rosetta locally,
        native on CI) alongside the native arch. GOAMD64 is pinned explicitly
-       because v3+ emits FMA on amd64 too. backend/space (openspec
-       add-space-kinematics) rides the same leg: it is a Go-only rule-bearing
-       package with no JavaScript-runtime leg by design (Decision 1 — no
-       TypeScript mirror), so this compiled-output cross-target run is its
-       whole determinism story, not merely a fixture-file diff.
+       because v3+ emits FMA on amd64 too. All three are Go-only rule-bearing
+       packages with no JavaScript-runtime leg by design (no TypeScript
+       mirror), so this compiled-output cross-target run is their whole
+       determinism story, not merely a fixture-file diff.
     2. Compiled-output FMA inspection over the whole backend module
        (check-fma-contraction.sh) — the primary mechanism; consults and
        prints the deviation register.
@@ -1104,31 +1103,31 @@ def run_determinism_cross_target() -> dict:
 
     reasons = []
 
-    print_info("Board + polar + space + system + galaxy fixture suites, native arch...")
+    print_info("space + system + galaxy fixture suites, native arch...")
     native = run_command(
-        "go test ./board/ ./polar/ ./space/ ./system/ ./galaxy/ -short -count=1", cwd=backend_dir, check=False
+        "go test ./space/ ./system/ ./galaxy/ -short -count=1", cwd=backend_dir, check=False
     )
     if native.returncode == 0:
-        print_success("native arch board/polar/space/system/galaxy tests passed")
+        print_success("native arch space/system/galaxy tests passed")
     else:
-        print_error("native arch board/polar/space/system/galaxy tests failed")
+        print_error("native arch space/system/galaxy tests failed")
         reasons.append(
-            "native-arch board/polar/space/system/galaxy tests failed:\n" + native.stdout + native.stderr)
+            "native-arch space/system/galaxy tests failed:\n" + native.stdout + native.stderr)
 
     print_info(
-        "Board + polar + space + system + galaxy fixture suites, GOARCH=amd64 GOAMD64=v1 "
+        "space + system + galaxy fixture suites, GOARCH=amd64 GOAMD64=v1 "
         "(non-contracting target)..."
     )
     amd64 = run_command(
-        "GOARCH=amd64 GOAMD64=v1 go test ./board/ ./polar/ ./space/ ./system/ ./galaxy/ -short -count=1",
+        "GOARCH=amd64 GOAMD64=v1 go test ./space/ ./system/ ./galaxy/ -short -count=1",
         cwd=backend_dir, check=False
     )
     if amd64.returncode == 0:
-        print_success("amd64/GOAMD64=v1 board/polar/space/system/galaxy tests passed")
+        print_success("amd64/GOAMD64=v1 space/system/galaxy tests passed")
     else:
-        print_error("amd64/GOAMD64=v1 board/polar/space/system/galaxy tests failed")
+        print_error("amd64/GOAMD64=v1 space/system/galaxy tests failed")
         reasons.append(
-            "amd64/GOAMD64=v1 board/polar/space/system/galaxy tests failed (on Apple Silicon this leg needs "
+            "amd64/GOAMD64=v1 space/system/galaxy tests failed (on Apple Silicon this leg needs "
             "Rosetta 2 — `softwareupdate --install-rosetta`):\n" + amd64.stdout + amd64.stderr)
 
     print_info("Compiled-output FMA-contraction inspection (backend module, arm64 vs amd64/v1)...")
@@ -1187,8 +1186,10 @@ def run_determinism_cross_target() -> dict:
 
 def run_mirror_map_check() -> dict:
     """Mirror-map coverage check (openspec cross-stack-determinism): every
-    function defined in both backend/board and frontend/lib/board must be named
-    in fixtures/board/mirror-map.json and be fixture-covered or inventoried."""
+    function defined in both backend/market and frontend/lib/market must be
+    named in fixtures/market/mirror-map.json and be fixture-covered or
+    inventoried, and every Go-sole-authority package's anti-mirror map must
+    find no shared name on the TypeScript side."""
     print_header("Checking Determinism Mirror Map Coverage")
 
     result = run_command("bash .claude/scripts/check-mirror-map.sh", check=False)
@@ -1513,19 +1514,17 @@ def main():
     elif run_all_checks:
         results["backend_tests_unit"] = run_backend_unit_tests()
 
-    # Determinism cross-target matrix: runs alongside the native-arch board
-    # tests (not an opt-in extra step — openspec cross-stack-determinism).
+    # Determinism cross-target matrix: runs alongside the native-arch fixture
+    # suites (not an opt-in extra step — openspec cross-stack-determinism).
     # Also triggered in file-based-only runs when the change touches
-    # backend/board, backend/polar, backend/space, backend/system, or
-    # fixtures/, which is the surface the matrix pins (openspec
-    # pin-system-generation-determinism, design.md Decision 3 / tasks.md 5.4:
-    # polar and space were already enrolled in the command above but missing
-    # from this predicate — the same false-enforcement gap system would
-    # otherwise repeat).
+    # backend/space, backend/system, backend/galaxy or fixtures/, which is the
+    # surface the matrix pins. Keep this predicate in step with the package
+    # list in run_determinism_cross_target's own commands: a package enrolled
+    # in the command but missing from this predicate is never reached by a
+    # changed-file run, which is a false-enforcement gap with no symptom.
     determinism_trigger = args.backend_tests or run_all_checks or any(
-        f.startswith(str(Path.cwd() / "backend" / "board") + os.sep)
-        or f.startswith(str(Path.cwd() / "backend" / "polar") + os.sep)
-        or f.startswith(str(Path.cwd() / "backend" / "space") + os.sep)
+        f.startswith(str(Path.cwd() / "backend" / "space") + os.sep)
+        or f.startswith(str(Path.cwd() / "backend" / "galaxy") + os.sep)
         or f.startswith(str(Path.cwd() / "backend" / "system") + os.sep)
         or f.startswith(str(Path.cwd() / "fixtures") + os.sep)
         for f in files
@@ -1534,19 +1533,16 @@ def main():
         results["determinism_cross_target"] = run_determinism_cross_target()
 
     # Mirror-map coverage: any change touching a mirrored/anti-mirrored
-    # package or the fixtures. frontend/lib/hex was deleted by the polar
-    # migration; repointed to frontend/lib/board and frontend/lib/polar,
-    # the two TypeScript mirrors check_mirror actually compares against
-    # (openspec pin-system-generation-determinism, design.md Decision 3 /
-    # tasks.md 5.5). backend/polar and backend/system are added for the same
-    # reason as determinism_trigger above — check_mirror polar/anti_mirror
-    # system already run; this predicate never triggered on either.
+    # package or the fixtures. backend/market <-> frontend/lib/market is the
+    # one MIRRORED pair check_mirror compares (fixtures/market/mirror-map.json);
+    # backend/system and the other Go-sole-authority packages run in
+    # anti-mirror mode. A pass enrolled in check-mirror-map.sh but missing
+    # from this predicate is never reached by a changed-file run — enroll both
+    # sides of any pair added here.
     mirror_trigger = run_all_checks or any(
-        f.startswith(str(Path.cwd() / "backend" / "board") + os.sep)
-        or f.startswith(str(Path.cwd() / "backend" / "polar") + os.sep)
+        f.startswith(str(Path.cwd() / "backend" / "market") + os.sep)
         or f.startswith(str(Path.cwd() / "backend" / "system") + os.sep)
-        or f.startswith(str(Path.cwd() / "frontend" / "lib" / "board") + os.sep)
-        or f.startswith(str(Path.cwd() / "frontend" / "lib" / "polar") + os.sep)
+        or f.startswith(str(Path.cwd() / "frontend" / "lib" / "market") + os.sep)
         or f.startswith(str(Path.cwd() / "fixtures") + os.sep)
         for f in files
     )

@@ -109,7 +109,7 @@ func keplerPeriodMs(radius float64) common.WorldMillis {
 		panic(fmt.Sprintf("keplerPeriodMs: non-finite or negative radius %v", radius))
 	}
 	ratio := radius / KeplerBaseRadius
-	sqrtRatio := math.Sqrt(ratio) // determinism:allow(pinned) — correctly-rounded, identical across every Go build target (design.md Decision 3; precedent space/park.go:177)
+	sqrtRatio := math.Sqrt(ratio) // determinism:allow(pinned) family:keplerPeriodMs — correctly-rounded, identical across every Go build target (design.md Decision 3; precedent space/park.go). Pinned by fixtures/system/cases.json's keplerPeriodMs family over radius in [0, 1e9]; radius < 0 is DELIBERATELY EXCLUDED (NaN->int64 is architecture-dependent), recorded in that family's mirror-map note as a reported defect
 	seconds := float64(float64(KeplerBaseSeconds*ratio) * sqrtRatio)
 	ms := math.Ceil(float64(seconds * 1000))
 	if ms < 1 {

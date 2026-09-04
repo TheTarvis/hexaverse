@@ -41,12 +41,15 @@
 # finding D-4 was exactly this class of gap — a new rule-bearing package
 # passing by omission — so the list is named once and referenced once.
 #
-# The lint also governs non-test .ts files under frontend/lib/board/ and
-# frontend/lib/polar/ (the two board-math mirrors; openspec
-# board-tactical-math bars runtime trig AND sqrt outright from both pairs'
-# rule-bearing surfaces — geometry runs on the pinned coordinate table, whose
-# trigonometry executes only in the fixture-recording flow, i.e. in test
-# files this lint already skips). Test files are skipped (they assert
+# The lint also governs non-test .ts files under frontend/lib/market/ — the
+# ONE surviving TypeScript rule-bearing surface, and the TS half of this
+# repo's only cross-language mirrored pair (foldSale, firstTonPrice,
+# capacity; fixtures/market/mirror-map.json). Its settlement math must agree
+# with backend/market's to the last unit, so a transcendental appearing there
+# is exactly the hazard this lint exists for. Do not delete this clause
+# without replacing it: with no TS branch at all, every .ts input falls to
+# the else branch below and no TypeScript file anywhere is
+# determinism-governed. Test files are skipped (they assert
 # against fixtures and hold no rule logic; the recording flow lives there by
 # design).
 # Comment-only lines are skipped (prose naming Math.round is not a call
@@ -79,13 +82,13 @@ REGISTER="$REPO_ROOT/fixtures/determinism-register.json"
 # The rule-bearing Go packages this lint governs. Adding a package that
 # produces persisted values, solve results, ETAs, or disclosure decisions is
 # a one-word edit here — the alternation below is built from it.
-RULE_BEARING_GO_PACKAGES=(board polar space disclosure fleet mine galaxy system corporations market)
+RULE_BEARING_GO_PACKAGES=(space disclosure fleet mine galaxy system corporations market)
 GO_PACKAGE_ALTERNATION=$(IFS='|'; echo "${RULE_BEARING_GO_PACKAGES[*]}")
 
 if [[ "$FILE_PATH" =~ backend/($GO_PACKAGE_ALTERNATION)/.*\.go$ && ! "$FILE_PATH" =~ _test\.go$ ]]; then
     PATTERN='math\.(Sin|Cos|Tan|Asin|Acos|Atan|Atan2|Sinh|Cosh|Tanh|Asinh|Acosh|Atanh|Log|Log2|Log10|Log1p|Exp|Exp2|Expm1|Pow|Sqrt|Round)\('
     COMMENT_RE='^[0-9]+:[[:space:]]*(//)'
-elif [[ "$FILE_PATH" =~ frontend/lib/(board|polar)/.*\.ts$ && ! "$FILE_PATH" =~ \.test\.ts$ ]]; then
+elif [[ "$FILE_PATH" =~ frontend/lib/market/.*\.ts$ && ! "$FILE_PATH" =~ \.test\.ts$ ]]; then
     PATTERN='Math\.(sin|cos|tan|asin|acos|atan|atan2|sinh|cosh|tanh|asinh|acosh|atanh|log|log2|log10|log1p|exp|expm1|pow|sqrt|round)\('
     COMMENT_RE='^[0-9]+:[[:space:]]*(//|\*|/\*)'
 else

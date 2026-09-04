@@ -13,12 +13,12 @@ source remains out of scope; this check is the loud-failure net in the
 meantime.
 
 STATE OF THE TREE: green. The three-package drift this check was written
-against was fixed in commit 9c00216 — both lists now name board, polar,
-space, disclosure, fleet, mine, galaxy, system, corporations and market. The
-test therefore passes today and fails only on a future divergence, which is
-its whole point. (This docstring previously said "EXPECTED RED TODAY" and
-described check.py's tuple as still missing polar/space/disclosure; that has
-been false since 9c00216.)
+against was fixed in commit 9c00216, and both lists have stayed in step
+since — they now name space, disclosure, fleet, mine, galaxy, system,
+corporations and market. (`board` and `polar` were removed from both, in one
+commit, when those packages were deleted; that this test would have failed
+had only one list been edited is the point of it.) The test passes today and
+fails only on a future divergence.
 
 HOW IT RUNS: from check.py, unconditionally, via
 run_determinism_lists_check() — not by hand and not behind a changed-file

@@ -242,48 +242,24 @@ The richest design source is the archived gameplay doc —
   dialed by region character. Create-if-absent under
   `galaxies/{gid}/systems/{sid}/interior` + `features/`. `GET /v1/systems/:id`
   materializes on first read (dev trigger; TODO #0008 arrival). Unfogged (M6).
-- **`board/`** — pure shared tactical math (no Firestore/clock), on the polar
-  ring-and-slot lattice since the 2026-08-25 rewrite (`backend/polar` owns
-  the lattice core — adjacency, arc paths, orbital advance; `board` owns the
-  pinned production slot schedule, the lattice-hop metric, movement state and
-  solves, lane gates, and visibility on the pinned coordinate table). A
-  `board.Cell{Ring, Slot}` is a position — ring 0 is the single core cell
-  (the star); every consumer resolves its schedule through
-  `board.ProductionSchedule()` (the process-wide default, memoized on
-  `common.Tuning().BoardRadius`) or `board.Schedule(radius)` where a
-  per-system radius is authoritative (system generation, its fog projection),
-  never a literal. `OrbState`, `ShipPos`, `SolveCell`/`SolveIntercept`,
-  **`StateAt`** — the effective-state fold (a burn past its `arriveTime` IS
-  its settled coast/dock; lane transit never folds — arrival is effectful) —
-  **`LineOfSight`** (the #0006 occluded scan beam; `BeamCells` is a
-  fixture-pinned, currently-unconsumed capability awaiting the directional-
-  scan variant) and **`Within`** (a materialized bounded-radius disc — the
-  `Distance`-derived set form `observation.Coverage` uses so a fog read
-  never pays for an unbounded BFS) round out the geometry. `board/params.go`
-  is the Firestore-native coordinate codec (`EncodeCell`/`DecodeCell`/
-  `EncodeTarget`/`DecodeTarget`) every `action.Params` coordinate must go
-  through — `action.Commit`'s validator (`action.ErrNonPrimitiveParam`)
-  rejects a bare `board.Cell`/`board.Target` in `Params` outright, closing
-  the class of bug where an in-memory unit test and a Firestore round-trip
-  silently disagreed on shape. Everything that answers "where/what is this
-  fleet" reads through `StateAt`/`ShipPos`; only resolvers and the settle
-  path read stored state raw (0004/S1–S2 pin this). Go↔TS contract is
-  `/fixtures/board/cases.json` (golden test) plus `/fixtures/polar/cases.json`
-  for the lattice core; the client mirror lives at `frontend/lib/board/` /
-  `frontend/lib/polar/`. **The renderer migration is done** (step 7,
-  `migrate-renderer-to-polar-board`, archived 2026-08-27): `lib/hex` is gone,
-  every frontend consumer reads ring/slot, the tile draws as an annular sector
-  (`cellWedge`/`wedgePath` in `lib/board/pixel.ts`, and a matching wedge SDF in
-  `webgl/scene-lattice.ts`), and the board camera pans/zooms — pointer, wheel,
-  pinch, and keyboard, all through the pure `components/board/board-camera.ts`.
-  Two mirror rules worth knowing before touching board math: the schedule is
-  threaded explicitly (`schedule(board.radius)`), with `productionSchedule()`
-  as a memoized default that is safe ONLY for `slotsForRing` reads — never for
-  `ringCells` or `pointToCell`, which depend on `maxRing`; and every function
-  added to `lib/board` must be registered in `fixtures/board/mirror-map.json`
-  (`bash .claude/scripts/check-mirror-map.sh`).
-- **`fleet/`** (#0004, *implemented*) — the map-mover. One movement state
-  (`coast|burn|docked`), `corporationId` from day one (dev-seeded through M8;
+- **`space/`** (the lattice's successor) — pure continuous-space kinematics,
+  Go-sole-authority with no TypeScript mirror by design. `Vec3`, `Orbit`
+  (radius/period/phase/inclination/node), `Park`, `Burn`, `ShipState`, the
+  brachistochrone `FlightSeconds`, `StateAt`, and `SubTurns`/`PhaseIndexOf` —
+  a pinned trig table, never runtime `atan2`. It REPLACED a ring-and-slot
+  lattice — two Go packages holding the lattice core and its schedule, hop
+  metric, movement solves, lane gates and line-of-sight, their two TypeScript
+  mirrors, their two fixture directories and their own capability — all
+  **deleted 2026-09-04** (openspec `delete-the-lattice`). Do not go looking
+  for them; nothing has a ring or a slot any more. A
+  body's position is its orbital element set, a fleet's is a solved `Vec3`,
+  and a lane gate is a body like any other. Go↔TS mirroring survives at
+  exactly one pair — `backend/market` ↔ `frontend/lib/market`
+  (`fixtures/market/mirror-map.json`); every other rule-bearing Go package is
+  registered anti-mirror. The renderer draws continuous space
+  (`frontend/components/space/`, WebGL in `webgl/`).
+- **`fleet/`** (#0004, *implemented*) — the map-mover. Motion is a continuous
+  `space.ShipState` (parked / burning / in lane transit), `corporationId` from day one (dev-seeded through M8;
   **ownership real since M9** — spawn is the only fleet-minter now).
   `POST /v1/fleets/:id/orders|cancel`, `GET /v1/fleets/:id` (arrival resolved
   opportunistically on read — no scheduler). `SeedFleet` survives as spawn's
@@ -315,13 +291,12 @@ The richest design source is the archived gameplay doc —
   (`galaxy`/`system`/`fleet` handlers take `.WithFog(...)`; server-side only, no
   ship-and-hide). Scan (revised 2026-07-14, #0006 Decisions #15–#24) is a
   **radial echo riding the fleet** on the #0005 dispatch, on the sensor
-  channel: echoes return by distance (`ScanDuration` = the rim round-trip),
-  and the running scan's growing **echo disc — centred on the unit's live
-  hex** — joins the corp's live coverage per read (Decision #23 —
-  `observation.Coverage`; no partial mints). Resolution still mints once at
-  eta: `asOf: eta` observations for the LOS-clear features from the fleet's
-  eta position (star/planets occlude — `board.LineOfSight`, occluders at
-  eta), charts
+  channel: echoes return by distance, and the running scan's growing **echo
+  radius — centred on the unit's live position** — joins the corp's live
+  coverage per read (Decision #23 — `observation.Coverage`; no partial mints).
+  Resolution still mints once at eta: `asOf: eta` observations for the
+  unoccluded features from the fleet's eta position (the star occludes —
+  occlusion is `proximity-disclosure`'s rule, in R³), charts
   **all the system's lanes** + rumors far endpoints (lanes-by-scanning; travel
   charts only lanes ridden, spawn charts none), grants **no graph tier**
   (`surveyed` is market-reserved; ladder in play: starVisible→rumored→explored),
@@ -340,7 +315,7 @@ The richest design source is the archived gameplay doc —
   orchestrates through the live galaxy/fleet/fog singletons: corp doc + account
   pointer commit in **one transaction** (`corporations/{corpId}` +
   `corpByAccount/{accountId}`, the uniqueness anchor), then the hull
-  (`fleet.SeedFleet` at a rim-ring hex) + initial fog (`observation.RevealArrival`:
+  (`fleet.SeedFleet` at a continuous home position) + initial fog (`observation.RevealArrival`:
   home `explored` **only** — no lanes, revised 2026-07-14 per #0006 Decision
   #17; scanning home is the first taught verb) follow — **idempotent per
   account** heals a partial spawn. `POST /v1/corporations` (idempotent), `GET
@@ -370,9 +345,11 @@ The richest design source is the archived gameplay doc —
   add-a-feature path, and whose `system.Feature` deliberately has no owner
   field. `OwnerCorpId` empty = NPC (present from day one so player ownership is
   a value change, never a retrofit). The orbit is **derived, never rolled**:
-  a pure function of (systemId, galaxy seed), non-core, off the lane-gate ring,
-  and **prograde with its system's disk** via the one exported
-  `system.DominantOrbitDirection` the interior generator itself uses. Spliced
+  a pure function of (systemId, galaxy seed, skeleton) —
+  `system.StationContinuousOrbit`, a full orbital element set, never persisted
+  on the station doc — and **prograde with its system's disk** via the one
+  exported `system.DominantOrbitDirection` the interior generator itself uses.
+  Spliced
   into `GetOrCreateInterior` **ungated** (that seam has no requester — arrival
   settlement runs under the OIDC sweep), gated only at the requester-scoped
   reads; **excluded from `fog_source.Features`**, which is what keeps

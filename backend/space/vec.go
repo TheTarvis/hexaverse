@@ -83,7 +83,7 @@ func (v Vec3) Cross(o Vec3) Vec3 {
 // operation, so it is not in this capability's exact-arithmetic set
 // (design.md Decision 6).
 func (v Vec3) Length() float64 {
-	return math.Sqrt(float64(v.X*v.X) + float64(v.Y*v.Y) + float64(v.Z*v.Z)) // determinism:allow(pinned) sqrt is correctly-rounded and identical across Go build targets
+	return math.Sqrt(float64(v.X*v.X) + float64(v.Y*v.Y) + float64(v.Z*v.Z)) // determinism:allow(pinned) family:arcTable — sqrt is correctly-rounded and identical across Go build targets; pinned by fixtures/space/cases.json's arcTable family, which folds this length over every segment
 }
 
 // normalizeEpsilon is the small-length floor below which Normalize reports

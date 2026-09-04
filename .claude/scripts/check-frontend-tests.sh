@@ -111,11 +111,11 @@ if [[ "$FILE_PATH" =~ /components/catalyst/.*\.(ts|tsx)$ ]]; then
 fi
 
 # Skip the WebGL render layer. These modules need a live GL context, so any unit
-# test for them degrades to `expect(typeof createLattice).toBe('function')` — a
+# test for them degrades to `expect(typeof SpaceWorld).toBe('function')` — a
 # tautology that hides the gap instead of covering it.
 #
 # The exemption is only safe because of the rule it is paired with (see
-# docs/plans/webgl-board-port.md): components/board/webgl/ holds GL PLUMBING
+# docs/plans/webgl-board-port.md): components/space/webgl/ holds GL PLUMBING
 # ONLY. Anything that DECIDES something — fog band → visual treatment, appearance
 # selection, instance-buffer packing, projection math, formation offsets — is
 # pure, lives OUTSIDE this directory, and is tested there. Fog treatment in
@@ -123,7 +123,7 @@ fi
 #
 # So: wanting a file exempt means moving it into webgl/, and moving it there is
 # the claim that it contains no decisions. Review that claim.
-if [[ "$FILE_PATH" =~ /components/board/webgl/.*\.(ts|tsx)$ ]]; then
+if [[ "$FILE_PATH" =~ /components/space/webgl/.*\.(ts|tsx)$ ]]; then
   exit 0
 fi
 

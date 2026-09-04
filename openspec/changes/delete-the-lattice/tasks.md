@@ -501,7 +501,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 
 ## 7. Fixtures, mirror maps, and the deviation register
 
-- [ ] 7.1 `rm -rf fixtures/board fixtures/polar`. The stated verification
+- [x] 7.1 `rm -rf fixtures/board fixtures/polar`. The stated verification
       grep excludes only `docs/plans/` and `openspec/changes/archive/`, but
       the citation survives in fifteen further sites this task must also
       repoint (a sixteenth, `openspec/specs/system-interior/spec.md:1085`, is
@@ -597,7 +597,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       (`cross-stack-determinism`: *Shared Board Math Is Pinned By a
       Cross-Language Golden Fixture* › "An uncovered mirrored function is caught
       by the coverage inventory check")
-- [ ] 7.4 Prove the new pass can fail, not merely pass: temporarily add a
+- [x] 7.4 Prove the new pass can fail, not merely pass: temporarily add a
       function to `frontend/lib/market` that is absent from the map and confirm
       `bash .claude/scripts/check-mirror-map.sh` exits 2 naming it, then revert.
       A check that has never been observed to fail has not been shown to check
@@ -610,7 +610,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       "task 7.5" continues to resolve; it carries no independent work.
 - [x] 7.6 **Moved to task 2.10d (C6),** for the same reason as 7.5. See 2.10d
       for the full task text.
-- [ ] 7.6b Run the surviving-`sqrt` audit the retired board-audit scenario is
+- [x] 7.6b Run the surviving-`sqrt` audit the retired board-audit scenario is
       replaced by: enumerate every runtime `sqrt` on a rule-bearing path in
       `backend/` (at minimum `system.keplerPeriodMs` and `space`'s flight-time
       and delta-v solve), and confirm each is covered by a recorded fixture
@@ -622,7 +622,7 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
       "Every surviving rule-bearing sqrt call site names its pinning family",
       "A delta-v computation using sqrt is pinned", "A newly introduced
       rule-bearing sqrt arrives with its family")
-- [ ] 7.7 Edit `fixtures/determinism-register.json`'s `checks` legend — **two
+- [x] 7.7 Edit `fixtures/determinism-register.json`'s `checks` legend — **two
       entries, not one**:
       - the `cross-target` entry names "the amd64 differential **board-test**
         leg in /check", which no longer exists. Repoint it at the surviving leg
@@ -641,25 +641,25 @@ is dirty, **stop**: the predecessor is not complete, and the fix belongs there
 Every site below is enumerated in design.md's *enforcement surface*. Each task
 names the file and states its verification.
 
-- [ ] 8.1 `.gitlab-ci.yml`: remove `GOAMD64=v1 go test ./board/` and
+- [x] 8.1 `.gitlab-ci.yml`: remove `GOAMD64=v1 go test ./board/` and
       `./polar/` from the amd64 cross-target leg and their comments (sites 2–3),
       leaving `./space/ ./system/`
-- [ ] 8.2 `.gitlab-ci.yml`: remove the `board` and `polar` compile-and-run lines
+- [x] 8.2 `.gitlab-ci.yml`: remove the `board` and `polar` compile-and-run lines
       from the qemu arm64 leg, and update the
       `DETERMINISM ARM64 LEG UNASSERTED` message string so it enumerates only
       the packages the leg actually runs (sites 4–5). A skip message naming a
       package it does not run is a false enforcement claim of exactly the
       species this chain has shipped three times
-- [ ] 8.3 `.gitlab-ci.yml`: rewrite the `.fixtures-changes` anchor comment
+- [x] 8.3 `.gitlab-ci.yml`: rewrite the `.fixtures-changes` anchor comment
       (site 1) — the `fixtures/**/*` glob is correct and unchanged; only the
       prose naming `fixtures/board/**`, `fixtures/polar/**`,
       `frontend/lib/hex` and `polar-lattice-math` is wrong
-- [ ] 8.4 `check.py`: remove `"board"` and `"polar"` from
+- [x] 8.4 `check.py`: remove `"board"` and `"polar"` from
       `DETERMINISM_GO_PACKAGES` (site 6) and the matching entries from
       `check-transcendental.sh`'s `RULE_BEARING_GO_PACKAGES` (site 15) **in the
       same commit** — `test_check_determinism_lists.py` fails if the two
       disagree, which is the point
-- [ ] 8.5 **REPOINT, do not remove, the TypeScript leg of the transcendental
+- [x] 8.5 **REPOINT, do not remove, the TypeScript leg of the transcendental
       lint (C9 ruling).** `check.py:258-259`'s
       `frontend/lib/board`/`frontend/lib/polar` seam-file predicate clauses
       become one `frontend/lib/market` clause; `check-transcendental.sh:88`'s
@@ -677,11 +677,11 @@ names the file and states its verification.
       here just as much as it does to `check_mirror` itself. This is also
       what makes task 8.14's docstring repoint literally true rather than a
       claim about a seam that no longer exists
-- [ ] 8.6 `check.py`: remove `./board/ ./polar/` from both
+- [x] 8.6 `check.py`: remove `./board/ ./polar/` from both
       `run_determinism_cross_target` command strings and from the four result
       messages (site 9), and rewrite its docstring, which cites the retired
       `polar-lattice-math` capability (site 8)
-- [ ] 8.7 `check.py`: remove the `backend/board` and `backend/polar` clauses
+- [x] 8.7 `check.py`: remove the `backend/board` and `backend/polar` clauses
       from `determinism_trigger` (site 11), and the `backend/board`,
       `backend/polar`, `frontend/lib/board` and `frontend/lib/polar` clauses
       from `mirror_trigger` (site 12), adding `backend/market` and
@@ -689,9 +689,9 @@ names the file and states its verification.
       actually reachable from a changed-file run. **A pass enrolled in a command
       whose trigger never fires is not enforced** — this is
       `pin-system-generation-determinism`'s sharpest finding, repeated
-- [ ] 8.8 `check.py`: rewrite `run_mirror_map_check`'s docstring (site 10),
+- [x] 8.8 `check.py`: rewrite `run_mirror_map_check`'s docstring (site 10),
       which describes the board pair specifically
-- [ ] 8.9 `check-mirror-map.sh`: rewrite the header comment (site 17) and
+- [x] 8.9 `check-mirror-map.sh`: rewrite the header comment (site 17) and
       update the final `PASS:` message's package enumeration (site 20).
       **Site 18 — the `frontend/app/spike/space-3d` carve-out comment at
       `:181` — is left in place.** Its premise was that
@@ -701,7 +701,7 @@ names the file and states its verification.
       only if OQ-5 is ruled "delete `space-3d`", in which case 6.3b's
       verification grep covers it. Deleting a true carve-out note is how an
       exemption becomes folklore
-- [ ] 8.10 `check-frontend-tests.sh`: **REPOINT, do not delete, the
+- [x] 8.10 `check-frontend-tests.sh`: **REPOINT, do not delete, the
       `components/board/webgl/` GL-plumbing carve-out (C7 ruling)** —
       `:126` (the predicate: `/components/board/webgl/.*\.(ts|tsx)$` →
       `/components/space/webgl/.*\.(ts|tsx)$`), `:118` (the same path inside
@@ -720,7 +720,7 @@ names the file and states its verification.
       `grep -rn 'components/board' .claude/` returning nothing **and**
       `grep -rn 'components/space/webgl' .claude/` returning the repointed
       predicate and comment
-- [ ] 8.11 `test_check_determinism_lists.py`: rewrite the docstring's "STATE OF
+- [x] 8.11 `test_check_determinism_lists.py`: rewrite the docstring's "STATE OF
       THE TREE" paragraph (site 13), which enumerates the current list contents
       including `board` and `polar`. Then run it standalone and confirm it
       passes: `python3 .claude/skills/code-quality-checks/test_check_determinism_lists.py`
@@ -728,18 +728,18 @@ names the file and states its verification.
       `python3 .claude/skills/code-quality-checks/check.py --backend-tests` and
       confirm the determinism cross-target matrix **still runs** and still names
       `./space/ ./system/ ./galaxy/`, rather than silently skipping
-- [ ] 8.13 `infra/docker/test-runner.Dockerfile:5` (site 30): the comment
+- [x] 8.13 `infra/docker/test-runner.Dockerfile:5` (site 30): the comment
       justifying `qemu-user-static` says the arm64 leg "runs the `GOARCH=arm64`
       **board** fixture suite under `qemu-aarch64-static`". Keep the install —
       the leg survives for `./space/ ./system/` — and repoint the prose at the
       packages the leg actually runs
-- [ ] 8.14 `check.py:250` (site 31): `check_transcendental`'s docstring cites
+- [x] 8.14 `check.py:250` (site 31): `check_transcendental`'s docstring cites
       "the TS **board-math** mirror". Repoint it at `frontend/lib/market`
       (C9 ruling — the same repoint task 8.5 makes to the predicate itself,
       so this docstring describes a seam that actually exists rather than
       one 8.5 has just deleted). This is a third, separate docstring from
       sites 8 and 10
-- [ ] 8.15 `fixtures/system/mirror-map.json` (site 32): **re-derive the whole
+- [x] 8.15 `fixtures/system/mirror-map.json` (site 32): **re-derive the whole
       `coverage` array against the post-change Go surface, rather than
       deleting only the two named entries** (C8) — `orbitFor` (line 63) is a
       third entry that must be removed, not repointed, because 2.4 deletes
@@ -763,15 +763,15 @@ names the file and states its verification.
       returning nothing
 ## 9. Defect docs, project docs, and the numbered spec series
 
-- [ ] 9.1 `docs/defects/2026-08-26-station-on-gate-ring.md`: flip
+- [x] 9.1 `docs/defects/2026-08-26-station-on-gate-ring.md`: flip
       `**Status:** open` to `**Status:** dissolved (delete-the-lattice)` and add
       a short note that the derivation and the gate ring both ceased to exist,
       so the defect was not repaired (design.md Decision 7). Confirm it carries
       no `fixtures/determinism-register.json` entry to remove — it does not
-- [ ] 9.2 `docs/defects/2026-08-25-lanegate-near-tie-divergence.md`: same
+- [x] 9.2 `docs/defects/2026-08-25-lanegate-near-tie-divergence.md`: same
       treatment — the Go↔TS pair it names is deleted, so there is no seam left
       to diverge across
-- [ ] 9.3 In the same edit to 9.2, record the successor question rather than
+- [x] 9.3 In the same edit to 9.2, record the successor question rather than
       declaring victory: `system.gateOrbit` does the same discretized-argmax job
       through `space.PhaseIndexOf`, on the **Go build-target** axis rather than
       the language seam. Confirm `fixtures/system/cases.json`'s `gateOrbitSweep`
@@ -793,19 +793,19 @@ names the file and states its verification.
       (`cross-stack-determinism`: *Inexact Arithmetic Is Rule-Bearing Only
       Through a Discretized, Tie-Broken Choice* › "Authority does not cover a
       same-side cross-target disagreement")
-- [ ] 9.4 Record — do not decide — the state of `docs/specs/0004-movement-board.md`
+- [x] 9.4 Record — do not decide — the state of `docs/specs/0004-movement-board.md`
       and `docs/specs/0007-hex-board-view.md` (design.md OQ-4). Confirm
       `cd frontend && npx vitest run lib/spec-scenarios.test.ts` stays green
       after every deletion: `0004`'s S1/S2 are cited by `backend/fleet` tests
       that survive, and `0007` declares no `### S` scenarios, so nothing should
       break — but this is an enforced spec↔test seam nobody has catalogued in
       this chain, and it must be checked rather than assumed
-- [ ] 9.5 Update the root `CLAUDE.md`'s **Domain quick-reference**: the
+- [x] 9.5 Update the root `CLAUDE.md`'s **Domain quick-reference**: the
       `board/` bullet describes a package that no longer exists, and the
       `system/`, `fleet/` and `stations/` bullets cite lattice concepts. Replace
       the `board/` bullet rather than deleting it silently, so a reader learns
       the lattice was removed rather than that it was never there
-- [ ] 9.6 Update `docs/plans/continous_space/chain.md`'s link 9 row and section
+- [x] 9.6 Update `docs/plans/continous_space/chain.md`'s link 9 row and section
       to reflect what this change actually turned out to be (a ten-capability
       change with a generator-output consequence, not the four-line deletion the
       original entry predicted)

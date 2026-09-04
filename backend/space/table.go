@@ -43,8 +43,9 @@ type turnTableFile struct {
 	Fine       []trigEntry    `json:"fine"`
 }
 
-// turnTableMeta is the fixture's recording-provenance envelope, matching
-// fixtures/polar/cases.json's `_meta.generatedOn` shape as closely as this
+// turnTableMeta is the fixture's recording-provenance envelope. It matches
+// fixtures/space/turn-table.json's own `_meta.generatedOn` shape — the
+// repo-wide convention for a recorded fixture — as closely as this
 // package's no-TypeScript-mirror status (design.md Decision 1) allows: this
 // package's table is asserted only across the Go build-target matrix, so
 // generatedOn.JSRuntime is always populated with an explicit "no JS leg by

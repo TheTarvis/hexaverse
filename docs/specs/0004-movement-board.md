@@ -10,6 +10,37 @@ superseded_by:  # filled in when this spec is retired
 
 # 0004 — In-system movement (coast & thrust)
 
+> **Recorded, not decided (2026-09-04, openspec `delete-the-lattice`).** This
+> document describes in-system movement on the hex/ring board, and that board
+> no longer exists: `backend/board`, `backend/polar`, `frontend/lib/board`,
+> `frontend/lib/polar` and `fixtures/board` are all deleted, and a fleet's
+> position is a continuous `space.Vec3` solved by `backend/space`. Most of the
+> mechanics below — hex lines, ring cells, `routeAround`, the core hex — name
+> things that are gone.
+>
+> Its **status is deliberately left `implemented`, and this change does NOT
+> mark it `superseded`.** The `docs/specs/` numbered series is Travis's own
+> artifact and its supersession policy is his to set, not the spec team's.
+> Two facts argue against a blind stamp, which is why the question is being
+> asked rather than answered:
+>
+> - `S1` and `S2` (below) are still **true** in continuous space — "a new
+>   order departs from where the ship actually is, even when its last arrival
+>   never settled", and its cancel counterpart — and are still **cited by
+>   surviving tests**: `backend/fleet/stale_arrival_integration_test.go:84,107`
+>   name them as `Spec: 0004/S1` and `Spec: 0004/S2`, and
+>   `frontend/lib/spec-scenarios.test.ts` enforces that seam (13 tests, green
+>   after every deletion in this change).
+> - So the document most likely to look retired is the one whose scenarios are
+>   most alive.
+>
+> **Open question for Travis:** mark `0004` superseded and re-home S1/S2 (they
+> have openspec successors — the tests name them: *"Order to a Body or a
+> Point"* and *"An Arrival That Went Dark"*), or leave it as the historical
+> record of a shipped design with two still-load-bearing scenarios? The
+> companion question for `0007-hex-board-view.md` is easier: it declares **no**
+> `### S` scenarios at all, so nothing cites it and nothing breaks either way.
+
 > The **movement verb** on the orbital hex board: **coast** your orbit for free,
 > **thrust** to break free and travel hex-to-hex, **click a moving body to
 > intercept** it (the game leads the target for you) and **dock** to ride it —
@@ -157,9 +188,10 @@ snapshots while Visible** — exactly #0003 Decision #10, now with a concrete pr
   core hex `(0,0)` — it is a body, not a destination. A burn whose straight hex-line
   would cross the core **routes around it** (`board.RouteAround`: detour via the
   least-cost ring-1 hex beside the star; the ETA follows the routed length, not the
-  straight-line distance). Both ends run the identical routing (pinned by the
-  `routeAround` cases in `/fixtures/board/cases.json`), so the client preview matches
-  what the server commits. And the **core is rejected as a destination** — you can
+  straight-line distance). Both ends ran the identical routing, pinned by a
+  `routeAround` cross-language fixture family, so the client preview matched
+  what the server committed. (That family, and the hex board it described, were
+  deleted with the lattice — see the note at the top of this document.) And the **core is rejected as a destination** — you can
   neither fly a fleet onto `(0,0)` nor dock the star (`fleet.ErrCoreDestination` →
   `400`); the client offers no move-onto-star and says so in the facts panel.
 - **API (sketch)** — a fleet is top-level (Decision #8), so routes are **not** nested

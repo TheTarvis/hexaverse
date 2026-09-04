@@ -3,7 +3,7 @@
 **Filed:** 2026-08-26, by the `migrate-consumers-to-polar-board` change
 (tasks.md 2.8), while renaming `stations`' `gateRing` field/parameter to the
 correct noun `boardRadius`.
-**Status:** open
+**Status:** dissolved (openspec `delete-the-lattice`, 2026-09-04)
 **Against:** `trading-station` ("never on the gate ring") and
 `stations/placement.go`'s `DeriveOrbit`.
 **Severity:** low — a station on the real lane-gate ring collides with a
@@ -50,3 +50,27 @@ station (there is one per spawn-home system) sits on rings 13–15 before
 shipping; if any do, the fix needs a one-time re-derivation or an explicit
 grandfather note, since `EnsureStation` is idempotent per system and will not
 re-roll an existing station on its own.
+
+## Dissolved, not repaired (2026-09-04)
+
+`delete-the-lattice` did not fix this. It removed both sides of it.
+
+`stations.DeriveOrbit` is gone with `stations/placement.go`, and so is the
+ring-and-slot coordinate system it drew into. A station's orbit is now derived
+by `system.StationContinuousOrbit` as a continuous element set — a radius, a
+period, a phase, an inclination and a node — from (galaxy seed, system id,
+skeleton), and is never persisted. There is no `boardRadius` span to draw from
+and no lane-gate RING to collide with: a lane gate is itself a body with its
+own continuous orbit, so "the station landed on the gate ring" no longer names
+a possible state.
+
+The recommended fix above is therefore moot, and so is the grandfathering
+question it raised — no station's orbit was ever stored, so there is nothing
+provisioned on a bad ring to re-derive.
+
+What survives of the underlying concern is a different, weaker question: two
+bodies can still be derived to nearly the same place in continuous space. That
+is a placement-quality question about `StationContinuousOrbit`, not a
+correctness violation of a "never on the gate ring" rule, and it is not filed
+here. Confirmed at dissolution time: this defect carried no
+`fixtures/determinism-register.json` entry, so there is none to remove.

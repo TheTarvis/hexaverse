@@ -10,8 +10,9 @@ import (
 
 // The shared Go/TS golden. The TS proceeds preview asserts the SAME file, so the
 // number a player is shown before committing and the number that settles cannot
-// silently diverge — the cross-stack rule docs/plans/build-order.md already
-// established with fixtures/board/cases.json.
+// silently diverge — the cross-stack rule docs/plans/build-order.md established.
+// backend/market <-> frontend/lib/market is now the ONLY mirrored pair this
+// discipline governs (fixtures/market/mirror-map.json).
 type marketFixture struct {
 	Fold []struct {
 		Name          string        `json:"name"`

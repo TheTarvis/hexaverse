@@ -158,7 +158,7 @@ func (b Burn) DeltaV() float64 {
 // (space-kinematics: "Flight Time Is the Brachistochrone of the Curve's Arc
 // Length").
 func FlightSeconds(curveLength, accel float64) float64 {
-	return float64(2 * math.Sqrt(float64(curveLength/accel))) // determinism:allow(pinned) sqrt is correctly-rounded and identical across Go build targets
+	return float64(2 * math.Sqrt(float64(curveLength/accel))) // determinism:allow(pinned) family:travelTime — sqrt is correctly-rounded and identical across Go build targets; pinned by fixtures/space/cases.json's travelTime family (and family:burnSpeed for the delta-v price, which is this value times commanded accel)
 }
 
 // QuantizeArrival quantizes a float flight-seconds duration to an integer

@@ -217,7 +217,8 @@ const serFloats = "strconv.FormatFloat(v, 'b', -1, 64), components joined by ','
 const serMixed = "integers in decimal, floats as strconv.FormatFloat(v, 'b', -1, 64), components joined by ','; an error outcome is the fixed token " + errToken
 
 // sweepHash accumulates the newline-joined preimage incrementally (no
-// trailing newline), exactly as backend/polar/fixtures_test.go does.
+// trailing newline) — the shape backend/system/fixtures_test.go uses too, so
+// a sweep digest means the same thing in both packages.
 type sweepHash struct {
 	h     hash.Hash
 	lines int

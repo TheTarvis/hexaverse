@@ -6,8 +6,8 @@ import type { DemandEntry, Fill } from '@/lib/types/market'
 
 // The shared Go/TS golden. The Go settlement fold asserts the SAME file, so the
 // number a player is shown before committing and the number that settles cannot
-// silently diverge — the cross-stack rule fixtures/board/cases.json already
-// establishes for the hex math.
+// silently diverge — the cross-stack rule this repo applies to every mirrored
+// pair, of which this is now the only one.
 interface FoldCase {
   name: string
   entries: DemandEntry[]

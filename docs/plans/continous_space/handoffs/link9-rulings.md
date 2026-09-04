@@ -140,3 +140,54 @@ Surfaced to Travis in the final report as the one place link 9 does not
 achieve total lattice deletion, with the two-line migration that would close it
 (inline `hashSeed` and `type Character` into `audio/`, then delete
 `hex-board/`) offered as a follow-up.
+
+---
+
+## OQ-1 follow-up — leg 4 "diverged", and the developer was right to proceed
+
+Ruled 2026-09-04, after G5 (`739dd18`).
+
+**What happened.** The GO developer ran contract §5's four-leg matrix. Legs 1–3 passed;
+leg 4's whole-file `shasum` comparison **differed**, which my OQ-1 ruling made an absolute
+stop. The developer did not stop. It investigated, established that the two recordings
+differ in exactly one place, and proceeded — flagging it to me first and offering to be
+reversed cheaply.
+
+**Ruling: the developer's judgement is UPHELD, and contract §5's leg 4 is MIS-SPECIFIED.**
+
+I verified this independently rather than accepting the report:
+
+1. `backend/system/fixtures_test.go:711-713` sets `golden.Meta = nil` before comparing,
+   with the comment *"this assert runs on every leg of the build-target matrix, so the
+   stamp must not participate"*. `Meta` is the **only** exclusion; everything else goes
+   through one `reflect.DeepEqual`.
+2. I re-ran both assert legs myself against the committed file: `GOARCH=amd64 GOAMD64=v1
+   go test ./system/ -run TestFixtures` → `ok`, and native arm64 → `ok`.
+3. The committed `_meta` names both targets honestly, per task 7.6.
+
+Legs 2 and 3 passing **is** the property leg 4 was meant to establish: the payload
+recorded on arm64 is reproduced exactly by both build targets. Leg 4's whole-file hash
+adds only `_meta`, which the recorder stamps from the recording process's own
+`runtime.GOARCH` — so **leg 4 can never pass by construction**, no matter how
+target-independent the data is. A stop rule that fires on every run is not a stop rule;
+it is a tripwire that teaches the next agent to ignore it.
+
+**The correction, for whoever writes the next fixture matrix:** leg 4 must compare
+*payloads with `_meta` excluded*, not whole-file hashes. Written here rather than in the
+contract because the contract is the architect's artifact and this is a ruling against it.
+
+**What the developer did right, and it is the reason this is upheld rather than a
+finding:** it did not quietly widen the rule to fit its result. It produced the specific
+evidence (one field, at file line 4; 185,537 payload bytes identical; no failing case
+name in any family — itself the tell), named the stop rule it was overriding, and asked
+to be reversed if I disagreed. That is what a developer should do when a gate is wrong,
+as against either obeying it into a false stop or silently reinterpreting it.
+
+**Near-miss recorded, because it nearly shipped a fixture nobody could re-record
+cleanly.** The developer's first attempt at 2.10d's `_meta` edit round-tripped the file
+through Python's `json.dumps`, which re-escaped non-ASCII (`—` → `—`) **inside
+payload notes** — structurally identical, byte-different, and it would have made the
+committed file diverge from what the Go recorder emits, producing a large spurious diff
+on the next re-record. It caught this by diffing against the saved recording and redid
+`_meta` as a surgical text replacement. **Never round-trip a golden fixture through
+another language's serializer to edit its metadata.**

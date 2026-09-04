@@ -10,6 +10,19 @@ superseded_by:  # filled in when this spec is retired
 
 # 0007 — Hex Board View (system renderer)
 
+> **Recorded, not decided (2026-09-04, openspec `delete-the-lattice`).** The
+> hex board this document specifies is gone: `frontend/lib/board` and
+> `frontend/lib/polar` are deleted and the system view renders continuous
+> space (`frontend/components/space/`). Its status is deliberately left
+> `accepted` — the `docs/specs/` series is Travis's artifact and its
+> supersession policy is his.
+>
+> Unlike `0004-movement-board.md`, this document declares **no** `### S`
+> scenarios, so nothing in `frontend/lib/spec-scenarios.test.ts` cites it and
+> retiring it would break nothing. **Open question for Travis:** mark it
+> `superseded` (pointing at the openspec `system-space-view` capability), or
+> keep it as the historical record of the renderer that shipped first?
+
 > The **tactical-tier client**: an SVG hex board rendering one system's fogged
 > interior — bodies gliding on computed orbits, the three visibility bands
 > styled legibly, and the select → preview → commit gesture for the slice

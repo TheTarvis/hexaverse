@@ -2,7 +2,7 @@
 
 **Filed:** 2026-08-25, by the `pin-cross-stack-determinism-seam` change's
 near-tie probe (its tasks.md, task 1.4, anticipated exactly this outcome).
-**Status:** open
+**Status:** dissolved (openspec `delete-the-lattice`, 2026-09-04) — successor question filed as `2026-09-04-phaseindexof-near-tie-cross-target.md`
 **Against:** `board-tactical-math` (`backend/board/gate.go` /
 `frontend/lib/hex/gate.ts`), and the `cross-stack-determinism` capability's
 scenario "A near-tie bearing selects the same candidate in both languages."
@@ -69,3 +69,41 @@ The fix change must also add the repro above as a `laneGate` case in
 today would freeze Go's accidental winner and permanently fail the TS
 suite). Until then, `LaneTransit.EntryGate` values already persisted are
 unaffected — the fix only changes which hex wins inside the knife-edge.
+
+## Dissolved, not repaired (2026-09-04)
+
+`delete-the-lattice` did not fix this. It removed the seam it lived on.
+
+`LaneGateHex` is gone with `backend/board`, `frontend/lib/hex` (and its
+successor `frontend/lib/polar`) is gone with the TypeScript mirrors, and
+`fixtures/board/cases.json` — where the recommended fix said to record the
+repro — no longer exists. There is no Go↔TS pair left to disagree, because a
+lane gate's direction is now derived server-side only: `system.gateOrbit`
+reduces the bearing to a phase index and SERVES it, and the client consumes
+the served value rather than re-deriving it. The predecessor's own
+"recommended fix" is therefore moot, including its instruction to add the
+repro as a `laneGate` fixture case.
+
+Nothing was persisted under the divergence and nothing needs re-deriving: the
+`LaneTransit.EntryGate` field this defect named no longer exists either.
+
+## The successor question, recorded rather than waved through (task 9.3)
+
+Deleting the seam does not delete the JOB. `system.gateOrbit` still answers
+"which direction does this lane depart in" by reducing an inexact bearing to a
+discretized, tie-broken choice — through `space.PhaseIndexOf`, a fixed
+twenty-comparison bracketing search over a pinned trig table, with the tie rule
+stated explicitly in `crossAtOrBefore`. That is a materially better
+construction than the `atan2` argmin it replaces.
+
+But the axis moved rather than vanishing: from the LANGUAGE seam to the Go
+BUILD-TARGET axis (arm64 vs amd64/GOAMD64=v1). Task 9.3 required checking
+whether `fixtures/system/cases.json`'s `gateOrbitSweep` exercises near-tie
+bearings. **It does not** — measured, not assumed: it draws two independent
+`galaxy.Coords` uniformly from `[-2000, 2000]³` boxes, so the chance a drawn
+bearing lands within one ULP of a table entry's direction is effectively zero;
+and the `gateOrbit` hand family's tie case is an EXACT tie, which both targets
+agree on by construction and is not the hazard.
+
+Per task 9.3's own instruction, that is filed as a new open defect rather than
+closed silently: `docs/defects/2026-09-04-phaseindexof-near-tie-cross-target.md`.

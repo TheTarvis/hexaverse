@@ -80,7 +80,7 @@ after that design was written.
 | 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | ✅ `3913952` |
 | 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | ✅ `1b6c7c0` |
 | 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | ✅ `1bc5e46`…`3088748` |
-| 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | 📝 spec, 0/96 |
+| 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | 🚧 implementing — G1–G7 + §7/§8/§9 landed; §10 sweeps, §11 validation, §12–13 archive remain |
 
 Downstream and off the critical path: `add-station-exchange` (M12) gets
 re-proposed after link 6; `add-cargo-transfer` (the rescue verb
@@ -797,6 +797,31 @@ reset between them.
 `fixtures/board`, `fixtures/polar`, their mirror-map entries, and the
 `board-tactical-math` spec. Per the ground rules this is deletion, not
 deprecation.
+
+**Landed so far (2026-09-04).** The six Go packages/directories above are
+gone, and with them: `system.Orbit` and `Feature`'s ring/parent/fixed/footprint
+fields (a WIRE removal on the interior read); `system.PeriodFor` and the
+global orbital law `common.GameTuning.OrbitBasePeriod`/`OrbitPeriod` it read
+(a body's period is Keplerian from its own radius now, drawn once and
+persisted); `stations.DeriveOrbit` and `Station.orbit` (also a wire removal,
+with no successor field — the station's orbit is derived at interior-splice
+time and never stored); `LaneGates`' radius parameter and `SystemInterior.Radius`;
+`fleet.MovementParams.BoardRadius`, `MsPerTile` and `InterceptHorizon`. The one
+tuning knob that survives is renamed `common.GameTuning.MaxOrbitalIndex` — kept
+because system generation's extent still reads it.
+
+Two things worth knowing before touching what is left:
+
+- **The Go↔TS mirror discipline now has exactly one instance**,
+  `backend/market` ↔ `frontend/lib/market` (`fixtures/market/mirror-map.json`).
+  Every other rule-bearing Go package is registered anti-mirror. `check_mirror`
+  kept a call site rather than becoming a working check with none.
+- **Two open defects were dissolved rather than fixed**, because the code both
+  sides of them ceased to exist: the station-on-gate-ring placement span, and
+  the lane-gate near-tie Go↔TS divergence. The second left a genuine successor
+  question on a different axis (Go build-target, not language seam), filed as
+  `docs/defects/2026-09-04-phaseindexof-near-tie-cross-target.md` with its own
+  deviation-register entry.
 
 ---
 

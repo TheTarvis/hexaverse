@@ -1,5 +1,5 @@
 {
-  "_comment": "Shared Go/TS golden for market settlement math (#0011 Decision 22). The Go settlement fold (backend/market) and the TS proceeds preview (frontend/lib) both assert against these exact cases, so the number a player is SHOWN can never silently diverge from the number that SETTLES. Mirrors fixtures/board/cases.json's precedent.",
+  "_comment": "Shared Go/TS golden for market settlement math (#0011 Decision 22). The Go settlement fold (backend/market) and the TS proceeds preview (frontend/lib) both assert against these exact cases, so the number a player is SHOWN can never silently diverge from the number that SETTLES. It is this capability's one remaining cross-language mirrored pair.",
   "fold": [
     {
       "name": "fully covered by the top entry",

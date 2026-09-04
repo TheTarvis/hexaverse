@@ -236,14 +236,75 @@ func TestGitlabCI_Scenario_ArmLegUnassertedMarkerIsGreppableAndNamesPackages(t *
 		t.Errorf(".gitlab-ci.yml's qemu arm64 leg fallback does not contain the literal greppable marker %q "+
 			"(cross-stack-determinism: \"An emulated leg missing its runtime reports a named, greppable warning\")", marker)
 	}
-	for _, pkg := range []string{"./board/", "./space/", "./system/", "./polar/"} {
-		if !strings.Contains(block, pkg) {
-			t.Errorf(".gitlab-ci.yml's qemu arm64 leg fallback does not name package %q as unchecked", pkg)
+	// The packages the message must name are DERIVED from the leg's own
+	// compile lines rather than hard-coded here. The property this scenario
+	// pins is "the skip message enumerates the packages the leg actually
+	// runs" — a message naming a package the leg does not run is a false
+	// enforcement claim, and so is a hard-coded list in this test that has
+	// drifted from the leg. Deriving both sides from one source is what makes
+	// the assertion mean what the scenario says.
+	run := armLegPackages(block)
+	if len(run) == 0 {
+		t.Fatal(".gitlab-ci.yml's qemu arm64 leg compiles no packages — the leg has no subject, so its skip message cannot be checked")
+	}
+	marked := block[strings.Index(block, marker):]
+	for _, pkg := range run {
+		if !strings.Contains(marked, pkg) {
+			t.Errorf(".gitlab-ci.yml's qemu arm64 leg RUNS %s but its fallback message does not name it as unchecked", pkg)
+		}
+	}
+	for _, pkg := range armLegNamedInMessage(marked) {
+		if !contains(run, pkg) {
+			t.Errorf(".gitlab-ci.yml's qemu arm64 leg fallback message names %s as unchecked, but the leg does not run it — "+
+				"a skip message naming a package it does not run is a false enforcement claim", pkg)
 		}
 	}
 	if !strings.Contains(block, "infra/docker/build-test-runner.sh") {
 		t.Error(".gitlab-ci.yml's qemu arm64 leg fallback does not name the remedy command infra/docker/build-test-runner.sh")
 	}
+}
+
+// armLegPackages extracts the package paths the qemu arm64 leg actually
+// compiles, from its own `go test -c ... ./pkg/` lines.
+func armLegPackages(block string) []string {
+	var out []string
+	for _, line := range strings.Split(block, "\n") {
+		if !strings.Contains(line, "go test -c") {
+			continue
+		}
+		for _, f := range strings.Fields(line) {
+			if strings.HasPrefix(f, "./") && strings.HasSuffix(f, "/") && !contains(out, f) {
+				out = append(out, f)
+			}
+		}
+	}
+	return out
+}
+
+// armLegNamedInMessage extracts the package paths the fallback message claims
+// are unchecked.
+func armLegNamedInMessage(message string) []string {
+	var out []string
+	for _, f := range strings.Fields(message) {
+		// Trim surrounding quotes, then trailing punctuation ONLY — a cutset
+		// containing '.' would eat the leading dot of "./space/" and make this
+		// extraction return nothing at all, which reads as a pass.
+		f = strings.Trim(f, "\"'")
+		f = strings.TrimRight(f, ",.")
+		if strings.HasPrefix(f, "./") && strings.HasSuffix(f, "/") && !contains(out, f) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func contains(hay []string, needle string) bool {
+	for _, h := range hay {
+		if h == needle {
+			return true
+		}
+	}
+	return false
 }
 
 // Scenario: A degraded leg does not fail the pipeline by itself.

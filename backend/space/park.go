@@ -194,7 +194,7 @@ func StationKeepUpkeep(rate float64, fromMs, toMs common.WorldMillis) float64 {
 // "Releasing a Station-Keep Hold Re-Circularizes at the Held Offset's
 // Planar Radius").
 func ReleaseStationkeep(bodyId string, offset Vec3, releaseMs common.WorldMillis) Park {
-	planarRadius := math.Sqrt(float64(offset.X*offset.X) + float64(offset.Z*offset.Z)) // determinism:allow(pinned) sqrt is correctly-rounded and identical across Go build targets
+	planarRadius := math.Sqrt(float64(offset.X*offset.X) + float64(offset.Z*offset.Z)) // determinism:allow(pinned) family:parkPosition — sqrt is correctly-rounded and identical across Go build targets; pinned by fixtures/space/cases.json's parkPosition family via three recorded released holds (HAND CASES ONLY: no sweep draws a release — recorded as such in fixtures/space/mirror-map.json's coverage entry for ReleaseStationkeep)
 	radius := planarRadius
 	if radius < MinOrbitRadius {
 		radius = MinOrbitRadius

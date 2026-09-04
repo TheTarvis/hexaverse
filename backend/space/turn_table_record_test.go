@@ -14,9 +14,9 @@ import (
 // place math.Sin/math.Cos execute in this capability"). It regenerates
 // fixtures/space/turn-table.json and this package's embedded copy
 // (turn-table.json) only when UPDATE_FIXTURES=1 is set — normal test runs
-// only assert the two are byte-identical, mirroring backend/board's
-// coordtable.json / fixtures/board/coordinate-table.json precedent
-// (backend/board/fixtures_test.go).
+// only assert the two are byte-identical: a recorded table with an embedded
+// Go copy is recorded once and compared thereafter, never recomputed on
+// whatever target happens to run the test.
 
 const (
 	turnTablePathCanonical = "../../fixtures/space/turn-table.json"
@@ -72,8 +72,7 @@ func generateTurnTable() []byte {
 // itself reintroduce the cross-target hazard this pinned table exists to
 // remove. The trigonometry runs exactly once, in
 // TestTurnTable_RecordOrRegenerate's UPDATE_FIXTURES=1 branch, on whichever
-// single machine performs the recording (mirroring backend/board's
-// TestCoordinateTable_ByteIdentical precedent exactly).
+// single machine performs the recording.
 func TestTurnTable_ByteIdentical(t *testing.T) {
 	canonical, err := os.ReadFile(turnTablePathCanonical)
 	if err != nil {

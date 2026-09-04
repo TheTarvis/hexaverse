@@ -2,8 +2,9 @@ FROM golang:1.26.6
 
 # Install Java (required for Firebase emulators), Node.js, PostgreSQL client, and Firebase tools.
 # qemu-user-static provides the arm64 leg of the cross-target determinism matrix
-# (openspec cross-stack-determinism): test-backend runs the GOARCH=arm64 board
-# fixture suite under qemu-aarch64-static on the amd64 runner.
+# (openspec cross-stack-determinism): test-backend runs the GOARCH=arm64
+# ./space/ and ./system/ fixture suites under qemu-aarch64-static on the amd64
+# runner.
 RUN apt-get update && apt-get install -y \
     default-jre-headless \
     postgresql-client \

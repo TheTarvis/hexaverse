@@ -65,12 +65,13 @@ variables:
 # build-backend and deploy-backend-dev, so widening them would make a
 # fixture-only commit build and deploy the backend.
 #
-# The path filter is family-agnostic by design: it covers fixtures/board/**
-# (backend/board <-> frontend/lib/hex; openspec cross-stack-determinism) AND
-# fixtures/polar/** (backend/polar <-> frontend/lib/polar; openspec
-# polar-lattice-math — its Go and TS fixture suites run inside these same two
-# jobs, so no polar-specific anchor is needed and none should be added: a
-# second anchor with identical rules on identical jobs would be dead YAML).
+# The path filter is family-agnostic by design: the fixtures/**/* glob covers
+# every recorded family at once — fixtures/market/** (the backend/market <->
+# frontend/lib/market mirrored pair; openspec cross-stack-determinism),
+# fixtures/space/**, fixtures/system/**, fixtures/galaxy/** and the rest. Their
+# Go and TS fixture suites all run inside these same two jobs, so no
+# per-family anchor is needed and none should be added: a second anchor with
+# identical rules on identical jobs would be dead YAML.
 .fixtures-changes: &fixtures-changes
   changes:
     - fixtures/**/*
@@ -339,18 +340,11 @@ test-backend:
     # (pinned by tags below/above); GOAMD64=v1 is pinned EXPLICITLY because
     # v3+ emits fused multiply-add on amd64, silently making this the
     # contracting target the check exists to catch.
-    - GOAMD64=v1 go test ./board/ -short -count=1
-    # backend/polar (openspec polar-lattice-math) rides the same cross-target
-    # leg board does — already enforced locally by check.py but missing from
-    # CI until pin-system-generation-determinism closed the asymmetry
-    # (design.md Decision 3).
-    - GOAMD64=v1 go test ./polar/ -short -count=1
-    # backend/space (openspec add-space-kinematics) rides the same
-    # cross-target leg board does: a Go-only rule-bearing package with no
-    # JavaScript-runtime leg by design (Decision 1 — no TypeScript mirror),
-    # so this compiled-output cross-target run is its whole determinism
-    # story. The three scenario tests that were disputed during this change's
-    # TDD run were adjudicated as test defects and fixed by the SDET; the
+    # backend/space (openspec add-space-kinematics) is a Go-only rule-bearing
+    # package with no JavaScript-runtime leg by design (Decision 1 — no
+    # TypeScript mirror), so this compiled-output cross-target run is its
+    # whole determinism story. The three scenario tests that were disputed
+    # during add-space-kinematics' own TDD run were adjudicated as test defects and fixed by the SDET; the
     # package's suite is green (81 pass, 2 documented skips — the
     # fixture-blocked round-count case and the UPDATE_FIXTURES-gated table
     # recording flow).
@@ -367,16 +361,12 @@ test-backend:
     - |
       QEMU=$(command -v qemu-aarch64-static || command -v qemu-aarch64 || true)
       if [ -n "$QEMU" ]; then
-        CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/board-arm64.test ./board/
-        (cd board && "$QEMU" /tmp/board-arm64.test -test.short -test.count=1)
-        CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/polar-arm64.test ./polar/
-        (cd polar && "$QEMU" /tmp/polar-arm64.test -test.short -test.count=1)
         CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/space-arm64.test ./space/
         (cd space && "$QEMU" /tmp/space-arm64.test -test.short -test.count=1)
         CGO_ENABLED=0 GOARCH=arm64 go test -c -o /tmp/system-arm64.test ./system/
         (cd system && "$QEMU" /tmp/system-arm64.test -test.short -test.count=1)
       else
-        echo "DETERMINISM ARM64 LEG UNASSERTED: TEST_RUNNER_IMAGE lacks qemu-user, so the emulated-architecture leg cannot execute for ./board/ ./space/ ./system/ ./polar/ — rebuild the image via infra/docker/build-test-runner.sh to clear this. Until then these packages' cross-target claim is asserted by the local /check gate only, not by this CI leg."
+        echo "DETERMINISM ARM64 LEG UNASSERTED: TEST_RUNNER_IMAGE lacks qemu-user, so the emulated-architecture leg cannot execute for ./space/ ./system/ — rebuild the image via infra/docker/build-test-runner.sh to clear this. Until then these packages' cross-target claim is asserted by the local /check gate only, not by this CI leg."
       fi
 
     # Dependency vulnerability scan (govulncheck baked into test-runner image).

@@ -3,8 +3,8 @@
 // This is duplicated cross-stack math: the Go settlement in backend/market and
 // this preview must produce the SAME number, or the figure a player is shown
 // before committing differs from the one that settles. Both assert against
-// fixtures/market/cases.json — the same discipline fixtures/board/cases.json
-// already enforces for the hex math.
+// fixtures/market/cases.json, and fixtures/market/mirror-map.json is what
+// enrols this pair in the repo's cross-language mirror check.
 //
 // Do not "simplify" the rounding here without changing the fixture and the Go
 // side together.
