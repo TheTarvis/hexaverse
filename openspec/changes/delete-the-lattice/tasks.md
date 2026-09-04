@@ -812,7 +812,7 @@ names the file and states its verification.
 
 ## 10. Whole-tree sweep
 
-- [ ] 10.1 Whole-tree sweep. Run this pipeline **exactly as written** — it is
+- [x] 10.1 Whole-tree sweep. Run this pipeline **exactly as written** — it is
       byte-identical to `link9-acceptance-greps.sh`'s 10.1 leg, and r7's
       addendum ruling E requires harness and task to agree character for
       character. Do not re-derive it, re-order the filters, or tidy them:
@@ -902,7 +902,7 @@ names the file and states its verification.
       residue whatever else it says); no
       `TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse` filter
       (0 lines here). **Do not widen** beyond the filters printed above.
-- [ ] 10.1b Run a **second, bare-token** sweep, because the enforcement lists
+- [x] 10.1b Run a **second, bare-token** sweep, because the enforcement lists
       do not spell the packages as paths and 10.1's path patterns miss all of
       them: `check.py`'s `DETERMINISM_GO_PACKAGES = ("board", "polar", …)`,
       `check-transcendental.sh`'s `RULE_BEARING_GO_PACKAGES=(board polar …)`,
@@ -920,7 +920,7 @@ names the file and states its verification.
       alternatives either. Without this leg the section-8 tasks are
       self-attested; with it, these two sites still are, and must be checked
       by hand
-- [ ] 10.1c Sweep for SYMBOL citations of the deleted packages, which 10.1's
+- [x] 10.1c Sweep for SYMBOL citations of the deleted packages, which 10.1's
       path patterns and 10.1b's `.claude` scope both miss:
       `grep -rnE '\b(board|polar)\.[A-Za-z]' backend --include='*.go'` and
       `grep -rnE '\b(board|polar)\.[A-Za-z]' frontend --include='*.ts' --include='*.tsx' | grep -v node_modules`.
@@ -952,7 +952,7 @@ names the file and states its verification.
       `backend/space/{params.go:41,burn.go:11,helpers_test.go:79,params_test.go:28,63}`
       (a package no other task touches), `backend/fleet/resolver.go:26`,
       `backend/fleet/model.go:162`.
-- [ ] 10.2 Case-insensitive `lattice` sweep. Run this pipeline **exactly as
+- [x] 10.2 Case-insensitive `lattice` sweep. Run this pipeline **exactly as
       written** — it is byte-identical to `link9-acceptance-greps.sh`'s 10.2
       leg, and r7's addendum ruling E requires harness and task to agree
       character for character. Do not re-derive it, re-order the filters, or
@@ -1266,7 +1266,7 @@ names the file and states its verification.
 retirement in section 13 happens. The archiver is the gate, and it is the
 archiver that must be rehearsed.
 
-- [ ] 12.1 Copy `openspec/` to a scratch directory. **All four predecessors
+- [x] 12.1 Copy `openspec/` to a scratch directory. **All four predecessors
       still ahead of this change at authoring time —
       `add-stationkeep-hold-verb`, `serve-orbital-elements-and-burn-preview`,
       `build-production-space-view`, `add-scan-and-sightings-surface`
@@ -1279,10 +1279,10 @@ archiver that must be rehearsed.
       grep; if either fails, archive whatever is outstanding **in the copy**,
       in the order above, before running 12.2. Rehearsing against an
       unarchived tree rehearses a shape that never ships.
-- [ ] 12.2 In that copy, run `openspec archive delete-the-lattice --yes` and
+- [x] 12.2 In that copy, run `openspec archive delete-the-lattice --yes` and
       confirm it succeeds even though `board-tactical-math` has no delta
       directory
-- [ ] 12.3 In that copy, confirm the rebuilt specs are what the deltas said:
+- [x] 12.3 In that copy, confirm the rebuilt specs are what the deltas said:
       `openspec/specs/system-interior/spec.md` carries *Interior Generation Is
       Lazy and Deterministic* and **no** *Lazy, Deterministic Interior
       Generation*, and no longer contains the strings "slot count", "clampRing",
@@ -1291,18 +1291,18 @@ archiver that must be rehearsed.
       requirement; `openspec/specs/cross-stack-determinism/spec.md` carries
       *Rule-Bearing Square Roots Are Pinned By a Recorded Fixture Family* and no
       *Square Roots In Rules Are Pinned, Not Assumed*
-- [ ] 12.4 In that copy, delete `openspec/specs/board-tactical-math/` and then
+- [x] 12.4 In that copy, delete `openspec/specs/board-tactical-math/` and then
       `grep -rn 'board-tactical-math' openspec/specs/`. There SHALL be no
       remaining citation. `--strict` does not catch a dangling cross-reference
       to a retired capability, so this grep is the only guard
-- [ ] 12.5 Build the **retired-requirement-title list** once, into a file, so
+- [x] 12.5 Build the **retired-requirement-title list** once, into a file, so
       both legs of the sweep below run against the same list: every one of
       `board-tactical-math`'s 22 requirement titles, plus every requirement
       title this change retires in `system-interior`, `trading-station` and
       `cross-stack-determinism` (the six `REMOVED`+`ADDED` originals and the
       five pure `REMOVED`). Write them one per line to
       `/tmp/retired-titles.txt`
-- [ ] 12.5a **Leg one — in the scratch copy**, `grep -F -f /tmp/retired-titles.txt
+- [x] 12.5a **Leg one — in the scratch copy**, `grep -F -f /tmp/retired-titles.txt
       -rn openspec/specs/`. Each hit is a citation of a requirement that no
       longer exists and must be repointed or removed. (Authoring found two such
       citations up front — `trading-station`'s *Station-Store Read Failure
