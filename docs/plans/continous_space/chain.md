@@ -78,7 +78,7 @@ after that design was written.
 | 7b | `add-stationkeep-hold-verb` | *(carved out of 7)* the hold/release verbs + their fuel upkeep | ✅ `ca7e5d2` |
 | 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | ✅ `3913952` |
 | 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | ✅ `1b6c7c0` |
-| 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | 📝 spec final (3 adversary rounds), 0/105 — **next** |
+| 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | 🔨 built `1bc5e46`, 118/119 — **journey red on one leg, not archived** |
 | 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | 📝 spec, 0/96 |
 
 Downstream and off the critical path: `add-station-exchange` (M12) gets
@@ -660,16 +660,51 @@ longer will. If previews read as laggy in play, reversing means building
 
 ## Link 8b — `add-scan-and-sightings-surface`
 
-**Landed 2026-09-03** (`IMPL_HASH` implementation, `ARCH_HASH` archive),
-ALL_TASKS tasks. The focused scan's whole player-facing half and the
-sightings display, together, as ruled: a scan control fed by a new
-owner-scoped `GET /v1/fleets/:id/scan-targets`, the running sweep's countdown
-and cancel off the action inbox, the settled report with six fizzle copies,
-sighting ghosts at their frozen positions, and the sighting log. Vitest
-VITEST_N, Playwright PW_N, root backend e2e ROOT_E2E. QA 156 PASS / 1
-BLOCKED (Playwright-only) / 0 FAIL after one MAJOR was fixed; security CLEAR.
+**Built 2026-09-04** (`1bc5e46` implementation, `73c3f51` journey fix +
+record) — **not archived.** 118 of 119 tasks; only 10.9, the pre-archive
+validation, is open, because the archive gate's journey is still red on one
+leg. The focused scan's whole player-facing half and the sightings display,
+together, as ruled: a scan control fed by a new owner-scoped
+`GET /v1/fleets/:id/scan-targets`, the running sweep's countdown and cancel
+off the action inbox, the settled report with six fizzle copies, sighting
+ghosts at their frozen positions, and the sighting log. Vitest 1534 across
+123 files, tier 3 2040 tests in 85m, Playwright 5 of 6 on the two scan specs.
+QA 156 PASS / 1 BLOCKED (Playwright-only) / 0 FAIL after one MAJOR was fixed;
+security CLEAR. The full gate record is
+`handoffs/add-scan-and-sightings-surface-journey.md`.
 
-**Ten adversary rounds, not three.** Rounds 1–3 were before the resume;
+**What stopped it:** `scan-journey.spec.ts:332` asserts that mid-burn the
+control says "No host is in range to sweep." The captured error context shows
+the control rendering the Sweep button and the emission warning instead — the
+served list was **not** empty, so withholding that copy was correct. The test
+assumes nothing is in range while the fleet is still travelling, but partway
+along the burn to the home station the fleet is already within range of it.
+The same range dial as the recorded finding that a freshly spawned fleet has
+nothing in range (design.md OQ 12), seen from the other side. It passed in two
+earlier runs against identical production code. One SDET fix and a rerun of
+the two scan specs is all that stands between this and archive; the batched
+revision round had already been spent on the fizzle spec, and
+`docs/testing-tiers.md` forbids a second.
+
+**Eleven adversary rounds, not three.** Round 11 was the `--chain` currency
+check on the resume: rounds 4–10's verdicts were all spent, but round 10's own
+five accepted repairs had been applied and never attacked. Attacking only that
+diff returned **NOT CLEAR** — 1 blocker, 1 major, both inside round 10's text.
+The blocker (F11-1) is the sharpest instance of this change's whole lesson:
+round 10 closed the pending window's hang by opening an early-settle exit, and
+that exit handed the control to a settled-sweep report **nothing on that path
+refreshes** — `ScanSweepWatcher` arms only on an ETA the client never reads
+there, so the outcome went unreported and the held-channel empty set came back
+as "no host is in range", the originating defect one instant further down the
+sequence. Repairing it then introduced a third defect the developer caught
+itself: the empty-set copy was suppressed by *any* stale unacknowledged report,
+so an undismissed old report hid a genuinely empty list forever. Rounds 8–11
+therefore teach one rule twice over — **a clause naming a window must name
+every way the window ends, and every state it ends into must be one something
+refreshes; a repair that withholds something must name exactly which instant it
+withholds it for.**
+
+Rounds 1–3 were before the resume;
 round 4 re-attacked the resumed change against the `system-space-view` spec
 8a-2 had just made live (1 blocker, 6 majors); rounds 5–7 found only residue
 of each previous round's repairs; rounds 8–10 were mid-build spot-checks on
@@ -724,6 +759,25 @@ Also recorded: rejection copy keyed on server error strings (a future
 mineable but never a scan host (`decisions.md`, 2026-09-03), and three
 composite Firestore indexes Travis must `terraform apply` — the emulator
 auto-indexes, so only production fails without them.
+
+**Three pre-existing flakes the gate surfaced, none of them 8b's and none
+patched here:** `P1b` in `SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx`
+(green 5/5 isolated, flakes under full-suite load — its window depends on
+`Date.now()` beating a query's `dataUpdatedAt`); `lib/realtime.test.ts` (races
+the `__anti_mirror_probe__` directory the mirror-map test creates and deletes,
+dying on `ENOENT` mid-glob); and `space-double-submit.spec.ts`'s "captured off
+the wire" helper, which flaked in both directions across runs. Tier 3's single
+failure was likewise not 8b's: link 7's refund threshold asserts ≥90% refunded
+when a burn is cut "within milliseconds", and 85 minutes into the suite the two
+round trips took 2.5s and 2.4s — 89.6%, passing alone in 29s.
+
+**One process lesson for the next link:** tiers 3 and 4 share the
+`hexaverse-emulator` project, and `docs/testing-tiers.md` forbids running them
+*concurrently* but says nothing about running them back to back. Doing so wasted
+a full tier-4 run — 2040 tests' worth of leftover data aggravated the open
+spawn-lock defect until four specs failed on a 60s wake timeout. Restarting the
+emulators clean turned all four scan-journey tests green. The doc should say to
+reset between them.
 
 ## Link 9 — `delete-the-lattice`
 
