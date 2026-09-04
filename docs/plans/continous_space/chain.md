@@ -13,8 +13,14 @@ Link 8a was split the same way — both halves are **done and archived**:
 `build-production-space-view` (117 tasks, `1b6c7c0`; `board-view` retired).
 Link 8b is **done and archived** (`add-scan-and-sightings-surface`, 119 tasks,
 `3088748`) — the focused scan has a player-facing surface and sightings are
-displayed. **The game is playable in R³ and the lattice is unreferenced.**
-Only link 9, the deletion, remains.
+displayed. Link 9 is **done and archived** (`delete-the-lattice`, 100 tasks,
+`e0ef062`): the lattice packages, their TypeScript mirrors, their fixtures and
+the `board-tactical-math` capability are all gone.
+
+**THE CHAIN IS COMPLETE.** The game is playable in R³ and there is no second
+spatial representation left in the tree — `space-kinematics` is the only
+spatial authority, and nothing reconciles against a lattice because none
+exists.
 
 Link 7b is worth a note. Its review loop ran one round past the nominal
 cap of three, deliberately — every round's blockers were bred by the previous
@@ -80,7 +86,7 @@ after that design was written.
 | 8a-1 | `serve-orbital-elements-and-burn-preview` | *(carved out of 8a)* elements on both DTOs, the preview endpoint, the upkeep rate | ✅ `3913952` |
 | 8a-2 | `build-production-space-view` | The renderer, the docked panel; `board-view` retired | ✅ `1b6c7c0` |
 | 8b | `add-scan-and-sightings-surface` | The focused scan's player-facing half **and** the sightings display, together | ✅ `1bc5e46`…`3088748` |
-| 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | 🚧 implementing — G1–G7 + §7/§8/§9 landed; §10 sweeps, §11 validation, §12–13 archive remain |
+| 9 | `delete-the-lattice` | `board`, `polar`, their mirrors, fixtures, specs | ✅ `e0ef062` |
 
 Downstream and off the critical path: `add-station-exchange` (M12) gets
 re-proposed after link 6; `add-cargo-transfer` (the rescue verb
@@ -822,6 +828,74 @@ Two things worth knowing before touching what is left:
   question on a different axis (Go build-target, not language seam), filed as
   `docs/defects/2026-09-04-phaseindexof-near-tie-cross-target.md` with its own
   deviation-register entry.
+
+**Landed and archived 2026-09-04 at `e0ef062`, 100/100 tasks.** Tier 3: 1875
+tests, 1 skipped, 1 failure (pre-existing, filed, passes in isolation). Tier 4:
+19 passed, 3 failed — all three the known wire-capture flake in one spec, with
+every sibling spec making the same assertion green. Full gate record in
+`handoffs/link9-journey.md`.
+
+### What this link taught
+
+**The journey judgement: a deletion link has no new walk to write.** The gate
+normally has the SDET author one journey spec per change. Link 9 adds no
+player-visible behaviour, and the UI it must not break was built by 8a-2 and
+8b, which already carry specs that walk it. Writing a new journey would have
+meant inventing a walk with no new behaviour in it — the "written blind"
+failure that produced half this repo's historical e2e reds. **The existing
+suite was this link's journey**, which is exactly what tasks 6.4 and 11.5 ask
+for: for a deletion the proof obligation is that the slice still works, not
+that something new does. Recorded rather than skipped silently.
+
+**A verdict expires against the tree, not just against the spec.** Archiving
+8b changed two capability specs link 9 had MODIFIED deltas against *and*
+shifted `check.py` by +29/+35 lines. The spec half survived intact — all 15
+MODIFIED headers and every scenario heading reproduced verbatim. What expired
+was the **worklist's grip on the tree**: eight stale line citations, two of
+which had come to point at each other's territory, so a developer following
+task 8.6's numbers would have edited a docstring twice and never touched the
+two `go test ./board/ ./polar/` invocations that were the only edit
+de-enrolling the deleted packages. Re-attack the diff, and check citations,
+not just requirements.
+
+**A sweep's own change id can defeat it.** `delete-the-lattice` contains the
+word the change sweeps for, so every red-phase file failed the gate by obeying
+the manifest convention, and three separate agents wrote comments citing the
+change by name that became residue. The durable fix was citing "link 9,
+tasks.md N" instead. Sibling trap: `sub-lattice` is load-bearing mathematics —
+a lattice of real numbers, nothing to do with the board — and renaming it to
+quiet a grep would have made a test's own failure message lie.
+
+**Do not let the grep define the work.** Four unfailable `toHaveCount(0)`
+assertions guarded testids whose producer was already deleted; two of them
+escaped the sweep purely on a spelling accident. All four were cut. The
+converse discipline mattered as much: `renderer-unsupported` and
+`renderer-interrupted` are the same shape but have a live producer, so they
+stay — and that distinction is now written in the spec so a later sweep does
+not take them for the same species.
+
+**A stop rule that fires on every run is a tripwire.** The fixture matrix's
+leg 4 compares whole-file hashes, but the recorder stamps `_meta` from its own
+`GOARCH`, so it can never pass however target-independent the data is. The
+developer investigated, produced the evidence (one field, 185,537 payload bytes
+identical), named the rule it was overriding, and offered to be reversed. Legs
+2 and 3 already prove the property. **Compare payloads with `_meta` excluded.**
+
+**Two green suites hid inert checks, and only injection found them.** A guard
+hard-coding the four packages its message must name went stale the moment the
+leg lost two — and the rewritten version still had a `strings.Trim` cutset
+eating the leading dot of `./space/`, so half of it checked nothing. Found by
+injecting a failure and watching it not fail. Separately, a determinism-register
+entry pointed at line 624 while its `math.Sqrt` had drifted to 637, so a
+suppression matched nothing and a lint had been failing unreviewed on a file
+this change never touched.
+
+**The rehearsal earned its place, and cost a `cp -R`.** It predicted the real
+archive exactly (+6, ~17, -11), proved the archiver accepts a capability with
+no delta directory, and showed that after the hand-delete precisely one
+citation remains — task 13.1's own target. Two "failures" at that point were
+pre-archive states with a documented mechanism, not residue: both sweeps
+measured clean the moment the archive landed.
 
 ---
 
