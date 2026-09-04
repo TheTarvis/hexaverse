@@ -1164,13 +1164,13 @@ names the file and states its verification.
       *Refuel Offer on the Docked Fleet* (`:316`); like the *board read
       serves the station* scenario heading they are recorded here as
       accepted vocabulary residue, not forgotten
-- [ ] 10.4 `python3 .claude/skills/code-quality-checks/check.py` fully green
+- [x] 10.4 `python3 .claude/skills/code-quality-checks/check.py` fully green
 
 ## 11. Validation
 
-- [ ] 11.1 `openspec validate delete-the-lattice --strict` green, and
+- [x] 11.1 `openspec validate delete-the-lattice --strict` green, and
       `python3 .claude/scripts/openspec-reconcile.py delete-the-lattice` exits 0
-- [ ] 11.2 **The re-expression audit** (`handoffs/README.md`, *Lesson four*).
+- [x] 11.2 **The re-expression audit** (`handoffs/README.md`, *Lesson four*).
       For each of the six `REMOVED` + `ADDED` pairs in design.md Decision 2's
       table, diff the ADDED requirement's body and scenario list mechanically
       against its live original in `openspec/specs/`, and account for every
@@ -1180,13 +1180,13 @@ names the file and states its verification.
       neither does `openspec-reconcile.py`; this audit is the only thing
       standing in for both. **Re-run it whenever any ADDED requirement is
       edited**
-- [ ] 11.3 Do the same, in the same run, for the five pure `REMOVED`
+- [x] 11.3 Do the same, in the same run, for the five pure `REMOVED`
       requirements (three in `system-interior`, two in `trading-station`): for
       each, confirm against the live tree that the successor named in its
       `**Reason**` actually exists and actually carries the obligation claimed.
       A REMOVED whose stated successor does not exist is a silent loss with a
       paper trail, which is worse than one without
-- [ ] 11.4 Confirm every `MODIFIED` block reproduces every scenario the spec
+- [x] 11.4 Confirm every `MODIFIED` block reproduces every scenario the spec
       will have once every predecessor still ahead of this change in the
       archive order has landed, not only the live one. `build-production-
       space-view` archived at `7a2e837` before this task was last revised:
