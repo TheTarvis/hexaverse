@@ -555,7 +555,9 @@ function SpaceLayers({
         role="group"
         aria-label="System camera"
         tabIndex={0}
-        className="pointer-events-none absolute bottom-4 left-4 grid grid-cols-4 gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+        // Bottom-centre: clear of the floating nav (bottom-left) and the
+        // command column (right) now that the stage is the whole window.
+        className="pointer-events-none absolute bottom-4 left-1/2 grid -translate-x-1/2 grid-cols-4 gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
         onKeyDown={(e) => {
           const step: Record<string, [number, number]> = {
             ArrowLeft: [-1, 0],
@@ -625,7 +627,7 @@ function SpaceLayers({
         return (
           <div
             data-testid="contact-facts"
-            className="absolute right-4 top-4 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
+            className="absolute left-1/2 top-4 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
           >
             <div>Bearing {heading.toFixed(0)}°</div>
             <div>Speed {speed.toFixed(2)}</div>
@@ -670,7 +672,7 @@ function SpaceLayers({
         return (
           <div
             data-testid="sighting-facts"
-            className="absolute right-4 top-16 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
+            className="absolute left-1/2 top-16 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
           >
             <div>Observed at {shown.mark.asOf ?? '—'}</div>
             <div>Bearing {heading.toFixed(0)}°</div>
@@ -689,10 +691,10 @@ function SpaceLayers({
             data-testid={`offscreen-${mark.id}`}
             aria-label={`Bring ${mark.id} into view`}
             className={
-              'pointer-events-auto absolute right-2 rounded-full border border-white/20 bg-black/60 px-2 py-1 text-[10px] text-zinc-200' +
+              'pointer-events-auto absolute left-4 rounded-full border border-white/20 bg-black/60 px-2 py-1 text-[10px] text-zinc-200' +
               ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
             }
-            style={{ top: `${8 + offScreen.findIndex((o) => o.mark.id === mark.id) * 26}px` }}
+            style={{ top: `${16 + offScreen.findIndex((o) => o.mark.id === mark.id) * 26}px` }}
             onClick={() => {
               onReframe(mark.position)
               onSelect({ bodyId: mark.id })

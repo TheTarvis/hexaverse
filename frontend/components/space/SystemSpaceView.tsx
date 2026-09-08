@@ -651,7 +651,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const showLoading = !interiorFailed && canvasAvailable && (interior.isLoading || !firstFrame)
 
   return (
-    <div data-testid="space-view" className="relative flex h-full w-full gap-3">
+    <div
+      data-testid="space-view"
+      className="relative h-dvh w-full overflow-hidden bg-[#05060a]"
+    >
       {/* The live world clock, exposed so the served scale it runs at is
           observable rather than assumed. */}
       <span
@@ -686,11 +689,15 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
       ))}
 
-      <div className="relative flex-1">
+      {/* The canvas IS the window (spec #0002's canvas model, as the galaxy
+          view does it): the stage fills the viewport and every panel floats
+          over it. */}
+      <div className="absolute inset-0">
         {interiorFailed ? (
+          <div className="absolute inset-0 grid place-items-center p-6">
           <div
             data-testid="space-interior-error"
-            className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-800/50 dark:bg-white/[0.12]"
+            className="flex w-full max-w-md flex-col items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-800/50 dark:bg-white/[0.12]"
           >
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               The system could not be read. {interior.error?.message ?? ''}
@@ -704,12 +711,13 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               Retry
             </button>
           </div>
+          </div>
         ) : (
           <>
             {showLoading && (
               <div
                 data-testid="space-loading"
-                className="absolute inset-0 z-10 grid place-items-center rounded-lg bg-zinc-900/60 text-sm text-zinc-300"
+                className="absolute inset-0 z-10 grid place-items-center bg-zinc-900/60 text-sm text-zinc-300"
               >
                 Charting the system…
               </div>
@@ -735,7 +743,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {ghostFeed.isError && (
           <div
             data-testid="sightings-unavailable"
-            className="absolute bottom-4 left-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
           >
             <p className="text-zinc-600 dark:text-zinc-400">
               This system&apos;s sightings could not be read.
@@ -750,7 +758,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           </div>
         )}
         {logOpen && !interior.isLoading && (
-          <div className="absolute right-2 top-2 z-20">
+          // Just inboard of the floating panel column on the right.
+          <div className="absolute right-[calc(18rem+2rem)] top-4 z-20">
             <SightingLog
               systemId={systemId}
               highlightedGhostId={highlightedGhostId}
@@ -762,7 +771,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         )}
       </div>
 
-      <div className="flex w-72 max-w-[85vw] flex-col gap-3">
+      {/* The command column floats over the canvas, top-right, scrolling
+          within the viewport when it outgrows it. The gaps between panels
+          pass pointer events through to the stage. */}
+      <div className="pointer-events-none absolute inset-y-4 right-4 flex w-72 max-w-[85vw] flex-col gap-3 overflow-y-auto [&>*]:pointer-events-auto">
         {fleets.isError && (
           <div
             data-testid="space-fleets-error"

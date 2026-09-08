@@ -75,11 +75,36 @@ vi.mock('three', () => {
     setScalar(s: number) {
       return this.set(s, s, s)
     }
+    multiplyScalar(s: number) {
+      return this.set(this.x * s, this.y * s, this.z * s)
+    }
+    addScaledVector(v: Vector3, s: number) {
+      return this.set(this.x + v.x * s, this.y + v.y * s, this.z + v.z * s)
+    }
+    crossVectors(a: Vector3, b: Vector3) {
+      return this.set(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
+    }
+    normalize() {
+      const l = Math.hypot(this.x, this.y, this.z) || 1
+      return this.multiplyScalar(1 / l)
+    }
+  }
+  class Quaternion {
+    copy() {
+      return this
+    }
+  }
+  class Color {
+    set() {
+      return this
+    }
   }
   class Obj3D {
     children: Obj3D[] = []
     position = new Vector3()
     scale = new Vector3(1, 1, 1)
+    quaternion = new Quaternion()
+    visible = true
     add(child: Obj3D) {
       this.children.push(child)
     }
@@ -95,6 +120,9 @@ vi.mock('three', () => {
       this.points = points
       return this
     }
+    setAttribute() {
+      return this
+    }
     dispose() {
       this.disposed = true
       recorder.disposedGeometries += 1
@@ -106,12 +134,35 @@ vi.mock('three', () => {
     }
   }
   class BufferGeometry extends Geometry {}
+  class RingGeometry extends Geometry {}
+  class OctahedronGeometry extends Geometry {}
+  class BufferAttribute {}
   class Material {
     disposed = false
+    transparent = false
+    opacity = 1
     constructor(public params: { color?: number } = {}) {}
     dispose() {
       this.disposed = true
     }
+  }
+  class Group extends Obj3D {}
+  class Points extends Obj3D {
+    constructor(
+      public geometry: Geometry,
+      public material: Material,
+    ) {
+      super()
+    }
+  }
+  class Light extends Obj3D {
+    color = new Color()
+  }
+  class AmbientLight extends Light {}
+  class PointLight extends Light {}
+  class PolarGridHelper extends Obj3D {
+    geometry = new Geometry()
+    material = new Material()
   }
   class Mesh extends Obj3D {
     constructor(
@@ -161,6 +212,7 @@ vi.mock('three', () => {
       recorder.renderers.push(this)
     }
     setClearColor() {}
+    setPixelRatio() {}
     setSize() {}
     render(scene: Scene) {
       const meshes = scene.children.filter((c) => c instanceof Mesh) as Mesh[]
@@ -194,20 +246,35 @@ vi.mock('three', () => {
   }
   return {
     Vector3,
+    Quaternion,
+    Color,
     Scene,
+    Group,
     SphereGeometry,
     BufferGeometry,
+    RingGeometry,
+    OctahedronGeometry,
+    BufferAttribute,
     MeshBasicMaterial: Material,
+    MeshStandardMaterial: Material,
     LineBasicMaterial: Material,
+    PointsMaterial: Material,
     Mesh,
     Line,
+    Points,
+    AmbientLight,
+    PointLight,
+    PolarGridHelper,
     PerspectiveCamera,
     WebGLRenderer,
     CatmullRomCurve3,
+    AdditiveBlending: 2,
+    BackSide: 1,
+    DoubleSide: 2,
   }
 })
 
-import { SpaceWorld } from './SpaceWorld'
+import { SpaceWorld, BODY_DRAW_SCALE, MARK_FLOOR_DIV } from './SpaceWorld'
 
 const EXTENT = 658.7081316032265
 
@@ -232,6 +299,7 @@ function sceneOf(over: Partial<SceneModel> = {}): SceneModel {
     ],
     curves: [],
     beltFields: [],
+    orbitRings: [],
     positionTimeMs: 7,
     decorativeTimeMs: 7,
     omissions: [],
@@ -276,7 +344,7 @@ describe('SpaceWorld — what it actually draws', () => {
     )
     expect(container.innerHTML, 'the world renders no DOM of its own').toBe('')
 
-    expect(meshAt({ x: 0, y: 0, z: 0 }).scale).toBeCloseTo(floor * 10, 9)
+    expect(meshAt({ x: 0, y: 0, z: 0 }).scale).toBeCloseTo(floor * 10 * BODY_DRAW_SCALE, 9)
     expect(
       meshAt({ x: 1, y: 0, z: 0 }).scale,
       'a sub-floor mark must clamp UP, not vanish',

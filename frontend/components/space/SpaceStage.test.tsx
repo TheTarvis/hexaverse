@@ -18,6 +18,7 @@ const scene: SceneModel = {
   ],
   curves: [],
   beltFields: [],
+    orbitRings: [],
   positionTimeMs: 7,
   decorativeTimeMs: 7,
   omissions: [],

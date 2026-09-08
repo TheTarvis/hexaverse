@@ -34,7 +34,9 @@ export const DRAG_THRESHOLD_PX = 8
 
 // --- the configured multipliers (OQ-2: values open) ---------------------
 
-export const DEFAULT_DISTANCE_MULT = 1
+// Under half the extent: the inner system fills the frame and the outer
+// lane gates — at roughly the extent itself — start off-screen.
+export const DEFAULT_DISTANCE_MULT = 0.45
 export const ZOOM_MIN_MULT = 0.08
 export const ZOOM_MAX_MULT = 6
 export const PAN_BOUND_MULT = 1.5
@@ -45,11 +47,11 @@ export const PICK_RADIUS_MULT = 1
 
 export const PITCH_MIN = -1.45
 export const PITCH_MAX = 1.45
-// A high, near-overhead default: the ecliptic reads as a plane, the inner
-// system fills the frame, and the outer lane gates sit off-screen — which
-// is what the off-screen reach affordance exists for.
+// A raised three-quarter default: the ecliptic reads as a plane in
+// perspective, the inner system fills the frame, and the outer lane gates
+// sit off-screen — which is what the off-screen reach affordance exists for.
 export const DEFAULT_YAW = 0.6
-export const DEFAULT_PITCH = 1.3
+export const DEFAULT_PITCH = 0.72
 
 /** Radians of orbit per arrow-key press. */
 export const KEY_ORBIT_STEP = 0.05

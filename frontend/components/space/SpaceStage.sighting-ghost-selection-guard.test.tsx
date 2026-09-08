@@ -87,6 +87,7 @@ const scene = {
   marks,
   curves: [],
   beltFields: [],
+    orbitRings: [],
   positionTimeMs: 1,
   decorativeTimeMs: 1,
   omissions: [],

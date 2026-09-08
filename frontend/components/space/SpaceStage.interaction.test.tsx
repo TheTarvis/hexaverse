@@ -56,6 +56,7 @@ const scene = {
   marks,
   curves: [],
   beltFields: [],
+    orbitRings: [],
   positionTimeMs: 1,
   decorativeTimeMs: 1,
   omissions: [],
@@ -457,9 +458,10 @@ describe('SpaceStage — off-screen reach', () => {
 
   // Scenario: An off-screen body is selectable the same way
   it('Scenario: An off-screen body is selectable the same way', async () => {
-    // Zoom right in so a normally-visible body goes off screen.
+    // Zoom right in and pan away so a normally-visible body goes off screen.
     stage()
     for (let i = 0; i < 200; i++) fireEvent.click(screen.getByTestId('camera-zoom-in'))
+    for (let i = 0; i < 200; i++) fireEvent.click(screen.getByTestId('camera-pan-right'))
     await waitFor(() => expect(screen.queryByTestId('offscreen-feat-body-1')).not.toBeNull())
     await userEvent.click(screen.getByTestId('offscreen-feat-body-1'))
     expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-1' })
@@ -542,10 +544,10 @@ describe('SpaceStage — picking stays correct after the camera moves', () => {
   it('Scenario: A click beyond the pick radius still clears the selection after camera movement', async () => {
     stage({ selection: { bodyId: 'feat-body-0' } })
     await userEvent.click(screen.getByTestId('camera-pan-right'))
-    await userEvent.click(screen.getByTestId('camera-zoom-out'))
+    for (let i = 0; i < 12; i++) await userEvent.click(screen.getByTestId('camera-zoom-out'))
     await userEvent.click(screen.getByTestId('camera-orbit-right'))
     onSelect.mockClear()
-    // The far corner of a zoomed-out view lies beyond the maximum pick
+    // The far corner of a well zoomed-out view lies beyond the maximum pick
     // radius — a configured multiple of the served `extent`.
     fireEvent.pointerDown(region(), { clientX: 2, clientY: 2, button: 0, pointerId: 11 })
     fireEvent.pointerUp(region(), { clientX: 2, clientY: 2, pointerId: 11 })

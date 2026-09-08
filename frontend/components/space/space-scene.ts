@@ -27,6 +27,7 @@ import {
   drawParkPosition,
   isDrawOrigin,
   vecAdd,
+  type DrawOrbitElements,
   type DrawVec3,
 } from '@/lib/space/draw'
 import type { Burn, Drift, Park, Vec3 } from '@/lib/types/fleet'
@@ -71,6 +72,15 @@ export interface SceneMark {
   /** Sighting ghosts only — the record's `asOf`, for its label. */
   asOf?: number
   /**
+   * Bodies, belts, the star and lane gates — the SERVED feature type
+   * (`rocky`, `gas_giant`, `ice`, `moon`, `station`, …; `gate` for a lane
+   * gate). Decorative only: it picks a palette and a silhouette in the
+   * renderer and bears on no rule.
+   */
+  bodyType?: string
+  /** The star only — the interior's served spectral class, for its tint. */
+  starClass?: string
+  /**
    * Sighting ghosts only — the record's SERVED `id`, carried separately
    * from `mark.id` (which is `sighting-${record.id}`, mirroring
    * `contact-${index}`). The DOM test id and the row<->ghost cross-
@@ -90,6 +100,27 @@ export interface SceneBeltField {
   bodyId: string
   center: DrawVec3
   memberCount: number
+  /**
+   * The belt's served orbital elements and its parent's drawn position:
+   * the decorative particle ring is scattered along this orbit, in the
+   * parent's frame. Decorative only — no member is ever a mark.
+   */
+  elements: DrawOrbitElements
+  ringCenter: DrawVec3
+}
+
+/**
+ * A body's orbit, drawn as a faint ring in its parent's frame — depth
+ * reference and structure, nothing more. Sampled by the renderer from the
+ * SAME served elements the body's position is drawn from, so the ring and
+ * the body it carries can never disagree.
+ */
+export interface SceneOrbitRing {
+  bodyId: string
+  parentId: string
+  bodyType: string
+  elements: DrawOrbitElements
+  parentPosition: DrawVec3
 }
 
 export interface SceneOmission {
@@ -101,6 +132,7 @@ export interface SceneModel {
   marks: SceneMark[]
   curves: SceneCurve[]
   beltFields: SceneBeltField[]
+  orbitRings: SceneOrbitRing[]
   /** ALWAYS the live world time — positions never freeze. */
   positionTimeMs: number
   /** FROZEN under a reduced-motion preference — decoration only. */
@@ -152,8 +184,8 @@ const CONTACT_MARK_RADIUS = 0.6
 const POINT_MARK_RADIUS = 0.5
 
 /** Belt members are decorative: a fixed count per belt, seeded by its id. */
-const BELT_MEMBERS_MIN = 60
-const BELT_MEMBERS_SPREAD = 60
+const BELT_MEMBERS_MIN = 420
+const BELT_MEMBERS_SPREAD = 240
 
 function toDraw(v: Vec3 | undefined | null): DrawVec3 | null {
   if (!v) return null
@@ -212,12 +244,14 @@ export function buildSceneModel(input: SceneInput): SceneModel {
   const marks: SceneMark[] = []
   const curves: SceneCurve[] = []
   const beltFields: SceneBeltField[] = []
+  const orbitRings: SceneOrbitRing[] = []
   const omissions: SceneOmission[] = []
 
   const empty: SceneModel = {
     marks: [],
     curves: [],
     beltFields: [],
+    orbitRings: [],
     positionTimeMs: worldTimeMs,
     // A frozen decorative clock is a CONSTANT, not a captured instant: two
     // reads at different world times must agree.
@@ -261,12 +295,25 @@ export function buildSceneModel(input: SceneInput): SceneModel {
       radius: feature.size,
       pickable: kind !== 'star',
       selected: selectionMatches(selection, feature.id),
+      bodyType: feature.type,
+      ...(kind === 'star' && interior.starClass ? { starClass: interior.starClass } : {}),
     })
-    if (kind === 'belt') {
+    const elements = feature.orbitElements
+    if (kind === 'belt' && elements) {
       beltFields.push({
         bodyId: feature.id,
         center: position,
         memberCount: beltMemberCount(feature.id),
+        elements,
+        ringCenter: positionOf(elements.parentId),
+      })
+    } else if (elements) {
+      orbitRings.push({
+        bodyId: feature.id,
+        parentId: elements.parentId,
+        bodyType: feature.type,
+        elements,
+        parentPosition: positionOf(elements.parentId),
       })
     }
   }
@@ -285,7 +332,17 @@ export function buildSceneModel(input: SceneInput): SceneModel {
       radius: gate.size,
       pickable: true,
       selected: selectionMatches(selection, gate.id),
+      bodyType: 'gate',
     })
+    if (gate.orbitElements) {
+      orbitRings.push({
+        bodyId: gate.id,
+        parentId: gate.orbitElements.parentId,
+        bodyType: 'gate',
+        elements: gate.orbitElements,
+        parentPosition: positionOf(gate.orbitElements.parentId),
+      })
+    }
   }
 
   // --- own fleets ----------------------------------------------------------
@@ -411,6 +468,7 @@ export function buildSceneModel(input: SceneInput): SceneModel {
     marks,
     curves,
     beltFields,
+    orbitRings,
     positionTimeMs: worldTimeMs,
     decorativeTimeMs: reducedMotion ? 0 : worldTimeMs,
     omissions,
