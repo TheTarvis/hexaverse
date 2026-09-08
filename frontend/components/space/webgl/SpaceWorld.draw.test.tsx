@@ -378,10 +378,11 @@ describe('SpaceWorld — what it actually draws', () => {
             { x: 5, y: 0, z: 0 },
             { x: 10, y: 0, z: 5 },
           ],
+          param: 0.5,
         },
         // A single control point is not a path; drawing it would put a
         // zero-length streak on the canvas.
-        { fleetId: 'fleet_degenerate', controlPoints: [{ x: 1, y: 1, z: 1 }] },
+        { fleetId: 'fleet_degenerate', controlPoints: [{ x: 1, y: 1, z: 1 }], param: 0 },
       ],
     })
     render(<SpaceWorld canvas={usableCanvas()} scene={withCurve} camera={defaultCamera(EXTENT)} extent={EXTENT} />)

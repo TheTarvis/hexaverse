@@ -131,11 +131,18 @@ header).
 
 ```
 e2e/
+├── cli/users.ts         # `npm run users` — ensure/find/list/delete/token/login-url on either cluster
+├── config/clusters.ts   # the dev + test emulator clusters (ports read from firebase*.json)
 ├── config/env.ts        # E2E_ENV resolution (local | dev | prod), ports, test user
-├── helpers/             # emulator REST helpers (signUp / signIn)
+├── helpers/             # emulator REST helpers (signUp / signIn / lookup / custom token)
 ├── setup/               # globalSetup/teardown, backend lifecycle, auth.setup
 └── tests/               # *.spec.ts — start from smoke.spec.ts
 ```
+
+The same helpers drive the **dev** stack too: `npm run users -- ensure` seeds
+`dev@hexaverse.test` on the dev emulator, `-- token` gets a bearer token for
+`:9010`, and `-- login-url` prints a one-shot `/dev/login#token=…` URL that
+signs a browser in without a password (see `.claude/skills/dev-users/`).
 
 Conventions for new specs:
 

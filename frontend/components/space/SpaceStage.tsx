@@ -37,6 +37,7 @@ import {
   type TouchEvent as ReactTouchEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react'
+import { formatEta } from '@/lib/eta'
 import { projectToScreen, unprojectToViewPlane, type DrawVec3 } from '@/lib/space/draw'
 import { SpaceCanvas } from './SpaceCanvas'
 import { viewBasisOf } from './space-projection'
@@ -89,6 +90,14 @@ export interface SpaceStageProps {
   highlightedGhostId?: string | null
   /** Activating a ghost reports its record id here — never a selection. */
   onHighlightGhost?: (recordId: string | null) => void
+  /**
+   * The fleet the view is commanding. Its mark is ringed, and activating
+   * ANY own fleet's mark reports that fleet's id here — a fleet is never a
+   * member of `selection` (it is not a burn target), so this is separate
+   * state held beside it, exactly as the ghost highlight is.
+   */
+  actingFleetId?: string | null
+  onActivateFleet?: (fleetId: string) => void
 }
 
 const CAMERA_CONTROL_ATTR = 'data-space-camera-control'
@@ -123,6 +132,8 @@ export function SpaceStage({
   onFirstFrame,
   highlightedGhostId = null,
   onHighlightGhost,
+  actingFleetId = null,
+  onActivateFleet,
 }: SpaceStageProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState(true)
@@ -131,6 +142,7 @@ export function SpaceStage({
   const [focusedMarkId, setFocusedMarkId] = useState<string | null>(null)
   const [hoveredContactId, setHoveredContactId] = useState<string | null>(null)
   const [hoveredGhostId, setHoveredGhostId] = useState<string | null>(null)
+  const [hoveredFleetId, setHoveredFleetId] = useState<string | null>(null)
 
   // A new system is a new view: the framing resets, with no transition, and
   // nothing else resets it. Adjusted during render (never in an effect) so a
@@ -353,7 +365,13 @@ export function SpaceStage({
         onAvailabilityChange={handleAvailability}
         claimFocus={focusInsideRef.current}
         renderWorld={(canvas) => (
-          <SpaceWorld canvas={canvas} scene={scene} camera={camera} extent={extent} />
+          <SpaceWorld
+            canvas={canvas}
+            scene={scene}
+            camera={camera}
+            extent={extent}
+            actingFleetId={actingFleetId}
+          />
         )}
       >
         <SpaceLayers
@@ -367,6 +385,10 @@ export function SpaceStage({
           hoveredContactId={hoveredContactId}
           hoveredGhostId={hoveredGhostId}
           highlightedGhostId={highlightedGhostId}
+          hoveredFleetId={hoveredFleetId}
+          actingFleetId={actingFleetId}
+          onHoverFleet={setHoveredFleetId}
+          onActivateFleet={onActivateFleet}
           onFocusMark={(id, position) => {
             setFocusedMarkId(id)
             if (position) reframeOn(position)
@@ -444,6 +466,10 @@ interface SpaceLayersProps {
   hoveredContactId: string | null
   hoveredGhostId: string | null
   highlightedGhostId: string | null
+  hoveredFleetId: string | null
+  actingFleetId: string | null
+  onHoverFleet: (id: string | null) => void
+  onActivateFleet?: (fleetId: string) => void
   onFocusMark: (id: string, reframeTo: DrawVec3 | null) => void
   onBlurMark: () => void
   onHoverContact: (id: string | null) => void
@@ -466,6 +492,10 @@ function SpaceLayers({
   hoveredContactId,
   hoveredGhostId,
   highlightedGhostId,
+  hoveredFleetId,
+  actingFleetId,
+  onHoverFleet,
+  onActivateFleet,
   onFocusMark,
   onBlurMark,
   onHoverContact,
@@ -489,6 +519,7 @@ function SpaceLayers({
   const offScreen = pickables.filter((p) => !p.screen.onScreen)
   const contacts = projected.filter((p) => p.mark.kind === 'contact')
   const sightings = projected.filter((p) => p.mark.kind === 'sighting')
+  const fleets = projected.filter((p) => p.mark.kind === 'fleet')
 
   const panAtLimit = (right: number, up: number): boolean => {
     const next = panBySteps(camera, right, up, extent)
@@ -681,6 +712,56 @@ function SpaceLayers({
         )
       })()}
 
+      {/* --- own fleets: an AFFORDANCE, never a selection. Clicking a mark
+              makes that fleet the acting one (what the command panels are
+              about); hovering or focusing it shows its facts. The
+              `data-space-affordance` attribute is what keeps a press here
+              from bubbling to the region's exhaustive picking rule, where it
+              would read as empty space and become a point selection. --- */}
+      <div className="pointer-events-none absolute inset-0">
+        {fleets.map(({ mark, screen }) => {
+          const acting = mark.id === actingFleetId
+          return (
+            <button
+              key={mark.id}
+              type="button"
+              {...{ [AFFORDANCE_ATTR]: '' }}
+              data-testid={`fleet-mark-${mark.id}`}
+              data-acting={acting ? 'true' : 'false'}
+              aria-label={`Fleet ${mark.id}`}
+              aria-pressed={acting}
+              className={
+                'pointer-events-auto absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full' +
+                ' border border-emerald-300/40 hover:border-emerald-200/90 hover:bg-emerald-300/10' +
+                ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400' +
+                (acting ? ' ring-2 ring-emerald-400/70' : '')
+              }
+              style={
+                screen.onScreen
+                  ? { left: `${screen.x}px`, top: `${screen.y}px` }
+                  : { left: '-9999px', top: '-9999px' }
+              }
+              onPointerOver={() => onHoverFleet(mark.id)}
+              onPointerOut={() => onHoverFleet(null)}
+              onFocus={() => onHoverFleet(mark.id)}
+              onBlur={() => onHoverFleet(null)}
+              onClick={() => onActivateFleet?.(mark.id)}
+            />
+          )
+        })}
+      </div>
+      {(() => {
+        const shown = fleets.find(({ mark }) => mark.id === hoveredFleetId)
+        if (!shown) return null
+        return (
+          <FleetFacts
+            mark={shown.mark}
+            nowMs={scene.positionTimeMs}
+            acting={shown.mark.id === actingFleetId}
+          />
+        )
+      })()}
+
       {/* --- off-screen reach: pointer AND touch --- */}
       <div className="pointer-events-none absolute inset-0">
         {offScreen.map(({ mark }) => (
@@ -714,6 +795,56 @@ function SpaceLayers({
           has no body mark to highlight and no intrinsic outline. */}
       {selection?.point && <span className="sr-only" data-testid="point-selection-mark" />}
     </>
+  )
+}
+
+/**
+ * The hovered fleet's facts: what it is doing (from its SERVED mode), the
+ * served arrival countdown for a burn, and the served heading and speed for
+ * a drift. Every figure is a served value or a difference of served stamps
+ * against the live clock — nothing is read back from a drawn position.
+ */
+function FleetFacts({
+  mark,
+  nowMs,
+  acting,
+}: {
+  mark: SceneMark
+  nowMs: number
+  acting: boolean
+}) {
+  let activity: string
+  let detail: string | null = null
+  if (mark.fleetMode === 0) {
+    const remaining = mark.arriveMs !== undefined ? mark.arriveMs - nowMs : 0
+    activity = remaining > 0 ? 'Under way' : 'Arriving'
+    if (remaining > 0) detail = `Arrives in ${formatEta(remaining)}`
+  } else if (mark.fleetMode === 2) {
+    activity = 'Drifting'
+    if (mark.velocity) {
+      const v = mark.velocity
+      const speed = Math.hypot(v.x, v.y, v.z)
+      const heading = ((Math.atan2(v.x, -v.z) * 180) / Math.PI + 360) % 360
+      detail = `Bearing ${heading.toFixed(0)}° · Speed ${speed.toFixed(2)}`
+    }
+  } else if (mark.fleetMode === 1) {
+    activity = 'Parked'
+  } else {
+    activity = 'Status unknown'
+  }
+  return (
+    <div
+      data-testid="fleet-facts"
+      className="absolute left-1/2 top-28 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
+    >
+      <div className="font-mono text-[11px] text-emerald-300">
+        {mark.id}
+        {acting ? ' · commanding' : ''}
+      </div>
+      <div>{activity}</div>
+      {detail && <div className="text-zinc-400">{detail}</div>}
+      {!acting && <div className="text-[10px] text-zinc-500">Click to command this fleet</div>}
+    </div>
   )
 }
 

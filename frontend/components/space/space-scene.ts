@@ -64,11 +64,21 @@ export interface SceneMark {
   emitting?: boolean
   scanning?: boolean
   /**
-   * Contacts and sighting ghosts only — the SERVED velocity, carried so the
-   * facts surface can DISPLAY a heading and speed. It is never integrated:
-   * neither a contact nor a sighting drifts between reads.
+   * Contacts, sighting ghosts and DRIFTING own fleets — the SERVED velocity,
+   * carried so the facts surface can DISPLAY a heading and speed (and the
+   * renderer can draw a heading streak). It is never integrated here:
+   * neither a contact nor a sighting drifts between reads, and a drifting
+   * fleet's position comes from `drawDriftPosition`, not from this field.
    */
   velocity?: DrawVec3
+  /**
+   * Own fleets only — the served `space.ShipMode` (0 burn, 1 parked,
+   * 2 drift). Decorative and informational: it tints the mark and labels
+   * the facts card, and bears on no rule.
+   */
+  fleetMode?: 0 | 1 | 2
+  /** Own fleets under a burn only — the burn's served `ArriveMs`, for the facts card's countdown. */
+  arriveMs?: number
   /** Sighting ghosts only — the record's `asOf`, for its label. */
   asOf?: number
   /**
@@ -94,6 +104,12 @@ export interface SceneMark {
 export interface SceneCurve {
   fleetId: string
   controlPoints: DrawVec3[]
+  /**
+   * Where along the curve the fleet's mark is drawn right now — the same
+   * `burnDrawParam` the mark itself uses, so the renderer can dim the
+   * traversed half of the path and brighten what is still ahead.
+   */
+  param: number
 }
 
 export interface SceneBeltField {
@@ -357,21 +373,36 @@ export function buildSceneModel(input: SceneInput): SceneModel {
       omitOrigin(fleet.id, 'fleet')
       continue
     }
+    const mode = fleet.state?.Mode
+    const fleetMode: 0 | 1 | 2 | undefined = mode === 0 || mode === 1 || mode === 2 ? mode : undefined
+    const burn = mode === 0 ? fleet.state?.Burn : null
+    const driftVelocity = mode === 2 ? toDraw(fleet.state?.Drift?.Velocity) : null
     marks.push({
       id: fleet.id,
       kind: 'fleet',
       position: resolved,
       radius: FLEET_MARK_RADIUS,
-      // The space view draws NO selection affordance for a fleet: a fleet is
-      // commanded through the roster, never by clicking its mark.
+      // A fleet is NEVER a member of `SpaceSelection` (it is not a burn
+      // target), so it stays unpickable here. It does have its own
+      // affordance in the stage — clicking its mark makes it the acting
+      // fleet and hovering it shows its facts — but that is separate state,
+      // never a selection.
       pickable: false,
       selected: false,
+      ...(fleetMode !== undefined ? { fleetMode } : {}),
+      ...(burn ? { arriveMs: burn.ArriveMs } : {}),
+      ...(driftVelocity ? { velocity: driftVelocity } : {}),
     })
 
-    const burn = fleet.state?.Mode === 0 ? fleet.state.Burn : null
     if (burn) {
       const controlPoints = curveControlPoints(burn.Curve)
-      if (controlPoints.length > 0) curves.push({ fleetId: fleet.id, controlPoints })
+      if (controlPoints.length > 0) {
+        curves.push({
+          fleetId: fleet.id,
+          controlPoints,
+          param: burnDrawParam(burn.DepartMs, burn.ArriveMs, worldTimeMs),
+        })
+      }
       const ghost = ghostPosition(burn, positionOf)
       if (ghost) {
         marks.push({
@@ -475,13 +506,36 @@ export function buildSceneModel(input: SceneInput): SceneModel {
   }
 }
 
-/** The six served control points, in draw space. */
+/**
+ * The six served control points, in draw space.
+ *
+ * THE WIRE SHAPE IS AN OBJECT, NOT AN ARRAY. `space.Curve` is a Go struct
+ * with fields `P0, C1, C2, C3, C4, P5` and no json tags, so a fleet read
+ * serves it as `{"P0":{"X":..},"C1":..,...,"P5":..}`. (The flat 18-number
+ * array is the PERSISTENCE codec's shape — `codec_state.go` — and never
+ * reaches the client.) Accepting only an array here was the defect that
+ * froze every burning fleet at its served position until arrival: the
+ * curve failed to parse, the mark fell back to the frozen read position,
+ * and the fleet "teleported" at the arrival refetch. Both shapes are
+ * accepted so a fixture written either way still draws.
+ */
+const CURVE_WIRE_KEYS = ['P0', 'C1', 'C2', 'C3', 'C4', 'P5'] as const
+
 function curveControlPoints(curve: unknown): DrawVec3[] {
-  if (!Array.isArray(curve)) return []
+  if (!curve || typeof curve !== 'object') return []
   const points: DrawVec3[] = []
-  for (const raw of curve) {
-    const p = toDraw(raw as Vec3)
-    if (p) points.push(p)
+  if (Array.isArray(curve)) {
+    for (const raw of curve) {
+      const p = toDraw(raw as Vec3)
+      if (p) points.push(p)
+    }
+    return points
+  }
+  const record = curve as Record<string, unknown>
+  for (const key of CURVE_WIRE_KEYS) {
+    const p = toDraw(record[key] as Vec3)
+    if (!p) return []
+    points.push(p)
   }
   return points
 }

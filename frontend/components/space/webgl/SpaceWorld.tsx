@@ -31,7 +31,12 @@
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { drawOrbitPosition, type DrawOrbitElements, type DrawVec3 } from '@/lib/space/draw'
+import {
+  bezierPointAt,
+  drawOrbitPosition,
+  type DrawOrbitElements,
+  type DrawVec3,
+} from '@/lib/space/draw'
 import { TAN_HALF_FOV, viewBasisOf } from '../space-projection'
 import type { SpaceCamera } from '../space-camera'
 import type { SceneMark, SceneModel } from '../space-scene'
@@ -41,6 +46,12 @@ export interface SpaceWorldProps {
   scene: SceneModel
   camera: SpaceCamera
   extent: number
+  /**
+   * The fleet the view is commanding — ringed in the fleet green so the
+   * player can tell which mark the command panels are about. Separate from
+   * `selection` (the burn TARGET, ringed in cyan): both can show at once.
+   */
+  actingFleetId?: string | null
   onFirstFrame?: () => void
 }
 
@@ -89,6 +100,27 @@ const BODY_TINTS: Record<string, number[]> = {
   radiation: [0x8ec9a8],
   gate: [0x67e8f9],
 }
+
+/**
+ * A fleet mark's tint by served mode — the at-a-glance cue for what the
+ * fleet is doing. Burn orange matches the path it is riding; drift violet
+ * matches the roster's own drifting tone; parked stays the fleet green.
+ */
+export const FLEET_MODE_COLOR: Record<0 | 1 | 2, number> = {
+  0: 0xffb454,
+  1: 0x4ade80,
+  2: 0xc4b5fd,
+}
+const BURN_PATH_COLOR = 0xffb454
+const ACTING_RING_COLOR = 0x4ade80
+/**
+ * A drift's heading streak: this many seconds of served velocity, capped at
+ * a fraction of the system's extent so a fast coast reads as a heading
+ * pointer rather than a line off the edge of the world.
+ */
+const DRIFT_STREAK_SECONDS = 30
+const DRIFT_STREAK_MAX_EXTENT = 0.08
+const CURVE_SAMPLES = 96
 
 const MARK_COLOR: Record<string, number> = {
   star: 0xfde68a,
@@ -140,6 +172,7 @@ function seeded(seed: number): () => number {
 
 function tintOf(mark: SceneMark): number {
   if (mark.kind === 'star') return STAR_TINT[(mark.starClass ?? '').charAt(0).toUpperCase()] ?? STAR_TINT_DEFAULT
+  if (mark.kind === 'fleet' && mark.fleetMode !== undefined) return FLEET_MODE_COLOR[mark.fleetMode]
   const byType = mark.bodyType ? BODY_TINTS[mark.bodyType] : undefined
   if (byType && byType.length > 0) return byType[hashOf(mark.id) % byType.length]!
   return MARK_COLOR[mark.kind] ?? MARK_COLOR.body!
@@ -162,12 +195,21 @@ function ringKeyOf(ring: { parentId: string; elements: DrawOrbitElements }): str
   return `${ring.parentId}:${e.radius.toFixed(4)}:${e.inclination}:${e.node}`
 }
 
-export function SpaceWorld({ canvas, scene, camera, extent, onFirstFrame }: SpaceWorldProps) {
+export function SpaceWorld({
+  canvas,
+  scene,
+  camera,
+  extent,
+  actingFleetId = null,
+  onFirstFrame,
+}: SpaceWorldProps) {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const sceneRef = useRef<SceneModel>(scene)
   const cameraRef = useRef<SpaceCamera>(camera)
+  const actingRef = useRef<string | null>(actingFleetId)
   sceneRef.current = scene
   cameraRef.current = camera
+  actingRef.current = actingFleetId
 
   useEffect(() => {
     // A context that cannot answer the calls a renderer makes is not a
@@ -261,13 +303,33 @@ export function SpaceWorld({ canvas, scene, camera, extent, onFirstFrame }: Spac
     reticle.visible = false
     decor.add(reticle)
 
+    // Acting-fleet ring — the same camera-facing ring in the fleet green,
+    // riding whichever own fleet the command panels are about.
+    const actingRing = new THREE.Mesh(
+      new THREE.RingGeometry(1, 1.12, 48),
+      new THREE.MeshBasicMaterial({
+        color: ACTING_RING_COLOR,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }),
+    )
+    actingRing.visible = false
+    decor.add(actingRing)
+
     // --- per-entity caches -------------------------------------------------
     interface MarkEntry {
       mesh: THREE.Mesh
       kind: SceneMark['kind']
+      /** A fleet's served mode: its tint, so a mode change rebuilds the mesh. */
+      variant: number | undefined
     }
     const meshes = new Map<string, MarkEntry>()
     const lines: THREE.Line[] = []
+    /** Decorative streaks rebuilt every frame: the path ahead, drift headings. */
+    const streaks: THREE.Line[] = []
     const rings = new Map<string, THREE.Line>()
     const belts = new Map<string, THREE.Points>()
     let frame = 0
@@ -349,15 +411,17 @@ export function SpaceWorld({ canvas, scene, camera, extent, onFirstFrame }: Spac
     const syncMarks = () => {
       const live = new Set<string>()
       let selected: { mark: SceneMark; radius: number } | null = null
+      let acting: { mark: SceneMark; radius: number } | null = null
       for (const mark of sceneRef.current.marks) {
         live.add(mark.id)
         let entry = meshes.get(mark.id)
-        if (!entry || entry.kind !== mark.kind) {
+        const variant = mark.kind === 'fleet' ? mark.fleetMode : undefined
+        if (!entry || entry.kind !== mark.kind || entry.variant !== variant) {
           if (entry) {
             world.remove(entry.mesh)
             disposeMesh(entry.mesh)
           }
-          entry = { mesh: buildMesh(mark), kind: mark.kind }
+          entry = { mesh: buildMesh(mark), kind: mark.kind, variant }
           meshes.set(mark.id, entry)
           world.add(entry.mesh)
         }
@@ -370,6 +434,7 @@ export function SpaceWorld({ canvas, scene, camera, extent, onFirstFrame }: Spac
           starLight.color.set(tintOf(mark))
         }
         if (mark.selected && mark.kind !== 'point-selection' && !selected) selected = { mark, radius: size }
+        if (mark.kind === 'fleet' && mark.id === actingRef.current) acting = { mark, radius: size }
       }
       for (const [id, entry] of meshes) {
         if (live.has(id)) continue
@@ -388,24 +453,96 @@ export function SpaceWorld({ canvas, scene, camera, extent, onFirstFrame }: Spac
       } else {
         reticle.visible = false
       }
+
+      if (acting) {
+        const { mark, radius } = acting
+        const pulse = 2.2 + Math.sin(sceneRef.current.decorativeTimeMs / 340) * 0.1
+        actingRing.position.set(mark.position.x, mark.position.y, mark.position.z)
+        actingRing.scale.setScalar(radius * pulse)
+        actingRing.quaternion.copy(view.quaternion)
+        actingRing.visible = true
+      } else {
+        actingRing.visible = false
+      }
     }
 
+    const disposeLine = (line: THREE.Line) => {
+      line.geometry.dispose()
+      ;(line.material as THREE.Material).dispose()
+    }
+
+    /**
+     * The served curve, sampled on the SAME Bézier evaluation the fleet's
+     * mark rides (`bezierPointAt`) — never a spline THROUGH the control
+     * points, which would draw a path the mark visibly leaves. One line per
+     * curve as a direct child of the world (the shape the draw tests pin),
+     * drawn dim; the part still AHEAD of the mark is overlaid bright under
+     * `decor`, so the traversed and remaining halves read differently.
+     */
     const syncCurves = () => {
       for (const line of lines.splice(0)) {
         world.remove(line)
-        line.geometry.dispose()
-        ;(line.material as THREE.Material).dispose()
+        disposeLine(line)
+      }
+      for (const line of streaks.splice(0)) {
+        decor.remove(line)
+        disposeLine(line)
       }
       for (const curve of sceneRef.current.curves) {
-        const points = curve.controlPoints.map(toV)
-        if (points.length < 2) continue
-        const smooth = new THREE.CatmullRomCurve3(points).getPoints(64)
+        if (curve.controlPoints.length < 2) continue
+        const whole: THREE.Vector3[] = []
+        for (let i = 0; i <= CURVE_SAMPLES; i++) {
+          whole.push(toV(bezierPointAt(curve.controlPoints, i / CURVE_SAMPLES)))
+        }
         const line = new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints(smooth),
-          new THREE.LineBasicMaterial({ color: 0xffb454, transparent: true, opacity: 0.9 }),
+          new THREE.BufferGeometry().setFromPoints(whole),
+          new THREE.LineBasicMaterial({ color: BURN_PATH_COLOR, transparent: true, opacity: 0.28 }),
         )
         lines.push(line)
         world.add(line)
+
+        const u = curve.param
+        if (u < 1) {
+          const ahead: THREE.Vector3[] = [toV(bezierPointAt(curve.controlPoints, u))]
+          for (let i = 0; i <= CURVE_SAMPLES; i++) {
+            const t = i / CURVE_SAMPLES
+            if (t > u) ahead.push(toV(bezierPointAt(curve.controlPoints, t)))
+          }
+          if (ahead.length >= 2) {
+            const bright = new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints(ahead),
+              new THREE.LineBasicMaterial({ color: BURN_PATH_COLOR, transparent: true, opacity: 0.95 }),
+            )
+            streaks.push(bright)
+            decor.add(bright)
+          }
+        }
+      }
+
+      // A drifting fleet's heading: a streak from the mark along its SERVED
+      // velocity. Decorative — the facts card displays the served figures.
+      for (const mark of sceneRef.current.marks) {
+        if (mark.kind !== 'fleet' || mark.fleetMode !== 2 || !mark.velocity) continue
+        const v = mark.velocity
+        const speed = Math.hypot(v.x, v.y, v.z)
+        if (!(speed > 0)) continue
+        const length = Math.min(speed * DRIFT_STREAK_SECONDS, extent * DRIFT_STREAK_MAX_EXTENT)
+        const from = toV(mark.position)
+        const to = new THREE.Vector3(
+          mark.position.x + (v.x / speed) * length,
+          mark.position.y + (v.y / speed) * length,
+          mark.position.z + (v.z / speed) * length,
+        )
+        const streak = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([from, to]),
+          new THREE.LineBasicMaterial({
+            color: FLEET_MODE_COLOR[2],
+            transparent: true,
+            opacity: 0.8,
+          }),
+        )
+        streaks.push(streak)
+        decor.add(streak)
       }
     }
 
@@ -515,10 +652,8 @@ export function SpaceWorld({ canvas, scene, camera, extent, onFirstFrame }: Spac
     const disposeAll = () => {
       cancelAnimationFrame(frame)
       for (const [, entry] of meshes) disposeMesh(entry.mesh)
-      for (const line of lines) {
-        line.geometry.dispose()
-        ;(line.material as THREE.Material).dispose()
-      }
+      for (const line of lines) disposeLine(line)
+      for (const line of streaks) disposeLine(line)
       for (const [, line] of rings) {
         line.geometry.dispose()
         ;(line.material as THREE.Material).dispose()

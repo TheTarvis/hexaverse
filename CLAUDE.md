@@ -48,7 +48,9 @@ conventions for that codebase. **Read the relevant one before working there.**
   configurations for these scripts; `scripts/dev/with-test-emulators.sh`
   auto-starts/reuses the test emulators around e2e/integration runs;
   `scripts/dev/admin/` grants the `admin: true` Firebase custom claim (see
-  its README).
+  its README). Emulator accounts on the dev or test cluster (create, find,
+  bearer token, password-less browser sign-in via `/dev/login`):
+  `cd frontend && npm run users -- …` — the `/dev-users` skill.
 - `backend/` — Go service. See `backend/CLAUDE.md` (domain package shape,
   handler→service→DAO layering, events, sentinel errors, emulator testing).
 - `frontend/` — Next.js app. See `frontend/CLAUDE.md` (component→hook→service→

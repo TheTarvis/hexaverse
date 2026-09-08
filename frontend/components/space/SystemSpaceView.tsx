@@ -733,6 +733,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               onFirstFrame={() => setFirstFrame(true)}
               highlightedGhostId={highlightedGhostId}
               onHighlightGhost={setHighlightedGhostId}
+              actingFleetId={acting?.id ?? null}
+              onActivateFleet={setActingFleetId}
             />
           </>
         )}

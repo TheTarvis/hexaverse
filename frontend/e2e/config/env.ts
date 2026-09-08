@@ -16,15 +16,20 @@
  * Every value has an env override so the same config serves CI and local debugging.
  */
 
+import { emulatorClusterConfig, type EmulatorConfig } from './clusters'
+
 export type E2EEnv = 'local' | 'dev' | 'prod'
 
-export interface EmulatorConfig {
-  host: string
-  authPort: string
-  firestorePort: string
-  projectId: string
-  apiKey: string
-}
+// The emulator shape lives in `clusters.ts` (shared with the user CLI);
+// re-exported so every existing import of it from here keeps working.
+export type { EmulatorConfig } from './clusters'
+export {
+  emulatorClusterConfig,
+  isEmulatorCluster,
+  CLUSTER_DEFAULT_USER,
+  type ClusterConfig,
+  type EmulatorCluster,
+} from './clusters'
 
 export interface E2EConfig {
   env: E2EEnv
@@ -60,6 +65,10 @@ export function resolveE2EConfig(): E2EConfig {
   const env = (process.env.E2E_ENV ?? 'local') as E2EEnv
 
   if (env === 'local') {
+    // The `test` cluster: ports read from firebase.test.json, the default
+    // e2e user, and the isolated stack's origins — one registry shared with
+    // the user CLI (`e2e/cli/users.ts`), so nothing here can drift from it.
+    const test = emulatorClusterConfig('test')
     return {
       env,
       // Defaults target the ISOLATED test stack, not your dev stack, so a suite
@@ -80,18 +89,18 @@ export function resolveE2EConfig(): E2EConfig {
       //     run to keep the long-lived local emulator from accumulating data (see
       //     e2e/setup/backend-stack.ts). CI uses a throwaway emulator.
       // Any of these is env-overridable for one-off targeting.
-      baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3110',
-      apiURL: process.env.E2E_API_URL ?? 'http://localhost:9012',
+      baseURL: process.env.E2E_BASE_URL ?? test.frontendURL,
+      apiURL: process.env.E2E_API_URL ?? test.apiURL,
       user: {
-        email: process.env.E2E_USER_EMAIL ?? 'e2e@hexaverse.test',
-        password: process.env.E2E_USER_PASSWORD ?? 'e2ePassword123!',
+        email: process.env.E2E_USER_EMAIL ?? test.user.email,
+        password: process.env.E2E_USER_PASSWORD ?? test.user.password,
       },
       emulator: {
-        host: process.env.E2E_EMULATOR_HOST ?? '127.0.0.1',
-        authPort: process.env.E2E_AUTH_EMULATOR_PORT ?? '10109',
-        firestorePort: process.env.E2E_FIRESTORE_EMULATOR_PORT ?? '9100',
-        projectId: process.env.E2E_PROJECT_ID ?? 'hexaverse-emulator',
-        apiKey: process.env.E2E_API_KEY ?? 'demo-api-key',
+        host: process.env.E2E_EMULATOR_HOST ?? test.emulator.host,
+        authPort: process.env.E2E_AUTH_EMULATOR_PORT ?? test.emulator.authPort,
+        firestorePort: process.env.E2E_FIRESTORE_EMULATOR_PORT ?? test.emulator.firestorePort,
+        projectId: process.env.E2E_PROJECT_ID ?? test.emulator.projectId,
+        apiKey: process.env.E2E_API_KEY ?? test.emulator.apiKey,
       },
       reuseServer: bool(process.env.E2E_REUSE_SERVER, false),
     }
