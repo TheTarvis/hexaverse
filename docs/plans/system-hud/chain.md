@@ -37,7 +37,7 @@ carry the change-id, so nothing collides.
 
 | # | Change | Delivers | Capabilities | State |
 | --- | --- | --- | --- | --- |
-| 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (copy only) | ⬜ not authored |
+| 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (copy only) | ✅ authored r3 `da3ba36` |
 | 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge with cost overlay, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view`, `docked-fleet-actions` (readouts re-homed), `fleet-roster` (switch-fleet chevron) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |

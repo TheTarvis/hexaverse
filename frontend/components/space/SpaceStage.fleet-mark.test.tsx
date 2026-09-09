@@ -14,6 +14,14 @@ vi.mock('./SpaceCanvas', () => ({
 }))
 
 import { SpaceStage } from './SpaceStage'
+import { assertFiguresMatchModule } from '@/lib/format/assert-figures'
+
+// MIGRATION NOTE (task 9.4, openspec change `add-figure-formatting`):
+// `SpaceStage` gains a required `scale: number | undefined` prop (task 8.2).
+// `fleet-facts`'s "Arrives in …" line moves onto the duration formatter with
+// the `world-ms-span-in` token, as `fleet-facts-arrival` — the label drops
+// its own "in" (RULING 25's MINOR 1), so the rendered line is
+// "Arrives" + a figure reading "in 1m 30s", never "Arrives in in 1m 30s".
 
 const T0 = 1_000_000
 const marks = [
@@ -67,7 +75,7 @@ beforeEach(() => {
 function stage(over: Partial<React.ComponentProps<typeof SpaceStage>> = {}) {
   const onSelect = vi.fn()
   const onActivateFleet = vi.fn()
-  render(
+  const { container } = render(
     <SpaceStage
       systemId="sys_1"
       scene={scene as never}
@@ -77,10 +85,11 @@ function stage(over: Partial<React.ComponentProps<typeof SpaceStage>> = {}) {
       onSelect={onSelect}
       actingFleetId="fleet-1"
       onActivateFleet={onActivateFleet}
+      scale={1}
       {...over}
     />,
   )
-  return { onSelect, onActivateFleet }
+  return { onSelect, onActivateFleet, container }
 }
 
 describe('SpaceStage — the own-fleet mark is an affordance, never a selection', () => {
@@ -101,12 +110,29 @@ describe('SpaceStage — the own-fleet mark is an affordance, never a selection'
   })
 
   it('hovering a burning fleet shows its activity and served arrival countdown', async () => {
-    stage()
+    const { container } = stage()
     fireEvent.pointerOver(screen.getByTestId('fleet-mark-fleet-1'))
     const facts = await screen.findByTestId('fleet-facts')
     expect(facts).toHaveTextContent('Under way')
-    expect(facts).toHaveTextContent(/Arrives in 2m/)
+    // The label drops its own "in": the module supplies it once.
+    expect(facts).toHaveTextContent('Arrives')
+    expect(facts).not.toHaveTextContent('Arrives in in')
+    const arrival = screen.getByTestId('fleet-facts-arrival')
+    expect(arrival).toHaveAttribute('data-unit', 'world-ms-span-in')
+    // mark.arriveMs (T0+90_000) - nowMs (T0) = 90_000.
+    expect(arrival).toHaveAttribute('data-raw', '90000')
+    expect(arrival).toHaveTextContent('in 1m 30s')
     expect(facts).toHaveTextContent('commanding')
+    assertFiguresMatchModule(container, { scale: 1 })
+  })
+
+  it('SDET-added: on a scale-less mount the arrival figure renders absent, still carrying its raw span', async () => {
+    const { container } = stage({ scale: undefined })
+    fireEvent.pointerOver(screen.getByTestId('fleet-mark-fleet-1'))
+    const arrival = await screen.findByTestId('fleet-facts-arrival')
+    expect(arrival).toHaveAttribute('data-raw', '90000')
+    expect(arrival).toHaveTextContent('—')
+    assertFiguresMatchModule(container, { scale: undefined })
   })
 
   it('hovering a drifting fleet shows its served bearing and speed', async () => {

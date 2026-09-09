@@ -56,6 +56,15 @@ vi.mock('@/hooks/use-sightings', () => ({
 }))
 
 import { SightingLog } from './SightingLog'
+import { assertFiguresMatchModule } from '@/lib/format/assert-figures'
+
+// MIGRATION NOTE (task 9.3, openspec change `add-figure-formatting`):
+// `SightingLog` gains a required `scale: number | undefined` prop (task 7.4,
+// its own `asOf` stamps need it for their `×N` suffix — the log itself never
+// renders a span, so it needs no `worldTime`). The row's `asOf` (case c) gets
+// a new derived testid, `sighting-asof-{id}`, carrying `world-ms-instant` and
+// the record's raw `asOf` — coverage this file did not have before (task
+// 9.3's own note).
 
 function page(sightings: Record<string, unknown>[], nextCursor = '') {
   return { pages: [{ sightings, nextCursor }] }
@@ -82,6 +91,7 @@ function log(over: Record<string, unknown> = {}) {
       systemId="sys-1"
       highlightedGhostId={null}
       onHighlightRow={vi.fn()}
+      scale={1}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       {...(over as any)}
     />,
@@ -210,5 +220,48 @@ describe('SightingLog — row/ghost cross-highlight (A Log Row and Its Ghost Add
     log({ onHighlightRow, highlightedGhostId: null })
     await user.click(screen.getByTestId('sighting-row-sight-clean'))
     expect(screen.getByTestId('sighting-row-sight-clean').textContent?.toLowerCase()).toMatch(/no mark/)
+  })
+})
+
+describe('SightingLog — the asOf stamp, presented per figure-formatting (new coverage, task 9.3)', () => {
+  it("Scenario: A composition row shows hulls (asOf half) — the row's asOf is a formatted T+ stamp carrying its raw served value", () => {
+    pile.data = page([record({ asOf: 187_980_000 })])
+    const { container } = log()
+    const figure = screen.getByTestId('sighting-asof-sight-a1')
+    expect(figure).toHaveAttribute('data-unit', 'world-ms-instant')
+    expect(figure).toHaveAttribute('data-raw', '187980000')
+    expect(figure.textContent).toContain('T+ 2d 04:13')
+    // R4's accessible-label scenario (RULING 22): every T+ figure carries
+    // `title={instantScaleLabel(scale)}`.
+    expect(figure).toHaveAttribute('title', 'The world clock is running at 1 times real time.')
+    assertFiguresMatchModule(container, { scale: 1 })
+  })
+
+  it('Scenario: Two records within the same minute render identical stamps, distinguished only by row order', () => {
+    pile.data = page([
+      record({ id: 'sight-2', asOf: 1_000 }),
+      record({ id: 'sight-1', asOf: 40_000 }),
+    ])
+    log()
+    const first = screen.getByTestId('sighting-asof-sight-2')
+    const second = screen.getByTestId('sighting-asof-sight-1')
+    // Identical rendered stamps...
+    expect(first.textContent).toBe(second.textContent)
+    // ...but distinct raw values, so served ordering stays assertable.
+    expect(first).toHaveAttribute('data-raw', '1000')
+    expect(second).toHaveAttribute('data-raw', '40000')
+    // Row order — not the stamps — is what shows which was observed first.
+    const rows = screen.getAllByTestId(/^sighting-row-/)
+    expect(rows.map((r) => r.getAttribute('data-testid'))).toEqual(['sighting-row-sight-2', 'sighting-row-sight-1'])
+  })
+
+  it('SDET-added: on a scale-less mount the T+ portion still renders, with an absent suffix', () => {
+    pile.data = page([record({ asOf: 187_980_000 })])
+    const { container } = log({ scale: undefined })
+    const figure = screen.getByTestId('sighting-asof-sight-a1')
+    expect(figure).toHaveAttribute('data-raw', '187980000')
+    expect(figure.textContent).toContain('T+ 2d 04:13')
+    expect(figure.textContent).toContain('×—')
+    assertFiguresMatchModule(container, { scale: undefined })
   })
 })

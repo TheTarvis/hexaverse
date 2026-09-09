@@ -316,3 +316,31 @@ test on the first migrated file, and MAJOR 2 is invisible until it is not). If
 the orchestrator elects to carry them forward as a follow-up change instead,
 the chain may proceed: none of the five ships wrong behaviour undetected by
 the rest of the suite, and none affects archivability.
+
+---
+
+## Verdict commit
+
+**`da3ba3683dfc9254403415264f303de2e2334656`** — the commit at which this change's
+adversary verdict was issued, for the currency check
+(`.claude/skills/openspec-team-workflow/SKILL.md` § *Verdict expiry and re-attack
+scope*). The verdict is current while this is empty:
+
+```bash
+git diff da3ba3683dfc9254403415264f303de2e2334656 -- \
+  openspec/specs/system-space-view openspec/specs/docked-fleet-actions \
+  openspec/specs/fleet-roster openspec/specs/sighting-log \
+  openspec/changes/add-figure-formatting
+```
+
+**Scope note, recorded honestly.** Round 3 returned *no BLOCKER* with 3 MAJOR and
+2 MINOR residue. Under the round-cap rule that residue could have ridden forward
+as a follow-up change; the orchestrator repaired it instead (RULINGs 25, 26 and
+two inline minors), so **the content at this commit is one repair pass newer than
+the round-3 attack that verified it.** The round cap is three and all three are
+spent, so no fourth round verified these final edits. Mitigations are recorded in
+the rulings file's closing section: every repair is text-only and adds no scope,
+RULING 25's formulation is verified case-by-case against all six cases in play
+rather than asserted, and these clauses become executable in the red phase as
+task 9.5's `assertFiguresMatchModule` helper — so a wrong formulation surfaces as
+a red test on the first migrated file rather than as a silent gap.

@@ -33,11 +33,13 @@ import {
   useRef,
   useState,
   type FocusEvent as ReactFocusEvent,
+  type ReactNode,
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react'
-import { formatEta } from '@/lib/eta'
+import { Figure } from '@/components/figure/Figure'
+import { formatByUnit, formatInstant, instantScaleLabel } from '@/lib/format'
 import { projectToScreen, unprojectToViewPlane, type DrawVec3 } from '@/lib/space/draw'
 import { SpaceCanvas } from './SpaceCanvas'
 import { viewBasisOf } from './space-projection'
@@ -76,6 +78,18 @@ export interface SpaceStageProps {
   /** The interior's served continuous extent — every camera figure scales off it. */
   extent: number
   worldTime: number
+  /**
+   * The mounting view's served world-clock scale (add-figure-formatting,
+   * design.md's un-defaulted-`servedScale` decision) — `undefined` when the
+   * mount has not yet received one. Every duration/stamp figure this stage
+   * renders (the fleet-facts arrival, the ghost's asOf labels) reads
+   * `figure-formatting`'s absent form rather than assuming scale 1
+   * (RULING 8/19).
+   *
+   * Required key, nullable value (contract §6) — a forcing function so a
+   * mount site cannot silently omit it and fall back to an assumed scale.
+   */
+  scale: number | undefined
   selection: SpaceSelection | null
   onSelect?: (selection: SpaceSelection | null) => void
   onAvailabilityChange?: (available: boolean) => void
@@ -126,6 +140,7 @@ export function SpaceStage({
   scene,
   extent,
   worldTime,
+  scale,
   selection,
   onSelect,
   onAvailabilityChange,
@@ -378,6 +393,7 @@ export function SpaceStage({
           scene={scene}
           camera={camera}
           extent={extent}
+          scale={scale}
           basis={basis}
           viewport={viewport}
           selection={selection}
@@ -459,6 +475,7 @@ interface SpaceLayersProps {
   scene: SceneModel
   camera: SpaceCamera
   extent: number
+  scale: number | undefined
   basis: ReturnType<typeof viewBasisOf>
   viewport: { width: number; height: number }
   selection: SpaceSelection | null
@@ -486,6 +503,7 @@ function SpaceLayers({
   scene,
   camera,
   extent,
+  scale,
   basis,
   selection,
   focusedMarkId,
@@ -690,7 +708,9 @@ function SpaceLayers({
             onBlur={() => onHoverGhost(null)}
             onClick={() => onHighlightGhost?.(mark.recordId ?? null)}
           >
-            {mark.asOf !== undefined && <span className="sr-only">Observed at {mark.asOf}</span>}
+            {mark.asOf !== undefined && (
+              <GhostAsOfLabel recordId={mark.recordId ?? mark.id} asOf={mark.asOf} scale={scale} />
+            )}
           </button>
         ))}
       </div>
@@ -705,7 +725,16 @@ function SpaceLayers({
             data-testid="sighting-facts"
             className="absolute left-1/2 top-16 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
           >
-            <div>Observed at {shown.mark.asOf ?? '—'}</div>
+            <div>
+              Observed at{' '}
+              <Figure
+                raw={shown.mark.asOf}
+                unit="world-ms-instant"
+                text={formatInstant(shown.mark.asOf, scale)}
+                data-testid="sighting-facts-asof"
+                title={instantScaleLabel(scale)}
+              />
+            </div>
             <div>Bearing {heading.toFixed(0)}°</div>
             <div>Speed {speed.toFixed(2)}</div>
           </div>
@@ -758,6 +787,7 @@ function SpaceLayers({
             mark={shown.mark}
             nowMs={scene.positionTimeMs}
             acting={shown.mark.id === actingFleetId}
+            scale={scale}
           />
         )
       })()}
@@ -799,6 +829,37 @@ function SpaceLayers({
 }
 
 /**
+ * A sighting ghost's sr-only `asOf` label (`system-space-view`: "A ghost's
+ * asOf label reads as a formatted stamp, on the mark and on its facts
+ * surface"). The prose prefix is composed into the Figure's own `text`
+ * because the mark's testid moves onto the Figure itself here (there is no
+ * separate wrapper to hold "Observed at " as a sibling on the mark, unlike
+ * the on-hover `sighting-facts` line below).
+ */
+function GhostAsOfLabel({
+  recordId,
+  asOf,
+  scale,
+}: {
+  recordId: string
+  asOf: number | undefined
+  scale: number | undefined
+}) {
+  const stamp = formatInstant(asOf, scale)
+  const text = 'Observed at ' + stamp
+  return (
+    <Figure
+      raw={asOf}
+      unit="world-ms-instant"
+      text={text}
+      className="sr-only"
+      data-testid={`sighting-mark-asof-${recordId}`}
+      title={instantScaleLabel(scale)}
+    />
+  )
+}
+
+/**
  * The hovered fleet's facts: what it is doing (from its SERVED mode), the
  * served arrival countdown for a burn, and the served heading and speed for
  * a drift. Every figure is a served value or a difference of served stamps
@@ -808,17 +869,31 @@ function FleetFacts({
   mark,
   nowMs,
   acting,
+  scale,
 }: {
   mark: SceneMark
   nowMs: number
   acting: boolean
+  scale: number | undefined
 }) {
   let activity: string
-  let detail: string | null = null
+  let detail: ReactNode | null = null
   if (mark.fleetMode === 0) {
     const remaining = mark.arriveMs !== undefined ? mark.arriveMs - nowMs : 0
     activity = remaining > 0 ? 'Under way' : 'Arriving'
-    if (remaining > 0) detail = `Arrives in ${formatEta(remaining)}`
+    if (remaining > 0) {
+      detail = (
+        <>
+          Arrives{' '}
+          <Figure
+            raw={remaining}
+            unit="world-ms-span-in"
+            text={formatByUnit(remaining, scale, 'world-ms-span-in')}
+            data-testid="fleet-facts-arrival"
+          />
+        </>
+      )
+    }
   } else if (mark.fleetMode === 2) {
     activity = 'Drifting'
     if (mark.velocity) {

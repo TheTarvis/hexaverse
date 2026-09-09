@@ -402,9 +402,19 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
 
   // The clock: the interior read's served scale, falling back to the fleet
   // read's when the interior read has failed.
-  const servedScale = interior.data?.scale ?? acting?.scale ?? allFleets[0]?.scale ?? 1
+  //
+  // TWO SCALE VALUES, DELIBERATELY (add-figure-formatting design.md's
+  // un-defaulted-`servedScale` decision). `clockScale` keeps today's `?? 1`
+  // default and anchors the `useWorldTime` projection and the
+  // `space-world-clock` element's `data-scale` — unchanged, so no existing
+  // clock assertion moves. `servedScale` is the SAME fallback chain WITHOUT
+  // the default, threaded to every figure-rendering child below so a figure
+  // renders `figure-formatting`'s absent form (never an assumed scale of 1)
+  // when the mount has not yet received one (RULING 8).
+  const clockScale = interior.data?.scale ?? acting?.scale ?? allFleets[0]?.scale ?? 1
+  const servedScale: number | undefined = interior.data?.scale ?? acting?.scale ?? allFleets[0]?.scale
   const serverWorldTime = interior.data?.worldTime ?? acting?.worldTime ?? allFleets[0]?.worldTime
-  const worldTime = useWorldTime(serverWorldTime, { scale: servedScale })
+  const worldTime = useWorldTime(serverWorldTime, { scale: clockScale })
   const worldTimeRef = useRef(worldTime)
   worldTimeRef.current = worldTime
 
@@ -660,7 +670,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       <span
         className="sr-only"
         data-testid="space-world-clock"
-        data-scale={String(servedScale)}
+        data-scale={String(clockScale)}
         data-world-time={String(Math.round(worldTime))}
       />
       <span className="sr-only" role="status" aria-live="polite" data-testid="space-announcer">
@@ -727,6 +737,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               scene={scene}
               extent={extent}
               worldTime={worldTime}
+              scale={servedScale}
               selection={selection}
               onSelect={(picked) => setSelection((current) => toggleSelection(current, picked))}
               onAvailabilityChange={setCanvasAvailable}
@@ -768,6 +779,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               onHighlightRow={setHighlightedGhostId}
               galaxySystemNames={systemNames}
               drawnRecordIds={drawnSightingRecordIds}
+              scale={servedScale}
             />
           </div>
         )}
@@ -800,6 +812,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           gateFacts={gateFacts}
           canvasAvailable={canvasAvailable}
           mineRunning={mineRunning}
+          worldTime={worldTime}
+          scale={servedScale}
         />
 
         <FleetActionsPanel
@@ -811,6 +825,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           credits={credits}
           canvasAvailable={canvasAvailable}
           worldTime={worldTime}
+          scale={servedScale}
         />
 
         {/* A SIBLING of FleetActionsPanel, never nested inside it
@@ -822,6 +837,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         <ScanControl
           fleet={acting}
           worldTime={worldTime}
+          scale={servedScale}
           onOpenLog={() => setLogOpen(true)}
           committedPending={committedPending}
           onCommitAccepted={markScanCommitAccepted}
@@ -889,6 +905,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             asserting a falsehood is what the live requirement forbids. */}
         <FleetRoster
           worldTime={worldTime}
+          scale={servedScale}
           commandOwner="view"
           activeFleetId={acting?.id ?? null}
           currentSystemId={systemId}

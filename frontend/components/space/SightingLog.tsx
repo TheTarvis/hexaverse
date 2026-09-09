@@ -8,7 +8,9 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/catalyst/button'
+import { Figure } from '@/components/figure/Figure'
 import { useSightings } from '@/hooks/use-sightings'
+import { formatInstant, instantScaleLabel } from '@/lib/format'
 import type { Sighting } from '@/lib/types/sighting'
 
 export interface SightingLogProps {
@@ -16,6 +18,12 @@ export interface SightingLogProps {
   systemId: string | null
   highlightedGhostId: string | null
   onHighlightRow: (recordId: string | null) => void
+  /**
+   * The mounting view's served world-clock scale (contract §6). Required
+   * key, nullable value — a forcing function so a mount site cannot
+   * silently omit it and fall back to an assumed scale.
+   */
+  scale: number | undefined
   /** `fleet-roster`'s own system-name fallback precedent. */
   galaxySystemNames?: Record<string, string>
   /**
@@ -48,12 +56,14 @@ function Row({
   systemNames,
   highlighted,
   noMark,
+  scale,
   onSelect,
 }: {
   record: Sighting
   systemNames: Record<string, string> | undefined
   highlighted: boolean
   noMark: boolean
+  scale: number | undefined
   onSelect: () => void
 }) {
   return (
@@ -67,7 +77,13 @@ function Row({
       >
         <div className="flex items-center justify-between">
           <span>{systemLabel(record.systemId, systemNames)}</span>
-          <span>{record.asOf}</span>
+          <Figure
+            raw={record.asOf}
+            unit="world-ms-instant"
+            text={formatInstant(record.asOf, scale)}
+            data-testid={`sighting-asof-${record.id}`}
+            title={instantScaleLabel(scale)}
+          />
         </div>
         <div>Host: {record.hostId}</div>
         {record.cleanSweep ? (
@@ -92,6 +108,7 @@ export function SightingLog({
   systemId: _systemId,
   highlightedGhostId,
   onHighlightRow,
+  scale,
   galaxySystemNames,
   drawnRecordIds,
 }: SightingLogProps) {
@@ -178,6 +195,7 @@ export function SightingLog({
               systemNames={galaxySystemNames}
               highlighted={hasGhost(record) && highlightedGhostId === record.id}
               noMark={noMarkRowId === record.id}
+              scale={scale}
               onSelect={() => selectRow(record)}
             />
           ))}

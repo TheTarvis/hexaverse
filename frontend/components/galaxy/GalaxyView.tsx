@@ -471,6 +471,7 @@ export function GalaxyView() {
               row can offer is supplied below. */}
           <FleetRoster
             worldTime={worldTime}
+            scale={myFleets?.[0]?.scale}
             commandOwner="roster"
             isChartedGate={isGateBody}
             activeFleetId={activeFleetId}

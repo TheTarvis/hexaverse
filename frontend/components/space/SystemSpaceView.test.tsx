@@ -223,6 +223,13 @@ vi.mock('./SpaceStage', async () => {
 })
 
 import { SystemSpaceView } from './SystemSpaceView'
+import { assertFiguresMatchModule } from '@/lib/format/assert-figures'
+
+// MIGRATION NOTE (task 9.4, openspec change `add-figure-formatting`): the
+// credit-balance integration assertion below moves off a loose text regex
+// (which happens to still match the formatted `₡ 1,250` text and would
+// therefore be a tautological non-migration) onto `balance-figure`'s
+// data-raw, the strong assertion task 9.4 calls for.
 
 const T0 = 21_175_110_953
 const SYSTEM_ID = 'sys_-7_17'
@@ -527,13 +534,17 @@ describe('SystemSpaceView — the data fan-in', () => {
   // Scenario: The panel shows the current credit balance
   it('Scenario: The panel shows the current credit balance (the view sources it, not the panel)', () => {
     setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
-    view()
-    const balance = screen.getByTestId('balance-value')
+    const { container } = view()
+    // `balance-value` (case c) keeps its wrapper id; `balance-figure` is the
+    // credits <Figure> — the view has to have read the balance for the
+    // panel to have one at all.
+    const figure = screen.getByTestId('balance-figure')
     expect(
-      balance.textContent,
+      figure.getAttribute('data-raw'),
       "the balance readout must show the corporation's served credit balance, not a placeholder — " +
         'the view has to read it for the panel to have one',
-    ).toMatch(/1[,.]?250/)
+    ).toBe('1250')
+    assertFiguresMatchModule(container, { scale: 1 })
   })
 
   it('SDET-added: sell is offered against the station the view read, not against any docked body', () => {

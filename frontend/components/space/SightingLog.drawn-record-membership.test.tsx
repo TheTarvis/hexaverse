@@ -19,6 +19,12 @@ import React from 'react'
 // are `SystemSpaceView`-level reasons the set ends up not containing that
 // id, which is exactly why this component takes the set as a prop instead
 // of re-deriving any of them).
+//
+// SDET repair (add-figure-formatting build adjudications, dispute 2):
+// `scale` restored to a required key on `SightingLog`. None of this file's
+// scenarios are about scale or figure formatting (they pin drawnRecordIds
+// membership), so `scale={1}` — matching the sibling `SightingLog.test.tsx`
+// default — keeps every render call compiling and realistic.
 
 const pile: {
   data: { pages: { sightings: Record<string, unknown>[]; nextCursor: string }[] } | undefined
@@ -81,6 +87,7 @@ describe('SightingLog — drawnRecordIds membership (QA return: no "list of reas
         highlightedGhostId={null}
         onHighlightRow={onHighlightRow}
         drawnRecordIds={new Set(['sight-in-scene'])}
+        scale={1}
       />,
     )
     await user.click(screen.getByTestId('sighting-row-sight-in-scene'))
@@ -101,6 +108,7 @@ describe('SightingLog — drawnRecordIds membership (QA return: no "list of reas
         highlightedGhostId={null}
         onHighlightRow={onHighlightRow}
         drawnRecordIds={new Set()}
+        scale={1}
       />,
     )
     await user.click(screen.getByTestId('sighting-row-sight-origin'))
@@ -122,6 +130,7 @@ describe('SightingLog — drawnRecordIds membership (QA return: no "list of reas
         highlightedGhostId={null}
         onHighlightRow={onHighlightRow}
         drawnRecordIds={new Set(['some-other-drawn-id'])}
+        scale={1}
       />,
     )
     await user.click(screen.getByTestId('sighting-row-sight-beyond-page'))
@@ -143,6 +152,7 @@ describe('SightingLog — drawnRecordIds membership (QA return: no "list of reas
         highlightedGhostId={null}
         onHighlightRow={onHighlightRow}
         drawnRecordIds={new Set()}
+        scale={1}
       />,
     )
     await user.click(screen.getByTestId('sighting-row-sight-canvas-down'))
@@ -160,6 +170,7 @@ describe('SightingLog — drawnRecordIds membership (QA return: no "list of reas
         highlightedGhostId={null}
         onHighlightRow={onHighlightRow}
         drawnRecordIds={new Set(['sight-clean'])}
+        scale={1}
       />,
     )
     await user.click(screen.getByTestId('sighting-row-sight-clean'))

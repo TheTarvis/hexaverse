@@ -48,6 +48,14 @@ import { useCancelAction } from '@/hooks/use-actions'
 import { queryKeys } from '@/lib/query-keys'
 import type { Fleet } from '@/lib/types/fleet'
 import type { GameAction } from '@/lib/types/action'
+import { assertFiguresMatchModule } from '@/lib/format/assert-figures'
+
+// MIGRATION NOTE (task 9.4, openspec change `add-figure-formatting`):
+// `FleetRoster` gains a required `scale: number | undefined` prop (tasks
+// 3.3/6.1/6.4) — every render call below supplies `scale={1}`. `fleet-row-
+// eta-{id}` (case a), `fleet-fuel-{id}` and `fleet-range-{id}` (case b) are
+// migrated to data-raw/data-unit reads; `?? 0` becomes the absent form
+// (RULING 13, a named behaviour fix, not pure formatting).
 
 vi.mock('@/hooks/use-fleets', () => ({ useMyFleets: vi.fn() }))
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
@@ -138,7 +146,7 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
     // Scenario: The active fleet's row is marked
     it('Scenario: The active fleet\'s row is marked', () => {
       setFleets([fleet('f1', 'sys-0', parkState()), fleet('f2', 'sys-0', parkState())])
-      render(<FleetRoster worldTime={0} isChartedGate={() => false} activeFleetId="f2" />)
+      render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} activeFleetId="f2" />)
       expect(screen.getByTestId('fleet-row-f2')).toHaveAttribute('data-active', 'true')
       expect(
         screen.getByTestId('fleet-row-f1'),
@@ -153,7 +161,7 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
     // Scenario: A fleet in the currently open board is marked "here"
     it('Scenario: A fleet in the currently open board is marked "here"', () => {
       setFleets([fleet('here-1', 'sys-0', parkState()), fleet('away-1', 'sys-9', parkState())])
-      render(<FleetRoster worldTime={0} isChartedGate={() => false} currentSystemId="sys-0" />)
+      render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} currentSystemId="sys-0" />)
       expect(screen.getByTestId('fleet-row-here-1')).toHaveTextContent(/here/i)
       expect(
         screen.getByTestId('fleet-row-away-1'),
@@ -163,7 +171,7 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
 
     it('SDET-added: with no system open, no row is marked "here"', () => {
       setFleets([fleet('f1', 'sys-0', parkState())])
-      render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+      render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
       expect(screen.getByTestId('fleet-row-f1')).not.toHaveTextContent(/here/i)
     })
   })
@@ -172,20 +180,20 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
   it('always offers burn, regardless of kinematic state', () => {
     const burning = fleet('f1', 'sys-0', burnState(90_000))
     setFleets([burning])
-    render(<FleetRoster worldTime={30_000} isChartedGate={() => false} />)
+    render(<FleetRoster scale={1} worldTime={30_000} isChartedGate={() => false} />)
     expect(screen.getByTestId('fleet-cmd-burn-f1')).toBeInTheDocument()
   })
 
   // Scenario: Cut drive is offered only while burning / withheld outside a burn
   it('offers cut-drive only while burning', () => {
     setFleets([fleet('f1', 'sys-0', burnState(90_000))])
-    render(<FleetRoster worldTime={30_000} isChartedGate={() => false} />)
+    render(<FleetRoster scale={1} worldTime={30_000} isChartedGate={() => false} />)
     expect(screen.getByTestId('fleet-cmd-cut-drive-f1')).toBeInTheDocument()
   })
 
   it('withholds cut-drive for a parked fleet', () => {
     setFleets([fleet('f1', 'sys-0', parkState())])
-    render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+    render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
     expect(screen.queryByTestId('fleet-cmd-cut-drive-f1')).not.toBeInTheDocument()
   })
 
@@ -200,14 +208,14 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
   // down between separate `it()`s, so each half gets a clean container.
   it('offers stop while drifting', () => {
     setFleets([fleet('f1', 'sys-0', driftState())])
-    render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+    render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
     expect(screen.getByTestId('fleet-cmd-stop-f1')).toBeInTheDocument()
   })
 
   // Scenario: Stop in place is withheld while parked
   it('withholds stop while parked', () => {
     setFleets([fleet('f1', 'sys-0', parkState())])
-    render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+    render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
     expect(screen.queryByTestId('fleet-cmd-stop-f1')).not.toBeInTheDocument()
   })
 
@@ -216,14 +224,14 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
   // Split for the same reason as the stop pair above (A1).
   it('offers jump while attached to a charted gate', () => {
     setFleets([fleet('f1', 'sys-0', parkState(), { attachedTo: 'gate-1' })])
-    render(<FleetRoster worldTime={0} isChartedGate={(id: string) => id === 'gate-1'} />)
+    render(<FleetRoster scale={1} worldTime={0} isChartedGate={(id: string) => id === 'gate-1'} />)
     expect(screen.getByTestId('fleet-cmd-jump-f1')).toBeInTheDocument()
   })
 
   // Scenario: Jump is withheld at an uncharted gate
   it('withholds jump at an uncharted gate', () => {
     setFleets([fleet('f1', 'sys-0', parkState(), { attachedTo: 'gate-1' })])
-    render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+    render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
     expect(screen.queryByTestId('fleet-cmd-jump-f1')).not.toBeInTheDocument()
   })
 
@@ -232,7 +240,7 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
     const onCutDrive = vi.fn()
     const burning = fleet('f1', 'sys-0', burnState(90_000))
     setFleets([burning])
-    render(<FleetRoster worldTime={30_000} isChartedGate={() => false} onBurn={onBurn} onCutDrive={onCutDrive} />)
+    render(<FleetRoster scale={1} worldTime={30_000} isChartedGate={() => false} onBurn={onBurn} onCutDrive={onCutDrive} />)
 
     fireEvent.click(screen.getByTestId('fleet-cmd-burn-f1'))
     expect(onBurn).toHaveBeenCalledWith(burning)
@@ -262,11 +270,18 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
       setFleets([docked])
       seedRunningMine('f1', 90_000)
 
-      render(<FleetRoster worldTime={30_000} isChartedGate={() => true} />)
+      const { container } = render(<FleetRoster scale={1} worldTime={30_000} isChartedGate={() => true} />)
 
       expect(screen.getByTestId('fleet-cmd-burn-f1')).toBeDisabled()
       expect(screen.getByTestId('fleet-cmd-jump-f1')).toBeDisabled()
-      expect(screen.getByTestId('fleet-row-eta-f1')).toHaveTextContent('1m')
+      // fleet-row-eta-{id} (case a) is a world-ms-span-left figure now:
+      // raw = remaining span (eta 90_000 - worldTime 30_000 = 60_000), text
+      // "1m 0s left" (RULING 15's visible shape change from "1m").
+      const countdown = screen.getByTestId('fleet-row-eta-f1')
+      expect(countdown).toHaveAttribute('data-unit', 'world-ms-span-left')
+      expect(countdown).toHaveAttribute('data-raw', '60000')
+      expect(countdown).toHaveTextContent('1m 0s left')
+      assertFiguresMatchModule(container, { scale: 1 })
     })
 
     it('offers a cancel-mine control that invokes the generic action-cancel endpoint', () => {
@@ -274,7 +289,7 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
       setFleets([docked])
       seedRunningMine('f1', 90_000)
 
-      render(<FleetRoster worldTime={30_000} isChartedGate={() => true} />)
+      render(<FleetRoster scale={1} worldTime={30_000} isChartedGate={() => true} />)
       fireEvent.click(screen.getByTestId('fleet-cmd-cancel-mine-f1'))
 
       expect(cancelMutate).toHaveBeenCalledWith(
@@ -297,6 +312,7 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
 
       render(
         <FleetRoster
+          scale={1}
           worldTime={30_000}
           isChartedGate={() => true}
           onBurn={onBurn}
@@ -313,12 +329,25 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
       expect(onJump).not.toHaveBeenCalled()
     })
 
+    // Scenario: A countdown renders absent until a scale is served
+    it('Scenario: A countdown renders absent until a scale is served, never at an assumed scale of 1', () => {
+      const docked = fleet('f1', 'sys-0', parkState(), { attachedTo: 'gate-1' })
+      setFleets([docked])
+      seedRunningMine('f1', 90_000)
+
+      render(<FleetRoster scale={undefined} worldTime={30_000} isChartedGate={() => true} />)
+
+      const countdown = screen.getByTestId('fleet-row-eta-f1')
+      expect(countdown).toHaveAttribute('data-raw', '60000')
+      expect(countdown).toHaveTextContent('—')
+    })
+
     it('lifts the gate once the eta passes, with no navigation required', () => {
       const docked = fleet('f1', 'sys-0', parkState(), { attachedTo: 'gate-1' })
       setFleets([docked])
       seedRunningMine('f1', 90_000)
 
-      render(<FleetRoster worldTime={91_000} isChartedGate={() => true} />)
+      render(<FleetRoster scale={1} worldTime={91_000} isChartedGate={() => true} />)
 
       expect(screen.getByTestId('fleet-cmd-burn-f1')).not.toBeDisabled()
       expect(screen.queryByTestId('fleet-cmd-cancel-mine-f1')).not.toBeInTheDocument()
@@ -365,10 +394,19 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
         roster: rosterWith({ cargo: { fuel: 42.5 }, estimatedRange: 833.25 }),
       })
       setFleets([f])
-      render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+      const { container } = render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
 
-      expect(screen.getByTestId('fleet-fuel-f1')).toHaveTextContent('42.5')
-      expect(screen.getByTestId('fleet-range-f1')).toHaveTextContent('833.25')
+      // fleet-fuel-{id} (case b — "fuel" becomes a sibling word) is a `tons`
+      // figure; fleet-range-{id} (case b — "range" label stays a sibling) is
+      // a `range` figure. Range carries no unit name of its own (RULING 14),
+      // so 833.25 reads `833` — below the first magnitude threshold — not
+      // the raw served float.
+      expect(screen.getByTestId('fleet-fuel-f1')).toHaveAttribute('data-unit', 'tons')
+      expect(screen.getByTestId('fleet-fuel-f1')).toHaveAttribute('data-raw', '42.5')
+      expect(screen.getByTestId('fleet-range-f1')).toHaveAttribute('data-unit', 'range')
+      expect(screen.getByTestId('fleet-range-f1')).toHaveAttribute('data-raw', '833.25')
+      expect(screen.getByTestId('fleet-range-f1')).toHaveTextContent('833')
+      assertFiguresMatchModule(container, { scale: 1 })
     })
 
     // Scenario: The roster never computes range client-side. A LARGE fuel
@@ -381,17 +419,29 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
         roster: rosterWith({ cargo: { fuel: 999 }, estimatedRange: 1 }),
       })
       setFleets([f])
-      render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+      render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
 
-      expect(screen.getByTestId('fleet-range-f1')).toHaveTextContent('1')
+      expect(screen.getByTestId('fleet-range-f1')).toHaveAttribute('data-raw', '1')
       expect(screen.getByTestId('fleet-range-f1')).not.toHaveTextContent('999')
+    })
+
+    // Scenario: An unavailable fuel or range figure reads as absent, not zero
+    it('shows the figure-formatting absent form, never 0t fuel, when the roster fields are unavailable', () => {
+      const f = fleet('f1', 'sys-0', parkState(), { roster: undefined })
+      setFleets([f])
+      render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
+
+      expect(screen.getByTestId('fleet-fuel-f1')).not.toHaveAttribute('data-raw')
+      expect(screen.getByTestId('fleet-fuel-f1')).toHaveTextContent('—')
+      expect(screen.getByTestId('fleet-range-f1')).not.toHaveAttribute('data-raw')
+      expect(screen.getByTestId('fleet-range-f1')).toHaveTextContent('—')
     })
 
     // Scenario: A stranded fleet's roster row shows a persistent indication
     it('shows a persistent stranded indication when the read reports it, distinct from idle', () => {
       const stranded = fleet('f1', 'sys-0', parkState(), { roster: rosterWith({ stranded: true }) })
       setFleets([stranded])
-      render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+      render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
 
       const indicator = screen.getByTestId('fleet-stranded-f1')
       expect(indicator).toBeInTheDocument()
@@ -408,14 +458,14 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
     it('shows the indication on a completely fresh mount, with no prior commit-time warning ever rendered', () => {
       const stranded = fleet('f2', 'sys-0', parkState(), { roster: rosterWith({ stranded: true }) })
       setFleets([stranded])
-      const { unmount } = render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+      const { unmount } = render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
       expect(screen.getByTestId('fleet-stranded-f2')).toBeInTheDocument()
       unmount()
 
       // A second, wholly independent mount (standing in for "a different
       // session, device, or reload") — same server-reported flag, same
       // result, with no state carried over from the first mount.
-      render(<FleetRoster worldTime={12_345} isChartedGate={() => false} />)
+      render(<FleetRoster scale={1} worldTime={12_345} isChartedGate={() => false} />)
       expect(screen.getByTestId('fleet-stranded-f2')).toBeInTheDocument()
     })
 
@@ -425,7 +475,7 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
       const idle = fleet('f1', 'sys-0', parkState(), { roster: rosterWith({ stranded: false }) })
       const burning = fleet('f2', 'sys-0', burnState(90_000), { roster: rosterWith({ stranded: false }) })
       setFleets([idle, burning])
-      render(<FleetRoster worldTime={30_000} isChartedGate={() => false} />)
+      render(<FleetRoster scale={1} worldTime={30_000} isChartedGate={() => false} />)
 
       expect(screen.queryByTestId('fleet-stranded-f1')).not.toBeInTheDocument()
       expect(screen.queryByTestId('fleet-stranded-f2')).not.toBeInTheDocument()
@@ -449,7 +499,7 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
         roster: rosterWith({ cargo: { fuel: 5 }, estimatedRange: 10, stranded: true }),
       })
       setFleets([parked])
-      const { container } = render(<FleetRoster worldTime={0} isChartedGate={() => false} />)
+      const { container } = render(<FleetRoster scale={1} worldTime={0} isChartedGate={() => false} />)
 
       const rowPrefixed = container.querySelectorAll('[data-testid^="fleet-row-"]')
       expect(rowPrefixed).toHaveLength(1)

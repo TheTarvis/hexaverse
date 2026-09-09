@@ -41,6 +41,11 @@ describe('SpaceStage — the state it publishes', () => {
         extent={658.7}
         worldTime={4242}
         selection={{ bodyId: 'feat-body-0' }}
+        // SDET repair (add-figure-formatting build adjudications, dispute 2):
+        // `scale` restored to a required key; this suite pins the stage's
+        // published state, not a scale-dependent figure, so a scale-less
+        // mount is the correct explicit value.
+        scale={undefined}
       />,
     )
     const region = screen.getByTestId('space-canvas-region')
@@ -66,6 +71,7 @@ describe('SpaceStage — the state it publishes', () => {
         selection={null}
         onAvailabilityChange={onAvailabilityChange}
         onFirstFrame={onFirstFrame}
+        scale={undefined}
       />,
     )
     expect(onAvailabilityChange).toHaveBeenCalledWith(true)
@@ -73,7 +79,7 @@ describe('SpaceStage — the state it publishes', () => {
   })
 
   it('publishes an empty selection rather than a stale one when nothing is selected', () => {
-    render(<SpaceStage systemId="s" scene={scene} extent={1} worldTime={1} selection={null} />)
+    render(<SpaceStage systemId="s" scene={scene} extent={1} worldTime={1} selection={null} scale={undefined} />)
     expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', '')
   })
 
@@ -85,6 +91,7 @@ describe('SpaceStage — the state it publishes', () => {
         extent={1}
         worldTime={1}
         selection={{ point: { x: 3, y: 0, z: 4 } }}
+        scale={undefined}
       />,
     )
     expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'point')

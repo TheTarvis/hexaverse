@@ -91,7 +91,7 @@ test.describe('the vertical slice', () => {
     // grant's size is a tuning constant this suite has no business pinning.
     await expect(page.getByTestId('hold-readout')).toBeVisible({ timeout: 20_000 })
     expect(
-      await digits(page, 'hold-capacity'),
+      await digits(page, 'hold-capacity-used'),
       'a freshly spawned hull should hold its starting-fuel grant, not an empty hold',
     ).toBeGreaterThan(0)
 

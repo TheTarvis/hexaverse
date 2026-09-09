@@ -48,8 +48,13 @@ function fleet(over: Record<string, unknown> = {}) {
 
 function control(over: Record<string, unknown> = {}) {
   return render(
+    // SDET repair (add-figure-formatting build adjudications, dispute 2):
+    // `scale` restored to a required key. None of this file's scenarios are
+    // about scale or figure formatting (they pin inbox-failure copy and
+    // keyboard operability), so a served scale matching the sibling
+    // `ScanControl.test.tsx` default keeps this file's assertions realistic.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <ScanControl fleet={fleet() as any} worldTime={T0} onOpenLog={vi.fn()} {...over} />,
+    <ScanControl fleet={fleet() as any} worldTime={T0} onOpenLog={vi.fn()} scale={1} {...over} />,
   )
 }
 

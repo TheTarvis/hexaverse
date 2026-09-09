@@ -1,0 +1,167 @@
+{
+  "_readme": "Fixture table for figure-formatting (openspec change add-figure-formatting). Every row has a stable `id` used by figures.test.ts and the red-coverage table. `null` in a numeric field means JS `undefined`; the strings \"NaN\", \"Infinity\", \"-Infinity\" mean those exact non-finite values. Rows tagged `sdetAdded: true` are boundary probes beyond the literal spec scenarios (scenario-test-automation SKILL.md).",
+
+  "duration": [
+    { "id": "duration-scale1-under-hour", "scenario": "A world-millisecond span at scale 1 reads as the same wall duration / Under an hour reads minutes and seconds / A cost or estimate duration renders bare", "spanMs": 252000, "scale": 1, "form": "bare", "expected": "4m 12s" },
+    { "id": "duration-scale60-divides", "scenario": "A time-warped world divides the span by its scale", "spanMs": 252000, "scale": 60, "form": "bare", "expected": "0m 4s" },
+    { "id": "duration-fractional-scale-multiplies", "scenario": "A fractional scale multiplies the wait", "spanMs": 60000, "scale": 0.5, "form": "bare", "expected": "2m 0s" },
+    { "id": "duration-nonpositive-scale-zero", "scenario": "A non-positive scale is refused, not divided by", "spanMs": 252000, "scale": 0, "form": "bare", "expected": "—" },
+    { "id": "duration-nonpositive-scale-negative", "scenario": "A non-positive scale is refused, not divided by", "spanMs": 252000, "scale": -5, "form": "bare", "expected": "—" },
+    { "id": "duration-under-day-hours-minutes", "scenario": "Under a day reads hours and minutes", "spanMs": 12300000, "scale": 1, "form": "bare", "expected": "3h 25m" },
+    { "id": "duration-day-or-more-days-hours", "scenario": "A day or more reads days and hours", "spanMs": 187200000, "scale": 1, "form": "bare", "expected": "2d 4h" },
+    { "id": "duration-exactly-one-minute", "scenario": "Exactly one minute", "spanMs": 60000, "scale": 1, "form": "bare", "expected": "1m 0s" },
+    { "id": "duration-exactly-one-hour", "scenario": "Exactly one hour", "spanMs": 3600000, "scale": 1, "form": "bare", "expected": "1h 0m" },
+    { "id": "duration-exactly-one-day", "scenario": "Exactly one day", "spanMs": 86400000, "scale": 1, "form": "bare", "expected": "1d 0h" },
+    { "id": "duration-sub-second-rounds-to-zero", "scenario": "Sub-second durations round to zero", "spanMs": 400, "scale": 1, "form": "bare", "expected": "0m 0s" },
+    { "id": "duration-crosses-hour-boundary-after-rounding", "scenario": "A duration that crosses a unit boundary only after rounding", "spanMs": 3599600, "scale": 1, "form": "bare", "expected": "1h 0m" },
+    { "id": "duration-crosses-day-boundary-after-rounding", "scenario": "A duration that rounds up across the day boundary reselects its unit pair", "spanMs": 86399600, "scale": 1, "form": "bare", "expected": "1d 0h" },
+    { "id": "duration-deadline-future-in", "scenario": "A future ETA reads \"in\"", "spanMs": 252000, "scale": 1, "form": "in", "expected": "in 4m 12s" },
+    { "id": "duration-deadline-remaining-left", "scenario": "A running order's remainder reads \"left\"", "spanMs": 160000, "scale": 1, "form": "left", "expected": "2m 40s left" },
+    { "id": "duration-deadline-past-ago", "scenario": "A past stamp reads \"ago\"", "spanMs": -12000000, "scale": 1, "form": "ago", "expected": "3h 20m ago" },
+    { "id": "duration-ago-positive-input", "scenario": "A past stamp reads \"ago\" (positive-magnitude input)", "spanMs": 12000000, "scale": 1, "form": "ago", "expected": "3h 20m ago", "sdetAdded": true, "note": "ago takes the positive magnitude of spanMs regardless of the input's own sign" },
+    { "id": "duration-due-exactly-zero", "scenario": "Exactly zero is due, not a zero quantity", "spanMs": 0, "scale": 1, "form": "in", "expected": "now" },
+    { "id": "duration-due-negative-small-in", "scenario": "A negative span never renders a minus sign or a growing countdown", "spanMs": -1, "scale": 1, "form": "in", "expected": "now" },
+    { "id": "duration-due-negative-large-left", "scenario": "A negative span never renders a minus sign or a growing countdown", "spanMs": -900000, "scale": 1, "form": "left", "expected": "now" },
+    { "id": "duration-ago-negative-magnitude", "scenario": "A negative span in an \"ago\" context is a positive magnitude", "spanMs": -200000, "scale": 1, "form": "ago", "expected": "3m 20s ago" },
+    { "id": "duration-in-scale60", "scenario": "A relative duration counts in wall-clock (RULING 1) — \"in\" at scale 60", "spanMs": 252000, "scale": 60, "form": "in", "expected": "in 0m 4s", "sdetAdded": true },
+    { "id": "duration-left-scale60", "scenario": "A relative duration counts in wall-clock (RULING 1) — \"left\" at scale 60", "spanMs": 160000, "scale": 60, "form": "left", "expected": "0m 3s left", "sdetAdded": true },
+    { "id": "duration-ago-scale60", "scenario": "A relative duration counts in wall-clock (RULING 1) — \"ago\" at scale 60", "spanMs": -12000000, "scale": 60, "form": "ago", "expected": "3m 20s ago", "sdetAdded": true },
+    { "id": "duration-bare-negative-clamped-zero", "scenario": "F5 — a bare (cost) duration with a negative span clamps to zero", "spanMs": -5000, "scale": 1, "form": "bare", "expected": "0m 0s" },
+    { "id": "duration-scale-absent-in", "scenario": "A duration with no served scale renders absent, not at scale 1", "spanMs": 252000, "scale": null, "form": "in", "expected": "—" },
+    { "id": "duration-scale-absent-bare", "scenario": "A duration with no served scale renders absent, not at scale 1", "spanMs": 252000, "scale": null, "form": "bare", "expected": "—" }
+  ],
+
+  "instant": [
+    { "id": "instant-scale60-days-hours-minutes", "scenario": "A stamp renders days, hours and minutes with its scale", "worldMs": 187980000, "scale": 60, "expected": "T+ 2d 04:13 ×60" },
+    { "id": "instant-worldtime-not-walltime-scale1", "scenario": "The absolute stamp is world time, not wall time", "worldMs": 187980000, "scale": 1, "expected": "T+ 2d 04:13 ×1" },
+    { "id": "instant-zero-padded", "scenario": "Hours and minutes are zero-padded", "worldMs": 273900000, "scale": 1, "expected": "T+ 3d 04:05 ×1" },
+    { "id": "instant-zero", "scenario": "Zero", "worldMs": 0, "scale": 1, "expected": "T+ 0d 00:00 ×1" },
+    { "id": "instant-subminute-a", "scenario": "Sub-minute stamps are not distinguished", "worldMs": 1000, "scale": 1, "expected": "T+ 0d 00:00 ×1" },
+    { "id": "instant-subminute-b", "scenario": "Sub-minute stamps are not distinguished", "worldMs": 40000, "scale": 1, "expected": "T+ 0d 00:00 ×1" },
+    { "id": "instant-scale-absent-suffix", "scenario": "An absolute stamp with no served scale still renders its world-time portion, with an absent suffix", "worldMs": 187980000, "scale": null, "expected": "T+ 2d 04:13 ×—" },
+    { "id": "instant-scale-zero-suffix", "scenario": "RULING 19 — non-positive scale renders the absent suffix, never ×1", "worldMs": 187980000, "scale": 0, "expected": "T+ 2d 04:13 ×—", "sdetAdded": true },
+    { "id": "instant-scale-negative-suffix", "scenario": "RULING 19 — non-positive scale renders the absent suffix, never ×1", "worldMs": 187980000, "scale": -5, "expected": "T+ 2d 04:13 ×—", "sdetAdded": true },
+    { "id": "instant-scale-nan-suffix", "scenario": "RULING 19 — a non-finite scale renders the absent suffix", "worldMs": 187980000, "scale": "NaN", "expected": "T+ 2d 04:13 ×—", "sdetAdded": true },
+    { "id": "instant-nonfinite-worldms-nan", "scenario": "NaN (An Absent, Non-Finite, or Unsupplied Figure Reads as Explicitly Absent)", "worldMs": "NaN", "scale": 1, "expected": "—" },
+    { "id": "instant-nonfinite-worldms-infinity", "scenario": "Infinity", "worldMs": "Infinity", "scale": 1, "expected": "—" },
+    { "id": "instant-nonfinite-worldms-neg-infinity", "scenario": "Infinity", "worldMs": "-Infinity", "scale": 1, "expected": "—" },
+    { "id": "instant-worldms-undefined", "scenario": "Undefined", "worldMs": null, "scale": 1, "expected": "—" }
+  ],
+
+  "scaleLabel": [
+    { "id": "label-positive-scale-60", "scenario": "The scale suffix carries an accessible explanation", "scale": 60, "expected": "The world clock is running at 60 times real time." },
+    { "id": "label-scale-1", "scenario": "The scale suffix carries an accessible explanation, at scale 1", "scale": 1, "expected": "The world clock is running at 1 times real time." },
+    { "id": "label-fractional-scale", "scenario": "instantScaleLabel renders the shortest-decimal rule for a fractional scale", "scale": 0.5, "expected": "The world clock is running at 0.5 times real time.", "sdetAdded": true },
+    { "id": "label-scale-undefined", "scenario": "A figure whose clock scale has not been served reads as absent (label half)", "scale": null, "expected": "The world clock's rate has not been served." },
+    { "id": "label-scale-zero", "scenario": "instantScaleLabel treats a non-positive scale as unserved", "scale": 0, "expected": "The world clock's rate has not been served.", "sdetAdded": true },
+    { "id": "label-scale-negative", "scenario": "instantScaleLabel treats a non-positive scale as unserved", "scale": -5, "expected": "The world clock's rate has not been served.", "sdetAdded": true },
+    { "id": "label-scale-nan", "scenario": "instantScaleLabel treats a non-finite scale as unserved", "scale": "NaN", "expected": "The world clock's rate has not been served.", "sdetAdded": true }
+  ],
+
+  "tons": [
+    { "id": "tons-below-100-keeps-decimal", "scenario": "Below 100 keeps one decimal", "tons": 47.23519999999999, "expected": "47.2 t" },
+    { "id": "tons-at-or-above-100-drops-decimal", "scenario": "At or above 100 drops the decimal", "tons": 153.4, "expected": "153 t" },
+    { "id": "tons-exactly-100", "scenario": "Exactly 100", "tons": 100, "expected": "100 t" },
+    { "id": "tons-9995-rounds-up-threshold", "scenario": "99.95 rounds up across the threshold and takes the no-decimal form", "tons": 99.95, "expected": "100 t" },
+    { "id": "tons-9994-stays-below", "scenario": "99.94 stays below the threshold", "tons": 99.94, "expected": "99.9 t" },
+    { "id": "tons-zero", "scenario": "Zero", "tons": 0, "expected": "0.0 t" },
+    { "id": "tons-whole-number-below-100-shows-decimal", "scenario": "A whole number below 100 still shows its decimal", "tons": 6, "expected": "6.0 t" },
+    { "id": "tons-negative", "scenario": "A negative tonnage", "tons": -5.2, "expected": "-5.2 t" },
+    { "id": "tons-just-below-one", "scenario": "The unit is separated by a thin space (boundary probe near zero)", "tons": 0.04, "expected": "0.0 t", "sdetAdded": true },
+    { "id": "tons-negative-at-or-above-100", "scenario": "A negative tonnage at or above 100 magnitude still drops its decimal", "tons": -153.4, "expected": "-153 t", "sdetAdded": true }
+  ],
+
+  "range": [
+    { "id": "range-thousands-suffix", "scenario": "Thousands take the suffix", "value": 13944.775743999995, "expected": "13.9k" },
+    { "id": "range-below-first-magnitude", "scenario": "Below the first magnitude reads bare", "value": 833.25, "expected": "833" },
+    { "id": "range-sigfigs-not-decimals-a", "scenario": "Significant figures, not decimal places", "value": 1, "expected": "1.00" },
+    { "id": "range-sigfigs-not-decimals-b", "scenario": "Significant figures, not decimal places", "value": 12.3456, "expected": "12.3" },
+    { "id": "range-carry-crosses-magnitude", "scenario": "Three-significant-figure carry crosses a magnitude", "value": 999.5, "expected": "1.00k" },
+    { "id": "range-exactly-at-magnitude", "scenario": "Exactly at a magnitude", "value": 1000, "expected": "1.00k" },
+    { "id": "range-millions", "scenario": "Millions", "value": 1234567, "expected": "1.23M" },
+    { "id": "range-zero", "scenario": "Zero", "value": 0, "expected": "0.00" },
+    { "id": "range-carry-crosses-to-millions", "scenario": "The three-sig-fig carry rule applied one magnitude up", "value": 999999, "expected": "1.00M", "sdetAdded": true }
+  ],
+
+  "deltaV": [
+    { "id": "deltav-fractional-rounds", "scenario": "A fractional delta-v rounds to an integer", "mps": 269.4, "expected": "269 m/s" },
+    { "id": "deltav-half-rounds-away-from-zero", "scenario": "A half rounds to nearest, away from zero", "mps": 268.5, "expected": "269 m/s" },
+    { "id": "deltav-large-thousands-sep", "scenario": "A large delta-v takes a thousands separator", "mps": 3721.2, "expected": "3,721 m/s" },
+    { "id": "deltav-zero", "scenario": "Zero", "mps": 0, "expected": "0 m/s" },
+    { "id": "deltav-negative-tie-away-from-zero", "scenario": "Ties round away from zero, negative half", "mps": -0.5, "expected": "-1 m/s", "sdetAdded": true },
+    { "id": "deltav-negative-large", "scenario": "A negative delta-v keeps its thousands separator", "mps": -3721.2, "expected": "-3,721 m/s", "sdetAdded": true },
+    { "id": "deltav-boundary-below-1000", "scenario": "No separator just below the 1,000 boundary", "mps": 999.4, "expected": "999 m/s", "sdetAdded": true },
+    { "id": "deltav-boundary-exactly-1000", "scenario": "A large delta-v takes a thousands separator, at the boundary", "mps": 1000, "expected": "1,000 m/s", "sdetAdded": true }
+  ],
+
+  "credits": [
+    { "id": "credits-four-figure", "scenario": "A four-figure balance", "credits": 1000, "expected": "₡ 1,000" },
+    { "id": "credits-below-thousand", "scenario": "Below a thousand", "credits": 28, "expected": "₡ 28" },
+    { "id": "credits-zero-is-figure", "scenario": "Zero is a figure, never the absent form", "credits": 0, "expected": "₡ 0" },
+    { "id": "credits-negative", "scenario": "A negative balance", "credits": -50, "expected": "₡ -50" },
+    { "id": "credits-integer-grouping", "scenario": "Credits are integers and never gain a decimal", "credits": 1250, "expected": "₡ 1,250" },
+    { "id": "credits-large-grouping", "scenario": "Thousands separators at a larger magnitude", "credits": 1234567, "expected": "₡ 1,234,567", "sdetAdded": true },
+    { "id": "credits-negative-below-thousand", "scenario": "A negative balance below a thousand", "credits": -5, "expected": "₡ -5", "sdetAdded": true }
+  ],
+
+  "rate": [
+    { "id": "rate-per-minute-legible", "scenario": "A rate legible per minute reads per minute", "rate": 0.04, "scale": 1, "denominator": "world-s", "expected": "2.4 t/min" },
+    { "id": "rate-too-small-falls-to-hour", "scenario": "A rate too small per minute falls to per hour", "rate": 0.0001, "scale": 1, "denominator": "world-s", "expected": "0.4 t/h" },
+    { "id": "rate-threshold-below-1-per-second", "scenario": "The unit flips at its stated threshold (0.9 half)", "rate": 0.9, "scale": 1, "denominator": "world-s", "expected": "54.0 t/min" },
+    { "id": "rate-threshold-at-1-per-second", "scenario": "The unit flips at its stated threshold (1.0 half)", "rate": 1.0, "scale": 1, "denominator": "world-s", "expected": "1.0 t/s" },
+    { "id": "rate-world-ms-denominator-converted", "scenario": "A world-per-millisecond rate is converted", "rate": 0.001, "scale": 1, "denominator": "world-ms", "expected": "1.0 t/s" },
+    { "id": "rate-world-s-denominator-converted", "scenario": "A world-per-second rate is converted", "rate": 0.02, "scale": 1, "denominator": "world-s", "expected": "1.2 t/min" },
+    { "id": "rate-scale60-direction-pinned", "scenario": "A time-warped world converts the denominator in the same direction as a duration", "rate": 0.001, "scale": 60, "denominator": "world-ms", "expected": "60.0 t/s" },
+    { "id": "rate-zero", "scenario": "A zero rate", "rate": 0, "scale": 1, "denominator": "world-ms", "expected": "0.0 t/h" },
+    { "id": "rate-below-display-floor", "scenario": "A rate too small to show at one decimal is not shown as a true zero", "rate": 0.00001, "scale": 1, "denominator": "world-s", "expected": "<0.1 t/h" },
+    { "id": "rate-negative-is-absent", "scenario": "A negative rate reads as the absent form", "rate": -0.01, "scale": 1, "denominator": "world-s", "expected": "—" },
+    { "id": "rate-scale-absent", "scenario": "A rate with no served scale renders absent, not at scale 1", "rate": 0.001, "scale": null, "denominator": "world-ms", "expected": "—" },
+    { "id": "rate-scale-zero", "scenario": "RULING 1 non-positive-scale analogue for rate", "rate": 0.001, "scale": 0, "denominator": "world-ms", "expected": "—", "sdetAdded": true },
+    { "id": "rate-scale-negative", "scenario": "RULING 1 non-positive-scale analogue for rate", "rate": 0.001, "scale": -5, "denominator": "world-ms", "expected": "—", "sdetAdded": true }
+  ],
+
+  "absent": {
+    "duration": [
+      { "id": "absent-duration-undefined", "scenario": "Undefined", "spanMs": null, "scale": 1, "form": "bare", "expected": "—" },
+      { "id": "absent-duration-nan", "scenario": "NaN", "spanMs": "NaN", "scale": 1, "form": "bare", "expected": "—" },
+      { "id": "absent-duration-infinity", "scenario": "Infinity", "spanMs": "Infinity", "scale": 1, "form": "bare", "expected": "—" },
+      { "id": "absent-duration-neg-infinity", "scenario": "Infinity", "spanMs": "-Infinity", "scale": 1, "form": "bare", "expected": "—" }
+    ],
+    "instant": [
+      { "id": "absent-instant-undefined", "scenario": "Undefined", "worldMs": null, "scale": 1, "expected": "—" },
+      { "id": "absent-instant-nan", "scenario": "NaN", "worldMs": "NaN", "scale": 1, "expected": "—" },
+      { "id": "absent-instant-infinity", "scenario": "Infinity", "worldMs": "Infinity", "scale": 1, "expected": "—" },
+      { "id": "absent-instant-neg-infinity", "scenario": "Infinity", "worldMs": "-Infinity", "scale": 1, "expected": "—" }
+    ],
+    "tons": [
+      { "id": "absent-tons-undefined", "scenario": "Undefined", "tons": null, "expected": "—" },
+      { "id": "absent-tons-nan", "scenario": "NaN", "tons": "NaN", "expected": "—" },
+      { "id": "absent-tons-infinity", "scenario": "Infinity", "tons": "Infinity", "expected": "—" },
+      { "id": "absent-tons-neg-infinity", "scenario": "Infinity", "tons": "-Infinity", "expected": "—" }
+    ],
+    "range": [
+      { "id": "absent-range-undefined", "scenario": "Undefined", "value": null, "expected": "—" },
+      { "id": "absent-range-nan", "scenario": "NaN", "value": "NaN", "expected": "—" },
+      { "id": "absent-range-infinity", "scenario": "Infinity", "value": "Infinity", "expected": "—" },
+      { "id": "absent-range-neg-infinity", "scenario": "Infinity", "value": "-Infinity", "expected": "—" }
+    ],
+    "deltaV": [
+      { "id": "absent-deltav-undefined", "scenario": "Undefined", "mps": null, "expected": "—" },
+      { "id": "absent-deltav-nan", "scenario": "NaN", "mps": "NaN", "expected": "—" },
+      { "id": "absent-deltav-infinity", "scenario": "Infinity", "mps": "Infinity", "expected": "—" },
+      { "id": "absent-deltav-neg-infinity", "scenario": "Infinity", "mps": "-Infinity", "expected": "—" }
+    ],
+    "credits": [
+      { "id": "absent-credits-undefined", "scenario": "Undefined", "credits": null, "expected": "—" },
+      { "id": "absent-credits-nan", "scenario": "NaN", "credits": "NaN", "expected": "—" },
+      { "id": "absent-credits-infinity", "scenario": "Infinity", "credits": "Infinity", "expected": "—" },
+      { "id": "absent-credits-neg-infinity", "scenario": "Infinity", "credits": "-Infinity", "expected": "—" }
+    ],
+    "rate": [
+      { "id": "absent-rate-undefined", "scenario": "Undefined", "rate": null, "scale": 1, "denominator": "world-s", "expected": "—" },
+      { "id": "absent-rate-nan", "scenario": "NaN", "rate": "NaN", "scale": 1, "denominator": "world-s", "expected": "—" },
+      { "id": "absent-rate-infinity", "scenario": "Infinity", "rate": "Infinity", "scale": 1, "denominator": "world-s", "expected": "—" },
+      { "id": "absent-rate-neg-infinity", "scenario": "Infinity", "rate": "-Infinity", "scale": 1, "denominator": "world-s", "expected": "—" }
+    ]
+  }
+}

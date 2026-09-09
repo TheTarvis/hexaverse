@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 import {
   captureInteriors,
+  digits,
   mineableBodyId,
   pickAnyOnScreenBodyByPointer,
   selectBody,
@@ -78,12 +79,6 @@ test.use({ storageState: { cookies: [], origins: [] } })
 // across a whole system under its own power, twice, plus a lane crossing.
 test.setTimeout(1_800_000)
 
-async function digits(page: Page, testId: string): Promise<number> {
-  const text = (await page.getByTestId(testId).textContent()) ?? ''
-  const m = text.replace(/,/g, '').match(/-?\d+(\.\d+)?/)
-  return m ? Number(m[0]) : NaN
-}
-
 test.describe('the continuous-space slice, end to end through the new view', () => {
   test('spawn -> see the system -> burn -> dock -> mine -> sell -> refuel -> gate -> jump', async ({
     page,
@@ -155,10 +150,22 @@ test.describe('the continuous-space slice, end to end through the new view', () 
     const lodeId = await pickFarLode(page, home!, stationFeatureId(home!) ?? undefined)
     await selectBody(page, lodeId)
     // The preview quotes the order BEFORE it is committed, and the ceiling
-    // the player agrees to is displayed alongside the point cost.
+    // the player agrees to is displayed alongside the point cost. Each
+    // figure carries its own `data-raw`/`data-unit` pair
+    // (`figure-formatting`, openspec change `add-figure-formatting`, task
+    // 12.1) — the wire value the player is agreeing to, not merely that
+    // some text is on screen.
     await expect(page.getByTestId('preview-panel')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('preview-arrival')).toHaveAttribute('data-unit', 'world-ms-span-in')
+    await expect(page.getByTestId('preview-arrival')).toHaveAttribute('data-raw', /-?\d+(\.\d+)?/)
+    await expect(page.getByTestId('preview-deltav')).toHaveAttribute('data-unit', 'delta-v')
+    await expect(page.getByTestId('preview-deltav')).toHaveAttribute('data-raw', /-?\d+(\.\d+)?/)
     await expect(page.getByTestId('preview-fuel')).toBeVisible()
+    await expect(page.getByTestId('preview-fuel')).toHaveAttribute('data-unit', 'tons')
+    await expect(page.getByTestId('preview-fuel')).toHaveAttribute('data-raw', /-?\d+(\.\d+)?/)
     await expect(page.getByTestId('preview-fuel-ceiling')).toBeVisible()
+    await expect(page.getByTestId('preview-fuel-ceiling')).toHaveAttribute('data-unit', 'tons')
+    await expect(page.getByTestId('preview-fuel-ceiling')).toHaveAttribute('data-raw', /-?\d+(\.\d+)?/)
     await page.getByTestId('burn-button').click()
     await expect(row, 'the burn must actually be under way, not merely end docked').toContainText(
       /under way/i,

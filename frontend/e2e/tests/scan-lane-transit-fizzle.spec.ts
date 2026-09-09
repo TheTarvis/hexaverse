@@ -227,10 +227,22 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
     //    jump directly with the exact read `fleet.Get` performs on any other
     //    trigger (an authenticated `GET /v1/fleets/:id`), and assert ITS
     //    response, not the roster's, shows the fleet arrived.
-    await expect(
-      page.getByTestId(`fleet-row-eta-${fleetId}`),
-      "the jump's own ETA must actually count down to zero before forcing settlement means anything",
-    ).toHaveText('now', { timeout: 900_000 })
+    // A `data-raw <= 0` check on the served remaining span, never the due
+    // form's copy (`figure-formatting`, openspec change
+    // `add-figure-formatting`, task 10.2): the due form is presentation
+    // (RULING 21's literal "now"), and asserting that string would let a
+    // future copy change silently regress this wait to its own timeout.
+    await expect
+      .poll(
+        async () =>
+          Number(await page.getByTestId(`fleet-row-eta-${fleetId}`).getAttribute('data-raw')),
+        {
+          timeout: 900_000,
+          message:
+            "the jump's own ETA must actually count down to zero before forcing settlement means anything",
+        },
+      )
+      .toBeLessThanOrEqual(0)
 
     const settleRes = await page.request.get(`${cfg.apiURL}/v1/fleets/${fleetId}`, {
       headers: { Authorization: `Bearer ${idToken}` },

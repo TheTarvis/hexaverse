@@ -69,7 +69,7 @@ const H = 900
 
 function stage(over: Record<string, unknown> = {}) {
   return render(
-     
+
     <SpaceStage
       systemId="sys_-7_17"
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,6 +77,11 @@ function stage(over: Record<string, unknown> = {}) {
       extent={658.7081316032265}
       worldTime={1}
       selection={null}
+      // SDET repair (add-figure-formatting build adjudications, dispute 2):
+      // `scale` restored to a required key. This file exercises the render
+      // guard, not a figure, so an explicit scale-less mount is the correct
+      // choice — no scenario here renders a scale-dependent figure.
+      scale={undefined}
       {...over}
     />,
   )
@@ -180,6 +185,7 @@ describe('SpaceStage — the unsupported state', () => {
           extent={658.7081316032265}
           worldTime={1}
           selection={null}
+          scale={undefined}
         />
       </div>,
     )
@@ -224,7 +230,7 @@ describe('SpaceStage — the interrupted state', () => {
     const onFirstFrame = vi.fn()
     const { rerender } = render(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={100} selection={null} onFirstFrame={onFirstFrame} />,
+      <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={100} selection={null} onFirstFrame={onFirstFrame} scale={undefined} />,
     )
     const canvas = (await screen.findByTestId('space-canvas')) as HTMLCanvasElement
     loseContext(canvas)
@@ -233,7 +239,7 @@ describe('SpaceStage — the interrupted state', () => {
     // World time has moved on while the context was gone.
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={999_999} selection={null} onFirstFrame={onFirstFrame} />,
+      <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={999_999} selection={null} onFirstFrame={onFirstFrame} scale={undefined} />,
     )
     restoreContext(canvas)
     // The redraw after restore is invoked with the POST-restore world time —
@@ -251,7 +257,7 @@ describe('SpaceStage — the interrupted state', () => {
       return (
         <div>
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={1} selection={{ bodyId: 'feat-body-0' }} />
+          <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={1} selection={{ bodyId: 'feat-body-0' }} scale={undefined} />
           <input data-testid="panel-input" value={text} onChange={(e) => setText(e.target.value)} />
         </div>
       )

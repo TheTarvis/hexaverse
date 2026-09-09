@@ -37,8 +37,9 @@ import type { GameAction } from '@/lib/types/action'
 import { useMyFleets } from '@/hooks/use-fleets'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import { useCancelAction } from '@/hooks/use-actions'
+import { Figure } from '@/components/figure/Figure'
+import { formatByUnit } from '@/lib/format'
 import { queryKeys } from '@/lib/query-keys'
-import { formatEta } from '@/lib/eta'
 import { toast } from '@/lib/toast'
 import { rosterRowStatus, type StatusTone } from './roster-status'
 import { rosterCommandVisibility, rosterMineGate, type IsChartedGate } from './roster-commands'
@@ -67,6 +68,8 @@ export type RosterCommandOwner = 'roster' | 'view'
 export interface FleetRosterProps {
   // The live world clock of the mounting view — the countdown's input.
   worldTime: number
+  /** The mounting view's served world-clock scale — see contract §6. */
+  scale: number | undefined
   /**
    * The mounting view's declaration of who owns the fleet commands. Defaults
    * to `'roster'` — the historical behaviour, and the galaxy view's.
@@ -98,6 +101,7 @@ const NEVER_CHARTED: IsChartedGate = () => false
 
 export function FleetRoster({
   worldTime,
+  scale,
   commandOwner = 'roster',
   isChartedGate = NEVER_CHARTED,
   activeFleetId,
@@ -192,35 +196,50 @@ export function FleetRoster({
                   <span className="flex items-center gap-2 pl-3.5 text-xs text-zinc-400">
                     <span className="truncate">{status.activity}</span>
                     {status.remainingMs !== undefined && (
-                      <span
+                      <Figure
+                        raw={status.remainingMs}
+                        unit="world-ms-span-left"
+                        text={formatByUnit(status.remainingMs, scale, 'world-ms-span-left')}
                         data-testid={`fleet-row-eta-${f.id}`}
                         className="ml-auto font-mono text-zinc-500"
-                      >
-                        {formatEta(status.remainingMs)}
-                      </span>
+                      />
                     )}
                   </span>
                   {/* add-fuel-as-cargo tasks.md 8.1/8.2 — fleet-roster ADDED
                       "The Roster Row Shows Held Fuel and an Estimated
                       Range" / "... a Persistent Stranded Indication". Both
                       figures are rendered VERBATIM off the served roster —
-                      this row derives/computes neither. */}
-                  {f.roster && (
-                    <span className="flex items-center gap-2 pl-3.5 font-mono text-[10px] text-zinc-500">
-                      <span data-testid={`fleet-fuel-${f.id}`}>{f.roster.cargo?.fuel ?? 0}t fuel</span>
-                      <span data-testid={`fleet-range-${f.id}`}>
-                        {f.roster.estimatedRange ?? 0} range
-                      </span>
-                      {f.roster.stranded && (
-                        <span
-                          data-testid={`fleet-stranded-${f.id}`}
-                          className="ml-auto rounded-full border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-amber-300"
-                        >
-                          Stranded
-                        </span>
-                      )}
+                      this row derives/computes neither. An unserved roster
+                      reads as the absent form, never a lying `0t fuel`
+                      (RULING 13). */}
+                  <span className="flex items-center gap-2 pl-3.5 font-mono text-[10px] text-zinc-500">
+                    <span>
+                      <Figure
+                        raw={f.roster?.cargo?.fuel}
+                        unit="tons"
+                        text={formatByUnit(f.roster?.cargo?.fuel ?? NaN, scale, 'tons')}
+                        data-testid={`fleet-fuel-${f.id}`}
+                      />{' '}
+                      fuel
                     </span>
-                  )}
+                    <span>
+                      <Figure
+                        raw={f.roster?.estimatedRange}
+                        unit="range"
+                        text={formatByUnit(f.roster?.estimatedRange ?? NaN, scale, 'range')}
+                        data-testid={`fleet-range-${f.id}`}
+                      />{' '}
+                      range
+                    </span>
+                    {f.roster?.stranded && (
+                      <span
+                        data-testid={`fleet-stranded-${f.id}`}
+                        className="ml-auto rounded-full border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-amber-300"
+                      >
+                        Stranded
+                      </span>
+                    )}
+                  </span>
                 </button>
 
                 {rowOwnsCommands && (

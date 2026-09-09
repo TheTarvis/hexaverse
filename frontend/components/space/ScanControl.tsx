@@ -23,9 +23,11 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/catalyst/button'
+import { figureAttrs, Figure } from '@/components/figure/Figure'
 import { useCancelAction, useRunningScan, useAcknowledgeAction } from '@/hooks/use-actions'
 import { useScan, useScanTargets, useSettledScan } from '@/hooks/use-scan'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
+import { formatByUnit } from '@/lib/format'
 import { commandErrorReason } from '@/lib/rejection-copy'
 import { isStaleTargetRejection, scanErrorCopy, scanFizzleCopy } from '@/lib/scan-copy'
 import { toast } from '@/lib/toast'
@@ -36,6 +38,12 @@ export interface ScanControlProps {
   fleet: Fleet | null
   /** This view's own scale-correct projected world time. */
   worldTime: number
+  /**
+   * The mounting view's served world-clock scale (contract §6). Required
+   * key, nullable value — a forcing function so a mount site cannot
+   * silently omit it and fall back to an assumed scale.
+   */
+  scale: number | undefined
   /** Opens the sighting log — offered from a filed-records report. */
   onOpenLog?: () => void
   /**
@@ -71,17 +79,10 @@ export interface ScanControlProps {
   earlySettleHandoff?: boolean
 }
 
-/** A sweep countdown wants second-level precision, matching the mine countdown's own convention. */
-function countdown(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  const minutes = Math.floor(total / 60)
-  const seconds = total % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
-}
-
 export function ScanControl({
   fleet,
   worldTime,
+  scale,
   onOpenLog,
   committedPending = false,
   onCommitAccepted,
@@ -207,9 +208,21 @@ export function ScanControl({
             This fleet is detectable for the remainder of the sweep.
           </p>
           <div className="flex items-center justify-between">
-            <span data-testid="scan-countdown" className="font-mono text-[11px] text-sky-400">
-              {settling ? 'Settling…' : countdown(runningEta! - worldTime)}
-            </span>
+            {settling ? (
+              // F4: the settling state renders NO figure — a plain span with
+              // the mandated override copy and no data-raw/data-unit pair.
+              <span data-testid="scan-countdown" className="font-mono text-[11px] text-sky-400">
+                Settling…
+              </span>
+            ) : (
+              <Figure
+                raw={runningEta! - worldTime}
+                unit="world-ms-span-left"
+                text={formatByUnit(runningEta! - worldTime, scale, 'world-ms-span-left')}
+                data-testid="scan-countdown"
+                className="font-mono text-[11px] text-sky-400"
+              />
+            )}
             <button
               type="button"
               data-testid="scan-cancel"
@@ -286,8 +299,12 @@ export function ScanControl({
             onChange={(e) => setSelectedHostId(e.target.value)}
           >
             {targets.map((t) => (
-              <option key={t.hostId} value={t.hostId}>
-                {t.kind} · {t.hostId} · {countdown(t.durationMs)}
+              <option
+                key={t.hostId}
+                value={t.hostId}
+                {...figureAttrs(t.durationMs, 'world-ms-span-bare')}
+              >
+                {t.kind} · {t.hostId} · {formatByUnit(t.durationMs, scale, 'world-ms-span-bare')}
               </option>
             ))}
           </select>

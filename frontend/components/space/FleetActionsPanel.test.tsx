@@ -74,6 +74,22 @@ vi.mock('@/lib/toast', () => ({
 
 import { FleetActionsPanel } from './FleetActionsPanel'
 import { foldSale } from '@/lib/market/fold'
+import { assertFiguresMatchModule } from '@/lib/format/assert-figures'
+
+// MIGRATION NOTE (task 9.1, openspec change `add-figure-formatting`): every
+// assertion below that used to read rendered figure TEXT now reads the
+// `data-raw`/`data-unit` pair `<Figure>` emits, and every group calls
+// `assertFiguresMatchModule` at least once with a served scale and at least
+// once with `{ scale: undefined }` (contract §7 Phase D's own coverage
+// requirement, RULING 8/26). `FleetActionsPanel` gains a required `scale:
+// number | undefined` prop (task 5.8) — the `panel()` helper below supplies
+// `scale={1}` by default; tests that need the scale-absent branch pass
+// `scale: undefined` explicitly.
+//
+// Two visible copy changes this migration expects, not regresses (contract
+// §4/F10): `hold-capacity` now reads two figures, `{used} t / {total} t`,
+// each carrying its own unit — not today's single `{used} / {total} t`. The
+// mine/scan countdown shape change (`M:SS` -> `Nm Ss`) is RULING 15.
 
 const T0 = 21_175_110_953
 
@@ -150,6 +166,7 @@ function panel(over: Record<string, unknown> = {}) {
       credits={1000}
       canvasAvailable
       worldTime={T0}
+      scale={1}
       {...over}
     />,
   )
@@ -215,27 +232,30 @@ describe('FleetActionsPanel — the mine offer', () => {
 
   // Scenario: The preview tracks the tonnage input
   it('Scenario: The preview tracks the tonnage input', async () => {
-    panel()
+    const { container } = panel()
     const input = screen.getByTestId('mine-tons-input') as HTMLInputElement
     await userEvent.clear(input)
     await userEvent.type(input, '10')
-    const ten = screen.getByTestId('mine-eta-preview').textContent
+    // mine-eta-preview is a `world-ms-span-bare` figure now (case b — the
+    // testid moves onto the <Figure>, "About"/"at the served rate" are
+    // siblings): its raw is the client-derived tonnage/rate span.
+    expect(screen.getByTestId('mine-eta-preview')).toHaveAttribute('data-unit', 'world-ms-span-bare')
+    const ten = screen.getByTestId('mine-eta-preview').getAttribute('data-raw')
     await userEvent.clear(input)
     await userEvent.type(input, '20')
-    const twenty = screen.getByTestId('mine-eta-preview').textContent
-    expect(twenty, 'doubling the tonnage must change the previewed duration').not.toBe(ten)
+    const twenty = screen.getByTestId('mine-eta-preview').getAttribute('data-raw')
+    expect(twenty, 'doubling the tonnage must change the previewed duration raw span').not.toBe(ten)
+    expect(Number(twenty)).toBeCloseTo(Number(ten) * 2, 6)
+    assertFiguresMatchModule(container, { scale: 1 })
   })
 
   it('SDET-added: the previewed duration is tonnage divided by the SERVED mining rate', async () => {
     // A hard-coded rate would survive the "it moves" test above; this one
-    // changes the served rate and requires the preview to follow.
+    // changes the served rate and requires the preview's RAW span to follow.
     panel()
-    const fast = screen.getByTestId('mine-eta-preview').textContent
-    const { unmount } = { unmount: () => {} }
-    unmount()
-    screen.getByTestId('mine-section')
+    const fastRaw = Number(screen.getByTestId('mine-eta-preview').getAttribute('data-raw'))
     const slow = render(
-       
+
       <FleetActionsPanel
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         fleet={fleet({ roster: { ...fleet().roster, miningRate: 0.0002 } }) as any}
@@ -247,10 +267,11 @@ describe('FleetActionsPanel — the mine offer', () => {
         credits={1000}
         canvasAvailable
         worldTime={T0}
+        scale={1}
       />,
     )
-    const slower = slow.getAllByTestId('mine-eta-preview').at(-1)!.textContent
-    expect(slower).not.toBe(fast)
+    const slowerRaw = Number(slow.getAllByTestId('mine-eta-preview').at(-1)!.getAttribute('data-raw'))
+    expect(slowerRaw, 'a slower served rate must widen the raw previewed span').toBeGreaterThan(fastRaw)
   })
 
   // Scenario: A successful mine commit arms the countdown  +
@@ -265,12 +286,15 @@ describe('FleetActionsPanel — the mine offer', () => {
     // The countdown derives from the RETURNED eta, not the pre-commit
     // preview. 123456 ms is deliberately unlike the previewed duration.
     runningMine = { id: 'act_1', eta: T0 + 123_456 }
-    const { rerender } = panel()
+    const { rerender, container } = panel()
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FleetActionsPanel fleet={fleet() as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={1000} canvasAvailable worldTime={T0} />,
+      <FleetActionsPanel fleet={fleet() as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={1000} canvasAvailable worldTime={T0} scale={1} />,
     )
-    expect(screen.getAllByTestId('mine-countdown').at(-1)!.textContent).toMatch(/2:03|123|2 min/i)
+    const countdown = screen.getAllByTestId('mine-countdown').at(-1)!
+    expect(countdown).toHaveAttribute('data-unit', 'world-ms-span-left')
+    expect(countdown).toHaveAttribute('data-raw', '123456')
+    assertFiguresMatchModule(container, { scale: 1 })
   })
 
   // Scenario: A failed mine commit toasts the reason
@@ -333,25 +357,58 @@ describe('FleetActionsPanel — running mine gates the movement commands', () =>
 describe('FleetActionsPanel — the cargo hold readout', () => {
   // Scenario: The hold readout shows contents and capacity
   it('Scenario: The hold readout shows contents and capacity', () => {
-    panel()
-    expect(screen.getByTestId('hold-capacity')).toHaveTextContent(/18.*40|40/)
-    expect(screen.getByTestId('hold-metals')).toHaveTextContent(/10/)
-    expect(screen.getByTestId('hold-organics')).toHaveTextContent(/2/)
+    const { container } = panel()
+    // `hold-capacity` (case c) is now a wrapper carrying two figures, each
+    // its own testid: `hold-capacity-used` (client-derived, 40-22=18) and
+    // `hold-capacity-total` (roster.cargoCapacity, served) — F10's named
+    // copy change (`18.0 t / 40.0 t`, not today's `18 / 40 t`).
+    const used = screen.getByTestId('hold-capacity-used')
+    expect(used).toHaveAttribute('data-unit', 'tons')
+    expect(used).toHaveAttribute('data-raw', '18')
+    const total = screen.getByTestId('hold-capacity-total')
+    expect(total).toHaveAttribute('data-unit', 'tons')
+    expect(total).toHaveAttribute('data-raw', '40')
+    // `hold-{kind}` (case c) keeps its wrapper id (carrying the kind label);
+    // `hold-{kind}-tons` is the nested figure.
+    expect(screen.getByTestId('hold-metals-tons')).toHaveAttribute('data-raw', '10')
+    expect(screen.getByTestId('hold-organics-tons')).toHaveAttribute('data-raw', '2')
     // `fuel` rides the SAME cargo map, never a separate field.
-    expect(screen.getByTestId('hold-fuel')).toHaveTextContent(/6/)
-    expect(screen.getByTestId('hold-free')).toHaveTextContent(/22/)
+    expect(screen.getByTestId('hold-fuel-tons')).toHaveAttribute('data-raw', '6')
+    // `hold-free` (case b) — the testid moves onto the Figure itself.
+    expect(screen.getByTestId('hold-free')).toHaveAttribute('data-raw', '22')
+    expect(screen.getByTestId('hold-free')).toHaveAttribute('data-unit', 'tons')
+    assertFiguresMatchModule(container, { scale: 1 })
   })
 
   // Scenario: The hold visibly fills when a mine run resolves
   it('Scenario: The hold visibly fills when a mine run resolves', () => {
-    const { rerender } = panel()
-    expect(screen.getByTestId('hold-metals')).toHaveTextContent(/10/)
+    const { rerender, container } = panel()
+    expect(screen.getByTestId('hold-metals-tons')).toHaveAttribute('data-raw', '10')
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FleetActionsPanel fleet={fleet({ roster: { ...fleet().roster, cargo: { fuel: 6, metals: 30, organics: 2 }, freeHold: 2 } }) as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={1000} canvasAvailable worldTime={T0} />,
+      <FleetActionsPanel fleet={fleet({ roster: { ...fleet().roster, cargo: { fuel: 6, metals: 30, organics: 2 }, freeHold: 2 } }) as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={1000} canvasAvailable worldTime={T0} scale={1} />,
     )
-    expect(screen.getByTestId('hold-metals')).toHaveTextContent(/30/)
-    expect(screen.getByTestId('hold-free')).toHaveTextContent(/\b2\b/)
+    expect(screen.getByTestId('hold-metals-tons')).toHaveAttribute('data-raw', '30')
+    expect(screen.getByTestId('hold-free')).toHaveAttribute('data-raw', '2')
+    assertFiguresMatchModule(container, { scale: 1 })
+  })
+
+  it('SDET-added: the hold readout on a scale-less mount still renders (tonnage needs no scale, RULING 26)', () => {
+    const { container } = panel({ scale: undefined })
+    expect(screen.getByTestId('hold-free')).toHaveAttribute('data-raw', '22')
+    assertFiguresMatchModule(container, { scale: undefined })
+  })
+
+  it('Scenario: An unloaded roster reads as absent, not an empty hold', () => {
+    // WHEN the fleet read has not yet served roster fields for the acting
+    // fleet, THEN used/total capacity and free hold read as the absent
+    // form, never `0 / 0 t` or `0 t free`.
+    panel({ fleet: fleet({ roster: undefined }) })
+    expect(screen.getByTestId('hold-capacity-used')).not.toHaveAttribute('data-raw')
+    expect(screen.getByTestId('hold-capacity-used')).toHaveTextContent('—')
+    expect(screen.getByTestId('hold-capacity-total')).not.toHaveAttribute('data-raw')
+    expect(screen.getByTestId('hold-free')).not.toHaveAttribute('data-raw')
+    expect(screen.getByTestId('hold-free')).toHaveTextContent('—')
   })
 })
 
@@ -401,14 +458,16 @@ describe('FleetActionsPanel — the sell offer', () => {
 
   // Scenario: The proceeds preview reflects the served quote
   it('Scenario: The proceeds preview reflects the served quote', async () => {
-    panel(docked)
+    const { container } = panel(docked)
     const input = screen.getByTestId('sell-tons-input') as HTMLInputElement
     await userEvent.clear(input)
     await userEvent.type(input, '2')
-    const two = screen.getByTestId('sell-proceeds-preview').textContent
+    expect(screen.getByTestId('sell-proceeds-preview')).toHaveAttribute('data-unit', 'credits')
+    const two = screen.getByTestId('sell-proceeds-preview').getAttribute('data-raw')
     await userEvent.clear(input)
     await userEvent.type(input, '4')
-    expect(screen.getByTestId('sell-proceeds-preview').textContent).not.toBe(two)
+    expect(screen.getByTestId('sell-proceeds-preview').getAttribute('data-raw')).not.toBe(two)
+    assertFiguresMatchModule(container, { scale: 1 })
   })
 
   // Scenario: A split-fill preview matches the settlement fold exactly
@@ -423,7 +482,10 @@ describe('FleetActionsPanel — the sell offer', () => {
     const input = screen.getByTestId('sell-tons-input') as HTMLInputElement
     await userEvent.clear(input)
     await userEvent.type(input, '10')
-    expect(screen.getByTestId('sell-proceeds-preview')).toHaveTextContent(String(expected.totalProceeds))
+    expect(screen.getByTestId('sell-proceeds-preview')).toHaveAttribute(
+      'data-raw',
+      String(expected.totalProceeds),
+    )
   })
 
   // Scenario: A successful sale refreshes hold and balance
@@ -436,9 +498,9 @@ describe('FleetActionsPanel — the sell offer', () => {
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FleetActionsPanel fleet={fleet({ attachedTo: 'feat-station', roster: { ...fleet().roster, cargo: { fuel: 6, organics: 2 } } }) as any} dockedFeature={STATION_BODY as any} interiorFailed={false} station={STATION as any} stationQuotes={QUOTES as any} credits={1050} canvasAvailable worldTime={T0} />,
+      <FleetActionsPanel fleet={fleet({ attachedTo: 'feat-station', roster: { ...fleet().roster, cargo: { fuel: 6, organics: 2 } } }) as any} dockedFeature={STATION_BODY as any} interiorFailed={false} station={STATION as any} stationQuotes={QUOTES as any} credits={1050} canvasAvailable worldTime={T0} scale={1} />,
     )
-    expect(screen.getByTestId('balance-value')).toHaveTextContent(/1050|1,050/)
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1050')
   })
 
   // Scenario: A failed sale toasts player-facing copy, not raw server text
@@ -457,19 +519,106 @@ describe('FleetActionsPanel — the sell offer', () => {
   // Scenario: A price-changed rejection refreshes the offer instead of
   // freezing it  +  Scenario: Re-committing a re-priced sale uses a new
   // operation key
+  //
+  // SDET repair (add-figure-formatting build adjudications, dispute 3). The
+  // original version of this test asserted only that `sell-price-expected`
+  // and `sell-price-refreshed` DIFFER — an assertion both the wrong
+  // implementation (`sellTons × expectedUnitPrice`, a flat single-price
+  // estimate) and the right one (the settlement fold's `totalProceeds`,
+  // captured at commit time) satisfy, because they are computed by two
+  // different formulas over the same entries regardless of whether a real
+  // re-quote ever happens. That is `README.md` lesson two's shape: a test
+  // shaped so it cannot observe the failure it was written to catch.
+  //
+  // Strengthened two ways:
+  //   1. `sell-price-expected` is asserted EQUAL to the fold's
+  //      `totalProceeds` at commit time, not merely "some number".
+  //   2. The fixture is a genuine split fill (`fills.length > 1`), so the
+  //      flat estimate and the fold provably diverge — otherwise a
+  //      non-split fixture would let the flat estimate coincide with the
+  //      fold and this test would still not distinguish the two
+  //      implementations.
+  // The comparison between "expected" and "refreshed" is now driven by an
+  // ACTUAL re-quote (a rerender with different `stationQuotes`), not by
+  // comparing two different formulas over unchanged entries.
   it('Scenario: Re-committing a re-priced sale uses a new operation key', async () => {
+    const preCommitEntries = QUOTES.quotes[0].entries
+    const expectedAtCommit = foldSale(preCommitEntries as never, 10)
+    expect(expectedAtCommit.fills.length, 'the fixture case must actually split').toBeGreaterThan(1)
+    const flatEstimate = 10 * preCommitEntries[0].unitPrice
+    expect(
+      flatEstimate,
+      'the flat single-price estimate and the settlement fold must diverge, or this test cannot ' +
+        'tell the wrong implementation from the right one',
+    ).not.toBe(expectedAtCommit.totalProceeds)
+
     sell.mutate.mockImplementationOnce((_v: unknown, opts?: { onError?: (e: unknown) => void }) => {
       opts?.onError?.(
         Object.assign(new Error('x'), { data: { error: 'market: price changed since your quote' } }),
       )
     })
-    panel(docked)
+    const { container, rerender } = panel(docked)
     await userEvent.click(screen.getByTestId('sell-button'))
     const firstKey = (sell.mutate.mock.calls[0][0].request ?? sell.mutate.mock.calls[0][0]).operationKey
     expect(firstKey).toBeTruthy()
+
+    // The station genuinely re-quotes between commit and now — a real price
+    // change, not an artifact of comparing two formulas over one fixture.
+    const REPRICED_QUOTES = {
+      ...QUOTES,
+      quotes: [
+        {
+          kind: 'metals',
+          entries: [
+            { unitPrice: 20, source: 'request', remainingQuantity: 4, requestId: 'r1' },
+            { unitPrice: 5, source: 'floor', unlimited: true },
+          ],
+        },
+      ],
+    }
+    const expectedAfterRequote = foldSale(REPRICED_QUOTES.quotes[0].entries as never, 10)
+    rerender(
+      <FleetActionsPanel
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fleet={docked.fleet as any}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dockedFeature={STATION_BODY as any}
+        interiorFailed={false}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        station={STATION as any}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        stationQuotes={REPRICED_QUOTES as any}
+        credits={1000}
+        canvasAvailable
+        worldTime={T0}
+        scale={1}
+      />,
+    )
+
     // The offer refreshes rather than freezing: the player is shown the new
-    // figure alongside the one they expected.
+    // figure alongside the one they expected. `sell-price-changed` (case c)
+    // keeps its wrapper id with NO pair; `sell-price-expected` and
+    // `sell-price-refreshed` are the two child <Figure>s, each its own
+    // credits figure (contract §4).
     await waitFor(() => expect(screen.getByTestId('sell-price-changed')).toBeInTheDocument())
+    expect(screen.getByTestId('sell-price-changed')).not.toHaveAttribute('data-raw')
+    expect(screen.getByTestId('sell-price-expected')).toHaveAttribute('data-unit', 'credits')
+    expect(screen.getByTestId('sell-price-refreshed')).toHaveAttribute('data-unit', 'credits')
+    // THE CORE OF THIS REPAIR: what the player "expected" is the settlement
+    // fold shown on screen at commit time — never `sellTons × a single unit
+    // price` — so it must equal that fold's `totalProceeds` exactly.
+    expect(screen.getByTestId('sell-price-expected')).toHaveAttribute(
+      'data-raw',
+      String(expectedAtCommit.totalProceeds),
+    )
+    expect(screen.getByTestId('sell-price-refreshed')).toHaveAttribute(
+      'data-raw',
+      String(expectedAfterRequote.totalProceeds),
+    )
+    expect(screen.getByTestId('sell-price-expected').getAttribute('data-raw')).not.toBe(
+      screen.getByTestId('sell-price-refreshed').getAttribute('data-raw'),
+    )
+    assertFiguresMatchModule(container, { scale: 1 })
     // Re-commit: a re-priced sale is a NEW INTENT, never a retry.
     await userEvent.click(screen.getByTestId('sell-button'))
     const secondKey = (sell.mutate.mock.calls[1][0].request ?? sell.mutate.mock.calls[1][0]).operationKey
@@ -539,22 +688,24 @@ describe('FleetActionsPanel — the refuel offer', () => {
   // Scenario: The cost preview reflects the server-served fuel price, not a
   // client-maintained constant
   it('Scenario: The cost preview reflects the server-served fuel price, not a client-maintained constant', async () => {
-    panel(docked)
+    const { container } = panel(docked)
     const input = screen.getByTestId('refuel-tons-input') as HTMLInputElement
     await userEvent.clear(input)
     await userEvent.type(input, '3')
-    expect(screen.getByTestId('refuel-cost-preview')).toHaveTextContent(/15/) // 3 x 5
+    expect(screen.getByTestId('refuel-cost-preview')).toHaveAttribute('data-unit', 'credits')
+    expect(screen.getByTestId('refuel-cost-preview')).toHaveAttribute('data-raw', '15') // 3 x 5
+    assertFiguresMatchModule(container, { scale: 1 })
 
     // Change ONLY the served price. A client-maintained constant would not
     // move.
-    render(
+    const second = render(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FleetActionsPanel fleet={fleet({ attachedTo: 'feat-station', roster: { ...fleet().roster, fuelPricePerTon: 11 } }) as any} dockedFeature={STATION_BODY as any} interiorFailed={false} station={STATION as any} stationQuotes={QUOTES as any} credits={1000} canvasAvailable worldTime={T0} />,
+      <FleetActionsPanel fleet={fleet({ attachedTo: 'feat-station', roster: { ...fleet().roster, fuelPricePerTon: 11 } }) as any} dockedFeature={STATION_BODY as any} interiorFailed={false} station={STATION as any} stationQuotes={QUOTES as any} credits={1000} canvasAvailable worldTime={T0} scale={1} />,
     )
-    const second = screen.getAllByTestId('refuel-tons-input').at(-1) as HTMLInputElement
-    await userEvent.clear(second)
-    await userEvent.type(second, '3')
-    expect(screen.getAllByTestId('refuel-cost-preview').at(-1)).toHaveTextContent(/33/)
+    const secondInput = second.getAllByTestId('refuel-tons-input').at(-1) as HTMLInputElement
+    await userEvent.clear(secondInput)
+    await userEvent.type(secondInput, '3')
+    expect(second.getAllByTestId('refuel-cost-preview').at(-1)).toHaveAttribute('data-raw', '33')
   })
 
   // Scenario: A successful refuel refreshes hold, range, and balance
@@ -579,7 +730,7 @@ describe('FleetActionsPanel — the refuel offer', () => {
     await waitFor(() => expect(toastError).toHaveBeenCalled())
     expect(String(toastError.mock.calls[0][0])).not.toContain(raw)
     // No partial credit is shown anywhere: the hold readout is untouched.
-    expect(screen.getByTestId('hold-fuel')).toHaveTextContent(/\b6\b/)
+    expect(screen.getByTestId('hold-fuel-tons')).toHaveAttribute('data-raw', '6')
   })
 })
 
@@ -630,9 +781,16 @@ describe('FleetActionsPanel — station-keeping hold and release', () => {
 
   // Scenario: The drain readout shows the served upkeep rate while holding
   it('Scenario: The drain readout shows the served upkeep rate while holding', () => {
-    panel({ fleet: holding })
-    expect(screen.getByTestId('stationkeep-rate')).toHaveTextContent(/0\.02/)
-    expect(screen.getByTestId('stationkeep-rate').textContent!.toLowerCase()).toMatch(/t|ton/)
+    // `stationkeep-rate` is now a `tons-per-world-s` figure converted to a
+    // WALL-CLOCK rate by figure-formatting: the served 0.02 t/world-s reads
+    // as "1.2 t/min" at scale 1, never the raw "0.02" (RULING 3/4). The raw
+    // wire value still lives on `data-raw`.
+    const { container } = panel({ fleet: holding })
+    const rate = screen.getByTestId('stationkeep-rate')
+    expect(rate).toHaveAttribute('data-unit', 'tons-per-world-s')
+    expect(rate).toHaveAttribute('data-raw', '0.02')
+    expect(rate.textContent!.toLowerCase()).toMatch(/t\/(s|min|h)/)
+    assertFiguresMatchModule(container, { scale: 1 })
   })
 
   // Scenario: The Hold control prices the hold before it is taken
@@ -644,9 +802,17 @@ describe('FleetActionsPanel — station-keeping hold and release', () => {
     panel({ fleet: orbiting })
     const rate = screen.getByTestId('stationkeep-rate')
     expect(rate).toBeInTheDocument()
-    expect(rate).toHaveTextContent(/0\.02/)
+    expect(rate).toHaveAttribute('data-raw', '0.02')
     // ...and it is attached to the "Hold here" control itself.
     expect(screen.getByTestId('stationkeep-control')).toHaveTextContent(/hold here/i)
+  })
+
+  it('SDET-added: the drain readout on a scale-less mount renders absent (a rate needs the scale, RULING 8/26)', () => {
+    const { container } = panel({ fleet: holding, scale: undefined })
+    const rate = screen.getByTestId('stationkeep-rate')
+    expect(rate).toHaveAttribute('data-raw', '0.02')
+    expect(rate).toHaveTextContent('—')
+    assertFiguresMatchModule(container, { scale: undefined })
   })
 
   // Scenario: The drain readout is never derived from orbital elements
@@ -704,8 +870,25 @@ describe('FleetActionsPanel — station-keeping hold and release', () => {
 describe('FleetActionsPanel — the credit balance readout', () => {
   // Scenario: The panel shows the current credit balance
   it('Scenario: The panel shows the current credit balance', () => {
-    panel({ credits: 4321 })
-    expect(screen.getByTestId('balance-value')).toHaveTextContent(/4321|4,321/)
+    // `balance-value` (case c) keeps its id AND `data-available`; the new
+    // child `balance-figure` carries the credits pair.
+    const { container } = panel({ credits: 4321 })
+    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'true')
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-unit', 'credits')
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '4321')
+    assertFiguresMatchModule(container, { scale: 1 })
+  })
+
+  // Scenario: An unavailable balance reads as unavailable, not as a figure
+  it('Scenario: An unavailable balance reads as unavailable, not as a figure', () => {
+    panel({ credits: null })
+    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'false')
+    expect(screen.getByTestId('balance-value')).toHaveTextContent(/unavailable/i)
+    // The credit override, not figure-formatting's generic `—` (RULING 13):
+    // no balance-figure element at all, and the wrapper itself carries no
+    // data-raw/data-unit pair.
+    expect(screen.queryByTestId('balance-figure')).toBeNull()
+    expect(screen.getByTestId('balance-value')).not.toHaveAttribute('data-raw')
   })
 
   // Scenario: A balance change is announced to assistive technology
@@ -715,9 +898,19 @@ describe('FleetActionsPanel — the credit balance readout', () => {
     expect(live).toHaveAttribute('aria-live')
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FleetActionsPanel fleet={fleet() as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={1200} canvasAvailable worldTime={T0} />,
+      <FleetActionsPanel fleet={fleet() as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={1200} canvasAvailable worldTime={T0} scale={1} />,
     )
     expect(screen.getByTestId('balance-live-region').textContent).toMatch(/1200|1,200/)
+  })
+
+  it('Scenario: A transition to or from an unavailable balance is announced', () => {
+    const { rerender } = panel({ credits: 1000 })
+    rerender(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      <FleetActionsPanel fleet={fleet() as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={null} canvasAvailable worldTime={T0} scale={1} />,
+    )
+    // The region must NOT render as empty text on this transition.
+    expect(screen.getByTestId('balance-live-region').textContent ?? '').not.toBe('')
   })
 
   // Scenario: A failed sale's or refuel's error is announced to assistive

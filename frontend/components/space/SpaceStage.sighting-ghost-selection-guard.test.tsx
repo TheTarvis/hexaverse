@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
 
 // RED-PHASE ADDENDUM — openspec change add-scan-and-sightings-surface,
@@ -94,6 +94,15 @@ const scene = {
 }
 
 import { SpaceStage } from './SpaceStage'
+import { assertFiguresMatchModule } from '@/lib/format/assert-figures'
+
+// SDET-ADDED MIGRATION (openspec change `add-figure-formatting`, not itself
+// a task-9.x-named file, but directly affected): `SpaceStage` gains a
+// required `scale` prop, and the ghost mark's sr-only `asOf` label
+// (`sighting-mark-asof-{recordId}`) becomes a `world-ms-instant` figure
+// (contract §4's `SpaceStage.tsx` table). This fixture already carries
+// `asOf: 42_000` unused by the selection-guard scenario above; this file is
+// the natural place to close that gap rather than leave it unautomated.
 
 const W = 1200
 const H = 900
@@ -118,6 +127,7 @@ function stage(over: Record<string, unknown> = {}) {
       worldTime={1}
       selection={null}
       onSelect={onSelect}
+      scale={1}
       {...over}
     />,
   )
@@ -170,5 +180,42 @@ describe('SpaceStage — the ghost-selection guard (system-space-view "A Ghost I
       'this harness must be ABLE to produce a point selection at all, or the primary test\'s negative ' +
         'assertion (no point selection from a ghost click) would be vacuous rather than meaningful',
     ).toHaveBeenCalled()
+  })
+
+  // SDET-added: system-space-view "A ghost's asOf label reads as a formatted
+  // stamp, on the mark and on its facts surface" (mark half).
+  it('SDET-added: the ghost mark\'s sr-only asOf label is a world-ms-instant figure carrying its raw served value', () => {
+    const { container } = stage()
+    const label = screen.getByTestId(`sighting-mark-asof-${RECORD_ID}`)
+    expect(label).toHaveAttribute('data-unit', 'world-ms-instant')
+    expect(label).toHaveAttribute('data-raw', '42000')
+    expect(label.textContent).toContain('Observed at ')
+    expect(label.textContent).toContain('T+ 0d 00:00 ×1')
+    assertFiguresMatchModule(container, { scale: 1 })
+  })
+
+  it('SDET-added: on a scale-less mount the ghost mark\'s asOf still renders its T+ portion, with an absent suffix', () => {
+    const { container } = stage({ scale: undefined })
+    const label = screen.getByTestId(`sighting-mark-asof-${RECORD_ID}`)
+    expect(label).toHaveAttribute('data-raw', '42000')
+    expect(label.textContent).toContain('×—')
+    assertFiguresMatchModule(container, { scale: undefined })
+  })
+
+  // SDET-added: system-space-view "A ghost's asOf label reads as a formatted
+  // stamp, on the mark and on its facts surface" (facts-surface half — task
+  // 7.3, `SpaceStage.tsx:708`'s on-hover "Observed at" line). No test in
+  // this repo asserted `sighting-facts` at all before this change (verified
+  // by grep), so this is new coverage, not a migration.
+  it('SDET-added: hovering a ghost shows the sighting-facts surface with a world-ms-instant asOf figure', async () => {
+    const { container } = stage()
+    const ghost = screen.getByTestId(`sighting-mark-${RECORD_ID}`)
+    fireEvent.pointerOver(ghost)
+    const facts = await screen.findByTestId('sighting-facts')
+    const asOf = screen.getByTestId('sighting-facts-asof')
+    expect(asOf).toHaveAttribute('data-unit', 'world-ms-instant')
+    expect(asOf).toHaveAttribute('data-raw', '42000')
+    expect(facts.textContent).toContain('Observed at')
+    assertFiguresMatchModule(container, { scale: 1 })
   })
 })

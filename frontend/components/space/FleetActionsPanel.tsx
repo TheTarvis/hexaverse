@@ -22,11 +22,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/catalyst/badge'
 import { Button } from '@/components/catalyst/button'
+import { Figure } from '@/components/figure/Figure'
 import { Input } from '@/components/catalyst/input'
 import { useCancelAction, useRunningMine } from '@/hooks/use-actions'
 import { useCutDrive, useHold, useMine, useRelease, useStop } from '@/hooks/use-fleets'
 import { useRefuel, useSell } from '@/hooks/use-market'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
+import { formatByUnit } from '@/lib/format'
 import { firstTonPrice, foldSale } from '@/lib/market/fold'
 import { GENERIC_SALE_FAILURE, isPriceChanged, saleErrorCopy } from '@/lib/market-copy'
 import { refuelErrorCopy } from '@/lib/refuel-copy'
@@ -63,18 +65,12 @@ export interface FleetActionsPanelProps {
   credits: number | null
   canvasAvailable: boolean
   worldTime: number
+  /** The mounting view's served world-clock scale — see contract §6. */
+  scale: number | undefined
 }
 
 const SECTION = 'mt-3 border-t border-dashed border-white/15 pt-3'
 const LABEL = 'font-mono text-[11px] font-medium tracking-wide text-zinc-400 uppercase'
-
-/** A mine countdown wants second-level precision — "2:03", not "2m". */
-function countdown(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  const minutes = Math.floor(total / 60)
-  const seconds = total % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
-}
 
 function clampTons(raw: string, max: number): number {
   const parsed = Number(raw)
@@ -90,12 +86,22 @@ export function FleetActionsPanel({
   stationQuotes,
   credits,
   worldTime,
+  scale,
 }: FleetActionsPanelProps) {
   const fleetId = fleet?.id ?? ''
   const systemId = fleet?.systemId ?? ''
   const roster = fleet?.roster
   const held = useMemo(() => roster?.cargo ?? {}, [roster?.cargo])
   const freeHold = roster?.freeHold ?? 0
+  // The FIGURE-ONLY raw values: undefined when the roster hasn't been
+  // served, so the hold readout reads figure-formatting's absent form
+  // instead of a lying `0 t` (`docked-fleet-actions`: "An unloaded roster
+  // reads as absent, not an empty hold"). Every OTHER computation in this
+  // panel keeps its numeric default (`freeHold` above) unchanged.
+  const freeHoldRaw = roster?.freeHold
+  const cargoCapacityRaw = roster?.cargoCapacity
+  const cargoUsedRaw =
+    typeof cargoCapacityRaw === 'number' ? cargoCapacityRaw - freeHold : undefined
 
   const mine = useMine(systemId)
   const sell = useSell(systemId)
@@ -200,7 +206,11 @@ export function FleetActionsPanel({
     sellKind && sellable.some((q) => q.kind === sellKind) ? sellKind : (sellable[0]?.kind ?? null)
   const sellHeld = activeSellKind ? (held[activeSellKind] ?? 0) : 0
   const [sellTons, setSellTons] = useState<number>(0)
-  const [repricedFrom, setRepricedFrom] = useState<number | null>(null)
+  // What the player was quoted at commit time (`sellPreview.totalProceeds`,
+  // captured — the same fold `sell-proceeds-preview` was showing, never a
+  // flat tons × price re-derivation) versus what the CURRENT fold now says —
+  // the two figures `sell-price-changed` compares (contract §4).
+  const [priceChange, setPriceChange] = useState<{ expectedTotal: number } | null>(null)
 
   const sellEntries = useMemo(
     () => quotes.find((q) => q.kind === activeSellKind)?.entries ?? [],
@@ -226,6 +236,13 @@ export function FleetActionsPanel({
     // dedup them and the player is charged twice.
     if (!sellGuard.claim()) return
     const operationKey = newOperationKey()
+    const expectedUnitPrice = firstTonPrice(sellEntries)
+    // The fold's total that was ON SCREEN at commit time (`sell-proceeds-preview`),
+    // captured — not tons × price. Proceeds are a fold across entries, not a
+    // flat multiply (`docked-fleet-actions`: *A split-fill preview matches the
+    // settlement fold exactly*), so the figure the player compares against must
+    // be the one they actually saw.
+    const expectedTotal = sellPreview.totalProceeds
     sell.mutate(
       {
         fleetId: fleet.id,
@@ -234,19 +251,19 @@ export function FleetActionsPanel({
           kind: activeSellKind,
           tons: sellTons,
           operationKey,
-          expectedUnitPrice: firstTonPrice(sellEntries),
+          expectedUnitPrice,
         },
       },
       {
         onSuccess: () => {
           sellGuard.release()
-          setRepricedFrom(null)
+          setPriceChange(null)
           toast.success('Sale settled.')
         },
         onError: (error: unknown) => {
           sellGuard.release()
           const reason = commandErrorReason(error)
-          if (isPriceChanged(reason)) setRepricedFrom(firstTonPrice(sellEntries))
+          if (isPriceChanged(reason)) setPriceChange({ expectedTotal })
           reportFailure(reason ? saleErrorCopy(reason) : GENERIC_SALE_FAILURE)
         },
         onSettled: () => sellGuard.release(),
@@ -315,8 +332,6 @@ export function FleetActionsPanel({
     )
   }
 
-  const cargoUsed = (roster?.cargoCapacity ?? 0) - freeHold
-
   return (
     <aside
       data-testid="space-fleet-panel"
@@ -338,11 +353,20 @@ export function FleetActionsPanel({
             credits === null ? 'text-zinc-500 italic' : 'text-zinc-900 dark:text-white'
           }`}
         >
-          {credits === null ? 'Unavailable' : credits}
+          {credits === null ? (
+            'Unavailable'
+          ) : (
+            <Figure
+              raw={credits}
+              unit="credits"
+              text={formatByUnit(credits, scale, 'credits')}
+              data-testid="balance-figure"
+            />
+          )}
         </span>
       </div>
       <span className="sr-only" role="status" aria-live="polite" data-testid="balance-live-region">
-        {credits === null ? '' : `Balance ${credits} credits`}
+        {credits === null ? 'Balance unavailable.' : `Balance ${formatByUnit(credits, scale, 'credits')}.`}
       </span>
       <span className="sr-only" role="status" aria-live="assertive" data-testid="panel-error-live-region">
         {errorAnnouncement}
@@ -352,17 +376,46 @@ export function FleetActionsPanel({
       <div data-testid="hold-readout" className={SECTION}>
         <div className="flex items-center justify-between">
           <span className={LABEL}>Hold</span>
-          <span data-testid="hold-capacity" className="font-mono text-[11px] text-zinc-400">
-            {cargoUsed} / {roster?.cargoCapacity ?? 0} t
+          <span
+            data-testid="hold-capacity"
+            className="flex items-center gap-1 font-mono text-[11px] text-zinc-400"
+          >
+            <Figure
+              raw={cargoUsedRaw}
+              unit="tons"
+              text={formatByUnit(cargoUsedRaw ?? NaN, scale, 'tons')}
+              data-testid="hold-capacity-used"
+            />
+            <span>/</span>
+            <Figure
+              raw={cargoCapacityRaw}
+              unit="tons"
+              text={formatByUnit(cargoCapacityRaw ?? NaN, scale, 'tons')}
+              data-testid="hold-capacity-total"
+            />
           </span>
         </div>
         <ul className="mt-1 flex flex-wrap gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
           {Object.entries(held).map(([kind, tons]) => (
             <li key={kind} data-testid={`hold-${kind}`}>
-              {kind} {tons} t
+              {kind}{' '}
+              <Figure
+                raw={tons}
+                unit="tons"
+                text={formatByUnit(tons ?? NaN, scale, 'tons')}
+                data-testid={`hold-${kind}-tons`}
+              />
             </li>
           ))}
-          <li data-testid="hold-free">{freeHold} t free</li>
+          <li>
+            <Figure
+              raw={freeHoldRaw}
+              unit="tons"
+              text={formatByUnit(freeHoldRaw ?? NaN, scale, 'tons')}
+              data-testid="hold-free"
+            />{' '}
+            free
+          </li>
         </ul>
       </div>
 
@@ -395,8 +448,15 @@ export function FleetActionsPanel({
               onChange={(e) => setMineTons(clampTons(e.target.value, freeHold))}
             />
           </div>
-          <p data-testid="mine-eta-preview" className="mt-1 text-[11px] text-zinc-500">
-            About {countdown(minePreviewMs)} at the served rate
+          <p className="mt-1 text-[11px] text-zinc-500">
+            About{' '}
+            <Figure
+              raw={minePreviewMs}
+              unit="world-ms-span-bare"
+              text={formatByUnit(minePreviewMs, scale, 'world-ms-span-bare')}
+              data-testid="mine-eta-preview"
+            />{' '}
+            at the served rate
           </p>
           <Button
             type="button"
@@ -418,9 +478,13 @@ export function FleetActionsPanel({
       )}
       {mineRunning && mineEta && (
         <div className={`${SECTION} flex items-center justify-between`}>
-          <span data-testid="mine-countdown" className="font-mono text-[11px] text-sky-400">
-            {countdown(mineEta.eta - worldTime)}
-          </span>
+          <Figure
+            raw={mineEta.eta - worldTime}
+            unit="world-ms-span-left"
+            text={formatByUnit(mineEta.eta - worldTime, scale, 'world-ms-span-left')}
+            data-testid="mine-countdown"
+            className="font-mono text-[11px] text-sky-400"
+          />
           <button
             type="button"
             data-testid="mine-cancel"
@@ -444,9 +508,23 @@ export function FleetActionsPanel({
             <span className={LABEL}>Sell</span>
             <Badge color="cyan">DOCKED</Badge>
           </div>
-          {repricedFrom !== null && (
+          {priceChange !== null && (
             <p data-testid="sell-price-changed" className="mt-1 text-[11px] text-amber-500">
-              The price moved from {repricedFrom} while you were deciding — this is the new offer.
+              The price moved while you were deciding — you expected{' '}
+              <Figure
+                raw={priceChange.expectedTotal}
+                unit="credits"
+                text={formatByUnit(priceChange.expectedTotal, scale, 'credits')}
+                data-testid="sell-price-expected"
+              />
+              , the new offer is{' '}
+              <Figure
+                raw={sellPreview.totalProceeds}
+                unit="credits"
+                text={formatByUnit(sellPreview.totalProceeds, scale, 'credits')}
+                data-testid="sell-price-refreshed"
+              />
+              .
             </p>
           )}
           <div className="mt-2 flex items-center gap-2">
@@ -471,8 +549,13 @@ export function FleetActionsPanel({
               onChange={(e) => setSellTons(clampTons(e.target.value, sellHeld))}
             />
           </div>
-          <p data-testid="sell-proceeds-preview" className="mt-1 text-[11px] text-zinc-500">
-            {sellPreview.totalProceeds} credits
+          <p className="mt-1 text-[11px] text-zinc-500">
+            <Figure
+              raw={sellPreview.totalProceeds}
+              unit="credits"
+              text={formatByUnit(sellPreview.totalProceeds, scale, 'credits')}
+              data-testid="sell-proceeds-preview"
+            />
           </p>
           <Button
             type="button"
@@ -502,8 +585,14 @@ export function FleetActionsPanel({
             value={String(refuelTons)}
             onChange={(e) => setRefuelTons(clampTons(e.target.value, freeHold))}
           />
-          <p data-testid="refuel-cost-preview" className="mt-1 text-[11px] text-zinc-500">
-            {refuelTons * fuelPrice} credits at the served price
+          <p className="mt-1 text-[11px] text-zinc-500">
+            <Figure
+              raw={refuelTons * fuelPrice}
+              unit="credits"
+              text={formatByUnit(refuelTons * fuelPrice, scale, 'credits')}
+              data-testid="refuel-cost-preview"
+            />{' '}
+            at the served price
           </p>
           <Button
             type="button"
@@ -533,8 +622,14 @@ export function FleetActionsPanel({
             // Rendered on BOTH park modes the field is served for: the live
             // drain while holding, and what holding WOULD cost before it is
             // taken.
-            <p data-testid="stationkeep-rate" className="mt-1 text-[11px] text-zinc-500">
-              {parkMode === 'stationkeep' ? 'Drain' : 'Holding costs'} {upkeepRate} t/s
+            <p className="mt-1 text-[11px] text-zinc-500">
+              {parkMode === 'stationkeep' ? 'Drain' : 'Holding costs'}{' '}
+              <Figure
+                raw={upkeepRate}
+                unit="tons-per-world-s"
+                text={formatByUnit(upkeepRate, scale, 'tons-per-world-s')}
+                data-testid="stationkeep-rate"
+              />
             </p>
           )}
         </div>

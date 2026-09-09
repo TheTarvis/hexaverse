@@ -60,6 +60,17 @@ vi.mock('@/lib/toast', () => ({ toast: { error: (m: string) => toastError(m), su
 
 import { SpaceCommandPanel } from './SpaceCommandPanel'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
+import { assertFiguresMatchModule } from '@/lib/format/assert-figures'
+
+// MIGRATION NOTE (task 9.2, openspec change `add-figure-formatting`):
+// `SpaceCommandPanel` gains a required `scale: number | undefined` prop
+// AND a new `worldTime: number` prop (contract §10 F1 — every figure this
+// panel converts is a remaining span against the mounting view's projected
+// world time, which the panel did not previously receive at all). The
+// `panel()` helper below supplies both by default. `commit-drift-notice`
+// splits into four `<Figure>` elements (contract §4), each asserted
+// independently, with the wrapper `<p>` keeping its id and carrying NO
+// pair (case c).
 
 const T0 = 21_175_110_953
 
@@ -101,6 +112,8 @@ function panel(over: Record<string, unknown> = {}) {
       fleet={FLEET as any}
       selection={{ bodyId: 'feat-body-3' }}
       canvasAvailable
+      worldTime={T0}
+      scale={1}
       {...over}
     />,
   )
@@ -118,12 +131,32 @@ beforeEach(() => {
 describe('SpaceCommandPanel — the preview overlay figures', () => {
   // Scenario: Selecting a target shows a preview curve and its figures
   it('Scenario: Selecting a target shows a preview curve and its figures', () => {
-    panel()
+    const { container } = panel()
     expect(screen.getByTestId('preview-panel')).toBeInTheDocument()
-    expect(screen.getByTestId('preview-arrival')).toBeInTheDocument()
+    const arrival = screen.getByTestId('preview-arrival')
+    expect(arrival).toHaveAttribute('data-unit', 'world-ms-span-in')
+    // preview.arriveMs (T0 + 930_373) - worldTime (T0) = 930_373.
+    expect(arrival).toHaveAttribute('data-raw', '930373')
+    const deltav = screen.getByTestId('preview-deltav')
+    expect(deltav).toHaveAttribute('data-unit', 'delta-v')
+    expect(deltav).toHaveAttribute('data-raw', String(QUOTE.deltaV))
+    expect(deltav).toHaveTextContent(/3721|3,721/)
+    const fuel = screen.getByTestId('preview-fuel')
+    expect(fuel).toHaveAttribute('data-unit', 'tons')
+    expect(fuel).toHaveAttribute('data-raw', String(QUOTE.fuelCostTons))
+    expect(fuel).toHaveTextContent(/744/)
+    expect(screen.getByTestId('preview-affordable')).toHaveAttribute('data-affordable', 'true')
+    assertFiguresMatchModule(container, { scale: 1 })
+  })
+
+  it('SDET-added: on a scale-less mount the arrival renders absent while delta-v/fuel/ceiling render normally (RULING 8/26)', () => {
+    const { container } = panel({ scale: undefined })
+    const arrival = screen.getByTestId('preview-arrival')
+    expect(arrival).toHaveAttribute('data-raw', '930373')
+    expect(arrival).toHaveTextContent('—')
     expect(screen.getByTestId('preview-deltav')).toHaveTextContent(/3721|3,721/)
     expect(screen.getByTestId('preview-fuel')).toHaveTextContent(/744/)
-    expect(screen.getByTestId('preview-affordable')).toHaveAttribute('data-affordable', 'true')
+    assertFiguresMatchModule(container, { scale: undefined })
   })
 
   // Scenario: An unaffordable preview is shown as such
@@ -148,10 +181,15 @@ describe('SpaceCommandPanel — the preview overlay figures', () => {
     // the served numbers must change every displayed number; if a figure
     // were recomputed from a drawn position it would not move.
     previewState.preview = { ...QUOTE, deltaV: 11.5, fuelCostTons: 2.3, arriveMs: T0 + 7 }
-    panel()
-    expect(screen.getByTestId('preview-deltav')).toHaveTextContent(/11\.5/)
+    const { container } = panel()
+    // deltaV is now an INTEGER m/s figure (R7): 11.5 ties away from zero to
+    // 12, so the raw value — not the rounded display text — is what proves
+    // the figure tracks the served quote.
+    expect(screen.getByTestId('preview-deltav')).toHaveAttribute('data-raw', '11.5')
+    expect(screen.getByTestId('preview-fuel')).toHaveAttribute('data-raw', '2.3')
     expect(screen.getByTestId('preview-fuel')).toHaveTextContent(/2\.3/)
     expect(screen.getByTestId('preview-deltav')).not.toHaveTextContent(/3721/)
+    assertFiguresMatchModule(container, { scale: 1 })
   })
 })
 
@@ -242,8 +280,12 @@ describe('SpaceCommandPanel — the quote lock', () => {
     const ceiling = QUOTE.fuelCostTons * BURN_FUEL_ALLOWANCE
     expect(BURN_FUEL_ALLOWANCE, 'the allowance must leave real slack').toBeGreaterThan(1)
     const shown = screen.getByTestId('preview-fuel-ceiling')
-    // The DISPLAYED ceiling is the figure actually sent, not the point cost.
-    expect(shown).toHaveTextContent(new RegExp(String(Math.floor(ceiling))))
+    // The DISPLAYED ceiling is the figure actually sent, not the point cost
+    // — asserted via data-raw, which survives figure-formatting's rounding
+    // regardless of the allowance factor's value (a formatted-text regex
+    // built from `Math.floor(ceiling)` would be fragile against rounding).
+    expect(shown).toHaveAttribute('data-unit', 'tons')
+    expect(Number(shown.getAttribute('data-raw'))).toBeCloseTo(ceiling, 6)
     expect(screen.getByTestId('preview-fuel')).toHaveTextContent(/744/)
     await userEvent.click(screen.getByTestId('burn-button'))
     const body = order.mutate.mock.calls[0][0].request ?? order.mutate.mock.calls[0][0]
@@ -283,7 +325,16 @@ describe('SpaceCommandPanel — commit outcome reporting', () => {
     panel()
     await userEvent.click(screen.getByTestId('burn-button'))
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
-    expect(String(toastSuccess.mock.calls[0][0]), 'the served arrival time must be carried').toMatch(/\d/)
+    const shown = String(toastSuccess.mock.calls[0][0])
+    // R12's toast/aria-label exemption: the toast uses the shared formatter
+    // and carries no data-raw/data-unit of its own, but it must NEVER
+    // interpolate the raw world-ms arrival — RULING 12, proposal.md's own
+    // headline defect.
+    expect(shown, 'never the raw world-ms arrival integer').not.toContain(String(QUOTE.arriveMs))
+    // ArriveMs (QUOTE.arriveMs) - worldTime (T0) = 930_373ms = "in 15m 30s".
+    expect(shown, 'the served arrival time must be carried as a formatted relative duration').toContain(
+      'in 15m 30s',
+    )
   })
 
   // Scenario: A failed burn commit reports the mapped reason
@@ -337,13 +388,29 @@ describe('SpaceCommandPanel — commit outcome reporting', () => {
         state: { Mode: 0, Park: null, Drift: null, Burn: { ArriveMs: QUOTE.arriveMs + 40_000, DeltaV: QUOTE.deltaV + 60, DepartMs: QUOTE.departMs, Curve: QUOTE.controlPoints } },
       })
     })
-    panel()
+    const { container } = panel()
     await userEvent.click(screen.getByTestId('burn-button'))
     const notice = await screen.findByTestId('commit-drift-notice')
-    // BOTH figures — the actual alongside the previewed.
-    expect(notice).toHaveTextContent(/3781|3,781/) // actual deltaV
-    expect(notice).toHaveTextContent(/3721|3,721/) // previewed deltaV
+    // The wrapper keeps its id and carries NO pair (case c); each of the
+    // four figures is its own element with its own raw value.
+    expect(notice).not.toHaveAttribute('data-raw')
+    const actualDeltav = screen.getByTestId('commit-drift-actual-deltav')
+    const previewedDeltav = screen.getByTestId('commit-drift-previewed-deltav')
+    const actualArrival = screen.getByTestId('commit-drift-actual-arrival')
+    const previewedArrival = screen.getByTestId('commit-drift-previewed-arrival')
+    expect(actualDeltav).toHaveAttribute('data-unit', 'delta-v')
+    expect(actualDeltav).toHaveAttribute('data-raw', String(QUOTE.deltaV + 60))
+    expect(actualDeltav).toHaveTextContent(/3781|3,781/)
+    expect(previewedDeltav).toHaveAttribute('data-raw', String(QUOTE.deltaV))
+    expect(previewedDeltav).toHaveTextContent(/3721|3,721/)
+    // Both arrivals take the SAME `in` direction form (RULING 24) — never
+    // one `in` beside one `left`.
+    expect(actualArrival).toHaveAttribute('data-unit', 'world-ms-span-in')
+    expect(actualArrival).toHaveAttribute('data-raw', String(QUOTE.arriveMs + 40_000 - T0))
+    expect(previewedArrival).toHaveAttribute('data-unit', 'world-ms-span-in')
+    expect(previewedArrival).toHaveAttribute('data-raw', String(QUOTE.arriveMs - T0))
     expect(toastSuccess, 'the success feedback is still shown').toHaveBeenCalled()
+    assertFiguresMatchModule(container, { scale: 1 })
   })
 
   // Scenario: An uncapped commit still surfaces its actual figures
@@ -359,7 +426,15 @@ describe('SpaceCommandPanel — commit outcome reporting', () => {
     panel()
     await userEvent.click(screen.getByTestId('burn-button'))
     const notice = await screen.findByTestId('commit-drift-notice')
-    expect(notice).toHaveTextContent(/88\.5/)
+    // deltaV rounds to an integer now (88.5 ties away from zero to 89), so
+    // the raw value — not the pre-migration "88.5" text — proves the
+    // actual figure carries the served quote.
+    const actualDeltav = screen.getByTestId('commit-drift-actual-deltav')
+    expect(actualDeltav).toHaveAttribute('data-raw', '88.5')
+    expect(notice).toHaveTextContent(/no quote had been shown/i)
+    // No quote had been shown, so no PREVIEWED figures exist at all.
+    expect(screen.queryByTestId('commit-drift-previewed-deltav')).toBeNull()
+    expect(screen.queryByTestId('commit-drift-previewed-arrival')).toBeNull()
   })
 })
 

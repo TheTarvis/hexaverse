@@ -984,3 +984,118 @@ must expand it row by row rather than treat 2.1 as one unit, or ~69 scenarios
 would share a single pass/fail signal. This is an explicit instruction to the red
 phase, recorded here because it is the kind of thing a coverage table silently
 collapses.
+
+---
+
+## Kickoff adjudications — the architect's ten flagged findings
+
+Source: `add-figure-formatting-impl-contract.md` §10. The architect reported ten
+items rather than reinterpreting them, and asked whether any needs the writer.
+
+**Adjudication: none of the ten requires a spec amendment.** This matters
+mechanically, not just editorially — the adversary round cap is spent, so a spec
+edit would expire a verdict that cannot be refreshed. Each item below is either
+spec-silent (the contract may settle it) or a task/paraphrase defect (the spec
+itself is sound). Every settlement is **binding on the SDET and the developer**;
+none may be re-decided during the build.
+
+| # | Nature | Adjudication |
+|---|---|---|
+| **F1** | Task scope, additive | `SpaceCommandPanel` has no `worldTime` prop and all three of its figures are remaining spans. 3.3 threads `worldTime` alongside `scale` at that mount; 4.4 consumes it. Inside existing task scope. **The failure to avoid** is an implementer reaching for a component-local clock instead — a second world-time projection with no requirement behind it, which is the defect `defect-galaxy-clock-assumes-scale-1.md` already records twice. |
+| **F2** | tasks.md ordering defect | Real: 3.1/3.2 double-own re-pointing that 6.1, 8.1, 5.3 and 7.1 also own, and sit before them, so the tree does not compile between 3.1 and 6.1. Resolved by **execution order, not by editing tasks.md** — contract §7 Phase E runs 3.1/3.2 as verification tasks (done-condition: absent and unimported) after the call sites move. No task dropped; the change folder is untouched, so the verdict stays current. |
+| **F3** | Paraphrase defect, not a spec defect | The spec's own wording is *"rendering exactly `figure-formatting`'s absent form **for that quantity**"* — which already scopes the claim to the figure, not the element's whole `textContent`. The loose reading comes from **task 9.5's paraphrase**, which dropped the qualifier. Contract §5.2 governs: the absent case runs the same containment clauses with `expected = ABSENT_FIGURE`. No spec change; the natural reading is the implementable one. |
+| **F4** | Spec-silent | In the settling state the surface renders **no figure** — a plain span with the mandated `Settling…` copy and no `data-raw`/`data-unit` pair — exactly as the unavailable credit balance does. R11 binds *figures*; a surface rendering its own mandated override copy is not rendering one. Binding, because an implementer who attaches the pair fails clause 1 on compliant markup. |
+| **F5** | Spec-silent | A `bare` (cost) duration with a negative span renders `0m 0s`, magnitude clamped at zero. Reachable only through a client-derived preview. |
+| **F6** | Task scope, corrective | `space-journey.spec.ts:81` carries its **own byte-copy** of `digits()`, so 10.1's "single point of change" is false, and it calls that copy against two testids that become composite wrappers. Deleting the local copy joins 10.1's scope. **This one is markable-done-while-broken and only surfaces at tier 4** — the most expensive place to find it. |
+| **F7** | Ownership | Task 1.8's parenthetical is call-site behaviour at six mounts, not module behaviour. Split per contract §9. |
+| **F8** | Checkability | The 2.1–2.8 split is coherent; rows gain a stable `id` and a per-group manifest assertion so a group is independently checkable. **Load-bearing:** 2.7's scale-60 row is the only place the rate conversion's *direction* is pinned — drop it and `× scale` / `÷ scale` become indistinguishable again, which is the architect's own round-1 BLOCKER 2. |
+| **F9** | Expected | `world-ms-span-ago` has no call site in this change (module and fixtures only). Do not delete it to satisfy a dead-code instinct. |
+| **F10** | Visible copy | Two further intended copy changes: `hold-capacity` reads `18.0 t / 40.0 t`, and the word `credits` is dropped wherever `₡` renders. Both must appear in the red-coverage notes so QA and the journey read them as intended, not as regressions. |
+
+**Standing rule for the build, restated because this is where it gets tested:** a
+finding that genuinely contradicts shipped spec text halts that task and routes to
+the writer. It is not resolved in the contract, in a test, or in code. None of
+these ten met that bar; the next one might.
+
+---
+
+## Build adjudications — the developer's one dispute and two interpretation calls
+
+The developer completed 54 of 55 tasks (13.2 is the archive gate, correctly left),
+halted on one test dispute rather than resolving it in code, and reported two
+interpretation calls rather than making them silently. All three are adjudicated
+here. **Two go against the implementation** — recorded because a build report that
+ends "everything passes" is exactly where this project has previously stopped
+looking.
+
+### Dispute 1 — `GalaxyView.test.tsx:435`: **the developer is right; the fixture is wrong**
+
+The test *"shows a travelling fleet in the roster, with its route and a live ETA"*
+asserts `/^11m \d{1,2}s left$/` from a `traveling` fixture that never sets
+`Fleet.scale`. Implementing task 6.3 literally (un-defaulted
+`myFleets?.[0]?.scale`, per RULINGs 7/8) makes the scale `undefined`, so the
+figure correctly renders `—`.
+
+**Adjudicated against the spec:** the implementation is right and the fixture is
+incomplete. RULING 8 and `fleet-roster`'s scenario *A countdown renders absent
+until a scale is served* both mandate the absent form for a scale-dependent
+figure with no served scale — the developer implemented exactly that. The test's
+own **intent**, stated in its name, is the *live-ETA* path, which corresponds to
+`fleet-roster`'s *A burning fleet counts down to arrival* and requires a served
+scale to exercise at all. So the fixture must set `scale: 1`; the assertion
+stands as written.
+
+**Only the SDET may make that edit**, and it must also confirm the absent-scale
+scenario has its **own dedicated test** — otherwise fixing this fixture would
+remove the only coverage of RULING 8's behaviour while appearing to fix a bug.
+
+### Dispute 2 — `scale?: number` on three components: **restore the contract's form**
+
+The developer made `scale` optional on `SpaceStage`, `ScanControl` and
+`SightingLog` because the contract's `scale: number | undefined` (required key)
+broke `tsc` against four **pre-existing test files this change does not own** —
+and a developer may not edit a test file. That was the correct way to be stuck,
+and the correct thing to report.
+
+**Adjudicated: restore the contract's required-key form**, and have the SDET add
+the prop to those four test files. The contract chose a required key as a
+**forcing function** — a mount site that forgets the scale fails to compile
+rather than silently rendering the absent form. Runtime behaviour is identical
+either way, so the whole value of the decision is the compile-time catch. Links
+2a–4 **re-mount every one of these components** into the console dock; that is
+precisely when a forgotten scale prop would appear, and precisely when a compile
+error is worth four mechanical test-file edits now.
+
+### Dispute 3 — `sell-price-expected`: **a finding against the implementation**
+
+The developer read "the one the player originally expected" as
+`sellTons × expectedUnitPrice` — a flat single-price estimate — against the live
+`sellPreview.totalProceeds` fold, and reported it as an interpretation.
+
+**Adjudicated: that reading is wrong, and it contradicts a sibling requirement.**
+The spec's clause reads "refresh the offer to the server's current applicable
+price(s) and **proceeds total**, showing that refreshed figure alongside **the one
+the player originally expected**" — the two figures are parallel, so both are
+proceeds totals. And *Sell Offer on the Docked Fleet*'s own scenario *A split-fill
+preview matches the settlement fold exactly* establishes that proceeds are a
+**fold across entries, not tons × price**. So `sellTons × expectedUnitPrice`
+differs from the fold whenever a fill splits — meaning the figure labelled "what
+you expected" would be a number **the player never saw**, on the one surface whose
+entire purpose is to let them compare what they expected against what they got.
+
+**Correct implementation:** show the `sellPreview.totalProceeds` that was on
+screen at commit time, captured — no new arithmetic, no new served field, and
+consistent with the quote-lock pattern the burn path already uses.
+
+**The test could not have caught this**, which is the more important half. The
+developer verified against "the test's inequality assertion" — a test asserting
+only that the two figures *differ*. Both the wrong and the right implementation
+satisfy that. This is `README.md` lesson two exactly: a test shaped so it cannot
+observe the failure. The SDET must strengthen it to assert the expected figure
+**equals the captured pre-commit preview total**.
+
+### Sequencing
+
+SDET first (all three test-side edits), then the developer (restore the
+required-key form; fix the sell-price figure). A developer never edits a test, and
+an SDET never edits production code — the split holds through the repair.

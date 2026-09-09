@@ -374,17 +374,47 @@ export async function burnToSelectionAndDock(
   await expect(row).toContainText(/docked/i, { timeout: flightTimeoutMs })
 }
 
-/** The first numeric run in a readout ("1,250 cr" -> 1250, "12 / 200 t" -> 12). */
+/**
+ * The raw served value behind a figure (`figure-formatting`, openspec change
+ * `add-figure-formatting`, contract §8). Reads `data-raw` off the element
+ * itself when the testid names the figure directly (case a); otherwise
+ * resolves the ONE `<Figure>` nested inside it (case b/c's wrapper). Neither
+ * case is left to the caller to disambiguate — 0 or more than 1 nested
+ * figure is a hard, named failure rather than a silent wrong answer, because
+ * `hold-capacity`-shaped wrappers hold TWO figures and a caller reading the
+ * aggregate would otherwise get whichever the DOM happened to return first.
+ *
+ * Never parses rendered text: the thin space, the `₡` glyph and the `T+`
+ * prefix are all irrelevant here.
+ */
 export async function digits(page: Page, testId: string): Promise<number> {
-  const text = (await page.getByTestId(testId).textContent()) ?? ''
-  const m = text.replace(/,/g, '').match(/-?\d+(\.\d+)?/)
-  return m ? Number(m[0]) : NaN
+  const el = page.getByTestId(testId)
+  const ownRaw = await el.getAttribute('data-raw')
+  if (ownRaw !== null) return Number(ownRaw)
+
+  const nested = el.locator('[data-raw]')
+  const count = await nested.count()
+  if (count === 1) {
+    const raw = await nested.getAttribute('data-raw')
+    return Number(raw)
+  }
+  if (count === 0) {
+    throw new Error(
+      `digits(page, '${testId}'): no [data-raw] on or inside this element — the figure moved; ` +
+        'name the derived testid the caller actually wants.',
+    )
+  }
+  throw new Error(
+    `digits(page, '${testId}'): ${count} [data-raw] elements inside this element — a composite; ` +
+      'name which figure you mean by its own derived testid.',
+  )
 }
 
 /**
  * One resource kind's own tonnage off the hold readout's per-kind row
- * (`hold-{kind}` renders "metals 5 t"). A kind with nothing aboard renders
- * no row at all, which legitimately reads 0 rather than failing.
+ * (`hold-{kind}` wraps the kind label and its own `hold-{kind}-tons`
+ * figure). A kind with nothing aboard renders no row at all, which
+ * legitimately reads 0 rather than failing.
  *
  * Never use the AGGREGATE (`hold-capacity`) to prove a mining delta: fuel
  * shares the same cargo pool and every burn spends some, so the total moves
@@ -393,9 +423,7 @@ export async function digits(page: Page, testId: string): Promise<number> {
 export async function holdKindTons(page: Page, kind: string): Promise<number> {
   const row: Locator = page.getByTestId(`hold-${kind}`)
   if ((await row.count()) === 0) return 0
-  const text = await row.innerText()
-  const match = text.match(/([\d.]+)\s*t\b/)
-  return match ? Number(match[1]) : 0
+  return digits(page, `hold-${kind}`)
 }
 
 /**

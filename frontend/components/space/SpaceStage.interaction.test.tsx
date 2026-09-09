@@ -86,6 +86,7 @@ function stage(over: Record<string, unknown> = {}) {
       scene={scene as any}
       extent={EXTENT}
       worldTime={1}
+      scale={1}
       selection={null}
       onSelect={onSelect}
       {...over}
@@ -168,7 +169,7 @@ describe('SpaceStage — keyboard tab order', () => {
     for (const t of [2, 3, 4, 5, 6]) {
       rerender(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        <SpaceStage systemId="sys_-7_17" scene={scene as any} extent={EXTENT} worldTime={t} selection={null} onSelect={onSelect} />,
+        <SpaceStage systemId="sys_-7_17" scene={scene as any} extent={EXTENT} worldTime={t} scale={1} selection={null} onSelect={onSelect} />,
       )
     }
     expect(
@@ -374,7 +375,7 @@ describe('SpaceStage — recenter', () => {
     // (a) a selection change
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="sys_-7_17" scene={scene as any} extent={EXTENT} worldTime={1} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} />,
+      <SpaceStage systemId="sys_-7_17" scene={scene as any} extent={EXTENT} worldTime={1} scale={1} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} />,
     )
     expect(region().getAttribute('data-camera')).toBe(moved)
 
@@ -387,7 +388,7 @@ describe('SpaceStage — recenter', () => {
     }
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="sys_-7_17" scene={moved2 as any} extent={EXTENT} worldTime={2} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} />,
+      <SpaceStage systemId="sys_-7_17" scene={moved2 as any} extent={EXTENT} worldTime={2} scale={1} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} />,
     )
     expect(region().getAttribute('data-camera')).toBe(moved)
   })
@@ -401,7 +402,7 @@ describe('SpaceStage — recenter', () => {
     expect(region().getAttribute('data-camera')).not.toBe(initial)
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="sys_OTHER" scene={scene as any} extent={EXTENT} worldTime={1} selection={null} onSelect={onSelect} />,
+      <SpaceStage systemId="sys_OTHER" scene={scene as any} extent={EXTENT} worldTime={1} scale={1} selection={null} onSelect={onSelect} />,
     )
     expect(region().getAttribute('data-camera')).toBe(initial)
     expect(region()).toHaveAttribute('data-reframe-animated', 'false')

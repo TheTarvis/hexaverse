@@ -32,9 +32,11 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/catalyst/button'
+import { Figure } from '@/components/figure/Figure'
 import { useJump, useOrder } from '@/hooks/use-fleets'
 import { useBurnPreview } from '@/hooks/use-burn-preview'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
+import { ABSENT_FIGURE, formatByUnit } from '@/lib/format'
 import { jumpErrorCopy } from '@/lib/jump-copy'
 import { burnErrorCopy, commandErrorReason, isQuotedCapExceeded } from '@/lib/rejection-copy'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
@@ -60,6 +62,15 @@ export interface SpaceCommandPanelProps {
    * own refetch scheduling — this panel neither reads nor re-derives it.
    */
   mineRunning?: boolean
+  /**
+   * The mounting view's projected world time (add-figure-formatting,
+   * contract §10 F1). Every duration this panel renders is a REMAINING
+   * SPAN against it — the panel had no clock of its own before this change
+   * and must not grow one now (`defect-galaxy-clock-assumes-scale-1.md`).
+   */
+  worldTime: number
+  /** The mounting view's served world-clock scale — see contract §6. */
+  scale: number | undefined
 }
 
 interface CommitFigures {
@@ -75,10 +86,6 @@ const PANEL_OK = 'border-zinc-200 bg-zinc-50/90 dark:border-zinc-800/50 dark:bg-
 const PANEL_UNAFFORDABLE = 'border-amber-500/60 bg-amber-500/10 text-amber-200'
 const LABEL = 'font-mono text-[11px] font-medium tracking-wide text-zinc-400 uppercase'
 
-function fixed(value: number | undefined): string {
-  return typeof value === 'number' ? value.toFixed(2) : '—'
-}
-
 function differs(a: number | undefined, b: number | undefined): boolean {
   if (typeof a !== 'number' || typeof b !== 'number') return true
   return Math.abs(a - b) > 1e-6
@@ -90,6 +97,8 @@ export function SpaceCommandPanel({
   gateFacts = null,
   canvasAvailable,
   mineRunning = false,
+  worldTime,
+  scale,
 }: SpaceCommandPanelProps) {
   const order = useOrder()
   const jump = useJump()
@@ -132,7 +141,12 @@ export function SpaceCommandPanel({
             ...(typeof burn?.DeltaV === 'number' ? { deltaV: burn.DeltaV } : {}),
             ...(quoted ? { previewedArriveMs: quoted.arriveMs, previewedDeltaV: quoted.deltaV } : {}),
           })
-          toast.success(`Burn committed — arriving at ${burn?.ArriveMs ?? '?'}.`)
+          const arrivalText =
+            typeof burn?.ArriveMs === 'number'
+              ? formatByUnit(burn.ArriveMs - worldTime, scale, 'world-ms-span-in')
+              : ABSENT_FIGURE
+          const successCopy = 'Burn committed — arriving ' + arrivalText + '.'
+          toast.success(successCopy)
         },
         onError: (error: unknown) => {
           burnGuard.release()
@@ -207,16 +221,44 @@ export function SpaceCommandPanel({
       {preview && (
         <dl className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-zinc-400">
           <dt>Arrival</dt>
-          <dd data-testid="preview-arrival">{preview.arriveMs}</dd>
+          <dd>
+            <Figure
+              raw={preview.arriveMs - worldTime}
+              unit="world-ms-span-in"
+              text={formatByUnit(preview.arriveMs - worldTime, scale, 'world-ms-span-in')}
+              data-testid="preview-arrival"
+            />
+          </dd>
           <dt>Delta-v</dt>
-          <dd data-testid="preview-deltav">{fixed(preview.deltaV)}</dd>
+          <dd>
+            <Figure
+              raw={preview.deltaV}
+              unit="delta-v"
+              text={formatByUnit(preview.deltaV, scale, 'delta-v')}
+              data-testid="preview-deltav"
+            />
+          </dd>
           <dt>Fuel</dt>
-          <dd data-testid="preview-fuel">{fixed(preview.fuelCostTons)}</dd>
+          <dd>
+            <Figure
+              raw={preview.fuelCostTons}
+              unit="tons"
+              text={formatByUnit(preview.fuelCostTons, scale, 'tons')}
+              data-testid="preview-fuel"
+            />
+          </dd>
           {ceiling !== null && (
             <>
               <dt>Ceiling</dt>
               {/* The ceiling the player agrees to IS the figure sent. */}
-              <dd data-testid="preview-fuel-ceiling">{fixed(ceiling)}</dd>
+              <dd>
+                <Figure
+                  raw={ceiling}
+                  unit="tons"
+                  text={formatByUnit(ceiling, scale, 'tons')}
+                  data-testid="preview-fuel-ceiling"
+                />
+              </dd>
             </>
           )}
         </dl>
@@ -277,10 +319,55 @@ export function SpaceCommandPanel({
 
       {driftNotice && (
         <p data-testid="commit-drift-notice" className="mt-2 text-[11px] text-amber-400">
-          Committed at delta-v {fixed(commit.deltaV)} arriving {commit.arriveMs ?? '—'}
-          {commit.previewedDeltaV !== undefined
-            ? ` — previewed ${fixed(commit.previewedDeltaV)} arriving ${commit.previewedArriveMs}`
-            : ' — no quote had been shown'}
+          Committed at delta-v{' '}
+          <Figure
+            raw={commit.deltaV}
+            unit="delta-v"
+            text={formatByUnit(commit.deltaV ?? NaN, scale, 'delta-v')}
+            data-testid="commit-drift-actual-deltav"
+          />{' '}
+          arriving{' '}
+          <Figure
+            raw={commit.arriveMs !== undefined ? commit.arriveMs - worldTime : undefined}
+            unit="world-ms-span-in"
+            text={formatByUnit(
+              commit.arriveMs !== undefined ? commit.arriveMs - worldTime : NaN,
+              scale,
+              'world-ms-span-in',
+            )}
+            data-testid="commit-drift-actual-arrival"
+          />
+          {commit.previewedDeltaV !== undefined ? (
+            <>
+              {' '}
+              — previewed{' '}
+              <Figure
+                raw={commit.previewedDeltaV}
+                unit="delta-v"
+                text={formatByUnit(commit.previewedDeltaV, scale, 'delta-v')}
+                data-testid="commit-drift-previewed-deltav"
+              />{' '}
+              arriving{' '}
+              <Figure
+                raw={
+                  commit.previewedArriveMs !== undefined
+                    ? commit.previewedArriveMs - worldTime
+                    : undefined
+                }
+                unit="world-ms-span-in"
+                text={formatByUnit(
+                  commit.previewedArriveMs !== undefined
+                    ? commit.previewedArriveMs - worldTime
+                    : NaN,
+                  scale,
+                  'world-ms-span-in',
+                )}
+                data-testid="commit-drift-previewed-arrival"
+              />
+            </>
+          ) : (
+            ' — no quote had been shown'
+          )}
         </p>
       )}
 

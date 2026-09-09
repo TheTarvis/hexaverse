@@ -413,6 +413,12 @@ describe('GalaxyView', () => {
     mockGalaxyState()
     const traveling: Fleet = {
       ...parkedFleet('fleet_1', 'sys-0'),
+      // SDET repair (add-figure-formatting build adjudications, dispute 1):
+      // this scenario's own name is "a live ETA" — that path only exercises
+      // once a scale has been served. The absent-scale path has its own
+      // dedicated coverage in FleetRoster.test.tsx ("A countdown renders
+      // absent until a scale is served, never at an assumed scale of 1").
+      scale: 1,
       jump: { laneId: 'lane-0', destSystemId: 'sys-1', departMs: 0, arriveMs: 660_000 },
     }
     mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
@@ -421,7 +427,18 @@ describe('GalaxyView', () => {
     const row = screen.getByTestId('fleet-row-fleet_1')
     expect(row).toHaveTextContent('Axion → Borealis')
     expect(row).toHaveTextContent('In transit')
-    expect(screen.getByTestId('fleet-row-eta-fleet_1')).toHaveTextContent('11m')
+    // MIGRATION (task 6.3, openspec change `add-figure-formatting`):
+    // fleet-row-eta-{id} is now a world-ms-span-left figure. The raw span is
+    // asserted with a small tolerance (not an exact "660000") because
+    // useWorldTime projects forward from mount, so a handful of wall-ms may
+    // elapse before this assertion runs — the same tolerance the pre-
+    // migration "11m" substring match already relied on.
+    const countdown = screen.getByTestId('fleet-row-eta-fleet_1')
+    expect(countdown).toHaveAttribute('data-unit', 'world-ms-span-left')
+    const raw = Number(countdown.getAttribute('data-raw'))
+    expect(raw).toBeGreaterThan(659_000)
+    expect(raw).toBeLessThanOrEqual(660_000)
+    expect(countdown).toHaveTextContent(/^11m \d{1,2}s left$/)
   })
 
   // burn has no target-naming surface at the galaxy tier (design.md Decision

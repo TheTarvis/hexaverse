@@ -65,6 +65,16 @@ vi.mock('@/hooks/use-actions', () => ({
 }))
 
 import { ScanControl } from './ScanControl'
+import { assertFiguresMatchModule } from '@/lib/format/assert-figures'
+
+// MIGRATION NOTE (task 9.3, openspec change `add-figure-formatting`):
+// `ScanControl` gains a required `scale: number | undefined` prop (task 7.4).
+// The option's duration goes through `figureAttrs` (contract §3.1's one
+// platform exception — an `<option>` cannot nest a `<span>`), so its pair
+// lives on the `<option>` element itself, `data-unit="world-ms-span-bare"`.
+// `scan-countdown` while running is a `<Figure>` (`world-ms-span-left`); while
+// settling it is a PLAIN span with NO pair (F4 — an element rendering the
+// surface's own mandated override copy is not rendering a figure).
 
 const T0 = 21_175_110_953
 
@@ -75,7 +85,7 @@ function fleet(over: Record<string, unknown> = {}) {
 function control(over: Record<string, unknown> = {}) {
   return render(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <ScanControl fleet={fleet() as any} worldTime={T0} {...over} />,
+    <ScanControl fleet={fleet() as any} worldTime={T0} scale={1} {...over} />,
   )
 }
 
@@ -102,9 +112,33 @@ describe('ScanControl — the served target list (system-space-view "The Focused
     }
     control()
     const select = screen.getByTestId('scan-target-select') as HTMLSelectElement
-    const options = Array.from(select.querySelectorAll('option')).map((o) => o.textContent ?? '')
-    expect(options.some((t) => t.includes('feat-belt-1') && t.toLowerCase().includes('body'))).toBe(true)
-    expect(options.some((t) => t.includes('flt-9x2') && t.toLowerCase().includes('fleet'))).toBe(true)
+    const options = Array.from(select.querySelectorAll('option'))
+    const texts = options.map((o) => o.textContent ?? '')
+    expect(texts.some((t) => t.includes('feat-belt-1') && t.toLowerCase().includes('body'))).toBe(true)
+    expect(texts.some((t) => t.includes('flt-9x2') && t.toLowerCase().includes('fleet'))).toBe(true)
+
+    // Each option carries the figureAttrs pair itself — the one platform
+    // exception, since an <option>'s content model cannot nest a <span>.
+    const belt = options.find((o) => o.value === 'feat-belt-1')!
+    expect(belt).toHaveAttribute('data-unit', 'world-ms-span-bare')
+    expect(belt).toHaveAttribute('data-raw', '4880')
+    // The label's duration is presented per figure-formatting: a bare
+    // (no-affix) duration — a cost quoted before the sweep is committed.
+    expect(belt.textContent).toContain('0m 5s')
+    const flt = options.find((o) => o.value === 'flt-9x2')!
+    expect(flt).toHaveAttribute('data-unit', 'world-ms-span-bare')
+    expect(flt).toHaveAttribute('data-raw', '3120')
+    expect(flt.textContent).toContain('0m 3s')
+  })
+
+  it('SDET-added: on a scale-less mount, each option still carries its pair and reads the absent form', () => {
+    scanTargets.data = { targets: [{ hostId: 'feat-belt-1', kind: 'body', durationMs: 4880 }] }
+    control({ scale: undefined })
+    const belt = screen
+      .getByTestId('scan-target-select')
+      .querySelector('option[value="feat-belt-1"]')!
+    expect(belt).toHaveAttribute('data-raw', '4880')
+    expect(belt.textContent).toContain('—')
   })
 
   // Scenario: An empty target set is stated, not shown as an empty list.
@@ -291,18 +325,38 @@ describe('ScanControl — the running sweep (system-space-view "A Running Sweep\
 
   // Scenario: The commit control is withheld while a sweep runs.
   it('Scenario: The commit control is withheld while a sweep runs', () => {
-    control()
+    const { container } = control()
     expect(screen.queryByTestId('scan-commit-button')).not.toBeInTheDocument()
-    expect(screen.getByTestId('scan-countdown')).toBeInTheDocument()
+    const countdown = screen.getByTestId('scan-countdown')
+    expect(countdown).toBeInTheDocument()
+    expect(countdown).toHaveAttribute('data-unit', 'world-ms-span-left')
+    // committedAt=T0, eta=T0+5000, worldTime=T0 (control()'s default).
+    expect(countdown).toHaveAttribute('data-raw', '5000')
+    assertFiguresMatchModule(container, { scale: 1 })
+  })
+
+  it('SDET-added: the running countdown on a scale-less mount renders absent, still carrying its raw span', () => {
+    const { container } = control({ scale: undefined })
+    const countdown = screen.getByTestId('scan-countdown')
+    expect(countdown).toHaveAttribute('data-raw', '5000')
+    expect(countdown).toHaveTextContent('—')
+    assertFiguresMatchModule(container, { scale: undefined })
   })
 
   // Scenario: A past-ETA sweep reads as settling, not as a negative countdown.
   it('Scenario: A past-ETA running sweep is presented as settling', () => {
     runningScan.data = { id: 'action_running_1', committedAt: T0 - 10_000, eta: T0 - 1 }
     control()
-    const text = screen.getByTestId('scan-countdown').textContent?.toLowerCase() ?? ''
+    const countdown = screen.getByTestId('scan-countdown')
+    const text = countdown.textContent?.toLowerCase() ?? ''
     expect(text).toContain('settl')
     expect(text).not.toContain('-')
+    // F4: the settling state renders NO figure at all — a plain span with
+    // the mandated "Settling…" copy and no data-raw/data-unit pair. An
+    // element carrying the pair whose text is override copy would fail
+    // assertFiguresMatchModule's clause 1 for compliant markup.
+    expect(countdown).not.toHaveAttribute('data-raw')
+    expect(countdown).not.toHaveAttribute('data-unit')
   })
 
   // Scenario: Cancel names the scan action's own id.
