@@ -242,11 +242,13 @@ diagnosis rather than by luck:
 - **Tier 3: 972s / 16.2m** (run 1: 973s).
 
 **Tier 3 is ~5× faster than the 5118s (85m) recorded in
-`add-scan-and-sightings-surface-journey.md`**, which closed by predicting "expect a
-third raise" of the timeout budget. The raise was not needed. The per-test spawn
-provisioning that record identified as the dominant cost appears to have been
-addressed since; recording the improvement because that record recorded the
-regression.
+`add-scan-and-sightings-surface-journey.md`** (link 8b), which flagged the budget line
+as "worth watching at link 9" — the implicit worry being that per-test provisioning
+growth would eventually force a third raise of the 90m budget. It has not: link 9's
+own journey record (`link9-journey.md`) already brought tier 3 down to 1007.5s, and
+this run holds at 972s, comfortably inside budget with no raise anywhere in this
+chain. Recording the improvement because the prior record is the one that flagged the
+regression risk.
 
 ## The four BLOCKED rows from QA's matrix — all CLOSED
 
