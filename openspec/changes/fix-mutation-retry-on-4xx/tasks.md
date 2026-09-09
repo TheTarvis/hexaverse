@@ -1,6 +1,6 @@
 ## 1. Implementation
 
-- [ ] 1.1 Split `frontend/lib/query-client.ts`'s single `shouldRetry`
+- [x] 1.1 Split `frontend/lib/query-client.ts`'s single `shouldRetry`
       predicate into a query predicate and a mutation predicate. The query
       predicate is unchanged (queries keep retrying `408` and no-status
       failures up to 3 times, exactly as today). The new mutation predicate
@@ -15,14 +15,14 @@
       cause-specific test (`AbortError`, `TypeError`, `instanceof Error`)
       and do not narrow the arm to errors that are `Error` instances, since
       a thrown non-`Error` value must still take it
-- [ ] 1.1b In the mutation predicate, write one `console.warn` identifying
+- [x] 1.1b In the mutation predicate, write one `console.warn` identifying
       an automatic transport-level resend, on the branch that authorizes the
       status-less resend and **only** on that branch, so the number of
       warnings equals the number of automatic resends (the predicate becomes
       side-effecting; this is accepted deliberately — RULING 45). Do not log
       on the `4xx`/`5xx` refusal branch and do not log from the query
       predicate
-- [ ] 1.2 Update `frontend/lib/query-client.test.ts`. Touch only the
+- [x] 1.2 Update `frontend/lib/query-client.test.ts`. Touch only the
       "mutation retry logic" block — the "retry logic" **query** block
       (including its `408` and no-status assertions) must keep passing
       unedited. In the mutation block, assert: a `409` failure is not
@@ -46,14 +46,14 @@
       raised after a response was received (an unparseable body) and a
       thrown value that is not an `Error` at all — so a later cause-specific
       narrowing of the arm goes red
-- [ ] 1.2b In the mutation block, spy on the console warning channel and
+- [x] 1.2b In the mutation block, spy on the console warning channel and
       assert it is written exactly once when the predicate authorizes the
       status-less resend, and not written for a `409`, a `408`, a `500`, **or
       a status-less failure at `failureCount` 1, where no resend is
       authorized**; and assert the warning's message contains the fixed
       marker `automatic transport-level resend`, so the record is greppable
       in a captured console log
-- [ ] 1.2c In `frontend/lib/api-client.test.ts`'s existing "timeout handling"
+- [x] 1.2c In `frontend/lib/api-client.test.ts`'s existing "timeout handling"
       test (`:306-322`), assert the thrown error carries **no** `status`
       property —
       `await expect(slowClient.get('/test')).rejects.not.toHaveProperty('status')` —
@@ -61,7 +61,7 @@
       attach it. The `query-client.test.ts` assertion in 1.2 pins the
       predicate only; it constructs its own error and cannot observe
       `api-client.ts`
-- [ ] 1.3 Change `frontend/e2e/tests/space-double-submit.spec.ts`'s
+- [x] 1.3 Change `frontend/e2e/tests/space-double-submit.spec.ts`'s
       `recordPosts` helper so each entry is still pushed **on the `request`
       event, at send time** (so the existing count assertions keep catching
       a second request the instant it leaves the browser), and additionally
@@ -79,7 +79,7 @@
       the response body downloads (making the file's poll-then-read
       `toBe(1)` checks a race) and never fires at all for a transport-layer
       failure, which is exactly the class this change preserves
-- [ ] 1.3b Leave every existing count expectation in
+- [x] 1.3b Leave every existing count expectation in
       `frontend/e2e/tests/space-double-submit.spec.ts` exactly as it is —
       `toBe(1)` for the double-activation guards, `toBe(2)` for the
       guard-release checks at `:214` and `:310`, which are a second,
@@ -103,8 +103,8 @@
 
 ## 2. Validation
 
-- [ ] 2.1 `npx vitest run frontend/lib/query-client.test.ts`
-- [ ] 2.1b Confirm the invariant the requirement states: **no `useMutation`
+- [x] 2.1 `npx vitest run frontend/lib/query-client.test.ts`
+- [x] 2.1b Confirm the invariant the requirement states: **no `useMutation`
       call site passes a `retry` option**. List every production `retry:` in
       the frontend (`grep -rn 'retry:' frontend/hooks frontend/components
       frontend/app frontend/lib`, excluding tests) and check, for each hit,
@@ -122,7 +122,7 @@
       `retry: false` (strictly narrower than the default) satisfies the
       requirement; anything that can return `true` for a status-carrying
       failure does not
-- [ ] 2.2 Per-commit gate green: `bash .claude/scripts/check.sh` and
+- [x] 2.2 Per-commit gate green: `bash .claude/scripts/check.sh` and
       `python3 .claude/skills/code-quality-checks/check.py --files-only`
       (tiers 0-1, `docs/testing-tiers.md`)
 - [ ] 2.3 `frontend/e2e/tests/space-double-submit.spec.ts` rerun once, at

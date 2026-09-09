@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page, type Request } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 import type { InteriorCapture } from '../helpers/space-view'
 import {
@@ -79,10 +79,42 @@ test.setTimeout(900_000)
 interface Recorded {
   url: string
   body: Record<string, unknown>
+  /**
+   * How the request settled: an HTTP status, `null` for a request that never
+   * produced a readable response (transport failure, or a page closed
+   * mid-flight), or `undefined` while it is still in flight. `undefined` is
+   * the "not landed yet" sentinel every status assertion polls through — it
+   * is never read as a failure.
+   */
+  status: number | null | undefined
 }
 
+/**
+ * Record every matching POST **at send time**, and fill in how it settled.
+ *
+ * openspec change `fix-mutation-retry-on-4xx`, tasks.md 1.3. Read the whole
+ * comment before touching this function; three of its properties are
+ * load-bearing and each has already been got wrong once.
+ *
+ * 1. ENTRIES ARE PUSHED ON `request`, NOT `requestfinished`. This file's count
+ *    assertions exist to catch a second request THE INSTANT IT LEAVES THE
+ *    BROWSER. `requestfinished` fires only after the response body downloads,
+ *    which turns the poll-then-read `toBe(1)` checks into a race — and it never
+ *    fires at all for a transport-layer failure, which is exactly the class
+ *    this change preserves as the one surviving automatic resend.
+ * 2. `requestfailed` MUTATES the already-recorded entry; it never pushes.
+ *    Playwright fires `request` and THEN one of `requestfinished` /
+ *    `requestfailed`, so a second push would count one lost POST twice — a
+ *    phantom doubling, in the file whose entire purpose is telling a real
+ *    doubling from a phantom one.
+ * 3. `req.response()` is `.catch`ed. It rejects when the page or context
+ *    closes while a matched POST is still outstanding, and an unhandled
+ *    rejection is reported by the runner as an unexplained test-level error.
+ */
 function recordPosts(page: Page, pattern: RegExp): Recorded[] {
   const seen: Recorded[] = []
+  const entryOf = new Map<Request, Recorded>()
+
   page.on('request', (req) => {
     if (req.method() !== 'POST' || !pattern.test(req.url())) return
     let body: Record<string, unknown> = {}
@@ -91,9 +123,58 @@ function recordPosts(page: Page, pattern: RegExp): Recorded[] {
     } catch {
       body = {}
     }
-    seen.push({ url: req.url(), body })
+    const entry: Recorded = { url: req.url(), body, status: undefined }
+    entryOf.set(req, entry)
+    seen.push(entry)
+    void req
+      .response()
+      .then((res) => {
+        // `res` is null when no response was ever received; that is the same
+        // "not 2xx" outcome as a transport failure, so it records `null`
+        // rather than leaving the entry pending forever.
+        entry.status = res ? res.status() : null
+      })
+      .catch(() => {
+        entry.status = null
+      })
   })
+
+  page.on('requestfailed', (req) => {
+    const entry = entryOf.get(req)
+    // Mutate, never push — see property 2 above.
+    if (entry) entry.status = null
+  })
+
   return seen
+}
+
+/**
+ * Every request recorded so far settled with a `2xx`.
+ *
+ * openspec change `fix-mutation-retry-on-4xx`, tasks.md 1.3b. A bare count
+ * assertion cannot tell a REFUSED command from a successful one, so a `409`
+ * answered to an automatic client retry reads as a phantom extra user request
+ * instead of the doubling it actually is. `null` (no response read) is not
+ * `2xx`; `undefined` (still in flight) is polled through, not failed.
+ *
+ * This is ADDITIVE to the count expectations, which stay exactly as they are —
+ * including the two deliberate `toBe(2)` guard-release checks. Never relax or
+ * scope down this assertion to get a green gate: if it goes red, the command
+ * genuinely failed, and RULING 51 says record it and report it.
+ */
+async function expectAllSettled2xx(seen: Recorded[], what: string): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        seen
+          .filter((e) => !(typeof e.status === 'number' && e.status >= 200 && e.status < 300))
+          .map((e) => `${e.status === undefined ? 'in-flight' : e.status} ${new URL(e.url).pathname}`),
+      {
+        timeout: 20_000,
+        message: `every ${what} request recorded so far must settle 2xx (null = no response read, in-flight = never settled)`,
+      },
+    )
+    .toEqual([])
 }
 
 /**
@@ -205,6 +286,7 @@ test.describe('space view — synchronous double-submit guards', () => {
       orders.length,
       `expected exactly one /orders request from two same-tick activations, got ${orders.length}: ${JSON.stringify(orders.map((o) => o.body))}`,
     ).toBe(1)
+    await expectAllSettled2xx(orders, '/orders')
 
     // Scenario: The guard releases when the request settles or fails — a
     // later, genuinely new command goes through.
@@ -212,6 +294,20 @@ test.describe('space view — synchronous double-submit guards', () => {
     await selectBody(page, bodyIds[1])
     await page.getByTestId('burn-button').click()
     await expect.poll(() => orders.length, { timeout: 20_000 }).toBe(2)
+    // RULING 51 — READ BEFORE "FIXING" A RED HERE. This is the one command in
+    // the file with no `/under way/` wait after the click, so until this
+    // change it could only ever assert a COUNT: a refused command was
+    // invisible. The sequence it drives — burn, dock, immediately order again
+    // — is verbatim the one `defect-post-dock-burn-cost-drift.md` names as
+    // producing `ErrQuotedCapExceeded`. If this goes red with a `409` carrying
+    // "solved fuel cost exceeds the requested maxFuelTons cap", that is that
+    // defect, it is OUT OF SCOPE here, and the ruling is: record it against
+    // the defect file, report the red, stop. Do NOT widen
+    // `BURN_FUEL_ALLOWANCE` (RULING 41 forbids it) and do NOT relax, scope
+    // down or delete this assertion — a `409`'d command is not a successful
+    // one, and a visibility check that only ever shows green is not
+    // visibility.
+    await expectAllSettled2xx(orders, '/orders')
   })
 
   test('Scenario: Two activations in one tick submit one mine run', async ({ page }) => {
@@ -237,6 +333,7 @@ test.describe('space view — synchronous double-submit guards', () => {
       mines.length,
       `expected exactly one /mine request, got ${mines.length}: ${JSON.stringify(mines.map((m) => m.body))}`,
     ).toBe(1)
+    await expectAllSettled2xx(mines, '/mine')
   })
 
   test('Scenario: Two activations in one tick submit one sale and mint one key', async ({ page }) => {
@@ -283,6 +380,7 @@ test.describe('space view — synchronous double-submit guards', () => {
       sales.length,
       `expected exactly one /sell request, got ${sales.length}: ${JSON.stringify(sales.map((s) => s.body))}`,
     ).toBe(1)
+    await expectAllSettled2xx(sales, '/sell')
 
     // ...carrying EXACTLY ONE operation key. The second activation must mint
     // none at all: two independently-minted keys defeat server-side
@@ -308,6 +406,9 @@ test.describe('space view — synchronous double-submit guards', () => {
     await page.getByTestId('sell-tons-input').fill('1')
     await page.getByTestId('sell-button').click()
     await expect.poll(() => sales.length, { timeout: 20_000 }).toBe(2)
+    // Two sales, both of which the server actually accepted. `toBe(2)` is
+    // deliberate here — a second, genuinely new user command — and stays.
+    await expectAllSettled2xx(sales, '/sell')
     expect(sales[1].body.operationKey).toBeTruthy()
     expect(sales[1].body.operationKey).not.toBe(sales[0].body.operationKey)
   })
@@ -331,6 +432,7 @@ test.describe('space view — synchronous double-submit guards', () => {
       refuels.length,
       `expected exactly one /refuel request, got ${refuels.length}: ${JSON.stringify(refuels.map((r) => r.body))}`,
     ).toBe(1)
+    await expectAllSettled2xx(refuels, '/refuel')
     expect(refuels.map((r) => r.body.operationKey).filter(Boolean)).toHaveLength(1)
   })
 
@@ -365,6 +467,7 @@ test.describe('space view — synchronous double-submit guards', () => {
       jumps.length,
       `expected exactly one /jump request, got ${jumps.length}: ${JSON.stringify(jumps.map((j) => j.body))}`,
     ).toBe(1)
+    await expectAllSettled2xx(jumps, '/jump')
     expect(jumps[0].body.laneId, 'the lane id comes from the fleet\'s own read').toBeTruthy()
   })
 })

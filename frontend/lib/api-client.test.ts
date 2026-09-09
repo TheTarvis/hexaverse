@@ -320,6 +320,19 @@ describe('ApiClient', () => {
       )
 
       await expect(slowClient.get('/test')).rejects.toThrow('Request timeout')
+
+      // Scenario: A client-side request timeout is a status-less failure, not a 408
+      // (openspec change `fix-mutation-retry-on-4xx`, capability
+      // `mutation-retry-policy`, tasks.md 1.2c / adversary R3 MAJOR A).
+      //
+      // The mutation retry policy classifies a failure by the OBSERVABLE
+      // absence of a response status, so this abort must carry none: attach a
+      // `408` here as a "correctness improvement" and the app's one surviving
+      // automatic transport resend disappears silently, falsifying
+      // `docked-fleet-actions/spec.md:325-329`. `query-client.test.ts` cannot
+      // catch that — it constructs its own error and never observes this file.
+      // This is the assertion at the place that would attach it.
+      await expect(slowClient.get('/test')).rejects.not.toHaveProperty('status')
     })
   })
 

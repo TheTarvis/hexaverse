@@ -381,3 +381,233 @@ that let this defect hide for four analyses, and buys a green gate with a lie.
 
 **Reversal cost.** N/A — this is a ruling about how to read a result, not a
 change to any artifact.
+
+---
+
+### FULL-AUTO RULING 52 — no architect kickoff and no impl contract for this change
+
+**The question.** Phase 2 step 7 is an architect kickoff producing
+`<change-id>-impl-contract.md`. Does this change get one?
+
+**Ruling. No.** Phase 2 starts directly at the SDET red phase.
+
+**Basis.** Precedence 2 — the impl contract exists for a stated purpose, and
+that purpose is absent here. Per the handoffs README it holds "wire shapes,
+identifiers, sequencing — everything the spec deliberately leaves open, settled
+so the SDET can write both sides against one shape." This change has **no wire
+shape** (it adds no endpoint and changes no payload), **no identifiers**, and
+**no sequencing** (one developer, one production file, `frontend/lib/query-client.ts`).
+Nothing crosses the Next.js/Go seam; there is no "both sides" for a contract to
+reconcile. The tasks.md file already sequences the work, and the spec leaves
+nothing open that an architect would have to settle — three adversary rounds
+were spent closing exactly those gaps.
+
+Consistent with RULING 44, which skipped the architect at panel time for the
+same reason: a single-capability change with no cross-stack seam.
+
+**Alternatives rejected.** Running the kickoff anyway for completeness —
+rejected: it would produce a document whose every section is "n/a", and an
+empty contract in the handoffs directory is worse than none, because a later
+reader takes its existence as evidence a seam was considered and settled.
+
+**Only one developer is needed** — `openspec-nextjs-dev`. There is no Go work,
+so `openspec-golang-dev` is not launched, and the parallelism the kickoff
+normally sequences does not arise.
+
+**Reversal cost.** N/A — a process ruling. If the developer hits a genuine
+design question mid-build, that is a spec conflict and routes back through the
+writer (which would expire the adversary verdict), not to an after-the-fact
+contract.
+
+---
+
+### FULL-AUTO RULING 53 — ticking a task checkbox does not expire the adversary verdict
+
+**The question**, raised by the SDET at red handoff and correctly not resolved
+unilaterally. Tasks 1.2, 1.2b, 1.2c, 1.3 and 1.3b are complete, but the SDET
+declined to tick them, because the adversary R3 verdict's own currency check is:
+
+```bash
+git diff 946a70b -- openspec/changes/fix-mutation-retry-on-4xx openspec/specs/mutation-retry-policy
+```
+
+and ticking a checkbox makes that diff non-empty. Yet `openspec archive`
+requires every task checked. Read literally, the two rules cannot both be
+satisfied: the change can never be archived without expiring the verdict that
+permits it to be archived.
+
+**Ruling.** A `- [ ]` → `- [x]` transition is **progress state, not content**,
+and does not expire an adversary verdict. Ticking proceeds normally.
+
+**Basis.** Precedence 2 — the expiry rule read for its purpose rather than its
+letter. The workflow skill defines the re-attack scope on a stale verdict as
+"**the clauses whose live targets or delta text changed**". A checkbox tick
+changes no clause, no requirement, no scenario, and no task's *text*; there is
+nothing for a re-attack to attack. The rule exists so that edited normative
+content is never implemented under a verdict issued against different words.
+That hazard is absent here, and applying the rule literally would make every
+change in this repo unarchivable — which is a reductio, not a policy.
+
+**Made verifiable rather than asserted.** The exemption is narrow and must be
+checked, not trusted. Before archive, the diff against the verdict commit must
+contain **nothing but checkbox transitions**:
+
+```bash
+git diff 946a70b -- openspec/changes/fix-mutation-retry-on-4xx \
+  | grep '^[+-]' | grep -v '^[+-][+-]' | grep -v '^[+-]- \[[ x]\]'
+```
+
+That must print nothing. If it prints any line, the delta text or a task's
+wording genuinely changed, the verdict IS expired, and the change does not
+archive without an adversary pass over that diff.
+
+**Alternatives rejected.** (a) Leave every task unticked and archive anyway —
+rejected: `openspec archive` requires them checked, and an unticked completed
+task is a false record of what was done. (b) Re-run the adversary after ticking
+— rejected: the cap is three rounds and a checkbox is not a finding surface;
+this would also recur on every change forever. (c) Tick them all at the end in
+one commit to "minimise" the diff — rejected as cosmetic: the diff is the same
+size either way, and ticking a task when it is done is the honest record.
+
+**Who ticks.** The agent that completes the task ticks it, per the standing
+role rules — the developer for 1.1/1.1b, the SDET for its own test tasks, the
+orchestrator for the 2.x validation tasks it runs. The SDET's five are ticked
+by the orchestrator now, since it declined for this reason and is finished.
+
+**Reversal cost.** N/A — a process ruling.
+
+---
+
+### FULL-AUTO RULING 54 — a non-4xx, non-5xx response status (e.g. `302`) stays unspecified
+
+**The question**, raised by the SDET: the delta decides `4xx`, `5xx`, and
+status-less. It says nothing about a mutation failing with a `3xx` or `1xx`
+status. The SDET asserted nothing rather than invent semantics.
+
+**Ruling.** Correct, and it stays that way. **No requirement is added.**
+
+**Basis.** Precedence 4 — the most reversible option — reinforced by the
+spec-first invariant: inventing a rule for a case no evidence has ever produced
+is speccing a fantasy. `fetch` follows redirects transparently, so a `3xx`
+reaching the retry predicate as a failure is near-unreachable; no artifact, no
+defect, and no captured evidence in this repo describes one. Adding a clause
+would mean choosing its behaviour with no basis, which is precisely the guess
+the full-auto rules forbid.
+
+**Consequence, stated honestly.** Such a status falls through to whatever the
+implemented predicate does with an unmatched status. That is unspecified
+behaviour in a capability that otherwise specifies its whole domain — a real,
+if tiny, gap. Recorded here so it is a known gap rather than an unknown one.
+
+**Alternatives rejected.** Sweeping "any response status" into the no-resend
+rule — rejected: it is a wider behaviour change than RULING 40 authorises, and
+it would silently redefine the capability's scope in its final hour on a case
+nobody has observed.
+
+**Reversal cost.** One requirement and one scenario in a follow-up change, if a
+`3xx` ever shows up in a log.
+
+---
+
+### FULL-AUTO RULING 55 — the tier-1 gate's two reds are pre-existing and do not block; proven, not assumed
+
+**The question.** The full frontend suite reports `2 failed | 1610 passed
+(1612)`. Both failures are in
+`frontend/components/space/SpaceStage.interaction.test.tsx`
+(`SpaceStage — keyboard camera`). Does this change's tier-1 gate pass?
+
+**Ruling.** **Yes — the gate passes**, with the two reds attributed to
+`defect-spacestage-keyboard-camera-timeout-flake.md` (filed this run). This
+change's own tests are `40 passed (40)`.
+
+**Basis.** Precedence 2 — RULING 42's standing lesson, which this run treats as
+binding method: *every analysis that reasoned from an absence in a log was
+wrong; the one action that produced truth was capturing evidence.* So the
+attribution was **proven twice, not asserted**:
+
+1. **No code path exists.** `grep` over both the test file and `SpaceStage.tsx`
+   finds no reference to `query-client`, `queryClient`, `useMutation` or
+   `QueryClientProvider`. This change modifies exactly one production file,
+   `frontend/lib/query-client.ts`, which nothing in that test's graph reaches.
+2. **It reproduces at HEAD without the change.** Run in a clean `git worktree`
+   detached at `31df519`, with the original `query-client.ts` confirmed in
+   place: `1 failed | 36 passed (37)`.
+
+And the decisive detail: **which of the two keyboard tests fails is not
+stable.** Across four runs it failed case 1 alone, case 2 alone, and both
+together, at 10.3–16.1 s against a 10 s `testTimeout`. A deterministic
+regression does not migrate between sibling tests; a boundary timeout under
+varying load does.
+
+Corroborated independently by the SDET, which observed this same file flaking
+at red handoff — when no production code for this change existed at all.
+
+**A worktree was used deliberately.** Reverting `query-client.ts` in place
+would have been the obvious way to test the counterfactual, and it was
+rejected: the live tree held the developer's uncommitted implementation, and
+`README.md`'s *Lesson seven* records this repo losing exactly such work to
+exactly that manoeuvre. `git worktree add` is the tool the README names for a
+scratch proof needing a clean tree. The worktree was removed and
+`git status` confirmed the live tree unchanged.
+
+**Alternatives rejected.** (a) Call the gate red and stop the run — rejected:
+the reds are demonstrably not this change's, and stopping would block a
+prerequisite on another capability's flake. (b) Fix the flaky test here —
+rejected: it is outside the proposal's four-file Impact, in another
+capability's area, and the workflow classes an out-of-Impact diff as a finding
+against the developer. (c) Raise `testTimeout` — rejected outright:
+`docs/testing-tiers.md` forbids raising a budget to make a suite pass, and it
+would erase the only signal anyone has about the real cause.
+
+**Reported honestly, not rounded off.** This change's tier-1 result is *not*
+"all green". It is "40/40 for this change; 2 pre-existing reds in the suite,
+proven pre-existing". `add-vitals-strip`'s next gate run will meet the same two
+tests and should read the defect file rather than re-derive this.
+
+**Reversal cost.** N/A — an attribution ruling. If someone later shows a causal
+link from `query-client.ts` to `SpaceStage`, this ruling is wrong and the
+defect file's *Proof* section is where to attack it.
+
+---
+
+### FULL-AUTO RULING 56 — the developer's `3xx` decision is AFFIRMED, and it supersedes RULING 54's "falls through"
+
+**What the developer reported** (flagged, not slipped in — correctly, since
+RULING 54 had named this band unspecified). Its `shouldRetryMutation` treats
+**any** carried response status as "a response was read → no automatic resend",
+so a hypothetical `302` reaching the predicate is now refused. Today's code
+would have resent it once.
+
+**Ruling. Affirmed.** No spec change, no task change.
+
+**Basis.** Precedence 2 — the delta's own Requirement 2, which authorizes the
+surviving resend **only** for the status-less class. The developer's reasoning
+is better than the alternative it rejected, and it is worth recording:
+preserving the old fall-through would resend a status-carrying failure that is
+outside the class Requirement 2 covers, and that resend would then either be
+**unrecorded** — breaking Requirement 3's "the number of records equals the
+number of automatic resends" — or be recorded from a non-status-less branch,
+breaking task 1.1b. So the old behaviour is not merely unspecified here; it is
+**inconsistent with two of the three requirements**. Refusing it is the only
+implementation that satisfies all three.
+
+**This narrows RULING 54.** That ruling said the band stays unspecified and
+"falls through to whatever the implemented predicate does". It is now known
+what the predicate does, and it is the right thing. The *spec* still says
+nothing about `3xx` — that part of RULING 54 stands, and adding a clause on a
+case nobody has ever observed remains forbidden. What changes is that the gap
+is no longer a shrug: the implemented behaviour is principled, derived from the
+requirements rather than from an accident of control flow, and documented here.
+
+**Reachability, checked not assumed.** `api-client.ts` attaches a `status` only
+on `!response.ok`, and `fetch` follows redirects transparently, so a `3xx`
+reaching this predicate as a failure is effectively unreachable. This is a
+correctness-of-shape decision, not a behaviour change anyone will observe.
+
+**Alternatives rejected.** (a) Preserve the old fall-through — rejected on the
+two-requirement conflict above. (b) Add a `3xx` requirement now to make it
+explicit — rejected: the adversary round cap is spent, and a new requirement
+would ship with no adversarial review at all, which is worse than a documented
+gap on an unreachable case.
+
+**Reversal cost.** One conditional in `shouldRetryMutation`.

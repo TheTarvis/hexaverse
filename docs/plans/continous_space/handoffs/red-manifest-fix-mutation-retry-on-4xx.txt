@@ -1,0 +1,6 @@
+# red-suite handoff manifest for fix-mutation-retry-on-4xx
+# recorded 2026-09-09T22:29:58Z
+# verify with: bash .claude/scripts/openspec-red-manifest.sh verify fix-mutation-retry-on-4xx
+2a97adf1a521f7315eceae4a68f5de65201d3b3538ecc8debbdc8259112539d9  frontend/e2e/tests/space-double-submit.spec.ts
+64bfbb7cac0a1355a08c21ae2d995c77c8de9e98180d9852f01cb4e6929606a4  frontend/lib/api-client.test.ts
+acfba0bade650e4244c82b991a75895049f4a1e53ba76f6a877ec44386aa7e18  frontend/lib/query-client.test.ts
