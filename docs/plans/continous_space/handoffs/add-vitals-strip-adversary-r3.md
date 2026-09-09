@@ -434,3 +434,26 @@ accept it until it was true. The chain doc named this link's adversary target as
 **Phase 1 closes here.** No BLOCKER rides forward, no residue is deferred to a
 follow-up change, and implementation is authorised once the final repair is
 verified and committed.
+
+## Verdict commit
+
+**`aa21687`** — `docs(openspec): author add-vitals-strip — the system view's
+vitals strip`.
+
+This is the commit the round-3 verdict was issued at. The verdict is current
+while this is empty:
+
+```bash
+git diff aa21687 -- openspec/specs/system-space-view openspec/specs/docked-fleet-actions \
+                    openspec/specs/figure-formatting openspec/specs/fleet-roster \
+                    openspec/changes/add-vitals-strip
+```
+
+When it is not empty, the re-attack scope is **that diff**, not the whole
+change. The likeliest cause during this chain is another link archiving into one
+of the four live specs above.
+
+Note the four residue repairs from round 3 are **inside** this commit; they were
+applied after the verdict and before it was issued, under the ruling above that
+the cap governs adversary rounds rather than repairs. They have not themselves
+been adversarially reviewed — that is the recorded, accepted residual risk.
