@@ -38,7 +38,8 @@ carry the change-id, so nothing collides.
 | # | Change | Delivers | Capabilities | State |
 | --- | --- | --- | --- | --- |
 | 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `a4471a3` |
-| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge with cost overlay, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view`, `docked-fleet-actions` (readouts re-homed), `fleet-roster` (switch-fleet chevron) | ⬜ not authored |
+| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | ⬜ not authored |
+| 2a-ii | `add-burn-cost-overlay` | The fuel gauge's cost overlay: the burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props, the shortfall segment | MODIFIED `system-console` (the overlay), `system-space-view` (stale-preview presentation) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
 | 4 | `add-arc-figures-and-entity-tab` | Course label + Burn on the drawn curve, progress while burning; the **Selected entity** dock tab; `SpaceCommandPanel` retired last | MODIFIED `system-console`, `system-space-view`, `market-board-panel` (mounted as a station's tab) | ⬜ not authored |
@@ -46,6 +47,16 @@ carry the change-id, so nothing collides.
 **The archive order is the row order.** 2a and 2b are the scoping doc's step
 2 pre-split (see *Why 2 is two links*); 4 carries a pre-identified seam in
 case its panel finds it past the 40-task cap.
+
+**2a-ii was split off 2a in-run on 2026-09-09**, by the full-auto orchestrator,
+after its analyst sized 2a at ≈57 tasks against the 40-task cap — see
+`../continous_space/handoffs/add-vitals-strip-rulings.md` FULL-AUTO RULING 9 for
+the seam and why it is clean. The row is `not authored` rather than `authored`
+because `add-burn-cost-overlay` adds a requirement to `system-console`, a
+capability that does not exist in `openspec/specs/` until 2a archives; the
+full-auto rule authors an unauthored link *after its predecessor archived*, so
+its deltas target specs that exist and its adversary verdict is not born
+expired.
 
 Out of the chain, deliberately: the galaxy-view strip (open question, ruled
 *no* for now), a mobile layout, a theming pass, a resizable dock. None gates
@@ -174,7 +185,11 @@ full-width, **no verbs** — the instrument panel. Cells left to right per
   40s`, `Holding · 0.4 t/h`, `Mining · 1h 23m`, `Stranded`.
 - **Fuel** — `47.2 t · range 13.9k` over a gauge; a **cost overlay** whenever
   a preview resolves (the segment past the fill is the shortfall, in the
-  affordability colour) and a **drain** while burning.
+  affordability colour) — *moved to 2a-ii by the split* — and a **drain** while
+  burning. "Drain" is re-scoped (RULING 8): nothing on the wire carries fuel
+  consumed so far on a running burn, and fuel-per-Δv is a `backend/space` rule
+  the client may not mirror, so it is a visual state on the cell plus step-wise
+  updates as reads land, never an interpolated animation.
 - **Hold** — `47 / 200 t · 153 free` over a gauge segmented by kind (fuel is
   a kind).
 - **Credits** — `₡ 1,000`.
@@ -192,27 +207,118 @@ above the strip. Orbit up/down/left/right and pan stay keyboard and pointer;
 `roster-status.ts`'s existing derivation, never a second state machine. If
 the pill and the roster row can disagree, one of them is wrong.
 
-- **Touches:** ADDED `system-console` (the strip's cells, the no-verbs
-  invariant, the gauge overlays, the state-pill derivation, the `85vw` floor
-  as a MUST); MODIFIED `system-space-view` "Space View Camera Orbit, Pan, and
-  Zoom" (the on-screen cluster) and the layout requirement the column lives
-  under; `docked-fleet-actions` "Fleet Panel Cargo Hold Readout" and "Credit
-  Balance Readout" re-homed to the strip; `fleet-roster` "Row Selection
-  Delegated to the Mounting View" gains the chevron as a second delegate.
-- **Sizing risk:** the gauge overlays are the only new rendering; the cost
-  overlay reads `BurnPreview.fuelCostTons` and `affordable` off the preview
-  the command panel already holds — lift that state to the view, do not
-  re-query.
-- **Journey:** dock at a station, read the strip's four cells, select a
+- **Touches:** *(the draft's guesses, and what reading the specs found.)* ADDED
+  `system-console` (the strip's cells, the no-verbs invariant, the state-pill
+  derivation, the width floor as a MUST — stated as **1280 × 720 px**, since
+  `85vw` is 85 % of an unknown and the repo's only exercised laptop viewport is
+  Playwright's `Desktop Chrome`, RULING 12). Then, corrected:
+  - `system-space-view` **"System Space View Route and Data Fan-In"** (15
+    scenarios) is "the layout requirement the column lives under" — there is no
+    separate layout requirement.
+  - The cluster shrink lands in **"Space View Camera Is Keyboard-Operable"**,
+    not "Space View Camera Orbit, Pan, and Zoom" (which names no button and
+    stays true). ⚠️ **This doc's claim that the keyboard requirement "is
+    unaffected" is wrong** — the four `camera-pan-*` buttons are the app's only
+    keyboard pan path, and the twelfth button is `select-pan-target-point`, a
+    *selection* control this change must not delete. RULING 10.
+  - **"Toggle-to-Deselect Single Selection…"** is MODIFIED too: it claims the
+    acting fleet "is instead set by the fleet roster's row selection", which is
+    already false — `SpaceStage.tsx:754`'s fleet mark is a second setter, and
+    the chevron is a third.
+  - `docked-fleet-actions` is 2 REMOVED + 2 MODIFIED + **1 ADDED**: `Credit
+    Balance Readout`'s seventh scenario is a *panel* announcement with nothing
+    to do with credits, and removing the requirement wholesale would leave it
+    unspecced (RULING 11). `Sell Commit` and `Refuel Commit` assert the readouts
+    this change empties.
+  - `figure-formatting` **"An Absent, Non-Finite, or Unsupplied Figure…"** is
+    MODIFIED — this doc never mentioned it; its last scenario cross-references
+    the credits readout being removed.
+  - `fleet-roster` takes **no delta** (RULING 15). Its row-selection requirement
+    claims no exclusivity and is scoped to a row click; the chevron is not a
+    roster element. The exclusivity claim that goes stale is in
+    `system-space-view`, above.
+- **Sizing risk:** *(measured, and it was not the gauges.)* The analyst sized
+  2a at ≈57 tasks. The cost was the **test files**, exactly as link 1 was
+  taught: `FleetActionsPanel.test.tsx` (53 tests, 9 move and 2 rewrite),
+  `SpaceCommandPanel.test.tsx` (34 tests, 23 `previewState` references become
+  props), `SpaceStage.interaction.test.tsx` (4 camera tests break). The
+  preview lift was the seam; see 2a-ii. It still reads
+  `BurnPreview.fuelCostTons` and `affordable` off the preview the command panel
+  already holds — lift that state to the view, do not re-query.
+- **Journey:** ~~dock at a station, read the strip's four cells, select a
   target and watch the fuel gauge grow a cost segment, commit and watch the
-  pill flip to `Burning · … · Nm Ss`.
+  pill flip to `Burning · … · Nm Ss`.~~ **Revised by the 2a-ii split:** dock at
+  a station, read the strip's five cells, switch the acting fleet by the
+  chevron, commit a burn, watch the pill flip to the burning state and count
+  down. The cost-segment leg is 2a-ii's journey.
 - **Source:** `../system-hud.md` "Surface 1" and "What leaves"; the design
   canvas (two states); `SpaceStage.tsx` camera cluster;
   `components/fleet/roster-status.ts`.
 
+## Link 2a-ii — `add-burn-cost-overlay`
+
+**Split off 2a in-run on 2026-09-09** (RULING 9). 2a delivers the strip with a
+plain fuel gauge; this link gives that gauge its cost overlay, which is the
+part that requires a cross-component refactor.
+
+**Delivers.** The burn-preview state `SpaceCommandPanel` holds today lifted to
+`SystemSpaceView` and passed to both consumers; `SpaceCommandPanel` converted
+from a hook call to props; the fuel gauge's cost overlay — the segment past the
+fill is the shortfall, in the affordability colour — drawn only while the quote
+is current, withdrawn when the selection clears, when a refresh fails, or when
+an order commits.
+
+**Why it is the expensive half.** `SpaceCommandPanel.test.tsx` is 630 lines and
+34 tests built on `vi.mock('@/hooks/use-burn-preview')` plus a mutable
+`previewState`; 23 references become props, and mutations that happen after
+render today must become re-renders. That harness migration, not the overlay, is
+the cost.
+
+**Carries a filed defect.** `drift-running-mine-preview-unsuppressed.md` — the
+only production preview call site omits `mineRunning` from
+`commitWouldBeAccepted`, so the running-mine suppression that
+`system-space-view` mandates is specified, tested at the hook, and never wired.
+This link lifts that call site and **must not carry the bug up**. It needs no
+delta (the fix makes a live scenario true); it needs a **view-level** test, since
+a test that mocks the hook cannot observe it.
+
+- **Touches:** MODIFIED `system-console` (the overlay requirement);
+  `system-space-view` "A Failed or Stale Preview Is Never Presented as a Current
+  Quote" — a graphical projection of a quote is a presentation of that quote,
+  and the live text binds only "figures".
+- **Open question inherited from 2a:** whether the strip prints any cost or
+  shortfall *text*, or only the gauge segment. The chain doc's 2a scope said
+  segment-only, with `▲ short 6.6 t` belonging to link 4.
+- **Journey:** select a target, watch the fuel gauge grow a cost segment; pick an
+  unaffordable target and watch the segment extend past the fill in the
+  unaffordable state; clear the selection and watch it go.
+
 ## Link 2b — `add-console-dock`
 
 **Carved out of the scoping doc's step 2** — see *Why 2 is two links*.
+
+**Inherits `system-console`'s capability boundary.** `openspec archive`
+discards a delta's `## Purpose` section (proof:
+`openspec/specs/focused-scan/spec.md` reads the archiver's generated `TBD`
+placeholder to this day), so link 2a's `add-vitals-strip` pastes its
+boundary paragraph here, verbatim, as this link's copy of record — read
+this before touching `system-console`, rather than re-deriving the
+boundary from the strip's shipped code:
+
+> The console: everything that floats over the system space view as
+> instrumentation rather than as scene. `system-space-view` owns what the
+> canvas draws and how you pick — the renderer, the camera, and the selection
+> among a body, a lane gate, or a point. `system-console` owns the always-on
+> vitals strip along the bottom of that view — the acting fleet and its state,
+> its fuel and range, its hold, the corporation's balance, and the world clock
+> — and the per-entity detail dock the strip is the collapsed state of. The
+> strip reads; it does not command. It renders only figures the mounting view
+> supplies, issues no read of its own, carries no verb but the affordance to
+> switch which fleet is acting, and never changes the space view's selection.
+
+This is the paragraph **as of link 2a**; where it and
+`openspec/specs/system-console/spec.md` disagree, the spec wins, and this copy
+exists only because the archiver discards the original.
 
 **Delivers.** The dock beneath the strip: a tab bar and a ~164px detail
 area (220px total with the strip), default collapsed, four tabs that always
