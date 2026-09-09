@@ -862,3 +862,134 @@ the module's path in test files; every hit is a file in Impact.
 Step F has landed. `guards.test.ts`'s `.toFixed(` anchors moved from
 `[681, 682, 738, 739, 903]` to `[753, 754, 810, 811, 975]`. SDET re-greps and
 re-anchors; the developer correctly did not touch it.
+
+---
+
+## Rulings at the third gate run (authorised by Travis)
+
+Travis ruled option 1 from the journey record: fix the silent second burn, and
+spend a third tier-4 run. That is an explicit exception to the gate's two-run
+budget, granted for this link only — it is not a new default, and the budget
+stays two runs for every later link in this chain.
+
+### FULL-AUTO RULING 33 — red 1 (the Next.js dev overlay) is fixed in the test environment, never by moving the strip
+
+**Finding.** `vitals-strip-journey.spec.ts:257`'s chevron click is intercepted
+by `<nextjs-portal>` — Next.js 15's dev-mode issues badge, which renders in the
+**bottom-left corner**, the same corner as the strip's fleet cell. `npm run e2e`
+boots the frontend with `next dev` (`playwright.config.ts:14-19`), so the badge
+is present in the e2e stack by construction. `next build && next start` strips
+it entirely, so **no player ever sees it**.
+
+**Ruling.** Fix it in the **test environment** — either by disabling the dev
+indicator for the e2e stack (gated on `ENV=test`, so Travis's own `npm run dev`
+keeps its overlay) or test-side in the spec. **Do not move, re-anchor, or
+re-order the strip's fleet cell for it**, and do not change production layout.
+
+**Basis.** Precedence 2 — the spec-first invariant. Production layout changes
+only as implementation of a requirement; there is no requirement that the strip
+avoid a development-only artifact, and inventing one would let a dev-tool
+detail dictate the shipped design. Precedence 4 for the mechanism: an
+`ENV=test`-gated config flag is the most reversible option and touches nothing a
+player runs.
+
+**Alternatives rejected.** (a) Move the fleet cell out of the bottom-left corner
+— changes the shipped design to accommodate a tool that never ships, and the
+corner is where the scoping doc's Surface 1 puts it. (b) Raise the strip's
+z-index above the overlay — wins the click while leaving the badge visually on
+top of the cell, and it is an arms race with a framework surface. (c) Leave it
+and narrow the journey — abandons the viewport-containment row QA has BLOCKED,
+which is the one thing only this tier can prove.
+
+**Reversal cost.** One config flag.
+
+**Recorded caveat.** The badge reads **"2 Issues"**, meaning the app threw twice.
+Suppressing the badge must not become a way of not reading them: the diagnosis
+reads both issues *first*, because they may be the same root cause as red 2.
+Silencing a symptom before understanding it is how a green suite stops meaning
+anything — which is this repo's most-repeated lesson.
+
+### FULL-AUTO RULING 34 — red 2 is PRE-EXISTING, and the "silent second burn" symptom was an artifact
+
+**The diagnosis overturned the finding as written.** The literal symptom recorded
+in the journey record — a click producing *zero* requests — **did not reproduce
+in four live runs**. The reproducible form is the already-filed racy 409 on a
+follow-on order after a resolved action (`defect-post-sale-departure-burn-409s.md`),
+and the entire burn-commit path (`SpaceCommandPanel`, `use-submit-guard`,
+`use-fleets`) is **byte-identical before and after this change**.
+
+So my first suspect — a double-submit `inFlight` ref latching because a reset
+that depended on a remount no longer happens — is **refuted**, and I am recording
+that plainly. It was a plausible story that fit the symptom and not the evidence,
+and the only reason it did not become the fix is that the diagnosis was told to
+confirm or refute it rather than to act on it.
+
+**Two corrections to the journey record follow from this**, and both matter for
+anyone reading it later:
+
+1. The pass-in-run-1 / fail-in-rerun timeline is explained by **intermittency**,
+   not by the two-line diff between the runs. The record should not leave a
+   reader hunting for a causal link between `FloatingNav`'s offset and burn
+   submission; there is none.
+2. "Reaches the server zero times" was inferred from an absent log line. The
+   diagnosis found requests *are* sent and are refused 409. An absence of
+   evidence read as evidence of absence — the same shape as my own
+   misattribution of `defect-station-order-500` from the wrong log file, twice
+   in one gate.
+
+**The option this creates, which I am surfacing rather than taking.** Red 2 now
+meets this chain's own definition of acceptable residue: a **pre-existing,
+filed** backend defect on `space-double-submit.spec.ts`, a spec **this change
+did not touch**. By the letter of the gate rules, `add-vitals-strip` could
+archive with it recorded. I am not doing that, because Travis's instruction is
+to fix it and the defect is real and player-facing — but the cheaper path
+existed and should be visible in the record.
+
+### FULL-AUTO RULING 35 — the backend fix runs as a separate change outside the chain
+
+**Question.** The chain states "No backend work anywhere in this chain," and the
+fix for red 2 is in the backend.
+
+**Ruling.** The fix is authored and archived as its own fast-tracked minimal
+change, **`fix-follow-on-order-claim`**, outside this chain — writer → validator
+→ adversary → SDET red test → Go developer → tier 1, then archived **before**
+`add-vitals-strip`'s gate rerun so 2a's deltas still target a clean tree.
+
+**Basis.** Travis's direct instruction, relayed as a course correction, overrides
+the chain's no-backend rule **for this one defect**. The structural form —
+a separate change rather than backend tasks inside link 2a — is what keeps both
+things true at once: the instruction is carried out, and the chain's rule is not
+bent. `add-vitals-strip` remains a frontend-only change whose Impact says so.
+
+Note this is *not* a spec-first exemption: the backend fix gets the full
+fast-track (a real proposal, a real delta, a validator pass and an adversary
+pass), because the workflow skill's rule is that a fast-track shrinks the
+artifacts, never the gates. The adversary is non-skippable there as it is here.
+
+**Scope.** The claim lifecycle: which 409 branch fires on a follow-on order once
+the previous action has resolved. `action.ErrActiveActionExists` is the
+single-slot guard (`backend/action/service.go:17`, raised at
+`backend/action/dao.go:212`, mapped to 409 at `backend/fleet/handler.go:561`).
+The suspicion recorded in `defect-post-sale-departure-burn-409s.md` is that the
+resolve fold that releases the claim had not run — correctness must not depend
+on the sweep, which that defect file already notes is a liveness floor.
+
+**Consequence for the gate.** Because a backend file changes, **tier 3 must run
+again** alongside tier 4 in the third gate run. It cannot be skipped on the
+grounds that it was green before.
+
+### FULL-AUTO RULING 36 — the preview-poll 500 is filed, not fixed here
+
+The diagnosis found a third, **reproducible** defect: a fleet docked at a station
+stays selected, so `useBurnPreview` keeps polling a zero-length burn every 10s and
+the server answers 500 (`curve length below the configured minimum`). This is
+almost certainly what raised the dev overlay's "2 Issues".
+
+**Ruling.** Filed as `defect-docked-selection-polls-zero-length-preview.md`, not
+fixed in `add-vitals-strip`. It is a `system-space-view` selection/preview
+concern, not a `system-console` one; no task or scenario in this change covers
+it; and fixing it here would be a diff exceeding the change's stated Impact. It
+is a natural candidate for **link 2a-ii** (`add-burn-cost-overlay`), which owns
+the preview lift and already carries `drift-running-mine-preview-unsuppressed.md`.
+
+Reconsider only if the SDET shows it blocks the journey.
