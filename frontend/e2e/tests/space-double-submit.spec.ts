@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
-import type { ServedInterior } from '../helpers/space-view'
+import type { InteriorCapture } from '../helpers/space-view'
 import {
   bodyIdsMatching,
   captureInteriors,
@@ -167,10 +167,10 @@ const MIN_RUN_TONS = '5'
 async function burnToMineableBodyAndDock(
   page: Page,
   fleetId: string,
-  interiors: Map<string, ServedInterior>,
+  interiors: InteriorCapture,
 ): Promise<void> {
   const homeId = new URL(page.url()).pathname.split('/').pop()!
-  const home = interiors.get(homeId)
+  const home = await interiors.get(homeId)
   expect(home, `no interior read for ${homeId} was captured off the wire`).toBeTruthy()
   const lodeId = mineableBodyId(home!, stationFeatureId(home!) ?? undefined)
   expect(lodeId, `the home system's interior read carried no mineable body (home ${homeId})`).toBeTruthy()
@@ -349,7 +349,7 @@ test.describe('space view — synchronous double-submit guards', () => {
     // affordance is exercised deliberately by `space-journey.spec.ts`, which
     // is where tasks.md 11.2 requires it.)
     const homeId = new URL(page.url()).pathname.split('/').pop()!
-    const gate = (interiors.get(homeId)?.laneGates ?? [])[0]
+    const gate = ((await interiors.get(homeId)).laneGates ?? [])[0]
     expect(gate?.id, `the interior read for ${homeId} served no lane-gate body id`).toBeTruthy()
     await selectBody(page, gate.id!)
     await expect(page.getByTestId('gate-facts')).toBeVisible({ timeout: 20_000 })

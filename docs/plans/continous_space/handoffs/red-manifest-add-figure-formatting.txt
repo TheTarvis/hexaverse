@@ -1,5 +1,5 @@
 # red-suite handoff manifest for add-figure-formatting
-# recorded 2026-09-09T04:51:16Z
+# recorded 2026-09-09T05:07:12Z
 # verify with: bash .claude/scripts/openspec-red-manifest.sh verify add-figure-formatting
 b2c4be9d3a849c2223682758db15fe872e360a87f56dd21f497bd7c40a9d7056  frontend/components/figure/Figure.test.tsx
 495f50ddfa342ae7972cbae341a0f4de0497e53e70e43670d13e6974fea0628e  frontend/components/fleet/FleetRoster.test.tsx
@@ -20,4 +20,4 @@ b95bdc024dd6ae681b3022cf692af88decab763e28f57e35cfc26481a181cbea  frontend/compo
 4e13fa9c4fa91fa154082b3949d3c0618c7bc015a824f6cd031d3a61a534dd31  frontend/lib/format/assert-figures.ts
 5f231d0abbc855cf36229d01f0f2d4a72fb4f534a9bfcabdb2a0c3b581da875f  frontend/lib/format/cases.json
 7cb42ef47c3a4e0e983aaac1fb30aa40e5b79bf1fcdeaffa81a51e41714dc719  frontend/lib/format/figures.test.ts
-38616cd1e0a4a41531241d2d9925b2dca64a245dc5bf1a2ff56ae06f52dfef19  frontend/lib/format/guards.test.ts
+7753265c52daec961e924bf885cb0496dba5a964d6262ae9e67908fb05009554  frontend/lib/format/guards.test.ts

@@ -37,7 +37,7 @@ carry the change-id, so nothing collides.
 
 | # | Change | Delivers | Capabilities | State |
 | --- | --- | --- | --- | --- |
-| 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (copy only) | ✅ authored r3 `da3ba36` |
+| 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `PENDING` |
 | 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge with cost overlay, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view`, `docked-fleet-actions` (readouts re-homed), `fleet-roster` (switch-fleet chevron) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
@@ -112,6 +112,49 @@ Size the tasks against the test files, not the components.
   figure via its `data-*` attribute.
 - **Source:** `../system-hud.md` "The problem" fault #1 and "Formatting";
   `frontend/lib/eta.ts`; the five components above.
+
+**Taught.** Landed 2026-09-09. 55 tasks, not the ~30 the doc implied — the sizing
+input really was the test files, and the panel found three more.
+
+- **The doc undercounted the link.** It named three `docked-fleet-actions`
+  requirements; seven carry figures. It named one `fleet-roster` requirement; the
+  roster's ETA lives under a different one. It named `lib/eta.ts` as the thing
+  retired; `countdown()` was duplicated verbatim in two more components, so there
+  were **three** duration formatters. And `lib/eta.ts` had **two** callers, not one
+  — the second, `SpaceStage`, is on a surface with no covering requirement in any
+  spec at all. Links 2a–4 should expect the same: the doc names the *placements*
+  accurately and the *requirement counts* optimistically.
+- **A cross-surface invariant cannot be split.** R12 ("only the formatter produces
+  figure text") is whole-tree, so no seam halves it without shipping it false behind
+  an exception list. That is why this link ran to 55 tasks instead of splitting
+  (RULING 18) — and it is a property of any later link that states a
+  vocabulary-wide rule.
+- **Enumerating prohibitions never closed the invariant; a computable check did.**
+  Five formulations failed — ban `toFixed`, ban local formatters, ban template
+  literals, an undecidable byte-identity check, a containment clause that was
+  simultaneously too strict and too loose. What held (RULINGs 23, 25) was making an
+  element's text a **total function of its own attributes** — `(raw, scale, token) →
+  expected text` — and checking it. The fifth bypass was found in `range`, whose
+  no-unit output is a decimal *prefix* of its own raw (`833.25` renders `833`).
+  Any later link adding a figure kind inherits this: give it a token that
+  determines its form, or the check goes undecidable again.
+- **`data-unit` is a kind vocabulary, not a unit one**, and it changed twice under
+  review. It is now closed and exported; links 2a–4 extend it rather than inventing
+  tokens at call sites.
+- **Two figure defects were found by review, not by tests.** The roster's `?? 0`
+  read `0t fuel` for an unavailable roster — indistinguishable from a dry fleet. And
+  the sell price-changed notice compared a flat `tons × price` estimate against a
+  fold, so on a split fill it showed a number the player never saw; its test asserted
+  only that the two figures *differed*, which both the wrong and right
+  implementations satisfy. Assert the *value*, not the difference.
+- **The archive gate cost two runs and the second was clean.** Tier 4 went 19/22 →
+  **22/22**; the only genuine fix was an e2e helper that could not tell "never
+  served" from "served, not yet parsed" — a weakness that had now stalled **two
+  consecutive** chains' gates. Everything else red was `defect-station-order-500`
+  (arrival-phase intermittent, open since 2026-09-02) and a post-sale 409, both
+  backend, both filed, neither touchable here.
+- **Tier 3 came in at 972s against the prior chain's 5118s**, which had closed
+  predicting a third timeout raise. The raise was not needed.
 
 ## Link 2a — `add-vitals-strip`
 

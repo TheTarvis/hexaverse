@@ -278,7 +278,7 @@ adversary round 3's concentration-risk finding).
 - [x] 13.1 Per-commit gate green: `bash .claude/scripts/check.sh` and
       `python3 .claude/skills/code-quality-checks/check.py --files-only`
       (tiers 0–1, `docs/testing-tiers.md`)
-- [ ] 13.2 Tier 4 (Playwright journey) then tier 3 (full emulator suite) run
+- [x] 13.2 Tier 4 (Playwright journey) then tier 3 (full emulator suite) run
       once each with the tree locked, archive time only; write
       `docs/plans/continous_space/handoffs/add-figure-formatting-journey.md`
       with the suite budget line

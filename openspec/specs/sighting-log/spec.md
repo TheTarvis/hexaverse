@@ -12,9 +12,17 @@ client re-sort would silently assert a different ordering than the one the
 server's pagination is built on.
 
 Each row SHALL show the record's system, its `asOf`, and the **raw host id** of
-the host that was swept. The raw id is the label, not a fallback from one: no
-wire surface in this codebase serves a name for a body or for a fleet, so there
-is nothing for the row to prefer and nothing for it to fall back from. The row
+the host that was swept. The `asOf` is presented per `figure-formatting` as an
+absolute `T+` stamp and carries its raw served value; this presentation rule
+applies to `asOf` alone. Because the absolute stamp is minute-resolution
+(`figure-formatting`'s `T+ Dd HH:MM`), two records whose `asOf` values fall
+within the same minute render an identical stamp. The row order — served,
+never client-sorted — remains the only visible signal of their relative
+sequence; this is accepted rather than remedied by a seconds field on this
+surface alone, per `figure-formatting`'s one-format-everywhere rule. The raw
+id is the label, not a fallback from one: no wire surface in this codebase
+serves a name for a body or for a fleet, so there is nothing for the row to
+prefer and nothing for it to fall back from. The row
 SHALL NOT present the id as degraded — no placeholder text, no empty cell, no
 "unknown host", no styling that marks it as missing information.
 
@@ -37,8 +45,9 @@ at that host — itself a filed claim, not an absence of one.
 
 #### Scenario: A composition row shows hulls
 - **WHEN** a served record names a target
-- **THEN** its row shows the record's system, `asOf`, swept host, hull count,
-  and hull types
+- **THEN** its row shows the record's system, `asOf` (presented per
+  `figure-formatting` and carrying its raw served value), swept host, hull
+  count, and hull types
 
 #### Scenario: The swept host is shown as its raw id, whatever the host is
 - **GIVEN** records whose swept hosts are a planet, a moon, a belt, a lane gate,
@@ -52,6 +61,13 @@ at that host — itself a filed claim, not an absence of one.
 - **WHEN** a served record is a clean sweep
 - **THEN** its row shows a clean-sweep marker and no hull count or hull types
 - **AND** it still shows the system, `asOf`, and swept host
+
+#### Scenario: Two records within the same minute render identical stamps, distinguished only by row order
+- **GIVEN** two served records whose `asOf` values fall within the same minute
+- **WHEN** their rows are shown
+- **THEN** both display the identical `T+ Dd HH:MM` stamp
+- **AND** their relative order in the list — never their stamps — is what
+  shows which was observed first
 
 ### Requirement: A Log Row Names No Owner
 The system SHALL NOT display an owner, corporation, or fleet identity for a

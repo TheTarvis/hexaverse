@@ -77,7 +77,7 @@ test.describe('jump commit — wire to click', () => {
     // 2. The gate bodies ship unfiltered from the first read
     //    (`system-interior`: "Bodies Are Public; Ships Are Disclosed"), so a
     //    corporation that has charted nothing still sees its home gates.
-    const home = interiors.get(homeSystemId)
+    const home = await interiors.get(homeSystemId)
     expect(
       home,
       `no interior read for ${homeSystemId} was captured off the wire — the wire half of this ` +

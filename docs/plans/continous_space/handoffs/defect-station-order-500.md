@@ -124,3 +124,94 @@ seed-dependent, in a file nobody in that pass had touched.
 **This strengthens the escalation above.** The corrective change should sweep every `space`
 sentinel reaching `respond`, not map them one at a time as each is discovered — three have
 been found by accident, one per link.
+
+---
+
+## Recurrence 2026-09-09 — still open, and it cost another archive gate
+
+Hit again during `add-figure-formatting`'s tier-4 archive gate (link 1 of the
+system-HUD chain), in `e2e/tests/scan-journey.spec.ts:307` — the burn to the home
+station leg. Same signature, captured the same way:
+
+```
+POST /v1/fleets/…/orders/preview  500
+  error="fleet: solving burn: space: endpoint at or inside the star-clearance radius"
+POST /v1/fleets/…/orders          500
+  error="fleet: solving burn: space: endpoint at or inside the star-clearance radius"
+```
+
+Fleet `fleet_0b6a2717-…`. The **preview 500'd too**, which the original report does not
+record — worth noting, because it means the player is not merely refused at commit;
+they are refused a quote as well, so the surface has nothing to show and no reason to
+give. `system-space-view`'s *A Failed or Stale Preview Is Never Presented as a Current
+Quote* handles the display side correctly, but the underlying refusal is this defect.
+
+**One correction to a diagnosis made in this run.** The SDET investigating it, without
+having found this file, reasoned the failure looked **deterministic** — the failing case
+was the shortest possible burn (home station, immediately after spawn, near-zero
+displacement) while every other burn-to-station in the same run succeeded after an
+intervening mine run. That inference was reasonable and wrong: this file's original
+analysis is better, and explains why. The standoff offset is added to the host's own
+orbit radius, so a station whose orbit sits just outside the clearance is inside it
+**for some arrival phases and outside it for others** — the same order against the same
+station succeeds or fails depending on where the station is in its orbit at the solved
+arrival instant. Zero displacement is not the variable; arrival phase is. Expect it to
+recur intermittently rather than reliably, which also means **a green rerun does not
+mean it is fixed**.
+
+**Still not folded into the change that found it**, for the same reason as 2026-09-02:
+`add-figure-formatting` is UI-only, touches zero backend files, and its chain
+(`docs/plans/system-hud/chain.md`) forbids backend work outright — "a link that finds
+itself wanting a new field is mis-scoped".
+
+**A second, smaller defect rides along and is worth fixing at the same time:** the error
+is *unmapped*. `backend/fleet/handler.go`'s switch has no case for
+`space.ErrEndpointInsideClearance`, so it falls through to a bare bodyless 500. Even
+while the geometry question is open, a reachable, player-selectable target should never
+produce an unmapped 500 — `docked-fleet-actions`' *Rejection Reasons Map to
+Player-Facing Copy, Not Raw Server Text* is the standing rule that arm violates.
+
+## 2026-09-09, second observation — a test is misattributing this defect to fuel tuning
+
+The `add-figure-formatting` archive-gate **rerun** hit this defect twice more in tier 3
+(1875 tests, 1 skipped, 2 failures, 972s). Both failures are this signature:
+
+```
+fuel_stranding_and_range_e2e_test.go:239
+  order to home station: status = 500
+
+fuel_spawn_starting_fuel_e2e_test.go:236
+  sample account #3: default order to home station rejected (status = 500)
+```
+
+Three occurrences across two runs (run 1: `fuel_discard_refund_e2e_test.go:126`), each in
+a different fuel test, each on the burn to the home station — consistent with the
+arrival-phase intermittency this file already describes, and inconsistent with any
+per-test cause.
+
+**The finding worth acting on.** `fuel_spawn_starting_fuel_e2e_test.go` converts that 500
+into a conclusion about *fuel economy*:
+
+```
+fuel_spawn_starting_fuel_e2e_test.go:249
+  1/8 sampled accounts could not afford their own default spawn-to-home-station burn —
+  per this requirement's own instruction, a failing sample is a signal to retune
+  FuelParams.StartingFuelTons, never to relax this requirement
+```
+
+That is a **misattribution**, and a costly-shaped one. The sample did not fail on
+affordability; it failed on an unmapped 500 from the clearance-radius guard. A reader
+following the message's own instruction would retune `FuelParams.StartingFuelTons` — a
+game-balance constant — to work around a geometry defect, and the retune would appear to
+work, because raising starting fuel changes which arrival phases the solver reaches.
+
+This is the same species as the "A TIMEOUT IS NOT AN ASSERTION FAILURE" banner already
+recorded in this directory: a failure mode whose surface reading points at the wrong
+subsystem. The fix is the same shape too — the test should distinguish *rejected because
+unaffordable* (the condition it means to sample) from *rejected with an unmapped 500*
+(this defect), and say which. Until it does, this defect is capable of silently
+consuming a balance-tuning cycle.
+
+That distinction becomes trivial once the handler-mapping half of this defect is fixed:
+a mapped, distinguishable rejection reason is exactly what the test needs to tell the two
+apart.

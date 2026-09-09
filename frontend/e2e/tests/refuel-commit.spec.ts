@@ -85,7 +85,7 @@ test.describe('refuel commit — wire to click, double-submit guard', () => {
     //    station is therefore identified here from the SERVED interior read's
     //    own `type: "station"`, never from a rendered attribute and never
     //    from a guessed id.
-    const home = interiors.get(homeSystemId)
+    const home = await interiors.get(homeSystemId)
     expect(home, `no interior read for ${homeSystemId} was captured off the wire`).toBeTruthy()
     const stationId = stationFeatureId(home!)
     expect(

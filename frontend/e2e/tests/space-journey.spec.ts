@@ -141,7 +141,7 @@ test.describe('the continuous-space slice, end to end through the new view', () 
     // interior read is what says which one does — not whichever mark happens
     // to be drawn first.
     const homeId = new URL(page.url()).pathname.split('/').pop()!
-    const home = interiors.get(homeId)
+    const home = await interiors.get(homeId)
     expect(home, `no interior read for ${homeId} was captured off the wire`).toBeTruthy()
     expect(
       mineableBodyId(home!, stationFeatureId(home!) ?? undefined),

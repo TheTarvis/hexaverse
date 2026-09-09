@@ -98,7 +98,7 @@ test.describe('the vertical slice', () => {
     // 2. NO SCAN — `system-interior`'s fully-disclosed interim read ships
     //    every body, resources included, from the very first read. The lode
     //    is already there; nothing to trigger, nothing to wait on.
-    const home = interiors.get(homeSystemId)
+    const home = await interiors.get(homeSystemId)
     expect(
       home,
       `no interior read for ${homeSystemId} was captured off the wire — this journey's every ` +
@@ -191,7 +191,7 @@ test.describe('the vertical slice', () => {
     //    Every home system has at least one lane-gate body: the backend's own
     //    traversability e2e hard-fails a spawn whose home interior carries
     //    zero. That is a structural guarantee, not a lucky seed.
-    const gates = interiors.get(homeSystemId)?.laneGates ?? []
+    const gates = (await interiors.get(homeSystemId)).laneGates ?? []
     expect(gates.length, 'the home system interior served no lane-gate body').toBeGreaterThan(0)
     const gate = gates[0]
     expect(gate.id, `the gate toward ${gate.destSystemId} was served with no body id`).toBeTruthy()

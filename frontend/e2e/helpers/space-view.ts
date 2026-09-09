@@ -48,28 +48,115 @@ export interface ServedInterior {
   laneGates: ServedGate[]
 }
 
+/** What `InteriorCapture.get` waits (bounded) for a system's interior read. */
+const DEFAULT_INTERIOR_TIMEOUT_MS = 20_000
+
+/**
+ * The read side of `captureInteriors`. `get` is a BOUNDED POLL, not a single
+ * synchronous map read — see the fix note on `captureInteriors` for why a
+ * single read is unsound against a response captured off an event listener.
+ */
+export interface InteriorCapture {
+  /**
+   * Resolves once `GET /v1/systems/:systemId`'s body has been captured AND
+   * parsed, polling up to `timeoutMs` (default 20s). Throws — it never
+   * silently returns `undefined` — and the thrown message SAYS WHICH of the
+   * two distinct failures happened: the response was never observed at all,
+   * or it was observed (a response object arrived) but its body did not
+   * finish parsing inside the budget. Collapsing those two into one "missing"
+   * outcome is exactly the bug this replaces.
+   */
+  get(systemId: string, timeoutMs?: number): Promise<ServedInterior>
+}
+
 /**
  * Records every `GET /v1/systems/:id` body this session receives, keyed by
  * system id. This is the "wire" end of every wire-to-click assertion below:
  * nothing in these suites is a fixture, and nothing re-derives a served id.
  *
  * Call before the first navigation.
+ *
+ * FIX (2026-09-09, second consecutive archive gate this helper stalled).
+ * The prior shape returned a plain `Map` and populated it from inside a
+ * DETACHED `page.on('response', async (res) => { await res.json() ... })`
+ * handler: the listener callback runs as its own floating promise, and nothing
+ * connected its completion to a caller's later, SYNCHRONOUS `interiors.get(id)`
+ * read. A response genuinely served (200, in well under a second) could still
+ * lose that race against a caller who read the map a couple of seconds later,
+ * because "a couple of seconds" was never a guarantee the parse had finished —
+ * only usually enough. The failure then read as "interior never captured",
+ * which is false: it was captured, just not yet parsed at the instant of the
+ * synchronous read. The old code could not even tell the two cases apart.
+ *
+ * This version fixes both problems:
+ *
+ *   1. The parse is anchored to the response object itself
+ *      (`res.body()`, the raw bytes), started synchronously at event-fire
+ *      time — same as before — but the CONSUMER now waits on it too, via a
+ *      bounded poll (`get`, below), instead of taking one synchronous
+ *      snapshot of a map that may not have been written yet.
+ *   2. `servedAt` is written synchronously, at event-fire time, BEFORE the
+ *      body is parsed — so a poll that times out can distinguish "no
+ *      response was ever observed for this system id" (nothing in
+ *      `servedAt`) from "a response arrived but parsing it did not finish in
+ *      time" (`servedAt` has it, `parsed` does not), and say which in the
+ *      thrown error rather than reporting one generic "never captured".
  */
-export function captureInteriors(page: Page): Map<string, ServedInterior> {
-  const seen = new Map<string, ServedInterior>()
-  page.on('response', async (res) => {
+export function captureInteriors(page: Page): InteriorCapture {
+  const parsed = new Map<string, ServedInterior>()
+  const servedAt = new Map<string, number>()
+
+  page.on('response', (res) => {
     const url = new URL(res.url())
     const m = /^\/v1\/systems\/([^/]+)$/.exec(url.pathname)
     if (!m || res.request().method() !== 'GET' || !res.ok()) return
-    try {
-      const body = (await res.json()) as ServedInterior
-      if (Array.isArray(body.features) || Array.isArray(body.laneGates)) seen.set(m[1], body)
-    } catch {
-      // A non-JSON or already-consumed body is not a suite's concern; every
-      // caller below fails loudly if nothing was ever captured.
-    }
+    const systemId = m[1]
+    // Synchronous, at event-fire time: this is what lets `get`'s bounded
+    // poll (below) tell "never served" from "served, still parsing" even
+    // while the parse below is still in flight.
+    servedAt.set(systemId, Date.now())
+    // Anchored to THIS event's own response — its raw bytes via `res.body()`
+    // — rather than a detached `await res.json()` a synchronous read could
+    // race past. The consumer no longer takes a single synchronous snapshot;
+    // it polls (see `get`), so this promise settling late is tolerated, not
+    // silently missed.
+    void res
+      .body()
+      .then((buf) => {
+        const body = JSON.parse(buf.toString('utf-8')) as ServedInterior
+        if (Array.isArray(body.features) || Array.isArray(body.laneGates)) {
+          parsed.set(systemId, body)
+        }
+      })
+      .catch(() => {
+        // A non-JSON or unreadable body is not a suite's concern; `get`'s
+        // poll below times out and reports "served, not parsed" rather than
+        // hanging on a body that will never arrive.
+      })
   })
-  return seen
+
+  return {
+    async get(systemId: string, timeoutMs = DEFAULT_INTERIOR_TIMEOUT_MS): Promise<ServedInterior> {
+      const deadline = Date.now() + timeoutMs
+      for (;;) {
+        const hit = parsed.get(systemId)
+        if (hit) return hit
+        if (Date.now() >= deadline) break
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      if (servedAt.has(systemId)) {
+        throw new Error(
+          `captureInteriors: GET /v1/systems/${systemId} WAS served (response observed at ` +
+            `${new Date(servedAt.get(systemId)!).toISOString()}) but its body did not finish ` +
+            `parsing within ${timeoutMs}ms — a parse race, not a missing read.`,
+        )
+      }
+      throw new Error(
+        `captureInteriors: GET /v1/systems/${systemId} was never served within ${timeoutMs}ms — ` +
+          `no matching response was observed at all.`,
+      )
+    },
+  }
 }
 
 /** Records the JSON body of every POST matching `pathPattern`. */

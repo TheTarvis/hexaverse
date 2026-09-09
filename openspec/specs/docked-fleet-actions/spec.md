@@ -29,7 +29,6 @@ Three of its members are neither "docked" nor a "fleet action":
 
 What this capability really is, is the fleet command panel; the name is fixed
 by ruling, and the shape is the one above.
-
 ## Requirements
 ### Requirement: Mine Offer on the Docked Fleet
 The system SHALL offer the mine verb on the acting fleet's panel section
@@ -69,17 +68,27 @@ The system SHALL, while the mine offer is shown, preview the run's duration
 as the entered tonnage divided by the fleet's served derived mining rate
 (from the fleet read's roster fields), recomputed live as the tonnage or
 kind selection changes; after commit, countdowns SHALL use the ETA frozen
-on the returned action, not the client preview.
+on the returned action, not the client preview. The previewed duration is
+presented per `figure-formatting` as a duration, with no direction affix —
+a cost quoted before the run starts, not a position in time — and the
+committed countdown is presented per `figure-formatting` as a relative
+duration, suffixed `left`, at the mounting view's served scale; each
+carries its raw span in unscaled world-milliseconds — the preview's span
+being the client-side tonnage-over-rate figure this requirement already
+defines, the committed countdown's being the remainder to the action's
+served ETA.
 
 #### Scenario: The preview tracks the tonnage input
 - **WHEN** the tonnage input value changes
 - **THEN** the previewed duration updates to the new tonnage divided by the
-  fleet's served mining rate
+  fleet's served mining rate, presented per `figure-formatting` as a bare
+  duration, with no direction affix
 
 #### Scenario: The committed countdown uses the server's ETA
 - **WHEN** a mine run commits successfully
 - **THEN** the running countdown derives from the action's returned ETA,
-  not from the pre-commit client preview
+  not from the pre-commit client preview, presented per `figure-formatting`
+  as a relative duration suffixed `left`
 
 ### Requirement: Mine Commit
 The system SHALL, when the mine command is invoked with a chosen kind and
@@ -131,16 +140,35 @@ derived from the fleet read's owner-only roster fields: cargo contents by
 resource kind (including `fuel`, per `fleet-movement`'s "Fleet Cargo
 Pool") and used versus total capacity; the readout SHALL reflect the
 post-resolution cargo after a mine run resolves (via the space view's
-refetch rules), without requiring navigation. This readout is the fleet's
-*cargo* hold, distinct from the *station-keeping* hold this capability's
-own "Station-Keeping Hold and Release Controls" defines — the two share the
-word "hold" but name unrelated concepts.
+refetch rules), without requiring navigation. Every tonnage in the readout
+— per-kind tons, used capacity, and total capacity — is presented per
+`figure-formatting` as a tonnage. The per-kind tons and the total capacity
+each carry their own raw served value; the used capacity is derived
+client-side from the fleet read's served capacity and free-hold fields
+(`capacity − freeHold`) and carries its raw value, not "raw served value" —
+it is computed, not itself a field the server returns. This
+readout is the fleet's *cargo* hold, distinct from the *station-keeping*
+hold this capability's own "Station-Keeping Hold and Release Controls"
+defines — the two share the word "hold" but name unrelated concepts. WHEN
+the fleet read has not yet served roster fields for the acting fleet, the
+readout SHALL show `figure-formatting`'s absent form for used capacity,
+total capacity, and free hold, rather than substituting zero — a fleet
+whose roster has not loaded is not indistinguishable from a fleet holding
+an empty hold.
 
 #### Scenario: The hold readout shows contents and capacity
 - **WHEN** the space view renders an acting fleet whose fleet read carries
   roster fields
 - **THEN** the fleet panel shows cargo tons by kind and the used/total
-  hold capacity
+  hold capacity, each presented per `figure-formatting`; the per-kind and
+  total-capacity figures carry their own raw served value, and the used
+  figure carries its own raw (client-derived) value
+
+#### Scenario: An unloaded roster reads as absent, not an empty hold
+- **WHEN** the fleet panel renders for an acting fleet whose fleet read has
+  not yet served roster fields
+- **THEN** the hold readout shows the `figure-formatting` absent form for
+  used/total capacity and free hold, never `0 / 0 t` or `0 t free`
 
 #### Scenario: The hold visibly fills when a mine run resolves
 - **WHEN** a running mine's ETA passes and the space view's refetch lands
@@ -172,7 +200,10 @@ selected kind (per `goods-sale`'s "Settlement Folds Tonnage Across a
 Venue's Ordered Demand Entries" and per-portion rounding rule), pinned to
 the exact same fold and rounding the server settlement uses via the shared
 `fixtures/market/cases.json` golden — so a player is never shown a split or
-a total the settlement won't honor.
+a total the settlement won't honor. The held tonnage and the previewed
+proceeds are presented per `figure-formatting` (tonnage as a tonnage,
+proceeds as a credit figure) and each carries its raw served or computed
+value.
 
 #### Scenario: Sell is offered while docked at a station with cargo aboard
 - **WHEN** the acting fleet's effective state is `docked` to a station and
@@ -205,7 +236,8 @@ a total the settlement won't honor.
 - **WHEN** the tonnage or kind selection changes while the sell offer is
   shown
 - **THEN** the previewed proceeds update to reflect the served quote for
-  the newly selected kind and tonnage
+  the newly selected kind and tonnage, presented per `figure-formatting` as
+  a credit figure and carrying its raw computed value
 
 #### Scenario: A kind with no configured floor at this station is excluded from the picker
 - **WHEN** the acting fleet holds a kind for which the docked station's
@@ -230,10 +262,12 @@ server's distinguishable rejection reason and leave the offer's state
 unchanged — except for a "price changed" (slippage guard) rejection, which
 SHALL instead refresh the offer to the server's current applicable price(s)
 and proceeds total, showing that refreshed figure alongside the one the
-player originally expected, so the player can accept or abandon the new
-price from inside the flow without re-navigating; re-committing after such
-a refresh SHALL use a newly generated operation key (a re-priced sale is a
-new intent, never a retry of the old one).
+player originally expected — each presented per `figure-formatting` as a
+credit figure, in its own element carrying its own raw value, never
+combined into a single interpolated string — so the player can accept or
+abandon the new price from inside the flow without re-navigating;
+re-committing after such a refresh SHALL use a newly generated operation
+key (a re-priced sale is a new intent, never a retry of the old one).
 
 #### Scenario: A successful sale refreshes hold and balance
 - **WHEN** the sell command succeeds
@@ -254,8 +288,9 @@ new intent, never a retry of the old one).
   rejection
 - **THEN** the offer refreshes to the server's current applicable price(s)
   and total proceeds, displaying that figure alongside the player's
-  originally expected one, rather than leaving the stale pre-rejection
-  offer on screen
+  originally expected one — each presented per `figure-formatting` as a
+  credit figure in its own element with its own raw value — rather than
+  leaving the stale pre-rejection offer on screen
 
 #### Scenario: Re-committing a re-priced sale uses a new operation key
 - **WHEN** a player re-commits a sale after a price-changed refresh
@@ -327,7 +362,9 @@ preview computed as the entered tonnage times the fuel price served on the
 fleet's own read (`fleet-movement`'s "Fleet Read Serves the Configured
 Fuel Price, Never Duplicated Client-Side") — never a client-maintained
 copy of that constant, so the preview and the settlement's actually-
-charged cost can never diverge.
+charged cost can never diverge. The default tonnage and the previewed cost
+are presented per `figure-formatting` (tonnage as a tonnage, cost as a
+credit figure) and each carries its raw computed value.
 
 #### Scenario: Refuel is offered while docked at a station
 - **WHEN** the acting fleet's effective state is `docked` to a station
@@ -367,7 +404,9 @@ charged cost can never diverge.
 - **WHEN** the tonnage entered changes while the refuel offer is shown
 - **THEN** the previewed cost updates as tonnage times the fuel price
   served on the fleet's own read, with no per-station or per-region
-  variance and no locally-stored copy of that price
+  variance and no locally-stored copy of that price, presented per
+  `figure-formatting` as a credit figure and carrying its raw computed
+  value
 
 ### Requirement: Refuel Commit
 The system SHALL, when the refuel command is invoked with a chosen
@@ -462,7 +501,11 @@ new park mode and, while holding, the upkeep rate for the held body,
 without requiring navigation. WHENEVER the fleet read serves an upkeep rate
 — which is on **both** park modes with a host body (`fleet-movement`'s
 "Fleet Read Serves the Station-Keeping Upkeep Rate in Fuel Tons") — the
-panel SHALL show it in fuel tons per unit time, taken **only** from that
+panel SHALL show it, presented per `figure-formatting` as a rate (a
+wall-clock tons-per-time-unit figure converted from the served rate field
+at the mounting view's served scale — a **presentation** transform of that
+served value, never a re-derivation of it) and carrying its raw served
+value and its served denominator on `data-unit`, taken **only** from that
 served owner-only rate field: while the mode is `stationkeep`, as the live
 drain the hold is costing now; while it is `orbit`, on the "Hold here"
 control itself, as what holding here **would** cost. The `orbit` case is not
@@ -476,21 +519,24 @@ radius, or its period: that derivation is `space.StationKeepRate` — a
 rule-bearing computation with a floor clamp and a non-positive-period
 branch — followed by the equally rule-bearing delta-v-to-tons conversion,
 and reproducing either on the client is the mirror `space-kinematics`'s
-sole-authority requirement forbids. On the fleet's next refetch after its
-stored dry instant passes, the panel SHALL reflect the server's automatic
-force-demotion to `orbit` (`fleet-movement`'s "Station-Keeping Upkeep Is
-Settled at Discrete Events, Never Folded Into the Stored Cargo Pool") with
-no client-side prediction of the demotion. On failure — including `hold`'s
-rejection when the fleet's currently held `fuel` is **at or below the
-configured station-keeping reserve** (`FuelParams.StationKeepReserveTons`),
-which is where the predecessor verb actually rejects, and which is *not*
-the same as holding no fuel — the system SHALL show an error toast carrying
-the server's distinguishable rejection reason, mapped to player-facing
-copy, and leave the panel's state unchanged. That reason's mapped copy
-SHALL name the **reserve** as the boundary, and SHALL NOT tell the player
-they have no fuel: a fleet holding 0.4 t against a 1 t reserve is rejected
-by this rule, and copy reading "no fuel" would be both false and
-unactionable — the player's actual remedy is to refuel above the reserve.
+sole-authority requirement forbids; `figure-formatting`'s wall-clock unit
+conversion of the served rate is not such a reproduction, since it changes
+only which time unit the served number is expressed in and computes no new
+rate. On the fleet's next refetch after its stored dry instant passes, the
+panel SHALL reflect the server's automatic force-demotion to `orbit`
+(`fleet-movement`'s "Station-Keeping Upkeep Is Settled at Discrete Events,
+Never Folded Into the Stored Cargo Pool") with no client-side prediction of
+the demotion. On failure — including `hold`'s rejection when the fleet's
+currently held `fuel` is **at or below the configured station-keeping
+reserve** (`FuelParams.StationKeepReserveTons`), which is where the
+predecessor verb actually rejects, and which is *not* the same as holding
+no fuel — the system SHALL show an error toast carrying the server's
+distinguishable rejection reason, mapped to player-facing copy, and leave
+the panel's state unchanged. That reason's mapped copy SHALL name the
+**reserve** as the boundary, and SHALL NOT tell the player they have no
+fuel: a fleet holding 0.4 t against a 1 t reserve is rejected by this rule,
+and copy reading "no fuel" would be both false and unactionable — the
+player's actual remedy is to refuel above the reserve.
 
 #### Scenario: Holding an orbiting fleet submits hold and the panel reflects station-keep
 - **WHEN** "Hold here" is invoked while the acting fleet's effective park
@@ -511,18 +557,22 @@ unactionable — the player's actual remedy is to refuel above the reserve.
 
 #### Scenario: The drain readout shows the served upkeep rate while holding
 - **WHEN** the acting fleet's effective park mode is `stationkeep`
-- **THEN** the panel shows a live drain readout in fuel tons per unit time
-  whose value is the fleet read's served upkeep-rate field
+- **THEN** the panel shows a live drain readout, presented per
+  `figure-formatting` as a rate, whose raw value is the fleet read's served
+  upkeep-rate field
 
 #### Scenario: The Hold control prices the hold before it is taken
 - **WHEN** the acting fleet's effective park mode is `orbit` and its read
   serves an upkeep rate for its host body
-- **THEN** the "Hold here" control shows that served rate, in fuel tons per
-  unit time, as what holding here would cost — before the hold is submitted
+- **THEN** the "Hold here" control shows that served rate, presented per
+  `figure-formatting`, as what holding here would cost — before the hold is
+  submitted
 
 #### Scenario: The drain readout is never derived from orbital elements
 - **WHEN** the drain readout is rendered
-- **THEN** its value comes from the served rate field alone
+- **THEN** its raw value comes from the served rate field alone, passed
+  through `figure-formatting`'s wall-clock unit conversion and no other
+  computation
 - **AND** no client-side computation of the rate from a body's radius,
   period, or orbital elements exists anywhere in the view
 
@@ -551,14 +601,24 @@ reflecting the post-settlement balance after a sale or a refuel resolves
 via this panel's own sale-commit or refuel-commit response, without
 requiring navigation, and SHALL announce a balance change to assistive
 technology (an `aria-live` region or equivalent) at the moment it updates,
-not solely as a visual change. IF the session balance is unavailable, THEN
-the readout SHALL show an explicit unavailable indication and SHALL NOT show
-a figure — never a placeholder that a mounting view supplying no balance at
-all would render indistinguishably and permanently.
+not solely as a visual change; the announced copy uses the same
+`figure-formatting` presentation as the visual readout. When shown as a
+figure, the balance is presented per `figure-formatting` as a credit
+figure and carries its raw served value. IF the session balance is
+unavailable, THEN the readout SHALL show an explicit unavailable
+indication and SHALL NOT show a figure — never a placeholder that a
+mounting view supplying no balance at all would render indistinguishably
+and permanently, and never `figure-formatting`'s generic absent form in
+place of this capability's own mandated unavailable indication. The readout
+SHALL announce a transition between showing a balance figure and showing
+the unavailable indication, in either direction, to assistive technology
+via that same live region — the region SHALL NOT render as empty text when
+the balance becomes unavailable.
 
 #### Scenario: The panel shows the current credit balance
 - **WHEN** the fleet panel renders for an authenticated, spawned requester
-- **THEN** the requester's current credit balance is shown
+- **THEN** the requester's current credit balance is shown, presented per
+  `figure-formatting` and carrying its raw served value
 
 #### Scenario: An unavailable balance reads as unavailable, not as a figure
 - **WHEN** the fleet panel renders while the corporation session balance is
@@ -581,6 +641,12 @@ all would render indistinguishably and permanently.
   updates
 - **THEN** the updated balance is announced via an accessible live region,
   not conveyed by a purely visual change
+
+#### Scenario: A transition to or from an unavailable balance is announced
+- **WHEN** the credit balance readout transitions between showing a figure
+  and showing the unavailable indication, in either direction
+- **THEN** the transition is announced via the accessible live region, not
+  left as an empty announcement
 
 #### Scenario: A failed sale's or refuel's error is announced to assistive technology
 - **WHEN** a sell or refuel command fails and an error toast is shown

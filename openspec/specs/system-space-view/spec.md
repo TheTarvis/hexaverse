@@ -462,7 +462,14 @@ Preview Solves Without Committing*) and render its solved curve as a distinct
 preview overlay alongside the arrival time, delta-v cost, fuel cost, whether
 that cost is currently affordable, and whether it would leave the fleet
 stranded — all figures the server's own solve returns, never recomputed or
-re-derived client-side.
+re-derived client-side. The arrival time, delta-v cost, and fuel cost are
+each presented per `figure-formatting` (arrival as a relative duration at
+the mounting view's served scale, delta-v as integer metres per second, fuel
+as a tonnage); the delta-v cost and the fuel cost each carry their own raw
+served value, and the arrival time carries its raw remaining span in
+unscaled world-milliseconds — the span from the mounting view's projected
+world time to the preview's served arrival instant, per `figure-formatting`'s
+duration rule.
 
 A preview SHALL be requested whenever a commit of that same order would be
 accepted, and only then. In particular a preview SHALL be requested while the
@@ -492,7 +499,11 @@ fixed here.
 - **WHEN** a body, lane-gate body, or point becomes the selection and a
   commit of that order would be accepted
 - **THEN** a preview request is sent and its returned curve, arrival time,
-  delta-v cost, fuel cost, and affordability are rendered
+  delta-v cost, fuel cost, and affordability are rendered, the arrival time,
+  delta-v cost, and fuel cost each presented per `figure-formatting`, the
+  delta-v cost and fuel cost each carrying their own raw served value, and
+  the arrival time carrying its raw remaining span in unscaled
+  world-milliseconds
 
 #### Scenario: A burning fleet's re-target is previewed
 - **GIVEN** the acting fleet has a running burn
@@ -592,7 +603,10 @@ figure the player agrees to is the figure that is actually enforced. A burn's
 solved cost moves continuously as the target advances along its orbit and the
 fleet advances along its own state, so a zero-allowance cap would reject
 ordinary commits; the allowance exists to distinguish that ordinary drift from
-a cost the player never agreed to.
+a cost the player never agreed to. The displayed ceiling is presented per
+`figure-formatting` as a tonnage and carries its raw client-derived value —
+it is computed client-side from the preview's served fuel cost and the named
+allowance factor, and is never itself a value the server returns.
 
 IF the commit is rejected for exceeding its cap, THEN the system SHALL request
 a fresh preview and present the new figures for re-confirmation without
@@ -609,7 +623,8 @@ automatically at the higher cost.
 #### Scenario: The ceiling the player agrees to is the one displayed
 - **WHEN** a preview's figures are shown for an uncommitted selection
 - **THEN** the fuel ceiling that would be sent as `maxFuelTons` is displayed
-  alongside the previewed point cost
+  alongside the previewed point cost, presented per `figure-formatting` as a
+  tonnage and carrying its raw client-derived value
 
 #### Scenario: A cap rejection re-quotes in flow instead of failing the interaction
 - **WHEN** a burn commit is rejected for exceeding its quoted cap
@@ -625,11 +640,20 @@ distinguishable rejection reason (`docked-fleet-actions`'s *Rejection Reasons
 Map to Player-Facing Copy, Not Raw Server Text*), never the raw reason string,
 leaving the fleet's state and the current selection unchanged. A commit SHALL
 NOT be silent in either direction: the adjacent *Jump Commit* already reports
-both, and a burn is the more consequential of the two.
+both, and a burn is the more consequential of the two. The arrival time
+named in the success feedback is presented per `figure-formatting` as a
+relative duration, its text built from the module's own output for the
+order's served arrival instant, never interpolated as a raw
+world-millisecond integer into the toast string; the success feedback is a
+toast, a string-only surface per `figure-formatting`'s toast/aria-label
+exemption, and carries no `data-raw`/`data-unit` attribute of its own.
 
 #### Scenario: A successful burn commit reports success
 - **WHEN** a burn order commits successfully
-- **THEN** success feedback is shown carrying the order's served arrival time
+- **THEN** success feedback is shown naming the order's served arrival time
+  as a relative duration produced by the shared `figure-formatting` module,
+  with no `data-raw`/`data-unit` attribute on the toast, since the toast is
+  a string-only surface
 
 #### Scenario: A failed burn commit reports the mapped reason
 - **WHEN** a burn order commit fails with a distinguishable server reason
@@ -685,11 +709,22 @@ WHEN a burn order commits and its response's actual solved arrival time or
 delta-v cost differs from the figures the last-shown preview displayed for
 that same target, the system SHALL surface the actual figures alongside the
 committed order's own success feedback, rather than leaving the stale
-previewed figures on screen with no acknowledgment of the difference. This is
-the display half of the quote lock; the reject half is the `maxFuelTons` cap
-of *A Burn Commit Is Quote-Locked to the Preview the Player Agreed To*. Both
-are kept: the cap bounds what the player can be charged, and this rule makes
-the difference within that bound visible rather than silent.
+previewed figures on screen with no acknowledgment of the difference. The
+actual and previewed figures are each presented per `figure-formatting`, each
+in its own element: the actual and previewed delta-v each carry their own raw
+served value, and the actual and previewed arrival each carry their own raw
+remaining span in unscaled world-milliseconds — the span from the mounting
+view's projected world time to that figure's own served arrival instant. Both
+arrival figures take the same direction form, `in` — both are deadlines read
+from the mounting view's projected now, not the remainder of an already-
+running order — so the comparison's two halves are read in one vocabulary,
+never one `in` beside one `left`. A line surfacing both an actual and a
+previewed figure for the same quantity SHALL render each in its own element
+rather than combining them into one. This is the display half of the quote
+lock; the reject half is the `maxFuelTons` cap of *A Burn Commit Is
+Quote-Locked to the Preview the Player Agreed To*. Both are kept: the cap
+bounds what the player can be charged, and this rule makes the difference
+within that bound visible rather than silent.
 
 #### Scenario: A commit matching the preview shows no drift notice
 - **WHEN** a burn commits with an actual arrival time and delta-v cost
@@ -700,13 +735,18 @@ the difference within that bound visible rather than silent.
 - **WHEN** a burn commits with an actual arrival time or delta-v cost
   differing from the last-shown preview
 - **THEN** the success feedback is shown, and the actual figures are
-  additionally surfaced alongside the previewed ones
+  additionally surfaced alongside the previewed ones, with the actual
+  delta-v, actual arrival, previewed delta-v, and previewed arrival each
+  rendered in its own element per `figure-formatting`; the two delta-v
+  elements each carry their own raw served value, and the two arrival
+  elements each carry their own raw remaining span in unscaled
+  world-milliseconds and render in the same `in` direction form
 
 #### Scenario: An uncapped commit still surfaces its actual figures
 - **WHEN** a burn commits with no `maxFuelTons` cap, because no current
   preview existed
 - **THEN** the response's actual arrival time and delta-v cost are surfaced
-  with the success feedback
+  with the success feedback, each presented per `figure-formatting`
 
 ### Requirement: Burn Command Targets Any Selected Body, Lane Gate, or Point Uniformly
 The system SHALL, when a body, a lane-gate body, or a point in space is the
@@ -1745,12 +1785,14 @@ offer a focused-scan control that lists exactly the hosts the server's
 scan-target read returned for that fleet (`focused-scan`'s *Eligible Scan
 Targets Are Served Per Fleet, To Their Owner Alone*), each labelled by its kind
 — a body or one of the corporation's own fleets — and each showing its served
-sweep duration, so the cost of sweeping a distant host is visible before it is
-paid. The control SHALL NOT compute, mirror, or approximate the range or
-occlusion predicates that decide eligibility: a body present in the interior
-read but absent from the served target set SHALL NOT be offered as a target,
-and a body present in the served set SHALL be offered even if the client's own
-scene would place it elsewhere.
+sweep duration, presented per `figure-formatting` as a duration, with no
+direction affix — it is a cost quoted before the sweep is committed, not a
+position in time — and carrying its raw served value, so the cost of
+sweeping a distant host is visible before it is paid. The control SHALL NOT compute, mirror, or
+approximate the range or occlusion predicates that decide eligibility: a body
+present in the interior read but absent from the served target set SHALL NOT
+be offered as a target, and a body present in the served set SHALL be offered
+even if the client's own scene would place it elsewhere.
 
 This control's targets are its own; they are not the space view's selection
 (*Toggle-to-Deselect Single Selection Among a Body, a Lane Gate, or a Point*),
@@ -1806,7 +1848,9 @@ the client has itself invalidated.
 #### Scenario: Served targets are listed with their kind and duration
 - **WHEN** the scan-target read returns a body and an own fleet
 - **THEN** the control lists both, each labelled as a body or an own fleet, and
-  each showing its served sweep duration
+  each showing its served sweep duration presented per `figure-formatting`
+  as a bare duration, with no direction affix, and carrying its raw served
+  value
 
 #### Scenario: A body absent from the served set is not offered
 - **GIVEN** a body present in the interior read's body set but absent from the
@@ -2056,8 +2100,15 @@ sweep from the owning corporation's action inbox — the running action of type
 time to its ETA, measured against **this view's projected world time**
 (*Own-Fleet Position, Burn Curve, and Arrival Ghost Render Continuously*'s
 scale-correct projection), the inbox supplying the ETA and the committed time
-only. The window SHALL NOT be sourced from the fleet read, which serves no
-sweep window at all.
+only. The countdown is presented per `figure-formatting` as a relative
+duration and carries its raw remaining span in unscaled world-milliseconds;
+the settling rule below (rather than counting below zero) is
+`figure-formatting`'s due-form override for this surface
+(*A Relative Duration Names Its Direction, a Cost Duration Renders Bare, and
+a Due Duration Names That Explicitly*), not a rule this requirement restates
+independently. The window
+SHALL NOT be sourced from the fleet read, which serves no sweep window at
+all.
 
 The system SHALL offer a cancel affordance that cancels that action by its own
 id through the generic action cancel endpoint, never through the fleet-level
@@ -2074,7 +2125,8 @@ control SHALL show it as settling rather than counting below zero.
 - **WHEN** the control is shown
 - **THEN** it counts down to that ETA against the view's scale-correct
   projected world time, using the action's own committed time and ETA, and no
-  world time the inbox served
+  world time the inbox served, presented per `figure-formatting` and
+  carrying its raw remaining span in unscaled world-milliseconds
 
 #### Scenario: The window is not taken from the fleet read
 - **WHEN** the running sweep is displayed
@@ -2310,9 +2362,13 @@ read of the corporation's sighting pile **filtered server-side to the open
 system** (`sighting-records`' *The Pile Read Filters To One System On
 Request*), at that record's stored position, visually distinct from a live
 contact and from an own fleet, and labelled with the record's `asOf`. The
-source is that filtered read and not a client-side scan of an unfiltered
-pile: the pile spans every system the corporation has ever swept, never
-expires, and is served a bounded page at a time, so filtering client-side
+`asOf` label is presented per `figure-formatting` as an absolute `T+` stamp
+and carries its raw served value wherever it is rendered — on the mark itself
+(a screen-reader-only element is still its own DOM element, and carries the
+attribute pair like any other) and on its facts surface when the ghost is
+highlighted or hovered. The source is that filtered read and not a client-side scan of an
+unfiltered pile: the pile spans every system the corporation has ever swept,
+never expires, and is served a bounded page at a time, so filtering client-side
 would silently omit this system's older records as soon as the pile outgrew
 the pages the client happened to have fetched. The system SHALL NOT advance a
 ghost by the record's stored velocity, by an orbital prediction, or by any other
@@ -2352,7 +2408,13 @@ layer with the clean-sweep marker lost.
 - **WHEN** the system-filtered pile read serves a target-naming record for the
   open system
 - **THEN** a ghost mark is drawn at that record's stored position, labelled with
-  its `asOf`
+  its `asOf`, presented per `figure-formatting` as a `T+` stamp
+
+#### Scenario: A ghost's asOf label reads as a formatted stamp, on the mark and on its facts surface
+- **WHEN** a ghost mark is drawn, and separately when it is highlighted or hovered
+- **THEN** both its own label and its facts-surface "Observed at" line present
+  the record's `asOf` per `figure-formatting` as a `T+` stamp, never as a raw
+  world-millisecond integer
 
 #### Scenario: The ghost layer reads the pile filtered by system
 - **WHEN** the ghost layer sources its records

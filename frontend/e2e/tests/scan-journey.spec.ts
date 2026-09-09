@@ -68,7 +68,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     // eligible target (`focused-scan`'s own self-sweep/belt-member
     // exclusions exploit the identical zero-distance guarantee) — and is
     // what actually produces the M3 clean-sweep record this leg asserts.
-    const home = interiors.get(homeSystemId)
+    const home = await interiors.get(homeSystemId)
     expect(home, `no interior read for ${homeSystemId} was captured off the wire`).toBeTruthy()
     const stationId = home!.features.find((f) => f.type === 'station')?.id
     expect(stationId, 'this freshly generated home system served no station feature').toBeTruthy()
@@ -266,7 +266,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     await expect.poll(() => corpBox.id, { timeout: 30_000 }).not.toBeNull()
     const corpId = corpBox.id!
 
-    const home = interiors.get(homeSystemId)
+    const home = await interiors.get(homeSystemId)
     expect(home).toBeTruthy()
     const hostId = await selectFirstBodyMatching(page, 'feat-').catch(() => home!.features[0]!.id)
 
@@ -310,7 +310,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
     const interiors = captureInteriors(page)
     const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Scan-Beside-Panel', 'scan-beside-panel')
-    const home = interiors.get(homeSystemId)
+    const home = await interiors.get(homeSystemId)
     expect(home).toBeTruthy()
     const stationId = home!.features.find((f) => f.type === 'station')?.id
     test.skip(!stationId, 'no station in this freshly generated system')
@@ -338,7 +338,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     const scanTargetsByFleet = captureScanTargets(page)
     const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Scan-Mid-Burn', 'scan-mid-burn')
 
-    const home = interiors.get(homeSystemId)
+    const home = await interiors.get(homeSystemId)
     expect(home, `no interior read for ${homeSystemId} was captured`).toBeTruthy()
     const stationId = home!.features.find((f) => f.type === 'station')?.id
     expect(stationId, 'this freshly generated home system served no station feature').toBeTruthy()

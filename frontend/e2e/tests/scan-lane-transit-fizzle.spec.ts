@@ -110,7 +110,7 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
       'scan-fizzle',
     )
 
-    const home = interiors.get(homeSystemId)
+    const home = await interiors.get(homeSystemId)
     expect(home, `no interior read for ${homeSystemId} was captured`).toBeTruthy()
     const gates = home!.laneGates ?? []
     expect(gates.length, 'the home system served zero lane gates').toBeGreaterThan(0)

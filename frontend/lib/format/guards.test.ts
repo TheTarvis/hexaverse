@@ -51,22 +51,32 @@ function rel(p: string): string {
 /**
  * The reviewed exception list for `.toFixed(` under `components/space/**`
  * and `components/fleet/**` (contract §1, design.md's decision). Each entry
- * is a `file:line` anchor so the check fails loudly — not silently — when
- * the anchored line moves or the site is removed (the anti-vacuity trick
- * `anti-mirror-guard.test.ts` already uses).
+ * is anchored to the specific `lines` its site occupies WITHIN its file —
+ * following `fixtures/determinism-register.json`'s own convention ("Line
+ * numbers are load-bearing: if a site drifts, the consulting check fails
+ * until the entry is updated, which keeps every suppression a reviewable
+ * diff"). Matching is by file **and** line, not file alone: a `.toFixed(`
+ * anywhere else in an exempted file — including one added later — is an
+ * UNREVIEWED violation and fails the guard. A line listed here that no
+ * longer calls `.toFixed(` (moved or deleted) also fails the guard, loudly,
+ * until the entry is re-located by grep — never by moving the code back to
+ * match a stale entry (the anti-vacuity trick `anti-mirror-guard.test.ts`
+ * already uses).
  *
  * NEITHER SITE NAMES A QUANTITY THIS CAPABILITY DEFINES. Both are recorded
  * with the ruling/requirement that permits them (R12's own "rounding
  * exception list" scenario).
  */
-const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; ruling: string; note: string }> = [
+const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: string; note: string }> = [
   {
     file: 'frontend/components/space/SpaceStage.tsx',
+    lines: [681, 682, 738, 739, 903],
     ruling: 'RULING 10',
     note: 'bearing/speed hover-facts toFixed — no covering requirement anywhere; filed as defect-hover-facts-unspecced.md, not fixed here',
   },
   {
     file: 'frontend/components/space/webgl/SpaceWorld.tsx',
+    lines: [195],
     ruling: 'not a player-facing figure',
     note: 'toFixed(4) builds a memo key, never rendered to a player',
   },
@@ -79,10 +89,21 @@ describe('lib/format/guards — R12: no component-local decimal rounding', () =>
     const violations: string[] = []
     for (const dir of TOFIXED_SCOPE_DIRS) {
       for (const file of walk(join(REPO_ROOT, dir), isSourceFile)) {
-        if (!readFileSync(file, 'utf-8').includes('.toFixed(')) continue
+        const text = readFileSync(file, 'utf-8')
+        if (!text.includes('.toFixed(')) continue
         const relPath = rel(file)
         const exception = KNOWN_TOFIXED_EXCEPTIONS.find((e) => e.file === relPath)
-        if (!exception) violations.push(relPath)
+        const lines = text.split('\n')
+        lines.forEach((lineText, idx) => {
+          if (!lineText.includes('.toFixed(')) return
+          const lineNum = idx + 1
+          // File-level match is not enough: the line itself must be one of
+          // the entry's reviewed anchors, or a new/moved site in an
+          // otherwise-exempted file is a silent, unreviewed violation.
+          if (!exception || !exception.lines.includes(lineNum)) {
+            violations.push(`${relPath}:${lineNum}`)
+          }
+        })
       }
     }
     expect(
@@ -91,16 +112,20 @@ describe('lib/format/guards — R12: no component-local decimal rounding', () =>
     ).toEqual([])
   })
 
-  it('Scenario: The rounding exception list holds only quantities this capability does not define — each entry still exists, so the list fails loudly when its site is removed', () => {
+  it('Scenario: The rounding exception list holds only quantities this capability does not define — each entry\'s anchored lines still exist and still call .toFixed(, so the list fails loudly when a site moves or is removed', () => {
     for (const entry of KNOWN_TOFIXED_EXCEPTIONS) {
       const full = join(REPO_ROOT, entry.file)
       expect(existsSync(full), `exception file no longer exists: ${entry.file} (${entry.ruling})`).toBe(
         true,
       )
-      expect(
-        readFileSync(full, 'utf-8').includes('.toFixed('),
-        `exception file ${entry.file} no longer calls .toFixed( — remove this now-stale exception (${entry.ruling})`,
-      ).toBe(true)
+      const lines = readFileSync(full, 'utf-8').split('\n')
+      for (const lineNum of entry.lines) {
+        const lineText = lines[lineNum - 1] ?? ''
+        expect(
+          lineText.includes('.toFixed('),
+          `exception ${entry.file}:${lineNum} no longer calls .toFixed( at that line — re-locate this entry by grep against the live file, never by moving the code back to match a stale line number (${entry.ruling})`,
+        ).toBe(true)
+      }
     }
     // The exception's own note must not smuggle in a figure-formatting quantity.
     const FORBIDDEN = /\b(tonnage|duration|range|delta-?v|credit|rate|stamp)\b/i
