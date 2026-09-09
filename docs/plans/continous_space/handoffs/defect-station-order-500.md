@@ -259,3 +259,53 @@ this is recorded and NOT fixed here, per the pattern established above. First-pa
 attribution on this run's tier-4 report incorrectly concluded "no known-defect signature
 present" from a `grep` over the Playwright log alone (see *Where to look*, above) — caught
 and corrected before the gate closed.
+
+---
+
+## Second instance of *problem 2*, captured 2026-09-09 — a different sentinel, same bodyless 500
+
+Found during `fix-mutation-retry-on-4xx`'s tier-4 archive gate (which **passed**,
+6/6). Not this defect's original sentinel, and not on this defect's original
+route — which is why it is worth recording here rather than filed separately:
+it confirms *problem 2* ("whatever the geometry does, the failure surfaces as a
+bodyless `500`, indistinguishable from a server fault") is a **class**, not a
+one-off.
+
+Four occurrences in one 8.5-minute run, verbatim from
+`frontend/playwright/.auth/backend.log` (copied here because that file is
+overwritten by every e2e run — the mistake this chain has already paid for
+twice):
+
+```
+7:12:50PM ERR fleet operation failed
+  error="fleet: solving burn: space: curve length below the configured minimum"
+[GIN] 2026/09/09 - 19:12:50 | 500 | 31.807083ms | ::1 | POST "/v1/fleets/fleet_82eadf3c-…/orders/preview"
+```
+
+Timestamps 19:12:50, 19:13:02, 19:13:13 (all one fleet, `fleet_82eadf3c-…`) and
+19:15:34 (`fleet_8a96688b-…`).
+
+Three differences from the original report, all of which matter:
+
+1. **Sentinel:** `curve length below the configured minimum`, not
+   `ErrEndpointInsideClearance` / `star-clearance radius`. Zero occurrences of
+   the clearance signature in this run.
+2. **Route:** `POST /v1/fleets/:id/orders/**preview**`, not `/orders`. So the
+   quote path has the same fall-through as the commit path.
+3. **Consequence:** none, this run. The UI recovers (the player picks another
+   body / re-quotes), and the double-submit recorder is anchored `/orders$`, so
+   preview traffic never entered its counts. The gate stayed green.
+
+**It is not `fix-mutation-retry-on-4xx`'s, and that change does not touch it.**
+A `5xx` was excluded from automatic mutation resend before that change and is
+excluded after it — the change widened the *4xx* exclusion. Had the
+early-draft "5xx is still retried once" clause survived adversarial review
+(it was BLOCKER 1 of round 1), each of these four would have been **eight**.
+That is the concrete harm the adversary predicted, measured on the same route
+family in the same suite, and it is the best available evidence that killing
+that clause was correct.
+
+**For whoever fixes this defect:** the corrective change should cover the
+preview arm too, and should treat "deterministic geometry refusal" as one
+response-shape decision across both routes rather than mapping sentinels one at
+a time.

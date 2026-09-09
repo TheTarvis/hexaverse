@@ -125,11 +125,11 @@
 - [x] 2.2 Per-commit gate green: `bash .claude/scripts/check.sh` and
       `python3 .claude/skills/code-quality-checks/check.py --files-only`
       (tiers 0-1, `docs/testing-tiers.md`)
-- [ ] 2.3 `frontend/e2e/tests/space-double-submit.spec.ts` rerun once, at
+- [x] 2.3 `frontend/e2e/tests/space-double-submit.spec.ts` rerun once, at
       archive time per `docs/testing-tiers.md` tier 4, confirming the
       strengthened status assertions pass against the fixed retry policy
       and that the two `toBe(2)` guard-release checks still expect two
-- [ ] 2.4 After `openspec archive`, confirm
+- [x] 2.4 After `openspec archive`, confirm
       `openspec/specs/mutation-retry-policy/spec.md` carries the Purpose
       paragraph written into this change's spec delta, not the archiver's
       generated placeholder, with two checks (run separately — `grep -c`

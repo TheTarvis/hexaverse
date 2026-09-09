@@ -611,3 +611,71 @@ would ship with no adversarial review at all, which is worse than a documented
 gap on an unreachable case.
 
 **Reversal cost.** One conditional in `shouldRetryMutation`.
+
+---
+
+### FULL-AUTO RULING 57 — `npm run e2e -- <spec>` silently ignores the spec and runs the WHOLE Playwright suite
+
+**Found the hard way, mid-gate.** The obvious way to run one spec at tier 4 is
+the one this run reached for first:
+
+```bash
+cd frontend && npm run e2e -- e2e/tests/space-double-submit.spec.ts
+```
+
+It does not work, and — this is the dangerous part — **it does not fail
+either.** It runs the entire e2e suite instead.
+
+**Mechanism.** `frontend/package.json`'s `e2e` script is:
+
+```json
+"e2e": "bash ../scripts/dev/with-test-emulators.sh 'cd frontend && npx playwright test'"
+```
+
+`npm run -- <arg>` appends the argument *after* the whole shell invocation, so
+the real command line becomes:
+
+```
+bash ../scripts/dev/with-test-emulators.sh 'cd frontend && npx playwright test' e2e/tests/space-double-submit.spec.ts
+```
+
+and `scripts/dev/with-test-emulators.sh` uses only `"$CMD"` (its `$1`) — at
+`:47` `exec bash -c "$CMD"` and at `:59-63` `exec "$FIREBASE" emulators:exec … "$CMD"`.
+The second argument is **dropped on the floor**. Playwright never sees a
+filter and runs everything.
+
+**Why it matters more than a wasted hour.** The full suite includes
+`frontend/e2e/tests/vitals-strip-journey.spec.ts` and every other spec in the
+directory. This change's brief scopes it to one spec, and `add-vitals-strip`'s
+journey is another change's gate with its own known reds. A run like that
+produces a pile of failures that are **not this change's**, at the exact moment
+the operator is primed to interpret a red as theirs — the precise mis-attribution
+this entire chain keeps paying for.
+
+**The correct invocation** puts the filter *inside* the quoted command:
+
+```bash
+cd frontend && bash ../scripts/dev/with-test-emulators.sh \
+  'cd frontend && npx playwright test e2e/tests/space-double-submit.spec.ts'
+```
+
+**Caught by reading the log's own echoed command line**, not by reasoning about
+it: the log printed the `with-test-emulators.sh '…' e2e/tests/…` line verbatim
+with the spec sitting outside the quotes. RULING 42's lesson, applied
+one level down — read what actually ran, do not assume the flag took.
+
+**Cleanup performed before the re-run**, so the second attempt was not fighting
+the first: the background task was stopped, and ports 9100 / 10109 / 9106 /
+9012 / 3110 were each checked with `lsof` (all free, no orphans). The script's
+own header warns that a stale partial emulator set is a trap.
+
+**This is a docs bug, not a one-off.** `docs/testing-tiers.md` gives tier 4 as
+`cd frontend && npm run e2e` — correct for the whole suite, and it never
+promises a per-spec form. But the per-spec form is what any change with a
+single named spec will reach for, and it fails silently. **Filed as a follow-up
+task**: either make `with-test-emulators.sh` forward `"${@:2}"`, or document
+the quoted-command form in `docs/testing-tiers.md` and
+`frontend/e2e/README.md`. Not fixed inside this change — it is tooling outside
+the proposal's four-file Impact, and RULING 47's reasoning applies unchanged.
+
+**Reversal cost.** N/A — an operational finding.
