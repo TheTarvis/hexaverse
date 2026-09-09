@@ -7,6 +7,15 @@ const nextConfig: NextConfig = {
   // NEXT_PUBLIC_* values (project id, emulator ports, API url); a shared build
   // cache serves whichever compiled last, silently poisoning the other.
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
+  // Next 15's dev-mode issues badge (<nextjs-portal>) renders bottom-left —
+  // the same corner as the vitals strip's fleet cell — and intercepts the
+  // Playwright chevron click in the e2e stack (playwright.config.ts sets
+  // ENV=test and boots via `next dev`). It never ships: `next build && next
+  // start` strips the overlay entirely, so this only touches the test
+  // environment, never Travis's own `npm run dev`. See
+  // docs/plans/continous_space/handoffs/add-vitals-strip-rulings.md
+  // RULING 33 / RULING 44.
+  ...(process.env.ENV === 'test' ? { devIndicators: false } : {}),
   outputFileTracingRoot: path.join(__dirname, "./"),
   images: {
     remotePatterns: [

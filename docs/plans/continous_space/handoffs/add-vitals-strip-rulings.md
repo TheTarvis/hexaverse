@@ -1154,3 +1154,150 @@ was one, refused), "the inbox stopped polling" (the inbox resolves nothing), "no
 capturing a response body. **Read the payload before theorising about the
 mechanism**, and when a defect file names its own cheapest next step, do that
 step first.
+
+---
+
+## Rulings at the third gate run — execution (fresh orchestrator, 2026-09-09)
+
+Numbering continues this file's sequence. (`fix-mutation-retry-on-4xx` used
+43–57 in **its own** rulings file; numbering is per-file, so 43 here is a
+different ruling from 43 there.)
+
+### FULL-AUTO RULING 43 — the r3 adversary verdict is CURRENT; no re-attack
+
+**Checked, not assumed.** `git diff aa21687 HEAD -- openspec/changes/add-vitals-strip
+openspec/specs/{system-space-view,docked-fleet-actions,figure-formatting,system-console}`
+returns exactly one file: `openspec/changes/add-vitals-strip/tasks.md`, 39
+insertions / 39 deletions, **every one a `- [ ]` → `- [x]` flip** (verified by
+filtering the diff for any non-checkbox line — none). No requirement text, no
+scenario, no proposal, no delta changed since the verdict.
+
+The one commit since then that touched a spec — `6fce684`, archiving
+`fix-mutation-retry-on-4xx` — created `openspec/specs/mutation-retry-policy/spec.md`,
+a **net-new capability** this change's four deltas do not target, so there is no
+delta collision and no live target moved under this change's feet.
+
+**Ruling.** The r3 verdict stands. Re-attack scope is empty; the adversary is not
+re-run. This satisfies the non-skippable rule by *currency*, not by exemption.
+
+### FULL-AUTO RULING 44 — the dev-overlay fix is `devIndicators: false`, gated on `ENV=test`, and the two config files have two different owners
+
+**Mechanism, verified against the installed version rather than remembered.**
+`frontend/package.json` pins `next@^15.5.9`; the installed build is **15.5.22**.
+In that build `devIndicators` accepts `false` or `{ position }` and nothing else
+(`node_modules/next/dist/server/config-schema.js:257-273`), and `false` is
+threaded to the client as a define:
+`'process.env.__NEXT_DEV_INDICATOR': config.devIndicators !== false`
+(`node_modules/next/dist/build/define-env.js:122`), which the compiled devtools
+overlay reads into `disableDevIndicator` and renders as
+`disableDevIndicator && … ? "none" : "block"`
+(`node_modules/next/dist/compiled/next-devtools/index.js`). The deprecated
+`buildActivity` / `buildActivityPosition` keys warn on this version and must not
+be used. So the mechanism does what RULING 33 says: **no badge is rendered in the
+gated environment, and nothing about `next build` output changes** — the whole
+overlay is dev-server-only.
+
+**Ruling.** `frontend/next.config.ts` sets `devIndicators: false` **only** when
+`process.env.ENV === 'test'`; `frontend/playwright.config.ts`'s `webServer.env`
+sets `ENV: 'test'` (joining the `NEXT_DIST_DIR` / `NEXT_PUBLIC_*` values it
+already sets for the isolated e2e frontend). Travis's own `npm run dev` sets no
+`ENV`, so his overlay is untouched. Nothing in `frontend/` reads
+`process.env.ENV` today (grepped), so the marker collides with nothing.
+
+**Ownership.** `next.config.ts` is in the production tree → `openspec-nextjs-dev`.
+`playwright.config.ts` is journey-harness configuration → `openspec-sdet`. Neither
+crosses into the other's file, and no test assertion is touched by either.
+
+**No spec delta and no new task.** This is not product behaviour: `devIndicators`
+has no effect outside `next dev`, so there is no requirement to write and nothing
+a player can observe. It is gate infrastructure, recorded here and in the journey
+record rather than in `tasks.md`. (Contrast the batched round's `FloatingNav`
+fix, which *was* product code and traced to `system-console`'s
+*No other floating surface covers a strip cell*.)
+
+**Alternatives rejected.** (a) Gate on `NEXT_DIST_DIR` being set — needs no
+`playwright.config.ts` edit, but couples a dev-tooling decision to a build-cache
+path, and renaming the dist dir would silently re-arm the badge. (b) Reposition
+the indicator (`devIndicators: { position: 'top-right' }`) instead of disabling
+it — leaves a framework surface loose in a viewport the journey asserts on, and
+moves the contention rather than removing it.
+
+**Reversal cost.** Two lines, one in each file.
+
+### FULL-AUTO RULING 45 — the caveat is closed by instrumenting the run, not by trusting the inference; and the portal is also hidden test-side for the one-run budget
+
+RULING 33's caveat forbids suppressing the badge without reading the two issues
+it counted. The inference on record is strong — RULING 36 filed
+`defect-docked-selection-polls-zero-length-preview.md` after reproducing, **live
+and four times**, a docked fleet whose still-selected host makes `useBurnPreview`
+poll a zero-length burn that the server refuses 500 every ~10s — but an inference
+is what this link has been burned by five times (RULING 42's lesson: every
+analysis that reasoned from a log's *absence* was wrong).
+
+**Ruling.** The third run **captures** the issues instead of inferring them:
+
+1. `frontend/e2e/tests/vitals-strip-journey.spec.ts` registers `page.on('pageerror')`
+   and `page.on('console')` (error/warning levels) into a buffer that is printed
+   at the end of the journey, pass or fail. Whatever the badge would have counted
+   is then named in the run log, in this change's own record, by evidence.
+2. `frontend/playwright.config.ts`'s `webServer` gains `stdout: 'pipe'` /
+   `stderr: 'pipe'` — the exact gap the rerun's Finding A named
+   (`next dev`'s own console "was not captured anywhere this run wrote to").
+3. Belt and braces for the **one-run budget**: the journey also injects
+   `nextjs-portal { display: none !important }` via `page.addInitScript`, so the
+   run survives even if the config gate does not take (a reused server on :3110,
+   a mis-set env). Hiding the host element cannot hide anything from the record,
+   because 1 and 2 capture the same errors independently of the overlay.
+
+**Basis.** Precedence 1 — RULING 33's own caveat text. Precedence 4 for the
+belt-and-braces: the gate has exactly one run left, and a redundant test-side
+guard costs three lines and no assertion.
+
+**Alternatives rejected.** (a) Reproduce by hand against Travis's dev stack on
+:3010 — his data has no docked fleet at a selected host on demand, so it means
+driving a full spawn-and-dock by browser against a stack I was told to leave
+alone, to learn what the filed defect already recorded. (b) Trust RULING 36 and
+suppress unread — precisely what the caveat forbids.
+
+**Reversal cost.** Delete one `beforeEach` block and two `webServer` keys.
+
+### FULL-AUTO RULING 46 — `floating-nav` joins the journey's floating-surface list; the surface that broke this gate must be asserted, not assumed fixed
+
+**The gap.** The journey's step 4 checks the strip's five cells against four
+surfaces — `space-fleet-panel`, `preview-panel`, `space-camera-controls`,
+`sightings-unavailable` — the three the impl contract's §9 bottom-band survey
+enumerated plus the ghost layer's error card. `FloatingNav` is **not** in that
+list, and `FloatingNav` is the surface that actually failed this gate's run 1.
+Its fix (`frontend/components/floating-nav.tsx:33`, `bottom-4` →
+`bottom-[4.5rem]`) is currently verified only *indirectly* — by the rerun's
+failure moving from `:222` to `:257`. The scenario it violated
+(*No other floating surface covers a strip cell*) would archive asserted
+against every surface **except** the one known to have violated it.
+
+**Ruling.** The SDET adds `floating-nav` to step 4's `floatingSurfaces` list.
+That is an **added** assertion over the same scenario, not a changed or relaxed
+one; every existing expectation stays byte-identical.
+
+**Basis.** Precedence 2 — the requirement's own text says "every floating
+surface the view mounts", and the batched round already adjudicated
+`FloatingNav` as in scope (it is mounted app-wide by
+`layout-wrapper.tsx:108`, on every route the view renders under). Precedence 1
+also applies: the chain doc's Taught record for this link says
+"**the framework itself is an occupant**" and that no hand survey found the
+corner's occupants — an assertion is the only thing that closes that.
+
+**Why this is safe to add on the last run, checked rather than hoped.** The
+geometry is arithmetic, not luck: the strip is `h-14` = 56 px
+(`VitalsStrip.tsx:249`) and `FloatingNav` now sits at `bottom-[4.5rem]` = 72 px,
+a 16 px clearance. If that arithmetic is wrong the assertion fails — and a
+failure there would be a **real** violation of a live requirement, which is
+precisely what this gate exists to catch. An assertion that can only pass is
+worth nothing.
+
+**Alternatives rejected.** (a) Leave the list as authored and record the
+indirect verification — ships the change's central layout scenario with its
+one known offender excluded from the check. (b) Add it as a separate new
+journey step — the journey is one spec walking one path (`docs/testing-tiers.md`),
+and this belongs in the step that already owns the geometry.
+
+**Reversal cost.** One line in one array.

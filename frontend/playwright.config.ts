@@ -21,10 +21,20 @@ const webServer = cfg.reuseServer
       timeout: 120_000,
       reuseExistingServer: !process.env.CI,
       ignoreHTTPSErrors: true,
+      // RULING 45.2 (add-vitals-strip rulings): capture `next dev`'s own
+      // console in the run log — the exact gap the rerun's Finding A named
+      // ("was not captured anywhere this run wrote to").
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
       env: {
         // Build into a dedicated dir so the e2e frontend never shares its compiled
         // bundle (with e2e's inlined NEXT_PUBLIC_* values) with the dev server's.
         NEXT_DIST_DIR: process.env.NEXT_DIST_DIR ?? '.next-e2e',
+        // RULING 44 (add-vitals-strip rulings): the marker `next.config.ts`
+        // gates `devIndicators: false` on, so the e2e stack never renders the
+        // dev-mode issues badge. Travis's own `npm run dev` sets no ENV, so
+        // his overlay is untouched.
+        ENV: 'test',
         // The dev server's apiClient throws at module-eval if this is unset.
         // CI has no .env.local, so forward the resolved backend origin here.
         NEXT_PUBLIC_API_URL: cfg.apiURL,

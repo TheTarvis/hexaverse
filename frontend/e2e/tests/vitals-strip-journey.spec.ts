@@ -85,6 +85,62 @@ test.use({
 test.setTimeout(900_000)
 
 /**
+ * RULING 45.1 (add-vitals-strip rulings) — the third gate run CAPTURES the
+ * console instead of inferring what the Next.js dev-overlay's "2 Issues"
+ * badge counted. Registered per-test in `beforeEach` below and printed at the
+ * end of the journey, pass or fail, in `afterEach`, prefixed
+ * `[journey-console]` so it is greppable in the run log. Purely
+ * observational: no assertion here, and nothing about the journey's own
+ * expectations changes.
+ */
+interface JourneyConsoleEntry {
+  kind: 'pageerror' | 'console-error' | 'console-warning'
+  text: string
+  url: string
+}
+
+let journeyConsoleBuffer: JourneyConsoleEntry[] = []
+
+test.beforeEach(async ({ page }) => {
+  journeyConsoleBuffer = []
+  page.on('pageerror', (err) => {
+    journeyConsoleBuffer.push({ kind: 'pageerror', text: err.message, url: page.url() })
+  })
+  page.on('console', (msg) => {
+    const type = msg.type()
+    if (type !== 'error' && type !== 'warning') return
+    journeyConsoleBuffer.push({
+      kind: type === 'error' ? 'console-error' : 'console-warning',
+      text: msg.text(),
+      url: page.url(),
+    })
+  })
+
+  // RULING 45.3 — belt-and-braces for the one-run budget: hide the dev
+  // overlay's host element test-side, independent of the `ENV=test` config
+  // gate (RULING 44), via an init script so it survives every navigation in
+  // this spec. This cannot hide anything from the record above — the
+  // console/pageerror capture just above is wired independently of the
+  // overlay's DOM.
+  await page.addInitScript(() => {
+    const style = document.createElement('style')
+    style.textContent = 'nextjs-portal { display: none !important }'
+    ;(document.head ?? document.documentElement).appendChild(style)
+  })
+})
+
+test.afterEach(() => {
+  console.log(
+    `[journey-console] ${journeyConsoleBuffer.length} browser console error/warning/pageerror entr${
+      journeyConsoleBuffer.length === 1 ? 'y' : 'ies'
+    } captured this run`,
+  )
+  for (const entry of journeyConsoleBuffer) {
+    console.log(`[journey-console] ${entry.kind} at ${entry.url}: ${entry.text}`)
+  }
+})
+
+/**
  * Prefers a served gate CONFIRMED off-screen at the default framing — same
  * technique as `jump-commit.spec.ts`/`scan-lane-transit-fizzle.spec.ts`'s
  * `pickFarGate`: farther means a longer burn, long enough to read the
@@ -348,12 +404,20 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     const commandColumnB = await box(page, 'preview-panel')
     const cameraCluster = await box(page, 'space-camera-controls')
     const sightingsBox = await box(page, 'sightings-unavailable')
+    // RULING 46 (add-vitals-strip rulings) — `FloatingNav` is mounted
+    // app-wide by `frontend/components/layout-wrapper.tsx:108` for every
+    // authenticated route; it is the surface that failed this gate's run 1
+    // and was fixed to `bottom-[4.5rem]` (`frontend/components/floating-nav.tsx:33`)
+    // — 16px of clearance above the strip's `h-14` = 56px. Asserted directly
+    // here rather than left to the rerun's indirect evidence.
+    const floatingNav = await box(page, 'floating-nav')
 
     const floatingSurfaces: [string, Box][] = [
       ['space-fleet-panel', commandColumnA],
       ['preview-panel', commandColumnB],
       ['space-camera-controls', cameraCluster],
       ['sightings-unavailable', sightingsBox],
+      ['floating-nav', floatingNav],
     ]
 
     // Scenario: No other floating surface covers a strip cell — "every such
