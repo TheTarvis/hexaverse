@@ -38,7 +38,7 @@ carry the change-id, so nothing collides.
 | # | Change | Delivers | Capabilities | State |
 | --- | --- | --- | --- | --- |
 | 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `a4471a3` |
-| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | 🟨 authored r3 `aa21687` |
+| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | 🟥 built r3 `aa21687`, gate red |
 | 2a-ii | `add-burn-cost-overlay` | The fuel gauge's cost overlay: the burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props, the shortfall segment | MODIFIED `system-console` (the overlay), `system-space-view` (stale-preview presentation) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
@@ -255,6 +255,51 @@ the pill and the roster row can disagree, one of them is wrong.
   canvas (two states); `SpaceStage.tsx` camera cluster;
   `components/fleet/roster-status.ts`.
 
+**Taught (gate red, 2026-09-09).** Authored and built in one full-auto run;
+42 tasks, 39 built, tier 1 and tier 3 green, tier 4 red after its one rerun.
+**Not archived** — `add-vitals-strip` is live in the tree as an unarchived
+change. See `../continous_space/handoffs/add-vitals-strip-journey.md` for the
+full gate record and the three options for Travis.
+
+- **The chain doc under-counted again, and asserted a non-effect it had not
+  checked.** It named two of six touched requirements, put a delta on
+  `fleet-roster` that belonged in `system-space-view`, and stated the keyboard
+  camera requirement "is unaffected" when the buttons being deleted were the
+  app's *only* keyboard pan path. Link 1 taught that the doc names placements
+  accurately and counts optimistically; add to that: **treat every "X is
+  unaffected" as a hypothesis to check against the spec text.**
+- **The pill took seven edits across four review passes** and both round-1
+  blockers landed on it. That is the process locating the change's single
+  load-bearing claim — *does the strip lie about state* — and refusing it until
+  it was true. Expect the same concentration wherever a link makes one central
+  claim.
+- **Four figures the wire does not carry were found one at a time** (fleet name,
+  fuel drain, docked-host name, burn-target name). Each was re-scoped correctly,
+  but they should have been found by **one systematic sweep of every figure a
+  surface renders against the served types**, not by four separate rounds.
+- **`openspec archive` discards a delta's `## Purpose`** — verified: 14 of 34
+  live specs carry the `TBD - created by archiving` placeholder. A new
+  capability's boundary paragraph needs an explicit post-archive restore step,
+  and this doc's Link 2b section carries a copy of `system-console`'s.
+- **Inheriting a testid preserves the selector, not the precondition.** The impl
+  contract promised five tier-4 specs would need no edits, reasoning entirely
+  about names and DOM shape. Re-homing `hold-readout` into an always-present
+  surface changed its *mount timing*: its visibility no longer implies the fleet
+  read landed. **Link 2b re-homes far more than this link did.**
+- **The bottom-left corner is contested by more surfaces than any hand survey
+  finds.** The impl contract enumerated three occupants of the bottom band and
+  missed `FloatingNav`, mounted app-wide from the layout rather than from the
+  space view. The rerun then found a fourth: Next.js's own dev-mode issues
+  badge, which renders in that same corner and exists in the e2e stack by
+  construction. **Enumerate by grepping for fixed + bottom-anchored elements,
+  and remember the framework itself is an occupant.** Placing the strip's only
+  interactive affordance in that corner is what made both collisions fatal
+  rather than cosmetic.
+- **A gate rerun's value is partly in what it clears.** The rerun proved the
+  `FloatingNav` fix worked (the failure moved from `:222` to `:257`) and that
+  the `slice.spec.ts` mount-timing fix held — which is how the two new findings
+  were isolated as new rather than unresolved.
+
 ## Link 2a-ii — `add-burn-cost-overlay`
 
 **Split off 2a in-run on 2026-09-09** (RULING 9). 2a delivers the strip with a
@@ -345,6 +390,15 @@ link is to catch a behavioural change smuggled in as a placement change —
 the double-submit guards, the running-mine gating, the inbox-driven cancel
 and the log's mount-ordering rule are the ones most likely to break when
 their host component is remounted inside a tab.
+
+**Inherited from 2a's security audit — assert it, do not inherit it.**
+`VitalsStripProps.acting: Fleet | null` is not own-ness-constrained at the type
+level. In 2a the fog contract holds only because the caller is disciplined and
+the server omits `roster` for `own: false` (`backend/fleet/handler.go:697`).
+This link mounts that component against an *arbitrary selected entity*, so the
+property needs its own scenario: WHEN the selected entity is a fleet the
+requester does not own THEN the hold and fuel cells render the absent form and
+no gauge segments. See `../continous_space/handoffs/add-vitals-strip-security-audit.md`.
 
 **Tab remount is the trap.** `SystemSpaceView.tsx` already computes the
 running-sweep marker *outside* `ScanControl` because the control must

@@ -138,9 +138,25 @@ test.describe('the vertical slice', () => {
     // 5. PERSISTED: reload — the hold readout re-derives from a fresh
     //    Firestore read (the same read a returning player would issue), not
     //    from anything still in this tab's memory.
+    //
+    //    POLLED, not a single synchronous read, since `add-vitals-strip`
+    //    (openspec-team gate, 2026-09-09): `hold-readout` now lives in the
+    //    ALWAYS-PRESENT vitals strip (`system-console` R1), not inside
+    //    `FleetActionsPanel`'s old `if (!fleet) return …` gate — so its
+    //    visibility is no longer proof the post-reload fleet read has
+    //    landed, only that the strip has mounted. Impl contract §3.3
+    //    promised this testid's NAME and DOM SHAPE would survive unedited,
+    //    and they did; it never promised the testid's MOUNT TIMING would.
+    //    The assertion is unchanged in substance — the tons must still
+    //    reach `before + 5`, and a wrong implementation still fails it.
     await page.reload()
     await expect(page.getByTestId('hold-readout')).toBeVisible({ timeout: 30_000 })
-    expect(await holdKindTons(page, mineKind)).toBe(before + 5)
+    await expect
+      .poll(() => holdKindTons(page, mineKind), {
+        timeout: 30_000,
+        message: 'the persisted hold must reflect the resolved mine on a fresh Firestore read',
+      })
+      .toBe(before + 5)
 
     // 6. Mine AGAIN — the lode's ledger and the mined resource both
     //    accumulate (exactly-once deltas: 5 + 5, never 5 or 15).

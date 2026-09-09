@@ -215,3 +215,47 @@ consuming a balance-tuning cycle.
 That distinction becomes trivial once the handler-mapping half of this defect is fixed:
 a mapped, distinguishable rejection reason is exactly what the test needs to tell the two
 apart.
+
+## Where to look — the signature is NOT in the Playwright report
+
+Recorded 2026-09-09 because it just caused a misattribution (below): grepping
+`frontend/playwright-report`, Playwright's stdout, or `frontend/test-results/**` for
+`status = 500` / `409` finds **nothing** for this defect. Playwright's own failure output
+only ever shows the *symptom* one layer up — e.g. `refuel-commit.spec.ts`'s
+`burnToSelectionAndDock` reporting "the burn must actually be under way, not merely end
+docked" with the row stuck on `On station`. **The signature itself lives in the TEST
+BACKEND's own log**, `frontend/playwright/.auth/backend.log` (written by
+`e2e/setup/backend-stack.ts`'s spawned `ENV=test` backend process, never surfaced into
+the Playwright report). Grep that file for:
+
+```
+grep -n 'endpoint at or inside the star-clearance radius' frontend/playwright/.auth/backend.log
+```
+
+which shows both the structured `ERR fleet operation failed error="…"` line and the
+paired `[GIN] … | 500 | … POST ".../orders"` (and usually `.../orders/preview`) access-log
+line for the same fleet id and timestamp. A grep of the Playwright-side artifacts alone —
+report, stdout, `test-results/**/error-context.md` — will find nothing and wrongly
+conclude this defect is not in play.
+
+## Recurrence 2026-09-09 (third) — `add-vitals-strip` archive gate, `refuel-commit.spec.ts`
+
+Hit a third time, in `add-vitals-strip`'s tier-4 archive gate (link 2a), same suite family
+as the two 2026-09-09 recurrences above but a different spec:
+`e2e/tests/refuel-commit.spec.ts:99` → `helpers/space-view.ts:457`
+(`burnToSelectionAndDock`, the burn to the home station leg). Same signature, captured the
+same way, fleet `fleet_cd3dccca-2ee0-455f-bceb-beb3e96e91ab`, `06:13:01`:
+
+```
+frontend/playwright/.auth/backend.log:
+ERR fleet operation failed error="fleet: solving burn: space: endpoint at or inside the star-clearance radius"
+POST /v1/fleets/fleet_cd3dccca…/orders/preview  ->  500
+POST /v1/fleets/fleet_cd3dccca…/orders          ->  500
+```
+
+`add-vitals-strip` is frontend-only (impl contract §0: "no wire change, no new served
+field") and its chain forbids backend work the same way `add-figure-formatting`'s did, so
+this is recorded and NOT fixed here, per the pattern established above. First-pass
+attribution on this run's tier-4 report incorrectly concluded "no known-defect signature
+present" from a `grep` over the Playwright log alone (see *Where to look*, above) — caught
+and corrected before the gate closed.
