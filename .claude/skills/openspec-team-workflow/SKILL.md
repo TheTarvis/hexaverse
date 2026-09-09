@@ -23,7 +23,7 @@ Production code changes ONLY as implementation of a validated, adversary-reviewe
 | Starting state | Route | Why |
 |---|---|---|
 | Existing code, affected capabilities unspecced | `openspec-brownfield` retrofits baseline specs for those capabilities first (it writes `openspec/specs/` directly — the one sanctioned exception to specs-change-only-via-archive, because baselines document current truth) | MODIFIED/REMOVED deltas must target existing requirement headers |
-| Net-new app (idea/brief, no code) | `openspec-greenfield` scaffolds, writes project.md, draws the MVP line, produces the foundational analysis (replaces the analyst for the first change); confirm the MVP line with the user before authoring | greenfield's failure mode is speccing a fantasy — the MVP gate contains it |
+| Net-new app (idea/brief, no code) | `openspec-greenfield` scaffolds, writes project.md, draws the MVP line, produces the foundational analysis (replaces the analyst for the first change); confirm the MVP line with the user before authoring (under `--full-auto`: draw it from the design input's stated scope and record where it was drawn) | greenfield's failure mode is speccing a fantasy — the MVP gate contains it |
 | Specs already cover the affected capabilities | straight to Phase 1 | steady state |
 
 Brownfield discipline: baselines document what the code DOES — suspected defects are flagged in the report, never canonized as SHALLs nor silently "corrected"; behavior changes go through normal changes. A brownfield retrofit followed by a change to the same capability is two steps, not one. Retrofitted baselines get a **baseline-mode adversary audit** (spec-vs-code, the codebase as source of truth) before any delta targets them — a wrong baseline poisons every change built on it.
@@ -60,7 +60,7 @@ Launch selected reviewers **in parallel, each with the same inputs**: design doc
 ## Gates
 
 - **Phase 1 → user**: validator PASS (`--strict`) + adversary "no material findings" (or round-cap with open items listed). Present spec; stop unless end-to-end delivery was requested.
-- **Phase 1 → Phase 2**: user approval (explicit, or prior end-to-end mandate).
+- **Phase 1 → Phase 2**: user approval (explicit, a prior end-to-end mandate, or a `--full-auto` run).
 - **Kickoff → Build (red gate)**: impl contract in `docs/plans/continous_space/handoffs/`; SDET red handoff delivered — coverage table in `docs/plans/continous_space/handoffs/<id>-red-coverage.md` accounts for **every scenario** (`assertion-red` / `compile-red` / `already-green` / `Playwright, deferred` / `reasoned-not-automated`), every written test confirmed failing for the right reason, red manifest recorded. The red suite is unit and integration only. Developers do not start before this gate.
 - **Build → Verify (green gate)**: all tasks checked or explicitly blocked; the SDET suite fully green at tiers 1 and 2.
 - **Verify → Journey**: SDET integrity check clean (manifest verify) + QA matrix with every row PASS or BLOCKED-awaiting-journey + security/dba implementation audits clear + zero unchecked tasks. Any FAIL is one batched dev round and one re-verification, not a loop.
@@ -93,6 +93,20 @@ A chain doc (`docs/plans/<chain>/chain.md`) lists changes in archive order with 
 4. Move to the next link with a **fresh orchestrator** reading the chain doc and the handoff files — never one orchestrator carrying every link.
 
 Links are sized to 20–40 tasks; a link that grows past that under panel review is split before authoring continues (hexaverse's links grew from 47 to 131 tasks, and every adversary round and dev pass re-read all of it). Archiving link N is the moment link N+1's verdict most likely expires; check by diff before implementing it, not by re-running the whole harden phase.
+
+A plain chain run implements **authored** links only: the first link with no `openspec/changes/<id>/` folder stops it, because there is no verdict to check and nothing to build.
+
+### Full-auto chains (`--full-auto`)
+
+`--full-auto` lifts every user gate and nothing else. Per link, in addition to the four steps above:
+
+1. **An unauthored link is authored in-run, after its predecessor archived** (so its MODIFIED deltas target specs that exist). Design input is the chain doc: the link's row, the open-decisions section, the "taught" records of archived links, and every source document the doc names for that link. Full Phase 1 — analyst → writer → panel → validator → adversary loop — no shortcuts because "the roadmap already described it".
+2. **Open questions are ruled, not asked.** Precedence: the chain doc's or design input's recorded recommendation → a settled decision in the root `CLAUDE.md` / `openspec/project.md` → the panel's recommendation → the most reversible option (one migration, one flag, or one file to undo, no backfill). Each ruling is written to `docs/plans/continous_space/handoffs/<id>-rulings.md` as a `FULL-AUTO RULING` with its basis, the alternatives rejected, and the reversal cost, and the writer authors from the ruling. A ruling with a recorded basis is a decision; a choice without one is a guess, and guesses are forbidden.
+3. **Hard stops.** A question that needs information nobody in the repo has — a credential, an external account, a product call with no recorded lean anywhere — halts the chain before authoring, with the question in the report. So does BLOCKER residue at the adversary round cap; MAJOR/MINOR residue becomes a follow-up change and the chain continues.
+4. **The verdict gets a real commit.** After the adversary clears, commit the change folder and handoffs, append that hash to the latest `<id>-adversary-r<N>.md` as the verdict commit for currency checks, and set the chain doc state to `authored r<N> <hash>` — then run the ordinary currency check and build. Without this step the next currency diff sees an untracked folder and can never be current.
+5. **Splits still fire.** Past 40 tasks, split at the link's pre-identified seam (or the architect's); the second half's row goes into the chain doc right after the first, state `authored`, and is picked up as the next link.
+
+Everything else holds unchanged: the adversary is non-skippable, TDD is strict, the archive gate is the single journey run, one fresh orchestrator per link.
 
 ## Parallelism map
 

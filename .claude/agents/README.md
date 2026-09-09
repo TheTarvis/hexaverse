@@ -90,9 +90,11 @@ Quickest entry — the `/team` command (defined in `.claude/commands/team.md`) l
 /team                                      # report current state and ask
 /team docs/payment-redesign.md --workflow  # same pipeline as a deterministic multi-agent Workflow
 /team --chain docs/plans/billing/chain.md  # implement authored changes in archive order, one fresh orchestrator per link
+/team --chain docs/plans/billing/chain.md --full-auto  # also author each unauthored link in-run (rulings recorded, no user gates), then build it
+/team docs/plans/billing/chain.md --full-auto  # same — a chain doc path implies --chain
 ```
 
-The `--workflow` variant runs `.claude/workflows/openspec-team.js` — the same pipeline with script-enforced structure: the panel fans out in parallel, the adversary repair loop is hard-capped at 3 rounds, Phase 2 only runs with `implement: true`, and `openspec archive` only ever runs with an explicit `archive: true`. The orchestrator agent (default) is better when the run needs judgment calls mid-flight; the workflow is better for big changes where you want maximum parallelism and predictable gates.
+The `--workflow` variant runs `.claude/workflows/openspec-team.js` — the same pipeline with script-enforced structure: the panel fans out in parallel, the adversary repair loop is hard-capped at 3 rounds, Phase 2 only runs with `implement: true` (or a chain, or `fullAuto: true`), and `openspec archive` only ever runs with an explicit `archive: true` or a chain. `fullAuto: true` is the `--full-auto` flag: unauthored chain links are authored in-run, open questions are ruled from the recorded recommendations into `docs/plans/continous_space/handoffs/<id>-rulings.md`, and a question the repo cannot answer is a hard stop. The orchestrator agent (default) is better when the run needs judgment calls mid-flight; the workflow is better for big changes where you want maximum parallelism and predictable gates.
 
 Full pipeline, in your own words:
 
