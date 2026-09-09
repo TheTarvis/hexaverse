@@ -1,6 +1,9 @@
 # Defect — the departure burn after a sale is rejected 409, twice
 
-**Status:** open, needs confirmation. **Found:** 2026-09-09, by the SDET diagnosing
+**Status:** **RESOLVED / RECLASSIFIED 2026-09-09.** The mechanism recorded below
+was wrong; see *The answer* at the foot of this file. Kept in full because the
+reasoning is instructive: every inference here was drawn from an **absence** in a
+log, and every one of them was false. **Found:** 2026-09-09, by the SDET diagnosing
 `add-figure-formatting`'s tier-4 archive gate. **Not fixed there** — that change is
 UI-only, touches zero backend files, and its chain forbids backend work.
 
@@ -77,3 +80,61 @@ Note the irony worth recording: `defect-burn-cancels-running-mine.md` is open be
 that release branch is **too eager** (a burn silently destroys a running mine). This
 defect is about an order being refused as though the slot were still held. They may well
 be two faces of the same under-specified claim lifecycle, and are worth reading together.
+
+
+---
+
+# The answer — captured 2026-09-09, from a Playwright trace
+
+Four separate analyses inferred four different causes from logs. One captured
+response body settled it. **Verbatim**, copied here rather than cited by path,
+because `frontend/playwright/.auth/backend.log` is overwritten by every e2e run
+and this defect's original evidence was destroyed that way:
+
+```
+HTTP 409
+{"error":"fleet: solved fuel cost exceeds the requested maxFuelTons cap",
+ "fuelCostTons":6.1296,
+ "maxFuelTons":4.99488}
+```
+
+- **Branch:** `ErrQuotedCapExceeded` — `backend/fleet/handler.go:480-494`, raised
+  at `backend/fleet/service.go:807`.
+- **Fleet state:** docked, **69.37 t of fuel**.
+- **Not** `action.ErrActiveActionExists`. **Not** `ErrInsufficientFuel`.
+
+## Every inference in the original filing was wrong, and each in the same way
+
+| Inferred from | Claimed | Actually |
+|---|---|---|
+| No second request in the log | The click reached the server zero times | It reached the server and was refused |
+| The inbox poll stopped at 1:15:41 | A claim was never released | `InboxByType` → `dao.List`; **the inbox resolves nothing** |
+| No 500/409 in the Playwright log | No known-defect signature present | Wrong log — the signature was in the backend log |
+| Two identical 409s | Two user attempts ⇒ deterministic, not a race | **One** click plus one automatic client retry |
+
+**The doubling was never the server.** `frontend/lib/query-client.ts:9-23`'s
+global mutation retry resends any non-401/403/5xx failure once, with the
+unchanged payload — so every deterministic refusal appears twice, and the
+server-side request count that `space-double-submit.spec.ts` asserts is
+corrupted by a retry the test cannot see.
+
+## What this actually decomposes into
+
+1. **The 4xx mutation retry** — fixed by `fix-mutation-retry-on-4xx`
+   (`add-vitals-strip-rulings.md` RULING 40).
+2. **Post-dock cost drift** — the solved cost moved **+22.7%** above the quote's
+   cap between a preview taken while docked and the commit that followed. Filed
+   separately as `defect-post-dock-burn-cost-drift.md`. The 10 %
+   `BURN_FUEL_ALLOWANCE` is **not** widened: `SpaceCommandPanel`'s re-quote on
+   cap-exceeded is the specced quote-lock behaviour, and widening a margin to
+   pass a test weakens a live requirement (RULING 41).
+3. **A `signUpAndWake` wake-up flake** — filed as
+   `defect-wake-roster-row-flake.md`; unrelated to either.
+
+## The rule this cost
+
+Read the payload before theorising about the mechanism. Four analyses reasoned
+from what was *missing* in a log; an absence of evidence is not evidence of
+absence, and every one of them was wrong. When a defect file names its own
+cheapest next step — this one said "capture the 409 body" at filing time — do
+that step first.

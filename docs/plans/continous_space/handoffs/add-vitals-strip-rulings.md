@@ -993,3 +993,164 @@ is a natural candidate for **link 2a-ii** (`add-burn-cost-overlay`), which owns
 the preview lift and already carries `drift-running-mine-preview-unsuppressed.md`.
 
 Reconsider only if the SDET shows it blocks the journey.
+
+### FULL-AUTO RULING 37 — `fix-follow-on-order-claim` is NOT built; the premise is wrong and the evidence is gone
+
+**Adversary verdict: BLOCKED**, and it is the right call. Full findings:
+`docs/plans/continous_space/handoffs/fix-follow-on-order-claim-adversary-r1.md`.
+
+**The repro would still 409 after this fix.** `fleet.Service.OrderTo` releases the
+movement slot **twice** before `action.Commit` is ever reached — `settleIfDue`
+inside `solveOrder` (`backend/fleet/service.go:653-657`) and the unconditional
+re-task `Cancel` (`:821-828`) — and both read the same field `commitTx` checks.
+Three facts falsify the stale-claim story outright:
+
+1. The 1:16:21 sale proves `resolveDue` had already cleared the slot **19 seconds
+   before** the first 409.
+2. **Both** attempts 409'd. A stale claim would have been consumed by the first
+   attempt's own `Cancel` branch, so the second could not have seen it. Two
+   identical rejections are a **deterministic precondition**, not a race —
+   candidates being `ErrInsufficientFuel`, `QuotedCapExceededError`,
+   `ErrHoldWithoutFuel`, all mapped to 409 at `fleet/handler.go:480-562`.
+3. The defect doc's one clue — the inbox poll stopping at 1:15:41 — is **causally
+   inert**: `InboxByType` → `dao.List`. **The inbox resolves nothing.**
+
+The gap the writer found is genuine (`action/dao.go:211` is the one slot read in
+the system that never resolves) but it is reachable **only on the sensor
+channel**, via `fleet.Scan` — not on the movement channel this defect is about.
+Building it would have been this repo's signature failure: a correct derivation
+that nothing in the failing path reaches, shipping green while the defect stayed
+live and *looked* fixed.
+
+**Ruling.** The change is **not implemented**. Its folder stays in
+`openspec/changes/` unarchived, with this ruling recorded, because the
+architectural gap it documents is real and worth keeping — but it is re-scoped
+to the sensor channel and its proposal's "regardless of which verb" claim is
+false (`mine/service.go:355-361` rejects at the service layer and never reaches
+`commitTx`).
+
+**Two things this cost, both recorded so the next run does not repeat them:**
+
+- **The evidence has been destroyed.** `frontend/playwright/.auth/backend.log` is
+  overwritten on every e2e run; the `fleet_dab3894e` sequence the defect was
+  filed from no longer exists. A defect filed from a log that the next run
+  overwrites needs its evidence **copied into the handoff at filing time**, not
+  referenced by path. Amend `defect-post-sale-departure-burn-409s.md` accordingly.
+- **Nobody has captured the 409 response body**, which the defect file itself
+  named as the cheapest next step when it was filed. Three agents have now
+  reasoned about which branch fires; one `curl` would have settled it. **That is
+  the next action** — diagnosis before specification, not after.
+
+**A second-order lesson worth more than the change.** The writer, the validator
+and I all treated "which 409 arm fires" as an open question we could specify
+around. It is not: it is the *entire content* of the defect. A corrective change
+whose cause is unconfirmed is not a fast-track, it is a guess with artifacts —
+and the adversary is the only reason it did not ship.
+
+### FULL-AUTO RULING 38 — the deterministic-precondition hypothesis changes what red 2 probably is
+
+If both 409s are a deterministic precondition rather than a race, the leading
+candidate is `ErrInsufficientFuel` — the fleet cannot afford the departure burn.
+That would make `space-double-submit`'s two failures a **test-fixture** problem
+(a fuel budget that no longer covers the walk), not a product defect at all, and
+the fix would be the SDET's rather than a developer's.
+
+It would also explain the timeline that nothing else does — passing in gate run 1
+and failing in the rerun with a two-line diff that cannot touch fuel — if the
+fixture sits near a threshold. **Do not act on this**; it is a hypothesis with a
+one-command test, and this link has already spent one cycle on a plausible story
+that the evidence refuted.
+
+### FULL-AUTO RULING 39 — the 409 is `ErrQuotedCapExceeded`; `fix-follow-on-order-claim` is abandoned and RULING 35's backend exception is withdrawn
+
+**The evidence, captured verbatim from the Playwright trace** — the thing the
+defect file asked for when it was filed, and which four separate analyses
+inferred instead of reading:
+
+```
+HTTP 409
+{"error":"fleet: solved fuel cost exceeds the requested maxFuelTons cap",
+ "fuelCostTons":6.1296,
+ "maxFuelTons":4.99488}
+```
+
+`ErrQuotedCapExceeded` — `backend/fleet/handler.go:480-494`, raised at
+`backend/fleet/service.go:807`. The fleet was docked with **69.37 t of fuel**.
+
+So it is **not** `action.ErrActiveActionExists` (the claim-lifecycle story the
+abandoned change was written against), and **not** `ErrInsufficientFuel` (my own
+hypothesis). Both were wrong. The solved cost drifted **+22.7%** above the
+quote's cap between preview and commit, and the quote-lock refused it — which is
+the specced behaviour working, not a bug in the claim spine.
+
+**Ruling.** `openspec/changes/fix-follow-on-order-claim/` is **deleted**. Its
+premise is refuted by evidence, so there is nothing to repair; keeping a change
+folder whose proposal is known-false would be worse than removing it. Its
+adversary report is kept — `fix-follow-on-order-claim-adversary-r1.md` — because
+the architectural gap it documented (`action/dao.go:211` is the one slot read
+that never resolves, reachable on the **sensor** channel) is real and someone
+should specify it one day, on evidence, for the channel it actually affects.
+
+**RULING 35's backend exception is withdrawn.** The defect is not in the backend,
+so the chain's no-backend rule stands again unmodified, and **tier 3 does not
+need rerunning** in the third gate run.
+
+**Why the adversary's "two identical 409s means deterministic, not a race" was
+right about the conclusion and wrong about the mechanism.** The doubling is not
+two user attempts: `frontend/lib/query-client.ts:9-23`'s global mutation retry
+resends any non-401/403/5xx failure **once**, with the unchanged payload. One
+click, one refusal, one pointless automatic retry of a deterministic 409.
+
+### FULL-AUTO RULING 40 — the real fix is the mutation retry policy, and it is frontend and small
+
+**The defect.** The global mutation retry resends 4xx. A 409 is a *deterministic
+refusal* — the same payload will be refused identically — so the retry cannot
+succeed, and it inflates the server-side request count that
+`space-double-submit.spec.ts` exists to assert. A guard test whose counting can
+be corrupted by an invisible client retry is a test that cannot see the thing it
+guards.
+
+**Ruling.** Fast-tracked minimal change **`fix-mutation-retry-on-4xx`**: a
+mutation retry never resends a 4xx. Full gates — writer → validator → adversary
+→ SDET red test → developer → tier 1 — because a fast-track shrinks artifacts,
+never gates. Archived **before** `add-vitals-strip`'s gate rerun.
+
+Paired with it, and equally important: the SDET makes the double-submit spec
+assert **response status**, not merely request count, so this whole class is
+visible the next time rather than presenting as a phantom missing request.
+
+**Basis.** Precedence 2 — the spec-first invariant: this is a behaviour change,
+so it gets a change. It is frontend-only, so tier 3 stays out of the gate.
+
+### FULL-AUTO RULING 41 — the 10% fuel allowance stays; the post-dock cost drift is filed
+
+`SpaceCommandPanel`'s re-quote on cap-exceeded is the **specced quote-lock
+behaviour** (`system-space-view`, *A Burn Commit Is Quote-Locked to the Preview
+the Player Agreed To*). Widening `BURN_FUEL_ALLOWANCE` to swallow a 22.7% drift
+would weaken a live requirement to make a test pass, which is the one thing this
+whole pipeline exists to prevent.
+
+**Ruling.** The margin is untouched. The *drift* — why a solved cost moves 22.7%
+between a preview taken while docked and the commit that follows — is filed as
+its own defect for someone to investigate on evidence, not guessed at here.
+
+### FULL-AUTO RULING 42 — three signatures, not one, and they are now separated
+
+This single "red 2" has resolved into **three distinct failures**, which is why
+it survived four analyses:
+
+1. **`ErrQuotedCapExceeded`** — post-dock cost drift beyond the quote cap (filed).
+2. **The 4xx mutation retry** — doubling every rejection (fixed by RULING 40).
+3. **A `signUpAndWake` wake-up flake** — the roster row not appearing within 15s,
+   which is what failed the `:242` repro and is unrelated to either (filed).
+
+And `:185` **passed** in the isolated repro while both failed at the gate, which
+confirms intermittency rather than a deterministic regression.
+
+**The lesson, and it is the most expensive one this link taught:** every analysis
+that reasoned from an *absence* in a log was wrong — "no second request" (there
+was one, refused), "the inbox stopped polling" (the inbox resolves nothing), "no
+500 or 409 in the log" (wrong log). The one action that produced truth was
+capturing a response body. **Read the payload before theorising about the
+mechanism**, and when a defect file names its own cheapest next step, do that
+step first.
