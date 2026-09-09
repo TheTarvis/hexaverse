@@ -549,6 +549,18 @@ function SpaceLayers({
   }
   const zoomLimit = atZoomLimit(camera, extent)
   const orbitLimit = atOrbitLimit(camera)
+  // camera-orbit's own data-pan-at-limit (impl contract §10.3): the
+  // space-separated set of blocked pan directions, computed per render from
+  // the SAME panAtLimit helper the deleted camera-pan-* buttons used —
+  // never routed through camera-limit-status's single-slot priority chain.
+  const blockedPanDirections = (
+    [
+      panAtLimit(-1, 0) ? 'left' : null,
+      panAtLimit(1, 0) ? 'right' : null,
+      panAtLimit(0, 1) ? 'up' : null,
+      panAtLimit(0, -1) ? 'down' : null,
+    ].filter((d): d is string => d !== null)
+  ).join(' ')
   const limitMessage = zoomLimit
     ? LIMIT_MESSAGE.zoom
     : atPanLimit(camera, extent)
@@ -597,16 +609,27 @@ function SpaceLayers({
   return (
     <>
       {/* --- camera controls: FIRST in the tab order, and gone entirely
-              while the canvas is unavailable (this whole layer is). --- */}
+              while the canvas is unavailable (this whole layer is).
+              SHRUNK to exactly four sibling cells (openspec change
+              `add-vitals-strip`, `system-console`/`system-space-view`
+              MODIFIED *Space View Camera Is Keyboard-Operable*, impl
+              contract §10, RULING 10/23): `camera-orbit`, `camera-zoom-in`,
+              `camera-zoom-out`, `camera-recenter`. The eight
+              `camera-orbit-*`/`camera-pan-*` buttons are gone — discrete
+              pointer orbit is already served by canvas drag-to-orbit, and
+              keyboard pan moves onto `camera-orbit`'s own `Shift`+arrow
+              binding below. The wrapper's own pre-existing tabIndex/
+              onKeyDown (bare-arrow orbit) is UNCHANGED — it predates and is
+              independent of the four now-deleted `camera-orbit-*` buttons.
+              Re-anchored bottom-right, above the vitals strip's 56px bar +
+              a 16px gap. --- */}
       <div
         {...{ [CAMERA_CONTROL_ATTR]: '' }}
         data-testid="space-camera-controls"
         role="group"
         aria-label="System camera"
         tabIndex={0}
-        // Bottom-centre: clear of the floating nav (bottom-left) and the
-        // command column (right) now that the stage is the whole window.
-        className="pointer-events-none absolute bottom-4 left-1/2 grid -translate-x-1/2 grid-cols-4 gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+        className="pointer-events-none absolute bottom-[4.5rem] right-4 grid grid-cols-4 gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
         onKeyDown={(e) => {
           const step: Record<string, [number, number]> = {
             ArrowLeft: [-1, 0],
@@ -620,28 +643,77 @@ function SpaceLayers({
           onCamera((prev) => orbitBySteps(prev, s[0], s[1]))
         }}
       >
-        <CameraButton testId="camera-orbit-left" label="Orbit left" onPress={() => onCamera((p) => orbitBySteps(p, -1, 0))} atLimit={false} glyph="◀" />
-        <CameraButton testId="camera-orbit-right" label="Orbit right" onPress={() => onCamera((p) => orbitBySteps(p, 1, 0))} atLimit={false} glyph="▶" />
-        <CameraButton testId="camera-orbit-up" label="Orbit up" onPress={() => onCamera((p) => orbitBySteps(p, 0, 1))} atLimit={orbitLimit === 'max'} glyph="▲" />
-        <CameraButton testId="camera-orbit-down" label="Orbit down" onPress={() => onCamera((p) => orbitBySteps(p, 0, -1))} atLimit={orbitLimit === 'min'} glyph="▼" />
-        <CameraButton testId="camera-pan-left" label="Pan left" onPress={() => onCamera((p) => panBySteps(p, -1, 0, extent))} atLimit={panAtLimit(-1, 0)} glyph="←" />
-        <CameraButton testId="camera-pan-right" label="Pan right" onPress={() => onCamera((p) => panBySteps(p, 1, 0, extent))} atLimit={panAtLimit(1, 0)} glyph="→" />
-        <CameraButton testId="camera-pan-up" label="Pan up" onPress={() => onCamera((p) => panBySteps(p, 0, 1, extent))} atLimit={panAtLimit(0, 1)} glyph="↑" />
-        <CameraButton testId="camera-pan-down" label="Pan down" onPress={() => onCamera((p) => panBySteps(p, 0, -1, extent))} atLimit={panAtLimit(0, -1)} glyph="↓" />
+        {/* camera-orbit — the one focusable cell replacing the four
+            camera-orbit-* buttons. Bare arrows orbit; `Shift`+arrow pans,
+            with the deleted pan buttons' exact step vectors (Left [-1,0],
+            Right [1,0], Up [0,1], Down [0,-1]) and the existing pan bound
+            (impl contract §10.2). Both axes' at-limit state live here too
+            (§10.3): `camera-orbit-up`/`-down` are gone, so the orbit axis's
+            attribute moves onto the element that replaces them, and the pan
+            axis's attribute is NEW (never routed through
+            `camera-limit-status`'s single-slot zoom>pan>orbit chain, which
+            would mask it behind a simultaneous zoom clamp). */}
+        <div
+          {...{ [CAMERA_CONTROL_ATTR]: '' }}
+          data-testid="camera-orbit"
+          role="group"
+          tabIndex={0}
+          aria-label="Orbit the camera with arrow keys; hold Shift and press arrow keys to pan"
+          {...(orbitLimit ? { 'data-orbit-at-limit': orbitLimit } : {})}
+          {...(blockedPanDirections ? { 'data-pan-at-limit': blockedPanDirections } : {})}
+          className={
+            'pointer-events-auto flex h-8 w-8 items-center justify-center rounded-md border border-white/15' +
+            ' bg-black/60 font-mono text-sm text-zinc-300 backdrop-blur transition-colors' +
+            ' hover:bg-white/[0.16] hover:text-white' +
+            ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
+          }
+          onKeyDown={(e) => {
+            const step: Record<string, [number, number]> = {
+              ArrowLeft: [-1, 0],
+              ArrowRight: [1, 0],
+              ArrowUp: [0, 1],
+              ArrowDown: [0, -1],
+            }
+            const s = step[e.key]
+            if (!s) return
+            e.preventDefault()
+            // Stop here: the wrapper's OWN bare-arrow onKeyDown (unchanged,
+            // for when the wrapper itself is directly focused) would
+            // otherwise ALSO fire on the bubbling phase and double-apply
+            // the orbit step alongside this cell's own handling.
+            e.stopPropagation()
+            if (e.shiftKey) {
+              onCamera((prev) => panBySteps(prev, s[0], s[1], extent))
+            } else {
+              onCamera((prev) => orbitBySteps(prev, s[0], s[1]))
+            }
+          }}
+        >
+          ⟳
+        </div>
         <CameraButton testId="camera-zoom-in" label="Zoom in" onPress={() => onCamera((p) => zoomBySteps(p, 1, extent))} atLimit={zoomLimit === 'min'} glyph="+" />
         <CameraButton testId="camera-zoom-out" label="Zoom out" onPress={() => onCamera((p) => zoomBySteps(p, -1, extent))} atLimit={zoomLimit === 'max'} glyph="−" />
         <CameraButton testId="camera-recenter" label="Recenter" onPress={onRecenter} atLimit={false} glyph="⌖" />
-        {/* The keyboard path to a POINT selection. Without it — and without
-            the keyboard pan above — a keyboard-only player can only ever
-            name the star, the one point every burn solve rejects. */}
-        <CameraButton
-          testId="select-pan-target-point"
-          label="Select the point at the camera's centre"
-          onPress={() => onSelect({ point: { ...camera.target } })}
-          atLimit={false}
-          glyph="◎"
-        />
       </div>
+
+      {/* select-pan-target-point — moved OUT of the wrapper (impl contract
+          §10.1): a selection affordance, not a camera cell, so it does not
+          count against "exactly four". Carries CAMERA_CONTROL_ATTR itself,
+          since SpaceStage.tsx's own canvas-pick suppression
+          (`target.closest('[data-space-camera-control], [data-affordance]')`)
+          would otherwise fire both its own selection and the canvas pick on
+          one click, now that it is outside the wrapper's subtree. The
+          keyboard path to a POINT selection: without it — and without the
+          keyboard pan above — a keyboard-only player can only ever name the
+          star, the one point every burn solve rejects. */}
+      <CameraButton
+        testId="select-pan-target-point"
+        label="Select the point at the camera's centre"
+        onPress={() => onSelect({ point: { ...camera.target } })}
+        atLimit={false}
+        glyph="◎"
+        controlAttr
+      />
 
       <span className="sr-only" role="status" aria-live="polite" data-testid="camera-limit-status">
         {limitMessage}
@@ -929,12 +1001,17 @@ function CameraButton({
   onPress,
   atLimit,
   glyph,
+  controlAttr,
 }: {
   testId: string
   label: string
   onPress: () => void
   atLimit: boolean
   glyph: string
+  /** RULING 10/impl contract §10.1: `select-pan-target-point` moves out of
+   *  the `space-camera-controls` wrapper and must carry CAMERA_CONTROL_ATTR
+   *  itself, or the canvas-pick suppression at `:252` misses it. */
+  controlAttr?: boolean
 }) {
   return (
     <button
@@ -942,6 +1019,7 @@ function CameraButton({
       data-testid={testId}
       aria-label={label}
       className={BUTTON}
+      {...(controlAttr ? { [CAMERA_CONTROL_ATTR]: '' } : {})}
       {...(atLimit ? { 'data-at-limit': 'true' } : {})}
       onClick={(e) => {
         e.stopPropagation()

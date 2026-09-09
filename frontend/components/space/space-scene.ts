@@ -30,7 +30,15 @@ import {
   type DrawOrbitElements,
   type DrawVec3,
 } from '@/lib/space/draw'
-import type { Burn, Drift, Park, Vec3 } from '@/lib/types/fleet'
+import {
+  PARK_KIND_ORBIT,
+  PARK_KIND_POINT,
+  PARK_KIND_STATIONKEEP,
+  type Burn,
+  type Drift,
+  type Park,
+  type Vec3,
+} from '@/lib/types/fleet'
 import type { Sighting } from '@/lib/types/sighting'
 import type { SystemSpace } from '@/lib/types/system-space'
 import type { SpaceSelection } from './space-selection'
@@ -586,7 +594,11 @@ function fleetPosition(
     const park = state.Park
     const local = drawParkPosition(
       {
-        kind: (park.Kind === 1 ? 1 : park.Kind === 2 ? 2 : 0) as 0 | 1 | 2,
+        kind: (park.Kind === PARK_KIND_STATIONKEEP
+          ? PARK_KIND_STATIONKEEP
+          : park.Kind === PARK_KIND_POINT
+            ? PARK_KIND_POINT
+            : PARK_KIND_ORBIT) as 0 | 1 | 2,
         bodyId: park.BodyId,
         radius: park.Radius,
         periodMs: park.PeriodMs,
@@ -599,7 +611,7 @@ function fleetPosition(
     )
     // A point park is already absolute; an orbit or station-keep park is
     // relative to its host body, which is itself moving.
-    if (park.Kind === 2) return local
+    if (park.Kind === PARK_KIND_POINT) return local
     return vecAdd(positionOf(park.BodyId), local)
   }
 

@@ -1,6 +1,6 @@
 ## 1. Roster-status derivation and gauge atom
 
-- [ ] 1.1 Extend `roster-status.ts` ADDITIVELY: `tone`, `where`, `activity`
+- [x] 1.1 Extend `roster-status.ts` ADDITIVELY: `tone`, `where`, `activity`
       and `remainingMs` SHALL return byte-identical values for every input
       they return today, and the pill's new distinctions arrive as NEW
       optional fields the roster row is free to ignore, each an
@@ -31,11 +31,11 @@
       `PARK_KIND_ORBIT`/`PARK_KIND_STATIONKEEP`/`PARK_KIND_POINT` once from
       `lib/types/fleet.ts` beside the existing `SHIP_MODE_*` constants and
       repoint both existing sites, so the derivation is not the third copy
-- [ ] 1.2 Keep every existing `roster-status.test.ts` case asserting the old
+- [x] 1.2 Keep every existing `roster-status.test.ts` case asserting the old
       four fields exactly — that table is the additive-only check — and add
       cases for the new fields only; re-run `FleetRoster.test.tsx` to
       confirm the row is unaffected
-- [ ] 1.3 Build a shared gauge atom: a plain fill-ratio variant (fuel) and a
+- [x] 1.3 Build a shared gauge atom: a plain fill-ratio variant (fuel) and a
       kind-segmented variant (hold), both over the served `cargoCapacity`
       denominator, segments sorted by kind name — so two reads of the same
       pool render the same order — in zinc-family shades. The gauge is
@@ -45,18 +45,18 @@
       cell's text. The gauge carries a DOM-observable state attribute
       distinguishing no data, no fill/no segments, and a rendered fill, so
       that state is assertable without parsing the adjacent figure's text
-- [ ] 1.4 Test the gauge atom: fill ratio, segment count and order, the
+- [x] 1.4 Test the gauge atom: fill ratio, segment count and order, the
       no-data/no-fill/filled state attribute, legibility with colour removed
       — the gauge exposes no accessible value; every kind and tonnage is
       carried by the cell's text
 
 ## 2. Fleet cell and chevron
 
-- [ ] 2.1 Render the fleet cell's identity from the acting fleet's served
+- [x] 2.1 Render the fleet cell's identity from the acting fleet's served
       id (no synthesized display name — `Fleet` carries no `name` field)
       and its chevron; when there is no acting fleet the identity shows the
       absent form but the chevron stays present and interactive
-- [ ] 2.2 Wire the chevron to a menu of every fleet the requester owns
+- [x] 2.2 Wire the chevron to a menu of every fleet the requester owns
       (never filtered to the open system, and reading the own-fleets query's
       live data on every render rather than a snapshot frozen at open time;
       an own-fleets read whose most recent attempt has failed empties the
@@ -68,17 +68,17 @@
       in (`systemNames`, falling back to the raw system id when the galaxy
       read has not resolved it), or that it is under way between systems
       for a fleet in lane transit
-- [ ] 2.3 Verify the fleet-mark activation path (`onActivateFleet`), the
+- [x] 2.3 Verify the fleet-mark activation path (`onActivateFleet`), the
       roster row, and the chevron all delegate to that one callback, and
       that none of the three adds the fleet to the space-view's
       body/lane-gate/point selection
-- [ ] 2.4 Make the chevron and its menu keyboard-operable: reachable via the
+- [x] 2.4 Make the chevron and its menu keyboard-operable: reachable via the
       strip's tab order, opens with Enter or Space, entries reachable by
       arrow-key navigation and selectable with Enter, and Escape closes the
       menu without choosing and returns focus to the chevron — a
       conventional accessible menu-button primitive (a native `<select>` or
       an ARIA `menu`/`listbox` pattern) gets this for free
-- [ ] 2.5 Test: identity by served id, the chevron surviving the
+- [x] 2.5 Test: identity by served id, the chevron surviving the
       no-acting-fleet state, chevron menu membership (all owned fleets,
       sole-fleet case, empty for a requester who owns no fleet),
       same-system/other-system/on-lane delegate outcomes,
@@ -91,7 +91,7 @@
 
 ## 3. State pill
 
-- [ ] 3.1 Render the pill from a props signature of the derivation's return
+- [x] 3.1 Render the pill from a props signature of the derivation's return
       value — or its explicit absence, supplied by the mounting view
       whenever the own-fleets read's most recent attempt has failed — the
       served `stranded` flag, the served world-clock `scale`, and the
@@ -107,15 +107,15 @@
       `figure-formatting` makes scale a required argument of the
       duration/rate formatters this pill renders and the projected clock is
       what task 3.4's advancing countdown reads from
-- [ ] 3.2 Render the served `stranded` flag as a marker beside the pill,
+- [x] 3.2 Render the served `stranded` flag as a marker beside the pill,
       distinct from and never replacing the activity pill
-- [ ] 3.3 Degrade the pill to the raw id (never blank) when the interior
+- [x] 3.3 Degrade the pill to the raw id (never blank) when the interior
       read cannot resolve a docked host or a burn target — including when
       `attachedTo`, or the burn's served target body id, matches neither
       the interior read's `features` nor its `laneGates` collection, or the
       interior read has failed; same pattern for the holding state's rate
       figure when the fleet read has not yet served it
-- [ ] 3.4 Compute a duration the pill renders from the derivation's
+- [x] 3.4 Compute a duration the pill renders from the derivation's
       absolute-instant ETA anchor (task 1.1) and the `worldTime` prop (task
       3.1), via `figure-formatting`'s `world-ms-span-left` formatter, rather
       than a value baked in at the last read, so it advances between reads
@@ -126,7 +126,7 @@
       clock. Show the pill's absent form, not the last-rendered state, when
       the own-fleets read's most recent attempt has failed, even though a
       cached fleet read remains
-- [ ] 3.5 Test: all seven pill states — including drifting, in transit, and
+- [x] 3.5 Test: all seven pill states — including drifting, in transit, and
       on station, asserted against the strip component directly rather than
       through `SystemSpaceView` — the stranded marker alongside each, the
       degraded-host cases (a `laneGates` hit naming the destination system,
@@ -154,18 +154,18 @@
 
 ## 4. Fuel cell
 
-- [ ] 4.1 Render fuel tonnage and range (`figure-formatting` `tons`/`range`)
+- [x] 4.1 Render fuel tonnage and range (`figure-formatting` `tons`/`range`)
       over the gauge atom (fill = served `fuel` / served `cargoCapacity`),
       with an adjacent label identifying the range
-- [ ] 4.2 Handle the absent case (no gauge fill) identically for an
+- [x] 4.2 Handle the absent case (no gauge fill) identically for an
       unserved roster and for a fleet whose cargo pool carries no `fuel`
       entry — the wire omits a kind held at zero, so there is no served
       zero to distinguish; this matches the roster row's own absent
       rendering for the same fleet
-- [ ] 4.3 Mark the cell draining while the acting fleet's effective state is
+- [x] 4.3 Mark the cell draining while the acting fleet's effective state is
       a burn; update the figure and gauge fill only when a read serves new
       values, never interpolated between reads
-- [ ] 4.4 Test: figures and gauge fill, the absent state for a fleet holding
+- [x] 4.4 Test: figures and gauge fill, the absent state for a fleet holding
       no fuel or an unserved roster (matching the roster row's rendering for
       the same fleet), drain marker, figure unchanged between reads while
       burning, and the gauge's state attribute reading its no-data value for
@@ -176,17 +176,17 @@
 
 ## 5. Hold cell
 
-- [ ] 5.1 Render used, total, and free hold tonnage (`figure-formatting`
+- [x] 5.1 Render used, total, and free hold tonnage (`figure-formatting`
       `tons`), each derived from the acting fleet's own owner-only roster
       fields, over the kind-segmented gauge atom, `fuel` as an ordinary kind
-- [ ] 5.2 Handle the unloaded-roster absent case (all three figures absent,
+- [x] 5.2 Handle the unloaded-roster absent case (all three figures absent,
       no segments) and the empty-hold case (no segments, the served `free`
       figure rendered — never client-derived — for a fixture where it
       equals capacity); reflect the post-resolution cargo when a running
       mine's ETA passes and the space view's refetch lands the updated
       fleet read, via the mounting view's existing refetch rules, without
       navigation
-- [ ] 5.3 Test: contents and capacity with segments (each segment's own
+- [x] 5.3 Test: contents and capacity with segments (each segment's own
       served tonnage on `data-raw`), the empty-hold case asserting the
       served `free` value rather than the capacity−freeHold equation,
       absent roster, each segment's kind-and-tonnage text, the
@@ -195,7 +195,7 @@
 
 ## 6. Credits and clock cells
 
-- [ ] 6.1 Add `useCorporationSessionOptional()` beside `useCorporationOptional`
+- [x] 6.1 Add `useCorporationSessionOptional()` beside `useCorporationOptional`
       in `frontend/components/corporation-provider.tsx`, returning
       `{ corporation: Corporation | null, isError: boolean }` without
       throwing when no provider is mounted (the throwing
@@ -207,9 +207,9 @@
       the unavailable indication rather than the stale balance — with an
       explicit unavailable indication distinct from `figure-formatting`'s
       generic absent form
-- [ ] 6.2 Add the live region announcing a balance change and a
+- [x] 6.2 Add the live region announcing a balance change and a
       figure/unavailable transition, in either direction
-- [ ] 6.3 Render the world clock (`figure-formatting` `world-ms-instant`)
+- [x] 6.3 Render the world clock (`figure-formatting` `world-ms-instant`)
       with its accessible `×N` scale explanation, `×—` when no scale is
       served, and track whether a world time has ever been served (latched
       true the first time `serverWorldTime` is defined) so the whole stamp
@@ -224,7 +224,7 @@
       forward. Once latched AND a scale has been served, the stamp and its
       `data-raw` re-render as the mounting view's projected `worldTime`
       advances, with no refetch required
-- [ ] 6.4 Test: balance figure, unavailable indication, a stale balance
+- [x] 6.4 Test: balance figure, unavailable indication, a stale balance
       after a prior successful read is never shown as current
       (`useCorporationSessionOptional`'s `isError` case), update on sale,
       update on refuel, change announcement, transition announcement, clock
@@ -237,22 +237,22 @@
 
 ## 7. Strip container invariants
 
-- [ ] 7.1 Mount the strip on every render of the system space view —
+- [x] 7.1 Mount the strip on every render of the system space view —
       including a failed interior read, a failed own-fleets read, and an
       unavailable renderer — with unfed cells showing the absent form
       rather than being removed, and rendering no error or retry affordance
       of its own for a failed own-fleets read (that surface belongs to the
       fleet panel)
-- [ ] 7.2 Enforce, across the strip: no element beyond the chevron and its
+- [x] 7.2 Enforce, across the strip: no element beyond the chevron and its
       menu issues a mutating request; the strip issues no network read of
       its own; activating any strip element never changes the space-view
       selection; the strip announces only the credits cell's own changes,
       never a landed burn, jump, or mine
-- [ ] 7.3 Enforce the 1280×720 CSS-pixel width floor: every cell renders
+- [x] 7.3 Enforce the 1280×720 CSS-pixel width floor: every cell renders
       without horizontal overflow, truncation, or a second row, at that
       viewport and every wider one, and no other floating surface (command
       column, camera cluster, failed-sightings retry) overlaps a strip cell
-- [ ] 7.4 Test: the always-present matrix (failed interior, failed
+- [x] 7.4 Test: the always-present matrix (failed interior, failed
       own-fleets with no retry of its own, unavailable renderer, no acting
       fleet in this system with the chevron still listing fleets owned
       elsewhere, no owned fleet at all with an empty chevron menu), the
@@ -263,7 +263,7 @@
 
 ## 8. Wire the strip in and retire the panel's readouts
 
-- [ ] 8.1 Mount the strip full-width across the foot of `SystemSpaceView`,
+- [x] 8.1 Mount the strip full-width across the foot of `SystemSpaceView`,
       supplying the own-fleets read (its data and its error state, so a read
       that resolved once and has since failed to refresh is distinguishable
       from current), the interior and galaxy reads the pill needs, the
@@ -279,13 +279,13 @@
       `sightings-unavailable` (`:759`) above it so its retry stays
       reachable, and re-anchor the camera cluster bottom-right above it
       (`SpaceStage.tsx:609`)
-- [ ] 8.2 Remove `FleetActionsPanel`'s cargo hold and credit-balance
+- [x] 8.2 Remove `FleetActionsPanel`'s cargo hold and credit-balance
       readouts; leave `panel-error-live-region`
       (`FleetActionsPanel.tsx:371-373`) in place — it is a sibling of the
       balance block, not inside it — and re-point its comment and its test
       at this capability's new *A Failed Command Is Announced to Assistive
       Technology* requirement
-- [ ] 8.3 Point `Sell Commit`'s and `Refuel Commit`'s post-success refresh at
+- [x] 8.3 Point `Sell Commit`'s and `Refuel Commit`'s post-success refresh at
       the strip's hold and credits cells, reusing the panel's former
       testids on the strip's cells so the tier-4 specs that read them need
       no edit: `balance-readout`, `balance-value` (keeping its
@@ -296,17 +296,17 @@
       `[data-raw]` it names (`hold-capacity` excepted, read only via
       `-used`/`-total`) — the e2e `digits()` helper throws on a composite
       (`e2e/helpers/space-view.ts:488-497`)
-- [ ] 8.4 Migrate/rewrite `FleetActionsPanel.test.tsx`'s cargo-hold-readout
+- [x] 8.4 Migrate/rewrite `FleetActionsPanel.test.tsx`'s cargo-hold-readout
       and credit-balance-readout describes onto the strip's suite; keep the
       failed-command-announcement test in place, re-pointed at the panel's
       new requirement
-- [ ] 8.5 Test: `SystemSpaceView` mounts the strip fed from its own reads;
+- [x] 8.5 Test: `SystemSpaceView` mounts the strip fed from its own reads;
       the panel renders no hold or balance readout; a sale's or refuel's
       refreshed reads land on the strip
 
 ## 9. Camera cluster shrink
 
-- [ ] 9.1 Restructure the cluster to exactly four sibling cells —
+- [x] 9.1 Restructure the cluster to exactly four sibling cells —
       `camera-orbit` (one focusable cell carrying `tabIndex=0`,
       `CAMERA_CONTROL_ATTR` and the key handler, replacing the four
       `camera-orbit-*` buttons; pointer orbit is already served by canvas
@@ -315,21 +315,21 @@
       the cluster wrapper so the four-cell count is a DOM fact, carrying
       `CAMERA_CONTROL_ATTR` onto it so `SpaceStage.tsx:252`'s canvas-pick
       suppression still reaches it
-- [ ] 9.2 Bind `Shift`+arrow-key pan on `camera-orbit`'s existing
+- [x] 9.2 Bind `Shift`+arrow-key pan on `camera-orbit`'s existing
       `onKeyDown`, using the deleted buttons' exact step vectors (Left
       `-1,0`, Right `1,0`, Up `0,1`, Down `0,-1`) and the existing pan
       bound; bare arrows continue to orbit. Update the camera cluster's
       accessible name or description to state the `Shift`+arrow pan binding,
       so a screen-reader user discovers the mechanism without the deleted
       on-screen buttons
-- [ ] 9.3 Move BOTH axes' at-limit state onto `camera-orbit`:
+- [x] 9.3 Move BOTH axes' at-limit state onto `camera-orbit`:
       `data-pan-at-limit` naming the blocked pan directions (from the
       existing `panAtLimit` helper) and `data-orbit-at-limit` (`min`/`max`,
       from `orbitLimit`), each absent away from its clamp. Leave
       `camera-limit-status` and its zoom>pan>orbit priority chain unchanged
-- [ ] 9.4 Confirm `select-pan-target-point` is untouched by the shrink —
+- [x] 9.4 Confirm `select-pan-target-point` is untouched by the shrink —
       still in tab order, still selecting the live pan target
-- [ ] 9.5 Repoint every `SpaceStage.interaction.test.tsx` test that drives
+- [x] 9.5 Repoint every `SpaceStage.interaction.test.tsx` test that drives
       the camera through a deleted button — fourteen tests reference
       `camera-pan-*`/`camera-orbit-*`, and nine of them belong to
       requirements this change does not touch (recenter, selection

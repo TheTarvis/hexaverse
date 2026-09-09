@@ -37,7 +37,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FleetRoster } from '@/components/fleet/FleetRoster'
-import { useCorporationOptional } from '@/components/corporation-provider'
+import { rosterRowStatus, type ResolvedBody } from '@/components/fleet/roster-status'
+import { useCorporationOptional, useCorporationSessionOptional } from '@/components/corporation-provider'
 import { useRunningMine, useRunningScan } from '@/hooks/use-actions'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import { useMyFleets } from '@/hooks/use-fleets'
@@ -58,6 +59,7 @@ import { SpaceCommandPanel } from './SpaceCommandPanel'
 import { SpaceStage } from './SpaceStage'
 import { buildSceneModel } from './space-scene'
 import { toggleSelection, type SpaceSelection } from './space-selection'
+import { VitalsStrip } from './VitalsStrip'
 
 export interface SystemSpaceViewProps {
   systemId: string
@@ -235,6 +237,13 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // (`docked-fleet-actions`: *Credit Balance Readout*). The OPTIONAL
   // accessor: a missing provider withdraws a readout, never the view.
   const corporation = useCorporationOptional()
+  // add-vitals-strip, impl contract §6.3: the SESSION accessor, which also
+  // exposes `isError` — a session that resolved once and has since failed to
+  // refresh must read Unavailable on the strip, never the stale cached
+  // balance. `useCorporationOptional` above stays exactly as it is; nothing
+  // else on this view reads the session accessor.
+  const { corporation: sessionCorporation, isError: sessionFailed } = useCorporationSessionOptional()
+  const creditsShown: number | null = sessionFailed ? null : (sessionCorporation?.credits ?? null)
 
   const [selection, setSelection] = useState<SpaceSelection | null>(null)
   const [actingFleetId, setActingFleetId] = useState<string | null>(null)
@@ -633,6 +642,30 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     return gate ? { bodyId: gate.id, destSystemId: gate.destSystemId } : null
   }, [interior.data, selection?.bodyId])
 
+  // add-vitals-strip, impl contract §2.3/§6.3: the shared roster derivation's
+  // fifth argument — checks BOTH interior collections, keyed by a docked
+  // host's `attachedTo` or a burn's served target body id. A failed interior
+  // read leaves `interior.data` undefined, so every lookup returns null and
+  // every label degrades to the raw id (`roster-status.ts`'s own fallback).
+  const resolveBody = useCallback(
+    (bodyId: string): ResolvedBody | null => {
+      const feature = interior.data?.features.find((f) => f.id === bodyId)
+      if (feature) return { kind: 'feature', type: feature.type, id: feature.id }
+      const gate = interior.data?.laneGates.find((g) => g.id === bodyId)
+      if (gate) return { kind: 'gate', destSystemId: gate.destSystemId }
+      return null
+    },
+    [interior.data],
+  )
+  const nameOf = useCallback((id: string) => systemNames[id] ?? id, [systemNames])
+  // The strip's pill: null whenever the own-fleets read's most recent
+  // attempt has failed, or there is no acting fleet to derive from — the
+  // SAME projection the roster row runs through (`system-console`'s *The
+  // Fleet Cell's State Pill Is a Projection of the Shared Roster
+  // Derivation*).
+  const vitalsStatus =
+    fleets.isError || !acting ? null : rosterRowStatus(acting, worldTime, nameOf, runningMine, resolveBody)
+
   // --- the station-anchored inputs ----------------------------------------
   //
   // A 404 is "this system has no visible station" — the ordinary answer, and
@@ -756,7 +789,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {ghostFeed.isError && (
           <div
             data-testid="sightings-unavailable"
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
+            // Raised above the vitals strip's 56px bar + a 16px gap
+            // (openspec change `add-vitals-strip`, `system-console`) so its
+            // retry stays reachable, never occluded by the strip.
+            className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
           >
             <p className="text-zinc-600 dark:text-zinc-400">
               This system&apos;s sightings could not be read.
@@ -787,8 +823,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
 
       {/* The command column floats over the canvas, top-right, scrolling
           within the viewport when it outgrows it. The gaps between panels
-          pass pointer events through to the stage. */}
-      <div className="pointer-events-none absolute inset-y-4 right-4 flex w-72 max-w-[85vw] flex-col gap-3 overflow-y-auto [&>*]:pointer-events-auto">
+          pass pointer events through to the stage. Bottom inset raised above
+          the vitals strip (openspec change `add-vitals-strip`,
+          `system-console`) — its own [&>*]:pointer-events-auto children
+          would otherwise sit over the strip's clock and credits cells and
+          eat their pointer events. */}
+      <div className="pointer-events-none absolute top-4 bottom-[4.5rem] right-4 flex w-72 max-w-[85vw] flex-col gap-3 overflow-y-auto [&>*]:pointer-events-auto">
         {fleets.isError && (
           <div
             data-testid="space-fleets-error"
@@ -910,6 +950,26 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           activeFleetId={acting?.id ?? null}
           currentSystemId={systemId}
           onSelect={selectFleet}
+        />
+      </div>
+
+      {/* The vitals strip (openspec change `add-vitals-strip`,
+          `system-console`) — a sibling of the canvas layer, full-width
+          across the foot of the view, above the stage in z-order. Fed
+          entirely from reads this view already holds: it issues no read of
+          its own. */}
+      <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-20">
+        <VitalsStrip
+          acting={acting}
+          ownedFleets={allFleets}
+          fleetsFailed={fleets.isError}
+          status={vitalsStatus}
+          onSelectFleet={selectFleet}
+          systemNames={systemNames}
+          credits={creditsShown}
+          scale={servedScale}
+          worldTime={worldTime}
+          serverWorldTime={serverWorldTime}
         />
       </div>
     </div>

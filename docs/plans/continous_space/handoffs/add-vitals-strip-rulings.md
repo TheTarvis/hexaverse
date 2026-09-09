@@ -666,3 +666,199 @@ review panel. Each gets a ruling appended below once the panel reports.
   link 4. After RULING 9 the overlay is not in this change at all, so this
   question moves with it to `add-burn-cost-overlay` — recorded here so it is not
   re-litigated in this link.
+
+---
+
+## Rulings made at implementation kickoff
+
+Input: `docs/plans/continous_space/handoffs/add-vitals-strip-impl-contract.md`.
+Six findings from the architect's kickoff; section references are to that file.
+
+### FULL-AUTO RULING 25 — `guards.test.ts`'s line-anchored exception list is SDET work, and Impact widens for it
+
+**Finding.** `frontend/lib/format/guards.test.ts` holds a `.toFixed(` exception
+list **anchored to line numbers** in `SpaceStage.tsx` (`[681, 682, 738, 739,
+903]`) and asserts each still contains `.toFixed(`. This change deletes eight
+camera buttons at `:623-643`, shifting every anchor — so the per-commit gate
+fails, and the guard's own message forbids resolving it by moving code back.
+
+**Ruling.** The re-grep is **SDET work, not developer work** — developers never
+edit tests, and this is a test whose fixture went stale, not a test that is
+wrong. It happens in the red phase, before the developer touches `SpaceStage`,
+so the developer never sees a red gate it is forbidden to fix. `proposal.md`'s
+Impact widens to name `frontend/lib/format/guards.test.ts`, exactly as round 1's
+MAJOR 7 widened it for `corporation-provider.tsx` and round 3 for
+`lib/types/fleet.ts`.
+
+**Basis.** Precedence 2 — the workflow skill's absolute rule that only the SDET
+alters a test, and its rule that an edit outside the stated Impact is a finding
+against the developer. **Reversal cost:** none; it is a fixture refresh.
+
+**Worth noting for the chain:** this is the third artifact this change has had to
+add to Impact after authoring closed. A change that edits a widely-referenced
+component should enumerate its *reverse* dependencies — who anchors to it — at
+authoring time, not discover them one gate failure at a time.
+
+### FULL-AUTO RULING 26 — the chevron may deviate from Catalyst-only UI
+
+**Finding.** § 7.3 proposes a hand-rolled ARIA menu button rather than a Catalyst
+primitive. `frontend/CLAUDE.md` documents **Catalyst-only UI**, so this is a
+deviation from a recorded repo convention and needs a ruling rather than a
+developer's discretion.
+
+**Ruling. Approved**, with one condition.
+
+The reasons are sound and specific: jsdom implements no native-select popup, so
+under a Catalyst primitive the chevron's three keyboard scenarios would be
+provable only at the archive gate — and `docs/testing-tiers.md` records that
+red-phase Playwright written blind was **half of this repo's e2e reds**. Of the
+two candidate primitives, one takes no `data-testid` on its trigger (defeating
+the testid contract this change depends on) and the other pulls framer-motion
+over a live WebGL canvas.
+
+**The condition:** the hand-rolled control uses the same visual tokens Catalyst
+would have — same zinc palette, same 11px mono labels, same `white/[0.12]`
+fill. The convention exists to keep the UI *vocabulary* uniform; this deviation
+is about interaction mechanics and must not become a visual one. The chain's
+"no palette, type scale or panel fill change" rule already binds here.
+
+**Basis.** Precedence 2 for the convention, overridden on precedence 3 (the
+panel's reasoning) because the convention's purpose — visual consistency — is
+preserved while its literal application would move three scenarios from tier 1
+to tier 4. **Alternatives rejected:** Catalyst `listbox` (no trigger testid);
+`dropdown-v2` (framer-motion over WebGL). **Reversal cost:** swap the primitive;
+the callback contract and testids are unchanged either way.
+
+### FULL-AUTO RULING 27 — task 2.3 stands as scoped; the fleet mark is not rerouted
+
+**Finding.** Task 2.3 asks to verify three acting-fleet paths "all delegate to
+that one callback", but `onActivateFleet` (`SystemSpaceView.tsx:747`) is wired to
+`setActingFleetId`, not `selectFleet`. The architect ruled it correct as-is
+(marks are always in-system) and scoped 2.3 to the selection-independence check.
+
+**Ruling. Accepted as scoped. The fleet mark is not rerouted through
+`selectFleet` in this change.** RULING 16's claim is that the acting fleet has
+three *setters* and that a fleet is never a member of the space view's
+*selection* — both remain true. Rerouting a shipped, working path would be a
+behaviour change beyond this change's stated Impact, which the workflow skill
+treats as a finding against the developer, and it buys nothing the spec asks
+for.
+
+**Basis.** Precedence 2 (no opportunistic edits) and precedence 4 (most
+reversible). **Reversal cost:** a task in a later link, if 2b's dock ever needs
+one code path for all three.
+
+### FULL-AUTO RULING 28 — three contract corrections accepted, none blocking
+
+- **The colour validator is overstated** in `design.md` Decision 1 and task 1.3:
+  `dark:bg-zinc-800` and the bare-`bg-zinc-100`/`text-zinc-900`/`border-zinc-200`
+  rules are severity **warning** (`check.py:1044` passes a warnings-only file),
+  and `check.sh` runs no colour check at all. Only `no-gray-scale` and
+  `no-dark-zinc-900-bg` are errors. **The conclusion stands and the stated
+  consequence does not.** Corrected at archive, not now: it over-constrains in a
+  safe direction (palette colours with dark variants are wanted regardless), and
+  hand-editing the change folder mid-build to relax a constraint is not worth the
+  role-separation cost.
+- **Task 8.2's under-specification is real and is pinned in contract § 8.3.**
+  `FleetActionsPanel.tsx:280` uses the `credits` prop for refuel's affordable
+  default; a developer told only to "remove the readouts" could remove the prop
+  and silently flip that default to `freeHold`. Only
+  `freeHoldRaw`/`cargoCapacityRaw`/`cargoUsedRaw` become dead. This is precisely
+  the *behaviour change smuggled in as a placement change* that the chain doc
+  names as link 2b's adversary target, arriving a link early — the developer
+  delegation must carry it.
+- **Task 4.4's fixture prose** pins the sub-pixel condition to "the 1280-px width
+  floor" when the gauge is cell-width. Harmless — `data-gauge-state` is
+  width-independent — and recorded so nobody reverse-engineers a gauge width
+  from it.
+
+---
+
+## Test disputes and collateral, adjudicated at the green gate
+
+The developer completed 39 of 42 tasks, edited no test, and reported four
+problems rather than resolving any of them in code. That is the contract working
+exactly as intended: every one of these would have been invisible if it had
+"fixed" them itself.
+
+### FULL-AUTO RULING 29 — dispute (a): the developer is right; two SDET assertions contradict a live requirement
+
+**Dispute.** `VitalsStripPill.test.tsx:271` and `:287` assert
+`not.toHaveAttribute('data-raw')` for a duration and a rate when no `scale` has
+been served but the underlying value is a finite number.
+
+**Ruling: the tests are wrong. The developer implements as it has.** The live
+`figure-formatting` requirement *A Figure Whose Clock Scale Has Not Been Served
+Reads as Absent* says the opposite, in the requirement body and again in two
+scenarios:
+
+> …SHALL render the absent form rather than being computed at an assumed scale
+> of 1, **and SHALL still carry its `data-raw`, since the value is known and only
+> the scale is not.** … This rule binds every mounting view and every consuming
+> surface, not only the one surface whose own scenario names it.
+
+Three independent confirmations, all cited by the developer and all checked:
+the archived requirement, the implementation contract's own code example ("keep
+`raw` finite"), and existing repo precedent in `ScanControl.test.tsx`, whose
+identical scale-less scenario asserts `data-raw` **present**.
+
+Only the SDET may change a test, and it changes these two.
+
+**Why this one matters beyond itself:** the assertion would have forced an
+implementation that drops the raw value whenever the scale is briefly unserved —
+which is the state of *every first render*. Tests would then have enshrined a
+figure that loses its wire value exactly when the strip is least able to explain
+itself. A dev that "fixed" its code to match would have shipped it green.
+
+### FULL-AUTO RULING 30 — dispute (b): two SDET assertions contradict each other; the dedicated one wins
+
+**Dispute.** The stranded-marker loop at `VitalsStripPill.test.tsx:397` asserts
+pill text against the fixture's `activity` (`'On station'`), while the dedicated
+ladder test at `:156`, on the same fixture, requires the literal `"Holding"`.
+
+**Ruling: the dedicated test is right and the generic loop assertion is wrong.**
+`activityKind` diverging from `activity` for the holding row is *the entire
+reason the discriminant exists*: Decision 4 makes the `roster-status.ts`
+extension additive-only because `FleetRoster.tsx:197` renders `activity`
+verbatim, so `Holding` **cannot** be an `activity` value and can only be an
+`activityKind`. A generic assertion that pill text equals `activity` is
+therefore false by construction for exactly the row the discriminant was
+introduced for.
+
+The SDET rewrites the loop's assertion to go through the ladder, not through
+`activity`.
+
+### FULL-AUTO RULING 31 — the missing `await` is a test defect
+
+`VitalsStripFleetCell.test.tsx`'s "The chevron's menu lists every fleet the
+requester owns" calls `userEvent.click(...)` without `await` inside a
+non-async `it()`, so the assertion runs before the click resolves. SDET fixes.
+Recorded because a test that passes or fails on timing rather than on behaviour
+is the species this repo's handoffs README lesson two catalogues.
+
+### FULL-AUTO RULING 32 — the five archived-change mocks are SDET work, and Impact widens again
+
+Five pre-existing spec files from the archived `add-scan-and-sightings-surface`
+change mock `@/components/corporation-provider` with a static object lacking
+`useCorporationSessionOptional`, which `SystemSpaceView` must now call to satisfy
+the credits-cell staleness rule (`useCorporationOptional` structurally cannot —
+it exposes no `isError`). Twenty assertions fail for that reason alone.
+
+**Ruling: SDET adds the one-line mock export to each; `proposal.md`'s Impact
+widens to name all five.** Updating a mock to match a module's new surface is not
+weakening a test — the assertions are untouched — so the "handed-off and
+immutable" comment on one of them does not bar it; that comment protects the
+*assertions*, which no one is changing.
+
+This is the **fourth** Impact widening this change has needed after authoring
+closed (`corporation-provider.tsx`, `lib/types/fleet.ts`, `guards.test.ts`, now
+these five). The pattern is consistent and worth carrying to link 2b, which
+remounts far more components than this one: **a change that alters a widely-mocked
+module's exported surface must enumerate its mockers at authoring time.** Grep for
+the module's path in test files; every hit is a file in Impact.
+
+### The scheduled re-anchor (RULING 25) is now due
+
+Step F has landed. `guards.test.ts`'s `.toFixed(` anchors moved from
+`[681, 682, 738, 739, 903]` to `[753, 754, 810, 811, 975]`. SDET re-greps and
+re-anchors; the developer correctly did not touch it.

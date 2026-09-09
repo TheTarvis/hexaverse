@@ -40,7 +40,7 @@ import {
 } from '@/lib/rejection-copy'
 import { newOperationKey } from '@/lib/services/market-service'
 import { toast } from '@/lib/toast'
-import type { Fleet } from '@/lib/types/fleet'
+import { PARK_KIND_ORBIT, PARK_KIND_STATIONKEEP, type Fleet } from '@/lib/types/fleet'
 import type { Station, VenueQuotes } from '@/lib/types/market'
 import type { ResourceDeposit, ResourceKind } from '@/lib/types/system-space'
 
@@ -93,15 +93,6 @@ export function FleetActionsPanel({
   const roster = fleet?.roster
   const held = useMemo(() => roster?.cargo ?? {}, [roster?.cargo])
   const freeHold = roster?.freeHold ?? 0
-  // The FIGURE-ONLY raw values: undefined when the roster hasn't been
-  // served, so the hold readout reads figure-formatting's absent form
-  // instead of a lying `0 t` (`docked-fleet-actions`: "An unloaded roster
-  // reads as absent, not an empty hold"). Every OTHER computation in this
-  // panel keeps its numeric default (`freeHold` above) unchanged.
-  const freeHoldRaw = roster?.freeHold
-  const cargoCapacityRaw = roster?.cargoCapacity
-  const cargoUsedRaw =
-    typeof cargoCapacityRaw === 'number' ? cargoCapacityRaw - freeHold : undefined
 
   const mine = useMine(systemId)
   const sell = useSell(systemId)
@@ -308,7 +299,7 @@ export function FleetActionsPanel({
   // anything in: an orbit park can take a hold, a station-keep hold can be
   // released. A burn, a drift and a point park have neither.
   const parkMode: 'orbit' | 'stationkeep' | null =
-    park?.Kind === 0 ? 'orbit' : park?.Kind === 1 ? 'stationkeep' : null
+    park?.Kind === PARK_KIND_ORBIT ? 'orbit' : park?.Kind === PARK_KIND_STATIONKEEP ? 'stationkeep' : null
   const upkeepRate = roster?.stationKeepRateTonsPerSecond
 
   const submitHold = () => {
@@ -337,87 +328,18 @@ export function FleetActionsPanel({
       data-testid="space-fleet-panel"
       className="pointer-events-auto flex w-72 max-w-[85vw] flex-col self-start rounded-xl border border-zinc-200 bg-zinc-50/90 p-3 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]"
     >
-      {/* ---------------------------------------------------- credits
-          An unresolved session balance reads as EXPLICITLY unavailable, not
-          as a dash: a placeholder a view supplying no balance at all would
-          render indistinguishably and permanently is precisely what
-          `docked-fleet-actions`' *Credit Balance Readout* forbids. It
-          withdraws the readout, never a verb — sell and refuel stay
-          invokable, and refuel's default falls back to the free hold. */}
-      <div data-testid="balance-readout" className="flex items-center justify-between">
-        <span className={LABEL}>Credits</span>
-        <span
-          data-testid="balance-value"
-          data-available={credits === null ? 'false' : 'true'}
-          className={`font-mono text-sm ${
-            credits === null ? 'text-zinc-500 italic' : 'text-zinc-900 dark:text-white'
-          }`}
-        >
-          {credits === null ? (
-            'Unavailable'
-          ) : (
-            <Figure
-              raw={credits}
-              unit="credits"
-              text={formatByUnit(credits, scale, 'credits')}
-              data-testid="balance-figure"
-            />
-          )}
-        </span>
-      </div>
-      <span className="sr-only" role="status" aria-live="polite" data-testid="balance-live-region">
-        {credits === null ? 'Balance unavailable.' : `Balance ${formatByUnit(credits, scale, 'credits')}.`}
-      </span>
+      {/* The credit-balance readout and the cargo-hold readout RE-HOMED to
+          the vitals strip (openspec change `add-vitals-strip`, RULING 7 —
+          no coexistence): `system-console`'s *The Credits Cell...* / *The
+          Hold Cell...* now own `balance-readout`/`balance-value`/
+          `balance-figure`/`balance-live-region` and
+          `hold-readout`/`hold-capacity`/`hold-<kind>`/`hold-free`. The
+          `credits` prop STAYS here (refuel's affordable default, impl
+          contract §8.3) even though it is no longer rendered. `held` and
+          `freeHold` stay too — mine/sell/refuel still read them. */}
       <span className="sr-only" role="status" aria-live="assertive" data-testid="panel-error-live-region">
         {errorAnnouncement}
       </span>
-
-      {/* ------------------------------------------------- cargo hold */}
-      <div data-testid="hold-readout" className={SECTION}>
-        <div className="flex items-center justify-between">
-          <span className={LABEL}>Hold</span>
-          <span
-            data-testid="hold-capacity"
-            className="flex items-center gap-1 font-mono text-[11px] text-zinc-400"
-          >
-            <Figure
-              raw={cargoUsedRaw}
-              unit="tons"
-              text={formatByUnit(cargoUsedRaw ?? NaN, scale, 'tons')}
-              data-testid="hold-capacity-used"
-            />
-            <span>/</span>
-            <Figure
-              raw={cargoCapacityRaw}
-              unit="tons"
-              text={formatByUnit(cargoCapacityRaw ?? NaN, scale, 'tons')}
-              data-testid="hold-capacity-total"
-            />
-          </span>
-        </div>
-        <ul className="mt-1 flex flex-wrap gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-          {Object.entries(held).map(([kind, tons]) => (
-            <li key={kind} data-testid={`hold-${kind}`}>
-              {kind}{' '}
-              <Figure
-                raw={tons}
-                unit="tons"
-                text={formatByUnit(tons ?? NaN, scale, 'tons')}
-                data-testid={`hold-${kind}-tons`}
-              />
-            </li>
-          ))}
-          <li>
-            <Figure
-              raw={freeHoldRaw}
-              unit="tons"
-              text={formatByUnit(freeHoldRaw ?? NaN, scale, 'tons')}
-              data-testid="hold-free"
-            />{' '}
-            free
-          </li>
-        </ul>
-      </div>
 
       {/* -------------------------------------------------------- mine */}
       {mineOffered && activeMineKind && (

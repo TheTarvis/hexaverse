@@ -17,11 +17,22 @@ import React from 'react'
 // things a keyboard-only or touch-only player actually touches, and the
 // things a pure-function suite cannot see.
 //
-// data-testid contract:
-//   space-camera-controls, camera-orbit-left|right|up|down,
-//   camera-pan-left|right|up|down, camera-zoom-in, camera-zoom-out,
-//   camera-recenter, camera-limit-status,
-//   select-pan-target-point       (the keyboard point-selection control)
+// data-testid contract (add-vitals-strip, impl contract §10, tasks.md
+// 9.1-9.5 — the camera-cluster SHRINK: the twelve-button cluster becomes
+// FOUR sibling cells; the four `camera-orbit-*` and four `camera-pan-*`
+// buttons are GONE):
+//   space-camera-controls          (wrapper, exactly four element children)
+//   camera-orbit                   (ONE focusable cell: bare arrows orbit,
+//                                   Shift+arrow pans — data-pan-at-limit
+//                                   naming blocked directions,
+//                                   data-orbit-at-limit min|max, both absent
+//                                   away from their own clamp)
+//   camera-zoom-in, camera-zoom-out, camera-recenter   (unchanged)
+//   camera-limit-status             (unchanged: the single-slot zoom>pan>orbit
+//                                    priority-masked live region)
+//   select-pan-target-point        (moved OUT of the wrapper; still the
+//                                   keyboard point-selection control; still
+//                                   carries CAMERA_CONTROL_ATTR itself)
 //   body-hit-<bodyId>             (a body's or gate's keyboard hit target)
 //   offscreen-<bodyId>            (the off-screen reach affordance)
 //   space-canvas-region           (carries data-selection / data-camera)
@@ -180,12 +191,17 @@ describe('SpaceStage — keyboard tab order', () => {
 })
 
 describe('SpaceStage — the keyboard point-selection control', () => {
-  // Scenario: A keyboard control selects the point at the camera's pan target
+  // Scenario: A keyboard control selects the point at the camera's pan
+  // target. NEW DRIVER (add-vitals-strip, impl contract §10.4 line 184): the
+  // on-screen `camera-pan-right` button is deleted; the pan input is now
+  // `Shift`+ArrowRight on the surviving `camera-orbit` cell.
   it('Scenario: A keyboard control selects the point at the camera\'s pan target', async () => {
     stage()
     // Move the pan target off the star first — at default framing the target
     // IS the star, the one point every burn solve rejects.
-    await userEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
     onSelect.mockClear()
     await userEvent.click(screen.getByTestId('select-pan-target-point'))
 
@@ -201,14 +217,19 @@ describe('SpaceStage — the keyboard point-selection control', () => {
     ).toBeGreaterThan(0)
   })
 
-  // Scenario: A keyboard-only player can pan to a point away from the star
+  // Scenario: A keyboard-only player can pan to a point away from the star.
+  // NEW DRIVER (impl contract §10.4 line 205): five `Shift`+ArrowRight
+  // presses on `camera-orbit`, replacing five clicks on the deleted
+  // `camera-pan-right` button.
   it('Scenario: A keyboard-only player can pan to a point away from the star', async () => {
     stage()
     // Without the keyboard pan this control can only ever name the star,
     // which `space.BuildCurve`'s endpoint-clearance guard always rejects —
     // so the accessibility requirement would be satisfiable while shipping a
     // control whose every activation produces an illegal burn target.
-    for (let i = 0; i < 5; i++) await userEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    for (let i = 0; i < 5; i++) fireEvent.keyDown(orbit, { key: 'ArrowRight', shiftKey: true })
     await userEvent.click(screen.getByTestId('select-pan-target-point'))
     const sel = onSelect.mock.calls.at(-1)![0]
     const r = Math.hypot(sel.point.x, sel.point.y, sel.point.z)
@@ -232,26 +253,40 @@ describe('SpaceStage — keyboard camera', () => {
     expect(after.target, 'orbiting does not translate the pan target').toEqual(before.target)
   })
 
-  // Scenario: Pan keys translate the camera's target
+  // Scenario: Pan keys translate the camera's target. NEW DRIVER (impl
+  // contract §10.4 line 236): `Shift`+ArrowRight on `camera-orbit`,
+  // replacing a click on the deleted `camera-pan-right` button.
   it('Scenario: Pan keys translate the camera\'s target', async () => {
     stage()
     const before = cameraOf()
-    await userEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
     const after = cameraOf()
     expect(after.target).not.toEqual(before.target)
     expect(after.yaw, 'the viewing angle is unchanged').toBe(before.yaw)
   })
 
-  it('SDET-added: the pan input is a DISTINCT control from the orbit input', () => {
+  // REWRITTEN, not merely re-pointed (impl contract §10.4 line 245): the
+  // four pan buttons this test used to enumerate no longer exist. The same
+  // underlying claim — pan and orbit are two distinct inputs — is now
+  // provable only by driving BOTH inputs on the one surviving element and
+  // showing each moves exactly one camera property.
+  it('SDET-added (rewritten for the camera-cluster shrink): the pan input is a DISTINCT input from the orbit input on the one surviving camera-orbit cell — bare arrow orbits (yaw changes, target unchanged), Shift+arrow pans (target changes, yaw unchanged)', async () => {
     stage()
-    // Two requirements cite a "keyboard-operable orbit/pan/zoom affordance";
-    // the point-selection control reads the PAN target. A pan bound to the
-    // same arrow keys as orbit would make one of the two unreachable.
-    expect(screen.getByTestId('camera-pan-right')).toBeInTheDocument()
-    expect(screen.getByTestId('camera-pan-left')).toBeInTheDocument()
-    expect(screen.getByTestId('camera-pan-up')).toBeInTheDocument()
-    expect(screen.getByTestId('camera-pan-down')).toBeInTheDocument()
-    expect(screen.getByTestId('camera-pan-right')).not.toBe(screen.getByTestId('camera-orbit-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    const initial = cameraOf()
+
+    await userEvent.keyboard('{ArrowRight}')
+    const afterOrbit = cameraOf()
+    expect(afterOrbit.yaw, 'a bare arrow must orbit').not.toBe(initial.yaw)
+    expect(afterOrbit.target, 'a bare arrow must NOT pan').toEqual(initial.target)
+
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    const afterPan = cameraOf()
+    expect(afterPan.target, 'Shift+arrow must pan').not.toEqual(afterOrbit.target)
+    expect(afterPan.yaw, 'Shift+arrow must NOT orbit').toBe(afterOrbit.yaw)
   })
 
   // Scenario: Zoom keys zoom the camera
@@ -274,26 +309,101 @@ describe('SpaceStage — keyboard camera', () => {
     expect(zoom.className).toMatch(/focus[-:]/)
   })
 
-  // Scenario: Keyboard input at a clamp is distinguishable from no input
+  // Scenario: Keyboard input at a clamp is distinguishable from no input.
+  // NEW DRIVER (impl contract §10.4 line 278, §10.3): the pan axis's
+  // at-limit state moved OFF the deleted `camera-pan-*` buttons and onto
+  // `camera-orbit`'s own `data-pan-at-limit` attribute (a space-separated
+  // set of blocked directions), asserted here WHILE the camera is ALSO at
+  // its zoom clamp — the regression guard for why pan's at-limit state was
+  // deliberately NOT routed through `camera-limit-status` (a single-slot
+  // priority chain, zoom > pan > orbit, which would report only zoom and
+  // mask pan's own clamp entirely).
   it('Scenario: Keyboard input at a clamp is distinguishable from no input', async () => {
     stage()
+    const orbit = screen.getByTestId('camera-orbit')
     const status = screen.getByTestId('camera-limit-status')
-    // Away from the clamp: no at-limit state.
-    await userEvent.click(screen.getByTestId('camera-zoom-in'))
+    orbit.focus()
+    // Away from any clamp: no at-limit state anywhere.
+    await userEvent.keyboard('{ArrowRight}')
     expect(status.textContent?.trim() ?? '').toBe('')
+    expect(orbit).not.toHaveAttribute('data-orbit-at-limit')
+    expect(orbit).not.toHaveAttribute('data-pan-at-limit')
 
-    // Drive to the zoom clamp.
+    // Drive to the zoom clamp (the on-screen zoom buttons are unchanged by
+    // the shrink).
     for (let i = 0; i < 200; i++) fireEvent.click(screen.getByTestId('camera-zoom-in'))
     await waitFor(() => expect(status.textContent?.trim() ?? '').not.toBe(''))
     expect(screen.getByTestId('camera-zoom-in')).toHaveAttribute('data-at-limit', 'true')
 
-    // The PAN axis, separately — all three axes carry the state.
-    for (let i = 0; i < 500; i++) fireEvent.click(screen.getByTestId('camera-pan-right'))
-    await waitFor(() =>
-      expect(screen.getByTestId('camera-pan-right')).toHaveAttribute('data-at-limit', 'true'),
-    )
+    // The PAN axis, separately, on camera-orbit's own attribute — driven
+    // WHILE the zoom clamp is still engaged.
+    for (let i = 0; i < 500; i++) fireEvent.keyDown(orbit, { key: 'ArrowRight', shiftKey: true })
+    await waitFor(() => expect(orbit.getAttribute('data-pan-at-limit') ?? '').toMatch(/\bright\b/))
     // ...and the opposite direction is NOT at limit, so a blanket flag fails.
-    expect(screen.getByTestId('camera-pan-left')).not.toHaveAttribute('data-at-limit', 'true')
+    expect(orbit.getAttribute('data-pan-at-limit') ?? '').not.toMatch(/\bleft\b/)
+  })
+
+  // Scenario: A pan limit is still observable while the camera is also at
+  // the zoom clamp (system-space-view MODIFIED "Space View Camera Is
+  // Keyboard-Operable" — a scenario NEW to this change). Same drive as
+  // above; the point of THIS test is asserting `camera-limit-status` still
+  // reports only the zoom clamp (the priority chain's own documented
+  // behaviour) at the exact moment `data-pan-at-limit` independently proves
+  // the pan clamp — the two surfaces disagreeing on purpose is what makes
+  // this the regression guard for RULING 23's routing decision.
+  it('Scenario: A pan limit is still observable while the camera is also at the zoom clamp', async () => {
+    stage()
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    for (let i = 0; i < 200; i++) fireEvent.click(screen.getByTestId('camera-zoom-in'))
+    await waitFor(() => expect(screen.getByTestId('camera-zoom-in')).toHaveAttribute('data-at-limit', 'true'))
+    // The single-slot priority chain reports ONLY zoom right now.
+    expect(screen.getByTestId('camera-limit-status').textContent?.trim() ?? '').not.toBe('')
+
+    for (let i = 0; i < 500; i++) fireEvent.keyDown(orbit, { key: 'ArrowRight', shiftKey: true })
+    await waitFor(() => expect(orbit.getAttribute('data-pan-at-limit') ?? '').toMatch(/\bright\b/))
+    expect(orbit.getAttribute('data-pan-at-limit') ?? '').not.toMatch(/\bleft\b/)
+    // The priority-chain live region is UNCHANGED by this change (RULING
+    // 23) — it still names the zoom clamp, not pan. This is what "masked"
+    // means, and why data-pan-at-limit exists at all.
+    expect(screen.getByTestId('camera-limit-status').textContent?.trim() ?? '').not.toBe('')
+  })
+
+  // Scenario: The camera group's accessible description names the pan
+  // binding (system-space-view MODIFIED "Space View Camera Is
+  // Keyboard-Operable" — NEW: deleting four labelled buttons removes where
+  // a screen-reader user learned pan existed at all; RULING 23's UX half).
+  it('Scenario: The camera group\'s accessible description names the pan binding', () => {
+    stage()
+    const orbit = screen.getByTestId('camera-orbit')
+    const label = orbit.getAttribute('aria-label') ?? ''
+    const describedBy = orbit.getAttribute('aria-describedby')
+    const description = describedBy ? (document.getElementById(describedBy)?.textContent ?? '') : ''
+    const accessibleText = `${label} ${description}`
+    expect(accessibleText, 'the binding must name the modifier key').toMatch(/shift/i)
+    expect(accessibleText, 'the binding must name what it does (pan/arrow)').toMatch(/pan|arrow/i)
+  })
+
+  // Scenario: The on-screen cluster renders exactly four camera cells (impl
+  // contract §10.1, done-conditions §16: "space-camera-controls has exactly
+  // four element children, and select-pan-target-point is not one of them
+  // and carries CAMERA_CONTROL_ATTR itself").
+  it('Scenario: The on-screen cluster renders exactly four camera cells', () => {
+    stage()
+    const cluster = screen.getByTestId('space-camera-controls')
+    expect(cluster.children).toHaveLength(4)
+    expect(screen.getByTestId('camera-orbit')).toBeInTheDocument()
+    expect(screen.getByTestId('camera-zoom-in')).toBeInTheDocument()
+    expect(screen.getByTestId('camera-zoom-out')).toBeInTheDocument()
+    expect(screen.getByTestId('camera-recenter')).toBeInTheDocument()
+    for (const id of ['camera-orbit-left', 'camera-orbit-right', 'camera-orbit-up', 'camera-orbit-down', 'camera-pan-left', 'camera-pan-right', 'camera-pan-up', 'camera-pan-down']) {
+      expect(screen.queryByTestId(id), `${id} must be deleted`).toBeNull()
+    }
+    // select-pan-target-point is NOT one of the four cluster cells, and
+    // still carries the attribute that keeps it out of canvas-pick
+    // suppression's blind spot (SpaceStage.tsx:252).
+    expect(cluster.contains(screen.getByTestId('select-pan-target-point'))).toBe(false)
+    expect(screen.getByTestId('select-pan-target-point').getAttribute('data-space-camera-control')).not.toBeNull()
   })
 
   // Scenario: Focus moving to an off-screen glyph brings it into view
@@ -312,12 +422,15 @@ describe('SpaceStage — keyboard camera', () => {
 })
 
 describe('SpaceStage — recenter', () => {
-  // Scenario: Recenter restores default framing on demand
+  // Scenario: Recenter restores default framing on demand. NEW DRIVER
+  // (impl contract §10.4 line 316): Shift+arrow on camera-orbit.
   it('Scenario: Recenter restores default framing on demand', async () => {
     stage()
     expect(region().getAttribute('data-camera')).not.toBeNull()
     const before = JSON.parse(region().getAttribute('data-camera')!)
-    await userEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
     await userEvent.click(screen.getByTestId('camera-zoom-in'))
     expect(JSON.parse(region().getAttribute('data-camera')!)).not.toEqual(before)
     await userEvent.click(screen.getByTestId('camera-recenter'))
@@ -325,10 +438,13 @@ describe('SpaceStage — recenter', () => {
     expect(region()).toHaveAttribute('data-reframe-animated', 'false')
   })
 
-  // Scenario: Recenter is reachable from the keyboard
+  // Scenario: Recenter is reachable from the keyboard. NEW DRIVER (impl
+  // contract §10.4 line 329): Shift+arrow on camera-orbit.
   it('Scenario: Recenter is reachable from the keyboard', async () => {
     stage()
-    await userEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
     const moved = JSON.parse(region().getAttribute('data-camera')!)
     const recenter = screen.getByTestId('camera-recenter')
     recenter.focus()
@@ -348,24 +464,33 @@ describe('SpaceStage — recenter', () => {
     expect(onSelect, 'recentering must not touch the selection').not.toHaveBeenCalled()
   })
 
-  // Scenario: Activating a camera control does not change the selection
+  // Scenario: Activating a camera control does not change the selection.
+  // NEW DRIVER (impl contract §10.4 line 352): iterate the four SURVIVING
+  // cells by click, plus a Shift+arrow press on camera-orbit (the pan input
+  // the deleted buttons used to exercise).
   it('Scenario: Activating a camera control does not change the selection', async () => {
     stage({ selection: { bodyId: 'feat-body-0' } })
     onSelect.mockClear()
-    for (const id of ['camera-recenter', 'camera-zoom-in', 'camera-pan-right', 'camera-orbit-right']) {
+    for (const id of ['camera-recenter', 'camera-zoom-in', 'camera-zoom-out', 'camera-orbit']) {
       await userEvent.click(screen.getByTestId(id))
     }
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
     expect(onSelect).not.toHaveBeenCalled()
     expect(region()).toHaveAttribute('data-selection', 'feat-body-0')
   })
 
   // Scenario: Camera state survives a selection change and a realtime
-  // refetch
+  // refetch. NEW DRIVER (impl contract §10.4 line 364): Shift+arrow on
+  // camera-orbit, replacing the deleted camera-pan-right button.
   it('Scenario: Camera state survives a selection change and a realtime refetch', async () => {
     const { rerender } = stage()
     const initial = region().getAttribute('data-camera')
     expect(initial, 'the stage must expose its camera state to be asserted on at all').not.toBeNull()
-    await userEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
     await userEvent.click(screen.getByTestId('camera-zoom-in'))
     const moved = region().getAttribute('data-camera')
     expect(moved, 'the camera must actually have moved before "it survives" means anything').not.toBe(
@@ -393,12 +518,15 @@ describe('SpaceStage — recenter', () => {
     expect(region().getAttribute('data-camera')).toBe(moved)
   })
 
-  // Scenario: Camera resets when the system changes
+  // Scenario: Camera resets when the system changes. NEW DRIVER (impl
+  // contract §10.4 line 397): Shift+arrow on camera-orbit.
   it('Scenario: Camera resets when the system changes', async () => {
     const { rerender } = stage()
     const initial = region().getAttribute('data-camera')
     expect(initial).not.toBeNull()
-    await userEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
     expect(region().getAttribute('data-camera')).not.toBe(initial)
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -457,12 +585,17 @@ describe('SpaceStage — off-screen reach', () => {
     expect(viaAffordance).toEqual(direct)
   })
 
-  // Scenario: An off-screen body is selectable the same way
+  // Scenario: An off-screen body is selectable the same way. NEW DRIVER
+  // (impl contract §10.4 line 461): 200 Shift+ArrowRight key presses on
+  // camera-orbit, replacing 200 clicks on the deleted camera-pan-right
+  // button.
   it('Scenario: An off-screen body is selectable the same way', async () => {
     // Zoom right in and pan away so a normally-visible body goes off screen.
     stage()
     for (let i = 0; i < 200; i++) fireEvent.click(screen.getByTestId('camera-zoom-in'))
-    for (let i = 0; i < 200; i++) fireEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    for (let i = 0; i < 200; i++) fireEvent.keyDown(orbit, { key: 'ArrowRight', shiftKey: true })
     await waitFor(() => expect(screen.queryByTestId('offscreen-feat-body-1')).not.toBeNull())
     await userEvent.click(screen.getByTestId('offscreen-feat-body-1'))
     expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-1' })
@@ -509,13 +642,18 @@ describe('SpaceStage — pointer picking through the DOM', () => {
 })
 
 describe('SpaceStage — picking stays correct after the camera moves', () => {
-  // Scenario: Picking survives camera movement
+  // Scenario: Picking survives camera movement. NEW DRIVER (impl contract
+  // §10.4 line 513): Shift+arrow pans, a bare arrow orbits — both on the
+  // one surviving camera-orbit cell.
   it('Scenario: Picking survives camera movement', async () => {
     stage()
     // Move the camera well away from the default framing on all three axes.
-    await userEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
     await userEvent.click(screen.getByTestId('camera-zoom-in'))
-    await userEvent.click(screen.getByTestId('camera-orbit-right'))
+    orbit.focus()
+    await userEvent.keyboard('{ArrowRight}')
     onSelect.mockClear()
 
     // Click the mark at its CURRENTLY DRAWN position — the hit target must
@@ -526,11 +664,15 @@ describe('SpaceStage — picking stays correct after the camera moves', () => {
     expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-0' })
   })
 
-  // Scenario: A point-in-space click resolves correctly after camera movement
+  // Scenario: A point-in-space click resolves correctly after camera
+  // movement. NEW DRIVER (impl contract §10.4 line 530): Shift+ArrowRight
+  // pans, bare ArrowUp orbits — both on camera-orbit.
   it('Scenario: A point-in-space click resolves correctly after camera movement', async () => {
     stage()
-    await userEvent.click(screen.getByTestId('camera-pan-right'))
-    await userEvent.click(screen.getByTestId('camera-orbit-up'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    await userEvent.keyboard('{ArrowUp}')
     onSelect.mockClear()
     // A click over empty space, well inside the pick radius.
     fireEvent.pointerDown(region(), { clientX: 610, clientY: 460, button: 0, pointerId: 10 })
@@ -542,11 +684,16 @@ describe('SpaceStage — picking stays correct after the camera moves', () => {
 
   // Scenario: A click beyond the pick radius still clears the selection after
   // camera movement
+  // NEW DRIVER (impl contract §10.4 line 545): Shift+ArrowRight pans, a
+  // bare ArrowRight orbits — both on camera-orbit.
   it('Scenario: A click beyond the pick radius still clears the selection after camera movement', async () => {
     stage({ selection: { bodyId: 'feat-body-0' } })
-    await userEvent.click(screen.getByTestId('camera-pan-right'))
+    const orbit = screen.getByTestId('camera-orbit')
+    orbit.focus()
+    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
     for (let i = 0; i < 12; i++) await userEvent.click(screen.getByTestId('camera-zoom-out'))
-    await userEvent.click(screen.getByTestId('camera-orbit-right'))
+    orbit.focus()
+    await userEvent.keyboard('{ArrowRight}')
     onSelect.mockClear()
     // The far corner of a well zoomed-out view lies beyond the maximum pick
     // radius — a configured multiple of the served `extent`.

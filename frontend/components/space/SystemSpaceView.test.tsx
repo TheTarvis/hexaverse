@@ -43,9 +43,19 @@ vi.mock('next/navigation', () => ({
 
 const interiorRefetch = vi.fn()
 const fleetsRefetch = vi.fn()
+const stationRefetch = vi.fn()
+const boardRefetch = vi.fn()
 const useSystemSpace = vi.fn()
 const useMyFleets = vi.fn()
 const useRunningMine = vi.fn()
+// add-vitals-strip: these five previously-hardcoded market hooks are now
+// mockable per test — the five station/board-failure scenarios below
+// (system-space-view MODIFIED "System Space View Route and Data Fan-In")
+// had NO existing coverage anywhere in the frontend suite prior to this
+// change (a pre-existing gap this red phase closes, not one this change
+// introduces).
+const useStation = vi.fn()
+const useMarketBoard = vi.fn()
 
 // HARNESS NOTE (revised 2026-09-03, orchestrator-adjudicated — the developer
 // disputed this file as unsatisfiable by an honest implementation, and the
@@ -99,6 +109,9 @@ const market = vi.hoisted(() => ({
     ],
   } as Record<string, unknown> | undefined,
   corporation: { id: 'corp-1', name: 'SDET Corp', credits: 1250 } as Record<string, unknown> | null,
+  // add-vitals-strip: mutated per-test, mirroring `stage.available`'s own
+  // pattern — true simulates "resolved once, has since failed to refresh".
+  corporationSessionFailed: false,
 }))
 
 const mutations = vi.hoisted(() => {
@@ -160,8 +173,8 @@ vi.mock('@/hooks/use-market', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@/hooks/use-market')
   return {
     ...actual,
-    useMarketBoard: () => ({ data: market.board, isLoading: false, isError: false }),
-    useStation: () => ({ data: market.station, isLoading: false, isError: false, refetch: vi.fn() }),
+    useMarketBoard: () => useMarketBoard(),
+    useStation: (systemId: string | null) => useStation(systemId),
     useSell: () => mutations.sell,
     useRefuel: () => mutations.refuel,
   }
@@ -172,6 +185,17 @@ vi.mock('@/hooks/use-market', async () => {
 vi.mock('@/components/corporation-provider', () => ({
   useCorporationOptional: () => market.corporation,
   useCorporation: () => market.corporation,
+  // add-vitals-strip, impl contract §6: the strip's staleness rule ("a
+  // session that resolved once and has since failed to refresh reads
+  // Unavailable, not the cached figure") is unreachable through
+  // `useCorporationOptional`'s bare `corporation?.credits` — this is the
+  // seam `useCorporationSessionOptional` exists to close.
+  // `market.corporationSessionFailed` defaults to false and is flipped per
+  // test (mirrors `stage.available`'s own mutate-the-hoisted-flag pattern).
+  useCorporationSessionOptional: () => ({
+    corporation: market.corporation,
+    isError: market.corporationSessionFailed,
+  }),
 }))
 // The roster resolves system NAMES through the galaxy read. Mocked rather
 // than provided, because the real hook reaches for `useAccountContext` and
@@ -209,6 +233,11 @@ vi.mock('./SpaceStage', async () => {
       'div',
       {
         'data-testid': 'space-canvas-region',
+        // add-vitals-strip: exposed so "activating the strip changes no
+        // space-view selection" is assertable from OUTSIDE — the view's
+        // `selection` state has no other observable surface at this mock
+        // boundary.
+        'data-selection': props.selection ? (props.selection.bodyId ?? 'point') : '',
         'data-fleet-states': (props.scene?.marks ?? [])
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .filter((m: any) => m.kind === 'fleet')
@@ -217,6 +246,15 @@ vi.mock('./SpaceStage', async () => {
           .join(','),
       },
       stage.available ? null : React.createElement('div', { 'data-testid': 'renderer-unsupported' }, 'WebGL unavailable'),
+      // A minimal, test-only trigger for the real `onSelect` callback the
+      // view passes down — the mock otherwise renders no pickable surface
+      // at all (that surface is SpaceStage's own seam, out of THIS file's
+      // scope).
+      React.createElement(
+        'button',
+        { type: 'button', 'data-testid': 'mock-select-body', onClick: () => props.onSelect?.({ bodyId: 'feat-body-0' }) },
+        'select',
+      ),
     )
   }
   return { SpaceStage: SpaceStageMock, default: SpaceStageMock }
@@ -353,12 +391,23 @@ function setReads(
   })
 }
 
+function setMarketReads(
+  station: Partial<{ data: unknown; isError: boolean; error: unknown }> = {},
+  board: Partial<{ data: unknown; isError: boolean; error: unknown }> = {},
+) {
+  useStation.mockReturnValue({ data: market.station, isLoading: false, isError: false, error: null, refetch: stationRefetch, ...station })
+  useMarketBoard.mockReturnValue({ data: market.board, isLoading: false, isError: false, error: null, refetch: boardRefetch, ...board })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   useRunningMine.mockReturnValue({ data: null })
   stage.available = true
   stage.firstFrame = true
+  market.corporationSessionFailed = false
+  market.corporation = { id: 'corp-1', name: 'SDET Corp', credits: 1250 }
   setReads()
+  setMarketReads()
 })
 
 // Every read and mutation the composed tree makes is mocked above, so the
@@ -694,6 +743,75 @@ describe('SystemSpaceView — the data fan-in', () => {
     // ...but the acting-fleet panel is anchored to this system's fleet.
     expect(screen.getByTestId('fleet-row-fleet_1')).toBeInTheDocument()
   })
+
+  // Scenario: The view reads the open system's station and the market
+  // board. PRE-EXISTING requirement text, reproduced verbatim in this
+  // change's MODIFIED delta — and, found while authoring this red suite, a
+  // gap with NO prior coverage anywhere in the frontend (not introduced by
+  // add-vitals-strip; closed here since every scenario in the delta must
+  // appear in the coverage table).
+  it('Scenario: The view reads the open system\'s station and the market board', () => {
+    view()
+    expect(useStation).toHaveBeenCalledWith(SYSTEM_ID)
+    expect(useMarketBoard).toHaveBeenCalled()
+  })
+
+  // Scenario: A failed station read withdraws the station-anchored offers
+  // without misreporting the system
+  it('Scenario: A failed station read withdraws the station-anchored offers without misreporting the system', async () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    setMarketReads({ data: undefined, isError: true, error: new Error('station read exploded') })
+    view()
+    expect(screen.queryByTestId('sell-section')).toBeNull()
+    expect(screen.queryByTestId('refuel-section')).toBeNull()
+    const notice = screen.getByTestId('station-unavailable')
+    expect(notice.textContent!.toLowerCase()).not.toMatch(/nothing to trade/)
+    await userEvent.click(screen.getByTestId('station-retry'))
+    expect(stationRefetch).toHaveBeenCalled()
+    // The canvas and the fleet's other own-state-anchored commands stay
+    // invokable — the fixture's park mode is 'orbit' (Park.Kind 0), which
+    // offers the hold control.
+    expect(screen.queryByTestId('space-interior-error')).toBeNull()
+    expect(screen.getByTestId('stationkeep-control')).toBeInTheDocument()
+  })
+
+  // Scenario: A system with no station shows no station error
+  it('Scenario: A system with no station shows no station error', () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    setMarketReads({ data: undefined, isError: true, error: { status: 404 } })
+    view()
+    expect(screen.queryByTestId('sell-section')).toBeNull()
+    expect(screen.queryByTestId('refuel-section')).toBeNull()
+    expect(screen.queryByTestId('station-unavailable')).toBeNull()
+    expect(screen.queryByTestId('station-retry')).toBeNull()
+  })
+
+  // Scenario: A failed market-board read withdraws the sell offer but not
+  // the refuel offer
+  it('Scenario: A failed market-board read withdraws the sell offer but not the refuel offer', async () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    setMarketReads({}, { data: undefined, isError: true, error: new Error('board down') })
+    view()
+    expect(screen.queryByTestId('sell-section')).toBeNull()
+    expect(screen.getByTestId('market-board-unavailable')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('market-board-retry'))
+    expect(boardRefetch).toHaveBeenCalled()
+    // Refuel's cost preview comes from the fleet's OWN served fuel price,
+    // never the board.
+    expect(screen.getByTestId('refuel-section')).toBeInTheDocument()
+    expect(screen.getByTestId('refuel-cost-preview')).toBeInTheDocument()
+  })
+
+  // Scenario: An unresolved credit balance withdraws the readout, not the
+  // verbs
+  it('Scenario: An unresolved credit balance withdraws the readout, not the verbs', () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    market.corporationSessionFailed = true
+    view()
+    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'false')
+    expect(screen.getByTestId('sell-section')).toBeInTheDocument()
+    expect(screen.getByTestId('refuel-section')).toBeInTheDocument()
+  })
 })
 
 describe('SystemSpaceView — the world clock is projected at the served scale', () => {
@@ -1025,5 +1143,174 @@ describe('SystemSpaceView — landed resolutions are announced', () => {
     setReads({}, { data: [dockedFleet()] })
     rerender(<SystemSpaceView systemId={SYSTEM_ID} />)
     await waitFor(() => expect(announcer().textContent ?? '').toMatch(/arriv/i))
+  })
+})
+
+// =============================================================================
+// add-vitals-strip — the seams only THIS file can prove: that
+// `system-console`'s `VitalsStrip` is actually MOUNTED, fed from the view's
+// OWN reads (never a second read of its own), and that the wiring survives
+// exactly the failure states `VitalsStrip.test.tsx` cannot exercise because
+// they are not inputs on `VitalsStripProps` at all (impl contract §7.2)
+// — the interior read and the renderer's availability. RED-PHASE,
+// COMPILE-clean today (SystemSpaceView.tsx exists) but ASSERTION-RED: the
+// strip is not mounted yet, so every `vitals-*`/`fuel-gauge`/`hold-gauge`
+// query below throws "unable to find an element".
+// =============================================================================
+
+describe('SystemSpaceView — the vitals strip is mounted and fed from the view\'s own reads (system-console)', () => {
+  // Scenario: The strip renders with every read resolved (task 8.5's own
+  // "mounts the strip fed from its own reads" — the composition seam
+  // nothing else can see, same shape as the credit-balance seam above:
+  // `VitalsStrip.test.tsx` proves the strip renders correctly GIVEN props;
+  // only this file proves `SystemSpaceView` actually SUPPLIES them).
+  it('Scenario: The strip renders with every read resolved — fed from the view\'s own interior/fleets/session/galaxy reads, never a second read of its own', () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    const { container } = view()
+    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
+    expect(screen.getByTestId('vitals-fleet-id').textContent).toMatch(/fleet_1/)
+    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '12')
+    expect(screen.getByTestId('hold-capacity-used')).toHaveAttribute('data-raw', String(40 - 25))
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
+    assertFiguresMatchModule(container.querySelector('[data-testid="vitals-strip"]') as HTMLElement, { scale: 1 })
+  })
+
+  // Scenario: The strip survives a failed interior read — the cells fed by
+  // the fleet read and the session are unchanged. VitalsStrip has no
+  // interior prop of its own (contract §7.2), so this is provable only
+  // here: the view must keep mounting the strip, fed from the reads that
+  // did NOT fail.
+  it('Scenario: The strip survives a failed interior read', () => {
+    setReads(
+      { data: undefined, isError: true, error: new Error('interior down') },
+      { data: [dockedFleet({ attachedTo: STATION.featureId })] },
+    )
+    view()
+    expect(screen.getByTestId('space-interior-error')).toBeInTheDocument()
+    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
+    expect(screen.getByTestId('vitals-fleet-id').textContent).toMatch(/fleet_1/)
+    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '12')
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
+  })
+
+  // Scenario: The strip survives an unavailable renderer. Same reasoning:
+  // renderer availability reaches VitalsStrip through no prop it has.
+  it('Scenario: The strip survives an unavailable renderer', () => {
+    stage.available = false
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    view()
+    expect(screen.getByTestId('renderer-unsupported')).toBeInTheDocument()
+    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
+    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '12')
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
+  })
+
+  // Scenario: The strip survives a failed own-fleets read — mounted here to
+  // confirm the VIEW routes `fleets.isError` into the strip's
+  // `fleetsFailed` prop (never confusing it with `fleets.data` simply being
+  // empty); `VitalsStrip.test.tsx` covers the strip's OWN response to
+  // `fleetsFailed=true` given directly.
+  it('Scenario: The strip survives a failed own-fleets read, with no error or retry of its own', () => {
+    setReads({}, { data: undefined, isError: true })
+    view()
+    expect(screen.getByTestId('space-fleets-error')).toBeInTheDocument()
+    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
+    expect(screen.getByTestId('vitals-fleet-id').textContent).toMatch(/—/)
+  })
+
+  // The credits cell's staleness rule (system-console: "A stale session
+  // read is never presented as a current balance") has NO reachable
+  // implementation path through `useCorporationOptional` — this is the
+  // seam `useCorporationSessionOptional` (contract §6) exists to close, and
+  // the derivation (`sessionFailed ? null : (corporation?.credits ?? null)`)
+  // lives in THIS component, not in VitalsStrip. Only this file can
+  // exercise it.
+  it('SDET-added: a session that resolved once and has since failed to refresh reads Unavailable on the strip, never the cached figure (contract §6.3)', () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    const { rerender } = view()
+    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'true')
+
+    market.corporationSessionFailed = true
+    rerender(<SystemSpaceView systemId={SYSTEM_ID} />)
+    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'false')
+    expect(screen.queryByTestId('balance-figure')).toBeNull()
+  })
+
+  // Scenario: Clicking a strip cell leaves the selection unchanged /
+  // Scenario: Switching the acting fleet leaves the selection unchanged.
+  // `selection` is THIS component's own state — VitalsStrip has no setter
+  // for it at all (contract §7.2), so this is provable only at this level.
+  it('Scenario: Clicking a strip cell leaves the selection unchanged', async () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    view()
+    await userEvent.click(screen.getByTestId('mock-select-body'))
+    expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
+    await userEvent.click(screen.getByTestId('vitals-clock-cell'))
+    expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
+  })
+
+  it('Scenario: Switching the acting fleet leaves the selection unchanged', async () => {
+    setReads(
+      {},
+      { data: [dockedFleet({ id: 'fleet_1' }), dockedFleet({ id: 'fleet_2', systemId: SYSTEM_ID, attachedTo: undefined })] },
+    )
+    view()
+    await userEvent.click(screen.getByTestId('mock-select-body'))
+    expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
+    await userEvent.click(screen.getByTestId('vitals-fleet-chevron'))
+    await userEvent.click(screen.getByTestId('vitals-fleet-menu-item-fleet_2'))
+    expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
+  })
+
+  // docked-fleet-actions MODIFIED "Sell Commit"/"Refuel Commit": "the
+  // strip's hold and credits cells... reflect the sale's/refuel's effect
+  // without a page navigation". `VitalsStrip.test.tsx` proves the strip
+  // reacts correctly to new props; this proves the VIEW keeps supplying
+  // them from the SAME `useMyFleets()`/session reads a settled mutation's
+  // query invalidation (`hooks/use-market.ts`'s real `onSuccess`,
+  // unmodified by this change) would refetch — no navigation anywhere in
+  // either test.
+  it('Scenario: A successful sale refreshes hold and balance — landing on the strip, without navigation', () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    const { rerender } = view()
+    // `hold-capacity-used`/`balance-figure` are RULING 17's inherited
+    // testids — they would still pass against today's PANEL-rendered
+    // readout even before the strip exists, which would make this
+    // assertion tautological on its own (README lesson two's shape). The
+    // `vitals-strip` presence check is what actually pins the new surface.
+    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
+    expect(screen.getByTestId('hold-capacity-used')).toHaveAttribute('data-raw', String(40 - 25))
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
+
+    // What a settled sale's query invalidation would land: less cargo, more
+    // credits, same fleet, same route.
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId, roster: { ...dockedFleet().roster, cargo: { fuel: 12 }, freeHold: 40 } })] })
+    market.corporation = { id: 'corp-1', name: 'SDET Corp', credits: 1300 }
+    rerender(<SystemSpaceView systemId={SYSTEM_ID} />)
+
+    expect(screen.getByTestId('hold-capacity-used')).toHaveAttribute('data-raw', '0')
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1300')
+    expect(push, 'no navigation on a settled sale').not.toHaveBeenCalled()
+  })
+
+  it('Scenario: A successful refuel refreshes hold, range, and balance — landing on the strip and the roster row, without navigation', () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    const { rerender } = view()
+    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '12')
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
+
+    setReads(
+      {},
+      { data: [dockedFleet({ attachedTo: STATION.featureId, roster: { ...dockedFleet().roster, cargo: { fuel: 22, metals: 3 }, freeHold: 15, estimatedRange: 9000 } })] },
+    )
+    market.corporation = { id: 'corp-1', name: 'SDET Corp', credits: 1150 }
+    rerender(<SystemSpaceView systemId={SYSTEM_ID} />)
+
+    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '22')
+    // The estimated range on the fleet ROSTER row (unchanged surface,
+    // docked-fleet-actions' own clause) updates from the SAME read.
+    expect(screen.getByTestId('fleet-range-fleet_1')).toHaveAttribute('data-raw', '9000')
+    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1150')
+    expect(push, 'no navigation on a settled refuel').not.toHaveBeenCalled()
   })
 })

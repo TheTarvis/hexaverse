@@ -51,6 +51,28 @@ export function useCorporationOptional(): Corporation | null {
   return useContext(CorporationContext)?.corporation ?? null
 }
 
+// useCorporationSessionOptional — like `useCorporationOptional`, non-throwing
+// with no provider required, but additionally surfaces `isError` (add-vitals-
+// strip, impl contract §6). `isError`/`error`/`refetch` live on
+// `CorporationContextValue`, reachable only through the THROWING
+// `useCorporationContext`, which a surface that must never blank the board
+// (the space view) cannot call — the same reason `useCorporationOptional`
+// exists at all. This is what lets a caller distinguish "a session read that
+// resolved once and has since failed to refresh" from "currently resolved",
+// which a bare `corporation?.credits` cannot (round 1 MAJOR 7).
+//
+// `isError` defaults to `false` because `CorporationContextValue.isError` is
+// optional at the TYPE level only — the provider always supplies it at
+// runtime; the optionality exists solely so predating test doubles keep
+// type-checking.
+export function useCorporationSessionOptional(): {
+  corporation: Corporation | null
+  isError: boolean
+} {
+  const ctx = useContext(CorporationContext)
+  return { corporation: ctx?.corporation ?? null, isError: ctx?.isError ?? false }
+}
+
 export function CorporationProvider({ children }: { children: React.ReactNode }) {
   const { user, account, isLoading: accountLoading } = useAccountContext()
 

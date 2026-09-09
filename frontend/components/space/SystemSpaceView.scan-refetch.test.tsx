@@ -119,6 +119,12 @@ vi.mock('@/hooks/use-market', async () => {
 vi.mock('@/components/corporation-provider', () => ({
   useCorporationOptional: () => ({ id: 'corp-1', name: 'SDET Corp', credits: 1000 }),
   useCorporation: () => ({ id: 'corp-1', name: 'SDET Corp', credits: 1000 }),
+  // add-vitals-strip RULING 32: SystemSpaceView now calls
+  // useCorporationSessionOptional for the strip's credits-staleness rule;
+  // useCorporationOptional structurally cannot satisfy it (no isError). This
+  // file's own assertions are untouched — only the mock's exported surface
+  // is extended to match the module it mocks.
+  useCorporationSessionOptional: () => ({ corporation: { id: 'corp-1', name: 'SDET Corp', credits: 1000 }, isError: false }),
 }))
 vi.mock('@/hooks/use-galaxy', () => ({
   useGalaxy: () => ({ data: undefined, isLoading: false, isError: false, isStartArea: false }),

@@ -69,9 +69,16 @@ function rel(p: string): string {
  */
 const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: string; note: string }> = [
   {
+    // Re-anchored by the SDET per add-vitals-strip RULING 25's scheduled
+    // re-anchor, after step F's SpaceStage.tsx camera-cluster shrink
+    // landed. Anchors verified by grep against the live file (not taken
+    // from the developer's report) and moved from [681, 682, 738, 739,
+    // 903] to the lines below. Routine fixture maintenance under the
+    // guard's own stated procedure — not a test change requiring a fresh
+    // cause adjudication, and not a violation of test immutability.
     file: 'frontend/components/space/SpaceStage.tsx',
-    lines: [681, 682, 738, 739, 903],
-    ruling: 'RULING 10',
+    lines: [753, 754, 810, 811, 975],
+    ruling: 'RULING 10 / RULING 25',
     note: 'bearing/speed hover-facts toFixed — no covering requirement anywhere; filed as defect-hover-facts-unspecced.md, not fixed here',
   },
   {

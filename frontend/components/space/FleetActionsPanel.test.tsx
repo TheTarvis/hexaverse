@@ -27,12 +27,21 @@ import React from 'react'
 //   space-fleet-panel, mine-section, mine-kind-select, mine-tons-input,
 //   mine-eta-preview, mine-button, mine-countdown, mine-cancel,
 //   mine-unavailable,
-//   hold-readout, hold-capacity, hold-<kind>, hold-free,
 //   sell-section, sell-kind-select, sell-tons-input, sell-proceeds-preview,
 //   sell-button,
 //   refuel-section, refuel-tons-input, refuel-cost-preview, refuel-button,
 //   stationkeep-control, stationkeep-rate,
-//   balance-readout, balance-value, balance-live-region
+//   panel-error-live-region
+//
+// RE-HOMED (add-vitals-strip, RULING 7 — no coexistence). The cargo hold
+// readout (`hold-readout`, `hold-capacity`, `hold-<kind>`, `hold-free`, ...)
+// and the credit balance readout (`balance-readout`, `balance-value`,
+// `balance-figure`, `balance-live-region`) leave THIS panel for the vitals
+// strip (`system-console`'s *The Hold Cell...* / *The Credits Cell...*).
+// This panel no longer renders either — their scenarios are pinned in
+// `VitalsStrip.test.tsx` now. The `credits` prop STAYS on this panel (it
+// drives refuel's affordable default, impl contract §8.3) even though the
+// panel no longer displays it.
 //
 // VACUITY NOTES inline. Structural one: every "offered" assertion has a
 // paired "not offered" case in the adjacent state, so a panel that rendered
@@ -354,63 +363,17 @@ describe('FleetActionsPanel — running mine gates the movement commands', () =>
 
 // ------------------------------------------------------------ cargo readout
 
-describe('FleetActionsPanel — the cargo hold readout', () => {
-  // Scenario: The hold readout shows contents and capacity
-  it('Scenario: The hold readout shows contents and capacity', () => {
-    const { container } = panel()
-    // `hold-capacity` (case c) is now a wrapper carrying two figures, each
-    // its own testid: `hold-capacity-used` (client-derived, 40-22=18) and
-    // `hold-capacity-total` (roster.cargoCapacity, served) — F10's named
-    // copy change (`18.0 t / 40.0 t`, not today's `18 / 40 t`).
-    const used = screen.getByTestId('hold-capacity-used')
-    expect(used).toHaveAttribute('data-unit', 'tons')
-    expect(used).toHaveAttribute('data-raw', '18')
-    const total = screen.getByTestId('hold-capacity-total')
-    expect(total).toHaveAttribute('data-unit', 'tons')
-    expect(total).toHaveAttribute('data-raw', '40')
-    // `hold-{kind}` (case c) keeps its wrapper id (carrying the kind label);
-    // `hold-{kind}-tons` is the nested figure.
-    expect(screen.getByTestId('hold-metals-tons')).toHaveAttribute('data-raw', '10')
-    expect(screen.getByTestId('hold-organics-tons')).toHaveAttribute('data-raw', '2')
-    // `fuel` rides the SAME cargo map, never a separate field.
-    expect(screen.getByTestId('hold-fuel-tons')).toHaveAttribute('data-raw', '6')
-    // `hold-free` (case b) — the testid moves onto the Figure itself.
-    expect(screen.getByTestId('hold-free')).toHaveAttribute('data-raw', '22')
-    expect(screen.getByTestId('hold-free')).toHaveAttribute('data-unit', 'tons')
-    assertFiguresMatchModule(container, { scale: 1 })
-  })
-
-  // Scenario: The hold visibly fills when a mine run resolves
-  it('Scenario: The hold visibly fills when a mine run resolves', () => {
-    const { rerender, container } = panel()
-    expect(screen.getByTestId('hold-metals-tons')).toHaveAttribute('data-raw', '10')
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FleetActionsPanel fleet={fleet({ roster: { ...fleet().roster, cargo: { fuel: 6, metals: 30, organics: 2 }, freeHold: 2 } }) as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={1000} canvasAvailable worldTime={T0} scale={1} />,
-    )
-    expect(screen.getByTestId('hold-metals-tons')).toHaveAttribute('data-raw', '30')
-    expect(screen.getByTestId('hold-free')).toHaveAttribute('data-raw', '2')
-    assertFiguresMatchModule(container, { scale: 1 })
-  })
-
-  it('SDET-added: the hold readout on a scale-less mount still renders (tonnage needs no scale, RULING 26)', () => {
-    const { container } = panel({ scale: undefined })
-    expect(screen.getByTestId('hold-free')).toHaveAttribute('data-raw', '22')
-    assertFiguresMatchModule(container, { scale: undefined })
-  })
-
-  it('Scenario: An unloaded roster reads as absent, not an empty hold', () => {
-    // WHEN the fleet read has not yet served roster fields for the acting
-    // fleet, THEN used/total capacity and free hold read as the absent
-    // form, never `0 / 0 t` or `0 t free`.
-    panel({ fleet: fleet({ roster: undefined }) })
-    expect(screen.getByTestId('hold-capacity-used')).not.toHaveAttribute('data-raw')
-    expect(screen.getByTestId('hold-capacity-used')).toHaveTextContent('—')
-    expect(screen.getByTestId('hold-capacity-total')).not.toHaveAttribute('data-raw')
-    expect(screen.getByTestId('hold-free')).not.toHaveAttribute('data-raw')
-    expect(screen.getByTestId('hold-free')).toHaveTextContent('—')
-  })
-})
+// The cargo hold readout — RE-HOMED (add-vitals-strip, RULING 7). This
+// panel no longer renders `hold-readout`/`hold-capacity`/`hold-<kind>`/
+// `hold-free`: those testids and every scenario that read them (contents +
+// capacity, the mine-resolution refresh, the scale-less render, the
+// unloaded-roster absent case) now live in `VitalsStrip.test.tsx`'s hold
+// cell describe block (`system-console`'s *The Hold Cell Shows Used, Total
+// and Free Tonnage Over a Kind-Segmented Gauge*), migrated onto the strip's
+// own props rather than the full panel. Nothing here proves the panel
+// itself still HOLDS the correct `held`/`freeHold` numbers driving its own
+// verbs — that is exercised throughout the mine/sell/refuel describes
+// below, which never stopped depending on them.
 
 // -------------------------------------------------------------------- sell
 
@@ -488,19 +451,20 @@ describe('FleetActionsPanel — the sell offer', () => {
     )
   })
 
-  // Scenario: A successful sale refreshes hold and balance
+  // Scenario: A successful sale refreshes hold and balance. THE PANEL'S OWN
+  // HALF: the commit succeeds and toasts. The "hold and balance visibly
+  // reflect it" half is now the strip's (`system-console`), whose props
+  // this panel no longer feeds — see `VitalsStrip.test.tsx`'s credits-cell
+  // "balance visibly updates when a sale resolves" and the equivalent hold
+  // test, plus `SystemSpaceView.test.tsx`'s wiring-level companion.
   it('Scenario: A successful sale refreshes hold and balance', async () => {
     sell.mutate.mockImplementation((_v: unknown, opts?: { onSuccess?: (d: unknown) => void }) => {
       opts?.onSuccess?.({ fills: [{ source: 'floor', unitPrice: 5, tons: 10, proceeds: 50 }], proceeds: 50, balance: 1050 })
     })
-    const { rerender } = panel(docked)
+    panel(docked)
     await userEvent.click(screen.getByTestId('sell-button'))
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FleetActionsPanel fleet={fleet({ attachedTo: 'feat-station', roster: { ...fleet().roster, cargo: { fuel: 6, organics: 2 } } }) as any} dockedFeature={STATION_BODY as any} interiorFailed={false} station={STATION as any} stationQuotes={QUOTES as any} credits={1050} canvasAvailable worldTime={T0} scale={1} />,
-    )
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1050')
+    expect(sell.mutate).toHaveBeenCalled()
   })
 
   // Scenario: A failed sale toasts player-facing copy, not raw server text
@@ -729,8 +693,11 @@ describe('FleetActionsPanel — the refuel offer', () => {
     await userEvent.click(screen.getByTestId('refuel-button'))
     await waitFor(() => expect(toastError).toHaveBeenCalled())
     expect(String(toastError.mock.calls[0][0])).not.toContain(raw)
-    // No partial credit is shown anywhere: the hold readout is untouched.
-    expect(screen.getByTestId('hold-fuel-tons')).toHaveAttribute('data-raw', '6')
+    // No partial credit anywhere: the mutation was invoked exactly once,
+    // with no retry and no second commit — the offer's state is otherwise
+    // untouched. (The hold FIGURE itself is the strip's now — see
+    // `VitalsStrip.test.tsx`'s unserved/dry-fuel absent-form tests.)
+    expect(refuel.mutate).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -867,52 +834,24 @@ describe('FleetActionsPanel — station-keeping hold and release', () => {
 
 // ---------------------------------------------------------- credit balance
 
-describe('FleetActionsPanel — the credit balance readout', () => {
-  // Scenario: The panel shows the current credit balance
-  it('Scenario: The panel shows the current credit balance', () => {
-    // `balance-value` (case c) keeps its id AND `data-available`; the new
-    // child `balance-figure` carries the credits pair.
-    const { container } = panel({ credits: 4321 })
-    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'true')
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-unit', 'credits')
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '4321')
-    assertFiguresMatchModule(container, { scale: 1 })
-  })
-
-  // Scenario: An unavailable balance reads as unavailable, not as a figure
-  it('Scenario: An unavailable balance reads as unavailable, not as a figure', () => {
-    panel({ credits: null })
-    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'false')
-    expect(screen.getByTestId('balance-value')).toHaveTextContent(/unavailable/i)
-    // The credit override, not figure-formatting's generic `—` (RULING 13):
-    // no balance-figure element at all, and the wrapper itself carries no
-    // data-raw/data-unit pair.
-    expect(screen.queryByTestId('balance-figure')).toBeNull()
-    expect(screen.getByTestId('balance-value')).not.toHaveAttribute('data-raw')
-  })
-
-  // Scenario: A balance change is announced to assistive technology
-  it('Scenario: A balance change is announced to assistive technology', () => {
-    const { rerender } = panel({ credits: 1000 })
-    const live = screen.getByTestId('balance-live-region')
-    expect(live).toHaveAttribute('aria-live')
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FleetActionsPanel fleet={fleet() as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={1200} canvasAvailable worldTime={T0} scale={1} />,
-    )
-    expect(screen.getByTestId('balance-live-region').textContent).toMatch(/1200|1,200/)
-  })
-
-  it('Scenario: A transition to or from an unavailable balance is announced', () => {
-    const { rerender } = panel({ credits: 1000 })
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FleetActionsPanel fleet={fleet() as any} dockedFeature={ORE_BODY as any} interiorFailed={false} station={null} stationQuotes={null} credits={null} canvasAvailable worldTime={T0} scale={1} />,
-    )
-    // The region must NOT render as empty text on this transition.
-    expect(screen.getByTestId('balance-live-region').textContent ?? '').not.toBe('')
-  })
-
+// The credit balance readout — RE-HOMED (add-vitals-strip, RULING 7). This
+// panel no longer renders `balance-readout`/`balance-value`/
+// `balance-figure`/`balance-live-region`: six of this describe block's
+// seven scenarios (current balance, unavailable, change announced,
+// transition announced, and the two update-on-sale/refuel scenarios) now
+// live in `VitalsStrip.test.tsx`'s credits-cell describe block
+// (`system-console`'s *The Credits Cell Shows the Corporation's Served
+// Balance and Announces Its Changes*). The `credits` prop itself STAYS on
+// this panel (refuel's affordable default, impl contract §8.3) — it is
+// simply no longer rendered here.
+//
+// The seventh scenario — *A failed sale's or refuel's error is announced to
+// assistive technology* — was never about the credit balance at all; it is
+// `panel-error-live-region`'s own behaviour (a SIBLING of the deleted
+// balance block, never inside it), re-anchored under
+// `docked-fleet-actions`' own new ADDED requirement of that name (RULING
+// 11). It stays here, unedited in substance, renamed to its new home.
+describe('FleetActionsPanel — A Failed Command Is Announced to Assistive Technology (docked-fleet-actions ADDED)', () => {
   // Scenario: A failed sale's or refuel's error is announced to assistive
   // technology
   it('Scenario: A failed sale\'s or refuel\'s error is announced to assistive technology', async () => {
@@ -938,7 +877,14 @@ describe('FleetActionsPanel — usable while the canvas is unavailable', () => {
       station: STATION,
       stationQuotes: QUOTES,
     })
-    for (const id of ['sell-section', 'refuel-section', 'stationkeep-control', 'hold-readout', 'balance-readout']) {
+    // `hold-readout`/`balance-readout` dropped from this enumeration
+    // (add-vitals-strip, impl contract §8.3/task 8.4): they no longer exist
+    // on THIS panel at all, having moved to the strip — a component that
+    // renders neither is not "unusable while the canvas is down", it is
+    // simply drawing them elsewhere now. The strip's own always-present
+    // matrix (`VitalsStrip.test.tsx`) is what proves those readouts survive
+    // canvas unavailability going forward.
+    for (const id of ['sell-section', 'refuel-section', 'stationkeep-control']) {
       expect(screen.getByTestId(id), `${id} must remain usable`).toBeInTheDocument()
     }
   })

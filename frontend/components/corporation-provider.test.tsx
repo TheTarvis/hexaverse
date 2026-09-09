@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { CorporationProvider, useCorporationContext } from './corporation-provider'
+import {
+  CorporationProvider,
+  useCorporationContext,
+  useCorporationSessionOptional,
+} from './corporation-provider'
 import { corporationService } from '@/lib/services'
 
 // corporation-provider.tsx imports account context relatively — mock the same
@@ -114,5 +118,102 @@ describe('CorporationProvider', () => {
     })
     expect(screen.getByTestId('needs-wake')).toHaveTextContent('false')
     expect(mockGetMine).toHaveBeenCalledTimes(2)
+  })
+})
+
+// =============================================================================
+// ADDITIVE — add-vitals-strip, impl contract §6: `useCorporationSessionOptional`,
+// beside `useCorporationOptional`. NON-THROWING (unlike `useCorporationContext`,
+// which the space view must not call — a missing provider must never blank the
+// board), and — unlike `useCorporationOptional`'s bare `corporation?.credits` —
+// it surfaces `isError` too, which is what lets a consumer distinguish "resolved
+// once and has since failed to refresh" from "currently resolved", the credits
+// cell's stale-balance rule (round 1 MAJOR 7; system-console *The Credits Cell
+// Shows the Corporation's Served Balance...*'s staleness clause).
+//
+// RED-PHASE: COMPILE-RED until `useCorporationSessionOptional` is exported.
+// =============================================================================
+
+function SessionTestComponent() {
+  const { corporation, isError } = useCorporationSessionOptional()
+  return (
+    <div>
+      <div data-testid="session-corp-id">{corporation ? corporation.id : 'null'}</div>
+      <div data-testid="session-is-error">{String(isError)}</div>
+    </div>
+  )
+}
+
+describe('useCorporationSessionOptional', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('Scenario: no provider mounted -> returns { corporation: null, isError: false }, never throws', () => {
+    // Deliberately NO <CorporationProvider> wrapper — this is the whole
+    // point of the "Optional" accessor (contract §6.1).
+    expect(() => render(<SessionTestComponent />)).not.toThrow()
+    expect(screen.getByTestId('session-corp-id')).toHaveTextContent('null')
+    expect(screen.getByTestId('session-is-error')).toHaveTextContent('false')
+  })
+
+  it('Scenario: a resolved session -> returns the corporation and isError=false', async () => {
+    mockGetMine.mockResolvedValue({ id: 'corp_9', accountId: 'a1', name: 'Nine', createdAt: 1, credits: 500 })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CorporationProvider>
+          <SessionTestComponent />
+        </CorporationProvider>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('session-corp-id')).toHaveTextContent('corp_9'))
+    expect(screen.getByTestId('session-is-error')).toHaveTextContent('false')
+  })
+
+  // The scenario this accessor exists to make reachable: a session that
+  // resolved once and has SINCE failed to refresh must surface isError=true
+  // ALONGSIDE the still-cached corporation object — so a caller (the space
+  // view's `creditsShown` derivation) can distinguish "currently
+  // unavailable, showing what was last confirmed" from "currently
+  // available", per contract §6.3: `sessionFailed ? null :
+  // (corporation?.credits ?? null)`. `useCorporationOptional`'s bare
+  // `corporation?.credits` has NO reachable path to this distinction — that
+  // is round 1 MAJOR 7's finding, and the reason this accessor exists at
+  // all.
+  it('Scenario: a session that resolved once and has since failed to refresh -> isError=true, corporation still cached (never discarded)', async () => {
+    mockGetMine.mockResolvedValueOnce({ id: 'corp_9', accountId: 'a1', name: 'Nine', createdAt: 1, credits: 500 })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+    function WithRefetch() {
+      const session = useCorporationSessionOptional()
+      const ctx = useCorporationContext()
+      return (
+        <div>
+          <div data-testid="session-corp-id">{session.corporation ? session.corporation.id : 'null'}</div>
+          <div data-testid="session-is-error">{String(session.isError)}</div>
+          <button data-testid="refetch" onClick={() => ctx.refetch && ctx.refetch()}>
+            retry
+          </button>
+        </div>
+      )
+    }
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CorporationProvider>
+          <WithRefetch />
+        </CorporationProvider>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('session-corp-id')).toHaveTextContent('corp_9'))
+    expect(screen.getByTestId('session-is-error')).toHaveTextContent('false')
+
+    mockGetMine.mockRejectedValueOnce({ status: 500, message: 'boom' })
+    fireEvent.click(screen.getByTestId('refetch'))
+
+    await waitFor(() => expect(screen.getByTestId('session-is-error')).toHaveTextContent('true'))
+    // THE CORE OF THE SCENARIO: the cached corporation is NOT discarded by
+    // the failed refetch — a caller reading isError still has the object to
+    // decide, on its own terms, to treat it as stale.
+    expect(screen.getByTestId('session-corp-id')).toHaveTextContent('corp_9')
   })
 })

@@ -80,6 +80,15 @@ export const SHIP_MODE_BURN: ShipMode = 0
 export const SHIP_MODE_PARKED: ShipMode = 1
 export const SHIP_MODE_DRIFT: ShipMode = 2
 
+// ParkKind — space.ParkKind's iota. A NAME for a wire enum, not a mirror of a
+// rule: nothing here recomputes anything backend/space decides. Exported once
+// (add-vitals-strip, contract §2.4) so `roster-status.ts` is not a third
+// hard-coded copy alongside `FleetActionsPanel.tsx` and `space-scene.ts`.
+export type ParkKind = 0 | 1 | 2
+export const PARK_KIND_ORBIT: ParkKind = 0
+export const PARK_KIND_STATIONKEEP: ParkKind = 1
+export const PARK_KIND_POINT: ParkKind = 2
+
 // ShipState — space.ShipState: exactly one of Burn/Park/Drift is non-null,
 // selected by Mode.
 export interface ShipState {
