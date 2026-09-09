@@ -369,13 +369,13 @@ asserts only `rejects.toThrow('Request timeout')` and never the absence of a
 `status` property, so nothing in the suite today would catch a `408` being
 attached to the abort path. 1.2c closes it at the place that would attach it.
 
-**Verdict commit: `eacb561`** — `spec(mutation-retry): author
+**Verdict commit: `946a70b`** — `spec(mutation-retry): author
 fix-mutation-retry-on-4xx through three adversary rounds`. This CLEAR verdict
 covers the change folder exactly as committed at that hash. It is current while
 this is empty:
 
 ```bash
-git diff eacb561 -- openspec/changes/fix-mutation-retry-on-4xx openspec/specs/mutation-retry-policy
+git diff 946a70b -- openspec/changes/fix-mutation-retry-on-4xx openspec/specs/mutation-retry-policy
 ```
 
 `mutation-retry-policy` is a net-new ADDED capability owned by no other change,
