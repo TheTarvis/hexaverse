@@ -6,12 +6,17 @@ around the three surfaces Travis picked on 2026-09-08: the **in-system list**,
 vitals strip**. The scoping doc `../system-hud.md` is the model and carries
 the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
-**Status (2026-09-08): drafted, nothing authored.** Every link is
-`not authored` — no `openspec/changes/<id>/` folder exists yet. A plain
-`/team --chain` run stops at link 1; `/team docs/plans/system-hud/chain.md
---full-auto` authors each link in-run from this document, the scoping doc and
-the archived predecessors' specs, ruling the open questions below from their
-recorded leans.
+**Status (2026-09-09): link 1 archived; link 2a built and waiting on its
+archive gate.** `add-figure-formatting` archived at `a4471a3`.
+`add-vitals-strip` is authored, adversary-cleared (r3, `aa21687`, verdict still
+current), validated, and built — 39 of 42 tasks, tier 1 and tier 3 green — but
+**not archived**: its tier-4 journey has never been allowed to finish. Five
+executions, of which the last three were each killed mid-run by an external
+`SIGTERM` to the Firebase test emulators (`docs/plans/continous_space/handoffs/add-vitals-strip-journey.md`).
+Nothing is wrong with the change; the machine needs to be quiet for thirty
+minutes. Links 2a-ii onward remain `not authored`; the full-auto rule authors
+each one only after its predecessor archives, so **the chain is stalled behind
+2a's gate**.
 
 **No backend work anywhere in this chain.** Every figure the HUD shows is
 served today — burn preview, roster, credits, market board, scan targets,
@@ -38,7 +43,7 @@ carry the change-id, so nothing collides.
 | # | Change | Delivers | Capabilities | State |
 | --- | --- | --- | --- | --- |
 | 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `a4471a3` |
-| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | 🟥 built r3 `aa21687`, gate red |
+| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | 🟧 built r3 `aa21687`, **gate blocked by the environment** — see Link 2a *Taught* |
 | 2a-ii | `add-burn-cost-overlay` | The fuel gauge's cost overlay: the burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props, the shortfall segment | MODIFIED `system-console` (the overlay), `system-space-view` (stale-preview presentation) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
@@ -255,11 +260,18 @@ the pill and the roster row can disagree, one of them is wrong.
   canvas (two states); `SpaceStage.tsx` camera cluster;
   `components/fleet/roster-status.ts`.
 
-**Taught (gate red, 2026-09-09).** Authored and built in one full-auto run;
-42 tasks, 39 built, tier 1 and tier 3 green, tier 4 red after its one rerun.
-**Not archived** — `add-vitals-strip` is live in the tree as an unarchived
-change. See `../continous_space/handoffs/add-vitals-strip-journey.md` for the
-full gate record and the three options for Travis.
+**Taught (gate blocked, 2026-09-09).** Authored and built in one full-auto run;
+42 tasks, 39 built, tier 1 and tier 3 green. Tier 4 has now been executed
+**five** times: runs 1 and 2 (the budgeted pair) were red with real findings,
+all of which were diagnosed and fixed or filed; the third run Travis authorised
+was executed three times and **never completed**, because something outside the
+run `SIGTERM`ed the Firebase test emulators each time — at 10, 3 and 21 minutes
+in. **Not archived**; `add-vitals-strip` is live in the tree as an unarchived
+change, and the chain is stalled behind it. The full gate record, with the
+evidence copied out of every log that the next run overwrites, is
+`../continous_space/handoffs/add-vitals-strip-journey.md`. **What it needs is
+one quiet half-hour** — no `make stop-emulators`, no `/spinup`, no second e2e
+run, from any terminal or session, while tier 4 runs.
 
 - **The chain doc under-counted again, and asserted a non-effect it had not
   checked.** It named two of six touched requirements, put a delta on
@@ -299,6 +311,29 @@ full gate record and the three options for Travis.
   `FloatingNav` fix worked (the failure moved from `:222` to `:257`) and that
   the `slice.spec.ts` mount-timing fix held — which is how the two new findings
   were isolated as new rather than unresolved.
+- **The most dangerous failure shape is a stack death that prints test names.**
+  Each killed run reported a plausible pile of reds — 13, then 9, then 10 — in
+  specs any reader would attribute to product defects. What separated "ten
+  reds" from "one dead emulator" was reading `backend.log` and the emulator's
+  own `Received SIGTERM` line. **Check the stack's health before attributing a
+  single test**, and treat a uniform ~22s failure time across unrelated specs
+  as an environment signature, not a coincidence.
+- **"One emulator project, one suite at a time" is a rule about the machine,
+  not about your own session.** Moving the emulators out of the run's process
+  tree (detached, via `ensure-test-emulators.sh`) did not save them: a
+  `pkill -f firebase.test.json` — which is exactly what `backend/make
+  stop-emulators` and `/spinup` do — matches them wherever they live. Later
+  links should expect to need an announced quiet window for tier 4.
+- **A mechanism that fits one observation is not a diagnosis.** The first
+  post-mortem named a 600-second tool timeout; it fit the first killed run
+  exactly and was refuted by the next one dying in three minutes. Corrected on
+  the record (RULING 49) rather than quietly replaced — the same discipline
+  RULING 42 demanded after four analyses of a single red.
+- **Capture beats inference, and it pays on the first outing.** Instrumentation
+  added only to read the dev-overlay badge's "2 Issues" immediately caught its
+  own sibling's bug (`document.head` is null inside `addInitScript`) and then
+  gave the browser-side face of the emulator death. Link 2b should keep the
+  `[journey-console]` capture in its own journey spec.
 
 ## Link 2a-ii — `add-burn-cost-overlay`
 
