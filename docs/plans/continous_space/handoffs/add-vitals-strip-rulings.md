@@ -1399,3 +1399,76 @@ file is involved and no assertion changes.
 inferring things caught a real bug in itself within one run. That is the whole
 argument for capturing over inferring, and it is recorded here as the counter-
 example to RULING 42's list of five wrong inferences.
+
+### FULL-AUTO RULING 49 — RULING 47's mechanism was wrong; the emulators are being SIGTERMed by something outside the run, so they are moved outside the run
+
+**RULING 47's conclusion (the run is void) stands. Its mechanism does not, and
+I am correcting it rather than leaving a plausible story on the record.**
+
+The re-execution — launched with an explicit 60-minute budget, which was
+RULING 47's whole remedy — died the *same* way after **three minutes**, not ten.
+A 600-second tool timeout cannot explain a 180-second death. The log this time
+carried the sentence the first run's did not, because the reaping happened while
+firebase still had a line to print:
+
+```
+i  emulators: Received SIGTERM for the first time. Starting a clean shutdown.
+i  emulators: Shutting down emulators.
+i  auth: Stopping Authentication Emulator
+```
+
+So: **an external SIGTERM to the `firebase emulators:exec` process**, twice, at
+two unrelated elapsed times (10:00 and 3:00), in both cases leaving the
+`npx playwright test` grandchild **orphaned and still running** — which is what
+manufactures the 13-red "result": every remaining spec fails at sign-in with
+`dial tcp [::1]:10109: connect: connection refused` while the backend itself
+stays up and answers 401.
+
+**What was ruled out, by checking rather than by supposing:**
+
+- *The 600 s tool timeout* — refuted by the second run's 3-minute death.
+- *An emulator crash / memory pressure* — the shutdown is clean and firebase
+  announces it received a signal; a jetsam kill is `SIGKILL` and prints nothing.
+- *A sibling project reaping the same ports.* `/Users/travis/Projects/Chartz`
+  is another Volt fork and was actively running during both deaths (its dev
+  server starts at `20:17:27`, two seconds after the second SIGTERM — the one
+  correlation that looked damning). Its `firebase.test.json` uses auth `10139`
+  and pubsub `9136`, its `with-test-emulators.sh` reaps `10139 9136` only, and
+  it runs **no firestore emulator at all**. It cannot touch `9100/10109/9106`.
+- *My own harness edits* — `ENV=test` is read by exactly one line in the whole
+  frontend (`next.config.ts:18`, mine; verified by a correctly-quoted grep after
+  an earlier zsh-eaten `--include` glob made a first grep silently match
+  nothing), and `stdout: 'pipe'` cannot signal a parent.
+
+**The source of the SIGTERM is still unidentified.** I am recording that as an
+open question rather than inventing a fifth mechanism — this link has already
+paid four times for a plausible story that the evidence later refuted
+(RULING 42).
+
+**Ruling.** Stop trying to keep the emulators alive *inside* the run's process
+tree, and take them out of it: start them **detached** with the repo's own
+`scripts/dev/ensure-test-emulators.sh` (`nohup`, its own session), then run the
+suite. `with-test-emulators.sh` detects a complete set and `exec`s the command
+directly, so `firebase` is no longer in the tree at all and no signal aimed at
+that tree can take the emulators with it. The suite itself runs in the
+**foreground** with the 60-minute budget, so nothing about background-task
+lifecycle is in play either.
+
+**Basis.** Precedence 1/2 — this is `docs/testing-tiers.md`'s own documented
+arrangement for exactly this situation: *"For a sequence of changes, keep a
+persistent test stack up for the whole chain so tier 4 skips the boot —
+`npm run firebase:emulators:test` once."* The change is to the run's plumbing,
+not to the suite, the specs, or the budget.
+
+**Alternatives rejected.** (a) Keep retrying the same shape and hope — two
+identical deaths say the shape is the problem. (b) Hunt the signal's source
+first — it costs unbounded time on a machine I do not own, and the isolation
+above makes the answer unnecessary for this gate. (c) Declare the gate red —
+the reds are a dead auth emulator's 401s, evidence of nothing about the strip.
+
+**If it dies a third way, that is where this stops.** A gate run cannot be
+completed on a machine that keeps signalling it, and at that point the honest
+report is that the environment, not the change, is blocking the archive.
+
+**Cleanup owed:** the detached emulators outlive the run —
+`cd backend && make stop-emulators` when the gate closes.
