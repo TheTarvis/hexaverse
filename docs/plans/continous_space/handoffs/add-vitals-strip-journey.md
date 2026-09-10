@@ -8,15 +8,19 @@ a station and read all five cells → switch the acting fleet by the chevron
 count down → the 1280×720 viewport check with every floating surface present,
 closing QA's two BLOCKED rows.
 
-## Outcome: **BLOCKED — not archived.** The gate cannot be closed on this machine while something outside the run keeps stopping the test emulators.
+## Outcome: **RED — not archived.** The gate finally ran end to end; the journey failed on its own cross-system navigation leg, which no previous run had ever reached.
 
-Five tier-4 executions have now been spent on this gate. Runs 1 and 2 (the
-budgeted pair) were **red with findings**. Runs 3a, 3b and 3c — the single
-additional run Travis authorised, plus its two re-executions — produced **no
-verdict at all**: each was destroyed mid-flight by an external `SIGTERM` to the
-Firebase test emulators. The change is validated, adversary-cleared (r3,
-current), 39/42 tasks built and tier-1 green; the only thing missing is a
-journey that is allowed to finish.
+Six tier-4 executions have been spent on this gate. Runs 1 and 2 (the budgeted
+pair) were red with findings, all diagnosed and fixed or filed. Runs 3a, 3b and
+3c produced **no verdict at all** — each was destroyed mid-flight by a
+name-matched `pkill` from another project's Claude session (RULING 50). **Run
+3d, with that cause identified and warned off, completed: 53.1 minutes, 18
+passed, 5 failed, zero `Received SIGTERM` in `backend/emulator.log`.** Four of
+its five reds are attributable; the fifth is this change's own journey, and it
+is unattributed — so the gate does not close and nothing is archived.
+
+The change itself remains validated, adversary-cleared (r3 at `aa21687`, still
+current by diff), 39/42 tasks built, tier 1 and tier 3 green.
 
 ---
 
@@ -186,38 +190,110 @@ is evidence of anything**, and in particular none of them says anything about
 `defect-post-dock-burn-cost-drift` or `defect-wake-roster-row-flake`, which is
 what the double-submit reds would otherwise have been checked against.
 
+---
+
+## Run 3d — the authorised run, completed: 18 passed / 5 failed, 53.1m
+
+Emulators started detached beforehand, suite run in the foreground with an
+explicit 3 600 000 ms budget, both known causes of the earlier deaths removed.
+**`grep -c "Received SIGTERM" backend/emulator.log` → 0.** The stack held for
+the whole run: `slice.spec.ts`, `space-journey.spec.ts`,
+`scan-lane-transit-fizzle.spec.ts` and four of the five `space-double-submit`
+cases — every spec the void runs had turned into a 401 — **passed**.
+
+**The environment fix worked, and so did every fix carried in from runs 1–2.**
+The journey walked step 1 (all five cells read while docked), the *first*
+chevron open — the leg `FloatingNav` blocked in run 1 and the Next.js dev badge
+blocked in run 2 — the same-system switch, the cross-system `page.goto`, the
+absent-form assertions in a foreign system, and the *second* chevron open,
+before failing at the navigation that follows it. Neither interception recurred:
+RULINGs 33/44 (the `ENV=test` dev-indicator gate) and run 1's `FloatingNav`
+relocation are both confirmed by a run that walked straight past them.
+
+### The five reds, each attributed
+
+| # | Spec | Failure | Attribution |
+|---|---|---|---|
+| 1 | `new-user.spec.ts:81` | `waitForURL` after wake, 20s | **Filed** — appended to `defect-wake-roster-row-flake.md` as occurrence 3 (a second manifestation of the same wake, one step earlier than the roster) |
+| 2 | `scan-journey.spec.ts:249` | seeded ghost `sighting-mark-8152ad…` never visible, 20s | **Filed** — `defect-seeded-sighting-ghost-not-drawn.md`. Second occurrence in two runs (run 3c's `:260` was the first, on a different test and record id), which is why it is now a filed intermittent rather than noise |
+| 3 | `scan-journey.spec.ts:307` (via `helpers/space-view.ts:220`) | roster row count 0, expected 1, 20s | **Filed** — `defect-wake-roster-row-flake.md`, occurrence 2, the assertion that file was opened on |
+| 4 | `space-double-submit.spec.ts:276` | `feat-body-*` count 1, expected > 1 | **Filed** — `defect-spawn-system-single-body.md`. Same family as `defect-station-order-500`: a tier-4 fixture asserting on a randomly generated spawn |
+| 5 | **`vitals-strip-journey.spec.ts:332`** | `waitForURL('**/systems/sys_9_7')`, 20s — the chevron's cross-system navigation | **UNATTRIBUTED.** `defect-cross-system-chevron-nav-stall.md`. This is the blocker |
+
+Evidence for 1–4 is copied verbatim into those files, at filing time, because
+`frontend/playwright/.auth/backend.log` and the Playwright report are both
+overwritten by the next run.
+
+### Red 5, and why the gate stops here
+
+What is established: the click reached the callback (the chevron's
+`justSelectedId` transient label proves it); `router.push` issued its App Router
+fetch and **the dev server served `GET /systems/sys_9_7 200 in 546ms`** —
+captured only because RULING 45.2 piped `next dev`'s stdout into the run log;
+and the URL never changed. What is **not** established is why the transition
+never committed. The leading candidate is load — the run took **53.1 minutes
+against the suite's usual ~28**, with another project's session running CPU-load
+diagnostics throughout, and two sibling failures in the same run have the same
+"did not get there in 20 s" shape — but that is a hypothesis, and this link has
+spent five runs learning that a story consistent with the evidence is not a
+diagnosis.
+
+**The gate rule is unambiguous and is being followed: residue archives only
+when every red is attributable to a filed pre-existing defect. Red 5 is this
+change's own journey failing its own scenario, on a leg that has never once
+been exercised. It is not residue, so nothing is archived.**
+
 ## QA's two BLOCKED rows — unchanged, still BLOCKED
 
 Both under `system-console`'s *The Strip Is Laptop-First and Never Overflows the
 View*, both `Playwright, deferred` in `add-vitals-strip-red-coverage.md`:
 
-| Row | State after five tier-4 executions |
+| Row | State after six tier-4 executions |
 |---|---|
-| **Every cell is inside the viewport at 1280×720** | **BLOCKED.** Step 4 has never been reached: runs 1 and 2 stalled at the chevron, runs 3a–3c never got past sign-up. Zero evidence either way. |
-| **No other floating surface covers a strip cell** | **BLOCKED.** Run 1 caught `FloatingNav` (fixed, verified indirectly); the rerun caught the dev-overlay badge (fixed for the test env, RULING 44); the assertion that would close the row — now including `floating-nav` itself, RULING 46 — has never executed. |
+| **Every cell is inside the viewport at 1280×720** | **BLOCKED.** Step 4 has still never been reached: runs 1 and 2 stalled at the chevron, 3a–3c never got past sign-up, and 3d stalled one leg later, in step 2's cross-system navigation. Zero evidence either way. |
+| **No other floating surface covers a strip cell** | **BLOCKED**, but materially closer. Run 1's `FloatingNav` collision and run 2's dev-overlay collision are now **both confirmed cleared** — 3d walked through both chevron opens without an interception. The geometric assertion that would actually close the row (now including `floating-nav` itself, RULING 46) sits in step 4 and has still never executed. |
 
 ## The suite budget line
 
 | Tier | Command | Wall time | Verdict |
 |---|---|---|---|
-| 4 | `cd frontend && npm run e2e` | run 1 29.8m · run 2 28.5m · 3a 10.0m (killed) · 3b 3.0m (killed) · 3c 28.2m (stack died at ~21m) | no green run |
+| 4 | `cd frontend && npm run e2e` | run 1 29.8m · run 2 28.5m · 3a 10.0m (killed) · 3b 3.0m (killed) · 3c 28.2m (stack died at ~21m) · **3d 53.1m (completed)** | 18 passed / 5 failed; no green run |
 | 3 | `npm run test:backend:all` | 1130.471s (~18.84m), once | green — 1875 tests, 1 skipped, 0 failed |
 
 Tier 3 was **not** rerun and did not need to be: RULING 39 withdrew the backend
-exception, and no backend file is in this change's diff. Tier 4's three
-completed runs sit within 5 % of each other (1788s / 1710s / 1692s) — no growth
-signal. No timeout was raised or approached anywhere, in any tier, at any point.
+exception, and no backend file is in this change's diff. Runs 1, 2 and 3c sit
+within 5 % of each other (1788s / 1710s / 1692s) — no growth signal from the
+suite itself. **Run 3d's 53.1m is 1.9× that band and is a machine-load figure,
+not a suite-growth figure**: it shares its spec list with 3c exactly, and the
+foreign CPU-load diagnostics running throughout are the only variable that
+changed. It is recorded here as the control the next run needs — if a rerun on
+a quiet machine comes back near 28m and the journey passes, the load hypothesis
+for red 5 is confirmed; if it comes back near 28m and the journey still fails,
+red 5 is a real defect. **No timeout was raised or approached anywhere, in any
+tier, at any point, in any of the six runs.**
 
-## What the next run needs — and it is one sentence long
+## What the next run needs
 
-**Nothing may stop the hexaverse test emulators while tier 4 runs**: no
-`cd backend && make stop-emulators`, no `pkill -f firebase.test.json`, no
-`/spinup`, no second e2e or `--backend-tests` run, from any terminal or any
-Claude session, for the ~30 minutes the suite takes. With that held, the
-prepared run is already committed and needs no further edits: start the
-emulators detached (`bash scripts/dev/ensure-test-emulators.sh`), run
-`cd frontend && npm run e2e` in the foreground, and the journey either closes
-QA's two rows or produces its first real finding since run 2.
+**A quiet machine — not merely one that leaves the emulators alone.** Run 3d
+proved the emulator problem is solved (RULING 50, zero SIGTERMs) and replaced it
+with a subtler one: at 1.9× wall time, three of the suite's specs cannot get
+where they are going inside their 20 s budgets, and one of the three is this
+change's own journey. No foreign CPU-load diagnostics, no parallel builds, for
+the ~30 minutes the suite takes.
+
+The prepared run is already committed and needs no edits:
+
+```bash
+bash scripts/dev/ensure-test-emulators.sh          # detached
+cd frontend && npm run e2e                          # foreground, 3_600_000 ms budget
+```
+
+**Judge it by wall time first.** If the suite comes back near 28 minutes, its
+verdict on red 5 is trustworthy either way — a pass closes QA's two rows and the
+gate, a failure makes `defect-cross-system-chevron-nav-stall.md` a confirmed
+product defect that must be specified and fixed before this change archives. If
+it comes back near 50 minutes again, the machine was not quiet and the run
+should not be read as a verdict at all.
 
 ## Taught
 
@@ -246,4 +322,20 @@ QA's two rows or produces its first real finding since run 2.
 - **The dev-overlay fix belongs to the environment, not the product.** RULING 33
   refused to move the strip's fleet cell for a badge no player sees; the fix is
   three lines of test-environment config and Travis's own `npm run dev` keeps
-  its overlay.
+  its overlay. Run 3d walked through both chevron opens without an
+  interception — the ruling is now confirmed by execution, not by inference.
+- **Kill by port, never by process name.** Three runs died to another project's
+  `pkill -f "emulators:exec"`, including a set started detached specifically to
+  survive. A name-matched kill is a machine-wide weapon written as though it
+  were project-scoped, and no amount of care inside hexaverse defends against
+  one.
+- **A shared machine is part of the test environment, and wall time is how you
+  measure it.** Run 3d's 53.1m against an unchanged spec list is the only reason
+  its three navigation timeouts can be read as a load signature rather than
+  three regressions. **Record the suite's wall time on every gate run**; it is
+  the control that makes the next run's reds interpretable.
+- **The instrumentation earned its place three times over.** `stdout: 'pipe'`
+  produced the single most valuable line in the whole gate —
+  `GET /systems/sys_9_7 200 in 546ms` — which is what separates "the app never
+  asked" from "the app asked and the transition never committed" in red 5.
+  Without it, red 5 would have been indistinguishable from a dead click.

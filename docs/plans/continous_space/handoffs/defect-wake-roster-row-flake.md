@@ -38,3 +38,47 @@ racing the seeded fleet, or a 15s budget that is simply tight on a cold emulator
 A run of the wake path under load with the spawn→roster sequence timed. If the
 budget is the problem the fix is a poll, not a longer timeout — `docs/testing-tiers.md`
 is explicit that raising a budget to pass is never the fix.
+
+---
+
+## Two further occurrences, 2026-09-09 — `add-vitals-strip` gate run 3d
+
+Evidence copied in at filing time (`frontend/playwright/.auth/backend.log` and
+the Playwright report are both overwritten by the next run).
+
+**Occurrence 2 — the same assertion, count 0 instead of 1.**
+`frontend/e2e/tests/scan-journey.spec.ts:307`, through the same helper:
+
+```
+Error: a fresh spawn has exactly one hull
+expect(locator).toHaveCount(expected) failed
+Locator: getByTestId('fleet-roster').locator('[data-testid^="fleet-row-"]')
+Expected: 1   Received: 0   Timeout: 20000ms
+  3 × locator resolved to 0 elements
+  at helpers/space-view.ts:220 (wakeNewCorp)
+```
+
+**Occurrence 3 — a second manifestation of the same wake, one step earlier.**
+`frontend/e2e/tests/new-user.spec.ts:59` never reaches the roster at all: the
+post-spawn navigation onto the home system does not happen inside 20 s.
+
+```
+TimeoutError: page.waitForURL: Timeout 20000ms exceeded.
+waiting for navigation until "load"
+  at new-user.spec.ts:81
+```
+
+**Context that matters for reading these.** The run they come from took
+**53.1 minutes** against the same suite's usual ~28 — another project's Claude
+session was running CPU-load diagnostics on the machine throughout (see
+`add-vitals-strip-rulings.md` RULING 50). Three of that run's five failures are
+"the app did not get there in 20 s" on the wake or navigation path, which is
+the signature this defect describes. Whether the wake path has a genuine race
+or is merely tight enough that a loaded machine exposes it **is still the open
+question this file was opened with** — and it now has three data points, all
+from loaded runs, which is exactly the confound that keeps it unresolved.
+
+The next useful step is unchanged and still cheap: time the
+spawn→roster sequence on a **quiet** machine, under load, with the wake path
+instrumented. If the budget is the problem the fix is a poll, not a longer
+timeout.

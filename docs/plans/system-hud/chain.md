@@ -10,13 +10,17 @@ the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 archive gate.** `add-figure-formatting` archived at `a4471a3`.
 `add-vitals-strip` is authored, adversary-cleared (r3, `aa21687`, verdict still
 current), validated, and built — 39 of 42 tasks, tier 1 and tier 3 green — but
-**not archived**: its tier-4 journey has never been allowed to finish. Five
-executions, of which the last three were each killed mid-run by an external
-`SIGTERM` to the Firebase test emulators (`docs/plans/continous_space/handoffs/add-vitals-strip-journey.md`).
-Nothing is wrong with the change; the machine needs to be quiet for thirty
-minutes. Links 2a-ii onward remain `not authored`; the full-auto rule authors
-each one only after its predecessor archives, so **the chain is stalled behind
-2a's gate**.
+**not archived**: its tier-4 journey is red on one leg. Six executions; three of
+them were killed mid-run by another project's name-matched `pkill` (now
+identified and warned off), and the sixth ran to completion — 53.1m, 18 passed,
+5 failed. Four reds are attributed to filed defects; the fifth is the journey's
+own **cross-system chevron navigation**, which never committed inside 20 s on a
+machine running at 1.9× normal wall time
+(`../continous_space/handoffs/defect-cross-system-chevron-nav-stall.md`, and the
+full record in `../continous_space/handoffs/add-vitals-strip-journey.md`).
+Links 2a-ii onward remain `not authored`; the full-auto rule authors each one
+only after its predecessor archives, so **the chain is stalled behind 2a's
+gate**.
 
 **No backend work anywhere in this chain.** Every figure the HUD shows is
 served today — burn preview, roster, credits, market board, scan targets,
@@ -43,7 +47,7 @@ carry the change-id, so nothing collides.
 | # | Change | Delivers | Capabilities | State |
 | --- | --- | --- | --- | --- |
 | 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `a4471a3` |
-| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | 🟧 built r3 `aa21687`, **gate blocked by the environment** — see Link 2a *Taught* |
+| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | 🟥 built r3 `aa21687`, **gate red on one leg** — `defect-cross-system-chevron-nav-stall.md` |
 | 2a-ii | `add-burn-cost-overlay` | The fuel gauge's cost overlay: the burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props, the shortfall segment | MODIFIED `system-console` (the overlay), `system-space-view` (stale-preview presentation) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
@@ -260,18 +264,19 @@ the pill and the roster row can disagree, one of them is wrong.
   canvas (two states); `SpaceStage.tsx` camera cluster;
   `components/fleet/roster-status.ts`.
 
-**Taught (gate blocked, 2026-09-09).** Authored and built in one full-auto run;
-42 tasks, 39 built, tier 1 and tier 3 green. Tier 4 has now been executed
-**five** times: runs 1 and 2 (the budgeted pair) were red with real findings,
-all of which were diagnosed and fixed or filed; the third run Travis authorised
-was executed three times and **never completed**, because something outside the
-run `SIGTERM`ed the Firebase test emulators each time — at 10, 3 and 21 minutes
-in. **Not archived**; `add-vitals-strip` is live in the tree as an unarchived
-change, and the chain is stalled behind it. The full gate record, with the
-evidence copied out of every log that the next run overwrites, is
-`../continous_space/handoffs/add-vitals-strip-journey.md`. **What it needs is
-one quiet half-hour** — no `make stop-emulators`, no `/spinup`, no second e2e
-run, from any terminal or session, while tier 4 runs.
+**Taught (gate red on one leg, 2026-09-09).** Authored and built in one
+full-auto run; 42 tasks, 39 built, tier 1 and tier 3 green. Tier 4 has been
+executed **six** times: runs 1 and 2 (the budgeted pair) were red with real
+findings, all diagnosed and fixed or filed; the run Travis authorised was
+destroyed three times by another project's `pkill -f "emulators:exec"`; and the
+sixth **completed** — 53.1m, 18 passed, 5 failed, no emulator death. Four of
+those reds are attributed to filed defects (`defect-wake-roster-row-flake`,
+`defect-seeded-sighting-ghost-not-drawn`, `defect-spawn-system-single-body`).
+The fifth is this change's own journey, on the chevron's cross-system
+navigation — a leg no earlier run had ever reached — and it is unattributed:
+`../continous_space/handoffs/defect-cross-system-chevron-nav-stall.md`. **Not
+archived**, and the chain is stalled behind it. Full record:
+`../continous_space/handoffs/add-vitals-strip-journey.md`.
 
 - **The chain doc under-counted again, and asserted a non-effect it had not
   checked.** It named two of six touched requirements, put a delta on
@@ -331,9 +336,21 @@ run, from any terminal or session, while tier 4 runs.
   RULING 42 demanded after four analyses of a single red.
 - **Capture beats inference, and it pays on the first outing.** Instrumentation
   added only to read the dev-overlay badge's "2 Issues" immediately caught its
-  own sibling's bug (`document.head` is null inside `addInitScript`) and then
-  gave the browser-side face of the emulator death. Link 2b should keep the
-  `[journey-console]` capture in its own journey spec.
+  own sibling's bug (`document.head` is null inside `addInitScript`), then gave
+  the browser-side face of the emulator death, and finally produced the gate's
+  single most valuable line — `GET /systems/sys_9_7 200 in 546ms`, which is what
+  separates "the click did nothing" from "the app asked and the transition never
+  committed". **Link 2b should carry both the `[journey-console]` capture and
+  the webServer `stdout: 'pipe'` into its own journey.**
+- **Record the suite's wall time on every gate run, and read the reds against
+  it.** Run 3d took 53.1m against the same spec list's usual ~28 because another
+  project was running CPU-load diagnostics; three of its five reds are
+  "the app did not get there in 20 s". Without the wall-time control those three
+  read as regressions. **A shared machine is part of the test environment.**
+- **A journey only tests the legs it reaches.** Five runs died before step 2's
+  final leg, so five runs said nothing about it — and the moment one got there,
+  it found something. Read a partial journey as *untested*, never as *passing*,
+  and expect the first run that reaches a new leg to find what is waiting there.
 
 ## Link 2a-ii — `add-burn-cost-overlay`
 
