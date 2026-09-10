@@ -1472,3 +1472,60 @@ report is that the environment, not the change, is blocking the archive.
 
 **Cleanup owed:** the detached emulators outlive the run —
 `cd backend && make stop-emulators` when the gate closes.
+
+### FULL-AUTO RULING 50 — the SIGTERM source is identified: a `pkill -f "emulators:exec"` from another project's Claude session. RULING 49's open question is closed, and RULINGs 47 and 49 are each half-corrected
+
+**Found by the coordinator, in another project's transcript** — not in this
+repo, which is why three passes through hexaverse's own tooling could not find
+it. A subagent of a Claude session in `/Users/travis/Projects/Roma`
+(`~/.claude/projects/-Users-travis-Projects-Roma/d29cfff3-*/subagents/agent-a276e6893f51e878b.jsonl`)
+runs, as its **pre-run cleanup**:
+
+```bash
+pkill -f "emulators:start" 2>/dev/null; pkill -f "emulators:exec" 2>/dev/null
+```
+
+at `2026-09-09T23:57:55Z`, `2026-09-10T00:18:43Z` and `2026-09-10T00:54:40Z` —
+**one within a minute of each of this gate's three emulator deaths**: run 3a's
+`emulators:exec` set, run 3b's set, and run 3c's *detached* `emulators:start`
+set. `pkill -f` matches the whole command line, so a cleanup written to clear
+one project's emulators SIGTERMs **every Firebase emulator on the machine**,
+whatever its project, config or ports. Nothing in hexaverse sent them:
+`backend/Makefile`'s `stop-emulators` was never invoked, and no `/spinup` ran.
+
+**This closes RULING 49's open question**, and it vindicates the decision
+recorded there not to invent a fifth mechanism: the answer was in a place no
+amount of reasoning about this repo could have reached.
+
+**Both earlier mechanisms were half right, and both are corrected rather than
+replaced:**
+
+- **RULING 47** named the 600 s Bash default timeout. It was **also true of run
+  3a** — that run carried the default timeout as well as taking a pkill — which
+  is exactly why its 10-minute death looked so clean and so wrong. Two causes,
+  one death; the timeout was real and was not the whole story.
+- **RULING 49** said "external SIGTERM, source unidentified" and refuted the
+  timeout using run 3b's 3-minute death. Run 3b is now explained precisely: the
+  `00:18:43Z` pkill plus Playwright's **120 s `webServer` budget** — the dev
+  server outlived nothing, the suite simply had two minutes of runway left. Not
+  a separate cause, and not evidence against RULING 47 as strongly as it read.
+
+**Ruling.** The single authorised run proceeds now, with both known causes
+removed: emulators started **detached**, the suite run in the **foreground**
+with an explicit **3 600 000 ms** budget (never the 600 s default). The
+coordinator has messaged the Roma session — still live — to kill by port
+instead of by name. **That session cannot be compelled**, so the risk is
+*reduced, not eliminated*: if the `Received SIGTERM` line appears in
+`backend/emulator.log` again, or `:10109` starts refusing connections, the run
+is **VOID, not red**, it is recorded as such, and **no further run is started**.
+
+**Basis.** Precedence 1 — the coordinator's finding and instruction, which is
+the recorded authority for this link's third run. **Reversal cost:** none.
+
+**The lesson, and it outlives this link.** A name-matched `pkill` is a
+machine-wide weapon written as if it were project-scoped. Hexaverse's own
+`with-test-emulators.sh` carries the comment *"ports are unique per repo, so
+this never touches another project's emulator"* — true of *its* port-based
+reaping, and precisely the assumption a sibling project's **name-based** kill
+breaks. **Kill by port, never by process name**, in any repo that shares a
+machine with another.

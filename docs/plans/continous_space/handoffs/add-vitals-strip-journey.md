@@ -134,20 +134,36 @@ Locator: getByTestId('wake-up-flow')
   the entire frontend (`next.config.ts:18`), confirmed by a correctly-quoted
   grep after zsh silently ate an earlier `--include` glob.
 
-### The prime suspect, stated as a suspect
+### The source, identified — a name-matched `pkill` from another project (RULING 50)
 
-`backend/Makefile:83-89`'s `stop-emulators` target is
-`pkill -f "firebase.test.json"` — a **SIGTERM aimed at exactly the process whose
-command line carries that config**, which is precisely the signature observed
-three times. `/spinup`'s "kills anything on the hexaverse ports (orphans
-included)" does the same job. Ten `claude` processes were running on this
-machine during the gate. Something — a person or a peer session — ran that
-cleanup three times in seventy minutes, and `docs/testing-tiers.md`'s rule
-*"one emulator project, one suite at a time"* was being broken by an actor the
-run cannot see or serialise against.
+**Not a suspicion any more.** A subagent of a Claude session in
+`/Users/travis/Projects/Roma` runs, as its pre-run cleanup,
 
-**This is not proven.** No process was caught in the act, and the record says so
-rather than promoting a strong suspicion to a conclusion.
+```bash
+pkill -f "emulators:start" 2>/dev/null; pkill -f "emulators:exec" 2>/dev/null
+```
+
+at `23:57:55Z`, `00:18:43Z` and `00:54:40Z` — **one within a minute of each of
+this gate's three emulator deaths**, matching run 3a's `emulators:exec` set, run
+3b's set, and run 3c's *detached* `emulators:start` set in turn. `pkill -f`
+matches the entire command line, so a cleanup meant for one project kills every
+Firebase emulator on the machine, whatever its ports. Nothing in hexaverse sent
+those signals: `backend/Makefile`'s `stop-emulators` was never invoked and no
+`/spinup` ran. My earlier prime suspect — this repo's own `stop-emulators` —
+was **wrong**, and it was wrong in the direction that flatters the investigator:
+the culprit was the tool I could see rather than the one I could not.
+
+Two consequences for the mechanisms recorded above:
+
+- Run **3a** carried the 600 s Bash default timeout **as well as** taking a
+  pkill. RULING 47 was not refuted, it was incomplete — two causes, one death.
+- Run **3b**'s three-minute death is the `00:18:43Z` pkill plus Playwright's
+  120 s `webServer` budget, not a separate mechanism.
+
+**The lesson that outlives this link: kill by port, never by process name.**
+`with-test-emulators.sh` says *"ports are unique per repo, so this never touches
+another project's emulator"* — true of its own port-based reaping, and exactly
+the assumption a sibling project's name-based kill breaks.
 
 ---
 
