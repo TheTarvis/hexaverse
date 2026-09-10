@@ -123,9 +123,20 @@ test.beforeEach(async ({ page }) => {
   // console/pageerror capture just above is wired independently of the
   // overlay's DOM.
   await page.addInitScript(() => {
-    const style = document.createElement('style')
-    style.textContent = 'nextjs-portal { display: none !important }'
-    ;(document.head ?? document.documentElement).appendChild(style)
+    // RULING 48 — `addInitScript` runs before the document element exists,
+    // so `document.head`/`document.documentElement` are both `null` at this
+    // point; inject immediately when a parent is already there, otherwise
+    // wait for `DOMContentLoaded`. Same one-line style, same purpose.
+    const inject = () => {
+      const style = document.createElement('style')
+      style.textContent = 'nextjs-portal { display: none !important }'
+      document.head.appendChild(style)
+    }
+    if (document.head) {
+      inject()
+    } else {
+      document.addEventListener('DOMContentLoaded', inject)
+    }
   })
 })
 

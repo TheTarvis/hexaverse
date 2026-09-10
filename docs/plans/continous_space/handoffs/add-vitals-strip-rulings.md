@@ -1301,3 +1301,101 @@ journey step — the journey is one spec walking one path (`docs/testing-tiers.m
 and this belongs in the step that already owns the geometry.
 
 **Reversal cost.** One line in one array.
+
+### FULL-AUTO RULING 47 — the third run is VOID, not red: the harness killed it at 600 s and the orphaned Playwright kept "testing" a dead auth emulator
+
+**What the log looks like at first glance.** 10 passed, **13 failed** — every
+failure after test #9 in a uniform 21–25 s, including this change's own journey
+(#23, 22.0 s). Read as a gate result that is a catastrophic red.
+
+**It is not a gate result at all.** The evidence, gathered before any
+attribution was attempted:
+
+1. `frontend/playwright/.auth/backend.log` — the test backend never crashed. It
+   answers every request, and from `19:58:06` onward answers **401** with:
+   ```
+   WRN Failed to verify Firebase JWT token
+       error="failed to establish a connection: Post
+       \"http://localhost:10109/identitytoolkit.googleapis.com/v1/projects/hexaverse-emulator/accounts:lookup\":
+       dial tcp [::1]:10109: connect: connection refused"
+   GIN 2026/09/09 - 19:58:06 | 401 | 7.005663709s | POST "/v1/actions/…/cancel"
+   ```
+   The **auth emulator** was gone; the backend was fine. Every remaining spec
+   fails at sign-in/wake, which is why they all take the same ~22 s.
+2. `firestore-debug.log` and `pubsub-debug.log` both end with
+   `*** shutting down gRPC server since JVM is shutting down` — a **clean
+   SIGTERM**, not a crash — with mtimes `19:57:57` and `19:57:58`.
+3. The backgrounded command's own output file was written at **19:57:58**,
+   carrying `TIER4 EXIT: 0`. The wrapper (`firebase emulators:exec`) exited
+   there; `scripts/dev/with-test-emulators.sh` `exec`s it, so its death takes
+   the emulators with it — and leaves the `npx playwright test` grandchild
+   **orphaned but alive**, which is why the reporter kept emitting results
+   until `20:09`, long after the stack it was testing had gone.
+4. `19:57:58` is **exactly 600 s** after the command started, and
+   `.claude/settings.json` sets `BASH_DEFAULT_TIMEOUT_MS: 600000`. I launched
+   the run with `run_in_background: true` and **no explicit `timeout`**, so the
+   tool killed it at ten minutes.
+
+**Ruling.** The run is **void**. It is re-executed once, with an explicit
+60-minute budget (`BASH_MAX_TIMEOUT_MS`), and **it is not a fourth run** — the
+third produced no verdict about anything. Tests #1–#9 (setup, `endless-frontier`,
+`jump-commit`, `new-user`, `refuel-commit`, four `renderer-availability` cases)
+completed *before* `19:57:58` and are real greens; everything from
+`scan-journey` on is an artifact of a dead emulator.
+
+**Basis.** Precedence 2 — `docs/testing-tiers.md` and the workflow skill's
+failure playbook both state the rule in terms: *"Foreground command killed by
+the tool timeout — **not a test failure** — do not rerun in the foreground;
+rerun once in the background with a log file."* This is the same kill by the
+same clock, one notch along (a background command hitting the background
+default). The playbook's remedy is a rerun, and no budget line in this repo
+treats an aborted environment as evidence.
+
+**Alternatives rejected.** (a) Report 13 reds as the gate's verdict — they are
+evidence of nothing except that a killed emulator refuses tokens, and calling
+them a product verdict would be precisely the artifact-for-evidence error
+RULING 42 recorded as this link's most expensive lesson. (b) Stop and hand
+Travis a red gate — it would spend his granted exception on **my invocation
+error** and tell him nothing about the strip, which is the one thing the
+exception was granted to learn. (c) Salvage a partial verdict from tests #1–#9
+— the journey is #23; nothing in the first nine touches the strip.
+
+**Recorded against myself, because it is the operational lesson.** A 30-minute
+suite was launched with a 10-minute budget I did not set and did not check. The
+tool's default is not the suite's budget, and `docs/testing-tiers.md`'s
+"long runs go in the background" is only half the rule — **the other half is
+naming the timeout**. Worse, the failure is *silent in the shape that matters*:
+the orphaned runner keeps printing plausible red test names for another twelve
+minutes, so the run looks like a catastrophic product regression rather than a
+killed process. Anyone who read the summary without reading the backend log
+would have filed thirteen defects.
+
+**Reversal cost.** None; one parameter on one command.
+
+### FULL-AUTO RULING 48 — the belt-and-braces init script is a test defect, found by the very capture that was added to read the badge
+
+The console capture (RULING 45.1) worked on its first outing and immediately
+caught its own sibling:
+
+```
+[journey-console] pageerror at http://localhost:3110/login?signUp=true:
+  Cannot read properties of null (reading 'appendChild')
+```
+
+`page.addInitScript` runs **before the document element exists**, so both
+`document.head` and `document.documentElement` are `null` and the
+`nextjs-portal` style injection throws on every navigation — meaning the
+belt-and-braces guard was **never actually applied** in the void run, and it
+raised a page error of its own on every page (one that
+`renderer-availability.spec.ts`'s "no page error" assertions could plausibly
+have tripped over later in a longer-lived run).
+
+**Ruling.** SDET fixes it — inject on `DOMContentLoaded` when `document.head`
+is not yet available, keeping the same one-line style. This is a **test
+defect** in code written this session, not a product finding: no production
+file is involved and no assertion changes.
+
+**Worth stating plainly:** the instrumentation added to stop this gate
+inferring things caught a real bug in itself within one run. That is the whole
+argument for capturing over inferring, and it is recorded here as the counter-
+example to RULING 42's list of five wrong inferences.
