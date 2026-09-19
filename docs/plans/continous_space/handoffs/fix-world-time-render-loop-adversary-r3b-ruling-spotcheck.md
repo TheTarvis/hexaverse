@@ -55,6 +55,34 @@ repairs. The re-attack scope is those six amendments; each is the adversary's
 own prescribed text, and none touches a spec delta, so no re-validation risk
 beyond the mechanical gates (which were re-run).
 
+## VERDICT COMMIT — `3566af9a35db11c06254398447f3a3ba645904f3`
+
+`spec(system-space-view): harden fix-world-time-render-loop through panel and
+three adversary rounds`, on `main`, 2026-09-19. Not pushed.
+
+**This is the pinning commit for every adversary verdict on this change** —
+rounds 1, 2 and 3 and this spot-check. All four were issued against untracked
+content and could not be currency-checked until now. From this commit forward
+the standard test applies:
+
+```bash
+git diff 3566af9 -- openspec/specs/system-space-view openspec/specs/galaxy-view openspec/changes/fix-world-time-render-loop
+```
+
+Empty ⇒ the verdicts are current. Non-empty ⇒ **that diff** is the re-attack
+scope, not the whole change. The likeliest trigger is `add-vitals-strip`
+archiving, which rewrites `openspec/specs/system-space-view/spec.md` — the
+live spec this change's MODIFIED block targets.
+
+Contents: the change folder (6 files) plus this change's 13 handoff records,
+including the two filed defect/drift records and Travis's own 2026-09-19
+diagnosis of the chevron stall. 20 files, +4484/−13. Deliberately excluded and
+left dirty in the tree: `.claude/skills/code-quality-checks/skill.md`,
+`.agents/`, `.claude/skills/team/`, `AGENTS.md`.
+
+The six repairs above landed **before** this commit, so the committed state is
+the repaired one — the verdict and the tree agree.
+
 ---
 
 ## Scoped spot-check — `fix-world-time-render-loop`, the four-ruling diff
