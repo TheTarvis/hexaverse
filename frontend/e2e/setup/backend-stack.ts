@@ -147,12 +147,38 @@ export async function startBackend(): Promise<void> {
   // --project so token audiences line up — see env.ts). We deliberately do NOT
   // override the project here; isolation from the Go suite comes from the per-run
   // wipe + serial execution, not a separate namespace.
+  // PACING. The suite used to wait out the simulation in real time: ~20s per
+  // burn to the home station in a dozen specs, and ~6 minutes for one lane jump
+  // in scan-lane-transit-fizzle — 60% of a 16.5-minute run spent watching a
+  // clock. Two knobs fix that, and they are set HERE rather than in
+  // backend/.env.test on purpose: the Go emulator suite loads that same file and
+  // several of its tests state, in their own comments, that the test world runs
+  // at scale exactly 1 (backend/orbit_elements_wire_e2e_test.go,
+  // backend/fuel_e2e_helpers_test.go). This stack is the only consumer that
+  // wants a warped world.
+  //
+  //   WORLD_TIME_SCALE    — how fast the simulation clock RUNS. Every read that
+  //                         carries a worldTime carries this beside it and the
+  //                         client clock projects off the served pair, so the UI
+  //                         countdowns stay honest; only wall time shrinks.
+  //   LANE_MS_PER_DISTANCE — what a lane COSTS (world-ms per unit of length),
+  //                         overriding common.DefaultTuning's 2500. Lane travel
+  //                         is long enough relative to everything else that
+  //                         scale alone would not bring the jump into range.
+  //                         Travel time only — market pricing never reads it.
+  //
+  // Both are env-overridable for debugging a timing-sensitive spec: a leg that
+  // has to be observed mid-flight is easier to watch at E2E_WORLD_TIME_SCALE=1.
+  // Note this applies only when THIS code boots the backend — a run attached to
+  // an already-running stack (E2E_MANAGE_STACK=0, CI) gets that stack's pacing.
   const env: Record<string, string> = {
     PATH: process.env.PATH ?? '',
     HOME: process.env.HOME ?? '',
     USER: process.env.USER ?? '',
     ENV: 'test',
     PORT: port,
+    WORLD_TIME_SCALE: process.env.E2E_WORLD_TIME_SCALE ?? '5',
+    LANE_MS_PER_DISTANCE: process.env.E2E_LANE_MS_PER_DISTANCE ?? '500',
   }
   for (const key of ['LOG_LEVEL', 'GOOGLE_APPLICATION_CREDENTIALS', 'IMPORT_BUCKET', 'EXPORT_BUCKET']) {
     if (process.env[key]) env[key] = process.env[key] as string

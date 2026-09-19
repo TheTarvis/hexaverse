@@ -75,8 +75,10 @@ async function pickFarLode(page: Page, interior: ServedInterior, excludeId?: str
 const cfg = resolveE2EConfig()
 
 test.use({ storageState: { cookies: [], origins: [] } })
-// The world runs at real-time scale on the test stack and this journey burns
-// across a whole system under its own power, twice, plus a lane crossing.
+// This journey burns across a whole system under its own power, twice, plus a
+// lane crossing. The stack runs the world warped (`backend-stack.ts`), so the
+// budget below is a hang budget rather than the expected wait — it still holds
+// for an unwarped E2E_WORLD_TIME_SCALE=1 run.
 test.setTimeout(1_800_000)
 
 test.describe('the continuous-space slice, end to end through the new view', () => {

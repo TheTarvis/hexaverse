@@ -50,8 +50,9 @@ const cfg = resolveE2EConfig()
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-// The test stack runs the world at real-time scale and this journey burns all
-// the way to the home station under its own power.
+// This journey burns all the way to the home station under its own power. The
+// stack runs the world warped (`backend-stack.ts`), so this is a hang budget,
+// not the expected wait — it still holds unwarped.
 test.setTimeout(900_000)
 
 test.describe('refuel commit — wire to click, double-submit guard', () => {

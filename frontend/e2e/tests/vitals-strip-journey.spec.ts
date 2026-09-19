@@ -80,8 +80,9 @@ test.use({
 // One full-length burn to the home station (the 500-defect's own site,
 // budgeted like `refuel-commit.spec.ts`/`slice.spec.ts`), plus a
 // deliberately-not-awaited-to-completion burn to the rim gate, a route
-// intercept, and a reload. Generous, not tight — the world runs at real
-// scale 1 in the test stack.
+// intercept, and a reload. Generous, not tight: a hang budget that holds at any
+// scale, including an unwarped E2E_WORLD_TIME_SCALE=1 run. The stack itself
+// runs the world warped (`backend-stack.ts`).
 test.setTimeout(900_000)
 
 /**

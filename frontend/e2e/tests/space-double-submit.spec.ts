@@ -72,8 +72,9 @@ import {
 const cfg = resolveE2EConfig()
 
 test.use({ storageState: { cookies: [], origins: [] } })
-// The test stack runs the world at real-time scale and this journey burns
-// under its own power; mirrors jump-commit.spec.ts's own note.
+// This journey burns under its own power; mirrors jump-commit.spec.ts's own
+// note. The stack runs the world warped (`backend-stack.ts`), so this is a hang
+// budget, not the expected wait — it still holds unwarped.
 test.setTimeout(900_000)
 
 interface Recorded {

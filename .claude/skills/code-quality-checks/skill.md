@@ -1,3 +1,8 @@
+---
+name: code-quality-checks
+description: Run the project code quality checks for changed files or specified directories. Use for quality gates, pre-commit validation, or requests to run project checks.
+---
+
 # Code Quality Checks
 
 Runs automated code quality checks against changed files or specified directories.

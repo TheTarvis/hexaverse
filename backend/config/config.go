@@ -61,6 +61,16 @@ type ServiceConfiguration struct {
 	// prod=1 (real time), dev/test fast so long burns resolve in seconds.
 	// NEVER change on a world holding data — stored stamps would reinterpret.
 	WorldTimeScale float64
+
+	// LaneMsPerDistance overrides the shipped gameplay tuning knob of the same
+	// name (common.DefaultTuning) — the world-ms it costs to cross one unit of
+	// lane length. 0 (the default) means "leave the shipped baseline alone", so
+	// this is inert everywhere nobody sets it. It exists because a lane jump is
+	// the single longest wait in the Playwright suite, which boots its backend
+	// with this set (frontend/e2e/setup/backend-stack.ts). It prices travel
+	// TIME only — market pricing is deliberately independent of it
+	// (backend/market/params.go).
+	LaneMsPerDistance float64
 }
 
 var ServiceConfig ServiceConfiguration
@@ -137,6 +147,9 @@ func init() {
 
 	// World simulation clock. Default 1 (real time); dev/test override fast.
 	flag.Float64Var(&ServiceConfig.WorldTimeScale, "WORLD_TIME_SCALE", 1, "Simulation time-warp factor relative to wall clock")
+
+	// Gameplay tuning override. Default 0 = keep common.DefaultTuning's value.
+	flag.Float64Var(&ServiceConfig.LaneMsPerDistance, "LANE_MS_PER_DISTANCE", 0, "Override for the lane-travel pacing knob in world-ms per unit of lane length (0 = shipped tuning)")
 
 	flag.Parse()
 }

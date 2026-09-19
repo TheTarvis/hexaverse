@@ -54,10 +54,10 @@ const cfg = resolveE2EConfig()
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
-// The burn to the nearest lane gate rides the real world clock at scale 1
-// (see slice.spec.ts's wall-clock note) — left generous rather than guessed
-// tight. A gate sits at the system's rim, so this is the longest single burn
-// any suite here commits.
+// The burn to the nearest lane gate rides the world clock, which this stack
+// runs warped (see slice.spec.ts's wall-clock note) — the budget is left
+// generous rather than guessed tight, so it holds unwarped too. A gate sits at
+// the system's rim, so this is the longest single burn any suite here commits.
 test.setTimeout(900_000)
 
 test.describe('jump commit — wire to click', () => {

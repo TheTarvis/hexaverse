@@ -1,6 +1,10 @@
 package common
 
-import "sync"
+import (
+	"sync"
+
+	"hexaverse/config"
+)
 
 // GameTuning is the single source of truth for gameplay PACING — the knobs that
 // govern how fast the world feels. One struct, one file, primitives only: it is
@@ -46,9 +50,12 @@ import "sync"
 //
 // This is distinct from config.WorldTimeScale (see worldtime.go), which warps sim
 // time against the wall clock globally. Tuning changes what the world COSTS;
-// scale changes how fast the clock RUNS. Today scale is 1 everywhere (the client
-// clock in frontend/hooks/use-world-time.ts hardcodes 1 and is not yet shipped the
-// server's scale), so tuning is the knob that actually works end-to-end.
+// scale changes how fast the clock RUNS. Both work end to end now: every read
+// that carries a worldTime carries the clock's scale beside it, and the client
+// clock (frontend/lib/client-clock) projects off the SERVED pair rather than
+// assuming 1. Prod and dev still run at scale 1; the Playwright stack boots its
+// backend warped (frontend/e2e/setup/backend-stack.ts) so a suite does not wait
+// out a burn in real time.
 //
 // # Liveness caveat (read before building the admin page)
 //
@@ -129,6 +136,25 @@ var (
 	tuningMu     sync.RWMutex
 	activeTuning = DefaultTuning()
 )
+
+// init applies the one env-level tuning override this codebase has:
+// LANE_MS_PER_DISTANCE (config.ServiceConfig.LaneMsPerDistance). 0 — the flag's
+// default, and what every environment that sets nothing gets — leaves the
+// shipped baseline exactly as DefaultTuning states it, so prod and dev are
+// untouched. The Playwright stack sets it so a lane jump does not cost the
+// suite real minutes of wall clock.
+//
+// It runs before any service is constructed (package-level vars initialize
+// first, then init, and config's own init — flag parsing included — has already
+// run because common imports config), which matters: the pacing knobs are
+// captured at construction, per the liveness caveat on GameTuning.
+func init() {
+	if v := config.ServiceConfig.LaneMsPerDistance; v > 0 {
+		t := activeTuning
+		t.LaneMsPerDistance = v
+		activeTuning = t
+	}
+}
 
 // Tuning returns the live gameplay tuning. Cheap (a read-locked struct copy), so
 // call sites are free to read it per-invocation rather than caching it — that is

@@ -93,7 +93,11 @@ async function pickFarGate(page: Page, gates: ServedGate[]): Promise<ServedGate>
 const cfg = resolveE2EConfig()
 
 test.use({ storageState: { cookies: [], origins: [] } })
-test.setTimeout(1_200_000)
+// The stack this suite boots runs the simulation clock warped and lane travel
+// cheap (see `backend-stack.ts`), so the jump this spec waits out costs seconds
+// of wall clock, not the ~6 minutes it costs at prod pacing. The budget below is
+// sized to catch a HANG, not to accommodate the wait.
+test.setTimeout(300_000)
 
 test.describe('a lane-transit fizzle reports its own copy and files no record', () => {
   test('committing a sweep against the attached gate, then jumping immediately, fizzles as laneTransit/leftSystem', async ({
@@ -208,8 +212,9 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
     //    this leg failed with twice, at the full 900s budget, not a slow
     //    countdown. A reload gives `useMyFleets` its first read of the
     //    post-jump fleet; from there the roster's own client-side world
-    //    clock (`useWorldTime`, extrapolating off the wall clock at scale 1)
-    //    carries the ETA down to "now" on its own, with no further read
+    //    clock (`lib/client-clock`, extrapolating off the wall clock at the
+    //    scale the read itself served) carries the ETA down to "now" on its
+    //    own, with no further read
     //    needed — this is the same forced-refetch technique
     //    `scan-journey.spec.ts` already uses for an out-of-band state change.
     await page.reload()
@@ -237,7 +242,10 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
         async () =>
           Number(await page.getByTestId(`fleet-row-eta-${fleetId}`).getAttribute('data-raw')),
         {
-          timeout: 900_000,
+          // Generous against the warped stack's own jump (seconds), small
+          // enough that a jump that never lands fails this run in a minute
+          // rather than a quarter of an hour.
+          timeout: 120_000,
           message:
             "the jump's own ETA must actually count down to zero before forcing settlement means anything",
         },

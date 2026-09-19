@@ -7,6 +7,7 @@ import {
   createWorldClock,
   useWorldClock,
   useCoarseWorldTime,
+  wallMsUntil,
   COARSE_TICK_MS,
 } from './index'
 
@@ -27,6 +28,33 @@ describe('projectWorldTime', () => {
     const anchor = { world: 0, wall: 0 }
     // A 60× world advances 60 world-ms per wall-ms.
     expect(projectWorldTime(anchor, 10, 60)).toBe(600)
+  })
+})
+
+describe('wallMsUntil — a served world instant becomes a wall-clock delay', () => {
+  it('returns the raw remaining at scale 1, where world ms and wall ms coincide', () => {
+    const clock = createWorldClock(() => 0)
+    clock.anchor(1_000, 1)
+    expect(wallMsUntil(clock, 5_000)).toBe(4_000)
+  })
+
+  it('divides by the scale on a warped world — the case a subtraction gets wrong', () => {
+    const clock = createWorldClock(() => 0)
+    clock.anchor(1_000, 5)
+    // 4000 world-ms of remaining flight elapses in 800 wall-ms at 5x. Scheduling
+    // the undivided 4000 would refetch five times later than the arrival.
+    expect(wallMsUntil(clock, 5_000)).toBe(800)
+  })
+
+  it('never returns a negative delay for an instant already past', () => {
+    const clock = createWorldClock(() => 0)
+    clock.anchor(10_000, 5)
+    expect(wallMsUntil(clock, 1_000)).toBe(0)
+  })
+
+  it('falls back to scale 1 before the clock has any reading', () => {
+    const clock = createWorldClock(() => 0)
+    expect(wallMsUntil(clock, 3_000)).toBe(3_000)
   })
 })
 

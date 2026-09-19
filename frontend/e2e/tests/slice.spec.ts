@@ -59,12 +59,15 @@ import {
  * note on exactly that failure), and it could not tell a station from a belt.
  * Reading the server's own `type`/`resources` cannot.
  *
- * Wall-clock note (design.md Risks): the test stack runs the world at scale 1
- * (no WORLD_TIME_SCALE in .env.test), so every eta here is real seconds —
- * mining 1s/ton. A burn's duration is solved from continuous distance and the
- * fleet's acceleration (`space.SolveBurn`); the exact figure is a production
- * tuning constant, not a scenario this change's spec names, so the timeouts
- * are left deliberately generous rather than guessed tight.
+ * Wall-clock note (design.md Risks): every eta here is world time, and the
+ * stack this suite boots runs the simulation clock WARPED — `backend-stack.ts`
+ * sets WORLD_TIME_SCALE (and a cheaper lane) so the suite does not wait out a
+ * burn in real time. Durations still come out of production code unchanged (a
+ * burn is solved from continuous distance and the fleet's acceleration,
+ * `space.SolveBurn`; mining is 1s/ton of world time) — only the wall clock they
+ * are spent against shrinks. The timeouts below are deliberately generous
+ * rather than guessed tight: they are hang budgets, not expected waits, and
+ * they hold at any scale including an unwarped E2E_WORLD_TIME_SCALE=1 run.
  *
  * Local-only: drives the auth emulator's signup path, like new-user.spec.ts.
  */

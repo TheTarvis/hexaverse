@@ -101,6 +101,32 @@ cd backend && ENV=TEST go run ./cmd/seed
 is the same hazard **sequentially**, which is easier to trip and gives no
 warning at all.
 
+### The Playwright stack runs the world warped
+
+The suite used to wait out the simulation in real time — a burn to the home
+station cost ~20s in a dozen specs and one lane jump cost ~6 minutes, which was
+60% of a 16.5-minute run. `backend-stack.ts` now boots the test backend with two
+pacing knobs set:
+
+| Env var | Default here | What it changes |
+|---|---|---|
+| `WORLD_TIME_SCALE` | `5` | How fast the simulation clock RUNS against the wall clock |
+| `LANE_MS_PER_DISTANCE` | `500` | What a lane COSTS in world-ms per unit of length (shipped tuning is 2500) |
+
+Neither weakens what the specs assert. Durations are still produced by
+production code, every read carries the clock's scale beside its world time, and
+the client clock projects off that served pair — only the wall clock the waits
+are spent against shrinks. Timeouts in the specs are hang budgets sized to hold
+at any scale, so they stay valid unwarped.
+
+Override with `E2E_WORLD_TIME_SCALE` / `E2E_LANE_MS_PER_DISTANCE` when a leg has
+to be observed mid-flight and the warped stack is too quick to watch —
+`E2E_WORLD_TIME_SCALE=1` restores real-time pacing. These are set on the spawned
+process rather than in `backend/.env.test` on purpose: the Go e2e suite loads
+that file and several of its tests state that the test world runs at scale
+exactly 1. A run attached to an already-running stack (`E2E_MANAGE_STACK=0`, CI)
+gets whatever pacing that stack was booted with.
+
 ### The Go e2e suite gets slower the dirtier the emulator gets
 
 Also worth knowing before you conclude the suite has hung. The backend e2e

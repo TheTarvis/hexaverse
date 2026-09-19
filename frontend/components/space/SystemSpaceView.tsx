@@ -47,7 +47,7 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion'
 import { useScanTargets, useSettledScan } from '@/hooks/use-scan'
 import { useSightings } from '@/hooks/use-sightings'
 import { useSystemSpace } from '@/hooks/use-system-space'
-import { useCoarseWorldTime, useWorldClock, type WorldClock } from '@/lib/client-clock'
+import { useCoarseWorldTime, useWorldClock, wallMsUntil, type WorldClock } from '@/lib/client-clock'
 import { queryKeys } from '@/lib/query-keys'
 import { BOARD_POLL_MS, ETA_CUSHION_MS } from '@/lib/realtime'
 import type { Fleet } from '@/lib/types/fleet'
@@ -184,7 +184,12 @@ function ScanSweepWatcher({
       )
     }
 
-    const delay = Math.max(0, eta - clock.now()) + ETA_CUSHION_MS
+    // `eta` is WORLD time and `setTimeout` counts WALL time: on a world served
+    // at a scale other than 1 those differ by exactly that factor, so the
+    // conversion is `wallMsUntil`'s, not a subtraction here. The cushion stays
+    // wall ms — it is a "just after the server would have resolved it" margin,
+    // not a simulated duration.
+    const delay = wallMsUntil(clock, eta) + ETA_CUSHION_MS
     timer = setTimeout(attempt, delay)
     return () => {
       cancelled = true
@@ -551,7 +556,9 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       .filter((e) => Number.isFinite(e) && e > clock.now())
     if (future.length === 0) return
     const soonest = Math.min(...future)
-    const delay = Math.max(0, soonest - clock.now()) + ETA_CUSHION_MS
+    // World instant -> wall delay (see the watcher's own note above): a served
+    // arrival is world time, and this timer is wall time.
+    const delay = wallMsUntil(clock, soonest) + ETA_CUSHION_MS
     const timer = setTimeout(resyncAndRefreshScanTargets, delay)
     return () => clearTimeout(timer)
   }, [candidateKey, resyncAndRefreshScanTargets, clock])

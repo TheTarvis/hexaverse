@@ -83,6 +83,32 @@ export function wallClock(): number {
  * Decision 2). */
 export const COARSE_TICK_MS = 1000
 
+/**
+ * The WALL milliseconds to wait until a WORLD instant arrives — what a
+ * `setTimeout` scheduling a refetch against a served eta actually needs.
+ *
+ * The distinction is the whole point of this helper. An eta, a burn's
+ * `ArriveMs` and a jump's `arriveMs` are all world time; `setTimeout` counts
+ * wall time. `eta − clock.now()` mixes the two, and the two are only
+ * interchangeable at scale 1 — the scale prod happens to run at, which is why
+ * a caller can get this wrong and never see it. On a world served at scale s,
+ * a world-time remaining of `d` elapses in `d / s` wall ms, so scheduling `d`
+ * directly fires late by a factor of s (at s=5, a burn that lands in 4s is
+ * refetched at 20s, and the UI sits on a stale row until the baseline poll
+ * rescues it).
+ *
+ * Never negative — a world instant already past schedules immediately. Before
+ * the clock has a reading, or on a non-finite scale, it falls back to treating
+ * the delta as wall ms, which is exactly right at scale 1 and no worse than
+ * the arithmetic it replaces anywhere else.
+ */
+export function wallMsUntil(clock: WorldClock, worldInstant: number): number {
+  const scale = clock.reading()?.scale
+  const remaining = worldInstant - clock.now()
+  const s = Number.isFinite(scale) && (scale as number) > 0 ? (scale as number) : 1
+  return Math.max(0, remaining / s)
+}
+
 export function createWorldClock(wall: () => number = wallClock): WorldClock {
   let reading: WorldReading | null = null
   return {
