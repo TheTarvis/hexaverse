@@ -1,11 +1,80 @@
 # Gate blocker — the chevron's cross-system navigation did not commit within 20s
 
-**Status:** OPEN, **one occurrence, mechanism not established**. This is the
-finding that is blocking `add-vitals-strip`'s archive.
-**Found:** 2026-09-09, `add-vitals-strip` archive-gate run 3d — the first run in
-five attempts to reach this leg at all.
-**Filed as an investigation note, not as a confirmed product defect.** Read the
-*What is established* / *What is not* split below before acting on it.
+**Status:** OPEN, **CONFIRMED product defect, mechanism established by
+experiment (2026-09-19).** Still blocking `add-vitals-strip`'s archive. The load
+hypothesis below is **refuted**; the sections from *Where* to *The cheapest next
+step* are the 2026-09-09 filing, kept as the record. Read *2026-09-19* first.
+**Found:** 2026-09-09, `add-vitals-strip` archive-gate run 3d.
+
+## 2026-09-19 — reproduced on a fast machine, and what starves the transition
+
+**Gate run 4** (full tier 4, no emulator death, zero `Received SIGTERM`):
+**13.8 minutes**, 20 passed / 3 failed. The journey failed at the *same*
+`waitForURL` (`vitals-strip-journey.spec.ts:332`). At half the usual wall time,
+load cannot be the cause. The other two reds: `refuel-commit.spec.ts:58` (burn
+never reads "under way" — the `defect-station-order-500` family) and
+`space-double-submit.spec.ts:266` (`defect-spawn-system-single-body`).
+
+**Base rate, journey alone** (`with-test-emulators.sh 'cd frontend && npx
+playwright test <spec> --repeat-each 6'`): **4 of 6 stalled at the cross-system
+`waitForURL`**, 1 of 6 failed earlier at "burn must be under way", 1 passed. A
+single solo run before that passed — so *one green solo run proves nothing*, and
+the old "what would make this stale" clause was wrong.
+
+**What the console capture had been saying all along.** The `[journey-console]`
+capture logged 31 × React `Maximum update depth exceeded` on the system view —
+home system and foreign system alike. A temporary `console.error` stack hook
+named the two setters:
+
+- `hooks/use-world-time.ts` — the rAF `tick` calls `setWorldTime` **every
+  animation frame**. The hook is called by `SystemSpaceView`, so the *entire*
+  view (scene rebuild included) re-renders at default priority ~60×/s.
+- `components/space/SpaceStage.tsx:200-204` — an effect keyed on `worldTime`
+  calls `setDrawWorldTime(worldTime)`, a second state update inside every one
+  of those commits. This is the nested passive update React is warning about.
+
+Both predate this change (`1b6c7c0`, 2026-09-03). The strip did not introduce
+the defect; its journey is the first tier-4 walk to do an **in-app
+cross-system `router.push`** out of a mounted system view.
+
+**The discriminating experiment.** Same spec, same six repeats, with one
+temporary change: the rAF tick stops calling `setWorldTime` from the instant
+before the menu-entry click. **6 of 6 passed** (vs 4 of 6 stalling without it).
+So the mechanism is: an App Router navigation is a React *transition*; the
+per-frame default-priority re-render of the whole view interrupts that
+transition's render every ~16 ms, and in dev mode the target route's render
+never gets an uninterrupted window before the 20 s budget. The `200 in 546ms`
+line from run 3d fits — the payload arrives; the render that would commit it is
+what starves. (Both diagnostic edits were reverted; nothing of them is in the
+tree.)
+
+**Not established:** whether production builds stall too (dev-mode renders are
+several times slower, so prod may merely be janky), and whether the other
+`router.push` sites in this view (the departure hand-off to `/`, the roster
+row's cross-nav — same `selectFleet`) stall at the same rate. They share the
+mechanism by construction; none has been measured.
+
+**What a fix must decide** (none applied — this needs a ruling, and likely its
+own `fix-*` change since no backend or spec'd behaviour of the strip is wrong):
+
+1. **Take the clock out of React state for the view.** Keep world time in a ref
+   / external store; the canvas reads it in its own rAF draw, and only the
+   clock readout and countdown figures subscribe (at ~1 Hz). Removes the
+   60 Hz whole-view render entirely. The real fix, and the larger one —
+   `scene` is a `useMemo` keyed on `worldTime` today.
+2. **Pause the tick while a navigation is pending** — `useTransition` around
+   the view's `router.push` calls, `animate: !isPending`. Small, and exactly
+   what the experiment proved sufficient; leaves the per-frame render in place
+   for every other transition-priority update.
+3. Drop the `SpaceStage.tsx:200` nested update (derive `drawWorldTime` during
+   render, or stamp it in the draw path). Worth doing under either option; not
+   sufficient alone — untested.
+
+**What would make this stale:** the journey green on `--repeat-each 6` (not one
+run), with no `Maximum update depth exceeded` line in its `[journey-console]`
+capture.
+
+---
 
 ## Where
 
@@ -42,7 +111,7 @@ waiting for navigation to "**/systems/sys_9_7" until "load"
    (RULING 16); its cross-system branch is covered green at unit level
    (`VitalsStripFleetCell.test.tsx:136`).
 
-## What is NOT established
+## What is NOT established *(2026-09-09 filing — superseded above)*
 
 **Why the transition never committed.** Three candidates, none confirmed, and
 this file deliberately stops short of choosing:
@@ -72,7 +141,7 @@ learning that a story consistent with the evidence is not a diagnosis
 the scenario it guards — *A menu entry names its fleet's system before it
 navigates*.
 
-## The cheapest next step, in order
+## The cheapest next step, in order *(done 2026-09-19 — see top)*
 
 1. **Re-run the journey alone on a quiet machine** (RULING 57's working
    per-spec invocation, in `fix-mutation-retry-on-4xx-rulings.md` — `npm run
@@ -80,8 +149,3 @@ navigates*.
    hypothesis stands and the gate closes; the suite's wall time is the control.
 2. If it fails again, attach a browser console and watch `router.push`: the
    question is whether the URL commit is slow or never arrives.
-
-## What would make this stale
-
-One green run of `vitals-strip-journey.spec.ts` on a machine that is not under
-foreign load, with the suite's wall time back near 28 minutes.
