@@ -43,10 +43,11 @@ import { useRunningMine, useRunningScan } from '@/hooks/use-actions'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import { useMyFleets } from '@/hooks/use-fleets'
 import { useMarketBoard, useStation } from '@/hooks/use-market'
+import { useReducedMotion } from '@/hooks/use-reduced-motion'
 import { useScanTargets, useSettledScan } from '@/hooks/use-scan'
 import { useSightings } from '@/hooks/use-sightings'
 import { useSystemSpace } from '@/hooks/use-system-space'
-import { useWorldTime } from '@/hooks/use-world-time'
+import { useCoarseWorldTime, useWorldClock, type WorldClock } from '@/lib/client-clock'
 import { queryKeys } from '@/lib/query-keys'
 import { BOARD_POLL_MS, ETA_CUSHION_MS } from '@/lib/realtime'
 import type { Fleet } from '@/lib/types/fleet'
@@ -59,6 +60,7 @@ import { SpaceCommandPanel } from './SpaceCommandPanel'
 import { SpaceStage } from './SpaceStage'
 import { buildSceneModel } from './space-scene'
 import { toggleSelection, type SpaceSelection } from './space-selection'
+import type { SceneFrameInputs, SpaceFrameSource } from './space-transform-loop'
 import { VitalsStrip } from './VitalsStrip'
 
 export interface SystemSpaceViewProps {
@@ -102,14 +104,17 @@ function isNoStation(error: unknown): boolean {
  */
 function ScanSweepWatcher({
   fleetId,
-  worldTimeRef,
+  clock,
   actingIdRef,
   resyncInterior,
   onSettled,
   onAnnounce,
 }: {
   fleetId: string
-  worldTimeRef: MutableRefObject<number>
+  /** The view's shared world clock (openspec change
+   * `fix-world-time-render-loop`, task 3.3a) — a component-boundary prop,
+   * not an in-place ref read. Stable for the view's lifetime. */
+  clock: WorldClock
   /**
    * A3 (link8b-adversary-r9): the post-settle scan-target follower read is
    * scoped to the ACTING fleet only -- the target list has exactly one
@@ -179,14 +184,17 @@ function ScanSweepWatcher({
       )
     }
 
-    const delay = Math.max(0, eta - worldTimeRef.current) + ETA_CUSHION_MS
+    const delay = Math.max(0, eta - clock.now()) + ETA_CUSHION_MS
     timer = setTimeout(attempt, delay)
     return () => {
       cancelled = true
       clearTimeout(timer)
     }
+    // `clock` is stable for the view's lifetime, so it needs no
+    // eslint-disable of its own — the remaining exclusions
+    // (`runningScan`, `settledScan`) are unchanged.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eta, resyncInterior, onSettled, onAnnounce, qc, fleetId])
+  }, [eta, resyncInterior, onSettled, onAnnounce, qc, fleetId, clock])
 
   return null
 }
@@ -281,8 +289,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   )
   const acting =
     allFleets.find((f) => f.id === actingFleetId) ?? here[0] ?? null
-  // Read inside an effect below without becoming a dependency of it — the
-  // same pattern `worldTimeRef` already uses in this file.
+  // Read inside an effect below without becoming a dependency of it.
   const actingIdRef = useRef(acting?.id ?? null)
   actingIdRef.current = acting?.id ?? null
 
@@ -409,12 +416,14 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
 
   const runningMine = useRunningMine(acting?.id ?? null).data ?? null
 
-  // The clock: the interior read's served scale, falling back to the fleet
-  // read's when the interior read has failed.
+  // The clock: a CLOCK OBJECT, not clock state (openspec change
+  // `fix-world-time-render-loop`, design.md Decision 1) — the interior
+  // read's served scale, falling back to the fleet read's when the interior
+  // read has failed.
   //
   // TWO SCALE VALUES, DELIBERATELY (add-figure-formatting design.md's
   // un-defaulted-`servedScale` decision). `clockScale` keeps today's `?? 1`
-  // default and anchors the `useWorldTime` projection and the
+  // default and anchors `useWorldClock`'s projection and the
   // `space-world-clock` element's `data-scale` — unchanged, so no existing
   // clock assertion moves. `servedScale` is the SAME fallback chain WITHOUT
   // the default, threaded to every figure-rendering child below so a figure
@@ -423,25 +432,55 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const clockScale = interior.data?.scale ?? acting?.scale ?? allFleets[0]?.scale ?? 1
   const servedScale: number | undefined = interior.data?.scale ?? acting?.scale ?? allFleets[0]?.scale
   const serverWorldTime = interior.data?.worldTime ?? acting?.worldTime ?? allFleets[0]?.worldTime
-  const worldTime = useWorldTime(serverWorldTime, { scale: clockScale })
-  const worldTimeRef = useRef(worldTime)
-  worldTimeRef.current = worldTime
+  const clock = useWorldClock(serverWorldTime, clockScale)
+  // The COARSE tick (design.md Decision 2) — the value every panel, the
+  // roster, the strip and `data-world-time` read. Must come immediately
+  // after `useWorldClock`, in this same component (its own "immediately on
+  // re-anchor" path relies on layout-effect declaration order).
+  const worldTime = useCoarseWorldTime(clock)
+
+  // The live `prefers-reduced-motion` preference (task 3.8, OQ1 folded in).
+  const reducedMotion = useReducedMotion()
+  const sceneLog = useCallback((message: string, detail?: unknown) => console.warn(`[space] ${message}`, detail), [])
 
   const extent = interior.data?.extent ?? FALLBACK_EXTENT
 
+  // The COARSE scene — React renders the target SET, labels, tab order, aria,
+  // contacts, ghosts and fleet facts from this. Built at the coarse
+  // `worldTime`, never the per-frame value (design.md Decision 3, kickoff
+  // finding F3): the per-frame value lives only in `sceneInputsRef` below,
+  // read by the transform loop.
   const scene = useMemo(
     () =>
       buildSceneModel({
         interior: interior.data ?? null,
         fleets: here,
         worldTimeMs: worldTime,
-        reducedMotion: false,
+        reducedMotion,
         selection,
-        log: (message, detail) => console.warn(`[space] ${message}`, detail),
+        log: sceneLog,
         sightings: ghostFeed.sightings,
       }),
-    [interior.data, here, worldTime, selection, ghostFeed.sightings],
+    [interior.data, here, worldTime, reducedMotion, selection, ghostFeed.sightings, sceneLog],
   )
+
+  // The transform loop's own scene inputs, refreshed during render (the
+  // file's existing ref precedent) — the loop reads THIS at `clock.now()`,
+  // once per animation frame, never through React state.
+  const sceneInputsRef = useRef<SceneFrameInputs | null>(null)
+  sceneInputsRef.current = {
+    interior: interior.data ?? null,
+    fleets: here,
+    reducedMotion,
+    selection,
+    log: sceneLog,
+    sightings: ghostFeed.sightings,
+  }
+  const frameSource = useMemo<SpaceFrameSource>(() => ({ clock, inputsRef: sceneInputsRef }), [clock])
+
+  // A STABLE callback: the inline arrow this replaces would re-fire the
+  // stage's announce effect on every render.
+  const handleFirstFrame = useCallback(() => setFirstFrame(true), [])
 
   // QA return (sighting-log "A Log Row and Its Ghost Address the Same
   // Record By Its Served Id"): the log answers "does this row have a mark"
@@ -509,13 +548,13 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     const future = candidateKey
       .split(',')
       .map(Number)
-      .filter((e) => Number.isFinite(e) && e > worldTimeRef.current)
+      .filter((e) => Number.isFinite(e) && e > clock.now())
     if (future.length === 0) return
     const soonest = Math.min(...future)
-    const delay = Math.max(0, soonest - worldTimeRef.current) + ETA_CUSHION_MS
+    const delay = Math.max(0, soonest - clock.now()) + ETA_CUSHION_MS
     const timer = setTimeout(resyncAndRefreshScanTargets, delay)
     return () => clearTimeout(timer)
-  }, [candidateKey, resyncAndRefreshScanTargets])
+  }, [candidateKey, resyncAndRefreshScanTargets, clock])
 
   // Rule 2 — the live channel: resync on reconnect, since events may have
   // landed while it was down. (`EventSource` is absent under test.)
@@ -592,12 +631,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     }
     phaseRef.current = next
 
-    const mineNow = !!runningMine && runningMine.eta > worldTimeRef.current
+    const mineNow = !!runningMine && runningMine.eta > clock.now()
     if (mineRunningRef.current && !mineNow) landed.push('Mining run complete.')
     mineRunningRef.current = mineNow
 
     if (landed.length > 0) setAnnouncement(landed.join(' '))
-  }, [allFleets, runningMine])
+  }, [allFleets, runningMine, clock])
 
   // --- departure hand-off, scoped to the ACTING fleet ----------------------
 
@@ -724,7 +763,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         <ScanSweepWatcher
           key={fleet.id}
           fleetId={fleet.id}
-          worldTimeRef={worldTimeRef}
+          clock={clock}
           actingIdRef={actingIdRef}
           resyncInterior={resync}
           onSettled={refetchGhostFeed}
@@ -774,11 +813,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               selection={selection}
               onSelect={(picked) => setSelection((current) => toggleSelection(current, picked))}
               onAvailabilityChange={setCanvasAvailable}
-              onFirstFrame={() => setFirstFrame(true)}
+              onFirstFrame={handleFirstFrame}
               highlightedGhostId={highlightedGhostId}
               onHighlightGhost={setHighlightedGhostId}
               actingFleetId={acting?.id ?? null}
               onActivateFleet={setActingFleetId}
+              frameSource={frameSource}
             />
           </>
         )}

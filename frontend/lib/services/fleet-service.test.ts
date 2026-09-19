@@ -33,19 +33,28 @@ describe('fleetService', () => {
     vi.clearAllMocks()
   })
 
-  it('lists the requester’s own fleets via GET /v1/fleets?mine=true', async () => {
-    const list: FleetList = { fleets: [fleet], worldTime: 123456 }
+  // fix-world-time-render-loop, task 3.4 (impl contract §4): `listMine()`
+  // now returns the WHOLE envelope — `{ fleets, worldTime, scale }` — not
+  // just the fleets array, so `GalaxyView`'s clock can anchor on the
+  // envelope's served scale instead of dropping it.
+  it('lists the requester’s own fleets via GET /v1/fleets?mine=true, exposing the envelope\'s scale', async () => {
+    const list: FleetList = { fleets: [fleet], worldTime: 123456, scale: 60 }
     mockGet.mockResolvedValue(ok(list))
 
     const result = await fleetService.listMine()
 
     expect(mockGet).toHaveBeenCalledWith('/v1/fleets?mine=true')
-    expect(result).toEqual([fleet])
+    expect(result.fleets).toEqual([fleet])
+    expect(result.worldTime).toBe(123456)
+    expect(result.scale).toBe(60)
   })
 
-  it('returns an empty array when the envelope carries no fleets', async () => {
-    mockGet.mockResolvedValue(ok({ worldTime: 1 } as FleetList))
-    expect(await fleetService.listMine()).toEqual([])
+  it('returns an empty fleets array when the envelope carries none, still exposing worldTime/scale', async () => {
+    mockGet.mockResolvedValue(ok({ worldTime: 1, scale: 1 } as FleetList))
+    const result = await fleetService.listMine()
+    expect(result.fleets).toEqual([])
+    expect(result.worldTime).toBe(1)
+    expect(result.scale).toBe(1)
   })
 
   it('gets one own fleet via GET /v1/fleets/:id', async () => {

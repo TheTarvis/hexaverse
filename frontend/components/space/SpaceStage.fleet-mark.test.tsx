@@ -86,6 +86,8 @@ function stage(over: Partial<React.ComponentProps<typeof SpaceStage>> = {}) {
       actingFleetId="fleet-1"
       onActivateFleet={onActivateFleet}
       scale={1}
+      // fix-world-time-render-loop, task 4.7 migration: static-scene mode.
+      frameSource={null}
       {...over}
     />,
   )

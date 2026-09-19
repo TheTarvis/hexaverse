@@ -37,14 +37,20 @@ import {
   type DrawOrbitElements,
   type DrawVec3,
 } from '@/lib/space/draw'
-import { TAN_HALF_FOV, viewBasisOf } from '../space-projection'
-import type { SpaceCamera } from '../space-camera'
+import { TAN_HALF_FOV } from '../space-projection'
 import type { SceneMark, SceneModel } from '../space-scene'
+import type { SpaceFrame } from '../space-transform-loop'
 
 export interface SpaceWorldProps {
   canvas: HTMLCanvasElement
-  scene: SceneModel
-  camera: SpaceCamera
+  /**
+   * The transform loop's published frame (openspec change
+   * `fix-world-time-render-loop`, impl contract §8) — replaces the former
+   * `scene`/`camera` props. `draw()` reads `frameRef.current` fresh every
+   * frame; with no frame published yet it renders nothing and announces
+   * nothing.
+   */
+  frameRef: { readonly current: SpaceFrame | null }
   extent: number
   /**
    * The fleet the view is commanding — ringed in the fleet green so the
@@ -197,18 +203,13 @@ function ringKeyOf(ring: { parentId: string; elements: DrawOrbitElements }): str
 
 export function SpaceWorld({
   canvas,
-  scene,
-  camera,
+  frameRef,
   extent,
   actingFleetId = null,
   onFirstFrame,
 }: SpaceWorldProps) {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
-  const sceneRef = useRef<SceneModel>(scene)
-  const cameraRef = useRef<SpaceCamera>(camera)
   const actingRef = useRef<string | null>(actingFleetId)
-  sceneRef.current = scene
-  cameraRef.current = camera
   actingRef.current = actingFleetId
 
   useEffect(() => {
@@ -332,8 +333,20 @@ export function SpaceWorld({
     const streaks: THREE.Line[] = []
     const rings = new Map<string, THREE.Line>()
     const belts = new Map<string, THREE.Points>()
-    let frame = 0
+    let frameId = 0
     let announced = false
+    // The published frame's scene, refreshed at the top of every `draw()`
+    // call — the sync helpers below read THIS, never `frameRef` directly, so
+    // they stay agnostic to where the scene came from.
+    let liveScene: SceneModel = {
+      marks: [],
+      curves: [],
+      beltFields: [],
+      orbitRings: [],
+      positionTimeMs: 0,
+      decorativeTimeMs: 0,
+      omissions: [],
+    }
 
     const halo = (color: number, opacity: number, scale: number): THREE.Mesh => {
       const shell = new THREE.Mesh(
@@ -412,7 +425,7 @@ export function SpaceWorld({
       const live = new Set<string>()
       let selected: { mark: SceneMark; radius: number } | null = null
       let acting: { mark: SceneMark; radius: number } | null = null
-      for (const mark of sceneRef.current.marks) {
+      for (const mark of liveScene.marks) {
         live.add(mark.id)
         let entry = meshes.get(mark.id)
         const variant = mark.kind === 'fleet' ? mark.fleetMode : undefined
@@ -445,7 +458,7 @@ export function SpaceWorld({
 
       if (selected) {
         const { mark, radius } = selected
-        const pulse = 1.7 + Math.sin(sceneRef.current.decorativeTimeMs / 260) * 0.08
+        const pulse = 1.7 + Math.sin(liveScene.decorativeTimeMs / 260) * 0.08
         reticle.position.set(mark.position.x, mark.position.y, mark.position.z)
         reticle.scale.setScalar(radius * pulse)
         reticle.quaternion.copy(view.quaternion)
@@ -456,7 +469,7 @@ export function SpaceWorld({
 
       if (acting) {
         const { mark, radius } = acting
-        const pulse = 2.2 + Math.sin(sceneRef.current.decorativeTimeMs / 340) * 0.1
+        const pulse = 2.2 + Math.sin(liveScene.decorativeTimeMs / 340) * 0.1
         actingRing.position.set(mark.position.x, mark.position.y, mark.position.z)
         actingRing.scale.setScalar(radius * pulse)
         actingRing.quaternion.copy(view.quaternion)
@@ -488,7 +501,7 @@ export function SpaceWorld({
         decor.remove(line)
         disposeLine(line)
       }
-      for (const curve of sceneRef.current.curves) {
+      for (const curve of liveScene.curves) {
         if (curve.controlPoints.length < 2) continue
         const whole: THREE.Vector3[] = []
         for (let i = 0; i <= CURVE_SAMPLES; i++) {
@@ -521,7 +534,7 @@ export function SpaceWorld({
 
       // A drifting fleet's heading: a streak from the mark along its SERVED
       // velocity. Decorative — the facts card displays the served figures.
-      for (const mark of sceneRef.current.marks) {
+      for (const mark of liveScene.marks) {
         if (mark.kind !== 'fleet' || mark.fleetMode !== 2 || !mark.velocity) continue
         const v = mark.velocity
         const speed = Math.hypot(v.x, v.y, v.z)
@@ -550,7 +563,7 @@ export function SpaceWorld({
     // one), sampled once and moved to the parent's frame every frame.
     const syncRings = () => {
       const live = new Set<string>()
-      for (const ring of sceneRef.current.orbitRings) {
+      for (const ring of liveScene.orbitRings) {
         const key = ringKeyOf(ring)
         live.add(key)
         let line = rings.get(key)
@@ -582,7 +595,7 @@ export function SpaceWorld({
     // in its parent's frame — never a mark, never pickable.
     const syncBelts = () => {
       const live = new Set<string>()
-      for (const field of sceneRef.current.beltFields) {
+      for (const field of liveScene.beltFields) {
         live.add(field.bodyId)
         let points = belts.get(field.bodyId)
         if (!points) {
@@ -625,16 +638,22 @@ export function SpaceWorld({
     }
 
     const draw = () => {
-      const width = canvas.clientWidth || 1
-      const height = canvas.clientHeight || 1
-      renderer.setSize(width, height, false)
-      view.aspect = width / height
+      const published = frameRef.current
+      if (!published) {
+        // No frame has been built yet — render nothing, announce nothing,
+        // and keep the loop alive for the next one.
+        frameId = requestAnimationFrame(draw)
+        return
+      }
+      liveScene = published.scene
+      const basis = published.basis
+      renderer.setSize(basis.widthPx, basis.heightPx, false)
+      view.aspect = basis.widthPx / Math.max(1, basis.heightPx)
       view.updateProjectionMatrix()
 
-      const basis = viewBasisOf(cameraRef.current, { width, height })
       view.position.set(basis.eye.x, basis.eye.y, basis.eye.z)
       view.up.set(basis.up.x, basis.up.y, basis.up.z)
-      const target = cameraRef.current.target
+      const target = published.camera.target
       view.lookAt(target.x, target.y, target.z)
 
       syncMarks()
@@ -646,11 +665,11 @@ export function SpaceWorld({
         announced = true
         onFirstFrame?.()
       }
-      frame = requestAnimationFrame(draw)
+      frameId = requestAnimationFrame(draw)
     }
 
     const disposeAll = () => {
-      cancelAnimationFrame(frame)
+      cancelAnimationFrame(frameId)
       for (const [, entry] of meshes) disposeMesh(entry.mesh)
       for (const line of lines) disposeLine(line)
       for (const line of streaks) disposeLine(line)
@@ -687,6 +706,9 @@ export function SpaceWorld({
     }
 
     return disposeAll
+    // `frameRef` is a stable ref object (`{ readonly current: SpaceFrame |
+    // null }`) for the whole mount — it belongs in no dependency array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvas, extent, onFirstFrame])
 
   return null

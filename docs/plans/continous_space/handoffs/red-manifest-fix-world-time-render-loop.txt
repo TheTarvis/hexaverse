@@ -1,5 +1,5 @@
 # red-suite handoff manifest for fix-world-time-render-loop
-# recorded 2026-09-19T18:56:58Z
+# recorded 2026-09-19T19:47:03Z
 # verify with: bash .claude/scripts/openspec-red-manifest.sh verify fix-world-time-render-loop
 6169ce61b0babdf0a44151ff7dc1a074f9492f93b39c5defd04ae55c553db00a  frontend/components/galaxy/GalaxyView.render-loop.test.tsx
 b35f0248a8608bc0081eee0944454f09a4fcce9927be923c3356faa41037f24b  frontend/components/galaxy/GalaxyView.test.tsx
@@ -8,14 +8,15 @@ c0a04d10c7aca453ace2263ade42fdae02ba88ab43e67ea1f41ae57ba3501229  frontend/compo
 39d04369bd6493ef8fe22441228f194aa4af1f64c4fec0f62c608f419fec5a98  frontend/components/space/SpaceStage.renderer.test.tsx
 c326483477115df03f9cabb06cd451a8143d9263415d38739f5dfa97f9a51101  frontend/components/space/SpaceStage.sighting-ghost-selection-guard.test.tsx
 e6a63ecfd474c9eabcfc0c8962643fa2fccee359108c54412796a3af9a7e81a0  frontend/components/space/SpaceStage.test.tsx
-4e873fcc3a6c1353c0cef4a646778737b732773923bc4a8fd61f2dc544a8557e  frontend/components/space/SpaceStage.transform-loop.test.tsx
+49c1328644e1145bda3ade3248ec8dae5a2ab9819e0a5e53e214fa90cfb15027  frontend/components/space/SpaceStage.transform-loop.test.tsx
 dae85b9fb0c22d0024c156300bffbcc88d053d37d4c2f0c3040872df52b17fa7  frontend/components/space/SystemSpaceView.render-loop.test.tsx
 95bd3d2c2aaa6c73015032794952bd41cab1348d0b30ef7b05c34bb10a3c6307  frontend/components/space/SystemSpaceView.test.tsx
 47850893bf3fb1c94028ccb800dccc53ddb28048eb949d1932a376f7bd027486  frontend/components/space/space-projection.test.ts
 97c8b4accd0d7ff9a569104fffdddd7a2924e73f08e0d100756aca7d5d5dfb38  frontend/components/space/space-transform-loop.test.ts
-dd95dfdf0389c1b4d2725bb448ba1cb9eb988d44923f83da99826f8f5a1f77be  frontend/components/space/webgl/SpaceWorld.draw.test.tsx
-0bb1628727c758332ceb5f4c39e3bb184868cc4f54c0c8578899caebffec332f  frontend/components/space/webgl/SpaceWorld.test.tsx
+1775e7d82646a383b0ac3717f6e3a8d423670e995b678cffe468e30a2fff0dfd  frontend/components/space/webgl/SpaceWorld.draw.test.tsx
+7d6a1ad696f5ae722b0bc08ebeaa6089d0f76c9a64a94734d84b6c8d04a340bf  frontend/components/space/webgl/SpaceWorld.test.tsx
 afab44a5b98b9ddb632c578a17530d63a1b641e521951bbc74df85fc8e1e3693  frontend/hooks/use-fleets.test.tsx
 27911be63a04ae5c1cf3c82374362ba35b31d8a2598611c8ca639e6d32e444de  frontend/hooks/use-reduced-motion.test.tsx
 68e8312ed837c069d5b92c3c9411e4619986601ce71e28a13a6950455ae5e3db  frontend/lib/client-clock/index.test.tsx
+07d7b45c6cdba047c437cb61b57594b97f3fbd52756bf1494a2c18c40f31832b  frontend/lib/format/guards.test.ts
 8393fded25c779fa1127a7abc5491aa8f72f99fa5cc3a9f325ef1a30f78cd95e  frontend/lib/services/fleet-service.test.ts

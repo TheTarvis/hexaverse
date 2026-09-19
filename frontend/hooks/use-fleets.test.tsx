@@ -63,8 +63,13 @@ function createWrapper() {
 describe('useMyFleets', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  // fix-world-time-render-loop, task 3.4 (impl contract §4): `listMine()`
+  // now resolves the WHOLE fleet-list envelope; `data` keeps its `Fleet[]`
+  // shape for every existing consumer (`FleetRoster.tsx`, `SystemSpaceView.tsx`,
+  // `GalaxyView.tsx` all read it as an array), migrated to resolve an
+  // envelope rather than a bare array.
   it('reads the requester’s own fleets across systems', async () => {
-    mockService.listMine.mockResolvedValue([parkedFleet])
+    mockService.listMine.mockResolvedValue({ fleets: [parkedFleet], worldTime: 123_456, scale: 1 })
     const { Wrapper } = createWrapper()
 
     const { result } = renderHook(() => useMyFleets(), { wrapper: Wrapper })
@@ -72,6 +77,32 @@ describe('useMyFleets', () => {
 
     expect(mockService.listMine).toHaveBeenCalled()
     expect(result.current.data).toEqual([parkedFleet])
+  })
+
+  // SDET-added (impl contract §4): `scale` and `worldTime` come from the
+  // ENVELOPE, not from any individual fleet — the state a fleetless
+  // requester's galaxy-view hold (task 3.4d) depends on.
+  it('exposes the envelope\'s scale and worldTime alongside data, not per-fleet values', async () => {
+    mockService.listMine.mockResolvedValue({ fleets: [parkedFleet], worldTime: 999_000, scale: 60 })
+    const { Wrapper } = createWrapper()
+
+    const { result } = renderHook(() => useMyFleets(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(result.current.scale).toBe(60)
+    expect(result.current.worldTime).toBe(999_000)
+  })
+
+  it('SDET-added: an empty fleet list still exposes the envelope\'s served scale (no fleetless branch)', async () => {
+    mockService.listMine.mockResolvedValue({ fleets: [], worldTime: 500, scale: 1 })
+    const { Wrapper } = createWrapper()
+
+    const { result } = renderHook(() => useMyFleets(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(result.current.data).toEqual([])
+    expect(result.current.scale).toBe(1)
+    expect(result.current.worldTime).toBe(500)
   })
 
   it('honours an `enabled: false` override (the logged-out start area)', async () => {

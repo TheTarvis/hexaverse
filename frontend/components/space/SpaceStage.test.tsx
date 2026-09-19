@@ -46,6 +46,10 @@ describe('SpaceStage — the state it publishes', () => {
         // published state, not a scale-dependent figure, so a scale-less
         // mount is the correct explicit value.
         scale={undefined}
+        // fix-world-time-render-loop, task 4.7 migration: `frameSource` is a
+        // required key (contract §7.1); `null` is the static-scene test mode
+        // — this suite asserts published state, not the frame loop.
+        frameSource={null}
       />,
     )
     const region = screen.getByTestId('space-canvas-region')
@@ -72,6 +76,7 @@ describe('SpaceStage — the state it publishes', () => {
         onAvailabilityChange={onAvailabilityChange}
         onFirstFrame={onFirstFrame}
         scale={undefined}
+        frameSource={null}
       />,
     )
     expect(onAvailabilityChange).toHaveBeenCalledWith(true)
@@ -79,7 +84,7 @@ describe('SpaceStage — the state it publishes', () => {
   })
 
   it('publishes an empty selection rather than a stale one when nothing is selected', () => {
-    render(<SpaceStage systemId="s" scene={scene} extent={1} worldTime={1} selection={null} scale={undefined} />)
+    render(<SpaceStage systemId="s" scene={scene} extent={1} worldTime={1} selection={null} scale={undefined} frameSource={null} />)
     expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', '')
   })
 
@@ -92,6 +97,7 @@ describe('SpaceStage — the state it publishes', () => {
         worldTime={1}
         selection={{ point: { x: 3, y: 0, z: 4 } }}
         scale={undefined}
+        frameSource={null}
       />,
     )
     expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'point')

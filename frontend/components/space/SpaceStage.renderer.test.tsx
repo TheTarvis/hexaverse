@@ -82,6 +82,9 @@ function stage(over: Record<string, unknown> = {}) {
       // guard, not a figure, so an explicit scale-less mount is the correct
       // choice — no scenario here renders a scale-dependent figure.
       scale={undefined}
+      // fix-world-time-render-loop, task 4.7 migration: static-scene mode —
+      // this file exercises the render guard, not the frame loop.
+      frameSource={null}
       {...over}
     />,
   )
@@ -186,6 +189,7 @@ describe('SpaceStage — the unsupported state', () => {
           worldTime={1}
           selection={null}
           scale={undefined}
+          frameSource={null}
         />
       </div>,
     )
@@ -230,7 +234,7 @@ describe('SpaceStage — the interrupted state', () => {
     const onFirstFrame = vi.fn()
     const { rerender } = render(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={100} selection={null} onFirstFrame={onFirstFrame} scale={undefined} />,
+      <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={100} selection={null} onFirstFrame={onFirstFrame} scale={undefined} frameSource={null} />,
     )
     const canvas = (await screen.findByTestId('space-canvas')) as HTMLCanvasElement
     loseContext(canvas)
@@ -239,7 +243,7 @@ describe('SpaceStage — the interrupted state', () => {
     // World time has moved on while the context was gone.
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={999_999} selection={null} onFirstFrame={onFirstFrame} scale={undefined} />,
+      <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={999_999} selection={null} onFirstFrame={onFirstFrame} scale={undefined} frameSource={null} />,
     )
     restoreContext(canvas)
     // The redraw after restore is invoked with the POST-restore world time —
@@ -257,7 +261,7 @@ describe('SpaceStage — the interrupted state', () => {
       return (
         <div>
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={1} selection={{ bodyId: 'feat-body-0' }} scale={undefined} />
+          <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={1} selection={{ bodyId: 'feat-body-0' }} scale={undefined} frameSource={null} />
           <input data-testid="panel-input" value={text} onChange={(e) => setText(e.target.value)} />
         </div>
       )

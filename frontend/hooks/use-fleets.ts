@@ -10,20 +10,34 @@ import {
 } from '@tanstack/react-query'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
-import type { Fleet, MineCommit, MineRequest, OrderRequest } from '@/lib/types/fleet'
+import type { Fleet, FleetList, MineCommit, MineRequest, OrderRequest } from '@/lib/types/fleet'
+
+// MyFleetsResult — `useMyFleets`'s own shape (openspec change
+// `fix-world-time-render-loop`, task 3.4, impl contract §4). `data` KEEPS
+// the `Fleet[]` shape every existing consumer already reads it as
+// (`FleetRoster.tsx`, `SystemSpaceView.tsx`, `GalaxyView.tsx`); `scale` and
+// `worldTime` are the ENVELOPE's served values — never a per-fleet one —
+// which is what lets a fleetless requester's clock still anchor on a served
+// scale (`GalaxyView`'s unserved-scale hold names the alternative).
+export type MyFleetsResult = Omit<UseQueryResult<FleetList, Error>, 'data'> & {
+  data: Fleet[] | undefined
+  scale: number | undefined
+  worldTime: number | undefined
+}
 
 // useMyFleets — the requester's own fleets across systems, the source both
 // the roster panel and the board's mine/sell surface read from (the board
 // itself fetches no fleet data — design.md Decision 12). Enabled only when
 // authed (a corp exists).
 export function useMyFleets(
-  options?: Omit<UseQueryOptions<Fleet[], Error>, 'queryKey' | 'queryFn'>,
-): UseQueryResult<Fleet[], Error> {
-  return useQuery<Fleet[], Error>({
+  options?: Omit<UseQueryOptions<FleetList, Error>, 'queryKey' | 'queryFn'>,
+): MyFleetsResult {
+  const query = useQuery<FleetList, Error>({
     queryKey: queryKeys.fleets.mine(),
     queryFn: () => fleetService.listMine(),
     ...options,
   })
+  return { ...query, data: query.data?.fleets, scale: query.data?.scale, worldTime: query.data?.worldTime }
 }
 
 function invalidateFleet(qc: ReturnType<typeof useQueryClient>, fleet: Fleet): void {

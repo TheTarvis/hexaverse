@@ -818,10 +818,11 @@ describe('SystemSpaceView — the world clock is projected at the served scale',
   // Scenario: Live world time is projected at the served scale, not an
   // assumed one
   it('Scenario: Live world time is projected at the served scale, not an assumed one', async () => {
-    // `hooks/use-world-time.ts` defaults `scale` to 1 with a comment
-    // anticipating exactly this; `WORLD_TIME_SCALE` is a real server flag.
-    // Under continuous space a mis-scaled clock draws every orbit and burn
-    // mark visibly wrong, and reaches u = 1 at the wrong wall instant.
+    // The client clock's scale is un-defaulted here (`clockScale`'s own `?? 1`
+    // chain is the LAST resort, never the assumed value); `WORLD_TIME_SCALE`
+    // is a real server flag. Under continuous space a mis-scaled clock draws
+    // every orbit and burn mark visibly wrong, and reaches u = 1 at the wrong
+    // wall instant.
     const warped = { ...INTERIOR, scale: 60 }
     setReads({ data: warped })
     view()

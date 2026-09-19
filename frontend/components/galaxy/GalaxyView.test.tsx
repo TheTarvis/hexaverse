@@ -160,7 +160,10 @@ vi.mock('@/hooks/use-fleets', () => ({
 }))
 vi.mock('@/hooks/use-actions', () => ({ useCancelAction: vi.fn() }))
 vi.mock('@/hooks/use-market', () => ({ useMarketBoard: vi.fn() }))
-vi.mock('@/hooks/use-world-time', () => ({ useWorldTime: () => 0 }))
+// fix-world-time-render-loop, task 3.4/K7: the old per-frame world-time hook
+// this line used to mock is deleted (task 3.5); the new `@/lib/client-clock`
+// module has no rAF to stub, so there is nothing to mock here any more (the
+// mock line is removed, not repointed).
 vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 // The floating account chip reads auth context; default to logged-out (no chip).

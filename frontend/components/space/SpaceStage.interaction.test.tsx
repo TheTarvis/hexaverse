@@ -100,6 +100,9 @@ function stage(over: Record<string, unknown> = {}) {
       scale={1}
       selection={null}
       onSelect={onSelect}
+      // fix-world-time-render-loop, task 4.7 migration: static-scene mode —
+      // this file exercises the DOM interaction surface, not the frame loop.
+      frameSource={null}
       {...over}
     />,
   )
@@ -172,22 +175,11 @@ describe('SpaceStage — keyboard tab order', () => {
     expect(onSelect).toHaveBeenCalledWith({ bodyId: 'gate-sys_-6_16' })
   })
 
-  // Scenario: Focus survives the view's animation frames
-  it('Scenario: Focus survives the view\'s animation frames', async () => {
-    const { rerender } = stage()
-    const hit = screen.getByTestId('body-hit-feat-body-0')
-    hit.focus()
-    for (const t of [2, 3, 4, 5, 6]) {
-      rerender(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        <SpaceStage systemId="sys_-7_17" scene={scene as any} extent={EXTENT} worldTime={t} scale={1} selection={null} onSelect={onSelect} />,
-      )
-    }
-    expect(
-      document.activeElement,
-      'the per-frame world-time update must not unfocus the element the player is on',
-    ).toBe(screen.getByTestId('body-hit-feat-body-0'))
-  })
+  // Scenario: Focus survives the view's animation frames — MOVED (task 4.7,
+  // fix-world-time-render-loop): the old rerender-on-worldTime-prop loop is
+  // removed here (that mechanism no longer models a frame — worldTime is now
+  // the coarse figure). Restated rAF-driven, against the real transform
+  // loop, in `SpaceStage.transform-loop.test.tsx` (task 2.4).
 })
 
 describe('SpaceStage — the keyboard point-selection control', () => {
@@ -500,7 +492,7 @@ describe('SpaceStage — recenter', () => {
     // (a) a selection change
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="sys_-7_17" scene={scene as any} extent={EXTENT} worldTime={1} scale={1} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} />,
+      <SpaceStage systemId="sys_-7_17" scene={scene as any} extent={EXTENT} worldTime={1} scale={1} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} frameSource={null} />,
     )
     expect(region().getAttribute('data-camera')).toBe(moved)
 
@@ -513,7 +505,7 @@ describe('SpaceStage — recenter', () => {
     }
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="sys_-7_17" scene={moved2 as any} extent={EXTENT} worldTime={2} scale={1} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} />,
+      <SpaceStage systemId="sys_-7_17" scene={moved2 as any} extent={EXTENT} worldTime={2} scale={1} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} frameSource={null} />,
     )
     expect(region().getAttribute('data-camera')).toBe(moved)
   })
@@ -530,7 +522,7 @@ describe('SpaceStage — recenter', () => {
     expect(region().getAttribute('data-camera')).not.toBe(initial)
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <SpaceStage systemId="sys_OTHER" scene={scene as any} extent={EXTENT} worldTime={1} scale={1} selection={null} onSelect={onSelect} />,
+      <SpaceStage systemId="sys_OTHER" scene={scene as any} extent={EXTENT} worldTime={1} scale={1} selection={null} onSelect={onSelect} frameSource={null} />,
     )
     expect(region().getAttribute('data-camera')).toBe(initial)
     expect(region()).toHaveAttribute('data-reframe-animated', 'false')

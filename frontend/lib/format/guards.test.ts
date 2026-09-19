@@ -69,22 +69,30 @@ function rel(p: string): string {
  */
 const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: string; note: string }> = [
   {
-    // Re-anchored by the SDET per add-vitals-strip RULING 25's scheduled
-    // re-anchor, after step F's SpaceStage.tsx camera-cluster shrink
-    // landed. Anchors verified by grep against the live file (not taken
-    // from the developer's report) and moved from [681, 682, 738, 739,
-    // 903] to the lines below. Routine fixture maintenance under the
-    // guard's own stated procedure — not a test change requiring a fresh
-    // cause adjudication, and not a violation of test immutability.
+    // Re-anchored by the SDET per D2 (green-phase test dispute,
+    // fix-world-time-render-loop-rulings.md), after the frame-loop rewire
+    // (SpaceLayers' hit-target positioning moved to `space-transform-loop.ts`,
+    // task 4.3) shifted these lines. Anchors verified by grep against the
+    // live file and moved from [753, 754, 810, 811, 975] to the lines below
+    // — same three reviewed call sites (bearing/speed hover-facts ×2 panels
+    // + the drift-streak detail string), same count. Routine fixture
+    // maintenance under the guard's own stated procedure — not a test
+    // change requiring a fresh cause adjudication, and not a violation of
+    // test immutability.
     file: 'frontend/components/space/SpaceStage.tsx',
-    lines: [753, 754, 810, 811, 975],
-    ruling: 'RULING 10 / RULING 25',
+    lines: [837, 838, 894, 895, 1055],
+    ruling: 'RULING 10 / RULING 25 / D2',
     note: 'bearing/speed hover-facts toFixed — no covering requirement anywhere; filed as defect-hover-facts-unspecced.md, not fixed here',
   },
   {
+    // Re-anchored by the SDET per D2 (green-phase test dispute,
+    // fix-world-time-render-loop-rulings.md) — the orbit-ring memo key moved
+    // from line 195 to 201 in the same file when the frame-loop rewire
+    // landed. Anchor verified by grep against the live file; same single
+    // reviewed site (the memo key, never rendered to a player).
     file: 'frontend/components/space/webgl/SpaceWorld.tsx',
-    lines: [195],
-    ruling: 'not a player-facing figure',
+    lines: [201],
+    ruling: 'not a player-facing figure / D2',
     note: 'toFixed(4) builds a memo key, never rendered to a player',
   },
 ]

@@ -35,10 +35,17 @@ function orderBody(request: OrderRequest): Record<string, unknown> {
 
 class FleetService {
   // GET /v1/fleets?mine=true — the requester's own fleets across systems (a
-  // corpless requester gets an empty list, not an error).
-  async listMine(): Promise<Fleet[]> {
+  // corpless requester gets an empty list, not an error). Resolves the WHOLE
+  // envelope — `fleets`, `worldTime` and `scale` — so a fleetless requester's
+  // clock still has a served scale to anchor on (openspec change
+  // `fix-world-time-render-loop`, task 3.4).
+  async listMine(): Promise<FleetList> {
     const response = await apiClient.get<FleetList>('/v1/fleets?mine=true')
-    return response.data.fleets ?? []
+    return {
+      fleets: response.data.fleets ?? [],
+      worldTime: response.data.worldTime,
+      scale: response.data.scale,
+    }
   }
 
   // GET /v1/fleets/:id — one own fleet (404 if foreign, per fleet-movement

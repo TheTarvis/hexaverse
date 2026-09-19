@@ -33,7 +33,7 @@ import { useCutDrive, useJump, useMyFleets, useStop } from '@/hooks/use-fleets'
 import { useMarketBoard } from '@/hooks/use-market'
 import { MarketBoardPanel } from '@/components/market/MarketBoardPanel'
 import type { Quote } from '@/lib/types/market'
-import { useWorldTime } from '@/hooks/use-world-time'
+import { useCoarseWorldTime, useWorldClock } from '@/lib/client-clock'
 import { toast } from '@/lib/toast'
 import { jumpErrorCopy, jumpErrorReason } from '@/lib/jump-copy'
 import type { Fleet } from '@/lib/types/fleet'
@@ -158,6 +158,17 @@ export function GalaxyView() {
     guard.retry()
   }, [guard])
 
+  // A STABLE callback (openspec change `fix-world-time-render-loop`,
+  // mirroring `SystemSpaceView`'s `handleFirstFrame`): the inline arrow this
+  // replaces would re-fire `<GalaxyGraph>`'s `onReady` effect (keyed on
+  // `[onReady]`) on every render — including the coarse tick's own — costing
+  // a second commit per tick that the render-count invariant does not allow.
+  const handleGraphReady = useCallback((controller: GalaxyGraphController) => {
+    controllerRef.current = controller
+    setGraphReady(true)
+    setGuardCanvas(controller.canvas?.() ?? null)
+  }, [])
+
   // The canvas region unmounts <GalaxyGraph> only when it leaves
   // live/interrupted (composition snippet below) — nothing should keep
   // referencing its now-torn-down controller once that happens. Keyed on
@@ -176,10 +187,26 @@ export function GalaxyView() {
   // presence-marker/recenter source (components/galaxy/presence.ts).
   // Disabled on the logged-out start area (no auth token, and nothing to
   // command).
-  const { data: myFleets } = useMyFleets({ enabled: !isStartArea })
+  const { data: myFleets, scale: envelopeScale, worldTime: envelopeWorldTime } = useMyFleets({
+    enabled: !isStartArea,
+  })
   const ownFleets = useMemo(() => myFleets ?? [], [myFleets])
-  // Live clock (for the roster's countdowns) anchored to the fleet read.
-  const worldTime = useWorldTime(myFleets?.[0]?.worldTime ?? galaxy?.worldTime)
+  // Live clock (for the roster's countdowns) anchored to the fleet read's
+  // served scale (openspec change `fix-world-time-render-loop`, task 3.4;
+  // `defect-galaxy-view-clock-ignores-served-scale.md`, USER RULING 4). The
+  // envelope's `worldTime`/`scale` come first — the SAME response, so the
+  // world time and the scale the clock anchors to never disagree
+  // (kickoff finding F6) — falling back to a fleet's own served values, and
+  // finally the galaxy read's world time (which carries no scale).
+  const servedScale = envelopeScale ?? myFleets?.[0]?.scale
+  const servedWorldTime = envelopeWorldTime ?? myFleets?.[0]?.worldTime ?? galaxy?.worldTime
+  const clock = useWorldClock(servedWorldTime, servedScale)
+  const coarseWorldTime = useCoarseWorldTime(clock)
+  // The hold (design.md Decision 1, m18; galaxy-view's unserved-scale hold,
+  // B5): while no scale has been served, the clock never anchors, and this
+  // view renders the raw served world time it already holds directly —
+  // never projecting forward at an assumed rate of 1.
+  const worldTime = clock.hasReading() ? coarseWorldTime : (servedWorldTime ?? 0)
 
   // Systems hosting an own, non-jumping fleet → galaxy-tier presence markers;
   // the recenter/wake-focus home target skips a mid-jump fleet the same way
@@ -429,11 +456,7 @@ export function GalaxyView() {
               onSelect={(node) => setSelectedId(node?.id ?? null)}
               fleetSystemIds={fleetSystemIds}
               homeSystemId={homeSystemId}
-              onReady={(controller) => {
-                controllerRef.current = controller
-                setGraphReady(true)
-                setGuardCanvas(controller.canvas?.() ?? null)
-              }}
+              onReady={handleGraphReady}
             />
           </CanvasRegionBoundary>
           {/* guard.status === 'interrupted' here (the only remaining case:
@@ -471,7 +494,7 @@ export function GalaxyView() {
               row can offer is supplied below. */}
           <FleetRoster
             worldTime={worldTime}
-            scale={myFleets?.[0]?.scale}
+            scale={servedScale}
             commandOwner="roster"
             isChartedGate={isGateBody}
             activeFleetId={activeFleetId}

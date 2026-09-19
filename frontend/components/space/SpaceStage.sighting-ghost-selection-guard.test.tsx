@@ -128,6 +128,8 @@ function stage(over: Record<string, unknown> = {}) {
       selection={null}
       onSelect={onSelect}
       scale={1}
+      // fix-world-time-render-loop, task 4.7 migration: static-scene mode.
+      frameSource={null}
       {...over}
     />,
   )

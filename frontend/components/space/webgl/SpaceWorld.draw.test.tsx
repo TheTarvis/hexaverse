@@ -2,8 +2,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
 import React from 'react'
 import type { SceneModel } from '../space-scene'
-import { defaultCamera } from '../space-camera'
-import { viewBasisOf } from '../space-projection'
+import { defaultCamera, type SpaceCamera } from '../space-camera'
+import { viewBasisOf, projectMarks } from '../space-projection'
+import type { SpaceFrame } from '../space-transform-loop'
+
+// fix-world-time-render-loop, task 4.7 migration: `SpaceWorld` loses its
+// `scene`/`camera` props for a single `frameRef` (impl contract §8) — every
+// construction site below builds one via `frameOf`, matching what the
+// transform loop would publish.
+function frameOf(scene: SceneModel, camera: SpaceCamera, width = 1200, height = 900): { current: SpaceFrame } {
+  const basis = viewBasisOf(camera, { width, height })
+  return {
+    current: {
+      scene,
+      camera,
+      basis,
+      projected: new Map(projectMarks(scene, basis).map((p) => [p.mark.id, p])),
+    },
+  }
+}
 
 // SDET-AUTHORED, 2026-09-03, as the audit half of Job 5 (openspec change
 // `build-production-space-view`).
@@ -274,7 +291,7 @@ vi.mock('three', () => {
   }
 })
 
-import { SpaceWorld, BODY_DRAW_SCALE, MARK_FLOOR_DIV } from './SpaceWorld'
+import { SpaceWorld, BODY_DRAW_SCALE } from './SpaceWorld'
 
 const EXTENT = 658.7081316032265
 
@@ -320,7 +337,7 @@ beforeEach(() => {
 describe('SpaceWorld — what it actually draws', () => {
   it('SDET-added: draws one mesh per scene mark, at the served position', () => {
     const scene = sceneOf()
-    render(<SpaceWorld canvas={usableCanvas()} scene={scene} camera={defaultCamera(EXTENT)} extent={EXTENT} />)
+    render(<SpaceWorld canvas={usableCanvas()} frameRef={frameOf(scene, defaultCamera(EXTENT))} extent={EXTENT} />)
 
     expect(recorder.renderers, 'a usable context must produce a renderer').toHaveLength(1)
     expect(recorder.renderCalls, 'one frame must have been drawn').toHaveLength(1)
@@ -340,7 +357,7 @@ describe('SpaceWorld — what it actually draws', () => {
       ],
     })
     const { container } = render(
-      <SpaceWorld canvas={usableCanvas()} scene={scene} camera={defaultCamera(EXTENT)} extent={EXTENT} />,
+      <SpaceWorld canvas={usableCanvas()} frameRef={frameOf(scene, defaultCamera(EXTENT))} extent={EXTENT} />,
     )
     expect(container.innerHTML, 'the world renders no DOM of its own').toBe('')
 
@@ -355,7 +372,7 @@ describe('SpaceWorld — what it actually draws', () => {
     const at = { x: 18, y: -3, z: -15 } // feat-body-0's served position
     const base = sceneOf()
     const first = render(
-      <SpaceWorld canvas={usableCanvas()} scene={base} camera={defaultCamera(EXTENT)} extent={EXTENT} />,
+      <SpaceWorld canvas={usableCanvas()} frameRef={frameOf(base, defaultCamera(EXTENT))} extent={EXTENT} />,
     )
     const unselected = meshAt(at).scale
     first.unmount()
@@ -364,7 +381,7 @@ describe('SpaceWorld — what it actually draws', () => {
     const selected = sceneOf({
       marks: base.marks.map((m) => (m.id === 'feat-body-0' ? { ...m, selected: true } : m)),
     })
-    render(<SpaceWorld canvas={usableCanvas()} scene={selected} camera={defaultCamera(EXTENT)} extent={EXTENT} />)
+    render(<SpaceWorld canvas={usableCanvas()} frameRef={frameOf(selected, defaultCamera(EXTENT))} extent={EXTENT} />)
     expect(meshAt(at).scale, 'the selected mark must read larger').toBeGreaterThan(unselected)
   })
 
@@ -385,7 +402,7 @@ describe('SpaceWorld — what it actually draws', () => {
         { fleetId: 'fleet_degenerate', controlPoints: [{ x: 1, y: 1, z: 1 }], param: 0 },
       ],
     })
-    render(<SpaceWorld canvas={usableCanvas()} scene={withCurve} camera={defaultCamera(EXTENT)} extent={EXTENT} />)
+    render(<SpaceWorld canvas={usableCanvas()} frameRef={frameOf(withCurve, defaultCamera(EXTENT))} extent={EXTENT} />)
     expect(recorder.renderCalls[0]!.lineCount).toBe(1)
   })
 
@@ -397,7 +414,7 @@ describe('SpaceWorld — what it actually draws', () => {
     // pixels off its click target — invisible in a screenshot, maddening in
     // play.
     const camera = defaultCamera(EXTENT)
-    render(<SpaceWorld canvas={usableCanvas()} scene={sceneOf()} camera={camera} extent={EXTENT} />)
+    render(<SpaceWorld canvas={usableCanvas()} frameRef={frameOf(sceneOf(), camera)} extent={EXTENT} />)
 
     const basis = viewBasisOf(camera, { width: 1200, height: 900 })
     const drawn = recorder.cameras.at(-1)!
@@ -419,8 +436,7 @@ describe('SpaceWorld — what it actually draws', () => {
     render(
       <SpaceWorld
         canvas={usableCanvas()}
-        scene={sceneOf()}
-        camera={defaultCamera(EXTENT)}
+        frameRef={frameOf(sceneOf(), defaultCamera(EXTENT))}
         extent={EXTENT}
         onFirstFrame={onFirstFrame}
       />,
@@ -432,7 +448,7 @@ describe('SpaceWorld — what it actually draws', () => {
     // A view the player navigates away from and back to must not leak a
     // context per visit — browsers hand out a small, fixed number.
     const { unmount } = render(
-      <SpaceWorld canvas={usableCanvas()} scene={sceneOf()} camera={defaultCamera(EXTENT)} extent={EXTENT} />,
+      <SpaceWorld canvas={usableCanvas()} frameRef={frameOf(sceneOf(), defaultCamera(EXTENT))} extent={EXTENT} />,
     )
     expect(recorder.disposedRenderers).toBe(0)
     unmount()

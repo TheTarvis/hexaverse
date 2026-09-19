@@ -29,7 +29,7 @@ import dynamic from 'next/dynamic'
 import {
   useCallback,
   useEffect,
-  useMemo,
+  useLayoutEffect,
   useRef,
   useState,
   type FocusEvent as ReactFocusEvent,
@@ -40,9 +40,9 @@ import {
 } from 'react'
 import { Figure } from '@/components/figure/Figure'
 import { formatByUnit, formatInstant, instantScaleLabel } from '@/lib/format'
-import { projectToScreen, unprojectToViewPlane, type DrawVec3 } from '@/lib/space/draw'
+import { unprojectToViewPlane, type DrawVec3, type DrawViewBasis } from '@/lib/space/draw'
 import { SpaceCanvas } from './SpaceCanvas'
-import { viewBasisOf } from './space-projection'
+import { projectMarks } from './space-projection'
 import {
   advanceDrag,
   atOrbitLimit,
@@ -66,11 +66,26 @@ import {
 } from './space-camera'
 import { resolvePick, type PickMark, type SpaceSelection } from './space-selection'
 import type { SceneMark, SceneModel } from './space-scene'
+import {
+  applyHitTransform,
+  createHitTargetRegistry,
+  useSpaceTransformLoop,
+  type HitTargetRegistry,
+  type SpaceFrame,
+  type SpaceFrameSource,
+} from './space-transform-loop'
 
 // three needs a GL context, so the world stays off the SSR path entirely.
 const SpaceWorld = dynamic(() => import('./webgl/SpaceWorld').then((m) => m.SpaceWorld), {
   ssr: false,
 })
+
+/** The screen sentinel every mark reads while no basis has been published
+ * yet (task 4.6, M11) — `x`/`y` are non-finite so the existing `screen.x ||
+ * 0` idiom the contacts/sighting layers already use degrades to `0`, and
+ * `onScreen: false` never counts toward off-screen membership (that is
+ * handled separately, at zero marks, while `viewBasis` is null). */
+const NO_BASIS_SCREEN = { x: NaN, y: NaN, depth: 0, onScreen: false } as const
 
 export interface SpaceStageProps {
   systemId: string
@@ -112,6 +127,14 @@ export interface SpaceStageProps {
    */
   actingFleetId?: string | null
   onActivateFleet?: (fleetId: string) => void
+  /**
+   * The transform loop's clock + inputs source (openspec change
+   * `fix-world-time-render-loop`, impl contract §7.1). Required key,
+   * nullable value: non-null means the loop builds each frame's scene at
+   * `clock.now()` from the inputs ref; `null` means the loop publishes the
+   * `scene` prop as-is (a static scene — tests only).
+   */
+  frameSource: SpaceFrameSource | null
 }
 
 const CAMERA_CONTROL_ATTR = 'data-space-camera-control'
@@ -149,6 +172,7 @@ export function SpaceStage({
   onHighlightGhost,
   actingFleetId = null,
   onActivateFleet,
+  frameSource,
 }: SpaceStageProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState(true)
@@ -158,6 +182,7 @@ export function SpaceStage({
   const [hoveredContactId, setHoveredContactId] = useState<string | null>(null)
   const [hoveredGhostId, setHoveredGhostId] = useState<string | null>(null)
   const [hoveredFleetId, setHoveredFleetId] = useState<string | null>(null)
+  const [viewBasis, setViewBasis] = useState<DrawViewBasis | null>(null)
 
   // A new system is a new view: the framing resets, with no transition, and
   // nothing else resets it. Adjusted during render (never in an effect) so a
@@ -169,11 +194,34 @@ export function SpaceStage({
     setCamera(defaultCamera(extent))
   }
 
-  const viewport = useMemo(
-    () => ({ width: host?.clientWidth || 1, height: host?.clientHeight || 1 }),
-    [host],
+  // THE transform loop's published frame (design.md Decision 3, decided
+  // option B) — written by the loop, read by `pickAt`, the pan-by-pixels
+  // gesture, and the focus/off-screen-chip reframe (Decision 3, Decision 7).
+  const frameRef = useRef<SpaceFrame | null>(null)
+  const cameraRef = useRef(camera)
+  cameraRef.current = camera
+  const staticSceneRef = useRef(scene)
+  staticSceneRef.current = scene
+
+  // A newly mounted target is placed from the last frame in the same
+  // commit (via `applyHitTransform`), so it never flashes at the origin.
+  const [registry] = useState<HitTargetRegistry>(() =>
+    createHitTargetRegistry((id, el) => applyHitTransform(frameRef.current, id, el)),
   )
-  const basis = useMemo(() => viewBasisOf(camera, viewport), [camera, viewport])
+
+  const loop = useSpaceTransformLoop({
+    enabled: available,
+    host,
+    registry,
+    cameraRef,
+    frameRef,
+    source: frameSource,
+    staticSceneRef,
+    onViewChange: setViewBasis,
+  })
+  useLayoutEffect(() => {
+    loop.refresh()
+  }, [camera, loop])
 
   // Focus bookkeeping for the notice's focus claim. Cleared only when focus
   // lands somewhere else — never by an unmount, which in most engines moves
@@ -194,14 +242,23 @@ export function SpaceStage({
     [onAvailabilityChange],
   )
 
-  // The draw stamp advances only while the context is live, so a redraw
-  // after a restore is observably taken from the CURRENT world time rather
-  // than replayed from the stale one the loss froze.
+  // The draw stamp — a RENDER-PHASE state adjustment (React's sanctioned
+  // "adjust state when a prop changes" pattern, not an effect: task 4.5,
+  // design.md Decision 6, kickoff ruling K1). It advances only while the
+  // context is live, so a redraw after a restore is observably taken from
+  // the CURRENT world time rather than replayed from the stale one the loss
+  // froze — and it costs no second commit the way a passive-effect write
+  // would (K1: two commits per coarse tick would blow the ≤3-per-2s bound).
+  if (available && drawWorldTime !== worldTime) {
+    setDrawWorldTime(worldTime)
+  }
+
+  // `onFirstFrame` stays on the React side (design.md Decision 6) — never
+  // threaded onto either loop.
   useEffect(() => {
     if (!available) return
-    setDrawWorldTime(worldTime)
     onFirstFrame?.()
-  }, [available, worldTime, onFirstFrame])
+  }, [available, onFirstFrame])
 
   const reframeOn = useCallback(
     (position: DrawVec3) => {
@@ -214,15 +271,20 @@ export function SpaceStage({
 
   // --- picking -------------------------------------------------------------
 
+  // Reads the transform loop's published frame — the SOLE basis authority
+  // (design.md Decision 7). With no frame yet, returns `undefined` (never
+  // `null`, which means "resolved to no selection") and `finishGesture`
+  // below does not call `onSelect` at all.
   const pickAt = useCallback(
-    (clientX: number, clientY: number, marks: PickMark[]): SpaceSelection | null => {
-      if (!host) return null
+    (clientX: number, clientY: number, marks: PickMark[]): SpaceSelection | null | undefined => {
+      const frame = frameRef.current
+      if (!host || !frame) return undefined
       const rect = host.getBoundingClientRect()
       const planePoint = unprojectToViewPlane(
         clientX - rect.left,
         clientY - rect.top,
-        basis,
-        camera.target,
+        frame.basis,
+        frame.camera.target,
       )
       return resolvePick({
         screenX: clientX - rect.left,
@@ -234,7 +296,7 @@ export function SpaceStage({
         pickRadius: pickRadius(extent),
       })
     },
-    [host, basis, camera.target, extent],
+    [host, extent],
   )
 
   // --- pointer gestures ----------------------------------------------------
@@ -273,13 +335,19 @@ export function SpaceStage({
       // A gesture that BEGINS over a mark still moves the camera — the mark
       // claims the press only if it turns out to be a click.
       if (!isGesture(gesture.tracker)) return
-      setCamera((prev) =>
-        gesture.secondary
-          ? panByPixels(prev, dx, dy, viewport, extent)
-          : orbitByPixels(prev, dx, dy),
-      )
+      if (gesture.secondary) {
+        // Pan by pixels reads the LOOP's published viewport (design.md
+        // Decision 7) — `SpaceStage`'s own `[host]`-keyed memo is deleted.
+        // With no frame published yet, the move is skipped.
+        const frame = frameRef.current
+        if (!frame) return
+        const viewportPx = { width: frame.basis.widthPx, height: frame.basis.heightPx }
+        setCamera((prev) => panByPixels(prev, dx, dy, viewportPx, extent))
+      } else {
+        setCamera((prev) => orbitByPixels(prev, dx, dy))
+      }
     },
-    [viewport, extent],
+    [extent],
   )
 
   const finishGesture = useCallback(
@@ -291,7 +359,9 @@ export function SpaceStage({
         onSelect?.({ bodyId: gesture.bodyId })
         return
       }
-      onSelect?.(pickAt(clientX, clientY, marks))
+      const picked = pickAt(clientX, clientY, marks)
+      if (picked === undefined) return
+      onSelect?.(picked)
     },
     [onSelect, pickAt],
   )
@@ -380,13 +450,7 @@ export function SpaceStage({
         onAvailabilityChange={handleAvailability}
         claimFocus={focusInsideRef.current}
         renderWorld={(canvas) => (
-          <SpaceWorld
-            canvas={canvas}
-            scene={scene}
-            camera={camera}
-            extent={extent}
-            actingFleetId={actingFleetId}
-          />
+          <SpaceWorld canvas={canvas} frameRef={frameRef} extent={extent} actingFleetId={actingFleetId} />
         )}
       >
         <SpaceLayers
@@ -394,8 +458,8 @@ export function SpaceStage({
           camera={camera}
           extent={extent}
           scale={scale}
-          basis={basis}
-          viewport={viewport}
+          viewBasis={viewBasis}
+          registry={registry}
           selection={selection}
           focusedMarkId={focusedMarkId}
           hoveredContactId={hoveredContactId}
@@ -405,9 +469,10 @@ export function SpaceStage({
           actingFleetId={actingFleetId}
           onHoverFleet={setHoveredFleetId}
           onActivateFleet={onActivateFleet}
-          onFocusMark={(id, position) => {
+          onFocusMark={(id) => {
             setFocusedMarkId(id)
-            if (position) reframeOn(position)
+            const live = frameRef.current?.projected.get(id)
+            if (live && !live.screen.onScreen) reframeOn(live.mark.position)
           }}
           onBlurMark={() => setFocusedMarkId(null)}
           onHoverContact={setHoveredContactId}
@@ -416,7 +481,10 @@ export function SpaceStage({
           onSelect={(next) => onSelect?.(next)}
           onCamera={setCamera}
           onRecenter={recenter}
-          onReframe={reframeOn}
+          onReframe={(markId, coarsePosition) => {
+            const live = frameRef.current?.projected.get(markId)
+            reframeOn(live?.mark.position ?? coarsePosition)
+          }}
           onPointerUpCapture={(clientX, clientY, marks) => finishGesture(clientX, clientY, marks)}
         />
       </SpaceCanvas>
@@ -476,8 +544,13 @@ interface SpaceLayersProps {
   camera: SpaceCamera
   extent: number
   scale: number | undefined
-  basis: ReturnType<typeof viewBasisOf>
-  viewport: { width: number; height: number }
+  /** The transform loop's published basis (design.md Decision 7 addendum,
+   * M11) — `null` before the loop's first publish. Membership recomputes
+   * whenever this or `scene` changes. */
+  viewBasis: DrawViewBasis | null
+  /** Each pickable/own-fleet target registers itself here (task 4.3a); the
+   * loop reads the registry to write every element's live position. */
+  registry: HitTargetRegistry
   selection: SpaceSelection | null
   focusedMarkId: string | null
   hoveredContactId: string | null
@@ -487,7 +560,7 @@ interface SpaceLayersProps {
   actingFleetId: string | null
   onHoverFleet: (id: string | null) => void
   onActivateFleet?: (fleetId: string) => void
-  onFocusMark: (id: string, reframeTo: DrawVec3 | null) => void
+  onFocusMark: (id: string) => void
   onBlurMark: () => void
   onHoverContact: (id: string | null) => void
   onHoverGhost: (id: string | null) => void
@@ -495,7 +568,7 @@ interface SpaceLayersProps {
   onSelect: (selection: SpaceSelection | null) => void
   onCamera: (next: (prev: SpaceCamera) => SpaceCamera) => void
   onRecenter: () => void
-  onReframe: (position: DrawVec3) => void
+  onReframe: (markId: string, coarsePosition: DrawVec3) => void
   onPointerUpCapture: (clientX: number, clientY: number, marks: PickMark[]) => void
 }
 
@@ -504,7 +577,8 @@ function SpaceLayers({
   camera,
   extent,
   scale,
-  basis,
+  viewBasis,
+  registry,
   selection,
   focusedMarkId,
   hoveredContactId,
@@ -528,13 +602,21 @@ function SpaceLayers({
   // boundary: a throw while building the drawn state is contained here.
   const marks = scene.marks
 
-  const projected = marks.map((mark) => ({ mark, screen: projectToScreen(mark.position, basis) }))
+  // Membership recomputes on the coarse tick (a new `scene` each second) and
+  // on camera/viewport change (a fresh `viewBasis`) — task 4.6, design.md
+  // Decision 7 addendum M11. Before the loop's first publish, `viewBasis` is
+  // null: no mark is off-screen and no chip is offered, but this layer still
+  // reads `scene.marks` (below), which is what keeps the canvas region's
+  // error boundary containing a throw.
+  const projected = viewBasis
+    ? projectMarks({ marks }, viewBasis)
+    : marks.map((mark) => ({ mark, screen: NO_BASIS_SCREEN }))
   const pickables = projected.filter((p) => p.mark.pickable)
   // Bodies first, then lane gates — the tab order the requirement fixes,
   // each group in the scene's own stable order.
   const bodies = pickables.filter((p) => p.mark.kind !== 'gate')
   const gates = pickables.filter((p) => p.mark.kind === 'gate')
-  const offScreen = pickables.filter((p) => !p.screen.onScreen)
+  const offScreen = viewBasis ? pickables.filter((p) => !p.screen.onScreen) : []
   const contacts = projected.filter((p) => p.mark.kind === 'contact')
   const sightings = projected.filter((p) => p.mark.kind === 'sighting')
   const fleets = projected.filter((p) => p.mark.kind === 'fleet')
@@ -569,26 +651,28 @@ function SpaceLayers({
         ? LIMIT_MESSAGE.orbit
         : ''
 
-  const hitButton = (entry: { mark: SceneMark; screen: { x: number; y: number; onScreen: boolean } }) => {
-    const { mark, screen } = entry
+  // A body/gate hit target's ENTIRE placement — the −50%/−50% centring
+  // included — is written by the transform loop's `style.transform`, every
+  // frame it runs (design.md Decision 3's "one writer per element"). React
+  // writes identity, labels, tab order and aria alone, from the coarse
+  // scene: no `left`/`top`, no translate class.
+  const hitButton = (entry: { mark: SceneMark }) => {
+    const { mark } = entry
     return (
       <button
         key={mark.id}
         type="button"
+        ref={registry.refFor(mark.id)}
         data-testid={`body-hit-${mark.id}`}
         data-body-id={mark.id}
         aria-label={mark.id}
         aria-pressed={mark.selected}
         className={
-          'pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full' +
+          'pointer-events-auto absolute left-0 top-0 rounded-full' +
           ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
         }
-        style={
-          screen.onScreen
-            ? { left: `${screen.x}px`, top: `${screen.y}px`, width: 24, height: 24 }
-            : { left: '-9999px', top: '-9999px', width: 24, height: 24 }
-        }
-        onFocus={() => onFocusMark(mark.id, screen.onScreen ? null : mark.position)}
+        style={{ width: 24, height: 24 }}
+        onFocus={() => onFocusMark(mark.id)}
         onBlur={onBlurMark}
         onKeyDown={(e) => {
           if (e.key !== 'Enter' && e.key !== ' ') return
@@ -820,27 +904,23 @@ function SpaceLayers({
               from bubbling to the region's exhaustive picking rule, where it
               would read as empty space and become a point selection. --- */}
       <div className="pointer-events-none absolute inset-0">
-        {fleets.map(({ mark, screen }) => {
+        {fleets.map(({ mark }) => {
           const acting = mark.id === actingFleetId
           return (
             <button
               key={mark.id}
               type="button"
+              ref={registry.refFor(mark.id)}
               {...{ [AFFORDANCE_ATTR]: '' }}
               data-testid={`fleet-mark-${mark.id}`}
               data-acting={acting ? 'true' : 'false'}
               aria-label={`Fleet ${mark.id}`}
               aria-pressed={acting}
               className={
-                'pointer-events-auto absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full' +
+                'pointer-events-auto absolute left-0 top-0 h-5 w-5 cursor-pointer rounded-full' +
                 ' border border-emerald-300/40 hover:border-emerald-200/90 hover:bg-emerald-300/10' +
                 ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400' +
                 (acting ? ' ring-2 ring-emerald-400/70' : '')
-              }
-              style={
-                screen.onScreen
-                  ? { left: `${screen.x}px`, top: `${screen.y}px` }
-                  : { left: '-9999px', top: '-9999px' }
               }
               onPointerOver={() => onHoverFleet(mark.id)}
               onPointerOut={() => onHoverFleet(null)}
@@ -879,12 +959,12 @@ function SpaceLayers({
             }
             style={{ top: `${16 + offScreen.findIndex((o) => o.mark.id === mark.id) * 26}px` }}
             onClick={() => {
-              onReframe(mark.position)
+              onReframe(mark.id, mark.position)
               onSelect({ bodyId: mark.id })
             }}
             onTouchEnd={(e) => {
               e.preventDefault()
-              onReframe(mark.position)
+              onReframe(mark.id, mark.position)
               onSelect({ bodyId: mark.id })
             }}
           >

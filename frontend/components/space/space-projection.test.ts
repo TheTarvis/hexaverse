@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { projectToScreen, unprojectToViewPlane } from '@/lib/space/draw'
-import { viewBasisOf, TAN_HALF_FOV } from './space-projection'
+import { viewBasisOf, TAN_HALF_FOV, projectMarks, hitTargetTransform, OFFSCREEN_PX } from './space-projection'
 import { defaultCamera, panBySteps, orbitBySteps } from './space-camera'
+import type { SceneMark } from './space-scene'
 
 // Implementer-authored (openspec build-production-space-view). The basis is
 // what keeps a DRAWN mark and its DOM hit target in the same place, and what
@@ -71,5 +72,87 @@ describe('space-projection — the camera basis', () => {
   it('exposes one field of view, shared by the picking basis and the renderer', () => {
     expect(TAN_HALF_FOV).toBeGreaterThan(0)
     expect(viewBasisOf(defaultCamera(EXTENT), VIEWPORT).tanHalfFov).toBe(TAN_HALF_FOV)
+  })
+})
+
+// RED-PHASE ADDITION — task 4.1 (impl contract §5): `projectMarks` and
+// `hitTargetTransform`, extracted from `SpaceLayers`' render so the transform
+// loop can call the SAME projection React's coarse render used to.
+
+function mark(over: Partial<SceneMark> = {}): SceneMark {
+  return { id: 'm', kind: 'body', position: { x: 0, y: 0, z: 0 }, radius: 1, pickable: true, selected: false, ...over }
+}
+
+describe('projectMarks', () => {
+  it('returns one entry per scene mark, in scene order, each { mark, screen: projectToScreen(mark.position, basis) }', () => {
+    const camera = defaultCamera(EXTENT)
+    const basis = viewBasisOf(camera, VIEWPORT)
+    const a = mark({ id: 'a', position: { x: 10, y: 0, z: 0 } })
+    const b = mark({ id: 'b', position: { x: -10, y: 0, z: 0 } })
+    const result = projectMarks({ marks: [a, b] }, basis)
+    expect(result).toHaveLength(2)
+    expect(result[0]!.mark).toBe(a)
+    expect(result[1]!.mark).toBe(b)
+    expect(result[0]!.screen).toEqual(projectToScreen(a.position, basis))
+    expect(result[1]!.screen).toEqual(projectToScreen(b.position, basis))
+  })
+
+  it('returns an empty array for an empty scene', () => {
+    const basis = viewBasisOf(defaultCamera(EXTENT), VIEWPORT)
+    expect(projectMarks({ marks: [] }, basis)).toEqual([])
+  })
+
+  it('is pure — the same scene and basis project identically on repeated calls', () => {
+    const basis = viewBasisOf(defaultCamera(EXTENT), VIEWPORT)
+    const scene = { marks: [mark({ id: 'a', position: { x: 5, y: 1, z: -2 } })] }
+    expect(projectMarks(scene, basis)).toEqual(projectMarks(scene, basis))
+  })
+})
+
+describe('hitTargetTransform', () => {
+  it('places an on-screen point at its x/y, centred', () => {
+    expect(hitTargetTransform({ x: 12.5, y: 40, onScreen: true })).toBe(
+      'translate3d(12.5px, 40px, 0px) translate(-50%, -50%)',
+    )
+  })
+
+  it('parks an off-screen point at the sentinel, centred', () => {
+    expect(hitTargetTransform({ x: 900, y: 900, onScreen: false })).toBe(
+      `translate3d(${OFFSCREEN_PX}px, ${OFFSCREEN_PX}px, 0px) translate(-50%, -50%)`,
+    )
+  })
+
+  it('parks a point behind the eye (onScreen false with a non-positive depth) at the sentinel', () => {
+    const camera = defaultCamera(EXTENT)
+    const basis = viewBasisOf(camera, VIEWPORT)
+    const behind = {
+      x: basis.eye.x - basis.forward.x * EXTENT,
+      y: basis.eye.y - basis.forward.y * EXTENT,
+      z: basis.eye.z - basis.forward.z * EXTENT,
+    }
+    const screen = projectToScreen(behind, basis)
+    expect(screen.onScreen).toBe(false)
+    expect(hitTargetTransform(screen)).toBe(
+      `translate3d(${OFFSCREEN_PX}px, ${OFFSCREEN_PX}px, 0px) translate(-50%, -50%)`,
+    )
+  })
+
+  it('parks an undefined screen point at the sentinel (a mark absent from the frame)', () => {
+    expect(hitTargetTransform(undefined)).toBe(
+      `translate3d(${OFFSCREEN_PX}px, ${OFFSCREEN_PX}px, 0px) translate(-50%, -50%)`,
+    )
+  })
+
+  it('parks a non-finite screen point at the sentinel', () => {
+    expect(hitTargetTransform({ x: NaN, y: NaN, onScreen: false })).toBe(
+      `translate3d(${OFFSCREEN_PX}px, ${OFFSCREEN_PX}px, 0px) translate(-50%, -50%)`,
+    )
+  })
+
+  it('jsdom round-trips the transform string verbatim, so a direct string comparison against a written style is valid', () => {
+    const el = document.createElement('div')
+    const str = hitTargetTransform({ x: 12.5, y: 40, onScreen: true })
+    el.style.transform = str
+    expect(el.style.transform).toBe(str)
   })
 })

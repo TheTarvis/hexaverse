@@ -187,3 +187,88 @@ and `SystemSpaceView.test.tsx` (comment-only edit) and `GalaxyView.test.tsx`
 (mock-line removal) — every file this red handoff created or modified.
 `hooks/use-world-time.test.tsx` is not in the manifest because it no longer
 exists (deleted, not modified).
+
+**Post-handoff re-record.** The manifest was re-recorded after the two
+green-phase test revisions in §10 below (adding `lib/format/guards.test.ts` —
+not part of the original red handoff, since it's a pre-existing
+`add-figure-formatting` suite, not one this change wrote — to the same 18
+paths). The re-record is **not** evidence of a fresh red handoff; it is the
+new immutability baseline for the integrity check, reflecting the two
+authorized revisions below and nothing else. `git diff`/manifest verification
+against the *original* 2026-09-19 handoff state would show exactly these two
+files changed, both with a logged cause.
+
+## 10. Post-handoff test revisions (green phase)
+
+Both authorized by the orchestrator's adjudication of a developer test
+dispute in the developer's favor (`fix-world-time-render-loop-rulings.md`,
+"Green-phase test disputes", D1 and D2) — the only cause besides a spec
+change that lets a test change after handoff. Neither assertion was weakened;
+both are fixture/anchor corrections to tests that provably misread a
+precondition or went stale under a rewire this change made, not tests that
+misjudged behaviour.
+
+- **D1 — `SpaceStage.transform-loop.test.tsx`'s `burningFleetInputs()` fixture.**
+  Cause: the fixture set `interior: null`, and `space-scene.ts:285`'s
+  `if (!interior) return empty` means `buildSceneModel` can never emit ANY
+  mark — `fleet-mark-fleet-1` included — regardless of what `fleets` names.
+  The 4.3b test (*A hit target tracks its mark on every frame*) could not
+  pass against ANY correct implementation with that fixture; this was a test
+  defect, not a behaviour dispute. Fix: `interior: movingBodyInputs().interior`
+  (a real interior, exactly as the ruling specifies), no other line touched;
+  the assertions and the scenario title are unchanged.
+  - **Meaningfulness check** (required by the ruling): backed up
+    `components/space/space-transform-loop.ts` with `cp` to
+    `/tmp/space-transform-loop.ts.bak`, neutered the loop's per-frame write
+    (`el.style.transform = hitTargetTransform(...)` → a no-op) in place,
+    re-ran the fixed test — it failed (`expected '' to be 'translate3d(...)'`),
+    confirming the test still exercises the real write. Restored the file
+    from the `cp` backup and confirmed byte-identical via `diff` before
+    deleting the backup.
+  - Confirmed green against the current (unmodified) implementation:
+    `SpaceStage.transform-loop.test.tsx` — 6/6 pass.
+- **D2 — `lib/format/guards.test.ts`'s `KNOWN_TOFIXED_EXCEPTIONS` anchors.**
+  Cause: this change's frame-loop rewire shifted line numbers in
+  `SpaceStage.tsx` and `webgl/SpaceWorld.tsx` (unrelated content added above
+  the reviewed `.toFixed(` sites), so the anchors recorded before this change
+  went stale — a routine re-anchor under the guard's own stated procedure
+  (its doc comment names exactly this maintenance path), not a behaviour
+  dispute. Verified by grep against the live files before touching anything:
+  `SpaceStage.tsx:837,838,894,895,1055` and `SpaceWorld.tsx:201` — same three
+  reviewed call sites (bearing/speed hover-facts ×2 panels + the drift-streak
+  detail string; the orbit-ring memo key), same count as the previously
+  reviewed set (`[753,754,810,811,975]` and `[195]`), and a full
+  `grep -rn '\.toFixed\(' components/space components/fleet` (excluding
+  `.test.ts`) confirmed no additional, unreviewed site exists anywhere in
+  scope. Fix: re-anchored both `lines` arrays to the grepped values, appended
+  `/ D2` to both `ruling` fields, reworded both comments with the cause.
+  - Confirmed green: `lib/format/guards.test.ts` — 8/8 pass.
+
+`lib/format/guards.test.ts` is added to the red-manifest's tracked set
+(alongside the original 18) purely so its own immutability is now baselined
+too — it was never part of this change's original red handoff (it predates
+`fix-world-time-render-loop`, from `add-figure-formatting`), but D2 makes it
+a file this change's integrity check must now also watch.
+
+- **D4 — `webgl/SpaceWorld.test.tsx`'s and `webgl/SpaceWorld.draw.test.tsx`'s
+  `frameOf()` helpers.** Cause: I reported this myself as a compile-only
+  finding after D1/D2 (`npx tsc --noEmit` — 2 errors, neither file touched
+  by D1/D2). The red-phase `frameOf()` helper's `.map((p: { mark: { id:
+  string } }) => ...)` parameter annotation existed solely to silence
+  `TS7006` (implicit `any`) while `projectMarks` did not exist yet; now that
+  the green phase landed the real `projectMarks`/`ProjectedMark` types, that
+  narrow annotation actively conflicts with them
+  (`Map<string, {mark:{id:string}}>` no longer satisfies
+  `ReadonlyMap<string, ProjectedMark>`). Fix (type-only, no assertion
+  touched, in both files): dropped the explicit parameter type so TypeScript
+  infers `ProjectedMark` from `projectMarks`'s own signature —
+  `.map((p) => [p.mark.id, p])`.
+  - Also cleared the pre-existing unused `MARK_FLOOR_DIV` import at
+    `webgl/SpaceWorld.draw.test.tsx:294` (a bare unused named import —
+    confirmed by grep that it appears nowhere else in the file, unlike its
+    sibling `BODY_DRAW_SCALE`, which is used at line 364 — so removing it
+    changes nothing else).
+  - Confirmed: `npx tsc --noEmit` — 0 errors (repo-wide). `npx eslint
+    components/space/webgl/SpaceWorld.test.tsx
+    components/space/webgl/SpaceWorld.draw.test.tsx` — 0 errors, 0 warnings.
+    `npx vitest run` on both files — 11/11 pass, assertions unchanged.

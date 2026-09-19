@@ -231,8 +231,14 @@ export interface MineCommit {
   worldTime: number
 }
 
-// The `GET /v1/fleets?systemId=` (or `?mine=true`) envelope.
+// The `GET /v1/fleets?systemId=` (or `?mine=true`) envelope. `scale` is
+// served UNCONDITIONALLY on every list form, including an empty list
+// (`fleet-movement`: *Fleet Reads Serve the Simulation Clock's Scale
+// Alongside Their World Time*) — a required field, so a fleetless
+// requester's clock never has to fall back to an assumed scale of 1
+// (openspec change `fix-world-time-render-loop`, task 3.4).
 export interface FleetList {
   fleets: Fleet[]
   worldTime: number
+  scale: number
 }

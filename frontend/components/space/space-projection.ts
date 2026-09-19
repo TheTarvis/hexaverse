@@ -4,8 +4,9 @@
 // basis a `SpaceCamera` implies, so the pure draw math stays free of view
 // state and the camera stays free of projection math.
 
-import type { DrawVec3, DrawViewBasis } from '@/lib/space/draw'
+import { projectToScreen, type DrawScreenPoint, type DrawVec3, type DrawViewBasis } from '@/lib/space/draw'
 import type { SpaceCamera } from './space-camera'
+import type { SceneMark, SceneModel } from './space-scene'
 
 /** The vertical field of view, as tan(fov / 2). */
 export const TAN_HALF_FOV = Math.tan((70 * Math.PI) / 360)
@@ -36,4 +37,42 @@ export function viewBasisOf(
     heightPx: viewport.height,
     tanHalfFov: TAN_HALF_FOV,
   }
+}
+
+// --- the transform loop's projection surface (openspec change
+// `fix-world-time-render-loop`, task 4.1) — extracted from `SpaceLayers`'
+// render so the transform loop can call the SAME projection React's coarse
+// render used to.
+
+/** One scene mark, projected to screen space. */
+export interface ProjectedMark {
+  mark: SceneMark
+  screen: DrawScreenPoint
+}
+
+/**
+ * Pure. One entry per scene mark, in scene order:
+ * `{ mark, screen: projectToScreen(mark.position, basis) }`.
+ */
+export function projectMarks(scene: Pick<SceneModel, 'marks'>, basis: DrawViewBasis): ProjectedMark[] {
+  return scene.marks.map((mark) => ({ mark, screen: projectToScreen(mark.position, basis) }))
+}
+
+/** The off-screen sentinel a hit target's `translate3d` parks at — replaces
+ * today's `left: -9999px` sentinel. */
+export const OFFSCREEN_PX = -9999
+
+/**
+ * A hit target's ENTIRE placement, centring included. Off-screen, behind
+ * the eye, non-finite, or undefined (a mark absent from the published
+ * frame) all park at the same sentinel.
+ */
+export function hitTargetTransform(
+  screen: Pick<DrawScreenPoint, 'x' | 'y' | 'onScreen'> | undefined,
+): string {
+  const onScreen =
+    !!screen && screen.onScreen && Number.isFinite(screen.x) && Number.isFinite(screen.y)
+  const x = onScreen ? screen!.x : OFFSCREEN_PX
+  const y = onScreen ? screen!.y : OFFSCREEN_PX
+  return `translate3d(${x}px, ${y}px, 0px) translate(-50%, -50%)`
 }
