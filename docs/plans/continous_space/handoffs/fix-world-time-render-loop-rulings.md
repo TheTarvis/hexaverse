@@ -235,3 +235,102 @@ If the writer's count exceeds 40, it **stops and reports**. The remaining
 options at that point (cut scope per `A-F6`/`A-F8`; or ship Decision 1's
 rejected `startTransition` fallback as its own smaller change) are decisions
 for Travis, not for the writer and not for me.
+
+---
+
+## Kickoff sizing (tasks 1.1–1.2), architect, 2026-09-19
+
+Measured against the tree at `1b437af` (the change's artifacts unchanged since
+the verdict commit `3566af9`). The impl contract that uses these numbers is
+`fix-world-time-render-loop-impl-contract.md` (§10.1 has the per-test migration
+list).
+
+### 1.1 — assertions counted in the eight named files
+
+How I counted: **membership** means a `get/query/findByTestId` lookup of a hit
+target or off-screen chip (`body-hit-*`, `fleet-mark-*`, `offscreen-*`,
+`sighting-mark-*`, `contact-mark-*`), plus the one structural tab-order test
+that reads hit targets through `querySelectorAll`. **Plumbing** means a site
+the frame-loop threading touches: a `<SpaceStage>` render site (gains the new
+required `frameSource` key), a `<SpaceWorld>` construction site (loses
+`scene`/`camera`, gains `frameRef`), a `data-draw-world-time` assertion, or a
+point pick issued before the loop has published a basis.
+
+| File | Membership lookups | Plumbing sites |
+|---|---|---|
+| `SpaceStage.test.tsx` | 0 | 4 render sites, 1 draw-stamp assertion |
+| `SpaceStage.renderer.test.tsx` | 1 | 5 render sites, 1 draw-stamp assertion |
+| `SpaceStage.interaction.test.tsx` | 21 + 1 tab-order test | 5 render sites, 2 point picks after a camera move |
+| `SpaceStage.fleet-mark.test.tsx` | 7 | 1 render site |
+| `SpaceStage.sighting-ghost-selection-guard.test.tsx` | 2 | 1 render site, 1 point pick at mount |
+| `SystemSpaceView.test.tsx` | 0 (SpaceStage is mocked at its seam) | 0 |
+| `webgl/SpaceWorld.draw.test.tsx` | 0 | 8 construction sites |
+| `webgl/SpaceWorld.test.tsx` | 0 | 3 construction sites |
+| **Total** | **31 lookups + 1 structural test** | **32 sites** (16 render, 11 construction, 2 draw-stamp, 3 early/after-move picks) |
+
+Most of these are mechanical. **Nine tests are at risk**: tests that would
+need to wait one animation frame, because chip membership, focus reframing and
+point picks now read the basis the loop publishes. Eight are in
+`SpaceStage.interaction`: *Focus survives the view's animation frames*,
+*Focus moving to an off-screen glyph brings it into view*, the four
+off-screen-reach tests that query a chip synchronously at mount, and the two
+point-pick-after-camera-move tests. The ninth is the SDET control test in
+`sighting-ghost-selection-guard`. The impl contract (§6.2) removes eight of
+them from the migration list. It runs the loop's first frame synchronously
+when the loop starts, and it re-publishes the basis synchronously on every
+camera change. A test that queries straight after `render()` or after a
+camera input therefore already sees a published basis. **The one semantic
+migration left** is *Focus survives the view's animation frames*. It drives
+"frames" by re-rendering with a new `worldTime`, which no longer models a
+frame, so task 2.4 restates it as rAF-driven. The **11 `SpaceWorld`
+construction rewrites** stay. Everything else is a one-key prop addition per
+render helper (`frameSource={null}`).
+
+Outside the eight files, task 3.4's envelope change touches 1 assertion in
+`hooks/use-fleets.test.tsx` and 2 in `lib/services/fleet-service.test.ts`.
+Task 3.4 already covers these ("update its consumers"), so they need no new
+task.
+
+**Task count: 37 as written. No task is added. This is below the cap of 40,
+so no stop is needed.**
+
+### 1.2 — `use-world-time` mock sites and `worldTimeRef` reads
+
+- `vi.mock('@/hooks/use-world-time')`: **one site**,
+  `frontend/components/galaxy/GalaxyView.test.tsx:163`. No other test mocks it.
+- Other importers of the hook, all rewired or deleted by this change:
+  `GalaxyView.tsx:36` (import) / `:182` (call); `SystemSpaceView.tsx:49`
+  (import) / `:426` (call); `hooks/use-world-time.test.tsx:3` (moves to
+  `lib/client-clock/`, task 3.1).
+- `worldTimeRef` in `SystemSpaceView.tsx`: declared at `:427`, written during
+  render at `:428`, and **read at `:182`** (inside `ScanSweepWatcher`, through
+  its prop), **`:512`**, **`:515`**, and **`:595`**. It is passed as a prop at
+  `:727`, with the prop's type at `:112` and its destructure at `:105`. `:285`
+  is a comment that names it. This is the known list plus nothing: there are no
+  other reads.
+- One site affects task 3.5's acceptance grep: the comment at
+  `SystemSpaceView.test.tsx:821` contains the literal `hooks/use-world-time.ts`,
+  so `grep -r use-world-time frontend` will match it until the SDET edits that
+  comment. The grep also has to exclude `node_modules` and `.next`, or a stale
+  build cache matches.
+
+## Phase 2 kickoff rulings — orchestrator, 2026-09-19
+
+On the architect's kickoff findings (`fix-world-time-render-loop-impl-contract.md`,
+findings F1–F10 as reported at kickoff). These are ORCHESTRATOR RULINGs on
+implementation detail inside the decided design shape — not product rulings,
+not `FULL-AUTO RULING`s. No change artifact under `openspec/changes/` is edited
+by any of them, so the adversary verdict at `3566af9` stays current.
+
+| # | Finding | Ruling | Basis |
+| --- | --- | --- | --- |
+| K1 | F1 — the draw-stamp write as an effect costs a second commit per coarse tick (4 commits in 2 s vs the ≤3 bound of *A counting figure advances without a per-frame render*) | **Accepted: write the stamp during render** (state-adjusted-from-props pattern), guarded by `available` and by value change. | Decision 6's load-bearing content is *React-written, at the coarse cadence, under the `if (!available)` guard*, and task 4.5 lists what stays: the state, `setDrawWorldTime`, the guard. "Effect" in task 4.5 names where the write lives today, not a requirement. The render-phase write keeps all three, is the defect record's own fix option 3 ("derive `drawWorldTime` during render"), and removes the nested passive update the defect names. `SpaceStage.renderer.test.tsx`'s restore assertion stays unchanged, as task 4.5 requires. Reversal cost: one hunk. |
+| K2 | F2 — task 2.5 / the live reduced-motion requirement say contact positions "keep advancing"; contacts are drawn at their served position and never move | **Test asserts contacts are unaffected by the preference** (as the contract says). The baseline wording is a drift candidate, recorded here and in the final report; not edited in this change. | Correcting live baseline text is a brownfield baseline correction, outside this change's delta set and its verdict. |
+| K3 | F3 — task 4.2's "remove `worldTime` from the memo deps (it builds at the coarse value)" | Read as: the per-frame value leaves the memo's deps; the coarse value is what the React-side memo builds at. | The parenthetical says so; no other reading is coherent. |
+| K4 | F4 — up to one frame of skew between WebGL picture and DOM hit targets | Accepted as-is; not a regression; Decision 3's two loops stand. | USER RULING 3 decided two loops. |
+| K5 | F5 — task 3.5's grep scope | Grep excludes `node_modules` and `.next`; the SDET rewords the comment at `SystemSpaceView.test.tsx:821`. | Mechanical. |
+| K6 | F6 — GalaxyView anchors on the envelope's `worldTime` with the envelope's `scale` | Accepted, within task 3.4. | Same-response time/scale pair is the only coherent anchor. |
+| K7 | F10 — delete `GalaxyView.test.tsx`'s `use-world-time` mock rather than repoint it | Accepted — the SDET removes it (test edit, SDET-owned). | The new clock module has no rAF to stub; task 3.4's intent (the mock no longer targets a deleted module) is met. |
+| K8 | F9 — task 2.3 may not be observable red under jsdom | The SDET must attempt it against the pre-fix tree and report the result verbatim; it may NOT weaken the assertion to get a red, and a 2.3 never observed red is recorded as such in the coverage table, not as `assertion-red`. | Task 2.3's own text: "a 2.3 that is green before group 3 is not evidence". |
+
+**Role split for test-bearing tasks.** Every test half of tasks 2.x, 3.x, 4.x (including 3.1's moved pure tests, 3.5's deletion of `use-world-time.test.tsx`, 4.7's migrations, and the removal of `GalaxyView.test.tsx`'s mock) is the SDET's, done in the red phase. The nextjs-dev owns production code only.
