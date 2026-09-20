@@ -34,8 +34,8 @@ type ServiceConfiguration struct {
 	// Email (platform-managed Resend sender) Configuration
 	// Used by the `email` provider — Flywheel-branded transactional sender that
 	// sends to the workflow owner only (recipient locked to pipeline.CreatedBy).
-	ResendAPIKey        string // Resend API key for the platform-managed Flywheel sender
-	EmailSender string // From address for platform-managed emails (e.g. "Hexaverse <pipelines@hexaverse.io>")
+	ResendAPIKey string // Resend API key for the platform-managed Flywheel sender
+	EmailSender  string // From address for platform-managed emails (e.g. "Hexaverse <pipelines@hexaverse.io>")
 
 	// Scheduler Configuration (local development)
 	SchedulerTriggerInterval int // Interval in seconds for local scheduler trigger (default 60)

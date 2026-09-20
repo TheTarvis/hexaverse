@@ -31,8 +31,8 @@ func (f fakeFleetSource) FleetsInSystem(context.Context, string) ([]FleetPresenc
 // cases.
 type noAttachments struct{}
 
-func (noAttachments) HostOf(string) (string, bool)    { return "", false }
-func (noAttachments) AttachedTo(string) []string      { return nil }
+func (noAttachments) HostOf(string) (string, bool) { return "", false }
+func (noAttachments) AttachedTo(string) []string   { return nil }
 
 // starOnlyBodyTable builds a minimal BodyTable — a star at the origin — for
 // tests that only need disclosure's occlusion/position machinery to have

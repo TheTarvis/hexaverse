@@ -42,8 +42,8 @@ type worldClock struct {
 	scale float64
 }
 
-func (c *worldClock) Now() WorldMillis            { return c.FromWall(time.Now()) }
-func (c *worldClock) Scale() float64              { return c.scale }
+func (c *worldClock) Now() WorldMillis { return c.FromWall(time.Now()) }
+func (c *worldClock) Scale() float64   { return c.scale }
 func (c *worldClock) FromWall(t time.Time) WorldMillis {
 	elapsed := t.Sub(c.epoch).Milliseconds()
 	return WorldMillis(float64(elapsed) * c.scale)

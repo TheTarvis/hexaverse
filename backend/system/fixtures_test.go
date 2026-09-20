@@ -255,7 +255,9 @@ type sweepAxis struct {
 	Note string  `json:"note,omitempty"`
 }
 
-func ax(name string, lo, hi float64) sweepAxis { return sweepAxis{Name: name, Kind: "float", Lo: lo, Hi: hi} }
+func ax(name string, lo, hi float64) sweepAxis {
+	return sweepAxis{Name: name, Kind: "float", Lo: lo, Hi: hi}
+}
 func iax(name string, lo, hi int64) sweepAxis {
 	return sweepAxis{Name: name, Kind: "int", Lo: float64(lo), Hi: float64(hi)}
 }
@@ -415,9 +417,9 @@ func lineForGateOrbit(from, to galaxy.Coords, extent float64) string {
 
 func handGateOrbit() []gateOrbitCase {
 	inputs := []struct {
-		note        string
-		from, to    galaxy.Coords
-		extent      float64
+		note     string
+		from, to galaxy.Coords
+		extent   float64
 	}{
 		{"a zero horizontal projection resolves to the named default phase index", coordsOf(0, 0, 0), coordsOf(0, 0, 0), 500},
 		{"elevation (Z, the coordinate's third component) is dropped — only X/Y (the horizontal plane) resolves the bearing", coordsOf(0, 0, 0), coordsOf(30, 40, 999), 500},

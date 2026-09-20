@@ -188,9 +188,9 @@ func TestTraversability_Scenario_SpawnBurnDockJumpArriveEndToEnd(t *testing.T) {
 
 	// --- Arrive (settles opportunistically on read) ---
 	var arrived struct {
-		SystemId   string       `json:"systemId"`
-		AttachedTo string       `json:"attachedTo,omitempty"`
-		Jump       *struct{}    `json:"jump,omitempty"`
+		SystemId   string    `json:"systemId"`
+		AttachedTo string    `json:"attachedTo,omitempty"`
+		Jump       *struct{} `json:"jump,omitempty"`
 	}
 	if w := doJSON(t, router, http.MethodGet, "/v1/fleets/"+fleetId, token, nil, &arrived); w.Code != http.StatusOK {
 		t.Fatalf("GET /v1/fleets/%s (settling the due jump arrival): status = %d, body = %s",

@@ -2,8 +2,8 @@ package account
 
 import (
 	"context"
-	"testing"
 	"hexaverse/common"
+	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

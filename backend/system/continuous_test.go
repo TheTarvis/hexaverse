@@ -328,8 +328,8 @@ func TestKeplerPeriodMs_Scenario_PositiveRadiusValueUnchangedByGuard(t *testing.
 		{0, 1},
 		{0.001, 1},
 		{1, 159},
-		{BaseOrbitRadius, 18591},   // 24
-		{KeplerBaseRadius, 40000},  // 40
+		{BaseOrbitRadius, 18591},  // 24
+		{KeplerBaseRadius, 40000}, // 40
 		{100, 158114},
 		{234, 565971},
 		{658.7, 2673016},

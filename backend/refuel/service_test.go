@@ -285,9 +285,9 @@ func TestComputeCost_Scenario_FractionalCostRoundsUpAgainstTheBuyer(t *testing.T
 		tons, price float64
 		want        int64
 	}{
-		{tons: 3, price: 2.5, want: 8},     // 7.5 -> 8, never 7
-		{tons: 1, price: 0.01, want: 1},    // 0.01 -> 1
-		{tons: 4, price: 2, want: 8},       // exact integer stays exact, never bumped up an extra credit
+		{tons: 3, price: 2.5, want: 8},  // 7.5 -> 8, never 7
+		{tons: 1, price: 0.01, want: 1}, // 0.01 -> 1
+		{tons: 4, price: 2, want: 8},    // exact integer stays exact, never bumped up an extra credit
 		{tons: 10, price: 10.0001, want: 101},
 	}
 	for _, c := range cases {
