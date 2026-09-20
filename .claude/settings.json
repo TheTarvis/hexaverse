@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/tools/hook-post-edit.sh\"",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/harness/hook-post-edit.sh\"",
             "timeout": 60,
             "statusMessage": "validating edit"
           }

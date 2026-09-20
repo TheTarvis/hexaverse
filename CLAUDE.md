@@ -63,12 +63,18 @@ conventions for that codebase. **Read the relevant one before working there.**
   flow, Pub/Sub wiring, setup-gcp.sh vs Terraform split).
 - `bootstrap/` — fork-time setup. `config.env` + `init.sh` substitute
   placeholder values across the repo and write `frontend/.env.local`.
-- `tools/` — the repo's scripts, owned by no single client and shared by all
-  of them: the `check-*` quality gate, the OpenSpec validators,
-  `validate-file.sh` (post-edit check — Claude runs it from a hook, Codex runs
-  it by instruction, you run it by hand), `check-quote-fidelity.py` (the
-  reducer gate) and `agent-token-usage.py` (what the harness costs).
-  `.claude/scripts` is a symlink to it so older references still resolve.
+- `harness/` — everything the coding agents share, owned by no single client:
+  the `check-*` quality gate, the OpenSpec validators, `validate-file.sh`
+  (post-edit check — Claude runs it from a hook, Codex runs it by instruction,
+  you run it by hand), `check-quote-fidelity.py` (the reducer gate) and
+  `agent-token-usage.py` (what the harness costs), plus `skills/`, `agents/`
+  (the OpenSpec team) and `commands/`. This is the real directory; write new
+  references as `harness/<name>`. `tools` and `.claude/scripts` are compat
+  symlinks to it so older references still resolve.
+- `.claude/` — Claude Code's own configuration, and nothing else: `settings.json`
+  (hooks, permissions) and the `openspec-team` Workflow (`workflows/`). Its
+  `skills`, `agents` and `commands` entries are symlinks into `harness/`, the
+  same files Codex reaches through `.agents/skills`; see `AGENTS.md`.
 - `scripts/` — ops scripts. `decommission-old-hexaverse.sh` tears down the
   pre-Volt implementation's resources inside the `hexaverse` prod project
   (dry-run by default; explicit 2026-07-02 inventory — never touches the
@@ -92,12 +98,12 @@ are `--backend-tests` / `--e2e` only (tiers 3 and 4 in `docs/testing-tiers.md`):
 
 ```bash
 python3 .claude/skills/code-quality-checks/check.py   # flags: --files-only --lint --backend-tests --e2e ... (see /check)
-bash .claude/scripts/check.sh              # fast bash gate only: --backend --frontend --lint --test --keep-going
+bash harness/check.sh              # fast bash gate only: --backend --frontend --lint --test --keep-going
 ```
 
 Commit with `/commit` — one conventional commit for the whole working tree,
 type-prefixed bullets per change, `Impact:` trailer (see
-`.claude/skills/commit/SKILL.md`).
+`harness/skills/commit/SKILL.md`).
 
 Backend (`cd backend`):
 
@@ -203,11 +209,11 @@ themselves if missing.
   workflow: one change at a time, driven in this session.
 - `/team <design doc | request | change-id> [--implement] [--brownfield
   <caps>] [--greenfield] [--workflow]` — the multi-agent team in
-  `.claude/agents/` (analyst, spec writer, specialist review panel,
+  `harness/agents/` (analyst, spec writer, specialist review panel,
   validator, adversary, and an optional strict-TDD implementation crew).
   `--workflow` runs the same pipeline as the deterministic `openspec-team`
-  Workflow. Read `.claude/agents/README.md` first.
-- `python3 tools/openspec-reconcile.py` before archiving — catches
+  Workflow. Read `harness/agents/README.md` first.
+- `python3 harness/openspec-reconcile.py` before archiving — catches
   the MODIFIED-block omissions that `validate --strict` misses and
   `archive` refuses.
 - `/team --chain docs/plans/<chain>/chain.md` implements already-authored
@@ -217,9 +223,9 @@ themselves if missing.
   per-commit gate never boots a stack; the Playwright journey and the full
   emulator suite run once per change, at archive time, with the tree locked.
 
-Format rules live in `.claude/skills/openspec-conventions/`; the team's
+Format rules live in `harness/skills/openspec-conventions/`; the team's
 operating rules (spec-first, no vibe coding, adversary is non-skippable)
-in `.claude/skills/openspec-team-workflow/`.
+in `harness/skills/openspec-team-workflow/`.
 
 
 ## User profile

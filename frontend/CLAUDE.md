@@ -96,7 +96,7 @@ Vitest + Testing Library. Run `npx vitest run` for one-shot, `npx vitest` for wa
 | When | Run |
 | --- | --- |
 | Per task | `npx vitest run <files you touched>` and `npx tsc --noEmit` |
-| Per commit | `bash .claude/scripts/check.sh --frontend` (tsc, eslint, the whole vitest suite; seconds) |
+| Per commit | `bash harness/check.sh --frontend` (tsc, eslint, the whole vitest suite; seconds) |
 | Once per change, at archive time | `npm run e2e` — the Playwright journey (minutes plus a stack boot) |
 
 Playwright is **one journey spec per change**, written after every task is checked, run once at archive time, never per task and never as a confirming rerun. Per-scenario and edge-case coverage belongs in vitest against the component or hook. Playwright fixtures are provisioned once per spec file (`test.beforeAll`), not per test. Never raise a Playwright timeout to make a suite pass.

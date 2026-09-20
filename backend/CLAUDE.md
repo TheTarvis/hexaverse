@@ -78,7 +78,7 @@ func NewServiceWithDao(dao Dao) *Service { return &Service{dao: dao} }  // for t
 | --- | --- |
 | Per task | `go vet ./... && go test -short ./<pkg>/...` for the packages you touched |
 | Per task that touches persistence | `go test ./<pkg>/...` with the test emulator up (`npm run firebase:emulators:test`) |
-| Per commit | `bash .claude/scripts/check.sh --backend` |
+| Per commit | `bash harness/check.sh --backend` |
 | Once per change, at archive time | `npm run test:backend:all` (the whole emulator suite; minutes, and grows with every test) |
 
 Never run the full suite as a per-task check or as a "confirming rerun", and never raise its `-timeout` to make it pass — an overrun is a growing suite; report it.

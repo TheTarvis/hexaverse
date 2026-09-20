@@ -13,7 +13,7 @@ If a command here stops working, fix it **here** and nowhere else.
 | Tier | What it proves | Command | Cost | When it runs |
 | --- | --- | --- | --- | --- |
 | 0 | Changed-file conventions (test files exist, testids, param helpers, colors) | `python3 .claude/skills/code-quality-checks/check.py --files-only` | seconds | every commit |
-| 1 | Unit behaviour, types, lint | `bash .claude/scripts/check.sh` (go vet, `go test -short ./...`, tsc, eslint, vitest) | seconds | every task, every commit |
+| 1 | Unit behaviour, types, lint | `bash harness/check.sh` (go vet, `go test -short ./...`, tsc, eslint, vitest) | seconds | every task, every commit |
 | 2 | One package against the Firestore emulator | `cd backend && go test ./<pkg>/...` with the test emulator up | seconds to a minute | before the tasks in that package are checked off |
 | 3 | Whole backend against the emulator | `npm run test:backend:all` | minutes, grows with every test | **once per change, at archive time** |
 | 4 | The player/user journey through the real UI | `cd frontend && npm run e2e` | minutes plus stack boot | **once per change, at archive time** |

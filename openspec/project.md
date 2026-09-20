@@ -33,7 +33,7 @@ full picture; this file exists for the OpenSpec tooling.
 
 ## How to run
 - Quality gate: `python3 .claude/skills/code-quality-checks/check.py` or
-  `bash .claude/scripts/check.sh`.
+  `bash harness/check.sh`.
 - Backend (`cd backend`): `make run` (localhost:9010), `make test`
   (`go test -short ./...`), `make generate` (regen DAO mocks).
 - Frontend (`cd frontend`): `npm run dev` (localhost:3010), `npm run lint`,
