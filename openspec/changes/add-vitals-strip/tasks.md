@@ -347,7 +347,7 @@
 - [ ] 10.2 Journey spec written after every task above is checked; tier 4
       then tier 3 run once each with the tree locked — archive time only,
       never per task
-- [ ] 10.3 `docs/plans/continous_space/handoffs/add-vitals-strip-journey.md`
+- [ ] 10.3 `docs/handoffs/add-vitals-strip-journey.md`
       written with the suite budget line. After `openspec archive`, confirm
       `openspec/specs/system-console/spec.md`'s `## Purpose` reads the
       boundary paragraph already pasted verbatim into

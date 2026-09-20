@@ -2354,7 +2354,7 @@ rejection**. `OrderTo`'s re-task branch cancels whatever holds the fleet's
 movement-channel slot without inspecting its type, so a burn ordered against
 a mining fleet is accepted today and the running mine is cancelled with no
 warning and no compensation — an open production defect recorded in
-`docs/plans/continous_space/handoffs/defect-burn-cancels-running-mine.md`,
+`docs/handoffs/defect-burn-cancels-running-mine.md`,
 whose resolution (reject, warn, or forfeit the run) is an undecided gameplay
 question. This change is additive and SHALL NOT alter that behaviour, and
 SHALL NOT be read as requiring the commit to reject. The preview therefore

@@ -395,7 +395,7 @@ func TestGenerate_Scenario_ZeroRetrogradeChanceYieldsFullyPrograde(t *testing.T)
 			// unaffected by that deletion and, on its own, still fails if
 			// continuousStarParented's retrograde input silently becomes
 			// always-false (proven by stub in a scratch copy; see the SDET
-			// coverage report at docs/plans/continous_space/handoffs/
+			// coverage report at docs/handoffs/
 			// link9-red-coverage.md, task 2.10b).
 			if f.Space == nil {
 				continue

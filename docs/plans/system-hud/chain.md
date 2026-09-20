@@ -36,7 +36,7 @@ in the same change.
 **Handoffs.** The team tooling (`.claude/commands/team.md`,
 `.claude/workflows/openspec-team.js`) writes every per-change record —
 panel reports, adversary rounds, rulings, journey — to
-`docs/plans/continous_space/handoffs/` by a hardcoded path. This chain's
+`docs/handoffs/` by a hardcoded path. This chain's
 records land there too until that path is parameterised; the file names
 carry the change-id, so nothing collides.
 

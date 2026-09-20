@@ -504,7 +504,7 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrAccelBelowFloor), errors.Is(err, ErrAccelAboveCeiling):
 		// DRIFT REPAIR (add-stationkeep-hold-verb task 5.2; write-up:
-		// docs/plans/continous_space/handoffs/drift-fleet-wrong-state-500.md).
+		// docs/handoffs/drift-fleet-wrong-state-500.md).
 		// Both were unwired and fell through to a bodyless 500, violating
 		// two live fleet-movement scenarios ("A commanded acceleration below
 		// the disclosure floor is rejected", "...above the ceiling is

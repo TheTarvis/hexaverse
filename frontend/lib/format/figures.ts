@@ -7,7 +7,7 @@
 // `@/lib/space`) — see `guards.test.ts` for the mechanical enforcement of
 // that fence.
 //
-// Basis: `docs/plans/continous_space/handoffs/add-figure-formatting-impl-contract.md`
+// Basis: `docs/handoffs/add-figure-formatting-impl-contract.md`
 // §1-§2 (the exported surface, exact signatures and per-function behaviour)
 // and the fixture table `./cases.json` (task 2.1-2.9), which this module is
 // pinned against by `figures.test.ts`.

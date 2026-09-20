@@ -4,7 +4,7 @@ package main
 // section 5 — DRIFT REPAIR. No spec delta: all three requirements are already
 // LIVE and already correct; the handler simply never implemented them, so
 // each falls through `respond`'s final arm to a bodyless 500.
-// Full write-up: docs/plans/continous_space/handoffs/drift-fleet-wrong-state-500.md
+// Full write-up: docs/handoffs/drift-fleet-wrong-state-500.md
 //
 //   - task 5.1: fleet.ErrNotBurning (service.go:707) → 409 Conflict with a
 //     reason-bearing body — fleet-movement (live) "Cutting a parked,

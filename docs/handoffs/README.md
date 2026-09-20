@@ -304,8 +304,10 @@ outcome, and which later ruling revised it) — and **that** is the file a
 delegation names and a resuming orchestrator reads. Regenerate after every
 ruling; `--check <change-id>` exits 1 when it is stale.
 
-The script auto-detects this directory, so it needs no arguments here even
-though handoffs live under `docs/plans/`, not `docs/handoffs/`.
+The script auto-detects this directory and needs no arguments. These handoffs
+used to live under `docs/plans/continous_space/handoffs/`; that path is now a
+symlink here, so the frozen records and archived changes that name it still
+resolve.
 
 A ruling heading must therefore state its outcome in one sentence — that heading
 *is* its index line. The four `link6`–`link9` ledgers predate this convention and

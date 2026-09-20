@@ -556,7 +556,7 @@ scale has been served, the stamp resumes advancing against the projected
   lane-gate mark directly but can never move `select-pan-target-point`'s
   target away from the star, so a point-target burn or mine order is
   unreachable from a touch-only device from this change forward. Filed as
-  `docs/plans/continous_space/handoffs/defect-touch-pan-lost-with-camera-cluster.md`.
+  `docs/handoffs/defect-touch-pan-lost-with-camera-cluster.md`.
 
 ## Migration Plan
 
@@ -572,5 +572,5 @@ None outstanding. The two questions this document opened at authoring are
 ruled above: the fuel gauge's denominator is the served `cargoCapacity`
 (Decision 1) and keyboard pan is `Shift`+arrow on `camera-orbit` with a
 directional `data-pan-at-limit` attribute (Decision 3). Both are recorded
-against `docs/plans/continous_space/handoffs/add-vitals-strip-rulings.md`'s
+against `docs/handoffs/add-vitals-strip-rulings.md`'s
 "Routed to the panel" section.

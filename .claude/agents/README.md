@@ -71,7 +71,7 @@ Phase 2 — Implementation (on request, strict TDD)
                     → openspec archive
 ```
 
-Test tiers, their commands, and when each runs are defined once in `docs/testing-tiers.md`; the team's durable state (panel reports, adversary rounds with verdict commits, rulings, impl contracts, coverage tables, journey records) lives in `docs/plans/continous_space/handoffs/` per its README. Delegations cite both and never paste commands or findings.
+Test tiers, their commands, and when each runs are defined once in `docs/testing-tiers.md`; the team's durable state (panel reports, adversary rounds with verdict commits, rulings, impl contracts, coverage tables, journey records) lives in `docs/handoffs/` per its README. Delegations cite both and never paste commands or findings.
 
 Role separation is absolute: reviewers and the adversary never edit specs, the writer never judges its own work, the SDET never touches production code, developers never touch tests, QA never fixes.
 
@@ -94,7 +94,7 @@ Quickest entry — the `/team` command (defined in `.claude/commands/team.md`) l
 /team docs/plans/billing/chain.md --full-auto  # same — a chain doc path implies --chain
 ```
 
-The `--workflow` variant runs `.claude/workflows/openspec-team.js` — the same pipeline with script-enforced structure: the panel fans out in parallel, the adversary repair loop is hard-capped at 3 rounds, Phase 2 only runs with `implement: true` (or a chain, or `fullAuto: true`), and `openspec archive` only ever runs with an explicit `archive: true` or a chain. `fullAuto: true` is the `--full-auto` flag: unauthored chain links are authored in-run, open questions are ruled from the recorded recommendations into `docs/plans/continous_space/handoffs/<id>-rulings.md`, and a question the repo cannot answer is a hard stop. The orchestrator agent (default) is better when the run needs judgment calls mid-flight; the workflow is better for big changes where you want maximum parallelism and predictable gates.
+The `--workflow` variant runs `.claude/workflows/openspec-team.js` — the same pipeline with script-enforced structure: the panel fans out in parallel, the adversary repair loop is hard-capped at 3 rounds, Phase 2 only runs with `implement: true` (or a chain, or `fullAuto: true`), and `openspec archive` only ever runs with an explicit `archive: true` or a chain. `fullAuto: true` is the `--full-auto` flag: unauthored chain links are authored in-run, open questions are ruled from the recorded recommendations into `docs/handoffs/<id>-rulings.md`, and a question the repo cannot answer is a hard stop. The orchestrator agent (default) is better when the run needs judgment calls mid-flight; the workflow is better for big changes where you want maximum parallelism and predictable gates.
 
 Full pipeline, in your own words:
 
@@ -154,7 +154,7 @@ Two gates the CLI does not give you, both in `.claude/scripts/`:
 | Script | What it catches |
 |---|---|
 | `openspec-reconcile.py [change-id...]` | What `openspec archive` will **refuse**: a `## MODIFIED` block that omits a scenario the live spec still has. `validate --strict` doesn't check this, so a change can be strict-valid for days and still abort at archive time. Run before presenting a change and again before archiving; exit 1 = archive would fail. |
-| `openspec-red-manifest.sh record\|verify <change-id> [paths...]` | The SDET's red-handoff baseline. Committing a red suite would turn `main` red, so this records content hashes of the test files instead (`docs/plans/continous_space/handoffs/red-manifest-<id>.txt`, override with `RED_MANIFEST_DIR`); `verify` reports any test modified, deleted, or added since the handoff — the integrity check's evidence. |
+| `openspec-red-manifest.sh record\|verify <change-id> [paths...]` | The SDET's red-handoff baseline. Committing a red suite would turn `main` red, so this records content hashes of the test files instead (`docs/handoffs/red-manifest-<id>.txt`, override with `RED_MANIFEST_DIR`); `verify` reports any test modified, deleted, or added since the handoff — the integrity check's evidence. |
 
 ## Prerequisites
 

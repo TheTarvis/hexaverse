@@ -110,7 +110,7 @@ func TestStopFreeBranch_Scenario_StoppingAtOrBelowTheSpeedFloorPersistsItsPointP
 			"persists only through `s.actions.Cancel(ctx, f.ActiveActionId, cancelState)`, guarded by "+
 			"`f.ActiveActionId != \"\"`, and `Handler.Stop` performs no DAO write — so for a fleet with no "+
 			"active action it writes NOTHING AT ALL (task 4.5, "+
-			"docs/plans/continous_space/handoffs/drift-stop-free-branch-no-write.md). It must persist its "+
+			"docs/handoffs/drift-stop-free-branch-no-write.md). It must persist its "+
 			"point park, its cleared attachedTo, and its updatedAt UNCONDITIONALLY.", got)
 	}
 	if got := storedParkKind(t, sp.fleetId); got != space.ParkPoint {

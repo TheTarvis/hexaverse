@@ -90,7 +90,7 @@ E2E_REUSE_SERVER=1                     # attach Playwright to a long-lived test 
 ```
 
 The per-run wipe still isolates data. Record the wall time of tiers 3 and 4 in
-the change's handoff record when it closes (`docs/plans/continous_space/handoffs/`); an overrun
+the change's handoff record when it closes (`docs/handoffs/`); an overrun
 becomes a task in the next change, not a surprise at link eight.
 
 ## Local development

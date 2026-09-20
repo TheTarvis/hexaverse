@@ -79,7 +79,7 @@ describe('queryClient', () => {
    *
    * Every `it()` below is named for the `#### Scenario:` it automates, so
    * coverage is greppable in both directions. The table lives at
-   * `docs/plans/continous_space/handoffs/fix-mutation-retry-on-4xx-red-coverage.md`.
+   * `docs/handoffs/fix-mutation-retry-on-4xx-red-coverage.md`.
    *
    * SCOPE — read before "harmonising" anything. This block asserts the
    * MUTATION predicate only. The `retry logic` block above asserts the

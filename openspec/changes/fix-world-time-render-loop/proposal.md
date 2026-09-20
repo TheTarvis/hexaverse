@@ -8,7 +8,7 @@ React *transition*; that per-frame render interrupts it every ~16 ms and, in
 the dev and e2e stacks, the target route never commits. This is the confirmed
 cause of `add-vitals-strip`'s archive-gate red — the chevron's cross-system
 navigation stalled in 4 of 6 solo repeats and in 0 of 6 with the tick silenced
-(`docs/plans/continous_space/handoffs/defect-cross-system-chevron-nav-stall.md`)
+(`docs/handoffs/defect-cross-system-chevron-nav-stall.md`)
 — and it stalls the `system-hud` chain behind link 2a. The code predates 2a
 (`1b6c7c0`); 2a's journey is merely the first to navigate in-app out of a
 mounted system view.

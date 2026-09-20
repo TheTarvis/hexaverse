@@ -19,7 +19,7 @@ entire floating command column (`SpaceCommandPanel`, `FleetActionsPanel`,
 things: a refilled `sceneRef` and moved DOM hit targets.
 
 Evidence (2026-09-19, recorded in
-`docs/plans/continous_space/handoffs/defect-cross-system-chevron-nav-stall.md`):
+`docs/handoffs/defect-cross-system-chevron-nav-stall.md`):
 the chevron's cross-system `router.push` stalled past 20 s in 4 of 6 solo
 repeats; with the tick's `setState` silenced from just before the click, 0 of
 6. The full suite that reproduced it ran in 13.8 min, so machine load is ruled
@@ -484,7 +484,7 @@ plain `git revert`. If a revert is needed *after* this change has archived,
 `git revert` alone is insufficient: the ADDED requirement in
 `openspec/specs/system-space-view/spec.md` must be reverted or reopened as
 its own change alongside the code, and
-`docs/plans/continous_space/handoffs/defect-cross-system-chevron-nav-stall.md`
+`docs/handoffs/defect-cross-system-chevron-nav-stall.md`
 must be reopened (status back to OPEN) — a code-only revert would leave the
 spec asserting an invariant the code no longer holds, and `add-vitals-strip`'s
 archived status must be reconsidered, since its own gate depended on this
@@ -493,7 +493,7 @@ fix.
 ## Open Questions
 
 All four questions the panel raised
-(`docs/plans/continous_space/handoffs/fix-world-time-render-loop-rulings.md`)
+(`docs/handoffs/fix-world-time-render-loop-rulings.md`)
 were answered directly by Travis, 2026-09-19 (that file's "USER RULINGS —
 Travis, 2026-09-19" section). Three are kept below as the resolution record;
 OQ3 is removed from this list entirely because its resolution is now folded

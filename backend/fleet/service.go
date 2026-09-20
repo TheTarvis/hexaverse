@@ -131,7 +131,7 @@ var (
 	// branch cancels whatever holds the slot without inspecting its type, so
 	// a burn ordered against a mining fleet is accepted today and the run is
 	// destroyed (an open defect recorded in
-	// docs/plans/continous_space/handoffs/defect-burn-cancels-running-mine.md,
+	// docs/handoffs/defect-burn-cancels-running-mine.md,
 	// which this additive change leaves exactly as it is). A preview cannot
 	// mirror a commit that proceeds by cancelling a run, since a preview
 	// never writes; refusing is the conservative choice while the defect
@@ -1300,7 +1300,7 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 		newState := space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint, Point: pos}}
 
 		// The free branch's own persistence, UNCONDITIONAL (add-stationkeep-
-		// hold-verb task 4.5; write-up: docs/plans/continous_space/handoffs/
+		// hold-verb task 4.5; write-up: docs/handoffs/
 		// drift-stop-free-branch-no-write.md). Until this change its ONLY
 		// write was s.actions.Cancel, guarded by ActiveActionId != "", and
 		// Handler.Stop performs no DAO write of its own — so for a fleet with

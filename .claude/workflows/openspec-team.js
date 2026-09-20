@@ -25,8 +25,8 @@ const CTX = [
   a.request ? `User request: ${a.request}` : '',
   a.changeId ? `Existing change to continue: openspec/changes/${a.changeId}/` : '',
   a.chain ? `Chain document: ${a.chain} — links are implemented in its archive order.` : '',
-  fullAuto ? 'FULL-AUTO run: there is no user gate anywhere in this run. Design-choice open questions are ruled in-run (the ruling step records each one in docs/plans/continous_space/handoffs/<id>-rulings.md as a FULL-AUTO RULING with its basis, the alternatives, and the reversal cost) and the writer applies the rulings; a question that needs information nobody in the repo has — a credential, an external account, a product call with no recorded lean — is a hard stop, never a guess.' : '',
-  'Durable state lives in docs/plans/continous_space/handoffs/ (see docs/plans/continous_space/handoffs/README.md); test tiers and commands come from docs/testing-tiers.md — never from this prompt.',
+  fullAuto ? 'FULL-AUTO run: there is no user gate anywhere in this run. Design-choice open questions are ruled in-run (the ruling step records each one in docs/handoffs/<id>-rulings.md as a FULL-AUTO RULING with its basis, the alternatives, and the reversal cost) and the writer applies the rulings; a question that needs information nobody in the repo has — a credential, an external account, a product call with no recorded lean — is a hard stop, never a guess.' : '',
+  'Durable state lives in docs/handoffs/ (see docs/handoffs/README.md); test tiers and commands come from docs/testing-tiers.md — never from this prompt.',
 ].filter(Boolean).join('\n')
 
 // ---------- schemas ----------
@@ -216,7 +216,7 @@ async function analyze(input, label) {
 // full-auto only: rule on the design-choice open questions before the writer sees them; hard stops halt the run
 async function rule(changeId, source, label) {
   const r = await agent(
-    `FULL-AUTO ruling step for ${changeId}. Below is the material the spec writer is about to author from. Extract every open question / ambiguity / INFERRED item that needs a decision and rule on each, using this precedence and naming which one applied: (1) the chain document's or design input's own recorded recommendation or lean; (2) a settled project decision in the root CLAUDE.md or openspec/project.md; (3) the specialist panel's recommendation if one is quoted; (4) otherwise the most reversible option — the one whose reversal is one migration, one flag, or one file, with no backfill. A question that needs information nobody in the repo has (a credential, an external account, a product call with no recorded lean) goes in hardStops, not rulings. Write every ruling to docs/plans/continous_space/handoffs/${changeId}-rulings.md (append if it exists) as a "FULL-AUTO RULING" entry: the question, the ruling, its basis, the alternatives rejected, and the reversal cost.\n${CTX}\n\n## Material\n${source}`,
+    `FULL-AUTO ruling step for ${changeId}. Below is the material the spec writer is about to author from. Extract every open question / ambiguity / INFERRED item that needs a decision and rule on each, using this precedence and naming which one applied: (1) the chain document's or design input's own recorded recommendation or lean; (2) a settled project decision in the root CLAUDE.md or openspec/project.md; (3) the specialist panel's recommendation if one is quoted; (4) otherwise the most reversible option — the one whose reversal is one migration, one flag, or one file, with no backfill. A question that needs information nobody in the repo has (a credential, an external account, a product call with no recorded lean) goes in hardStops, not rulings. Write every ruling to docs/handoffs/${changeId}-rulings.md (append if it exists) as a "FULL-AUTO RULING" entry: the question, the ruling, its basis, the alternatives rejected, and the reversal cost.\n${CTX}\n\n## Material\n${source}`,
     { label, phase: 'Analyze', schema: RULINGS }
   )
   if (!r) throw new Error(`ruling step failed for ${changeId}`)
@@ -230,7 +230,7 @@ async function author(analysisText, fixedId, label) {
     ? `Author exactly the change-id ${fixedId} (openspec/changes/${fixedId}/) — it is a chain link and its id is fixed. Its MODIFIED deltas target the live openspec/specs/ the archived predecessor links produced. If the 20–40 task size cap forces a split, ${fixedId} keeps the first, self-contained half; name the second half verb-led, author it too, and insert its row in the chain document ${a.chain} immediately after ${fixedId}'s row with state "authored". Return every change-id you authored, ${fixedId} first. `
     : ''
   const questionClause = fullAuto
-    ? `Open questions that docs/plans/continous_space/handoffs/${fixedId || '<change-id>'}-rulings.md rules on are written as decisions citing the ruling (design.md ## Decisions, or the proposal); any question it does not rule on goes into design.md ## Open Questions verbatim — never answered by fiat.`
+    ? `Open questions that docs/handoffs/${fixedId || '<change-id>'}-rulings.md rules on are written as decisions citing the ruling (design.md ## Decisions, or the proposal); any question it does not rule on goes into design.md ## Open Questions verbatim — never answered by fiat.`
     : 'Open questions from the analysis go into design.md/proposal verbatim — never answered by fiat.'
   const result = await agent(
     `Author the OpenSpec change(s) from this analysis.\n${CTX}\n\n## Analysis\n${analysisText}\n\n` +
@@ -260,7 +260,7 @@ async function panel(changeId) {
   ))).filter(Boolean)
   // persist every reviewer's own report: consolidation silently discards findings
   await agent(
-    `Write each of these reviewer reports verbatim to docs/plans/continous_space/handoffs/${changeId}-panel-<reviewer>.md (one file per reviewer; create docs/plans/continous_space/handoffs/ if absent). Do not summarize or merge.\n\n${reviews.map(r => fmtFindings(r.key, r)).join('\n\n')}`,
+    `Write each of these reviewer reports verbatim to docs/handoffs/${changeId}-panel-<reviewer>.md (one file per reviewer; create docs/handoffs/ if absent). Do not summarize or merge.\n\n${reviews.map(r => fmtFindings(r.key, r)).join('\n\n')}`,
     { label: `persist-panel:${changeId}`, phase: 'Panel', effort: 'low' }
   )
   const total = reviews.reduce((n, r) => n + r.findings.length, 0)
@@ -269,7 +269,7 @@ async function panel(changeId) {
   // consolidated revision pass (single writer pass; writer dedupes)
   const body = reviews.map(r => fmtFindings(r.key, r)).join('\n\n')
   await agent(
-    `Revise openspec/changes/${changeId}/ applying this consolidated specialist-panel feedback. Dedupe overlapping findings. Tie-breaks: architect wins on technical shape, security on controls, dba on data-integrity mechanics, ux on user-observable behavior. Note any finding you dispute rather than silently ignoring it. Keep unrelated content untouched. First write the consolidated set — every accepted finding restated in full — to docs/plans/continous_space/handoffs/${changeId}-panel-consolidated.md.${a.chain ? ` If the accepted findings take tasks.md past 40 tasks, split per the chain doc's pre-identified seam for this link (or the architect's proposed seam): ${changeId} keeps the first half; insert the second half's row in ${a.chain} immediately after, state "authored".` : ''}\n${CTX}\n\n${body}`,
+    `Revise openspec/changes/${changeId}/ applying this consolidated specialist-panel feedback. Dedupe overlapping findings. Tie-breaks: architect wins on technical shape, security on controls, dba on data-integrity mechanics, ux on user-observable behavior. Note any finding you dispute rather than silently ignoring it. Keep unrelated content untouched. First write the consolidated set — every accepted finding restated in full — to docs/handoffs/${changeId}-panel-consolidated.md.${a.chain ? ` If the accepted findings take tasks.md past 40 tasks, split per the chain doc's pre-identified seam for this link (or the architect's proposed seam): ${changeId} keeps the first half; insert the second half's row in ${a.chain} immediately after, state "authored".` : ''}\n${CTX}\n\n${body}`,
     { label: `revise:${changeId}`, phase: 'Panel', agentType: 'openspec-spec-writer' }
   )
 }
@@ -293,7 +293,7 @@ async function harden(changeId) {
     }
     const attack = await agent(
       `Adversarially review openspec/changes/${changeId}/ against the original design input.\n${CTX}\n` +
-      `Run your five attacks; hold the finding quality bar (location, exploit, severity, smallest fix). Round ${round}: ${round > 1 ? 'verify prior findings were actually fixed, then spot-check only revised areas.' : 'full review.'} No padding — "no material findings" is a valid result. Write the round, with the current HEAD commit as the verdict commit, to docs/plans/continous_space/handoffs/${changeId}-adversary-r${round}.md.`,
+      `Run your five attacks; hold the finding quality bar (location, exploit, severity, smallest fix). Round ${round}: ${round > 1 ? 'verify prior findings were actually fixed, then spot-check only revised areas.' : 'full review.'} No padding — "no material findings" is a valid result. Write the round, with the current HEAD commit as the verdict commit, to docs/handoffs/${changeId}-adversary-r${round}.md.`,
       { label: `adversary:${changeId}:r${round}`, phase: 'Harden', agentType: 'openspec-adversary', schema: FINDINGS }
     )
     const material = attack ? attack.findings.filter(f => f.severity !== 'MINOR') : []
@@ -317,7 +317,7 @@ async function harden(changeId) {
 async function verdictCheck(changeId) {
   phase('Harden')
   const check = await agent(
-    `Verdict currency check for openspec/changes/${changeId}/. Find the latest docs/plans/continous_space/handoffs/${changeId}-adversary-r<N>.md and the verdict commit it records. Run: git diff <that-sha> -- openspec/specs/<every capability this change touches> openspec/changes/${changeId}. Empty diff → verdict is current: return "CURRENT" with no findings. Otherwise re-attack ONLY the clauses whose live targets or delta text changed (plus verify prior findings stayed fixed), hold your finding quality bar, and record this round as the next docs/plans/continous_space/handoffs/${changeId}-adversary-r<N+1>.md with today's HEAD as the verdict commit. If no adversary file exists, say so and run a full review.\n${CTX}`,
+    `Verdict currency check for openspec/changes/${changeId}/. Find the latest docs/handoffs/${changeId}-adversary-r<N>.md and the verdict commit it records. Run: git diff <that-sha> -- openspec/specs/<every capability this change touches> openspec/changes/${changeId}. Empty diff → verdict is current: return "CURRENT" with no findings. Otherwise re-attack ONLY the clauses whose live targets or delta text changed (plus verify prior findings stayed fixed), hold your finding quality bar, and record this round as the next docs/handoffs/${changeId}-adversary-r<N+1>.md with today's HEAD as the verdict commit. If no adversary file exists, say so and run a full review.\n${CTX}`,
     { label: `verdict-check:${changeId}`, phase: 'Harden', agentType: 'openspec-adversary', schema: FINDINGS }
   )
   let material = check ? check.findings.filter(f => f.severity !== 'MINOR') : []
@@ -328,7 +328,7 @@ async function verdictCheck(changeId) {
       { label: `repair:${changeId}:chain`, phase: 'Harden', agentType: 'openspec-spec-writer' }
     )
     const re = await agent(
-      `Verify these findings were fixed in openspec/changes/${changeId}/ and spot-check only the revised clauses. Record the round in docs/plans/continous_space/handoffs/${changeId}-adversary-r<N+1>.md with HEAD as the verdict commit.\n\n${fmtFindings('prior-round', { verdict: 'NEEDS REVISION', findings: material })}`,
+      `Verify these findings were fixed in openspec/changes/${changeId}/ and spot-check only the revised clauses. Record the round in docs/handoffs/${changeId}-adversary-r<N+1>.md with HEAD as the verdict commit.\n\n${fmtFindings('prior-round', { verdict: 'NEEDS REVISION', findings: material })}`,
       { label: `re-verify:${changeId}:chain`, phase: 'Harden', agentType: 'openspec-adversary', schema: FINDINGS }
     )
     material = re ? re.findings.filter(f => f.severity !== 'MINOR') : material
@@ -339,7 +339,7 @@ async function verdictCheck(changeId) {
 // full-auto chain: an authored link gets a real verdict commit, or the next link's currency diff cannot run
 async function markAuthored(changeId) {
   await agent(
-    `Link ${changeId} is authored, validated and adversary-cleared. Do exactly this, in order: (1) git commit openspec/changes/${changeId}/ and docs/plans/continous_space/handoffs/${changeId}-*.md — stage nothing else — as "docs(openspec): author ${changeId} (chain link)"; (2) append to the latest docs/plans/continous_space/handoffs/${changeId}-adversary-r<N>.md a line "Verdict commit for currency checks: <that commit's short hash> — the tree this verdict describes, committed unchanged"; (3) set ${changeId}'s state in ${a.chain} to "authored r<N> <that hash>"; (4) commit the adversary file and the chain doc as "docs(chain): record ${changeId} authored". Report both hashes.`,
+    `Link ${changeId} is authored, validated and adversary-cleared. Do exactly this, in order: (1) git commit openspec/changes/${changeId}/ and docs/handoffs/${changeId}-*.md — stage nothing else — as "docs(openspec): author ${changeId} (chain link)"; (2) append to the latest docs/handoffs/${changeId}-adversary-r<N>.md a line "Verdict commit for currency checks: <that commit's short hash> — the tree this verdict describes, committed unchanged"; (3) set ${changeId}'s state in ${a.chain} to "authored r<N> <that hash>"; (4) commit the adversary file and the chain doc as "docs(chain): record ${changeId} authored". Report both hashes.`,
     { label: `chain-mark:${changeId}`, phase: 'Harden', effort: 'low' }
   )
 }
@@ -354,11 +354,11 @@ const doArchive = a.archive === true || !!a.chain
 async function implementChange(changeId) {
   phase('Implement')
   const kickoff = await agent(
-    `Implementation kickoff for openspec/changes/${changeId}/: task-to-component mapping (Next.js vs Go vs shared contract), API contract finalized FIRST, work ordering. Write the settled contract to docs/plans/continous_space/handoffs/${changeId}-impl-contract.md — the SDET writes the failing suite against it before developers start.\n${CTX}`,
+    `Implementation kickoff for openspec/changes/${changeId}/: task-to-component mapping (Next.js vs Go vs shared contract), API contract finalized FIRST, work ordering. Write the settled contract to docs/handoffs/${changeId}-impl-contract.md — the SDET writes the failing suite against it before developers start.\n${CTX}`,
     { label: `kickoff:${changeId}`, phase: 'Implement', agentType: 'openspec-architect' }
   )
   const red = await agent(
-    `TDD RED phase for openspec/changes/${changeId}/: write the automated tests FIRST from every scenario and the contract in docs/plans/continous_space/handoffs/${changeId}-impl-contract.md — UNIT AND INTEGRATION LEVEL ONLY: no Playwright, no router-level e2e; end-to-end-only scenarios are recorded "Playwright, deferred". Confirm each new test fails for the right reason. Write the coverage table to docs/plans/continous_space/handoffs/${changeId}-red-coverage.md and record the red manifest before returning. Deliver the red handoff per your protocol.\n\n## Architect kickoff\n${kickoff || '(kickoff unavailable — derive the contract from design.md)'}\n${CTX}`,
+    `TDD RED phase for openspec/changes/${changeId}/: write the automated tests FIRST from every scenario and the contract in docs/handoffs/${changeId}-impl-contract.md — UNIT AND INTEGRATION LEVEL ONLY: no Playwright, no router-level e2e; end-to-end-only scenarios are recorded "Playwright, deferred". Confirm each new test fails for the right reason. Write the coverage table to docs/handoffs/${changeId}-red-coverage.md and record the red manifest before returning. Deliver the red handoff per your protocol.\n\n## Architect kickoff\n${kickoff || '(kickoff unavailable — derive the contract from design.md)'}\n${CTX}`,
     { label: `sdet-red:${changeId}`, phase: 'Implement', agentType: 'openspec-sdet', schema: STATUS }
   )
   if (!red || red.status === 'BLOCKED') {
@@ -377,7 +377,7 @@ async function implementChange(changeId) {
     { label: `sdet-integrity:${changeId}`, phase: 'Verify', agentType: 'openspec-sdet', schema: STATUS }
   )
   const qaPrompt = (extra) =>
-    `QA acceptance for openspec/changes/${changeId}/: build the acceptance matrix from every scenario and verify it against test evidence first (docs/plans/continous_space/handoffs/${changeId}-red-coverage.md), driving the running system only for rows evidence cannot reach and for the exploratory charters. Rows marked "Playwright, deferred" are BLOCKED awaiting the journey — not failures. Never run tier 3 or tier 4. ${extra}Verdict: SHIP / RETURN_TO_DEV / BLOCKED with evidence; SHIP is valid with only journey-awaiting BLOCKED rows.`
+    `QA acceptance for openspec/changes/${changeId}/: build the acceptance matrix from every scenario and verify it against test evidence first (docs/handoffs/${changeId}-red-coverage.md), driving the running system only for rows evidence cannot reach and for the exploratory charters. Rows marked "Playwright, deferred" are BLOCKED awaiting the journey — not failures. Never run tier 3 or tier 4. ${extra}Verdict: SHIP / RETURN_TO_DEV / BLOCKED with evidence; SHIP is valid with only journey-awaiting BLOCKED rows.`
   let [qa, secAudit, dbaAudit] = await parallel([
     () => agent(qaPrompt(''), { label: `qa:${changeId}`, phase: 'Verify', agentType: 'openspec-qa', schema: QA }),
     () => agent(
@@ -409,7 +409,7 @@ async function implementChange(changeId) {
   if (preJourneyClean) {
     phase('Journey')
     const journeyPrompt = (extra) =>
-      `Journey (archive gate) for openspec/changes/${changeId}/. Every task is checked and the tree is LOCKED — no other agent runs until you return, so do not wait for anyone. ${extra}Run tier 4 (the one Playwright journey for this change) then tier 3 (full backend suite) ONCE each per docs/testing-tiers.md, backgrounded with logs, never concurrently. Never raise a timeout. Return PASS, or RED with EVERY finding from the run labelled test-side / product / spec-gap with an owner (sdet / golang / nextjs / writer), or BLOCKED. Write docs/plans/continous_space/handoffs/${changeId}-journey.md with the outcome and the suite budget line.`
+      `Journey (archive gate) for openspec/changes/${changeId}/. Every task is checked and the tree is LOCKED — no other agent runs until you return, so do not wait for anyone. ${extra}Run tier 4 (the one Playwright journey for this change) then tier 3 (full backend suite) ONCE each per docs/testing-tiers.md, backgrounded with logs, never concurrently. Never raise a timeout. Return PASS, or RED with EVERY finding from the run labelled test-side / product / spec-gap with an owner (sdet / golang / nextjs / writer), or BLOCKED. Write docs/handoffs/${changeId}-journey.md with the outcome and the suite budget line.`
     journey = await agent(
       journeyPrompt(`First write the journey spec against the UI that now exists (one spec per change, asserting at every step; fixtures shared per spec file), plus any router-level e2e the coverage table deferred. `),
       { label: `journey:${changeId}`, phase: 'Journey', agentType: 'openspec-sdet', schema: JOURNEY }
@@ -423,7 +423,7 @@ async function implementChange(changeId) {
           { label: `journey-writer:${changeId}`, phase: 'Journey', agentType: 'openspec-spec-writer' }
         )
         await agent(
-          `Spot-check ONLY the clauses just revised in openspec/changes/${changeId}/ for these journey-found gaps; record as the next docs/plans/continous_space/handoffs/${changeId}-adversary-r<N>.md with HEAD as the verdict commit:\n${gaps.map(g => `- ${g.summary}`).join('\n')}`,
+          `Spot-check ONLY the clauses just revised in openspec/changes/${changeId}/ for these journey-found gaps; record as the next docs/handoffs/${changeId}-adversary-r<N>.md with HEAD as the verdict commit:\n${gaps.map(g => `- ${g.summary}`).join('\n')}`,
           { label: `journey-adversary:${changeId}`, phase: 'Journey', agentType: 'openspec-adversary', schema: FINDINGS }
         )
       }
@@ -451,7 +451,7 @@ async function implementChange(changeId) {
     archived = true
     if (a.chain) {
       await agent(
-        `Update the chain document ${a.chain}: mark ${changeId} archived with the archive commit hash (commit the implementation and the archived change as "chore(openspec): archive ${changeId}" first if the tree is not yet committed; then git log -1 --format=%h), and add what the link taught (from docs/plans/continous_space/handoffs/${changeId}-journey.md and its latest adversary round) to its section. Change nothing else.`,
+        `Update the chain document ${a.chain}: mark ${changeId} archived with the archive commit hash (commit the implementation and the archived change as "chore(openspec): archive ${changeId}" first if the tree is not yet committed; then git log -1 --format=%h), and add what the link taught (from docs/handoffs/${changeId}-journey.md and its latest adversary round) to its section. Change nothing else.`,
         { label: `chain-update:${changeId}`, phase: 'Journey', effort: 'low' }
       )
     }
@@ -581,7 +581,7 @@ return {
   implementation: implReports,
   note: a.chain
     ? (fullAuto
-      ? 'full-auto chain run: each link authored if needed (rulings in docs/plans/continous_space/handoffs/<id>-rulings.md), verdict-checked, implemented, journeyed, and archived in order; stopped at the first hard stop, BLOCKER, or unclean gate'
+      ? 'full-auto chain run: each link authored if needed (rulings in docs/handoffs/<id>-rulings.md), verdict-checked, implemented, journeyed, and archived in order; stopped at the first hard stop, BLOCKER, or unclean gate'
       : 'chain run: each authored link verdict-checked, implemented, journeyed, and archived in order; stopped at the first unauthored link or unclean gate')
     : implement
       ? (doArchive ? 'archive ran only for fully clean changes' : 'archive NOT run (pass archive:true to enable) — clean changes are marked readyToArchive')

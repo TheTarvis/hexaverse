@@ -78,7 +78,7 @@ conventions for that codebase. **Read the relevant one before working there.**
   (test emulators: Firestore 9100, Auth 10109, Pub/Sub 9106).
 - `docs/` — project docs. `docs/testing-tiers.md` is the single definition of
   every test suite, its cost, and when it runs (per-commit gate vs. archive
-  gate); `docs/plans/continous_space/handoffs/` is the OpenSpec team's durable per-change state
+  gate); `docs/handoffs/` is the OpenSpec team's durable per-change state
   (panel reports, adversary rounds, rulings, impl contracts, coverage tables,
   journey records — see its README).
 

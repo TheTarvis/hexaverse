@@ -5,8 +5,8 @@ A MODIFIED block must reproduce every scenario heading the live spec still
 has for that requirement. `openspec validate --strict` does NOT check this:
 a change can be strict-valid for days and still abort at archive time with
 "current spec contains scenario(s) not present in the modified block".
-This script finds that early. Measured behaviour, 2026-09-02 — see
-docs/plans/continous_space/handoffs/README.md.
+This script finds that early (behaviour measured against openspec 1.6.0,
+2026-09-02).
 
 Usage:  python3 .claude/scripts/openspec-reconcile.py <change-id> [...]
 Run it from the repo root, or set REPO_ROOT.

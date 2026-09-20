@@ -33,7 +33,7 @@ package system
 // and watch it fail" but "run against a fake, sub-lattice-confined
 // generator and watch it fail there" — done in a scratch copy per the
 // coverage report for this change, not committed here. See
-// docs/plans/continous_space/handoffs/link9-red-coverage.md.
+// docs/handoffs/link9-red-coverage.md.
 
 import (
 	"testing"

@@ -14,7 +14,7 @@
 # Exit 1 on any modification, deletion, or unrecorded addition.
 set -euo pipefail
 ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel)}"
-DIR="$ROOT/docs/plans/continous_space/handoffs"
+DIR="${RED_MANIFEST_DIR:-$ROOT/docs/handoffs}"
 cmd="${1:?usage: record|verify <change-id> [paths...]}"
 id="${2:?missing change-id}"
 man="$DIR/red-manifest-$id.txt"

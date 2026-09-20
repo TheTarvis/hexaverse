@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   // ENV=test and boots via `next dev`). It never ships: `next build && next
   // start` strips the overlay entirely, so this only touches the test
   // environment, never Travis's own `npm run dev`. See
-  // docs/plans/continous_space/handoffs/add-vitals-strip-rulings.md
+  // docs/handoffs/add-vitals-strip-rulings.md
   // RULING 33 / RULING 44.
   ...(process.env.ENV === 'test' ? { devIndicators: false } : {}),
   outputFileTracingRoot: path.join(__dirname, "./"),

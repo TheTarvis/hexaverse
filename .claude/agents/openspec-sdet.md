@@ -38,7 +38,7 @@ Invoked again once **every task in tasks.md is checked** and the tree is quiet:
 3. Run tier 4 once (`cd frontend && npm run e2e`), then tier 3 once (`npm run test:backend:all`) — never both at the same time, they share one emulator project. Background anything expected to exceed five minutes with the Bash tool's `run_in_background` — it re-invokes you when the command exits, so **do not poll for it**. No `sleep N; tail`, no `until ! ps -p $(cat …)`, no `for i in $(seq 1 30)`. Each poll spends a whole model turn on a context already hundreds of thousands of tokens wide; measured across 44 runs of this agent, those loops burned **1h34m of pure waiting**. If you must block on a condition rather than on a process exiting, use Monitor with an until-loop, never `sleep` in Bash.
 4. Red? Report **every** finding from the run in one report — test-side misreadings and product defects alike, each labelled — for a single batched revision round. Do not open a revision loop per red leg. After the round it runs once more; that is the last run.
 5. Never raise a timeout to make a suite pass. A suite that overruns its budget is a growing suite: report the wall time and stop.
-6. Write `docs/plans/continous_space/handoffs/<change-id>-journey.md`: outcome, findings, and the suite budget line (tier 3 and tier 4 wall times).
+6. Write `docs/handoffs/<change-id>-journey.md`: outcome, findings, and the suite budget line (tier 3 and tier 4 wall times).
 
 ## Rigor
 
@@ -51,11 +51,11 @@ Invoked again once **every task in tasks.md is checked** and the tree is quiet:
 
 ## Report
 
-**Red handoff**: the coverage table written to `docs/plans/continous_space/handoffs/<change-id>-red-coverage.md` (scenario → test → level → status: `assertion-red`, `compile-red` with the scratch-copy verification, `already-green` with why, `Playwright, deferred`, `reasoned-not-automated` with the reason), confirmation every test fails for the right reason (run output), the tier commands that show each red group, and the recorded manifest.
+**Red handoff**: the coverage table written to `docs/handoffs/<change-id>-red-coverage.md` (scenario → test → level → status: `assertion-red`, `compile-red` with the scratch-copy verification, `already-green` with why, `Playwright, deferred`, `reasoned-not-automated` with the reason), confirmation every test fails for the right reason (run output), the tier commands that show each red group, and the recorded manifest.
 
 **Integrity check**: tier 1 and tier 2 run output (all green — tiers 3 and 4 belong to the journey, not here), diff-against-handoff result (unmodified / list of unauthorized changes as BLOCKERs), post-handoff test changes you made with their adjudicated cause, and production defects found (with the failing test as reproduction).
 
-**Journey**: `docs/plans/continous_space/handoffs/<change-id>-journey.md` — run outcome, every finding labelled test-side or product, and the suite budget line.
+**Journey**: `docs/handoffs/<change-id>-journey.md` — run outcome, every finding labelled test-side or product, and the suite budget line.
 
 ## Backing skills
 
