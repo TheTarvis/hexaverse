@@ -1,3 +1,16 @@
+<!-- reduction-receipt: volt_reduction_v1
+# Written by harness/check-quote-fidelity.py --write-header; do not hand-edit.
+# Every source below is pinned by content hash. If one of them changes, this
+# reduction is a claim about a file that has moved on: re-verify it with
+# --verify-header and re-reduce before anything downstream trusts it.
+source=docs/handoffs/add-vitals-strip-panel-architect.md sha256=d4c4dbdc70caf6f79d4829e0901e4dc3970c691ba893eac23a566c5124a2e89d bytes=55533 lines=1222
+source=docs/handoffs/add-vitals-strip-panel-ux.md sha256=9eb79fa16493911e63bd8090638acf0fe4c91b93fcd28fa4032bd5ea0f368b31 bytes=38583 lines=744
+source=docs/handoffs/add-vitals-strip-panel-reliability.md sha256=a7e19cfb2f258b442f3a606ed13c124ae24359017a202669d699991b2f01f950 bytes=26672 lines=509
+source=docs/handoffs/add-vitals-strip-panel-security.md sha256=51a2b48b2bb578ce47d74e35fe8cb6af2b4dff3e773e5435fc7eaade785bb6a5 bytes=7773 lines=146
+source=docs/handoffs/defect-touch-pan-lost-with-camera-cluster.md sha256=726a1fecde2514e77c12fee194b5c3916c2094a88d28e1056730fedf1627c617 bytes=3068 lines=63
+authority=the orchestrator retains adjudication; this file is evidence, not a ruling
+readback=sed -n '<start>,<end>p' <source> — each quote marker carries its line
+-->
 # `add-vitals-strip` — panel consolidation and orchestrator adjudication
 
 Four reviewers ran in parallel against the authored change. **Each persisted its

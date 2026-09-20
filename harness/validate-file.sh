@@ -131,13 +131,47 @@ $(echo "$out" | head -10)"
       # The reducer gate, fired by the edit that wrote the reduction. A
       # consolidated findings file is exactly where evidence goes missing, and
       # the author is the only one who can still cheaply put it back.
-      if have python3 && [[ -f "$REPO_ROOT/tools/check-quote-fidelity.py" ]]; then
-        if ! out="$(cd "$REPO_ROOT" && python3 tools/check-quote-fidelity.py "$rel" 2>&1)"; then
+      #
+      # --verify-header additionally pins the sources by hash: "these quotes
+      # match" is only evidence when it is a statement about the files that
+      # were actually reduced, not about whatever those paths hold today.
+      if have python3 && [[ -f "$REPO_ROOT/harness/check-quote-fidelity.py" ]]; then
+        if ! out="$(cd "$REPO_ROOT" && python3 harness/check-quote-fidelity.py "$rel" --verify-header 2>&1)"; then
           fail "$rel: quote fidelity
-$(echo "$out" | head -20)"
+$(echo "$out" | head -24)"
         else
           note "$rel: quote fidelity ok"
         fi
+      fi
+      ;;
+    */handoffs/*.md)
+      # An index that has gone stale is worse than no index: delegations are
+      # told to read it instead of the source, so it silently hands them the
+      # previous revision. Only files that already have one are checked —
+      # indexing is a decision (harness/reduction-economics.py), not a default.
+      if have python3 && [[ -f "${abs%.md}-index.md" && -f "$REPO_ROOT/harness/handoff-index.py" ]]; then
+        if ! out="$(cd "$REPO_ROOT" && python3 harness/handoff-index.py --check "$rel" 2>&1)"; then
+          fail "$rel: handoff index is stale
+$(echo "$out" | head -6)
+    fix: python3 harness/handoff-index.py $rel"
+        else
+          note "$rel: handoff index current"
+        fi
+      fi
+      # Editing a pinned SOURCE is what makes a reduction stale, and this hook
+      # fires on the file that was edited, never on the reduction downstream of
+      # it. Re-verify every receipt naming this path, at the moment the drift is
+      # caused rather than whenever someone next happens to touch the reduction.
+      if have python3 && [[ -f "$REPO_ROOT/harness/check-quote-fidelity.py" ]]; then
+        while IFS= read -r red; do
+          [[ -n "$red" ]] || continue
+          relred="${red#"$REPO_ROOT"/}"
+          if ! out="$(cd "$REPO_ROOT" && python3 harness/check-quote-fidelity.py "$relred" --verify-header 2>&1)"; then
+            fail "$relred: pins $rel, and this edit changed it
+$(echo "$out" | tail -12)"
+          fi
+        done < <(grep -rl --include='*-consolidated.md' --include='*-reduced.md' \
+                      -F "source=$rel " "$(dirname "$abs")" 2>/dev/null)
       fi
       ;;
     *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs)

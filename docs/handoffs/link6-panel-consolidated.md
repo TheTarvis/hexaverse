@@ -1,3 +1,12 @@
+<!-- reduction-receipt: volt_reduction_v1
+# Written by harness/check-quote-fidelity.py --write-header; do not hand-edit.
+# Every source below is pinned by content hash. If one of them changes, this
+# reduction is a claim about a file that has moved on: re-verify it with
+# --verify-header and re-reduce before anything downstream trusts it.
+source=docs/handoffs/link6-rulings.md sha256=f0b5b43539d1e1cf84dd7c9be77f1fcf5d9467bfda6e5599bcb7d7fa7a469817 bytes=16403 lines=268
+authority=the orchestrator retains adjudication; this file is evidence, not a ruling
+readback=sed -n '<start>,<end>p' <source> — each quote marker carries its line
+-->
 # Link 6 — consolidated panel findings + orchestrator rulings
 
 Panel: architect, DBA, security, UX (reliability skipped — no new external deps).

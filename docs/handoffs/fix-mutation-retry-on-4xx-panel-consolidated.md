@@ -1,3 +1,13 @@
+<!-- reduction-receipt: volt_reduction_v1
+# Written by harness/check-quote-fidelity.py --write-header; do not hand-edit.
+# Every source below is pinned by content hash. If one of them changes, this
+# reduction is a claim about a file that has moved on: re-verify it with
+# --verify-header and re-reduce before anything downstream trusts it.
+source=docs/handoffs/fix-mutation-retry-on-4xx-adversary-r2.md sha256=d1dda2ccf6a4b25fa73013a83a5c2c287411dc0eb888ce95a05daabaff143d67 bytes=23181 lines=368
+source=docs/handoffs/fix-mutation-retry-on-4xx-panel-reliability.md sha256=62720c815de70f213a9b4d2ef570863561830b26f1b00f2cd82e203b496e67c3 bytes=20610 lines=373
+authority=the orchestrator retains adjudication; this file is evidence, not a ruling
+readback=sed -n '<start>,<end>p' <source> — each quote marker carries its line
+-->
 # Consolidated findings → spec writer — `fix-mutation-retry-on-4xx`
 
 **Assembled** 2026-09-09 by the orchestrator, from two reports that ran in

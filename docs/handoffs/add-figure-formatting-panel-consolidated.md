@@ -1,3 +1,16 @@
+<!-- reduction-receipt: volt_reduction_v1
+# Written by harness/check-quote-fidelity.py --write-header; do not hand-edit.
+# Every source below is pinned by content hash. If one of them changes, this
+# reduction is a claim about a file that has moved on: re-verify it with
+# --verify-header and re-reduce before anything downstream trusts it.
+source=docs/plans/system-hud/chain.md sha256=99b0cfb0a2bafeebd30fd7827184df76f779235d276be8dd50aa43ce1ede1210 bytes=41464 lines=637
+source=docs/handoffs/add-figure-formatting-panel-architect.md sha256=f01f95174b83585deb760a8af417946baa573c5f3be68ba0dcfc6a5e55228129 bytes=35831 lines=654
+source=docs/handoffs/add-figure-formatting-panel-ux.md sha256=eb5889c8eefc2ecc30c8e6669333c649c96d56e8b33853fbf0130cbaf5c9027b bytes=29789 lines=570
+source=docs/handoffs/add-figure-formatting-panel-security.md sha256=9e3b5de9b6c8b80277e861aac80960118efa2c793d5cd4431efc9f4690a10045 bytes=6584 lines=115
+source=docs/handoffs/defect-galaxy-clock-assumes-scale-1.md sha256=8676b1a7b8b6fe1bf543c073c49cc051d93792b5c50cef8456ea2abe4adecb42 bytes=4546 lines=95
+authority=the orchestrator retains adjudication; this file is evidence, not a ruling
+readback=sed -n '<start>,<end>p' <source> — each quote marker carries its line
+-->
 # add-figure-formatting — consolidated panel findings
 
 Orchestrator's consolidation of the three-reviewer panel, 2026-09-08.

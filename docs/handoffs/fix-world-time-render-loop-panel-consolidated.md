@@ -1,3 +1,20 @@
+<!-- reduction-receipt: volt_reduction_v1
+# Written by harness/check-quote-fidelity.py --write-header; do not hand-edit.
+# Every source below is pinned by content hash. If one of them changes, this
+# reduction is a claim about a file that has moved on: re-verify it with
+# --verify-header and re-reduce before anything downstream trusts it.
+source=docs/handoffs/fix-world-time-render-loop-panel-architect.md sha256=791159ead413cb756716d3b7bdf2c199705de83b9a77f73e00da8bc68f598b20 bytes=66354 lines=1270
+source=docs/handoffs/fix-world-time-render-loop-panel-reliability.md sha256=3a807a69e93aacfdc826aa1e566450c876425f0e587e16d40a6c790db8531041 bytes=36145 lines=138
+source=docs/handoffs/fix-world-time-render-loop-panel-ux.md sha256=89aa597a47ebd66ac997bef5a017e19cf345797583a248ffdc819510e266f5d0 bytes=28094 lines=228
+source=docs/handoffs/fix-world-time-render-loop-panel-security.md sha256=3aab4c9e82d436c9e7250f7c4a15801ee9406f3e2ddcdeea56d273de49f0bb21 bytes=4715 lines=33
+source=docs/handoffs/drift-reduced-motion-never-detected.md sha256=618ac41415f71d2b0734923ae878a8d12027b68ca204d978bda30492c85332b9 bytes=6261 lines=125
+source=docs/testing-tiers.md sha256=8e755a1b5e8319bd863ca22e6bbb1079211ae77f1815f08f513d684c07d6baa8 bytes=5962 lines=102
+source=docs/handoffs/defect-cross-system-chevron-nav-stall.md sha256=0d78356174809e969f66a0911dbede9d1bbc5b19c6651a74db2394bbaf48506e bytes=8468 lines=152
+source=docs/handoffs/fix-world-time-render-loop-rulings.md sha256=12abb040a7ff45288696c3f6e03210627936898929ce97bc65004ff318af9bcf bytes=24851 lines=346
+source=docs/handoffs/fix-world-time-render-loop-panel-brief.md sha256=dd5062eef8b402d677153bc3472fb1e3eccac6edc5a3be03f6ceb8ff98c4874a bytes=8394 lines=146
+authority=the orchestrator retains adjudication; this file is evidence, not a ruling
+readback=sed -n '<start>,<end>p' <source> — each quote marker carries its line
+-->
 # Panel consolidated — `fix-world-time-render-loop`
 
 Orchestrator, 2026-09-19. This is the deduped, tie-broken finding set handed to

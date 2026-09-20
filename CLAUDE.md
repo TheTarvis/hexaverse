@@ -66,8 +66,11 @@ conventions for that codebase. **Read the relevant one before working there.**
 - `harness/` — everything the coding agents share, owned by no single client:
   the `check-*` quality gate, the OpenSpec validators, `validate-file.sh`
   (post-edit check — Claude runs it from a hook, Codex runs it by instruction,
-  you run it by hand), `check-quote-fidelity.py` (the reducer gate) and
-  `agent-token-usage.py` (what the harness costs), plus `skills/`, `agents/`
+  you run it by hand), `check-quote-fidelity.py` (the reducer gate, which also
+  pins a reduction's sources by hash), `handoff-index.py` (section map + line
+  ranges for any handoff too big to read whole) and `reduction-economics.py`
+  (whether reducing a handoff repays the reducer, or you should just index it),
+  and `agent-token-usage.py` (what the harness costs), plus `skills/`, `agents/`
   (the OpenSpec team) and `commands/`. This is the real directory; write new
   references as `harness/<name>`. `tools` and `.claude/scripts` are compat
   symlinks to it so older references still resolve.

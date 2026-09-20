@@ -319,7 +319,7 @@ instead. Nothing reconstructs ids for them.
 Lesson three above is enforceable now, not merely remembered:
 
 ```bash
-python3 tools/check-quote-fidelity.py docs/plans/continous_space/handoffs/<id>-panel-consolidated.md --report
+python3 harness/check-quote-fidelity.py docs/handoffs/<id>-panel-consolidated.md --strict --write-header
 ```
 
 It fails the file unless every **attributed** quotation matches an archived
@@ -329,14 +329,70 @@ in the three lines above it; unattributed blocks are reported as unverified
 rather than failed, because blockquotes here also carry the orchestrator's own
 proposed text. Run it with `--strict` when the file claims to be a reduction.
 
+It also fails the file unless **every source still hashes to what the reduction
+pinned**. `--write-header` writes a `<!-- reduction-receipt: volt_reduction_v1 -->`
+block naming each source with its sha256, byte and line count, and rewrites each
+`<!-- quote: <path> -->` marker to carry the line the quote was found at;
+`--verify-header` fails when a pinned source has moved on. Without it, "the
+quotes match" is a statement about whatever those paths hold today, not about
+the thing that was reduced — a panel report that gains a finding *after*
+consolidation is Lesson three wearing a passing check. The receipt's
+`authority=` line matters too: a reduction with no stated authority gets read
+downstream as a ruling.
+
 Run against this directory today, 6 of 7 consolidated files pass.
 `link8a-panel-consolidated.md` fails with *"cites no readable source"* — it is
 the only `link8a-*` file on disk, which is precisely the defect Lesson three
 records. The check would have caught it the day it was written.
 
-This runs automatically: editing any `*-consolidated.md` fires it through
-`tools/validate-file.sh`, which Claude Code runs from a PostToolUse hook and
-other clients run by the instruction in `AGENTS.md`.
+This runs automatically, on both ends of the relationship: editing any
+`*-consolidated.md` fires `--verify-header` through `harness/validate-file.sh`,
+and editing any handoff that some receipt *pins* re-verifies that reduction too,
+so drift is caught by the edit that causes it. Claude Code runs the gate from a
+PostToolUse hook; other clients run it by the instruction in `AGENTS.md`.
+
+### Index it before you reduce it
+
+Reduction costs model tokens. Indexing costs none, because it is a script.
+
+```bash
+python3 harness/reduction-economics.py <sources> --readers <n>   # which one pays
+python3 harness/handoff-index.py docs/handoffs/<id>-impl-contract.md
+```
+
+`handoff-index.py` writes `<file>-index.md`: a section-by-section map with line
+ranges and byte counts, the head and tail of the file on whole lines, and the
+`sed -n '<start>,<end>p'` command that pages any row back. The source is not
+touched, so nothing is lost and no fidelity gate applies. It is the rulings
+index generalised to every handoff — and the same trick as ObservationPack in
+[NVlabs/SoL-Pi](https://github.com/NVlabs/SoL-Pi) (MIT), which the receipt
+format and the break-even below also come from.
+
+The agent writing or revising a handoff reads it whole; you cannot rewrite
+current state through a keyhole, and reviewers and the adversary stay the
+deliberate exception because they hunt for what is *missing*. Every downstream
+delegation is handed the `-index.md` path instead and opens the ranges that bear
+on its task, exactly as delegations already name a rulings index.
+
+Files at or below 10 KB are left alone — a handle costs more than they do — and
+a `*-consolidated.md` is skipped outright: a file is reduced or it is indexed,
+never both. Once a file has an index, `validate-file.sh` fails any edit that
+leaves it stale, because delegations were told to trust it.
+
+**When reduction still wins.** `reduction-economics.py` puts a number on it:
+
+```
+saving    = archive_tokens - reduced_tokens              per downstream read
+cost      = archive_tokens*W_in + reduced_tokens*W_out   the reducer's own bill
+breakeven = cost / (saving * W_in)                       readers needed to repay it
+```
+
+The ITE weights come from `harness/agent-token-usage.py`, so output counts 5x
+input: writing the reduction, not reading the sources, is most of what it costs.
+Count readers as delegations that will be handed the path — a consolidated panel
+file is read by the spec writer, the adversary and a resuming orchestrator (3);
+an impl contract by both developers, the SDET, QA and the adversary (5). Both
+routinely land *below* break-even, which is the answer: index them.
 
 ### Why files, not relayed prose
 
@@ -364,6 +420,7 @@ greppable.
 | `<change-id>-panel-consolidated.md` | orchestrator | the deduped, tie-broken findings sent to the writer, **every accepted finding restated in full** |
 | `<change-id>-adversary-r<N>.md` | adversary, then orchestrator | round N's findings, each with the orchestrator's binding ruling, and the **commit hash the verdict was issued at** |
 | `<change-id>-rulings.md` | orchestrator | open questions and their rulings, including any reversal with its reasoning |
+| `<any handoff>-index.md` | `harness/handoff-index.py` | the section map for any handoff over 10 KB — line range, byte count and opening line per section, plus the file's head and tail. **Delegations are handed this path**; the source is untouched and stays authoritative. Regenerate after every edit; `--check` exits 1 when stale, and `validate-file.sh` enforces it |
 | `<change-id>-impl-contract.md` | architect at kickoff | wire shapes, identifiers, sequencing — everything the spec deliberately leaves open, settled so the SDET can write both sides against one shape |
 | `<change-id>-red-coverage.md` | SDET at red handoff | the coverage table: every scenario → test → level → status (`assertion-red`, `compile-red`, `already-green`, `Playwright, deferred`, `reasoned-not-automated`) |
 | `red-manifest-<change-id>.txt` | `openspec-red-manifest.sh record` | content hashes of the red suite at handoff; the integrity check's baseline |

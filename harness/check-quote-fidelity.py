@@ -42,8 +42,27 @@ otherwise.
 Sources default to every file path the document itself names in backticks, plus
 its sibling `<prefix>-panel-*.md` reports. A reduced file that cites no sources
 has nothing to be checked against, and that is itself the finding.
+
+**Source pinning.** Both checks run against whatever the sources say *today*,
+so a reduction that passed when it was written silently becomes a claim about
+a file that has since moved on. `--write-header` records a receipt — the idea
+and most of the field list are lifted from the evidence-preserving reducer in
+NVlabs/SoL-Pi (MIT) — pinning every source by sha256, and upgrading each
+`<!-- quote: <path> -->` marker to carry the line the quote was found at and
+the quote's own hash:
+
+    <!-- reduction-receipt: volt_reduction_v1
+    source=docs/handoffs/x-panel-architect.md sha256=… bytes=24797 lines=612
+    authority=…
+    readback=…
+    -->
+
+`--verify-header` then fails the file when a pinned source no longer hashes to
+what the receipt claims. That is the difference between "these quotes match"
+and "these quotes match the thing I said I reduced". The `authority=` line is
+load-bearing too: without it a downstream agent reads a reduction as a ruling.
 """
-import argparse, pathlib, re, sys, unicodedata
+import argparse, bisect, hashlib, pathlib, re, sys, unicodedata
 
 FOLD = {"‘": "'", "’": "'", "“": '"', "”": '"',
         "–": "-", "—": "-", "−": "-", " ": " ",
@@ -54,8 +73,18 @@ HEADING = re.compile(r"^#{2,4}\s+(?P<text>.+?)\s*$")
 FINDING_ID = re.compile(r"^(?P<id>[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)?)\s*[—–:.-]")
 BACKTICK_PATH = re.compile(r"`([^`\s]+\.(?:md|txt))`")
 INLINE_QUOTE = re.compile(r"[\"“]([^\"“”]{20,})[\"”]")
-QUOTE_MARKER = re.compile(r"<!--\s*quote:\s*(?P<path>[^\s>]+)\s*-->")
+# The path may be followed by anchors written by --write-header: `L204 sha256=…`.
+QUOTE_MARKER = re.compile(r"<!--\s*quote:\s*(?P<path>[^\s>]+)(?P<anchors>[^>]*?)-->")
 ELISION = re.compile(r"\s*(?:\.\.\.|\[\s*\.\.\.\s*\])\s*")
+
+SCHEMA = "volt_reduction_v1"
+RECEIPT_BLOCK = re.compile(rf"(?s)^\s*<!--\s*reduction-receipt:\s*{SCHEMA}\s*\n(?P<body>.*?)-->[ \t]*\n?")
+PIN = re.compile(r"^source=(?P<path>\S+)\s+sha256=(?P<sha>[0-9a-f]{64})\s+"
+                 r"bytes=(?P<bytes>\d+)\s+lines=(?P<lines>\d+)\s*$")
+
+
+def sha256(text):
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 def norm(text):
@@ -70,6 +99,111 @@ def norm(text):
         text = text.replace(a, b)
     text = re.sub(r"(?m)^\s*>+\s?", "", text)
     return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def norm_index(text):
+    """-> (normalised text, [(offset, line_no)]) so a match can name a source line.
+
+    `norm` folds the whole document into one line, which is what makes quote
+    matching survive re-wrapping — and what loses the line number a reader needs
+    to page the source back. Normalising line by line and joining on the single
+    space `norm` would have left produces the identical string, plus the offset
+    of every contributing line.
+    """
+    parts, marks, pos = [], [], 0
+    for n, line in enumerate(text.split("\n"), start=1):
+        piece = norm(line)
+        if not piece:
+            continue
+        if parts:
+            pos += 1
+        marks.append((pos, n))
+        parts.append(piece)
+        pos += len(piece)
+    return " ".join(parts), marks
+
+
+def locate(quote, body, marks):
+    """Line number in the source where `quote` starts, or None."""
+    segments = [norm(s) for s in ELISION.split(quote) if norm(s)]
+    if not segments:
+        return None
+    at = body.find(segments[0])
+    if at < 0:
+        return None
+    i = bisect.bisect_right([m[0] for m in marks], at) - 1
+    return marks[i][1] if i >= 0 else None
+
+
+def relpath(path, repo):
+    try:
+        return str(path.resolve().relative_to(repo))
+    except ValueError:
+        return str(path)
+
+
+def receipt(paths, raw, repo):
+    """The pin block. Sources in the order they were resolved, hashes over raw bytes."""
+    out = [f"<!-- reduction-receipt: {SCHEMA}",
+           "# Written by harness/check-quote-fidelity.py --write-header; do not hand-edit.",
+           "# Every source below is pinned by content hash. If one of them changes, this",
+           "# reduction is a claim about a file that has moved on: re-verify it with",
+           "# --verify-header and re-reduce before anything downstream trusts it."]
+    for p in paths:
+        out.append(f"source={relpath(p, repo)} sha256={sha256(raw[p])} "
+                   f"bytes={len(raw[p].encode())} lines={len(raw[p].split(chr(10)))}")
+    out += ["authority=the orchestrator retains adjudication; this file is evidence, not a ruling",
+            "readback=sed -n '<start>,<end>p' <source> — each quote marker carries its line",
+            "-->"]
+    return "\n".join(out) + "\n"
+
+
+def read_pins(text):
+    """-> (list of pins, found) for the receipt block at the top of `text`."""
+    m = RECEIPT_BLOCK.match(text)
+    if not m:
+        return [], False
+    pins = []
+    for line in m.group("body").split("\n"):
+        hit = PIN.match(line.strip())
+        if hit:
+            pins.append(dict(path=hit.group("path"), sha=hit.group("sha"),
+                             bytes=int(hit.group("bytes")), lines=int(hit.group("lines"))))
+    return pins, True
+
+
+def anchor_markers(text, raw, repo):
+    """Rewrite every `<!-- quote: <path> -->` to carry the quote's line and hash.
+
+    An unanchored marker names the file and leaves the reader to grep 25 KB for
+    a passage that has been re-wrapped. The anchor turns readback into one
+    `sed -n`, which is the whole point of keeping the archive.
+    """
+    indexed = {p: norm_index(t) for p, t in raw.items()}
+    by_name = {p.name: p for p in raw}
+    lines, out, changed = text.split("\n"), [], 0
+    for n, line in enumerate(lines):
+        m = QUOTE_MARKER.search(line)
+        if not m:
+            out.append(line)
+            continue
+        src = by_name.get(pathlib.Path(m.group("path")).name)
+        # The blockquote this marker attributes: the next `>` run within 3 lines.
+        buf, k = [], n + 1
+        while k < len(lines) and k <= n + 3 and not lines[k].lstrip().startswith(">"):
+            if lines[k].strip():
+                break
+            k += 1
+        while k < len(lines) and lines[k].lstrip().startswith(">"):
+            buf.append(re.sub(r"^\s*>\s?", "", lines[k]))
+            k += 1
+        quote = "\n".join(buf)
+        at = locate(quote, *indexed[src]) if src and quote else None
+        anchor = f" L{at} sha256={sha256(norm(quote))[:12]}" if at else ""
+        rewritten = line[:m.start()] + f"<!-- quote: {m.group('path')}{anchor} -->" + line[m.end():]
+        changed += rewritten != line
+        out.append(rewritten)
+    return "\n".join(out), changed
 
 
 def attributed(lines, idx, names):
@@ -148,17 +282,32 @@ def matches(quote, sources):
     return False
 
 
+def is_source(p, doc):
+    """Archived evidence only — not derived artefacts, not documentation.
+
+    A `*-index.md` is generated FROM a handoff by harness/handoff-index.py;
+    treating one as a source lets a reduction verify a quote against a head/tail
+    excerpt of the very file it is reducing, and inflates the reduction ratio
+    with bytes nobody wrote. A `README.md` is the convention document these
+    files are written *under* — reductions cite it in passing, and pinning it
+    makes every edit to the conventions invalidate reductions it has nothing to
+    do with. Neither is evidence of a finding.
+    """
+    return (p.is_file() and p.name != "README.md"
+            and not p.name.endswith("-index.md") and p.resolve() != doc.resolve())
+
+
 def resolve_sources(doc, explicit, repo):
     if explicit:
         return [pathlib.Path(p) for p in explicit]
     text, out = doc.read_text(errors="ignore"), []
     for raw in BACKTICK_PATH.findall(text):
         for cand in (repo / raw, doc.parent / raw):
-            if cand.is_file() and cand.resolve() != doc.resolve():
+            if is_source(cand, doc):
                 out.append(cand)
                 break
     prefix = re.sub(r"-(consolidated|reduced)\b.*$", "", doc.stem)
-    out += [p for p in doc.parent.glob(f"{prefix}*.md") if p.resolve() != doc.resolve()]
+    out += [p for p in doc.parent.glob(f"{prefix}*.md") if is_source(p, doc)]
     seen, uniq = set(), []
     for p in out:
         if p.resolve() not in seen:
@@ -180,6 +329,10 @@ def main():
     ap.add_argument("--no-coverage", action="store_true", help="skip the finding-id check")
     ap.add_argument("--strict", action="store_true",
                     help="also fail on blockquotes that claim no source")
+    ap.add_argument("--write-header", action="store_true",
+                    help="pin the sources by hash and anchor every quote marker (rewrites the file)")
+    ap.add_argument("--verify-header", action="store_true",
+                    help="fail when a pinned source has changed since the reduction was written")
     args = ap.parse_args()
 
     doc = pathlib.Path(args.document)
@@ -244,6 +397,23 @@ def main():
         print(f"  reduction : {src_bytes:,} B of sources -> {doc_bytes:,} B "
               f"({pct:+.0f}%{'  — this file is LARGER than its sources' if pct < 0 else ''})")
 
+    pins, has_receipt = read_pins(text)
+    drifted, unpinned = [], []
+    if args.verify_header:
+        pinned_names = {pathlib.Path(p["path"]).name for p in pins}
+        for pin in pins:
+            p = pathlib.Path(pin["path"])
+            p = p if p.is_file() else repo / pin["path"]
+            if not p.is_file():
+                drifted.append((pin, "no longer exists"))
+            elif sha256(p.read_text(errors="ignore")) != pin["sha"]:
+                drifted.append((pin, "has changed since this reduction was written"))
+        unpinned = [p for p in paths if p.name not in pinned_names]
+        print(f"  receipt   : {'absent' if not has_receipt else f'{len(pins)} source(s) pinned'}"
+              f"{f', {len(drifted)} drifted' if drifted else ''}"
+              f"{f', {len(unpinned)} resolved source(s) not pinned' if unpinned else ''}")
+
+    sys.stdout.flush()
     for fid, names in ambiguous:
         print(f"  note: id {fid} is used by {len(names)} reports ({', '.join(names)}); "
               f"one mention satisfies all of them", file=sys.stderr)
@@ -263,12 +433,47 @@ def main():
         for n, q in loose:
             print(f"  {doc}:{n}: {norm(q)[:100]}", file=sys.stderr)
 
-    if bad or dropped or (loose and args.strict):
+    if args.verify_header and not has_receipt:
+        print(f"\n{doc}: no reduction receipt. This file claims to reduce "
+              f"{len(paths)} source(s) but pins none of them, so 'the quotes match'\n"
+              f"is a statement about today's files, not about what was reduced.\n"
+              f"  fix: python3 harness/check-quote-fidelity.py {doc} --write-header",
+              file=sys.stderr)
+    if drifted:
+        print(f"\n{len(drifted)} pinned source(s) no longer match the receipt:", file=sys.stderr)
+        for pin, why in drifted:
+            print(f"  {pin['path']}: {why} (was {pin['bytes']:,} B / {pin['lines']:,} lines)",
+                  file=sys.stderr)
+        print("  Re-read them and re-reduce, then re-pin with --write-header. A reduction\n"
+              "  of a superseded source is not evidence of anything.", file=sys.stderr)
+    if unpinned:
+        print(f"\n{len(unpinned)} source(s) this file cites are absent from the receipt:",
+              file=sys.stderr)
+        for p in unpinned:
+            print(f"  {relpath(p, repo)}", file=sys.stderr)
+
+    failed = bool(bad or dropped or (loose and args.strict))
+    header_failed = args.verify_header and (not has_receipt or drifted or unpinned)
+
+    if failed:
         print("\nFAIL — the reduction is not evidence-preserving. Restore the dropped\n"
               "findings and correct the quotations, or reproduce the sources in full.",
               file=sys.stderr)
+    if args.write_header:
+        if failed:
+            print("\nReceipt NOT written: a receipt over a failing reduction would pin the\n"
+                  "defect rather than catch it. Fix the above, then re-run --write-header.",
+                  file=sys.stderr)
+            return 1
+        body, anchored = anchor_markers(RECEIPT_BLOCK.sub("", text, count=1), raw, repo)
+        doc.write_text(receipt(paths, raw, repo) + body)
+        print(f"  receipt   : written — {len(paths)} source(s) pinned, "
+              f"{anchored} quote marker(s) anchored")
+        return 0
+    if failed or header_failed:
         return 1
-    print("  OK — every quotation matches a source, every finding id survives.")
+    print("  OK — every quotation matches a source, every finding id survives."
+          + (" Pinned sources are unchanged." if args.verify_header else ""))
     return 0
 
 
