@@ -35,11 +35,11 @@ if (process.env.NODE_ENV === 'development') {
   const emulatorHost = process.env.NEXT_PUBLIC_EMULATOR_HOST || '127.0.0.1'
 
   // Ports are env-overridable so the same code can target either the dev
-  // emulators (firebase.json: auth 9109 / firestore 8090) or the isolated test
-  // emulators (firebase.test.json: auth 10109 / firestore 9100) used by E2E.
+  // emulators (firebase.json: auth 20211 / firestore 20212) or the isolated test
+  // emulators (firebase.test.json: auth 20241 / firestore 20242) used by E2E.
   // Defaults preserve the dev behavior.
-  const authPort = process.env.NEXT_PUBLIC_AUTH_EMULATOR_PORT ?? '9109'
-  const firestorePort = Number(process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT ?? '8090')
+  const authPort = process.env.NEXT_PUBLIC_AUTH_EMULATOR_PORT ?? '20211'
+  const firestorePort = Number(process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT ?? '20212')
 
   if (!globalAny.__FIREBASE_AUTH_EMULATOR_CONNECTED__) {
     globalAny.__FIREBASE_AUTH_EMULATOR_CONNECTED__ = true

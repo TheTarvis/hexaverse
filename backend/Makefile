@@ -1,5 +1,17 @@
 # Backend Makefile
 
+
+# Port lane for this checkout. .ports.env is generated at the repo root by
+# `python3 harness/ports.py render` from ports.env's PORT_BASE — never hardcode
+# a port below, or a re-laned project silently talks to another fork's stack.
+-include ../.ports.env
+ifndef PORT_BASE
+$(error no ../.ports.env — run: python3 harness/ports.py render)
+endif
+# Exported so recipes that shell out (docker-compose host-port substitution)
+# see the lane too, not just Make's own variable expansion.
+export
+
 .PHONY: help test test-unit test-integration test-all clean build run emulators emulators-bg ensure-emulators stop-emulators check-emulators postgres
 
 help:
@@ -39,25 +51,25 @@ test-full:
 	@make check-services
 	@echo ""
 	@echo "Step 3: Running E2E integration tests..."
-	FIRESTORE_EMULATOR_HOST=localhost:9100 \
-	FIREBASE_AUTH_EMULATOR_HOST=localhost:10109 \
-	PUBSUB_EMULATOR_HOST=localhost:9106 \
+	FIRESTORE_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_FIRESTORE) \
+	FIREBASE_AUTH_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_AUTH) \
+	PUBSUB_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_PUBSUB) \
 	go test ./e2e/... -tags=integration -v -run TestIndependentFlows -count=1
 	@echo ""
 	@echo "All tests passed! ✅"
 
 test-integration: check-services
 	@echo "Running E2E integration tests only..."
-	FIRESTORE_EMULATOR_HOST=localhost:9100 \
-	FIREBASE_AUTH_EMULATOR_HOST=localhost:10109 \
-	PUBSUB_EMULATOR_HOST=localhost:9106 \
+	FIRESTORE_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_FIRESTORE) \
+	FIREBASE_AUTH_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_AUTH) \
+	PUBSUB_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_PUBSUB) \
 	go test ./e2e/... -tags=integration -v -run TestIndependentFlows -count=1
 
 test-integration-verbose: check-services
 	@echo "Running E2E integration tests with verbose output..."
-	FIRESTORE_EMULATOR_HOST=localhost:9100 \
-	FIREBASE_AUTH_EMULATOR_HOST=localhost:10109 \
-	PUBSUB_EMULATOR_HOST=localhost:9106 \
+	FIRESTORE_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_FIRESTORE) \
+	FIREBASE_AUTH_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_AUTH) \
+	PUBSUB_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_PUBSUB) \
 	go test ./e2e/... -tags=integration -v -run TestIndependentFlows -count=1
 
 test-all: test-full
@@ -76,18 +88,18 @@ emulators-bg: ensure-emulators
 ensure-emulators:
 	@bash ../scripts/dev/ensure-test-emulators.sh
 
-# Only stops the TEST emulator set (firebase.test.json — ports 9100/10109/9106).
+# Only stops the TEST emulator set (firebase.test.json — ports 20242/20241/20244).
 # A dev emulator started with `npm run firebase:emulators` (default ports
-# 8090/9109/…) is left alone: we match the CLI process by its --config arg,
+# 20212/20211/…) is left alone: we match the CLI process by its --config arg,
 # then reap any leftover child emulators still holding the test ports.
 stop-emulators:
 	@echo "Stopping test emulators (dev emulators untouched)..."
 	@pkill -f "firebase.test.json" || true
 	@for i in $$(seq 1 10); do \
-		nc -z localhost 9100 2>/dev/null || break; \
+		nc -z localhost $(PORT_TEST_EMU_FIRESTORE) 2>/dev/null || break; \
 		sleep 1; \
 	done
-	@for port in 9100 10109 9106; do \
+	@for port in $(PORT_TEST_EMU_FIRESTORE) $(PORT_TEST_EMU_AUTH) $(PORT_TEST_EMU_PUBSUB); do \
 		pids=$$(lsof -ti tcp:$$port 2>/dev/null || true); \
 		if [ -n "$$pids" ]; then \
 			echo "Force-killing leftover emulator process on :$$port"; \
@@ -98,13 +110,13 @@ stop-emulators:
 
 check-emulators:
 	@echo "Checking if Firebase emulators are running..."
-	@nc -z localhost 9100 || (echo "Firestore emulator not running on port 9100. Run 'make ensure-emulators' first" && exit 1)
-	@nc -z localhost 10109 || (echo "Auth emulator not running on port 10109. Run 'make ensure-emulators' first" && exit 1)
+	@nc -z localhost $(PORT_TEST_EMU_FIRESTORE) || (echo "Firestore emulator not running on port $(PORT_TEST_EMU_FIRESTORE). Run 'make ensure-emulators' first" && exit 1)
+	@nc -z localhost $(PORT_TEST_EMU_AUTH) || (echo "Auth emulator not running on port $(PORT_TEST_EMU_AUTH). Run 'make ensure-emulators' first" && exit 1)
 	@echo "Emulators are running"
 
 check-postgres:
 	@echo "Checking if PostgreSQL is running..."
-	@nc -z localhost 5432 || (echo "PostgreSQL not running on port 5432. Run 'docker-compose up -d postgres' first" && exit 1)
+	@nc -z localhost $(PORT_POSTGRES) || (echo "PostgreSQL not running on port $(PORT_POSTGRES). Run 'docker-compose up -d postgres' first" && exit 1)
 	@echo "PostgreSQL is running"
 
 check-services: check-emulators check-postgres
@@ -130,8 +142,8 @@ seed-start-area:
 
 run-with-emulators:
 	@echo "Running backend with emulators..."
-	FIRESTORE_EMULATOR_HOST=localhost:9100 \
-	FIREBASE_AUTH_EMULATOR_HOST=localhost:10109 \
+	FIRESTORE_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_FIRESTORE) \
+	FIREBASE_AUTH_EMULATOR_HOST=localhost:$(PORT_TEST_EMU_AUTH) \
 	go run .
 
 # Code generation

@@ -85,7 +85,7 @@ For a sequence of changes, keep a persistent test stack up for the whole chain
 so tier 4 skips the boot:
 
 ```bash
-npm run firebase:emulators:test        # once; auth :10109, firestore :9100
+npm run firebase:emulators:test        # once; auth :20241, firestore :20242
 E2E_REUSE_SERVER=1                     # attach Playwright to a long-lived test backend/frontend
 ```
 

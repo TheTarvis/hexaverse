@@ -282,9 +282,9 @@ test-backend:
 
     # Firebase emulator configuration
     FIREBASE_PROJECT_ID: "hexaverse-emulator"
-    FIRESTORE_EMULATOR_HOST: "localhost:9100"
-    FIREBASE_AUTH_EMULATOR_HOST: "localhost:10109"
-    PUBSUB_EMULATOR_HOST: "localhost:9106"
+    FIRESTORE_EMULATOR_HOST: "localhost:20242"
+    FIREBASE_AUTH_EMULATOR_HOST: "localhost:20241"
+    PUBSUB_EMULATOR_HOST: "localhost:20244"
     FIREBASE_EMULATORS_PATH: "${CI_PROJECT_DIR}/.cache/firebase/emulators"
 
     # Go test configuration
@@ -302,9 +302,9 @@ test-backend:
     - |
       echo "Waiting for Firebase emulators to start..."
       for i in {1..30}; do
-        if curl -s http://localhost:9100 > /dev/null 2>&1 && \
-            curl -s http://localhost:10109 > /dev/null 2>&1 && \
-            curl -s http://localhost:9106 > /dev/null 2>&1; then
+        if curl -s http://localhost:20242 > /dev/null 2>&1 && \
+            curl -s http://localhost:20241 > /dev/null 2>&1 && \
+            curl -s http://localhost:20244 > /dev/null 2>&1; then
           echo "Emulators are ready!"
           break
         fi

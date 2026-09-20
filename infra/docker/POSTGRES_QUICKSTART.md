@@ -62,7 +62,7 @@ go run .
 
 # In another terminal, test postgres endpoints
 # (Note: Replace {orgId} and {connId} with actual values from your test)
-curl http://localhost:9010/v1/connections/{orgId}/{connId}/postgres/schemas
+curl http://localhost:20201/v1/connections/{orgId}/{connId}/postgres/schemas
 ```
 
 ---
@@ -173,7 +173,7 @@ LIMIT 5;
 
 ## Troubleshooting
 
-### Issue: Port 5432 already in use
+### Issue: Port 20250 already in use
 
 **Problem**: Local PostgreSQL is already running
 ```
@@ -283,8 +283,8 @@ go run .
 
 # Run e2e tests (in another terminal)
 cd backend
-FIRESTORE_EMULATOR_HOST=localhost:9100 \
-PUBSUB_EMULATOR_HOST=localhost:9106 \
+FIRESTORE_EMULATOR_HOST=localhost:20242 \
+PUBSUB_EMULATOR_HOST=localhost:20244 \
 go test -v -run TestIndependentFlows/PostgresImport
 ```
 
@@ -340,13 +340,13 @@ Use these credentials for connecting to the test database:
 ### Connection String
 
 ```
-postgresql://testuser:testpass@localhost:5432/testdb?sslmode=disable
+postgresql://testuser:testpass@localhost:20250/testdb?sslmode=disable
 ```
 
 ### psql Command
 
 ```bash
-psql postgresql://testuser:testpass@localhost:5432/testdb
+psql postgresql://testuser:testpass@localhost:20250/testdb
 ```
 
 ---

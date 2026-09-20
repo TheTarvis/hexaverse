@@ -2,7 +2,7 @@
 //
 //   node set-admin-claims.js [--dev] [--remove] <UID>
 //
-// --dev     target the local Auth emulator (localhost:9109, project
+// --dev     target the local Auth emulator (localhost:20211, project
 //           hexaverse-emulator) instead of the real Firebase project
 // --remove  clear the admin claim instead of setting it
 //
@@ -31,7 +31,7 @@ const defaultProjectId = isDevMode ? 'hexaverse-emulator' : 'hexaverse';
 const projectId = process.env.FIREBASE_PROJECT_ID || defaultProjectId;
 
 if (isDevMode) {
-  process.env.FIREBASE_AUTH_EMULATOR_HOST ||= 'localhost:9109';
+  process.env.FIREBASE_AUTH_EMULATOR_HOST ||= 'localhost:20211';
   console.log(`🔧 Using Firebase Auth emulator at ${process.env.FIREBASE_AUTH_EMULATOR_HOST}`);
 }
 

@@ -721,7 +721,7 @@ def run_frontend_e2e(required: bool = True) -> dict:
     # Default fast-path gate only. The actual run + emulator handling belong to the
     # wrapper (npm run e2e); here we just probe the test emulator's Firestore port
     # (firebase.test.json) to decide whether the heavy suite is worth starting.
-    if not required and not _http_reachable("http://127.0.0.1:9100"):
+    if not required and not _http_reachable("http://127.0.0.1:20242"):
         print_warning("Test emulator not running — skipping E2E.")
         print_info("Start it (npm run firebase:emulators:test) or run `/check --e2e` to cold-start one.")
         return {"passed": True, "skipped": True}

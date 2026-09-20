@@ -221,7 +221,7 @@ mutation, venue folds, the sell transaction) are already built.
 ## The PoC — what's demoable today
 
 Route **`/spike/space-3d`** (`npm run dev:frontend`, then
-http://localhost:3010/spike/space-3d). All of this works now:
+http://localhost:20200/spike/space-3d). All of this works now:
 
 - Seeded deterministic system: star, 5–7 planets on inclined (±8°) Kepler-ish
   orbits, hierarchical moons, an NPC station, an asteroid belt. Reseed button.

@@ -4,27 +4,27 @@
   },
   "emulators": {
     "auth": {
-      "port": "9109",
+      "port": 20211,
       "host": "0.0.0.0"
     },
     "ui": {
       "enabled": true,
       "host": "0.0.0.0",
-      "port": 4010
+      "port": 20210
     },
     "hub": {
-      "port": 4410
+      "port": 20216
     },
     "logging": {
-      "port": 4510
+      "port": 20217
     },
     "firestore": {
-      "port": "8090",
-      "websocketPort": 9160,
+      "port": 20212,
+      "websocketPort": 20213,
       "host": "0.0.0.0"
     },
     "pubsub": {
-      "port": 8096,
+      "port": 20214,
       "host": "0.0.0.0"
     },
     "singleProjectMode": true

@@ -13,7 +13,7 @@ export default defineConfig({
     globals: true,
     reporters: [['default', { summary: false }]],
     env: {
-      NEXT_PUBLIC_API_URL: 'http://localhost:9010',
+      NEXT_PUBLIC_API_URL: 'http://localhost:20201',
     },
     css: false, // Disable CSS processing for speed (not needed for most tests)
     testTimeout: 10000,

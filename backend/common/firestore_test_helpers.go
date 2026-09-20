@@ -22,7 +22,7 @@ func SetupFirestoreTestClient(t *testing.T) *firestore.Client {
 		t.Skip("integration test needs the Firestore emulator; skipped with -short")
 	}
 	// Ensure we're using the test emulator
-	os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:9100")
+	os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:20242")
 
 	ctx := context.Background()
 	// Project ID must match the emulator's --project flag to see data in UI

@@ -41,13 +41,18 @@ func SetupRouter() *gin.Engine {
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = []string{}
 	if config.IsLocal() {
-		// Hexaverse dev frontend runs on :3010 (base +10 so it coexists with
-		// Flywheel on :3000). Next.js bumps to the next free port when 3010 is
-		// taken, so accept :3011 too. :3110 is the dedicated e2e frontend port
-		// (playwright boots the dev server there) — without it the browser's API
-		// calls are CORS-blocked during e2e.
+		// This checkout's port lane (ports.env / docs/ports.md): :20200 is the
+		// dev frontend, :20230 the dedicated e2e frontend that Playwright boots
+		// — without the latter the browser's API calls are CORS-blocked during
+		// e2e.
+		//
+		// The old ":3011" entry is deliberately gone. It existed because Next
+		// silently bumps to the next free port when --port is taken; inside a
+		// lane that lands on :20201, which is THIS service. `npm run dev` now
+		// runs `ports.py check --only frontend` first and refuses to start on a
+		// busy port, so a bumped origin is a bug to surface, not to allow.
 		corsConfig.AllowOrigins = append(corsConfig.AllowOrigins,
-			"http://localhost:3010", "http://localhost:3011", "http://localhost:3110")
+			"http://localhost:20200", "http://localhost:20230")
 	}
 	corsConfig.AllowCredentials = true
 	corsConfig.AllowHeaders = []string{

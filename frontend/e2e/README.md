@@ -16,14 +16,14 @@ otherwise it starts a **throwaway** set for the run and tears it down after. Sam
 for the backend Go suites (`npm run test:backend:e2e` etc. from the repo root) — no
 more "forgot to start the emulator."
 
-You do **not** need your dev frontend (`:3010`) or dev backend (`:9010`) — the suite
+You do **not** need your dev frontend (`:20200`) or dev backend (`:20201`) — the suite
 boots its own on separate ports.
 
 **Optional (faster iteration):** keep a persistent emulator running and every run
 will reuse it instead of cold-starting one:
 
 ```bash
-npm run firebase:emulators:test    # repo root — auth :10109, firestore :9100, pubsub :9106
+npm run firebase:emulators:test    # repo root — auth :20241, firestore :20242, pubsub :20244
 ```
 
 The `--project hexaverse-emulator` flag that script passes is what pins the
@@ -53,10 +53,10 @@ raise a timeout to get a run green — report the overrun instead.
      `npx playwright test` without an emulator up).
    - **Wipes** the emulator project's Firestore + Auth (REST clear endpoints) so the
      long-lived local emulator doesn't accumulate data across runs.
-   - Builds and starts the `ENV=test` backend binary on **`:9012`** (rate limiting
+   - Builds and starts the `ENV=test` backend binary on **`:20232`** (rate limiting
      off, pointed at the test emulators). Kills any leftover from a prior run first,
      so you never reuse stale data or stale code.
-2. **`webServer`**: Playwright boots its **own** Next.js frontend on **`:3110`**,
+2. **`webServer`**: Playwright boots its **own** Next.js frontend on **`:20230`**,
    into its **own build dir** (`.next-e2e`) so it can't clobber your dev server's
    `.next`.
 3. **`setup` project** (`auth.setup.ts`): seeds the test user in the auth emulator,
@@ -67,9 +67,9 @@ raise a timeout to get a run green — report the overrun instead.
 
 | Piece | Local (default) | Your dev stack (untouched) |
 |---|---|---|
-| Frontend | `:3110` (`.next-e2e`) | `:3010` |
-| Backend | `:9012` (`ENV=test`) | `:9010` |
-| Emulators | firebase.test.json — auth `:10109`, firestore `:9100` | firebase.json — auth `:9109`, firestore `:8090` |
+| Frontend | `:20230` (`.next-e2e`) | `:20200` |
+| Backend | `:20232` (`ENV=test`) | `:20201` |
+| Emulators | firebase.test.json — auth `:20241`, firestore `:20242` | firebase.json — auth `:20211`, firestore `:20212` |
 | Firebase project | `hexaverse-emulator` (wiped each run) | your dev project |
 
 ### Shared emulator project
@@ -167,7 +167,7 @@ e2e/
 
 The same helpers drive the **dev** stack too: `npm run users -- ensure` seeds
 `dev@hexaverse.test` on the dev emulator, `-- token` gets a bearer token for
-`:9010`, and `-- login-url` prints a one-shot `/dev/login#token=…` URL that
+`:20201`, and `-- login-url` prints a one-shot `/dev/login#token=…` URL that
 signs a browser in without a password (see `.claude/skills/dev-users/`).
 
 Conventions for new specs:

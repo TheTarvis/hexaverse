@@ -14,17 +14,17 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # CORS — comma-separated list of allowed frontend origins
-    cors_allowed_origins: str = "http://localhost:3010"
+    cors_allowed_origins: str = "http://localhost:20200"
 
     # Anthropic
     anthropic_api_key: str = ""
 
     # Firebase
     firebase_project_id: str = ""
-    firebase_auth_emulator_host: str | None = None  # e.g. "localhost:9109" for local dev
+    firebase_auth_emulator_host: str | None = None  # e.g. "localhost:20211" for local dev
 
     # Backend (Go service) — used by tools that call the backend with the user's token
-    backend_api_url: str = "http://localhost:9010"
+    backend_api_url: str = "http://localhost:20201"
 
     # Rate Limiting (per-user sliding window on /chat)
     rate_limit_requests_per_minute: int = 20

@@ -5,8 +5,12 @@
   "scripts": {
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && go run .",
-    "dev:agent": "cd claude-agent && PYTHONUNBUFFERED=1 uv run uvicorn src.main:app --reload --port 8100 --host 0.0.0.0 2>&1 | tee dev.log",
+    "dev:agent": "cd claude-agent && set -a && . ../.ports.env && set +a && PYTHONUNBUFFERED=1 uv run uvicorn src.main:app --reload --port $PORT_AGENT --host 0.0.0.0 2>&1 | tee dev.log",
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "ports": "python3 harness/ports.py show",
+    "ports:render": "python3 harness/ports.py render",
+    "ports:check": "python3 harness/ports.py check",
+    "ports:registry": "python3 harness/ports.py registry",
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && go build -o ../dist/backend .",
     "build": "npm run build:frontend && npm run build:backend",

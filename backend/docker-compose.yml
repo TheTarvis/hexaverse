@@ -2,7 +2,7 @@ services:
   dynamodb-local:
     image: amazon/dynamodb-local:latest
     ports:
-      - "8000:8000"
+      - "${PORT_DYNAMODB:-20255}:8000"
     volumes:
       - ./ddbdata:/home/dynamodblocal/data
     command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/home/dynamodblocal/data"]
@@ -13,7 +13,7 @@ services:
     image: aaronshaf/dynamodb-admin:latest
     container_name: flywheel-dynamodb-admin
     ports:
-      - "8001:8001"
+      - "${PORT_DYNAMODB_ADMIN:-20256}:8001"
     environment:
       - DYNAMO_ENDPOINT=http://dynamodb-local:8000
     depends_on:
@@ -25,8 +25,8 @@ services:
     image: minio/minio:latest
     container_name: flywheel-minio
     ports:
-      - "9550:9000"   # S3 API
-      - "9551:9001"   # Web Console
+      - "${PORT_MINIO:-20252}:9000"   # S3 API
+      - "${PORT_MINIO_CONSOLE:-20253}:9001"   # Web Console
     environment:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
@@ -43,7 +43,7 @@ services:
     image: flywheel-postgres-test:latest
     container_name: flywheel-postgres
     ports:
-      - "5432:5432"
+      - "${PORT_POSTGRES:-20250}:5432"
     environment:
       - POSTGRES_USER=testuser
       - POSTGRES_PASSWORD=testpass

@@ -81,7 +81,7 @@ conventions for that codebase. **Read the relevant one before working there.**
   Volt stack). `cleanup-firestore.sh` / `cleanup-pubsub.sh` were brought
   from Flywheel and are **not yet adapted** to hexaverse.
 - `firebase.json`, `firebase.test.json` — emulator and deploy config
-  (test emulators: Firestore 9100, Auth 10109, Pub/Sub 9106).
+  (test emulators: Firestore 20242, Auth 20241, Pub/Sub 20244).
 - `docs/` — project docs. `docs/testing-tiers.md` is the single definition of
   every test suite, its cost, and when it runs (per-commit gate vs. archive
   gate); `docs/handoffs/` is the OpenSpec team's durable per-change state
@@ -108,7 +108,7 @@ type-prefixed bullets per change, `Impact:` trailer (see
 Backend (`cd backend`):
 
 ```bash
-make run                                   # run locally (localhost:9010)
+make run                                   # run locally (localhost:20201)
 make test                                  # unit tests (go test -short ./...)
 go test ./widgets/ -run TestName -short    # single test
 make generate                              # regen mocks after editing a DAO interface
@@ -118,7 +118,7 @@ make emulators-bg / stop-emulators         # Firebase emulators in background
 Frontend (`cd frontend`):
 
 ```bash
-npm run dev                                # localhost:3010
+npm run dev                                # localhost:20200
 npm run lint                               # ESLint + tsc
 npx vitest run                             # tests, one-shot
 npx vitest run path/to/file.test.tsx       # single file
@@ -127,7 +127,7 @@ npx vitest run path/to/file.test.tsx       # single file
 Claude agent (`cd claude-agent`):
 
 ```bash
-uv sync && uv run python -m src.main       # server at :8100
+uv sync && uv run python -m src.main       # server at :20202
 uv run pytest                              # tests
 uv run ruff check src tests && uv run pyright src
 ```
@@ -181,20 +181,20 @@ After forking:
 Local dev loop (three terminals, from the repo root):
 
 ```bash
-# 1. Firebase dev emulators (firebase.json — auth :9109, firestore :8090)
+# 1. Firebase dev emulators (firebase.json — auth :20211, firestore :20212)
 npm run firebase:emulators
 
-# 2. Backend (:9010)
+# 2. Backend (:20201)
 npm run dev:backend
 
-# 3. Frontend (:3010)
+# 3. Frontend (:20200)
 npm run dev:frontend
 ```
 
 `npm run dev` runs frontend + backend concurrently in one terminal. E2E
 (`cd frontend && npm run e2e`) needs none of these — it boots its own
-isolated stack (test emulators, `ENV=test` backend on :9012, frontend on
-:3110).
+isolated stack (test emulators, `ENV=test` backend on :20232, frontend on
+:20230).
 
 ## Spec-driven development (OpenSpec)
 

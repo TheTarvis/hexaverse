@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack -p 3010",
+    "dev": "set -a && . ../.ports.env && set +a && python3 ../harness/ports.py check --only frontend && next dev --turbopack -p 20200 --port $PORT_FRONTEND",
     "build": "next build",
-    "start": "next start",
+    "start": "set -a && . ../.ports.env && set +a && next start --port $PORT_FRONTEND",
     "lint": "eslint . && ./scripts/tsc-check.sh",
     "test": "vitest",
     "test:run": "vitest run",

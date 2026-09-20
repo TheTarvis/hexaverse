@@ -4,7 +4,7 @@
  * Build the server binary, run it on an isolated port with a *curated* env
  * (ENV=test → loads .env.test → test emulators + DISABLE_RATE_LIMITING), then
  * poll /healthcheck. This is what keeps E2E off your real dev stack — the test
- * backend talks to the firebase.test.json emulators (9100 / 10109 / 9106), never
+ * backend talks to the firebase.test.json emulators (20242 / 20241 / 20244), never
  * the dev emulators your `make run` backend uses.
  *
  * CI already boots its own backend inside the job, so it sets E2E_MANAGE_STACK=0

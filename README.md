@@ -36,10 +36,10 @@ Three terminals:
 firebase emulators:start --only firestore,auth,pubsub --config firebase.test.json
 
 # Terminal 2 — backend
-cd backend && make run                # localhost:9010
+cd backend && make run                # localhost:20201
 
 # Terminal 3 — frontend
-cd frontend && npm run dev                 # localhost:3010
+cd frontend && npm run dev                 # localhost:20200
 ```
 
 ## Where to look

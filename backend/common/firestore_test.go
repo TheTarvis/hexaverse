@@ -21,7 +21,7 @@ func setupFirestoreTestClient(t *testing.T) *firestore.Client {
 	}
 
 	// Ensure we're using the test emulator
-	os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:9100")
+	os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:20242")
 
 	// Ensure emulator is being used
 	emulatorHost := os.Getenv("FIRESTORE_EMULATOR_HOST")

@@ -14,8 +14,8 @@ npm run users -- <ensure|find|list|delete|token|login-url> [--cluster dev|test] 
 
 | Cluster | Config | Auth / Firestore | Frontend / Backend | Default user |
 |---|---|---|---|---|
-| `dev` (default) | `firebase.json` | 9109 / 8090 | :3010 / :9010 | `dev@hexaverse.test` |
-| `test` | `firebase.test.json` | 10109 / 9100 | :3110 / :9012 | `e2e@hexaverse.test` (Playwright's; wiped every e2e run) |
+| `dev` (default) | `firebase.json` | 20211 / 20212 | :20200 / :20201 | `dev@hexaverse.test` |
+| `test` | `firebase.test.json` | 20241 / 20242 | :20230 / :20232 | `e2e@hexaverse.test` (Playwright's; wiped every e2e run) |
 
 Ports are read from the two firebase JSON files at run time (`frontend/e2e/config/clusters.ts`), never copied. Both clusters run under project `hexaverse-emulator`. Emulator accounts are in-memory: an emulator restart (`/spinup`) forgets them — just `ensure` again.
 
@@ -27,7 +27,7 @@ Ports are read from the two firebase JSON files at run time (`frontend/e2e/confi
 - `list` — every user on the cluster (Google-provider dev identities show as `[google.com]`).
 - `delete --uid U` (or `--email E`).
 - `token` — an ID token for email+password. Use as `Authorization: Bearer <token>` against the cluster's backend.
-- `login-url` — a one-shot `http://localhost:3010/dev/login#token=…` URL (by `--uid` or `--email`). Opening it signs the **browser** in as that user via an unsigned custom token the emulator accepts and real Firebase rejects. The route 404s outside development builds.
+- `login-url` — a one-shot `http://localhost:20200/dev/login#token=…` URL (by `--uid` or `--email`). Opening it signs the **browser** in as that user via an unsigned custom token the emulator accepts and real Firebase rejects. The route 404s outside development builds.
 
 `--json` gives machine-readable output for scripting.
 
@@ -37,7 +37,7 @@ Ports are read from the two firebase JSON files at run time (`frontend/e2e/confi
 ```bash
 cd frontend && npm run users -- bootstrap >/dev/null
 TOKEN=$(npm run -s users -- token)
-curl -s -H "Authorization: Bearer $TOKEN" http://localhost:9010/v1/corporations/me
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:20201/v1/corporations/me
 ```
 A fresh account has no corporation until `POST /v1/corporations {"name": …}` spawns one (or the wake-up flow in the UI does); spawn drops a full-fuel hull at a home system, which makes the throwaway user the right account for exercising burns.
 

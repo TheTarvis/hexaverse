@@ -15,7 +15,7 @@ cp .env.example .env
 # Fill in at least: ANTHROPIC_API_KEY, FIREBASE_PROJECT_ID
 
 # 3. Run
-uv run python -m src.main           # → http://localhost:8100
+uv run python -m src.main           # → http://localhost:20202
 ```
 
 ## Test

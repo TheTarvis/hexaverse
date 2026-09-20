@@ -7,26 +7,27 @@
   },
   "emulators": {
     "auth": {
-      "port": 10109
+      "port": 20241
     },
     "ui": {
       "enabled": false,
-      "port": 4011
+      "port": 20240
     },
     "firestore": {
-      "port": 9100
+      "port": 20242,
+      "websocketPort": 20243
     },
     "pubsub": {
-      "port": 9106
+      "port": 20244
     },
     "storage": {
-      "port": 10209
+      "port": 20245
     },
     "hub": {
-      "port": 9410
+      "port": 20246
     },
     "logging": {
-      "port": 9510
+      "port": 20247
     },
     "singleProjectMode": false
   }

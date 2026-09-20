@@ -40,7 +40,7 @@ npm run remove-admin:dev -- <UID>
 ```
 
 Find a UID in the Firebase console (Authentication → Users) or the emulator
-UI at http://localhost:4000/auth.
+UI at http://localhost:20210/auth.
 
 Expected output:
 

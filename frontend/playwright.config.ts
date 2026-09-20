@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { lane } from './e2e/config/clusters'
 import { resolveE2EConfig, STORAGE_STATE } from './e2e/config/env'
 
 const cfg = resolveE2EConfig()
@@ -10,9 +11,12 @@ const cfg = resolveE2EConfig()
 // are auto-started by the `npm run e2e` wrapper (firebase.test.json).
 //
 // Command is env-overridable and defaults to the dev server on baseURL's port
-// (e.g. :3110 locally so it doesn't collide with your dev server on :3010).
-const devPort = new URL(cfg.baseURL).port || '3010'
-const defaultDevCommand = `npm run dev -- --port ${devPort}`
+// (e.g. :20230 locally so it doesn't collide with your dev server on :20200).
+const devPort = new URL(cfg.baseURL).port
+// `npx next dev` rather than `npm run dev -- --port ...`: the npm script sources
+// the repo's port lane, guards the port and already passes its own --port, so
+// going through it would hand Next two conflicting --port flags.
+const defaultDevCommand = `npx next dev --turbopack --port ${devPort}`
 const webServer = cfg.reuseServer
   ? undefined
   : {
@@ -42,10 +46,10 @@ const webServer = cfg.reuseServer
         // by the starter suite, but the URL must exist for any code that
         // constructs the client.
         NEXT_PUBLIC_CLAUDE_AGENT_URL:
-          process.env.NEXT_PUBLIC_CLAUDE_AGENT_URL ?? 'http://127.0.0.1:8081',
+          process.env.NEXT_PUBLIC_CLAUDE_AGENT_URL ?? `http://127.0.0.1:${lane().agent}`,
         NEXT_PUBLIC_EMULATOR_HOST: cfg.emulator?.host ?? '127.0.0.1',
-        NEXT_PUBLIC_AUTH_EMULATOR_PORT: cfg.emulator?.authPort ?? '9109',
-        NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT: cfg.emulator?.firestorePort ?? '8090',
+        NEXT_PUBLIC_AUTH_EMULATOR_PORT: cfg.emulator?.authPort ?? '20211',
+        NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT: cfg.emulator?.firestorePort ?? '20212',
         NEXT_PUBLIC_FIREBASE_PROJECT_ID: cfg.emulator?.projectId ?? 'hexaverse-emulator',
         NEXT_PUBLIC_FIREBASE_API_KEY: cfg.emulator?.apiKey ?? 'demo-api-key',
       },

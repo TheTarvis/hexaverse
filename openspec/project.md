@@ -34,13 +34,13 @@ full picture; this file exists for the OpenSpec tooling.
 ## How to run
 - Quality gate: `python3 .claude/skills/code-quality-checks/check.py` or
   `bash harness/check.sh`.
-- Backend (`cd backend`): `make run` (localhost:9010), `make test`
+- Backend (`cd backend`): `make run` (localhost:20201), `make test`
   (`go test -short ./...`), `make generate` (regen DAO mocks).
-- Frontend (`cd frontend`): `npm run dev` (localhost:3010), `npm run lint`,
+- Frontend (`cd frontend`): `npm run dev` (localhost:20200), `npm run lint`,
   `npx vitest run`, `cd frontend && npm run e2e` (Playwright, isolated
   stack).
 - Claude agent (`cd claude-agent`): `uv sync && uv run python -m src.main`
-  (:8100), `uv run pytest`, `uv run ruff check src tests && uv run pyright
+  (:20202), `uv run pytest`, `uv run ruff check src tests && uv run pyright
   src`.
 - Full local loop: Firebase emulators (`npm run firebase:emulators`),
   backend (`npm run dev:backend`), frontend (`npm run dev:frontend`), or

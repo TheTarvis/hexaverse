@@ -15,7 +15,7 @@ package main
 // (middlewares.InitializeFirebase), which in turn requires the Firebase Auth
 // emulator — the same mechanism the frontend e2e stack already uses to
 // authenticate against this exact emulator (firebase.test.json, port
-// 10109). This is new test INFRASTRUCTURE, not new test PHILOSOPHY: no
+// 20241). This is new test INFRASTRUCTURE, not new test PHILOSOPHY: no
 // existing Go integration test in this repo drives a fully-authenticated
 // HTTP request through the production-constructed router, because until
 // this change nothing needed to distinguish "the service logic is right"
