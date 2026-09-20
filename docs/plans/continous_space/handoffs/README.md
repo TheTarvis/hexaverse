@@ -295,6 +295,47 @@ the orchestrator between links.
 They are dated working documents, not living specification. Where one disagrees
 with `openspec/specs/`, the spec wins.
 
+### The rulings ledger has an index, and agents read the index
+
+`<change-id>-rulings.md` is history: append-only, every ruling with its full
+reasoning. Nothing should read it end to end. `tools/openspec-rulings-index.py`
+generates `<change-id>-rulings-index.md` — one line per ruling (id, line range,
+outcome, and which later ruling revised it) — and **that** is the file a
+delegation names and a resuming orchestrator reads. Regenerate after every
+ruling; `--check <change-id>` exits 1 when it is stale.
+
+The script auto-detects this directory, so it needs no arguments here even
+though handoffs live under `docs/plans/`, not `docs/handoffs/`.
+
+A ruling heading must therefore state its outcome in one sentence — that heading
+*is* its index line. The four `link6`–`link9` ledgers predate this convention and
+carry no ruling ids; their indexes correctly mint none and list sections by line
+instead. Nothing reconstructs ids for them.
+
+### Reduction is allowed when it is verified, not when it is trusted
+
+Lesson three above is enforceable now, not merely remembered:
+
+```bash
+python3 tools/check-quote-fidelity.py docs/plans/continous_space/handoffs/<id>-panel-consolidated.md --report
+```
+
+It fails the file unless every **attributed** quotation matches an archived
+source and every finding id in a source appears in the reduction. A blockquote
+is attributed by a `<!-- quote: <path> -->` marker or a backticked source path
+in the three lines above it; unattributed blocks are reported as unverified
+rather than failed, because blockquotes here also carry the orchestrator's own
+proposed text. Run it with `--strict` when the file claims to be a reduction.
+
+Run against this directory today, 6 of 7 consolidated files pass.
+`link8a-panel-consolidated.md` fails with *"cites no readable source"* — it is
+the only `link8a-*` file on disk, which is precisely the defect Lesson three
+records. The check would have caught it the day it was written.
+
+This runs automatically: editing any `*-consolidated.md` fires it through
+`tools/validate-file.sh`, which Claude Code runs from a PostToolUse hook and
+other clients run by the instruction in `AGENTS.md`.
+
 ### Why files, not relayed prose
 
 - **Consolidation silently discards findings.** Hexaverse lost nine architect

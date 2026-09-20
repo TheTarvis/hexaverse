@@ -12,7 +12,15 @@ those shared files so Claude and Codex use the same source.
 - `.claude/skills/` is the source of truth for this project's skills.
   `.agents/skills` links to that directory so Codex discovers the same files.
   Add or edit skills in `.claude/skills/`; do not maintain duplicate copies.
+- `tools/` is the source of truth for this project's scripts, and is not owned
+  by any one client. `.claude/scripts` is a symlink to it, kept so that older
+  handoffs and archived changes that name that path still resolve; write new
+  references as `tools/<name>`.
 - Run skill scripts from the repository root unless the skill says otherwise.
+- **After editing a file, run `bash tools/validate-file.sh <path>`.** It is fast,
+  it is the same check Claude Code runs automatically from a hook, and it catches
+  a file that does not parse or is not formatted while you still hold the context
+  that wrote it. It exits non-zero with the fix on stderr.
 - Invoke the shared team workflow in Codex with `$team <arguments>` (for
   example, `$team <change-id> --full-auto`). The skill reads this project's
   `.claude/commands/team.md`; Claude Code keeps its `/team` entry point.

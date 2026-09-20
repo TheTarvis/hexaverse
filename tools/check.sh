@@ -6,7 +6,9 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Resolved from git, never from a hardcoded depth: this file is reachable both
+# as tools/<name> and through the .claude/scripts symlink older references use.
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || { cd "$SCRIPT_DIR/.." && pwd; })"
 
 KEEP_GOING=0
 TARGETS=()

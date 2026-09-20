@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""Generate the rulings INDEX for an OpenSpec change.
+
+`docs/handoffs/<id>-rulings.md` is history: append-only, every ruling with its
+full reasoning. Nothing should read it end to end. This writes
+`docs/handoffs/<id>-rulings-index.md` — one line per ruling (id, line range,
+outcome heading, and which later ruling revised it) — which is what
+delegations name and what a resuming orchestrator reads.
+
+    openspec-rulings-index.py <change-id> [<change-id>...]
+    openspec-rulings-index.py --all
+    openspec-rulings-index.py --check <change-id>   # exit 1 when stale
+
+Recognised ruling headings (id may be `12`, `J`, `3-R54`, `4b-R1`, `4'-R3`):
+
+    ## RULING <id> — <outcome>
+    ## FULL-AUTO RULING <id> — <outcome>
+    ### RULING <id> ...
+    ## R-<id> ...
+    ## 2b-R20 — <outcome>        (bare chain-style id, as Roma writes them)
+
+A `##` section that is not a ruling (`## Carried-forward decisions`, `## Open
+questions`) is listed as a section pointer, never as a ruling: minting a
+ruling out of a prose heading would put a phantom id into the record.
+"""
+import argparse, os, pathlib, re, sys
+
+def find_handoffs(explicit=None):
+    """Where this repo keeps its handoffs.
+
+    Volt and most forks use `docs/handoffs/`. hexaverse keeps them under
+    `docs/plans/<plan>/handoffs/`, so a hardcoded path silently indexes nothing
+    there — which is exactly how that repo ended up with 8 rulings ledgers and
+    no index. Resolution order: --handoffs, $OPENSPEC_HANDOFFS, the first
+    directory named `handoffs` under docs/ that actually holds a ledger, then
+    the conventional default.
+    """
+    if explicit:
+        return pathlib.Path(explicit)
+    if (env := os.environ.get("OPENSPEC_HANDOFFS")):
+        return pathlib.Path(env)
+    default = pathlib.Path("docs/handoffs")
+    if list(default.glob("*-rulings.md")):
+        return default
+    for cand in sorted(pathlib.Path("docs").glob("**/handoffs")):
+        if cand.is_dir() and list(cand.glob("*-rulings.md")):
+            return cand
+    return default
+
+
+HANDOFFS = find_handoffs()
+# An id is `12`, `12a`, a single letter (`J`), or a chain-style `2b-R20` / `4′-R11`.
+# Deliberately NOT any word: `## Ruling ledger` is a prose section, not ruling "ledger".
+ID = r"(?:[A-Za-z0-9._'′’]+-)?R-?\d+[a-z]?|\d+[a-z]?|[A-Z]"
+RULING_HEADINGS = [
+    re.compile(rf"^#{{2,3}}\s+(?:FULL-AUTO\s+)?RULING\s+(?P<id>{ID})\s*(?:[—–:-]\s*(?P<text>.*))?$", re.I),
+    re.compile(rf"^#{{2,3}}\s+R-(?P<id>{ID})\s*(?:[—–:-]\s*(?P<text>.*))?$"),
+    # bare chain-style ids: `## 2b-R20 — …`, `## 4′-R11 — …`, `## R12 — …`
+    re.compile(r"^#{2,3}\s+(?P<id>(?:[A-Za-z0-9._'\u2032\u2019-]+-)?R-?\d+[a-z]?)\s*[—–:-]\s*(?P<text>.*)$"),
+]
+SECTION = re.compile(r"^##\s+(?P<text>.+?)\s*$")
+VERB = re.compile(r"\b(amend|revis|supersed|reverse|narrow|reclassif|correct|withdraw|replac|overrul)\w*\b", re.I)
+CITE = [re.compile(rf"\b(?:RULING|R-)\s*({ID})\b", re.I),
+        # bare chain-style citation: `2b-R12`, `4\u2032-R11`, `R12`
+        re.compile(r"\b((?:[A-Za-z0-9._'\u2032\u2019]+-)?R-?\d+[a-z]?)\b")]
+
+
+def parse(text):
+    """-> ([ruling], [section]); a ruling is a dict with id/line/end/text/body."""
+    lines = text.split("\n")
+    rulings, sections, current = [], [], None
+    for n, line in enumerate(lines, start=1):
+        hit = next((m for p in RULING_HEADINGS if (m := p.match(line))), None)
+        if hit:
+            if current:
+                current["end"] = n - 1
+            current = dict(id=hit.group("id"), line=n, end=len(lines),
+                           text=(hit.group("text") or "").strip(), body=[], revised_by=[])
+            rulings.append(current)
+            continue
+        if (m := SECTION.match(line)) and not line.startswith("###"):
+            if current:
+                current["end"] = n - 1
+                current = None
+            sections.append(dict(line=n, text=m.group("text").strip()))
+            continue
+        if current:
+            current["body"].append(line)
+    return rulings, sections
+
+
+def link_revisions(rulings):
+    """A later ruling revises an earlier one when it cites it in its heading,
+    or on a body line that also carries a revision verb."""
+    by_id, seen = {r["id"].lower(): r for r in rulings}, []
+    for r in rulings:
+        cited = set()
+        if VERB.search(r["text"]):
+            cited |= {c.lower() for p in CITE for c in p.findall(r["text"])}
+        for line in r["body"]:
+            if VERB.search(line):
+                cited |= {c.lower() for p in CITE for c in p.findall(line)}
+        for c in cited:
+            target = by_id.get(c)
+            if target is not None and target is not r and target in seen:
+                target["revised_by"].append(r["id"])
+        seen.append(r)
+
+
+def render(change_id, src, text):
+    rulings, sections = parse(text)
+    link_revisions(rulings)
+    out = [f"# {change_id} — rulings index",
+           "",
+           f"Generated by `tools/openspec-rulings-index.py {change_id}` from",
+           f"`{src.name}` ({len(text.encode()):,} bytes, {len(rulings)} rulings). **Read this file, not that one.**",
+           "Open a ruling body by its line range (`sed -n '<start>,<end>p'`) when the one-line",
+           "outcome is not enough. A ruling with a **revised by** entry is not current on its own —",
+           "the later ruling wins.",
+           "",
+           "| Ruling | Lines | Outcome | Revised by |",
+           "| --- | --- | --- | --- |"]
+    for r in rulings:
+        text_cell = r["text"].replace("|", "\\|") or "_(heading states no outcome — defect: a ruling heading is its index line)_"
+        out.append(f"| {r['id']} | {r['line']}-{r['end']} | {text_cell} | "
+                   f"{', '.join(r['revised_by']) if r['revised_by'] else '—'} |")
+    if not rulings:
+        out.append("| — | — | _no ruling headings found_ | — |")
+    if sections:
+        out += ["", "**Other sections** (not rulings; no id is minted for them):", ""]
+        out += [f"- L{s['line']} — {s['text']}" for s in sections]
+    return "\n".join(out) + "\n"
+
+
+def targets(args):
+    if args.all:
+        return sorted(p.name[: -len("-rulings.md")] for p in HANDOFFS.glob("*-rulings.md"))
+    return args.change_id
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("change_id", nargs="*")
+    ap.add_argument("--all", action="store_true", help="every *-rulings.md in docs/handoffs/")
+    ap.add_argument("--check", metavar="CHANGE_ID", help="verify the index is current; exit 1 if not")
+    ap.add_argument("--handoffs", metavar="DIR",
+                    help="handoffs directory (default: auto-detected; $OPENSPEC_HANDOFFS overrides)")
+    args = ap.parse_args()
+
+    global HANDOFFS
+    HANDOFFS = find_handoffs(args.handoffs)
+
+    if args.check:
+        args.change_id, check = [args.check], True
+    else:
+        check = False
+    ids = targets(args)
+    if not ids:
+        if args.all:
+            # A repo that has not adopted the rulings ledger yet has nothing to
+            # index, and that is not a usage error.
+            print(f"no *-rulings.md under {HANDOFFS}/ — nothing to index")
+            return 0
+        ap.error("name a change-id, or pass --all")
+
+    stale, wrote = [], 0
+    for cid in ids:
+        src, dst = HANDOFFS / f"{cid}-rulings.md", HANDOFFS / f"{cid}-rulings-index.md"
+        if not src.exists():
+            print(f"{cid}: no {src} — nothing to index", file=sys.stderr)
+            stale.append(cid)
+            continue
+        want = render(cid, src, src.read_text())
+        have = dst.read_text() if dst.exists() else None
+        if check:
+            if have != want:
+                stale.append(cid)
+                print(f"{cid}: {dst} is stale — run `tools/openspec-rulings-index.py {cid}`", file=sys.stderr)
+            else:
+                print(f"{cid}: index current ({dst})")
+            continue
+        if have != want:
+            dst.write_text(want)
+            wrote += 1
+        print(f"{cid}: {len(src.read_bytes()):,} B -> {len(want.encode()):,} B  {dst}")
+
+    if check:
+        return 1 if stale else 0
+    print(f"\n{wrote} index file(s) written, {len(ids) - wrote} already current")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

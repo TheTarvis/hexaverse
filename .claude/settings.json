@@ -2,5 +2,20 @@
   "env": {
     "BASH_DEFAULT_TIMEOUT_MS": "600000",
     "BASH_MAX_TIMEOUT_MS": "3600000"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/tools/hook-post-edit.sh\"",
+            "timeout": 60,
+            "statusMessage": "validating edit"
+          }
+        ]
+      }
+    ]
   }
 }

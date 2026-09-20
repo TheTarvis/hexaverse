@@ -63,6 +63,12 @@ conventions for that codebase. **Read the relevant one before working there.**
   flow, Pub/Sub wiring, setup-gcp.sh vs Terraform split).
 - `bootstrap/` — fork-time setup. `config.env` + `init.sh` substitute
   placeholder values across the repo and write `frontend/.env.local`.
+- `tools/` — the repo's scripts, owned by no single client and shared by all
+  of them: the `check-*` quality gate, the OpenSpec validators,
+  `validate-file.sh` (post-edit check — Claude runs it from a hook, Codex runs
+  it by instruction, you run it by hand), `check-quote-fidelity.py` (the
+  reducer gate) and `agent-token-usage.py` (what the harness costs).
+  `.claude/scripts` is a symlink to it so older references still resolve.
 - `scripts/` — ops scripts. `decommission-old-hexaverse.sh` tears down the
   pre-Volt implementation's resources inside the `hexaverse` prod project
   (dry-run by default; explicit 2026-07-02 inventory — never touches the
@@ -201,7 +207,7 @@ themselves if missing.
   validator, adversary, and an optional strict-TDD implementation crew).
   `--workflow` runs the same pipeline as the deterministic `openspec-team`
   Workflow. Read `.claude/agents/README.md` first.
-- `python3 .claude/scripts/openspec-reconcile.py` before archiving — catches
+- `python3 tools/openspec-reconcile.py` before archiving — catches
   the MODIFIED-block omissions that `validate --strict` misses and
   `archive` refuses.
 - `/team --chain docs/plans/<chain>/chain.md` implements already-authored
