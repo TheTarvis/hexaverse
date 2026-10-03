@@ -355,3 +355,14 @@ Order: step A journey-spec edits, tiers 0-1 green (1694/1694 vitest, tsc, eslint
 **BLOCKED rows.** The two `add-vitals-strip` rows are CLOSED (cell-inside-viewport incl. non-empty; no-surface-covers-a-cell incl. activatable; controls hit-tested per repeat: floating-nav 2, preview-panel 1, sightings-unavailable 1, space-camera-controls 4, space-fleet-panel 2). The four `fix-world-time-render-loop` rows (#6, #7, #17, #18) are tabulated in `fix-world-time-render-loop-journey.md`.
 
 **Verdict:** the journey and the render-loop acceptance are met; tier 4 is not fully green because of the filed-defect red. Whether that blocks archive is the orchestrator's call; no rerun was made.
+
+## Post-archive confirmation (task 10.3), 2026-10-03
+
+`openspec archive add-vitals-strip --yes` wrote the generated `TBD - created by
+archiving change add-vitals-strip` placeholder into
+`openspec/specs/system-console/spec.md`, as predicted. **Hand-pasted:** the
+`## Purpose` paragraph was restored from the archived delta
+(`openspec/changes/archive/2026-10-03-add-vitals-strip/specs/system-console/spec.md`),
+which matches the copy of record in `docs/plans/system-hud/chain.md`'s Link 2b
+section. `grep -c 'TBD - created by archiving' openspec/specs/system-console/spec.md`
+now returns `0`.

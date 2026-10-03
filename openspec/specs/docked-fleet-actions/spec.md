@@ -134,48 +134,6 @@ render-dependent guard does not exist at the moment it is needed.
   mine command
 - **THEN** the guard has been released and the new attempt submits normally
 
-### Requirement: Fleet Panel Cargo Hold Readout
-The system SHALL show, for the acting (own) fleet, a cargo hold readout
-derived from the fleet read's owner-only roster fields: cargo contents by
-resource kind (including `fuel`, per `fleet-movement`'s "Fleet Cargo
-Pool") and used versus total capacity; the readout SHALL reflect the
-post-resolution cargo after a mine run resolves (via the space view's
-refetch rules), without requiring navigation. Every tonnage in the readout
-— per-kind tons, used capacity, and total capacity — is presented per
-`figure-formatting` as a tonnage. The per-kind tons and the total capacity
-each carry their own raw served value; the used capacity is derived
-client-side from the fleet read's served capacity and free-hold fields
-(`capacity − freeHold`) and carries its raw value, not "raw served value" —
-it is computed, not itself a field the server returns. This
-readout is the fleet's *cargo* hold, distinct from the *station-keeping*
-hold this capability's own "Station-Keeping Hold and Release Controls"
-defines — the two share the word "hold" but name unrelated concepts. WHEN
-the fleet read has not yet served roster fields for the acting fleet, the
-readout SHALL show `figure-formatting`'s absent form for used capacity,
-total capacity, and free hold, rather than substituting zero — a fleet
-whose roster has not loaded is not indistinguishable from a fleet holding
-an empty hold.
-
-#### Scenario: The hold readout shows contents and capacity
-- **WHEN** the space view renders an acting fleet whose fleet read carries
-  roster fields
-- **THEN** the fleet panel shows cargo tons by kind and the used/total
-  hold capacity, each presented per `figure-formatting`; the per-kind and
-  total-capacity figures carry their own raw served value, and the used
-  figure carries its own raw (client-derived) value
-
-#### Scenario: An unloaded roster reads as absent, not an empty hold
-- **WHEN** the fleet panel renders for an acting fleet whose fleet read has
-  not yet served roster fields
-- **THEN** the hold readout shows the `figure-formatting` absent form for
-  used/total capacity and free hold, never `0 / 0 t` or `0 t free`
-
-#### Scenario: The hold visibly fills when a mine run resolves
-- **WHEN** a running mine's ETA passes and the space view's refetch lands
-  the updated fleet read
-- **THEN** the hold readout shows the credited cargo without a page
-  navigation
-
 ### Requirement: Sell Offer on the Docked Fleet
 The system SHALL offer the sell verb on the acting fleet's panel section
 whenever the acting fleet's effective state is `docked` **to the station the
@@ -255,24 +213,27 @@ value.
 ### Requirement: Sell Commit
 The system SHALL, when the sell command is invoked with a chosen kind and
 tonnage, submit the sale against the acting fleet's docked station; on
-success it SHALL show a success toast and refresh the fleet's hold and the
-requester's credit balance without requiring navigation; on failure it
-SHALL show an error toast carrying player-facing copy mapped from the
-server's distinguishable rejection reason and leave the offer's state
-unchanged — except for a "price changed" (slippage guard) rejection, which
-SHALL instead refresh the offer to the server's current applicable price(s)
-and proceeds total, showing that refreshed figure alongside the one the
-player originally expected — each presented per `figure-formatting` as a
-credit figure, in its own element carrying its own raw value, never
-combined into a single interpolated string — so the player can accept or
-abandon the new price from inside the flow without re-navigating;
-re-committing after such a refresh SHALL use a newly generated operation
-key (a re-priced sale is a new intent, never a retry of the old one).
+success it SHALL show a success toast, and the fleet's hold and the
+requester's credit balance SHALL both reflect the sale's effect without
+requiring navigation — on the strip's hold and credits cells
+(`system-console`) that render them, this panel no longer carrying either
+readout; on failure it SHALL show an error toast carrying player-facing copy
+mapped from the server's distinguishable rejection reason and leave the
+offer's state unchanged — except for a "price changed" (slippage guard)
+rejection, which SHALL instead refresh the offer to the server's current
+applicable price(s) and proceeds total, showing that refreshed figure
+alongside the one the player originally expected — each presented per
+`figure-formatting` as a credit figure, in its own element carrying its own
+raw value, never combined into a single interpolated string — so the player
+can accept or abandon the new price from inside the flow without
+re-navigating; re-committing after such a refresh SHALL use a newly
+generated operation key (a re-priced sale is a new intent, never a retry of
+the old one).
 
 #### Scenario: A successful sale refreshes hold and balance
 - **WHEN** the sell command succeeds
-- **THEN** a success toast is shown, and the fleet's hold readout and the
-  requester's credit balance both reflect the sale's effect without a page
+- **THEN** a success toast is shown, and the strip's hold cell and credits
+  cell (`system-console`) both reflect the sale's effect without a page
   navigation
 
 #### Scenario: A failed sale toasts player-facing copy, not raw server text
@@ -411,23 +372,26 @@ credit figure) and each carries its raw computed value.
 ### Requirement: Refuel Commit
 The system SHALL, when the refuel command is invoked with a chosen
 tonnage, submit the refuel against the acting fleet's docked station; on
-success it SHALL show a success toast and refresh the fleet's hold, its
-estimated range, and the requester's credit balance without requiring
-navigation; on failure — including a rejection because the requested
-tonnage's cost exceeds the requester's credit balance, since a refuel
-never partially fills (`fuel-purchase`'s "Refuel Is All-Or-Nothing, Never
-Partially Filled") — it SHALL show an error toast carrying player-facing
-copy mapped from the server's distinguishable rejection reason and leave
-the offer's state unchanged. Unlike the sell command, a refuel rejection
-carries no price-changed slippage refresh, because the fuel price is a
-single global constant that never moves between the offer's preview and
-its commit.
+success it SHALL show a success toast, and the fleet's hold, its estimated
+range, and the requester's credit balance SHALL all reflect the refuel's
+effect without requiring navigation — the estimated range on the fleet
+roster row (unchanged) and the strip's fuel cell, and the hold and the
+balance on the strip's hold and credits cells (`system-console`), this panel
+no longer carrying either readout; on failure — including a rejection
+because the requested tonnage's cost exceeds the requester's credit balance,
+since a refuel never partially fills (`fuel-purchase`'s "Refuel Is
+All-Or-Nothing, Never Partially Filled") — it SHALL show an error toast
+carrying player-facing copy mapped from the server's distinguishable
+rejection reason and leave the offer's state unchanged. Unlike the sell
+command, a refuel rejection carries no price-changed slippage refresh,
+because the fuel price is a single global constant that never moves between
+the offer's preview and its commit.
 
 #### Scenario: A successful refuel refreshes hold, range, and balance
 - **WHEN** the refuel command succeeds
-- **THEN** a success toast is shown, and the fleet's hold readout, its
-  estimated range, and the requester's credit balance all reflect the
-  refuel's effect without a page navigation
+- **THEN** a success toast is shown, and the fleet's estimated range on the
+  roster row, and the strip's hold cell and credits cell (`system-console`),
+  all reflect the refuel's effect without a page navigation
 
 #### Scenario: An unaffordable refuel is rejected in full, never partially filled
 - **WHEN** the refuel command's requested tonnage would cost more than the
@@ -591,68 +555,6 @@ player's actual remedy is to refuel above the reserve.
   refetch lands the server's force-demoted `orbit` state — the client never
   predicts the demotion ahead of a read confirming it
 
-### Requirement: Credit Balance Readout
-The system SHALL show, for the requester's own corporation, a credit
-balance readout on the fleet panel, sourced from the corporation's own
-session data (see `corporation-spawn`'s balance-bearing session bootstrap)
-and supplied to the panel by the mounting view
-(`system-space-view`'s *System Space View Route and Data Fan-In*),
-reflecting the post-settlement balance after a sale or a refuel resolves
-via this panel's own sale-commit or refuel-commit response, without
-requiring navigation, and SHALL announce a balance change to assistive
-technology (an `aria-live` region or equivalent) at the moment it updates,
-not solely as a visual change; the announced copy uses the same
-`figure-formatting` presentation as the visual readout. When shown as a
-figure, the balance is presented per `figure-formatting` as a credit
-figure and carries its raw served value. IF the session balance is
-unavailable, THEN the readout SHALL show an explicit unavailable
-indication and SHALL NOT show a figure — never a placeholder that a
-mounting view supplying no balance at all would render indistinguishably
-and permanently, and never `figure-formatting`'s generic absent form in
-place of this capability's own mandated unavailable indication. The readout
-SHALL announce a transition between showing a balance figure and showing
-the unavailable indication, in either direction, to assistive technology
-via that same live region — the region SHALL NOT render as empty text when
-the balance becomes unavailable.
-
-#### Scenario: The panel shows the current credit balance
-- **WHEN** the fleet panel renders for an authenticated, spawned requester
-- **THEN** the requester's current credit balance is shown, presented per
-  `figure-formatting` and carrying its raw served value
-
-#### Scenario: An unavailable balance reads as unavailable, not as a figure
-- **WHEN** the fleet panel renders while the corporation session balance is
-  unavailable
-- **THEN** the readout shows an explicit unavailable indication rather than a
-  number
-
-#### Scenario: The balance visibly updates when a sale resolves
-- **WHEN** a sale settles from this panel's sell commit
-- **THEN** the displayed credit balance updates to reflect the sale's
-  proceeds, with no page navigation
-
-#### Scenario: The balance visibly updates when a refuel resolves
-- **WHEN** a refuel settles from this panel's refuel commit
-- **THEN** the displayed credit balance updates to reflect the refuel's
-  cost, with no page navigation
-
-#### Scenario: A balance change is announced to assistive technology
-- **WHEN** a sale or a refuel settles and the credit balance readout
-  updates
-- **THEN** the updated balance is announced via an accessible live region,
-  not conveyed by a purely visual change
-
-#### Scenario: A transition to or from an unavailable balance is announced
-- **WHEN** the credit balance readout transitions between showing a figure
-  and showing the unavailable indication, in either direction
-- **THEN** the transition is announced via the accessible live region, not
-  left as an empty announcement
-
-#### Scenario: A failed sale's or refuel's error is announced to assistive technology
-- **WHEN** a sell or refuel command fails and an error toast is shown
-- **THEN** the error's player-facing copy is announced via an accessible
-  live region, not conveyed by a purely visual toast
-
 ### Requirement: Rejection Reasons Map to Player-Facing Copy, Not Raw Server Text
 Every server-distinguishable rejection reason returned by this
 capability's mine, sell, refuel, station-keeping hold, and release
@@ -704,4 +606,14 @@ requiring navigation.
 - **THEN** the cancellation is submitted through the generic action cancel
   endpoint, the movement channel frees on success, and the fleet's
   kinematic state and attachment are left untouched
+
+### Requirement: A Failed Command Is Announced to Assistive Technology
+The system SHALL announce a failed sell or refuel command's error to
+assistive technology via an accessible live region, not conveyed by a
+purely visual toast alone.
+
+#### Scenario: A failed sale's or refuel's error is announced to assistive technology
+- **WHEN** a sell or refuel command fails and an error toast is shown
+- **THEN** the error's player-facing copy is announced via an accessible
+  live region, not conveyed by a purely visual toast
 

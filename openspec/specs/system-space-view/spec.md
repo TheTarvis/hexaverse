@@ -30,9 +30,11 @@ rule-bearing figure the player is shown — an ETA, a Δv price, an arrival poin
 — is quoted by the server, never computed here (`space-kinematics`).
 ## Requirements
 ### Requirement: System Space View Route and Data Fan-In
-The system SHALL render `/systems/:systemId` from four reads this view issues
-itself, plus the corporation session read the surrounding layout already
-makes:
+The system SHALL render `/systems/:systemId` from five reads this view
+issues itself — the interior, the requester's own fleets, the open system's
+station, the market price board, and the galaxy graph it resolves system
+names from — plus the corporation session read the surrounding layout
+already makes:
 
 - **The interior** (`system-interior`'s *Interior Read Serves Continuous
   Bodies* — every body's continuous position, size, and orbital element set,
@@ -58,19 +60,30 @@ makes:
   (`market-price-board`'s *One Read Returns Every Visible Station's Quotes*),
   from which this view SHALL select the venue quotes whose system id is the
   open system's station's, and no other venue's.
+- **The galaxy graph**, read through `galaxy-generation`'s graph read, used
+  only to resolve a system id to a display name for the fleet roster's
+  rows, the vitals strip's fleet cell, and the sighting log. It drives no
+  offer and no command; IF it fails, THEN a system reads by its raw id and
+  nothing else is withheld.
 
-The requester's credit balance SHALL come from the ambient corporation session
-read the surrounding layout already makes (`corporation-spawn`'s
-balance-bearing session bootstrap), never from a fifth read issued by this
-view.
+The requester's credit balance SHALL come from the ambient corporation
+session read the surrounding layout already makes (`corporation-spawn`'s
+balance-bearing session bootstrap), never from a further read issued by
+this view.
 
 Every offer and readout this view mounts SHALL be driven by the results of
 those reads: `docked-fleet-actions`'s *Sell Offer on the Docked Fleet* by the
 station and the venue quotes, its *Refuel Offer on the Docked Fleet* by the
-station, and its *Credit Balance Readout* by the session balance. This view
-SHALL NOT offer a control whose commit would have no station, no quote, or no
-balance to name, and SHALL NOT render a balance readout that can never show a
-figure.
+station, and `system-console`'s *The Credits Cell Shows the Corporation's
+Served Balance and Announces Its Changes* by the session balance. The vitals
+strip this view mounts (`system-console`) SHALL be driven by the own-fleets
+read, the interior read (for the name of a docked fleet's host), the galaxy
+read (for the name of the system a fleet is in), the corporation session
+read, and the world clock and its served scale — alongside every other
+reader of those same reads, and never from a read the strip issues itself.
+This view SHALL NOT offer a control whose commit would have no station, no
+quote, or no balance to name, and SHALL NOT render a balance readout that
+can never show a figure.
 
 The system SHALL show a loading state while the interior read is in flight,
 or, while the view's rendering context is available and uninterrupted, until
@@ -96,7 +109,11 @@ another read's surface:
 - IF the own-fleets read fails, THEN the view SHALL show an error state in the
   fleet panel region, with its own retry affordance, and SHALL continue to
   render the interior's bodies, lane gates, and contacts; only the own-fleet
-  marks are absent.
+  marks are absent. The vitals strip's fleet, fuel, and hold cells — also fed
+  by this read — degrade the same way: absent when no own-fleets data has
+  ever been served, and never presenting a figure served by an earlier
+  successful read as current once that read's most recent attempt has
+  failed.
 - IF the station read fails, THEN the view SHALL withhold the sell and refuel
   offers, SHALL attribute their absence to the failed read alongside a retry
   that refetches the station, and SHALL NOT present that absence as the
@@ -141,7 +158,7 @@ another read's surface:
 - **THEN** the sell offer is shown and its proceeds preview reflects that
   station's served venue quotes
 - **AND** the refuel offer is shown
-- **AND** the credit balance readout shows the corporation's served balance
+- **AND** the strip's credits cell shows the corporation's served balance
   rather than an unavailable indication
 
 #### Scenario: An arrived fleet reads as arrived on both the canvas and the roster
@@ -213,7 +230,7 @@ another read's surface:
 #### Scenario: An unresolved credit balance withdraws the readout, not the verbs
 - **WHEN** the corporation session read has not resolved or has failed while
   the acting fleet is docked at a station with cargo aboard
-- **THEN** the credit balance readout shows an explicit unavailable
+- **THEN** the strip's credits cell shows an explicit unavailable
   indication rather than a figure
 - **AND** the sell and refuel offers remain invokable
 
@@ -237,9 +254,13 @@ re-select it; selecting a different item of any kind SHALL replace the
 current selection. The space view draws no selection affordance for a
 fleet — an own fleet's or a foreign contact's rendered position is never a
 member of this selection set; the acting fleet for `docked-fleet-actions`'
-commands is instead set by the fleet roster's row selection
-(`fleet-roster`'s *Row Selection Delegated to the Mounting View*),
-independent of this selection.
+commands is instead set by one of three paths, each independent of this
+selection: the fleet roster's row selection (`fleet-roster`'s *Row Selection
+Delegated to the Mounting View*), activating a fleet's own rendered mark on
+the canvas, or `system-console`'s fleet-cell chevron (*The Fleet Cell Names
+the Acting Fleet and Delegates a Switch to the Mounting View*) — all three
+delegate to the same callback contract, and none of them adds the fleet to
+this selection.
 
 #### Scenario: Re-selecting the same body deselects it
 - **WHEN** a body is selected and then clicked again
@@ -1559,6 +1580,25 @@ expose an at-limit state in the DOM (an attribute or a status message conveyed t
 assistive technology) that is absent when the same input is given away
 from the clamp.
 
+The on-screen camera cluster SHALL render exactly four cells — orbit,
+zoom-in, zoom-out, and recenter — and SHALL NOT render a dedicated on-screen
+pan control; the dedicated pan input this requirement mandates SHALL remain
+reachable by keyboard alone once its on-screen buttons are gone. The pan
+input SHALL be a modifier-plus-arrow chord on the surviving focusable orbit
+cell, distinct from the bare-arrow orbit input on that same element. The pan
+axis's at-limit state SHALL be exposed as an attribute on that cell naming
+the blocked direction, absent when no pan direction is blocked, and SHALL
+NOT be conveyed solely by the camera controls' shared status message: that
+message reports at most one axis at a time, so a camera at both the zoom
+clamp and the pan clamp would report no pan limit at all. The space view's
+camera controls' accessible description SHALL name the pan input's key
+binding, so a player who cannot see the deleted on-screen pan buttons can
+still discover the mechanism from the control's own accessible name or
+description. `select-pan-target-point` (*Body, Lane-Gate, and Point
+Selection Is Keyboard-Operable*) is a selection affordance, not a camera
+control, and SHALL continue to exist outside this four-cell count,
+unaffected by the cluster's shrink.
+
 #### Scenario: Arrow keys orbit the camera
 - **WHEN** arrow-key input is given while the space view's camera controls
   have keyboard focus
@@ -1605,6 +1645,24 @@ from the clamp.
 - **THEN** the camera control exposes an at-limit state in the DOM (an
   attribute or a status message conveyed to assistive technology) that is
   absent when the same input is given away from the clamp
+
+#### Scenario: A pan limit is still observable while the camera is also at the zoom clamp
+- **GIVEN** the camera at both its zoom clamp and its pan clamp
+- **WHEN** pan input is given in the direction of the pan clamp
+- **THEN** the pan axis's at-limit state is observable in the DOM, naming
+  the blocked direction, and is not masked by the zoom limit
+
+#### Scenario: The camera group's accessible description names the pan binding
+- **WHEN** the space view's keyboard-operable camera controls are inspected
+  by assistive technology
+- **THEN** their accessible name or description states the key binding that
+  pans the camera
+
+#### Scenario: The on-screen cluster renders exactly four camera cells
+- **WHEN** the space view's on-screen camera controls render
+- **THEN** the camera cluster contains exactly four cells — orbit, zoom-in,
+  zoom-out, and recenter — no on-screen pan button exists, and the
+  point-selection control is not one of them and is not inside the cluster
 
 ### Requirement: Space View Camera Manual Recenter
 The system SHALL offer a control, reachable via the space view's normal

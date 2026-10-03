@@ -400,8 +400,9 @@ in its quantity's own format, distinguishable from the absent form.
 
 #### Scenario: The absent form does not override a capability's own unavailable copy
 - **WHEN** a credit balance is supplied as `null` to a surface whose own
-  requirement mandates an explicit unavailable indication (`docked-fleet-
-  actions`'s *Credit Balance Readout*)
+  requirement mandates an explicit unavailable indication (`system-console`'s
+  *The Credits Cell Shows the Corporation's Served Balance and Announces Its
+  Changes*)
 - **THEN** that surface's own mandated unavailable copy is shown, not the
   generic `—`
 
