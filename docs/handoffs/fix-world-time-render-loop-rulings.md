@@ -343,3 +343,98 @@ by any of them, so the adversary verdict at `3566af9` stays current.
 | D2 | `lib/format/guards.test.ts` `KNOWN_TOFIXED_EXCEPTIONS` anchors stale after the `SpaceStage.tsx` / `webgl/SpaceWorld.tsx` rewire | **Routine re-anchor, SDET-owned.** SDET re-derives the anchors by grep against the live files; allowed only if they are the same three reviewed call sites (bearing/speed hover-facts ×2 panels + detail string; the orbit-ring memo key) and no new `.toFixed(` site exists. | Verified by orchestrator grep: `SpaceStage.tsx` 837/838/894/895/1055, `SpaceWorld.tsx` 201 — same sites, same count as the reviewed set. The guard's own procedure; the dev correctly declined to do it. |
 | D3 | `GalaxyView`'s inline `onReady` stabilised with `useCallback` (not in contract §9.2) | **Accepted**, in scope of task 3.4. | Required by task 3.4b's ≤3-render bound; mirrors the contract's `handleFirstFrame` pattern. |
 | D4 | (SDET-reported) `webgl/SpaceWorld.test.tsx:21` and `webgl/SpaceWorld.draw.test.tsx:20` — red-phase `frameOf()` parameter annotation `{ mark: { id: string } }` too narrow for the real `ProjectedMark` now that `projectMarks` exists; 2 `tsc` errors | **Test defect (red-phase scaffolding), SDET-owned.** Drop the explicit parameter type and let TS infer `ProjectedMark`; no assertion changes. | Type-only; the annotation existed solely to silence TS7006 while the symbol was missing. |
+
+---
+
+## Rulings at the archive gate (per-link orchestrator for chain link 2a, 2026-10-03, `--full-auto`)
+
+This change archives alongside `add-vitals-strip` (tasks 5.4–5.6). These are
+`FULL-AUTO RULING`s — the flag is in force on this run, unlike the 2026-09-19
+runs above. The link's other rulings are `add-vitals-strip-rulings.md` 51–53.
+
+### FULL-AUTO RULING 1 — every adversary verdict pinned at `3566af9` is CURRENT; no re-attack, the diff is checkbox flips and a handoff-path rename
+
+`git diff 3566af9 -- openspec/specs/system-space-view openspec/specs/galaxy-view
+openspec/changes/fix-world-time-render-loop` returns three files, all in the
+change folder: `tasks.md` (34 checkbox flips plus one path), `design.md` and
+`proposal.md` (handoff paths only). Every non-checkbox hunk is
+`docs/plans/continous_space/handoffs/` → `docs/handoffs/` from `f179757`; the old
+path is a symlink to the new. No delta, requirement, scenario or live spec byte
+changed.
+
+- **Basis:** the verdict-commit section of
+  `fix-world-time-render-loop-adversary-r3b-ruling-spotcheck.md` (empty-diff
+  test, re-attack scope = the diff); `add-vitals-strip-rulings.md` RULING 43/51.
+- **Rejected:** a further adversary pass — the change is at the cap plus a
+  spot-check, and a path string is not attackable spec content.
+- **Reversal cost:** none.
+- **Known expiry ahead:** archiving `add-vitals-strip` rewrites
+  `openspec/specs/system-space-view/spec.md`. The two changes' MODIFIED headers
+  are disjoint (design.md Migration Plan); the currency diff is re-run after
+  that archive, scoped to this change's one MODIFIED target, *Body, Lane-Gate,
+  and Point Selection Is Keyboard-Operable*, and `openspec-reconcile.py` is
+  re-run as task 5.6 requires.
+
+### FULL-AUTO RULING 2 — task 5.3 is checked with no record of its result anywhere in the repo; it is executed once more as its own invocation before 5.4, and recorded
+
+`1424a77` flipped 5.3 and 5.3a to `[x]`. No handoff carries 5.3's numbers:
+there is no `fix-world-time-render-loop-journey.md`, the defect record still
+reads OPEN with nothing after 2026-09-19's diagnosis, and the only Playwright
+artefact on disk (`frontend/test-results/.last-run.json`, 2026-09-19 18:16) is a
+*failed* run of a different spec. Task 5.5 must close the defect "with 5.3's
+numbers" and QA's verdict closes rows #6, #7, #17, #18 only "against the
+journey's own record". Neither can be done from a checkbox. The same commit
+also changed the code under test (`wallMsUntil`, the ×5 warped stack) and
+`2baf73b` moved every port, so numbers from before those would describe a
+different tree even if they had been written down.
+
+**Ruling.** The SDET runs task 5.3's dedicated invocation once — the journey
+spec at `--repeat-each 20`, per the task text — before and separate from 5.4's
+full-suite run, and writes the result to
+`docs/handoffs/fix-world-time-render-loop-journey.md`. USER RULING 2 (one run,
+no second independent one) is honoured: this is the one *recorded* run, not a
+confirming rerun of a recorded one.
+
+- **Basis:** design.md Migration Plan ("this change's closing evidence is its
+  own dedicated run … this is what closes the defect"); task 5.5's text;
+  `fix-world-time-render-loop-qa.md` Verdict; `docs/handoffs/README.md` (state
+  lives in the handoffs, a claim with no record is not a record).
+- **Rejected:** closing the defect on the checkbox (Lesson two — written and
+  never verified); a hard stop to ask for the numbers (they are reproducible by
+  running the task, and would be stale against today's tree anyway).
+- **Reversal cost:** none — one read-only run of one spec.
+
+### FULL-AUTO RULING 3 — tasks 5.3 and 5.3a go back to unchecked until a recorded run backs them, and QA row #7 is closed by an SDET-added hard assertion in the vitals journey, not by a log grep alone
+
+QA's scoped re-verification (`add-vitals-strip-qa-reverify.md`, 2026-10-03)
+found two things RULING 2 anticipated and one it did not.
+
+1. **5.3 and 5.3a are false completion claims** — no run is recorded behind
+   either. Both boxes are returned to `[ ]` now (a checkbox flip; the adversary
+   verdict's currency diff stays checkbox-only) and are re-checked only from
+   `fix-world-time-render-loop-journey.md`: 5.3 from the dedicated
+   `--repeat-each 20` run, 5.3a from the full tier-4 run of 5.4, which executes
+   `world-time-render-loop-journey.spec.ts`.
+2. **Row #7 (*The animating view raises no update-depth diagnostic*) has no
+   assertion that can close it.** The `[journey-console]` capture in
+   `vitals-strip-journey.spec.ts` is observational; a `Maximum update depth`
+   line would not turn the run red. Task 5.3's own acceptance text requires
+   "zero `Maximum update depth` lines in `[journey-console]`". The SDET adds
+   the hard assertion to the vitals journey before the run (the journey spec is
+   the SDET's, and it is written against the built UI before the tree locks),
+   mirroring the one `world-time-render-loop-journey.spec.ts` already carries
+   for the galaxy view, and also records the grep count across all repeats.
+3. **The two `add-vitals-strip` BLOCKED rows are only partly asserted** (the
+   "non-empty" clause at step 4; "activatable itself" for four of five floating
+   surfaces). The SDET reads the two scenarios' text in
+   `openspec/changes/add-vitals-strip/specs/system-console/spec.md` and adds
+   whatever the THEN clauses state and the journey does not yet assert — no
+   more than the scenario text demands.
+
+- **Basis:** task 5.3's acceptance text; the SDET role (the journey spec is
+  written by the SDET after every task is checked, before the run);
+  `docs/handoffs/README.md` Lesson two — a row closed by evidence that cannot
+  fail is not closed.
+- **Rejected:** closing #7 by grep only (works, but leaves the next change's
+  journey unable to go red on the regression); leaving the boxes checked.
+- **Reversal cost:** one assertion each; a checkbox.

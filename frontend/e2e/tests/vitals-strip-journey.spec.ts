@@ -141,6 +141,20 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
+/**
+ * FULL-AUTO RULING 3 (`fix-world-time-render-loop-rulings.md`) — the update-depth
+ * diagnostic is a HARD assertion, not an observation: `system-space-view`'s
+ * *The animating view raises no update-depth diagnostic* (THEN "no update-depth
+ * or nested-update diagnostic is written to the browser console") and task 5.3's
+ * acceptance ("zero `Maximum update depth` lines in `[journey-console]`"). Same
+ * pattern as `vitest`'s own guard in `SystemSpaceView.render-loop.test.tsx`
+ * (`/Maximum update depth|nested update/i`). SDET-added to this spec before the
+ * gate run. It lives in `afterEach` so it holds even when an earlier step failed
+ * first, and prints the count on every run so the figure across `--repeat-each`
+ * repeats is greppable: `[journey-console] update-depth lines: N`.
+ */
+const UPDATE_DEPTH = /maximum update depth|nested update/i
+
 test.afterEach(() => {
   console.log(
     `[journey-console] ${journeyConsoleBuffer.length} browser console error/warning/pageerror entr${
@@ -150,6 +164,16 @@ test.afterEach(() => {
   for (const entry of journeyConsoleBuffer) {
     console.log(`[journey-console] ${entry.kind} at ${entry.url}: ${entry.text}`)
   }
+  const updateDepthLines = journeyConsoleBuffer.filter((e) => UPDATE_DEPTH.test(e.text))
+  console.log(`[journey-console] update-depth lines: ${updateDepthLines.length}`)
+  expect(
+    updateDepthLines,
+    `React update-depth / nested-update diagnostic(s) captured in the browser console: ${JSON.stringify(
+      updateDepthLines,
+      null,
+      2,
+    )}`,
+  ).toEqual([])
 })
 
 /**
@@ -189,6 +213,45 @@ async function box(page: Page, testId: string): Promise<Box> {
   const b = await el.boundingBox()
   expect(b, `${testId} produced no bounding box (display:none or detached)`).not.toBeNull()
   return b!
+}
+
+/**
+ * SDET-added for *No other floating surface covers a strip cell* — THEN "every
+ * such surface remains fully visible and ... activatable itself". For each
+ * interactive descendant of the surface that lies inside both the surface and
+ * the viewport, the topmost element at its centre point must be that control
+ * (or part of it), i.e. a pointer would actually reach it. A surface with no
+ * interactive descendant has nothing to activate beyond being visible and
+ * uncovered, which the viewport and overlap assertions already prove.
+ */
+async function activatableControls(
+  page: Page,
+  testId: string,
+): Promise<{ checked: number; blocked: string[] }> {
+  return page.getByTestId(testId).first().evaluate((surface) => {
+    const sel =
+      'button, a[href], input, select, textarea, [role="button"], [role="menuitem"], [tabindex]:not([tabindex="-1"])'
+    const sr = surface.getBoundingClientRect()
+    const blocked: string[] = []
+    let checked = 0
+    for (const el of Array.from(surface.querySelectorAll(sel))) {
+      const r = el.getBoundingClientRect()
+      if (r.width === 0 || r.height === 0) continue
+      if (getComputedStyle(el).visibility === 'hidden') continue
+      const cx = r.x + r.width / 2
+      const cy = r.y + r.height / 2
+      if (cx < 0 || cy < 0 || cx >= window.innerWidth || cy >= window.innerHeight) continue
+      if (cx < sr.x || cx > sr.x + sr.width || cy < sr.y || cy > sr.y + sr.height) continue
+      checked++
+      const hit = document.elementFromPoint(cx, cy)
+      if (!hit || !(el.contains(hit) || hit.contains(el))) {
+        const label = el.getAttribute('data-testid') ?? el.getAttribute('aria-label') ?? el.tagName
+        const by = hit ? (hit.getAttribute('data-testid') ?? hit.tagName) : 'nothing'
+        blocked.push(`${label} (covered by ${by})`)
+      }
+    }
+    return { checked, blocked }
+  })
 }
 
 test.describe('the vitals strip — dock, switch, burn, and never overflow the view', () => {
@@ -438,6 +501,14 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
       expect(insideViewport(b, 1280, 720), `${name} must itself stay inside the 1280×720 viewport`).toBe(true)
     }
 
+    // ... and "activatable itself": every control inside each surface is
+    // reachable by a pointer, not covered by another surface or a strip cell.
+    for (const [name] of floatingSurfaces) {
+      const { checked, blocked } = await activatableControls(page, name)
+      console.log(`[journey-viewport] ${name}: ${checked} interactive control(s) hit-tested`)
+      expect(blocked, `${name} has control(s) a pointer cannot reach`).toEqual([])
+    }
+
     const cellTestIds = [
       'vitals-fleet-cell',
       'vitals-fuel-cell',
@@ -448,6 +519,11 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
 
     for (const cellId of cellTestIds) {
       const cellBox = await box(page, cellId)
+
+      // Scenario: Every cell is inside the viewport at 1280×720 — "rendered,
+      // non-empty" in this post-reload, all-surfaces-present state.
+      const cellText = ((await page.getByTestId(cellId).first().textContent()) ?? '').trim()
+      expect(cellText.length, `${cellId} must render non-empty content at 1280×720`).toBeGreaterThan(0)
 
       // Scenario: Every cell is inside the viewport at 1280×720.
       expect(insideViewport(cellBox, 1280, 720), `${cellId} must be fully inside the 1280×720 viewport`).toBe(

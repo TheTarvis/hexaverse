@@ -1,9 +1,18 @@
-# Gate blocker — the chevron's cross-system navigation did not commit within 20s
+# CLOSED — gate blocker: the chevron's cross-system navigation did not commit within 20s
 
-**Status:** OPEN, **CONFIRMED product defect, mechanism established by
-experiment (2026-09-19).** Still blocking `add-vitals-strip`'s archive. The load
-hypothesis below is **refuted**; the sections from *Where* to *The cheapest next
-step* are the 2026-09-09 filing, kept as the record. Read *2026-09-19* first.
+**Status:** CLOSED 2026-10-03 by `fix-world-time-render-loop` (implementation
+`3dc56da`). Closing evidence — that change's task 5.3, its own dedicated run of
+the journey spec at `--repeat-each 20`: **20 of 20 repeats passed the
+cross-system `waitForURL`** (20 s budget, never raised), **zero `Maximum update
+depth` lines** across all 20 console captures (now a hard assertion in the
+journey's `afterEach`, not only a grep), 305 s wall, on the warped test stack
+(world scale 5, lane 500 ms/unit), stack healthy. The full tier-4 run that
+followed passed the same leg again. Before the fix the base rate was 4 of 6
+stalled. Record: `fix-world-time-render-loop-journey.md`. **`--repeat-each 20`
+was this defect's CLOSING run's repeat count, not a new standing tier-4
+default.** To reopen, see that change's design.md "Rollback, post-archive".
+The sections below are the 2026-09-19 diagnosis and the 2026-09-09 filing, kept
+as the record.
 **Found:** 2026-09-09, `add-vitals-strip` archive-gate run 3d.
 
 ## 2026-09-19 — reproduced on a fast machine, and what starves the transition

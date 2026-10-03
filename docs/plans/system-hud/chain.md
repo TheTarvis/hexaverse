@@ -6,21 +6,26 @@ around the three surfaces Travis picked on 2026-09-08: the **in-system list**,
 vitals strip**. The scoping doc `../system-hud.md` is the model and carries
 the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
-**Status (2026-09-09): link 1 archived; link 2a built and waiting on its
-archive gate.** `add-figure-formatting` archived at `a4471a3`.
-`add-vitals-strip` is authored, adversary-cleared (r3, `aa21687`, verdict still
-current), validated, and built — 39 of 42 tasks, tier 1 and tier 3 green — but
-**not archived**: its tier-4 journey is red on one leg. Six executions; three of
-them were killed mid-run by another project's name-matched `pkill` (now
-identified and warned off), and the sixth ran to completion — 53.1m, 18 passed,
-5 failed. Four reds are attributed to filed defects; the fifth is the journey's
-own **cross-system chevron navigation**, which never committed inside 20 s on a
-machine running at 1.9× normal wall time
-(`../continous_space/handoffs/defect-cross-system-chevron-nav-stall.md`, and the
-full record in `../continous_space/handoffs/add-vitals-strip-journey.md`).
-Links 2a-ii onward remain `not authored`; the full-auto rule authors each one
-only after its predecessor archives, so **the chain is stalled behind 2a's
-gate**.
+**Status (2026-10-03): links 1 and 2a archived; the chain is unblocked and
+2a-ii is next.** `add-figure-formatting` archived at `a4471a3`.
+`add-vitals-strip` archived on 2026-10-03 (commit in the table below), and the
+out-of-chain fix that unblocked it, `fix-world-time-render-loop`, archived
+immediately after it, in that order. 2a's gate had been red on one leg since
+2026-09-09 — the strip's **cross-system chevron navigation** never committed
+inside 20 s. That was diagnosed on 2026-09-19 as a product defect that predates
+the strip (world time held in React state re-rendered the whole view every
+frame and starved App Router transitions), specified and fixed by
+`fix-world-time-render-loop`, and closed on 2026-10-03 by a dedicated
+20-of-20 run of the journey with zero update-depth diagnostics
+(`../../handoffs/defect-cross-system-chevron-nav-stall.md`, now CLOSED). The
+gate that archived both: tier 4 23 passed / 1 failed in ~5 minutes, the one red
+being the filed `defect-spawn-system-single-body`; tier 3 green in ~17 minutes
+(`../../handoffs/add-vitals-strip-journey.md`,
+`../../handoffs/fix-world-time-render-loop-journey.md`). Links 2a-ii onward
+remain `not authored`; the full-auto rule authors each one only after its
+predecessor archives, so **2a-ii (`add-burn-cost-overlay`) can now be
+authored** against a `system-console` capability that exists in
+`openspec/specs/`.
 
 **No backend work anywhere in this chain.** Every figure the HUD shows is
 served today — burn preview, roster, credits, market board, scan targets,
@@ -39,6 +44,9 @@ panel reports, adversary rounds, rulings, journey — to
 `docs/handoffs/` by a hardcoded path. This chain's
 records land there too until that path is parameterised; the file names
 carry the change-id, so nothing collides.
+Where this document still writes `../continous_space/handoffs/<file>`, read
+`docs/handoffs/<file>`: the directory moved in `f179757` and the old path is a
+symlink to it.
 
 ---
 
@@ -264,7 +272,12 @@ the pill and the roster row can disagree, one of them is wrong.
   canvas (two states); `SpaceStage.tsx` camera cluster;
   `components/fleet/roster-status.ts`.
 
-**Taught (gate red on one leg, 2026-09-09).** Authored and built in one
+**Taught.** Archived 2026-10-03, twenty-four days after it was built. The
+2026-09-09 record follows as written — it was accurate when the gate was red —
+and what the unblocking and the final gate taught is the list under *Taught at
+the archive (2026-10-03)* below it.
+
+*As recorded 2026-09-09 (gate red on one leg):* Authored and built in one
 full-auto run; 42 tasks, 39 built, tier 1 and tier 3 green. Tier 4 has been
 executed **six** times: runs 1 and 2 (the budgeted pair) were red with real
 findings, all diagnosed and fixed or filed; the run Travis authorised was
@@ -351,6 +364,63 @@ archived**, and the chain is stalled behind it. Full record:
   final leg, so five runs said nothing about it — and the moment one got there,
   it found something. Read a partial journey as *untested*, never as *passing*,
   and expect the first run that reaches a new leg to find what is waiting there.
+
+**Taught at the archive (2026-10-03).** `fix-world-time-render-loop` archived
+alongside, second, as its own design required (its ADDED requirement names the
+strip's fleet switcher, which lived only in this link's deltas until this link
+archived). Gate: the journey 20/20 in a dedicated run, tier 4 23/24 in ~5 min,
+tier 3 green in ~17 min; rulings 51–54 in `add-vitals-strip-rulings.md` and 1–3
+in `fix-world-time-render-loop-rulings.md`.
+
+- **The "unattributed" red was a product defect two months older than the
+  link, and the evidence had been in the log since run 1.** Thirty-one React
+  `Maximum update depth exceeded` lines sat in the `[journey-console]` capture
+  while four analyses blamed load. The strip did not cause the stall; its
+  journey was simply the first tier-4 walk to do an in-app cross-system
+  `router.push` out of a mounted system view. **When a journey reaches a leg no
+  earlier run reached, read the whole console capture before theorising** — and
+  expect links 3 and 4, which add more in-app navigation, to exercise paths no
+  spec has walked.
+- **A fix for a gate blocker is its own change, and the two archive in the
+  order the specs depend on, not the order they were built.** Reconcile was run
+  before, between and after; the two changes' MODIFIED headers were disjoint, so
+  the second verdict survived the first archive by diff.
+- **A checked box is not a record.** Tasks 5.3 and 5.3a of the fix were flipped
+  `[x]` in a commit with no run behind them and no journey file. The resuming
+  orchestrator found no numbers anywhere, unchecked both, and ran the task. A
+  gate task is complete when its handoff file exists, not when its box is
+  ticked — **a later link's orchestrator should grep for the record before
+  trusting any section-10 checkbox it inherits.**
+- **An observational capture closes nothing.** QA's update-depth row could not
+  be closed by the vitals journey because the capture only printed; a
+  regression would have left the run green. It is a hard `afterEach` assertion
+  now. Same for two half-asserted THEN clauses of the width-floor requirement
+  ("non-empty", "activatable itself"). **Before a gate run, have QA name the
+  line that closes each BLOCKED row** — it found all three gaps in four minutes,
+  before the run rather than after it.
+- **The warped test stack changed the gate's economics.** `1424a77` boots the
+  e2e backend at world scale 5 with a cheaper lane: tier 4 fell from ~28 minutes
+  to ~5, and twenty repeats of the journey cost five minutes. A repeat-N closing
+  run is now affordable for any navigation or timing defect. The price: the
+  journeys now prove behaviour at scale 5 only, and that commit carried
+  unspecced production edits (`wallMsUntil`, a backend `LANE_MS_PER_DISTANCE`
+  knob) that no change stands behind — listed in
+  `add-vitals-strip-qa-reverify.md` (U1–U10) for Travis to adjudicate.
+- **Verify evidence expires like an adversary verdict does.** Twenty-four days
+  and seven commits passed between QA's matrix and the gate. Re-verifying only
+  the production diff since the verified commit (QA, security, the red-manifest
+  check) took three short parallel delegations and is what surfaced the two
+  findings above. **A link resumed after other work landed should diff
+  production code against its QA commit before locking the tree.**
+- **The suite's most frequent red is now a fixture that asserts on a random
+  spawn.** `defect-spawn-system-single-body` has fired in three of four
+  completed gate runs. It is residue by rule (RULING 54), but every later link's
+  gate will meet it until the tier-4 random-spawn fixture policy that it and
+  `defect-station-order-500` both wait on is chosen.
+- **The quiet window was achievable without announcing one.** No SIGTERM, no
+  stack death; each run waited for load under 3.5 before starting. The
+  name-matched-`pkill` hazard remains real — checking the emulator log before
+  attributing any red stays mandatory.
 
 ## Link 2a-ii — `add-burn-cost-overlay`
 

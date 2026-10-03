@@ -8,7 +8,7 @@ a station and read all five cells → switch the acting fleet by the chevron
 count down → the 1280×720 viewport check with every floating surface present,
 closing QA's two BLOCKED rows.
 
-## Outcome: **RED — not archived.** The gate finally ran end to end; the journey failed on its own cross-system navigation leg, which no previous run had ever reached.
+## Outcome: **RUN 4 (2026-10-03): the journey is GREEN, 20/20 repeats and in the full suite; tier 4 is red only by one filed-defect red in an unrelated spec (`space-double-submit`, `defect-spawn-system-single-body`).** Runs 1-3d below were RED / VOID as recorded.
 
 Six tier-4 executions have been spent on this gate. Runs 1 and 2 (the budgeted
 pair) were red with findings, all diagnosed and fixed or filed. Runs 3a, 3b and
@@ -257,8 +257,8 @@ View*, both `Playwright, deferred` in `add-vitals-strip-red-coverage.md`:
 
 | Tier | Command | Wall time | Verdict |
 |---|---|---|---|
-| 4 | `cd frontend && npm run e2e` | run 1 29.8m · run 2 28.5m · 3a 10.0m (killed) · 3b 3.0m (killed) · 3c 28.2m (stack died at ~21m) · **3d 53.1m (completed)** | 18 passed / 5 failed; no green run |
-| 3 | `npm run test:backend:all` | 1130.471s (~18.84m), once | green — 1875 tests, 1 skipped, 0 failed |
+| 4 | `cd frontend && npm run e2e` | **run 4 (2026-10-03): ~4.95m (23 passed / 1 failed)**; run 1 29.8m · run 2 28.5m · 3a 10.0m (killed) · 3b 3.0m (killed) · 3c 28.2m (stack died at ~21m) · **3d 53.1m (completed)** | 18 passed / 5 failed; no green run |
+| 3 | `npm run test:backend:all` | 1130.471s (~18.84m); **rerun 2026-10-03: 1003.3s (~16.9m)** | green both times, 1875 tests, 1 skipped, 0 failed |
 
 Tier 3 was **not** rerun and did not need to be: RULING 39 withdrew the backend
 exception, and no backend file is in this change's diff. Runs 1, 2 and 3c sit
@@ -339,3 +339,19 @@ should not be read as a verdict at all.
   `GET /systems/sys_9_7 200 in 546ms` — which is what separates "the app never
   asked" from "the app asked and the transition never committed" in red 5.
   Without it, red 5 would have been indistinguishable from a dead click.
+
+---
+
+## Run 4 / gate run of 2026-10-03 (SDET; FULL-AUTO RULINGs 52-53)
+
+Order: step A journey-spec edits, tiers 0-1 green (1694/1694 vitest, tsc, eslint), tree locked, then Run 1 (this spec, `--repeat-each 20`, task 5.3 of `fix-world-time-render-loop`), Run 2 (`npm run e2e`), Run 3 (`npm run test:backend:all`), one execution each. Loads and stack health in `fix-world-time-render-loop-journey.md` (load 3.2-3.5 before each; no SIGTERM, no dead stack).
+
+**Spec edits before the run (test code only), `vitals-strip-journey.spec.ts`:** (1) `afterEach` HARD-asserts zero `/maximum update depth|nested update/i` lines in the console capture and prints `[journey-console] update-depth lines: N`; (2) step 4 asserts each strip cell's text is non-empty; (3) step 4 adds `activatableControls` (hit-test every interactive control of each of the five floating surfaces). QA's step-3 countdown-poll risk was left as is: an early dock makes the poll time out loudly (a red, never a false pass) and does not misread the scenario text (*the countdown advances between reads*); no poll failure in 21 executions.
+
+**Results.** Run 1: 21 passed / 0 failed, 305 s, update-depth lines 0 x 20. Run 2: 23 passed / 1 failed, ~297 s; this spec PASSED. Run 3: green, 1003.3 s.
+
+**Reds, each attributed.** One: `space-double-submit.spec.ts:267` *Scenario: Two activations in one tick submit one burn order*; first error verbatim `Error: a generated system carries several ordinary bodies / Expected: > 1  Received: 1` (`:277`). Attribution: filed defect `defect-spawn-system-single-body` (same assertion and message as run 3d). Evidence: identical signature, single failure on a healthy stack. No UNATTRIBUTED reds. Run 3d's red 5 (cross-system navigation) did not recur.
+
+**BLOCKED rows.** The two `add-vitals-strip` rows are CLOSED (cell-inside-viewport incl. non-empty; no-surface-covers-a-cell incl. activatable; controls hit-tested per repeat: floating-nav 2, preview-panel 1, sightings-unavailable 1, space-camera-controls 4, space-fleet-panel 2). The four `fix-world-time-render-loop` rows (#6, #7, #17, #18) are tabulated in `fix-world-time-render-loop-journey.md`.
+
+**Verdict:** the journey and the render-loop acceptance are met; tier 4 is not fully green because of the filed-defect red. Whether that blocks archive is the orchestrator's call; no rerun was made.

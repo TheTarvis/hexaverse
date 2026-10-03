@@ -1,8 +1,16 @@
 # Confirmed drift — the space view never detects a reduced-motion preference
 
-**Status:** OPEN, confirmed 2026-09-19 by the orchestrator, independently of
-the reviewer who found it. **Adjudication: the code is wrong, the spec is
-right.** Awaiting Travis's scope call (see *Whose call it is*).
+**Status:** CLOSED 2026-10-03 — closed by `fix-world-time-render-loop` (task
+3.8, USER RULING 1 / OQ1: folded in, tasks-only, no delta — the live requirement
+was already right). `hooks/use-reduced-motion.ts` reads the media query and
+tracks its `change` event live; `SystemSpaceView` threads the value through the
+scene inputs in place of the `reducedMotion: false` literal. Confirmed 2026-09-19
+by the orchestrator, independently of the reviewer who found it; adjudication
+was: the code is wrong, the spec is right. One residue stays open and is NOT
+closed by this: the live requirement's prose says contact positions "continue to
+advance", while contacts are drawn at their served position under either
+setting (kickoff ruling K2 in `fix-world-time-render-loop-rulings.md`) — a
+baseline-text correction for a later brownfield pass.
 
 **Found by:** `openspec-ux` during the Phase-1 panel on
 `fix-world-time-render-loop` (finding 3 —

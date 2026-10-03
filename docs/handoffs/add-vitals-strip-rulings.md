@@ -1529,3 +1529,124 @@ this never touches another project's emulator"* — true of *its* port-based
 reaping, and precisely the assumption a sibling project's **name-based** kill
 breaks. **Kill by port, never by process name**, in any repo that shares a
 machine with another.
+
+## Rulings at the resume of link 2a (fresh per-link orchestrator, 2026-10-03, `--full-auto`)
+
+Numbering continues this file's sequence. `fix-world-time-render-loop` rides
+with this link (its tasks 5.4–5.6 *are* this link's gate and archive order); its
+own two rulings from this run are in `fix-world-time-render-loop-rulings.md`.
+
+### FULL-AUTO RULING 51 — the r3 adversary verdict is still CURRENT at this resume; no re-attack, the diff is checkbox flips and a handoff-path rename
+
+**Checked, not assumed.** `git diff aa21687 -- openspec/changes/add-vitals-strip
+openspec/specs/{system-space-view,docked-fleet-actions,figure-formatting,fleet-roster,system-console}`
+returns two files, both inside the change folder: `tasks.md` (39 `- [ ]` → `- [x]`
+flips, plus task 10.3's handoff path) and `design.md` (two handoff paths). Every
+non-checkbox hunk is the same mechanical substitution,
+`docs/plans/continous_space/handoffs/` → `docs/handoffs/`, made by `f179757` when
+the handoffs directory moved; the old path is a symlink to the new one, so the
+references resolve identically. Zero bytes changed under the change's `specs/`,
+in `proposal.md`, or in any of the five live capability specs.
+
+- **Basis:** the chain rule's own test (`harness/commands/team.md` `--chain`
+  instruction 1: re-attack *the diff* when spec content changed) and this file's
+  RULING 43, which ruled the identical checkbox-only shape current. A path
+  string in prose is not spec content.
+- **Rejected:** a fourth adversary round over the path rename — the change is at
+  the three-round cap, the rename asserts nothing an adversary can attack, and a
+  round opened without attackable content is the "another full attack" the
+  convergence rule forbids.
+- **Reversal cost:** none; a later reader can open the spot-check at any time.
+
+### FULL-AUTO RULING 52 — the archive gate is run again (a seventh tier-4 execution, then tier 3 once), on the basis of `fix-world-time-render-loop` task 5.4
+
+This gate has run six times and tier 4 is "once, then one rerun". It is run
+again because the red that stopped it was a confirmed product defect
+(`defect-cross-system-chevron-nav-stall.md`, mechanism established 2026-09-19)
+which has since been specified, hardened and fixed by its own change, and that
+change's validated, adversary-cleared tasks.md prescribes this run as task 5.4 —
+"`add-vitals-strip`'s archive gate, run as its own separate invocation". That is
+the "one batched revision round, then one rerun" the tiers doc allows, with the
+revision round being a whole change.
+
+**Tier 3 is rerun once as well.** The recorded 1130 s green run predates
+`1424a77` (backend `tuning.go`/`config.go`, a grpc bump), `ad74811` (gofmt across
+the module) and `2baf73b` (every emulator and service port moved). The earlier
+record's reason for not rerunning it — "no backend file is in this change's
+diff" — is no longer true of the tree being archived.
+
+- **Basis:** `openspec/changes/fix-world-time-render-loop/tasks.md` 5.4 and
+  `design.md` Migration Plan (design input's recorded sequence);
+  `docs/testing-tiers.md` (tiers 3 and 4 are the archive gate, once per change).
+- **Rejected:** archiving on the six-run record (its last verdict is red);
+  running tier 4 only (tier 3's green is about a different backend tree).
+- **Reversal cost:** none — a run changes nothing. One rerun is the budget: red
+  after the single batched revision round stops the link, unarchived.
+
+### FULL-AUTO RULING 53 — production code changed after both changes' Verify evidence; it is re-verified by scope before the journey, and the unspecced hunks are reported, not reverted
+
+QA and the security audit verified `add-vitals-strip` at `b6e83a1` and
+`fix-world-time-render-loop` at `3dc56da`. Since `3dc56da` the tree gained
+production edits made outside this pipeline: `1424a77` (`lib/client-clock`
+`wallMsUntil`, 13 lines of `SystemSpaceView.tsx`, a backend
+`LANE_MS_PER_DISTANCE` knob in `common/tuning.go` + `config/config.go`,
+dependency bumps) and `2baf73b` (ports, `router.go`, `firebase_jwt*.go`). Both
+red manifests also report modified test files (`openspec-red-manifest.sh verify`).
+
+**Ruling.** Before the tree is locked: the SDET adjudicates every manifest
+modification (legitimate SDET-owned revision by the later change, or a weakened
+test) and runs tiers 0–1; QA re-verifies the production diff `3dc56da..HEAD`
+against both changes' deltas and the live specs; security re-audits the same
+diff. A FAIL goes to the one batched dev round. The unspecced edits themselves
+are neither reverted nor retro-specced by this link — they are committed work
+from another session and the adjudication of whether they needed a change is the
+user's; they are listed in this run's report.
+
+- **Basis:** the Verify → Journey gate in
+  `harness/skills/openspec-team-workflow/SKILL.md` (integrity check clean, QA
+  matrix, audits clear) — evidence about a tree that has since changed is not
+  evidence about this one; drift rule ("nobody silently edits either side").
+- **Rejected:** trusting the September verdicts; reverting `1424a77`'s
+  production hunks (destroys committed work the e2e suite now depends on).
+- **Reversal cost:** none; read-only checks.
+
+### FULL-AUTO RULING 54 — the gate passes for archive: both journeys green, tier 3 green, and the one tier-4 red is residue of a filed pre-existing defect; no rerun is spent on it
+
+The 2026-10-03 gate (`add-vitals-strip-journey.md`, gate run of 2026-10-03;
+`fix-world-time-render-loop-journey.md`): task 5.3's dedicated run 20/20 with
+zero update-depth lines (305 s); tier 4 full suite 23 passed / 1 failed (~297 s);
+tier 3 1875 tests, 0 failed (1003 s). Stack healthy in all three, no SIGTERM,
+load settled below 3.5 before each start, no timeout touched.
+
+The one red is `space-double-submit.spec.ts:267`, failing its own precondition
+`a generated system carries several ordinary bodies … Expected: > 1 Received: 1`
+— byte-for-byte the assertion `defect-spawn-system-single-body.md` was filed on
+(run 3d, 2026-09-09). It is a tier-4 fixture asserting on a random spawn draw:
+no scenario of either change, no file in either change's diff, and its fix
+candidates are a test-fixture policy that defect record explicitly leaves
+unchosen.
+
+**Ruling.** The gate is satisfied; both changes archive. No rerun: a second
+execution would only redraw the spawn, which is the "confirming rerun" the tiers
+doc forbids, and there is nothing in either change for a revision round to
+revise.
+
+- **Basis:** this change's own journey record states the gate rule the
+  previous orchestrator stopped on — "residue archives only when every red is
+  attributable to a filed pre-existing defect" (section *Red 5, and why the gate
+  stops here*) — and that rule stopped the archive when a red was unattributed,
+  so it is applied the same way now that none is;
+  `fix-world-time-render-loop` task 5.4 ("record wall time and reds against
+  filed defects") and 5.3 ("record it, do not count it"); the chain doc's Link 1
+  record, which closed its gate with backend-defect reds "filed, neither
+  touchable here".
+- **Rejected:** stopping the link unarchived (the defect is not this chain's to
+  fix — the chain forbids backend work and the fixture policy is an open user
+  decision — so the chain would stall permanently behind a 1-in-N spawn draw);
+  a rerun to get 24/24 (proves nothing about either change).
+- **Reversal cost:** `git revert` of the two archive commits, plus reopening the
+  ADDED requirements per `fix-world-time-render-loop` design.md "Rollback,
+  post-archive".
+- **Follow-up, listed in the run report:** `defect-spawn-system-single-body.md`
+  gains today's occurrence; the tier-4 random-spawn fixture policy it and
+  `defect-station-order-500.md` both wait on remains Travis's call.

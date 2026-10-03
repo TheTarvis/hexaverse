@@ -48,3 +48,15 @@ assertion to `>= 1` — the test genuinely needs two distinct targets.
 
 A tier-4 fixture policy for randomly generated spawns — the one artifact that
 would close this and `defect-station-order-500`'s class together.
+
+## Occurrence 3 — 2026-10-03, `add-vitals-strip` / `fix-world-time-render-loop` archive gate
+
+(Occurrence 2 was gate run 4, 2026-09-19 — recorded in
+`defect-cross-system-chevron-nav-stall.md`.) Full tier-4 run, 23 passed / 1
+failed, ~297 s, stack healthy: `space-double-submit.spec.ts:267` *Two
+activations in one tick submit one burn order* failed at `:277` with the same
+`a generated system carries several ordinary bodies … Expected: > 1 Received: 1`.
+The only red of the run. Ruled residue, not a gate stop
+(`add-vitals-strip-rulings.md` FULL-AUTO RULING 54). Three occurrences in four
+completed gate runs: the tier-4 fixture policy for random spawns is now the
+suite's most frequent red and is still unchosen.

@@ -342,12 +342,12 @@
 
 ## 10. Verification
 
-- [ ] 10.1 Per-commit gate green: `bash .claude/scripts/check.sh` and
+- [x] 10.1 Per-commit gate green: `bash .claude/scripts/check.sh` and
       `python3 .claude/skills/code-quality-checks/check.py --files-only`
-- [ ] 10.2 Journey spec written after every task above is checked; tier 4
+- [x] 10.2 Journey spec written after every task above is checked; tier 4
       then tier 3 run once each with the tree locked — archive time only,
       never per task
-- [ ] 10.3 `docs/handoffs/add-vitals-strip-journey.md`
+- [x] 10.3 `docs/handoffs/add-vitals-strip-journey.md`
       written with the suite budget line. After `openspec archive`, confirm
       `openspec/specs/system-console/spec.md`'s `## Purpose` reads the
       boundary paragraph already pasted verbatim into
