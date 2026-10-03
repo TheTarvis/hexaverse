@@ -438,3 +438,22 @@ found two things RULING 2 anticipated and one it did not.
 - **Rejected:** closing #7 by grep only (works, but leaves the next change's
   journey unable to go red on the regression); leaving the boxes checked.
 - **Reversal cost:** one assertion each; a checkbox.
+
+### FULL-AUTO RULING 4 — the verdict survived `add-vitals-strip`'s archive (e01b310): the re-attack scope is empty, so this change archives second with no further adversary pass
+
+RULING 1's known expiry, checked after the archive. `git diff 3566af9 --
+openspec/specs/galaxy-view` is empty. `git diff 3566af9 --
+openspec/specs/system-space-view/spec.md` is non-empty (the three requirements
+`add-vitals-strip` MODIFIED) but contains no line of this change's one
+MODIFIED target, *Body, Lane-Gate, and Point Selection Is Keyboard-Operable* —
+neither its header nor any scenario of it. `openspec-reconcile.py` is clean and
+`openspec validate fix-world-time-render-loop --strict` passes against the
+post-archive specs. The ADDED requirement's reference to the strip's fleet
+switcher now resolves to a live `system-console` requirement, which is the
+reason for the archive order.
+
+- **Basis:** the workflow skill's re-attack scope ("the clauses whose live
+  targets or delta text changed") — none did; design.md Migration Plan, which
+  predicted disjoint MODIFIED headers and prescribed exactly this re-check.
+- **Rejected:** a spot-check round with nothing in scope.
+- **Reversal cost:** none.
