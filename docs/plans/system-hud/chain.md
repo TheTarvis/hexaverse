@@ -8,9 +8,9 @@ the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
 **Status (2026-10-03): links 1 and 2a archived; the chain is unblocked and
 2a-ii is next.** `add-figure-formatting` archived at `a4471a3`.
-`add-vitals-strip` archived on 2026-10-03 (commit in the table below), and the
-out-of-chain fix that unblocked it, `fix-world-time-render-loop`, archived
-immediately after it, in that order. 2a's gate had been red on one leg since
+`add-vitals-strip` archived on 2026-10-03 at `e01b310`, and the out-of-chain fix
+that unblocked it, `fix-world-time-render-loop`, archived immediately after it
+at `438923c`, in that order. 2a's gate had been red on one leg since
 2026-09-09 — the strip's **cross-system chevron navigation** never committed
 inside 20 s. That was diagnosed on 2026-09-19 as a product defect that predates
 the strip (world time held in React state re-rendered the whole view every
@@ -55,7 +55,7 @@ symlink to it.
 | # | Change | Delivers | Capabilities | State |
 | --- | --- | --- | --- | --- |
 | 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `a4471a3` |
-| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | 🟥 built r3 `aa21687`, **gate red on one leg** — `defect-cross-system-chevron-nav-stall.md` |
+| 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | ✅ archived `e01b310` (2026-10-03); `fix-world-time-render-loop`, the out-of-chain fix for its gate blocker, archived alongside at `438923c` |
 | 2a-ii | `add-burn-cost-overlay` | The fuel gauge's cost overlay: the burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props, the shortfall segment | MODIFIED `system-console` (the overlay), `system-space-view` (stale-preview presentation) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
@@ -365,8 +365,8 @@ archived**, and the chain is stalled behind it. Full record:
   it found something. Read a partial journey as *untested*, never as *passing*,
   and expect the first run that reaches a new leg to find what is waiting there.
 
-**Taught at the archive (2026-10-03).** `fix-world-time-render-loop` archived
-alongside, second, as its own design required (its ADDED requirement names the
+**Taught at the archive (2026-10-03).** Archived at `e01b310`;
+`fix-world-time-render-loop` archived alongside at `438923c`, second, as its own design required (its ADDED requirement names the
 strip's fleet switcher, which lived only in this link's deltas until this link
 archived). Gate: the journey 20/20 in a dedicated run, tier 4 23/24 in ~5 min,
 tier 3 green in ~17 min; rulings 51–54 in `add-vitals-strip-rulings.md` and 1–3
