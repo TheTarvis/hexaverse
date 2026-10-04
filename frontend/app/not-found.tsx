@@ -7,7 +7,7 @@ export default function NotFound() {
   const router = useRouter()
 
   useEffect(() => {
-    router.replace('/workflows')
+    router.replace('/')
   }, [router])
 
   return null
