@@ -57,3 +57,5 @@ No material findings; the spec is implementation-ready. Nothing was run: this is
 Both are repaired in design.md exactly as the adversary stated, inside the
 verdict commit, without a third round
 (`surface-commit-stranding-warning-rulings.md` RULING 14). Rounds used: 2 of 3.
+
+**Verdict commit:** `af747be` — round 2 CLEAR; the verdict is current while `git diff af747be -- openspec/specs/system-space-view openspec/specs/fleet-roster openspec/changes/surface-commit-stranding-warning` is empty.
