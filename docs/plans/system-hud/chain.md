@@ -6,9 +6,10 @@ around the three surfaces Travis picked on 2026-09-08: the **in-system list**,
 vitals strip**. The scoping doc `../system-hud.md` is the model and carries
 the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
-**Status (2026-10-04): links 1, 2a and 2a-ii archived (2a-ii at `0f2ad5d`); 2a-iii
-split in-run into `surface-commit-stranding-warning` (2a-iii, authored r2 `af747be`)
-and `clear-burn-preview-on-commit` (2a-iii-b, `not authored`).** The link handed to
+**Status (2026-10-04): links 1, 2a, 2a-ii and 2a-iii archived (2a-iii
+`surface-commit-stranding-warning` at `3218d9d`); 2a-iii-b
+(`clear-burn-preview-on-commit`) is next, `not authored`.** 2a-iii was split in-run:
+the order record and the stranding notice went first, the commit-clear follows. The link handed to
 the 2026-10-03 run as 2a-ii, `add-burn-cost-overlay`, was split twice in-run and
 is now 2a-iv: the preview lift went first as `lift-burn-preview-to-view`
 (archived, this run), and the commit-clear its review could not get right inside
@@ -50,7 +51,7 @@ symlink to it.
 | 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `a4471a3` |
 | 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | ✅ archived `e01b310` (2026-10-03); `fix-world-time-render-loop`, the out-of-chain fix for its gate blocker, archived alongside at `438923c` |
 | 2a-ii | `lift-burn-preview-to-view` | The burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props; two unenforced preview-request preconditions made true (running mine, docked at the target) | MODIFIED `system-space-view` (2: the burn preview, the failed-or-stale preview) | ✅ archived `0f2ad5d` (2026-10-04); authored r3 `e3fd54c`, built `3802b92`, gate `c773e26` |
-| 2a-iii | `surface-commit-stranding-warning` | The commit's stranding warning shown on the system space view for the order's life; the view's per-fleet record of the last order it committed **whose response carried the warning** (no record is kept for an ordinary commit), with an end tied to the order's own life as the own-fleets read reports it | ADDED `system-space-view` (1); `fleet-roster` drift closed for the burn command (no delta) | 📝 authored r2 `af747be` |
+| 2a-iii | `surface-commit-stranding-warning` | The commit's stranding warning shown on the system space view for the order's life; the view's per-fleet record of the last order it committed **whose response carried the warning** (no record is kept for an ordinary commit), with an end tied to the order's own life as the own-fleets read reports it | ADDED `system-space-view` (1); `fleet-roster` drift closed for the burn command (no delta) | ✅ archived `3218d9d` (2026-10-04); authored r2 `af747be`, built `808420d`, gate `6494f35` |
 | 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` ("Burn Preview Reflects…", "A Failed or Stale Preview…", likely the double-submit requirement) | ⬜ not authored |
 | 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
@@ -533,6 +534,81 @@ keeps refreshing after a commit, as today.
   (§ 1b, § 2, § 5 M1), via its index.
 - **Journey:** commit a burn; the notice leg is conditional on a fixture that
   can arrange a stranding commit — otherwise recorded untested, never passing.
+
+**Taught.** Authored, built and archived (`3218d9d`) in one full-auto run, 2026-10-04. 40 tasks;
+one ADDED requirement, 25 scenarios; two adversary rounds (round 2 CLEAR); QA
+SHIP; tier 4 26/26 in 387 s, tier 3 once in 959 s with one red = the filed
+`defect-station-order-500`. Records: `../../handoffs/surface-commit-stranding-warning-*`.
+
+- **The doc under-counted a third time, and a split that looks like the small
+  half was not small.** The row named one MODIFIED and one "likely"; the analyst
+  found 2 ADDED and 3 MODIFIED and sized the whole at 40 before the panel. The
+  half split off as "about 15 tasks" was 33 at first authoring, 39 by the
+  architect's honest count and 43 counted one task per scenario. **A notice
+  whose lifetime is an order's life is as many scenarios as the order has ways
+  to end** — eight here, before fleets, failures and reloads.
+- **The cap was met by shedding, twice, and the number has no slack in it.**
+  The no-instants case (a warned response lacking a burn instant) left as
+  `../../handoffs/followup-warned-commit-without-burn-instants.md`; the task
+  unit was ruled to be the test arrangement group, so three parametrised pairs
+  are one task each (RULINGs 11–13). Read 40 as "43 scenarios' worth", not as
+  headroom.
+- **The record this link lands exists for warned orders only.** The view stores
+  nothing for an ordinary accepted commit (architect A12: no consumer). 2a-iii-b
+  wants "the order this view committed" for *every* commit — it must widen the
+  record, not assume it. The identity (the commit response's `DepartMs` and
+  `ArriveMs`, equal on the own-fleets read) and the gap rule carry over as built.
+- **A commit-to-read gap cannot be measured with timestamps.** The in-file scan
+  precedent (`marker > dataUpdatedAt`) ties under fake timers and inside one
+  millisecond; the architect measured 200 ties in 200. The gap is the own-fleets
+  query's answer count at acceptance. And a read begun before the acceptance
+  never answers after it: `useOrder`'s own invalidation cancels it before the
+  panel's callback runs — which means the notice depends on that invalidation
+  staying where it is.
+- **"Fails toward the safe side" has a different sign for a warning than for a
+  command.** The analyst recommended ending the gap on a failed read because
+  that caps a second Burn; for a warning that removes it on the strength of
+  stale data. Both reviewers reversed it (RULING 5). 2a-iii-b inherits both
+  consumers on one derivation and must state the failed-read rule per consumer.
+- **A clause about a new surface may only say what that surface contributes.**
+  "The notice SHALL NOT change the live-region announcement" was false on the
+  commonest way a notice ends — arrival at a body, where a live requirement
+  makes the same read announce the landing (adversary M2). Written as "adds no
+  text and causes no announcement of its own" it is true and testable.
+- **Every "whether or not", "both" and "exactly once" needs a row a one-sided
+  build fails.** The second warned commit by the same fleet, the comparison of
+  both instants and the once-per-response toast each had a wrong implementation
+  that passed all 25 scenarios until the adversary named it; the SDET's mutation
+  pass then found one the spec's own rows still let through (departure-only).
+- **2b must keep `SpaceCommandPanel` mounted across tab changes or lift
+  `useOrder`.** React Query drops mutate-level callbacks for an unmounted
+  observer: a commit whose response lands after the panel unmounts shows
+  neither its success toast, its warning toast nor its notice (architect A11).
+- **The notice's positive path has never been seen against a real backend.** No
+  deterministic stranding fixture exists on the e2e stack — the warning depends
+  on fuel against a random system's geometry and nothing sets a fleet's fuel —
+  so the journey proves only the negative (a non-stranding commit's real
+  response omits the field). The instants equality the lifetime rests on is
+  closed at tier 1 and by reading one DTO at both ends:
+  `../../handoffs/followup-stranding-notice-untested-on-real-wire.md`. It waits
+  on the same random-spawn fixture policy two filed defects wait on.
+- **The figure sweep found three things nobody had filed**, all by code reading:
+  the commit response carries no delta-v, so the drift notice would show after
+  every real commit and a live scenario is false in production
+  (`drift-commit-response-carries-no-delta-v.md` — cannot be made true inside
+  this chain's no-backend fence); a point burn serves `BodyId: ""` where the
+  client tests `== null` (`defect-point-burn-serves-empty-bodyid.md`); and a
+  stop's stranding warning is unrendered on both views
+  (`drift-stop-stranding-warning-not-rendered.md`). Link 4 owns the
+  commit-result surface and should read the first before touching it.
+- **The filed tier-3 defect moves between tests.** `defect-station-order-500`
+  fired in a different test of the same file from the previous gate. Attribute
+  it by its request, status and backend sentinel, and by an empty backend diff —
+  not by a test name carried from the last link (RULING 18).
+- **Another session committed to this branch mid-run** (`6efc86f`, `223b246`,
+  between the build and the gate commit) and its edits were in the tree under
+  the gate, unchanged throughout by mtime. Stage by explicit path, and record
+  foreign files' mtimes around each tier.
 
 ## Link 2a-iii-b — `clear-burn-preview-on-commit`
 
