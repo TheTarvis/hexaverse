@@ -589,3 +589,56 @@ one red was this change's own journey and tier 3 has no valid run. Waiting
 indefinitely — the orphan has no bounded end.
 
 **Reversal cost.** None; nothing was archived.
+
+---
+
+## Ruling made at the archive gate, after the single rerun (2026-10-04, 17:25 EDT)
+
+### FULL-AUTO RULING 19 — the rerun is green on everything this change owns and tier 3 is green, but tier 4 carries three unrelated reds that match no filed signature, so the link is not archived and the decision to archive past them is Travis's
+
+**Question.** Rerun (orchestrator-started, single runner, fresh emulators):
+tier 4 24 passed / 3 failed in 7.5 min; tier 3 1875 tests, 1 by-design skip,
+green in 1054 s. This change's journey passed — keyboard focus and the hold
+across the first own-fleets read both PASSED, the commit response's burn
+instants equal to the read's on the real wire. The three reds
+(`scan-journey.spec.ts:332`, `slice.spec.ts:83`, `space-journey.spec.ts:85`)
+are attributed in the journey record: none is on this change's journey or
+scenarios, the backend diff is empty, the change's diff is not on any of the
+three paths (for the Burn one: the control was enabled, the order POST went
+out, the server answered 409, and the view held no committed selection for
+that target), and all three passed in the first run on the same code. May the
+gate be passed over them?
+
+**Ruling.** No — not by this run. The rule this run was given for archiving
+past a red has three conditions: the failure matches a **filed** defect's
+recorded signature, the backend diff is empty, and it touches none of this
+change's scenarios. The second and third hold for all three; the first holds
+for none: two were unfiled until today, and the third fits a filed defect by
+request, status and sequence but its recorded signature (the 409 body) was not
+captured. Filing a defect in the same breath as archiving past it is not "a
+filed defect's recorded signature". The gate has had its one rerun, so it
+stays red and the run stops. The two unfiled reds are filed; the third is
+recorded on the candidate defect as an unverified occurrence.
+
+**What is done and durable.** Journey spec committed with the gate records;
+tier 3 green; reconcile, strict validation and the archive rehearsal clean
+(Purpose preserved); tasks 7.3, 7.5, 7.6 checked. Open: 7.4 (tier 4), 7.7.
+
+**To archive** (Travis's ruling, then a fresh orchestrator or a resume): if
+Travis rules the three reds as residue, the remaining steps are QA closing its
+two BLOCKED rows from the journey record, `openspec archive
+clear-burn-preview-on-commit --yes`, the archive commit, and the chain doc's
+State and final Taught. The verdict at `29f0a6b` is current (checkbox-only
+diff). No further gate run is owed by the rules; one may be wanted for
+confidence, on a quiet machine.
+
+**Basis.** The delegation's stated rule for residue and its stop rule;
+workflow skill, Gates ("green on the single rerun"); the chain's own precedent
+that residue is attributed "by its request, status and backend sentinel"
+(predecessor RULING 18).
+
+**Alternatives rejected.** Archiving because the change's own journey is green
+— the gate is the tier, not one spec. A second rerun — the rules allow one.
+Counting red 3 as `defect-post-dock-burn-cost-drift` — its body was not seen.
+
+**Reversal cost.** None; nothing archived.

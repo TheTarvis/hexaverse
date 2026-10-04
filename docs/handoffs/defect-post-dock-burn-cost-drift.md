@@ -57,3 +57,16 @@ A confirmed explanation for the drift, or a requirement stating what a preview
 guarantees about the solve that follows it. Until then the cause is checkable in
 one step: log the preview's and the commit's solve inputs for the same order and
 diff them.
+
+## Candidate occurrence, unverified — 2026-10-04 (`clear-burn-preview-on-commit` gate rerun)
+
+`frontend/e2e/tests/space-journey.spec.ts:85` failed at `:244`: at its step 7
+(the burn to the lane gate after dock → sell → refuel) the click sent
+`POST …/orders` and the server answered a single **409** (17:02:27); the roster
+row stayed "Docked". Request, status and sequence fit this defect, **but the
+409 body was not captured** (the e2e backend log holds no response bodies and
+no Playwright trace was recorded), so the recorded signature — the
+`ErrQuotedCapExceeded` body — is not verified and this is NOT counted as a
+match. Evidence: `clear-burn-preview-on-commit-journey.md`, "Gate rerun — tier
+4". To settle it: record a trace on that leg, or log 409 bodies in the e2e
+backend.

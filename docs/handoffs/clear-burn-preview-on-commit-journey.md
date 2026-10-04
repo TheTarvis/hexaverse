@@ -155,3 +155,167 @@ one-minute load under 4" gave up; load polls ranged 3.03–17.2.
 - Suite budget line: tier 4 6.8 min (red); tier 3 no valid run (~17.5 min wall
   for the voided one).
 - Not archived. Tasks 7.3–7.7 unchecked.
+
+## Gate rerun — tier 4 (2026-10-04 16:55–17:03)
+
+Attributed from evidence on disk by the SDET; nothing was run, no test, spec or
+production file was edited, no defect file was appended to. The gate decision is
+the orchestrator's.
+
+**Environment.** `HEAD 7d67377` plus the uncommitted
+`frontend/e2e/tests/committed-selection-journey.spec.ts`. Started 16:55:35 EDT,
+ended 17:03:12; load 2.77 at start, 9.16 at end (the backend log shows a 2.2 s
+`GET /v1/fleets` and a 3.0 s `GET /v1/systems/sys_-4_2` at 17:00:10, a
+load-shaped tail, not a cause of any red below). Fresh throwaway emulators (no
+test port listening beforehand), zero `Received SIGTERM`. Logs: scratchpad
+`gate3-t4.log`/`.meta`; backend log `frontend/playwright/.auth/backend.log`
+(`[e2e] test backend starting (… logs → playwright/.auth/backend.log)`); frontend
+`[WebServer]` lines are interleaved in the same Playwright log. Response bodies
+are NOT in the backend log and no trace was recorded (artifacts are
+error-context.md, screenshot, video only).
+
+**Counts.** 24 passed, 3 failed, 7.5 min (tier 4 budget line: 7.5 min).
+
+### This change's journey — PASSED (27.8 s)
+
+Legs: keyboard-focus PASSED; committed-render-hold PASSED; one-order-no-preview
+PASSED; second-activation PASSED; zero-preview-2-intervals UNTESTED (flight
+5423 ms wall at scale 5, covered at tier 1 by view tests 3.1/3.4, RULING 17);
+another-target-and-back PASSED; cut-the-drive PASSED; arrive-and-dock PASSED.
+
+Logged observations:
+- **Burn instants equal on the real wire**: commit response
+  `[119609206725,119609233838]` vs first own-fleets read
+  `[119609206725,119609233838]`. Identical.
+- Committed target `gate-sys_-8_-2`, 15 of 15 targets quoted (HTTP 200 each).
+- After the first commit: `commit-drift-notice` count 1, `commit-stranding-notice`
+  count 0. After the cut: same (1 / 0). After the re-commit: same (1 / 0).
+- After the cut: figures=1, no-quote=0, uncapped-label=0, stale=0 (a figure quote
+  followed, no no-quote state).
+- At arrival: row "Velyeth here Docked 49.9 t fuel 15.6k range", docked=true;
+  burn enabled=true, uncapped-label=1, no-quote=0.
+- Console: 2 captured entries, both a 404 resource load on `/login?signUp=true`
+  (pre-existing wake-page noise); update-depth lines 0.
+
+Weak spots, stated plainly:
+1. Keyboard focus: after acceptance `document.activeElement` was `BODY`, not
+   inside the command column (Burn went disabled and focus was dropped, not
+   moved). The leg passes on Tab landing on `fleet-cmd-cut-drive-…` inside the
+   column. Focus retention is therefore "recoverable in one Tab", not "kept".
+2. The first own-fleets read after acceptance started +1 ms after acceptance and
+   ended +77 ms; the 6 pre-read snapshots (+37..+155 ms) all held the statement
+   with Burn disabled, but only 3 snapshots post-date the read, so the
+   hold-through-read window is thin (it did hold).
+3. `commit-drift-notice` is logged, never asserted, and was present (count 1)
+   after a commit that is not stranding; whether that is the intended notice for
+   this commit was not asserted.
+4. zero-preview-2-intervals is UNTESTED at this tier (flight too short).
+
+### Red 1 — `scan-journey.spec.ts:332`, line 401 — UNFILED pre-existing, fixture assumption
+
+Evidence. Fleet `fleet_7a8cf365-…` produced zero `POST` requests in the backend
+log (no preview, no order): the failure is before any Burn. Its only traffic was
+`GET /v1/fleets/…/scan-targets` 200 (16:58:56) which served
+`[{"durationMs":4742,"hostId":"gate-sys_7_-10","kind":"body"}]`; the page
+(error-context.md) shows Burn disabled, nothing selected, the scan control open.
+The test asserts a freshly spawned fleet's point park has nothing in scan range.
+That is a property of the random, account-seeded spawn site; this spawn landed in
+range of a gate. Served by the backend before any code the diff touches
+(`git diff 987ba60 -- backend` is empty; the change's diff, read in full, is
+`selectionCommitted` plumbing in `SpaceCommandPanel.tsx`/`SystemSpaceView.tsx`,
+inert with no committed order). Not a match to a recorded signature:
+`defect-spawn-system-single-body.md` (system with one body, asserts
+`space-double-submit.spec.ts:276`) is the same *family* (fixture assumption about a
+random spawn), different signature; I do not attribute to it. This leg's own
+comment records an earlier flake of this same leg (add-scan-and-sightings-surface).
+Passed in run 1.
+
+### Red 2 — `slice.spec.ts:83`, line 199 — UNFILED pre-existing
+
+Evidence. Backend log 17:00:10: `Credit mutation rejected … reason="market: price
+changed since your quote"`, `Sale rejected`, then `409 POST
+/v1/fleets/fleet_5c390472-…/sell` (one 409, 32 ms; no retry). The page
+(error-context.md) shows the sell panel's own slippage handling working:
+status "The price changed while you were deciding. The offer has been updated.",
+"you expected ₡ 65, the new offer is ₡ 75", spinbutton 5, offer ₡ 75, fleet
+DOCKED. The balance stayed 1000 because the single sell click was refused and the
+test never re-clicks the refreshed offer. This is the market's quote-moves-under-
+you path; no burn is on it (the burn to the station had committed and docked
+normally, the panel shows "Committed at delta-v — arriving now"). No filed defect
+carries this signature: `defect-post-sale-departure-burn-409s.md` is a burn
+`POST …/orders` 409, not a `…/sell` 409 with this sentinel; I do not attribute to
+it. Passed in run 1.
+
+### Red 3 — `space-journey.spec.ts:85`, line 244 — UNFILED pre-existing (order refused 409; case (b)); body not captured
+
+Which case. (b). The Burn control was enabled and the click sent the request:
+backend log, fleet `fleet_f5cfb124-…`, 17:02:26 `refuel` 200, `orders/preview`
+200 (58 ms), then 17:02:27 `POST …/orders` **409** (18 ms), a single 409, no
+second. Line 244 is step 7 (the burn to the lane gate after sale and refuel), not
+the first burn. What this view had committed earlier for this fleet: a burn to a
+far lode (17:02:01, 200) and a burn to the station (17:02:21, 200), each docked
+with an own-fleets read answered since (sell 200 and refuel 200 followed, the
+row read "Docked" and sold). The gate selection's key differs from the station's
+committed key in any case. So `selectionCommitted` was false for this click and
+case (a) is excluded; no other order POST for this fleet went out and none was
+suppressed.
+Status/body/sentinel. 409; the response body is NOT recorded (backend log format,
+no trace) and the log carries no sentinel line for it. Page: the row stayed
+"Thalaara Minor here Docked 31.7 t fuel 6.27k range" for the full 20 s; later
+previews continued (17:02:37, 17:02:47), i.e. the panel kept quoting.
+Attribution. The request, status and position in the sequence (post-dock,
+post-refuel departure burn to a gate; preview 200 then order 409) fit
+`defect-post-dock-burn-cost-drift.md` (409, `ErrQuotedCapExceeded`,
+"solved fuel cost exceeds the requested maxFuelTons cap") and the resolved
+`defect-post-sale-departure-burn-409s.md`, but their recorded signature includes
+the cap-exceeded body, which this run did not capture, so I do NOT attribute it as
+MATCHES; it is the leading candidate, unverified. Independence from this change:
+`commitBurn`'s request, `maxFuelTons` ceiling and `onError` are unchanged by the
+diff (the diff adds only `committedKey` to the accepted-commit callback and the
+`selectionCommitted` gate on Burn/preview); the refusal is a server answer on a
+request the diff did not alter; `git diff 987ba60 -- backend` is empty. Passed in
+run 1 on the same production code (timing-dependent). Cheapest next step, for a
+later round, not mine: capture the 409 body (Playwright trace on this leg).
+
+### Which of QA's two BLOCKED rows the run closes
+
+Both, on the real wire (`clear-burn-preview-on-commit-qa-index.md`): scenario 21
+keyboard focus (journey leg keyboard-focus PASSED, with weak spot 1 above) and
+the real-wire burn-instants equality (commit response equals first read, logged
+above and asserted by the passing legs). The journey's zero-preview-2-intervals
+leg remains UNTESTED at this tier.
+
+Net: the three reds show no evidence of being this change's (red 3: order sent,
+server refused, `selectionCommitted` not in play), but red 3's sentinel is
+unverified and is the one claim that rests on inference.
+
+## Gate rerun — tier 3 (2026-10-04 17:05–17:22) and the gate's outcome (orchestrator)
+
+- Command: tier 3 per `docs/testing-tiers.md`, started by the orchestrator at
+  17:05:04 once the one-minute load was under 4 (3.39) and no test port was
+  listening; fresh throwaway emulators; single runner, no overlap (process
+  table empty of other test runs at start).
+- Result: **`DONE 1875 tests, 1 skipped in 1053.689s`, exit 0 — GREEN.** The
+  one skip is `TestTurnTable_RecordOrRegenerate` (fixture regeneration, by
+  design). Zero `Received SIGTERM`. Zero hits for the
+  `endpoint at or inside the star-clearance radius` sentinel — the filed
+  `defect-station-order-500` did not fire in this run. Wall 17:05:04–17:22:50
+  (17.8 min). Load at end 3.23.
+- Tree before/after: HEAD `7d67377`; the journey spec untracked and unchanged
+  (mtime 1791137964 before and after tier 4); during tier 3 the SDET's
+  attribution section was appended to this file (docs only).
+- Archive rehearsal on a scratch copy of `openspec/` (17:23): clean —
+  `+ 1 added, ~ 3 modified`; `system-space-view` 46 → 47 requirements, 292 →
+  313 scenarios; `## Purpose` preserved (no restore needed); `validate --specs
+  --strict` 34/34. `openspec-reconcile.py` OK, `validate --strict` valid.
+
+**Suite budget line:** tier 4 7.5 min (24 passed, 3 failed — none this
+change's); tier 3 17.6 min (green).
+
+**Gate outcome: NOT PASSED — stopped, not archived (RULING 19).** This change's
+own journey is green and tier 3 is green, but tier 4 has three reds that match
+no filed defect's recorded signature: two newly filed today
+(`defect-scan-journey-spawn-in-gate-range.md`,
+`defect-slice-sell-price-changed-409.md`) and one unverified candidate
+occurrence of `defect-post-dock-burn-cost-drift.md`. The gate has had its one
+rerun.
