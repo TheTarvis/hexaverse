@@ -1,7 +1,7 @@
 # Drift — the burn preview does not clear when an order commits
 
-**Status:** confirmed, adjudicated **code wrong**, owner link 2a-iii
-`clear-burn-preview-on-commit` of the system-HUD chain (`not authored`).
+**Status:** closed (2026-10-04) — was confirmed, adjudicated **code wrong**, owner link 2a-iii-b
+`clear-burn-preview-on-commit` of the system-HUD chain; built `62c8f15`, see the closing note at the end.
 **Found:** 2026-10-03, `add-burn-cost-overlay-analysis.md` § 6 item 5.
 **Adjudicated:** `lift-burn-preview-to-view-rulings.md` FULL-AUTO RULING 4
 (fix it), then RULING 13 (not in that change — its own link).
@@ -51,3 +51,21 @@ history and RULINGs 4 and 7 of `lift-burn-preview-to-view-rulings.md`.
 
 A scenario for the commit clause, an end condition tied to the order's own
 life, and a test that fails without them.
+
+## Closing note
+
+**Closed 2026-10-04 by `clear-burn-preview-on-commit` (`62c8f15`).** The
+live clause "the preview SHALL clear … when an order commits" now has
+scenarios and an implementation: the committed selection is a fourth withheld
+state, derived in render in `SystemSpaceView.tsx` from a per-fleet record of
+every accepted burn commit (`CommittedOrder`) against the own-fleets read, and
+the burn command is withdrawn for that selection with a static statement
+(`selection-committed-statement`). Closing tests, all in
+`frontend/components/space/SystemSpaceView.stranding-notice.test.tsx` unless
+noted: 3.1 (commit removes the quote, withholds Burn), 3.2-3.4 (the gap, the
+pre-acceptance read, no clock term), 3.5-3.9 (cut drive, stop, order gone,
+arrival hand-over, order settled in the round trip), 3.10 (failed reads), 3.11
+-3.14 (other targets, second commit, late response, per-fleet), 3.16, 3.19;
+panel half in `SpaceCommandPanel.test.tsx` (2.1-2.3). Regression guards 3.15,
+3.17, 3.18 stay green. UX F2 (an uncapped re-order after the clear) is closed
+by construction: the second Burn is unavailable, not uncapped.

@@ -8,7 +8,7 @@ the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
 **Status (2026-10-04): links 1, 2a, 2a-ii and 2a-iii archived (2a-iii
 `surface-commit-stranding-warning` at `3218d9d`); 2a-iii-b
-(`clear-burn-preview-on-commit`) is next, `authored r2 29f0a6b`.** 2a-iii was split in-run:
+(`clear-burn-preview-on-commit`) is authored (r2 `29f0a6b`) and built (`62c8f15`) but NOT archived: its gate's first run was red and its single rerun could not be started (`../../handoffs/clear-burn-preview-on-commit-journey.md`). The chain is stopped here.** 2a-iii was split in-run:
 the order record and the stranding notice went first, the commit-clear follows. The link handed to
 the 2026-10-03 run as 2a-ii, `add-burn-cost-overlay`, was split twice in-run and
 is now 2a-iv: the preview lift went first as `lift-burn-preview-to-view`
@@ -52,7 +52,7 @@ symlink to it.
 | 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | ✅ archived `e01b310` (2026-10-03); `fix-world-time-render-loop`, the out-of-chain fix for its gate blocker, archived alongside at `438923c` |
 | 2a-ii | `lift-burn-preview-to-view` | The burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props; two unenforced preview-request preconditions made true (running mine, docked at the target) | MODIFIED `system-space-view` (2: the burn preview, the failed-or-stale preview) | ✅ archived `0f2ad5d` (2026-10-04); authored r3 `e3fd54c`, built `3802b92`, gate `c773e26` |
 | 2a-iii | `surface-commit-stranding-warning` | The commit's stranding warning shown on the system space view for the order's life; the view's per-fleet record of the last order it committed **whose response carried the warning** (no record is kept for an ordinary commit), with an end tied to the order's own life as the own-fleets read reports it | ADDED `system-space-view` (1); `fleet-roster` drift closed for the burn command (no delta) | ✅ archived `3218d9d` (2026-10-04); authored r2 `af747be`, built `808420d`, gate `6494f35` |
-| 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` (3: "Burn Preview Reflects…", "A Failed or Stale Preview…", "Burn and Jump Commit Controls Guard Against Double-Submit") | 🟡 authored r2 `29f0a6b` |
+| 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` (3: "Burn Preview Reflects…", "A Failed or Stale Preview…", "Burn and Jump Commit Controls Guard Against Double-Submit") | 🟡 authored r2 `29f0a6b`, built `62c8f15`; **gate not passed** — first run red (journey, test-side) and tier 3 void; rerun not started (RULING 18) |
 | 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
@@ -647,6 +647,60 @@ second Burn from going out uncapped.
   it — it was written before 2a-iii was built.
 - **Journey:** commit a burn and watch the quote go; cut the drive and watch the
   burn command and its quote come back for the same selection.
+
+**As built (2026-10-04, `62c8f15`; gate pending).** One ADDED requirement (21
+scenarios) and three MODIFIED (20, 9 and 4 scenarios, the 33 carried scenarios
+keeping their headings; one carried body edited); 40 tasks by this link's count
+and 45 in the predecessor's strict unit (`../../handoffs/clear-burn-preview-on-commit-rulings-index.md`
+RULING 13); two adversary rounds, round 2 CLEAR. Recorded at the build, before
+the gate:
+
+- **The gate stopped the link, and the cause was the run's own orchestration.**
+  A delegate that handed back a one-word report while its background run was
+  still alive was treated as abandoned and replaced; it then resumed, and two
+  delegates ran tier 3 on one emulator project. One run was voided at once and
+  the other was left an orphan that outlived its emulators by hours — the
+  suite's 90-minute timeout is per test binary — and blocked the only rerun the
+  rules allow. **Gate tiers are started by the orchestrator itself, in the
+  background, one at a time; a delegate diagnoses and records, it does not
+  launch.** And a hand-back that arrives while its author's process is alive is
+  an interim report, not an abandonment.
+- **A journey leg sized against a number nobody measured fails before it
+  starts.** The first journey demanded a 50 s flight; a spawn home at world
+  scale 5 offers about 4.4 s. The analysis had said "the window must fit inside
+  the flight" and nobody read a flight time off a previous run's log. Size a
+  journey's waits from the last gate's log, and let a leg the fixture cannot
+  contain log UNTESTED rather than fail or pass.
+- **For link 4:** `use-burn-preview.ts`'s header comment counts the withheld
+  states and is stale by one (architect A10); the file was fenced here.
+- **One determination, two readers.** The predecessor's "is the acting fleet's
+  recorded order still its running burn, gap included" became the committed
+  selection's liveness too. Widening the record from warned orders to every
+  accepted commit, deleting the unwarned-delete branch, and reading the same
+  `orderLive` twice (notice via `warned`, committed selection via key equality)
+  was smaller and safer than a second map or a stored (fleet, selection) pair.
+  The handler stays branch-free and `[qc]`-only; the derivation stays above
+  `previewWanted`, un-memoised, with no clock term.
+- **The mocked-harness trap.** A harness that mocks `useMyFleets` (as
+  `SystemSpaceView.burn-preview.test.tsx` does) never answers a read after an
+  accepted commit, so the committed state holds until unmount: a quote or a
+  second Burn asserted on the committed selection after a commit there fails by
+  construction, not by defect. The absent-query case stays `undefined`, never
+  `null` (RULING 9). Section-3 tests therefore run over a real own-fleets hook
+  with a mocked service; a test that hand-sets the committed prop or mocks
+  `useMyFleets` observes an arrangement, not the derivation.
+- **Link 2b mount warning.** React Query drops mutate-level callbacks for an
+  unmounted observer. The record is written from the panel's mutate-level
+  `onSuccess` (it must run after `useOrder`'s hook-level invalidation). Link 2b
+  must keep `SpaceCommandPanel` mounted across tab changes, or lift `useOrder`;
+  otherwise a commit whose response lands after the panel unmounts enters no
+  committed state (and no stranding notice either).
+- **Callback order is load-bearing and unguarded by types.** It lives in
+  `use-fleets.ts`, which this change does not edit; test 3.3 is its only guard.
+- **Focus.** The scenario "Keyboard focus survives the burn command becoming
+  unavailable" has no tier-1 test (jsdom cannot judge it); it rests on the
+  journey keyboard leg. If Chromium disagrees, the fallback (`aria-disabled` for
+  this state only) is a batched-revision-round finding.
 
 ## Link 2a-iv — `add-burn-cost-overlay`
 

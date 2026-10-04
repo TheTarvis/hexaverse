@@ -480,3 +480,112 @@ owns technical shape.
 the verdict and spends the last adversary round on wording.
 
 **Reversal cost.** None.
+
+---
+
+## Ruling made at the archive gate, first run (2026-10-04)
+
+### FULL-AUTO RULING 17 — the gate's first run is red and incomplete: tier 4's one red is this change's own journey failing a fixture precondition the e2e stack cannot meet, and tier 3 was voided by two delegates' overlapping runs; both go into the one batched revision round, and the gate — tier 4 then tier 3 — gets its single rerun
+
+**Question.** Record: `docs/handoffs/clear-burn-preview-on-commit-journey.md`.
+Tier 4: 26 passed, 1 failed, 6.8 min — `committed-selection-journey.spec.ts`
+at its step 0: the longest flight in the spawn home is 4359 wall ms at world
+scale 5 against the 50 000 ms the spec demanded; all six candidates within 15 %
+of each other, so not a spawn draw. Every leg after step 0 is UNTESTED. Tier 3:
+the SDET delegate that started tier 4 handed back without a report, was treated
+as abandoned and replaced; it then resumed and both delegates ran
+`test:backend:all` against one emulator project for 13:55:21–14:11:31. Six reds
+(`POST /v1/corporations` 500, `no live galaxy`, 13:55:25–27) fall seconds after
+the second run's start, consistent with the root `TestMain` wipe; none matches
+a filed signature. What now?
+
+**Ruling.**
+1. Tier 4's red is a real red on this change's own journey, diagnosed
+   **test-side** (a fixture precondition no spawn can meet), not residue and
+   not a product finding — the journey never reached product behaviour.
+2. Tier 3's run is **void** (an orchestration fault of this run, recorded as
+   such): it is neither green nor attributable red, and nothing is appended to
+   any defect file.
+3. One batched revision round, test-side only (no spec gap, no product defect,
+   so no writer, no developer and no adversary spot-check): the SDET rewrites
+   the journey's legs to fit the flights the stack can arrange — the target is
+   the longest flight among every selectable target, the legs scale to it, and
+   a leg the flight cannot contain is logged UNTESTED at tier 4, never passed
+   vacuously. Task 7.3's "no preview POST across two preview intervals" is
+   performed only if a flight is long enough; otherwise it stands on tier 1
+   (view tests 3.1 at 20 s and 3.4 at 61 s of fake time) and is recorded
+   untested on the real stack. tasks.md is not edited; the verdict stays
+   current.
+4. Then the gate's single rerun: tier 4, then tier 3, once each, serialised,
+   started by the orchestrator itself in the background with distinct logs —
+   only after every process of the voided runs has exited and the one-minute
+   load is under 4. No delegate starts a tier.
+5. If the rerun's tier 4 is red on this change's journey or scenarios, or
+   either tier cannot be evaluated, the run stops and reports; nothing is
+   archived.
+
+**Basis.** Precedence 2 — workflow skill, Gates: "tier 4 and tier 3 run once
+each and green — or red once, one batched revision round, and green on the
+single rerun"; failure playbook "Journey red: collect every finding from the
+run — test-side misreadings and product defects alike — into one batched
+revision round … then one rerun". `docs/testing-tiers.md`: per-edge coverage
+lives in tier 1; "one emulator project, one suite at a time". Analysis r2 § 8
+and old § 9 step 2 anticipated this exact precondition ("The window must fit
+inside the flight at world scale 5; otherwise the leg is a fixture precondition
+failure, not a finding"). Chain precedent for a tier-4-untested leg: the
+predecessor's RULING 17.
+
+**Alternatives rejected.** Treating tier 3's six reds as results — they are
+overlap-attributable. Archiving on tier 4's 26 other passes — the red is this
+change's own journey. Lowering the stack's world scale for this spec — a
+stack-level knob (and one of the unspecced edits U1–U10), not a per-spec one.
+A development run of the journey before the rerun — tier 4 is never a per-task
+check.
+
+**Reversal cost.** None.
+
+---
+
+## Ruling made at the archive gate, rerun not started (2026-10-04, 16:11 EDT)
+
+### FULL-AUTO RULING 18 — the run stops here, not archived: the gate's single rerun could not be started, because a voided backend run this session spawned is still alive and may not be killed by this session
+
+**Question.** After the batched revision round (RULING 17) the rerun was
+queued to start once (a) every process of the voided tier 3 runs had exited and
+(b) the one-minute load was under 4. Two waits of ~55 minutes each
+(14:20–15:15, 15:16–16:11) gave up. The orphan — `npm run test:backend:all`,
+pid 24831 (go test pid 24865), started 13:55:21 by an SDET delegate — was still
+alive at 16:11, 2 h 16 m in, its emulators gone since 14:11:31; the suite's
+90-minute `-timeout` is per test binary under `-p 1`, so it has no near end.
+Load crossed under 4 only at isolated polls (3.17 at 15:55, 3.47 at 16:10) and
+was 16–17 at 15:15. The orchestrator's attempt to stop the orphan by its exact
+process ids at 13:55 was denied by the permission system and is not pursued by
+any other route.
+
+**Ruling.** Hard stop: the gate cannot be evaluated. Starting tier 4 or tier 3
+while the orphan lives would hand it fresh emulators on the shared
+`hexaverse-emulator` project and void the rerun the same way the first tier 3
+was voided — and the rerun is the only one the rules allow. Nothing is
+archived. The link stays `authored r2 29f0a6b`, built `62c8f15`, gate pending.
+The revised journey spec is left uncommitted and unrun.
+
+**To resume** (a fresh orchestrator, from
+`docs/handoffs/clear-burn-preview-on-commit-journey.md` and this index):
+confirm pid 24831 and its children are gone (Travis kills them, or they end);
+confirm `git diff 29f0a6b -- openspec/specs/system-space-view
+openspec/changes/clear-burn-preview-on-commit` shows only tasks.md checkboxes;
+wait for a quiet machine; run tier 4 then tier 3 once each, started by the
+orchestrator itself; then QA closes its two BLOCKED rows from the run,
+reconcile, rehearse, archive.
+
+**Basis.** The delegation's own stop rule ("stop and report — do not archive —
+… on a gate that cannot be evaluated"); workflow skill, Gates ("a gate that
+can't be evaluated halts the pipeline with a report — never waved through");
+`docs/testing-tiers.md` ("one emulator project, one suite at a time").
+
+**Alternatives rejected.** Running the rerun beside the orphan — voids it.
+Archiving on tier 1 evidence plus the first run's 26 other tier-4 passes — the
+one red was this change's own journey and tier 3 has no valid run. Waiting
+indefinitely — the orphan has no bounded end.
+
+**Reversal cost.** None; nothing was archived.

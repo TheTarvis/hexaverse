@@ -26,3 +26,11 @@ discard a warning the server sent.
 A scenario and its two tests (panel: the callback reports the missing instant
 as null; view: the gap-only notice) in a later change — or a served contract
 that guarantees the burn on every accepted order response.
+
+**2026-10-04 (`clear-burn-preview-on-commit`, `62c8f15`).** The order record
+now has a second consumer: the committed selection reads the same
+`orderLive` as the stranding notice. A response lacking a burn instant stores
+`null` for it, so `stillRunning` is false and the record holds only through
+the gap (`awaitingRead`); after the first answered read the committed
+selection ends. That hold-for-the-gap-only behaviour is by construction, not
+by decision, and this follow-up remains open for both consumers.

@@ -81,3 +81,13 @@ probably `docked-fleet-actions` "Running Mine Gates the Fleet Panel's Commands"
 - **Docked at the selected target:** Burn stays enabled with the (truthful)
   uncapped label; a click is an own-host burn the server answers with the
   zero-length 500.
+
+**2026-10-04 (`clear-burn-preview-on-commit`, `62c8f15`).** One withheld
+state now explains itself: the committed selection shows a static statement
+that is also the Burn control's `aria-describedby`. The arrival contrast is
+new: at arrival at the selected body the statement is removed and the
+docked-at-target state shows an enabled Burn under the uncapped label (which
+ends in the zero-length 500), so Burn visibly re-enables at arrival. This note
+records the contrast; it does not absorb this follow-up, which still covers
+the three earlier withheld states and docked-at-target, and its mechanism
+choice stays open.
