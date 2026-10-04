@@ -62,3 +62,12 @@ probably `docked-fleet-actions` "Running Mine Gates the Fleet Panel's Commands"
   reading.
 - The failed-read reason copy in the architect's design is new player-facing
   text no UX reviewer has seen.
+
+## Added at kickoff (2026-10-04)
+
+- **A transient "No quote" at a mine's end** (`lift-burn-preview-to-view`
+  RULING 20; impl contract F1): the preview path settles a due burn but not a
+  due mine (`backend/fleet/service.go:526`, refusal at `:987`), so the restoring
+  request sent at the ETA can be refused once and the panel shows the no-quote
+  state and Retry until the next interval. Backend fix (settle a due mine on
+  preview); outside the system-HUD chain's no-backend fence.

@@ -554,3 +554,59 @@ follow-up (leaves the gap open through the build that needs it closed).
 **Reversal cost.** None. **Residual risk, recorded:** the six repairs are not
 adversarially reviewed; the SDET's red phase and QA's closing-assertion pass
 are the next readers of them.
+
+---
+
+## Rulings made at implementation kickoff (2026-10-04)
+
+### FULL-AUTO RULING 19 — the architect's four kickoff edits to design.md do not expire the verdict: they change no requirement, scenario, task or proposal line, and are recorded as un-attacked residue with the round cap spent
+
+**Question.** The currency check `git diff e3fd54c -- openspec/specs/system-space-view
+openspec/changes/lift-burn-preview-to-view` is no longer empty: the architect's
+kickoff edited design.md (E1–E4 in the impl contract's report: the mount-time
+running-action read, the e2e specs' reads of the figure testids, the precise
+discard mechanism, one new risk bullet). The re-attack scope would be that
+diff; the three rounds are spent.
+
+**Ruling.** The orchestrator read the diff (4 insertions, 3 deletions, design.md
+only): each edit states a fact about existing code or sharpens a HOW the
+contract depends on; none alters what is required. The verdict on the deltas
+and tasks stands at `e3fd54c`; the design.md diff is committed with the impl
+contract and recorded here as not adversarially reviewed. From this commit on,
+the currency check for the build is the delta and tasks: `git diff e3fd54c --
+openspec/specs/system-space-view openspec/changes/lift-burn-preview-to-view/specs
+openspec/changes/lift-burn-preview-to-view/proposal.md` (tasks.md changes only
+by checkboxes).
+
+**Basis.** Precedence 2 — workflow skill: the architect owns design.md and
+finalises the technical approach at kickoff; a verdict expires when "the spec is
+edited" — the clauses whose live targets or delta text changed — and neither
+did. RULING 18's treatment of post-cap residue.
+
+**Alternatives rejected.** A fourth adversary round on four explanatory
+sentences. Reverting the architect's corrections (leaves design.md wrong about
+the read's lifecycle, which the SDET's harness depends on).
+
+**Reversal cost.** None.
+
+### FULL-AUTO RULING 20 — a transient "No quote" at a mine's end is accepted for this change and recorded; the journey does not assert the quote returns without it
+
+**Question.** Architect kickoff F1: the restoring request at a mine's ETA can
+reach the server before the mine is settled and be refused once, showing the
+no-quote state and Retry until the next interval.
+
+**Ruling.** Accepted. The spec stays true (RULING 17's failed-restoring-request
+rule covers it) and nothing regresses — today the panel shows that state for
+the mine's whole duration. Recorded in
+`followup-explain-withheld-burn-command.md`; the fix, if wanted, is backend
+(settle a due mine on preview) and outside this chain's fence. The architect's
+added test arm for task 1.8 (F3) and its accurate gate map (F2) are accepted as
+contract content; tasks.md is not edited.
+
+**Basis.** Precedence 1 — chain doc: no backend work in this chain. Precedence 4
+for not adding a client-side cushion (a timer, forbidden by RULING 5).
+
+**Alternatives rejected.** A client delay on the flag — a timer and a second
+notion of when a mine ends.
+
+**Reversal cost.** None.
