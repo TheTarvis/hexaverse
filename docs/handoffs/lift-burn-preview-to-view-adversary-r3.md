@@ -133,4 +133,14 @@ from this round. What *was* deferred earlier in the run is listed in RULINGs 12,
 
 ## Verdict commit
 
-_(appended below once the change folder and handoffs are committed)_
+**`e3fd54c`** — `docs(openspec): author lift-burn-preview-to-view, link 2a-ii of the system HUD chain`.
+
+The verdict is current while this is empty:
+
+```bash
+git diff e3fd54c -- openspec/specs/system-space-view openspec/changes/lift-burn-preview-to-view
+```
+
+When it is not empty the re-attack scope is that diff, not the whole change.
+The six round-3 residue repairs are inside this commit and were not themselves
+adversarially reviewed (RULING 18).
