@@ -56,7 +56,9 @@ symlink to it.
 | --- | --- | --- | --- | --- |
 | 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `a4471a3` |
 | 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | ✅ archived `e01b310` (2026-10-03); `fix-world-time-render-loop`, the out-of-chain fix for its gate blocker, archived alongside at `438923c` |
-| 2a-ii | `add-burn-cost-overlay` | The fuel gauge's cost overlay: the burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props, the shortfall segment | MODIFIED `system-console` (the overlay), `system-space-view` (stale-preview presentation) | ⬜ not authored |
+| 2a-ii | `lift-burn-preview-to-view` | The burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props; two unenforced preview-request preconditions made true (running mine, docked at the target) | MODIFIED `system-space-view` (2: the burn preview, the failed-or-stale preview) | ⬜ not authored (authoring in-run, 2026-10-03) |
+| 2a-iii | `clear-burn-preview-on-commit` | The preview clears when an order commits, with an end tied to the order's own life; the commit's stranding warning surfaced | MODIFIED `system-space-view` ("Burn Preview Reflects…", likely the double-submit requirement); `fleet-roster` drift closed | ⬜ not authored |
+| 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
 | 4 | `add-arc-figures-and-entity-tab` | Course label + Burn on the drawn curve, progress while burning; the **Selected entity** dock tab; `SpaceCommandPanel` retired last | MODIFIED `system-console`, `system-space-view`, `market-board-panel` (mounted as a station's tab) | ⬜ not authored |
@@ -75,7 +77,7 @@ full-auto rule authors an unauthored link *after its predecessor archived*, so
 its deltas target specs that exist and its adversary verdict is not born
 expired.
 
-Out of the chain, deliberately: the galaxy-view strip (open question, ruled
+Out of the chain, deliberately: `explain-withheld-burn-command` (a filed follow-up from link 2a-ii's review — `../../handoffs/followup-explain-withheld-burn-command.md`; link 4 should read it), the galaxy-view strip (open question, ruled
 *no* for now), a mobile layout, a theming pass, a resizable dock. None gates
 any link.
 
@@ -422,7 +424,69 @@ in `fix-world-time-render-loop-rulings.md`.
   name-matched-`pkill` hazard remains real — checking the emulator log before
   attributing any red stays mandatory.
 
-## Link 2a-ii — `add-burn-cost-overlay`
+## Link 2a-ii — `lift-burn-preview-to-view`
+
+**Split off `add-burn-cost-overlay` in-run on 2026-10-03** by the full-auto
+orchestrator, after its analyst put the unsplit link at 37 tasks before two
+carried defects and before the panel — see
+`../../handoffs/add-burn-cost-overlay-rulings.md` FULL-AUTO RULING 1 for the
+seam, and `../../handoffs/lift-burn-preview-to-view-rulings.md` for this link's
+own rulings.
+
+**Delivers.** `useBurnPreview` called once, in `SystemSpaceView`, and passed to
+`SpaceCommandPanel` by props; the panel's hook call deleted and its test harness
+migrated. Two preconditions the code never enforced: no preview while a mine
+holds the movement channel (`drift-running-mine-preview-unsuppressed.md`,
+view-level test) and none while the selected target is the acting fleet's own
+host (`defect-docked-selection-polls-zero-length-preview.md`). The burn
+command's availability is unchanged; stating *why* it is unavailable, and making
+it unavailable when docked at the target, is the filed follow-up
+`../../handoffs/followup-explain-withheld-burn-command.md` (RULING 16).
+
+- **Touches:** MODIFIED `system-space-view` "Burn Preview Reflects the
+  Server-Solved Order, Without Committing" and "A Failed or Stale Preview Is
+  Never Presented as a Current Quote".
+- **Journey:** select a target and read the quote in the panel; one preview
+  request per interval; select the docked fleet's own host and see no preview
+  request and no 500.
+
+## Link 2a-iii — `clear-burn-preview-on-commit`
+
+**Split off `lift-burn-preview-to-view` on 2026-10-03** by its adversary round 1
+(`../../handoffs/lift-burn-preview-to-view-rulings.md` FULL-AUTO RULING 13).
+
+**Delivers.** The live clause "the preview SHALL clear … when an order commits"
+made true — it has no scenario and no implementation today
+(`../../handoffs/drift-preview-does-not-clear-on-commit.md`).
+
+**Why it is its own link.** The first attempt (a stored fleet-and-selection pair)
+was a BLOCKER: the committed state outlived the order through cut drive, stop,
+arrival at a point and outside re-tasks. The central question is *when does a
+committed selection stop being committed*, and the answer must come from the
+served fleet read, survive the gap before that read shows the burn, keep a
+second Burn from going out uncapped, and keep a stranding warning on screen
+(`../../handoffs/drift-commit-stranding-warning-not-rendered.md`).
+
+- **Touches:** MODIFIED `system-space-view` "Burn Preview Reflects…" (the
+  commit clause's scenarios), probably "Burn and Jump Commit Controls Guard
+  Against Double-Submit"; `fleet-roster` "A Burn Commit's Stranding Warning Is
+  Surfaced to the Player" (drift, likely no delta).
+- **Read first:** `../../handoffs/lift-burn-preview-to-view-adversary-r1.md`
+  B1, M5, m4; `lift-burn-preview-to-view-panel-ux.md` F2; `-panel-architect.md`
+  A1, A4.
+- **Journey:** commit a burn and watch the quote go; cut the drive and watch the
+  burn command and its quote come back for the same selection.
+
+## Link 2a-iv — `add-burn-cost-overlay`
+
+**Renumbered from 2a-ii by the two 2026-10-03 splits.** Everything below about the
+lift, the prop conversion, the harness migration and the carried drift now
+belongs to `lift-burn-preview-to-view` above; this link is the overlay alone.
+Its opening rulings (segment-only, start-anchored geometry with no computed
+shortfall, amber, withdraw-on-stale, point cost) and the questions left for its
+own panel are already recorded in
+`../../handoffs/add-burn-cost-overlay-rulings.md`; its analysis is
+`../../handoffs/add-burn-cost-overlay-analysis.md`.
 
 **Split off 2a in-run on 2026-09-09** (RULING 9). 2a delivers the strip with a
 plain fuel gauge; this link gives that gauge its cost overlay, which is the
