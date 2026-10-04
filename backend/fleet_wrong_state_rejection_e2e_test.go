@@ -89,10 +89,15 @@ func TestDriftRepair_Scenario_FourWrongStateRejectionsAreReasonBearingAndPairwis
 	//     deliberate: a gate is motionless (system.gateOrbit gives every gate
 	//     PeriodMs = 0) and sits at the system rim, so its solved insertion
 	//     standoff can never dip inside the star-clearance radius the way an
-	//     inner body's can — see arriveInOrbitAround's own note on the
-	//     unwired space.ErrEndpointInsideClearance production defect, which
-	//     would otherwise turn this arrangement into an intermittent 500 that
-	//     has nothing to do with the rejection under test.
+	//     inner body's can — see arriveInOrbitAround's own corrected note on
+	//     star-clearance refusals (served as a 409 naming the origin or the
+	//     destination since fix-burn-order-geometry-refusals; formerly a
+	//     bodyless 500), which would otherwise turn this arrangement into a
+	//     refusal that has nothing to do with the rejection under test.
+	//     Re-read for task 4.2: the claim about the gate stands (it concerns the
+	//     DESTINATION's standoff point); the fleet's own ORIGIN here is the
+	//     seeded hull still at its spawn park (placed at the gate radius), far
+	//     outside the clearance.
 	gateBodyId, _ := gateBodyIdFor(t, sp)
 	setFleetFuel(t, sp.fleetId, 1_000_000)
 	burn, _, orderCode := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": gateBodyId})

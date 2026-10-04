@@ -201,26 +201,35 @@ func arriveInOrbitAround(t *testing.T, router http.Handler, sp fuelSpawn, bodyId
 	setFleetFuel(t, sp.fleetId, 5_000_000)
 	orderResp, _, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": bodyId})
 	if code != http.StatusOK || orderResp.State.Burn == nil {
-		// KNOWN PRODUCTION DEFECT, reported 2026-09-02 (SDET), NOT a fixture
-		// bug — named here so a future red is diagnosed in seconds instead of
-		// re-investigated: a `500` with an empty body on this arrangement is
-		// `space.ErrEndpointInsideClearance` ("space: endpoint at or inside
-		// the star-clearance radius", space/burn.go:179) escaping
-		// `fleet.Service.OrderTo` into `respond`'s default arm, exactly the
-		// bodyless-5xx drift class tasks 5.1/5.2/5.4 repair for the OTHER
-		// wrong-state sentinels. It fires when the solved INSERTION STANDOFF
-		// point for `bodyId` at the arrival instant dips inside
-		// 2.5 x starSize: the standoff orbit's own radius is added to the
-		// host's, so a host whose orbit radius is only a little outside the
-		// clearance is inside it for some arrival phases and outside for
-		// others — which is why this is intermittent (observed once in ~50
-		// station-targeted orders; the one captured case was a station
-		// provisioned at ring 4 of sys_3_2, star size 5.2, clearance 13.0).
-		// `SeedFleet` already refuses to place a fleet inside the clearance,
-		// so the ORIGIN endpoint is never the guilty one here.
+		// DIAGNOSIS CORRECTED by openspec change fix-burn-order-geometry-refusals
+		// (task 4.2). The original note here (2026-09-02) blamed only the
+		// DESTINATION and claimed "SeedFleet already refuses to place a fleet
+		// inside the clearance, so the ORIGIN endpoint is never the guilty one".
+		// Both halves were wrong:
+		//
+		//   - Either endpoint can be the guilty one. space.ErrEndpointInsideClearance
+		//     is raised when the burn's ORIGIN or its solved intercept (for a body
+		//     target, the insertion-standoff point) is at or inside 2.5 x starSize.
+		//     A fleet parked in orbit around a station is inside the clearance at
+		//     some orbital phases whenever the station's shell (its parent's orbit
+		//     radius less the station's orbit radius less the insertion standoff)
+		//     reaches the clearance — and SeedFleet's placement guard says nothing
+		//     about where the fleet stands after it has since moved and parked.
+		//   - The cause is the HOME SITE, not intermittence: a home whose station
+		//     shell reaches the clearance (a ring-0 parent, or a tight ring-1/2
+		//     parent under a large star) is refused at some phases and not others.
+		//     Home-site criterion (d) now keeps such systems from being chosen.
+		//
+		// What the refusal looks like: before this change a bodyless 500 (the
+		// sentinel escaped OrderTo into respond's default arm); now a 409 whose
+		// `error` names the origin or the destination ("burn origin is at or
+		// inside the star-clearance radius" / "burn destination is at or inside
+		// ..."), or a 404 for an absent body id. A geometry refusal at a home that
+		// qualified under criterion (d) means criterion (d) is the suspect.
 		t.Fatalf("arranging an orbit park: POST /orders {bodyId:%q} returned %d (burn=%v). If this is a 500, "+
-			"see the comment above: it is the unwired space.ErrEndpointInsideClearance production defect, "+
-			"not this fixture", bodyId, code, orderResp.State.Burn)
+			"see the comment above: a 409 naming the origin or the destination is a star-clearance "+
+			"refusal at this home (suspect: home-site criterion (d)); a bodyless 5xx is a different fault. "+
+			"Not this fixture", bodyId, code, orderResp.State.Burn)
 	}
 	forceBurnArrivalPast(t, sp.fleetId)
 	typed, _, code := fuelGetFleet(t, router, sp.token, sp.fleetId)

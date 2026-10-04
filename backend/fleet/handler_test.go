@@ -26,6 +26,13 @@ type fakeFleetSvc struct {
 	// jump_fail_closed_lane_horizon_test.go's HTTP-level 503 assertion
 	// (mechanical fixture addition, not a scenario assertion itself).
 	jumpErr error
+	// orderErr, previewErr and stopErr script the burn routes' error returns
+	// (fix-burn-order-geometry-refusals task 2.9, composed fault cases: the
+	// error a real solve helper returns is fed through the real handler's
+	// respond). Zero values leave every existing test's behaviour unchanged.
+	orderErr   error
+	previewErr error
+	stopErr    error
 }
 
 func (f *fakeFleetSvc) Get(context.Context, string) (*Fleet, error) { return f.fleet, f.getErr }
@@ -36,10 +43,16 @@ func (f *fakeFleetSvc) ListForCorp(context.Context, string) ([]Fleet, error) {
 	return f.list, nil
 }
 func (f *fakeFleetSvc) OrderTo(context.Context, string, OrderRequest) (*Fleet, error) {
-	return f.fleet, nil
+	return f.fleet, f.orderErr
+}
+
+// PreviewOrder makes the fake satisfy the handler's burnPreviewSource probe,
+// scripted by previewErr (task 2.9).
+func (f *fakeFleetSvc) PreviewOrder(context.Context, string, OrderRequest) (*BurnPreview, error) {
+	return nil, f.previewErr
 }
 func (f *fakeFleetSvc) CutDrive(context.Context, string) (*Fleet, error) { return f.fleet, nil }
-func (f *fakeFleetSvc) Stop(context.Context, string) (*Fleet, error)     { return f.fleet, nil }
+func (f *fakeFleetSvc) Stop(context.Context, string) (*Fleet, error)     { return f.fleet, f.stopErr }
 func (f *fakeFleetSvc) Jump(context.Context, string, string) (*Fleet, error) {
 	return f.fleet, f.jumpErr
 }

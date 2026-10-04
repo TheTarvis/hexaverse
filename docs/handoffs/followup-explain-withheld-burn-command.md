@@ -91,3 +91,19 @@ ends in the zero-length 500), so Burn visibly re-enables at arrival. This note
 records the contrast; it does not absorb this follow-up, which still covers
 the three earlier withheld states and docked-at-target, and its mechanism
 choice stays open.
+
+**2026-10-04 (`fix-burn-order-geometry-refusals`, its RULING 10; UX panel MAJOR 2 in
+`fix-burn-order-geometry-refusals-panel-ux.md`).** A fifth gap, appended and not absorbed: a
+REFUSED preview. The server now answers a deterministic solve refusal (star clearance at origin
+or destination, minimum arc, absent body) with a reason-bearing `409`/`404`, but the command
+panel's no-quote state (`SpaceCommandPanel.tsx:322-349`) still reads "No quote - could not be
+solved" with **Retry quote** — a retry that cannot succeed — and still lets the player commit
+uncapped into the same refusal (which the commit path does now explain, in mapped copy). The
+proposed shape is to show the mapped reason in the existing no-quote slot and withhold Retry
+for those four refusals only; that is a `system-space-view` delta and was kept out of a backend
+corrective change. Related, also unaddressed: `shouldRetryQuery`
+(`frontend/lib/query-client.ts:28-37`) would retry a sub-500 refusal on a query path, and the
+cut-drive handlers beside both Stop surfaces (`FleetActionsPanel.tsx:570`, `GalaxyView.tsx:316`)
+still show mine-table or raw copy (impl contract section 9). The "ends in the zero-length 500"
+wording in the notes above is superseded: an own-host burn is now refused with the minimum-arc
+`409` only at phases where its solved curve is below the minimum, and commits otherwise.

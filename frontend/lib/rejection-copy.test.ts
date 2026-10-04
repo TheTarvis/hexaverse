@@ -46,7 +46,10 @@ import {
 const R = {
   insufficientFuel: 'fleet: fuel cost exceeds available fuel',
   inTransit: 'fleet: fleet is in lane transit and has no position in either system',
-  clearance: 'space: endpoint at or inside the star-clearance radius',
+  // Re-pointed (fix-burn-order-geometry-refusals task 3.1) from the raw `space:`
+  // sentinel to the DESTINATION reason the server now serves; the cases below
+  // that use it keep their intent (a clearance refusal maps to its own line).
+  clearance: 'fleet: burn destination is at or inside the star-clearance radius',
   capExceeded: 'fleet: solved fuel cost exceeds the requested maxFuelTons cap',
   invalidCap: 'fleet: maxFuelTons must be a finite, non-negative number',
   accelCeiling: "fleet: commanded acceleration exceeds the fleet's derived ceiling",
@@ -202,5 +205,112 @@ describe('lib/rejection-copy — the per-corporation write quota', () => {
     expect(saleErrorCopy(R.quota)).not.toContain(R.quota)
     expect(refuelErrorCopy(R.quota)).not.toBe(GENERIC_REFUEL_FAILURE)
     expect(refuelErrorCopy(R.quota)).not.toContain(R.quota)
+  })
+})
+
+
+// ---------------------------------------------------------------------------
+// fix-burn-order-geometry-refusals task 3.1 — docked-fleet-actions, *A Served
+// Burn Solve Refusal Reads as Player-Facing Copy on Commit and on Every Stop
+// Surface*. The four reason strings are the literals served by backend/fleet
+// (design.md Decision 6, impl-contract 3.1), typed out here verbatim; the four
+// lines are typed out from the delta. The Go side pins the same four literals
+// in its own tests (task 2.7); there is no shared fixture file.
+// ---------------------------------------------------------------------------
+
+const SERVED = {
+  origin: 'fleet: burn origin is at or inside the star-clearance radius',
+  destination: 'fleet: burn destination is at or inside the star-clearance radius',
+  minimumArc: 'fleet: burn curve is below the minimum arc length',
+  absent: 'fleet: target body is not present in this system',
+} as const
+
+const FRAGMENT = {
+  origin: 'origin is at or inside',
+  destination: 'destination is at or inside',
+  minimumArc: 'minimum arc length',
+  absent: 'target body is not present',
+} as const
+
+const LINE = {
+  origin: 'This fleet is too close to the star to take a course from here right now.',
+  destination: 'That destination is too close to the star to fly to.',
+  minimumArc: 'That burn is too short to fly. Choose a target farther away.',
+  absent: 'That body is not in this system. Pick another target.',
+} as const
+
+type Refusal = keyof typeof SERVED
+const REFUSALS = Object.keys(SERVED) as Refusal[]
+
+describe('lib/rejection-copy — the four served burn solve refusals', () => {
+  // Scenario: Each of the four refusals displays its own line
+  it('Scenario: Each of the four refusals displays its own line', () => {
+    for (const k of REFUSALS) {
+      expect(burnErrorCopy(SERVED[k]), `${k}: the pinned line, verbatim`).toBe(LINE[k])
+      expect(burnErrorCopy(SERVED[k]), `${k}: must not be the generic failure line`).not.toBe(GENERIC_COMMAND_FAILURE)
+      expect(burnErrorCopy(SERVED[k]), `${k}: must not render the raw reason`).not.toContain(SERVED[k])
+      expect(burnErrorCopy(SERVED[k]), `${k}: must not leak the package prefix`).not.toContain('fleet:')
+    }
+    // Pairwise different.
+    const lines = REFUSALS.map((k) => burnErrorCopy(SERVED[k]))
+    expect(new Set(lines).size).toBe(4)
+  })
+
+  it('Scenario: Each of the four refusals displays its own line (not the absent fleet or destination line)', () => {
+    // The `not found` line reads "That fleet or destination is not available."
+    // The absent-body reason must not be caught by it, and none of the four
+    // may display it.
+    const notFoundLine = burnErrorCopy('fleet: fleet not found')
+    expect(notFoundLine).not.toBe(GENERIC_COMMAND_FAILURE) // the line exists and is distinct
+    for (const k of REFUSALS) {
+      expect(burnErrorCopy(SERVED[k]), `${k}: must not display the absent fleet-or-destination line`).not.toBe(notFoundLine)
+    }
+    // The absent-body reason is caught by its own needle, ahead of `not found`.
+    expect(burnErrorCopy(SERVED.absent)).toBe(LINE.absent)
+  })
+
+  // Scenario: No refusal reason contains another refusal's fragment, nor the generic not-found text
+  it('Scenario: No refusal reason contains another refusal\'s fragment, nor the generic not-found text', () => {
+    for (const k of REFUSALS) {
+      expect(SERVED[k], `${k} contains its own fragment`).toContain(FRAGMENT[k])
+      for (const other of REFUSALS) {
+        if (other !== k) expect(SERVED[k], `${k} must not contain ${other}'s fragment`).not.toContain(FRAGMENT[other])
+      }
+      expect(SERVED[k], `${k} must not contain the generic not-found text`).not.toContain('not found')
+      // The mapping is keyed by the fragment: the fragment alone selects the
+      // refusal's own line, so no refusal can be caught by another's needle.
+      expect(burnErrorCopy(FRAGMENT[k]), `${k}: its fragment alone selects its own line`).toBe(LINE[k])
+    }
+  })
+
+  // The origin and destination reasons share the words "star-clearance
+  // radius": a needle on those words (the legacy `star-clearance` needle)
+  // would serve one line for both. The two lines must be different.
+  it('SDET-added: the origin and destination reasons, which share "star-clearance", still map to different lines', () => {
+    expect(burnErrorCopy(SERVED.origin)).not.toBe(burnErrorCopy(SERVED.destination))
+    expect(burnErrorCopy(SERVED.origin)).toBe(LINE.origin)
+    expect(burnErrorCopy(SERVED.destination)).toBe(LINE.destination)
+  })
+
+  // RULING 11: the legacy `star-clearance` / `star clearance` needles are
+  // replaced by the origin and destination needles, so the raw `space:`
+  // sentinel text (which the server no longer serves) is not mapped to either
+  // refusal's line by a leftover needle.
+  it('SDET-added (RULING 11): the legacy raw space sentinel text no longer maps to a refusal line', () => {
+    const legacy = 'space: endpoint at or inside the star-clearance radius'
+    expect(burnErrorCopy(legacy)).toBe(GENERIC_COMMAND_FAILURE)
+  })
+
+  it('SDET-added: the reasons are matched case-insensitively and extracted from a response body', () => {
+    expect(burnErrorCopy(SERVED.origin.toUpperCase())).toBe(LINE.origin)
+    expect(burnErrorCopy(commandErrorReason({ data: { error: SERVED.minimumArc } }))).toBe(LINE.minimumArc)
+    expect(burnErrorCopy(commandErrorReason({ data: { error: SERVED.absent } }))).toBe(LINE.absent)
+  })
+
+  it('SDET-added: the existing burn lines are unchanged by the new needles', () => {
+    expect(burnErrorCopy(R.insufficientFuel)).toBe('That burn needs more fuel than this fleet is carrying.')
+    expect(burnErrorCopy(R.inTransit)).toBe('This fleet is crossing a lane and cannot be given a course yet.')
+    expect(burnErrorCopy(R.accelCeiling)).toBe("That burn is harder than this fleet's drives can push.")
+    expect(burnErrorCopy(R.previewChannelHeld)).toBe('This fleet is busy with another run. Cancel it first.')
   })
 })

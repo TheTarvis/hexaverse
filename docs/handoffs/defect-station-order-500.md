@@ -29,6 +29,16 @@ sample, then 1 in 10 runs against the unlucky one. `SeedFleet` already refuses t
 fleet inside the clearance, so the *origin* endpoint is never the guilty one; it is always
 the destination standoff.
 
+> **CORRECTION 2026-10-04 (`fix-burn-order-geometry-refusals`, analysis section 4 and 12).**
+> The origin claim above is wrong after the first order. The guard refuses on EITHER endpoint
+> (`backend/space/burn.go:281`, `space-kinematics` scenario *A burn whose endpoint is already
+> inside the clearance radius is rejected*). A fleet docked at an affected station orbits it at
+> radius 3.85 and sweeps inside the clearance, so its DEPARTURE is refused by the same guard
+> (analyst probe: 8.2% of departure solves in the ~8.9% of affected systems). The log line is
+> identical for both endpoints, so past occurrences in this file cannot be attributed to one or
+> the other. The "ring 4" captured case also cannot dip under today's continuous derivation;
+> affected stations are those whose parent sits at ring 0 (any star) or ring 1 (hot stars).
+
 ## Two separable problems
 
 1. **The geometry.** A legitimate order to a legitimate body fails. This is the real bug.
@@ -217,6 +227,22 @@ a mapped, distinguishable rejection reason is exactly what the test needs to tel
 apart.
 
 ## Where to look — the signature is NOT in the Playwright report
+
+> **SUPERSEDED 2026-10-04 by `fix-burn-order-geometry-refusals`.** After that change a solve
+> refusal is no longer a bodyless 500 logged at error level. It is served as a `409` (or `404`
+> for an absent body) whose `error` body names the cause, and the test backend's log
+> (`frontend/playwright/.auth/backend.log`, still the place to look — never the Playwright
+> report) carries ONE info-level entry per served refusal:
+>
+> ```
+> grep -n 'fleet: burn solve refusal served' frontend/playwright/.auth/backend.log
+> ```
+>
+> with fields `refusalCause` (`absent-body` | `origin-inside-clearance` |
+> `destination-inside-clearance` | `minimum-arc`), `route` (`order` | `preview` | `stop`),
+> `fleetId`, `systemId`. The grep below finds nothing on a build that includes the fix; an
+> `endpoint at or inside the star-clearance radius` ERROR line after the fix would mean a solve
+> path that bypasses `solveBurnClassified`. The text below is kept as the pre-fix record.
 
 Recorded 2026-09-09 because it just caused a misattribution (below): grepping
 `frontend/playwright-report`, Playwright's stdout, or `frontend/test-results/**` for

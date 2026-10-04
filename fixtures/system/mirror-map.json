@@ -89,7 +89,12 @@
     { "go": "gateOrbit", "coverage": "family:gateOrbit", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.2) as a pinned randomized sweep over two independently drawn galaxy.Coords and an extent" },
 
     { "go": "StationContinuousOrbit", "coverage": "family:stationOrbit", "note": "direct: recorded by migrate-fleet-to-continuous-burns (link 4, tasks.md 1.3) as a pinned randomized sweep over a galaxy seed, a synthetic system id, and a 1-8 body-type skeleton" },
-    { "go": "inclinationForDominant", "coverage": "family:stationOrbit", "note": "indirect: its only caller is StationContinuousOrbit" }
+    { "go": "inclinationForDominant", "coverage": "family:stationOrbit", "note": "indirect: its only caller is StationContinuousOrbit" },
+
+    { "go": "stationParentIndex", "coverage": "family:stationOrbit", "note": "indirect: StationContinuousOrbit's parent-index expression, extracted verbatim by fix-burn-order-geometry-refusals; its other caller is stationShellBound" },
+    { "go": "stationShellBound", "coverage": "inventory", "note": "the lower bound on the station shell's star distance and the star clearance it is compared with; subtraction over already-guarded values" },
+    { "go": "shellClears", "coverage": "inventory", "note": "the strict comparison deciding home-site criterion (d)" },
+    { "go": "StationShellClearsStar", "coverage": "inventory", "note": "direct: corporations.qualify's criterion (d); shellClears(stationShellBound(...))" }
   ],
 
   "inventory": [
@@ -97,6 +102,21 @@
       "pair": "gateId",
       "why": "A deterministic string-format helper (\"gate-\" + destSystemId) with no floating-point or cross-target arithmetic content — not the kind of value this capability's fixture machinery exists to pin. Covered functionally by bodies_test.go, not by a byte-for-byte fixture family.",
       "expectedChange": "the change that first gives lane gates a fixture-worthy rule (e.g. a gate id format change) — until then this is a documentation gap, not a determinism risk"
+    },
+    {
+      "pair": "StationShellClearsStar",
+      "why": "Added by fix-burn-order-geometry-refusals under a stop condition forbidding any recorded system fixture on the authoring machine. Its decisions are pinned by a hand-written pass/fail table over parent type, ring and star class in backend/system, not by a recorded family.",
+      "expectedChange": "the next change that modifies backend/system gives it a recorded family, recorded off arm64 with the amd64 cross-check"
+    },
+    {
+      "pair": "stationShellBound",
+      "why": "Added by fix-burn-order-geometry-refusals under a stop condition forbidding any recorded system fixture on the authoring machine. Its decisions are pinned by a hand-written pass/fail table over parent type, ring and star class in backend/system, not by a recorded family.",
+      "expectedChange": "the next change that modifies backend/system gives it a recorded family, recorded off arm64 with the amd64 cross-check"
+    },
+    {
+      "pair": "shellClears",
+      "why": "Added by fix-burn-order-geometry-refusals under a stop condition forbidding any recorded system fixture on the authoring machine. Its decisions are pinned by a hand-written pass/fail table over parent type, ring and star class in backend/system, not by a recorded family.",
+      "expectedChange": "the next change that modifies backend/system gives it a recorded family, recorded off arm64 with the amd64 cross-check"
     }
   ]
 }

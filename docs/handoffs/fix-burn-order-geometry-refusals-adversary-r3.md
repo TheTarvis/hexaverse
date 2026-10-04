@@ -53,4 +53,4 @@ VERDICT: CLEAR
 
 Round 3 of 3: CLEAR, no findings to rule. Adversary rounds used: 3 of 3 — any further spec edit on this change cannot buy another round; residue would become a follow-up change.
 
-Verdict commit:
+Verdict commit: fde977d

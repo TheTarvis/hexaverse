@@ -24,10 +24,85 @@ package main
 //     to a fourth healed asset)
 
 import (
+	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 )
+
+// orderOutcome separates the three things a fresh hull's own first order to
+// its home station can come back as (fix-burn-order-geometry-refusals task
+// 4.1). Before this change a geometry refusal was a bodyless 500 that these
+// tests read as "unaffordable" and answered with "retune StartingFuelTons" —
+// a wrong diagnosis that hid a spawn-placement defect. They are now distinct:
+//
+//   - orderAccepted: 200.
+//   - orderUnaffordable: a non-200 whose `error` contains the fuel reason
+//     ("exceeds available fuel") — the one outcome these tests sample, and the
+//     only one for which a tuning message is right.
+//   - orderGeometryRefusal: a non-200 whose `error` is one of the three burn
+//     geometry refusals (origin or destination at or inside the star clearance,
+//     or a curve below the minimum arc length). At a home that qualifies under
+//     home-site criterion (d) this must NEVER happen: it FAILS the test and
+//     names criterion (d) as the suspect. It is not a tuning signal.
+//   - orderOther: anything else (reported with its status and body).
+type orderOutcome int
+
+const (
+	orderAccepted orderOutcome = iota
+	orderUnaffordable
+	orderGeometryRefusal
+	orderOther
+)
+
+// classifyOrder reads a non-200 order response's `error` text and branches on
+// it; the fuel reason is checked first so an unaffordable order is never
+// mistaken for a geometry one.
+func classifyOrder(code int, body string) orderOutcome {
+	if code == http.StatusOK {
+		return orderAccepted
+	}
+	var parsed struct {
+		Error string `json:"error"`
+	}
+	_ = json.Unmarshal([]byte(body), &parsed)
+	switch {
+	case strings.Contains(parsed.Error, "exceeds available fuel"):
+		return orderUnaffordable
+	case strings.Contains(parsed.Error, "origin is at or inside"),
+		strings.Contains(parsed.Error, "destination is at or inside"),
+		strings.Contains(parsed.Error, "minimum arc length"):
+		return orderGeometryRefusal
+	default:
+		return orderOther
+	}
+}
+
+// geometryRefusalMessage is the failure text for orderGeometryRefusal: it names
+// home-site criterion (d) as the suspect and states this is not a tuning signal.
+func geometryRefusalMessage(code int, body string) string {
+	return "the fresh hull's own default burn order to its home station was REFUSED FOR GEOMETRY (status " +
+		strconv.Itoa(code) + ", body " + body + "). A home chosen by site selection satisfies criterion (d) — its " +
+		"station shell clears the star — so this refusal means criterion (d) is the suspect (the predicate, " +
+		"its table, or its wiring into site selection). This is NOT a tuning signal: do not retune " +
+		"FuelParams.StartingFuelTons"
+}
+
+// postStationOrder is the fresh hull's real, unmodified first order (no accel,
+// so it defaults to the fleet's ceiling) to its home station. Unlike
+// postOrder it keeps the body of a non-200, which the classification reads.
+func postStationOrder(t *testing.T, router http.Handler, sp fuelSpawn) (resp fuelFleetDTO, code int, body string) {
+	t.Helper()
+	w := doJSON(t, router, http.MethodPost, "/v1/fleets/"+sp.fleetId+"/orders", sp.token, map[string]any{"bodyId": sp.stationId}, nil)
+	if w.Code == http.StatusOK {
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decoding order response for fleet %s: %v\nbody: %s", sp.fleetId, err, w.Body.String())
+		}
+	}
+	return resp, w.Code, w.Body.String()
+}
 
 // TestSpawn_Scenario_ASeededHullCanReachItsHomeStationOnItsStartingFuel is
 // the flagship. A fresh corporation's spawn grants NO fuel today (task 5 is
@@ -48,11 +123,21 @@ func TestSpawn_Scenario_ASeededHullCanReachItsHomeStationOnItsStartingFuel(t *te
 
 	// The real, unmodified first order: no explicit accel (defaults to the
 	// ceiling), targeting the home station.
-	resp, _, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": sp.stationId})
-	if code != http.StatusOK {
+	resp, code, body := postStationOrder(t, router, sp)
+	switch classifyOrder(code, body) {
+	case orderAccepted:
+	case orderUnaffordable:
 		t.Fatalf("corporation-spawn \"A seeded hull can reach its home station on its starting fuel\": the "+
-			"fresh hull's own default (ceiling-priced) burn order to its home station was REJECTED (status = "+
-			"%d) — a fresh corporation must never deadlock at spawn. Granted starting fuel: %v", code, granted)
+			"fresh hull's own default (ceiling-priced) burn order to its home station was REJECTED as "+
+			"unaffordable (status = %d, body = %s) — a fresh corporation must never deadlock at spawn. "+
+			"Granted starting fuel: %v", code, body, granted)
+	case orderGeometryRefusal:
+		t.Fatalf("corporation-spawn \"A seeded hull can reach its home station on its starting fuel\": %s. "+
+			"Granted starting fuel: %v", geometryRefusalMessage(code, body), granted)
+	default:
+		t.Fatalf("corporation-spawn \"A seeded hull can reach its home station on its starting fuel\": the "+
+			"fresh hull's own default burn order was rejected for an unexpected reason (status = %d, body = %s)",
+			code, body)
 	}
 	if resp.State.Burn == nil {
 		t.Fatalf("order response is not a Burn: %+v", resp.State)
@@ -227,14 +312,30 @@ func TestSpawn_Scenario_StartingFuelReachabilitySample(t *testing.T) {
 	router := SetupRouter()
 
 	const sampleSize = 8
+	// failures counts UNAFFORDABLE outcomes only: the final message tells the
+	// reader to retune StartingFuelTons, which is the right advice for those
+	// and wrong for any other. A geometry refusal or an unexpected rejection
+	// fails the test on its own, with its own message.
 	var failures int
 	for i := 0; i < sampleSize; i++ {
 		sp := spawnFuelCorp(t, router, "SDET Sample Corp")
 		granted := fleetCargoFuel(t, sp.fleetId)
-		resp, _, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": sp.stationId})
-		if code != http.StatusOK || resp.State.Burn == nil {
-			t.Errorf("sample account #%d: default order to home station rejected (status = %d)", i, code)
+		resp, code, body := postStationOrder(t, router, sp)
+		switch classifyOrder(code, body) {
+		case orderAccepted:
+		case orderUnaffordable:
+			t.Errorf("sample account #%d: default order to home station rejected as unaffordable (status = %d, body = %s)", i, code, body)
 			failures++
+			continue
+		case orderGeometryRefusal:
+			t.Errorf("sample account #%d: %s", i, geometryRefusalMessage(code, body))
+			continue
+		default:
+			t.Errorf("sample account #%d: default order to home station rejected for an unexpected reason (status = %d, body = %s)", i, code, body)
+			continue
+		}
+		if resp.State.Burn == nil {
+			t.Errorf("sample account #%d: accepted order response is not a Burn: %+v", i, resp.State)
 			continue
 		}
 		cost := expectedFuelCostTons(resp.State.Burn, 1)

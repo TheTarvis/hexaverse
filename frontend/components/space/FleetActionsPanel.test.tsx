@@ -53,6 +53,9 @@ const refuel = { mutate: vi.fn(), isPending: false }
 const hold = { mutate: vi.fn(), isPending: false }
 const release = { mutate: vi.fn(), isPending: false }
 const cancelAction = { mutate: vi.fn(), isPending: false }
+// Shared (not per-call) so a test can script the Stop mutation's onError
+// (fix-burn-order-geometry-refusals task 3.3).
+const stop = { mutate: vi.fn(), isPending: false }
 let runningMine: { id: string; eta: number } | null = null
 
 vi.mock('@/hooks/use-fleets', async () => {
@@ -63,7 +66,7 @@ vi.mock('@/hooks/use-fleets', async () => {
     useHold: () => hold,
     useRelease: () => release,
     useCutDrive: () => ({ mutate: vi.fn(), isPending: false }),
-    useStop: () => ({ mutate: vi.fn(), isPending: false }),
+    useStop: () => stop,
   }
 })
 vi.mock('@/hooks/use-market', async () => {
@@ -913,5 +916,65 @@ describe('FleetActionsPanel — usable while the canvas is unavailable', () => {
     const notice = screen.getByTestId('mine-unavailable')
     expect(notice.textContent!.toLowerCase()).not.toMatch(/nothing to mine|no resources|carries no/)
     expect(notice.textContent!.toLowerCase()).toMatch(/load|read|unavailable|retry/)
+  })
+})
+
+
+// ---------------------------------------------------------------------------
+// fix-burn-order-geometry-refusals task 3.3 — docked-fleet-actions, *A Served
+// Burn Solve Refusal Reads as Player-Facing Copy on Commit and on Every Stop
+// Surface*: the panel's Stop reports a refusal through the BURN copy table,
+// not the mine one, and never as the raw server reason. The reasons and lines
+// are typed out verbatim from the delta / design.md Decision 6.
+// ---------------------------------------------------------------------------
+
+const STOP_REASON = {
+  origin: 'fleet: burn origin is at or inside the star-clearance radius',
+  destination: 'fleet: burn destination is at or inside the star-clearance radius',
+}
+const STOP_LINE = {
+  origin: 'This fleet is too close to the star to take a course from here right now.',
+  destination: 'That destination is too close to the star to fly to.',
+}
+
+describe('FleetActionsPanel — a stop refused for the star clearance', () => {
+  // Scenario: A stop refused for the clearance shows the same line a burn refused for it shows
+  it.each([
+    ['origin', STOP_REASON.origin, STOP_LINE.origin],
+    ['destination', STOP_REASON.destination, STOP_LINE.destination],
+  ] as const)(
+    'Scenario: A stop refused for the clearance shows the same line a burn refused for it shows (%s)',
+    async (_name, raw, line) => {
+      stop.mutate.mockImplementation((_id: unknown, opts?: { onError?: (e: unknown) => void }) => {
+        opts?.onError?.(Object.assign(new Error('x'), { data: { error: raw } }))
+      })
+      panel()
+      await userEvent.click(screen.getByTestId('fleet-cmd-stop-fleet_1'))
+      await waitFor(() => expect(toastError).toHaveBeenCalled())
+      const shown = String(toastError.mock.calls.at(-1)![0])
+      expect(shown, 'the pinned line, verbatim').toBe(line)
+      expect(shown, 'never the raw reason').not.toContain(raw)
+      expect(shown, 'never the package prefix').not.toContain('fleet:')
+      // The assistive-technology announcement carries the same line.
+      expect(screen.getByTestId('panel-error-live-region').textContent).toBe(line)
+      stop.mutate.mockReset()
+    },
+  )
+
+  it('SDET-added: the panel Stop shows the origin line and the destination line as different lines', async () => {
+    const shown: string[] = []
+    for (const raw of [STOP_REASON.origin, STOP_REASON.destination]) {
+      stop.mutate.mockImplementation((_id: unknown, opts?: { onError?: (e: unknown) => void }) => {
+        opts?.onError?.(Object.assign(new Error('x'), { data: { error: raw } }))
+      })
+      const { unmount } = panel()
+      await userEvent.click(screen.getByTestId('fleet-cmd-stop-fleet_1'))
+      await waitFor(() => expect(toastError).toHaveBeenCalled())
+      shown.push(String(toastError.mock.calls.at(-1)![0]))
+      unmount()
+      toastError.mockClear()
+    }
+    expect(new Set(shown).size).toBe(2)
+    stop.mutate.mockReset()
   })
 })

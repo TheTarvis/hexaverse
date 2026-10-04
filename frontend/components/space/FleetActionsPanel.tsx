@@ -33,6 +33,7 @@ import { firstTonPrice, foldSale } from '@/lib/market/fold'
 import { GENERIC_SALE_FAILURE, isPriceChanged, saleErrorCopy } from '@/lib/market-copy'
 import { refuelErrorCopy } from '@/lib/refuel-copy'
 import {
+  burnErrorCopy,
   commandErrorReason,
   holdErrorCopy,
   mineErrorCopy,
@@ -581,7 +582,7 @@ export function FleetActionsPanel({
           disabled={mineRunning}
           onClick={() =>
             stop.mutate(fleet.id, {
-              onError: (error: unknown) => reportFailure(mineErrorCopy(commandErrorReason(error))),
+              onError: (error: unknown) => reportFailure(burnErrorCopy(commandErrorReason(error))),
             })
           }
         >

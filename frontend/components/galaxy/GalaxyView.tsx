@@ -35,6 +35,7 @@ import { MarketBoardPanel } from '@/components/market/MarketBoardPanel'
 import type { Quote } from '@/lib/types/market'
 import { useCoarseWorldTime, useWorldClock } from '@/lib/client-clock'
 import { toast } from '@/lib/toast'
+import { burnErrorCopy, commandErrorReason } from '@/lib/rejection-copy'
 import { jumpErrorCopy, jumpErrorReason } from '@/lib/jump-copy'
 import type { Fleet } from '@/lib/types/fleet'
 import type { Galaxy, GalaxyNode, Region } from '@/lib/types/galaxy'
@@ -322,7 +323,7 @@ export function GalaxyView() {
     (fleet: Fleet) => {
       stop.mutate(fleet.id, {
         onSuccess: () => toast.success('Stopping'),
-        onError: (e) => toast.error(e.message || 'Stop failed'),
+        onError: (e) => toast.error(burnErrorCopy(commandErrorReason(e))),
       })
     },
     [stop],

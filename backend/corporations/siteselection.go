@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"hexaverse/galaxy"
+	"hexaverse/system"
 )
 
 // ErrNoSpawnSite is the DEFENSIVE RAIL, not an expected outcome. Since the
@@ -44,12 +45,15 @@ type spawnWalk struct {
 	// systems share almost all of their 3×3 window, so this collapses the walk's
 	// storage cost to roughly one ensure per new block.
 	ensuredBlocks map[galaxy.Block]bool
+	// seed is the live galaxy's seed, the input the station derivation needs.
+	seed int64
 }
 
 // selectSpawnSite walks outward from settled space and returns the first
 // qualifying home. Qualification is (a) a mineable skeleton body — the bootstrap
 // guarantee; (b) at least MinSpawnDistance lane-hops from every other living
-// corporation's explored systems; (c) no existing spawn reservation. The walk
+// corporation's explored systems; (c) no existing spawn reservation; (d) the home station's orbital shell clears
+// its star's clearance radius. The walk
 // stops at the FIRST hop-ring holding a qualifier and draws uniformly among that
 // ring's qualifiers with an account-seeded source, so new corporations land just
 // beyond the settled fringe and the same account against the same world state
@@ -79,6 +83,7 @@ func selectSpawnSite(
 		claimed:       claimed,
 		reserved:      reserved,
 		blockSize:     meta.Params.BlockSize,
+		seed:          meta.Seed,
 		ensuredBlocks: map[galaxy.Block]bool{},
 	}
 	return w.run(ctx, sources, accountId)
@@ -179,7 +184,7 @@ func (w *spawnWalk) run(ctx context.Context, sources []string, accountId string)
 	return nil, ErrNoSpawnSite
 }
 
-// qualify filters one ring to the candidates that satisfy all three criteria.
+// qualify filters one ring to the candidates that satisfy all four criteria.
 // (b) and (c) are cheap in-memory set tests, so they run first and keep the
 // storage fan-out down to the systems that could actually be picked.
 func (w *spawnWalk) qualify(ctx context.Context, ring []string) ([]galaxy.System, error) {
@@ -199,6 +204,11 @@ func (w *spawnWalk) qualify(ctx context.Context, ring []string) ([]galaxy.System
 	var out []galaxy.System
 	for _, sys := range systems {
 		if w.params.RequireMineable && !galaxy.HasMineableBody(&sys) {
+			continue
+		}
+		// (d): the station's whole orbital shell stays outside the star's
+		// clearance, so a fleet docked there is never refused for its origin.
+		if !system.StationShellClearsStar(w.seed, sys.Id, sys.Skeleton) {
 			continue
 		}
 		out = append(out, sys)

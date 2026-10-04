@@ -134,3 +134,20 @@ writer open question 2. **Basis:** panel — reliability on observability (consi
 4, 6), UX on copy. **Rejected:** no log at all (a criterion regression would be silent); a
 separate warn level for origin; keeping a needle no served string matches.
 **Reversal cost:** one log call; one copy-table line.
+
+## FULL-AUTO RULING 12 — the three fault clauses a real body table cannot arrange (cycle 5xx, present target with a missing parent 5xx, the cycle's error-level log) are covered as "helper + handler, composed"; no exported table constructor is added
+
+**Question:** impl contract, "the arrangement constraint". **Basis:** panel (architect, technical
+shape): `system.Service.BodyTable` drops every unresolvable feature, so the fault is unreachable
+through the real table; the solve helper takes the `space.Bodies` interface. Most reversible: no
+production surface is added for tests. **Rejected:** an exported table constructor (no task covers
+it; exceeds Impact); marking the clauses reasoned-not-automated. **Reversal cost:** none.
+
+## FULL-AUTO RULING 13 — tasks 1.10 (starting-fuel sample clause), 5.2 and 6.3 close from the archive gate itself; they do not block entry to the journey
+
+**Question:** the Verify → Journey gate asks for zero unchecked tasks, but these three are
+defined in terms of the gate's own result (the sample is an e2e-tagged tier-3 test; 5.2 closes
+defect records "with the evidence of the gates that pass"; 6.3 is the gate). **Basis:**
+`docs/testing-tiers.md` (tier 3 runs once per change, at archive time, never as a per-task
+check); precedent `clear-burn-preview-on-commit` tasks 7.3-7.6. **Rejected:** a separate tier-3
+run before the gate (forbidden "confirming rerun"). **Reversal cost:** none.

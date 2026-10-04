@@ -39,7 +39,7 @@ func StationContinuousOrbit(galaxySeed int64, systemId string, skeleton galaxy.S
 		}
 	}
 
-	k := int(mix64(mix64(uint64(seed))) % uint64(len(skeleton.Bodies)))
+	k := stationParentIndex(seed, len(skeleton.Bodies))
 	parentType := skeleton.Bodies[k].Type
 	ceiling := MaxFeatureSize(featureTypeForBody(parentType))
 	localRadius := float64(ceiling + float64(space.InsertionStandoff(space.Body{Size: ceiling})+StationStandoff))
@@ -63,4 +63,41 @@ func inclinationForDominant(systemSeed int64) space.SubTurns {
 		return space.SubTurn / 2
 	}
 	return 0
+}
+
+// stationParentIndex is the station's parent choice among the skeleton's major
+// bodies, `mix64(mix64(systemSeed)) mod bodyCount`. Shared by
+// StationContinuousOrbit and stationShellBound so the two cannot disagree.
+// Never called with bodyCount == 0 (callers guard the empty skeleton).
+func stationParentIndex(systemSeed int64, bodyCount int) int {
+	return int(mix64(mix64(uint64(systemSeed))) % uint64(bodyCount))
+}
+
+// StationShellClearsStar reports whether the station's whole orbital shell
+// stays strictly outside its star's clearance radius, so no station park
+// position can lie inside the clearance (home-site criterion (d)). Pure over
+// galaxy-tier data: no store read, no clock, no square root, no trigonometry.
+func StationShellClearsStar(galaxySeed int64, systemId string, skeleton galaxy.Skeleton) bool {
+	return shellClears(stationShellBound(galaxySeed, systemId, skeleton))
+}
+
+// stationShellBound returns a lower bound on the station's star distance (the
+// parent's ring radius less the station's local radius less the parent's
+// insertion standoff) and the star clearance it is compared with.
+func stationShellBound(galaxySeed int64, systemId string, skeleton galaxy.Skeleton) (bound, clearance float64) {
+	orbit := StationContinuousOrbit(galaxySeed, systemId, skeleton)
+	standoff := space.InsertionStandoff(space.Body{Size: StationSize})
+	if len(skeleton.Bodies) == 0 {
+		bound = float64(orbit.Radius - standoff)
+	} else {
+		k := stationParentIndex(galaxy.SystemSeed(galaxySeed, systemId), len(skeleton.Bodies))
+		bound = float64(float64(ContinuousRadius(skeleton.Bodies[k].Ring)-orbit.Radius) - standoff)
+	}
+	clearance = space.StarClearanceRadius(StarSize(skeleton.StarClass))
+	return bound, clearance
+}
+
+// shellClears is the strict comparison deciding criterion (d).
+func shellClears(bound, clearance float64) bool {
+	return bound > clearance
 }

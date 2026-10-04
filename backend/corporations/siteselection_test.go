@@ -28,6 +28,14 @@ type lineGraph struct {
 	ensured *[]galaxy.Block
 	// origin overrides the recorded origin system.
 	origin string
+	// skeleton, when set, replaces the default one-body skeleton per index
+	// (fix-burn-order-geometry-refusals tasks 1.3-1.5: a candidate whose station
+	// shell reaches the star is a single ring-0 body).
+	skeleton func(i int) galaxy.Skeleton
+	// seed is the live galaxy document's Seed. Zero by default, as before; the
+	// task 1.4 tests set a non-zero one so a wiring that passes seed 0 into the
+	// station-orbit derivation is caught.
+	seed int64
 }
 
 func newLineGraph(n int, mineable func(i int) bool) *lineGraph {
@@ -49,18 +57,27 @@ func (g *lineGraph) GetLiveSystem(_ context.Context, id string) (*galaxy.System,
 	if !ok || i < 0 || i >= g.materialized {
 		return nil, galaxy.ErrSystemNotFound
 	}
+	sk := galaxy.Skeleton{
+		// The star class is explicit (task 1.10): the fake's candidates satisfy
+		// criterion (d) by statement (rocky ring 1 under G passes), not by the
+		// unknown-class default.
+		StarClass: "G",
+		Bodies:    []galaxy.Body{{Type: galaxy.BodyRocky, Ring: 1, Mineable: g.mineable(i)}},
+	}
+	if g.skeleton != nil {
+		sk = g.skeleton(i)
+	}
 	return &galaxy.System{
-		Id:     id,
-		Coords: galaxy.Coords{X: float64(i)},
-		Skeleton: galaxy.Skeleton{
-			Bodies: []galaxy.Body{{Type: galaxy.BodyRocky, Ring: 1, Mineable: g.mineable(i)}},
-		},
+		Id:       id,
+		Coords:   galaxy.Coords{X: float64(i)},
+		Skeleton: sk,
 	}, nil
 }
 
 func (g *lineGraph) LiveGalaxyMeta(context.Context) (*galaxy.Galaxy, error) {
 	return &galaxy.Galaxy{
 		Id:             "gal_line",
+		Seed:           g.seed,
 		OriginSystemId: g.origin,
 		Params:         galaxy.GenerationParams{BlockSize: g.blockSize},
 	}, nil

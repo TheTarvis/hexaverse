@@ -468,6 +468,18 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 	switch {
 	case errors.Is(err, ErrNotFound):
 		c.AbortWithStatus(http.StatusNotFound)
+	// Served burn-solve refusals: each serves its sentinel's OWN text (never
+	// the wrapped err.Error()), and writes no log entry — the solve helper
+	// already recorded the refusal once, below error level. No arm for the raw
+	// space sentinels: an unclassified one reaches the default 500 arm.
+	case errors.Is(err, ErrTargetBodyAbsent):
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": ErrTargetBodyAbsent.Error()})
+	case errors.Is(err, ErrOriginInsideClearance):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": ErrOriginInsideClearance.Error()})
+	case errors.Is(err, ErrDestinationInsideClearance):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": ErrDestinationInsideClearance.Error()})
+	case errors.Is(err, ErrBurnArcTooShort):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": ErrBurnArcTooShort.Error()})
 	case errors.Is(err, ErrEmptyOrder), errors.Is(err, ErrAmbiguousOrder):
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrInvalidFuelCap):

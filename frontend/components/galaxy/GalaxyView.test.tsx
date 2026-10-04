@@ -513,6 +513,82 @@ describe('GalaxyView', () => {
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Drive cut')
   })
 
+  // --- a stop refused for the star clearance on the roster (fix-burn-order-
+  // geometry-refusals task 3.3; docked-fleet-actions "A Served Burn Solve
+  // Refusal Reads as Player-Facing Copy on Commit and on Every Stop Surface").
+  // The reasons and lines are typed out verbatim from the delta and
+  // design.md Decision 6.
+  describe('roster Stop refused for the star clearance', () => {
+    const ORIGIN_REASON = 'fleet: burn origin is at or inside the star-clearance radius'
+    const DESTINATION_REASON = 'fleet: burn destination is at or inside the star-clearance radius'
+    const ORIGIN_LINE = 'This fleet is too close to the star to take a course from here right now.'
+    const DESTINATION_LINE = 'That destination is too close to the star to fly to.'
+
+    function burningFleet(): Fleet {
+      return {
+        ...parkedFleet('fleet_1', 'sys-0'),
+        state: {
+          Mode: 0,
+          Burn: {
+            Origin: { X: 0, Y: 0, Z: 0 },
+            Target: { BodyId: 'p-1', Point: null },
+            Intercept: { X: 1, Y: 0, Z: 0 },
+            Curve: {},
+            Length: 10,
+            DepartMs: 0,
+            ArriveMs: 90_000,
+            Accel: 1,
+            InsertionPhase: 0,
+          },
+          Park: null,
+          Drift: null,
+        },
+      }
+    }
+
+    function refuseStopWith(raw: string, error: Error = Object.assign(new Error('x'), { data: { error: raw } })) {
+      mockGalaxyState()
+      mockUseMyFleets.mockReturnValue({ data: [burningFleet()] } as unknown as ReturnType<typeof useMyFleets>)
+      // The same error shape apiClient rejects with: the reason is in `data.error`.
+      stopMutate.mockImplementation((_id, opts) =>
+        (opts as { onError?: (e: unknown) => void })?.onError?.(error),
+      )
+      renderView()
+      fireEvent.click(screen.getByTestId('fleet-cmd-stop-fleet_1'))
+      expect(stopMutate).toHaveBeenCalledWith('fleet_1', expect.anything())
+    }
+
+    // Scenario: A stop refused on the galaxy roster does not toast the raw reason
+    it('Scenario: A stop refused on the galaxy roster does not toast the raw reason (destination)', () => {
+      refuseStopWith(DESTINATION_REASON)
+      expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1)
+      const shown = vi.mocked(toast.error).mock.calls[0]![0] as string
+      expect(shown, 'the destination line, verbatim').toBe(DESTINATION_LINE)
+      expect(shown).not.toContain('fleet:')
+      expect(shown).not.toContain(DESTINATION_REASON)
+    })
+
+    // Scenario: A stop refused for the clearance shows the same line a burn refused for it shows (roster half)
+    it('Scenario: A stop refused for the clearance shows the same line a burn refused for it shows (roster, origin)', () => {
+      refuseStopWith(ORIGIN_REASON)
+      expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1)
+      const shown = vi.mocked(toast.error).mock.calls[0]![0] as string
+      expect(shown, 'the origin line, verbatim').toBe(ORIGIN_LINE)
+      expect(shown).not.toContain('fleet:')
+      expect(shown).not.toContain(ORIGIN_REASON)
+    })
+
+    it('SDET-added: a reasonless stop failure shows the one generic line, never an apiClient transport summary', () => {
+      // A bodyless response: apiClient synthesizes only a transport message.
+      refuseStopWith('', new Error('API Error: 500 Internal Server Error'))
+      const shown = vi.mocked(toast.error).mock.calls[0]![0] as string
+      expect(shown).not.toContain('API Error')
+      expect(shown).not.toMatch(/\b5\d\d\b/)
+      expect(shown).not.toBe(ORIGIN_LINE)
+      expect(shown).not.toBe(DESTINATION_LINE)
+    })
+  })
+
   // --- jump gating (replace-observation-with-sightings tasks.md 4.10,
   // fleet-roster ADDED "The Roster Row Is the Fleet Command Surface, Jump
   // Gated by Attachment Alone") -----------------------------------------

@@ -6,7 +6,7 @@ import (
 
 // SpawnParams are the spawn-placement knobs (#0009). The numbers still wait for
 // whole-graph tuning; the SHAPE — an outward lane-graph walk that materializes
-// as it goes, filtered by the three criteria, drawn uniformly within the first
+// as it goes, filtered by the four criteria, drawn uniformly within the first
 // qualifying ring — is what survives that tuning. Frontier weighting retired
 // with the finite galaxy: the nearest-qualifying-ring rule already lands new
 // corporations just beyond the settled fringe.

@@ -622,7 +622,7 @@ func (o *orderSolve) RemainingFuel() float64 {
 // Hold First"). A preview passes false: it "SHALL create no action, claim no
 // channel slot, debit no fuel, and store no burn", and an upkeep settlement
 // debits fuel.
-func (s *Service) solveOrder(ctx context.Context, id string, req OrderRequest, settleExpiredHold bool) (*orderSolve, error) {
+func (s *Service) solveOrder(ctx context.Context, id string, req OrderRequest, route burnRoute, settleExpiredHold bool) (*orderSolve, error) {
 	var target space.Target
 	switch {
 	case req.BodyId != "" && req.Point != nil:
@@ -717,7 +717,7 @@ func (s *Service) solveOrder(ctx context.Context, id string, req OrderRequest, s
 
 	starClearance := space.StarClearanceRadius(bt.StarSize())
 
-	sol, err := space.SolveBurn(bt, from, target, now, accel, departDir, starClearance, space.SolveRounds)
+	sol, err := solveBurnClassified(ctx, route, f.Id, f.SystemId, bt, from, target, now, accel, departDir, starClearance)
 	if err != nil {
 		return nil, fmt.Errorf("fleet: solving burn: %w", err)
 	}
@@ -782,7 +782,7 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 		return nil, err
 	}
 
-	solved, err := s.solveOrder(ctx, id, req, true)
+	solved, err := s.solveOrder(ctx, id, req, routeOrder, true)
 	if err != nil {
 		return nil, err
 	}
@@ -970,7 +970,7 @@ func (s *Service) PreviewOrder(ctx context.Context, id string, req OrderRequest)
 		return nil, ErrPreviewLaneTarget
 	}
 
-	solved, err := s.solveOrder(ctx, id, req, false)
+	solved, err := s.solveOrder(ctx, id, req, routePreview, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1345,7 +1345,7 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 		lead = pos.Add(unit.Scale(space.MinArcLength * 2))
 	}
 	starClearance := space.StarClearanceRadius(bt.StarSize())
-	sol, err := space.SolveBurn(bt, pos, space.Target{Point: &lead}, now, defaultAccel, nil, starClearance, space.SolveRounds)
+	sol, err := solveBurnClassified(ctx, routeStop, f.Id, f.SystemId, bt, pos, space.Target{Point: &lead}, now, defaultAccel, nil, starClearance)
 	if err != nil {
 		return nil, fmt.Errorf("fleet: solving stop burn: %w", err)
 	}
