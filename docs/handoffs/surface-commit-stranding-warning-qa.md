@@ -45,8 +45,8 @@ they observe the ordering the gap rule is about (not a hand-set mock).
 
 | Clause | Evidence | Verdict |
 |---|---|---|
-| Appearing/removal SHALL NOT remove, disable or re-order the Burn control | Control present and preceding the notice asserted (V 3.17, P 1.4). Not asserted: Burn's `disabled` state with the notice shown. Diff only inserts the `<p>` after the Button; Button props untouched | INSPECTED |
-| Adds no text to the live region / no announcement | V 3.17 announcer text compared at 3 points (removal path = cut drive). The removal-by-arrival-with-landing path is not exercised, but the notice is not in any live region (asserted) and diff adds no announcer write | PASS (arrival-landing leg INSPECTED) |
+| Appearing/removal SHALL NOT remove, disable or re-order the Burn control | Control present and preceding the notice (V 3.17, P 1.4). REVISED (ruling 16): P it.each `...the notice does not change the burn control's disabled state` (available / unavailable arms) asserts `disabled` equal without the notice, with it, and after removal; re-run green (56 tests in the file) | PASS (was INSPECTED) |
+| Adds no text to the live region / no announcement | V 3.17 announcer text compared at 3 points (removal path = cut drive). The removal-by-arrival-with-landing path is not exercised, but the notice is not in any live region (asserted) and diff adds no announcer write | PASS (arrival-landing leg now closed by V 3.7 body row: announcer `''` before the landing read, exactly `Burn complete — arrived and attached to feat-body-1.` after, notice removed) |
 | Warning toast independent of acting fleet | V 3.11 row 2, P 1.5 | PASS |
 | No further toast on removal / return / refresh | V 3.5, 3.11, 3.12 toast counts | PASS |
 | Toast and notice copy: no raw server text, no figure | constants in the diff; P 1.5, V 3.19 | PASS |
@@ -55,14 +55,14 @@ they observe the ordering the gap rule is about (not a hand-set mock).
 | Read requested after acceptance, error continues gap | V 3.10 step 1 | PASS |
 | The notice's end needs no user action / selection change | V 3.5 selection unchanged; derived at render, no effect/timer | PASS |
 | Roster indication neither computed nor duplicated | diff adds nothing roster-side; V 3.20 | INSPECTED + PASS |
-| Wire: served field omitted (not sent false) when not stranding | needs real response | BLOCKED-awaiting-journey (see below) |
+| Wire: served field omitted (not sent false) when not stranding | needs real response | PASS (was BLOCKED): journey spec step 1 asserts `'strandingWarning' in body` is false on the real POST /v1/fleets/:id/orders response, which the record says ran green (tier 4, 26 passed) |
 
 ## Matrix C — live `fleet-roster` "A Burn Commit's Stranding Warning Is Surfaced to the Player" on the burn command, system space view
 
 | Scenario | Closing test(s) | Verdict |
 |---|---|---|
 | A stranding warning renders alongside a successful commit | V 3.1 + P 1.5 (success toast x1, notice, separate warning toast, not error) | PASS (mocked wire) |
-| A commit with no warning shows no stranding notice | V 3.16, P 1.2 | PASS (mocked wire); real-wire omission BLOCKED-awaiting-journey |
+| A commit with no warning shows no stranding notice | V 3.16, P 1.2 | PASS (mocked wire) and PASS on the real wire (journey step 1: key absent, notice count 0 in `preview-panel` and on the page, success toast 1, warning toast 0) |
 | The warning is never rendered as an error | V 3.17, P 1.4/1.5: toast.warning not toast.error, no role/red class | PASS |
 
 The burn command on the system view now satisfies this requirement. The stop command is out of scope (drift file `drift-stop-stranding-warning-not-rendered.md`).
@@ -113,3 +113,41 @@ Tasks 1-4 `[x]` match reality (86 green; diff matches 4.1-4.3; 4.4 diff scope co
 - The announcer-unchanged clause is tested on the cut-drive removal only; the arrival-landing removal path is not exercised.
 
 **SHIP-PENDING-JOURNEY**
+
+---
+
+# Post-journey update (archive gate) — final verdict
+
+Inputs: `surface-commit-stranding-warning-journey.md`; spec `frontend/e2e/tests/commit-stranding-notice-journey.spec.ts` (assertions read); rulings 16-18.
+QA re-ran tier 1: `SpaceCommandPanel.test.tsx` + `SystemSpaceView.stranding-notice.test.tsx` -> 88 passed (56 + 32). I ran no stack; the tier 4 and tier 3 results are taken from the record.
+
+## Rows re-judged
+
+| Row | Closing evidence (existing in a test body or spec assertion) | Verdict |
+|---|---|---|
+| Burn control not disabled by the notice (was INSPECTED) | P it.each, two arms (available, unavailable): `disabled` equals expected before, with `commitStrandingNotice: true` (notice asserted present), and after removal. A `disabled={... || commitStrandingNotice}` mutant would fail it | PASS |
+| Announcer unchanged / arrival-landing removal (leg was INSPECTED) | V 3.7 body row: GIVEN announcer is `''`, after the landing read the notice is null and the announcer is exactly the landed-resolution text. The point row asserts only notice removal (no announcement is claimed) | PASS |
+| Real wire omits the field on a non-stranding commit (was BLOCKED) | journey spec: `expect('strandingWarning' in body).toBe(false)` on the real response after `res.ok()` | PASS |
+| Matrix C no-warning row, real-wire half | same assertion plus `commit-stranding-notice` count 0 in `preview-panel` and on page, `Burn committed` toast count 1, warning-toast text count 0 | PASS |
+| Cut drive on the command surface, no warning toast, Burn enabled | journey step 2 (corroboration only: the commit was unwarned, so there was no notice to remove) | PASS as stated; NOT evidence for the notice's removal |
+| `[journey-console]` update-depth | hard `afterEach` `toEqual([])`; record: 0 lines, 2 entries captured | PASS |
+| Roster indication neither computed nor duplicated | diff adds nothing roster-side; V 3.20 | INSPECTED (stays; no spec scenario can fail it) |
+
+## Not closed at tier 4 (the stranding leg, UNTESTED per ruling 17; not marked closed)
+
+No journey assertion exists for any of these; each is closed at tier 1 on a mocked wire only (V 3.1-3.20):
+1. Notice visible with exactly one warning toast after a real warned commit (real response carries `strandingWarning: true`).
+2. Real-wire instants equality: the real order response's `Burn.DepartMs/ArriveMs` equal the later real own-fleets read's for the same order (notice still visible after the first post-commit read). If these differed on the real backend the notice would vanish at the first read; this is unverified against a real backend.
+3. Notice removal on cut drive (and on arrival/stop) against real reads.
+4. Reload shows no notice while `fleet-stranded-<id>` shows on the roster row, against the real backend.
+Also unverified on a real wire: that the backend ever serves `strandingWarning` set true to this view at all.
+
+## Tier 3
+
+One red, `TestSpawn_Scenario_ASeededHullCanReachItsHomeStationOnItsStartingFuel`, attributed by the journey record to the filed OPEN `defect-station-order-500` and ruled residue (ruling 18). It is backend, in a file this frontend-only change does not touch; QA did not re-run it and takes the attribution as the SDET's. It does not bear on any scenario here.
+
+## Final counts
+
+PASS 38 (25 Matrix A + 10 Matrix B + 3 Matrix C), FAIL 0, BLOCKED 0, INSPECTED 1 (roster clause). Stranding-leg sub-clauses (items 1-4 above): closed at tier 1 on a mocked wire only, open at tier 4.
+
+**SHIP** — with the stranding-leg real-wire clauses recorded as untested at tier 4 (a known, ruled residual risk, chiefly instants equality on the real wire), not as passing.

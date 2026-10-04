@@ -318,3 +318,14 @@ to home station rejected (status = 500)"; log `fleet: solving burn: space:
 endpoint at or inside the star-clearance radius`. 1874 passed / 1 skipped / 1
 failed in 1042 s. The change under gate was frontend-only. Residue under
 `lift-burn-preview-to-view-rulings.md` FULL-AUTO RULING 23.
+
+## Occurrence — 2026-10-04, `surface-commit-stranding-warning` archive gate, tier 3
+
+`TestSpawn_Scenario_ASeededHullCanReachItsHomeStationOnItsStartingFuel`
+(`backend/fuel_spawn_starting_fuel_e2e_test.go:53`) — a **different test of the
+same file** from the previous occurrence, which passed this run. "The fresh
+hull's own default (ceiling-priced) burn order to its home station was REJECTED
+(status = 500)"; backend log `fleet: solving burn: space: endpoint at or inside
+the star-clearance radius`, home `sys_9_-15`. 1875 tests / 1 skipped / 1
+failure, 959 s. The change under gate was frontend-only (no backend diff).
+Treated as residue: `surface-commit-stranding-warning-rulings.md` RULING 18.

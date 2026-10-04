@@ -54,8 +54,8 @@ All tasks in `SystemSpaceView.stranding-notice.test.tsx`; each observes the noti
 
 - [x] 6.1 Per-commit gate green (tiers 0 and 1 per `docs/testing-tiers.md`), including a verifying run of the seven other `SystemSpaceView*.test.tsx` files and `SystemSpaceView.burn-preview.test.tsx` with no edit to them
 - [x] 6.2 Before the run, QA names the closing assertion for each scenario in the delta
-- [ ] 6.3 Journey at the archive gate (tier 4), written after every task above is checked, one spec: commit a burn on a fixture that does not strand and see no notice on the command surface with the real wire omitting the field; cut the drive and see the command surface reflect it; keyed on the command surface, not the roster row; the stranding leg (notice present, removed on cut drive, absent after reload while the roster row shows the stranded indication) runs only if a fixture can arrange a stranding commit, otherwise it is recorded untested and never as passing; the `[journey-console]` update-depth assertion carried forward as a hard check
-- [ ] 6.4 Tier 4 at the archive gate with the tree locked, once, per `docs/testing-tiers.md`
-- [ ] 6.5 Tier 3 at the archive gate with the tree locked, per `docs/testing-tiers.md`
-- [ ] 6.6 The OpenSpec reconcile check (`harness/openspec-reconcile.py`), strict validation, and an archive rehearsal on a scratch copy of `openspec/`
+- [x] 6.3 Journey at the archive gate (tier 4), written after every task above is checked, one spec: commit a burn on a fixture that does not strand and see no notice on the command surface with the real wire omitting the field; cut the drive and see the command surface reflect it; keyed on the command surface, not the roster row; the stranding leg (notice present, removed on cut drive, absent after reload while the roster row shows the stranded indication) runs only if a fixture can arrange a stranding commit, otherwise it is recorded untested and never as passing; the `[journey-console]` update-depth assertion carried forward as a hard check
+- [x] 6.4 Tier 4 at the archive gate with the tree locked, once, per `docs/testing-tiers.md`
+- [x] 6.5 Tier 3 at the archive gate with the tree locked, per `docs/testing-tiers.md`
+- [x] 6.6 The OpenSpec reconcile check (`harness/openspec-reconcile.py`), strict validation, and an archive rehearsal on a scratch copy of `openspec/`
 - [ ] 6.7 After the real archive, restore any `## Purpose` the archiver discards from `openspec/specs/system-space-view/spec.md`

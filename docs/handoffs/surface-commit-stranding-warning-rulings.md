@@ -515,3 +515,49 @@ frequent false red.
 — out of the chain's fences and unspecced production code.
 
 **Reversal cost.** One journey leg once a deterministic fuel fixture exists.
+
+---
+
+## Ruling made at the archive gate (2026-10-04)
+
+### FULL-AUTO RULING 18 — tier 4 is green and tier 3's one red is residue of the filed `defect-station-order-500`, in a different test of the same file than the last occurrence; it does not hold the gate and nothing is rerun
+
+**Question.** The gate ran once (`surface-commit-stranding-warning-journey.md`):
+tier 4 26/26 in 387 s with the journey green; tier 3 1875 tests, 1 skipped,
+1 failure in 959 s —
+`TestSpawn_Scenario_ASeededHullCanReachItsHomeStationOnItsStartingFuel`
+(`backend/fuel_spawn_starting_fuel_e2e_test.go:53`): the fresh hull's default
+burn order to its home station answered 500, the backend logging `fleet:
+solving burn: space: endpoint at or inside the star-clearance radius`. The
+previous link's occurrence of the same defect was in a different test of that
+file (`…StartingFuelReachabilitySample`, `:236`), which passed this run. The
+rule for this run allows a red to be treated as residue only when it is the
+same assertion as the filed defect and touches none of this change's
+scenarios. Is this the same assertion?
+
+**Ruling.** Yes; residue. The defect is defined in its own file by its
+signature, not by one test: a bodyless 500 on `POST /v1/fleets/{id}/orders` for
+a burn to the home station, with exactly that sentinel in the backend log, and
+the file records it "in a different fuel test" on each of several occurrences
+("consistent with the arrival-phase intermittency this file already describes,
+and inconsistent with any per-test cause"), naming this same test file. This
+failure is that request, that status and that log line. It touches no scenario
+of this change, and it cannot be caused by it: `git diff b695eeb HEAD --
+backend` is empty — the change edits two frontend components. The occurrence is
+appended to the defect file. Tier 3 is not rerun: it ran once, and no revision
+round exists that could affect it. The other filed residue red
+(`space-double-submit.spec.ts:267`) did not fire.
+
+Stated so the caller can overrule it: the failing *test name* is not the one
+the delegation listed. The attribution rests on the request, status and
+sentinel matching the defect's recorded signature and on the empty backend
+diff, not on the name.
+
+**Basis.** The rule the caller stated for this run; the precedents
+`lift-burn-preview-to-view` RULING 23 and `add-vitals-strip` RULING 54;
+`docs/testing-tiers.md` ("never a confirming rerun").
+
+**Alternatives rejected.** Stopping the chain on a red the change cannot have
+produced. Rerunning tier 3 until green.
+
+**Reversal cost.** None.
