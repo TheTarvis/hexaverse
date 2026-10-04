@@ -610,3 +610,33 @@ for not adding a client-side cushion (a timer, forbidden by RULING 5).
 notion of when a mine ends.
 
 **Reversal cost.** None.
+
+---
+
+## Ruling made at verification (2026-10-04)
+
+### FULL-AUTO RULING 21 — QA's two unclosed clauses are carried live drift with filed owners, not FAILs of this change; the verdict is SHIP-PENDING-JOURNEY
+
+**Question.** QA (`lift-burn-preview-to-view-qa.md`, 29/29 PASS) notes that two
+clauses of the MODIFIED requirement are not true of the implementation: the
+previewed curve is not drawn (F1), and the preview does not clear when an order
+commits (F2). Is either a FAIL?
+
+**Ruling.** Neither. Both are sentences carried verbatim from the live spec
+that the code contradicted before this change, that this change neither
+introduces nor alters, and that it could not fix inside its stated Impact. Each
+has a filed drift record and an owning link: `drift-preview-curve-never-drawn.md`
+(link 4) and `drift-preview-does-not-clear-on-commit.md` (link 2a-iii,
+RULING 13). QA's F3 and F4 (polling with the canvas unavailable; Burn enabled
+toward the fleet's own host) are added to
+`followup-explain-withheld-burn-command.md`.
+
+**Basis.** Precedence 2 — workflow skill, drift handling: drift is adjudicated
+and routed to a corrective change, never patched in passing or silently
+reworded; a MODIFIED block must carry the live requirement whole.
+
+**Alternatives rejected.** Rewording the carried sentences to match the code —
+that is editing the spec to match drift. Fixing either here — RULINGs 7
+(add-burn-cost-overlay) and 13.
+
+**Reversal cost.** None.

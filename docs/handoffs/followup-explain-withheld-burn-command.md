@@ -71,3 +71,13 @@ probably `docked-fleet-actions` "Running Mine Gates the Fleet Panel's Commands"
   request sent at the ETA can be refused once and the panel shows the no-quote
   state and Retry until the next interval. Backend fix (settle a due mine on
   preview); outside the system-HUD chain's no-backend fence.
+
+## Added at verification (2026-10-04) — `lift-burn-preview-to-view-qa.md` F3, F4
+
+- **Canvas unavailable with a selection held:** the preview keeps being
+  requested every interval while Burn is disabled — a priced endpoint polled
+  with no consumer able to commit. The spec's withheld states are three; this
+  is not one of them, and no test pins it either way.
+- **Docked at the selected target:** Burn stays enabled with the (truthful)
+  uncapped label; a click is an own-host burn the server answers with the
+  zero-length 500.
