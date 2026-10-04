@@ -6,7 +6,7 @@ around the three surfaces Travis picked on 2026-09-08: the **in-system list**,
 vitals strip**. The scoping doc `../system-hud.md` is the model and carries
 the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
-**Status (2026-10-04): links 1, 2a and 2a-ii archived; 2a-iii
+**Status (2026-10-04): links 1, 2a and 2a-ii archived (2a-ii at `0f2ad5d`); 2a-iii
 (`clear-burn-preview-on-commit`) is next, `not authored`.** The link handed to
 the 2026-10-03 run as 2a-ii, `add-burn-cost-overlay`, was split twice in-run and
 is now 2a-iv: the preview lift went first as `lift-burn-preview-to-view`
@@ -48,7 +48,7 @@ symlink to it.
 | --- | --- | --- | --- | --- |
 | 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `a4471a3` |
 | 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | ✅ archived `e01b310` (2026-10-03); `fix-world-time-render-loop`, the out-of-chain fix for its gate blocker, archived alongside at `438923c` |
-| 2a-ii | `lift-burn-preview-to-view` | The burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props; two unenforced preview-request preconditions made true (running mine, docked at the target) | MODIFIED `system-space-view` (2: the burn preview, the failed-or-stale preview) | 🟡 authored r3 `e3fd54c` (2026-10-03) |
+| 2a-ii | `lift-burn-preview-to-view` | The burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props; two unenforced preview-request preconditions made true (running mine, docked at the target) | MODIFIED `system-space-view` (2: the burn preview, the failed-or-stale preview) | ✅ archived `0f2ad5d` (2026-10-04); authored r3 `e3fd54c`, built `3802b92`, gate `c773e26` |
 | 2a-iii | `clear-burn-preview-on-commit` | The preview clears when an order commits, with an end tied to the order's own life; the commit's stranding warning surfaced | MODIFIED `system-space-view` ("Burn Preview Reflects…", likely the double-submit requirement); `fleet-roster` drift closed | ⬜ not authored |
 | 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
@@ -442,7 +442,7 @@ it unavailable when docked at the target, is the filed follow-up
   request per interval; re-target mid-burn; select the docked fleet's own host
   and see no preview request and no 500; start a mine and see the quote go.
 
-**Taught.** Authored, built and archived in one full-auto run, 2026-10-03/04.
+**Taught.** Authored, built and archived (`0f2ad5d`) in one full-auto run, 2026-10-03/04.
 40 tasks; two MODIFIED blocks (20 and 9 scenarios, 16 of them new; three carried
 bodies edited); three adversary rounds, cap reached with no blocker; QA 29/29;
 tier 4 red once on the journey's own step 5 (a test misreading), green on the
