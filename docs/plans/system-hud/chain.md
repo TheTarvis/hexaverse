@@ -6,26 +6,18 @@ around the three surfaces Travis picked on 2026-09-08: the **in-system list**,
 vitals strip**. The scoping doc `../system-hud.md` is the model and carries
 the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
-**Status (2026-10-03): links 1 and 2a archived; the chain is unblocked and
-2a-ii is next.** `add-figure-formatting` archived at `a4471a3`.
-`add-vitals-strip` archived on 2026-10-03 at `e01b310`, and the out-of-chain fix
-that unblocked it, `fix-world-time-render-loop`, archived immediately after it
-at `438923c`, in that order. 2a's gate had been red on one leg since
-2026-09-09 — the strip's **cross-system chevron navigation** never committed
-inside 20 s. That was diagnosed on 2026-09-19 as a product defect that predates
-the strip (world time held in React state re-rendered the whole view every
-frame and starved App Router transitions), specified and fixed by
-`fix-world-time-render-loop`, and closed on 2026-10-03 by a dedicated
-20-of-20 run of the journey with zero update-depth diagnostics
-(`../../handoffs/defect-cross-system-chevron-nav-stall.md`, now CLOSED). The
-gate that archived both: tier 4 23 passed / 1 failed in ~5 minutes, the one red
-being the filed `defect-spawn-system-single-body`; tier 3 green in ~17 minutes
-(`../../handoffs/add-vitals-strip-journey.md`,
-`../../handoffs/fix-world-time-render-loop-journey.md`). Links 2a-ii onward
-remain `not authored`; the full-auto rule authors each one only after its
-predecessor archives, so **2a-ii (`add-burn-cost-overlay`) can now be
-authored** against a `system-console` capability that exists in
-`openspec/specs/`.
+**Status (2026-10-04): links 1, 2a and 2a-ii archived; 2a-iii
+(`clear-burn-preview-on-commit`) is next, `not authored`.** The link handed to
+the 2026-10-03 run as 2a-ii, `add-burn-cost-overlay`, was split twice in-run and
+is now 2a-iv: the preview lift went first as `lift-burn-preview-to-view`
+(archived, this run), and the commit-clear its review could not get right inside
+the cap became 2a-iii. Earlier history: `add-figure-formatting` archived at
+`a4471a3`; `add-vitals-strip` archived on 2026-10-03 at `e01b310`, with the
+out-of-chain `fix-world-time-render-loop` that unblocked it at `438923c`
+(`../../handoffs/defect-cross-system-chevron-nav-stall.md`, CLOSED;
+`../../handoffs/add-vitals-strip-journey.md`,
+`../../handoffs/fix-world-time-render-loop-journey.md`). The full-auto rule
+authors each remaining link only after its predecessor archives.
 
 **No backend work anywhere in this chain.** Every figure the HUD shows is
 served today — burn preview, roster, credits, market board, scan targets,
@@ -447,8 +439,72 @@ it unavailable when docked at the target, is the filed follow-up
   Server-Solved Order, Without Committing" and "A Failed or Stale Preview Is
   Never Presented as a Current Quote".
 - **Journey:** select a target and read the quote in the panel; one preview
-  request per interval; select the docked fleet's own host and see no preview
-  request and no 500.
+  request per interval; re-target mid-burn; select the docked fleet's own host
+  and see no preview request and no 500; start a mine and see the quote go.
+
+**Taught.** Authored, built and archived in one full-auto run, 2026-10-03/04.
+40 tasks; two MODIFIED blocks (20 and 9 scenarios, 16 of them new; three carried
+bodies edited); three adversary rounds, cap reached with no blocker; QA 29/29;
+tier 4 red once on the journey's own step 5 (a test misreading), green on the
+one rerun (25/25, 388 s); tier 3 once, 1042 s, one red = the filed
+`defect-station-order-500`. Records: `../../handoffs/lift-burn-preview-to-view-*`.
+
+- **The link was three links, and review found the seams the analyst could
+  not.** The analyst's seam (lift vs overlay) held. The second seam — the
+  commit-clear — only appeared when the adversary showed the stored-pair design
+  outlives the order (cut drive, stop, arrival at a point). **A clause the live
+  spec states in one sentence with no scenario ("SHALL clear when an order
+  commits") is not a small fix; it is an unspecified feature.** Expect the same
+  of every unscenarioed SHALL a later link is told to "make true".
+- **A rule that sounds like a tidy-up can be the whole change.** "The burn
+  command is offered exactly where a preview is requested" took the link from
+  32 tasks to 49 across two reviews — two more MODIFIED blocks, reason copy, a
+  single-reader refactor of `FleetActionsPanel`. It is filed, whole, as
+  `../../handoffs/followup-explain-withheld-burn-command.md`. **When the panel
+  wants a principle and the link wants a fix, ship the fix and file the
+  principle** — but say out loud what the narrowing costs: here, a fleet docked
+  at its selected target lost its "No quote" hint and now shows only an
+  uncapped label over a Burn that 500s. That is the ordinary state after every
+  arrival, and the best reason to author the follow-up soon.
+- **"As last read" beats "while".** Every precondition was first written as
+  world truth ("while a mine holds the channel") and every one was unsatisfiable
+  as written, because the client knows the world only through reads. The text
+  that survived says *as the view last read it*, states the lag as a bound, and
+  names which two things share one value. Links 2a-iv and 4 project the same
+  quote; write their lifetimes the same way.
+- **Withholding a query is not clearing it.** A disabled React Query observer
+  keeps its data; re-enabling re-presents the old answer as current. The
+  resumed-preview rule (starts empty, requested at the transition) exists
+  because of that and was missed for two rounds. **Any link that gates a read on
+  a state that can toggle back needs the same question asked: what is shown at
+  the moment it resumes?**
+- **Lifting state moves a derivation out from under its only test.** The panel
+  test had been the only observer of `preview && !stale`; after the lift the
+  test supplies that value by hand. The round-3 MAJOR was exactly this, and it
+  is lesson two of the handoffs README again. Link 4 lifts and re-homes far more
+  — for each derivation that moves, name the test that observes it at its new
+  home.
+- **The doc's "what the harness migration costs" was wrong in the cheap
+  direction this time.** 34 tests, 23 `previewState` references, as stated — but
+  no post-render mutation anywhere, one `panel()` helper, 11 arrange steps. The
+  cost had moved to view-level tests that did not exist. Sizing against the test
+  files still held; the files were just not the ones named.
+- **Two surfaces, one fact, two readers — and the journey found it in 109 ms.**
+  The fleet panel's mine countdown runs off a commit-local ETA; the view's
+  preview flag runs off the running-action read. The journey's first step-5
+  assertion keyed on the countdown and went red on one snapshot in 22. The
+  product was right and the test had read the wrong surface. **Key a journey's
+  window on the surface the requirement binds, and log every snapshot's index
+  before asserting on any of them.**
+- **The design canvas is reachable.** The mock both docs cite lives in a
+  claude.ai artifact, not the repo; the analyst listed two hard-stop candidates
+  because it could not read it. The orchestrator can (Artifact read). 2a-iv's
+  geometry ruling was settled that way — its orchestrator should re-read the
+  mock rather than trust the recorded reading.
+- **Gate economics held.** Tier 4 ~6 min, tier 3 ~17 min, quiet windows found by
+  waiting for the one-minute load to fall under 4; no SIGTERM. The
+  random-spawn fixture red (`defect-spawn-system-single-body`) fired on run 1
+  and not on run 2, as a random draw would.
 
 ## Link 2a-iii — `clear-burn-preview-on-commit`
 

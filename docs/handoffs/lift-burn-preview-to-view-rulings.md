@@ -640,3 +640,79 @@ that is editing the spec to match drift. Fixing either here — RULINGs 7
 (add-burn-cost-overlay) and 13.
 
 **Reversal cost.** None.
+
+---
+
+## Rulings made at the archive gate (2026-10-04)
+
+Gate record: `lift-burn-preview-to-view-journey.md`. Run 1: tier 4 23 passed /
+2 failed in 366 s; tier 3 1874 passed / 1 skipped / 1 failed in 1042 s; no
+SIGTERM, no uniform-failure signature, load under 4 at each start.
+
+### FULL-AUTO RULING 22 — the journey's own red (step 5: a quote figure in one snapshot beside the mine countdown) is triaged as a test-side misreading of "as the view last read it"; the one batched revision is to the journey, followed by the one rerun
+
+**Question.** `burn-preview-journey.spec.ts:361`: of 22 atomic DOM snapshots
+with `mine-countdown` showing, one still rendered quote figures. Product defect
+or test misreading?
+
+**Ruling.** Test-side, on this evidence: `mine-countdown` is rendered by
+`FleetActionsPanel` from its own derivation — `running ?? committedEta`
+(`FleetActionsPanel.tsx:148-150`), where `committedEta` is local state set from
+the mine commit's response — so the countdown appears *before* the view's
+running-action read has answered. The requirement this change wrote says the
+preview is withheld while a mine holds the channel "as the view last read it",
+states the lag, and fixes one value only between the preview flag and the
+*command surface's* Burn gate (RULING 16 item 2). The journey keyed its "mine is
+known" window on the fleet panel's countdown, a second derivation the spec does
+not bind (it is the known two-reader issue filed in
+`followup-explain-withheld-burn-command.md`). In the view itself the figures
+cannot outlive the flag: the hook returns no quote in the same render in which
+it is disabled.
+
+The batched revision round is therefore SDET-only: the journey's mine window is
+keyed on the command surface's own state (the burn command unavailable under
+the mine — the value the spec binds), each snapshot's index and state are
+logged, and the countdown-vs-figures overlap is recorded as an observation
+bounded by the view's read, not asserted to be zero. No spec clause is revised,
+so there is no writer pass and no adversary spot-check; no production code
+changes. Then the single rerun of tier 4. **If the rerun shows a figure in any
+snapshot where the burn command is unavailable under the mine, or a preview
+request in that window, that is a product red and the run stops unarchived.**
+
+**Basis.** Precedence 2 — `docs/testing-tiers.md` and the workflow skill's
+journey-red rule: every finding from the run goes into one batched revision
+round, then one rerun; a written test changes only for a spec change or a test
+that provably misreads the spec, and only by the SDET. The misreading is
+provable from the requirement text and `FleetActionsPanel.tsx:148-150`.
+
+**Alternatives rejected.** Tolerating "the first snapshot" blindly (the SDET's
+fallback) — it would also hide a real late-landing response. Changing
+production code to make the fleet panel and the view agree — that is the
+deferred single-reader refactor (RULING 16), outside this change's Impact.
+
+**Reversal cost.** One journey step.
+
+### FULL-AUTO RULING 23 — the two other reds are residue of filed, out-of-chain defects that touch no scenario of this change, and do not hold the gate
+
+**Question.** Tier 4 `space-double-submit.spec.ts:267` ("a generated system
+carries several ordinary bodies", expected > 1, received 1); tier 3
+`TestSpawn_Scenario_StartingFuelReachabilitySample` (bodyless 500 on
+`POST /orders`, "endpoint at or inside the star-clearance radius").
+
+**Ruling.** Residue, both. The first is the identical assertion and message
+recorded in `defect-spawn-system-single-body.md` (a fixture asserting on a
+random spawn draw) — the same red the previous gate archived under
+`add-vitals-strip` RULING 54. The second matches `defect-station-order-500.md`
+line for line and is backend; this change edits three frontend files. Neither
+touches a scenario of this change. Each occurrence is appended to its defect
+file. Tier 3 is not rerun: it ran once, as `docs/testing-tiers.md` requires,
+and nothing in the batched revision can affect it.
+
+**Basis.** The rule the caller stated for this run (a red attributed to a
+filed, out-of-chain defect that touches no scenario of the change is residue,
+only if it is that same assertion), and the `add-vitals-strip` RULING 54
+precedent.
+
+**Alternatives rejected.** Rerunning until green — "never a confirming rerun".
+
+**Reversal cost.** None.

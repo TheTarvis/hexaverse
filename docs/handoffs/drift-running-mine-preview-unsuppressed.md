@@ -1,6 +1,6 @@
 # Drift — the running-mine preview suppression is specified, tested, and never wired
 
-**Status:** confirmed, adjudicated **code wrong**, deferred by one chain link.
+**Status:** **CLOSED 2026-10-04** by `lift-burn-preview-to-view` (commit `3802b92`). Was: confirmed, adjudicated **code wrong**, deferred by one chain link.
 **Found:** 2026-09-09, by the `add-vitals-strip` design analyst reading
 `SpaceCommandPanel.tsx` against the live `system-space-view` spec.
 **Owner:** the `add-burn-cost-overlay` change (link 2a-ii of the system-HUD
@@ -69,3 +69,19 @@ commitWouldBeAccepted: !!acting && !acting.jump && !mineRunning
 with a **view-level** test — one that observes the argument the real call site
 passes, not one that passes the flag into the hook by hand. A test that mocks
 the hook cannot close this finding.
+
+## Closed — 2026-10-04
+
+Fixed at the lifted call site by `lift-burn-preview-to-view` (`3802b92`):
+`SystemSpaceView.tsx` passes `!!acting && !acting.jump && !mineRunning &&
+!dockedAtTarget` as the hook's flag, and `SpaceCommandPanel` no longer calls the
+hook at all. **Closing test** (view-level, hook unmocked, selection made first):
+`frontend/components/space/SystemSpaceView.burn-preview.test.tsx` tasks 3.1–3.5
+and 3.16 — 3.1 asserts zero `fleetService.preview` calls across three refresh
+intervals with a mine known; `frontend/hooks/use-burn-preview.call-site.test.ts`
+pins the single call site. Corroborated end to end by
+`frontend/e2e/tests/burn-preview-journey.spec.ts` step 5 (zero `orders/preview`
+POSTs while the command surface is mine-held;
+`lift-burn-preview-to-view-journey.md`, run 2). Residual, by design and stated
+in the requirement: a mine the view has not yet read costs at most the requests
+until that read answers.

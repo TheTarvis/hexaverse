@@ -309,3 +309,12 @@ that clause was correct.
 preview arm too, and should treat "deterministic geometry refusal" as one
 response-shape decision across both routes rather than mapping sentinels one at
 a time.
+
+## Occurrence — 2026-10-04, `lift-burn-preview-to-view` archive gate, tier 3
+
+`TestSpawn_Scenario_StartingFuelReachabilitySample`
+(`fuel_spawn_starting_fuel_e2e_test.go:236`): "sample account #0: default order
+to home station rejected (status = 500)"; log `fleet: solving burn: space:
+endpoint at or inside the star-clearance radius`. 1874 passed / 1 skipped / 1
+failed in 1042 s. The change under gate was frontend-only. Residue under
+`lift-burn-preview-to-view-rulings.md` FULL-AUTO RULING 23.

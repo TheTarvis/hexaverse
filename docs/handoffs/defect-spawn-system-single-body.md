@@ -60,3 +60,10 @@ The only red of the run. Ruled residue, not a gate stop
 (`add-vitals-strip-rulings.md` FULL-AUTO RULING 54). Three occurrences in four
 completed gate runs: the tier-4 fixture policy for random spawns is now the
 suite's most frequent red and is still unchosen.
+
+## Occurrence — 2026-10-04, `lift-burn-preview-to-view` archive gate, tier 4 run 1
+
+`space-double-submit.spec.ts:267` (`:277`), "a generated system carries several
+ordinary bodies": Expected > 1, Received 1. Same assertion, same message. 23
+passed / 2 failed in 366 s; no SIGTERM. Treated as residue under
+`lift-burn-preview-to-view-rulings.md` FULL-AUTO RULING 23.

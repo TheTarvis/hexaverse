@@ -1,6 +1,6 @@
 # Defect — a fleet docked at its selected target polls a zero-length burn preview, 500 every 10s
 
-**Status:** open, **reproducible** (unlike most entries here, this one was
+**Status:** **CLOSED 2026-10-04** by `lift-burn-preview-to-view` (commit `3802b92`). Was: open, **reproducible** (unlike most entries here, this one was
 reproduced live, not inferred from a log).
 **Found:** 2026-09-09, by the developer diagnosing `add-vitals-strip`'s archive
 gate on a live e2e stack.
@@ -59,3 +59,21 @@ A `system-space-view` or `system-console` requirement stating when a preview is
 *not* requested, with the docked-at-target case named. Until then this note is
 live: the cause is checkable in one step — dock a fleet at its selected host and
 watch the network tab.
+
+## Closed — 2026-10-04
+
+Fixed by shape 2 (`lift-burn-preview-to-view-rulings.md` RULING 3), commit
+`3802b92`: no preview is requested while the selected body is the one the acting
+fleet is attached to (`dockedAtTarget` in `SystemSpaceView.tsx`; both ids must be
+present, so a point selection never matches). The requirement now names the
+case: `system-space-view` *Burn Preview Reflects the Server-Solved Order, Without
+Committing*, scenario "A fleet docked at its selected target requests no
+preview". **Closing tests:** `SystemSpaceView.burn-preview.test.tsx` task 3.7
+(station, gate and plain-body hosts: no request across three intervals) and,
+against the real backend, `burn-preview-journey.spec.ts` step 4 (zero
+`orders/preview` POSTs and zero 5xx over 22 s with the own host selected).
+
+**Not closed by this:** the server still answers 500 to a zero-length burn, and
+the burn command stays enabled toward the fleet's own host —
+`defect-zero-length-burn-returns-500.md` and
+`followup-explain-withheld-burn-command.md`.
