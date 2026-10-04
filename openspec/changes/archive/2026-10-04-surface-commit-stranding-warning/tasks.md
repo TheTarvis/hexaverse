@@ -48,7 +48,7 @@ All tasks in `SystemSpaceView.stranding-notice.test.tsx`; each observes the noti
 ## 5. Records
 
 - [x] 5.1 Update `docs/handoffs/drift-commit-stranding-warning-not-rendered.md`: closed for the burn command's commit with the closing tests of section 3 and the commit; left open for the stop command by pointing at `drift-stop-stranding-warning-not-rendered.md`; correct the stale line reference to `SpaceCommandPanel.tsx:280-284`
-- [ ] 5.2 Update `docs/plans/system-hud/chain.md` for the link: status, the one ADDED requirement and its scenario count, the Taught record (including: the order record exists for warned orders only, so link 2a-iii-b must not assume one for an ordinary commit; link 2b must keep `SpaceCommandPanel` mounted across tab changes or lift `useOrder`; a commit whose response lands after the panel unmounts shows neither its success feedback, its warning toast nor its stranding notice), and that the `fleet-roster` drift is closed for the burn command only
+- [x] 5.2 Update `docs/plans/system-hud/chain.md` for the link: status, the one ADDED requirement and its scenario count, the Taught record (including: the order record exists for warned orders only, so link 2a-iii-b must not assume one for an ordinary commit; link 2b must keep `SpaceCommandPanel` mounted across tab changes or lift `useOrder`; a commit whose response lands after the panel unmounts shows neither its success feedback, its warning toast nor its stranding notice), and that the `fleet-roster` drift is closed for the burn command only
 
 ## 6. Validation and gate
 
@@ -58,4 +58,4 @@ All tasks in `SystemSpaceView.stranding-notice.test.tsx`; each observes the noti
 - [x] 6.4 Tier 4 at the archive gate with the tree locked, once, per `docs/testing-tiers.md`
 - [x] 6.5 Tier 3 at the archive gate with the tree locked, per `docs/testing-tiers.md`
 - [x] 6.6 The OpenSpec reconcile check (`harness/openspec-reconcile.py`), strict validation, and an archive rehearsal on a scratch copy of `openspec/`
-- [ ] 6.7 After the real archive, restore any `## Purpose` the archiver discards from `openspec/specs/system-space-view/spec.md`
+- [x] 6.7 After the real archive, restore any `## Purpose` the archiver discards from `openspec/specs/system-space-view/spec.md`
