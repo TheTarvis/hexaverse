@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 
@@ -57,7 +57,14 @@ vi.mock('@/hooks/use-fleets', async () => {
 
 const toastError = vi.fn()
 const toastSuccess = vi.fn()
-vi.mock('@/lib/toast', () => ({ toast: { error: (m: string) => toastError(m), success: (m: string) => toastSuccess(m) } }))
+const toastWarning = vi.fn()
+vi.mock('@/lib/toast', () => ({
+  toast: {
+    error: (m: string) => toastError(m),
+    success: (m: string) => toastSuccess(m),
+    warning: (m: string) => toastWarning(m),
+  },
+}))
 
 import { SpaceCommandPanel } from './SpaceCommandPanel'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
@@ -694,4 +701,243 @@ describe('SpaceCommandPanel — burn target selection is unreachable without the
       /body|gate|point/,
     )
   })
+})
+
+// ===========================================================================
+// openspec change `surface-commit-stranding-warning` (tasks.md 1.1-1.5; impl
+// contract §5) — the panel's commit report, its advisory toast and its static
+// notice. Red until task 4.1. The new props are passed through the `panel()`
+// spread and a spread element for re-renders, so `tsc` is clean before 4.1.
+// The copy is asserted as LITERAL strings, never an imported constant.
+// ===========================================================================
+
+const NOTICE_COPY =
+  'Your current course leaves this fleet unable to reach any station or lane gate. Place a different order to change it.'
+const TOAST_COPY = 'This course leaves the fleet unable to reach a station or lane gate.'
+
+const CAP_REJECTION = Object.assign(new Error('rejected'), {
+  data: { error: 'fleet: solved fuel cost exceeds the requested maxFuelTons cap' },
+})
+
+function acceptedFleet(over: Record<string, unknown> = {}) {
+  return {
+    ...FLEET,
+    state: {
+      Mode: 0,
+      Park: null,
+      Drift: null,
+      Burn: { ...QUOTE, DepartMs: T0 + 1000, ArriveMs: T0 + 61000, DeltaV: QUOTE.deltaV },
+    },
+    ...over,
+  }
+}
+
+type Held = { onSuccess?: (d: unknown) => void; onError?: (e: unknown) => void }
+
+function holdResponse(): { get: () => Held } {
+  let held: Held = {}
+  order.mutate.mockImplementation((_v: unknown, opts?: Held) => {
+    held = opts ?? {}
+  })
+  return { get: () => held }
+}
+
+const panelElement = (over: Record<string, unknown>) => (
+  <SpaceCommandPanel
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fleet={FLEET as any}
+    selection={{ bodyId: 'feat-body-3' }}
+    canvasAvailable
+    worldTime={T0}
+    scale={1}
+    preview={QUOTE}
+    currentQuote={QUOTE}
+    previewStale={false}
+    previewNoQuote={false}
+    onRequote={onRequote}
+    {...over}
+  />
+)
+
+describe('SpaceCommandPanel — the commit report (surface-commit-stranding-warning 1.1)', () => {
+  // 1.1
+  it('Scenario: A response that lands after the acting fleet changed belongs to the fleet that committed — the callback carries the fleet the command was invoked for, the instants and the warning', async () => {
+    const onCommitAccepted = vi.fn()
+    const held = holdResponse()
+    const { rerender } = render(panelElement({ onCommitAccepted }))
+    await userEvent.click(screen.getByTestId('burn-button'))
+    expect(order.mutate, 'GIVEN: the command was invoked once').toHaveBeenCalledTimes(1)
+    expect(order.mutate.mock.calls[0][0].fleetId, 'GIVEN: invoked for fleet_1').toBe('fleet_1')
+
+    rerender(panelElement({ onCommitAccepted, fleet: { ...FLEET, id: 'fleet_2' } }))
+    expect(onCommitAccepted, 'GIVEN: nothing is reported before the response lands').not.toHaveBeenCalled()
+
+    act(() => held.get().onSuccess?.(acceptedFleet({ strandingWarning: true })))
+
+    expect(onCommitAccepted).toHaveBeenCalledTimes(1)
+    expect(onCommitAccepted).toHaveBeenCalledWith({
+      fleetId: 'fleet_1',
+      departMs: T0 + 1000,
+      arriveMs: T0 + 61000,
+      strandingWarning: true,
+    })
+  })
+})
+
+describe('SpaceCommandPanel — an unwarned commit (surface-commit-stranding-warning 1.2)', () => {
+  // 1.2
+  it.each([
+    ['the stranding field absent', {}],
+    ['the stranding field false', { strandingWarning: false }],
+  ] as const)(
+    'Scenario: A response without the stranding field shows no notice — %s reports no warning, fires no warning toast, one success toast',
+    async (_arm, extra) => {
+      const onCommitAccepted = vi.fn()
+      const held = holdResponse()
+      render(panelElement({ onCommitAccepted }))
+      await userEvent.click(screen.getByTestId('burn-button'))
+      act(() => held.get().onSuccess?.(acceptedFleet(extra)))
+
+      expect(onCommitAccepted).toHaveBeenCalledTimes(1)
+      expect(onCommitAccepted).toHaveBeenCalledWith({
+        fleetId: 'fleet_1',
+        departMs: T0 + 1000,
+        arriveMs: T0 + 61000,
+        strandingWarning: false,
+      })
+      expect(toastWarning).not.toHaveBeenCalled()
+      expect(toastSuccess).toHaveBeenCalledTimes(1)
+      expect(toastError).not.toHaveBeenCalled()
+    },
+  )
+})
+
+describe('SpaceCommandPanel — a rejected or failed commit reports nothing (surface-commit-stranding-warning 1.3)', () => {
+  // 1.3 — the control leg (a successful commit DOES call the callback) is what
+  // makes the "not called after the rejection" half non-vacuous.
+  it.each([
+    ['a cap rejection', CAP_REJECTION],
+    ['a failure with no mapped reason', new Error('API Error: 500 Internal Server Error')],
+  ] as const)(
+    'Scenario: A rejected or failed commit shows no notice and leaves an earlier one alone — %s does not call the callback',
+    async (_arm, failure) => {
+      const onCommitAccepted = vi.fn()
+      const held = holdResponse()
+      render(panelElement({ onCommitAccepted }))
+
+      await userEvent.click(screen.getByTestId('burn-button'))
+      act(() => held.get().onSuccess?.(acceptedFleet({ strandingWarning: true })))
+      expect(onCommitAccepted, 'CONTROL: an accepted commit calls the callback once').toHaveBeenCalledTimes(1)
+      expect(toastWarning).toHaveBeenCalledTimes(1)
+      toastError.mockClear()
+
+      await userEvent.click(screen.getByTestId('burn-button'))
+      expect(order.mutate, 'GIVEN: a second command was invoked').toHaveBeenCalledTimes(2)
+      act(() => held.get().onError?.(failure))
+
+      expect(onCommitAccepted, 'the rejection reports nothing').toHaveBeenCalledTimes(1)
+      expect(toastError, 'the existing error copy is unchanged: one error toast').toHaveBeenCalledTimes(1)
+      const shown = String(toastError.mock.calls[0][0])
+      expect(shown).not.toMatch(/API Error|500|Internal Server|^fleet:/)
+      expect(toastWarning, 'no second advisory toast').toHaveBeenCalledTimes(1)
+    },
+  )
+})
+
+describe('SpaceCommandPanel — the notice element (surface-commit-stranding-warning 1.4)', () => {
+  // 1.4
+  it.each([
+    ['the default preview props', {}],
+    ['no preview and no quote', { preview: null, currentQuote: null }],
+  ] as const)(
+    'Scenario: The notice is advisory and distinct from the preview\'s stranding line — commitStrandingNotice true with %s renders a static line below Burn',
+    (_arm, over) => {
+      panel({ commitStrandingNotice: true, ...over })
+      const notice = screen.getByTestId('commit-stranding-notice')
+      expect(notice).toBeInTheDocument()
+      expect(notice.textContent).toBe(NOTICE_COPY)
+      const burnBtn = screen.getByTestId('burn-button')
+      expect(
+        burnBtn.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'the Burn control precedes the notice',
+      ).toBeTruthy()
+      expect(notice.hasAttribute('role'), 'no alert/status role of its own').toBe(false)
+      expect(notice.closest('[aria-live],[role="alert"],[role="status"]'), 'outside any live region').toBeNull()
+      expect(notice.querySelector('button'), 'no dismiss control').toBeNull()
+      expect(notice.className, 'no error treatment').not.toMatch(/red|rose/)
+      expect(screen.getByTestId('burn-button'), 'the Burn control is still present').toBeInTheDocument()
+    },
+  )
+
+  it('Scenario: The notice is advisory and distinct from the preview\'s stranding line — false and omitted render nothing, while true renders it', () => {
+    const { rerender } = render(panelElement({ commitStrandingNotice: true }))
+    expect(screen.queryByTestId('commit-stranding-notice'), 'GIVEN: true renders it').not.toBeNull()
+    rerender(panelElement({ commitStrandingNotice: false }))
+    expect(screen.queryByTestId('commit-stranding-notice'), 'false renders nothing').toBeNull()
+    rerender(panelElement({ commitStrandingNotice: true }))
+    expect(screen.queryByTestId('commit-stranding-notice'), 'GIVEN again: true renders it').not.toBeNull()
+    rerender(panelElement({}))
+    expect(screen.queryByTestId('commit-stranding-notice'), 'omitted renders nothing').toBeNull()
+  })
+
+  // Revision (ruling 16, QA Matrix B clause "SHALL NOT remove, disable or
+  // re-order the burn control"): the burn control's disabled state is the same
+  // with and without the notice, in both an available and an unavailable arm.
+  it.each([
+    ['available (a body selected)', { selection: { bodyId: 'feat-body-3' } }, false],
+    ['unavailable (nothing selected)', { selection: null }, true],
+  ] as const)(
+    'Scenario: The notice is advisory and distinct from the preview\'s stranding line — the notice does not change the burn control\'s disabled state, %s',
+    (_arm, over, expectedDisabled) => {
+      const burnDisabled = () => (screen.getByTestId('burn-button') as HTMLButtonElement).disabled
+      const { rerender } = render(panelElement({ ...over }))
+      expect(burnDisabled(), 'GIVEN: the control state without the notice').toBe(expectedDisabled)
+      rerender(panelElement({ ...over, commitStrandingNotice: true }))
+      expect(screen.queryByTestId('commit-stranding-notice'), 'GIVEN: the notice is shown').not.toBeNull()
+      expect(burnDisabled(), 'the notice neither disables nor enables the control').toBe(expectedDisabled)
+      rerender(panelElement({ ...over, commitStrandingNotice: false }))
+      expect(burnDisabled(), 'removal leaves the state unchanged').toBe(expectedDisabled)
+    },
+  )
+
+  it('SDET-added: the notice is a separate element from the preview stranding line when both show', () => {
+    const stranding = { ...QUOTE, strandingWarning: true }
+    panel({ preview: stranding, currentQuote: stranding, commitStrandingNotice: true })
+    const line = screen.getByTestId('preview-stranding')
+    const notice = screen.getByTestId('commit-stranding-notice')
+    expect(line).not.toBe(notice)
+    expect(line.contains(notice)).toBe(false)
+    expect(notice.contains(line)).toBe(false)
+  })
+})
+
+describe('SpaceCommandPanel — the advisory toast (surface-commit-stranding-warning 1.5)', () => {
+  // 1.5
+  it.each([
+    ['the panel still holding fleet_1', 'fleet_1'],
+    ['the panel re-rendered with fleet_2 before the response', 'fleet_2'],
+  ] as const)(
+    'Scenario: The warning is conveyed once, at the acceptance — a warned response with %s fires one warning toast, no error toast, one success toast',
+    async (_arm, holding) => {
+      const held = holdResponse()
+      const { rerender } = render(panelElement({}))
+      await userEvent.click(screen.getByTestId('burn-button'))
+      if (holding === 'fleet_2') rerender(panelElement({ fleet: { ...FLEET, id: 'fleet_2' } }))
+      expect(toastWarning, 'GIVEN: no warning before the response').not.toHaveBeenCalled()
+
+      act(() => held.get().onSuccess?.(acceptedFleet({ strandingWarning: true })))
+
+      expect(toastWarning).toHaveBeenCalledTimes(1)
+      expect(toastWarning).toHaveBeenCalledWith(TOAST_COPY)
+      expect(toastError).not.toHaveBeenCalled()
+      // Scenario: The success feedback is not suppressed by the notice
+      expect(toastSuccess).toHaveBeenCalledTimes(1)
+      expect(String(toastSuccess.mock.calls[0][0])).toContain('in 1m')
+      const warned = String(toastWarning.mock.calls[0][0])
+      expect(warned).toMatch(/station/i)
+      expect(warned).toMatch(/lane gate/i)
+      expect(warned).not.toMatch(/\d/)
+      expect(warned).not.toMatch(/strand/i)
+    },
+  )
 })

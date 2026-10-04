@@ -57,7 +57,7 @@ import type { Sighting } from '@/lib/types/sighting'
 import { FleetActionsPanel } from './FleetActionsPanel'
 import { ScanControl } from './ScanControl'
 import { SightingLog } from './SightingLog'
-import { SpaceCommandPanel } from './SpaceCommandPanel'
+import { SpaceCommandPanel, type AcceptedBurnCommit } from './SpaceCommandPanel'
 import { SpaceStage } from './SpaceStage'
 import { buildSceneModel } from './space-scene'
 import { toggleSelection, type SpaceSelection } from './space-selection'
@@ -241,6 +241,14 @@ function SightingsGhostFeed({
   return null
 }
 
+interface WarnedOrder {
+  departMs: number | null
+  arriveMs: number | null
+  /** own-fleets dataUpdateCount at acceptance; null when the read the commit
+   *  started had already answered; undefined only when the query has no state */
+  readsAtAcceptance: number | null | undefined
+}
+
 export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const router = useRouter()
   const interior = useSystemSpace(systemId)
@@ -264,6 +272,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const [canvasAvailable, setCanvasAvailable] = useState(true)
   const [firstFrame, setFirstFrame] = useState(false)
   const [announcement, setAnnouncement] = useState('')
+  const [warnedOrders, setWarnedOrders] = useState<Record<string, WarnedOrder>>({})
 
   // --- add-scan-and-sightings-surface: the ghost layer's pile, the log
   //     drawer, and the row<->ghost cross-highlight ------------------------
@@ -335,6 +344,27 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // React Query hook at all (several suites render it standalone, with no
   // `QueryClientProvider` in the tree), so this owns the read/write both.
   const qc = useQueryClient()
+  const handleCommitAccepted = useCallback(
+    (commit: AcceptedBurnCommit) => {
+      if (!commit.strandingWarning) {
+        setWarnedOrders((current) => {
+          if (!(commit.fleetId in current)) return current
+          const next = { ...current }
+          delete next[commit.fleetId]
+          return next
+        })
+        return
+      }
+      const state = qc.getQueryState(queryKeys.fleets.mine())
+      const answered = state?.fetchStatus === 'idle' && state.status === 'success'
+      const readsAtAcceptance = answered ? null : state?.dataUpdateCount
+      setWarnedOrders((current) => ({
+        ...current,
+        [commit.fleetId]: { departMs: commit.departMs, arriveMs: commit.arriveMs, readsAtAcceptance },
+      }))
+    },
+    [qc],
+  )
   const actingRunningScan = useRunningScan(acting?.id ?? null)
   const commitPendingMarker = useQuery<number | null>({
     queryKey: queryKeys.fleets.scanCommitPending(acting?.id ?? ''),
@@ -747,6 +777,19 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     commitWouldBeAccepted: previewWanted,
   })
   const currentQuote = burnPreview.preview && !burnPreview.stale ? burnPreview.preview : null
+  const warnedOrder = acting ? warnedOrders[acting.id] : undefined
+  const fleetReadCount = qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount
+  const awaitingRead =
+    !!warnedOrder && warnedOrder.readsAtAcceptance !== null && fleetReadCount === warnedOrder.readsAtAcceptance
+  const actingBurn = acting?.state?.Mode === 0 ? acting.state.Burn : null
+  const stillRunning =
+    !!warnedOrder &&
+    !!actingBurn &&
+    warnedOrder.departMs !== null &&
+    warnedOrder.arriveMs !== null &&
+    actingBurn.DepartMs === warnedOrder.departMs &&
+    actingBurn.ArriveMs === warnedOrder.arriveMs
+  const commitStrandingNotice = awaitingRead || stillRunning
   const showLoading = !interiorFailed && canvasAvailable && (interior.isLoading || !firstFrame)
 
   return (
@@ -916,6 +959,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           previewStale={burnPreview.stale}
           previewNoQuote={burnPreview.noQuote}
           onRequote={burnPreview.retry}
+          onCommitAccepted={handleCommitAccepted}
+          commitStrandingNotice={commitStrandingNotice}
         />
 
         <FleetActionsPanel

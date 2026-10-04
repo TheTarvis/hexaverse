@@ -48,6 +48,18 @@ export interface GateFacts {
   destSystemId: string
 }
 
+export interface AcceptedBurnCommit {
+  fleetId: string
+  departMs: number | null
+  arriveMs: number | null
+  strandingWarning: boolean
+}
+
+const COMMIT_STRANDING_NOTICE_COPY =
+  'Your current course leaves this fleet unable to reach any station or lane gate. Place a different order to change it.'
+const COMMIT_STRANDING_TOAST_COPY =
+  'This course leaves the fleet unable to reach a station or lane gate.'
+
 export interface SpaceCommandPanelProps {
   /** The acting fleet. */
   fleet: Fleet | null
@@ -78,6 +90,10 @@ export interface SpaceCommandPanelProps {
   previewNoQuote: boolean
   /** Re-requests the quote (the preview hook's retry). */
   onRequote: () => void
+  /** Reported once per accepted burn commit, warned or not. */
+  onCommitAccepted?: (commit: AcceptedBurnCommit) => void
+  /** Advisory line shown while the acting fleet's warned order is running. */
+  commitStrandingNotice?: boolean
 }
 
 interface CommitFigures {
@@ -111,6 +127,8 @@ export function SpaceCommandPanel({
   previewStale: stale,
   previewNoQuote: noQuote,
   onRequote: retry,
+  onCommitAccepted,
+  commitStrandingNotice = false,
 }: SpaceCommandPanelProps) {
   const order = useOrder()
   const jump = useJump()
@@ -138,7 +156,7 @@ export function SpaceCommandPanel({
         onSuccess: (settled: Fleet) => {
           burnGuard.release()
           const burn = settled?.state?.Burn as
-            | { ArriveMs?: number; DeltaV?: number }
+            | { ArriveMs?: number; DepartMs?: number; DeltaV?: number }
             | null
             | undefined
           setCommit({
@@ -152,6 +170,14 @@ export function SpaceCommandPanel({
               : ABSENT_FIGURE
           const successCopy = 'Burn committed — arriving ' + arrivalText + '.'
           toast.success(successCopy)
+          const warned = settled?.strandingWarning === true
+          if (warned) toast.warning(COMMIT_STRANDING_TOAST_COPY)
+          onCommitAccepted?.({
+            fleetId: fleet.id,
+            departMs: typeof burn?.DepartMs === 'number' ? burn.DepartMs : null,
+            arriveMs: typeof burn?.ArriveMs === 'number' ? burn.ArriveMs : null,
+            strandingWarning: warned,
+          })
         },
         onError: (error: unknown) => {
           burnGuard.release()
@@ -321,6 +347,12 @@ export function SpaceCommandPanel({
       >
         Burn
       </Button>
+
+      {commitStrandingNotice && (
+        <p data-testid="commit-stranding-notice" className="mt-2 text-[11px] text-amber-400">
+          {COMMIT_STRANDING_NOTICE_COPY}
+        </p>
+      )}
 
       {driftNotice && (
         <p data-testid="commit-drift-notice" className="mt-2 text-[11px] text-amber-400">

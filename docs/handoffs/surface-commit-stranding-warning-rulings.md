@@ -413,3 +413,105 @@ RULING 18.
 the change's last round on non-normative text.
 
 **Reversal cost.** None.
+
+---
+
+## Ruling made at implementation kickoff (2026-10-04)
+
+### FULL-AUTO RULING 15 — the architect's three design.md corrections are settled in the impl contract and design.md is left as cleared, so the verdict stays current; task 3.7 is arranged with the confirming read first
+
+**Question.** At kickoff the architect found three points where design.md is
+imprecise (a field typed `number | null` that Decision 2 says can hold
+`undefined`; the harness turning off query retry but not mutation retry; no
+margin named for the notice) and one task (3.7 row one) that, read literally,
+duplicates 3.9. Edit the change folder, or settle them in the contract?
+
+**Ruling.** Settle them in `surface-commit-stranding-warning-impl-contract.md`,
+which the architect has done; design.md, the delta, tasks.md and proposal.md
+are not edited. None of the three changes a requirement, scenario or task; the
+contract is the file whose job is "everything the spec deliberately leaves
+open". Task 3.7 is arranged as the contract has it — a confirming read, then
+the arrival on the following read — which fits its wording and scenario and
+keeps it distinct from 3.9. Where the contract and design.md differ on these
+three points, the contract is current.
+
+**Basis.** Precedence 2 — handoffs README (the impl contract's role; "verdict
+expiry is a diff") and the predecessor's RULING 19, which accepted kickoff
+edits to design.md as un-attacked residue; leaving the folder untouched is the
+stricter of the two courses and keeps `git diff af747be` empty.
+
+**Alternatives rejected.** Editing design.md now — expires the verdict by diff
+for three non-normative clarifications and would spend the last adversary
+round on them.
+
+**Reversal cost.** None.
+
+---
+
+## Ruling made at verification (2026-10-04)
+
+### FULL-AUTO RULING 16 — QA's two unasserted clauses are closed by the SDET strengthening two existing tests, logged, with the manifest re-recorded; no spec text changes and the verdict is SHIP-PENDING-JOURNEY
+
+**Question.** QA returned 36 PASS, 0 FAIL, with two clauses established only by
+inspection (`surface-commit-stranding-warning-qa.md`): the burn control's
+`disabled` state is not asserted to be unchanged by the notice, and the
+"adds no announcement of its own" clause is tested on the cut-drive removal
+only, not on the arrival landing that the same clause names in parentheses.
+QA lists both as spec gaps.
+
+**Ruling.** Neither is a gap in the spec text: the requirement already says the
+notice's appearing or removal does not "remove, disable or re-order" the burn
+control and that "a landed arrival read that removes the notice still announces
+its landing". They are assertions the tests omit. The SDET — and only the SDET
+— adds one assertion to each of two existing tests (the panel test of the
+notice element: the burn control's disabled state is the same with and without
+the notice; the arrival-at-a-body row: the announcer carries exactly the
+landed-resolution text when the notice is removed), logs the revision with this
+cause in the coverage table, shows each new assertion able to fail, and
+re-records the red manifest. No production code changes; if either assertion is
+red against the shipped code, that is a product finding and goes to the
+developer in the one batched round.
+
+**Basis.** Precedence 2 — workflow skill, failure playbook ("a written test
+changes only via the SDET, and only for a spec change or an adjudicated test
+defect") and handoffs README Lesson two (a green test that cannot observe the
+failure is not coverage). A test that omits a THEN its scenario's requirement
+states is an adjudicated test defect.
+
+**Alternatives rejected.** Routing to the writer for new scenarios — the text
+already states both; editing the delta would expire the verdict and take the
+change to 42 tasks. Leaving them inspected — two SHALLs with no observer.
+
+**Reversal cost.** Two assertions.
+
+### FULL-AUTO RULING 17 — the journey's stranding leg is recorded UNTESTED at tier 4, as the cleared task 6.3 provides; three QA sub-clauses stay closed at tier 1 on a mocked wire only
+
+**Question.** The SDET found no deterministic way to arrange a stranding commit
+on the e2e stack with what exists: the warning depends on fuel left after the
+debit against the random system's geometry, play can only lower fuel by
+burning, a "burn until one strands" loop is unbounded, a skip-if-none loop
+passes vacuously, and an API arrangement needs a fuel-setting seed route this
+chain may not add. Write a leg anyway, add tooling, or record it untested?
+
+**Ruling.** Record it untested, never passing. The journey closes QA's
+BLOCKED item 1 (the real wire omits the field on a non-stranding commit; no
+notice, no warning toast, the success toast once; the command surface after a
+cut drive) and item 3 (the update-depth check). QA's item 2 sub-clauses — the
+served read's instants equal the commit response's, removal on cut drive
+against real reads, and the reload leg with the roster's stranded indication —
+are closed by `SystemSpaceView.stranding-notice.test.tsx` over a real own-fleets
+hook and a mocked service, and by nothing against a real backend. That residual
+risk is stated in the journey record and the report, and filed:
+`docs/handoffs/followup-stranding-notice-untested-on-real-wire.md`.
+
+**Basis.** Precedence 1 — the adversary-cleared task 6.3: "the stranding leg …
+runs only if a fixture can arrange a stranding commit, otherwise it is recorded
+untested and never as passing". Chain doc "What every link must not do" (no
+backend field, endpoint or query) excludes the seed route; the chain doc's
+Taught record for 2a names the random-spawn fixture as the suite's most
+frequent false red.
+
+**Alternatives rejected.** A probabilistic leg — vacuous or flaky. A seed route
+— out of the chain's fences and unspecced production code.
+
+**Reversal cost.** One journey leg once a deterministic fuel fixture exists.
