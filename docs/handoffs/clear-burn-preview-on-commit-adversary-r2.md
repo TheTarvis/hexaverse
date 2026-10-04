@@ -148,3 +148,5 @@ clause and n4's two proposal sentences; the architect applies n2's mirror in
 design.md Decision 15, n4's Decision 13 ordinal, and the already-queued Context
 sentence (scenario 10 and addendum 2). No task is added; no MODIFIED body or
 scenario heading changes.
+
+**Verdict commit:** `29f0a6b` — the commit containing the change folder with n1–n4 applied. The verdict is current while `git diff 29f0a6b -- openspec/specs/system-space-view openspec/changes/clear-burn-preview-on-commit` is empty.
