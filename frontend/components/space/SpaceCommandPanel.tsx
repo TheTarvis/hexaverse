@@ -30,7 +30,7 @@
 // run. The run itself is resolved by the mounting view and handed down as
 // `mineRunning`, so this panel takes no second read of it.
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Button } from '@/components/catalyst/button'
 import { Figure } from '@/components/figure/Figure'
 import { useJump, useOrder } from '@/hooks/use-fleets'
@@ -41,7 +41,7 @@ import { burnErrorCopy, commandErrorReason, isQuotedCapExceeded } from '@/lib/re
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
 import { toast } from '@/lib/toast'
 import type { BurnPreview, Fleet } from '@/lib/types/fleet'
-import { selectionWireRequest, type SpaceSelection } from './space-selection'
+import { selectionKey, selectionWireRequest, type SpaceSelection } from './space-selection'
 
 export interface GateFacts {
   bodyId: string
@@ -53,12 +53,16 @@ export interface AcceptedBurnCommit {
   departMs: number | null
   arriveMs: number | null
   strandingWarning: boolean
+  /** selectionKey() of the selection the command was invoked for, captured at click. */
+  selectionKey: string
 }
 
 const COMMIT_STRANDING_NOTICE_COPY =
   'Your current course leaves this fleet unable to reach any station or lane gate. Place a different order to change it.'
 const COMMIT_STRANDING_TOAST_COPY =
   'This course leaves the fleet unable to reach a station or lane gate.'
+const SELECTION_COMMITTED_STATEMENT_COPY =
+  'A burn order is committed to this target, so Burn is unavailable for it. Select another target to change course.'
 
 export interface SpaceCommandPanelProps {
   /** The acting fleet. */
@@ -94,6 +98,8 @@ export interface SpaceCommandPanelProps {
   onCommitAccepted?: (commit: AcceptedBurnCommit) => void
   /** Advisory line shown while the acting fleet's warned order is running. */
   commitStrandingNotice?: boolean
+  /** True while the selection is the acting fleet's committed selection. */
+  selectionCommitted?: boolean
 }
 
 interface CommitFigures {
@@ -129,6 +135,7 @@ export function SpaceCommandPanel({
   onRequote: retry,
   onCommitAccepted,
   commitStrandingNotice = false,
+  selectionCommitted = false,
 }: SpaceCommandPanelProps) {
   const order = useOrder()
   const jump = useJump()
@@ -140,13 +147,15 @@ export function SpaceCommandPanel({
   // CURRENT quote (supplied by the view) or from nothing at all.
   const ceiling = currentQuote ? currentQuote.fuelCostTons * BURN_FUEL_ALLOWANCE : null
 
-  const burnAvailable = !!selection && canvasAvailable && !!fleet && !mineRunning
+  const statementId = useId()
+  const burnAvailable = !!selection && canvasAvailable && !!fleet && !mineRunning && !selectionCommitted
 
   const commitBurn = () => {
     const request = selectionWireRequest(selection)
     if (!fleet || !request) return
     if (!burnGuard.claim()) return
     const quoted = currentQuote
+    const committedKey = selectionKey(selection)
     order.mutate(
       {
         fleetId: fleet.id,
@@ -177,6 +186,7 @@ export function SpaceCommandPanel({
             departMs: typeof burn?.DepartMs === 'number' ? burn.DepartMs : null,
             arriveMs: typeof burn?.ArriveMs === 'number' ? burn.ArriveMs : null,
             strandingWarning: warned,
+            selectionKey: committedKey,
           })
         },
         onError: (error: unknown) => {
@@ -337,12 +347,23 @@ export function SpaceCommandPanel({
         </p>
       )}
 
+      {selectionCommitted && (
+        <p
+          id={statementId}
+          data-testid="selection-committed-statement"
+          className="mt-1 text-[11px] text-zinc-500"
+        >
+          {SELECTION_COMMITTED_STATEMENT_COPY}
+        </p>
+      )}
+
       <Button
         type="button"
         data-testid="burn-button"
         color="dark/zinc"
         className="mt-2 w-full"
-        disabled={!selection || !canvasAvailable || !fleet || mineRunning}
+        disabled={!selection || !canvasAvailable || !fleet || mineRunning || selectionCommitted}
+        aria-describedby={selectionCommitted ? statementId : undefined}
         onClick={commitBurn}
       >
         Burn

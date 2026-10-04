@@ -1,0 +1,5 @@
+# red-suite handoff manifest for clear-burn-preview-on-commit
+# recorded 2026-10-04T17:33:03Z
+# verify with: bash harness/openspec-red-manifest.sh verify clear-burn-preview-on-commit
+51fc6445ecc66c814df65a10c94f0e049b556314513d7727816b5ea972140b98  frontend/components/space/SpaceCommandPanel.test.tsx
+3dd5be245c2792fdab2a4f5e4f6f98881ea690cadd15b9b53cf9aaa7f3359110  frontend/components/space/SystemSpaceView.stranding-notice.test.tsx

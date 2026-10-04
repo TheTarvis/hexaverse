@@ -442,3 +442,41 @@ only: convergence, not another full attack: verify residue"; the gate is
 last round of the cap, which mid-build spot-checks may need.
 
 **Reversal cost.** None.
+
+---
+
+## Ruling made at implementation kickoff (2026-10-04)
+
+### FULL-AUTO RULING 16 — the architect's nine reported problems and seven design.md precision points are settled in the impl contract; no file under the change folder is edited, so the verdict at `29f0a6b` stays current
+
+**Question.** The kickoff contract
+(`docs/handoffs/clear-burn-preview-on-commit-impl-contract.md` §§ 12, 13)
+reports nine places the spec or tasks cannot be done exactly as written and
+seven precision points on design.md. Edit the change (expiring the verdict), or
+settle them in the contract?
+
+**Ruling.** Settle in the contract; it governs the SDET and the developer where
+it is more precise than tasks.md or design.md. Specifically: task 4.2's stale
+row is a re-ordering inside its test, not an insertion (still one task; RULING
+13's count is unchanged and its "mechanical" description is corrected here);
+task 3.14 row two uses the per-fleet request count, the alternative its own
+parenthetical allows; the three guards (3.15, 3.17, 3.18) stay `already-green`
+and the SDET must show each red against a named wrong build in a scratch
+worktree; task 3.8 builds its own reference phase; scenario 12 is asserted
+under both readings; scenario 21 and the real-wire instants equality are
+`Playwright, deferred`. None of the nine makes a scenario false or
+unobservable; if the red phase finds one that is, that is a spec conflict
+routed to the writer and a round-3 spot-check of the revised clause.
+`commit-stranding-notice-journey.spec.ts:210` is watched at the gate and not
+edited to pass.
+
+**Basis.** Precedence 2/3 — the handoffs README defines the impl contract as
+"everything the spec deliberately leaves open, settled"; chain precedent is the
+predecessor's RULING 15
+(`docs/handoffs/surface-commit-stranding-warning-rulings-index.md`); architect
+owns technical shape.
+
+**Alternatives rejected.** Editing tasks.md/design.md for precision — expires
+the verdict and spends the last adversary round on wording.
+
+**Reversal cost.** None.

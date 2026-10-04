@@ -60,7 +60,7 @@ import { SightingLog } from './SightingLog'
 import { SpaceCommandPanel, type AcceptedBurnCommit } from './SpaceCommandPanel'
 import { SpaceStage } from './SpaceStage'
 import { buildSceneModel } from './space-scene'
-import { toggleSelection, type SpaceSelection } from './space-selection'
+import { selectionKey, toggleSelection, type SpaceSelection } from './space-selection'
 import type { SceneFrameInputs, SpaceFrameSource } from './space-transform-loop'
 import { VitalsStrip } from './VitalsStrip'
 
@@ -241,12 +241,15 @@ function SightingsGhostFeed({
   return null
 }
 
-interface WarnedOrder {
+interface CommittedOrder {
   departMs: number | null
   arriveMs: number | null
   /** own-fleets dataUpdateCount at acceptance; null when the read the commit
    *  started had already answered; undefined only when the query has no state */
   readsAtAcceptance: number | null | undefined
+  /** selectionKey of the selection the command was invoked for */
+  selectionKey: string
+  warned: boolean
 }
 
 export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
@@ -272,7 +275,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const [canvasAvailable, setCanvasAvailable] = useState(true)
   const [firstFrame, setFirstFrame] = useState(false)
   const [announcement, setAnnouncement] = useState('')
-  const [warnedOrders, setWarnedOrders] = useState<Record<string, WarnedOrder>>({})
+  const [committedOrders, setCommittedOrders] = useState<Record<string, CommittedOrder>>({})
 
   // --- add-scan-and-sightings-surface: the ghost layer's pile, the log
   //     drawer, and the row<->ghost cross-highlight ------------------------
@@ -346,21 +349,18 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const qc = useQueryClient()
   const handleCommitAccepted = useCallback(
     (commit: AcceptedBurnCommit) => {
-      if (!commit.strandingWarning) {
-        setWarnedOrders((current) => {
-          if (!(commit.fleetId in current)) return current
-          const next = { ...current }
-          delete next[commit.fleetId]
-          return next
-        })
-        return
-      }
       const state = qc.getQueryState(queryKeys.fleets.mine())
       const answered = state?.fetchStatus === 'idle' && state.status === 'success'
       const readsAtAcceptance = answered ? null : state?.dataUpdateCount
-      setWarnedOrders((current) => ({
+      setCommittedOrders((current) => ({
         ...current,
-        [commit.fleetId]: { departMs: commit.departMs, arriveMs: commit.arriveMs, readsAtAcceptance },
+        [commit.fleetId]: {
+          departMs: commit.departMs,
+          arriveMs: commit.arriveMs,
+          readsAtAcceptance,
+          selectionKey: commit.selectionKey,
+          warned: commit.strandingWarning,
+        },
       }))
     },
     [qc],
@@ -770,26 +770,27 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const mineRunning = !!runningMine && runningMine.eta > worldTime
   const dockedAtTarget =
     !!acting?.attachedTo && selection?.bodyId !== undefined && selection.bodyId === acting.attachedTo
-  const previewWanted = !!acting && !acting.jump && !mineRunning && !dockedAtTarget
+  const order = acting ? committedOrders[acting.id] : undefined
+  const fleetReadCount = qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount
+  const awaitingRead = !!order && order.readsAtAcceptance !== null && fleetReadCount === order.readsAtAcceptance
+  const actingBurn = acting?.state?.Mode === 0 ? acting.state.Burn : null
+  const stillRunning =
+    !!order &&
+    !!actingBurn &&
+    order.departMs !== null &&
+    order.arriveMs !== null &&
+    actingBurn.DepartMs === order.departMs &&
+    actingBurn.ArriveMs === order.arriveMs
+  const orderLive = awaitingRead || stillRunning
+  const commitStrandingNotice = orderLive && !!order && order.warned
+  const selectionCommitted = orderLive && !!order && selectionKey(selection) === order.selectionKey
+  const previewWanted = !!acting && !acting.jump && !mineRunning && !dockedAtTarget && !selectionCommitted
   const burnPreview = useBurnPreview({
     fleetId: acting?.id ?? null,
     selection,
     commitWouldBeAccepted: previewWanted,
   })
   const currentQuote = burnPreview.preview && !burnPreview.stale ? burnPreview.preview : null
-  const warnedOrder = acting ? warnedOrders[acting.id] : undefined
-  const fleetReadCount = qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount
-  const awaitingRead =
-    !!warnedOrder && warnedOrder.readsAtAcceptance !== null && fleetReadCount === warnedOrder.readsAtAcceptance
-  const actingBurn = acting?.state?.Mode === 0 ? acting.state.Burn : null
-  const stillRunning =
-    !!warnedOrder &&
-    !!actingBurn &&
-    warnedOrder.departMs !== null &&
-    warnedOrder.arriveMs !== null &&
-    actingBurn.DepartMs === warnedOrder.departMs &&
-    actingBurn.ArriveMs === warnedOrder.arriveMs
-  const commitStrandingNotice = awaitingRead || stillRunning
   const showLoading = !interiorFailed && canvasAvailable && (interior.isLoading || !firstFrame)
 
   return (
@@ -961,6 +962,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           onRequote={burnPreview.retry}
           onCommitAccepted={handleCommitAccepted}
           commitStrandingNotice={commitStrandingNotice}
+          selectionCommitted={selectionCommitted}
         />
 
         <FleetActionsPanel

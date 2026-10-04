@@ -780,6 +780,7 @@ describe('SpaceCommandPanel — the commit report (surface-commit-stranding-warn
       departMs: T0 + 1000,
       arriveMs: T0 + 61000,
       strandingWarning: true,
+      selectionKey: 'body:feat-body-3',
     })
   })
 })
@@ -804,6 +805,7 @@ describe('SpaceCommandPanel — an unwarned commit (surface-commit-stranding-war
         departMs: T0 + 1000,
         arriveMs: T0 + 61000,
         strandingWarning: false,
+        selectionKey: 'body:feat-body-3',
       })
       expect(toastWarning).not.toHaveBeenCalled()
       expect(toastSuccess).toHaveBeenCalledTimes(1)
@@ -940,4 +942,170 @@ describe('SpaceCommandPanel — the advisory toast (surface-commit-stranding-war
       expect(warned).not.toMatch(/strand/i)
     },
   )
+})
+
+
+// ===========================================================================
+// openspec change `clear-burn-preview-on-commit` (tasks.md 2.1-2.3; impl
+// contract §6) — the committed statement, the disabled Burn control and the
+// click-time selection key in the accepted-commit payload. Red until 5.1/5.2.
+// The new props go through the `Record<string, unknown>` spread, so this file
+// type-checks before the build. The copy is a LOCAL literal, never imported.
+// ===========================================================================
+
+const STATEMENT_COPY =
+  'A burn order is committed to this target, so Burn is unavailable for it. Select another target to change course.'
+const statementEl = () => screen.queryByTestId('selection-committed-statement')
+const burnEl = () => screen.getByTestId('burn-button') as HTMLButtonElement
+
+describe('Scenario: A committed order removes the quote and withholds the burn command — the panel arm (2.1 a)', () => {
+  it('Scenario: A committed order removes the quote and withholds the burn command — selectionCommitted true, false and omitted', async () => {
+    const noQuote = { preview: null, currentQuote: null }
+    const { rerender } = render(panelElement({ ...noQuote, selectionCommitted: true }))
+
+    const assertCommitted = async (leg: string) => {
+      const stmt = statementEl()
+      expect(stmt, `${leg}: the statement is present`).not.toBeNull()
+      expect(burnEl().disabled, `${leg}: the control is natively disabled`).toBe(true)
+      order.mutate.mockClear()
+      await userEvent.click(burnEl())
+      expect(order.mutate, `${leg}: activating the control sends no order`).not.toHaveBeenCalled()
+      expect(screen.queryByTestId('burn-uncapped-label'), `${leg}: no uncapped label`).toBeNull()
+      const described = burnEl().getAttribute('aria-describedby')
+      expect(described, `${leg}: the control is described`).toBeTruthy()
+      expect(described).toBe(stmt!.id)
+      expect(stmt!.id).not.toBe('')
+      expect(document.getElementById(described!), `${leg}: the description is the statement`).toBe(stmt)
+    }
+    const assertAvailable = (leg: string) => {
+      expect(statementEl(), `${leg}: no statement`).toBeNull()
+      expect(burnEl().disabled, `${leg}: the control is enabled`).toBe(false)
+      expect(screen.queryByTestId('burn-uncapped-label'), `${leg}: the label is shown`).not.toBeNull()
+      expect(burnEl().hasAttribute('aria-describedby'), `${leg}: no description`).toBe(false)
+    }
+
+    await assertCommitted('true')
+    rerender(panelElement({ ...noQuote, selectionCommitted: false }))
+    assertAvailable('false')
+    rerender(panelElement({ ...noQuote }))
+    assertAvailable('omitted')
+    rerender(panelElement({ ...noQuote, selectionCommitted: true }))
+    await assertCommitted('true again')
+  })
+
+  // 2.1 b
+  it('Scenario: A committed order removes the quote and withholds the burn command — with the canvas unavailable the statement is still shown and the label absent', () => {
+    panel({ selectionCommitted: true, canvasAvailable: false, preview: null, currentQuote: null })
+    expect(screen.queryByTestId('canvas-required-notice')).not.toBeNull()
+    const stmt = statementEl()
+    expect(stmt).not.toBeNull()
+    expect(screen.queryByTestId('burn-uncapped-label')).toBeNull()
+    expect(burnEl().getAttribute('aria-describedby')).toBe(stmt!.id)
+    expect(stmt!.id).not.toBe('')
+  })
+})
+
+describe('Scenario: A response that lands after the selection was replaced withholds nothing for the new selection — the click-time key (2.2)', () => {
+  it.each([
+    ['a body', { bodyId: 'feat-body-3' }, 'body:feat-body-3'],
+    ['a point', { point: { x: 30, y: 0, z: -10 } }, 'point:30,0,-10'],
+  ] as const)(
+    'Scenario: A response that lands after the selection was replaced withholds nothing for the new selection — the payload carries the selection the command was invoked for, %s',
+    async (_arm, invoked, key) => {
+      const onCommitAccepted = vi.fn()
+      const held = holdResponse()
+      const { rerender } = render(panelElement({ onCommitAccepted, selection: invoked }))
+      await userEvent.click(screen.getByTestId('burn-button'))
+      expect(order.mutate, 'GIVEN: the command was invoked once').toHaveBeenCalledTimes(1)
+
+      rerender(panelElement({ onCommitAccepted, selection: { bodyId: 'feat-body-9' } }))
+      expect(onCommitAccepted, 'GIVEN: nothing is reported before the response lands').not.toHaveBeenCalled()
+      act(() => held.get().onSuccess?.(acceptedFleet({})))
+
+      expect(onCommitAccepted).toHaveBeenCalledTimes(1)
+      expect(onCommitAccepted).toHaveBeenCalledWith({
+        fleetId: 'fleet_1',
+        departMs: T0 + 1000,
+        arriveMs: T0 + 61000,
+        strandingWarning: false,
+        selectionKey: key,
+      })
+    },
+  )
+})
+
+describe('Scenario: The statement carries no figure and no wire text — the panel arm (2.3)', () => {
+  const live = '[aria-live],[role="alert"],[role="status"],[role="log"],[role="timer"],[role="marquee"]'
+
+  // 2.3 a
+  it.each([
+    ['a body', { selection: { bodyId: 'feat-body-3' } }],
+    ['a lane gate (a body with matching gateFacts)', { selection: { bodyId: 'feat-body-3' }, gateFacts: { bodyId: 'feat-body-3', destSystemId: 'sys_4_4' } }],
+    ['a point', { selection: { point: { x: 30, y: 0, z: -10 } } }],
+  ] as const)(
+    'Scenario: The statement carries no figure and no wire text — the static copy, placed between the selection line and Burn, outside any live region, for %s',
+    (_arm, over) => {
+      panel({ ...over, selectionCommitted: true })
+      const stmt = statementEl()
+      expect(stmt, 'the statement is shown').not.toBeNull()
+      expect(stmt!.textContent).toBe(STATEMENT_COPY)
+      expect(stmt!.textContent).not.toMatch(/\d/)
+      expect(stmt!.textContent).toMatch(/burn is unavailable/i)
+      expect(stmt!.textContent).toMatch(/select another target/i)
+      expect(stmt!.textContent).not.toContain('feat-body-3')
+      const facts = screen.getByTestId('selection-facts')
+      expect(
+        facts.compareDocumentPosition(stmt as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'the selection line precedes it',
+      ).toBeTruthy()
+      expect(
+        stmt!.compareDocumentPosition(burnEl()) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'it precedes the burn control',
+      ).toBeTruthy()
+      expect(stmt!.hasAttribute('role'), 'no role').toBe(false)
+      expect(stmt!.hasAttribute('aria-live'), 'no aria-live').toBe(false)
+      expect(stmt!.closest(live), 'outside any live region').toBeNull()
+      expect(stmt!.querySelector('button'), 'no control inside it').toBeNull()
+    },
+  )
+
+  // 2.3 b
+  it('Scenario: The statement carries no figure and no wire text — identical across two different responses and fleets', async () => {
+    const textAfter = async (fleet: Record<string, unknown>, response: Record<string, unknown>) => {
+      const held = holdResponse()
+      const { rerender, unmount } = render(panelElement({ fleet }))
+      await userEvent.click(screen.getByTestId('burn-button'))
+      act(() => held.get().onSuccess?.(response))
+      rerender(panelElement({ fleet, selectionCommitted: true }))
+      const text = statementEl()?.textContent
+      unmount()
+      return text
+    }
+    const first = await textAfter(FLEET, acceptedFleet({}))
+    const second = await textAfter(
+      { ...FLEET, id: 'fleet_7', state: acceptedFleet({}).state },
+      acceptedFleet({ id: 'fleet_7', strandingWarning: true, state: { Mode: 0, Park: null, Drift: null, Burn: { ...QUOTE, DepartMs: T0 + 5000, ArriveMs: T0 + 80000, DeltaV: 12 } } }),
+    )
+    expect(first).toBe(STATEMENT_COPY)
+    expect(second).toBe(first)
+  })
+
+  // 2.3 c
+  it('Scenario: The statement carries no figure and no wire text — it precedes the stranding and drift notices when all show', async () => {
+    const held = holdResponse()
+    const { rerender } = render(panelElement({}))
+    await userEvent.click(screen.getByTestId('burn-button'))
+    act(() => held.get().onSuccess?.(acceptedFleet({ strandingWarning: true })))
+    rerender(panelElement({ selectionCommitted: true, commitStrandingNotice: true }))
+
+    const stranding = screen.queryByTestId('commit-stranding-notice')
+    const drift = screen.queryByTestId('commit-drift-notice')
+    expect(stranding, 'GIVEN: the stranding notice shows').not.toBeNull()
+    expect(drift, 'GIVEN: the drift notice shows').not.toBeNull()
+    const stmt = statementEl()
+    expect(stmt, 'the statement shows').not.toBeNull()
+    for (const el of [stranding, drift]) {
+      expect(stmt!.compareDocumentPosition(el as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+  })
 })

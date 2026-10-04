@@ -13,6 +13,14 @@ import React from 'react'
 // test. SECTION 3 (red until 4.2/4.3): one describe per task, each titled
 // `Scenario: <name, verbatim> — <arm>` with the task number in a comment.
 //
+// CHANGE `clear-burn-preview-on-commit` (link 2a-iii-b; impl contract
+// `docs/handoffs/clear-burn-preview-on-commit-impl-contract.md` §7-§9): this
+// file now covers BOTH readers of the per-fleet order record — the stranding
+// notice (above) and the committed selection (the final describe block). The
+// file keeps its name (design Decision 12). No section-3 test of that change
+// mocks `useMyFleets`, hand-sets `selectionCommitted`, or touches a preview
+// key on the query client; preview counts are always per fleet and per target.
+//
 // WHAT IS REAL. `SystemSpaceView`, `SpaceCommandPanel`, `FleetActionsPanel`,
 // `FleetRoster`, `ScanControl`, `VitalsStrip` and ALL of `@/hooks/use-fleets`
 // (`useMyFleets`, `useOrder`, `useCutDrive`, `useStop`) — there is NO
@@ -140,10 +148,14 @@ vi.mock('./SpaceStage', async () => {
       {
         'data-testid': 'space-canvas-region',
         'data-selection': props.selection ? (props.selection.bodyId ?? 'point') : '',
+        'data-selection-point': props.selection?.point
+          ? `${props.selection.point.x ?? props.selection.point.X},${props.selection.point.y ?? props.selection.point.Y},${props.selection.point.z ?? props.selection.point.Z}`
+          : '',
       },
       trigger('feat-body-0', { bodyId: 'feat-body-0' }),
       trigger('feat-body-1', { bodyId: 'feat-body-1' }),
       trigger('point', { point: { x: 30, y: 0, z: -10 } }),
+      trigger('point-2', { point: { x: -12, y: 6, z: 22 } }),
     )
   }
   return { SpaceStage: SpaceStageMock, default: SpaceStageMock }
@@ -210,6 +222,20 @@ const PARK = {
   Point: { X: 0, Y: 0, Z: 0 },
 }
 const POINT = { X: 30, Y: 0, Z: -10 }
+const POINT_2 = { X: -12, Y: 6, Z: 22 }
+
+// The committed statement's copy, carried as a literal so an edit of the
+// production string fails these tests (impl contract §1.2).
+const STATEMENT_COPY =
+  'A burn order is committed to this target, so Burn is unavailable for it. Select another target to change course.'
+const QUOTE_IDS = [
+  'preview-arrival',
+  'preview-deltav',
+  'preview-fuel',
+  'preview-fuel-ceiling',
+  'preview-affordable',
+  'preview-stranding',
+] as const
 
 type FleetFixture = Record<string, unknown> & { id: string; roster: Record<string, unknown> }
 
@@ -312,13 +338,13 @@ function deferred(): Deferred {
   return { promise, resolve, reject }
 }
 
-type Service = 'listMine' | 'order' | 'cutDrive' | 'stop'
+type Service = 'listMine' | 'order' | 'cutDrive' | 'stop' | 'preview'
 let pending: Record<Service, Deferred[]>
 let settled: string[]
 let qc: QueryClient
 
 function holdCalls() {
-  pending = { listMine: [], order: [], cutDrive: [], stop: [] }
+  pending = { listMine: [], order: [], cutDrive: [], stop: [], preview: [] }
   for (const name of ['listMine', 'order', 'cutDrive', 'stop'] as const) {
     mocks[name].mockImplementation(() => {
       const d = deferred()
@@ -360,6 +386,17 @@ const rejectOrder = (index: number, error: unknown) => settle('order', index, 'r
 const answerCutDrive = (index: number, fleet: FleetFixture) => settle('cutDrive', index, 'answer', fleet)
 const answerStop = (index: number, fleet: FleetFixture) => settle('stop', index, 'answer', fleet)
 
+/** From this call on, every preview request is held until `answerPreview`/`rejectPreview`. */
+function holdPreview() {
+  mocks.preview.mockImplementation(() => {
+    const d = deferred()
+    pending.preview.push(d)
+    return d.promise
+  })
+}
+const answerPreview = (index: number, quote: unknown = QUOTE) => settle('preview', index, 'answer', quote)
+const rejectPreview = (index: number, error: unknown) => settle('preview', index, 'reject', error)
+
 async function reconnect() {
   await act(async () => {
     window.dispatchEvent(new Event('sse-reconnect'))
@@ -392,6 +429,27 @@ function renderView() {
 const notice = () => screen.queryByTestId('commit-stranding-notice')
 const has = (id: string) => screen.queryByTestId(id) !== null
 const selection = () => screen.getByTestId('space-canvas-region').getAttribute('data-selection')
+const selectedPoint = () => screen.getByTestId('space-canvas-region').getAttribute('data-selection-point')
+const statement = () => screen.queryByTestId('selection-committed-statement')
+const burn = () => screen.getByTestId('burn-button') as HTMLButtonElement
+const quoteGone = () => QUOTE_IDS.every((id) => !has(id))
+const orderCalls = () => mocks.order.mock.calls.length
+
+type PreviewTarget = string | { X: number; Y: number; Z: number }
+/** Preview requests, by fleet and by target. `P(f, t)` in the contract is `previewCalls(f, t).length`. */
+function previewCalls(fleetId?: string, target?: PreviewTarget) {
+  return mocks.preview.mock.calls.filter((call) => {
+    const [id, request] = call as [string, { bodyId?: string; point?: unknown }]
+    if (fleetId !== undefined && id !== fleetId) return false
+    if (target === undefined) return true
+    if (typeof target === 'string') return request.bodyId === target
+    return JSON.stringify(request.point) === JSON.stringify(target)
+  })
+}
+const P = (fleetId?: string, target?: PreviewTarget) => previewCalls(fleetId, target).length
+
+/** A fleet whose own stamp is `worldTime` (`fleetOf` pins every fleet at W0). */
+const datedAt = (fleet: FleetFixture, worldTime: number): FleetFixture => ({ ...fleet, worldTime })
 const warningToast = () => vi.mocked(toast.warning)
 
 interface CommitOptions {
@@ -426,6 +484,24 @@ async function commitAndConfirm(opts: CommitOptions = {}) {
   await commit(opts)
   await answerListMine(1, [opts.ordered ?? burning('fleet_a', 1000, 61000)], W0)
   expect(notice(), 'GIVEN: the notice stays once the read confirms the order').not.toBeNull()
+}
+
+/** `commit()` with an unwarned accepting response (the committed-selection base). */
+const commitUnwarned = (opts: CommitOptions = {}) => commit({ warning: 'absent', ...opts })
+
+/** Unwarned base, then the first post-acceptance read reports the burn. Asserts nothing about the notice or the statement. */
+async function commitUnwarnedAndConfirm(opts: CommitOptions = {}) {
+  await commitUnwarned(opts)
+  await answerListMine(1, [opts.ordered ?? burning('fleet_a', 1000, 61000)], W0)
+}
+
+/** A second arrangement inside one test: tear the first down and reset the call logs. */
+function resetHarness() {
+  cleanup()
+  settled = []
+  holdCalls()
+  for (const m of [mocks.listMine, mocks.order, mocks.preview]) m.mockClear()
+  for (const m of [toast.success, toast.error, toast.warning, toast.info]) vi.mocked(m).mockClear()
 }
 
 const BASE_LOG = ['listMine#0 answer', 'order#0 answer']
@@ -466,6 +542,34 @@ describe('harness smoke test (surface-commit-stranding-warning 2.1, 2.2)', () =>
     await poll()
     expect(listMineCalls(), 'one BOARD_POLL_MS advance adds exactly one read').toBe(3)
     expect(settled).toEqual(['listMine#0 answer'])
+  })
+})
+
+describe('harness smoke test (clear-burn-preview-on-commit 1.1)', () => {
+  // 1.1 — the second point trigger, the point identity, the held preview and the per-fleet count.
+  it('SDET-added: point-2 selects a distinct point, preview requests are counted per fleet and per target, a held preview answers by index', async () => {
+    mount()
+    await answerListMine(0, [parked('fleet_a'), parked('fleet_b')], W0)
+    await click('mock-select-point-2')
+    expect(selection()).toBe('point')
+    expect(selectedPoint()).toBe('-12,6,22')
+    expect(P('fleet_a', POINT_2), 'one request for the acting fleet and that point').toBe(1)
+    expect(mocks.preview.mock.calls[0][1]).toEqual({ point: POINT_2 })
+    expect(has('preview-deltav')).toBe(true)
+
+    holdPreview()
+    await click('mock-select-point')
+    expect(selectedPoint()).toBe('30,0,-10')
+    expect(P('fleet_a', POINT), 'the next selection requests once').toBe(1)
+    expect(pending.preview.length).toBe(1)
+    expect(has('preview-deltav'), 'nothing from the previous selection is shown while it is pending').toBe(false)
+    await answerPreview(0)
+    expect(has('preview-deltav'), 'the answer shows its figures').toBe(true)
+    expect(settled).toContain('preview#0 answer')
+
+    await click('fleet-row-fleet_b')
+    expect(P('fleet_b'), 'the other fleet counts separately').toBe(1)
+    expect(P('fleet_a')).toBe(2)
   })
 })
 
@@ -794,9 +898,11 @@ describe('3.13 an unwarned later commit replaces the notice', () => {
   // 3.13
   it('Scenario: A later commit by the same fleet replaces the earlier notice', async () => {
     await commitAndConfirm()
+    // clear-burn-preview-on-commit 4.1: the committed selection withholds Burn, so the second command targets another body.
+    await click(`mock-select-${HOST}`)
     await click('burn-button')
     expect(pending.order.length, 'GIVEN: the second command is pending').toBe(2)
-    await answerOrder(1, orderResponse(burning('fleet_a', 5000, 80000), 'absent'))
+    await answerOrder(1, orderResponse(burning('fleet_a', 5000, 80000, HOST), 'absent'))
     expect(notice(), 'no notice at the second acceptance').toBeNull()
 
     await answerListMine(lastListMine(), [burning('fleet_a', 1000, 61000)], W0)
@@ -810,12 +916,14 @@ describe('3.14 a second warned commit replaces the notice', () => {
   // 3.14
   it('Scenario: A second warned commit by the same fleet replaces the notice and raises its own warning', async () => {
     await commitAndConfirm()
+    // clear-burn-preview-on-commit 4.1: the second command targets another body.
+    await click(`mock-select-${HOST}`)
     await click('burn-button')
-    await answerOrder(1, orderResponse(burning('fleet_a', 5000, 80000), true))
+    await answerOrder(1, orderResponse(burning('fleet_a', 5000, 80000, HOST), true))
     expect(notice(), 'shown at the second acceptance').not.toBeNull()
     expect(warningToast(), 'two advisory toasts in total').toHaveBeenCalledTimes(2)
 
-    await answerListMine(lastListMine(), [burning('fleet_a', 5000, 80000)], W0)
+    await answerListMine(lastListMine(), [burning('fleet_a', 5000, 80000, HOST)], W0)
     expect(notice(), 'the second order\'s read keeps it').not.toBeNull()
 
     await reconnect()
@@ -834,6 +942,8 @@ describe('3.15 a rejected or failed commit', () => {
     'Scenario: A rejected or failed commit shows no notice and leaves an earlier one alone — %s',
     async (_arm, failure) => {
       await commitAndConfirm()
+      // clear-burn-preview-on-commit 4.1: the second command targets another body.
+      await click(`mock-select-${HOST}`)
       await click('burn-button')
       expect(pending.order.length, 'GIVEN: the second command is pending').toBe(2)
       const reads = listMineCalls()
@@ -863,6 +973,8 @@ describe('3.16 a response without the stranding field', () => {
     expect(vi.mocked(toast.success), 'the success feedback once').toHaveBeenCalledTimes(1)
 
     // CONTROL LEG: a warned second commit by the same fleet shows the notice.
+    // clear-burn-preview-on-commit 4.1: it targets another body.
+    await click(`mock-select-${HOST}`)
     await click('burn-button')
     await answerOrder(1, orderResponse(burning('fleet_a', 5000, 80000), true))
     expect(settled).toEqual([...CONFIRMED_LOG, 'order#1 answer'])
@@ -885,6 +997,8 @@ describe('3.17 advisory and distinct from the preview line', () => {
     await click('burn-button')
     await answerOrder(0, orderResponse(burning('fleet_a', 1000, 61000), true))
     await answerListMine(1, [burning('fleet_a', 1000, 61000)], W0)
+    // clear-burn-preview-on-commit 4.2: the committed selection holds no quote, so the preview's own line is read on another body.
+    await click(`mock-select-${HOST}`)
     const shown = notice()
     expect(shown).not.toBeNull()
     const line = screen.getByTestId('preview-stranding')
@@ -912,6 +1026,8 @@ describe('3.18 independent of the preview', () => {
   it('Scenario: The notice does not depend on the preview — no-quote', async () => {
     mocks.preview.mockRejectedValue(new Error('boom'))
     await commit()
+    // clear-burn-preview-on-commit 4.2: the committed selection holds no quote, so the no-quote state is read on another body.
+    await click(`mock-select-${HOST}`)
     expect(has('preview-no-quote'), 'GIVEN: the preview is in its no-quote state').toBe(true)
     expect(notice()).not.toBeNull()
   })
@@ -921,12 +1037,17 @@ describe('3.18 independent of the preview', () => {
     await answerListMine(0, [parked('fleet_a')], W0)
     await click('mock-select-feat-body-1')
     expect(has('preview-deltav'), 'GIVEN: a preview first resolved').toBe(true)
+
+    // clear-burn-preview-on-commit 4.2 (a re-ordering, contract §8 and §12 item 1): the
+    // committed selection holds no quote, so commit first, then read the stale state on
+    // another body: a first quote for it, then a failing refresh.
+    await click('burn-button')
+    await answerOrder(0, orderResponse(burning('fleet_a', 1000, 61000), true))
+    await click(`mock-select-${HOST}`)
+    expect(has('preview-deltav'), 'GIVEN: the other body has a first quote').toBe(true)
     mocks.preview.mockRejectedValue(new Error('boom'))
     await flush(PREVIEW_REFRESH_MS)
     expect(has('preview-stale'), 'GIVEN: the refresh failed, so the preview is stale').toBe(true)
-
-    await click('burn-button')
-    await answerOrder(0, orderResponse(burning('fleet_a', 1000, 61000), true))
     expect(notice()).not.toBeNull()
     expect(has('preview-stale'), 'the preview is still stale').toBe(true)
   })
@@ -986,5 +1107,522 @@ describe('3.20 reload and remount', () => {
 
     expect(notice(), 'a fresh view shows no notice').toBeNull()
     expect(has('fleet-stranded-fleet_a'), 'the roster indication tracks the read').toBe(value)
+  })
+})
+
+// ===========================================================================
+// openspec change `clear-burn-preview-on-commit` (impl contract §9) — the
+// committed selection: the SECOND reader of the per-fleet order record. All of
+// it runs over the real own-fleets hook with a mocked service. Red until 5.3/5.4
+// except the three guards (3.15, 3.17, 3.18), which are green today.
+// ===========================================================================
+
+const expectLog = (log: string[]) => expect(settled).toEqual(log)
+const announcer = () => screen.getByTestId('space-announcer').textContent
+const noQuoteStates = () => ['burn-uncapped-label', 'preview-no-quote', 'preview-stale', 'preview-retry'].filter(has)
+
+/** The statement is shown, with its copy, and Burn is withheld and sends nothing. */
+async function expectCommitted(why: string, expected = true) {
+  if (expected) {
+    expect(statement(), `${why}: the statement is shown`).not.toBeNull()
+    expect(statement()!.textContent, `${why}: its copy`).toBe(STATEMENT_COPY)
+    expect(burn().disabled, `${why}: Burn is disabled`).toBe(true)
+  } else {
+    expect(statement(), `${why}: no statement`).toBeNull()
+    expect(burn().disabled, `${why}: Burn is enabled`).toBe(false)
+  }
+}
+
+describe('the committed selection (clear-burn-preview-on-commit section 3)', () => {
+  describe('3.1', () => {
+    it('Scenario: A committed order removes the quote and withholds the burn command — the quote is gone, Burn withheld across two refresh intervals and a baseline poll', async () => {
+      mount()
+      await answerListMine(0, [parked('fleet_a')], W0)
+      await click(`mock-select-${OTHER}`)
+      expect(has('preview-deltav'), 'GIVEN: a preview was shown').toBe(true)
+      await click('burn-button')
+      expect(pending.order.length, 'GIVEN: the order is pending').toBe(1)
+      const requestsBefore = P('fleet_a', OTHER)
+      expect(requestsBefore, 'GIVEN: one request so far').toBe(1)
+      await answerOrder(0, orderResponse(burning('fleet_a', 1000, 61000), 'absent'))
+      await answerListMine(1, [burning('fleet_a', 1000, 61000)], W0)
+
+      const reads = listMineCalls()
+      await flush(2 * PREVIEW_REFRESH_MS)
+      expect(listMineCalls(), 'the 20 s advance caused a baseline poll read').toBeGreaterThan(reads)
+      await answerListMine(lastListMine(), [burning('fleet_a', 1000, 61000)], W0)
+
+      expectLog(['listMine#0 answer', 'order#0 answer', 'listMine#1 answer', `listMine#${lastListMine()} answer`])
+      expect(quoteGone(), 'no quote element').toBe(true)
+      await expectCommitted('after the poll answered the same burn')
+      expect(selection(), 'the selection is unchanged').toBe(OTHER)
+      expect(noQuoteStates(), 'no uncapped label, no-quote, stale or retry').toEqual([])
+      expect(P('fleet_a', OTHER), 'window: acceptance to the poll answer, 20 s: no request').toBe(requestsBefore)
+      await click('burn-button')
+      expect(orderCalls(), 'activating Burn sends no order').toBe(1)
+      expect(vi.mocked(toast.success), 'the success feedback was given once').toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('3.2', () => {
+    it('Scenario: The committed selection holds before any read has answered after the acceptance', async () => {
+      await commitUnwarned()
+      expect(has('fleet-row-eta-fleet_a'), 'GIVEN: the cached read still describes the fleet as parked').toBe(false)
+      expect(pending.listMine.length, 'GIVEN: the post-acceptance read is requested and unanswered').toBe(2)
+      expectLog(BASE_LOG)
+      await expectCommitted('in the gap')
+      expect(quoteGone()).toBe(true)
+      await click('burn-button')
+      expect(orderCalls(), 'activating Burn sends no order').toBe(1)
+      expect(P('fleet_a', OTHER), 'no preview request since the selection').toBe(1)
+    })
+  })
+
+  describe('3.3', () => {
+    it('Scenario: A read begun before the commit and answered after it does not end the committed selection', async () => {
+      mount()
+      await answerListMine(0, [parked('fleet_a')], W0)
+      await reconnect()
+      expect(listMineCalls(), 'GIVEN: a read requested before the acceptance, held').toBe(2)
+      await click(`mock-select-${OTHER}`)
+      await click('burn-button')
+      await answerOrder(0, orderResponse(burning('fleet_a', 1000, 61000), 'absent'))
+      expect(listMineCalls(), 'a NEW read was requested at the acceptance').toBe(3)
+      await expectCommitted('at the acceptance')
+
+      const html = document.body.innerHTML
+      await answerListMine(1, [parked('fleet_a')], W0)
+      expect(document.body.innerHTML, 'answering the earlier read changed nothing on screen').toBe(html)
+      await expectCommitted('after the earlier read answered parked')
+      expect(P('fleet_a', OTHER)).toBe(1)
+
+      await answerListMine(2, [burning('fleet_a', 1000, 61000)], W0)
+      expectLog(['listMine#0 answer', 'order#0 answer', 'listMine#1 answer', 'listMine#2 answer'])
+      await expectCommitted('after the read requested at the acceptance answered the burn')
+      expect(P('fleet_a', OTHER)).toBe(1)
+    })
+  })
+
+  describe('3.4', () => {
+    it('Scenario: The projected clock passing the arrival does not end the committed selection', async () => {
+      await commitUnwarnedAndConfirm()
+      const reads = listMineCalls()
+      await flush(61_000)
+      expect(
+        Number(screen.getByTestId('space-world-clock').getAttribute('data-world-time')),
+        'GIVEN: the projected world time is past the arrival',
+      ).toBeGreaterThan(61_000)
+      expect(listMineCalls(), 'GIVEN: reads were requested and none answered').toBeGreaterThan(reads)
+      expectLog(CONFIRMED_LOG)
+      await expectCommitted('after 61 s with no read answered')
+      expect(P('fleet_a', OTHER), 'window: 61 s, six refresh intervals: no request').toBe(1)
+
+      await answerListMine(lastListMine(), [datedAt(burning('fleet_a', 1000, 61000), 99_999)], 99_999)
+      await expectCommitted('after a read answering the same burn dated past the arrival')
+      expect(P('fleet_a', OTHER)).toBe(1)
+    })
+  })
+
+  describe('3.5', () => {
+    it('Scenario: Cutting the drive ends the committed selection', async () => {
+      await commitUnwarnedAndConfirm()
+      await expectCommitted('GIVEN: committed')
+      holdPreview()
+      await click('fleet-cmd-cut-drive-fleet_a')
+      expect(pending.cutDrive.length, 'GIVEN: the cut was requested').toBe(1)
+      const before = listMineCalls()
+      await answerCutDrive(0, drifting('fleet_a'))
+      expect(listMineCalls(), 'the cut caused a refreshed read').toBe(before + 1)
+      await expectCommitted('still committed until the refreshed read answers')
+      expect(P('fleet_a', OTHER)).toBe(1)
+
+      await answerListMine(lastListMine(), [drifting('fleet_a')], W0)
+      expectLog([...CONFIRMED_LOG, 'cutDrive#0 answer', `listMine#${before} answer`])
+      await expectCommitted('after the drifting answer', false)
+      expect(P('fleet_a', OTHER), 'exactly one request sent at that answer').toBe(2)
+      expect(pending.preview.length, 'and it is pending').toBe(1)
+      expect(quoteGone(), 'no figure from before the commit').toBe(true)
+      expect(has('preview-stale')).toBe(false)
+      expect(has('burn-uncapped-label'), 'the uncapped label while the request is pending').toBe(true)
+
+      await click('burn-button')
+      expect(orderCalls(), 'GIVEN: a second command was invoked').toBe(2)
+      expect('maxFuelTons' in mocks.order.mock.calls[1][1], 'carries no cap').toBe(false)
+      await answerOrder(1, orderResponse(burning('fleet_a', 5000, 80000), 'absent'))
+      await expectCommitted('after the second acceptance')
+      expect(P('fleet_a', OTHER), 'no further request').toBe(2)
+      expect(selection(), 'the selection is unchanged').toBe(OTHER)
+    })
+  })
+
+  describe('3.6', () => {
+    it.each([
+      ['a different burn, 70000 to 90000', () => burning('fleet_a', 70000, 90000)],
+      ['a point park', () => pointParked('fleet_a')],
+    ] as const)('Scenario: A stop ends the committed selection, above or at the speed floor — the refreshed read answers %s', async (_arm, read) => {
+      await commitUnwarnedAndConfirm()
+      await click('fleet-cmd-stop-fleet_a')
+      expect(pending.stop.length, 'GIVEN: the stop was requested').toBe(1)
+      const before = listMineCalls()
+      await answerStop(0, read())
+      expect(listMineCalls(), 'the stop caused a refreshed read').toBe(before + 1)
+      expect(statement(), 'present until the refreshed read answers').not.toBeNull()
+
+      await answerListMine(lastListMine(), [read()], W0)
+      expectLog([...CONFIRMED_LOG, 'stop#0 answer', `listMine#${before} answer`])
+      await expectCommitted('after the refreshed read', false)
+      expect(P('fleet_a', OTHER), 'one request sent at that answer').toBe(2)
+    })
+  })
+
+  describe('3.7', () => {
+    it.each([
+      ['parked at a point', () => pointParked('fleet_a')],
+      ['a burn to another target, 5000 to 80000', () => burning('fleet_a', 5000, 80000, HOST)],
+      ['a burn to the same target, 5000 to 61000', () => burning('fleet_a', 5000, 61000, OTHER)],
+      ['a burn 1000 to 90000', () => burning('fleet_a', 1000, 90000, OTHER)],
+    ] as const)('Scenario: A read reporting the order gone ends the committed selection — %s', async (_arm, read) => {
+      await commitUnwarnedAndConfirm()
+      const reads = listMineCalls()
+      await poll()
+      expect(listMineCalls(), 'the poll requested a read').toBeGreaterThan(reads)
+      expect(statement(), 'present while the poll-caused read is unanswered').not.toBeNull()
+      expect(P('fleet_a', OTHER), 'window: the 20 s poll advance: no request while withheld').toBe(1)
+
+      await answerListMine(lastListMine(), [read()], W0)
+      await expectCommitted('after the read reporting the order gone', false)
+      expect(P('fleet_a', OTHER), 'one request at that answer').toBe(2)
+    })
+  })
+
+  describe('3.8', () => {
+    it('Scenario: Arrival at the selected body hands over to the docked-at-target state', async () => {
+      // Reference phase: the docked-at-target state with no commit in the history.
+      mount()
+      await answerListMine(0, [attached('fleet_a', OTHER)], W0)
+      await click(`mock-select-${OTHER}`)
+      const reference = { disabled: burn().disabled, label: has('burn-uncapped-label') }
+      resetHarness()
+
+      await commitUnwarnedAndConfirm()
+      await reconnect()
+      expect(announcer(), 'GIVEN: nothing announced before the landing read').toBe('')
+      expect(statement(), 'present before the arrival read answers').not.toBeNull()
+      await answerListMine(2, [attached('fleet_a', OTHER)], W0)
+
+      expectLog([...CONFIRMED_LOG, 'listMine#2 answer'])
+      expect(statement(), 'removed on arrival').toBeNull()
+      expect(P('fleet_a', OTHER), 'no preview request').toBe(1)
+      expect(burn().disabled, 'Burn equals the docked state').toBe(reference.disabled)
+      expect(has('burn-uncapped-label'), 'the label equals the docked state').toBe(reference.label)
+      expect(announcer(), 'the landing is announced, nothing else').toBe(`Burn complete — arrived and attached to ${OTHER}.`)
+    })
+  })
+
+  describe('3.9', () => {
+    it('Scenario: An order that settled inside the commit round trip never shows past the first read', async () => {
+      await commitUnwarned()
+      expect(statement(), 'shown until the first read answers').not.toBeNull()
+      await answerListMine(1, [attached('fleet_a', OTHER)], W0)
+      expectLog(CONFIRMED_LOG)
+      expect(statement(), 'removed when it does').toBeNull()
+      expect(P('fleet_a', OTHER), 'no preview request').toBe(1)
+    })
+  })
+
+  describe('3.10', () => {
+    it('Scenario: A failed read changes nothing for the quote and the burn command', async () => {
+      await commitUnwarned()
+      await rejectListMine(1, UNMAPPED_ERROR)
+      await expectCommitted('(1) after the first read failed')
+      expect(has('space-fleets-error'), '(1) the fleets-error notice').toBe(true)
+      expect(has('space-fleets-retry'), '(1) and its retry').toBe(true)
+      expect(['preview-no-quote', 'preview-stale', 'preview-retry'].filter(has), '(1) no quote state').toEqual([])
+      expect(P('fleet_a', OTHER)).toBe(1)
+
+      let reads = listMineCalls()
+      await click('space-fleets-retry')
+      expect(listMineCalls(), 'the retry requested a read').toBe(reads + 1)
+      await answerListMine(lastListMine(), [burning('fleet_a', 1000, 61000)], W0)
+      await expectCommitted('(2) the retry answered the committed instants')
+      expect(P('fleet_a', OTHER)).toBe(1)
+
+      reads = listMineCalls()
+      await reconnect()
+      expect(listMineCalls(), 'the reconnect requested a read').toBe(reads + 1)
+      await rejectListMine(lastListMine(), UNMAPPED_ERROR)
+      expect(has('space-fleets-error'), 'GIVEN: the later read failed').toBe(true)
+      await expectCommitted('(3) a later read failed')
+      expect(P('fleet_a', OTHER)).toBe(1)
+
+      reads = listMineCalls()
+      await click('space-fleets-retry')
+      expect(listMineCalls(), 'the second retry requested a read').toBe(reads + 1)
+      await answerListMine(lastListMine(), [drifting('fleet_a')], W0)
+      await expectCommitted('(4) the read answered drifting', false)
+      expect(P('fleet_a', OTHER), '(4) one request sent').toBe(2)
+      expect(has('preview-deltav'), '(4) the resumed preview shows').toBe(true)
+
+      const p = P('fleet_a', OTHER)
+      reads = listMineCalls()
+      await reconnect()
+      expect(listMineCalls(), 'the reconnect requested a read').toBe(reads + 1)
+      expect(has('preview-deltav'), 'GIVEN: the resumed preview is shown before the failure').toBe(true)
+      await rejectListMine(lastListMine(), UNMAPPED_ERROR)
+      expect(has('space-fleets-error'), 'GIVEN: the read failed').toBe(true)
+      await expectCommitted('(5) after the failed read', false)
+      expect(has('preview-deltav'), '(5) the resumed preview is untouched').toBe(true)
+      expect(P('fleet_a', OTHER), '(5) window: zero fake ms: the failure caused no request').toBe(p)
+    })
+  })
+
+  describe('3.11', () => {
+    it('Scenario: Another target is previewed and committable while the committed target stays committed — bodies', async () => {
+      await commitUnwarnedAndConfirm()
+      await click(`mock-select-${HOST}`)
+      expect(P('fleet_a', HOST), 'the other body is previewed').toBe(1)
+      expect(has('preview-deltav'), 'its figures are shown').toBe(true)
+      await expectCommitted('with the other body selected', false)
+
+      await click(`mock-select-${OTHER}`)
+      expectLog(CONFIRMED_LOG)
+      await expectCommitted('back on the committed body')
+      expect(P('fleet_a', OTHER), 'no request for the committed body since the commit').toBe(1)
+    })
+
+    it('Scenario: Another target is previewed and committable while the committed target stays committed — points', async () => {
+      await commitUnwarned({ select: 'mock-select-point', ordered: burningToPoint('fleet_a', 1000, 61000) })
+      expect(selectedPoint(), 'GIVEN: the committed point is selected').toBe('30,0,-10')
+      await expectCommitted('after the commit toward a point')
+      expect(P('fleet_a', POINT), 'no request for it beyond the first').toBe(1)
+
+      await click('mock-select-point-2')
+      expect(selectedPoint(), 'GIVEN: a different point is selected').toBe('-12,6,22')
+      expect(P('fleet_a', POINT_2), 'the other point is previewed').toBe(1)
+      await expectCommitted('with the other point', false)
+    })
+  })
+
+  describe('3.12', () => {
+    it.each([
+      ['the second response warned', true],
+      ['the second response unwarned', 'absent'],
+    ] as const)('Scenario: A second commit by the same fleet moves the committed selection — %s', async (_arm, warning) => {
+      await commitUnwarnedAndConfirm()
+      await click(`mock-select-${HOST}`)
+      await click('burn-button')
+      await answerOrder(1, orderResponse(burning('fleet_a', 5000, 80000, HOST), warning))
+      await expectCommitted('Y at the second acceptance')
+      expect(P('fleet_a', HOST), 'no request for Y beyond the first').toBe(1)
+
+      expect(pending.listMine.length, 'GIVEN: listMine#2 is requested and unanswered').toBe(3)
+      await click(`mock-select-${OTHER}`)
+      await expectCommitted('X in the gap', false)
+      expect(P('fleet_a', OTHER), 'X is previewed again').toBe(2)
+      expect(has('preview-deltav')).toBe(true)
+
+      await answerListMine(2, [burning('fleet_a', 1000, 61000)], W0)
+      expectLog([...CONFIRMED_LOG, 'order#1 answer', 'listMine#2 answer'])
+      await expectCommitted('X after the read still reporting the first order', false)
+      expect(P('fleet_a', OTHER)).toBe(2)
+      expect(has('preview-deltav')).toBe(true)
+    })
+  })
+
+  describe('3.13', () => {
+    it('Scenario: A response that lands after the selection was replaced withholds nothing for the new selection', async () => {
+      mount()
+      await answerListMine(0, [parked('fleet_a')], W0)
+      await click(`mock-select-${OTHER}`)
+      await click('burn-button')
+      expect(pending.order.length, 'GIVEN: the command was invoked for X and is pending').toBe(1)
+      await click(`mock-select-${HOST}`)
+      await answerOrder(0, orderResponse(burning('fleet_a', 1000, 61000), 'absent'))
+      await answerListMine(1, [burning('fleet_a', 1000, 61000)], W0)
+
+      expectLog(CONFIRMED_LOG)
+      expect(has('preview-deltav'), "Y's preview is still shown").toBe(true)
+      await expectCommitted('with Y selected', false)
+      expect(P('fleet_a', HOST), 'Y requested once').toBe(1)
+
+      await click(`mock-select-${OTHER}`)
+      await expectCommitted('with X selected again')
+    })
+  })
+
+  describe('3.14', () => {
+    const bothParked = () => [parked('fleet_a'), parked('fleet_b')]
+    const acting = (id: string) => screen.getByTestId(`fleet-row-${id}`).getAttribute('data-active')
+
+    it('Scenario: The committed selection follows the fleet — row one: both fleets commit toward the kept selection', async () => {
+      mount()
+      await answerListMine(0, bothParked(), W0)
+      await click(`mock-select-${OTHER}`)
+      await click('burn-button')
+      await answerOrder(0, orderResponse(burning('fleet_a', 1000, 61000), 'absent'))
+      await answerListMine(1, [burning('fleet_a', 1000, 61000), parked('fleet_b')], W0)
+      await expectCommitted('GIVEN: A is committed')
+
+      await click('fleet-row-fleet_b')
+      expect(acting('fleet_b'), 'GIVEN: B is acting').toBe('true')
+      expect(P('fleet_b', OTHER), 'B is previewed').toBe(1)
+      await expectCommitted('B acting, before any B commit', false)
+
+      await click('fleet-row-fleet_a')
+      expect(acting('fleet_a'), 'GIVEN: A is acting again').toBe('true')
+      await expectCommitted('A acting again')
+      expect(P('fleet_a', OTHER)).toBe(1)
+
+      await click('fleet-row-fleet_b')
+      expect(acting('fleet_b'), 'GIVEN: B is acting').toBe('true')
+      const pb = P('fleet_b', OTHER)
+      await click('burn-button')
+      expect(mocks.order.mock.calls[1][0], 'GIVEN: the second command is B\'s').toBe('fleet_b')
+      await answerOrder(1, orderResponse(burning('fleet_b', 2000, 50000), 'absent'))
+      await answerListMine(2, [burning('fleet_a', 1000, 61000), burning('fleet_b', 2000, 50000)], W0)
+      expectLog(['listMine#0 answer', 'order#0 answer', 'listMine#1 answer', 'order#1 answer', 'listMine#2 answer'])
+
+      await expectCommitted('B acting after its commit')
+      expect(P('fleet_a', OTHER)).toBe(1)
+      expect(P('fleet_b', OTHER)).toBe(pb)
+      await click('fleet-row-fleet_a')
+      await expectCommitted('A acting')
+      expect(P('fleet_a', OTHER)).toBe(1)
+      expect(P('fleet_b', OTHER)).toBe(pb)
+      await click('fleet-row-fleet_b')
+      await expectCommitted('B acting again')
+      expect(P('fleet_a', OTHER)).toBe(1)
+      expect(P('fleet_b', OTHER)).toBe(pb)
+    })
+
+    it('Scenario: The committed selection follows the fleet — row two: the command was invoked for A, B made acting, A\'s response placed', async () => {
+      mount()
+      await answerListMine(0, bothParked(), W0)
+      await click(`mock-select-${OTHER}`)
+      await click('burn-button')
+      expect(pending.order.length, 'GIVEN: the command was invoked for A').toBe(1)
+      await click('fleet-row-fleet_b')
+      expect(acting('fleet_b'), 'GIVEN: B is acting').toBe('true')
+      expect(has('preview-deltav'), 'GIVEN: B\'s figures are shown').toBe(true)
+      expect(P('fleet_b'), 'GIVEN: B has had its one request').toBe(1)
+      const before = P('fleet_b')
+
+      await answerOrder(0, orderResponse(burning('fleet_a', 1000, 61000), 'absent'))
+      expect(P('fleet_b'), 'window: B\'s request count across A\'s acceptance, no time elapsed').toBe(before)
+      expect(has('preview-deltav'), 'B\'s figures stay shown').toBe(true)
+      await expectCommitted('B acting while A\'s response lands', false)
+
+      await answerListMine(1, [burning('fleet_a', 1000, 61000), parked('fleet_b')], W0)
+      await click('fleet-row-fleet_a')
+      expect(acting('fleet_a'), 'GIVEN: A is acting again').toBe('true')
+      await expectCommitted('A acting again')
+      expect(P('fleet_a', OTHER)).toBe(1)
+    })
+  })
+
+  describe('3.15 (regression guard)', () => {
+    it.each([
+      ['a cap rejection', CAP_ERROR, false],
+      ['a failure with no mapped reason', UNMAPPED_ERROR, false],
+      // SDET-added: the contract's two rows reject with the own-fleets read idle, where even a
+      // build that reported the rejection to the order record would store `readsAtAcceptance:
+      // null` and hold nothing. With a read in flight that same build would hold the statement.
+      ['SDET-added: a failure with an own-fleets read in flight', UNMAPPED_ERROR, true],
+    ] as const)('Scenario: A rejected or failed commit enters no committed state — %s', async (arm, failure, readInFlight) => {
+      mount()
+      await answerListMine(0, [parked('fleet_a')], W0)
+      if (readInFlight) {
+        await reconnect()
+        expect(listMineCalls(), 'GIVEN: a read is requested and unanswered').toBe(2)
+      }
+      await click(`mock-select-${OTHER}`)
+      expect(has('preview-deltav'), 'GIVEN: the preview is shown').toBe(true)
+      await click('burn-button')
+      await rejectOrder(0, failure)
+
+      expectLog(['listMine#0 answer', 'order#0 reject'])
+      expect(statement(), 'no statement').toBeNull()
+      expect(burn().disabled, 'Burn is available').toBe(false)
+      if (arm === 'a cap rejection') {
+        expect(P('fleet_a', OTHER), 'a fresh preview was requested').toBe(2)
+        expect(has('preview-deltav'), 'and its figures presented').toBe(true)
+      }
+    })
+  })
+
+  describe('3.16', () => {
+    it('Scenario: A rejected commit leaves an earlier committed selection alone', async () => {
+      await commitUnwarnedAndConfirm()
+      expect(statement(), 'GIVEN: committed').not.toBeNull()
+      await click(`mock-select-${HOST}`)
+      await click('burn-button')
+      await rejectOrder(1, CAP_ERROR)
+      await click(`mock-select-${OTHER}`)
+      expectLog([...CONFIRMED_LOG, 'order#1 reject'])
+      await expectCommitted('X selected again after the rejected commit toward Y')
+    })
+  })
+
+  describe('3.17 (regression guard)', () => {
+    it('Scenario: The committed selection is silent — the live-region text is identical before, after, and after the cut', async () => {
+      mount()
+      await answerListMine(0, [parked('fleet_a')], W0)
+      await click(`mock-select-${OTHER}`)
+      const r0 = announcer()
+      await click('burn-button')
+      await answerOrder(0, orderResponse(burning('fleet_a', 1000, 61000), 'absent'))
+      await answerListMine(1, [burning('fleet_a', 1000, 61000)], W0)
+      const r1 = announcer()
+      await click('fleet-cmd-cut-drive-fleet_a')
+      await answerCutDrive(0, drifting('fleet_a'))
+      await answerListMine(lastListMine(), [drifting('fleet_a')], W0)
+      const r2 = announcer()
+      expect(r1, 'after the acceptance').toBe(r0)
+      expect(r2, 'after the cut').toBe(r0)
+    })
+  })
+
+  describe('3.18 (regression guard)', () => {
+    it('Scenario: A burn this view did not commit is previewed — opened on a burn', async () => {
+      mount()
+      await answerListMine(0, [burning('fleet_a', 1000, 61000)], W0)
+      await click(`mock-select-${OTHER}`)
+      expect(P('fleet_a', OTHER), 'one request for the selection').toBe(1)
+      expect(burn().disabled).toBe(false)
+      expect(statement()).toBeNull()
+    })
+
+    it('Scenario: A burn this view did not commit is previewed — remounted over a read reporting an earlier committed order', async () => {
+      await commitUnwarnedAndConfirm()
+      expect(pending.listMine.length, 'GIVEN: no read is pending').toBe(2)
+      expectLog(CONFIRMED_LOG)
+      const p = P('fleet_a', OTHER)
+      cleanup()
+      renderView()
+      await flush(0)
+      await click(`mock-select-${OTHER}`)
+      expect(P('fleet_a', OTHER), 'one request since the selection').toBe(p + 1)
+      expect(burn().disabled).toBe(false)
+      expect(statement()).toBeNull()
+    })
+  })
+
+  describe('3.19', () => {
+    it('Scenario: One order, two consumers', async () => {
+      await commit()
+      expect(notice(), 'the notice after the warned acceptance').not.toBeNull()
+      expect(statement(), 'and the statement').not.toBeNull()
+
+      await click(`mock-select-${HOST}`)
+      expect(notice(), 'the notice stays with another body selected').not.toBeNull()
+      expect(statement(), 'the statement goes').toBeNull()
+
+      await click('burn-button')
+      await answerOrder(1, orderResponse(burning('fleet_a', 5000, 80000, HOST), 'absent'))
+      expect(pending.listMine.length, 'GIVEN: the new read is unanswered').toBe(3)
+      expectLog(BASE_LOG.concat('order#1 answer'))
+      expect(statement(), 'the statement for the new commit').not.toBeNull()
+      expect(notice(), 'no notice for the unwarned commit').toBeNull()
+    })
   })
 })
