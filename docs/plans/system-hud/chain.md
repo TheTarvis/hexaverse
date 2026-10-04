@@ -7,7 +7,8 @@ vitals strip**. The scoping doc `../system-hud.md` is the model and carries
 the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
 **Status (2026-10-04): links 1, 2a and 2a-ii archived (2a-ii at `0f2ad5d`); 2a-iii
-(`clear-burn-preview-on-commit`) is next, `not authored`.** The link handed to
+split in-run into `surface-commit-stranding-warning` (2a-iii, being authored)
+and `clear-burn-preview-on-commit` (2a-iii-b, `not authored`).** The link handed to
 the 2026-10-03 run as 2a-ii, `add-burn-cost-overlay`, was split twice in-run and
 is now 2a-iv: the preview lift went first as `lift-burn-preview-to-view`
 (archived, this run), and the commit-clear its review could not get right inside
@@ -49,7 +50,8 @@ symlink to it.
 | 1 | `add-figure-formatting` | `lib/format/` — every player-facing figure has a unit; applied to today's panels; `lib/eta.ts` retired | ADDED `figure-formatting`; MODIFIED `system-space-view` (7), `docked-fleet-actions` (7), `fleet-roster` (2), `sighting-log` (1) | ✅ archived `a4471a3` |
 | 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | ✅ archived `e01b310` (2026-10-03); `fix-world-time-render-loop`, the out-of-chain fix for its gate blocker, archived alongside at `438923c` |
 | 2a-ii | `lift-burn-preview-to-view` | The burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props; two unenforced preview-request preconditions made true (running mine, docked at the target) | MODIFIED `system-space-view` (2: the burn preview, the failed-or-stale preview) | ✅ archived `0f2ad5d` (2026-10-04); authored r3 `e3fd54c`, built `3802b92`, gate `c773e26` |
-| 2a-iii | `clear-burn-preview-on-commit` | The preview clears when an order commits, with an end tied to the order's own life; the commit's stranding warning surfaced | MODIFIED `system-space-view` ("Burn Preview Reflects…", likely the double-submit requirement); `fleet-roster` drift closed | ⬜ not authored |
+| 2a-iii | `surface-commit-stranding-warning` | The commit's stranding warning shown on the system space view for the order's life; the view's per-fleet record of the last order it committed **whose response carried the warning** (no record is kept for an ordinary commit), with an end tied to the order's own life as the own-fleets read reports it | ADDED `system-space-view` (1); `fleet-roster` drift closed for the burn command (no delta) | ⬜ not authored (authoring in the 2026-10-04 run) |
+| 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` ("Burn Preview Reflects…", "A Failed or Stale Preview…", likely the double-submit requirement) | ⬜ not authored |
 | 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
@@ -506,30 +508,67 @@ one rerun (25/25, 388 s); tier 3 once, 1042 s, one red = the filed
   random-spawn fixture red (`defect-spawn-system-single-body`) fired on run 1
   and not on run 2, as a random draw would.
 
-## Link 2a-iii — `clear-burn-preview-on-commit`
+## Link 2a-iii — `surface-commit-stranding-warning`
+
+**Split off `clear-burn-preview-on-commit` in-run on 2026-10-04** by the
+full-auto orchestrator, after its analyst sized the unsplit link at 40 tasks
+before the panel — see `../../handoffs/clear-burn-preview-on-commit-rulings.md`
+FULL-AUTO RULING 3 for the seam, and
+`../../handoffs/surface-commit-stranding-warning-rulings.md` for this link's
+own rulings.
+
+**Delivers.** `SpaceCommandPanel` reports an accepted burn commit to the view;
+the view keeps, per fleet, a record of the last order it committed whose
+response carried the warning — and none for an ordinary commit (identity = the
+commit response's burn instants) and decides, against the own-fleets read as
+last reported, whether that order is still the fleet's running burn; the commit
+response's stranding warning is shown as a notice for that order's life
+(`../../handoffs/drift-commit-stranding-warning-not-rendered.md`). The quote
+keeps refreshing after a commit, as today.
+
+- **Touches:** ADDED `system-space-view` (the notice and the order's life);
+  `fleet-roster` "A Burn Commit's Stranding Warning Is Surfaced to the Player"
+  made true for the burn command, no delta.
+- **Read first:** `../../handoffs/clear-burn-preview-on-commit-analysis.md`
+  (§ 1b, § 2, § 5 M1), via its index.
+- **Journey:** commit a burn; the notice leg is conditional on a fixture that
+  can arrange a stranding commit — otherwise recorded untested, never passing.
+
+## Link 2a-iii-b — `clear-burn-preview-on-commit`
 
 **Split off `lift-burn-preview-to-view` on 2026-10-03** by its adversary round 1
-(`../../handoffs/lift-burn-preview-to-view-rulings.md` FULL-AUTO RULING 13).
+(`../../handoffs/lift-burn-preview-to-view-rulings.md` FULL-AUTO RULING 13);
+**halved on 2026-10-04**, the order record and the stranding notice going first
+as 2a-iii above.
 
 **Delivers.** The live clause "the preview SHALL clear … when an order commits"
 made true — it has no scenario and no implementation today
-(`../../handoffs/drift-preview-does-not-clear-on-commit.md`).
+(`../../handoffs/drift-preview-does-not-clear-on-commit.md`) — as a fourth
+withheld state built on the order-identity derivation 2a-iii lands — note that
+2a-iii stores a record for *warned* orders only, so this link must widen it to
+every accepted commit rather than assume it exists.
 
 **Why it is its own link.** The first attempt (a stored fleet-and-selection pair)
 was a BLOCKER: the committed state outlived the order through cut drive, stop,
 arrival at a point and outside re-tasks. The central question is *when does a
 committed selection stop being committed*, and the answer must come from the
-served fleet read, survive the gap before that read shows the burn, keep a
-second Burn from going out uncapped, and keep a stranding warning on screen
-(`../../handoffs/drift-commit-stranding-warning-not-rendered.md`).
+served fleet read, survive the gap before that read shows the burn, and keep a
+second Burn from going out uncapped.
 
-- **Touches:** MODIFIED `system-space-view` "Burn Preview Reflects…" (the
-  commit clause's scenarios), probably "Burn and Jump Commit Controls Guard
-  Against Double-Submit"; `fleet-roster` "A Burn Commit's Stranding Warning Is
-  Surfaced to the Player" (drift, likely no delta).
-- **Read first:** `../../handoffs/lift-burn-preview-to-view-adversary-r1.md`
-  B1, M5, m4; `lift-burn-preview-to-view-panel-ux.md` F2; `-panel-architect.md`
-  A1, A4.
+- **Touches:** *(as the 2026-10-04 analysis found, not as first drafted.)* ADDED
+  `system-space-view` (the committed state); MODIFIED "Burn Preview Reflects…"
+  (three → four withheld states, the commit clause), "A Failed or Stale Preview
+  Is Never Presented as a Current Quote" (the closed no-label enumeration),
+  and "Burn and Jump Commit Controls Guard Against Double-Submit" if the burn
+  command is ruled unavailable for a committed selection.
+- **Read first:** `../../handoffs/clear-burn-preview-on-commit-analysis.md`
+  (whole, via its index — §§ 3–5 and 8 are this link's; its open questions Q1's
+  product half, Q2, Q7 and Q8 are **unruled**) and
+  `../../handoffs/clear-burn-preview-on-commit-rulings-index.md`;
+  `../../handoffs/lift-burn-preview-to-view-adversary-r1.md` B1, M5, m4;
+  `lift-burn-preview-to-view-panel-ux.md` F2; `-panel-architect.md` A1, A4.
+  Re-check the analysis against 2a-iii's archived spec and code before trusting
+  it — it was written before 2a-iii was built.
 - **Journey:** commit a burn and watch the quote go; cut the drive and watch the
   burn command and its quote come back for the same selection.
 

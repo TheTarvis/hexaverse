@@ -1,10 +1,14 @@
 # Drift — a burn commit's stranding warning is never rendered on the system space view
 
 **Status:** reported by adversary round 1 of `lift-burn-preview-to-view` (M5),
-adjudicated **code wrong** on the adversary's evidence; **not yet independently
-re-verified** — the owning link's analyst should confirm before specifying.
-**Owner:** link 2a-iii `clear-burn-preview-on-commit` (clearing the preview at
-commit removes the only stranding text left on screen).
+adjudicated **code wrong**; **independently confirmed 2026-10-04** by code
+reading (`clear-burn-preview-on-commit-analysis.md` § 1b — the response carries
+the flag, `backend/fleet/handler.go:445-448`; nothing renders it; the preview's
+own read is at `SpaceCommandPanel.tsx:280-284`, not `:275`).
+**Owner:** link 2a-iii `surface-commit-stranding-warning` (split off
+`clear-burn-preview-on-commit` by that change's RULING 3), for the **burn
+command's commit only**. The stop command's half is
+`drift-stop-stranding-warning-not-rendered.md`.
 **Found:** 2026-10-03. **Ruling:** `lift-burn-preview-to-view-rulings.md` RULING 13.
 
 ## The requirement
