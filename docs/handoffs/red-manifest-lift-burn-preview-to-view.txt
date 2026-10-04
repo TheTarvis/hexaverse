@@ -1,0 +1,14 @@
+# red-suite handoff manifest for lift-burn-preview-to-view
+# recorded 2026-10-04T13:24:53Z
+# verify with: bash harness/openspec-red-manifest.sh verify lift-burn-preview-to-view
+17c72f420ea5d9a2737fb8be222f3ee15e554afa7aafe3383f9adbaa99d376ee  frontend/components/space/SpaceCommandPanel.test.tsx
+010f39feb427bfaa13be93fd89d8fce24eeefda5c3c42b5d707e67e5ce578565  frontend/components/space/SystemSpaceView.burn-preview.test.tsx
+6a5277212538caf71458d3a7219ec1de5b2805b54628a54b16e5b7257005a31f  frontend/components/space/SystemSpaceView.render-loop.test.tsx
+c67e08c94b3f3ade3c388153a0a0d942def82e216691b4e1a3c87261f3dd0c79  frontend/components/space/SystemSpaceView.scan-refetch.test.tsx
+0359798d2e33e0ce33b1b6a4845e9d93ce54cfa17b66b05b36e83e6101a891dc  frontend/components/space/SystemSpaceView.scan-settle-announcement.test.tsx
+58f74f7cbfd23e80da6700b32f7ded585801ad43d97674b2abc295c9b38e1658  frontend/components/space/SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx
+39c877c1915fd70f75706fb66679f55642641593dd0f388ea3f947fe8359df45  frontend/components/space/SystemSpaceView.sighting-log-mount-ordering.test.tsx
+4c9dc5951c36472a5e2f35c4ac774ef52c7584a9f6112a72940d231a6ea97332  frontend/components/space/SystemSpaceView.sighting-log-no-ghost-reasons.test.tsx
+ee81551e8eee3a2470b38cb0ae70b60c95ca20649d144c139a856682ef90ce5c  frontend/components/space/SystemSpaceView.test.tsx
+3da0b08b95f49c303ca47e640cf6d483de1d6b347dec3685ec23f3eb2e72504a  frontend/hooks/use-burn-preview.call-site.test.ts
+3a71be21617760cfdba15e6bd3d4dc83e735b6b7d4f520f9c921c22a8791d29e  frontend/hooks/use-burn-preview.test.tsx

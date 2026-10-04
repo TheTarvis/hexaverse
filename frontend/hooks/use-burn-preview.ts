@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useCallback, useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
 import { PREVIEW_REFRESH_MS } from '@/lib/realtime'
@@ -23,16 +23,16 @@ import type { BurnPreview } from '@/lib/types/fleet'
 // runs an N-solve stranding scan per acting fleet per player, so its rate
 // is a real server cost that must be priceable in one place.
 //
-// A BURNING FLEET IS PREVIEWED. A re-target is an ordinary commit, so the
-// caller passes `commitWouldBeAccepted: true` for it. Suppression is for
-// the states where a commit would be REFUSED — a running mine holding the
-// movement channel, or a fleet in lane transit — and a suppressed preview
+// A BURNING FLEET IS PREVIEWED. A re-target is an ordinary commit. The
+// caller decides when a preview is wanted; the flag is a client
+// request-suppression input (a running mine, lane transit, a target that is
+// the fleet's own host), not the server's enforcement. A suppressed preview
 // is not a failed one.
 
 export interface UseBurnPreviewArgs {
   fleetId: string | null
   selection: SpaceSelection | null
-  /** False while a commit of this same order would be refused. */
+  /** False while the caller does not want a preview requested (suppression, not enforcement). */
   commitWouldBeAccepted: boolean
 }
 
@@ -69,9 +69,24 @@ export function useBurnPreview({
     staleTime: PREVIEW_REFRESH_MS,
   })
 
+  // Read live: a caller may hold `retry` from before the flag went false.
+  const enabledRef = useRef(enabled)
+  enabledRef.current = enabled
   const retry = useCallback(() => {
+    if (!enabledRef.current) return
     void query.refetch()
   }, [query])
+
+  // Discard on disable: a resumed preview starts empty and fetches at the
+  // transition; nothing from before the withholding is presented.
+  const qc = useQueryClient()
+  const selKey = selectionKey(selection)
+  useEffect(() => {
+    if (enabled) return
+    const queryKey = queryKeys.fleets.burnPreview(fleetId ?? '', selKey)
+    void qc.cancelQueries({ queryKey, exact: true })
+    qc.removeQueries({ queryKey, exact: true })
+  }, [enabled, qc, fleetId, selKey])
 
   const preview = enabled ? (query.data ?? null) : null
   const failed = enabled && !!query.error

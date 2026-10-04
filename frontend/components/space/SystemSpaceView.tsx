@@ -41,6 +41,7 @@ import { rosterRowStatus, type ResolvedBody } from '@/components/fleet/roster-st
 import { useCorporationOptional, useCorporationSessionOptional } from '@/components/corporation-provider'
 import { useRunningMine, useRunningScan } from '@/hooks/use-actions'
 import { useGalaxy } from '@/hooks/use-galaxy'
+import { useBurnPreview } from '@/hooks/use-burn-preview'
 import { useMyFleets } from '@/hooks/use-fleets'
 import { useMarketBoard, useStation } from '@/hooks/use-market'
 import { useReducedMotion } from '@/hooks/use-reduced-motion'
@@ -737,6 +738,15 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
 
   const interiorFailed = interior.isError
   const mineRunning = !!runningMine && runningMine.eta > worldTime
+  const dockedAtTarget =
+    !!acting?.attachedTo && selection?.bodyId !== undefined && selection.bodyId === acting.attachedTo
+  const previewWanted = !!acting && !acting.jump && !mineRunning && !dockedAtTarget
+  const burnPreview = useBurnPreview({
+    fleetId: acting?.id ?? null,
+    selection,
+    commitWouldBeAccepted: previewWanted,
+  })
+  const currentQuote = burnPreview.preview && !burnPreview.stale ? burnPreview.preview : null
   const showLoading = !interiorFailed && canvasAvailable && (interior.isLoading || !firstFrame)
 
   return (
@@ -901,6 +911,11 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           mineRunning={mineRunning}
           worldTime={worldTime}
           scale={servedScale}
+          preview={burnPreview.preview}
+          currentQuote={currentQuote}
+          previewStale={burnPreview.stale}
+          previewNoQuote={burnPreview.noQuote}
+          onRequote={burnPreview.retry}
         />
 
         <FleetActionsPanel

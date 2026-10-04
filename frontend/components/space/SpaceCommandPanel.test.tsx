@@ -19,8 +19,11 @@ import React from 'react'
 //     gateFacts?: { bodyId: string; destSystemId: string } | null
 //     canvasAvailable: boolean
 //   }
-// It reads the quote through `useBurnPreview` and commits through
-// `useOrder` / `useJump`, per the component -> hook -> service layering.
+// It commits through `useOrder` / `useJump`, per the component -> hook ->
+// service layering. Since `lift-burn-preview-to-view` the quote arrives as
+// props (`preview`, `currentQuote`, `previewStale`, `previewNoQuote`,
+// `onRequote`) from the mounting view, which owns the one `useBurnPreview`
+// call; the panel does not import the hook.
 //
 // data-testid contract:
 //   burn-button, preview-panel, preview-arrival, preview-deltav,
@@ -41,18 +44,16 @@ import React from 'react'
 
 const order = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }
 const jump = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }
-const previewState = {
-  preview: null as unknown,
-  stale: false,
-  noQuote: false,
-  retry: vi.fn(),
-}
+// openspec change `lift-burn-preview-to-view` (tasks.md 1.2): the panel no
+// longer calls the preview hook — the mounting view lifts it and hands the
+// quote down as props, so there is no hook mock and no mutable `previewState`
+// here. `onRequote` is the hook's `retry` as the panel receives it.
+const onRequote = vi.fn()
 
 vi.mock('@/hooks/use-fleets', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@/hooks/use-fleets')
   return { ...actual, useOrder: () => order, useJump: () => jump }
 })
-vi.mock('@/hooks/use-burn-preview', () => ({ useBurnPreview: () => previewState }))
 
 const toastError = vi.fn()
 const toastSuccess = vi.fn()
@@ -114,6 +115,11 @@ function panel(over: Record<string, unknown> = {}) {
       canvasAvailable
       worldTime={T0}
       scale={1}
+      preview={QUOTE}
+      currentQuote={QUOTE}
+      previewStale={false}
+      previewNoQuote={false}
+      onRequote={onRequote}
       {...over}
     />,
   )
@@ -123,9 +129,6 @@ beforeEach(() => {
   vi.clearAllMocks()
   order.isPending = false
   jump.isPending = false
-  previewState.preview = QUOTE
-  previewState.stale = false
-  previewState.noQuote = false
 })
 
 describe('SpaceCommandPanel — the preview overlay figures', () => {
@@ -161,8 +164,8 @@ describe('SpaceCommandPanel — the preview overlay figures', () => {
 
   // Scenario: An unaffordable preview is shown as such
   it('Scenario: An unaffordable preview is shown as such', () => {
-    previewState.preview = { ...QUOTE, affordable: false }
-    panel()
+    const unaffordable = { ...QUOTE, affordable: false }
+    panel({ preview: unaffordable, currentQuote: unaffordable })
     expect(screen.getByTestId('preview-affordable')).toHaveAttribute('data-affordable', 'false')
     // ...and visually distinct from the affordable state, not merely a
     // different attribute value.
@@ -170,8 +173,8 @@ describe('SpaceCommandPanel — the preview overlay figures', () => {
   })
 
   it('SDET-added: a stranding warning on the quote is surfaced', () => {
-    previewState.preview = { ...QUOTE, strandingWarning: true }
-    panel()
+    const stranding = { ...QUOTE, strandingWarning: true }
+    panel({ preview: stranding, currentQuote: stranding })
     expect(screen.getByTestId('preview-stranding')).toBeInTheDocument()
   })
 
@@ -180,8 +183,8 @@ describe('SpaceCommandPanel — the preview overlay figures', () => {
     // Every figure on this panel comes from the SERVED quote. Changing only
     // the served numbers must change every displayed number; if a figure
     // were recomputed from a drawn position it would not move.
-    previewState.preview = { ...QUOTE, deltaV: 11.5, fuelCostTons: 2.3, arriveMs: T0 + 7 }
-    const { container } = panel()
+    const served = { ...QUOTE, deltaV: 11.5, fuelCostTons: 2.3, arriveMs: T0 + 7 }
+    const { container } = panel({ preview: served, currentQuote: served })
     // deltaV is now an INTEGER m/s figure (R7): 11.5 ties away from zero to
     // 12, so the raw value — not the rounded display text — is what proves
     // the figure tracks the served quote.
@@ -197,9 +200,7 @@ describe('SpaceCommandPanel — failed and stale quotes', () => {
   // Scenario: A failed first preview shows a no-quote state, not empty
   // figures
   it('Scenario: A failed first preview shows a no-quote state, not empty figures', () => {
-    previewState.preview = null
-    previewState.noQuote = true
-    panel()
+    panel({ preview: null, currentQuote: null, previewNoQuote: true })
     expect(screen.getByTestId('preview-no-quote')).toBeInTheDocument()
     expect(screen.queryByTestId('preview-arrival')).toBeNull()
     expect(screen.queryByTestId('preview-deltav')).toBeNull()
@@ -208,22 +209,19 @@ describe('SpaceCommandPanel — failed and stale quotes', () => {
 
   // Scenario: A failed first preview offers a retry
   it('Scenario: A failed first preview offers a retry', async () => {
-    previewState.preview = null
-    previewState.noQuote = true
-    panel()
+    panel({ preview: null, currentQuote: null, previewNoQuote: true })
     await userEvent.click(screen.getByTestId('preview-retry'))
-    expect(previewState.retry).toHaveBeenCalled()
+    expect(onRequote).toHaveBeenCalled()
   })
 
   // Scenario: A failed refresh marks the shown figures stale
   it('Scenario: A failed refresh marks the shown figures stale', async () => {
-    previewState.stale = true
-    panel()
+    panel({ currentQuote: null, previewStale: true })
     expect(screen.getByTestId('preview-stale')).toBeInTheDocument()
     // The figures are still SHOWN — marked, not withdrawn.
     expect(screen.getByTestId('preview-deltav')).toBeInTheDocument()
     await userEvent.click(screen.getByTestId('preview-retry'))
-    expect(previewState.retry).toHaveBeenCalled()
+    expect(onRequote).toHaveBeenCalled()
   })
 
   // Scenario: A later successful refresh clears the stale marking
@@ -231,9 +229,26 @@ describe('SpaceCommandPanel — failed and stale quotes', () => {
     // Asserted BOTH ways: the marking is gone AND the newest figures are
     // shown as current. Absence alone would pass against a panel that
     // rendered nothing at all.
-    previewState.stale = false
-    previewState.preview = { ...QUOTE, deltaV: 4444.4 }
-    panel()
+    const stalePanel = (over: Record<string, unknown>) => (
+      <SpaceCommandPanel
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fleet={FLEET as any}
+        selection={{ bodyId: 'feat-body-3' }}
+        canvasAvailable
+        worldTime={T0}
+        scale={1}
+        preview={QUOTE}
+        currentQuote={QUOTE}
+        previewStale={false}
+        previewNoQuote={false}
+        onRequote={onRequote}
+        {...over}
+      />
+    )
+    const { rerender } = render(stalePanel({ currentQuote: null, previewStale: true }))
+    expect(screen.getByTestId('preview-stale')).toBeInTheDocument()
+    const fresh = { ...QUOTE, deltaV: 4444.4 }
+    rerender(stalePanel({ preview: fresh, currentQuote: fresh, previewStale: false }))
     expect(screen.queryByTestId('preview-stale')).toBeNull()
     expect(screen.getByTestId('preview-deltav')).toHaveTextContent(/4444|4,444/)
   })
@@ -241,9 +256,7 @@ describe('SpaceCommandPanel — failed and stale quotes', () => {
   // Scenario: The burn stays committable without a quote, labelled as
   // uncapped
   it('Scenario: The burn stays committable without a quote, labelled as uncapped', async () => {
-    previewState.preview = null
-    previewState.noQuote = true
-    panel()
+    panel({ preview: null, currentQuote: null, previewNoQuote: true })
     const btn = screen.getByTestId('burn-button')
     expect((btn as HTMLButtonElement).disabled, 'a transient preview failure must not make the core verb unreachable').toBe(false)
     expect(screen.getByTestId('burn-uncapped-label')).toBeInTheDocument()
@@ -255,8 +268,7 @@ describe('SpaceCommandPanel — failed and stale quotes', () => {
 
   // Scenario: A stale figure never becomes a cap
   it('Scenario: A stale figure never becomes a cap', async () => {
-    previewState.stale = true
-    panel()
+    panel({ currentQuote: null, previewStale: true })
     await userEvent.click(screen.getByTestId('burn-button'))
     const req = order.mutate.mock.calls[0][0]
     const body = req.request ?? req
@@ -305,11 +317,68 @@ describe('SpaceCommandPanel — the quote lock', () => {
     panel()
     await userEvent.click(screen.getByTestId('burn-button'))
     // A fresh preview is requested...
-    await waitFor(() => expect(previewState.retry).toHaveBeenCalled())
+    await waitFor(() => expect(onRequote).toHaveBeenCalled())
     // ...the new figures are presented for RE-CONFIRMATION...
     expect(screen.getByTestId('preview-panel')).toBeInTheDocument()
     // ...and the order is NOT retried automatically at the higher cost.
     expect(order.mutate).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('SpaceCommandPanel — the uncapped label and the lifted currentQuote (lift-burn-preview-to-view)', () => {
+  // Scenario: The uncapped-burn label is never shown beside an unavailable
+  // burn command (tasks.md 1.6; design decision 10). Each arm also supplies
+  // no quote, so the label WOULD show under the pre-lift rule.
+  it.each([
+    ['no selection', { selection: null }],
+    ['no acting fleet', { fleet: null }],
+    ['an unavailable canvas', { canvasAvailable: false }],
+    ['a running mine holding the movement channel', { mineRunning: true }],
+  ])(
+    'Scenario: The uncapped-burn label is never shown beside an unavailable burn command — %s',
+    (_name, over) => {
+      panel({ preview: null, currentQuote: null, previewNoQuote: false, ...over })
+      expect((screen.getByTestId('burn-button') as HTMLButtonElement).disabled).toBe(true)
+      expect(screen.queryByTestId('burn-uncapped-label')).toBeNull()
+    },
+  )
+
+  // Scenario: The burn stays committable without a quote, labelled as uncapped
+  // (tasks.md 1.6, the available arms; the withheld/loading shape is the one
+  // the lift newly produces: no preview, no failure).
+  it.each([
+    ['the withheld or loading shape (no preview, no failure)', { preview: null, currentQuote: null, previewNoQuote: false }],
+    ['a failed first quote', { preview: null, currentQuote: null, previewNoQuote: true }],
+    ['a stale quote', { currentQuote: null, previewStale: true }],
+  ])(
+    'Scenario: The burn stays committable without a quote, labelled as uncapped — available Burn with %s shows the label',
+    (_name, over) => {
+      panel(over)
+      expect((screen.getByTestId('burn-button') as HTMLButtonElement).disabled).toBe(false)
+      expect(screen.getByTestId('burn-uncapped-label')).toBeInTheDocument()
+    },
+  )
+
+  it('SDET-added: with a current quote the uncapped label is absent and the burn is available', () => {
+    panel()
+    expect((screen.getByTestId('burn-button') as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.queryByTestId('burn-uncapped-label')).toBeNull()
+  })
+
+  // tasks.md 1.7, design decision 2: the panel does not derive currency
+  // itself. `preview` is supplied and NOT stale, but the view handed no
+  // `currentQuote`: the panel must trust that, not re-derive `preview && !stale`.
+  it('Scenario: A stale figure never becomes a cap — the panel does not derive currency itself (preview supplied, currentQuote null, previewStale false)', async () => {
+    panel({ preview: QUOTE, currentQuote: null, previewStale: false })
+    // the figures the view handed down are shown ...
+    expect(screen.getByTestId('preview-deltav')).toBeInTheDocument()
+    // ... but with no current quote there is no ceiling, the label shows ...
+    expect(screen.queryByTestId('preview-fuel-ceiling')).toBeNull()
+    expect(screen.getByTestId('burn-uncapped-label')).toBeInTheDocument()
+    // ... and the order carries no cap.
+    await userEvent.click(screen.getByTestId('burn-button'))
+    const body = order.mutate.mock.calls[0][0].request ?? order.mutate.mock.calls[0][0]
+    expect(Object.prototype.hasOwnProperty.call(body, 'maxFuelTons')).toBe(false)
   })
 })
 
@@ -415,15 +484,13 @@ describe('SpaceCommandPanel — commit outcome reporting', () => {
 
   // Scenario: An uncapped commit still surfaces its actual figures
   it('Scenario: An uncapped commit still surfaces its actual figures', async () => {
-    previewState.preview = null
-    previewState.noQuote = true
     order.mutate.mockImplementation((_v: unknown, opts?: { onSuccess?: (d: unknown) => void }) => {
       opts?.onSuccess?.({
         ...FLEET,
         state: { Mode: 0, Park: null, Drift: null, Burn: { ArriveMs: T0 + 12_345, DeltaV: 88.5, DepartMs: T0, Curve: [] } },
       })
     })
-    panel()
+    panel({ preview: null, currentQuote: null, previewNoQuote: true })
     await userEvent.click(screen.getByTestId('burn-button'))
     const notice = await screen.findByTestId('commit-drift-notice')
     // deltaV rounds to an integer now (88.5 ties away from zero to 89), so

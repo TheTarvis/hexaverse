@@ -208,7 +208,7 @@ vi.mock('@/components/account-provider', () => ({
   useAccountContext: () => ({ user: { uid: 'u1' }, authLoading: false, isAdmin: false }),
 }))
 vi.mock('@/hooks/use-burn-preview', () => ({
-  useBurnPreview: () => ({ data: undefined, isLoading: false, isError: false, isFetching: false }),
+  useBurnPreview: () => ({ preview: null, stale: false, noQuote: false, retry: vi.fn() }),
 }))
 vi.mock('@/lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },

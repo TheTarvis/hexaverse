@@ -34,7 +34,6 @@ import { useState } from 'react'
 import { Button } from '@/components/catalyst/button'
 import { Figure } from '@/components/figure/Figure'
 import { useJump, useOrder } from '@/hooks/use-fleets'
-import { useBurnPreview } from '@/hooks/use-burn-preview'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
 import { ABSENT_FIGURE, formatByUnit } from '@/lib/format'
 import { jumpErrorCopy } from '@/lib/jump-copy'
@@ -71,6 +70,14 @@ export interface SpaceCommandPanelProps {
   worldTime: number
   /** The mounting view's served world-clock scale — see contract §6. */
   scale: number | undefined
+  /** The figures to show; may be stale. Owned by the mounting view. */
+  preview: BurnPreview | null
+  /** The preview when it is not stale, else null — derived once by the view. */
+  currentQuote: BurnPreview | null
+  previewStale: boolean
+  previewNoQuote: boolean
+  /** Re-requests the quote (the preview hook's retry). */
+  onRequote: () => void
 }
 
 interface CommitFigures {
@@ -99,6 +106,11 @@ export function SpaceCommandPanel({
   mineRunning = false,
   worldTime,
   scale,
+  preview,
+  currentQuote,
+  previewStale: stale,
+  previewNoQuote: noQuote,
+  onRequote: retry,
 }: SpaceCommandPanelProps) {
   const order = useOrder()
   const jump = useJump()
@@ -106,18 +118,11 @@ export function SpaceCommandPanel({
   const jumpGuard = useSubmitGuard()
   const [commit, setCommit] = useState<CommitFigures | null>(null)
 
-  const { preview, stale, noQuote, retry } = useBurnPreview({
-    fleetId: fleet?.id ?? null,
-    selection,
-    // A burning fleet's re-target IS an ordinary commit, so it is previewed
-    // too. Only a fleet in lane transit has no position to solve from.
-    commitWouldBeAccepted: !!fleet && !fleet.jump,
-  })
-
   // A stale figure NEVER becomes a cap: the ceiling is derived from the
-  // CURRENT quote or from nothing at all.
-  const currentQuote: BurnPreview | null = preview && !stale ? preview : null
+  // CURRENT quote (supplied by the view) or from nothing at all.
   const ceiling = currentQuote ? currentQuote.fuelCostTons * BURN_FUEL_ALLOWANCE : null
+
+  const burnAvailable = !!selection && canvasAvailable && !!fleet && !mineRunning
 
   const commitBurn = () => {
     const request = selectionWireRequest(selection)
@@ -298,7 +303,7 @@ export function SpaceCommandPanel({
           Retry quote
         </button>
       )}
-      {!currentQuote && (
+      {burnAvailable && !currentQuote && (
         // Committable WITHOUT a quote — a transient preview failure must not
         // make the core verb unreachable — but labelled for what it is.
         <p data-testid="burn-uncapped-label" className="mt-1 text-[11px] text-zinc-500">

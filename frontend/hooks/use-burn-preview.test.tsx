@@ -323,3 +323,212 @@ describe('useBurnPreview — failure states', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// openspec change `lift-burn-preview-to-view` (tasks.md 1.8-1.10; impl
+// contract §3.1, §3.2, §5.3) — the hook's behaviour while the caller withholds
+// the preview (`commitWouldBeAccepted: false`). Same `wrapper()` and
+// `fleetService` mock as the describes above; the existing tests are untouched.
+//
+// "At the transition" = the service call count rises on the rerender to `true`
+// with NO timer advance beyond a zero-ms flush.
+// ---------------------------------------------------------------------------
+
+function deferred<T>() {
+  let resolve!: (v: T) => void
+  let reject!: (e: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
+function withheldHook() {
+  return renderHook(
+    ({ accepted }: { accepted: boolean }) =>
+      useBurnPreview({
+        fleetId: 'fleet_1',
+        selection: { bodyId: 'feat-body-3' },
+        commitWouldBeAccepted: accepted,
+      }),
+    { wrapper: wrapper(), initialProps: { accepted: true } },
+  )
+}
+
+describe('useBurnPreview — retry while the preview is withheld', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockPreview.mockResolvedValue(QUOTE)
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // Scenario: No path sends a preview request while one is withheld
+  it('Scenario: No path sends a preview request while one is withheld — retry() sends nothing while commitWouldBeAccepted is false', async () => {
+    const { result } = renderHook(
+      () =>
+        useBurnPreview({
+          fleetId: 'fleet_1',
+          selection: { bodyId: 'feat-body-3' },
+          commitWouldBeAccepted: false,
+        }),
+      { wrapper: wrapper() },
+    )
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPreview).not.toHaveBeenCalled()
+    await act(async () => {
+      result.current.retry()
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPreview, 'a retry while withheld must not send a preview request').not.toHaveBeenCalled()
+  })
+
+  it('Scenario: No path sends a preview request while one is withheld — retry() sends one while commitWouldBeAccepted is true', async () => {
+    const { result } = withheldHook()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPreview).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      result.current.retry()
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPreview, 'retry while enabled re-requests').toHaveBeenCalledTimes(2)
+  })
+
+  it('Scenario: No path sends a preview request while one is withheld — a retry captured while enabled and invoked after disabling sends nothing (SDET-added, impl contract §3.1 stale-closure arm)', async () => {
+    const { result, rerender } = withheldHook()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPreview).toHaveBeenCalledTimes(1)
+    const captured = result.current.retry
+    rerender({ accepted: false })
+    await vi.advanceTimersByTimeAsync(0)
+    await act(async () => {
+      captured()
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPreview, 'a retry captured before the withholding must read the enabled state live').toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('useBurnPreview — a resumed preview presents nothing from before the withholding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // Scenario: A resumed preview presents nothing from before the withholding
+  it('Scenario: A resumed preview presents nothing from before the withholding — earlier answer cached', async () => {
+    mockPreview.mockResolvedValueOnce(QUOTE)
+    const { result, rerender } = withheldHook()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(result.current.preview).toEqual(QUOTE)
+    expect(mockPreview).toHaveBeenCalledTimes(1)
+
+    rerender({ accepted: false })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(result.current.preview, 'withheld shows nothing').toBeNull()
+
+    const restoring = deferred<BurnPreview>()
+    mockPreview.mockImplementationOnce(() => restoring.promise)
+    rerender({ accepted: true })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(mockPreview, 'the restoring request is sent at the transition, not at the next interval').toHaveBeenCalledTimes(2)
+    expect(result.current.preview, 'no figure from before the withholding while the restoring request is pending').toBeNull()
+    expect(result.current.stale).toBe(false)
+    expect(result.current.noQuote).toBe(false)
+
+    // The restoring answer, once it lands, is the new current quote.
+    await act(async () => {
+      restoring.resolve(SECOND_QUOTE)
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(result.current.preview).toEqual(SECOND_QUOTE)
+  })
+
+  it('Scenario: A resumed preview presents nothing from before the withholding — a request still in flight when the withholding began', async () => {
+    const early = deferred<BurnPreview>()
+    mockPreview.mockImplementationOnce(() => early.promise)
+    const { result, rerender } = withheldHook()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPreview).toHaveBeenCalledTimes(1)
+
+    rerender({ accepted: false })
+    await vi.advanceTimersByTimeAsync(0)
+    // Its response lands DURING the withholding ...
+    await act(async () => {
+      early.resolve(QUOTE)
+    })
+    await vi.advanceTimersByTimeAsync(0)
+
+    const restoring = deferred<BurnPreview>()
+    mockPreview.mockImplementationOnce(() => restoring.promise)
+    rerender({ accepted: true })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(mockPreview, 'the restoring request is sent at the transition').toHaveBeenCalledTimes(2)
+    expect(result.current.preview, 'the response that landed while withheld is not presented on resume').toBeNull()
+    expect(result.current.stale).toBe(false)
+    expect(result.current.noQuote).toBe(false)
+  })
+
+  // Scenario: A failed restoring request is a no-quote state, not a stale one
+  it('Scenario: A failed restoring request is a no-quote state, not a stale one — earlier answer cached', async () => {
+    mockPreview.mockResolvedValueOnce(QUOTE)
+    const { result, rerender } = withheldHook()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(result.current.preview).toEqual(QUOTE)
+
+    rerender({ accepted: false })
+    await vi.advanceTimersByTimeAsync(0)
+
+    const restoring = deferred<BurnPreview>()
+    mockPreview.mockImplementationOnce(() => restoring.promise)
+    rerender({ accepted: true })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPreview, 'restoring request sent at the transition').toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      restoring.reject(new Error('restoring request failed'))
+    })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(result.current.noQuote, 'a failed restoring request is a no-quote state').toBe(true)
+    expect(result.current.stale, 'never a stale marking over figures from before the withholding').toBe(false)
+    expect(result.current.preview).toBeNull()
+  })
+
+  it('Scenario: A failed restoring request is a no-quote state, not a stale one — a request still in flight when the withholding began', async () => {
+    const early = deferred<BurnPreview>()
+    mockPreview.mockImplementationOnce(() => early.promise)
+    const { result, rerender } = withheldHook()
+    await vi.advanceTimersByTimeAsync(0)
+
+    rerender({ accepted: false })
+    await vi.advanceTimersByTimeAsync(0)
+    await act(async () => {
+      early.resolve(QUOTE)
+    })
+    await vi.advanceTimersByTimeAsync(0)
+
+    const restoring = deferred<BurnPreview>()
+    mockPreview.mockImplementationOnce(() => restoring.promise)
+    rerender({ accepted: true })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockPreview).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      restoring.reject(new Error('restoring request failed'))
+    })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(result.current.noQuote).toBe(true)
+    expect(result.current.stale).toBe(false)
+    expect(result.current.preview).toBeNull()
+  })
+})
