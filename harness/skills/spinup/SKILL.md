@@ -1,53 +1,78 @@
 ---
 name: spinup
-description: Clean-restart the full hexaverse dev stack (firebase emulators, backend, frontend, agent, test emulators). Kills anything on the hexaverse ports (orphans included), then launches everything as GoLand run configurations via the GoLand MCP. Use when the user asks to spin up, start, or restart the dev environment.
+description: Clean-restart this checkout's dev stack (Firebase emulators, backend, frontend, agent, and test emulators) in GoLand Run tabs. Use for /spinup, $spinup, or a request to start or restart the local dev environment.
 ---
 
-# Spinup — clean-restart the full dev stack
+# Spinup — restart the dev stack in GoLand
 
-Kill whatever holds the hexaverse ports (orphaned or healthy — this is a clean restart), then launch every service as a **GoLand run configuration** so each lands in its own IDE Run tab with stop/restart buttons.
+Run this workflow from the target repository root. `$startup` uses this same
+workflow through `harness/skills/startup/SKILL.md`. Keep the procedure here so
+Claude Code and Codex share one implementation.
 
-## Prerequisites
+## Preflight
 
-- GoLand must be open on the hexaverse project (the MCP tools fail otherwise — tell the user to open GoLand if calls error out).
-- Load the tool first if deferred: `ToolSearch("select:mcp__goland__execute_run_configuration")`.
-- Always pass `projectPath: /Users/travis/Projects/hexaverse`.
+1. Read the project's root `CLAUDE.md` and resolve its absolute repository root.
+   Pass that root as `projectPath` on every GoLand MCP call.
+2. Discover the available GoLand `get_run_configurations` and
+   `execute_run_configuration` tools. Claude Code can use ToolSearch when
+   deferred; Codex uses its available tool discovery or exposed MCP tools.
+   These are MCP capabilities, not shell commands. Claude settings do not
+   configure Codex's MCP connections.
+3. Call `get_run_configurations` for this project before stopping processes.
+   Confirm these configurations exist: `firebase:emulators`, `dev:backend`,
+   `dev:frontend`, `dev:agent`, and `firebase:emulators:test`.
+   If the MCP is unavailable, the project is not open in GoLand, or a required
+   configuration is missing, report the specific blocker before killing
+   anything. Preserve IDE Run tabs; do not silently switch to shell servers.
+4. Read current ports with `python3 harness/ports.py show` and
+   `python3 harness/ports.py env`. The latter provides shell assignments; use
+   `eval "$(python3 harness/ports.py env)"` in an explicitly selected Bash shell
+   when shell variables are needed. Do not use stale hardcoded ports or paths.
+5. Read `package.json`, `firebase.json`, and `firebase.test.json` to identify
+   the emulators actually launched by each configuration. A port in the lane
+   table alone does not mean a service is enabled. Check only enabled
+   emulators; Chartz uses Postgres and has no Firestore emulator.
 
-## Services and ports
+## Stop the services being restarted
 
-hexaverse runs on Flywheel/Volt ports **+10** (agent is the exception: 20202).
+Build an exact port list from `$PORT_FRONTEND`, `$PORT_BACKEND`, `$PORT_AGENT`,
+and both sets of enabled emulator ports, including their UI (when enabled),
+hub, logging, and Firestore websocket ports (when Firestore is enabled).
+The Firebase hub and logging ports come from the lane even if implicit in
+the Firebase configuration. Verify every selected port belongs to this
+checkout's lane. Do not sweep every allocated port: database containers,
+Storybook, and test fixture servers are separate dependencies or workflows.
 
-| Run configuration | Readiness ports |
-|---|---|
-| `firebase:emulators` (dev) | 20212 Firestore (ws 20213), 20211 Auth, 20214 Pub/Sub, 20210 UI (hub 20216, logging 20217) |
-| `dev:backend` | 20201 |
-| `dev:frontend` | 20200 |
-| `dev:agent` | 20202 |
-| `firebase:emulators:test` | 20242 Firestore, 20241 Auth, 20244 Pub/Sub (hub 20246, storage 20245; UI disabled) |
+Survey listeners with `lsof -nP -iTCP:<port> -sTCP:LISTEN` and inspect the
+holder's command and working directory. If a holder clearly belongs to
+another project, stop and report the conflict. Never kill by process name.
 
-## CRITICAL — kill by port, never by name
+Deduplicate listener PIDs, record them for the report, send SIGTERM, and wait
+two seconds. Recheck the selected ports and send SIGKILL only to confirmed
+remaining service listeners. Skip empty PID lists. Use Bash arrays with
+`"${ports[@]}"` and `"${pids[@]}"` (or iterate individual lines); zsh does not
+word-split a string containing ports. Recheck again and stop if any selected
+port is still held. Do not launch over a surviving listener.
 
-Flywheel and Volt run the same foundation on the -10 ports (3000, 9000, 8080, ...). A `pkill -f firebase`/`pkill -f uvicorn` would kill their stacks too. Only ever kill PIDs found listening on the **exact** hexaverse ports below. Never touch any other port.
+## Launch and verify
 
-## Procedure
+1. Ensure any database dependency required by the backend is ready. For a
+   Postgres checkout, use its existing `Local Dev` GoLand configuration if
+   needed and verify `$PORT_POSTGRES`; leave a healthy database running.
+2. Launch `firebase:emulators` with `waitForExit: false`. Retain the returned
+   `fullOutputPath` for diagnostics. Poll each enabled dev emulator's service
+   port with `nc -z localhost <port>` for up to 60 seconds before launching
+   dependent services. A failed dependency stops dependent launches.
+3. Launch `dev:backend`, `dev:frontend`, `dev:agent`, and
+   `firebase:emulators:test` in parallel using the current client's tools.
+   Pass `waitForExit: false` and the same `projectPath` for each launch.
+4. Poll `$PORT_BACKEND`, `$PORT_FRONTEND`, `$PORT_AGENT`, and every enabled
+   test emulator's service port for up to 90 seconds. Use short polling calls
+   so progress updates remain possible. A successful launch response alone
+   does not prove readiness.
+5. For a launch error or readiness timeout, read that configuration's
+   `fullOutputPath` and report the actual error. Do not relaunch blindly.
 
-1. **Kill everything on hexaverse ports** (clears orphans; SIGTERM, then SIGKILL stragglers):
-   ```bash
-   # NOTE: ports inlined in each loop on purpose — zsh does not word-split "$PORTS"
-   for p in 20212 20211 20214 20210 20216 20217 20213 20201 20200 20202 20242 20241 20244 20240 20246 20245; do lsof -ti tcp:$p -sTCP:LISTEN; done | sort -u | xargs kill 2>/dev/null
-   sleep 2
-   for p in 20212 20211 20214 20210 20216 20217 20213 20201 20200 20202 20242 20241 20244 20240 20246 20245; do lsof -ti tcp:$p -sTCP:LISTEN; done | sort -u | xargs kill -9 2>/dev/null
-   for p in 20212 20211 20214 20210 20216 20217 20213 20201 20200 20202 20242 20241 20244 20240 20246 20245; do lsof -ti tcp:$p -sTCP:LISTEN >/dev/null && echo "$p STILL HELD"; done; true
-   ```
-   If a port is STILL HELD after SIGKILL, stop and report it — do not launch on top of it.
-2. **Start dev emulators first** (backend depends on them):
-   `execute_run_configuration` with `configurationName: "firebase:emulators"`, `waitForExit: false`.
-3. **Poll until ready** (typically <5s): loop `nc -z` on 20212 and 20211, ~60s budget.
-4. **Start the rest in parallel** (one message, four tool calls, all `waitForExit: false`):
-   `dev:backend`, `dev:frontend`, `dev:agent`, `firebase:emulators:test`.
-5. **Poll until ready**: 20201, 20200, 20202, 20242 (~90s budget — frontend/agent cold starts are the slow ones).
-6. **If a port never comes up**: tail the `fullOutputPath` log file returned by that config's launch and report the actual error. Do not relaunch blindly.
-
-## Report
-
-End with a short table: service, port, status (restarted / FAILED + reason), noting any PIDs that were killed in step 1. Include the dev emulator UI link: http://localhost:20210 (the test emulator UI is disabled).
+Report a short service/port/status table, any killed PIDs, and failures with
+their reasons. Include the resolved dev emulator UI URL when enabled, and
+the test UI URL only when `firebase.test.json` enables it.
