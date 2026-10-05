@@ -450,3 +450,36 @@ counted across the whole change … MAJOR and MINOR residue at the cap becomes a
 follow-up") and "prior verdicts expire when the spec is edited".
 **Alternatives rejected.** A fourth round; an unreviewed edit.
 **Reversal cost.** Two sentences.
+
+---
+
+## Rulings at the archive gate, 2026-10-05
+
+### FULL-AUTO RULING 21 — tier 4's single red, `space-double-submit.spec.ts:267`, is residue of the filed `defect-spawn-system-single-body.md` and does not hold the gate; this change's journey passed
+
+**Question.** Tier 4, run once at `5a4c182` (436 s wall; one-minute load 3.62 at
+start; `Received SIGTERM` count 1 before and 1 after; tree clean; no foreign
+files): 31 passed, 1 failed. The red is
+`space-double-submit.spec.ts:267` "Two activations in one tick submit one burn
+order": `Error: a generated system carries several ordinary bodies … Expected:
+> 1 Received: 1` at `:277`, failing in 2.8 s at its own fixture precondition.
+Archive past it?
+
+**Ruling.** Yes — residue. All three conditions of the residue rule hold:
+(1) the message, assertion and line are the filed defect's recorded signature
+verbatim (`defect-spawn-system-single-body.md` "What happens"); (2) this
+change's relevant diff is empty for it — `git diff d965f5d HEAD --
+frontend/e2e/tests/space-double-submit.spec.ts backend` is empty, and the
+change touches no generator, spawn or burn-command code; (3) it touches none of
+this change's scenarios — it fails before any selection, quote or overlay
+exists. The occurrence is appended to the defect file. The change's own journey
+(`burn-cost-overlay-journey.spec.ts`, four tests) passed, with its three
+must-PASS legs PASSED. No rerun is taken: the one rerun the rules allow is for a
+red that needs a revision round, and this one needs none.
+
+**Basis.** Precedence 1 — the chain entry's residue rule for this link (filed
+signature + empty relevant diff + none of this change's scenarios), and chain
+doc Link 2a "Taught at the archive": "`defect-spawn-system-single-body` … is
+residue by rule (RULING 54), but every later link's gate will meet it".
+**Alternatives rejected.** A rerun to get a clean draw — a "confirming rerun"
+`docs/testing-tiers.md` forbids. **Reversal cost.** None; a record.

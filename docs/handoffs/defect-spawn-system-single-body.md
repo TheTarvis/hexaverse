@@ -67,3 +67,10 @@ suite's most frequent red and is still unchosen.
 ordinary bodies": Expected > 1, Received 1. Same assertion, same message. 23
 passed / 2 failed in 366 s; no SIGTERM. Treated as residue under
 `lift-burn-preview-to-view-rulings.md` FULL-AUTO RULING 23.
+
+## Occurrence — 2026-10-05, `add-burn-cost-overlay` archive gate, tier 4 (single run)
+
+`space-double-submit.spec.ts:267`, same message and assertion (`Expected: > 1
+Received: 1` at `:277`), failed in 2.8 s; 31 other tests passed including the
+change's own journey. Ruled residue: `add-burn-cost-overlay-rulings.md`
+FULL-AUTO RULING 21 (spec and backend diff empty for the change).

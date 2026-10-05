@@ -135,3 +135,47 @@ No leg was found that passes with zero probe targets on a must-PASS leg: 812-816
 ### Verdict after the second pass
 
 Unchanged: **SHIP** conditional on the run. Expected journey outcome at best: must-PASS legs PASSED, paint-light and paint-dark PASSED (clause 1 of row 20 closed in both schemes), clauses 2 and 3 of row 20 UNTESTED with tier-1 cover (V 2.1, V 2.2, G 1.4), row 9 containment accepted as INSPECTED-by-arithmetic. G1 and G2 are the two I would ask the SDET to fix before the run.
+
+## Third pass — rows closed from the gate run
+
+QA, 2026-10-04. Evidence: `docs/handoffs/add-burn-cost-overlay-tier4-run1.log` (journey spec as run at `5a4c182`; "31 passed, 1 failed", log line 365) and `docs/handoffs/add-burn-cost-overlay-tier3-run1-tail.log` (line 37 "DONE 1979 tests, 1 skipped", `EXIT=0`; a backend Go suite, no frontend or overlay content). I re-read the revised spec: the G1/G4 hardening is real at `wireViolations` (spec 263-292: capacity must be readable, the panel's quote must match a recorded wire answer for that target, the gauge state and mark must equal the WIRE's `affordable`, and the band must equal wire cost over capacity). I ran nothing.
+
+### Is each PASSED real? (from the log)
+
+- `grep -c "SKIPPED\|skipped"` over the tier-4 log: 0. The file-level `test.skip` did not fire; the journey's four tests ran (log lines 67, 105, 124, 140: all four ticked).
+- Probe is non-vacuous: 8 of 8 candidates quoted (line 55), with figures printed per target (lines 47-54; e.g. `feat-belt-0 band=16.8536 fill=50 ... quotedCost=33.7072 capacity=200`). No selection snapshot (line 44): `sel= gauge=filled costState=null band=null fill=50 panelFlag=null`. Clear: before `costState=affordable band=15.4624`, after `sel= costState=null band=null fill=50` (lines 57-58 of the sed range, log "clear: before/after").
+- Update-depth: `update-depth lines: 0` after every journey test (lines 63, 103, 122, 138). The only console errors are two `/login?signUp=true` 404s (pre-existing, outside this change).
+- Both schemes ran: light samples at lines 79 and 84, dark at lines 90 and 95, each with fill, extent and rail all non-n/a, `scaleX=1`, extent 8.55 and 3.38 device px (above the 2 px floor).
+
+### Closing table
+
+| BLOCKED item | Closing line (spec, as run) / log evidence | Final status |
+|---|---|---|
+| Row 20 clause 1: fill, extent, rail centre pixels pairwise unequal | `assertPaint` hard pairs in the paint legs (spec 984-area, pairs fill-extent, fill-rail, extent-rail); log: `[journey-leg] paint-light: PASSED` (line 88), `paint-dark: PASSED` (line 99). Light: fill rgb(159,159,169), extent rgb(82,82,92), rail rgb(212,212,216) (lines 79, 84). Dark: fill rgb(212,212,216), extent rgb(113,113,123), rail rgb(83,83,89) (lines 90, 95). Pairwise unequal in each scheme at two targets each. Contrast ratios recorded: light 2.94 / 1.77 / 5.22; dark 3.27 / 5.17 / 1.58 | **CLOSED** (both schemes) |
+| Row 20 clause 2: extent-past-fill centre pixel unequal to rail | `extent-past-fill: UNTESTED - not sampled in both schemes (light=false dark=false); costs are a small fraction of the fuel aboard` (lines 100, 119, 134); `pastFill=n/a` in every paint line | **NOT CLOSED, untested at any rendered tier**. Tier-1 cover: Gauge 1.1, VitalsStrip 2.1 (extent 30 % past a 20 % fill, `affordable`, mark absent), BP 3.5 (50 % past a 40 % fill). Geometry and state are tier-1 observed; the sRGB inequality of the past-fill part vs the rail is not observed anywhere |
+| Row 20 clause 3 and row 8 rendered paint: mark pixel unequal to extent and fill | `unaffordable-overlay-and-mark: UNTESTED - the bounded probe (round 1 ..., round 2 ...) arranged no unaffordable quote` (lines 120, 135); all 8 round-1 flags and all 5 round-2 flags `true`; `mark=n/a` in every paint line | **NOT CLOSED, untested at any rendered tier**. Tier-1 cover: Gauge 1.4 (per-scheme `bg-` shade of the mark differs from the extent's: light amber-500 vs amber-800, dark amber-400 vs amber-600), VitalsStrip 2.2 a/b/c. Class-level only; the rendered mark pixel is unobserved |
+| Row 9 rendered containment of the mark | No spec line (the journey bounds the extent only, line 75 `[journey-floor]`: band inside rail, rail inside fuel cell) | **INSPECTED-by-arithmetic**: V 2.2 c asserts `left: p%` with `translateX(-p%)` at 0, 100, 250 t; leading edge = p(W-w)/100, within [0, W-w] for p in [0,100]. Not observed as pixels |
+| Row 8 mark width, height and sameness at two costs, as rendered | No spec line | **INSPECTED / tier 1 only** (V 2.2 b: `w-1`, `inset-y-0`, no inline size) |
+
+Observed-in-journey positive results that bear on matrix rows (not previously BLOCKED, now additionally corroborated): rows 21 and 30 (no selection draws nothing; clear withdraws, `clear-withdraws: PASSED`), row 28 (replace never shows the previous cost: `replace-selection: PASSED`, 4 samples, line 72 X band 15.36 %, Y band 13.66 %), row 33 (commit withdraws from +100 ms: `commit-withdraws-at-acceptance: PASSED`, line 111; the early 2-snapshot observation within 100 ms of node-side acceptance is logged as observation only), and the 1280x720 floor (`width-floor-1280x720: PASSED`).
+
+### The red touches none of this change's scenarios
+
+`space-double-submit.spec.ts:267` fails at line 277, `a generated system carries several ordinary bodies`, `Expected: > 1, Received: 1` (log lines 335-345), 2.8 s in, at its own fixture precondition, before any selection, quote or overlay. That is the filed `defect-spawn-system-single-body.md` signature, ruled residue by RULING 21 (`docs/handoffs/add-burn-cost-overlay-rulings.md`, "FULL-AUTO RULING 21"; three conditions: signature verbatim, this change's diff empty for that spec and backend, touches none of this change's scenarios). It is not a FAIL against any of the 40 scenarios. Tier 3 is the backend Go suite and shows no failure (`DONE 1979 tests, 1 skipped`, `EXIT=0`).
+
+### Ships unobserved at any rendered tier (tier-1 evidence only)
+
+1. Row 20 clause 2: the extent-past-fill part's colour vs the rail, as sampled sRGB, in either scheme.
+2. Row 20 clause 3 / row 8: the unaffordable mark's colour vs the extent and the fill, as sampled sRGB, in either scheme (the mark and the unaffordable state were never drawn in the journey: every served flag was `true`).
+3. The unaffordable state against the wire in a real stack: the revised `wireViolations` would catch a flag-ignoring gauge, but with every probed flag `true` it never saw `false`, so the flag copy for `affordable: false` is tier-1 evidence only (G1's residual).
+4. Row 9: rendered containment of the mark (INSPECTED-by-arithmetic).
+5. Row 8: rendered mark width and height and their sameness across costs.
+6. Row 2's "end of the fill remains visible" is observed as a class-level proxy at tier 1 and, in the journey, only incidentally (the sampled extent was shorter than the fill, so the fill sample beyond the extent was visible at both targets). The past-fill visibility half is unobserved (same as item 1).
+
+All six were accepted in advance as untested by RULINGs 14 and 16; they are stated here as untested, not as passing.
+
+### Final verdict
+
+0 FAIL, 39 matrix rows PASS at tier 1, row 20 PARTIAL: clause 1 CLOSED at the journey in both schemes, clauses 2 and 3 untested at any rendered tier with named tier-1 cover. The three must-PASS journey legs are PASSED with real probe figures, no skip, update-depth 0, and the only red is ruled residue outside this change.
+
+**SHIP**
