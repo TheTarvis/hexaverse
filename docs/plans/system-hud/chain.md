@@ -6,11 +6,12 @@ around the three surfaces Travis picked on 2026-09-08: the **in-system list**,
 vitals strip**. The scoping doc `../system-hud.md` is the model and carries
 the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
-**Status (2026-10-05): links 1, 2a, 2a-ii, 2a-iii and 2a-iii-b archived
-(2a-iii-b `clear-burn-preview-on-commit` at `51944af`, its gate passed over
-three unrelated tier-4 reds by Travis's ruling —
+**Status (2026-10-05): links 1, 2a, 2a-ii, 2a-iii, 2a-iii-b and 2a-iv archived
+(2a-iv `add-burn-cost-overlay` at `647af3e`; 2a-iii-b
+`clear-burn-preview-on-commit` at `51944af`, its gate passed over three
+unrelated tier-4 reds by Travis's ruling —
 `../../handoffs/clear-burn-preview-on-commit-rulings-index.md` USER RULING 20);
-2a-iv (`add-burn-cost-overlay`) is next, `not authored`.** The out-of-chain
+2b (`add-console-dock`) is next, `not authored`.** The out-of-chain
 corrective change `fix-burn-order-geometry-refusals` archived at `d52eab1`
 between the two. 2a-iii was split in-run:
 the order record and the stranding notice went first, the commit-clear follows. The link handed to
@@ -57,7 +58,7 @@ symlink to it.
 | 2a-ii | `lift-burn-preview-to-view` | The burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props; two unenforced preview-request preconditions made true (running mine, docked at the target) | MODIFIED `system-space-view` (2: the burn preview, the failed-or-stale preview) | ✅ archived `0f2ad5d` (2026-10-04); authored r3 `e3fd54c`, built `3802b92`, gate `c773e26` |
 | 2a-iii | `surface-commit-stranding-warning` | The commit's stranding warning shown on the system space view for the order's life; the view's per-fleet record of the last order it committed **whose response carried the warning** (no record is kept for an ordinary commit), with an end tied to the order's own life as the own-fleets read reports it | ADDED `system-space-view` (1); `fleet-roster` drift closed for the burn command (no delta) | ✅ archived `3218d9d` (2026-10-04); authored r2 `af747be`, built `808420d`, gate `6494f35` |
 | 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` (3: "Burn Preview Reflects…", "A Failed or Stale Preview…", "Burn and Jump Commit Controls Guard Against Double-Submit") | ✅ archived `51944af` (2026-10-05); authored r2 `29f0a6b`, built `62c8f15`, gate `c3fcfcf` + USER RULING 20 |
-| 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) — *as authored: 2 ADDED `system-console`, no `system-space-view` delta (RULING 8)* | 🟡 authored r3 `65f2aef` |
+| 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) — *as authored: 2 ADDED `system-console`, no `system-space-view` delta (RULING 8)* | ✅ archived `647af3e` (2026-10-05); authored r3 `65f2aef`, built `261dc7e`, gate `1456cd6` |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
 | 4 | `add-arc-figures-and-entity-tab` | Course label + Burn on the drawn curve, progress while burning; the **Selected entity** dock tab; `SpaceCommandPanel` retired last | MODIFIED `system-console`, `system-space-view`, `market-board-panel` (mounted as a station's tab) | ⬜ not authored |
@@ -789,6 +790,87 @@ a test that mocks the hook cannot observe it.
   unaffordable target and watch the segment extend past the fill in the
   unaffordable state; clear the selection and watch it go.
 
+**Taught.** Authored, built and archived (`647af3e`) in one full-auto run,
+2026-10-05. Two ADDED `system-console` requirements, 40 scenarios, **no
+`system-space-view` delta**; 39 tasks, no split; three adversary rounds (r1: 1
+BLOCKER, 4 MAJOR, 7 MINOR; r2 CLEAR with five residue MINORs; r3 a diff
+spot-check, CLEAR, one MINOR carried unedited). QA SHIP, security clear. Gate,
+once each: tier 4 31/32 in 436 s — the journey green, the one red the filed
+`defect-spawn-system-single-body` (RULING 21); tier 3 1979/0 in 966 s. Records:
+`../../handoffs/add-burn-cost-overlay-*`.
+
+- **The table row over-counted for the fourth time, and this time in the
+  expensive direction.** It promised MODIFIED `system-space-view` blocks; none
+  was needed (RULING 8). The overlay's content and lifetime are two ADDED
+  requirements that *name* the three owning requirements and restate none of
+  them. A projection of a value another capability already determines needs no
+  delta on the owner — and a 21-scenario MODIFIED block to add two words is the
+  archiver trap at its largest.
+- **The value already existed.** The view's current-quote determination
+  (`SystemSpaceView.tsx:793`) was the panel's only source for the fuel ceiling;
+  the overlay is its second reader, and the whole production diff is 56 lines
+  in three files, three of them at the mount. Every withheld, stale, failed,
+  resumed and committed state the three predecessor links built is inherited by
+  reading that one value. **Link 4 projects the same quote onto the arc: read
+  the value, do not re-derive currency** — a reader of the hook's raw preview
+  passes every panel test and shows stale quotes; one test row (the failed
+  refresh over shown figures) is what catches it.
+- **"Present exactly together" was false on the day it was written.** The
+  first draft bound the overlay and the fuel ceiling as a biconditional; a dry
+  fleet has a ceiling and, by the same draft's no-data rule, no overlay — the
+  state of both view fixtures. It is one-way now, and the overlay's absence is
+  never a reason to withhold anything else. Any "A and B appear and disappear
+  together" needs every state in which the new surface declines to draw.
+- **The hard part was 6 px of paint, not state.** A start-anchored extent
+  drawn over the fill hides the fill's end, which is the one thing the gauge
+  exists to show; the mock avoids it only by drawing nothing when affordable.
+  What shipped (RULING 16): a 2 px band centred on the rail, and for an
+  unaffordable quote a fixed-size full-height mark keyed to the served flag, so
+  hue is never the only difference. Measured at the journey (recorded, not
+  gated): light fill-vs-extent 2.94:1, dark extent-vs-rail **1.58:1**. Inside
+  the zinc-and-amber fence nothing reaches 3:1 on both surfaces in the dark
+  scheme; if that is not good enough the fix is a palette decision, which is
+  Travis's.
+- **RULING 3's cost is real and is now visible to the eye.** In a burning
+  fleet's refunded re-target the band runs past the fill while the flag says
+  affordable; in an open station-keeping hold the band sits inside the fill
+  while the flag says not. The mark follows the flag in both, which is what
+  keeps the gauge from lying — but the mock's idiom ("past the fill means
+  short") is not what the picture means in those two states. A true shortfall
+  width needs a wire field.
+- **The unaffordable overlay has never been seen rendered.** A fresh hull
+  carries 100 t and the costliest of 13 real quotes was 42.7 t; the bounded
+  probe arranged nothing, as predicted. The mark's colour, size and containment,
+  the band past the fill, and `affordable: false` against a real wire are held
+  by tier 1 alone (`../../handoffs/add-burn-cost-overlay-qa.md`, third pass).
+  This waits on the same fixture policy the stranding notice waits on: nothing
+  on the e2e stack can set a fleet's fuel.
+- **Have QA read the journey spec before it runs.** Four of its gaps would
+  have let a wrong build pass a must-PASS leg — the worst, a leg that compared
+  the gauge with the panel's copy of the quote rather than the wire answer, so
+  two surfaces wrong together agreed. Fixed before the single run; the run was
+  then green first time, the first link in this sub-chain to need no rerun.
+- **A scenario about position needs both components.** "The mark sits at the
+  extent's end" passed a mark with no pull-back, which is clipped out of the
+  rail at a cost at or above capacity — nearly always the unaffordable case.
+  And jsdom mangles `clamp()`/`min()`/`max()` inline values but stores a
+  percentage `left` and `translateX(n%)` verbatim: design geometry so tier 1
+  can read it.
+- **Closing residue MINORs before the last round is affordable if the last
+  round is a diff.** Round 3 read 148 lines of `diff -ru` against a snapshot,
+  not the change. One MINOR found there was carried unedited (RULING 20)
+  rather than left without a verdict.
+- **Found and filed, not fixed:** after a failed own-fleets refetch over
+  retained data the strip's fuel and hold cells keep the earlier read's figures
+  (`../../handoffs/drift-strip-cells-retain-figures-after-failed-fleets-read.md`),
+  against Fan-In's own sentence; every existing test arranges that failure with
+  no data, which cannot tell. Link 2b re-homes these cells and should read it.
+  The overlay while the canvas is unavailable is drawn by construction and
+  pinned by nothing (`followup-explain-withheld-burn-command.md`, F3).
+- **Bookkeeping held.** Each role ticked its own boxes and every count in the
+  record was read from the file by grep (27 at red, 30 at green, 39 at archive).
+  The two determinism legs of the tier-0 check passed on this tree.
+
 ## Link 2b — `add-console-dock`
 
 **Carved out of the scoping doc's step 2** — see *Why 2 is two links*.
@@ -815,6 +897,30 @@ boundary from the strip's shipped code:
 This is the paragraph **as of link 2a**; where it and
 `openspec/specs/system-console/spec.md` disagree, the spec wins, and this copy
 exists only because the archiver discards the original.
+
+**Read first, from link 2a-iv (`add-burn-cost-overlay`).** Three flags:
+
+- (a) 2a-iv's rule is that the view supplies the strip a quote only while it
+  also presents the same quote's affordability as text. After this link either
+  the strip gets a text carrier (the rule stays true), or the view stops
+  supplying the quote while the panel is collapsed — in which case this link
+  must MODIFY `system-console` *The Cost Overlay Is Drawn Only for the View's
+  Successful, Current Preview, as the View Last Read It*, whose "exactly while"
+  would become false.
+- (b) The dock is collapsed by default and a tab hidden by the `hidden`
+  attribute is outside the accessibility tree, so the strip's `aria-hidden`
+  extent is then the only on-screen carrier of the quote's affordability. This
+  link must say what a keyboard or screen-reader user gets while the dock is
+  collapsed and a quote is current, and must keep the unaffordable mark. The
+  same holds for a fleet with no fuel aboard, whose gauge draws no overlay and
+  whose only carrier is that text.
+- (c) This link's own-ness deny scenario (below), when it mounts the strip
+  against an arbitrary selected entity, also asserts that a fleet the requester
+  does not own renders no cost extent and no extent state attribute. Today that
+  holds by the no-data rule, not by an assertion.
+
+Also read `../../handoffs/drift-strip-cells-retain-figures-after-failed-fleets-read.md`
+before re-homing the fuel and hold cells.
 
 **Delivers.** The dock beneath the strip: a tab bar and a ~164px detail
 area (220px total with the strip), default collapsed, four tabs that always
