@@ -6,9 +6,13 @@ around the three surfaces Travis picked on 2026-09-08: the **in-system list**,
 vitals strip**. The scoping doc `../system-hud.md` is the model and carries
 the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
-**Status (2026-10-04): links 1, 2a, 2a-ii and 2a-iii archived (2a-iii
-`surface-commit-stranding-warning` at `3218d9d`); 2a-iii-b
-(`clear-burn-preview-on-commit`) is authored (r2 `29f0a6b`) and built (`62c8f15`) but NOT archived: on the gate's single rerun its own journey and tier 3 were green, but tier 4 carried three unrelated reds that match no filed defect signature (`../../handoffs/clear-burn-preview-on-commit-journey.md`, RULING 19). The chain is stopped here pending Travis's ruling on those reds.** 2a-iii was split in-run:
+**Status (2026-10-05): links 1, 2a, 2a-ii, 2a-iii and 2a-iii-b archived
+(2a-iii-b `clear-burn-preview-on-commit` at `51944af`, its gate passed over
+three unrelated tier-4 reds by Travis's ruling —
+`../../handoffs/clear-burn-preview-on-commit-rulings-index.md` USER RULING 20);
+2a-iv (`add-burn-cost-overlay`) is next, `not authored`.** The out-of-chain
+corrective change `fix-burn-order-geometry-refusals` archived at `d52eab1`
+between the two. 2a-iii was split in-run:
 the order record and the stranding notice went first, the commit-clear follows. The link handed to
 the 2026-10-03 run as 2a-ii, `add-burn-cost-overlay`, was split twice in-run and
 is now 2a-iv: the preview lift went first as `lift-burn-preview-to-view`
@@ -52,7 +56,7 @@ symlink to it.
 | 2a | `add-vitals-strip` | The 56px bottom strip: fleet + state pill, fuel gauge, hold gauge, credits, clock; camera cluster shrinks to four | ADDED `system-console` (strip half); MODIFIED `system-space-view` (3), `docked-fleet-actions` (2 MODIFIED, 2 REMOVED, 1 ADDED), `figure-formatting` (1) | ✅ archived `e01b310` (2026-10-03); `fix-world-time-render-loop`, the out-of-chain fix for its gate blocker, archived alongside at `438923c` |
 | 2a-ii | `lift-burn-preview-to-view` | The burn preview lifted to the mounting view, `SpaceCommandPanel` converted to props; two unenforced preview-request preconditions made true (running mine, docked at the target) | MODIFIED `system-space-view` (2: the burn preview, the failed-or-stale preview) | ✅ archived `0f2ad5d` (2026-10-04); authored r3 `e3fd54c`, built `3802b92`, gate `c773e26` |
 | 2a-iii | `surface-commit-stranding-warning` | The commit's stranding warning shown on the system space view for the order's life; the view's per-fleet record of the last order it committed **whose response carried the warning** (no record is kept for an ordinary commit), with an end tied to the order's own life as the own-fleets read reports it | ADDED `system-space-view` (1); `fleet-roster` drift closed for the burn command (no delta) | ✅ archived `3218d9d` (2026-10-04); authored r2 `af747be`, built `808420d`, gate `6494f35` |
-| 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` (3: "Burn Preview Reflects…", "A Failed or Stale Preview…", "Burn and Jump Commit Controls Guard Against Double-Submit") | 🟡 authored r2 `29f0a6b`, built `62c8f15`; **gate not passed** — rerun: own journey green, tier 3 green, tier 4 three unrelated reds matching no filed signature (RULING 19); archive awaits Travis |
+| 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` (3: "Burn Preview Reflects…", "A Failed or Stale Preview…", "Burn and Jump Commit Controls Guard Against Double-Submit") | ✅ archived `51944af` (2026-10-05); authored r2 `29f0a6b`, built `62c8f15`, gate `c3fcfcf` + USER RULING 20 |
 | 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) | ⬜ not authored |
 | 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
@@ -648,12 +652,14 @@ second Burn from going out uncapped.
 - **Journey:** commit a burn and watch the quote go; cut the drive and watch the
   burn command and its quote come back for the same selection.
 
-**As built (2026-10-04, `62c8f15`; gate pending).** One ADDED requirement (21
+**Taught.** Authored and built in one full-auto run on 2026-10-04, archived (`51944af`) on 2026-10-05 after a user ruling. Records: `../../handoffs/clear-burn-preview-on-commit-*`. One ADDED requirement (21
 scenarios) and three MODIFIED (20, 9 and 4 scenarios, the 33 carried scenarios
 keeping their headings; one carried body edited); 40 tasks by this link's count
 and 45 in the predecessor's strict unit (`../../handoffs/clear-burn-preview-on-commit-rulings-index.md`
-RULING 13); two adversary rounds, round 2 CLEAR. Recorded at the build, before
-the gate:
+RULING 13); two adversary rounds, round 2 CLEAR. QA SHIP; security audit clear.
+Gate: first run tier 4 red on the journey's own fixture precondition and tier 3
+void; the one rerun had the journey and tier 3 green (1875 tests, 1054 s) and
+tier 4 at 24/27 in 7.5 min, the three reds unrelated; passed by USER RULING 20.
 
 - **The gate stopped the link, and the cause was the run's own orchestration.**
   A delegate that handed back a one-word report while its background run was
@@ -685,6 +691,26 @@ the gate:
   journey, twice) — `drift-commit-response-carries-no-delta-v.md` is now
   verified on a stack. After acceptance, focus sits on the document body and
   one Tab reaches the next control: the focus scenario passes, thinly.
+- **The unrelated reds were passed by Travis, not by the run — and one of their
+  causes was removed rather than tolerated.** USER RULING 20 archived the link.
+  In between, `fix-burn-order-geometry-refusals` (out of chain, archived
+  `d52eab1`) made the burn solve refuse with a named reason and stopped homing
+  a corporation where its station reaches the star clearance — the
+  `defect-station-order-500` half of the random-spawn fixture family, fixed at
+  its cause. Its own gate, on a tree containing this link, was 28/28 at tier 4
+  and 1979/0 at tier 3, with this link's three red specs all passing. The other
+  half of the family (a spawn that happens to sit in scan range of a gate, a
+  single-body spawn system, a sell whose price steps under warp) is still
+  random and still filed.
+- **A checkbox count is read from the file, not remembered.** The orchestrator
+  reported 35 and then 38 of 40 tasks checked; the file had 13. The SDET's
+  delegations forbade editing `openspec/`, so nobody ticked sections 1–4, and
+  the orchestrator never grepped. Travis's ruling made the reconciliation a
+  condition of the archive: `../../handoffs/clear-burn-preview-on-commit-task-reconciliation.md`
+  maps all 25 test tasks to their tests at HEAD (six under recorded contract
+  settlements). **Say in the SDET's red-phase brief who checks its boxes, and
+  grep `- \[ \]` before reporting a count** — link 2a's "a checked box is not a
+  record" has a mirror image.
 - **For link 4:** `use-burn-preview.ts`'s header comment counts the withheld
   states and is stale by one (architect A10); the file was fenced here.
 - **One determination, two readers.** The predecessor's "is the acting fleet's
