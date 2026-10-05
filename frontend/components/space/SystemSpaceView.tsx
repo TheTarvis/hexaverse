@@ -302,6 +302,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     setDock((d) => ({ expanded: true, openSeq: d.openSeq + 1 }))
   }, [])
   const collapseDock = useCallback(() => setDock((d) => ({ ...d, expanded: false })), [])
+  // The Log tab's content latch: opens at the first render of this mount in
+  // which no interior read is in flight, and never closes (the view re-reads the
+  // interior every 20 s, so a live condition would unmount the log).
+  const [logLatched, setLogLatched] = useState(false)
   const openLog = useCallback(() => openDockOn('log'), [openDockOn])
   const galaxy = useGalaxy()
   const systemNames = useMemo(() => {
@@ -357,6 +361,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // React Query hook at all (several suites render it standalone, with no
   // `QueryClientProvider` in the tree), so this owns the read/write both.
   const qc = useQueryClient()
+  // The one settle callback: the ghost feed's refetch, then the unfiltered pile
+  // (the log's key) so a sweep's minted record is listed without a timer.
+  const rereadPilesAfterSettle = useCallback(() => {
+    refetchGhostFeed()
+    void qc.invalidateQueries({ queryKey: queryKeys.sightings.pile(null) })
+  }, [refetchGhostFeed, qc])
   const handleCommitAccepted = useCallback(
     (commit: AcceptedBurnCommit) => {
       const state = qc.getQueryState(queryKeys.fleets.mine())
@@ -433,12 +443,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     if (actingRunningScan.isError || actingRunningScan.data) return
     earlySettleMarkerRef.current = Date.now()
     earlySettleExplainedIdRef.current = null
-    refetchGhostFeed()
+    rereadPilesAfterSettle()
     void actingSettledScanRefetchRef.current()
     if (actingIdRef.current) {
       void qc.invalidateQueries({ queryKey: queryKeys.fleets.scanTargets(actingIdRef.current) })
     }
-  }, [committedPending, actingRunningScan.isError, actingRunningScan.data, refetchGhostFeed, qc])
+  }, [committedPending, actingRunningScan.isError, actingRunningScan.data, rereadPilesAfterSettle, qc])
 
   // Derived every render, never imperatively cleared (mirrors
   // `committedPending`'s own derivation just above): while waiting for the
@@ -804,13 +814,13 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const showLoading = !interiorFailed && canvasAvailable && (interior.isLoading || !firstFrame)
 
 
-  // The Log tab's content: mounted only while the tab is shown, behind the
-  // interior read's first load as the floating panel was (`!interior.isLoading`),
-  // with the dock's own waiting indication until that gate opens (a failed
-  // interior read opens it too).
-  const logTabContent = !dock.expanded ? null : interior.isLoading ? (
-    <ConsolePanelWaiting />
-  ) : (
+  // The Log tab's content: present from the first render of this mount in which
+  // no interior read is in flight (`logLatched`, a latch), hidden by the dock
+  // shell's own `hidden` attribute while the tab is not shown, with the dock's
+  // waiting indication until the latch opens. It never reads `dock.expanded`.
+  const interiorAtRest = !interior.isLoading && !interior.isFetching
+  if (!logLatched && interiorAtRest) setLogLatched(true)
+  const logTabContent = logLatched ? (
     <SightingLog
       systemId={systemId}
       highlightedGhostId={highlightedGhostId}
@@ -819,6 +829,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       drawnRecordIds={drawnSightingRecordIds}
       scale={servedScale}
     />
+  ) : (
+    <ConsolePanelWaiting />
   )
   return (
     <div
@@ -854,7 +866,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           clock={clock}
           actingIdRef={actingIdRef}
           resyncInterior={resync}
-          onSettled={refetchGhostFeed}
+          onSettled={rereadPilesAfterSettle}
           onAnnounce={setAnnouncement}
         />
       ))}

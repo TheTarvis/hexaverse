@@ -7,7 +7,7 @@
 // attribute while collapsed. It never conditionally renders its own elements
 // and never decides what a tab's content is.
 
-import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 import {
   CONSOLE_DOCK_HEIGHT_COLLAPSED,
   CONSOLE_DOCK_HEIGHT_EXPANDED,
@@ -87,10 +87,24 @@ export function ConsoleDock({ expanded, openSeq, onOpen, onCollapse, strip, tabs
     }
   }, [expanded])
 
-  function handleCollapse() {
+  const handleCollapse = useCallback(() => {
     focusOpenOnCollapse.current = !!regionRef.current?.contains(document.activeElement)
     onCollapse()
-  }
+  }, [onCollapse])
+
+  // Escape collapses the dock from anywhere, through the same single collapse
+  // path as the collapse control. A `window` listener in the bubble phase, so a
+  // handler nearer the target (the fleet menu) that prevents the default wins;
+  // present only while expanded.
+  useEffect(() => {
+    if (!expanded) return
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.repeat) return
+      handleCollapse()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [expanded, handleCollapse])
 
   return (
     <div

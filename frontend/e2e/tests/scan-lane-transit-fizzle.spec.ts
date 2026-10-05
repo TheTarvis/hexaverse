@@ -294,10 +294,20 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
     // target-naming record for this sweep — this fresh corp's pile stays
     // entirely empty.
     // add-console-dock (3.3): the log sits behind the dock, collapsed on this
-    // fresh mount; open it through the "Console" control. Assertions unchanged:
-    // the log still reads when shown, so zero rows still means what it meant.
+    // fresh mount; open it through the "Console" control.
+    // keep-console-tab-content-mounted (3.3): the log now reads at view open,
+    // possibly before the sweep settled, and a collapsed dock keeps that read, so
+    // an unrefreshed zero-row count would pass on a stale pre-settle pile and
+    // prove nothing. Invoke Refresh and wait for the unfiltered `/v1/sightings`
+    // response (no `systemId`) before counting rows.
     await page.getByTestId('console-dock-open').click()
     await expect(page.getByTestId('sighting-log')).toBeVisible({ timeout: 10_000 })
+    const unfilteredPileRead = page.waitForResponse((res) => {
+      const url = new URL(res.url())
+      return url.pathname.endsWith('/v1/sightings') && url.searchParams.get('systemId') === null
+    })
+    await page.getByRole('button', { name: 'Refresh sighting log' }).click()
+    await unfilteredPileRead
     const rows = page.locator('[data-testid^="sighting-row-"]')
     await expect(rows).toHaveCount(0)
   })

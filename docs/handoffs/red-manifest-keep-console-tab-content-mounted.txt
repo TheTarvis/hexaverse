@@ -1,0 +1,7 @@
+# red-suite handoff manifest for keep-console-tab-content-mounted
+# recorded 2026-10-05T08:24:06Z
+# verify with: bash harness/openspec-red-manifest.sh verify keep-console-tab-content-mounted
+740a8c9283d8f18a4f9e4e4da1f818f1b9aa7759ea5162e7327bce1d2d5fddff  frontend/components/space/SystemSpaceView.console-dock-escape.test.tsx
+4689649d6f429b58be0f2c603c4f0ff0e55ed534fa0d950e3e2d075ac560cadc  frontend/components/space/SystemSpaceView.console-dock.test.tsx
+cac345c355b830999189c288d371ab9e5f652cfe37ddd329cb902fb9bd4ed12b  frontend/components/space/SystemSpaceView.console-log-mounted.test.tsx
+30680cf28038e79578c11408c95c52f9dce48b4bc3b612c59b95eaf2492bf74d  frontend/components/space/SystemSpaceView.sighting-log-mount-ordering.test.tsx

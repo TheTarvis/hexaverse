@@ -63,6 +63,12 @@ import {
  * excluded from `lib/query-client.ts`'s retry policy, so this resolves
  * within one round trip).
  *
+ * keep-console-tab-content-mounted (3.5): the Log tab's content is now mounted at
+ * view open, so the `/v1/sightings` route intercept below (glob with trailing wildcards) fails the sighting log's
+ * own unfiltered read as well as the ghost feed's. The log's hidden failed state,
+ * with its own Retry in the DOM, is therefore expected in this leg. No assertion
+ * changes: every assertion here is scoped to `sightings-unavailable`.
+ *
  * KNOWN RESIDUE THIS RUN MAY HIT (read before treating any red as a new
  * defect): `defect-station-order-500.md` — an intermittent (~2%) bodyless
  * 500 on a burn ordered TO A STATION, which this journey's first leg does.

@@ -305,3 +305,24 @@ counted across the change.
 **Alternatives rejected.** A further edit after the last round (the change
 would have no verdict on its current content).
 **Reversal cost.** None.
+
+---
+
+## Ruling at implementation kickoff, 2026-10-05
+
+### FULL-AUTO RULING 19 — the implementation contract's six settlements beyond design.md are accepted as written: build order 4.3, 4.1, the family run 3.2, then 4.2; tasks 1.10 and 1.11 carry a labelled precondition and are seen red for their stated reason only between 4.1 and 4.2; the listener's removal on unmount is QA's to mark INSPECTED
+
+**Question.** `keep-console-tab-content-mounted-impl-contract.md` § 7 lists six
+decisions the architect made past design.md and tasks.md.
+
+**Ruling.** All six stand. The orchestrator confirms the failing line of 1.10
+and 1.11 from the 3.2 family run before 4.2 starts. Security S2 has no test
+row (no section-2 arrangement carries it as a parameter, the dispositions'
+condition).
+
+**Basis.** Tier 3: the architect, whose call wins on technical shape (standing
+tie-break). None changes a requirement or a scenario; the change folder is
+unedited since the verdict commit.
+**Alternatives rejected.** Building 4.1 first (task 1.8's Escape row could not
+be seen red for its own reason).
+**Reversal cost.** None — sequencing only.

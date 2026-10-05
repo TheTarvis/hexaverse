@@ -36,6 +36,14 @@ import { captureCorporationId, captureScanTargets, commitScan, seedSightingFixtu
  * budgeted at 25 s of its test's 60). No leg waits for a burn. NO TIMEOUT IS
  * RAISED and there is no `test.setTimeout`.
  *
+ * keep-console-tab-content-mounted (3.6), header note only: this file's fixture
+ * still holds (a reload gives a cold cache, and the route predicate fails only
+ * the system-filtered read, sparing the unfiltered one the log now makes at view
+ * open); its Tab walks skip a hidden log (collapsed content is `hidden`, not in
+ * the tab order); and leg 13's deferred assertion (whether the settled sweep's
+ * record is listed) belongs to `keep-console-tab-content-mounted`'s journey
+ * (5.2), not upgraded here: one journey spec per change.
+ *
  * ADVERSARY NOTES THAT BIND THIS FILE: r1 B1: leg 13 asserts only that the dock
  * is expanded, the Log tab selected and focused and the log shown; whether the
  * settled sweep's new record is listed is LOGGED, never asserted

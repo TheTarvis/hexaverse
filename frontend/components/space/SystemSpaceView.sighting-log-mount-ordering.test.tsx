@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, act } from '@testing-library/react'
+import { render as rtlRender, act, screen, fireEvent, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 
@@ -51,6 +51,16 @@ const fleetsRefetch = vi.fn()
 // so this file does not over-fit a signature no task text pins.
 const sightingsCalls: unknown[] = []
 
+// keep-console-tab-content-mounted (tasks 1.12, 1.13): two things the new
+// arms need to vary, hoisted so the mock factories below can read them. The
+// defaults are exactly what this file's one existing test has always
+// observed: the same past-ETA sweep and the same empty page.
+const PAST_ETA_SWEEP = { id: 'action_past_eta', eta: 21_175_105_953 }
+const arms = vi.hoisted(() => ({
+  runningScan: { id: 'action_past_eta', eta: 21_175_105_953 } as unknown,
+  unfilteredResult: null as Record<string, unknown> | null,
+}))
+
 const mutations = vi.hoisted(() => {
   const make = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(async () => undefined), reset: vi.fn(), isPending: false, isError: false, error: null })
   return {
@@ -79,7 +89,7 @@ vi.mock('@/hooks/use-actions', async () => {
     // A running sweep whose ETA is already PAST at mount — the exact
     // fixture this scenario needs: a sweep that settles on the FIRST
     // interior read, not on a later scheduled one.
-    useRunningScan: () => ({ data: { id: 'action_past_eta', eta: 21_175_105_953 }, refetch: vi.fn() }),
+    useRunningScan: () => ({ data: arms.runningScan, refetch: vi.fn() }),
   }
 })
 vi.mock('@/hooks/use-scan', () => ({
@@ -90,6 +100,7 @@ vi.mock('@/hooks/use-scan', () => ({
 vi.mock('@/hooks/use-sightings', () => ({
   useSightings: (...args: unknown[]) => {
     sightingsCalls.push(args)
+    if (args[0] == null && arms.unfilteredResult) return arms.unfilteredResult
     return { data: { pages: [{ sightings: [], nextCursor: '' }] }, isLoading: false, isError: false, refetch: vi.fn() }
   },
 }))
@@ -166,6 +177,8 @@ function render(ui: React.ReactElement) {
 beforeEach(() => {
   vi.clearAllMocks()
   sightingsCalls.length = 0
+  arms.runningScan = PAST_ETA_SWEEP
+  arms.unfilteredResult = null
   useRunningMine.mockReturnValue({ data: null })
   useMyFleets.mockReturnValue({ data: [ownFleet('fleet_1')], isLoading: false, isError: false, refetch: fleetsRefetch })
   stage.available = true
@@ -211,5 +224,68 @@ describe('SystemSpaceView / SightingLog — the mount-time settle-ordering race 
       sightingsCalls.length,
       'the pile was never read at all, even after the settling interior read completed',
     ).toBeGreaterThan(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// keep-console-tab-content-mounted - tasks 1.12 and 1.13 (impl contract 3.5).
+// A "read of the unfiltered pile" in this file is a recorded call whose first
+// argument is `null`; the ghost feed's calls carry the system id and are
+// filtered out. The existing test above is unedited and still observes the
+// unfiltered `sightingsCalls.length` as before.
+// ---------------------------------------------------------------------------
+const unfilteredReads = () => sightingsCalls.filter((a) => Array.isArray(a) && a[0] === null)
+
+function renderOnOneClient() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  const tree = () => (
+    <QueryClientProvider client={qc}>
+      <SystemSpaceView systemId={SYSTEM_ID} />
+    </QueryClientProvider>
+  )
+  const result = rtlRender(tree())
+  return { ...result, again: () => act(() => result.rerender(tree())) }
+}
+
+describe('SystemSpaceView / SightingLog - the log-specific arms (keep-console-tab-content-mounted tasks 1.12, 1.13)', () => {
+  it('Scenario: The log reads nothing until the interior read\'s first load has finished / Scenario: A mount during an unsettled past-ETA sweep reads the pile after the settling read (dock collapsed)', () => {
+    useSystemSpace.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null, refetch: vi.fn() })
+    const view = renderOnOneClient()
+    expect(screen.getByTestId('console-dock-region')).toHaveAttribute('hidden') // dock never expanded
+    expect(unfilteredReads(), 'non-vacuity and first half: an unfiltered read was issued while the interior\'s first load was in flight').toHaveLength(0)
+
+    useSystemSpace.mockReturnValue({ data: INTERIOR, isLoading: false, isError: false, error: null, refetch: vi.fn() })
+    view.again()
+    expect(screen.getByTestId('console-dock-region')).toHaveAttribute('hidden')
+    expect(unfilteredReads().length, 'the log issued no unfiltered read once the settling interior read finished, with the dock collapsed').toBeGreaterThanOrEqual(1)
+  })
+
+  it('Scenario: The log reads nothing while the re-read of an interior the view already held is in flight / Scenario: A later re-read of the interior neither removes the log nor issues a pile read', () => {
+    const REC = {
+      id: 'sight-a', systemId: 'sys_3_4', asOf: 1_000, hostId: 'host-a', cleanSweep: false,
+      position: { X: 40, Y: 0, Z: -10 }, velocity: { X: 0, Y: 0, Z: 0 }, emitting: false, hullCount: 1, hullTypes: ['scout'],
+    }
+    useSystemSpace.mockReturnValue({ data: INTERIOR, isLoading: false, isFetching: true, isError: false, error: null, refetch: vi.fn() })
+    const view = renderOnOneClient()
+    expect(unfilteredReads(), 'collapsed, with the re-read in flight').toHaveLength(0)
+
+    fireEvent.click(screen.getByTestId('console-dock-open'))
+    expect(unfilteredReads(), 'expanded, with the re-read still in flight: a pile read was issued').toHaveLength(0)
+    expect(screen.queryByTestId('sighting-log'), 'expanded, with the re-read in flight: log content is present').toBeNull()
+
+    useSystemSpace.mockReturnValue({ data: INTERIOR, isLoading: false, isFetching: false, isError: false, error: null, refetch: vi.fn() })
+    view.again()
+    expect(unfilteredReads().length, 'no unfiltered read once the re-read finished').toBeGreaterThanOrEqual(1)
+
+    // a later re-read of the interior, no sweep running, the log holding rows
+    arms.runningScan = null
+    arms.unfilteredResult = {
+      data: { pages: [{ sightings: [REC], nextCursor: '' }] }, isLoading: false, isError: false, refetch: vi.fn(),
+    }
+    useSystemSpace.mockReturnValue({ data: INTERIOR, isLoading: false, isFetching: true, isError: false, error: null, refetch: vi.fn() })
+    view.again()
+    const log = within(screen.getByTestId('console-panel-log')).getByTestId('sighting-log')
+    expect(log).toBeInTheDocument()
+    expect(within(log).getByTestId('sighting-row-sight-a')).toBeInTheDocument()
   })
 })

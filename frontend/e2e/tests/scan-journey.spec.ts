@@ -121,10 +121,15 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     //    that minted records reports and links to the log") — not the
     //    "Console" control this journey exercises later (leg 9).
     //    add-console-dock (3.2): the dock is collapsed here (it opens
-    //    collapsed on every mount and nothing above expands it), so the log is
-    //    NOT mounted until this click — the link is the first show of the log
-    //    in this document load, which is what keeps the just-settled record
-    //    listed. Do not expand the dock earlier in this test.
+    //    collapsed on every mount and nothing above expands it).
+    //    REVISED keep-console-tab-content-mounted (3.4): the log is NOT
+    //    unmounted while collapsed any more — it is mounted, hidden, and has
+    //    read since view open. The row asserted below is listed only because the
+    //    settle re-read ran (the sweep's settling read invalidates the unfiltered
+    //    pile); the link's click only shows the tab and issues no pile request.
+    //    This is the end-to-end form of the closure of
+    //    `drift-sighting-log-not-reread-after-sweep-settles.md`. Do not expand
+    //    the dock earlier in this test.
     await expect(
       page.getByTestId('console-dock-open'),
       'precondition: the dock is collapsed before the report link is used',
@@ -156,7 +161,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     // `scrollIntoViewIfNeeded()`. REVISED add-console-dock (3.2): the floating
     // log and its `sighting-log-open` toggle are gone; the close affordance is
     // the dock's collapse control. Assert the collapse actually happened
-    // (log unmounted, "Console" control back) rather than assuming the click
+    // (log hidden, "Console" control back) rather than assuming the click
     // did anything, and sighting-log's "Closing the log returns to the view
     // intact" (the space view stays mounted, the same acting fleet stays
     // selected).

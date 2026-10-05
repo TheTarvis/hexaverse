@@ -20,9 +20,10 @@ import React from 'react'
 // per sighting mark.
 //
 // Conventions (contract 5.1): "not shown" is the `hidden` attribute for the
-// dock's own elements; the log's absence while collapsed is asserted with a
-// predicate that holds whether it is unmounted or hidden (that is
-// keep-console-tab-content-mounted's call, not this change's); a remount under
+// dock's own elements; the log's absence while collapsed is asserted as
+// present and hidden (keep-console-tab-content-mounted keeps the content
+// mounted while the dock is collapsed: the element exists, sits inside a
+// `hidden` ancestor and is not visible); a remount under
 // another system uses a `key`; tab walks start from a known element; control
 // names are matched exactly. No dimension, overlap, scroll position or resolved
 // calc()/var() is asserted here (design.md D-22).
@@ -244,10 +245,11 @@ function expectExpanded() {
   expect(region()).toBeVisible()
   expect(open()).toHaveAttribute('hidden')
 }
-/** The log is not shown: unmounted or hidden - both are correct for this change (contract 5.1). */
+/** The log is not shown: mounted and hidden (keep-console-tab-content-mounted task 3.1). */
 function expectLogNotShown() {
-  const el = screen.queryByTestId('sighting-log')
-  expect(el === null || el.closest('[hidden]') !== null).toBe(true)
+  const el = screen.getByTestId('sighting-log')
+  expect(el.closest('[hidden]')).not.toBeNull()
+  expect(el).not.toBeVisible()
 }
 
 beforeEach(() => {
