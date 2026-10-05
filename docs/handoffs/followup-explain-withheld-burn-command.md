@@ -107,3 +107,14 @@ cut-drive handlers beside both Stop surfaces (`FleetActionsPanel.tsx:570`, `Gala
 still show mine-table or raw copy (impl contract section 9). The "ends in the zero-length 500"
 wording in the notes above is superseded: an own-host burn is now refused with the minimum-arc
 `409` only at phases where its solved curve is below the minimum, and commits otherwise.
+
+---
+
+**Added 2026-10-05 by the `add-burn-cost-overlay` orchestrator (FULL-AUTO RULING 17
+there).** The fuel gauge's cost overlay is a second reader of the view's
+current-quote value, and the canvas is not a term of that value — so while the
+canvas is unavailable and a selection is held, the overlay is drawn, by
+construction, exactly as the panel's figures are. That link deliberately pins
+this with no scenario and no test (no harness running the real preview hook can
+switch the canvas: `add-burn-cost-overlay-panel-architect.md` A4). Whoever
+authors F3 owns the overlay's behaviour in that state too.
