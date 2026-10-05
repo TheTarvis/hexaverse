@@ -75,3 +75,7 @@ tasks:64 (5.10), the paused record:
 - The scenario's new GIVEN clause ("no scan commit is awaiting its first running-status answer") is the default state of 1.8's harness; no task text needed to change, as the round-2 ruling said.
 
 **Verdict: CLEAR.** One MINOR (r3-m1), to be settled in the implementation contract; no spec text is false, no new arrangement group, 40 tasks stand.
+
+---
+
+**Verdict commit: `805bfaa`** (2026-10-05). The verdict is current while `git diff 805bfaa -- openspec/specs/system-console openspec/specs/sighting-log openspec/specs/system-space-view openspec/changes/keep-console-tab-content-mounted` is empty.
