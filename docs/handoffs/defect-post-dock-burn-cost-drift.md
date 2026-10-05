@@ -70,3 +70,21 @@ no Playwright trace was recorded), so the recorded signature — the
 match. Evidence: `clear-burn-preview-on-commit-journey.md`, "Gate rerun — tier
 4". To settle it: record a trace on that leg, or log 409 bodies in the e2e
 backend.
+
+## Candidate occurrence, unverified - 2026-10-05 (`add-console-dock` gate run 1)
+
+`frontend/e2e/tests/committed-selection-journey.spec.ts:395` failed at `:828`
+("commit 2 (arrives): the commit was not accepted: HTTP 409"). Sequence
+(fleet `fleet_cb439941-...`, backend log 01:59:22-01:59:28): commit 1 `POST
+.../orders` 200 at 01:59:23; `POST .../cut-drive` 200 at 01:59:27 (480 ms); a
+fresh `POST .../orders/preview` 200 at 01:59:27; the Burn click, `POST
+.../orders` **409** at 01:59:28 (27.8 ms), then `POST .../orders/preview` 200
+at once (the specced re-quote). The fleet was parked mid-flight after the cut,
+not docked, and the 409 printed no `fleet: burn solve refusal served` line.
+Request, status, short quote-to-commit gap (about 1 s) and immediate re-quote
+fit this defect, **but the 409 body was not captured** (the spec asserted the
+status before reading the body; the e2e backend log holds no bodies), so this
+is NOT counted as a match and the residue rule does not apply on this
+evidence. Evidence: `add-console-dock-journey.md`, "Red 2". The spec now logs
+a refused commit's body as `[journey-http]` (revision round) so the next
+occurrence can be attributed.

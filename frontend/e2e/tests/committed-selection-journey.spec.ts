@@ -238,6 +238,18 @@ function recordWire(page: Page) {
       }
     } else if (req.method() === 'POST' && ORDER_URL.test(path)) {
       const answer: OrderAnswer = { at: now, status: res.status(), body: null }
+      if (answer.status >= 300) {
+        // Diagnostic only: a refused commit's status and body are logged BEFORE the answer is
+        // published to the legs, so the status assertion that follows can never fire ahead of the log.
+        void res
+          .text()
+          .catch((e: unknown) => `<body unreadable: ${String(e)}>`)
+          .then((txt) => {
+            console.log(`[journey-http] ${answer.status} POST ${path} body=${txt}`)
+            orderAnswers.push(answer)
+          })
+        return
+      }
       orderAnswers.push(answer)
       void res
         .json()

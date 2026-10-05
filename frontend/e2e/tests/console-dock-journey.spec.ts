@@ -203,7 +203,13 @@ async function hitTestControls(
   label: string,
 ): Promise<{ checked: number; ignored: number; blocked: string[] }> {
   const descendants = surface.locator(CONTROL_SELECTOR)
-  const rootIsControl = await surface.evaluate((node, sel) => node.matches(sel), CONTROL_SELECTOR)
+  // A root that cannot itself receive pointer events (`pointer-events: none`, e.g. the camera
+  // cluster's wrapper, whose four children carry `pointer-events-auto`) can never be its own
+  // hit target, so it is not a control; its descendants are still each hit-tested.
+  const rootIsControl = await surface.evaluate(
+    (node, sel) => node.matches(sel) && getComputedStyle(node).pointerEvents !== 'none',
+    CONTROL_SELECTOR,
+  )
   const nDesc = await descendants.count()
   const total = nDesc + (rootIsControl ? 1 : 0)
   expect(total, `${label} carries ${total} controls: more than the ${MAX_CONTROLS} this leg hit-tests (raise it deliberately, never truncate silently)`).toBeLessThanOrEqual(MAX_CONTROLS)
@@ -227,18 +233,20 @@ async function hitTestControls(
       const cx = r.x + r.width / 2
       const cy = r.y + r.height / 2
       const name = node.getAttribute('data-testid') ?? node.getAttribute('aria-label') ?? node.textContent?.trim() ?? node.tagName
-      if (!surf) return { name, skipped: 'not inside its surface', hit: '' }
+      const ident = `testid=${node.getAttribute('data-testid') ?? '-'} tag=${node.tagName.toLowerCase()} name="${node.getAttribute('aria-label') ?? node.textContent?.trim().slice(0, 40) ?? ''}" rect=${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}`
+      if (!surf) return { name, ident, skipped: 'not inside its surface', hit: '' }
       const sr = surf.getBoundingClientRect()
       if (cx < 0 || cy < 0 || cx >= window.innerWidth || cy >= window.innerHeight) {
-        return { name, skipped: 'centre outside the viewport', hit: '', cx, cy }
+        return { name, ident, skipped: 'centre outside the viewport', hit: '', cx, cy }
       }
       if (cx < sr.x || cx > sr.x + sr.width || cy < sr.y || cy > sr.y + sr.height) {
-        return { name, skipped: 'centre outside the surface after scrolling', hit: '', cx, cy }
+        return { name, ident, skipped: 'centre outside the surface after scrolling', hit: '', cx, cy }
       }
       const hit = document.elementFromPoint(cx, cy)
       const ok = !!hit && node.contains(hit)
       return {
         name,
+        ident,
         skipped: '',
         ok,
         hit: hit ? (hit.getAttribute('data-testid') ?? hit.tagName) : 'nothing',
@@ -249,11 +257,11 @@ async function hitTestControls(
     if (res.skipped) {
       // A control whose centre cannot lie inside the surface after scrolling is a finding:
       // it is reported as blocked, not skipped.
-      blocked.push(`${res.name} (${res.skipped})`)
+      blocked.push(`${res.name} [${res.ident}] (${res.skipped})`)
       continue
     }
     checked++
-    if (!res.ok) blocked.push(`${res.name} (covered by ${res.hit} at ${r1(res.cx!)},${r1(res.cy!)})`)
+    if (!res.ok) blocked.push(`${res.name} [${res.ident}] (covered by ${res.hit} at ${r1(res.cx!)},${r1(res.cy!)})`)
   }
   return { checked, ignored, blocked }
 }
@@ -524,6 +532,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
       for (const [name] of surfaces) {
         const { checked, ignored, blocked } = await hitTestControls(page.getByTestId(name).first(), name)
         console.log(`[journey-leg-data] geometry-collapsed: ${name}: ${checked} control(s) hit-tested, ${ignored} zero-size/hidden ignored, ${blocked.length} blocked`)
+        for (const b of blocked) console.log(`[journey-leg-data] geometry-collapsed: BLOCKED ${name}: ${b}`)
         expect(checked, `${name} must have at least one control actually hit-tested (a surface whose controls were all skipped passes nothing)`).toBeGreaterThanOrEqual(1)
         expect(blocked, `${name} has control(s) a pointer cannot reach (dock collapsed)`).toEqual([])
       }
@@ -723,6 +732,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
       for (const [name] of surfaces) {
         const { checked, ignored, blocked } = await hitTestControls(page.getByTestId(name).first(), name)
         console.log(`[journey-leg-data] geometry-expanded: ${name}: ${checked} control(s) hit-tested, ${ignored} zero-size/hidden ignored, ${blocked.length} blocked`)
+        for (const b of blocked) console.log(`[journey-leg-data] geometry-expanded: BLOCKED ${name}: ${b}`)
         expect(checked, `${name} must have at least one control actually hit-tested (a surface whose controls were all skipped passes nothing)`).toBeGreaterThanOrEqual(1)
         expect(blocked, `${name} has control(s) a pointer cannot reach (dock expanded)`).toEqual([])
       }

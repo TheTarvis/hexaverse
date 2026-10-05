@@ -1,0 +1,597 @@
+tier4 start 2026-10-05 01:57:13 HEAD bcf7719 load { 3.65 6.43 9.58 } sigterm 1
+Your user’s .npmrc file (${HOME}/.npmrc)
+has a `globalconfig` and/or a `prefix` setting, which are incompatible with nvm.
+Run `nvm use --delete-prefix v22.20.0 --silent` to unset it.
+compdef:153: _comps: assignment to invalid subscript range
+
+> frontend@0.1.0 e2e
+> bash ../scripts/dev/with-test-emulators.sh 'cd frontend && npx playwright test'
+
+[emulators] no complete test emulator detected — starting a throwaway set for this run
+i  emulators: Starting emulators: auth, firestore, pubsub
+⚠  firestore: Cloud Firestore rules file /Users/travis/Projects/hexaverse/firestore.rules specified in firebase.json does not exist.
+⚠  firestore: The emulator will default to allowing all reads and writes. Learn more about this option: https://firebase.google.com/docs/emulator-suite/install_and_configure#security_rules_configuration.
+i  firestore: Firestore Emulator logging to firestore-debug.log
+✔  firestore: Firestore Emulator UI websocket is running on 20243.
+i  pubsub: Pub/Sub Emulator logging to pubsub-debug.log
+i  Running script: cd frontend && npx playwright test
+[WebServer]    ▲ Next.js 15.5.25 (Turbopack)
+[WebServer]    - Local:        http://localhost:20230
+[WebServer]    - Network:      http://192.168.1.222:20230
+[WebServer]    - Environments: .env.local
+[WebServer] 
+[WebServer]  ✓ Starting...
+[WebServer]  ✓ Compiled middleware in 78ms
+[WebServer]  ✓ Ready in 906ms
+[WebServer]  ○ Compiling / ...
+[WebServer]  ✓ Compiled / in 2.3s
+[WebServer]  GET / 200 in 2618ms
+[e2e] wiped emulator project 'hexaverse-emulator' (Firestore + Auth)
+[e2e] building test backend in /Users/travis/Projects/hexaverse/backend
+[e2e] test backend starting (pid 89241, logs → playwright/.auth/backend.log)
+[e2e] test backend ready at http://localhost:20232
+
+Running 39 tests using 1 worker
+
+[WebServer]  ✓ Compiled /login in 337ms
+[WebServer]  GET /login 200 in 409ms
+[WebServer]  GET / 200 in 40ms
+  ✓   1 [setup] › e2e/setup/auth.setup.ts:15:6 › authenticate (1.4s)
+[WebServer]  ✓ Compiled /systems/[systemId] in 393ms
+[WebServer]  GET /login?signUp=true 200 in 107ms
+[WebServer]  GET / 200 in 36ms
+[WebServer]  GET /systems/sys_2_-3 200 in 54ms
+[journey-fixture] home sys_2_-3, fleet fleet_37919331-c962-454b-8d42-f2878fe6b5d3, 10 feature(s), 3 gate(s)
+[journey-overlay] no selection: snap#1 sel= gauge=filled costState=null band=null fill=50 mark=false panelFlag=null stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=null
+[journey-leg] no-selection: PASSED
+[journey-probe] round 1: 8 candidate(s): feat-belt-0(belt), feat-body-0(rocky), feat-body-1(gas_giant), feat-body-2(ice), feat-extra-0(rocky), feat-hazard-0(radiation), gate-sys_1_-4(lane-gate), gate-sys_2_-2(lane-gate)
+[journey-overlay] round 1 feat-belt-0 (belt) quoted: snap#2 sel=feat-belt-0 gauge=filled costState=affordable band=14.8536 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=29.7072
+[journey-overlay] round 1 feat-body-0 (rocky) quoted: snap#3 sel=feat-body-0 gauge=filled costState=affordable band=15.2952 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=30.5904
+[journey-overlay] round 1 feat-body-1 (gas_giant) quoted: snap#4 sel=feat-body-1 gauge=filled costState=affordable band=15.06 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=30.119999999999997
+[journey-overlay] round 1 feat-body-2 (ice) quoted: snap#5 sel=feat-body-2 gauge=filled costState=affordable band=15.6312 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=31.262400000000003
+[journey-overlay] round 1 feat-extra-0 (rocky) quoted: snap#6 sel=feat-extra-0 gauge=filled costState=affordable band=15.9952 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=31.9904
+[journey-overlay] round 1 feat-hazard-0 (radiation) quoted: snap#7 sel=feat-hazard-0 gauge=filled costState=affordable band=16.332 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=32.664
+[journey-overlay] round 1 gate-sys_1_-4 (lane-gate) quoted: snap#8 sel=gate-sys_1_-4 gauge=filled costState=affordable band=22.528 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=45.056
+[journey-overlay] round 1 gate-sys_2_-2 (lane-gate) MISSED QUOTE: snap#9 sel=gate-sys_2_-2 gauge=filled costState=null band=null fill=50 mark=false panelFlag=null stale=0 noQuote=1 fuelAboard=100 capacity=200 quotedCost=null
+[journey-probe] round 1: 7 quoted of 8 tried; flags: feat-belt-0=true feat-body-0=true feat-body-1=true feat-body-2=true feat-extra-0=true feat-hazard-0=true gate-sys_1_-4=true
+[journey-leg] overlay-equals-panel-flag: PASSED
+[journey-overlay] clear: before, feat-belt-0: snap#10 sel=feat-belt-0 gauge=filled costState=affordable band=16.8232 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=33.6464
+[journey-overlay] clear: after, feat-belt-0: snap#11 sel= gauge=filled costState=null band=null fill=50 mark=false panelFlag=null stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=null
+[journey-leg] clear-withdraws: PASSED
+[journey-console] 3 browser console error/warning/pageerror entries captured in "1: no selection draws nothing; a quoted target draws an overlay equal to the panel flag; clearing withdraws it"
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/systems/sys_2_-3: Failed to load resource: the server responded with a status of 409 (Conflict)
+[journey-console] update-depth lines: 0
+[journey-http] 404 GET /v1/accounts/firestore body=
+[journey-http] 404 GET /v1/corporations/me body=
+[journey-http] 409 POST /v1/fleets/fleet_37919331-c962-454b-8d42-f2878fe6b5d3/orders/preview body={"error":"fleet: burn curve is below the minimum arc length"}
+[journey-budget] "1: no selection draws nothing; a quoted target draws an overlay equal to the panel flag; clearing withdraws it": 7719 ms of the 60000 ms per-test budget
+  ✓   2 [chromium] › e2e/tests/burn-cost-overlay-journey.spec.ts:861:7 › the burn-cost overlay - quote, read, clear, replace, lay out, paint, commit › 1: no selection draws nothing; a quoted target draws an overlay equal to the panel flag; clearing withdraws it (7.7s)
+[journey-overlay] replace: X=feat-belt-0 before: snap#12 sel=feat-belt-0 gauge=filled costState=affordable band=16.86 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=33.72
+[journey-overlay] replace: Y=feat-body-0 after: snap#13 sel=feat-body-0 gauge=filled costState=affordable band=15.648 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=31.296
+[journey-overlay] replace: sampled while Y selected: snap#14 sel=feat-body-0 gauge=filled costState=null band=null fill=50 mark=false panelFlag=null stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=null
+[journey-overlay] replace: sampled while Y selected: snap#15 sel=feat-body-0 gauge=filled costState=affordable band=15.648 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=31.296
+[journey-replace] X feat-belt-0 band 16.86% ; Y feat-body-0 band 15.648% ; 3 sample(s) while Y selected, 2 distinct state(s) logged
+[journey-leg] replace-selection: PASSED
+[journey-overlay] floor: feat-belt-0: snap#16 sel=feat-belt-0 gauge=filled costState=affordable band=16.88 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=33.760000000000005
+[journey-floor] rail {"left":473.84375,"top":689.5,"right":513.84375,"bottom":695.5,"width":40,"height":6} band {"left":473.84375,"top":691.5,"right":480.59375,"bottom":693.5,"width":6.75,"height":2} fuel cell {"x":473.84375,"y":684.25,"width":159.375,"height":16.5}
+[journey-leg] width-floor-1280x720: PASSED
+[journey-paint] targets: gate-sys_1_-4(band 22.528%, fill 50%, flag true); feat-belt-0(band 14.8536%, fill 50%, flag true); past-fill arranged=false unaffordable arranged=false
+[journey-overlay] paint light: gate-sys_1_-4: snap#17 sel=gate-sys_1_-4 gauge=filled costState=affordable band=22.528 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=45.056
+[journey-paint] light gate-sys_1_-4: fill=rgb(159,159,169) extent=rgb(82,82,92) rail=rgb(212,212,216) pastFill=n/a mark=n/a :: dpr=1 scaleX=1 bandDevPx=9.00; fill sample: centre of the full-height fill part past the extent
+[journey-paint] light gate-sys_1_-4: contrast fill vs extent = 2.94:1 (recorded, not gated)
+[journey-paint] light gate-sys_1_-4: contrast fill vs rail = 1.77:1 (recorded, not gated)
+[journey-paint] light gate-sys_1_-4: contrast extent vs rail = 5.22:1 (recorded, not gated)
+[journey-overlay] paint light: feat-belt-0: snap#18 sel=feat-belt-0 gauge=filled costState=affordable band=16.8776 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=33.7552
+[journey-paint] light feat-belt-0: fill=rgb(159,159,169) extent=rgb(82,82,92) rail=rgb(212,212,216) pastFill=n/a mark=n/a :: dpr=1 scaleX=1 bandDevPx=6.75; fill sample: centre of the full-height fill part past the extent
+[journey-paint] light feat-belt-0: contrast fill vs extent = 2.94:1 (recorded, not gated)
+[journey-paint] light feat-belt-0: contrast fill vs rail = 1.77:1 (recorded, not gated)
+[journey-paint] light feat-belt-0: contrast extent vs rail = 5.22:1 (recorded, not gated)
+[journey-leg] paint-light: PASSED
+[journey-overlay] paint dark: feat-belt-0: snap#19 sel=feat-belt-0 gauge=filled costState=affordable band=16.8776 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=33.7552
+[journey-paint] dark feat-belt-0: fill=rgb(212,212,216) extent=rgb(113,113,123) rail=rgb(83,83,89) pastFill=n/a mark=n/a :: dpr=1 scaleX=1 bandDevPx=6.75; fill sample: centre of the full-height fill part past the extent
+[journey-paint] dark feat-belt-0: contrast fill vs extent = 3.27:1 (recorded, not gated)
+[journey-paint] dark feat-belt-0: contrast fill vs rail = 5.17:1 (recorded, not gated)
+[journey-paint] dark feat-belt-0: contrast extent vs rail = 1.58:1 (recorded, not gated)
+[journey-overlay] paint dark: gate-sys_1_-4: snap#20 sel=gate-sys_1_-4 gauge=filled costState=affordable band=22.528 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=45.056
+[journey-paint] dark gate-sys_1_-4: fill=rgb(212,212,216) extent=rgb(113,113,123) rail=rgb(83,83,89) pastFill=n/a mark=n/a :: dpr=1 scaleX=1 bandDevPx=9.00; fill sample: centre of the full-height fill part past the extent
+[journey-paint] dark gate-sys_1_-4: contrast fill vs extent = 3.27:1 (recorded, not gated)
+[journey-paint] dark gate-sys_1_-4: contrast fill vs rail = 5.17:1 (recorded, not gated)
+[journey-paint] dark gate-sys_1_-4: contrast extent vs rail = 1.58:1 (recorded, not gated)
+[journey-leg] paint-dark: PASSED
+[journey-leg] extent-past-fill: UNTESTED - not sampled in both schemes (light=false dark=false); costs are a small fraction of the fuel aboard; tier 1 tasks 1.1 and 2.1 hold the geometry
+[journey-leg] extent-past-fill: UNTESTED - not sampled in both schemes (light=false dark=false); costs are a small fraction of the fuel aboard; tier 1 tasks 1.1 and 2.1 hold the geometry
+[journey-console] 0 browser console error/warning/pageerror entries captured in "2: replacing the selection never shows the previous cost; the strip fits 1280x720 with an overlay; both extents read on one rail in both schemes"
+[journey-console] update-depth lines: 0
+[journey-budget] "2: replacing the selection never shows the previous cost; the strip fits 1280x720 with an overlay; both extents read on one rail in both schemes": 2278 ms of the 60000 ms per-test budget
+  ✓   3 [chromium] › e2e/tests/burn-cost-overlay-journey.spec.ts:966:7 › the burn-cost overlay - quote, read, clear, replace, lay out, paint, commit › 2: replacing the selection never shows the previous cost; the strip fits 1280x720 with an overlay; both extents read on one rail in both schemes (2.3s)
+[journey-overlay] commit: before, gate-sys_1_-4: snap#21 sel=gate-sys_1_-4 gauge=filled costState=affordable band=22.528 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=45.056
+[journey-commit] gate-sys_1_-4: flight 28160 world ms = 5632 wall ms at scale 5
+[journey-overlay] commit: +-191 ms from acceptance (read ended +139 ms): snap#22 sel=gate-sys_1_-4 gauge=filled costState=affordable band=22.528 fill=50 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=45.056
+[journey-overlay] commit: +98 ms from acceptance (read ended +139 ms): snap#23 sel=gate-sys_1_-4 gauge=filled costState=null band=null fill=50 mark=false panelFlag=null stale=0 noQuote=0 fuelAboard=100 capacity=200 quotedCost=null
+[journey-commit] OBSERVATION: 2 snapshot(s) within 100 ms of the node-side acceptance still showed the overlay (the browser receives the answer before node reports it; not asserted)
+[journey-leg] commit-withdraws-at-acceptance: PASSED
+[journey-overlay] arrived: overlay observation (not asserted): snap#24 sel=gate-sys_1_-4 gauge=filled costState=null band=null fill=27.472 mark=false panelFlag=null stale=0 noQuote=0 fuelAboard=54.944 capacity=200 quotedCost=null
+[journey-overlay] round 2 feat-belt-0 (belt) quoted: snap#25 sel=feat-belt-0 gauge=filled costState=affordable band=17.18 fill=27.472 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=54.944 capacity=200 quotedCost=34.36
+[journey-overlay] round 2 feat-body-0 (rocky) quoted: snap#26 sel=feat-body-0 gauge=filled costState=affordable band=15.6568 fill=27.472 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=54.944 capacity=200 quotedCost=31.3136
+[journey-overlay] round 2 feat-body-1 (gas_giant) quoted: snap#27 sel=feat-body-1 gauge=filled costState=affordable band=14.6936 fill=27.472 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=54.944 capacity=200 quotedCost=29.3872
+[journey-overlay] round 2 feat-body-2 (ice) quoted: snap#28 sel=feat-body-2 gauge=filled costState=affordable band=17.9448 fill=27.472 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=54.944 capacity=200 quotedCost=35.8896
+[journey-overlay] round 2 feat-extra-0 (rocky) quoted: snap#29 sel=feat-extra-0 gauge=filled costState=affordable band=16.9584 fill=27.472 mark=false panelFlag=true stale=0 noQuote=0 fuelAboard=54.944 capacity=200 quotedCost=33.9168
+[journey-probe] round 2: 5 quoted of 5; flags: feat-belt-0=true feat-body-0=true feat-body-1=true feat-body-2=true feat-extra-0=true
+[journey-leg] extent-past-fill: UNTESTED - not sampled in both schemes (light=false dark=false); costs are a small fraction of the fuel aboard; tier 1 tasks 1.1 and 2.1 hold the geometry
+[journey-leg] unaffordable-overlay-and-mark: UNTESTED - the bounded probe (round 1 before the commit, round 2 after the arrival, two rounds, under about 15 s of budget left) arranged no unaffordable quote: starting fuel is 100 t and observed costs are a small fraction of it. Tier 1 is the cover: tasks 2.1, 2.2 and 1.4.
+[journey-console] 0 browser console error/warning/pageerror entries captured in "3: a committed order withdraws the overlay from acceptance; a bounded second probe looks for an unaffordable overlay"
+[journey-console] update-depth lines: 0
+[journey-budget] "3: a committed order withdraws the overlay from acceptance; a bounded second probe looks for an unaffordable overlay": 10048 ms of the 60000 ms per-test budget
+  ✓   4 [chromium] › e2e/tests/burn-cost-overlay-journey.spec.ts:1130:7 › the burn-cost overlay - quote, read, clear, replace, lay out, paint, commit › 3: a committed order withdraws the overlay from acceptance; a bounded second probe looks for an unaffordable overlay (10.0s)
+[journey-summary] ===== leg outcomes =====
+[journey-summary] no-selection (MUST PASS): PASSED
+[journey-summary] overlay-equals-panel-flag (MUST PASS): PASSED
+[journey-summary] clear-withdraws (MUST PASS): PASSED
+[journey-summary] replace-selection: PASSED
+[journey-summary] commit-withdraws-at-acceptance: PASSED
+[journey-summary] width-floor-1280x720: PASSED
+[journey-summary] paint-light: PASSED
+[journey-summary] paint-dark: PASSED
+[journey-summary] extent-past-fill: UNTESTED - not sampled in both schemes (light=false dark=false); costs are a small fraction of the fuel aboard; tier 1 tasks 1.1 and 2.1 hold the geometry
+[journey-summary] unaffordable-overlay-and-mark: UNTESTED - the bounded probe (round 1 before the commit, round 2 after the arrival, two rounds, under about 15 s of budget left) arranged no unaffordable quote: starting fuel is 100 t and observed costs are a small fraction of it. Tier 1 is the cover: tasks 2.1, 2.2 and 1.4.
+[journey-summary] ========================
+[journey-console] 0 browser console error/warning/pageerror entries captured in "4: the must-pass legs passed and no leg failed"
+[journey-console] update-depth lines: 0
+[journey-budget] "4: the must-pass legs passed and no leg failed": 1 ms of the 60000 ms per-test budget
+  ✓   5 [chromium] › e2e/tests/burn-cost-overlay-journey.spec.ts:1290:7 › the burn-cost overlay - quote, read, clear, replace, lay out, paint, commit › 4: the must-pass legs passed and no leg failed (1ms)
+[WebServer]  GET /login?signUp=true 200 in 89ms
+[WebServer]  GET / 200 in 75ms
+[WebServer]  GET /systems/sys_2_1 200 in 86ms
+  ✓   6 [chromium] › e2e/tests/burn-geometry-refusals-journey.spec.ts:59:7 › burn geometry refusals — the home-station slice › wake -> a served refusal reads as player copy -> burn to the home station -> dock -> depart (14.0s)
+[WebServer]  GET /login?signUp=true 200 in 72ms
+[WebServer]  GET / 200 in 44ms
+[WebServer]  GET /systems/sys_4_-2 200 in 51ms
+[journey-step5] #0 +0ms countdown=true burnDisabled=false figures=4 uncappedLabel=0
+[journey-step5] #1 +99ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #2 +170ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #3 +225ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #4 +287ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #5 +358ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #6 +418ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #7 +481ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #8 +551ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #9 +611ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #10 +667ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #11 +726ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #12 +782ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #13 +839ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #14 +896ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #15 +950ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #16 +1004ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #17 +1059ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #18 +1112ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #19 +1170ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #20 +1234ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #21 +1289ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #22 +1352ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #23 +1408ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #24 +1464ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #25 +1533ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] #26 +1600ms countdown=true burnDisabled=true figures=0 uncappedLabel=0
+[journey-step5] OBSERVATION: 1 snapshot(s) showed the countdown with Burn still enabled before the window opened (1 of them with figures); overlap lasted 99 ms (first countdown +0ms, first mine-disabled snapshot +99ms); 26 withheld snapshot(s) in total
+[journey-step5] OBSERVATION: figures returned 170 ms after the countdown hid
+[journey-console] 2 browser console error/warning/pageerror entries captured this run
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] update-depth lines: 0
+  ✓   7 [chromium] › e2e/tests/burn-preview-journey.spec.ts:179:7 › the burn preview — quote, cadence, re-target, own-host withhold, mine withhold › quotes a selection once per interval, re-targets mid-burn, withholds at the own host and under a mine, and restores (1.0m)
+[WebServer]  GET /login?signUp=true 200 in 137ms
+[WebServer]  GET / 200 in 54ms
+[WebServer]  GET /systems/sys_6_-1 200 in 90ms
+[journey-step1] order response keys: corporationId,id,own,position,roster,scale,state,systemId,worldTime
+[journey-console] 2 browser console error/warning/pageerror entries captured this run
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] update-depth lines: 0
+  ✓   8 [chromium] › e2e/tests/commit-stranding-notice-journey.spec.ts:141:7 › the commit stranding notice — a non-stranding commit on the real wire › a burn to the home station omits the stranding field, shows no notice or warning toast, and cutting the drive leaves the command surface clean (5.5s)
+[WebServer]  GET /login?signUp=true 200 in 108ms
+[WebServer]  GET / 200 in 50ms
+[WebServer]  GET /systems/sys_-2_-3 200 in 93ms
+[journey-step0] 15 selectable target(s) offered: feat-belt-0(belt), feat-body-0(rocky), feat-body-1(rocky), feat-body-2(rocky), feat-body-3(rocky), feat-body-4(ice), feat-body-5(gas_giant), feat-extra-0(rocky), feat-hazard-0(nebula), feat-moon-0(moon), feat-special-0(anomaly), feat-station(station), gate-sys_-1_-2(lane-gate), gate-sys_-2_-4(lane-gate), gate-sys_-3_-3(lane-gate)
+[journey-step0] feat-belt-0 (belt): status 200 flight 23645 world ms
+[journey-step0] feat-body-0 (rocky): status 200 flight 20472 world ms
+[journey-step0] feat-body-1 (rocky): status 200 flight 18552 world ms
+[journey-step0] feat-body-2 (rocky): status 200 flight 19343 world ms
+[journey-step0] feat-body-3 (rocky): status 200 flight 19838 world ms
+[journey-step0] feat-body-4 (ice): status 200 flight 19950 world ms
+[journey-step0] feat-body-5 (gas_giant): status 200 flight 18638 world ms
+[journey-step0] feat-extra-0 (rocky): status 200 flight 19593 world ms
+[journey-step0] feat-hazard-0 (nebula): status 200 flight 16306 world ms
+[journey-step0] feat-moon-0 (moon): status 200 flight 18589 world ms
+[journey-step0] feat-special-0 (anomaly): status 200 flight 17431 world ms
+[journey-step0] feat-station (station): status 200 flight 18326 world ms
+[journey-step0] gate-sys_-1_-2 (lane-gate): status 200 flight 28201 world ms
+[journey-step0] gate-sys_-2_-4 (lane-gate): status 200 flight 10888 world ms
+[journey-step0] gate-sys_-3_-3 (lane-gate): status 200 flight 16718 world ms
+[journey-step0] committed target gate-sys_-1_-2 (lane-gate): 28201 world ms = 5640 wall ms at scale 5; another target gate-sys_-2_-4; station feat-station; 15 quoted of 15
+[journey-commit1] accepted; flight 5640 wall ms; expected natural end at +5640 ms
+[journey-keyboard] after acceptance: {"tag":"BODY","testId":null,"isBody":true,"isStatement":false,"insideColumn":false,"burnDisabled":true,"statementPresent":true}
+[journey-keyboard] after Tab: {"tag":"BUTTON","testId":"fleet-cmd-cut-drive-fleet_cb439941-7111-492a-98d3-a8f67e4eaf99","isBody":false,"isStatement":false,"insideColumn":true,"burnDisabled":true,"statementPresent":true}
+[journey-step3] 4 snapshot(s) from the first statement; first own-fleets read after the acceptance: start +67ms, end +220ms; 2 snapshot(s) after it
+[journey-step3] #0 +131ms statement=1 burnDisabled=true figures=0 uncapped=0 noQuote=0 stale=0
+[journey-step3] #1 +186ms statement=1 burnDisabled=true figures=0 uncapped=0 noQuote=0 stale=0
+[journey-step3] #2 +284ms statement=1 burnDisabled=true figures=0 uncapped=0 noQuote=0 stale=0
+[journey-step3] #3 +316ms statement=1 burnDisabled=true figures=0 uncapped=0 noQuote=0 stale=0
+[journey-step3] burn instants (first real-backend observation of the equality): commit response [119771819225,119771847426] vs first read [119771819225,119771847426]
+[journey-step3] OBSERVATION: commit-drift-notice count 1, commit-stranding-notice count 0 (logged, not asserted)
+[journey-leg] zero-preview-2-intervals: UNTESTED — UNTESTED at tier 4 — flight 5640 ms; covered at tier 1 by view tests 3.1 and 3.4 (RULING 17)
+[journey-plan] after the hold legs 4905 ms of flight remain (another-target needs 2500, cut needs 2500)
+[journey-cut] OBSERVATION after the cut: figures=0 no-quote=0 uncapped-label=0 stale=0; commit-drift-notice=1 commit-stranding-notice=0 (logged, not asserted)
+[journey-summary] ===== leg outcomes =====
+[journey-summary] keyboard-focus: PASSED
+[journey-summary] committed-render-hold: PASSED
+[journey-summary] one-order-no-preview: PASSED
+[journey-summary] second-activation: PASSED
+[journey-summary] zero-preview-2-intervals: UNTESTED — UNTESTED at tier 4 — flight 5640 ms; covered at tier 1 by view tests 3.1 and 3.4 (RULING 17)
+[journey-summary] another-target-and-back: PASSED
+[journey-summary] cut-the-drive: PASSED
+[journey-summary] arrive-and-dock: NOT REACHED — the walk never got there
+[journey-summary] ========================
+[journey-console] 3 browser console error/warning/pageerror entries captured this run
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/systems/sys_-2_-3: Failed to load resource: the server responded with a status of 409 (Conflict)
+[journey-console] update-depth lines: 0
+  ✘   9 [chromium] › e2e/tests/committed-selection-journey.spec.ts:395:7 › the committed selection — quote, commit, hold, release, re-commit, arrive › a committed burn withholds its own quote and Burn for that target until the order ends, and nothing else (13.8s)
+[WebServer]  GET /login?signUp=true 200 in 111ms
+[WebServer]  GET / 200 in 49ms
+[WebServer]  GET /systems/sys_5_-4 200 in 116ms
+[WebServer]  GET /systems/sys_5_-4 200 in 133ms
+[journey-fixture] home sys_5_-4, fleet fleet_38975140-2635-4d7a-acad-2e702cb8c185, corp corp_23b00fd2-acb0-45f9-88a9-2f9d8e7aeaea, records f8f13db13edb449f0acc38cfc674dfda, 10617fef310209ac9bcecee1ab3b0752, 633c9446d899b810ca5de2524409ecd0
+[journey-leg-data] opens-collapsed: root --console-dock-height = "3.5rem"
+[journey-leg] opens-collapsed: PASSED
+[journey-leg-data] hidden-beats-flex: {"hasFlexClass":true,"display":"none","hiddenAttr":true}
+[journey-leg] hidden-beats-flex: PASSED
+[journey-rect] vitals-strip (collapsed): x 0 y 664 w 1280 h 56 (foot 0 above the viewport foot)
+[journey-leg] strip-row-56: PASSED
+[journey-rect] space-command-column (collapsed): x 976 y 16 w 288 h 564 (foot 140 above the viewport foot)
+[journey-rect] sightings-unavailable (collapsed): x 516.3 y 575 w 247.3 h 73 (foot 72 above the viewport foot)
+[journey-rect] space-camera-controls (collapsed): x 1124 y 588 w 140 h 32 (foot 100 above the viewport foot)
+[journey-rect] floating-nav (collapsed): x 16 y 555 w 302.8 h 93 (foot 72 above the viewport foot)
+[journey-rect] console-dock-open (collapsed): x 1199.6 y 628 w 64.4 h 28 (foot 64 above the viewport foot)
+[journey-rect] vitals-strip (collapsed, geometry): x 0 y 664 w 1280 h 56 (foot 0 above the viewport foot)
+[journey-leg-data] geometry-collapsed: nav foot 72 px above the viewport foot
+[journey-leg-data] geometry-collapsed: space-command-column: 5 control(s) hit-tested, 0 zero-size/hidden ignored, 0 blocked
+[journey-leg-data] geometry-collapsed: sightings-unavailable: 1 control(s) hit-tested, 0 zero-size/hidden ignored, 0 blocked
+[journey-leg-data] geometry-collapsed: space-camera-controls: 5 control(s) hit-tested, 0 zero-size/hidden ignored, 1 blocked
+[journey-leg] geometry-collapsed: FAILED - space-camera-controls has control(s) a pointer cannot reach (dock collapsed) |  | expect(received).toEqual(expected) // deep equality |  | - Expected  - 1 | + Received  + 3
+[journey-rect] console-dock-open (targets-24, collapsed): x 1199.6 y 628 w 64.4 h 28 (foot 64 above the viewport foot)
+[journey-leg] targets-24: PASSED
+[journey-console] 3 browser console error/warning/pageerror entries captured in "1: the view opens collapsed; hidden hides the flex wrapper; the strip is 56 px; every floating surface clears the dock"
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/systems/sys_5_-4: Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[journey-console] update-depth lines: 0
+[journey-http] 404 GET /v1/accounts/firestore body=
+[journey-http] 404 GET /v1/corporations/me body=
+[journey-http] 500 GET /v1/sightings?systemId=sys_5_-4 body={"error":"forced by e2e (console-dock)"}
+[journey-budget] "1: the view opens collapsed; hidden hides the flex wrapper; the strip is 56 px; every floating surface clears the dock": 5883 ms of the 60000 ms per-test budget
+  ✓  10 [chromium] › e2e/tests/console-dock-journey.spec.ts:469:7 › the console dock - open collapsed, expand, read the log, lay out, keyboard, navigate › 1: the view opens collapsed; hidden hides the flex wrapper; the strip is 56 px; every floating surface clears the dock (5.9s)
+[journey-leg-data] tab-walk-collapsed: after the chevron, Tab -> console-dock-open
+[journey-leg-data] tab-walk-collapsed: bounded walk from the document start (90 stops): space-camera-controls > camera-orbit > camera-zoom-in > camera-zoom-out > camera-recenter > select-pan-target-point > body-hit-feat-belt-0 > body-hit-feat-body-0 > body-hit-feat-extra-0 > body-hit-feat-hazard-0 > body-hit-feat-special-0 > body-hit-feat-station > body-hit-gate-sys_4_-4 > body-hit-gate-sys_5_-5 > body-hit-gate-sys_6_-4 > fleet-mark-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > offscreen-feat-belt-0 > button:Retry > fleet-cmd-cut-drive-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > fleet-cmd-stop-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > fleet-roster-toggle > fleet-row-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > vitals-fleet-chevron > console-dock-open > nav-home > sign-out-button > (body) > space-camera-controls > camera-orbit > camera-zoom-in > camera-zoom-out > camera-recenter > select-pan-target-point > body-hit-feat-belt-0 > body-hit-feat-body-0 > body-hit-feat-extra-0 > body-hit-feat-hazard-0 > body-hit-feat-special-0 > body-hit-feat-station > body-hit-gate-sys_4_-4 > body-hit-gate-sys_5_-5 > body-hit-gate-sys_6_-4 > fleet-mark-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > offscreen-feat-belt-0 > button:Retry > fleet-cmd-cut-drive-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > fleet-cmd-stop-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > fleet-roster-toggle > fleet-row-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > vitals-fleet-chevron > console-dock-open > nav-home > sign-out-button > (body) > space-camera-controls > camera-orbit > camera-zoom-in > camera-zoom-out > camera-recenter > select-pan-target-point > body-hit-feat-belt-0 > body-hit-feat-body-0 > body-hit-feat-extra-0 > body-hit-feat-hazard-0 > body-hit-feat-special-0 > body-hit-feat-station > body-hit-gate-sys_4_-4 > body-hit-gate-sys_5_-5 > body-hit-gate-sys_6_-4 > fleet-mark-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > offscreen-feat-belt-0 > button:Retry > fleet-cmd-cut-drive-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > fleet-cmd-stop-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > fleet-roster-toggle > fleet-row-fleet_38975140-2635-4d7a-acad-2e702cb8c185 > vitals-fleet-chevron > console-dock-open > nav-home > sign-out-button > (body) > space-camera-controls > camera-orbit > camera-zoom-in > camera-zoom-out > camera-recenter > select-pan-target-point > body-hit-feat-belt-0 > body-hit-feat-body-0 > body-hit-feat-extra-0
+[journey-leg] tab-walk-collapsed: PASSED
+[journey-leg-data] focus-outline: Log tab, focused by keyboard expansion: {"style":"solid","width":2}
+[journey-rect] console-dock (expanded): x 0 y 500 w 1280 h 220 (foot 0 above the viewport foot)
+[journey-rect] vitals-strip (expanded): x 0 y 500 w 1280 h 56 (foot 164 above the viewport foot)
+[journey-rect] console-dock-region (expanded): x 0 y 556 w 1280 h 164 (foot 0 above the viewport foot)
+[journey-rect] console-tab-log (expanded): x 8 y 563 w 35.9 h 24 (foot 133 above the viewport foot)
+[journey-rect] console-panel-log (expanded): x 0 y 593 w 1280 h 127 (foot 0 above the viewport foot)
+[journey-leg-data] expand-collapse-keyboard: root --console-dock-height = "13.75rem"
+[journey-rect] console-tab-log (expanded, targets-24): x 8 y 563 w 35.9 h 24 (foot 133 above the viewport foot)
+[journey-rect] console-dock-collapse (expanded, targets-24): x 1248 y 563 w 24 h 24 (foot 133 above the viewport foot)
+[journey-leg-data] targets-24: collapsed "Console" x 1199.6 y 628 w 64.4 h 28 (foot 64 above the viewport foot)
+[journey-leg-data] focus-outline: collapse control, focused by Tab: {"style":"solid","width":2}
+[journey-leg-data] focus-outline: "Console" control, focused after a keyboard collapse: {"style":"solid","width":2}
+[journey-leg] expand-collapse-keyboard: PASSED
+[journey-console] 0 browser console error/warning/pageerror entries captured in "2: the Console control is reachable by Tab; Enter and Space operate both controls; the expanded dock is 220 px"
+[journey-console] update-depth lines: 0
+[journey-budget] "2: the Console control is reachable by Tab; Enter and Space operate both controls; the expanded dock is 220 px": 8819 ms of the 60000 ms per-test budget
+  ✓  11 [chromium] › e2e/tests/console-dock-journey.spec.ts:555:7 › the console dock - open collapsed, expand, read the log, lay out, keyboard, navigate › 2: the Console control is reachable by Tab; Enter and Space operate both controls; the expanded dock is 220 px (8.8s)
+[WebServer]  GET /systems/sys_5_-4 200 in 146ms
+[journey-leg] reload-collapsed: PASSED
+[journey-rect] console-panel-log: x 0 y 593 w 1280 h 127 (foot 0 above the viewport foot)
+[journey-rect] Refresh sighting log: x 1215.8 y 601 w 56.2 h 21 (foot 98 above the viewport foot)
+[journey-rect] first sighting row: x 8 y 630 w 1264 h 59.5 (foot 30.5 above the viewport foot)
+[journey-leg-data] log-panel-origin: 3 row(s) listed
+[journey-leg] log-panel-origin: PASSED
+[journey-leg-data] scroll-leg: {"scrollHeight":232,"clientHeight":127,"scrollTop":105}
+[journey-rect] last sighting row (panel scrolled to its end): x 8 y 652 w 1264 h 59.5 (foot 8.5 above the viewport foot)
+[journey-rect] console-panel-log (scrolled): x 0 y 593 w 1280 h 127 (foot 0 above the viewport foot)
+[journey-rect] console-dock (after scroll): x 0 y 500 w 1280 h 220 (foot 0 above the viewport foot)
+[journey-leg] scroll-leg: PASSED
+[journey-console] 1 browser console error/warning/pageerror entry captured in "3: a reload shows the dock collapsed; the log panel opens at its origin and scrolls to its last row"
+[journey-console] console-error at http://localhost:20230/systems/sys_5_-4: Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[journey-console] update-depth lines: 0
+[journey-http] 500 GET /v1/sightings?systemId=sys_5_-4 body={"error":"forced by e2e (console-dock)"}
+[journey-budget] "3: a reload shows the dock collapsed; the log panel opens at its origin and scrolls to its last row": 3509 ms of the 60000 ms per-test budget
+  ✓  12 [chromium] › e2e/tests/console-dock-journey.spec.ts:635:7 › the console dock - open collapsed, expand, read the log, lay out, keyboard, navigate › 3: a reload shows the dock collapsed; the log panel opens at its origin and scrolls to its last row (3.5s)
+[journey-rect] space-command-column (expanded): x 976 y 16 w 288 h 400 (foot 304 above the viewport foot)
+[journey-rect] sightings-unavailable (expanded): x 516.3 y 411 w 247.3 h 73 (foot 236 above the viewport foot)
+[journey-rect] space-camera-controls (expanded): x 1124 y 424 w 140 h 32 (foot 264 above the viewport foot)
+[journey-rect] floating-nav (expanded): x 16 y 391 w 302.8 h 93 (foot 236 above the viewport foot)
+[journey-rect] vitals-strip (expanded, geometry): x 0 y 500 w 1280 h 56 (foot 164 above the viewport foot)
+[journey-rect] console-dock (expanded, geometry): x 0 y 500 w 1280 h 220 (foot 0 above the viewport foot)
+[journey-leg-data] geometry-expanded: command column {"clientHeight":400,"scrollHeight":443}
+[journey-leg-data] geometry-expanded: space-command-column: 5 control(s) hit-tested, 0 zero-size/hidden ignored, 0 blocked
+[journey-leg-data] geometry-expanded: sightings-unavailable: 1 control(s) hit-tested, 0 zero-size/hidden ignored, 0 blocked
+[journey-leg-data] geometry-expanded: space-camera-controls: 5 control(s) hit-tested, 0 zero-size/hidden ignored, 1 blocked
+[journey-leg] geometry-expanded: FAILED - space-camera-controls has control(s) a pointer cannot reach (dock expanded) |  | expect(received).toEqual(expected) // deep equality |  | - Expected  - 1 | + Received  + 3
+[journey-leg-data] tab-walk-expanded: walk from the document start (1 stops): space-camera-controls
+[journey-leg-data] tab-walk-expanded: after the collapse control, Tab -> Refresh sighting log
+[journey-leg-data] tab-walk-expanded: the panel's focusables in DOM order: Refresh sighting log > sighting-row-633c9446d899b810ca5de2524409ecd0 > sighting-row-10617fef310209ac9bcecee1ab3b0752 > sighting-row-f8f13db13edb449f0acc38cfc674dfda
+[journey-leg] tab-walk-expanded: PASSED
+[journey-console] 0 browser console error/warning/pageerror entries captured in "4: expanded, every surface clears the dock and the strip; the camera controls precede the hit targets in Tab order"
+[journey-console] update-depth lines: 0
+[journey-budget] "4: expanded, every surface clears the dock and the strip; the camera controls precede the hit targets in Tab order": 6717 ms of the 60000 ms per-test budget
+  ✓  13 [chromium] › e2e/tests/console-dock-journey.spec.ts:696:7 › the console dock - open collapsed, expand, read the log, lay out, keyboard, navigate › 4: expanded, every surface clears the dock and the strip; the camera controls precede the hit targets in Tab order (6.7s)
+[journey-leg] report-link: UNTESTED - no scan target served in range for the fresh fleet (tier 1 cover: task 2.9; scan-journey 3.2 drives the link at tier 4)
+[journey-console] 0 browser console error/warning/pageerror entries captured in "5: a settled sweep's report link leaves the dock expanded on the Log tab with focus on it"
+[journey-console] update-depth lines: 0
+[journey-budget] "5: a settled sweep's report link leaves the dock expanded on the Log tab with focus on it": 282 ms of the 60000 ms per-test budget
+  ✓  14 [chromium] › e2e/tests/console-dock-journey.spec.ts:798:7 › the console dock - open collapsed, expand, read the log, lay out, keyboard, navigate › 5: a settled sweep's report link leaves the dock expanded on the Log tab with focus on it (283ms)
+[journey-leg-data] galaxy-nav-72: before leaving, root --console-dock-height = "13.75rem"
+[WebServer]  GET / 200 in 150ms
+[journey-rect] floating-nav (galaxy route): x 16 y 555 w 302.8 h 93 (foot 72 above the viewport foot)
+[journey-leg-data] galaxy-nav-72: root --console-dock-height on the galaxy route = "" (expected empty)
+[journey-leg] galaxy-nav-72: PASSED
+[WebServer]  GET /systems/sys_5_-4 200 in 151ms
+[journey-leg] return-collapsed: PASSED
+[journey-leg] other-system-collapsed: UNTESTED - no player path reaches another system from this one for a one-hull corporation without a jump: the only system-to-system navigation in the app is picking a roster fleet that sits in another system (SystemSpaceView.selectFleet), and this corporation owns one fleet; arranging a second fleet or a jump here would be a different journey (no router internals are reached). Cover: tier 1 task 2.1 (keyed remount "Navigating to another system and back shows the dock collapsed"); nearest tier-4 evidence is leg 15 return-collapsed (galaxy to system)
+[journey-console] 1 browser console error/warning/pageerror entry captured in "6: from an expanded dock the galaxy nav sits 72 px up; coming back by client navigation shows the dock collapsed"
+[journey-console] console-error at http://localhost:20230/systems/sys_5_-4: Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[journey-console] update-depth lines: 0
+[journey-http] 500 GET /v1/sightings?systemId=sys_5_-4 body={"error":"forced by e2e (console-dock)"}
+[journey-budget] "6: from an expanded dock the galaxy nav sits 72 px up; coming back by client navigation shows the dock collapsed": 2364 ms of the 60000 ms per-test budget
+  ✓  15 [chromium] › e2e/tests/console-dock-journey.spec.ts:874:7 › the console dock - open collapsed, expand, read the log, lay out, keyboard, navigate › 6: from an expanded dock the galaxy nav sits 72 px up; coming back by client navigation shows the dock collapsed (2.4s)
+[journey-summary] ===== leg outcomes =====
+[journey-summary] opens-collapsed (MUST PASS): PASSED
+[journey-summary] hidden-beats-flex (MUST PASS): PASSED
+[journey-summary] strip-row-56 (MUST PASS): PASSED
+[journey-summary] geometry-collapsed (MUST PASS): FAILED - space-camera-controls has control(s) a pointer cannot reach (dock collapsed) |  | expect(received).toEqual(expected) // deep equality |  | - Expected  - 1 | + Received  + 3
+[journey-summary] targets-24 (MUST PASS): PASSED
+[journey-summary] tab-walk-collapsed (MUST PASS): PASSED
+[journey-summary] expand-collapse-keyboard (MUST PASS): PASSED
+[journey-summary] reload-collapsed (MUST PASS): PASSED
+[journey-summary] log-panel-origin (MUST PASS): PASSED
+[journey-summary] scroll-leg (MUST PASS): PASSED
+[journey-summary] geometry-expanded (MUST PASS): FAILED - space-camera-controls has control(s) a pointer cannot reach (dock expanded) |  | expect(received).toEqual(expected) // deep equality |  | - Expected  - 1 | + Received  + 3
+[journey-summary] tab-walk-expanded (MUST PASS): PASSED
+[journey-summary] report-link: UNTESTED - no scan target served in range for the fresh fleet (tier 1 cover: task 2.9; scan-journey 3.2 drives the link at tier 4)
+[journey-summary] galaxy-nav-72 (MUST PASS): PASSED
+[journey-summary] return-collapsed (MUST PASS): PASSED
+[journey-summary] other-system-collapsed: UNTESTED - no player path reaches another system from this one for a one-hull corporation without a jump: the only system-to-system navigation in the app is picking a roster fleet that sits in another system (SystemSpaceView.selectFleet), and this corporation owns one fleet; arranging a second fleet or a jump here would be a different journey (no router internals are reached). Cover: tier 1 task 2.1 (keyed remount "Navigating to another system and back shows the dock collapsed"); nearest tier-4 evidence is leg 15 return-collapsed (galaxy to system)
+[journey-summary] ========================
+[journey-console] 0 browser console error/warning/pageerror entries captured in "7: the must-pass legs passed and no leg failed"
+[journey-console] update-depth lines: 0
+[journey-budget] "7: the must-pass legs passed and no leg failed": 2 ms of the 60000 ms per-test budget
+  ✘  16 [chromium] › e2e/tests/console-dock-journey.spec.ts:913:7 › the console dock - open collapsed, expand, read the log, lay out, keyboard, navigate › 7: the must-pass legs passed and no leg failed (146ms)
+  ✓  17 [chromium] › e2e/tests/endless-frontier.spec.ts:36:7 › the endless frontier › consecutive fresh wakes all succeed and the world grows to make room (16.8s)
+[WebServer]  GET /login?signUp=true 200 in 100ms
+[WebServer]  GET / 200 in 43ms
+[WebServer]  GET /systems/sys_-7_4 200 in 104ms
+[WebServer]  GET / 200 in 150ms
+  ✓  18 [chromium] › e2e/tests/jump-commit.spec.ts:64:7 › jump commit — wire to click › submits the jump order naming the laneId the interior read itself served (12.7s)
+[WebServer]  GET /login?signUp=true 200 in 154ms
+[WebServer]  GET / 200 in 47ms
+[WebServer]  GET /systems/sys_-8_6 200 in 143ms
+  ✓  19 [chromium] › e2e/tests/new-user.spec.ts:59:7 › new user first activities › signs up, wakes directly onto the home system in continuous space with a commandable fleet (4.7s)
+[WebServer]  GET /login?signUp=true 200 in 184ms
+[WebServer]  GET / 200 in 58ms
+[WebServer]  GET /systems/sys_8_1 200 in 181ms
+  ✓  20 [chromium] › e2e/tests/refuel-commit.spec.ts:59:7 › refuel commit — wire to click, double-submit guard › a docked fleet refuels for the server-served price, and a rapid double-click still settles exactly once (13.6s)
+[WebServer]  GET / 200 in 118ms
+  ✓  21 [chromium] › e2e/tests/renderer-availability.spec.ts:31:7 › renderer availability › a rendering context that cannot be created shows the named unsupported state, with the intel panel usable and no page error (671ms)
+[WebServer]  GET / 200 in 100ms
+  ✓  22 [chromium] › e2e/tests/renderer-availability.spec.ts:75:7 › renderer availability › a real context loss shows the interrupted state; restoring it recovers rendering without a page navigation (1.6s)
+[WebServer]  GET /systems/sys_-1_-1 200 in 108ms
+  ✓  23 [chromium] › e2e/tests/renderer-availability.spec.ts:185:7 › renderer availability — the system space view › a rendering context that cannot be created shows the named unsupported state, with the fleet panel usable and no page error (763ms)
+[WebServer]  GET /systems/sys_-1_-1 200 in 109ms
+  ✓  24 [chromium] › e2e/tests/renderer-availability.spec.ts:238:7 › renderer availability — the system space view › a real context loss shows the interrupted state on the space view; restoring it recovers rendering without a page navigation (2.5s)
+[WebServer]  GET /login?signUp=true 200 in 101ms
+[WebServer]  GET / 200 in 97ms
+[WebServer]  GET /systems/sys_-7_1 200 in 92ms
+[WebServer]  GET /systems/sys_-7_1 200 in 135ms
+[WebServer]  GET / 200 in 328ms
+[WebServer]  GET /systems/sys_-7_1 200 in 323ms
+[WebServer]  GET /systems/sys_-7_1 200 in 144ms
+  ✓  25 [chromium] › e2e/tests/scan-journey.spec.ts:42:7 › the focused-scan journey, end to end through the space view › commit a sweep against the served target, watch it settle, see the log row — a clean sweep (22.1s)
+[WebServer]  GET /login?signUp=true 200 in 108ms
+[WebServer]  GET / 200 in 51ms
+[WebServer]  GET /systems/sys_-1_-5 200 in 86ms
+[WebServer]  GET /systems/sys_-1_-5 200 in 160ms
+[WebServer]  GET /systems/sys_-1_-5 200 in 108ms
+  ✓  26 [chromium] › e2e/tests/scan-journey.spec.ts:298:7 › the focused-scan journey, end to end through the space view › a seeded target-naming sighting renders as a ghost and cross-highlights with its log row (9.7s)
+[WebServer]  GET /login?signUp=true 200 in 105ms
+[WebServer]  GET / 200 in 51ms
+[WebServer]  GET /systems/sys_-6_0 200 in 134ms
+  ✓  27 [chromium] › e2e/tests/scan-journey.spec.ts:383:7 › the focused-scan journey, end to end through the space view › the burn to the home station leg still docks normally (regression: scan control mounts beside, not inside, the fleet panel) (10.6s)
+[WebServer]  GET /login?signUp=true 200 in 119ms
+[WebServer]  GET / 200 in 50ms
+[WebServer]  GET /systems/sys_-11_3 200 in 169ms
+  ✓  28 [chromium] › e2e/tests/scan-journey.spec.ts:408:7 › the focused-scan journey, end to end through the space view › opening the scan control mid-burn shows "no host in range"; the docked host appears with no user action once the burn lands (12.0s)
+[WebServer]  GET /login?signUp=true 200 in 132ms
+[WebServer]  GET / 200 in 52ms
+[WebServer]  GET /systems/sys_-9_2 200 in 121ms
+[WebServer]  GET / 200 in 189ms
+[WebServer]  GET / 200 in 150ms
+[WebServer]  GET /systems/sys_-10_3 200 in 105ms
+  ✓  29 [chromium] › e2e/tests/scan-lane-transit-fizzle.spec.ts:103:7 › a lane-transit fizzle reports its own copy and files no record › committing a sweep against the attached gate, then jumping immediately, fizzles as laneTransit/leftSystem (25.0s)
+[WebServer]  GET /login?signUp=true 200 in 149ms
+[WebServer]  GET / 200 in 57ms
+[WebServer]  GET /systems/sys_7_10 200 in 113ms
+[WebServer]  GET /systems/sys_7_10 200 in 150ms
+[WebServer]  GET / 200 in 69ms
+  ✓  30 [chromium] › e2e/tests/slice.spec.ts:83:7 › the vertical slice › wake → mine → persisted → mine again → sell → fly to a gate → jump (1.2m)
+[WebServer]  GET / 200 in 129ms
+  ✓  31 [chromium] › e2e/tests/smoke.spec.ts:8:7 › smoke › authenticated session lands on the home page (480ms)
+[WebServer]  GET /login?signUp=true 200 in 114ms
+[WebServer]  GET / 200 in 200ms
+[WebServer]  GET /systems/sys_3_-10 200 in 132ms
+  ✓  32 [chromium] › e2e/tests/space-double-submit.spec.ts:267:7 › space view — synchronous double-submit guards › Scenario: Two activations in one tick submit one burn order (12.2s)
+[WebServer]  GET /login?signUp=true 200 in 122ms
+[WebServer]  GET / 200 in 51ms
+[WebServer]  GET /systems/sys_8_-7 200 in 94ms
+  ✓  33 [chromium] › e2e/tests/space-double-submit.spec.ts:314:7 › space view — synchronous double-submit guards › Scenario: Two activations in one tick submit one mine run (11.6s)
+[WebServer]  GET /login?signUp=true 200 in 127ms
+[WebServer]  GET / 200 in 49ms
+[WebServer]  GET /systems/sys_11_-6 200 in 98ms
+  ✓  34 [chromium] › e2e/tests/space-double-submit.spec.ts:340:7 › space view — synchronous double-submit guards › Scenario: Two activations in one tick submit one sale and mint one key (28.0s)
+[WebServer]  GET /login?signUp=true 200 in 181ms
+[WebServer]  GET / 200 in 50ms
+[WebServer]  GET /systems/sys_3_8 200 in 103ms
+  ✓  35 [chromium] › e2e/tests/space-double-submit.spec.ts:417:7 › space view — synchronous double-submit guards › Scenario: Two activations in one tick submit one refuel and mint one key (11.2s)
+[WebServer]  GET /login?signUp=true 200 in 118ms
+[WebServer]  GET / 200 in 55ms
+[WebServer]  GET /systems/sys_14_-7 200 in 135ms
+[WebServer]  GET / 200 in 90ms
+  ✓  36 [chromium] › e2e/tests/space-double-submit.spec.ts:440:7 › space view — synchronous double-submit guards › Scenario: A double-click yields exactly one jump order (12.2s)
+[WebServer]  GET /login?signUp=true 200 in 163ms
+[WebServer]  GET / 200 in 1117ms
+[WebServer]  GET /systems/sys_-5_5 200 in 149ms
+  ✘  37 [chromium] › e2e/tests/space-journey.spec.ts:85:7 › the continuous-space slice, end to end through the new view › spawn -> see the system -> burn -> dock -> mine -> sell -> refuel -> gate -> jump (47.7s)
+[WebServer]  GET /login?signUp=true 200 in 137ms
+[WebServer]  GET / 200 in 53ms
+[WebServer]  GET /systems/sys_10_-1 200 in 109ms
+[WebServer]  GET /systems/sys_10_0 200 in 106ms
+[WebServer]  GET /systems/sys_10_-1 200 in 103ms
+[WebServer]  GET /systems/sys_10_-1 200 in 115ms
+[journey-viewport] space-fleet-panel: 2 interactive control(s) hit-tested
+[journey-viewport] preview-panel: 1 interactive control(s) hit-tested
+[journey-viewport] space-camera-controls: 4 interactive control(s) hit-tested
+[journey-viewport] sightings-unavailable: 1 interactive control(s) hit-tested
+[journey-viewport] floating-nav: 2 interactive control(s) hit-tested
+[journey-console] 4 browser console error/warning/pageerror entries captured this run
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/login?signUp=true: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/systems/sys_10_0: Failed to load resource: the server responded with a status of 404 (Not Found)
+[journey-console] console-error at http://localhost:20230/systems/sys_10_-1: Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[journey-console] update-depth lines: 0
+  ✓  38 [chromium] › e2e/tests/vitals-strip-journey.spec.ts:263:7 › the vitals strip — dock, switch, burn, and never overflow the view › reads all five cells docked, switches the acting fleet both ways, counts down a burn, and clears every floating surface at 1280×720 (23.9s)
+[WebServer]  GET / 200 in 101ms
+[WebServer]  GET /systems/sys_0_-1 200 in 96ms
+[WebServer]  GET / 200 in 144ms
+[WebServer]  GET /systems/sys_0_-1 200 in 75ms
+[journey-console] 0 browser console error/warning/pageerror entries captured this run
+  ✓  39 [chromium] › e2e/tests/world-time-render-loop-journey.spec.ts:153:7 › the galaxy view — navigations survive the frame loop › a drill-in and a roster burn redirect both arrive while the graph animates (5.9s)
+
+
+  1) [chromium] › e2e/tests/committed-selection-journey.spec.ts:395:7 › the committed selection — quote, commit, hold, release, re-commit, arrive › a committed burn withholds its own quote and Burn for that target until the order ends, and nothing else 
+
+    Error: commit 2 (arrives): the commit was not accepted: HTTP 409
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 300
+    Received:   409
+
+      826 |         expect(got, `${label}: the commit sent no order answer within 15 s`).toBe(true)
+      827 |         const a = wire.orderAnswers[before]!
+    > 828 |         expect(a.status, `${label}: the commit was not accepted: HTTP ${a.status}`).toBeLessThan(300)
+          |                                                                                     ^
+      829 |         await pollUntil(() => a.body !== null, 2_000, 'order body parse')
+      830 |         await expect(statement, `${label}: the statement shows for the commit`).toHaveCount(1, { timeout: 10_000 })
+      831 |         console.log(
+        at commitAgain (/Users/travis/Projects/hexaverse/frontend/e2e/tests/committed-selection-journey.spec.ts:828:85)
+        at /Users/travis/Projects/hexaverse/frontend/e2e/tests/committed-selection-journey.spec.ts:887:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/tests-committed-selection--43816-order-ends-and-nothing-else-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/tests-committed-selection--43816-order-ends-and-nothing-else-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/tests-committed-selection--43816-order-ends-and-nothing-else-chromium/error-context.md
+
+  2) [chromium] › e2e/tests/console-dock-journey.spec.ts:913:7 › the console dock - open collapsed, expand, read the log, lay out, keyboard, navigate › 7: the must-pass legs passed and no leg failed 
+
+    Error: legs that FAILED (each message is the first assertion that broke; the leg logs above carry the rectangles)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 4
+
+    - Array []
+    + Array [
+    +   "geometry-collapsed: space-camera-controls has control(s) a pointer cannot reach (dock collapsed) |  | expect(received).toEqual(expected) // deep equality |  | - Expected  - 1 | + Received  + 3",
+    +   "geometry-expanded: space-camera-controls has control(s) a pointer cannot reach (dock expanded) |  | expect(received).toEqual(expected) // deep equality |  | - Expected  - 1 | + Received  + 3",
+    + ]
+
+      930 |     console.log('[journey-summary] ========================')
+      931 |     const failed = LEG_NAMES.filter((n) => legs.get(n)!.status === 'FAILED').map((n) => `${n}: ${legs.get(n)!.note}`)
+    > 932 |     expect(failed, 'legs that FAILED (each message is the first assertion that broke; the leg logs above carry the rectangles)').toEqual([])
+          |                                                                                                                                  ^
+      933 |     for (const n of MUST_PASS) {
+      934 |       expect(legs.get(n)!.status, `must-PASS leg ${n} is ${legs.get(n)!.status} (${legs.get(n)!.note})`).toBe('PASSED')
+      935 |     }
+        at /Users/travis/Projects/hexaverse/frontend/e2e/tests/console-dock-journey.spec.ts:932:130
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/tests-console-dock-journey-9f4eb-gs-passed-and-no-leg-failed-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/tests-console-dock-journey-9f4eb-gs-passed-and-no-leg-failed-chromium/error-context.md
+
+    Error Context: test-results/tests-console-dock-journey-9f4eb-gs-passed-and-no-leg-failed-chromium/error-context.md
+
+  3) [chromium] › e2e/tests/space-journey.spec.ts:85:7 › the continuous-space slice, end to end through the new view › spawn -> see the system -> burn -> dock -> mine -> sell -> refuel -> gate -> jump 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('fleet-row-fleet_7f9603b9-6e19-46b1-8c11-5ca636a03948')
+    Expected pattern: /under way/i
+    Received string:  "Kelueth NexushereDocked67.1 t fuel28.2k range"
+    Timeout: 20000ms
+
+    Call log:
+      - Expect "toContainText" with timeout 20000ms
+      - waiting for getByTestId('fleet-row-fleet_7f9603b9-6e19-46b1-8c11-5ca636a03948')
+        5 × locator resolved to <button type="button" data-active="true" class="flex w-full flex-col gap-0.5 text-left text-white" data-testid="fleet-row-fleet_7f9603b9-6e19-46b1-8c11-5ca636a03948">…</button>
+          - unexpected value "Kelueth NexushereDocked69.8 t fuel30.5k range"
+        37 × locator resolved to <button type="button" data-active="true" class="flex w-full flex-col gap-0.5 text-left text-white" data-testid="fleet-row-fleet_7f9603b9-6e19-46b1-8c11-5ca636a03948">…</button>
+           - unexpected value "Kelueth NexushereDocked67.1 t fuel28.2k range"
+
+
+      201 |     await selectFirstBodyMatching(page, 'feat-station')
+      202 |     await page.getByTestId('burn-button').click()
+    > 203 |     await expect(row).toContainText(/under way/i, { timeout: 20_000 })
+          |                       ^
+      204 |     await expect(row).toContainText(/docked/i, { timeout: 600_000 })
+      205 |
+      206 |     await expect(page.getByTestId('sell-section')).toBeVisible({ timeout: 20_000 })
+        at /Users/travis/Projects/hexaverse/frontend/e2e/tests/space-journey.spec.ts:203:23
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/tests-space-journey-the-co-f77e3-sell---refuel---gate---jump-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/tests-space-journey-the-co-f77e3-sell---refuel---gate---jump-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/tests-space-journey-the-co-f77e3-sell---refuel---gate---jump-chromium/error-context.md
+
+  3 failed
+    [chromium] › e2e/tests/committed-selection-journey.spec.ts:395:7 › the committed selection — quote, commit, hold, release, re-commit, arrive › a committed burn withholds its own quote and Burn for that target until the order ends, and nothing else 
+    [chromium] › e2e/tests/console-dock-journey.spec.ts:913:7 › the console dock - open collapsed, expand, read the log, lay out, keyboard, navigate › 7: the must-pass legs passed and no leg failed 
+    [chromium] › e2e/tests/space-journey.spec.ts:85:7 › the continuous-space slice, end to end through the new view › spawn -> see the system -> burn -> dock -> mine -> sell -> refuel -> gate -> jump 
+  36 passed (8.7m)
+⚠  Script exited unsuccessfully (code 1)
+i  emulators: Shutting down emulators.
+i  firestore: Stopping Firestore Emulator
+i  pubsub: Stopping Pub/Sub Emulator
+i  auth: Stopping Authentication Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator
+
+Error: Script "cd frontend && npx playwright test" exited with code 1
+tier4 end 2026-10-05 02:06:01 exit 1 wall 528s load { 12.69 13.72 12.42 } sigterm 1
