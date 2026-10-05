@@ -36,3 +36,26 @@ the start of the run and 8.57 at the end. The spec passed 28 minutes earlier in
 the same gate's first run on the same production code. Ruled residue:
 `add-console-dock-rulings.md` FULL-AUTO RULING 23. This is the second gate it
 has cost a red in.
+
+## Occurrence at a different spec — 2026-10-05, `keep-console-tab-content-mounted` archive-gate rerun (tier 4)
+
+Tree `aa00b36`; log `keep-console-tab-content-mounted-tier4-run2.log`. NOT
+`slice.spec.ts`: `frontend/e2e/tests/space-double-submit.spec.ts:340`
+("Two activations in one tick submit one sale and mint one key") failed at
+`:384` in `expectAllSettled2xx` (`:178`) — its one `/sell` request settled 409.
+E2E backend log, 05:36:18: `Credit mutation rejected … reason="market: price
+changed since your quote"`, `Sale rejected … reason="market: price changed since
+your quote"`, then `409 … POST "/v1/fleets/fleet_29f63b50-561a-447c-9ded-cb774dc9b453/sell"`
+— the run's only sell 409. The failure's DOM snapshot shows "The price changed
+while you were deciding. The offer has been updated." `slice.spec.ts:83` itself
+passed in that run. Load 3.90 at the start of the run and 8.76 at the end. The
+spec passed 13 minutes earlier in the same gate's first run on the same
+production code; that change's diff is empty for the backend and the sell path.
+
+The refusal is this defect's, word for word; the spec and line are not the
+recorded signature's, so that run did NOT rule it residue
+(`keep-console-tab-content-mounted-rulings.md` FULL-AUTO RULING 21) and stopped
+for Travis. This is the third gate the price step has cost a red in, and the
+first at a second spec: any tier-4 spec that sells once and requires a 2xx is
+exposed. A signature keyed to the backend sentinel rather than to
+`slice.spec.ts` would cover both.

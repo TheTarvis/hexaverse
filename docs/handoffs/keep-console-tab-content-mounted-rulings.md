@@ -359,3 +359,29 @@ order (`keep-console-tab-content-mounted-journey.md`).
 **Alternatives rejected.** Archiving past an unmatched red (forbidden).
 Stopping without using the rerun the gate rule provides.
 **Reversal cost.** None.
+
+### FULL-AUTO RULING 21 — the rerun's one tier-4 red, `space-double-submit.spec.ts:340` (a sell refused 409 "price changed since your quote"), is NOT ruled residue: its refusal matches the filed sell-price defect word for word but its spec and line are not that defect's recorded signature; the run stops for Travis after tier 3 and does not archive
+
+**Question.** Rerun: 44 passed, 1 failed, 508 s; this change's journey green
+(every must-PASS leg, the settle leg reached and PASSED); run 1's red did not
+recur. The one red is a spec that passed in run 1, refused by the backend with
+the exact sentinel and page copy of `defect-slice-sell-price-changed-409.md`,
+whose recorded signature is `slice.spec.ts:83` at `:199`. Residue or stop?
+
+**Ruling.** Stop. The residue rule this run was given admits a red only when it
+matches a filed signature verbatim, names the filed tier-4 signatures by spec
+and line, and says a red matching none is a stop for Travis. Two of its three
+conditions hold (this change's relevant diff is empty; none of its scenarios is
+touched); the first holds for the refusal and not for the spec. The orchestrator
+does not widen its own authorization. Tier 3 is still run once, and the
+reconcile, strict validation, archive rehearsal and gap records are completed,
+so that a ruling from Travis is one step from the archive.
+
+**Basis.** The chain entry point's residue rule and stop condition (a gate that
+stays red after its one batched revision round). Noted for Travis, not applied:
+the chain doc's own lesson from 2a-iii ("attribute it by its request, status and
+backend sentinel, and by an empty backend diff — not by a test name") points the
+other way, and by that test this red is the filed defect.
+**Alternatives rejected.** Ruling it residue on the sentinel (a second rerun is
+not allowed, and widening "verbatim" is not the orchestrator's call). 
+**Reversal cost.** One user ruling; then tasks 5.4, 5.8 and 5.9 and the archive.

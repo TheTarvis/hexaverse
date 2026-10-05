@@ -69,7 +69,50 @@ Other run-1 findings for the round: none in this change's journey spec.
 
 ## Gate rerun - tier 4
 
-(empty, to be filled after the orchestrator's rerun)
+Written by the orchestrator from `keep-console-tab-content-mounted-tier4-run2.log`
+and the e2e backend log (`frontend/playwright/.auth/backend.log`), 2026-10-05.
+
+- Started by the orchestrator, one runner, tree clean at `aa00b36` (0 uncommitted
+  files). START 05:29:32, load 3.90 8.62 11.33; END 05:38:00, load 8.76 9.39
+  10.51; wall **508 s**. No `Received SIGTERM`. The start waited 110 s for
+  another project's (Chartz) Playwright run to end and the load to fall under 4.
+- **44 passed, 1 failed.**
+- **This change's journey: green again.** 6 tests passed; `[journey-ran] …
+  ALL 13 legs accounted for; must-PASS legs PASSED; settle leg
+  must-PASS-when-reached: reached and PASSED` (log line 496). Leg outcomes
+  (lines 482-495) are identical to run 1: `expand-load-more`,
+  `escape-same-node`, `menu-open-escape`, `press-on-dock-not-a-pick`,
+  `escape-from-camera-control`, `failed-while-collapsed` PASSED;
+  `highlight-survives` and `settle-reread-collapsed` PASSED; `warm-return`
+  UNTESTED (no interior request inside the 60 s stale time); `other-system`
+  UNTESTED by design; `scroll-offset` OBSERVED (scrollTop 240 before the
+  collapse, 240 after the re-expansion); `select-popup-escape` OBSERVED (dock
+  collapsed); `toast-escape` OBSERVED (no toast present).
+- **Run 1's red did not recur.** `burn-geometry-refusals-journey.spec.ts:59`
+  passed; the helper's new refused-order log printed nothing in this run.
+- **The one red is a different spec:** `space-double-submit.spec.ts:340`
+  ("Two activations in one tick submit one sale and mint one key"), failing at
+  `:384` in `expectAllSettled2xx` (`:178`): the single recorded `/sell` request
+  settled `409 /v1/fleets/fleet_29f63b50-…/sell`. It passed in run 1 (26.8 s)
+  on the same production code.
+  - Backend log 05:36:18: `Credit mutation rejected … reason="market: price
+    changed since your quote"`, `Sale rejected … reason="market: price changed
+    since your quote"`, then `409 … POST "/v1/fleets/fleet_29f63b50-…/sell"` —
+    the run's only sell 409 (the other two sells answered 200).
+  - The failure's DOM snapshot shows "The price changed while you were
+    deciding. The offer has been updated."
+  - Exactly one `/sell` request was sent: the double-submit guard the spec
+    exists for held.
+  - This change's diff is empty for `backend/`, `frontend/components/fleet`,
+    `frontend/components/market`, `frontend/hooks` and `frontend/lib`
+    (`git diff 9648346 HEAD --stat`); the spec does not open the dock, read the
+    log, or press Escape; none of this change's scenarios is involved.
+  - **Attribution:** the backend sentinel and the page copy are, word for word,
+    those of the filed `defect-slice-sell-price-changed-409.md`. Its recorded
+    signature, however, is `slice.spec.ts:83` failing at `:199`; this is the
+    same refusal met by a different spec. Under the run's residue rule
+    (signature verbatim) it is therefore NOT ruled residue — FULL-AUTO RULING
+    21. The occurrence is appended to that defect record.
 
 ## Tier 3
 
