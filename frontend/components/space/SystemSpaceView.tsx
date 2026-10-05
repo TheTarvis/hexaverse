@@ -49,11 +49,13 @@ import { useScanTargets, useSettledScan } from '@/hooks/use-scan'
 import { useSightings } from '@/hooks/use-sightings'
 import { useSystemSpace } from '@/hooks/use-system-space'
 import { useCoarseWorldTime, useWorldClock, wallMsUntil, type WorldClock } from '@/lib/client-clock'
+import { CONSOLE_DOCK_LANE_COLUMN, CONSOLE_DOCK_LANE_LEFT_CENTER } from '@/lib/console-dock-layout'
 import { queryKeys } from '@/lib/query-keys'
 import { BOARD_POLL_MS, ETA_CUSHION_MS } from '@/lib/realtime'
 import type { Fleet } from '@/lib/types/fleet'
 import type { Station, VenueQuotes } from '@/lib/types/market'
 import type { Sighting } from '@/lib/types/sighting'
+import { ConsoleDock, ConsolePanelWaiting, type ConsoleTabId } from './ConsoleDock'
 import { FleetActionsPanel } from './FleetActionsPanel'
 import { ScanControl } from './ScanControl'
 import { SightingLog } from './SightingLog'
@@ -278,7 +280,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const [committedOrders, setCommittedOrders] = useState<Record<string, CommittedOrder>>({})
 
   // --- add-scan-and-sightings-surface: the ghost layer's pile, the log
-  //     drawer, and the row<->ghost cross-highlight ------------------------
+  //     (in the console dock), and the row<->ghost cross-highlight ------------------------
   const [ghostFeed, setGhostFeed] = useState<{
     sightings: Sighting[]
     isError: boolean
@@ -292,7 +294,15 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   ghostFeedRefetchRef.current = ghostFeed.refetch
   const refetchGhostFeed = useCallback(() => ghostFeedRefetchRef.current(), [])
   const [highlightedGhostId, setHighlightedGhostId] = useState<string | null>(null)
-  const [logOpen, setLogOpen] = useState(false)
+  // The console dock's state, reset on every mount (a cross-system navigation
+  // remounts the view). `openDockOn` is the one entry point that expands it:
+  // open-only by construction, so the report's link can never toggle it shut.
+  const [dock, setDock] = useState<{ expanded: boolean; openSeq: number }>({ expanded: false, openSeq: 0 })
+  const openDockOn = useCallback((_tab: ConsoleTabId) => {
+    setDock((d) => ({ expanded: true, openSeq: d.openSeq + 1 }))
+  }, [])
+  const collapseDock = useCallback(() => setDock((d) => ({ ...d, expanded: false })), [])
+  const openLog = useCallback(() => openDockOn('log'), [openDockOn])
   const galaxy = useGalaxy()
   const systemNames = useMemo(() => {
     const m: Record<string, string> = {}
@@ -793,6 +803,23 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const currentQuote = burnPreview.preview && !burnPreview.stale ? burnPreview.preview : null
   const showLoading = !interiorFailed && canvasAvailable && (interior.isLoading || !firstFrame)
 
+
+  // The Log tab's content: mounted only while the tab is shown, behind the
+  // interior read's first load as the floating panel was (`!interior.isLoading`),
+  // with the dock's own waiting indication until that gate opens (a failed
+  // interior read opens it too).
+  const logTabContent = !dock.expanded ? null : interior.isLoading ? (
+    <ConsolePanelWaiting />
+  ) : (
+    <SightingLog
+      systemId={systemId}
+      highlightedGhostId={highlightedGhostId}
+      onHighlightRow={setHighlightedGhostId}
+      galaxySystemNames={systemNames}
+      drawnRecordIds={drawnSightingRecordIds}
+      scale={servedScale}
+    />
+  )
   return (
     <div
       data-testid="space-view"
@@ -890,10 +917,11 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {ghostFeed.isError && (
           <div
             data-testid="sightings-unavailable"
-            // Raised above the vitals strip's 56px bar + a 16px gap
-            // (openspec change `add-vitals-strip`, `system-console`) so its
-            // retry stays reachable, never occluded by the strip.
-            className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
+            // Raised above the console dock (the strip's 56px row, or the
+            // expanded 220px dock) + a 16px gap, from the dock's published
+            // height (`lib/console-dock-layout`), so its retry stays
+            // reachable, never occluded by the dock.
+            className={`absolute ${CONSOLE_DOCK_LANE_LEFT_CENTER} left-1/2 -translate-x-1/2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]`}
           >
             <p className="text-zinc-600 dark:text-zinc-400">
               This system&apos;s sightings could not be read.
@@ -907,29 +935,19 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             </button>
           </div>
         )}
-        {logOpen && !interior.isLoading && (
-          // Just inboard of the floating panel column on the right.
-          <div className="absolute right-[calc(18rem+2rem)] top-4 z-20">
-            <SightingLog
-              systemId={systemId}
-              highlightedGhostId={highlightedGhostId}
-              onHighlightRow={setHighlightedGhostId}
-              galaxySystemNames={systemNames}
-              drawnRecordIds={drawnSightingRecordIds}
-              scale={servedScale}
-            />
-          </div>
-        )}
       </div>
 
       {/* The command column floats over the canvas, top-right, scrolling
           within the viewport when it outgrows it. The gaps between panels
           pass pointer events through to the stage. Bottom inset raised above
-          the vitals strip (openspec change `add-vitals-strip`,
-          `system-console`) — its own [&>*]:pointer-events-auto children
+          the console dock and the camera cluster (the column lane of
+          `lib/console-dock-layout`) — its own [&>*]:pointer-events-auto children
           would otherwise sit over the strip's clock and credits cells and
           eat their pointer events. */}
-      <div className="pointer-events-none absolute top-4 bottom-[4.5rem] right-4 flex w-72 max-w-[85vw] flex-col gap-3 overflow-y-auto [&>*]:pointer-events-auto">
+      <div
+        data-testid="space-command-column"
+        className={`pointer-events-none absolute top-4 ${CONSOLE_DOCK_LANE_COLUMN} right-4 flex w-72 max-w-[85vw] flex-col gap-3 overflow-y-auto [&>*]:pointer-events-auto`}
+      >
         {fleets.isError && (
           <div
             data-testid="space-fleets-error"
@@ -987,20 +1005,11 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           fleet={acting}
           worldTime={worldTime}
           scale={servedScale}
-          onOpenLog={() => setLogOpen(true)}
+          onOpenLog={openLog}
           committedPending={committedPending}
           onCommitAccepted={markScanCommitAccepted}
           earlySettleHandoff={earlySettleHandoff}
         />
-
-        <button
-          type="button"
-          data-testid="sighting-log-open"
-          className="self-start rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
-          onClick={() => setLogOpen((open) => !open)}
-        >
-          {logOpen ? 'Close sighting log' : 'Open sighting log'}
-        </button>
 
         {/* The station read failed — the offers it anchors are withdrawn,
             and their absence is attributed to THAT, never to the system
@@ -1062,12 +1071,18 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
       </div>
 
-      {/* The vitals strip (openspec change `add-vitals-strip`,
-          `system-console`) — a sibling of the canvas layer, full-width
-          across the foot of the view, above the stage in z-order. Fed
-          entirely from reads this view already holds: it issues no read of
-          its own. */}
-      <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-20">
+      {/* The console dock (openspec change `add-console-dock`,
+          `system-console`) — the LAST child of the view, full-width across
+          the foot, above the stage in z-order. Its top row is the vitals
+          strip (openspec change `add-vitals-strip`), fed entirely from reads
+          this view already holds: the strip issues no read of its own. */}
+      <ConsoleDock
+        expanded={dock.expanded}
+        openSeq={dock.openSeq}
+        onOpen={openDockOn}
+        onCollapse={collapseDock}
+        tabs={[{ id: 'log', label: 'Log', content: logTabContent }]}
+        strip={
         <VitalsStrip
           acting={acting}
           ownedFleets={allFleets}
@@ -1083,7 +1098,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             ? { burnCost: { tons: currentQuote.fuelCostTons, affordable: currentQuote.affordable } }
             : {})}
         />
-      </div>
+        }
+      />
     </div>
   )
 }

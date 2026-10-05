@@ -6,18 +6,18 @@
 // over whatever canvas is mounted (the galaxy or a system board). It mirrors the
 // other floating panels' look (the shared PANEL treatment).
 //
-// Raised clear of the system-view vitals strip (openspec `add-vitals-strip`,
-// full-width across the foot of that view at `bottom-0`, ~56px tall): the
-// bottom-[4.5rem] offset is the same treatment already applied to that
-// strip's three other bottom-band siblings (the command column, the
-// sightings-unavailable retry, and the camera cluster), so this floating
-// panel — mounted on every route, including the system view — never lands
-// on top of the strip's fleet cell and its chevron.
+// Raised clear of the system view's console dock (openspec
+// `add-console-dock`): the nav follows the dock's published height through
+// the left-and-centre lane of `lib/console-dock-layout`, and falls back to
+// 4.5rem where no dock is mounted (the galaxy route), so this floating panel
+// — mounted on every route, including the system view — never lands on top
+// of the strip's fleet cell and its chevron.
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/catalyst/button'
 import { useAccountContext } from '@/components/account-provider'
+import { CONSOLE_DOCK_LANE_LEFT_CENTER } from '@/lib/console-dock-layout'
 
 const PANEL =
   'pointer-events-auto rounded-xl border border-zinc-200 bg-zinc-50/90 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]'
@@ -30,7 +30,7 @@ export function FloatingNav() {
   const onGalaxy = pathname === '/'
 
   return (
-    <div className={`${PANEL} fixed bottom-[4.5rem] left-4 z-50 flex flex-col gap-1.5 p-3`} data-testid="floating-nav">
+    <div className={`${PANEL} fixed ${CONSOLE_DOCK_LANE_LEFT_CENTER} left-4 z-50 flex flex-col gap-1.5 p-3`} data-testid="floating-nav">
       <Link
         href="/"
         data-testid="nav-home"

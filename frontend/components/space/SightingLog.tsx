@@ -153,7 +153,7 @@ export function SightingLog({
   return (
     <div
       data-testid="sighting-log"
-      className="flex max-h-[70vh] w-80 max-w-[90vw] flex-col gap-2 overflow-auto rounded-xl border border-zinc-200 bg-zinc-50/95 p-3 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]"
+      className="flex flex-col gap-2 p-2"
     >
       <div className="flex items-center justify-between">
         <span className="font-mono text-[11px] font-medium uppercase tracking-wide text-zinc-400">

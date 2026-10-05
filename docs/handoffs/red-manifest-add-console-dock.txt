@@ -1,0 +1,9 @@
+# red-suite handoff manifest for add-console-dock
+# recorded 2026-10-05T05:31:06Z
+# verify with: bash harness/openspec-red-manifest.sh verify add-console-dock
+f61e34f28d9c31e6a106d98cbe3a4acb327ec9b46e6212229fa075b4c52db0c1  frontend/components/floating-nav.dock.test.tsx
+75af2fb815bc0b36984a0274b4f31d127ebf245db7d677f13f2e5f1e3e3e24d0  frontend/components/space/ConsoleDock.test.tsx
+65ccae307285bed6a7ae642942a524478522e912937c4871e68a73aafdad8cc2  frontend/components/space/SightingLog.test.tsx
+0c48ed68f4a4bf0f4ab33868b5c9b6a46c638732aa02c8f86784f9d9cc44eb11  frontend/components/space/SystemSpaceView.console-dock.test.tsx
+e73a57e4db6345f3863f7650b7062885897decc36e7ba0bf390be0ce2807a599  frontend/components/space/SystemSpaceView.sighting-log-no-ghost-reasons.test.tsx
+166ca7572d6287fcc44c6ee0ee76eb78c3ea5733457c50a25bebb250cb902e07  frontend/lib/console-dock-layout.test.ts

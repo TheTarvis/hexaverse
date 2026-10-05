@@ -64,6 +64,7 @@ import {
   type DragTracker,
   type SpaceCamera,
 } from './space-camera'
+import { CONSOLE_DOCK_LANE_CAMERA } from '@/lib/console-dock-layout'
 import { resolvePick, type PickMark, type SpaceSelection } from './space-selection'
 import type { SceneMark, SceneModel } from './space-scene'
 import {
@@ -705,15 +706,14 @@ function SpaceLayers({
               binding below. The wrapper's own pre-existing tabIndex/
               onKeyDown (bare-arrow orbit) is UNCHANGED — it predates and is
               independent of the four now-deleted `camera-orbit-*` buttons.
-              Re-anchored bottom-right, above the vitals strip's 56px bar +
-              a 16px gap. --- */}
+              Re-anchored bottom-right, in the console dock's camera lane. --- */}
       <div
         {...{ [CAMERA_CONTROL_ATTR]: '' }}
         data-testid="space-camera-controls"
         role="group"
         aria-label="System camera"
         tabIndex={0}
-        className="pointer-events-none absolute bottom-[4.5rem] right-4 grid grid-cols-4 gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+        className={`pointer-events-none absolute ${CONSOLE_DOCK_LANE_CAMERA} right-4 grid grid-cols-4 gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400`}
         onKeyDown={(e) => {
           const step: Record<string, [number, number]> = {
             ArrowLeft: [-1, 0],

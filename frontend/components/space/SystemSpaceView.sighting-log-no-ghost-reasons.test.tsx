@@ -203,7 +203,7 @@ function render() {
 
 async function openLogAndSelect(recordId: string) {
   const user = userEvent.setup()
-  await user.click(screen.getByTestId('sighting-log-open'))
+  await user.click(screen.getByTestId('console-dock-open'))
   await user.click(screen.getByTestId(`sighting-row-${recordId}`))
 }
 

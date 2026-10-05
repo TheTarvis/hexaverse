@@ -24,7 +24,7 @@ import React from 'react'
 // The component reads its OWN pile via `useSightings()` (unfiltered, per
 // task 4.4/4.7's key split) rather than receiving records as a prop.
 //
-// data-testid contract (pinned): sighting-log-open, sighting-log,
+// data-testid contract (pinned): sighting-log,
 // sighting-row-${id}, sighting-log-load-more, sighting-log-empty,
 // sighting-log-error.
 //
