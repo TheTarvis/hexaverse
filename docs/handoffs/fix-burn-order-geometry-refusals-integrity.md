@@ -22,3 +22,6 @@ All `assertion-red` and `compile-red` rows in `fix-burn-order-geometry-refusals-
 - Task 1.10 developer half, including the starting-fuel reachability sample naming accounts and homes: runs only at tier 3.
 - Tier 2 for the touched packages if the orchestrator brings up the test emulator.
 - The journey spec has not been started.
+
+## Manifest re-record (archive gate)
+Before the gate: verify reported all 20 files unchanged. The manifest was then re-recorded to 21 files, adding `backend/fleet/solve_refusal_test.go`. Cause: the tier-0 one-test-file-per-source-file convention (finding 1); no existing test changed.

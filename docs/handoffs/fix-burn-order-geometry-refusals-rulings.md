@@ -151,3 +151,25 @@ defect records "with the evidence of the gates that pass"; 6.3 is the gate). **B
 `docs/testing-tiers.md` (tier 3 runs once per change, at archive time, never as a per-task
 check); precedent `clear-burn-preview-on-commit` tasks 7.3-7.6. **Rejected:** a separate tier-3
 run before the gate (forbidden "confirming rerun"). **Reversal cost:** none.
+
+## FULL-AUTO RULING 14 — task 1.10 closes on the tier-3 pass of both starting-fuel tests; the accounts and homes they asserted are NOT named, and that limit is stated rather than bought with another run
+
+**Question:** task 1.10 asks to confirm the reachability sample passes "naming the accounts and
+homes it asserts"; the gate run passed both tests (the flagship and the 8-account sample) but a
+passing Go test logs nothing, so the journey record cannot name them. **Basis:** RULING 13 and
+`docs/testing-tiers.md` — tier 3 runs once per change and a confirming or verbose rerun is
+forbidden; the clause's purpose (reliability m2: a failing sample is attributable) is met by the
+repaired test, which names the sample index and the refusal class on failure. **Rejected:** a
+verbose tier-3 rerun; leaving the task unchecked and the change unarchivable over a logging
+detail. **Reversal cost:** none. **Carried forward:** if the homes matter, have the sample log
+each account's home system id (a test-only follow-up).
+
+## FULL-AUTO RULING 15 — the archive gate is GREEN at both tiers, run once each by one runner, with no residue to rule; the change is archived
+
+**Basis:** `fix-burn-order-geometry-refusals-journey.md` — tier 4 28 passed / 0 failed (410 s),
+tier 3 1979 tests / 1 by-design skip / 0 failures (1026 s), zero star-clearance error lines, no
+SIGTERM during either run; process table and test ports checked clear by the orchestrator at
+20:12 before the tree was touched; manifest verify clean at 21 files; `validate --strict` valid,
+reconcile OK, archive rehearsed on a scratch copy (8 added, 1 modified, all three `## Purpose`
+sections preserved). QA's matrix had no row waiting on the journey. **Rejected:** n/a.
+**Reversal cost:** n/a.

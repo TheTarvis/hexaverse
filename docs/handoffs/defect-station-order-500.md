@@ -2,7 +2,10 @@
 
 **Found** 2026-09-02 by link 7b's SDET, chasing a test that flaked 1 run in 10.
 **Caught in the act** with a server log, not inferred.
-**Status:** OPEN. Deliberately NOT folded into link 7b — see *Scope* below.
+**Status:** CLOSED 2026-10-04 by `fix-burn-order-geometry-refusals` (build `7020952`) for newly
+selected homes and for the response shape — see *CLOSED* at the foot of this file for the
+evidence and for what is deliberately left open. (Was: OPEN, not folded into link 7b — see
+*Scope* below.)
 
 ## What happens
 
@@ -355,3 +358,39 @@ hull's own default (ceiling-priced) burn order to its home station was REJECTED
 the star-clearance radius`, home `sys_9_-15`. 1875 tests / 1 skipped / 1
 failure, 959 s. The change under gate was frontend-only (no backend diff).
 Treated as residue: `surface-commit-stranding-warning-rulings.md` RULING 18.
+
+---
+
+## CLOSED — 2026-10-04, `fix-burn-order-geometry-refusals` (build `7020952`)
+
+**What closed it.** Travis ruled "star clearance is a space that a fleet may never be", so the
+solver guard stands on both endpoints and the fix is placement: spawn site selection now
+rejects a system whose station shell (parent orbit radius less the station's local orbit less
+its insertion standoff) is not strictly outside the star clearance. Separately, every solve
+refusal on `orders`, `orders/preview` and `stop` is served as a `409`/`404` with a fixed
+reason and one info-level log entry, never a bodyless 500 (both problems of *Two separable
+problems*, and the whole family of *WIDENED*).
+
+**Evidence** (`fix-burn-order-geometry-refusals-journey.md`, archive gate, each tier run once):
+
+- Tier 3: 1979 tests, 1 by-design skip, 0 failures, 1026 s — including
+  `fuel_spawn_starting_fuel_e2e_test.go`, the file this defect reddened in five recorded gates
+  (the flagship test and the 8-account sample both passed, and the repaired sample now fails
+  loudly on a geometry refusal instead of blaming `StartingFuelTons`).
+- Tier 4: 28 passed, 0 failed, 410 s. The test backend log holds ZERO
+  `endpoint at or inside the star-clearance radius` lines and no 500 on any order, preview or
+  stop; the only two refusal entries are the journey's own deliberate point-inside-clearance
+  leg (`destination-inside-clearance`, preview + order, `409`), rendered as player copy.
+- Solver-level (`backend/system/station_shell_sweep_test.go`): zero arrival and zero departure
+  refusals across the phase grid at qualifying homes; ring 0 as the refusing control.
+
+**A green gate is not by itself the proof** — this file's own warning ("a green rerun does not
+mean it is fixed") still applies to a ~2% intermittent. The proof is the predicate plus the
+sweep; the gate is corroboration.
+
+**Deliberately left open** (`defect-fleet-can-rest-inside-star-clearance.md`): corporations
+homed before the fix in a failing system are not migrated and still meet the refusal, now typed
+and intermittent; non-station bodies whose shell dips, drift and free stop inside the clearance,
+and a stop from a qualifying home whose lead point lands inside. A recurrence of a
+star-clearance refusal on a FRESHLY spawned corp's home-station order would mean criterion (d)
+regressed — reopen this file, do not file it as residue.

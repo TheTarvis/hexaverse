@@ -11,7 +11,7 @@ Tests first: 1.1 to 1.7 are red before 1.8 to 1.10. No retry and no sampling of 
 - [x] 1.7 SDET: a `backend/system` test (not `backend/space`, no fixture read or written) that, for the tightest qualifying parent type, ring and star class combinations (design.md Decision 9), sweeps station phase and park phase on a fixed grid stated in the test, with named system ids and an injected world clock, over a hand-built body table whose station orbit comes from the derivation, and finds zero arrival and zero departure clearance refusals, with a ring-0 system as a control that does refuse (scenario: no clearance refusal at its station)
 - [x] 1.8 Dev: add one exported pure predicate in `backend/system` beside `StationContinuousOrbit`, over galaxy-tier data only; extract the station's parent index into one unexported helper both functions use (a verbatim move: the `stationOrbit` and `stationOrbitSweep` fixture families must pass without re-recording, and a failure there is a stop); add `inventory` coverage entries for the new functions to `fixtures/system/mirror-map.json`
 - [x] 1.9 Dev: apply criterion (d) in `qualify` in `backend/corporations/siteselection.go`
-- [ ] 1.10 Dev: make the fake line graph's star class explicit so its candidates satisfy (d) by statement rather than by the unknown-class default, without changing any test's intent; update the "three criteria" comments in `siteselection.go` and `params.go:9`; confirm the starting-fuel reachability sample still passes, naming the accounts and homes it asserts
+- [x] 1.10 Dev: make the fake line graph's star class explicit so its candidates satisfy (d) by statement rather than by the unknown-class default, without changing any test's intent; update the "three criteria" comments in `siteselection.go` and `params.go:9`; confirm the starting-fuel reachability sample still passes, naming the accounts and homes it asserts
 
 ## 2. Refusal shape (fleet-movement)
 
@@ -45,13 +45,13 @@ Tests first: 2.1 to 2.9 are red before 2.10 to 2.12. Assert reason bodies, never
 ## 5. Records
 
 - [x] 5.1 Correct the origin claim at `docs/handoffs/defect-station-order-500.md:28-30` and rewrite its "Where to look" section (a served refusal is logged once below error level with its cause, no longer at error level)
-- [ ] 5.2 Close `defect-station-order-500.md` and `defect-zero-length-burn-returns-500.md` with the evidence of the gates that pass, correcting the latter's closing note: an order to the fleet's own host is refused only when its solved curve is below the minimum, and is accepted and committed at other phases
+- [x] 5.2 Close `defect-station-order-500.md` and `defect-zero-length-burn-returns-500.md` with the evidence of the gates that pass, correcting the latter's closing note: an order to the fleet's own host is refused only when its solved curve is below the minimum, and is accepted and committed at other phases
 - [x] 5.3 File `docs/handoffs/defect-fleet-can-rest-inside-star-clearance.md` (dipping non-station bodies, drift and free stop inside the clearance, the stranded false alarm, stop refused for a fleet inside, and a stop from a fleet docked at a qualifying home that is destination-refused because its lead point lands inside the clearance (probe: 0.86% of stops in a retrograde system, a correct typed refusal); RULING 8) with the measured rates: 8.2% departure refusal, about 8.9% of systems affected, 9.7% of mineable systems no longer eligible
 - [x] 5.4 File `docs/handoffs/defect-point-target-extent-unvalidated.md`: `OrderRequest.Point` has no extent or magnitude validation, stating both inferred outcomes (a 5xx from the solve or encoder, or a stored burn that later fails to decode) and the fix shape (a `400` in `backend/fleet` against the body table's extent, no edit under `backend/space`)
 - [x] 5.5 Append the refused-preview gap (the no-quote state reads "could not be solved" with Retry for a deterministic refusal) to `docs/handoffs/followup-explain-withheld-burn-command.md` (RULING 10)
 
 ## 6. Validation
 
-- [ ] 6.1 `openspec validate fix-burn-order-geometry-refusals --strict` and `python3 harness/openspec-reconcile.py fix-burn-order-geometry-refusals`
-- [ ] 6.2 Confirm `git diff` is empty for `backend/space`, for every `fixtures/**/cases.json` and for `fixtures/space/turn-table.json`
-- [ ] 6.3 Run `/check` and the archive-gate tiers in `docs/testing-tiers.md`
+- [x] 6.1 `openspec validate fix-burn-order-geometry-refusals --strict` and `python3 harness/openspec-reconcile.py fix-burn-order-geometry-refusals`
+- [x] 6.2 Confirm `git diff` is empty for `backend/space`, for every `fixtures/**/cases.json` and for `fixtures/space/turn-table.json`
+- [x] 6.3 Run `/check` and the archive-gate tiers in `docs/testing-tiers.md`
