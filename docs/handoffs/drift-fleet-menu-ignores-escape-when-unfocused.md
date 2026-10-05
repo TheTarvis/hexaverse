@@ -18,3 +18,22 @@ must word its menu clause to what the menu actually takes (A5's paste-ready
 text). Adjudication (code vs spec) is open.
 
 **Status.** OPEN.
+
+## Evidence narrowed — 2026-10-05 (`keep-console-tab-content-mounted`, FULL-AUTO RULING 7)
+
+The "Code" paragraph above overstates the reach. A menu with entries focuses
+its first entry whenever it opens, by pointer or keyboard
+(`VitalsStripFleetCell.tsx:76-78`), so it takes Escape in the ordinary case.
+The unfocused state is real in two cases only: (i) an EMPTY menu (a failed
+own-fleets read, or no other fleet, `:74`) opened by pointer in a browser that
+does not focus a clicked button (Safari, Firefox on macOS); (ii) focus that
+left an open menu (Tab out of it, or a press elsewhere — there is no blur or
+outside dismiss).
+
+`keep-console-tab-content-mounted` did not fix this and its requirement
+*Escape Collapses the Expanded Dock* states nothing about that state. What
+happens there, by mechanism: with the dock expanded, Escape collapses the dock
+and the menu stays open. Recovery: a pointer press on the chevron toggles the
+menu, or Shift+Tab back to the chevron and Escape closes it.
+
+**Status.** Still OPEN; adjudication (code vs spec) still open.

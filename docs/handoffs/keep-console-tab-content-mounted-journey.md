@@ -116,8 +116,26 @@ and the e2e backend log (`frontend/playwright/.auth/backend.log`), 2026-10-05.
 
 ## Tier 3
 
-(empty, to be filled)
+Run once by the orchestrator, after the tier-4 rerun, from
+`keep-console-tab-content-mounted-tier3-run1.log`. START 05:42:28, load 3.84
+7.58 9.50, HEAD `378beb1` (one uncommitted file at the start: the orchestrator's
+own edit to `docs/handoffs/drift-fleet-menu-ignores-escape-when-unfocused.md`;
+no code); END 05:58:27, load 9.67 6.04 6.57; wall **959 s**. `DONE 1979 tests,
+1 skipped in 946.822s` (the skip is the fixture-regeneration guard
+`TestTurnTable_RecordOrRegenerate`), exit 0, no `Received SIGTERM`, no timeout
+banner. **Green.** This change adds no backend test and edits no backend file.
 
 ## Suite budget line
 
-(placeholder: tier 3 wall time ___ ; tier 4 wall time run 1 519 s, rerun ___ )
+Tier 4: run 1 **519 s** (44 passed, 1 failed), rerun **508 s** (44 passed, 1
+failed) — 45 tests; this change's spec adds 6 tests. The last gate's tier 4 was
+509 s for 39 tests. Tier 3: **959 s**, 1979 tests (the last gate: 1554 s under
+load; the one before: 966 s). No budget was raised.
+
+## Gate verdict
+
+**RED, stopped for Travis** (FULL-AUTO RULING 21). This change's own journey is
+green in both runs and tier 3 is green. The rerun's one red,
+`space-double-submit.spec.ts:340`, carries the filed sell-price defect's
+refusal word for word but not its recorded spec and line, so the orchestrator
+did not rule it residue. Not archived.
