@@ -98,3 +98,7 @@ shade-level criterion binds. No edit is made to the change folder after this
 round, so the verdict covers the committed content exactly.
 
 ## Verdict commit
+
+`65f2aef` — the change folder and handoffs as cleared at round 3. Currency
+check: `git diff 65f2aef -- openspec/specs/system-console openspec/specs/system-space-view openspec/specs/figure-formatting openspec/changes/add-burn-cost-overlay`
+must be empty before the build starts and again before archive.
