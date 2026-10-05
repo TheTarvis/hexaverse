@@ -16,9 +16,13 @@ scenario *The log refetches after a sweep settles*.
 **Why nobody saw it.** The log is normally closed when a sweep settles, and
 opening it is a mount, hence a read. `scan-journey` step 5 does exactly that.
 
-**Adjudication.** Code wrong, spec right. Routed into `add-console-dock`
-(`add-console-dock-rulings.md` FULL-AUTO RULING 9): that change keeps the log
-mounted, which removes the mask. No delta; a view-level test over a real
+**Adjudication.** Code wrong, spec right. Routed first into `add-console-dock`
+(`add-console-dock-rulings.md` FULL-AUTO RULING 9), then by RULING 15 into
+`keep-console-tab-content-mounted`: that change keeps the log mounted, which
+removes the mask. No delta; a view-level test over a real
 sightings hook, on both settle exits.
 
-**Status.** OPEN until `add-console-dock` archives.
+**Status.** OPEN. `add-console-dock` archived at `c0b4aad` WITHOUT fixing it:
+RULING 15 moved the fix to link 2b-i-b `keep-console-tab-content-mounted`, and
+`add-console-dock` mounts the log only while its tab is shown, so the drift is
+exactly as masked as it was before.

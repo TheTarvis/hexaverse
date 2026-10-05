@@ -11,7 +11,7 @@ the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 `clear-burn-preview-on-commit` at `51944af`, its gate passed over three
 unrelated tier-4 reds by Travis's ruling —
 `../../handoffs/clear-burn-preview-on-commit-rulings-index.md` USER RULING 20);
-2b was split in-run into six pieces (see *Link 2b*); 2b-i (`add-console-dock`, the dock shell and the Log tab) is `authored r3 b52d412` and being built; 2b-i-b through 2b-v are `not authored`.** The out-of-chain
+2b was split in-run into six pieces (see *Link 2b*); 2b-i (`add-console-dock`, the dock shell and the Log tab) archived at `c0b4aad`; 2b-i-b (`keep-console-tab-content-mounted`) is next, `not authored`, as are 2b-ii through 2b-v.** The out-of-chain
 corrective change `fix-burn-order-geometry-refusals` archived at `d52eab1`
 between the two. 2a-iii was split in-run:
 the order record and the stranding notice went first, the commit-clear follows. The link handed to
@@ -59,7 +59,7 @@ symlink to it.
 | 2a-iii | `surface-commit-stranding-warning` | The commit's stranding warning shown on the system space view for the order's life; the view's per-fleet record of the last order it committed **whose response carried the warning** (no record is kept for an ordinary commit), with an end tied to the order's own life as the own-fleets read reports it | ADDED `system-space-view` (1); `fleet-roster` drift closed for the burn command (no delta) | ✅ archived `3218d9d` (2026-10-04); authored r2 `af747be`, built `808420d`, gate `6494f35` |
 | 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` (3: "Burn Preview Reflects…", "A Failed or Stale Preview…", "Burn and Jump Commit Controls Guard Against Double-Submit") | ✅ archived `51944af` (2026-10-05); authored r2 `29f0a6b`, built `62c8f15`, gate `c3fcfcf` + USER RULING 20 |
 | 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) — *as authored: 2 ADDED `system-console`, no `system-space-view` delta (RULING 8)* | ✅ archived `647af3e` (2026-10-05); authored r3 `65f2aef`, built `261dc7e`, gate `1456cd6` |
-| 2b-i | `add-console-dock` | The dock's shell beneath the strip — "Console" expand control, tab bar with a collapse control, collapsed on every mount, fixed 220px, the bottom-band occupants following its height — and the **Log** tab as the sighting log's home (mounted when shown, as today); the floating log panel and its toggle retired | ADDED `system-console` (5); MODIFIED `system-console` (1: "The Vitals Strip Is Present on Every Render…") | 🟡 authored r3 `b52d412` |
+| 2b-i | `add-console-dock` | The dock's shell beneath the strip — "Console" expand control, tab bar with a collapse control, collapsed on every mount, fixed 220px, the bottom-band occupants following its height — and the **Log** tab as the sighting log's home (mounted when shown, as today); the floating log panel and its toggle retired | ADDED `system-console` (5); MODIFIED `system-console` (1: "The Vitals Strip Is Present on Every Render…") | ✅ archived `c0b4aad` (2026-10-05); authored r3 `b52d412`, built `e5e9eff`, gate `15e6e33` |
 | 2b-i-b | `keep-console-tab-content-mounted` | A tab's content stays mounted and hidden; no read on show; the log re-read after a sweep settles; the mount latch; `Esc` collapses the dock; the dock is not a canvas pick | ADDED `system-console` (4, drafted) | ⬜ not authored |
 | 2b-ii | `move-scan-control-to-console-dock` | The **Scan** tab; tab switching and arrow keys become real | MODIFIED `system-console` (tab list), `system-space-view` (2 small blocks) | ⬜ not authored |
 | 2b-iii | `move-fleet-roster-to-console-dock` | The **Fleets · N** tab, `commandOwner="view"` | MODIFIED `system-console` (tab list); ADDED `system-console` | ⬜ not authored |
@@ -1008,7 +1008,87 @@ attribute is the mechanism.
 
 ### Link 2b-i — `add-console-dock`
 
-Authored r3 at `b52d412`. Records: `../../handoffs/add-console-dock-*`.
+**Delivered.** The dock shell — a "Console" expand control outside the strip, a
+tab bar with a collapse control, collapsed on every mount, a fixed 220px
+expanded height from one published source that the command column, the camera
+cluster, the sightings-unavailable card and `FloatingNav` follow — and the Log
+tab as the sighting log's home, mounted while shown exactly as the old toggle
+mounted it. The floating log panel, its toggle and `logOpen` are deleted.
+
+**Taught.** Authored, built and archived (`c0b4aad`) in one full-auto run,
+2026-10-04/05 (interrupted once by a usage limit and resumed from the handoff
+files). Five ADDED `system-console` requirements and one MODIFIED, 49 scenarios;
+40 tasks, the cap exactly; three adversary rounds (r1: 1 BLOCKER, 10 MAJOR, 6
+MINOR; r2: residue only, 1 MAJOR, 6 MINOR; r3 a diff spot-check, CLEAR, three
+MINORs carried unedited). QA SHIP (49 PASS), security clear. Gate: tier 4 red
+on the first run (36/39, 528 s), one batched test-side revision round, green
+for this change on the one rerun (38/39, 509 s — the one red the filed
+`defect-slice-sell-price-changed-409`, RULING 23); tier 3 once, 1979 tests
+green in 1554 s. Records: `../../handoffs/add-console-dock-*`.
+
+- **The row was six links, and the number was found in two steps.** The
+  analyst counted about 150 tasks against the test files and split five ways;
+  the architect then showed the first piece's 38 boxes were 52 arrangement
+  groups (two boxes each named eight scenarios) and split it again at
+  *placement against lifetime*. **A task count is only honest in the unit the
+  previous link used — one test arrangement group with one closing assertion —
+  and the writer's first count never is.** Have the architect re-count before
+  the adversary, not after.
+- **"The requirements move, not change" was wrong as an authoring instruction
+  and right as an adversary target.** A "mounted in the console" clause on each
+  moved requirement would have been 23 MODIFIED blocks carrying 83 scenarios.
+  Placement stated once, in ADDED requirements that name the owner, needed one
+  MODIFIED block — and that one only because "across the foot" became false.
+  Every later piece: MODIFY the three-scenario tab list and whatever live
+  sentence the move actually falsifies, nothing else.
+- **Mounting on show is what made the first piece small.** With the log mounted
+  only while its tab is shown, no read's timing moved, no e2e precondition
+  changed, and the filed drift (the log is never re-read after a sweep settles)
+  stayed exactly as masked as it was. All of that cost lands in 2b-i-b, where
+  the content stays mounted — expect its e2e migrations to be about
+  *preconditions*, not selectors.
+- **An "open is a read" assumption is only true on a cold cache.** The app-wide
+  60 s stale time means re-showing the log may issue nothing. The first journey
+  draft asserted a settled sweep's record appeared after the report's link; a
+  correct build fails that (adversary r1 B1). A journey may assert only what
+  its own change builds, and logs the rest.
+- **The gate's own red was the journey's helper, and the log could not say
+  which control.** A hit test that counts a surface root as a control met the
+  camera cluster's `pointer-events-none` wrapper. The helper asserted before it
+  named anything, so the diagnosis was structural inference. **Log the identity
+  of what failed before asserting on it** — the same lesson as "log every
+  snapshot's index", for geometry.
+- **QA reading the journey before the run paid again**: eleven gaps, the worst
+  a "Console" control that was never actually hit-tested and a scroll leg that
+  passed if the rows fit. It is now routine; keep it.
+- **Run 1's other two reds did not recur and were not this change's**: a burn
+  409 after a cut drive (no body captured — the committed-selection journey now
+  logs a refused commit's body before asserting) and a zero-length station burn
+  whose "under way" window was shorter than a read
+  (`../../handoffs/defect-space-journey-instant-station-burn.md`, filed new).
+  The random-spawn fixture family now has five members; three different ones
+  fired across this gate's two runs.
+- **Two legs the fixture cannot arrange are UNTESTED, not passing**: the
+  report's link on an already-expanded dock (no scan target in range of a fresh
+  fleet — tier 1 holds it), and system-to-system navigation (a one-hull
+  corporation has no player path; the keyed remount at tier 1 and Next's
+  segment keying, read but not run, are all there is). Link 3's list and link
+  4's jump are the first places a real path exists.
+- **What a player loses for now, said plainly.** There is no Escape key for the
+  dock until 2b-i-b. With the dock expanded, marks in the canvas's lowest 220px
+  cannot be picked and get no off-screen chip, the command column is a 400px
+  scroller, and the raised nav covers the reach chips from about the 15th.
+- **Tier 3 took 1554 s against the last gate's 966 s** with no new backend
+  test: the machine's load, not the suite. Record the load at both ends.
+- **Bookkeeping held**: each role ticked its own boxes; counts read by grep
+  were 21 at red, 26 at green, 31 before the gate, 32 after the journey, 40 at
+  archive.
+
+**`system-console`'s Purpose was extended by hand after the archive** (it
+survived the archiver this time, because the capability already existed): the
+strip is now "the top row of the console dock", and the dock's tabs host other
+capabilities' panels, which issue their own reads. The copy quoted at the top
+of this section is the paragraph as of link 2a; the live spec is current.
 
 ### Link 2b-i-b — `keep-console-tab-content-mounted`
 
@@ -1056,6 +1136,9 @@ hidden subtree).
   Sweep and the Scan Controls Are Reachable and Announced* ("tabs through the
   fleet panel") and *The Scan Surface Remains Usable While the Canvas Is
   Unavailable*, both made false when the control moves.
+- **`openDockOn` ignores its tab argument today** (one tab). When it starts
+  choosing a tab, the value must come from a closed set — never a served or
+  URL value unchecked (`../../handoffs/add-console-dock-security-audit.md` N3).
 - **Must de-vacuum** `SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx`'s
   `queryByRole` absence check, which passes with a cancel button present once
   the control sits in a hidden tab. "Log tab activatable by Enter or Space"
