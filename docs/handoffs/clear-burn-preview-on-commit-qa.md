@@ -98,3 +98,46 @@ No clause asserts only "two things differ".
 0 FAIL. 1 BLOCKED scenario (#21) plus one blocked requirement clause (wire instants), both closed by the journey assertions above.
 
 **SHIP-PENDING-JOURNEY**
+
+## Journey closure (2026-10-05)
+
+QA, from evidence on disk only; nothing run, nothing edited but this file. Sources: `clear-burn-preview-on-commit-journey.md` (whole), the committed journey spec (keyboard-focus leg lines 588-609, committed-render-hold 611-702, cut/arrive legs ~760-890), raw log `gate3-t4.log` lines 100-126, `fix-burn-order-geometry-refusals-journey.md`, scenario text (system-space-view delta, "Keyboard focus survives..." line 290-294, Focus paragraph 96-101), design.md Decision 15. Rulings 17, 19, USER RULING 20 noted: the gate itself is NOT PASSED (RULING 19) on three tier 4 reds that are not this change's; that is the orchestrator's decision and is not re-judged here.
+
+Gate facts this closure rests on: tier 4 rerun 24 passed / 3 failed; this change's journey PASSED (27.8 s); tier 3 green (1875 tests, exit 0). Corroboration: the later independent full run (`fix-burn-order-geometry-refusals-journey.md`) is 28 passed / 0 failed on a tree containing this change's code and spec; it does not print this journey's leg summary, so it corroborates "the journey did not go red on that tree", not any leg.
+
+### Previously BLOCKED rows
+
+1. **Scenario 21, keyboard focus: CLOSED-PASS, with one clause asserted more weakly than the scenario states (see weak clauses).**
+   - Assertion: `[journey-keyboard]` leg, spec 588-609. GIVEN asserted (line 536-540: Burn is the active element before Enter; Enter pressed, not click). Then: after acceptance `isStatement` false (595); one Tab; `isBody` false (599-603), `insideColumn` true (604-607), `isStatement` false (608).
+   - Log: after acceptance `tag BODY, isStatement false, burnDisabled true, statementPresent true`; after Tab `BUTTON fleet-cmd-cut-drive-fleet_fafd1ed5-..., isBody false, insideColumn true`. Summary: `keyboard-focus: PASSED`.
+   - Clause by clause. "Focus was not moved to the statement by the acceptance": asserted, passed. "Tab does not go to the start of the document": asserted as not-body and inside-the-column, passed; a Tab from a document-start point would not plausibly land on a column control, so this discriminates, but see below. "Tab moves to the next focusable element after the burn control in column order": NOT asserted by identity. The leg checks "some element inside the column", not "the first control after Burn". The landing element is a fleet-panel control, consistent with Decision 15's stated leg (assert the column, not the panel), but I did not verify from the DOM that cut-drive is the first focusable after Burn. This is the clause passed more weakly than stated.
+   - My own earlier row asked that `activeElement` after acceptance not be `body`. It WAS `BODY`. Decision 15 (adversary m6 rewording) says the engine's own fix-up reporting body before the Tab is not a breach, and the scenario THEN does not require otherwise, so I withdraw that sub-assertion as stronger than the spec. It is recorded here plainly: focus is dropped to body and recoverable in one Tab, not retained on the control. The scenario text ("survives ... not lost to the start of the document" decided by where Tab goes) is met; a reader expecting focus to remain on the control is not served, and that is a product-copy question for the spec owner, not a failure.
+2. **Real-wire burn-instants equality: CLOSED-PASS.**
+   - Assertion: committed-render-hold, spec 656-686: first own-fleets read at or after acceptance must report the burn (`readBurn` not null), and every sampler snapshot from first statement to read-end+250 ms must have statement present with exact copy, Burn disabled, aria-describedby = statement id, figures/uncapped/no-quote/stale all 0.
+   - Log: `commit response [119609206725,119609233838] vs first read [119609206725,119609233838]`, identical. `committed-render-hold: PASSED`. Read spanned +1..+77 ms after acceptance; 6 snapshots before the read all held.
+   - Thin: only 3 snapshots post-date the read (the leg demands at least one; the hold is asserted only to read+250 ms, not across later reads). The equality itself is directly printed and equal, so the row's THEN (record not ended by the first read) is observed. Later-read hold stays covered by tier 1 (V 3.3, 3.10).
+
+### Rows I wanted observed
+
+- **Real end of the order, cut: observed.** `cut-the-drive: PASSED`. Asserts statement removed (23), Burn enabled (24), a preview request for the kept selection sent within an interval (26-30), none between acceptance and cut. Log: after cut figures=1, no-quote=0, uncapped-label=0, stale=0. Weaker than my row: "exactly one request at the answer" is asserted as "at least one, none while committed", not a count of one; exactly-one stays on tier 1 (V 3.5/3.6).
+- **Real end of the order, arrival: observed.** `arrive-and-dock: PASSED`: statement gone, row no longer "under way", no quote elements, no preview POST over one interval from docked. Log: row Docked, burn enabled, uncapped-label=1, no-quote=0.
+- **Real reload mid-burn: NOT observed at tier 4.** The spec states the reload leg is not walked by design. Covered instead by remount at tier 1 (V 3.18). Real page reload remains unobserved; low risk, since committed records are in-memory view state.
+- **Drift notice, record-only: observed.** `commit-drift-notice` count 1 after the first commit, after the cut and after the re-commit; `commit-stranding-notice` 0 throughout. Confirms Exploratory 2: the spurious "committed at delta-v" line renders after every real commit (drift defect, link 4's to own). Not asserted, not a failure of this change.
+- Also NOT observed at tier 4: the two-interval zero-preview window (`zero-preview-2-intervals: UNTESTED`, flight 5423 ms). Covered at tier 1 by V 3.1 and V 3.4 per RULING 17. This is not a row of mine that was BLOCKED; scenario 1/4 are PASS at tier 1.
+
+### Clauses the journey passed more weakly than the scenario states
+
+1. Tab target: not-body and inside-column, not "the next focusable after the burn control" by identity.
+2. Hold-through-read: 3 post-read snapshots, window ends at read+250 ms.
+3. Post-cut request: at-least-one-in-an-interval, not exactly one.
+4. Drift notice: logged, never asserted.
+
+### Gate caveat (not QA's call)
+
+The three tier 4 reds (`scan-journey.spec.ts:332`, `slice.spec.ts:83`, `space-journey.spec.ts:85`) are attributed by the SDET as not this change's; the third (409 on a post-dock burn) rests on an unverified body (sentinel not captured), and `selectionCommitted` was false for that click, so the change's gating was not in play. The corroborating later run had all three green. I take the SDET's attribution as evidence, not as my own observation.
+
+### Updated summary
+
+ADDED requirement 21 scenarios: 21 PASS (scenario 21 now journey-closed), 0 FAIL, 0 BLOCKED. MODIFIED x3, 33 scenarios: 33 PASS. Requirement clause "real-wire instants equality": PASS. "Reload mid-burn": PASS at tier 1 (remount); real reload not observed. 0 FAIL, 0 BLOCKED. Nothing STILL OPEN as a row; the weaknesses above are recorded, none contradicts a THEN.
+
+**SHIP** (from QA: no FAIL, no BLOCKED rows remain; archive still waits on the orchestrator's RULING 19 gate decision about the three unrelated tier 4 reds).

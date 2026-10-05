@@ -319,3 +319,35 @@ no filed defect's recorded signature: two newly filed today
 `defect-slice-sell-price-changed-409.md`) and one unverified candidate
 occurrence of `defect-post-dock-burn-cost-drift.md`. The gate has had its one
 rerun.
+
+## Gate passed by user ruling (2026-10-05)
+
+**USER RULING 20** (`clear-burn-preview-on-commit-rulings-index.md`) — Travis,
+verbatim: "reconcile the task list against the code, archive, and then continue
+the chain with add-burn-cost-overlay." The rerun's three tier-4 reds are
+residue by that ruling; no further gate tier was run for this change.
+
+**Corroborating evidence (not the basis).** The out-of-chain corrective change
+`fix-burn-order-geometry-refusals` (archived `d52eab1`) ran the full gate on a
+later tree containing this change's built code and its committed journey spec:
+tier 4 **28 passed, 0 failed** (410 s), tier 3 **1979 tests, 0 failures**
+(1026 s) — `fix-burn-order-geometry-refusals-journey.md`. This change's
+journey did not go red there (that record does not print its leg summary, so
+it says nothing about any single leg), and the three specs red in this gate's
+rerun — `scan-journey.spec.ts:332`, `slice.spec.ts:83`,
+`space-journey.spec.ts:85` — all passed. This change's production, test and
+journey files are byte-identical between `c3fcfcf` and `d52eab1`.
+
+**QA closure.** `clear-burn-preview-on-commit-qa.md`, "Journey closure
+(2026-10-05)": both BLOCKED rows CLOSED-PASS, verdict SHIP. Passed more weakly
+than the scenario states, as QA records: the Tab target is asserted as inside
+the command column, not as the next focusable element by identity (focus drops
+to the document body at acceptance and is recovered in one Tab); the hold has
+3 post-read snapshots; the post-cut request is "at least one"; the drift
+notice is logged, never asserted. Not observed at tier 4: a real reload
+mid-burn; the two-interval zero-preview window (both tier 1 only).
+
+**Task list.** Reconciled against tests and code at `d52eab1` by the SDET:
+`clear-burn-preview-on-commit-task-reconciliation.md` — 25 of 25 test tasks
+EVIDENCED (six under recorded contract settlements), 127/127 vitest, red
+manifest unchanged since handoff. Task 7.4 is checked on USER RULING 20.

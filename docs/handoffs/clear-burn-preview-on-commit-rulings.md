@@ -642,3 +642,38 @@ that residue is attributed "by its request, status and backend sentinel"
 Counting red 3 as `defect-post-dock-burn-cost-drift` — its body was not seen.
 
 **Reversal cost.** None; nothing archived.
+
+---
+
+## User ruling on the RULING 19 stop (2026-10-05)
+
+### USER RULING 20 — Travis rules the link archived: the rerun's three tier-4 reds are treated as residue, after the task list is reconciled against the code
+
+**Question.** RULING 19 stopped the link un-archived because the gate rerun's
+three tier-4 reds (`scan-journey.spec.ts:332`, `slice.spec.ts:83`,
+`space-journey.spec.ts:85`) matched no filed defect's recorded signature, and
+left the decision to Travis.
+
+**Ruling (Travis, relayed by the chain coordinator, verbatim).** "reconcile the
+task list against the code, archive, and then continue the chain with
+add-burn-cost-overlay."
+
+This is a user ruling, not a full-auto one: it is the basis for treating the
+three reds as residue and passing the gate. The orchestrator of this link does
+the first two parts (reconcile the task list, archive); `add-burn-cost-overlay`
+is launched separately by the coordinator.
+
+**Corroborating evidence since the stop (not the basis; the basis is the ruling).**
+The out-of-chain corrective change `fix-burn-order-geometry-refusals` (archived
+`d52eab1`) ran the full archive gate on a tree containing this link's built code
+and committed journey spec — record:
+`docs/handoffs/fix-burn-order-geometry-refusals-journey.md`.
+
+**Task-list discrepancy this ruling exposed.** The orchestrator's reports said
+38 of 40 tasks were checked; the committed tasks.md had 13. Sections 1–4 (the
+SDET's 25 test tasks) were never checked off: the SDET was told not to edit
+`openspec/`, and the orchestrator counted from its own picture of the work
+instead of from the file. The reconciliation, task by task against tests at
+HEAD, is `docs/handoffs/clear-burn-preview-on-commit-task-reconciliation.md`.
+
+**Reversal cost.** `openspec archive` is undone by reverting the archive commit.
