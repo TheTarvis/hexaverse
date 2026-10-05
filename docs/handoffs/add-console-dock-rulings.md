@@ -408,3 +408,61 @@ edit after the verdict expires it, and a fourth round is not available. The
 adversary states that neither reading of r3-m2 nor of r3-m3 yields a wrong
 build. **Alternatives rejected.** Editing after the verdict; a fourth round.
 **Reversal cost.** None.
+
+---
+
+## Rulings at the archive gate, 2026-10-05
+
+### FULL-AUTO RULING 23 — the rerun's one tier-4 red, `slice.spec.ts:83`, is residue of the filed `defect-slice-sell-price-changed-409.md` and does not hold the archive
+
+**The gate.** Run 1 (tree `bcf7719`): tier 4 36/39 in 528 s, tier 3 1979 tests
+green in 1554 s. The three reds were diagnosed in `add-console-dock-journey.md`:
+this change's own journey on a test-side misreading (the camera cluster's
+`pointer-events-none` wrapper counted as a control), a post-cut burn 409 in
+`committed-selection-journey` with no body captured, and a zero-length station
+burn in `space-journey`. One batched revision round (`75bac5a`, test code only)
+and the one rerun: tier 4 **38/39 in 509 s**, this change's journey green
+(fourteen legs PASSED, two UNTESTED as designed), `committed-selection-journey`
+and `space-journey` both green, and one new red — `slice.spec.ts:83`, which had
+passed in run 1.
+
+**Ruling.** Residue. The archive proceeds.
+
+**Basis — the residue rule's three conditions, each checked against the files.**
+1. *The filed signature, verbatim.* `defect-slice-sell-price-changed-409.md`:
+   "`frontend/e2e/tests/slice.spec.ts:83`, failing at `:199` — `balance-value`
+   stayed 1000 for 30 s after the sell click. Backend log … `Sale rejected …
+   reason="market: price changed since your quote"`, then one 409 on
+   `POST …/sell`. The page showed "The price changed while you were deciding.
+   The offer has been updated."" This run: `slice.spec.ts:83` failing at
+   `:199`, `Expected: > 1000 Received: 1000` after the 30 s poll
+   (`add-console-dock-tier4-run2.log`); the e2e backend log at 02:48:00,
+   `Sale rejected … reason="market: price changed since your quote"`, then
+   `409 … POST "/v1/fleets/fleet_647271d0-…/sell"`, the only sell 409 of the
+   run; the failure's DOM snapshot carries "The price changed while you were
+   deciding. The offer has been updated." The record's load note recurs too:
+   2.2–2.6 s `GET /v1/fleets` and `GET /v1/systems/…` answers in the minute
+   before, load 3.99 at start and 8.57 at the end.
+2. *An empty relevant diff.* `git diff b52d412 75bac5a` names nothing under
+   `backend/`, `frontend/hooks`, `frontend/lib/services`, `frontend/lib/market`,
+   `FleetActionsPanel.tsx` or `slice.spec.ts`; the one e2e helper it names,
+   `scan-fixtures.ts`, changed a comment and is not on the sell path.
+3. *None of this change's scenarios.* The red is a sell; this change's 49
+   scenarios are the dock shell and the log's placement. The sell panel sits in
+   the command column, whose controls the journey hit-tested reachable in both
+   dock states, and the sell request was sent and answered.
+
+It also passed on this change's own tree in run 1 — as a random price step
+under warp would.
+
+**Alternatives rejected.** Holding the archive for a red in a path the change
+cannot reach; a second rerun (the rules allow one).
+
+**What is NOT ruled as residue, because it did not recur:** run 1's
+`committed-selection-journey` 409 (candidate occurrence appended, still
+unverified — the body capture added in the revision round logged nothing in the
+rerun because no commit was refused) and run 1's `space-journey` red (filed new
+as `defect-space-journey-instant-station-burn.md`). Neither was red in the run
+that gates the archive.
+
+**Reversal cost.** None; the occurrence is appended to the defect record.

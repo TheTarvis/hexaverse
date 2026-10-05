@@ -21,3 +21,18 @@ which may be how the quote aged past a price step.
 
 No burn is involved; backend diff empty; the sell path is untouched by the
 change's diff; the spec passed in the same gate's first run.
+
+## Occurrence — 2026-10-05, `add-console-dock` archive-gate rerun (tier 4)
+
+Tree `75bac5a`; log `add-console-dock-tier4-run2.log`. `slice.spec.ts:83` failed
+at `:199` (`Expected: > 1000 Received: 1000` after the 30 s poll). E2E backend
+log, 02:48:00: `Credit mutation rejected … reason="market: price changed since
+your quote"`, `Sale rejected … reason="market: price changed since your quote"`,
+then `409 … POST "/v1/fleets/fleet_647271d0-d528-44a2-a35a-13eb15aeccbc/sell"`
+— the run's only sell 409. The failure's DOM snapshot shows "The price changed
+while you were deciding. The offer has been updated." Slow reads in the minute
+before (2.2–2.6 s `GET /v1/fleets?mine=true`, `GET /v1/systems/…`); load 3.99 at
+the start of the run and 8.57 at the end. The spec passed 28 minutes earlier in
+the same gate's first run on the same production code. Ruled residue:
+`add-console-dock-rulings.md` FULL-AUTO RULING 23. This is the second gate it
+has cost a red in.

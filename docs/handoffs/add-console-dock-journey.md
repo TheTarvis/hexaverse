@@ -117,4 +117,107 @@ One batched round; nothing was run (no Playwright, stack or emulator). `npx tsc 
 
 Not applied: finding 6 (cover limit) and 7 (environment) need no test edit; QA keeps "does not collapse an expanded dock" at tier 1. The residue ruling for red 2 remains the orchestrator's or Travis's. No production file, openspec file or manifest-listed file was touched.
 
+## Gate rerun - tier 4 (2026-10-05)
+
+Read from `add-console-dock-tier4-run2.log` (line numbers below are that log's), the preserved e2e backend log and `tier4-run2-results/`. Nothing was run; no code or test was edited.
+
+### Run facts
+
+- HEAD `75bac5a` (revision round: test code only). Start 02:42:14, end 02:50:43, **wall 509 s**, exit 1. Playwright: **38 passed, 1 failed** (8.3 m), 39 tests. Load at start 3.99 5.48 6.01, at end 8.57 11.14 9.48. Emulator-log `Received SIGTERM`: 1 before, 1 after (no kill during the run).
+- The one red: `slice.spec.ts:83` (line 431, 1.3 m), at :199, `balance-value` stayed 1000 for 30 s after the sell click. It passed in run 1 (1.2 m). Diagnosis and ruling: RULING 23 (below).
+- The shell noise at log lines 2-4 (nvm/.npmrc, `compdef`) is the profile, not the run.
+
+### Leg table - `console-dock-journey.spec.ts`, run 2
+
+All 14 must-PASS legs PASSED, both aggregate checks held (`[journey-summary]` block, lines 354-371; test 7 PASSED, line 375). Console capture: update-depth lines 0 in every test of the spec.
+
+| Leg | Class | Result | Line | What the leg logged |
+|---|---|---|---|---|
+| opens-collapsed | MUST | PASSED | 240 | `--console-dock-height` = `3.5rem` |
+| hidden-beats-flex | MUST | PASSED | 242 | `hasFlexClass` true, computed `display` none, `hidden` attribute true |
+| strip-row-56 | MUST | PASSED | 244 | strip x 0 y 664 w 1280 **h 56**, foot 0 (collapsed) |
+| geometry-collapsed | MUST | PASSED | 258 | hit-tested, 0 blocked: space-command-column 5, sightings-unavailable 1, space-camera-controls **4**, floating-nav 2, console-dock-open 1 (lines 252-256); nav foot 72 (251); column x 976 y 16 w 288 h 564, foot 140; camera cluster y 588 h 32, foot 100; card y 575 h 73, foot 72; Retry y 608.5 h 26.5, foot 85 (257) |
+| targets-24 | MUST | PASSED | 260 | "Console" 64.4 x 28 |
+| tab-walk-collapsed | MUST | PASSED | 273 | after the strip chevron, Tab -> `console-dock-open` (271); bounded 90-stop walk from the document start: camera group > orbit > zoom-in > zoom-out > recenter > select-pan-target-point > body/gate hit targets > fleet mark > offscreen chips > Retry > fleet-cmd-cut-drive > fleet-cmd-stop > fleet-roster-toggle > fleet-row > vitals-fleet-chevron > console-dock-open > nav-home > sign-out-button > (body) (272) |
+| expand-collapse-keyboard | MUST | PASSED | 286 | dock x 0 y 500 **w 1280 h 220**, foot 0 (275); strip h 56 at y 500 expanded (276); region y 556 h 164 (277); `--console-dock-height` = `13.75rem` (280); focus outlines `solid` / 2 px on the Log tab (keyboard expansion), the collapse control (Tab) and the "Console" control (after a keyboard collapse) (274, 284, 285) |
+| reload-collapsed | MUST | PASSED | 292 | (no figure) |
+| log-panel-origin | MUST | PASSED | 297 | panel y 593 h 127 foot 0; Refresh y 601 h 21 foot 98; first row y 630 h 59.5 foot 30.5; 3 rows (293-296) |
+| scroll-leg | MUST | PASSED | 302 | scrollHeight 232 / clientHeight 127, scrollTop 105; last row y 652 h 59.5, foot 8.5 above the viewport foot; dock still y 500 h 220 after the scroll (298-301) |
+| geometry-expanded | MUST | PASSED | 326 | hit-tested, 0 blocked: command column 5, sightings-unavailable 1, camera cluster **4**, floating-nav 2 (316-319); column h 400, scrollHeight 443 (scrolls, not clipped), foot 304; card foot 236; cluster y 424 foot 264; nav y 391 foot 236; Retry foot 249; the five strip cells all inside the 1280 x 720 viewport (x 16 to 1264; feet 173 to 183.3, lines 321-325) |
+| tab-walk-expanded | MUST | PASSED | 330 | walk from the document start stops at `space-camera-controls`; after the collapse control, Tab -> Refresh sighting log; panel focusables: Refresh > sighting-row x 3 (327-329) |
+| report-link | - | **UNTESTED** | 335 | "no scan target served in range for the fresh fleet" (random spawn, as in run 1); cover below |
+| galaxy-nav-72 | MUST | PASSED | 344 | root property `13.75rem` before leaving, empty `""` on the galaxy route; nav x 16 y 555 h 93, foot 72 (340-343) |
+| return-collapsed | MUST | PASSED | 346 | (no figure) |
+| other-system-collapsed | - | **UNTESTED** by design | 347 | no player path to another system for a one-hull corporation without a jump |
+
+Tests 1-7 of the spec: 5.0, 3.7, 2.8, 5.0, 0.233, 1.9 and 0.005 s (lines 270, 290, 308, 334, 339, 353, 375); 18.6 s in all.
+
+### Budget use against the 60 s per-test default (`playwright.config.ts:87`)
+
+- The new spec: longest test 5.0 s, so at most 8.3 % of 60 s; the spec's seven tests total 18.6 s (run 1: about 28 s).
+- Slower tests in the run, all pre-existing, none this change's: `slice` 78 s (1.3 m, red, 30 s poll then the failure), `burn-preview-journey` 72 s (1.2 m), `space-double-submit` sale 27.1 s, `committed-selection-journey` 32.4 s, `space-journey` 36.0 s, `scan-lane-transit-fizzle` 22.3 s, `scan-journey` clean sweep 22.1 s, `vitals-strip-journey` 21.0 s. The ones over 60 s declare their own budgets (`test.setTimeout` 1 800 000 in `slice` and `space-journey`, 900 000 in `burn-preview-journey`, `committed-selection-journey` and `space-double-submit`). No timeout was raised for this run.
+
+### Scenarios the coverage table marked `Playwright, deferred`, and the rows QA held BLOCKED
+
+Row numbers are `add-console-dock-red-coverage.md` / `add-console-dock-qa.md`.
+
+| # | Scenario | Closed by (run 2) |
+|---|---|---|
+| 33 | Camera controls precede the hit targets, dock expanded | line 327 and leg line 330: the walk from the document start stops at `space-camera-controls` (a camera control before any body or gate target). The leg logs only the first stop, not the whole sequence. |
+| 34 | Expanded dock 220 x 1280 | line 275 (w 1280 h 220), line 280 (`13.75rem`), leg line 286 |
+| 35 | Strip row 56 collapsed and expanded | line 243-244 (h 56 collapsed) and line 276 (h 56 expanded), legs 244 and 286 |
+| 36 | More rows do not change the dock height | lines 298 and 301 (dock h 220 after the scroll), leg 302; the precondition QA's J2 found unasserted is visible in the log: scrollHeight 232 > clientHeight 127 |
+| 37 | Taller content scrolls within the panel | line 298 (scrollTop 105 of 232/127) and line 299 (last row foot 8.5), leg 302 |
+| 38 | Refresh and first row in view at the origin | lines 293-295 (Refresh foot 98, first row foot 30.5, panel foot 0), leg 297 |
+| 39 | Targets at least 24 x 24 | lines 259, 281-283 ("Console" 64.4 x 28, Log tab 35.9 x 24, collapse 24 x 24), leg lines 260 and 286. Two figures sit exactly on the 24 boundary (height 24; collapse 24 x 24). |
+| 40 | Expanded: nothing covers or is covered | lines 309-326: four surfaces hit-tested, 0 blocked, plus Retry (320) and the five strip cells (321-325). The "Console" control is not on the page expanded, so QA's J1 hole (never hit-tested) is closed collapsed (line 256). |
+| 41 | Collapsed: same | lines 245-258: five surfaces including the "Console" control hit-tested, 0 blocked; Retry (257) |
+| 42 | Strip cells inside the viewport, unoverlapped | lines 313 and 321-325, leg 326 (the revision's wrapper fix also made the camera count 4, not 5) |
+| 43 | Galaxy-route nav at 72 px | lines 340-343: nav foot 72 with the root property `""` after leaving from `13.75rem` (a leaked height would read 236); leg 344 |
+| 24 | Visible focus indicator (QA: INSPECTED, class tokens only) | now observed in a real browser: computed outline `solid` 2 px on three controls, lines 274, 284, 285. Colour and contrast were not read, so this is "an outline exists", not "it is legible". |
+
+Not closed at tier 4, as in run 1 (both legs UNTESTED, not failed):
+
+- **`report-link`** (line 335). Covers that actually passed in run 2: `scan-journey.spec.ts:42` "commit a sweep ... a clean sweep" PASSED (line 405, 22.1 s). Its migrated leg collapses the dock first, clicks `scan-report` ("open the sighting log"), then asserts the dock expanded, the Log tab `aria-selected=true` and focused. That covers "A settled sweep's report link expands a collapsed dock to the Log tab" and "The report's link to the log moves focus to the Log tab". "A settled sweep's report link does not collapse an expanded dock" has **no passing tier-4 cover**; its cover is tier 1 task 2.9 only (same limit as run 1, QA keeps that row at tier 1). The log has no per-leg lines for `scan-journey`, so the assertions are known from the spec source and the PASSED line, not from logged figures.
+- **`other-system-collapsed`** (line 347): no tier-4 cover exists. By design (J7): the dock's collapsed reset on a system change is covered by the view test `SystemSpaceView.console-dock.test.tsx` (tier 1) and by `return-collapsed`, which did PASS (line 346) for the client-navigation return to the same system.
+
+### `[journey-console]` hard assertion
+
+Held in every test of the run: every `[journey-console] update-depth lines:` line reads 0 (lines 63, 99, 118, 134, 173, 182, 232, 265, 288, 305, 332, 337, 350, 373, 476, 483, and the other specs' equivalents), and no test failed on it. Console noise is the forced `500 {"error":"forced by e2e (console-dock)"}` on `/v1/sightings?systemId=sys_-2_5` (lines 264, 268, 304, 306, 349, 351; the spec forces it by design), the pre-existing wake-page `/login?signUp=true` 404s, the `409` on `/systems/sys_2_3` in `burn-preview-journey` (line 172, the spec's own served refusal), and `vitals-strip-journey`'s 404/500 on `sys_1_-5`/`sys_1_-6` (lines 474-475, as in run 1).
+
+### Specs that failed in run 1
+
+- `committed-selection-journey.spec.ts:407` (was `:395`): **PASSED**, 32.4 s (line 233). The new `[journey-http]` body capture logged **nothing** for that test: no `[journey-http]` line sits between lines 194 and 233, because no commit was refused, so the 409 of run 1 did not recur and its body is still unknown. (The only `[journey-http]` lines in the run are the 404 `accounts/firestore` and `corporations/me` wake probes and the forced 500 sightings, lines 64-65, 266-268, 306, 351.)
+- `space-journey.spec.ts:85`: **PASSED**, 36.0 s (line 459).
+
+### Migrated specs
+
+- `scan-journey.spec.ts`: all four tests PASSED: `:42` 22.1 s (line 405), `:298` 8.4 s (411), `:383` 10.9 s (415), `:408` 10.6 s (419).
+- `scan-lane-transit-fizzle.spec.ts:103`: PASSED, 22.3 s (line 426).
+- `vitals-strip-journey.spec.ts:263`: PASSED, 21.0 s (line 477); hit-tested fleet panel 2, preview panel 1, camera cluster 4, sightings card 1, nav 2 (lines 463-467), update-depth 0.
+- `burn-cost-overlay-journey.spec.ts`: all four tests PASSED (lines 67, 101, 120, 136: 1.6 s, 2.1 s, 15.9 s, 2 ms). Its UNTESTED legs (`extent-past-fill`, `unaffordable-overlay-and-mark`) are its own, with tier 1 cover, as at its own gate.
+
+### RULING 23 evidence check (`slice.spec.ts:83`)
+
+Checked against the logs myself; all three claims hold, with two small precisions.
+
+1. **Signature**: holds. Run-2 log: failing at :199, `Expected: > 1000, Received: 1000`, 30 s poll. Backend log (copy in the scratchpad): line 2247 `Sale rejected ... reason="market: price changed since your quote"` at 02:48:00, then line 2249 `409 ... POST "/v1/fleets/fleet_647271d0-.../sell"`; the only sell 409 in the log (the other sells, 02:49-02:50, are 200). `error-context.md` line 65 carries "The price changed while you were deciding. The offer has been updated." Precision: the 2.2-2.6 s `GET /v1/fleets?mine=true` and `GET /v1/systems/...` answers are at 02:47:00-02:47:21, 40-60 s before the 02:48:00 sale rather than "in the minute before" in the strict sense; they are the same slow-read signature, but there is no slow read in the seconds before the sale itself. Load 3.99 at start, 8.57 at end: as quoted.
+2. **Empty relevant diff**: holds. `git diff b52d412 75bac5a --stat` over `backend`, `frontend/hooks`, `frontend/lib`, `FleetActionsPanel.tsx`, `slice.spec.ts` and `e2e/helpers` names only `lib/console-dock-layout.ts` and its test (new files) and `e2e/helpers/scan-fixtures.ts` (a comment: 8 lines, 5 insertions and 3 deletions, comment text only). Nothing on the sell path.
+3. **None of this change's scenarios**: holds (a sell in the command column; the column's controls were hit-tested reachable in both dock states, lines 252 and 316).
+
+Also true and checked: `slice.spec.ts:83` passed in run 1 on `bcf7719` (1.2 m).
+
+### Anything that looks wrong though it passed
+
+- Nothing in this change's spec. Observations only: (a) `tab-walk-expanded` logs only its first stop (`space-camera-controls`), so #33 is proven for the first stop and not for the whole order; the camera group is a tab stop before every hit target, which is what the scenario says. (b) The collapsed walk visits 90 stops and wraps through `(body)`, so it is long but bounded. (c) Two controls are measured at exactly 24 px (Log tab height, collapse control): a 1 px regression fails the leg, which is the intent. (d) `report-link` was UNTESTED in both runs: a random-spawn condition, so the tier-4 evidence for "does not collapse an expanded dock" still does not exist.
+- Pre-existing and unchanged by this change: `slice` and `burn-preview-journey` take 72-78 s, `space-double-submit`'s sale 27 s; run-wide load rose from 4 to 8.6 by the end. No SIGTERM, no emulator restart.
+
+### Verdict
+
+All 14 must-PASS legs of `console-dock-journey.spec.ts` PASSED in run 2, with 0 update-depth lines; the two UNTESTED legs have their stated covers; the one red is residue under RULING 23, whose evidence holds. Task 5.2 is ticked.
+
+## Suite budget line
+
+Tier 4: run 1 528 s (36 passed, 3 failed), rerun 509 s (38 passed, 1 failed; last gates 436 s and 410 s). Tier 3: 1554 s (once, 1979 tests green).
+
 STATUS: COMPLETE

@@ -221,3 +221,123 @@ M1's restored row-to-ghost direction is evidence for a `sighting-log` scenario
 this change re-homes, so it stays in `scan-journey.spec.ts`.
 
 STATUS: COMPLETE
+
+---
+
+# add-console-dock — QA closing pass (after the archive-gate journey)
+
+Appended verbatim by the orchestrator from QA's hand-back, 2026-10-05.
+
+Read-only. I ran no suite and booted nothing. I read the spec source at `75bac5a` (HEAD, with no working-tree diff in `frontend/e2e`), the whole run-2 log through line 440 plus its tail (lines 441-527), and the diffs.
+
+## Verdict: SHIP
+
+The matrix closes at 49 PASS. Two of those rows (#5 and #19) have a tier-4 half that is UNTESTED, covered at tier 1 only. Both are acceptable (see § 2).
+
+## 1. The eleven returned items, checked in the spec source
+
+Line numbers refer to `frontend/e2e/tests/console-dock-journey.spec.ts` at `75bac5a`. The fixes for J1-J8 and M1-M3 were already in `bcf7719`. The revision round (`bcf7719` to `75bac5a`) touched only the hit-test helper (J1-related) and the diagnostics.
+
+| Item | Fix is in the source | Would it fail the wrong build? | Run-2 evidence it ran |
+|---|---|---|---|
+| J1 | `hitTestControls` (:201-267) includes the surface root when it is a control with `pointer-events` not `none`. It asserts `total <= MAX_CONTROLS` (:215, no silent cap). It requires `node.contains(hit)`, never an ancestor (:246). Callers assert `checked >= 1` (:536, :736). | Yes. The "Console" button is now hit-tested. A control with `pointer-events:none` no longer passes via an ancestor. | Log 249-256 and 316-319. Collapsed: `console-dock-open: 1 control(s) hit-tested, 0 blocked`. Camera cluster 4 in both states. |
+| J2 | :681-682 assert `scrollHeight > clientHeight` and `scrollTop > 0`. :692 asserts nothing focusable follows the last row. | Yes. Content that fits the panel fails the precondition. | Log 298: `scrollHeight 232, clientHeight 127, scrollTop 105`. |
+| J3 | :598 asserts `\|dock.y - strip.y\| <= 1`. :602-606 assert region, tab bar and panel start at or below the strip's foot and lie inside the dock. | Yes. | Log 275-279: dock y 500 and strip y 500; region y 556; tab y 563; panel y 593. |
+| J4 | **See below.** | Yes. | Log 327-329. |
+| J5 | `measuredExpanded` is set at :615. The fold at :926 turns `targets-24` FAILED if it is unset. | Yes. A leg 7 that dies before :615 can no longer leave `targets-24` PASSED. | Log 282-283: both expanded controls measured. `targets-24` PASSED at 360. |
+| J6 | :873-877 return `{untested}` instead of silently passing. `scan-journey.spec.ts:140` adds `toBeFocused` on `console-tab-log` after the report link. | Yes. | `scan-journey.spec.ts:42` PASSED (log 405). `report-link` honestly logs UNTESTED (335). |
+| J7 | :912-917 are UNTESTED with the stated reason. They use no router internals, as the orchestrator bounded it. | Not applicable. It stays UNTESTED. | Log 347. |
+| J8 | `expectFocusOutline` (:306-317) asserts outline-style is not `none` and width is at least 2. It is called on three controls (:589, :621, :628). | Yes. | Log 274, 284, 285: `{"style":"solid","width":2}` on the Log tab, the collapse control and "Console". |
+| M1 | `scan-journey.spec.ts` ~355-380. A reload clears the highlight and collapses the dock. It asserts the ghost is not highlighted. The test expands the dock and asserts the row is not highlighted. It clicks the row and asserts the ghost has `data-highlighted=true`. | Yes. It is non-vacuous. | `scan-journey.spec.ts:298` PASSED (log 411). |
+| M2 | `toBeHidden()` replaces `toHaveCount(0)` at lines 132, 164, 241, 293. | Not applicable. | Same passing run. |
+| M3 | `vitals-strip-journey.spec.ts` `activatableControls` now runs `el.scrollIntoView({block:'nearest'})` inside the surface before the hit test. The assertions are unchanged. | Yes. | `vitals-strip-journey.spec.ts:263` PASSED (log 477). The hit-tested counts are in its lines 463-467. |
+
+**J4 specifically.** The SDET's remark that the log records only the first stop is true of that log line only. It does not mean the real log's controls went unwalked.
+
+- The source at :776-801 does the following:
+  - It reads the panel's visible, enabled focusables in DOM order.
+  - It starts `seen` at the post-collapse stop (Refresh).
+  - It presses Tab `expected.length - 1` more times.
+  - It asserts `seen` equals `expected` in order, each once (:796).
+  - It presses Tab once more and asserts focus has left the panel (:801).
+- Log line 327 is the #33 walk. It stops at its first stop, `space-camera-controls`, which is the thing #33 needs.
+- Log 328 shows the post-collapse Tab landing on `Refresh sighting log`.
+- Log 329 shows the expected sequence: Refresh, then three `sighting-row-*`.
+- Line 329 is printed before the walking loop. The leg then logged PASSED at 330. Any failed `toEqual` or `leftPanel` check would have thrown and logged FAILED instead. So the 3-row walk and the leave-panel check ran and held.
+- The sequence actually seen is not printed. Its pass is inferred from the PASSED leg. That is acceptable, but it is not a logged figure.
+
+## 2. The closed matrix, from the run-2 log itself
+
+I opened each cited log line.
+
+| # | Scenario | Verdict | Log line and measured figure |
+|---|---|---|---|
+| 33 | Camera controls precede hit targets (dock expanded) | PASS | 327 and 330. The walk from the document start stops at `space-camera-controls` after 1 stop. A build with a hit target first would stop on `body-hit-*` with `camera=false` and fail :764. The collapsed walk at 272 shows the same order. |
+| 34 | Expanded dock 220 × 1280 | PASS | 275: dock `x0 y500 w1280 h220`, foot 0. 280: `13.75rem`. |
+| 35 | Strip row 56, both states | PASS | 243-244: h 56 collapsed. 276: h 56 expanded at y 500. |
+| 36 | More rows do not change dock height | PASS | 301: dock h 220 after the scroll, with 232 against 127 shown at 298. |
+| 37 | Taller content scrolls in the panel | PASS | 298-299: `scrollTop 105`; last row foot 8.5 above the viewport foot, inside the panel. |
+| 38 | Refresh and first row inside panel at origin | PASS | 293-295: panel foot 0; Refresh y 601, foot 98; first row y 630, foot 30.5. |
+| 39 | Targets at least 24 px | PASS | 249 and 283: "Console" 64.4×28. 278 and 282: Log tab 35.9×24; collapse 24×24. Two figures sit exactly on the 24 boundary, so a 1 px regression fails. |
+| 40 | Expanded: nothing covers or is covered | PASS | 309-326: four surfaces hit-tested, 0 blocked (5, 1, 4 and 2 controls). Retry foot 249. Five strip cells inside the viewport. |
+| 41 | Collapsed: same | PASS | 245-258: five surfaces including "Console" hit-tested, 0 blocked. This closes J1's hole. |
+| 42 | Strip cells inside the viewport, unoverlapped | PASS | 321-325: x 16 to 1264; feet 173 to 183.3. The overlap assertions at :755 ran inside the PASSED leg 326. |
+| 43 | Galaxy-route nav at 72 px | PASS | 340-343: root property `13.75rem` before leaving, `""` after; nav foot 72. A leaked height would read 236. |
+| 24 | Visible focus indicator | PASS (was INSPECTED) | 274, 284, 285: computed `solid`, 2 px on three controls in a real browser. The caveat: the colour and contrast were not read. The scenario asks that an indicator exist, so this is acceptable. |
+
+**The two UNTESTED legs, and what they leave at tier 1 only:**
+
+- **`report-link` (log 335)**
+  - "The report's link does not collapse an expanded dock" (#19) is left with tier-1 evidence only.
+  - The tier-1 evidence is `SystemSpaceView.console-dock.test.tsx` 2.9, the expanded row. The SDET's earlier mutation showed that a toggling build fails it.
+  - That is acceptable. The behaviour is a pure state transition (expand, not toggle) in the real `SystemSpaceView` with only the stage mocked. Tier 4 cannot arrange it reliably, because the random spawn serves no scan target in range, as in run 1.
+  - The expand and focus halves have tier-4 evidence: `scan-journey.spec.ts:42` PASSED at log 405, with `toBeFocused` on the Log tab (source line 140). That covers #18 and #30.
+  - I read the assertions from the source and the PASSED line. The log has no per-leg lines for scan-journey.
+- **`other-system-collapsed` (log 347)**
+  - The cross-system "collapsed after navigating to another system and back" half of #5 is tier 1 only.
+  - The tier-1 evidence is the keyed-remount test, V 2.1.
+  - What it does not exercise is D-2, the premise that Next remounts the page when the route parameter changes. That premise is read, not run.
+  - The real galaxy to system client navigation did pass (`return-collapsed`, log 346).
+  - That is acceptable with a stated residual risk. There is no player path to a second system for a one-hull corporation. The orchestrator ruled that router internals must not be reached.
+
+**Final counts: 49 PASS / 0 FAIL / 0 BLOCKED / 0 UNTESTED rows.**
+
+- That is the 37 earlier PASS rows (#1-23, 25-32, 44-49), plus #24 and #33-43.
+- Two rows, #5 and #19, each carry a tier-4 half that is UNTESTED (see above).
+- Tier 1 was run by the predecessor (166 passed plus 36).
+- The tier-4 verdicts come from the log.
+
+## 3. Did the revision round weaken any assertion?
+
+I read `git diff bcf7719 75bac5a` in full for `frontend/e2e`. **No assertion was weakened.**
+
+- **`rootIsControl` change.** The root now counts as a control only when its computed `pointer-events` is not `none`.
+  - This removes one wrongly included target, the `pointer-events-none` camera wrapper. It could never be its own hit target.
+  - The four children are still each hit-tested. Counts of 4 appear in log 254 and 318.
+  - `checked >= 1` and `blocked toEqual([])` are untouched.
+  - A genuinely covered camera button still lands in `blocked`.
+  - A residual known gap: a build that made the wrapper `pointer-events-auto` is not caught. It was not caught before either.
+- **Diagnostic lines only.** The added `ident` field and the BLOCKED log lines print more.
+- **`committed-selection-journey.spec.ts`.** The body is read and logged before a 3xx-or-higher answer is published, and 2xx takes the original path. No assert, wait or ordering changed.
+- **Pre-existing limitation, not introduced here.** `vitals-strip-journey`'s `activatableControls` still accepts `hit.contains(el)`, an ancestor. I flag it as a note only. It is archived test code, and it was not relaxed by this change.
+
+## 4. The one red, `slice.spec.ts:83`
+
+**It touches none of this change's 49 scenarios.**
+
+- It failed at :199 (log 441+: `Expected: > 1000, Received: 1000`), a 30 s poll after a sale.
+- RULING 23 reports a backend 409 `market: price changed since your quote`, the filed `defect-slice-sell-price-changed-409.md` signature. I did not open the backend log myself. I accept the journey record's reading, which is internally consistent with the failing line.
+- The sell path is not in this change's diff. `git diff --stat b52d412 75bac5a` over `backend`, `frontend/hooks`, `frontend/lib/services` and `slice.spec.ts` is empty. The `frontend/components` stat lists only `floating-nav*`, `space/ConsoleDock*`, `SightingLog*`, `SpaceStage.tsx`, `SystemSpaceView*` and their tests. None of those is on the market or sell path.
+- The scenarios about the command column concern reachability and geometry. Both are hit-tested in both dock states (log 252 and 316).
+- It passed in run 1 on `bcf7719`. It is not a dock regression.
+
+## Non-blocking observations (no action required)
+
+- The `tab-walk-collapsed` walk is long (90 stops) but bounded, and wraps through `(body)`.
+- The seen-sequence of the real-log walk is not logged. Consider printing it in a future run.
+- The focus-outline check proves an outline exists, not that it is legible (contrast unread).
+- `committed-selection-journey:407` passed, and its new `[journey-http]` capture logged nothing. The 409 body from run 1 remains unknown. That is the SDET's filed candidate and not this change's.
+
+**SHIP**
+
+STATUS: COMPLETE
