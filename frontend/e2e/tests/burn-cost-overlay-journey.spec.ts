@@ -1019,6 +1019,11 @@ test.describe('the burn-cost overlay - quote, read, clear, replace, lay out, pai
       const i = logSnap(`floor: ${entry.id}`, q.s)
       expect(q.current && q.s.hasBand, `GIVEN: an overlay drawn at the floor (snap#${i}: ${fmt(i, q.s)})`).toBe(true)
       const cellIds = ['vitals-fleet-cell', 'vitals-fuel-cell', 'vitals-hold-cell', 'vitals-credits-cell', 'vitals-clock-cell']
+      // Re-read for add-console-dock (task 3.5), dock COLLAPSED (never expanded
+      // in this file): the nav stays at 72 px, the camera cluster moved up to
+      // 100 px, the command column's foot to 140 px. The panels, cluster and
+      // nav are measured by their own boxes, so no assertion depends on a
+      // moved edge and none was edited.
       const surfaceIds = ['space-fleet-panel', 'preview-panel', 'space-camera-controls', 'floating-nav']
       const surfaces: [string, Box][] = []
       for (const id of surfaceIds) {

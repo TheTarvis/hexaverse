@@ -231,13 +231,18 @@ async function activatableControls(
   return page.getByTestId(testId).first().evaluate((surface) => {
     const sel =
       'button, a[href], input, select, textarea, [role="button"], [role="menuitem"], [tabindex]:not([tabindex="-1"])'
-    const sr = surface.getBoundingClientRect()
     const blocked: string[] = []
     let checked = 0
     for (const el of Array.from(surface.querySelectorAll(sel))) {
-      const r = el.getBoundingClientRect()
+      let r = el.getBoundingClientRect()
       if (r.width === 0 || r.height === 0) continue
       if (getComputedStyle(el).visibility === 'hidden') continue
+      // add-console-dock (QA M3): a control the surface scrolls out of sight (the command
+      // column is a scrolling surface since the dock moved its foot) is scrolled into view
+      // WITHIN its surface before it is hit-tested; what is asserted is unchanged.
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      const sr = surface.getBoundingClientRect()
+      r = el.getBoundingClientRect()
       const cx = r.x + r.width / 2
       const cy = r.y + r.height / 2
       if (cx < 0 || cy < 0 || cx >= window.innerWidth || cy >= window.innerHeight) continue
@@ -481,10 +486,16 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     const sightingsBox = await box(page, 'sightings-unavailable')
     // RULING 46 (add-vitals-strip rulings) — `FloatingNav` is mounted
     // app-wide by `frontend/components/layout-wrapper.tsx:108` for every
-    // authenticated route; it is the surface that failed this gate's run 1
-    // and was fixed to `bottom-[4.5rem]` (`frontend/components/floating-nav.tsx:33`)
-    // — 16px of clearance above the strip's `h-14` = 56px. Asserted directly
-    // here rather than left to the rerun's indirect evidence.
+    // authenticated route; it is the surface that failed this gate's run 1.
+    // Re-read for add-console-dock (task 3.4), dock COLLAPSED (this leg never
+    // expands it): the nav and the sightings-unavailable card now take their
+    // 72 px foot from `CONSOLE_DOCK_LANE_LEFT_CENTER` (3.5rem + 1rem), the
+    // same 72 px as the old `bottom-[4.5rem]`; the camera cluster moved up to
+    // 100 px; the command column's foot moved to 140 px (564 px tall at this
+    // viewport) and carries `space-command-column`. This leg measures the
+    // column's two panels, the cluster, the card and the nav, never the
+    // column's own box, so no assertion below depends on a moved edge and none
+    // was edited. The collapsed dock's own geometry is the dock journey's.
     const floatingNav = await box(page, 'floating-nav')
 
     const floatingSurfaces: [string, Box][] = [

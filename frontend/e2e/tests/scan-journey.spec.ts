@@ -119,10 +119,26 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     // -------------------------------------------------------- 5. the log,
     //    opened via the REPORT's own affordance (system-space-view "A sweep
     //    that minted records reports and links to the log") — not the
-    //    standalone `sighting-log-open` control this leg also exercises
-    //    later.
+    //    "Console" control this journey exercises later (leg 9).
+    //    add-console-dock (3.2): the dock is collapsed here (it opens
+    //    collapsed on every mount and nothing above expands it), so the log is
+    //    NOT mounted until this click — the link is the first show of the log
+    //    in this document load, which is what keeps the just-settled record
+    //    listed. Do not expand the dock earlier in this test.
+    await expect(
+      page.getByTestId('console-dock-open'),
+      'precondition: the dock is collapsed before the report link is used',
+    ).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('sighting-log'), 'the log is not shown while the dock is collapsed').toBeHidden()
     await page.getByTestId('scan-report').getByRole('button', { name: /open the sighting log/i }).click()
-    await expect(page.getByTestId('sighting-log')).toBeVisible({ timeout: 10_000 })
+    // "A settled sweep's report link expands a collapsed dock to the Log tab"
+    await expect(page.getByTestId('console-dock-collapse'), 'the report link expanded the dock').toBeVisible({
+      timeout: 10_000,
+    })
+    await expect(page.getByTestId('console-tab-log')).toHaveAttribute('aria-selected', 'true')
+    // "The report's link to the log moves focus to the Log tab"
+    await expect(page.getByTestId('console-tab-log'), 'the report link moved focus to the Log tab').toBeFocused()
+    await expect(page.getByTestId('console-panel-log').getByTestId('sighting-log')).toBeVisible({ timeout: 10_000 })
     const rows = page.locator('[data-testid^="sighting-row-"]')
     await expect(rows.first(), 'the settled sweep\'s record is in the log').toHaveCount(1, { timeout: 10_000 })
     await expect(rows.first()).toContainText(chosen.hostId)
@@ -133,22 +149,22 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     ).toContainText(/clean/i)
 
     // REVISED 2026-09-03 (orchestrator-stopped run: the SDET's own bug, not
-    // a production defect or a spec misread). `sighting-log` renders no
-    // internal close/dismiss button at all (checked against
-    // `SightingLog.tsx` / `SystemSpaceView.tsx`) — the ONLY close affordance
-    // is the same toggle button as `sighting-log-open`, whose accessible
-    // name flips to "Close sighting log" while open. The old
+    // a production defect or a spec misread). The old
     // `.getByRole('button', { name: /close|dismiss/i }).click().catch(() =>
-    // {})` matched nothing inside the drawer, silently swallowed the
-    // failure, and left the drawer OPEN — which then sat over
-    // `scan-control` and hung the next pick's
-    // `scrollIntoViewIfNeeded()` (no explicit timeout) for the rest of this
-    // suite's 30-minute budget. Close it via the real toggle instead, and
-    // assert sighting-log's own "Closing the log returns to the view
+    // {})` matched nothing and silently swallowed the failure, leaving the
+    // log OPEN over `scan-control` and hanging the next pick's
+    // `scrollIntoViewIfNeeded()`. REVISED add-console-dock (3.2): the floating
+    // log and its `sighting-log-open` toggle are gone; the close affordance is
+    // the dock's collapse control. Assert the collapse actually happened
+    // (log unmounted, "Console" control back) rather than assuming the click
+    // did anything, and sighting-log's "Closing the log returns to the view
     // intact" (the space view stays mounted, the same acting fleet stays
-    // selected) rather than assuming the click did anything.
-    await page.getByTestId('sighting-log-open').click()
+    // selected).
+    await page.getByTestId('console-dock-collapse').click()
     await expect(page.getByTestId('sighting-log')).toBeHidden({ timeout: 10_000 })
+    await expect(page.getByTestId('console-dock-open'), 'collapsing returns the dock to the strip alone').toBeVisible({
+      timeout: 10_000,
+    })
     await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 10_000 })
     await expect(
       page.getByTestId(`fleet-row-${fleetId}`),
@@ -216,7 +232,13 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     await page.reload()
     await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByTestId('scan-control')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId('sighting-log-open')).toBeVisible({ timeout: 10_000 })
+    // "A reload shows the dock collapsed" (add-console-dock 3.2): the dock was
+    // collapsed at the end of leg 5, so this proves nothing about a reload on
+    // its own; the expansion below (leg 9) then re-proves it with the dock
+    // opened first and a reload in between.
+    await expect(page.getByTestId('console-dock-open')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('console-dock-region')).toBeHidden()
+    await expect(page.getByTestId('console-tab-log')).toBeHidden()
 
     // ------------------------------------------------- 9. mount-path (10.7)
     // Seed a target-naming fixture (10.2b/10.2c) — the ordinary journey
@@ -249,10 +271,26 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     await expect(page.getByTestId(`sighting-mark-${seededRecordId}`), 'the seeded ghost is drawn on first render').toBeVisible({
       timeout: 20_000,
     })
-    await page.getByTestId('sighting-log-open').click()
+    // The log is behind the dock (collapsed on this fresh mount): open it
+    // through the "Console" control, written here, not in a helper.
+    await expect(page.getByTestId('console-dock-open'), 'a fresh mount shows the dock collapsed').toBeVisible({
+      timeout: 10_000,
+    })
+    await page.getByTestId('console-dock-open').click()
+    await expect(page.getByTestId('console-tab-log')).toBeFocused({ timeout: 10_000 })
     await expect(page.getByTestId(`sighting-row-${seededRecordId}`), 'the seeded record is in the log on mount').toBeVisible(
       { timeout: 20_000 },
     )
+
+    // "A reload shows the dock collapsed" (add-console-dock 3.2): expanded
+    // here, a reload comes back collapsed — the toggle-reload leg of old.
+    await page.reload()
+    await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('console-dock-open'), 'a reload shows the dock collapsed').toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByTestId('console-dock-region')).toBeHidden()
+    await expect(page.getByTestId('sighting-log')).toBeHidden()
   })
 
   // 10.2b — the ghost leg, isolated: a seeded target-naming fixture renders
@@ -290,18 +328,56 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     const ghost = page.getByTestId(`sighting-mark-${recordId}`)
     await expect(ghost).toBeVisible({ timeout: 20_000 })
 
-    await page.getByTestId('sighting-log-open').click()
+    // add-console-dock (3.2). The dock is collapsed (every mount), and the
+    // ghost is activated FIRST, before any click on a log row: a row click
+    // sets the same highlighted id as the ghost does, so the other order would
+    // make ghost activation vacuous.
+    // "Activating a ghost while the dock is collapsed highlights the ghost and
+    // leaves the dock collapsed".
+    await expect(page.getByTestId('console-dock-open'), 'precondition: the dock is collapsed').toBeVisible({
+      timeout: 10_000,
+    })
+    await ghost.click()
+    await expect(ghost).toHaveAttribute('data-highlighted', 'true')
+    await expect(page.getByTestId('console-dock-open'), 'a ghost activation leaves the dock collapsed').toBeVisible()
+    await expect(page.getByTestId('console-dock-region')).toBeHidden()
+
+    // "The row for an activated ghost is highlighted when the tab is next
+    // shown": expand through the "Console" control, then read the row.
+    await page.getByTestId('console-dock-open').click()
     const row = page.getByTestId(`sighting-row-${recordId}`)
     await expect(row).toBeVisible({ timeout: 10_000 })
+    await expect(row, 'the activated ghost\'s row is highlighted when the tab is shown').toHaveAttribute(
+      'data-highlighted',
+      'true',
+    )
 
-    // Row -> ghost.
+    // The row -> ghost direction ("Selecting a row highlights its ghost",
+    // re-homed by this change), made non-vacuous: a RELOAD clears the highlight
+    // (and collapses the dock), so the ghost starts unhighlighted; then a row
+    // click must be what highlights it.
+    await page.reload()
+    await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
+    await expect(ghost).toBeVisible({ timeout: 20_000 })
+    await expect(
+      ghost,
+      'precondition: after the reload no ghost is highlighted, so the row click below is what does it',
+    ).not.toHaveAttribute('data-highlighted', 'true')
+    await expect(page.getByTestId('console-dock-open'), 'precondition: the reload collapsed the dock').toBeVisible({
+      timeout: 10_000,
+    })
+    await page.getByTestId('console-dock-open').click()
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    await expect(row, 'precondition: the row is not highlighted before it is clicked').not.toHaveAttribute(
+      'data-highlighted',
+      'true',
+    )
     await row.click()
-    await expect(ghost).toHaveAttribute('data-highlighted', 'true')
-
-    // Ghost -> row (activated via keyboard, the affordance a ghost mark
-    // exposes per its own facts surface).
-    await ghost.click()
-    await expect(row).toHaveAttribute('data-highlighted', 'true')
+    await expect(ghost, 'a row click highlights the stage ghost for that record').toHaveAttribute(
+      'data-highlighted',
+      'true',
+      { timeout: 10_000 },
+    )
   })
 
   test('the burn to the home station leg still docks normally (regression: scan control mounts beside, not inside, the fleet panel)', async ({

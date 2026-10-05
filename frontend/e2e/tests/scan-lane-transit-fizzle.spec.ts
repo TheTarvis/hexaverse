@@ -293,7 +293,10 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
     // No record was filed: a fizzle mints nothing at all, so the log has no
     // target-naming record for this sweep — this fresh corp's pile stays
     // entirely empty.
-    await page.getByTestId('sighting-log-open').click()
+    // add-console-dock (3.3): the log sits behind the dock, collapsed on this
+    // fresh mount; open it through the "Console" control. Assertions unchanged:
+    // the log still reads when shown, so zero rows still means what it meant.
+    await page.getByTestId('console-dock-open').click()
     await expect(page.getByTestId('sighting-log')).toBeVisible({ timeout: 10_000 })
     const rows = page.locator('[data-testid^="sighting-row-"]')
     await expect(rows).toHaveCount(0)

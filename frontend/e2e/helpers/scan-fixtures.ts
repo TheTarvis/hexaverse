@@ -247,9 +247,11 @@ async function servedScanTargets(
   // Explicit timeout (SDET fix, 2026-09-03): an action with no timeout of
   // its own is bounded only by the whole test's budget, so a failure here
   // reads as a 30-minute silence instead of a fast, named one (this is
-  // exactly what happened when a caller left the sighting-log drawer open
-  // over `scan-control` — see scan-journey.spec.ts's own fix for the root
-  // cause).
+  // exactly what happened when a caller left the sighting log open and a
+  // later pick hung — see scan-journey.spec.ts's own fix for the root
+  // cause). The log is the console dock's Log tab now: expanded, the dock
+  // covers the canvas's lowest 220 px, where `scan-control` may sit, so a
+  // caller collapses the dock before picking a target.
   await page.getByTestId('scan-control').scrollIntoViewIfNeeded({ timeout: 10_000 })
   // REVISED 2026-09-03 (test-dispute adjudicated: the SDET's own bug, not a
   // spec misread). Polling on `.length > 0` could never distinguish "no
