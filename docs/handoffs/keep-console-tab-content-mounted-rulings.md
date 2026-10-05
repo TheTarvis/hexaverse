@@ -326,3 +326,36 @@ unedited since the verdict commit.
 **Alternatives rejected.** Building 4.1 first (task 1.8's Escape row could not
 be seen red for its own reason).
 **Reversal cost.** None — sequencing only.
+
+---
+
+## Rulings at the archive gate, 2026-10-05
+
+### FULL-AUTO RULING 20 — tier-4 run 1 (44 passed, 1 failed, 519 s) is red on a spec this change does not touch; the red matches no filed signature verbatim, so the residue rule is not applied and the one permitted rerun is taken after a one-item test-side revision round
+
+**Question.** Run 1: this change's journey is green (6 tests; every must-PASS
+leg PASSED; the settle leg reached and PASSED). The one red is
+`burn-geometry-refusals-journey.spec.ts:59` at `:88`, a just-docked fleet's
+departure order answered 409 about one second after a 200 preview, with no
+refusal line and the body not captured. Archive past it, stop, or rerun?
+
+**Ruling.** Not residue: the filed signature of
+`defect-post-dock-burn-cost-drift.md` is its captured 409 body, and no body was
+captured here; the occurrence is appended to that record as an unverified
+candidate. The gate rule's one batched revision round is taken with one item —
+the shared helper `burnToSelectionAndDock` now logs a refused order's status
+and body before its unchanged guard — and tier 4 is rerun once. A recurrence
+with a captured body matching the filed signature is residue; a red matching
+no filed signature on the rerun stops the run for Travis.
+
+**Basis.** Tier 2: `docs/testing-tiers.md` ("If it goes red, every finding
+from that run goes into one batched revision round …, then it runs once
+more"); the chain entry point's residue rule (signature verbatim, an empty
+relevant diff, none of this change's scenarios). Precedent: `add-console-dock`
+RULING 23 and its run-1 revision round, which added the same body logging to
+another spec. This change's production diff is two files and touches no quote,
+order or fleet code; no sightings read sits between that preview and that
+order (`keep-console-tab-content-mounted-journey.md`).
+**Alternatives rejected.** Archiving past an unmatched red (forbidden).
+Stopping without using the rerun the gate rule provides.
+**Reversal cost.** None.

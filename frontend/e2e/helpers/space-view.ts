@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, type Locator, type Page, type Response } from '@playwright/test'
 
 /**
  * Shared drivers for the continuous-space system view
@@ -453,11 +453,27 @@ export async function burnToSelectionAndDock(
 ): Promise<void> {
   const row = page.getByTestId(`fleet-row-${fleetId}`)
   await expect(page.getByTestId('preview-panel')).toBeVisible({ timeout: 60_000 })
+  // Log-only attribution of a refused order (never asserts, never awaited): a refused
+  // POST .../orders prints its status and body BEFORE the `under way` guard below runs.
+  const logRefusedOrder = (response: Response): void => {
+    const request = response.request()
+    if (request.method() !== 'POST' || !/\/orders(\?|$)/.test(response.url())) return
+    if (response.status() < 400) return
+    void response
+      .text()
+      .then((body) =>
+        console.log(`[journey-http] ${response.status()} POST ${response.url()} burnToSelectionAndDock body=${body}`),
+      )
+      .catch((err: unknown) =>
+        console.log(`[journey-http] ${response.status()} POST ${response.url()} burnToSelectionAndDock body unreadable: ${String(err)}`),
+      )
+  }
+  page.on('response', logRefusedOrder)
   await page.getByTestId('burn-button').click()
   await expect(row, 'the burn must actually be under way, not merely end docked').toContainText(
     /under way/i,
     { timeout: 30_000 },
-  )
+  ).finally(() => page.off('response', logRefusedOrder))
   await expect(row).toContainText(/docked/i, { timeout: flightTimeoutMs })
 }
 

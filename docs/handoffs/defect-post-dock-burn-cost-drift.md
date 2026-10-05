@@ -88,3 +88,28 @@ is NOT counted as a match and the residue rule does not apply on this
 evidence. Evidence: `add-console-dock-journey.md`, "Red 2". The spec now logs
 a refused commit's body as `[journey-http]` (revision round) so the next
 occurrence can be attributed.
+
+## Candidate occurrence, unverified - 2026-10-05 (`keep-console-tab-content-mounted` gate run 1)
+
+`frontend/e2e/tests/burn-geometry-refusals-journey.spec.ts:59` failed at its
+step 4 (`:88`, the departure burn out of the station's orbit), inside the
+shared helper `burnToSelectionAndDock` at `frontend/e2e/helpers/space-view.ts:457`
+("the burn must actually be under way, not merely end docked"; the roster row
+read `Docked 68.8 t fuel 29.6k range` for the whole 30 s). Sequence (fleet
+`fleet_d5319948-...`, `frontend/playwright/.auth/backend.log` 05:16:24-05:16:52):
+the arrival burn `POST .../orders` 200 at 05:16:24; a fresh `POST
+.../orders/preview` 200 at 05:16:31; the Burn click, `POST .../orders` **409**
+at 05:16:32 (10.7 ms) with NO `fleet: burn solve refusal served` line; `POST
+.../orders/preview` 200 at once (the specced re-quote). The fleet was docked,
+about 8 s after the arrival burn committed. Request, status, the quote-to-commit
+gap of about 1 s and the immediate re-quote fit this defect - the third such
+sequence in three gates, and the first at this spec - **but the 409 body was
+not captured** (the helper asserts on the roster row and logs nothing of the
+response), so this is NOT counted as a match. Evidence:
+`keep-console-tab-content-mounted-tier4-run1.log` (test 6, failure block from
+line 608). That change's production diff is two files
+(`components/space/ConsoleDock.tsx`, `components/space/SystemSpaceView.tsx`: an
+Escape listener, the log's mount site, one cache invalidation) and touches no
+quote, order, fleet-read or command-panel code. In its revision round the
+helper gains a log of a refused order's response body, so the next occurrence
+at any spec that uses it can be attributed.
