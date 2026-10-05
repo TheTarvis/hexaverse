@@ -17,8 +17,10 @@
 //   3. "Never colour alone" (RULING 20) is satisfied by the adjacent text,
 //      which is required to exist anyway.
 //
-// The one state this element DOES carry is `data-gauge-state` — a plain
-// `data-*` token, never `data-raw`, never announced to assistive technology
+// The states this element DOES carry are `data-gauge-state` and, only while
+// a burn-cost overlay is drawn, `data-gauge-cost-state` (affordable |
+// unaffordable, copied from the served flag) — plain `data-*` tokens, never
+// `data-raw`, never announced to assistive technology
 // — because a 0%-width fill and a "no data" fill are the identical rendered
 // pixel state, and round 3 of the adversary caught "differs in a
 // DOM-observable attribute" being satisfiable by exactly that forbidden
@@ -36,6 +38,11 @@ export interface GaugeSegment {
   tons: number
 }
 
+export interface GaugeCost {
+  tons: number
+  affordable: boolean
+}
+
 export interface GaugeProps {
   /** roster.cargoCapacity. undefined = roster not served. */
   capacity: number | undefined
@@ -43,6 +50,8 @@ export interface GaugeProps {
   segments: GaugeSegment[] | undefined
   'data-testid': string
   className?: string
+  /** A served burn quote's cost and affordability flag; omitted = no overlay. */
+  cost?: GaugeCost
 }
 
 // Zinc-family shades WITH dark variants, picked from `frontend/CLAUDE.md`'s
@@ -58,6 +67,10 @@ const SEGMENT_SHADES = [
 
 const RAIL_SHADE = 'bg-zinc-300 dark:bg-white/[0.12]'
 
+const COST_BAND_AFFORDABLE = 'absolute inset-y-0.5 bg-zinc-600 dark:bg-zinc-500'
+const COST_BAND_UNAFFORDABLE = 'absolute inset-y-0.5 bg-amber-800 dark:bg-amber-600'
+const COST_MARK = 'absolute inset-y-0 w-1 border border-zinc-900 bg-amber-500 dark:border-zinc-950 dark:bg-amber-400'
+
 function hasValidCapacity(capacity: number | undefined): capacity is number {
   return capacity !== undefined && Number.isFinite(capacity) && capacity > 0
 }
@@ -71,9 +84,17 @@ function gaugeState(
   return total > 0 ? 'filled' : 'empty'
 }
 
-export function Gauge({ capacity, segments, className, ...rest }: GaugeProps) {
+export function Gauge({ capacity, segments, className, cost, ...rest }: GaugeProps) {
   const testId = rest['data-testid']
   const state = gaugeState(capacity, segments)
+  const costDrawn =
+    state !== 'no-data' &&
+    hasValidCapacity(capacity) &&
+    cost !== undefined &&
+    Number.isFinite(cost.tons) &&
+    cost.tons >= 0
+  const costPct = costDrawn ? Math.min((cost.tons / capacity) * 100, 100) : 0
+  const costState = costDrawn ? (cost.affordable ? 'affordable' : 'unaffordable') : undefined
 
   let offsetPct = 0
 
@@ -82,6 +103,7 @@ export function Gauge({ capacity, segments, className, ...rest }: GaugeProps) {
       aria-hidden="true"
       data-testid={testId}
       data-gauge-state={state}
+      data-gauge-cost-state={costState}
       className={`relative overflow-hidden rounded-full ${RAIL_SHADE} ${className ?? ''}`}
     >
       {state === 'filled' &&
@@ -101,6 +123,20 @@ export function Gauge({ capacity, segments, className, ...rest }: GaugeProps) {
             />
           )
         })}
+      {costDrawn && (
+        <div
+          data-gauge-cost-extent=""
+          style={{ left: '0%', width: `${costPct}%` }}
+          className={costState === 'affordable' ? COST_BAND_AFFORDABLE : COST_BAND_UNAFFORDABLE}
+        />
+      )}
+      {costDrawn && costState === 'unaffordable' && (
+        <div
+          data-gauge-cost-mark=""
+          style={{ left: `${costPct}%`, transform: `translateX(-${costPct}%)` }}
+          className={COST_MARK}
+        />
+      )}
     </div>
   )
 }

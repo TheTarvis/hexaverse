@@ -1626,3 +1626,199 @@ describe('the committed selection (clear-burn-preview-on-commit section 3)', () 
     })
   })
 })
+
+// ===========================================================================
+// RED-PHASE SUITE — openspec change `add-burn-cost-overlay`, tasks 4.1-4.6.
+// The lifetime rows of the fuel gauge's cost overlay that need the REAL
+// own-fleets read answering after an accepted commit. The overlay is derived
+// from the view's one current-quote determination; the view supplies the strip
+// a cost and flag only.
+//
+// EVERY fleet answered into any read below is `withFuel(...)` — the order
+// response, the read that reports the burn, and the read after a cut. A bare
+// `burning(...)` turns the gauge `no-data` and would let an absence assertion
+// pass against a build that never withdraws; `expectNoOverlay` also asserts
+// the gauge is not `no-data`.
+// ===========================================================================
+
+const withFuel = (fleet: FleetFixture, fuelTons = 80): FleetFixture => ({
+  ...fleet,
+  roster: { ...fleet.roster, cargo: { fuel: fuelTons }, cargoCapacity: 200, freeHold: 200 - fuelTons, estimatedRange: 5000 },
+})
+const quoteOf = (fuelCostTons: number, affordable = true) => ({ ...QUOTE, fuelCostTons, affordable })
+
+const fuelGauge = () => screen.getByTestId('fuel-gauge')
+
+function overlay() {
+  const g = fuelGauge()
+  const band = g.querySelector<HTMLElement>('[data-gauge-cost-extent]')
+  const mark = g.querySelector<HTMLElement>('[data-gauge-cost-mark]')
+  return {
+    state: g.getAttribute('data-gauge-cost-state'),
+    widthPct: band ? Number.parseFloat(band.style.width) : null,
+    band,
+    mark,
+  }
+}
+
+function fillPct() {
+  return Array.from(fuelGauge().children)
+    .filter((el) => !el.hasAttribute('data-gauge-cost-extent') && (el as HTMLElement).style.width !== '')
+    .reduce((sum, el) => sum + Number.parseFloat((el as HTMLElement).style.width), 0)
+}
+
+function expectOverlay(pct: number, state: 'affordable' | 'unaffordable', why: string) {
+  const o = overlay()
+  expect(o.state, `${why}: overlay state`).toBe(state)
+  expect(o.band, `${why}: the extent is drawn`).not.toBeNull()
+  expect(o.widthPct, `${why}: extent length`).toBeCloseTo(pct, 5)
+  if (state === 'unaffordable') expect(o.mark, `${why}: the unaffordable mark`).not.toBeNull()
+  else expect(o.mark, `${why}: no mark on an affordable quote`).toBeNull()
+}
+
+function expectNoOverlay(why: string) {
+  const o = overlay()
+  expect(o.band, `${why}: no extent`).toBeNull()
+  expect(o.mark, `${why}: no mark`).toBeNull()
+  expect(o.state, `${why}: no overlay state attribute`).toBeNull()
+  expect(fuelGauge().getAttribute('data-gauge-state'), `${why}: gauge still has data`).not.toBe('no-data')
+}
+
+describe('burn cost overlay (add-burn-cost-overlay section 4)', () => {
+  const BURN = () => withFuel(burning('fleet_a', 1000, 61000))
+
+  describe('4.1 harness smoke', () => {
+    it('SDET-added: a current quote draws 15 % over the real own-fleets read (task 4.1)', async () => {
+      mocks.preview.mockResolvedValue(quoteOf(30))
+      mount()
+      await answerListMine(0, [withFuel(parked('fleet_a'))], W0)
+      await click(`mock-select-${OTHER}`)
+      expectOverlay(15, 'affordable', 'a current quote')
+      expect(fillPct()).toBeCloseTo(40, 5)
+    })
+  })
+
+  describe('4.2 the committed order', () => {
+    it('Scenario: A committed order withdraws the overlay from acceptance through the gap / A committed order\'s overlay stays withdrawn while the read reports that burn (task 4.2)', async () => {
+      mocks.preview.mockResolvedValue(quoteOf(30))
+      mount()
+      await answerListMine(0, [withFuel(parked('fleet_a'))], W0)
+      await click(`mock-select-${OTHER}`)
+      expectOverlay(15, 'affordable', 'GIVEN: an overlay before the Burn click')
+      await click('burn-button')
+      expect(pending.order.length, 'GIVEN: the order is pending').toBe(1)
+      const before = listMineCalls()
+      await answerOrder(0, orderResponse(BURN(), 'absent'))
+      expect(listMineCalls(), 'the acceptance requested a new read').toBe(before + 1)
+      expectNoOverlay('at the acceptance, read #1 unanswered')
+
+      await answerListMine(1, [BURN()], W0)
+      expectNoOverlay('read #1 reports the burn')
+
+      const reads = listMineCalls()
+      await poll()
+      expect(listMineCalls(), 'the poll requested a read').toBeGreaterThan(reads)
+      await answerListMine(lastListMine(), [BURN()], W0)
+      expectLog([...CONFIRMED_LOG, `listMine#${lastListMine()} answer`])
+      expectNoOverlay('a later read reports the same burn')
+    })
+  })
+
+  describe('4.3 the drive is cut', () => {
+    it('Scenario: A resumed preview draws no overlay until its restoring response lands — the committed-order row (task 4.3)', async () => {
+      mocks.preview.mockResolvedValue(quoteOf(60))
+      mount()
+      await answerListMine(0, [withFuel(parked('fleet_a'))], W0)
+      await click(`mock-select-${OTHER}`)
+      expectOverlay(30, 'affordable', 'GIVEN: an overlay at 60 t before the commit')
+      await click('burn-button')
+      await answerOrder(0, orderResponse(BURN(), 'absent'))
+      await answerListMine(1, [BURN()], W0)
+      expectNoOverlay('GIVEN: committed and confirmed')
+
+      holdPreview()
+      await click('fleet-cmd-cut-drive-fleet_a')
+      expect(pending.cutDrive.length, 'GIVEN: the cut was requested').toBe(1)
+      const before = listMineCalls()
+      await answerCutDrive(0, withFuel(drifting('fleet_a')))
+      expect(listMineCalls(), 'the cut caused a refreshed read').toBe(before + 1)
+      expectNoOverlay('the cut answered')
+
+      await answerListMine(lastListMine(), [withFuel(drifting('fleet_a'))], W0)
+      expect(pending.preview.length, 'GIVEN: the restoring preview is requested and pending').toBe(1)
+      expectNoOverlay('the restoring preview is pending')
+
+      await answerPreview(0, quoteOf(30))
+      expectLog([...CONFIRMED_LOG, 'cutDrive#0 answer', `listMine#${before} answer`, 'preview#0 answer'])
+      // Drawn from the restoring response alone: 15 %, never the old 30 %.
+      expectOverlay(15, 'affordable', 'the restoring response landed')
+    })
+  })
+
+  describe('4.4 another target while the committed one runs', () => {
+    it('Scenario: Another target is overlaid while the committed target is not (task 4.4)', async () => {
+      mocks.preview.mockImplementation(async (_id: string, req: { bodyId?: string }) =>
+        req.bodyId === HOST ? quoteOf(50) : quoteOf(30),
+      )
+      await commitUnwarnedAndConfirm({ fleets: [withFuel(parked('fleet_a'))], ordered: BURN() })
+      expectNoOverlay('GIVEN: X is committed and running')
+
+      await click(`mock-select-${HOST}`)
+      expect(selection()).toBe(HOST)
+      expectOverlay(25, 'affordable', 'Y selected')
+
+      await click(`mock-select-${OTHER}`)
+      expect(selection()).toBe(OTHER)
+      expectLog(CONFIRMED_LOG)
+      expectNoOverlay('X selected again while its order runs')
+    })
+  })
+
+  describe('4.5 switching the acting fleet', () => {
+    it('Scenario: Switching the acting fleet never shows the previous fleet\'s cost (task 4.5)', async () => {
+      const forB = deferred()
+      mocks.preview.mockImplementation(async (id: string) => (id === 'fleet_b' ? forB.promise : quoteOf(30)))
+      mount()
+      await answerListMine(0, [withFuel(parked('fleet_a'), 80), withFuel(parked('fleet_b'), 40)], W0)
+      await click(`mock-select-${OTHER}`)
+      expectOverlay(15, 'affordable', 'A acting')
+      expect(fillPct()).toBeCloseTo(40, 5)
+
+      await click('fleet-row-fleet_b')
+      expect(selection(), 'the selection is kept').toBe(OTHER)
+      expectNoOverlay('B acting, its first response pending')
+      expect(fillPct(), 'B\'s fill').toBeCloseTo(20, 5)
+
+      await act(async () => {
+        forB.resolve(quoteOf(50))
+      })
+      await flush(0)
+      expectLog(['listMine#0 answer'])
+      expectOverlay(25, 'affordable', 'B\'s response landed')
+      expect(fillPct(), 'B\'s fill').toBeCloseTo(20, 5)
+    })
+  })
+
+  describe('4.6 a burn this view did not commit', () => {
+    it.each(['opened on a burn', 'remounted'] as const)(
+      'Scenario: A burn the view did not commit is overlaid as a re-target (task 4.6) — %s',
+      async (arm) => {
+        mocks.preview.mockResolvedValue(quoteOf(30))
+        if (arm === 'opened on a burn') {
+          mount()
+          await answerListMine(0, [BURN()], W0)
+          await click(`mock-select-${HOST}`)
+        } else {
+          await commitUnwarnedAndConfirm({ fleets: [withFuel(parked('fleet_a'))], ordered: BURN() })
+          expectLog(CONFIRMED_LOG)
+          cleanup()
+          renderView()
+          await flush(0)
+          await click(`mock-select-${HOST}`)
+        }
+        expectOverlay(15, 'affordable', 're-target quote')
+        expect(has('vitals-fuel-draining'), 'the draining marker is alongside').toBe(true)
+      },
+    )
+  })
+})

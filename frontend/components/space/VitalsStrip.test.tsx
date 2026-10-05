@@ -671,3 +671,228 @@ describe('VitalsStrip — announces only its own balance changes (contract §7.5
     expect(liveRegions[0]).toHaveAttribute('data-testid', 'balance-live-region')
   })
 })
+
+// ===========================================================================
+// RED-PHASE SUITE — openspec change `add-burn-cost-overlay`, tasks 2.1-2.5.
+// The strip's optional `burnCost` ({ tons, affordable }) reaches the FUEL gauge
+// alone. `burnCost` is passed through an untyped spread so this file stays
+// `tsc`-clean before the prop exists. A test here hand-sets `burnCost`: it
+// observes an arrangement, never the view's derivation (that is sections 3-4
+// of tasks.md), and counts as no cover for a lifetime scenario.
+// ===========================================================================
+
+import { cleanup } from '@testing-library/react'
+import type { ReactElement } from 'react'
+
+function stripElement(over: Record<string, unknown> = {}): ReactElement {
+  return (
+    <VitalsStrip
+      acting={fleet()}
+      ownedFleets={[fleet()]}
+      fleetsFailed={false}
+      status={onstationStatus}
+      onSelectFleet={vi.fn()}
+      systemNames={systemNames}
+      credits={1250}
+      scale={1}
+      worldTime={T0}
+      serverWorldTime={T0}
+      {...over}
+    />
+  )
+}
+
+// 200 t capacity with `fuelTons` of fuel aboard.
+function fuelActing(fuelTons: number): Fleet {
+  return fleet({
+    roster: roster({ cargo: { fuel: fuelTons }, cargoCapacity: 200, freeHold: 200 - fuelTons }),
+  })
+}
+
+const burnCostOf = (tons: number, affordable: boolean) => ({ burnCost: { tons, affordable } })
+
+function fuelGauge(): HTMLElement {
+  return screen.getByTestId('fuel-gauge')
+}
+
+function costBand(root: HTMLElement): HTMLElement | null {
+  return root.querySelector<HTMLElement>('[data-gauge-cost-extent]')
+}
+
+function costMark(root: HTMLElement): HTMLElement | null {
+  return root.querySelector<HTMLElement>('[data-gauge-cost-mark]')
+}
+
+function needEl(el: HTMLElement | null, what: string): HTMLElement {
+  expect(el, `${what} must be drawn`).not.toBeNull()
+  return el as HTMLElement
+}
+
+function fillWidths(root: HTMLElement): number[] {
+  return Array.from(root.querySelectorAll<HTMLElement>('[style]'))
+    .filter((el) => el !== root && el.style.width !== '' && !el.hasAttribute('data-gauge-cost-extent'))
+    .map((el) => Number.parseFloat(el.style.width))
+}
+
+function pctOf(el: HTMLElement): number {
+  return Number.parseFloat(el.style.width)
+}
+
+function toks(el: Element): string[] {
+  return (el.getAttribute('class') ?? '').split(/\s+/).filter(Boolean)
+}
+
+describe('VitalsStrip cost overlay — extent on the fuel gauge (task 2.1)', () => {
+  it.each([
+    { fuel: 40, cost: 60, affordable: true, bandPct: 30, fillPct: 20, state: 'affordable', markDrawn: false },
+    { fuel: 80, cost: 20, affordable: false, bandPct: 10, fillPct: 40, state: 'unaffordable', markDrawn: true },
+  ])(
+    'Scenario: The flag wins when the extent runs past or lies inside the fill (task 2.1) — fuel $fuel t, cost $cost t, flag $affordable',
+    ({ fuel, cost, affordable, bandPct, fillPct, state, markDrawn }) => {
+      const { rerender } = render(stripElement({ acting: fuelActing(fuel), ...burnCostOf(cost, affordable) }))
+      const gauge = fuelGauge()
+      expect(gauge).toHaveAttribute('data-gauge-cost-state', state)
+      expect(pctOf(needEl(costBand(gauge), 'the extent'))).toBeCloseTo(bandPct, 5)
+      expect(fillWidths(gauge)).toHaveLength(1)
+      expect(fillWidths(gauge)[0]).toBeCloseTo(fillPct, 5)
+      if (markDrawn) needEl(costMark(gauge), 'the mark')
+      else expect(costMark(gauge)).toBeNull()
+      const withQuote = fillWidths(gauge)
+
+      rerender(stripElement({ acting: fuelActing(fuel) }))
+      expect(fillWidths(fuelGauge())).toEqual(withQuote)
+    },
+  )
+})
+
+describe('VitalsStrip cost overlay — the unaffordable mark (task 2.2)', () => {
+  function expectMarkBesideBand(gauge: HTMLElement): { b: HTMLElement; m: HTMLElement } {
+    const b = needEl(costBand(gauge), 'the extent')
+    const m = needEl(costMark(gauge), 'the mark')
+    expect(b.contains(m)).toBe(false)
+    expect(m.parentElement).toBe(gauge)
+    return { b, m }
+  }
+
+  it('Scenario: An unaffordable extent too short to see still shows its warning (task 2.2 a)', () => {
+    const { rerender } = render(stripElement({ acting: fuelActing(1), ...burnCostOf(0.4, false) }))
+    let gauge = fuelGauge()
+    expect(gauge).toHaveAttribute('data-gauge-cost-state', 'unaffordable')
+    const first = expectMarkBesideBand(gauge)
+    expect(pctOf(first.b)).toBeCloseTo(0.2, 5)
+    const classAtSmall = first.m.className
+
+    rerender(stripElement({ acting: fuelActing(1), ...burnCostOf(30, false) }))
+    gauge = fuelGauge()
+    const second = expectMarkBesideBand(gauge)
+    expect(second.m.className).toBe(classAtSmall)
+  })
+
+  it('Scenario: The unaffordable mark has a visible size and its own paint — the size half (task 2.2 b)', () => {
+    const { rerender } = render(stripElement({ acting: fuelActing(80), ...burnCostOf(0.4, false) }))
+    for (const cost of [0.4, 30]) {
+      rerender(stripElement({ acting: fuelActing(80), ...burnCostOf(cost, false) }))
+      const { m } = expectMarkBesideBand(fuelGauge())
+      expect(toks(m)).toEqual(expect.arrayContaining(['w-1', 'inset-y-0']))
+      expect(m.style.width).toBe('')
+      expect(m.style.height).toBe('')
+    }
+    for (const cost of [0.4, 30]) {
+      rerender(stripElement({ acting: fuelActing(80), ...burnCostOf(cost, true) }))
+      const gauge = fuelGauge()
+      // Positive control: the affordable overlay itself is drawn.
+      expect(gauge).toHaveAttribute('data-gauge-cost-state', 'affordable')
+      needEl(costBand(gauge), 'the affordable extent')
+      expect(costMark(gauge)).toBeNull()
+    }
+  })
+
+  it.each([
+    { cost: 0, pct: 0 },
+    { cost: 100, pct: 50 },
+    { cost: 250, pct: 100 },
+  ])(
+    'Scenario: The unaffordable mark sits at the extent\'s end along the rail (task 2.2 c) — cost $cost t',
+    ({ cost, pct }) => {
+      render(stripElement({ acting: fuelActing(80), ...burnCostOf(cost, false) }))
+      const { b, m } = expectMarkBesideBand(fuelGauge())
+      const left = Number.parseFloat(m.style.left)
+      expect(left).toBeCloseTo(pct, 5)
+      expect(left).toBeCloseTo(pctOf(b), 5)
+      // The pull-back is the same percentage of the mark's own width, negated.
+      const raw = m.style.transform || /transform:\s*([^;]+)/.exec(m.getAttribute('style') ?? '')?.[1] || ''
+      const match = /translateX\(\s*(-?[\d.]+)%\s*\)/.exec(raw)
+      expect(match, `translateX(...) in ${raw}`).not.toBeNull()
+      expect(Number.parseFloat(match![1])).toBeCloseTo(-left, 5)
+    },
+  )
+})
+
+describe('VitalsStrip cost overlay — hold gauge and omission (task 2.3)', () => {
+  it('Scenario: The hold gauge never draws a cost extent (task 2.3)', () => {
+    render(stripElement({ ...burnCostOf(30, true) }))
+    // Positive control: the quote reaches the fuel gauge.
+    expect(fuelGauge()).toHaveAttribute('data-gauge-cost-state', 'affordable')
+    needEl(costBand(fuelGauge()), 'the extent on the fuel gauge')
+    const holdWith = screen.getByTestId('vitals-hold-cell').outerHTML
+    expect(screen.getByTestId('hold-gauge')).not.toHaveAttribute('data-gauge-cost-state')
+    expect(costBand(screen.getByTestId('hold-gauge'))).toBeNull()
+    cleanup()
+
+    render(stripElement())
+    expect(screen.getByTestId('vitals-hold-cell').outerHTML).toBe(holdWith)
+    expect(costBand(fuelGauge())).toBeNull()
+    expect(fuelGauge()).not.toHaveAttribute('data-gauge-cost-state')
+    expect(costBand(screen.getByTestId('hold-gauge'))).toBeNull()
+    expect(screen.getByTestId('hold-gauge')).not.toHaveAttribute('data-gauge-cost-state')
+  })
+})
+
+describe('VitalsStrip cost overlay — draining marker (task 2.4)', () => {
+  it('Scenario: The extent is drawn alongside the draining marker (task 2.4)', () => {
+    render(stripElement({ status: underwayStatus, ...burnCostOf(4, true) }))
+    expect(screen.getByTestId('vitals-fuel-draining')).toBeInTheDocument()
+    const gauge = fuelGauge()
+    expect(pctOf(needEl(costBand(gauge), 'the extent'))).toBeCloseTo(10, 5)
+  })
+})
+
+describe('VitalsStrip cost overlay — no figure, no control, no read (task 2.5)', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch' as never).mockImplementation(() => {
+      throw new Error('VitalsStrip must never issue a network request')
+    })
+  })
+  afterEach(() => fetchSpy.mockRestore())
+
+  function interactive(container: HTMLElement): HTMLElement[] {
+    return Array.from(
+      container.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, [role="menuitem"]'),
+    )
+  }
+
+  it('Scenario: The extent exposes no figure and no control (task 2.5)', () => {
+    const withQuote = render(stripElement({ acting: fuelActing(80), ...burnCostOf(30, false) }))
+    // Positive control: the overlay is drawn.
+    expect(fuelGauge()).toHaveAttribute('data-gauge-cost-state', 'unaffordable')
+    const chevron = screen.getByTestId('vitals-fleet-chevron')
+    for (const el of interactive(withQuote.container)) {
+      const ok = el === chevron || el.closest('[data-testid="vitals-fleet-menu"]') !== null
+      expect(ok, `unexpected interactive element: ${el.outerHTML}`).toBe(true)
+    }
+    const fuelTextWith = screen.getByTestId('vitals-fuel-cell').textContent
+    const live = withQuote.container.querySelectorAll('[aria-live], [role="status"]')
+    expect(live).toHaveLength(1)
+    const liveTextWith = live[0].textContent
+    cleanup()
+
+    const without = render(stripElement({ acting: fuelActing(80) }))
+    expect(screen.getByTestId('vitals-fuel-cell').textContent).toBe(fuelTextWith)
+    const liveWithout = without.container.querySelectorAll('[aria-live], [role="status"]')
+    expect(liveWithout).toHaveLength(1)
+    expect(liveWithout[0].textContent).toBe(liveTextWith)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})

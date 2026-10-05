@@ -24,7 +24,7 @@
 
 import { useRef } from 'react'
 import { Figure } from '@/components/figure/Figure'
-import { Gauge, type GaugeSegment } from './Gauge'
+import { Gauge, type GaugeCost, type GaugeSegment } from './Gauge'
 import { VitalsStripFleetCell } from './VitalsStripFleetCell'
 import type { RosterRowStatus } from '@/components/fleet/roster-status'
 import { formatByUnit, instantScaleLabel } from '@/lib/format'
@@ -53,6 +53,9 @@ export interface VitalsStripProps {
   /** The LAST SERVED world instant — what the clock cell holds at while no
    *  scale has been served. */
   serverWorldTime: number | undefined
+  /** The view's current burn quote's cost and served flag, for the fuel
+   *  gauge only. Omitted when there is no current quote. */
+  burnCost?: GaugeCost
 }
 
 const LABEL = 'font-mono text-[10px] font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400'
@@ -67,10 +70,12 @@ function FuelCell({
   roster,
   scale,
   draining,
+  burnCost,
 }: {
   roster: FleetRoster | undefined
   scale: number | undefined
   draining: boolean
+  burnCost?: GaugeCost
 }) {
   const fuelTons = roster?.cargo?.fuel
   const rangeVal = roster?.estimatedRange
@@ -80,7 +85,13 @@ function FuelCell({
 
   return (
     <div data-testid="vitals-fuel-cell" className="flex items-center gap-2">
-      <Gauge capacity={capacity} segments={segments} data-testid="fuel-gauge" className="h-1.5 w-10" />
+      <Gauge
+        capacity={capacity}
+        segments={segments}
+        data-testid="fuel-gauge"
+        className="h-1.5 w-10"
+        {...(burnCost ? { cost: burnCost } : {})}
+      />
       <Figure
         raw={fuelTons}
         unit="tons"
@@ -238,6 +249,7 @@ export function VitalsStrip({
   scale,
   worldTime,
   serverWorldTime,
+  burnCost,
 }: VitalsStripProps) {
   const roster = acting?.roster
   const stranded = acting?.roster?.stranded ?? false
@@ -261,7 +273,7 @@ export function VitalsStrip({
           worldTime={worldTime}
         />
       </div>
-      <FuelCell roster={roster} scale={scale} draining={draining} />
+      <FuelCell roster={roster} scale={scale} draining={draining} {...(burnCost ? { burnCost } : {})} />
       <HoldCell roster={roster} scale={scale} />
       <CreditsCell credits={credits} scale={scale} />
       <ClockCell scale={scale} worldTime={worldTime} serverWorldTime={serverWorldTime} />

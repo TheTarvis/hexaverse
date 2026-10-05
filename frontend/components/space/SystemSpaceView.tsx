@@ -1079,6 +1079,9 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           scale={servedScale}
           worldTime={worldTime}
           serverWorldTime={serverWorldTime}
+          {...(currentQuote
+            ? { burnCost: { tons: currentQuote.fuelCostTons, affordable: currentQuote.affordable } }
+            : {})}
         />
       </div>
     </div>

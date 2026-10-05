@@ -922,3 +922,372 @@ describe('SystemSpaceView — a resumed preview presents nothing from before the
     expectNoFigures()
   })
 })
+
+// ===========================================================================
+// RED-PHASE SUITE — openspec change `add-burn-cost-overlay`, tasks 3.1-3.10.
+// The view's lifetime rules for the fuel gauge's cost overlay, in this
+// harness (own-fleets MOCKED: no read answers after a commit, so no test here
+// commits a burn and then expects an overlay — those rows live in
+// `SystemSpaceView.stranding-notice.test.tsx`).
+//
+// The overlay is derived from the view's ONE current-quote determination
+// (`currentQuote`), supplied to the strip. Every test here selects through
+// `mock-select-<id>` and sets its own preview answer first (the `beforeEach`
+// default serves a 744 t quote against a 40 t capacity).
+// ===========================================================================
+
+const fuelRoster = (fuelTons = 80) => ({
+  ships: [{ class: 'hauler' }],
+  cargo: { fuel: fuelTons },
+  cargoCapacity: 200,
+  freeHold: 200 - fuelTons,
+  miningRate: 1,
+  estimatedRange: 5000,
+  fuelPricePerTon: 5,
+  stationKeepRateTonsPerSecond: 0.02,
+})
+const fuelFleet = (id: string, over: Record<string, unknown> = {}, fuelTons = 80) =>
+  fleet(id, { roster: fuelRoster(fuelTons), ...over })
+const quoteOf = (fuelCostTons: number, affordable = true) => ({ ...QUOTE, fuelCostTons, affordable })
+
+const fuelGauge = () => screen.getByTestId('fuel-gauge')
+
+function overlay() {
+  const g = fuelGauge()
+  const band = g.querySelector<HTMLElement>('[data-gauge-cost-extent]')
+  const mark = g.querySelector<HTMLElement>('[data-gauge-cost-mark]')
+  return {
+    state: g.getAttribute('data-gauge-cost-state'),
+    widthPct: band ? Number.parseFloat(band.style.width) : null,
+    band,
+    mark,
+  }
+}
+
+// The fill: inline widths of the gauge root's children that are not the band.
+function fillPct() {
+  return Array.from(fuelGauge().children)
+    .filter((el) => !el.hasAttribute('data-gauge-cost-extent') && (el as HTMLElement).style.width !== '')
+    .reduce((sum, el) => sum + Number.parseFloat((el as HTMLElement).style.width), 0)
+}
+
+function expectOverlay(pct: number, state: 'affordable' | 'unaffordable', why: string) {
+  const o = overlay()
+  expect(o.state, `${why}: overlay state`).toBe(state)
+  expect(o.band, `${why}: the extent is drawn`).not.toBeNull()
+  expect(o.widthPct, `${why}: extent length`).toBeCloseTo(pct, 5)
+  if (state === 'unaffordable') expect(o.mark, `${why}: the unaffordable mark`).not.toBeNull()
+  else expect(o.mark, `${why}: no mark on an affordable quote`).toBeNull()
+}
+
+function expectNoOverlay(why: string) {
+  const o = overlay()
+  expect(o.band, `${why}: no extent`).toBeNull()
+  expect(o.mark, `${why}: no mark`).toBeNull()
+  expect(o.state, `${why}: no overlay state attribute`).toBeNull()
+  // The overlay is withdrawn for the right reason, not because the gauge has no data.
+  expect(fuelGauge().getAttribute('data-gauge-state'), `${why}: gauge still has data`).not.toBe('no-data')
+}
+
+describe('SystemSpaceView — burn cost overlay: current quote, no selection, pending and failed (3.1-3.3)', () => {
+  // 3.1
+  it('Scenario: A supplied quote draws one extent on the gauge\'s own scale — a current quote draws 15 % (3.1)', async () => {
+    mocks.preview.mockResolvedValue(quoteOf(30))
+    mount([fuelFleet('fleet_1')])
+    await flush(0)
+    await click(`mock-select-${OTHER}`)
+    expectOverlay(15, 'affordable', 'a current quote')
+    expect(fillPct()).toBeCloseTo(40, 5)
+  })
+
+  // 3.2
+  it('Scenario: With no selection there is no overlay (3.2)', async () => {
+    mocks.preview.mockResolvedValue(quoteOf(30))
+    mount([fuelFleet('fleet_1')])
+    await flush(0)
+    expectNoOverlay('nothing selected')
+    expect(fillPct()).toBeCloseTo(40, 5)
+
+    // Positive control: selecting a target draws the overlay on this very view.
+    await click(`mock-select-${OTHER}`)
+    expectOverlay(15, 'affordable', 'control: a target is selected')
+  })
+
+  // 3.3
+  it.each(['pending', 'failed'] as const)(
+    'Scenario: A first preview still pending / A failed first preview draws no overlay (3.3) — %s',
+    async (arm) => {
+      const first = deferred<ReturnType<typeof quoteOf>>()
+      if (arm === 'pending') mocks.preview.mockImplementationOnce(() => first.promise)
+      else mocks.preview.mockRejectedValueOnce(new Error('first preview failed'))
+      mount([fuelFleet('fleet_1')])
+      await flush(0)
+      await click(`mock-select-${OTHER}`)
+
+      if (arm === 'pending') {
+        expectNoOverlay('the first preview is pending')
+        await act(async () => {
+          first.resolve(quoteOf(30))
+        })
+        await flush(0)
+      } else {
+        expect(has('preview-no-quote'), 'GIVEN: the first preview failed').toBe(true)
+        expectNoOverlay('the first preview failed')
+        mocks.preview.mockResolvedValue(quoteOf(30))
+        await click('preview-retry')
+        await flush(0)
+      }
+      expectOverlay(15, 'affordable', 'control: the response landed')
+    },
+  )
+})
+
+describe('SystemSpaceView — burn cost overlay: the refresh walk (3.4)', () => {
+  // 3.4
+  it('Scenario: A refresh in flight never blanks the overlay / A failed refresh withdraws the overlay and nothing else / A refresh sent after a failure draws no overlay while it is pending / A later successful refresh restores the overlay at the new cost and state / The overlay is never drawn without the fuel ceiling (3.4)', async () => {
+    const call2 = deferred<ReturnType<typeof quoteOf>>()
+    const call4 = deferred<ReturnType<typeof quoteOf>>()
+    mocks.preview
+      .mockResolvedValueOnce(quoteOf(30))
+      .mockImplementationOnce(() => call2.promise)
+      .mockRejectedValueOnce(new Error('refresh failed'))
+      .mockImplementationOnce(() => call4.promise)
+
+    mount([fuelFleet('fleet_1')])
+    await flush(0)
+    await click(`mock-select-${OTHER}`)
+    expectOverlay(15, 'affordable', 'call 1 answered')
+    expect(has('preview-fuel-ceiling'), 'GIVEN: the ceiling is present').toBe(true)
+    const rangeBefore = screen.getByTestId('vitals-fuel-range').getAttribute('data-raw')
+
+    // Watch the gauge root across the in-flight refresh and its answer.
+    const root = fuelGauge()
+    const records: MutationRecord[] = []
+    const observer = new MutationObserver((rs) => records.push(...rs))
+    observer.observe(root, { attributes: true, childList: true, subtree: true })
+
+    // Call 2 in flight: the overlay stays at 15 %, same state.
+    await flush(PREVIEW_REFRESH_MS)
+    expect(previewCalls().length, 'call 2 is sent').toBe(2)
+    expectOverlay(15, 'affordable', 'call 2 pending')
+    // Call 2 answers 36 t: the extent moves to 18 % in one change.
+    await act(async () => {
+      call2.resolve(quoteOf(36))
+    })
+    await flush(0)
+    expectOverlay(18, 'affordable', 'call 2 answered')
+    records.push(...observer.takeRecords())
+    observer.disconnect()
+    expect(fuelGauge(), 'the gauge root is the same element throughout').toBe(root)
+    const removedBand = records.some((r) =>
+      Array.from(r.removedNodes).some((n) => n instanceof HTMLElement && n.hasAttribute('data-gauge-cost-extent')),
+    )
+    expect(removedBand, 'the extent is never removed across a refresh').toBe(false)
+    const stateMutations = records.filter((r) => r.type === 'attributes' && r.attributeName === 'data-gauge-cost-state')
+    expect(stateMutations, 'the state attribute is never touched across a refresh').toHaveLength(0)
+
+    // Call 3 fails over the shown figures: overlay and ceiling withdrawn together.
+    await flush(PREVIEW_REFRESH_MS)
+    expect(has('preview-stale'), 'GIVEN: the refresh failed over shown figures').toBe(true)
+    expectNoOverlay('call 3 failed')
+    expect(has('preview-fuel-ceiling'), 'the ceiling is withdrawn with the overlay').toBe(false)
+    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '80')
+    expect(screen.getByTestId('vitals-fuel-range').getAttribute('data-raw')).toBe(rangeBefore)
+    expect(fillPct()).toBeCloseTo(40, 5)
+
+    // Call 4 sent and unanswered: still no overlay, still no ceiling.
+    await flush(PREVIEW_REFRESH_MS)
+    expect(previewCalls().length, 'call 4 is sent').toBe(4)
+    expectNoOverlay('call 4 pending')
+    expect(has('preview-fuel-ceiling'), 'no ceiling while the refresh after a failure is pending').toBe(false)
+
+    // Call 4 answers 45 t, flag false: restored at the new cost and state.
+    await act(async () => {
+      call4.resolve(quoteOf(45, false))
+    })
+    await flush(0)
+    expectOverlay(22.5, 'unaffordable', 'call 4 answered')
+    expect(has('preview-fuel-ceiling'), 'the ceiling returns with the overlay').toBe(true)
+    expect(fillPct()).toBeCloseTo(40, 5)
+  })
+})
+
+describe('SystemSpaceView — burn cost overlay: selection and acting fleet (3.5)', () => {
+  // 3.5
+  it('Scenario: Replacing the selection never shows the previous target\'s cost / The served flag is shown even when the cost exceeds the fuel aboard / Clearing the selection withdraws the overlay (3.5)', async () => {
+    const forY = deferred<ReturnType<typeof quoteOf>>()
+    mocks.preview.mockImplementation(async (_id: string, req: { bodyId?: string }) =>
+      req.bodyId === STATION ? forY.promise : quoteOf(30),
+    )
+    mount([fuelFleet('fleet_1')])
+    await flush(0)
+    await click(`mock-select-${OTHER}`)
+    expectOverlay(15, 'affordable', 'X answered')
+
+    await click(`mock-select-${STATION}`)
+    expect(selection()).toBe(STATION)
+    expectNoOverlay('Y selected, its response pending')
+
+    await act(async () => {
+      forY.resolve(quoteOf(100, true))
+    })
+    await flush(0)
+    // 100 t exceeds the 80 t aboard, yet the served flag (true) is shown.
+    expectOverlay(50, 'affordable', 'Y answered')
+    expect(fillPct()).toBeCloseTo(40, 5)
+
+    await click(`mock-select-${STATION}`) // re-picking the selection deselects it
+    expect(selection()).toBe('')
+    expectNoOverlay('selection cleared')
+  })
+})
+
+describe('SystemSpaceView — burn cost overlay: withheld previews (3.6-3.7)', () => {
+  // 3.6
+  it.each(['mine', 'transit', 'docked'] as const)(
+    'Scenario: A withheld preview draws no overlay (3.6) — %s',
+    async (arm) => {
+      mocks.preview.mockResolvedValue(quoteOf(30))
+      if (arm === 'mine') {
+        mount([fuelFleet('fleet_1', { attachedTo: HOST })])
+        await flush(0)
+        await click(`mock-select-${OTHER}`)
+        expectOverlay(15, 'affordable', 'GIVEN: an overlay before the mine')
+        running.set('fleet_1', [mineAction('fleet_1', 600_000)])
+        await refreshRunning('fleet_1')
+        expect(has('mine-countdown'), 'the mine is reported').toBe(true)
+      } else if (arm === 'transit') {
+        mount([fuelFleet('fleet_1')])
+        await flush(0)
+        // Without the row click a fleet in transit drops out of `here` and the gauge reads no-data.
+        await click('fleet-row-fleet_1')
+        await click(`mock-select-${OTHER}`)
+        expectOverlay(15, 'affordable', 'GIVEN: an overlay before the jump')
+        setFleets([
+          fuelFleet('fleet_1', {
+            jump: { laneId: 'lane_-7_17_-6_16', destSystemId: 'sys_-6_16', departMs: T0, arriveMs: T0 + 600_000 },
+          }),
+        ])
+        await act(async () => {
+          rerenderView()
+        })
+        await flush(0)
+      } else {
+        mount([fuelFleet('fleet_1')])
+        await flush(0)
+        await click(`mock-select-${HOST}`)
+        expectOverlay(15, 'affordable', 'GIVEN: an overlay before docking')
+        setFleets([fuelFleet('fleet_1', { attachedTo: HOST })])
+        await act(async () => {
+          rerenderView()
+        })
+        await flush(0)
+      }
+      expectNoOverlay(`withheld: ${arm}`)
+    },
+  )
+
+  // 3.7
+  it('Scenario: A resumed preview draws no overlay until its restoring response lands — the mine row (3.7)', async () => {
+    mocks.preview.mockResolvedValue(quoteOf(60))
+    mount([fuelFleet('fleet_1', { attachedTo: HOST })])
+    await flush(0)
+    await click(`mock-select-${OTHER}`)
+    expectOverlay(30, 'affordable', 'GIVEN: an overlay at 60 t')
+
+    running.set('fleet_1', [mineAction('fleet_1', 600_000)])
+    await refreshRunning('fleet_1')
+    expect(has('mine-countdown'), 'the mine is reported').toBe(true)
+
+    const restoring = deferred<ReturnType<typeof quoteOf>>()
+    mocks.preview.mockImplementationOnce(() => restoring.promise)
+    mocks.cancel.mockImplementation(async () => {
+      running.set('fleet_1', [])
+      return { ...mineAction('fleet_1', 600_000), status: 'cancelled' }
+    })
+    await click('mine-cancel')
+    await flush(0)
+    expectNoOverlay('the restoring call is pending')
+
+    await act(async () => {
+      restoring.resolve(quoteOf(30))
+    })
+    await flush(0)
+    // Drawn from the restoring response alone: 15 %, never the old 30 %.
+    expectOverlay(15, 'affordable', 'the restoring response landed')
+  })
+})
+
+describe('SystemSpaceView — burn cost overlay: affordability as text, silence, lag (3.8-3.10)', () => {
+  // 3.8
+  it.each([true, false])(
+    'Scenario: A drawn extent is always accompanied by the quote\'s affordability as text (3.8) — flag %s',
+    async (affordable) => {
+      mocks.preview.mockResolvedValue(quoteOf(30, affordable))
+      mount([fuelFleet('fleet_1')])
+      await flush(0)
+      await click(`mock-select-${OTHER}`)
+      expectOverlay(15, affordable ? 'affordable' : 'unaffordable', 'the overlay is drawn')
+      const text = screen.getByTestId('preview-affordable')
+      expect((text.textContent ?? '').trim()).not.toBe('')
+      const state = overlay().state
+      expect(text.getAttribute('data-affordable') === 'true').toBe(state === 'affordable')
+      expect(/not affordable/i.test(text.textContent ?? '')).toBe(state === 'unaffordable')
+    },
+  )
+
+  // 3.9
+  it('Scenario: The overlay is silent and costs no request (3.9)', async () => {
+    mocks.preview.mockResolvedValueOnce(quoteOf(30)).mockResolvedValue(quoteOf(36))
+    mount([fuelFleet('fleet_1')])
+    await flush(0)
+    const announcer = () => screen.getByTestId('space-announcer').textContent
+    const balance = () => screen.getByTestId('balance-live-region').textContent
+    const announcerBaseline = announcer()
+    const balanceBaseline = balance()
+
+    await click(`mock-select-${OTHER}`)
+    expectOverlay(15, 'affordable', 'appeared')
+    expect(announcer()).toBe(announcerBaseline)
+    expect(balance()).toBe(balanceBaseline)
+    expect(previewCalls().length, 'the selection sent one request').toBe(1)
+
+    await flush(PREVIEW_REFRESH_MS)
+    expectOverlay(18, 'affordable', 'changed')
+    expect(announcer()).toBe(announcerBaseline)
+    expect(balance()).toBe(balanceBaseline)
+    expect(previewCalls().length, 'one interval sent one request').toBe(2)
+
+    await click(`mock-select-${OTHER}`) // deselect
+    expectNoOverlay('withdrawn')
+    expect(announcer()).toBe(announcerBaseline)
+    expect(balance()).toBe(balanceBaseline)
+    await flush(0)
+    expect(previewCalls().length, 'drawing and withdrawing the overlay added no request').toBe(2)
+  })
+
+  // 3.10
+  it('Scenario: The fill can move before the overlay does (3.10)', async () => {
+    mocks.preview.mockResolvedValue(quoteOf(30, false))
+    mount([fuelFleet('fleet_1', {}, 20)])
+    await flush(0)
+    await click(`mock-select-${OTHER}`)
+    expectOverlay(15, 'unaffordable', '20 t aboard, 30 t quote')
+    expect(fillPct()).toBeCloseTo(10, 5)
+    const calls = previewCalls().length
+
+    setFleets([fuelFleet('fleet_1')])
+    await act(async () => {
+      rerenderView()
+    })
+    await flush(0)
+    expect(fillPct(), 'the fill moved with the own-fleets read').toBeCloseTo(40, 5)
+    expectOverlay(15, 'unaffordable', 'the overlay has not moved yet')
+    expect(previewCalls().length, 'the own-fleets read sent no preview request').toBe(calls)
+
+    mocks.preview.mockResolvedValue(quoteOf(30, true))
+    await flush(PREVIEW_REFRESH_MS)
+    expect(previewCalls().length, 'exactly one request within one refresh interval').toBe(calls + 1)
+    expectOverlay(15, 'affordable', 'the next response landed')
+  })
+})

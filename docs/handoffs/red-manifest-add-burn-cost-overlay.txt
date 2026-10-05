@@ -1,0 +1,7 @@
+# red-suite handoff manifest for add-burn-cost-overlay
+# recorded 2026-10-05T01:50:27Z
+# verify with: bash harness/openspec-red-manifest.sh verify add-burn-cost-overlay
+0f157209f1b3ee4d187d42c36cec24b8fc887999a9674430311c0b320b4783cb  frontend/components/space/Gauge.test.tsx
+fc2e58cf467f4016029160406c3f102951274a53b4bb06aa24a9a32ee26af31a  frontend/components/space/SystemSpaceView.burn-preview.test.tsx
+c657f035f982ea5b4163f498c9c6ecc7840a0998a4f88ed2e1dda61eddde588c  frontend/components/space/SystemSpaceView.stranding-notice.test.tsx
+23157726923ad19679e01a461cbc21a2b3c154f43f1b9dc27a060ced13ef494b  frontend/components/space/VitalsStrip.test.tsx
