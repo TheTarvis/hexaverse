@@ -11,7 +11,7 @@ the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 `clear-burn-preview-on-commit` at `51944af`, its gate passed over three
 unrelated tier-4 reds by Travis's ruling —
 `../../handoffs/clear-burn-preview-on-commit-rulings-index.md` USER RULING 20);
-2b (`add-console-dock`) is next, `not authored`.** The out-of-chain
+2b was split in-run into six pieces (see *Link 2b*); 2b-i (`add-console-dock`, the dock shell and the Log tab) is `authored r3 b52d412` and being built; 2b-i-b through 2b-v are `not authored`.** The out-of-chain
 corrective change `fix-burn-order-geometry-refusals` archived at `d52eab1`
 between the two. 2a-iii was split in-run:
 the order record and the stranding notice went first, the commit-clear follows. The link handed to
@@ -59,7 +59,12 @@ symlink to it.
 | 2a-iii | `surface-commit-stranding-warning` | The commit's stranding warning shown on the system space view for the order's life; the view's per-fleet record of the last order it committed **whose response carried the warning** (no record is kept for an ordinary commit), with an end tied to the order's own life as the own-fleets read reports it | ADDED `system-space-view` (1); `fleet-roster` drift closed for the burn command (no delta) | ✅ archived `3218d9d` (2026-10-04); authored r2 `af747be`, built `808420d`, gate `6494f35` |
 | 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` (3: "Burn Preview Reflects…", "A Failed or Stale Preview…", "Burn and Jump Commit Controls Guard Against Double-Submit") | ✅ archived `51944af` (2026-10-05); authored r2 `29f0a6b`, built `62c8f15`, gate `c3fcfcf` + USER RULING 20 |
 | 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) — *as authored: 2 ADDED `system-console`, no `system-space-view` delta (RULING 8)* | ✅ archived `647af3e` (2026-10-05); authored r3 `65f2aef`, built `261dc7e`, gate `1456cd6` |
-| 2b | `add-console-dock` | The dock beneath the strip with **Acting fleet**, **Scan**, **Log**, **Fleets** tabs; the right column, the floating log panel and its toggle retired | MODIFIED `system-console`, `system-space-view`, `docked-fleet-actions`, `fleet-roster`, `sighting-log` (mounted-in-the-console deltas) | ⬜ not authored |
+| 2b-i | `add-console-dock` | The dock's shell beneath the strip — "Console" expand control, tab bar with a collapse control, collapsed on every mount, fixed 220px, the bottom-band occupants following its height — and the **Log** tab as the sighting log's home (mounted when shown, as today); the floating log panel and its toggle retired | ADDED `system-console` (5); MODIFIED `system-console` (1: "The Vitals Strip Is Present on Every Render…") | 🟡 authored r3 `b52d412` |
+| 2b-i-b | `keep-console-tab-content-mounted` | A tab's content stays mounted and hidden; no read on show; the log re-read after a sweep settles; the mount latch; `Esc` collapses the dock; the dock is not a canvas pick | ADDED `system-console` (4, drafted) | ⬜ not authored |
+| 2b-ii | `move-scan-control-to-console-dock` | The **Scan** tab; tab switching and arrow keys become real | MODIFIED `system-console` (tab list), `system-space-view` (2 small blocks) | ⬜ not authored |
+| 2b-iii | `move-fleet-roster-to-console-dock` | The **Fleets · N** tab, `commandOwner="view"` | MODIFIED `system-console` (tab list); ADDED `system-console` | ⬜ not authored |
+| 2b-iv | `move-fleet-actions-to-console-dock` | The **Acting fleet** tab holding `FleetActionsPanel`; the jump control out of `SpaceCommandPanel` | MODIFIED `system-console` (tab list); ADDED `system-console` | ⬜ not authored |
+| 2b-v | `retire-right-command-column` | `SpaceCommandPanel`'s course half into the Acting-fleet tab as its interim home; the right column deleted; the 2a-iv flags (a) (b) | MODIFIED `system-console`; ADDED `system-console` | ⬜ not authored |
 | 3 | `add-in-system-list` | Top-left list of every known entity with its discovery subtitle; click = select + reframe; off-screen reach chips retired | MODIFIED `system-space-view` | ⬜ not authored |
 | 4 | `add-arc-figures-and-entity-tab` | Course label + Burn on the drawn curve, progress while burning; the **Selected entity** dock tab; `SpaceCommandPanel` retired last | MODIFIED `system-console`, `system-space-view`, `market-board-panel` (mounted as a station's tab) | ⬜ not authored |
 
@@ -975,6 +980,137 @@ survive a switch and the tests prove it.
 - **Source:** `../system-hud.md` "Surface 4" (all but the selected-entity
   tab), "What leaves"; `SystemSpaceView.tsx:779–890`.
 
+**Split in-run on 2026-10-05, twice.** The analyst sized this link at about 150
+tasks (`../../handoffs/add-console-dock-analysis.md` § 1.4) and it became five
+pieces (`../../handoffs/add-console-dock-rulings-index.md` FULL-AUTO RULING 1);
+the architect then counted the first piece honestly at 52-56 and it split again
+at *placement against lifetime* (RULING 15). Everything above this paragraph is
+the link **as first drafted**; the six sections below are what is being built.
+Each later piece is `not authored` (the RULING 9 precedent: a verdict authored
+now would expire when its predecessor archives). The right column shrinks over
+six changes instead of being deleted in one — a coexistence period the ground
+rules forbid in spirit and the cap makes unavoidable; no piece keeps what it
+replaced.
+
+**Do not author "a 'mounted in the console' clause on each requirement".** No
+`docked-fleet-actions` or `sighting-log` requirement names a placement that
+changes; placement is stated in ADDED `system-console` requirements that name
+the owner and restate nothing (RULING 12, after 2a-iv's RULING 8). The tab list
+lives in its own small requirement, *The Dock Carries These Tabs*, so each
+piece MODIFIES three scenarios, not thirty.
+
+**Never React `<Activity>`, never `experimental.routerBFCache`** as a hiding
+mechanism: under a hidden Activity React Query's mutate-level callbacks never
+run and an invalidation issues no read until re-show — confirmed by execution
+against the installed React 19.2.3 and React Query 5.90.11
+(`../../handoffs/add-console-dock-panel-architect.md` Job 2(a)). The `hidden`
+attribute is the mechanism.
+
+### Link 2b-i — `add-console-dock`
+
+Authored r3 at `b52d412`. Records: `../../handoffs/add-console-dock-*`.
+
+### Link 2b-i-b — `keep-console-tab-content-mounted`
+
+**Delivers.** *A Tab's Content Stays Mounted While It Is Not Shown*; *Showing
+or Hiding the Log Tab Issues No Read*; *Escape Collapses the Expanded Dock*
+(the chain's "`Esc` collapses the dock" — until this link the collapse control
+is the only way out); *Activating the Dock Changes No Space-View Selection*;
+the settle re-read that closes
+`../../handoffs/drift-sighting-log-not-reread-after-sweep-settles.md`; the
+mount latch with its warm-cache arm.
+
+- **Read first:** `../../handoffs/keep-console-tab-content-mounted-draft-delta.md`
+  — the four requirements as drafted, plus every finding deferred here (A3, A5,
+  A7's latch half, A8 item 3, A9's timing half, A10, U1, U2's Escape scenario,
+  U4's row-into-view, adversary r1 M1's focus clause). It is an **unreviewed
+  draft with no verdict**; it gets a full Phase 1. Then `add-console-dock`'s
+  archived design.md, whose D-1, D-2, D-7, D-8, D-11, D-16 and D-20 were
+  written for this link.
+- **Inherits rulings** 2 (mounted and hidden), 6 (Escape), 8 (no read on show),
+  9 (the settle re-read, no delta), 18's third clause (focus elsewhere is not
+  moved by a collapse) from `add-console-dock-rulings-index.md`.
+- **The mount timing changes here, not in 2b-i:** the log reads at view open.
+  `scan-lane-transit-fizzle.spec.ts`'s zero-row count becomes vacuous without a
+  refresh; `scan-journey` step 5 must read with no re-open; the 58 tests of
+  `SystemSpaceView.test.tsx` and `…render-loop.test.tsx` gain a second real
+  sightings read (architect A9).
+- **To file when it authors:** the settle watcher's disarm race; the ghost
+  layer's warm-cache mount gate; the join-in-flight first read (A10).
+  `../../handoffs/drift-fleet-menu-ignores-escape-when-unfocused.md` is filed
+  and bounds what its Escape clause may promise (A5).
+- **Journey:** expand, load more, collapse by Esc, re-expand to the same pages
+  and highlight with no request; commit a sweep, let it settle, and find the
+  new record in the Log tab with no refresh.
+
+### Link 2b-ii — `move-scan-control-to-console-dock`
+
+**Delivers.** The Scan tab (`ScanControl`, whole); two tabs make tab switching,
+arrow-key movement and "state survives a switch" real; a failure that lands
+while the tab is hidden is still announced (the scan live region leaves the
+hidden subtree).
+
+- **Must rule** which tab an expand shows (Q3) — "Console" may then open on
+  Scan, which bears on `sighting-log` *The log is opened from the space view*.
+- **MODIFIES** *The Dock Carries These Tabs*; `system-space-view` *A Settled
+  Sweep and the Scan Controls Are Reachable and Announced* ("tabs through the
+  fleet panel") and *The Scan Surface Remains Usable While the Canvas Is
+  Unavailable*, both made false when the control moves.
+- **Must de-vacuum** `SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx`'s
+  `queryByRole` absence check, which passes with a cancel button present once
+  the control sits in a hidden tab. "Log tab activatable by Enter or Space"
+  returns here (adversary r1 m3).
+- **Journey:** the chain's own — commit a sweep, switch to Log while it runs,
+  switch back and cancel; the log's row count unchanged by the tab dance.
+
+### Link 2b-iii — `move-fleet-roster-to-console-dock`
+
+**Delivers.** The Fleets tab. **Must rule** the zero-fleet tab and the roster's
+own header and collapse toggle inside a tab (Q17), and *Renderer
+Unavailability*'s "mounted and interactive" under a collapsed dock (Q22).
+`FleetRoster` is shared with the galaxy view: *Collapsible Panel* must stay
+true there. Independent of 2b-ii in order.
+
+### Link 2b-iv — `move-fleet-actions-to-console-dock`
+
+**Delivers.** The Acting-fleet tab holding `FleetActionsPanel`; jump moved in
+from `SpaceCommandPanel` with its guard (seam if past the cap:
+`move-jump-command-to-fleet-panel`, no dock code). **Must deliver** the
+`panel-error-live-region` outside the hidden subtree (a live requirement) and
+proof that a mine, sell or refuel response landing while hidden still runs its
+mutate-level callback. **Must rule** where the station and board failure cards
+live (Q15). Inherits, and must not fix by accident, the `committedEta` defect
+in `../../handoffs/followup-explain-withheld-burn-command.md`.
+
+### Link 2b-v — `retire-right-command-column`
+
+**Delivers.** The course half in the Acting-fleet tab (interim, until link 4);
+the column, its lane class and its `space-command-column` testid deleted, with
+a MODIFIED block on *The Dock Has One Fixed Height…* removing the scrolling-
+column clause; the own-fleets failure card placed.
+
+- **HARD-STOP CANDIDATES — no recorded lean anywhere. Travis: record a lean
+  here before this link runs, or its orchestrator stops.** (Q13) What does a
+  player get for a selected target while the dock is collapsed and Burn sits in
+  a hidden tab — ship as written, open-on-select early, or leave the course
+  panel floating until link 4? (Q14) What carries the quote's affordability
+  while collapsed — flags (a)/(b) above: a text carrier outside the hidden tab,
+  or stop supplying the quote and MODIFY the 20-scenario overlay-lifetime
+  block? The analyst's most-reversible options are in
+  `add-console-dock-analysis.md` § 10.
+- **Inherits verbatim** the 2a-iii / 2a-iii-b warning: the committed record is
+  written from `SpaceCommandPanel`'s mutate-level `onSuccess`; the panel stays
+  mounted in a hidden tab, and a test must show a commit whose response lands
+  after a collapse still enters the committed state with both toasts and the
+  notice.
+- **The own-ness deny scenario is NOT this link's by default** (RULING 20): it
+  is owed by *the first change that supplies `VitalsStrip`, or any dock tab
+  rendering roster-derived figures, a fleet not drawn from the own-fleets
+  read* — link 4 expected. In every 2b piece the strip is still fed from the
+  own-fleets read, so the premise in "Inherited from 2a's security audit" above
+  is false here. The scenario text of record is
+  `../../handoffs/add-console-dock-panel-security.md` § S1.
+
 ## Link 3 — `add-in-system-list`
 
 **Why after the dock.** The list drives selection and, in link 4, selection
@@ -1008,6 +1144,12 @@ without selecting, exactly as clicking its mark does today.
   requirement (chips → list), "Body, Lane-Gate, and Point Selection Is
   Keyboard-Operable" (the list is a second keyboard path and must not
   double-announce), the ghost non-selection requirement (a pill case).
+- **Carried from 2b-i (`add-console-dock` adversary r1 M8, M9):** with the dock
+  expanded the raised `FloatingNav` covers the off-screen reach chips from about
+  the 15th chip (the 21st before), and marks in the canvas's lowest 220px are
+  neither pickable nor chipped. This link deletes the chips: the list must
+  reach every entity under an expanded dock, and its own column must clear the
+  nav.
 - **Journey:** a system with a body off-screen at the default framing; click
   its pill; the camera lands on it and the burn preview resolves against it;
   a ghost pill reframes and selects nothing.
@@ -1072,6 +1214,11 @@ Acting-fleet tab's course column both render the preview.
   select, Esc); `market-board-panel` "Row Selection Delegated to the
   Mounting View" (the tab is the mounting view).
 - **Must rule (see *Open decisions*):** where Burn lives.
+- **Owes the own-ness deny scenario** if its Selected-entity tab is the first
+  surface to hand the strip, or a tab rendering roster-derived figures, a fleet
+  not drawn from the own-fleets read (`add-console-dock` RULING 20; text in
+  `../../handoffs/add-console-dock-panel-security.md` § S1). MODIFIES *Escape
+  Collapses the Expanded Dock* (from 2b-i-b) for the second-press rule.
 - **Journey:** the M11 slice through the new chrome — dock at home, mine
   from the entity tab, sell from the station's tab, pick a premium from
   the board, select the far gate from the list, commit the burn from the

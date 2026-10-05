@@ -80,4 +80,7 @@ carried UNEDITED — an edit after the verdict would expire it
 | r3-m2 | Carried unedited; settled in the impl contract: the no-literal assertion in 2.12 reads RAW source text, so the developer also rewrites the stale comment at `floating-nav.tsx:11`. |
 | r3-m3 | Carried unedited; settled in the impl contract: the return leg is the one route (roster-row select, then `enter-system-button`). |
 
+**Verdict commit: `b52d412`** (the change folder and handoffs as cleared). The verdict is current while
+`git diff b52d412 -- openspec/specs/system-console openspec/changes/add-console-dock` is empty.
+
 STATUS: COMPLETE
