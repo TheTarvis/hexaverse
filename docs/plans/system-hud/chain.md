@@ -6,12 +6,13 @@ around the three surfaces Travis picked on 2026-09-08: the **in-system list**,
 vitals strip**. The scoping doc `../system-hud.md` is the model and carries
 the DECIDED / RECOMMENDED rulings; this document is the sequencing.
 
-**Status (2026-10-05): links 1, 2a, 2a-ii, 2a-iii, 2a-iii-b and 2a-iv archived
+**Status (2026-10-08): links 1, 2a, 2a-ii, 2a-iii, 2a-iii-b, 2a-iv, 2b-i and
+2b-i-b archived
 (2a-iv `add-burn-cost-overlay` at `647af3e`; 2a-iii-b
 `clear-burn-preview-on-commit` at `51944af`, its gate passed over three
 unrelated tier-4 reds by Travis's ruling —
 `../../handoffs/clear-burn-preview-on-commit-rulings-index.md` USER RULING 20);
-2b was split in-run into six pieces (see *Link 2b*); 2b-i (`add-console-dock`, the dock shell and the Log tab) archived at `c0b4aad`; 2b-i-b (`keep-console-tab-content-mounted`) is next, `not authored`, as are 2b-ii through 2b-v.** The out-of-chain
+2b was split in-run into six pieces (see *Link 2b*); 2b-i (`add-console-dock`, the dock shell and the Log tab) archived at `c0b4aad`; 2b-i-b (`keep-console-tab-content-mounted`) archived at `e10bb04`, its gate passed over one unrelated tier-4 red by USER RULING 22; 2b-ii is next, `not authored`, as are 2b-iii through 2b-v. From 2b-ii on the chain is driven by hand in-session (Travis + one agent), not by the full-auto team: the links are built conversationally and each is locked in by its journey spec once it is right.** The out-of-chain
 corrective change `fix-burn-order-geometry-refusals` archived at `d52eab1`
 between the two. 2a-iii was split in-run:
 the order record and the stranding notice went first, the commit-clear follows. The link handed to
@@ -60,7 +61,7 @@ symlink to it.
 | 2a-iii-b | `clear-burn-preview-on-commit` | The preview clears when a burn order commits from this view and stays cleared for that order's life; the burn command for a committed selection | ADDED `system-space-view` (1); MODIFIED `system-space-view` (3: "Burn Preview Reflects…", "A Failed or Stale Preview…", "Burn and Jump Commit Controls Guard Against Double-Submit") | ✅ archived `51944af` (2026-10-05); authored r2 `29f0a6b`, built `62c8f15`, gate `c3fcfcf` + USER RULING 20 |
 | 2a-iv | `add-burn-cost-overlay` | The fuel gauge's cost overlay on the lifted quote: one start-anchored cost extent, its state from the served `affordable` flag | ADDED `system-console` (the overlay's content and lifetime); MODIFIED `system-space-view` (stale-preview presentation; the fan-in's strip-driver list if ruled enumerated) — *as authored: 2 ADDED `system-console`, no `system-space-view` delta (RULING 8)* | ✅ archived `647af3e` (2026-10-05); authored r3 `65f2aef`, built `261dc7e`, gate `1456cd6` |
 | 2b-i | `add-console-dock` | The dock's shell beneath the strip — "Console" expand control, tab bar with a collapse control, collapsed on every mount, fixed 220px, the bottom-band occupants following its height — and the **Log** tab as the sighting log's home (mounted when shown, as today); the floating log panel and its toggle retired | ADDED `system-console` (5); MODIFIED `system-console` (1: "The Vitals Strip Is Present on Every Render…") | ✅ archived `c0b4aad` (2026-10-05); authored r3 `b52d412`, built `e5e9eff`, gate `15e6e33` |
-| 2b-i-b | `keep-console-tab-content-mounted` | A tab's content stays mounted and hidden; no read on show; the log re-read after a sweep settles; the mount latch; `Esc` collapses the dock; the dock is not a canvas pick | ADDED `system-console` (4); MODIFIED `system-console` (1: "The Log Tab Is the Sighting Log's Home on This View") | 🟡 authored r3 `805bfaa`; built `41ae157`; **gate stopped for a ruling** — journey green twice and tier 3 green, one tier-4 red in an untouched spec not ruled residue (`../../handoffs/keep-console-tab-content-mounted-rulings-index.md` RULING 21); not archived |
+| 2b-i-b | `keep-console-tab-content-mounted` | A tab's content stays mounted and hidden; no read on show; the log re-read after a sweep settles; the mount latch; `Esc` collapses the dock; the dock is not a canvas pick | ADDED `system-console` (4); MODIFIED `system-console` (1: "The Log Tab Is the Sighting Log's Home on This View") | ✅ archived `e10bb04` (2026-10-08); authored r3 `805bfaa`, built `41ae157`, gate `4bb488e` + USER RULING 22 |
 | 2b-ii | `move-scan-control-to-console-dock` | The **Scan** tab; tab switching and arrow keys become real | MODIFIED `system-console` (tab list), `system-space-view` (2 small blocks) | ⬜ not authored |
 | 2b-iii | `move-fleet-roster-to-console-dock` | The **Fleets · N** tab, `commandOwner="view"` | MODIFIED `system-console` (tab list); ADDED `system-console` | ⬜ not authored |
 | 2b-iv | `move-fleet-actions-to-console-dock` | The **Acting fleet** tab holding `FleetActionsPanel`; the jump control out of `SpaceCommandPanel` | MODIFIED `system-console` (tab list); ADDED `system-console` | ⬜ not authored |
@@ -1122,6 +1123,51 @@ mount latch with its warm-cache arm.
 - **Journey:** expand, load more, collapse by Esc, re-expand to the same pages
   and highlight with no request; commit a sweep, let it settle, and find the
   new record in the Log tab with no refresh.
+
+**Taught.** Authored and built in one full-auto run on 2026-10-05, archived
+(`e10bb04`) on 2026-10-08 after a user ruling. Four ADDED `system-console`
+requirements and one MODIFIED (not the "4 ADDED" the row first guessed at —
+the count held); 40 tasks, the cap exactly; three adversary rounds (r1: 2
+BLOCKER, 3 MAJOR, 4 MINOR; r2 residue only; r3 a diff spot-check). QA SHIP,
+security clear. Gate: tier 4 run 1 44/45 in 519 s, red on an untouched
+burn-geometry spec with no body captured; one test-side revision round (the
+shared burn helper now logs a refused order's body); rerun 44/45 in 508 s,
+this change's journey green on every leg including the settle leg, the one red
+the filed sell-price 409 in a different spec than its recorded signature. Tier 3
+1979 green in 959 s. The full-auto orchestrator stopped rather than widen
+"signature verbatim" (RULING 21); Travis passed it by sentinel and empty diff
+(USER RULING 22). Records: `../../handoffs/keep-console-tab-content-mounted-*`.
+
+- **The residue rule's "signature verbatim" is wrong in the same way twice
+  now.** 2a-iii taught "attribute by request, status and backend sentinel, and
+  by an empty diff — not by a test name"; the rule the run was given still keys
+  on spec and line, so a known random-spawn red fired from a new spec and cost a
+  user ruling. Both the stop (RULING 21) and the pass (USER RULING 22) were
+  correct under their own rules. If a later run is given a residue rule at all,
+  key it on the sentinel and the diff.
+- **The drift is closed and the mask is gone.** The log reads at view open now,
+  and the settle path re-reads the unfiltered pile on both exits
+  (`drift-sighting-log-not-reread-after-sweep-settles.md`, CLOSED). Seven
+  further read gaps in the sighting log were filed, not fixed
+  (`drift-sighting-log-read-gaps.md`); 2b-ii mounts the scan control next to
+  that log and should read them.
+- **Carried to 2b-ii:** the row-into-view scroll follow-up (shed here by
+  RULING 13; predecessor UX U4 / design D-20); and the dock yields Escape to any
+  handler that prevents its default — wider than the requirement's "the fleet
+  cell's open menu" (design.md D-5). A Catalyst listbox or dialog inside the
+  Scan tab will be the first such control.
+- **Carried to 2b-iii:** the roster's row selection changes the acting fleet
+  from inside the panel, so that link MODIFIES *Activating the Dock Changes No
+  Space-View Selection*.
+- **Carried to 2b-iv:** the "Escape from a text field or a select" row.
+- **Carried to link 4:** the dock's Escape handling does not prevent the
+  event's default (RULING 14: unrequested hardening is not built); link 4 adds
+  it with the listener that reads it, and generalises the Escape exception to
+  "a control of the view that takes the key for itself" (D-5).
+- **The fleet-menu Escape drift is narrower than filed**
+  (`drift-fleet-menu-ignores-escape-when-unfocused.md`): the menu focuses its
+  first entry on open, so the unfocused state is an empty menu by pointer in
+  Safari/Firefox, or focus that tabbed out. Still OPEN, adjudication open.
 
 ### Link 2b-ii — `move-scan-control-to-console-dock`
 
