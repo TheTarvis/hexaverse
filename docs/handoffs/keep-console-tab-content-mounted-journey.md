@@ -139,3 +139,7 @@ green in both runs and tier 3 is green. The rerun's one red,
 `space-double-submit.spec.ts:340`, carries the filed sell-price defect's
 refusal word for word but not its recorded spec and line, so the orchestrator
 did not rule it residue. Not archived.
+
+**PASSED by USER RULING 22, 2026-10-08.** Travis attributed the rerun's one red
+to the filed `defect-slice-sell-price-changed-409` by sentinel and empty diff;
+no third run. Archived 2026-10-08.

@@ -29,6 +29,7 @@ the later ruling wins.
 | 19 | 313-331 | the implementation contract's six settlements beyond design.md are accepted as written: build order 4.3, 4.1, the family run 3.2, then 4.2; tasks 1.10 and 1.11 carry a labelled precondition and are seen red for their stated reason only between 4.1 and 4.2; the listener's removal on unmount is QA's to mark INSPECTED | — |
 | 20 | 334-362 | tier-4 run 1 (44 passed, 1 failed, 519 s) is red on a spec this change does not touch; the red matches no filed signature verbatim, so the residue rule is not applied and the one permitted rerun is taken after a one-item test-side revision round | — |
 | 21 | 363-388 | the rerun's one tier-4 red, `space-double-submit.spec.ts:340` (a sell refused 409 "price changed since your quote"), is NOT ruled residue: its refusal matches the filed sell-price defect word for word but its spec and line are not that defect's recorded signature; the run stops for Travis after tier 3 and does not archive | — |
+| 22 | 391-410 | USER RULING: the rerun's one tier-4 red is the filed sell-price defect, attributed by sentinel and empty diff; the gate passes and the change archives 2026-10-08 | — |
 
 **Other sections** (not rulings; no id is minted for them):
 
@@ -38,3 +39,4 @@ the later ruling wins.
 - L288 — Ruling at adversary clearance, 2026-10-05
 - L311 — Ruling at implementation kickoff, 2026-10-05
 - L332 — Rulings at the archive gate, 2026-10-05
+- L389 — Ruling by Travis at the archive gate, 2026-10-08

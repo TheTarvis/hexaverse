@@ -385,3 +385,26 @@ other way, and by that test this red is the filed defect.
 **Alternatives rejected.** Ruling it residue on the sentinel (a second rerun is
 not allowed, and widening "verbatim" is not the orchestrator's call). 
 **Reversal cost.** One user ruling; then tasks 5.4, 5.8 and 5.9 and the archive.
+
+## Ruling by Travis at the archive gate, 2026-10-08
+
+### USER RULING 22 — the rerun's one tier-4 red (`space-double-submit.spec.ts:340`, a sell refused 409 "price changed since your quote") is the filed `defect-slice-sell-price-changed-409`, attributed by sentinel and empty diff, not by test name; the gate passes and the change archives
+
+**Question.** FULL-AUTO RULING 21 stopped the run on a red whose refusal
+matched the filed sell-price defect word for word but fired from a different
+spec than the defect's recorded signature. Archive, or hold?
+
+**Ruling.** Archive. The red is attributed the way the chain doc's 2a-iii
+lesson says to attribute it: by its request, status and backend sentinel and
+by this change's empty relevant diff (two production files, no quote, order,
+sell or fleet code). The spec and line are appended to that defect's signature
+list; the random-spawn fixture family is the cause, and it is not this link's.
+No third run. Tasks 5.4, 5.8 and 5.9 are completed at the archive; the
+`system-console` Purpose survived the archiver and is extended by one clause
+(a tab's content stays mounted while it is not shown).
+
+**Basis.** Travis, in session, 2026-10-08. Precedent: `clear-burn-preview-on-commit`
+USER RULING 20 (three unrelated tier-4 reds passed by the same reasoning).
+**Alternatives rejected.** A third tier-4 run (nothing in this change's diff
+could change the outcome). Holding the chain behind a filed backend defect.
+**Reversal cost.** None.

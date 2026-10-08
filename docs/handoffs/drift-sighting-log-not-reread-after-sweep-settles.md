@@ -22,7 +22,16 @@ opening it is a mount, hence a read. `scan-journey` step 5 does exactly that.
 removes the mask. No delta; a view-level test over a real
 sightings hook, on both settle exits.
 
-**Status.** OPEN. `add-console-dock` archived at `c0b4aad` WITHOUT fixing it:
-RULING 15 moved the fix to link 2b-i-b `keep-console-tab-content-mounted`, and
-`add-console-dock` mounts the log only while its tab is shown, so the drift is
-exactly as masked as it was before.
+**Status.** CLOSED 2026-10-08 by `keep-console-tab-content-mounted` (built
+`41ae157`, archived 2026-10-08). The settle path now re-reads the unfiltered
+pile on both exits through one callback (`SystemSpaceView.tsx`, task 4.2).
+Held by `frontend/components/space/SystemSpaceView.console-log-mounted.test.tsx`:
+task 1.10 "A pile read that answers while the dock is collapsed is shown on
+re-expand (the ETA-scheduled settle exit)" and task 1.11 the same scenario on
+the early-settle exit. Both were seen red for "the unfiltered pile was not read
+again" before the fix. The journey's settle leg reached and passed on the real
+stack (`keep-console-tab-content-mounted-journey.md`, gate rerun).
+
+History: `add-console-dock` archived at `c0b4aad` WITHOUT fixing it — RULING
+15 moved the fix to link 2b-i-b, and `add-console-dock` mounted the log only
+while its tab was shown, so the drift stayed exactly as masked as before.
