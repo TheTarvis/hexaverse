@@ -1,10 +1,9 @@
 // Galaxy camera rig — the RTS pan-orbit model, spec #0002 Decision #8.
 //
-// Unlike the spike (which poked react-force-graph-3d's *internal* OrbitControls
-// private `_quat` to retrofit a Z-up basis), this rig OWNS its own OrbitControls
-// and sets `camera.up = +Z` BEFORE constructing them — so OrbitControls bakes
-// the correct Z-up orbit basis in its constructor, no private-field surgery.
-// The force-graph's own controls are neutered so the two never fight.
+// Own OrbitControls and set camera.up = +Z before construction so the
+// galactic disk and all orbit/pan gestures share the same coordinate basis.
+// GalaxyGraph advances this rig from its single presentation loop; standalone
+// callers can retain the default internally scheduled updates.
 //
 // Model: the XY galactic disk is the ground; you hover above it looking down/in.
 //  - orbit          — left-drag / one-finger.
@@ -57,6 +56,7 @@ export class CameraRig {
     domElement: HTMLElement,
     wrapper: HTMLElement,
     internalControls: Neuterable | null,
+    autoUpdate = true,
   ) {
     this.camera = camera
     this.wrapper = wrapper
@@ -102,18 +102,25 @@ export class CameraRig {
     this.onWheelCapture = (e: WheelEvent) => this.handleWheel(e)
     wrapper.addEventListener('wheel', this.onWheelCapture, { capture: true, passive: false })
 
-    // Own rAF loop so damping settles (react-force-graph drives its internal
-    // controls, not ours).
+    // Standalone callers may let the rig drive damping; owned renderers pass
+    // autoUpdate=false and step it only when presentation is eligible.
     const tick = () => {
       if (this.disposed) return
       this.stepGlide()
       controls.update()
       this.raf = requestAnimationFrame(tick)
     }
-    this.raf = requestAnimationFrame(tick)
+    if (autoUpdate) this.raf = requestAnimationFrame(tick)
+  }
+
+  update() {
+    if (this.disposed) return
+    this.stepGlide()
+    this.controls.update()
   }
 
   private handleWheel(e: WheelEvent) {
+    if (!this.controls.enabled) return
     if (e.ctrlKey) return // pinch — leave it for OrbitControls to dolly
     const cam = this.camera
     const target = this.controls.target

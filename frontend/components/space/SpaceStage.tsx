@@ -108,6 +108,7 @@ export interface SpaceStageProps {
   scale: number | undefined
   selection: SpaceSelection | null
   onSelect?: (selection: SpaceSelection | null) => void
+  onPendingChange?: (pending: boolean) => void
   onAvailabilityChange?: (available: boolean) => void
   onFirstFrame?: () => void
   /**
@@ -171,6 +172,7 @@ export function SpaceStage({
   selection,
   onSelect,
   onAvailabilityChange,
+  onPendingChange,
   onFirstFrame,
   highlightedGhostId = null,
   onHighlightGhost,
@@ -182,7 +184,7 @@ export function SpaceStage({
   frameSource,
 }: SpaceStageProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
-  const [available, setAvailable] = useState(true)
+  const [available, setAvailable] = useState(false)
   const [camera, storeCamera] = useState<SpaceCamera>(() => defaultCamera(extent))
   const frameRef = useRef<SpaceFrame | null>(null)
   const setCamera = useCallback((next: SpaceCamera | ((prev: SpaceCamera) => SpaceCamera)) => {
@@ -251,7 +253,9 @@ export function SpaceStage({
 
   const loop = useSpaceTransformLoop({
     extent,
-    enabled: available,
+    // Publishing current scene state must precede the first GPU frame and
+    // continue during recovery; only canvas input is gated by readiness.
+    enabled: true,
     host,
     registry,
     cameraRef,
@@ -489,12 +493,14 @@ export function SpaceStage({
     >
       <SpaceCanvas
         onAvailabilityChange={handleAvailability}
+        onPendingChange={onPendingChange}
         claimFocus={focusInsideRef.current}
-        renderWorld={(canvas) => (
-          <SpaceWorld canvas={canvas} frameRef={frameRef} extent={extent} actingFleetId={actingFleetId} />
+        renderWorld={(canvas, bindings) => (
+          <SpaceWorld canvas={canvas} {...bindings} frameRef={frameRef} extent={extent} actingFleetId={actingFleetId} />
         )}
       >
-        <SpaceLayers
+        {ready => <SpaceLayers
+          available={ready}
           scene={scene}
           camera={camera}
           extent={extent}
@@ -527,7 +533,7 @@ export function SpaceStage({
             reframeOn(live?.mark.position ?? coarsePosition)
           }}
           onPointerUpCapture={(clientX, clientY, marks) => finishGesture(clientX, clientY, marks)}
-        />
+        />}
       </SpaceCanvas>
       {/* Pointer release and touch end are bound on the region itself so a
           gesture that leaves the element it started on still resolves. */}
@@ -581,6 +587,7 @@ function PointerRelease({
 }
 
 interface SpaceLayersProps {
+  available: boolean
   scene: SceneModel
   camera: SpaceCamera
   extent: number
@@ -614,6 +621,7 @@ interface SpaceLayersProps {
 }
 
 function SpaceLayers({
+  available,
   scene,
   camera,
   extent,
@@ -642,6 +650,7 @@ function SpaceLayers({
   // THE ONE READ of `scene.marks`, inside the canvas region's error
   // boundary: a throw while building the drawn state is contained here.
   const marks = scene.marks
+  if (!available) return null
 
   // Membership recomputes on the coarse tick (a new `scene` each second) and
   // on camera/viewport change (a fresh `viewBasis`) — task 4.6, design.md

@@ -1,10 +1,8 @@
 import { test, expect, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 import {
-  burnToSelectionAndDock,
   captureInteriors,
   selectBody,
-  selectFirstBodyMatching,
   stationFeatureId,
   wakeNewCorp,
   type ServedInterior,
@@ -64,7 +62,6 @@ const PAGE_SIZE = 50
 const OTHER_SYSTEM_RECORDS = 51
 const SEEDED_TOTAL = OTHER_SYSTEM_RECORDS + 1
 /** Leg 9: the contract's wall budgets (docs/handoffs/...-impl-contract.md 5.4/5.5). */
-const DOCK_BUDGET_MS = 15_000
 const SWEEP_BUDGET_MS = 25_000
 /** World scale of the e2e stack (`frontend/e2e/setup/backend-stack.ts`). */
 const WORLD_SCALE = 5
@@ -229,7 +226,7 @@ async function stableCount(read: () => number, label: string): Promise<number> {
   return last
 }
 const actingIds = async (): Promise<string> =>
-  (await page.getByTestId('fleet-roster').locator('[data-active="true"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? '?'))).join(',')
+  (await page.getByTestId('vitals-fleet-id').innerText()).trim()
 /** Two animation frames: whatever a state change was going to issue has been issued. Not a sleep. */
 async function flushFrames(): Promise<void> {
   await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
@@ -285,6 +282,8 @@ async function expandDock(): Promise<void> {
     await page.getByTestId('console-dock-open').click()
   }
   await expect(page.getByTestId('console-dock-collapse')).toBeVisible({ timeout: 10_000 })
+  // These legs inspect Log; initial expansion now selects Scan.
+  await page.getByTestId('console-tab-log').click()
 }
 async function collapseDock(): Promise<void> {
   if (await page.getByTestId('console-dock-collapse').isVisible()) {
@@ -444,6 +443,9 @@ test.describe('the console dock keeps the Log tab mounted - read at open, same n
       expect(n, 'exactly one unfiltered GET /v1/sightings was ANSWERED after the reload, with the dock never expanded').toBe(1)
 
       await page.getByTestId('console-dock-open').click()
+      await expect(page.getByTestId('console-tab-scan')).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByTestId('console-panel-log')).toBeHidden()
+      await page.getByTestId('console-tab-log').click()
       await expect(page.getByTestId('console-dock-collapse')).toBeVisible({ timeout: 10_000 })
       await flushFrames()
       const afterExpand = logPile('after the first expansion')
@@ -502,6 +504,7 @@ test.describe('the console dock keeps the Log tab mounted - read at open, same n
       expect(display, 'the stylesheet does not defeat the hidden attribute on the log region').toBe('none')
 
       await page.getByTestId('console-dock-open').click()
+      await page.getByTestId('console-tab-log').click()
       await expect(page.getByTestId('console-dock-collapse')).toBeVisible({ timeout: 10_000 })
       await flushFrames()
       scrollAfter = await panel.evaluate((el) => `scrollTop=${el.scrollTop} scrollHeight=${el.scrollHeight} clientHeight=${el.clientHeight}`)
@@ -590,6 +593,7 @@ test.describe('the console dock keeps the Log tab mounted - read at open, same n
       expect(selected, 'precondition: a body is selected before the presses').toBe(bodyId)
 
       await page.getByTestId('console-dock-open').click()
+      await page.getByTestId('console-tab-log').click()
       await expect(page.getByTestId('console-dock-collapse')).toBeVisible({ timeout: 10_000 })
       await unchanged('pressing the Console control')
 
@@ -687,6 +691,7 @@ test.describe('the console dock keeps the Log tab mounted - read at open, same n
         const forcedBefore = await stableCount(() => forced, 'forced failures before the expansion')
         await expect(page.getByTestId('console-dock-open'), 'the dock is collapsed').toBeVisible()
         await page.getByTestId('console-dock-open').click()
+        await page.getByTestId('console-tab-log').click()
         await expect(page.getByTestId('console-dock-collapse')).toBeVisible({ timeout: 10_000 })
         const panel = page.getByTestId('console-panel-log')
         await logSubject('the failed state in the panel', panel.getByTestId('sighting-log-error'))
@@ -719,12 +724,9 @@ test.describe('the console dock keeps the Log tab mounted - read at open, same n
       if (!stationId) {
         return { untested: 'the served home interior has no station feature to dock at (random-spawn family: defect-space-journey-instant-station-burn.md, defect-scan-journey-spawn-in-gate-range.md)' }
       }
-      try {
-        await selectFirstBodyMatching(page, stationId)
-        await burnToSelectionAndDock(page, fleetId, DOCK_BUDGET_MS)
-      } catch (e) {
-        return { untested: `the fleet could not be docked at the home station within ${DOCK_BUDGET_MS} ms (${firstLine(e)})` }
-      }
+      await expect(page.getByTestId('vitals-state-pill'), 'the fresh hull is attached to its spawn station').toContainText(stationId)
+      await page.getByTestId('console-dock-open').click()
+      await page.getByTestId('console-tab-scan').click()
       try {
         await expect(page.getByTestId('scan-control')).toBeVisible({ timeout: 10_000 })
         await expect.poll(() => (scanTargets.get(fleetId) ?? []).length, { timeout: 15_000 }).toBeGreaterThan(0)
@@ -752,9 +754,10 @@ test.describe('the console dock keeps the Log tab mounted - read at open, same n
       }
       // From here the commit WAS accepted: a missing report or a missing re-read is a FAILURE, never UNTESTED (J1).
       sweepCommitted = true
+      await collapseDock()
       const commitAt = Date.now()
       console.log(`[journey-leg-data] settle-reread-collapsed: commit ACCEPTED (countdown shown); the leg is must-PASS from here`)
-      await expect(page.getByTestId('scan-report'), `a committed sweep's report appears within ${wallMs} ms of wall time`).toBeVisible({ timeout: wallMs })
+      await expect(page.getByTestId('scan-report'), `a committed sweep's report is mounted within ${wallMs} ms while the dock is collapsed`).toBeAttached({ timeout: wallMs })
       const reportAt = Date.now()
       await flushFrames()
       await expect(page.getByTestId('console-dock-open'), 'the dock was kept collapsed through the sweep').toBeVisible()
@@ -789,6 +792,7 @@ test.describe('the console dock keeps the Log tab mounted - read at open, same n
       await expect(page.getByTestId('console-dock-open')).toBeVisible()
       const before = logPile('immediately before the expansion')
       await page.getByTestId('console-dock-open').click()
+      await page.getByTestId('console-tab-log').click()
       await expect(page.getByTestId('console-dock-collapse')).toBeVisible({ timeout: 5_000 })
       const first = rowsLoc().first()
       await logSubject('first log row after the expansion (expect the swept host, clean sweep)', first)

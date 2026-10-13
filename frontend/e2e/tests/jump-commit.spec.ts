@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { arrangeBodyDock } from '../helpers/served-movement'
+import { emulatorSignIn } from '../helpers/firebase-emulator'
 import { resolveE2EConfig } from '../config/env'
 import {
-  burnToSelectionAndDock,
   captureInteriors,
-  capturePosts,
-  selectBody,
+  openObjectDetails,
+  prepareCommandHud,
   wakeNewCorp,
 } from '../helpers/space-view'
 
@@ -69,10 +70,9 @@ test.describe('jump commit — wire to click', () => {
     // The wire end of the path under test. Nothing below is a fixture, and
     // nothing re-derives a served id client-side.
     const interiors = captureInteriors(page)
-    const orders = capturePosts<{ bodyId?: string }>(page, /\/v1\/fleets\/[^/]+\/orders$/)
 
     // 1. Sign up and wake onto the home system's space view.
-    const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Jumper', 'jumpcommit')
+    const { homeSystemId, fleetId, email, password } = await wakeNewCorp(page, 'E2E Jumper', 'jumpcommit')
 
     // 2. The gate bodies ship unfiltered from the first read
     //    (`system-interior`: "Bodies Are Public; Ships Are Disclosed"), so a
@@ -109,34 +109,23 @@ test.describe('jump commit — wire to click', () => {
         `${JSON.stringify(gate)}`,
     ).toBeTruthy()
 
-    // 3. Select that gate and burn to it. A rim gate is normally OFF SCREEN
-    //    at the default framing, so `selectBody` takes whichever affordance
-    //    exists — both are player paths.
-    await selectBody(page, gate.id!)
-    await expect(
-      page.getByTestId('gate-facts'),
-      'a selected lane-gate body presents its destination',
-    ).toBeVisible({ timeout: 20_000 })
-
-    await burnToSelectionAndDock(page, fleetId, 900_000)
-
-    // Scenario: A burn order naming the served gate body id targets that gate
-    // (`system-interior`: *Lane-Gate Bodies Carry Their Body Id*; tasks.md
-    // 9.1d — "no client copy of the server's gate-id naming convention").
-    expect(orders.length, 'the burn click submitted no order at all').toBeGreaterThan(0)
-    expect(
-      orders[orders.length - 1]?.bodyId,
-      `the burn order named bodyId=${JSON.stringify(orders[orders.length - 1]?.bodyId)}, but the ` +
-        `interior read served this gate's id as ${JSON.stringify(gate.id)}. The client must pass ` +
-        `the SERVED id straight through — a reconstructed "gate-"+destSystemId would pass today ` +
-        `and break silently the day the server's convention changes.`,
-    ).toBe(gate.id)
+    // Movement is an explicit API fixture, not a claim of retired UI Burn coverage.
+    const { idToken } = await emulatorSignIn(cfg.emulator!, email, password)
+    await openObjectDetails(page, gate.id!)
+    await arrangeBodyDock(page, fleetId, gate.id!, idToken, 900_000)
+    await page.reload()
+    await prepareCommandHud(page)
+    await expect(page.getByTestId('vitals-state-pill')).toContainText(/docked/i)
 
     // 4. Scenario: Invoking jump submits the attached gate's lane.
     //    The command is offered on attachment alone — no charted-lane
     //    precondition, no canvas selection — and the click must put the
     //    SERVED laneId on the wire: not a client-side refusal, not a no-op,
     //    not some other lane.
+    // The current system HUD hides Jump; the galaxy roster exposes the live command.
+    await page.getByTestId('nav-home').click()
+    await page.waitForURL((url) => url.pathname === '/', { timeout: 20_000 })
+    await expect(page.getByTestId(`fleet-row-${fleetId}`)).toBeVisible({ timeout: 20_000 })
     const jumpButton = page.getByTestId(`fleet-cmd-jump-${fleetId}`)
     await expect(jumpButton).toBeVisible({ timeout: 20_000 })
     const jumpRequest = page.waitForRequest(

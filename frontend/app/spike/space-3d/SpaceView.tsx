@@ -13,6 +13,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import * as THREE from 'three'
+import { Button } from '@/components/catalyst/button'
+import { createRendererOwner, type RendererOwner, type RendererSnapshot } from '@/components/render-guard/renderer-owner'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import {
   bodyPosition,
@@ -51,7 +53,8 @@ const toV = (v: Vec3) => new THREE.Vector3(v.x, v.y, v.z)
 
 export function SpaceView({ system, clock, ship, preview, selected, onPick, onArrive }: SpaceViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [failed, setFailed] = useState(false)
+  const [rendererState, setRendererState] = useState<RendererSnapshot>({ phase: 'pending', backend: null, retrying: false })
+  const ownerRef = useRef<RendererOwner | null>(null)
 
   // Prop mirrors the rAF loop reads without re-running the mount effect.
   const shipRef = useRef(ship)
@@ -71,15 +74,11 @@ export function SpaceView({ system, clock, ship, preview, selected, onPick, onAr
     const container = containerRef.current
     if (!container) return
 
-    let renderer: THREE.WebGLRenderer
-    try {
-      renderer = new THREE.WebGLRenderer({ antialias: true })
-    } catch {
-      setFailed(true)
-      return
-    }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    container.appendChild(renderer.domElement)
+    let canvas = document.createElement('canvas')
+    let owner: RendererOwner | null = null
+    let intersecting = true
+    let disposed = false
+    const drawable = () => intersecting && document.visibilityState !== 'hidden' && container.clientWidth > 0 && container.clientHeight > 0
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x05060a)
@@ -87,7 +86,7 @@ export function SpaceView({ system, clock, ship, preview, selected, onPick, onAr
     const camera = new THREE.PerspectiveCamera(55, 1, 0.5, 4000)
     camera.position.set(0, 110, 170)
 
-    const controls = new OrbitControls(camera, renderer.domElement)
+    const controls = new OrbitControls(camera, canvas)
     controls.enableDamping = true
     controls.dampingFactor = 0.08
     controls.minDistance = 15
@@ -268,11 +267,11 @@ export function SpaceView({ system, clock, ship, preview, selected, onPick, onAr
       if (e.button === 0) downAt = { x: e.clientX, y: e.clientY }
     }
     const onPointerUp = (e: PointerEvent) => {
-      if (!downAt) return
+      if (!downAt || owner?.snapshot().phase !== 'ready') return
       const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y)
       downAt = null
       if (moved > PICK_DRAG_TOLERANCE_PX) return
-      const rect = renderer.domElement.getBoundingClientRect()
+      const rect = canvas.getBoundingClientRect()
       const ndc = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width) * 2 - 1,
         -((e.clientY - rect.top) / rect.height) * 2 + 1
@@ -288,19 +287,6 @@ export function SpaceView({ system, clock, ship, preview, selected, onPick, onAr
         onPickRef.current({ kind: 'point', point: { x: point.x, y: point.y, z: point.z } })
       }
     }
-    renderer.domElement.addEventListener('pointerdown', onPointerDown)
-    renderer.domElement.addEventListener('pointerup', onPointerUp)
-
-    const resize = () => {
-      const { clientWidth, clientHeight } = container
-      if (clientWidth === 0 || clientHeight === 0) return
-      renderer.setSize(clientWidth, clientHeight)
-      camera.aspect = clientWidth / clientHeight
-      camera.updateProjectionMatrix()
-    }
-    resize()
-    const observer = new ResizeObserver(resize)
-    observer.observe(container)
 
     let raf = 0
     let last = performance.now()
@@ -311,7 +297,12 @@ export function SpaceView({ system, clock, ship, preview, selected, onPick, onAr
     const up = new THREE.Vector3(0, 1, 0)
 
     const frame = (now: number) => {
-      raf = requestAnimationFrame(frame)
+      raf = 0
+      if (disposed) return
+      const state = owner?.snapshot()
+      if ((state?.phase === 'unavailable' || state?.phase === 'interrupted') && !state.retrying) return
+      if (!drawable()) return
+      void owner?.update(() => {
       // No dt cap: every position is closed-form in t, so a huge jump (rAF
       // throttled in a background tab, laptop lid closed) is safe — the world
       // moves on and the fold settles arrivals, exactly the game's contract.
@@ -397,15 +388,63 @@ export function SpaceView({ system, clock, ship, preview, selected, onPick, onAr
       }
 
       controls.update()
-      renderer.render(scene, camera)
+      }).then(() => owner?.present(scene, camera))
+      schedule()
     }
-    raf = requestAnimationFrame(frame)
+    function schedule() { if (!disposed && !raf && drawable()) raf = requestAnimationFrame(frame) }
+    const eligibility = () => {
+      owner?.setPresentationEligible(drawable())
+      controls.enabled = drawable() && (owner?.snapshot().phase === 'ready' || owner?.snapshot().phase === 'pending')
+    }
+    owner = createRendererOwner({
+      surface: 'space-spike', alpha: false, stencil: false,
+      createCanvas: () => document.createElement('canvas'),
+      onCanvas: next => {
+        canvas.removeEventListener('pointerdown', onPointerDown)
+        canvas.removeEventListener('pointerup', onPointerUp)
+        controls.disconnect()
+        canvas.remove()
+        canvas = next
+        canvas.style.cssText = 'width:100%;height:100%;display:block'
+        canvas.setAttribute('aria-label', 'Continuous space scene')
+        container.prepend(canvas)
+        controls.connect(canvas)
+        canvas.addEventListener('pointerdown', onPointerDown)
+        canvas.addEventListener('pointerup', onPointerUp)
+      },
+      onState: state => {
+        if (disposed) return
+        setRendererState(state)
+        if ((state.phase === 'unavailable' || state.phase === 'interrupted') && !state.retrying) { cancelAnimationFrame(raf); raf = 0 }
+        else schedule()
+        eligibility()
+      },
+    })
+    ownerRef.current = owner
+    const resize = () => {
+      const width = container.clientWidth, height = container.clientHeight
+      owner?.resize(width, height, Math.min(window.devicePixelRatio || 1, 2))
+      if (width > 0 && height > 0) { camera.aspect = width / height; camera.updateProjectionMatrix() }
+      eligibility(); schedule()
+    }
+    const observer = new ResizeObserver(resize)
+    observer.observe(container)
+    const intersection = new IntersectionObserver(entries => { intersecting = entries[0]?.isIntersecting ?? true; eligibility(); schedule() })
+    intersection.observe(container)
+    const visibility = () => { eligibility(); schedule() }
+    document.addEventListener('visibilitychange', visibility)
+    resize()
 
     return () => {
+      disposed = true
+      ownerRef.current = null
+      owner?.dispose()
+      intersection.disconnect()
+      document.removeEventListener('visibilitychange', visibility)
       cancelAnimationFrame(raf)
       observer.disconnect()
-      renderer.domElement.removeEventListener('pointerdown', onPointerDown)
-      renderer.domElement.removeEventListener('pointerup', onPointerUp)
+      canvas.removeEventListener('pointerdown', onPointerDown)
+      canvas.removeEventListener('pointerup', onPointerUp)
       controls.dispose()
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.Line) {
@@ -414,17 +453,15 @@ export function SpaceView({ system, clock, ship, preview, selected, onPick, onAr
           materials.forEach((m) => m.dispose())
         }
       })
-      renderer.dispose()
-      renderer.domElement.remove()
+      canvas.remove()
     }
   }, [system, clock])
 
-  if (failed) {
-    return (
-      <div data-testid="space-gl-fallback" className="absolute inset-0 grid place-items-center text-xs text-zinc-500">
-        WebGL unavailable — the continuous-space view needs a GL context.
-      </div>
-    )
-  }
-  return <div ref={containerRef} data-testid="space-gl-stage" className="absolute inset-0 cursor-crosshair" />
+  return <div className="absolute inset-0">
+    <div ref={containerRef} data-testid="space-gl-stage" className="absolute inset-0" />
+    {rendererState.phase !== 'ready' && rendererState.phase !== 'disposed' && <div data-testid="space-gl-fallback" role="status" aria-live="polite" className="absolute inset-0 grid place-content-center gap-3 text-sm text-zinc-400">
+      {rendererState.phase === 'pending' ? 'Preparing 3D view…' : rendererState.phase === 'interrupted' ? '3D view interrupted.' : '3D view unavailable.'}
+      {rendererState.phase !== 'pending' && <Button data-testid="space-renderer-retry" disabled={rendererState.retrying} onClick={() => ownerRef.current?.retry()}>{rendererState.retrying ? 'Retrying…' : 'Retry'}</Button>}
+    </div>}
+  </div>
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import React from 'react'
 import { SpaceWorld } from './SpaceWorld'
 import type { SceneModel } from '../space-scene'
@@ -23,14 +23,10 @@ function frameOf(scene: SceneModel, camera: SpaceCamera, width = 1200, height = 
   }
 }
 
-// Implementer-authored (openspec build-production-space-view). The one thing
-// worth pinning about this module outside a browser: it FAILS SOFT. A
-// context that cannot answer the calls a renderer makes — jsdom's stub, or a
-// driver that refused — must leave it mounting, drawing nothing, and
-// throwing nothing, because the renderer-availability guard (not this
-// module) owns the player-facing unavailable state. A renderer half-built
-// against such a context also attaches its own context-lost listeners and
-// then throws from inside them, outside any React boundary.
+const failed = vi.hoisted(() => ({ dispose: vi.fn() }))
+vi.mock('@/components/render-guard/renderer-candidate', () => ({ createRendererCandidate: ({ canvas }: { canvas: HTMLCanvasElement }) => ({
+  canvas, init: async () => { throw new Error('No device') }, backend: () => 'webgl2', render: vi.fn(), resize: vi.fn(), setClearColor: vi.fn(), onLoss: () => () => {}, dispose: failed.dispose,
+}) }))
 
 const scene: SceneModel = {
   marks: [
@@ -51,16 +47,17 @@ describe('SpaceWorld', () => {
     expect(() =>
       render(<SpaceWorld canvas={canvas} frameRef={frameOf(scene, defaultCamera(658.7))} extent={658.7} />),
     ).not.toThrow()
-    expect(spy, 'it must probe the context before building anything against it').toHaveBeenCalled()
+    expect(spy, 'the owner must initialize the renderer without a competing context probe').not.toHaveBeenCalled()
   })
 
-  it('registers no listener on a canvas it never built a renderer for', () => {
+  it('releases a failed candidate without an uncaught asynchronous rejection', async () => {
+    failed.dispose.mockClear()
     const canvas = document.createElement('canvas')
-    const added = vi.spyOn(canvas, 'addEventListener')
-    render(<SpaceWorld canvas={canvas} frameRef={frameOf(scene, defaultCamera(1))} extent={1} />)
-    const events = added.mock.calls.map((c) => c[0])
-    expect(events).not.toContain('webglcontextrestored')
-    expect(events).not.toContain('webglcontextlost')
+    const onRendererState = vi.fn()
+    render(<SpaceWorld canvas={canvas} frameRef={frameOf(scene, defaultCamera(1))} extent={1} onRendererState={onRendererState} />)
+    await act(async () => { for (let i = 0; i < 16; i++) await Promise.resolve() })
+    expect(failed.dispose).toHaveBeenCalled()
+    expect(onRendererState).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'unavailable' }))
   })
 
   it('renders no DOM of its own — the canvas is the whole surface', () => {

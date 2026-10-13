@@ -10,7 +10,10 @@ vi.mock('next/dynamic', () => ({
   default: () => () => null,
 }))
 vi.mock('./SpaceCanvas', () => ({
-  SpaceCanvas: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SpaceCanvas: ({ children, onAvailabilityChange }: { children: React.ReactNode | ((ready: boolean) => React.ReactNode); onAvailabilityChange?: (ready: boolean) => void }) => {
+    React.useEffect(() => { onAvailabilityChange?.(true) }, [onAvailabilityChange])
+    return <div>{typeof children === 'function' ? children(true) : children}</div>
+  },
 }))
 
 import { SpaceStage } from './SpaceStage'

@@ -28,7 +28,7 @@ export interface RendererStateNoticeProps {
 }
 
 const CAUSE_COPY: Record<FailureCause, string> = {
-  creation: 'Your browser or graphics hardware does not support WebGL2.',
+  creation: 'Your browser or graphics hardware could not initialize WebGPU or WebGL2 rendering.',
   lost: 'The rendering context was lost.',
   'restore-failed': 'The rendering context could not be re-established after a restore attempt.',
 }

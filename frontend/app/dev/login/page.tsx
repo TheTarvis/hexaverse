@@ -26,16 +26,12 @@ import { useEffect, useState } from 'react'
 import { notFound } from 'next/navigation'
 import { signInWithCustomToken } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import { tokenFromHash } from './token-from-hash'
 
-export function devLoginEnabled(): boolean {
+function devLoginEnabled(): boolean {
   return process.env.NODE_ENV === 'development'
 }
 
-export function tokenFromHash(hash: string): string | null {
-  const params = new URLSearchParams(hash.replace(/^#/, ''))
-  const token = params.get('token')
-  return token && token.length > 0 ? token : null
-}
 
 export default function DevLoginPage() {
   if (!devLoginEnabled()) notFound()
@@ -43,7 +39,7 @@ export default function DevLoginPage() {
 }
 
 /** Leave for home with a FULL page load (see the header note). */
-export function leaveForHome(): void {
+function leaveForHome(): void {
   window.location.replace('/')
 }
 

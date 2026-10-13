@@ -190,7 +190,7 @@ export interface WokenCorp {
  * frame after data arrives"), so a suite that clicked as soon as the route
  * settled would be clicking at a placeholder.
  */
-export async function wakeNewCorp(page: Page, name: string, tag: string): Promise<WokenCorp> {
+export async function wakeNewCorp(page: Page, name: string, tag: string, options: { keepGuide?: boolean } = {}): Promise<WokenCorp> {
   const email = `e2e+${tag}-${Date.now()}@hexaverse.test`
   const password = 'e2ePassword123!'
 
@@ -216,11 +216,41 @@ export async function wakeNewCorp(page: Page, name: string, tag: string): Promis
   await expect(page.getByTestId('space-canvas-region')).toBeVisible({ timeout: 20_000 })
   await expect(page.getByTestId('space-loading')).toBeHidden({ timeout: 60_000 })
 
-  const rows = page.getByTestId('fleet-roster').locator('[data-testid^="fleet-row-"]')
-  await expect(rows, 'a fresh spawn has exactly one hull').toHaveCount(1, { timeout: 20_000 })
-  const fleetId = (await rows.first().getAttribute('data-testid'))!.replace('fleet-row-', '')
+  if (!options.keepGuide) await prepareCommandHud(page)
+  const chooser = page.getByTestId('vitals-fleet-chevron')
+  await expect(chooser).toBeVisible()
+  await chooser.click()
+  const items = page.locator('[data-testid^="vitals-fleet-menu-item-"]')
+  await expect(items, 'a fresh spawn has exactly one hull').toHaveCount(1)
+  const fleetId = (await items.first().getAttribute('data-testid'))!.replace('vitals-fleet-menu-item-', '')
+  await chooser.press('Escape')
+  await expect(page.getByTestId('vitals-fleet-id')).toHaveText(fleetId)
 
   return { email, password, homeSystemId, fleetId }
+}
+
+/** Leave the optional tutorial and close Objects through real HUD controls. */
+export async function prepareCommandHud(page: Page): Promise<void> {
+  const dismiss = page.getByTestId('dismiss-guide')
+  if (await dismiss.isVisible()) await dismiss.click()
+  const objects = page.getByTestId('system-index-toggle')
+  await expect(objects).toBeVisible({ timeout: 10_000 })
+  if (await objects.getAttribute('aria-expanded') === 'true') await objects.click()
+}
+
+/** Open current disclosed object details; no retired command-panel selectors. */
+export async function openObjectDetails(page: Page, bodyId: string): Promise<Locator> {
+  const toggle = page.getByTestId('system-index-toggle')
+  await expect(toggle).toBeVisible({ timeout: 10_000 })
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+  const details = page.getByRole('complementary', { name: `Details for ${bodyId}`, exact: true })
+  if (!await details.isVisible()) {
+    const row = page.getByTestId(`index-${bodyId}`)
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    await row.click({ timeout: 10_000 })
+  }
+  await expect(details).toBeVisible()
+  return details
 }
 
 /**
@@ -276,17 +306,19 @@ export async function selectBody(page: Page, bodyId: string): Promise<void> {
   // first mineable body are the same feature — would otherwise clear its own
   // selection and read as "nothing got selected".
   if ((await page.getByTestId('space-canvas-region').getAttribute('data-selection')) === bodyId) {
-    await expectSelectionLanded(page)
+    await expectSelectionLanded(page, bodyId)
     return
   }
 
-  if (await offscreen.count()) {
-    await offscreen.first().click()
+  if (await offscreen.isVisible()) {
+    await offscreen.first().click({ timeout: 10_000 })
+  } else if (!await hit.isVisible()) {
+    await openObjectDetails(page, bodyId)
   } else {
     await hit.first().focus()
     await hit.first().press('Enter')
   }
-  await expectSelectionLanded(page)
+  await expectSelectionLanded(page, bodyId)
 }
 
 /**
@@ -343,7 +375,7 @@ export async function selectBodyByPointer(page: Page, bodyId: string): Promise<v
       },
     )
     .toBe(bodyId)
-  await expectSelectionLanded(page)
+  await expectSelectionLanded(page, bodyId)
 }
 
 /**
@@ -431,9 +463,9 @@ export async function bodyIdsMatching(page: Page, prefix: string): Promise<strin
   return ids
 }
 
-/** The selection landed: a facts panel for the selected entity is up. */
-async function expectSelectionLanded(page: Page): Promise<void> {
-  await expect(page.locator('[data-testid$="-facts"]').first()).toBeVisible({ timeout: 20_000 })
+/** Selection is observable on the map; the retired Course facts remain hidden. */
+async function expectSelectionLanded(page: Page, bodyId: string): Promise<void> {
+  await expect(page.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', bodyId, { timeout: 10_000 })
 }
 
 /**
@@ -451,8 +483,9 @@ export async function burnToSelectionAndDock(
   fleetId: string,
   flightTimeoutMs = 600_000,
 ): Promise<void> {
-  const row = page.getByTestId(`fleet-row-${fleetId}`)
-  await expect(page.getByTestId('preview-panel')).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByTestId('vitals-fleet-id')).toHaveText(fleetId)
+  const row = page.getByTestId('vitals-strip').getByTestId('vitals-state-pill')
+  await expect(page.getByTestId('burn-button'), 'UI burn commitment requires a visible current HUD action; retired Course is not clickable').toBeVisible({ timeout: 10_000 })
   // Log-only attribution of a refused order (never asserts, never awaited): a refused
   // POST .../orders prints its status and body BEFORE the `under way` guard below runs.
   const logRefusedOrder = (response: Response): void => {

@@ -45,12 +45,17 @@ vi.mock('@/components/galaxy/GalaxyGraph', async () => {
       galaxy,
       onSelect,
       onReady,
+      onController,
+      onRendererState,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }: any) => {
       const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
       React.useEffect(() => {
-        onReady?.({ recenter: vi.fn(), focusSystem: vi.fn(), focusPoint: vi.fn(), canvas: () => canvasRef.current })
-      }, [onReady])
+        const controller = { recenter: vi.fn(), focusSystem: vi.fn(), focusPoint: vi.fn(), canvas: () => canvasRef.current, pause: vi.fn(), resume: vi.fn(), retry: vi.fn() }
+        onController?.(controller)
+        onRendererState?.({ phase: 'ready', backend: 'webgpu', retrying: false })
+        onReady?.(controller)
+      }, [onReady, onController, onRendererState])
       return (
         <div data-testid="mock-graph">
           <canvas ref={canvasRef} data-testid="mock-graph-canvas" />
@@ -65,7 +70,7 @@ vi.mock('@/components/galaxy/GalaxyGraph', async () => {
     },
   }
 })
-vi.mock('react-force-graph-3d', () => ({ default: () => null }))
+
 
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
 vi.mock('@/hooks/use-fleets', () => ({

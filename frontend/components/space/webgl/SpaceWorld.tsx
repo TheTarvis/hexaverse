@@ -41,9 +41,13 @@ import { TAN_HALF_FOV, MARK_FLOOR_DIV, drawRadiusFor } from '../space-projection
 import type { SceneMark, SceneModel } from '../space-scene'
 import type { SpaceFrame } from '../space-transform-loop'
 import { createSpacecraftModel, loadSpacecraftAsset, type SpacecraftKind } from './spacecraft-art'
-import { advancePlanetClouds, createPlanetModel, planetKind, createRadialGlowTexture, createHexGrid, createBackdropMaterial } from './scene-art'
+import { advancePlanetClouds, createPlanetModel, planetKind, createHexGrid, createBackdropMaterial } from './scene-art'
 
-export interface SpaceWorldProps {
+import { createRendererOwner } from '@/components/render-guard/renderer-owner'
+import type { SpaceRendererBindings } from '../SpaceCanvas'
+import { createStarModel, stellarTint, type StarModel } from './star-art'
+
+export interface SpaceWorldProps extends Partial<SpaceRendererBindings> {
   canvas: HTMLCanvasElement
   /**
    * The transform loop's published frame (openspec change
@@ -75,15 +79,6 @@ export { STAR_DRAW_SCALE, BODY_DRAW_SCALE, MARK_FLOOR_DIV, drawScaleFor } from '
 
 // --- palette --------------------------------------------------------------------
 
-const STAR_TINT: Record<string, number> = {
-  O: 0x9bb0ff,
-  B: 0xaabfff,
-  A: 0xcad7ff,
-  F: 0xf8f3e6,
-  G: 0xffe7b8,
-  K: 0xffc98a,
-  M: 0xff9f6a,
-}
 const STAR_TINT_DEFAULT = 0xffd9a0
 
 const BODY_TINTS: Record<string, number[]> = {
@@ -172,7 +167,7 @@ function seeded(seed: number): () => number {
 }
 
 function tintOf(mark: SceneMark): number {
-  if (mark.kind === 'star') return STAR_TINT[(mark.starClass ?? '').charAt(0).toUpperCase()] ?? STAR_TINT_DEFAULT
+  if (mark.kind === 'star') return stellarTint(mark.starClass)
   if (mark.kind === 'fleet' && mark.fleetMode !== undefined) return FLEET_MODE_COLOR[mark.fleetMode]
   const byType = mark.bodyType ? BODY_TINTS[mark.bodyType] : undefined
   if (byType && byType.length > 0) return byType[hashOf(mark.id) % byType.length]!
@@ -201,35 +196,14 @@ export function SpaceWorld({
   frameRef,
   extent,
   actingFleetId = null,
-  onFirstFrame,
+  onFirstFrame, createCanvas, onCanvas, onRendererState, onRendererOwner, rendererFactory,
 }: SpaceWorldProps) {
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
+  const bindings = useRef({ createCanvas, onCanvas, onRendererState, onRendererOwner, rendererFactory, onFirstFrame })
+  bindings.current = { createCanvas, onCanvas, onRendererState, onRendererOwner, rendererFactory, onFirstFrame }
   const actingRef = useRef<string | null>(actingFleetId)
   actingRef.current = actingFleetId
 
   useEffect(() => {
-    // A context that cannot answer the calls a renderer makes is not a
-    // context to build one against. Under jsdom the stub answers
-    // `getExtension` and nothing else, and a half-constructed renderer would
-    // still attach its own context-lost/restored listeners to this canvas —
-    // and then throw from inside them, outside any React boundary.
-    // Context attributes are fixed by the first request, before Three reuses
-    // this context. Reserve the stencil buffer used by the hex silhouette mask.
-    const probe = canvas.getContext('webgl2', { stencil: true }) as WebGL2RenderingContext | null
-    if (!probe || typeof probe.createProgram !== 'function') return
-
-    let renderer: THREE.WebGLRenderer
-    try {
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, stencil: true })
-    } catch {
-      // No usable context here (jsdom, or a driver that refused): the guard
-      // owns that state — this module simply does not draw.
-      return
-    }
-    rendererRef.current = renderer
-    renderer.setClearColor(0x071324, 1)
-    renderer.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2))
-
     const world = new THREE.Scene()
     const view = new THREE.PerspectiveCamera(FOV_DEGREES, 1, extent / 1000, extent * 100)
     const floor = extent / MARK_FLOOR_DIV
@@ -288,8 +262,13 @@ export function SpaceWorld({
     // Bodies straddle XZ, so depth alone lets the plane cut across their
     // lower hemispheres. Their opaque silhouettes mask decorative lines.
     gridMaterial.stencilWrite = true
-    gridMaterial.stencilRef = 1
-    gridMaterial.stencilFunc = THREE.NotEqualStencilFunc
+    // The mask is binary: cleared background is 0; opaque silhouettes write 1.
+    // Equal/0 therefore preserves NotEqual/1's mask while ending each pass at
+    // the WebGPU default reference. Three r185 caches this reference across
+    // passes; switching opaque 1 → grid 0 avoids a stale reference on frame two.
+    // Grid stencil operations remain Keep; decoration never writes silhouettes.
+    gridMaterial.stencilRef = 0
+    gridMaterial.stencilFunc = THREE.EqualStencilFunc
     const gridOpacity = gridMaterial.opacity
     decor.add(grid)
 
@@ -334,6 +313,7 @@ export function SpaceWorld({
       starClass: string | undefined
     }
     const meshes = new Map<string, MarkEntry>()
+    const stars = new Map<THREE.Mesh, StarModel>()
     let rendererLive = true
     const assets = new Map<SpacecraftKind, Promise<THREE.Group | null>>()
     const sources = new Map<SpacecraftKind, THREE.Group>()
@@ -379,35 +359,9 @@ export function SpaceWorld({
       const tint = tintOf(mark)
       const type = mark.bodyType ?? ''
       if (mark.kind === 'star') {
-        const surface = new THREE.MeshBasicMaterial({ color: tint })
-        // Static local-space granulation: the luminous surface stays attached
-        // to the sphere across camera motion without an extra animation clock.
-        surface.onBeforeCompile = shader => {
-          shader.vertexShader = 'varying vec3 vStellarPosition;\n' + shader.vertexShader
-          shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
-            '#include <begin_vertex>\nvStellarPosition = position;')
-          shader.fragmentShader = 'varying vec3 vStellarPosition;\n' + shader.fragmentShader
-          shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
-            #include <color_fragment>
-            vec3 p = normalize(vStellarPosition);
-            float broad = sin(p.x * 13.0 + sin(p.y * 17.0)) * sin(p.z * 15.0 + sin(p.x * 11.0));
-            float grain = sin(p.x * 53.0 + sin(p.z * 39.0)) * sin(p.y * 47.0 + sin(p.x * 37.0));
-            diffuseColor.rgb = pow(diffuseColor.rgb, vec3(1.65)) * (0.94 + broad * 0.12 + grain * 0.04);
-          `)
-        }
-        const mesh = new THREE.Mesh(sphere, surface)
-        const corona = new THREE.Color(tint)
-        corona.setRGB(corona.r ** 4, corona.g ** 4, corona.b ** 4)
-        const glowMap = createRadialGlowTexture()
-        for (const [scale, opacity] of [[7.5, 0.95], [4, 1.0]]) {
-          const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: glowMap, color: corona, transparent: true,
-            blending: THREE.AdditiveBlending, depthWrite: false, opacity,
-          }))
-          glow.scale.set(scale!, scale!, 1)
-          mesh.add(glow)
-        }
-        return mesh
+        const star = createStarModel({ objectId: mark.id, starClass: mark.starClass, geometry: sphere })
+        stars.set(star.mesh, star)
+        return star.mesh
       }
       if (WIRE_KINDS.has(mark.kind)) {
         return new THREE.Mesh(
@@ -480,7 +434,10 @@ export function SpaceWorld({
       for (const material of materials) material.dispose()
       for (const item of geometries) item.dispose()
     }
-    const disposeMesh = (mesh: THREE.Mesh) => disposeResources(mesh, false)
+    const disposeMesh = (mesh: THREE.Mesh) => {
+      const star = stars.get(mesh)
+      if (star) { star.dispose(); stars.delete(mesh) } else disposeResources(mesh, false)
+    }
 
     const drawRadiusOf = (mark: SceneMark): number =>
       drawRadiusFor(mark, extent)
@@ -570,6 +527,7 @@ export function SpaceWorld({
           if (screen?.onScreen && diameterPx >= 80) advancePlanetClouds(mesh, cloudDelta)
         }
         if (mark.kind === 'star') {
+          if (cloudDelta > 0) stars.get(mesh)?.advance(cloudDelta)
           starLight.position.set(mark.position.x, mark.position.y, mark.position.z)
           starLight.color.set(tintOf(mark))
         }
@@ -766,7 +724,9 @@ export function SpaceWorld({
 
     const motionPreference = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')
     let previousCloudFrame = performance.now()
-    const draw = () => {
+    const draw = async () => {
+      frameId = 0
+      if (!rendererLive) return
       const now = performance.now()
       const cloudDelta = !document.hidden && !motionPreference?.matches ? Math.min((now - previousCloudFrame) / 1000, 0.1) : 0
       previousCloudFrame = now
@@ -774,12 +734,14 @@ export function SpaceWorld({
       if (!published) {
         // No frame has been built yet — render nothing, announce nothing,
         // and keep the loop alive for the next one.
-        frameId = requestAnimationFrame(draw)
+        frameId = requestAnimationFrame(() => { void draw() })
         return
       }
       liveScene = published.scene
       const basis = published.basis
-      renderer.setSize(basis.widthPx, basis.heightPx, false)
+      owner.resize(basis.widthPx, basis.heightPx, Math.min(globalThis.devicePixelRatio || 1, 2))
+      owner.setPresentationEligible(!document.hidden && basis.widthPx > 0 && basis.heightPx > 0)
+      await owner.update(() => {
       view.aspect = basis.widthPx / Math.max(1, basis.heightPx)
       view.updateProjectionMatrix()
 
@@ -799,13 +761,30 @@ export function SpaceWorld({
       syncCurves()
       syncRings()
       syncBelts()
-      renderer.render(world, view)
-      if (!announced) {
-        announced = true
-        onFirstFrame?.()
-      }
-      frameId = requestAnimationFrame(draw)
+      })
+      const presented = await owner.present(world, view)
+      if (presented && !announced) { announced = true; bindings.current.onFirstFrame?.() }
+      schedule()
     }
+
+    const schedule = () => {
+      const state = owner.snapshot()
+      if (rendererLive && !frameId && (state.phase === 'pending' || state.phase === 'ready' || state.retrying)) frameId = requestAnimationFrame(() => { void draw() })
+    }
+    let seedUsed = false
+    const owner = createRendererOwner({ surface: 'space', alpha: false, stencil: true,
+      factory: bindings.current.rendererFactory,
+      createCanvas: () => bindings.current.createCanvas?.() ?? (!seedUsed ? (seedUsed = true, canvas) : document.createElement('canvas')),
+      onCanvas: next => { bindings.current.onCanvas?.(next) },
+      onState: state => {
+        bindings.current.onRendererState?.(state)
+        if ((state.phase === 'interrupted' || state.phase === 'unavailable') && !state.retrying || state.phase === 'disposed') { cancelAnimationFrame(frameId); frameId = 0 }
+        else queueMicrotask(() => { if (rendererLive) schedule() })
+      },
+    })
+    bindings.current.onRendererOwner?.(owner)
+    const visibility = () => { previousCloudFrame = performance.now(); owner.setPresentationEligible(!document.hidden); schedule() }
+    document.addEventListener('visibilitychange', visibility)
 
     const disposeAll = () => {
       if (!rendererLive) return
@@ -813,6 +792,8 @@ export function SpaceWorld({
       cancelAnimationFrame(frameId)
       // Shared geometry might no longer be attached after its last mark was
       // removed. Dispose it explicitly, excluding it from the scene traversal.
+      for (const [mesh, star] of stars) { world.remove(mesh); star.dispose() }
+      stars.clear()
       const attachedShared = new Set<THREE.BufferGeometry>()
       world.traverse(object => {
         if (object instanceof THREE.Mesh && sharedGeometry.includes(object.geometry as THREE.SphereGeometry)) attachedShared.add(object.geometry)
@@ -821,29 +802,18 @@ export function SpaceWorld({
       for (const source of sources.values()) disposeResources(source, true, true)
       sources.clear()
       for (const geometry of sharedGeometry) if (!attachedShared.has(geometry)) geometry.dispose()
-      // dispose() also detaches three's own context-lost/restored listeners
-      // from the canvas — without it a renderer that failed to draw would
-      // keep reacting to a restore it can no longer serve.
-      try {
-        renderer.dispose()
-      } catch {
-        // A renderer this broken has nothing left to release.
-      }
-      rendererRef.current = null
+      owner.dispose()
+      bindings.current.onRendererOwner?.(null)
+      document.removeEventListener('visibilitychange', visibility)
     }
 
-    try {
-      draw()
-    } catch {
-      disposeAll()
-      return
-    }
+    void draw()
 
     return disposeAll
     // `frameRef` is a stable ref object (`{ readonly current: SpaceFrame |
     // null }`) for the whole mount — it belongs in no dependency array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvas, extent, onFirstFrame])
+  }, [canvas, extent])
 
   return null
 }

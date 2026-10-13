@@ -288,6 +288,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const [objectIndexOpen, setObjectIndexOpen] = useState(false)
   const [discoveredGuide, setDiscoveredGuide] = useState<string | null>(null)
   const [guideFocus, setGuideFocus] = useState<{ bodyId: string; sequence: number } | null>(null)
+  const [rendererPending, setRendererPending] = useState(false)
   const [canvasAvailable, setCanvasAvailable] = useState(true)
   const [firstFrame, setFirstFrame] = useState(false)
   const [announcement, setAnnouncement] = useState('')
@@ -889,7 +890,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     commitWouldBeAccepted: previewWanted,
   })
   const currentQuote = burnPreview.preview && !burnPreview.stale ? burnPreview.preview : null
-  const showLoading = !interiorFailed && canvasAvailable && (interior.isLoading || !firstFrame)
+  const showLoading = !interiorFailed && (canvasAvailable || rendererPending) && (interior.isLoading || !firstFrame)
 
 
   // The Log tab's content: present from the first render of this mount in which
@@ -1065,6 +1066,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               selection={selection}
               onSelect={(picked) => { setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)) }}
               onAvailabilityChange={setCanvasAvailable}
+              onPendingChange={setRendererPending}
               onFirstFrame={handleFirstFrame}
               highlightedGhostId={highlightedGhostId}
               onHighlightGhost={setHighlightedGhostId}
@@ -1126,7 +1128,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           key={systemId}
           systemName={systemNames[systemId] ?? systemId}
           objects={[
-            ...[...(interior.data?.features ?? [])].sort((a, b) => Number(b.type === 'station') - Number(a.type === 'station')).map(body => ({ name: body.id, knownFrom: 'System telemetry', kind: body.type.replaceAll('_', ' '), group: body.type === 'star' ? 'Stars' : body.type === 'station' ? 'Stations' : body.type === 'belt' ? 'Resource sites' : body.type === 'moon' ? 'Moons' : 'Worlds', x: 0, y: 0, className: body.type === 'gas_giant' ? 'gas' : body.type === 'ice' ? 'ice' : 'rock', resources: body.resources === undefined ? undefined : body.resources.length ? body.resources.map(resource => resource.kind).join(', ') : 'No disclosed deposits', fleets: fleets.isError ? ['Fleet telemetry unavailable'] : here.filter(fleet => !fleet.jump && fleet.attachedTo === body.id).map(fleet => `Fleet ${fleet.id.slice(-6)}`) })),
+            ...[...(interior.data?.features ?? [])].sort((a, b) => Number(b.type === 'station') - Number(a.type === 'station')).map(body => ({ name: body.id, starClass: body.type === 'star' ? interior.data?.starClass : undefined, knownFrom: 'System telemetry', kind: body.type.replaceAll('_', ' '), group: body.type === 'star' ? 'Stars' : body.type === 'station' ? 'Stations' : body.type === 'belt' ? 'Resource sites' : body.type === 'moon' ? 'Moons' : 'Worlds', x: 0, y: 0, className: body.type === 'gas_giant' ? 'gas' : body.type === 'ice' ? 'ice' : 'rock', resources: body.resources === undefined ? undefined : body.resources.length ? body.resources.map(resource => resource.kind).join(', ') : 'No disclosed deposits', fleets: fleets.isError ? ['Fleet telemetry unavailable'] : here.filter(fleet => !fleet.jump && fleet.attachedTo === body.id).map(fleet => `Fleet ${fleet.id.slice(-6)}`) })),
             ...(interior.data?.laneGates ?? []).map(gate => ({ name: gate.id, knownFrom: 'System telemetry', kind: `Gate to ${systemNames[gate.destSystemId] ?? gate.destSystemId}`, group: 'Lane gates', x: 0, y: 0, resources: 'Not a resource site' })),
             ...indexedFleets.map(fleet => ({ name: fleet.id, kind: 'fleet', group: 'Fleets', x: 0, y: 0, fleet: {
               id: fleet.id, mode: fleet.state?.Mode,

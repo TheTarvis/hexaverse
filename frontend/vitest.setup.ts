@@ -202,3 +202,22 @@ if (typeof window !== 'undefined' && typeof window.PointerEvent === 'undefined')
     }
   }
 }
+
+// Test-only synthetic GPU adapter. Existing probe fixtures still choose their
+// availability, but real consumers must initialize/present through the owner.
+// Dedicated migration suites override this module with deferred candidates.
+vi.mock('@/components/render-guard/renderer-candidate', () => ({
+  createRendererCandidate: (options: { canvas: HTMLCanvasElement }) => ({
+    canvas: options.canvas,
+    async init() {
+      if (!options.canvas.getContext('webgl2')) throw new Error('Test graphics unavailable')
+    },
+    backend: () => 'webgl2',
+    render() {}, resize() {}, setClearColor() {}, dispose() {},
+    onLoss(listener: (info: { message?: string }) => void) {
+      const lost = (event: Event) => { event.preventDefault(); listener({}) }
+      options.canvas.addEventListener('webglcontextlost', lost)
+      return () => options.canvas.removeEventListener('webglcontextlost', lost)
+    },
+  }),
+}))

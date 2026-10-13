@@ -1,153 +1,71 @@
 'use client'
 
-// The 3D galaxy renderer: react-force-graph-3d (three.js) driven by the real
-// #0001 (x,y,z) positions, wired to the owned CameraRig (spec #0002).
-//
-// SSR-guarded: react-force-graph-3d is dynamically imported client-only (three
-// needs `document`/WebGL). The glow texture is a lazy SSR-safe singleton and the
-// camera rig is only constructed after the graph mounts on the client.
-
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import dynamic from 'next/dynamic'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { Galaxy, GalaxyNode } from '@/lib/types/galaxy'
+import { createRendererOwner, type RendererOwner, type RendererSnapshot } from '@/components/render-guard/renderer-owner'
+import type { RendererCandidateFactory } from '@/components/render-guard/renderer-candidate'
 import { REGION_PALETTE } from './region-palette'
 import { glowTexture } from './glow-texture'
 import { CameraRig } from './camera-rig'
 
-// Client-only. Typed loosely — react-force-graph-3d's generics don't add value
-// here and the ref surface we use is a small, hand-declared slice (FgRef).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), { ssr: false }) as any
-
-type Neuterable = { enabled: boolean; enableDamping?: boolean }
-interface FgRef {
-  scene: () => THREE.Scene
-  camera: () => THREE.PerspectiveCamera
-  renderer: () => THREE.WebGLRenderer
-  controls: () => Neuterable
-  refresh: () => void
-  // add-renderer-availability-states (design.md "render-loop suspension is
-  // an implementation detail"): the accessors GalaxyView's guard calls to
-  // save CPU while the canvas region is unavailable/interrupted. Declared
-  // here for legibility, NOT for compile-time enforcement — `ForceGraph3D`
-  // is cast `as any` above, so TypeScript never structurally checks this
-  // interface against the library's real type (design.md Risks, "kickoff
-  // review" correction). The guard degrades to "interrupted state shown,
-  // loop not paused" via optional-call if the library ever renames/drops
-  // these.
-  pauseAnimation?: () => void
-  resumeAnimation?: () => void
-}
-
-// Imperative handle handed up to GalaxyView so the ⌖ recenter control and the
-// wake-focus glide can drive the camera without prop-drilling three internals.
 export interface GalaxyGraphController {
   recenter: () => void
   focusSystem: (id: string) => void
-  // Glide to an arbitrary point in graph space — a fleet out on a lane sits
-  // between stars, so focusing it needs a point, not a system (#0008).
   focusPoint: (p: { x: number; y: number; z: number }) => void
-  // add-renderer-availability-states (tasks.md 3.1/3.2): the seam GalaxyView's
-  // guard uses to attach webglcontextlost/webglcontextrestored listeners to
-  // the already-mounted FG3D renderer's canvas — never for creation-failure
-  // detection (design.md: that's the probe/boundary's job; construction
-  // failure never reaches this controller, since `onReady` is never called
-  // when construction throws). Null only if the renderer never exposed a
-  // `domElement` — should not happen once `onReady` has fired.
   canvas: () => HTMLCanvasElement | null
-  // Save CPU while nothing is drawable; correctness never depends on this
-  // (design.md, "render-loop suspension is an implementation detail").
-  // Degrades silently to a no-op if the library's `pauseAnimation` accessor
-  // is absent.
   pause: () => void
   resume: () => void
+  retry: () => void
 }
-
 interface GalaxyGraphProps {
   galaxy: Galaxy
   selectedId: string | null
   onSelect: (node: GalaxyNode | null) => void
   onReady?: (controller: GalaxyGraphController) => void
-  // Systems hosting the requester's own fleets that are not currently
-  // mid-jump — drawn with a presence marker (galaxy-view MODIFIED "Own-Fleet
-  // Presence and Recenter Target"; components/galaxy/presence.ts resolves
-  // this set from the fleet list). No transit-fleet overlay survives this
-  // change (design.md Decision 12; galaxy-view REMOVED "Transit Fleet
-  // Selection and Card" — a jump is atomic and single-hop, with no held
-  // mid-lane state to crawl).
+  onController?: (controller: GalaxyGraphController | null) => void
+  onRendererState?: (snapshot: RendererSnapshot) => void
+  rendererFactory?: RendererCandidateFactory
   fleetSystemIds?: string[]
-  // The fleet/home system the ⌖ recenter snaps to when one exists (else the
-  // whole-galaxy framing).
   homeSystemId?: string | null
 }
 
-const DBLCLICK_MS = 350
-
-export function GalaxyGraph({
-  galaxy,
-  selectedId,
-  onSelect,
-  onReady,
-  fleetSystemIds,
-  homeSystemId,
-}: GalaxyGraphProps) {
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const fgRef = useRef<FgRef | null>(null)
-  const rigRef = useRef<CameraRig | null>(null)
-  const gridRef = useRef<THREE.GridHelper | null>(null)
-  const readyRef = useRef(false)
-  const lastClickRef = useRef<{ id: string; t: number }>({ id: '', t: 0 })
-  const [size, setSize] = useState({ w: 0, h: 0 })
-
-  // Keep the latest selection in a ref so nodeThreeObject (rebuilt on refresh)
-  // reads the current value without being recreated every render.
-  const selectedRef = useRef<string | null>(selectedId)
-  selectedRef.current = selectedId
-
-  // Which systems host an own fleet — read through a ref so makeNode (rebuilt on
-  // refresh) sees the current set without being recreated every render.
-  const fleetSet = useMemo(() => new Set(fleetSystemIds ?? []), [fleetSystemIds])
-  const fleetSetRef = useRef(fleetSet)
-  fleetSetRef.current = fleetSet
-
-  // The recenter/home target, read through a ref so the controller handed up at
-  // init reflects the fleet's system even though it loads after the rig mounts.
-  const homeIdRef = useRef<string | null>(homeSystemId ?? null)
-  homeIdRef.current = homeSystemId ?? null
-
-  const graphData = useMemo(
-    () => ({ nodes: galaxy.nodes, links: galaxy.links.map((l) => ({ ...l })) }),
-    [galaxy],
-  )
-
-  const nodeById = useMemo(() => new Map(galaxy.nodes.map((n) => [n.id, n])), [galaxy])
-
-  const laneCount = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const l of galaxy.links) {
-      counts.set(l.source, (counts.get(l.source) ?? 0) + 1)
-      counts.set(l.target, (counts.get(l.target) ?? 0) + 1)
+function disposeGroup(group: THREE.Object3D) {
+  group.traverse(object => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Sprite) {
+      // Sprite geometry is shared by Three; the cached glow texture is shared too.
+      if (!(object instanceof THREE.Sprite)) object.geometry.dispose()
+      const materials = Array.isArray(object.material) ? object.material : [object.material]
+      materials.forEach(material => material.dispose())
     }
-    return counts
-  }, [galaxy])
+  })
+  group.clear()
+}
 
-  // ---- measure the container ----
+export function GalaxyGraph(props: GalaxyGraphProps) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const labelRef = useRef<HTMLDivElement>(null)
+  const latest = useRef(props)
+  latest.current = props
+  const rebuildRef = useRef<(() => void) | null>(null)
   useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return
-    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight })
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  // ---- build a node's sprite group (additive glow: halo + core) ----
-  const makeNode = useCallback(
-    (node: GalaxyNode) => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x05070d)
+    const content = new THREE.Group()
+    scene.add(content)
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100000)
+    let canvas: HTMLCanvasElement | null = null
+    let rig: CameraRig | null = null
+    let owner: RendererOwner | null = null
+    let raf = 0, paused = false, disposed = false, intersecting = true
+    let detach = () => {}
+    let firstReady = false
+    const proxies: THREE.Mesh[] = []
+    const makeNode = (node: GalaxyNode) => {
       const style = REGION_PALETTE[node.region]
-      const selected = selectedRef.current === node.id
+      const selected = latest.current.selectedId === node.id
       // The star map is common knowledge — every system renders fully visible
       // (#0006). Subspace tier is surfaced in the inspector, not by dimming the
       // graph; any explored-vs-charted emphasis is an M7 board-view decision.
@@ -188,7 +106,7 @@ export function GalaxyGraph({
       // Own-fleet presence marker — a bright cyan pip lifted above the star on
       // +Z so it reads as "a hull is on station here" from the oblique disk view
       // (#0002 Follow-ups 2026-07-11). A freshly spawned player sees it at home.
-      if (fleetSetRef.current.has(node.id)) {
+      if ((latest.current.fleetSystemIds ?? []).includes(node.id)) {
         const pip = new THREE.Sprite(
           new THREE.SpriteMaterial({
             map: glowTexture(),
@@ -205,186 +123,177 @@ export function GalaxyGraph({
         group.add(pip)
       }
       return group
-    },
-    [],
-  )
-
-  // Rebuild node sprites when the selection OR the own-fleet set changes so both
-  // the highlight and the fleet marker show ON the graph (spec acceptance:
-  // selection + fleet presence indicated on the graph, not only the inspector).
-  useEffect(() => {
-    fgRef.current?.refresh?.()
-  }, [selectedId, fleetSet])
-
-  const linkColor = useCallback(
-    (link: { source: GalaxyNode | string; target: GalaxyNode | string; bridge?: boolean }) => {
-      const a = typeof link.source === 'object' ? link.source : nodeById.get(link.source)
-      const b = typeof link.target === 'object' ? link.target : nodeById.get(link.target)
-      const seam = a?.region === 'barrier' || b?.region === 'barrier'
-      // A bridge is the deterministic stitch across a void the ordinary lane cap
-      // cannot span. It reads faint and cold so a long haul over empty space
-      // looks different from a local road — but it travels like any other lane.
-      if (link.bridge) return `rgba(150,185,230,0.16)`
-      // Every other lane we receive renders at full strength: lane-reveal-by-
-      // presence is enforced server-side (#0006) — the galaxy read only ships
-      // the requester's charted lanes, so there are no unknown lanes to dim here.
-      if (seam) return `rgba(244,114,182,0.5)`
-      return `rgba(150,185,230,0.42)`
-    },
-    [nodeById],
-  )
-
-  // Bridges draw thinner as well as fainter — two channels, so the distinction
-  // survives a colour-blind viewer and a dark display.
-  const linkWidth = useCallback((link: { bridge?: boolean }) => (link.bridge ? 0.25 : 0.5), [])
-
-  // ---- construct the camera rig once the graph has mounted on the client ----
-  useEffect(() => {
-    if (size.w === 0 || readyRef.current) return
-    let raf = 0
-    const tryInit = () => {
-      const fg = fgRef.current
-      const wrap = wrapRef.current
-      if (fg && wrap) {
-        const camera = fg.camera()
-        const renderer = fg.renderer()
-        const internal = fg.controls()
-        if (camera && renderer?.domElement) {
-          const rig = new CameraRig(camera, renderer.domElement, wrap, internal)
-          rigRef.current = rig
-          // Frame on the fleet's home if we already know it (spawn stashes it
-          // synchronously), else the whole disk; the wake-focus glide in
-          // GalaxyView re-centres once the fleet read settles.
-          const homeAtInit = homeIdRef.current ? nodeById.get(homeIdRef.current) : null
-          if (homeAtInit) rig.recenter({ x: homeAtInit.x, y: homeAtInit.y, z: homeAtInit.z }, 0)
-          else rig.frameBounds(galaxy.bounds)
-
-          // reference grid on the z=0 galactic disk — reads depth at a glance.
-          const scene = fg.scene()
-          if (scene && !gridRef.current) {
-            const span = Math.max(
-              galaxy.bounds.x[1] - galaxy.bounds.x[0],
-              galaxy.bounds.y[1] - galaxy.bounds.y[0],
-            )
-            const grid = new THREE.GridHelper(span * 1.4, 26, 0x33415e, 0x1b2440)
-            grid.rotation.x = Math.PI / 2 // XZ plane -> XY disk
-            grid.renderOrder = -1
-            const dim = (m: THREE.Material) => {
-              m.transparent = true
-              m.opacity = 0.5
-              m.depthWrite = false
-            }
-            const mat = grid.material
-            if (Array.isArray(mat)) mat.forEach(dim)
-            else dim(mat)
-            gridRef.current = grid
-            scene.add(grid)
-          }
-
-          readyRef.current = true
-          onReady?.({
-            // ⌖ recenter snaps to the fleet's system when one exists, else the
-            // whole disk (homeIdRef stays fresh as the fleet read settles).
-            recenter: () => {
-              const hn = homeIdRef.current ? nodeById.get(homeIdRef.current) : null
-              if (hn) rig.recenter({ x: hn.x, y: hn.y, z: hn.z })
-              else rig.frameBounds(galaxy.bounds)
-            },
-            // Glide a specific system to centre (the wake-focus handoff #0009).
-            focusSystem: (id: string) => {
-              const n = nodeById.get(id)
-              if (n) rig.focus({ x: n.x, y: n.y, z: n.z })
-            },
-            // Glide to a bare point — a fleet mid-lane (the roster's "show me").
-            focusPoint: (p) => rig.focus(p),
-            // add-renderer-availability-states: the already-mounted renderer's
-            // canvas — the seam GalaxyView's guard attaches
-            // webglcontextlost/webglcontextrestored listeners to.
-            canvas: () => renderer.domElement ?? null,
-            // Optional-call degradation, not a cast: an absent accessor on the
-            // library's real ref just means the loop keeps running while the
-            // interrupted state is shown — never a crash (design.md Risks).
-            pause: () => fg.pauseAnimation?.(),
-            resume: () => fg.resumeAnimation?.(),
-          })
-          return
+    }
+    const rebuild = () => {
+      disposeGroup(content)
+      proxies.length = 0
+      const galaxy = latest.current.galaxy
+      const nodes = new Map(galaxy.nodes.map(node => [node.id, node]))
+      for (const node of galaxy.nodes) {
+        const group = makeNode(node)
+        group.position.set(node.x, node.y, node.z)
+        content.add(group)
+        const proxy = new THREE.Mesh(new THREE.SphereGeometry(4), new THREE.MeshBasicMaterial({ visible: false }))
+        proxy.position.copy(group.position)
+        proxy.userData.nodeId = node.id
+        content.add(proxy)
+        proxies.push(proxy)
+      }
+      for (const lane of galaxy.links) {
+        const a = nodes.get(lane.source), b = nodes.get(lane.target)
+        if (!a || !b) continue
+        const seam = a.region === 'barrier' || b.region === 'barrier'
+        const start = new THREE.Vector3(a.x, a.y, a.z), end = new THREE.Vector3(b.x, b.y, b.z)
+        const direction = end.clone().sub(start)
+        // Cylinders preserve the original world-space lane width on both backends.
+        const width = lane.bridge ? 0.25 : 0.5
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(width / 2, width / 2, direction.length(), 6), new THREE.MeshBasicMaterial({
+          color: lane.bridge || !seam ? 0x96b9e6 : 0xf472b6,
+          transparent: true, opacity: lane.bridge ? 0.16 : seam ? 0.5 : 0.42, depthWrite: false,
+        }))
+        mesh.position.copy(start.add(end).multiplyScalar(0.5))
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize())
+        content.add(mesh)
+      }
+      const span = Math.max(galaxy.bounds.x[1] - galaxy.bounds.x[0], galaxy.bounds.y[1] - galaxy.bounds.y[0])
+      const grid = new THREE.GridHelper(span * 1.4, 26, 0x33415e, 0x1b2440)
+      grid.rotation.x = Math.PI / 2
+      grid.renderOrder = -1
+      const materials = Array.isArray(grid.material) ? grid.material : [grid.material]
+      materials.forEach(material => { material.transparent = true; material.opacity = 0.5; material.depthWrite = false })
+      content.add(grid)
+      scene.updateMatrixWorld(true)
+    }
+    rebuild()
+    rebuildRef.current = () => { void owner?.update(rebuild) }
+    const home = () => latest.current.galaxy.nodes.find(node => node.id === latest.current.homeSystemId)
+    const controller: GalaxyGraphController = {
+      recenter: () => { const node = home(); if (node) rig?.recenter(node); else rig?.frameBounds(latest.current.galaxy.bounds) },
+      focusSystem: id => { const node = latest.current.galaxy.nodes.find(node => node.id === id); if (node) rig?.focus(node) },
+      focusPoint: point => rig?.focus(point),
+      canvas: () => canvas,
+      pause: () => { paused = true; eligibility() },
+      resume: () => { paused = false; eligibility(); schedule() },
+      retry: () => owner?.retry(),
+    }
+    const drawable = () => !paused && intersecting && document.visibilityState !== 'hidden' && wrap.clientWidth > 0 && wrap.clientHeight > 0
+    const eligibility = () => {
+      owner?.setPresentationEligible(drawable())
+      if (rig) rig.controls.enabled = drawable() && (owner?.snapshot().phase === 'ready' || owner?.snapshot().phase === 'pending')
+    }
+    const frame = () => {
+      raf = 0
+      if (disposed) return
+      const state = owner?.snapshot()
+      if ((state?.phase === 'unavailable' || state?.phase === 'interrupted') && !state.retrying) return
+      if (drawable()) {
+        void owner?.update(() => { rig?.update() }).then(() => owner?.present(scene, camera))
+      }
+      schedule()
+    }
+    function schedule() { if (!disposed && !raf && drawable()) raf = requestAnimationFrame(frame) }
+    owner = createRendererOwner({
+      surface: 'galaxy', alpha: false, stencil: false, factory: props.rendererFactory,
+      createCanvas: () => document.createElement('canvas'),
+      onCanvas: next => {
+        detach()
+        const target = rig?.controls.target.clone()
+        rig?.dispose()
+        canvas?.remove()
+        canvas = next
+        next.style.cssText = 'width:100%;height:100%;display:block'
+        next.setAttribute('aria-label', 'Interactive galaxy map')
+        wrap.prepend(next)
+        rig = new CameraRig(camera, next, wrap, null, false)
+        if (target) { rig.controls.target.copy(target); rig.controls.update() }
+        else { const node = home(); if (node) rig.recenter(node, 0); else rig.frameBounds(latest.current.galaxy.bounds) }
+        const raycaster = new THREE.Raycaster()
+        const pick = (event: PointerEvent) => {
+          const rect = next.getBoundingClientRect()
+          if (!rect.width || !rect.height) return null
+          camera.updateMatrixWorld(true)
+          scene.updateMatrixWorld(true)
+          raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, 1 - (event.clientY - rect.top) / rect.height * 2), camera)
+          const id = raycaster.intersectObjects(proxies, false)[0]?.object.userData.nodeId
+          return latest.current.galaxy.nodes.find(node => node.id === id) ?? null
         }
-      }
-      raf = requestAnimationFrame(tryInit)
+        let down: { x: number; y: number } | null = null
+        let last = { id: '', time: -Infinity }
+        const pointerDown = (event: PointerEvent) => { if (event.button === 0) down = { x: event.clientX, y: event.clientY } }
+        const pointerUp = (event: PointerEvent) => {
+          if (!down) return
+          const movement = Math.hypot(event.clientX - down.x, event.clientY - down.y)
+          down = null
+          if (movement > 6 || owner?.snapshot().phase !== 'ready') return
+          const node = pick(event)
+          const now = performance.now()
+          if (node && last.id === node.id && now - last.time < 350) {
+            rig?.focus({ x: node.x, y: node.y, z: node.z }, 600)
+            last = { id: '', time: -Infinity }
+            latest.current.onSelect(node)
+          } else {
+            last = { id: node?.id ?? '', time: now }
+            latest.current.onSelect(node?.id === latest.current.selectedId ? null : node)
+          }
+        }
+        const hover = (event: PointerEvent) => {
+          const label = labelRef.current
+          if (!label) return
+          const node = pick(event)
+          label.textContent = node?.name ?? ''
+          label.hidden = !node
+          label.style.left = `${event.clientX - wrap.getBoundingClientRect().left + 12}px`
+          label.style.top = `${event.clientY - wrap.getBoundingClientRect().top + 12}px`
+        }
+        const leave = () => { if (labelRef.current) labelRef.current.hidden = true; down = null }
+        next.addEventListener('pointerdown', pointerDown)
+        next.addEventListener('pointerup', pointerUp)
+        next.addEventListener('pointermove', hover)
+        next.addEventListener('pointerleave', leave)
+        next.addEventListener('pointercancel', leave)
+        detach = () => {
+          next.removeEventListener('pointerdown', pointerDown); next.removeEventListener('pointerup', pointerUp)
+          next.removeEventListener('pointermove', hover); next.removeEventListener('pointerleave', leave); next.removeEventListener('pointercancel', leave)
+        }
+      },
+      onState: state => {
+        latest.current.onRendererState?.(state)
+        if (state.phase === 'ready' && !firstReady) { firstReady = true; latest.current.onReady?.(controller) }
+        if ((state.phase === 'unavailable' || state.phase === 'interrupted') && !state.retrying) { cancelAnimationFrame(raf); raf = 0 }
+        else schedule()
+        eligibility()
+      },
+    })
+    latest.current.onController?.(controller)
+    const resize = () => {
+      const width = wrap.clientWidth, height = wrap.clientHeight
+      owner?.resize(width, height, Math.min(window.devicePixelRatio || 1, 2))
+      if (width > 0 && height > 0) { camera.aspect = width / height; camera.updateProjectionMatrix() }
+      eligibility(); schedule()
     }
-    raf = requestAnimationFrame(tryInit)
+    const observer = new ResizeObserver(resize)
+    observer.observe(wrap)
+    const intersection = new IntersectionObserver(entries => { intersecting = entries[0]?.isIntersecting ?? true; eligibility(); schedule() })
+    intersection.observe(wrap)
+    const visibility = () => { eligibility(); schedule() }
+    document.addEventListener('visibilitychange', visibility)
+    resize()
     return () => {
-      if (raf) cancelAnimationFrame(raf)
+      disposed = true
+      cancelAnimationFrame(raf)
+      observer.disconnect(); intersection.disconnect()
+      document.removeEventListener('visibilitychange', visibility)
+      detach(); rig?.dispose(); owner?.dispose(); canvas?.remove(); disposeGroup(content)
+      rebuildRef.current = null
+      latest.current.onController?.(null)
     }
-  }, [size.w, galaxy.bounds, onReady, nodeById])
-
-  // Tear the rig down on unmount.
-  useEffect(() => {
-    return () => {
-      rigRef.current?.dispose()
-      rigRef.current = null
-      readyRef.current = false
-      // renderer().dispose() (called by the FG3D/react-kapsule chain) frees
-      // programs and render lists but does not release the GL context itself
-      // — that's left to GC timing. Force it here so a lost -> retry -> lost
-      // cycle never leaves more than one live context per canvas (module 1.7).
-      // Deliberately read at cleanup time, not captured at effect-setup time:
-      // FG3D attaches this ref asynchronously (after its dynamic import
-      // resolves), so a captured value would be null at mount.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      fgRef.current?.renderer()?.forceContextLoss?.()
-    }
-  }, [])
-
-  const handleNodeClick = useCallback(
-    (node: GalaxyNode) => {
-      // react-force-graph has no node dblclick; detect it from click timing.
-      // Double-click -> glide the star to centre preserving angle/zoom.
-      const now = performance.now()
-      const last = lastClickRef.current
-      if (last.id === node.id && now - last.t < DBLCLICK_MS) {
-        lastClickRef.current = { id: '', t: 0 }
-        onSelect(node)
-        rigRef.current?.focus({ x: node.x, y: node.y, z: node.z }, 600)
-        return
-      }
-      lastClickRef.current = { id: node.id, t: now }
-      onSelect(selectedRef.current === node.id ? null : node)
-    },
-    [onSelect],
-  )
-
-  return (
-    <div ref={wrapRef} data-testid="galaxy-graph" className="absolute inset-0">
-      {size.w > 0 && (
-        <ForceGraph3D
-          ref={fgRef}
-          width={size.w}
-          height={size.h}
-          graphData={graphData}
-          backgroundColor="#05070d"
-          showNavInfo={false}
-          controlType="orbit"
-          cooldownTicks={0}
-          enableNodeDrag={false}
-          nodeThreeObject={makeNode}
-          nodeLabel={(n: GalaxyNode) => n.name}
-          linkColor={linkColor}
-          linkWidth={linkWidth}
-          linkOpacity={0.8}
-          onNodeClick={handleNodeClick}
-          onBackgroundClick={() => onSelect(null)}
-        />
-      )}
-      {/* controls hint */}
-      <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] tracking-wider text-white/35">
-        drag to orbit · two-finger swipe to pan · pinch to zoom · double-click to
-        focus · ⌖ recenter
-      </div>
-      {/* keep laneCount referenced for potential future glyphs without recompute churn */}
-      <span className="hidden" data-lane-index={laneCount.size} />
+  }, [props.rendererFactory])
+  useEffect(() => { rebuildRef.current?.() }, [props.galaxy, props.selectedId, props.fleetSystemIds])
+  return <div ref={wrapRef} data-testid="galaxy-graph" className="absolute inset-0">
+    <div ref={labelRef} hidden className="pointer-events-none absolute rounded bg-zinc-800 px-2 py-1 text-xs text-white" />
+    <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] tracking-wider text-white/35">
+      drag to orbit · two-finger swipe to pan · pinch to zoom · double-click to focus · ⌖ recenter
     </div>
-  )
+  </div>
 }
-
 export default GalaxyGraph

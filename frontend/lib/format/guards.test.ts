@@ -82,7 +82,7 @@ const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: s
     // Archive maintenance 2026-10-12: same baseline-identical expressions;
     // parent adjudicated relocation from [837, 838, 894, 895, 1055].
     file: 'frontend/components/space/SpaceStage.tsx',
-    lines: [877, 878, 934, 935, 1096],
+    lines: [886, 887, 943, 944, 1105],
     ruling: 'RULING 10 / RULING 25 / D2',
     note: 'bearing/speed hover-facts toFixed — no covering requirement anywhere; filed as defect-hover-facts-unspecced.md, not fixed here',
   },
@@ -93,7 +93,7 @@ const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: s
     // landed. Anchor verified by grep against the live file; same single
     // reviewed site (the memo key, never rendered to a player).
     file: 'frontend/components/space/webgl/SpaceWorld.tsx',
-    lines: [196],
+    lines: [191],
     ruling: 'not a player-facing figure / D2',
     note: 'toFixed(4) builds a memo key, never rendered to a player',
   },

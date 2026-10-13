@@ -1,53 +1,11 @@
 import { test, expect } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 import { emulatorSignIn } from '../helpers/firebase-emulator'
+import { prepareCommandHud } from '../helpers/space-view'
 
-/**
- * New-user first activities (#0009 spawn, `system-interior`'s disclosed
- * interim read, `system-space-view`) — the common "wake up and take your
- * first steps" path:
- *
- *   sign up → name your lineage → wake DIRECTLY onto your home system's
- *   SPACE VIEW, with your hull on station AND commandable → and only home is
- *   charted (still zero lanes — see below).
- *
- * REWRITTEN for `build-production-space-view` tasks.md 2.1b / 10.8. Cause:
- * task 2.1 replaced `/systems/:systemId`'s view outright, so the two retired
- * ids step 3 once asserted on no longer exist — and neither does anything
- * that could emit them. Step 3 asserted their ABSENCE for a while afterwards;
- * those two lines were deleted 2026-09-04 by orchestrator ruling, with the
- * same species in `space-journey.spec.ts`, because an assertion no code path
- * can falsify has not been shown to test anything. Note that step 3's
- * `renderer-unsupported` / `renderer-interrupted` checks below are NOT the
- * same species and must not be swept with them: `RendererStateNotice.tsx`
- * emits both, so a failed WebGL bring-up turns them red.
- * Every assertion's SUBSTANCE is preserved; two are
- * strengthened, both for the same reason: the board view was mounted the
- * moment its data arrived, while the space view holds a placeholder until its
- * renderer has produced a first frame (`system-space-view`: "Loading persists
- * through first frame after data arrives"). "The view is up" therefore now
- * means "a frame was drawn and the placeholder is gone", not merely "a
- * container exists" — which is what a new player actually experiences, and
- * what a mounted-but-black canvas would fail.
- *
- * data-testid contract this spec assumes:
- *   - `space-view` — the view container
- *   - `space-canvas-region` — the rendering region
- *   - `space-loading` — the placeholder that must GIVE WAY
- *   - `fleet-roster` / `fleet-row-{fleetId}` — unchanged
- *   - `burn-button` — the burn commit, now on the command panel rather than
- *     the roster row (`system-space-view`: *Burn Command Targets Any Selected
- *     Body, Lane Gate, or Point Uniformly*). "Commandable" is proven through
- *     it: a freshly spawned, parked hull must reach a commit control.
- *
- * Unlike the other specs, this one drives a FRESH signup, so it opts out of
- * the shared logged-in storageState and creates its own account each run. The
- * spawn home system is chosen by an account-seeded RNG on a
- * per-signup-random Firebase UID, so we never hard-code a system: we read
- * home from the URL we land on and assert relative to it.
- *
- * Local-only: it exercises the auth emulator's signup REST path. dev/prod
- * runs use the shared pre-provisioned account and skip this.
+/** Fresh signup through the real UI: rendered home, station-docked hull,
+ * visible fleet chooser and inventory, and home-only lane disclosure.
+ * The current HUD hides Burn; this journey no longer claims UI commandability.
  */
 const cfg = resolveE2EConfig()
 
@@ -56,7 +14,7 @@ test.use({ storageState: { cookies: [], origins: [] } })
 
 test.describe('new user first activities', () => {
   // Spec: 0009/S6
-  test('signs up, wakes directly onto the home system in continuous space with a commandable fleet', async ({
+  test('signs up, wakes directly onto the home system in continuous space with a station-docked fleet and the current HUD', async ({
     page,
   }) => {
     test.skip(cfg.env !== 'local', 'new-user signup drives the auth emulator (local only)')
@@ -94,22 +52,20 @@ test.describe('new user first activities', () => {
       timeout: 30_000,
     })
 
-    // 4. The hull is on station in home and COMMANDABLE. A fresh spawn has
-    //    exactly one hull, so exactly one row is expected.
-    const roster = page.getByTestId('fleet-roster')
-    await expect(roster).toBeVisible({ timeout: 20_000 })
-    const rows = roster.locator('[data-testid^="fleet-row-"]')
-    await expect(rows).toHaveCount(1, { timeout: 20_000 })
-
-    // "Commandable" now means the player can reach a commit control for that
-    // hull. Burn lives on the command panel and is present from the first
-    // frame — disabled until something is selected, which is the offer, not
-    // its absence.
-    await expect(page.getByTestId('burn-button')).toBeVisible({ timeout: 20_000 })
-    // The docked-fleet panel is mounted alongside it, anchored to the hull's
-    // own served state rather than to any selection.
-    await expect(page.getByTestId('space-fleet-panel')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId('hold-readout')).toBeVisible({ timeout: 20_000 })
+    // 4. Dismiss the startup guide through its real control and inspect the
+    // current fleet through the persistent strip and fleet chooser.
+    await prepareCommandHud(page)
+    await expect(page.getByTestId('vitals-fleet-id')).toBeVisible()
+    await expect(page.getByTestId('vitals-state-pill')).toContainText(/docked at station/i)
+    await page.getByTestId('vitals-fleet-chevron').click()
+    const rows = page.locator('[data-testid^="vitals-fleet-menu-item-"]')
+    await expect(rows).toHaveCount(1)
+    const fleetId = (await rows.first().getAttribute('data-testid'))!.replace('vitals-fleet-menu-item-', '')
+    await rows.first().click()
+    await expect(page.getByTestId('vitals-fleet-id')).toHaveText(fleetId)
+    await expect(page.getByTestId('hold-readout')).toBeVisible()
+    await expect(page.getByTestId('system-index-toggle')).toBeVisible()
+    await expect(page.getByTestId('burn-button'), 'the current HUD does not expose a burn commit').toBeHidden()
 
     // 5. Lane fog (`fleet-movement`/`corporation-spawn`: spawn charts home
     //    only, no lanes). A fresh corp's galaxy read ships every node and ZERO

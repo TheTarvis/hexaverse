@@ -78,7 +78,10 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   async function openStationDetails() {
     const toggle = page.getByTestId('system-index-toggle')
     if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
-    await page.getByTestId(`index-${stationId}`).click()
+    const stationRow = page.getByTestId(`index-${stationId}`)
+    await expect(stationRow).toBeVisible({ timeout: 10_000 })
+    await stationRow.focus({ timeout: 10_000 })
+    await stationRow.press('Enter', { timeout: 10_000 })
     await expect(preview).toBeVisible()
   }
 
@@ -123,7 +126,6 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   await expect(region).toHaveAttribute('data-camera', stableCamera!)
   await expect(region).toHaveAttribute('data-selection', stationId)
   await expect(acting).toHaveAttribute('data-acting', 'true')
-  await capture('03-station-preview-controls.png')
   await page.getByTestId('details-back').click()
   await expect(page.getByTestId('spacecraft-preview-surface')).toHaveCount(0)
   await page.getByTestId('system-index-toggle').click()
@@ -143,7 +145,6 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   await expect(region).not.toHaveAttribute('data-selection', stationId)
   await stationHit.press('Enter')
   await expect(region).toHaveAttribute('data-selection', stationId)
-  await capture('04-map-close-selected-station-acting-ship.png')
   await expect(acting).toHaveAttribute('data-acting', 'true')
 
   // Inspect B while A acts and the station remains the gameplay target.
@@ -163,7 +164,6 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   const beforeInspect = await region.getAttribute('data-camera')
   await objectPreview.focus(); await objectPreview.press('ArrowLeft')
   await expect(region).toHaveAttribute('data-camera', beforeInspect!)
-  await capture('08-objects-inspected-fleet-not-acting.png')
   await objectPreview.press('Escape')
   await expect(fleetDetails).toHaveCount(0); await expect(fleetRow).toBeFocused()
   await page.getByTestId('system-index-toggle').click()
@@ -189,7 +189,6 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   await shipPreview.focus(); await shipPreview.press('ArrowLeft')
   await expect(region).toHaveAttribute('data-selection', stationId)
   await expect(acting).toHaveAttribute('data-acting', 'true')
-  await capture('05-own-fleet-inspector.png')
   await shipPreview.press('Escape')
   await expect(inspector).toHaveCount(0); await expect(chevron).toBeFocused()
   await expect(page.getByTestId('spacecraft-preview-surface')).toHaveCount(0)
@@ -208,7 +207,6 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   await expect(acting).toHaveAttribute('data-acting', 'true')
   await expect(stationHit).toBeVisible()
   await expect(region).toHaveAttribute('data-selection', stationId)
-  await capture('09-map-context-retry.png')
 
   stationFailure = true
   await page.reload()
@@ -224,7 +222,7 @@ test('Scenario: local models and isolated previews survive interaction, failure 
     if (!gl?.getExtension('WEBGL_lose_context')) throw new Error('Browser cannot exercise preview context loss')
     gl.getExtension('WEBGL_lose_context')!.loseContext()
   })
-  await expect(stationDetails.getByRole('status')).toHaveText(/unavailable/i)
+  await expect(stationDetails.getByRole('status')).toHaveText(/interrupted/i)
   await expect(canvas).toBeVisible(); await expect(page.getByTestId('renderer-unsupported')).toHaveCount(0)
   await expect(page.getByTestId('details-back')).toBeEnabled()
   stationFailure = false

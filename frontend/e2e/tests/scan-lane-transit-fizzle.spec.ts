@@ -1,13 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 import {
-  burnToSelectionAndDock,
+  prepareCommandHud,
   captureInteriors,
-  selectBody,
   wakeNewCorp,
   type ServedGate,
 } from '../helpers/space-view'
 import { captureScanTargets, openScanControlAndPickFarthestTarget } from '../helpers/scan-fixtures'
+import { arrangeBodyDock } from '../helpers/served-movement'
 import { emulatorSignIn } from '../helpers/firebase-emulator'
 
 /**
@@ -121,9 +121,14 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
     const gate = await pickFarGate(page, gates)
     expect(gate.id, 'the served gate carries no body id').toBeTruthy()
 
-    // 1. Fly to the gate and dock.
-    await selectBody(page, gate.id!)
-    await burnToSelectionAndDock(page, fleetId, 900_000)
+    // API flight is setup for the scan-fizzle observation, not UI Burn
+    // coverage: the current HUD deliberately hides the legacy command panel.
+    const { idToken } = await emulatorSignIn(cfg.emulator!, email, password)
+    await arrangeBodyDock(page, fleetId, gate.id!, idToken, 900_000)
+    await page.reload()
+    await prepareCommandHud(page)
+    await page.getByTestId('console-dock-open').click()
+    await page.getByTestId('console-tab-scan').click()
 
     // 2. Open the scan control and pick the FARTHEST served target — see
     //    the file-level comment above for why this replaced the attached
@@ -156,7 +161,6 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
 
     // 4. Commit the jump via the API — at leisure, no race to win anymore.
     expect(gate.laneId, 'the served gate carries no laneId to jump by').toBeTruthy()
-    const { idToken } = await emulatorSignIn(cfg.emulator!, email, password)
     const jumpRes = await page.request.post(`${cfg.apiURL}/v1/fleets/${fleetId}/jump`, {
       headers: { Authorization: `Bearer ${idToken}` },
       data: { laneId: gate.laneId },
@@ -275,7 +279,12 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
     //    relied upon.
     await page.goto(`/systems/${gate.destSystemId}`)
     await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
-    await page.getByTestId(`fleet-row-${fleetId}`).click()
+    await prepareCommandHud(page)
+    await page.getByTestId('vitals-fleet-chevron').click()
+    await page.getByTestId(`vitals-fleet-menu-item-${fleetId}`).click()
+    await expect(page.getByTestId('vitals-fleet-id')).toHaveText(fleetId)
+    await page.getByTestId('console-dock-open').click()
+    await page.getByTestId('console-tab-scan').click()
 
     // 8. The settled sweep's report: laneTransit or leftSystem copy —
     //    whichever fires depends on whether the sweep was folded before or
@@ -300,7 +309,7 @@ test.describe('a lane-transit fizzle reports its own copy and files no record', 
     // an unrefreshed zero-row count would pass on a stale pre-settle pile and
     // prove nothing. Invoke Refresh and wait for the unfiltered `/v1/sightings`
     // response (no `systemId`) before counting rows.
-    await page.getByTestId('console-dock-open').click()
+    await page.getByTestId('console-tab-log').click()
     await expect(page.getByTestId('sighting-log')).toBeVisible({ timeout: 10_000 })
     const unfilteredPileRead = page.waitForResponse((res) => {
       const url = new URL(res.url())

@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { MeshBasicNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu'
+import { uniform, uv, sin, vec2, vec3, texture, normalView, positionViewDirection, positionLocal, exp } from 'three/tsl'
 
 // Presentation only: sample a continuous 3D field on the sphere so longitude
 // wraps without a texture seam. No world generation or simulation uses this.
@@ -96,28 +98,19 @@ export function advancePlanetClouds(mesh: THREE.Mesh, seconds: number): void {
 
 /** Shared by the system map and inspector; the object ID fixes its surface. */
 export function createPlanetModel(kind: PlanetKind, objectId: string, geometry: THREE.SphereGeometry): THREE.Mesh {
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+  const mesh = new THREE.Mesh(geometry, new MeshStandardNodeMaterial({
     color: 0xffffff, map: createSurfaceTexture(kind, objectId),
     roughness: kind === 'ice' ? 0.65 : 0.9, metalness: 0,
   }))
   if (kind === 'gas_giant') {
-    const time = { value: 0 }
+    const time = uniform(0)
     cloudTimes.set(mesh, time)
-    // Move the existing UVs per vertex: no additional fragment samples, geometry,
-    // texture uploads or draw calls. Bounded shear avoids stretching forever.
-    mesh.material.onBeforeCompile = shader => {
-      shader.uniforms.cloudTime = time
-      shader.vertexShader = 'uniform float cloudTime;\n' + shader.vertexShader.replace('#include <uv_vertex>', `
-        #include <uv_vertex>
-        #ifdef USE_MAP
-          float latitude = vMapUv.y * 3.14159265;
-          float shear = sin(latitude * 8.0) * sin(cloudTime * 0.12) * 0.045;
-          float ripple = (sin(latitude * 14.0 + cloudTime * 0.18) - sin(latitude * 14.0)) * 0.008;
-          vMapUv.x += cloudTime * 0.006 + (shear + ripple) * sin(latitude);
-        #endif
-      `)
-    }
-    mesh.material.customProgramCacheKey = () => 'gas-cloud-drift-v1'
+    const latitude = uv().y.mul(Math.PI)
+    const shear = sin(latitude.mul(8)).mul(sin(time.mul(0.12))).mul(0.045)
+    const ripple = sin(latitude.mul(14).add(time.mul(0.18))).sub(sin(latitude.mul(14))).mul(0.008)
+    const offset = time.mul(0.006).add(shear.add(ripple).mul(sin(latitude)))
+    mesh.material.colorNode = texture(mesh.material.map!, uv().add(vec2(offset, 0)))
+
   }
   if (kind === 'rocky') {
     const atmosphere = new THREE.Mesh(geometry, createAtmosphereMaterial())
@@ -174,48 +167,19 @@ export function createHexGrid(extent: number): THREE.LineSegments {
 }
 
 /** A restrained scattering rim; its parent supplies position and draw scale. */
-export function createAtmosphereMaterial(): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    vertexShader: `
-      varying vec3 vNormal;
-      varying vec3 vEye;
-      void main() {
-        vec4 p = modelViewMatrix * vec4(position, 1.0);
-        vNormal = normalize(normalMatrix * normal);
-        vEye = -p.xyz;
-        gl_Position = projectionMatrix * p;
-      }`,
-    fragmentShader: `
-      varying vec3 vNormal;
-      varying vec3 vEye;
-      void main() {
-        float rim = pow(1.0 - max(dot(normalize(vNormal), normalize(vEye)), 0.0), 5.0);
-        gl_FragColor = vec4(0.16, 0.48, 0.7, rim * 0.48);
-        #include <colorspace_fragment>
-      }`,
-  })
+export function createAtmosphereMaterial(): MeshBasicNodeMaterial {
+  const material = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+  material.colorNode = vec3(0.16, 0.48, 0.7)
+  material.opacityNode = normalView.normalize().dot(positionViewDirection.normalize()).max(0).oneMinus().pow(5).mul(0.48)
+  return material
 }
 
 /** Far sky: static broad haze, never a foreground veil. */
-export function createBackdropMaterial(): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, depthTest: false,
-    vertexShader: `
-      varying vec3 vDirection;
-      void main() {
-        vDirection = position;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }`,
-    fragmentShader: `
-      varying vec3 vDirection;
-      void main() {
-        vec3 d = normalize(vDirection);
-        float ribbon = exp(-pow((d.y + 0.22 + 0.16 * sin(d.x * 4.0 + d.z * 2.0)) * 3.8, 2.0));
-        float cloud = 0.55 + 0.22 * sin(d.x * 7.0 + d.z * 5.0) * sin(d.z * 8.0 - d.y * 6.0);
-        vec3 color = vec3(0.0015, 0.004, 0.012) + vec3(0.003, 0.012, 0.032) * ribbon * cloud;
-        gl_FragColor = vec4(color, 1.0);
-        #include <colorspace_fragment>
-      }`,
-  })
+export function createBackdropMaterial(): MeshBasicNodeMaterial {
+  const material = new MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, depthTest: false })
+  const d = positionLocal.normalize()
+  const ribbon = exp(d.y.add(0.22).add(sin(d.x.mul(4).add(d.z.mul(2))).mul(0.16)).mul(3.8).pow(2).negate())
+  const cloud = sin(d.x.mul(7).add(d.z.mul(5))).mul(sin(d.z.mul(8).sub(d.y.mul(6)))).mul(0.22).add(0.55)
+  material.colorNode = vec3(0.0015, 0.004, 0.012).add(vec3(0.003, 0.012, 0.032).mul(ribbon).mul(cloud))
+  return material
 }

@@ -1,11 +1,12 @@
 import { test, expect, type Page } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
+import { emulatorSignIn } from '../helpers/firebase-emulator'
+import { commitServedBurn } from '../helpers/served-movement'
 import {
-  burnToSelectionAndDock,
   captureInteriors,
   digits,
   holdKindTons,
-  selectBody,
+  prepareCommandHud,
   stationFeatureId,
   wakeNewCorp,
   type ServedGate,
@@ -21,12 +22,12 @@ import {
  * THE WALK, verbatim from RULING 9's "Consequence for this link's journey"
  * (`add-vitals-strip-rulings.md`) plus QA's two BLOCKED rows:
  *
- *   1. Dock at a station and read all five strip cells.
+ *   1. Read all five strip cells at the station where the fleet spawns.
  *   2. Switch the acting fleet via the chevron — same-system, then
  *      cross-system.
- *   3. Commit a burn and watch the pill flip to the under-way state and
+ *   3. Arrange a real backend burn (not a UI commit) and watch the pill
  *      COUNT DOWN (assert it moves, not that it holds one value).
- *   4. The 1280×720 viewport check with the command column, the camera
+ *   4. The 1280×720 viewport check with the Objects browser, the camera
  *      cluster, and `sightings-unavailable` (with its retry affordance) all
  *      present at once — QA's two BLOCKED rows under *The Strip Is
  *      Laptop-First and Never Overflows the View*.
@@ -54,8 +55,8 @@ import {
  *
  * WHY `/v1/sightings` IS ROUTE-INTERCEPTED RATHER THAN LEFT TO CHANCE. The
  * viewport scenario *No other floating surface covers a strip cell* needs
- * `sightings-unavailable` on screen at the same instant as the command
- * column and the camera cluster — three floating surfaces at once, per QA's
+ * `sightings-unavailable` on screen at the same instant as the Objects
+ * browser and the camera cluster — three floating surfaces at once, per QA's
  * BLOCKED rows. `ghostFeed.isError` (`SystemSpaceView.tsx`) is the only
  * lever, and it is a real network failure, not a hand-built DOM fixture:
  * `page.route` returns a real 500 to a real fetch, and the real
@@ -69,12 +70,9 @@ import {
  * with its own Retry in the DOM, is therefore expected in this leg. No assertion
  * changes: every assertion here is scoped to `sightings-unavailable`.
  *
- * KNOWN RESIDUE THIS RUN MAY HIT (read before treating any red as a new
- * defect): `defect-station-order-500.md` — an intermittent (~2%) bodyless
- * 500 on a burn ordered TO A STATION, which this journey's first leg does.
- * `defect-post-sale-departure-burn-409s.md` and
- * `defect-burn-cancels-running-mine.md` do not apply here — this journey
- * never sells and never mines, the two preconditions both defects need.
+ * Current-HUD reconciliation: the fleet chooser also offers Inspect, so only
+ * fleet choices are counted. Burn is hidden; backend movement is setup for
+ * observing the live countdown/draining state and never UI command evidence.
  */
 const cfg = resolveE2EConfig()
 
@@ -83,12 +81,8 @@ test.use({
   viewport: { width: 1280, height: 720 },
 })
 
-// One full-length burn to the home station (the 500-defect's own site,
-// budgeted like `refuel-commit.spec.ts`/`slice.spec.ts`), plus a
-// deliberately-not-awaited-to-completion burn to the rim gate, a route
-// intercept, and a reload. Generous, not tight: a hang budget that holds at any
-// scale, including an unwarped E2E_WORLD_TIME_SCALE=1 run. The stack itself
-// runs the world warped (`backend-stack.ts`).
+// The existing hang budget is retained; the rim-bound observation leg does not
+// wait for docking. No timeout was raised for the HUD reconciliation.
 test.setTimeout(900_000)
 
 /**
@@ -274,7 +268,7 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     const interiors = captureInteriors(page)
 
     // 1. Sign up and wake onto the home system.
-    const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Vitals', 'vitals')
+    const { homeSystemId, fleetId, email, password } = await wakeNewCorp(page, 'E2E Vitals', 'vitals')
 
     const home = await interiors.get(homeSystemId)
     expect(home, `no interior read for ${homeSystemId} was captured off the wire`).toBeTruthy()
@@ -299,8 +293,8 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     // Step 1 — dock at a station, read all five strip cells.
     // -----------------------------------------------------------------
 
-    await selectBody(page, stationId!)
-    await burnToSelectionAndDock(page, fleetId, 600_000)
+    // Fresh fleets now spawn attached to the station; no travel setup needed.
+    await expect(page.getByTestId('burn-button')).toBeHidden()
 
     // Scenario: A docked fleet at a feature names its type and served id.
     await expect(page.getByTestId('vitals-state-pill'), 'the pill must read the docked state').toContainText(
@@ -365,8 +359,8 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     const menu = page.getByTestId('vitals-fleet-menu')
     await expect(menu).toBeVisible({ timeout: 10_000 })
     await expect(menu).toHaveAttribute('role', 'menu')
-    const menuItems = menu.locator('[role="menuitem"]')
-    await expect(menuItems, 'a sole owned fleet leaves the menu with exactly one entry').toHaveCount(1)
+    const menuItems = menu.locator('[data-testid^="vitals-fleet-menu-item-"]')
+    await expect(menuItems, 'a sole owned fleet leaves exactly one fleet choice (beside Inspect)').toHaveCount(1)
     await expect(page.getByTestId(`vitals-fleet-menu-item-${fleetId}`)).toBeVisible()
 
     await page.getByTestId(`vitals-fleet-menu-item-${fleetId}`).click()
@@ -390,11 +384,11 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     await expect(page.getByTestId('space-loading')).toBeHidden({ timeout: 60_000 })
     await expect(page.getByTestId('vitals-strip')).toBeVisible({ timeout: 20_000 })
 
-    // Scenario: The chevron survives the no-acting-fleet state.
+    // The current HUD retains the selected fleet while viewing another system.
     await expect(
       page.getByTestId('vitals-fleet-id'),
-      'no owned fleet is present in this foreign system, so identity reads absent',
-    ).toHaveText('—')
+      'the remote selected fleet remains identified in the current HUD',
+    ).toHaveText(fleetId)
 
     await page.getByTestId('vitals-fleet-chevron').click()
     await expect(page.getByTestId('vitals-fleet-menu')).toBeVisible({ timeout: 10_000 })
@@ -416,15 +410,19 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     await expect(page.getByTestId('vitals-state-pill')).toContainText(/docked/i)
 
     // -----------------------------------------------------------------
-    // Step 3 — commit a burn, watch the pill flip to under way, and watch
+    // Step 3 — arrange a burn through the backend, watch the pill flip to under way, and watch
     // the countdown MOVE (`system-console`: *The countdown advances
     // between reads*) — not merely that it holds one value.
     // -----------------------------------------------------------------
 
-    await selectBody(page, gate.id!)
-    await expect(page.getByTestId('gate-facts')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId('preview-panel')).toBeVisible({ timeout: 20_000 })
-    await page.getByTestId('burn-button').click()
+    // Arrange movement through the real backend solely to observe live vitals.
+    // Burn is hidden in the current HUD: this is not UI command coverage.
+    const { idToken } = await emulatorSignIn(cfg.emulator!, email, password)
+    // Low commanded acceleration keeps the gate-bound burn observable across reload.
+    await commitServedBurn(page, fleetId, { bodyId: gate.id!, accel: 1 }, idToken)
+    await page.reload()
+    await expect(page.getByTestId('space-loading')).toBeHidden({ timeout: 60_000 })
+    await prepareCommandHud(page)
 
     // Scenario: A burn toward a lane gate names the gate's destination
     // system.
@@ -483,30 +481,15 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     await expect(retryButton, 'the retry affordance must remain visible and activatable').toBeVisible()
     await expect(retryButton).toBeEnabled()
 
-    // The three relocated/floating surfaces. `space-fleet-panel` and
-    // `preview-panel` are the command column's own two panels (contract §9);
-    // both always mount, fleet-selected or not.
-    const commandColumnA = await box(page, 'space-fleet-panel')
-    const commandColumnB = await box(page, 'preview-panel')
+    await prepareCommandHud(page)
+    // Measure the surfaces the player can actually reach in the current HUD.
+    const objectBrowser = await box(page, 'live-object-browser')
     const cameraCluster = await box(page, 'space-camera-controls')
     const sightingsBox = await box(page, 'sightings-unavailable')
-    // RULING 46 (add-vitals-strip rulings) — `FloatingNav` is mounted
-    // app-wide by `frontend/components/layout-wrapper.tsx:108` for every
-    // authenticated route; it is the surface that failed this gate's run 1.
-    // Re-read for add-console-dock (task 3.4), dock COLLAPSED (this leg never
-    // expands it): the nav and the sightings-unavailable card now take their
-    // 72 px foot from `CONSOLE_DOCK_LANE_LEFT_CENTER` (3.5rem + 1rem), the
-    // same 72 px as the old `bottom-[4.5rem]`; the camera cluster moved up to
-    // 100 px; the command column's foot moved to 140 px (564 px tall at this
-    // viewport) and carries `space-command-column`. This leg measures the
-    // column's two panels, the cluster, the card and the nav, never the
-    // column's own box, so no assertion below depends on a moved edge and none
-    // was edited. The collapsed dock's own geometry is the dock journey's.
     const floatingNav = await box(page, 'floating-nav')
 
     const floatingSurfaces: [string, Box][] = [
-      ['space-fleet-panel', commandColumnA],
-      ['preview-panel', commandColumnB],
+      ['live-object-browser', objectBrowser],
       ['space-camera-controls', cameraCluster],
       ['sightings-unavailable', sightingsBox],
       ['floating-nav', floatingNav],

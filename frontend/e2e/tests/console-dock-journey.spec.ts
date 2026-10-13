@@ -12,7 +12,7 @@ import { captureCorporationId, captureScanTargets, commitScan, seedSightingFixtu
  * section 9.3; the record is `docs/handoffs/add-console-dock-integrity.md`.
  *
  * THE FLOATING SURFACES (the five the spec's geometry requirement names):
- * the command column (measured as ONE scrolling surface by `space-command-column`),
+ * the Objects browser (measured by `live-object-browser`),
  * the sightings-unavailable card, the camera cluster, `FloatingNav` and the
  * "Console" control. Transient toasts, hover fact cards and the off-screen
  * reach chips are not covered.
@@ -283,6 +283,8 @@ async function expandDock(): Promise<void> {
     await page.getByTestId('console-dock-open').click()
   }
   await expect(page.getByTestId('console-dock-collapse')).toBeVisible({ timeout: 10_000 })
+  // Log-focused legs choose Log explicitly; the current dock defaults to Scan.
+  await page.getByTestId('console-tab-log').click()
 }
 async function collapseDock(): Promise<void> {
   if (await page.getByTestId('console-dock-collapse').isVisible()) {
@@ -518,7 +520,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
         'the card must be up: the system-filtered sightings read is failed by the route predicate',
       ).toBeVisible({ timeout: 25_000 })
       const surfaces: [string, Box][] = [
-        ['space-command-column', await measure('space-command-column (collapsed)', 'space-command-column')],
+        ['live-object-browser', await measure('live-object-browser (collapsed)', 'live-object-browser')],
         ['sightings-unavailable', await measure('sightings-unavailable (collapsed)', 'sightings-unavailable')],
         ['space-camera-controls', await measure('space-camera-controls (collapsed)', 'space-camera-controls')],
         ['floating-nav', await measure('floating-nav (collapsed)', 'floating-nav')],
@@ -593,8 +595,15 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
       await open.focus()
       await page.keyboard.press('Enter')
       await expect(page.getByTestId('console-dock-region')).toBeVisible({ timeout: 10_000 })
-      await expect(tab, 'expanding by Enter moves focus to the Log tab').toBeFocused()
-      await expectFocusOutline('Log tab, focused by keyboard expansion')
+      const scanTab = page.getByTestId('console-tab-scan')
+      await expect(scanTab, 'first expansion focuses the default Scan tab').toBeFocused()
+      await expect(scanTab).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByTestId('console-panel-log')).toBeHidden()
+      await expectFocusOutline('Scan tab, focused by keyboard expansion')
+      await page.keyboard.press('ArrowRight')
+      await expect(tab, 'ArrowRight selects and focuses Log').toBeFocused()
+      await expect(tab).toHaveAttribute('aria-selected', 'true')
+      await expectFocusOutline('Log tab, selected by keyboard')
       const dock = await measure('console-dock (expanded)', 'console-dock')
       expect(dock.height, 'the expanded dock is 220 CSS px tall (strip top to the viewport foot)').toBeCloseTo(220, 0)
       expect(dock.width, 'the expanded dock is the full 1280 px wide').toBeCloseTo(1280, 0)
@@ -616,7 +625,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
 
       // The Log tab and the collapse control meet the 24 px minimum (targets-24's other half;
       // failures are recorded here and folded into that leg by the closing test).
-      for (const id of ['console-tab-log', 'console-dock-collapse']) {
+      for (const id of ['console-tab-scan', 'console-tab-log', 'console-dock-collapse']) {
         const tb = await measure(`${id} (expanded, targets-24)`, id)
         if (tb.width < 24 || tb.height < 24) targets24ExpandedFailures.push(`${id} is ${r1(tb.width)}x${r1(tb.height)}`)
       }
@@ -638,7 +647,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
       // Space on the "Console" control, Enter on the collapse control.
       await page.keyboard.press('Space')
       await expect(collapse).toBeVisible({ timeout: 10_000 })
-      await expect(tab, 'expanding by Space moves focus to the Log tab').toBeFocused()
+      await expect(tab, 'reopening by Space remembers and focuses the selected Log tab').toBeFocused()
       await collapse.focus()
       await page.keyboard.press('Enter')
       await expect(open, 'Enter on the collapse control collapses the dock').toBeVisible({ timeout: 10_000 })
@@ -718,15 +727,15 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
         'the card must be up (the route predicate is still installed)',
       ).toBeVisible({ timeout: 25_000 })
       const surfaces: [string, Box][] = [
-        ['space-command-column', await measure('space-command-column (expanded)', 'space-command-column')],
+        ['live-object-browser', await measure('live-object-browser (expanded)', 'live-object-browser')],
         ['sightings-unavailable', await measure('sightings-unavailable (expanded)', 'sightings-unavailable')],
         ['space-camera-controls', await measure('space-camera-controls (expanded)', 'space-camera-controls')],
         ['floating-nav', await measure('floating-nav (expanded)', 'floating-nav')],
       ]
       const strip = await measure('vitals-strip (expanded, geometry)', 'vitals-strip')
       const dock = await measure('console-dock (expanded, geometry)', 'console-dock')
-      const colClient = await page.getByTestId('space-command-column').evaluate((el) => ({ clientHeight: el.clientHeight, scrollHeight: el.scrollHeight }))
-      console.log(`[journey-leg-data] geometry-expanded: command column ${JSON.stringify(colClient)}`)
+      const colClient = await page.getByTestId('live-object-browser').evaluate((el) => ({ clientHeight: el.clientHeight, scrollHeight: el.scrollHeight }))
+      console.log(`[journey-leg-data] geometry-expanded: Objects browser ${JSON.stringify(colClient)}`)
       for (const [name, b] of surfaces) {
         expect(insideViewport(b), `${name} lies wholly inside 1280x720 with the dock expanded`).toBe(true)
         expect(overlaps(b, strip), `${name} must not overlap the strip`).toBe(false)
@@ -816,6 +825,8 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
   test("5: a settled sweep's report link leaves the dock expanded on the Log tab with focus on it", async () => {
     await runLeg('report-link', async () => {
       await collapseDock()
+      await page.getByTestId('console-dock-open').click()
+      await page.getByTestId('console-tab-scan').click()
       const map = scanTargetsByFleet.map!
       // The scan control and its served targets (the fixture may not arrange one).
       try {
@@ -852,11 +863,11 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
         return { untested: `the report carries no link to the log (a fizzled or empty sweep): ${JSON.stringify(text)}` }
       }
 
-      // GIVEN the dock collapsed, the link expands it on the Log tab and moves focus to the tab.
-      await expect(page.getByTestId('console-dock-open')).toBeVisible()
+      // The report is inside Scan now. Its visible link switches to Log and focuses the tab.
+      await expect(page.getByTestId('console-tab-scan')).toHaveAttribute('aria-selected', 'true')
       await link.scrollIntoViewIfNeeded({ timeout: 5_000 })
       await link.click()
-      await expect(page.getByTestId('console-dock-collapse'), 'the link expanded the collapsed dock').toBeVisible({ timeout: 10_000 })
+      await expect(page.getByTestId('console-dock-collapse'), 'the link keeps the dock expanded').toBeVisible({ timeout: 10_000 })
       await expect(page.getByTestId('console-tab-log')).toHaveAttribute('aria-selected', 'true')
       await expect(page.getByTestId('console-tab-log'), 'focus lands on the Log tab').toBeFocused()
       await expect(page.getByTestId('sighting-log'), 'the log is shown').toBeVisible({ timeout: 10_000 })
@@ -869,7 +880,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
       )
 
       // The link again while the dock is expanded: still expanded, focus back on the tab.
-      await page.getByTestId('vitals-fleet-chevron').focus()
+      await page.getByTestId('console-tab-scan').click()
       const link2 = page.getByTestId('scan-report').getByRole('button', { name: /open the sighting log/i })
       if ((await link2.count()) > 0) {
         await link2.scrollIntoViewIfNeeded({ timeout: 5_000 })

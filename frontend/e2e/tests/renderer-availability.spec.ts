@@ -1,32 +1,15 @@
 import { test, expect } from '@playwright/test'
 import { seededSystemId } from '../helpers/seeded-world'
 
-/**
- * Renderer availability states (add-renderer-availability-states).
- *
- * Two things ONLY this level can prove:
- *   1. Creation failure through a REAL mount path — every vitest-level test
- *      for this mocks the renderer wholesale (design.md's testability note);
- *      this is the one place a real library's construction is exercised at
- *      all.
- *   2. A REAL `webglcontextlost`/`webglcontextrestored` round trip against a
- *      REAL WebGLRenderer context — jsdom has no WebGL, so nothing below
- *      Playwright can genuinely lose or restore a context.
- *
- * EXTENDED for `build-production-space-view` tasks.md 10.8. When this suite
- * was written the galaxy view was "the one place a real WebGL renderer
- * actually mounts today" — the board half shipped mounted but with no real
- * canvas. That is no longer true: `/systems/:systemId` now mounts a real
- * three.js renderer on its own canvas, with its own guard, and it is the
- * surface a player spends their session in. The two galaxy tests below are
- * UNCHANGED; two space-view tests are added beside them, exercising the same
- * two scenarios against the new surface.
- *
- * Both halves matter and neither substitutes for the other: they are separate
- * renderers, separate mount paths, and separate guard instances — the galaxy
- * graph is a third-party library's canvas, the space view is this repo's own.
- * A regression in either is invisible to the other's test.
- */
+// Compatibility restoration remains automatic, while the migration journey
+// separately proves native device loss and explicit retry. Force the real
+// compatibility backend so a native adapter cannot bypass these loss fixtures.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined })
+  })
+})
+
 test.describe('renderer availability', () => {
   test('a rendering context that cannot be created shows the named unsupported state, with the intel panel usable and no page error', async ({
     page,
@@ -60,9 +43,8 @@ test.describe('renderer availability', () => {
     const notice = page.getByTestId('renderer-unsupported')
     await expect(notice).toBeVisible({ timeout: 15_000 })
     await expect(notice).toContainText(/browser|graphics hardware|webgl|gpu/i)
-    // The real react-force-graph-3d canvas never mounted — pre-emption, not
-    // a caught-after-the-fact crash.
-    await expect(page.getByTestId('galaxy-graph')).toHaveCount(0)
+    // No candidate published a first frame; the owner remains mounted for retry.
+    await expect(page.getByTestId('galaxy-graph').locator('canvas[data-renderer-ready="true"]')).toHaveCount(0)
 
     // Scenario: Surrounding galaxy affordances remain usable.
     await expect(page.getByTestId('intel-panel')).toBeVisible()
@@ -88,7 +70,7 @@ test.describe('renderer availability', () => {
     // querying for the canvas immediately after the testid appeared was an
     // intermittent `Cannot read properties of null (reading 'getContext')`
     // crash, not an app defect. Wait for the canvas element itself.
-    await page.waitForSelector('[data-testid="galaxy-graph"] canvas', { timeout: 15_000 })
+    await expect(page.getByTestId('galaxy-graph').locator('canvas')).toHaveAttribute('data-renderer-ready', 'true', { timeout: 15_000 })
     const urlBeforeLoss = page.url()
 
     // Hardening note (QA, post-SHIP): under this sandbox's headless
@@ -142,11 +124,13 @@ test.describe('renderer availability', () => {
 
       loseExt.restoreContext()
       const recovered = await waitUntil(
-        () => !document.querySelector('[data-testid="renderer-interrupted"]'),
+        () => !document.querySelector('[data-testid="renderer-interrupted"]') &&
+          !!document.querySelector('canvas[data-renderer-ready="true"]'),
         10_000,
       )
 
-      return { ok: true as const, sawInterrupted, canvasStillAttached, sameCanvasNode, recovered }
+      const freshCanvas = document.querySelector('canvas[data-renderer-ready="true"]') !== canvas
+      return { ok: true as const, sawInterrupted, canvasStillAttached, sameCanvasNode, recovered, freshCanvas }
     })
 
     expect(result.ok, `page.evaluate reported: ${JSON.stringify(result)}`).toBe(true)
@@ -161,6 +145,7 @@ test.describe('renderer availability', () => {
     expect(result.sameCanvasNode).toBe(true)
     // Scenario: A restored context resumes without navigation.
     expect(result.recovered).toBe(true)
+    expect(result.freshCanvas).toBe(true)
 
     // Re-confirm from Playwright's own side too (belt-and-suspenders, and
     // the one check that must be independent of the in-page script: a real
@@ -228,8 +213,11 @@ test.describe('renderer availability — the system space view', () => {
     // Scenario: The fleet panel and roster stay usable without a canvas.
     // Every command anchored to the fleet's own served state is reachable;
     // only the ones that need a canvas SELECTION are withdrawn.
-    await expect(page.getByTestId('space-fleet-panel')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId('fleet-roster')).toBeVisible()
+    await expect(page.getByTestId('vitals-strip')).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('button', { name: /Switch acting fleet/ }).click()
+    await expect(page.getByRole('menu')).toBeVisible()
+    await expect(page.getByRole('menuitem').first()).toBeEnabled()
+    await page.getByTestId('vitals-fleet-chevron').press('Escape')
 
     // Scenario: ...with no uncaught error thrown.
     expect(pageErrors).toEqual([])
@@ -247,6 +235,7 @@ test.describe('renderer availability — the system space view', () => {
     // The renderer actually came up before we take it away — losing a context
     // that never existed proves nothing.
     await expect(page.getByTestId('space-loading')).toBeHidden({ timeout: 60_000 })
+    await expect(page.getByTestId('space-canvas')).toHaveAttribute('data-renderer-ready', 'true')
     const urlBeforeLoss = page.url()
 
     // Lose and restore in ONE page-context turn. See the galaxy test above
@@ -290,11 +279,13 @@ test.describe('renderer availability — the system space view', () => {
 
       loseExt.restoreContext()
       const recovered = await waitUntil(
-        () => !document.querySelector('[data-testid="renderer-interrupted"]'),
+        () => !document.querySelector('[data-testid="renderer-interrupted"]') &&
+          !!document.querySelector('canvas[data-renderer-ready="true"]'),
         10_000,
       )
 
-      return { ok: true as const, sawInterrupted, canvasStillAttached, sameCanvasNode, recovered }
+      const freshCanvas = document.querySelector('canvas[data-renderer-ready="true"]') !== canvas
+      return { ok: true as const, sawInterrupted, canvasStillAttached, sameCanvasNode, recovered, freshCanvas }
     })
 
     expect(result.ok, `page.evaluate reported: ${JSON.stringify(result)}`).toBe(true)
@@ -306,6 +297,7 @@ test.describe('renderer availability — the system space view', () => {
     expect(result.sameCanvasNode).toBe(true)
     // Scenario: A restored context resumes rendering without navigation.
     expect(result.recovered).toBe(true)
+    expect(result.freshCanvas).toBe(true)
 
     await expect(page.getByTestId('renderer-interrupted')).not.toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('space-canvas')).toBeVisible({ timeout: 20_000 })

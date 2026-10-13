@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { stubUnsupported } from '@/components/render-guard/test-canvas'
@@ -67,6 +67,11 @@ import { SpaceStage } from './SpaceStage'
 const W = 1200
 const H = 900
 
+async function readyCanvas() {
+  await waitFor(() => expect(screen.getByTestId('space-canvas')).toHaveAttribute('data-renderer-ready', 'true'))
+  return screen.getByTestId('space-canvas') as HTMLCanvasElement
+}
+
 function stage(over: Record<string, unknown> = {}) {
   return render(
 
@@ -122,8 +127,9 @@ describe('SpaceStage — the unsupported state', () => {
     )
   })
 
-  it('SDET-added: in the default (available) world no unsupported notice is shown', () => {
+  it('SDET-added: in the default (available) world no unsupported notice is shown', async () => {
     stage()
+    await readyCanvas()
     expect(screen.queryByTestId('renderer-unsupported')).toBeNull()
     expect(screen.getByTestId('space-canvas-region')).toBeInTheDocument()
   })
@@ -154,7 +160,7 @@ describe('SpaceStage — the unsupported state', () => {
     const retry = await screen.findByTestId('renderer-retry')
     // Fire twice in one synchronous block — no awaited step between them,
     // the same shape the double-submit guards are held to.
-    await userEvent.click(retry)
+    fireEvent.click(retry)
     expect(
       (retry as HTMLButtonElement).disabled || retry.getAttribute('aria-disabled') === 'true',
       'the retry must go disabled and show progress until the attempt resolves',
@@ -210,7 +216,7 @@ describe('SpaceStage — the interrupted state', () => {
   // error
   it('Scenario: Context loss shows an interrupted state without an uncaught error', async () => {
     stage()
-    const canvas = await screen.findByTestId('space-canvas')
+    const canvas = await readyCanvas()
     loseContext(canvas as HTMLCanvasElement)
     await waitFor(() => expect(screen.getByTestId('renderer-interrupted')).toBeInTheDocument())
     // ...and the canvas element itself stays mounted, so the restore
@@ -221,7 +227,7 @@ describe('SpaceStage — the interrupted state', () => {
   // Scenario: A restored context resumes without navigation
   it('Scenario: A restored context resumes without navigation', async () => {
     stage()
-    const canvas = (await screen.findByTestId('space-canvas')) as HTMLCanvasElement
+    const canvas = await readyCanvas()
     loseContext(canvas)
     await waitFor(() => expect(screen.getByTestId('renderer-interrupted')).toBeInTheDocument())
     restoreContext(canvas)
@@ -236,7 +242,7 @@ describe('SpaceStage — the interrupted state', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       <SpaceStage systemId="s" scene={scene as any} extent={1} worldTime={100} selection={null} onFirstFrame={onFirstFrame} scale={undefined} frameSource={null} />,
     )
-    const canvas = (await screen.findByTestId('space-canvas')) as HTMLCanvasElement
+    const canvas = await readyCanvas()
     loseContext(canvas)
     await waitFor(() => expect(screen.getByTestId('renderer-interrupted')).toBeInTheDocument())
     onFirstFrame.mockClear()
@@ -268,7 +274,7 @@ describe('SpaceStage — the interrupted state', () => {
     }
     render(<Harness />)
     await userEvent.type(screen.getByTestId('panel-input'), '12')
-    const canvas = (await screen.findByTestId('space-canvas')) as HTMLCanvasElement
+    const canvas = await readyCanvas()
     loseContext(canvas)
     await waitFor(() => expect(screen.getByTestId('renderer-interrupted')).toBeInTheDocument())
     expect((screen.getByTestId('panel-input') as HTMLInputElement).value).toBe('12')
@@ -283,6 +289,7 @@ describe('SpaceStage — camera controls are inert while unavailable', () => {
   it('Scenario: Camera controls are absent while the space view is unavailable', async () => {
     // First the positive case, so "never render camera controls" fails.
     stage()
+    await readyCanvas()
     expect(screen.getByTestId('space-camera-controls')).toBeInTheDocument()
     expect(screen.getByTestId('camera-recenter')).toBeInTheDocument()
 
@@ -341,7 +348,7 @@ describe('SpaceStage — the unavailable states are accessible', () => {
   // the player
   it('Scenario: Focus does not get lost when the canvas region changes under the player', async () => {
     stage()
-    const canvas = (await screen.findByTestId('space-canvas')) as HTMLCanvasElement
+    const canvas = await readyCanvas()
     // Put focus on a focusable element INSIDE the canvas region.
     const hit = screen.getByTestId('body-hit-feat-body-0')
     hit.focus()
@@ -383,11 +390,11 @@ describe('SpaceStage — the shared render guard is actually wired to this view'
   // a retry affordance
   it('Scenario: A context that never restores keeps the interrupted state with a retry affordance', async () => {
     stage()
-    const canvas = (await screen.findByTestId('space-canvas')) as HTMLCanvasElement
+    const canvas = await readyCanvas()
     loseContext(canvas)
     await waitFor(() => expect(screen.getByTestId('renderer-interrupted')).toBeInTheDocument())
     // No restore event ever arrives.
-    await new Promise((r) => setTimeout(r, 50))
+    await waitFor(() => expect(screen.getByTestId('renderer-interrupted')).toBeInTheDocument())
     expect(screen.getByTestId('renderer-interrupted')).toBeInTheDocument()
     expect(screen.getByTestId('renderer-retry')).toBeInTheDocument()
   })
@@ -420,11 +427,11 @@ describe('SpaceStage — the shared render guard is actually wired to this view'
   // state change
   it('Scenario: A second context loss while already interrupted is a no-op state change', async () => {
     stage()
-    const canvas = (await screen.findByTestId('space-canvas')) as HTMLCanvasElement
+    const canvas = await readyCanvas()
     loseContext(canvas)
     await waitFor(() => expect(screen.getByTestId('renderer-interrupted')).toBeInTheDocument())
     loseContext(canvas)
-    await new Promise((r) => setTimeout(r, 20))
+    await waitFor(() => expect(screen.getAllByTestId('renderer-interrupted')).toHaveLength(1))
     expect(screen.getAllByTestId('renderer-interrupted')).toHaveLength(1)
   })
 
@@ -438,7 +445,7 @@ describe('SpaceStage — the shared render guard is actually wired to this view'
     stage()
     await screen.findByTestId('renderer-unsupported')
     const dump = JSON.stringify(errors)
-    expect(dump, 'the cause must be named').toMatch(/creation/)
+    expect(dump, 'the cause must be named').toMatch(/creation|init/)
     expect(dump, 'and attributed to this view').toMatch(/space/)
     spy.mockRestore()
   })

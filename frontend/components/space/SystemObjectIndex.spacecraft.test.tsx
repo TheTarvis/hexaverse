@@ -4,9 +4,9 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { SystemObjectIndex, type IndexedObject } from './SystemObjectIndex'
 
 const life = vi.hoisted(() => ({ created: [] as string[], disposed: [] as string[] }))
-vi.mock('./SpacecraftPreview', () => ({ SpacecraftPreview: ({ objectId, kind, label }: { objectId: string; kind: string; label: string }) => {
+vi.mock('./SpacecraftPreview', () => ({ SpacecraftPreview: ({ objectId, kind, label, starClass }: { objectId: string; kind: string; label: string; starClass?: string }) => {
   React.useEffect(() => { life.created.push(objectId); return () => { life.disposed.push(objectId) } }, [objectId])
-  return <div data-testid="test-preview" data-kind={kind} data-object={objectId}>3D preview of {label}</div>
+  return <div data-testid="test-preview" data-kind={kind} data-class={starClass} data-object={objectId}>3D preview of {label}</div>
 } }))
 beforeEach(() => { life.created = []; life.disposed = [] })
 const station: IndexedObject = { name: 'station-one', kind: 'station', group: 'Stations', x: 0, y: 0, knownFrom: 'System telemetry', resources: 'None' }
@@ -64,4 +64,23 @@ describe('station preview host eligibility', () => {
     expect(screen.queryByTestId('test-preview')).toBeNull()
     expect(life.created.length).toBe(life.disposed.length)
   })
+})
+
+
+it('Scenario: Selected stellar model matches the map / Star change and absent data do not retain stale art', () => {
+  const warm = { ...other, name: 'served-warm', kind: 'star', group: 'Stars', starClass: 'K' }
+  const cool = { ...warm, name: 'served-cool', starClass: 'O' }
+  const h = render(<SystemObjectIndex {...props} objects={[warm, cool]} selected={warm.name} />)
+  expect(screen.queryByTestId('test-preview')).toBeNull()
+  fireEvent.click(screen.getByTestId('index-served-warm'))
+  const preview = screen.getByTestId('test-preview')
+  expect(preview).toHaveAttribute('data-kind', 'star'); expect(preview).toHaveAttribute('data-class', 'K')
+  expect(screen.getByRole('heading', { name: warm.name }).compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('heading', { name: warm.name }).closest('aside')!.querySelector('[class*="portrait"]')).toBeNull()
+  expect(screen.getByRole('button', { name: /Focus served-warm/ })).toBeEnabled()
+  h.rerender(<SystemObjectIndex {...props} objects={[warm, cool]} selected={cool.name} />)
+  expect(screen.getAllByTestId('test-preview')).toHaveLength(1)
+  expect(screen.getByTestId('test-preview')).toHaveAttribute('data-class', 'O'); expect(life.disposed).toContain(warm.name)
+  h.rerender(<SystemObjectIndex {...props} objects={[]} selected={cool.name} />)
+  expect(screen.queryByTestId('test-preview')).toBeNull(); expect(life.disposed).toContain(cool.name)
 })

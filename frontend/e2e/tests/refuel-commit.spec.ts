@@ -1,10 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 import {
-  burnToSelectionAndDock,
   captureInteriors,
   digits,
-  selectBody,
+  openObjectDetails,
   stationFeatureId,
   wakeNewCorp,
 } from '../helpers/space-view'
@@ -66,14 +65,14 @@ test.describe('refuel commit — wire to click, double-submit guard', () => {
     // 1. Sign up and wake onto the home system — spawn's starting-fuel grant
     //    (corporation-spawn ADDED "Spawn Asset Healing") is what makes the
     //    very next step possible at all.
-    const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Refueler', 'refuel')
+    const { homeSystemId } = await wakeNewCorp(page, 'E2E Refueler', 'refuel')
 
     // The roster shows a held-fuel/range readout from the very first read
     // (fleet-roster ADDED "The Roster Row Shows Held Fuel and an Estimated
     // Range") — a fresh, un-spent starting grant, so both are present before
     // anything is burned.
-    await expect(page.getByTestId(`fleet-fuel-${fleetId}`)).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByTestId(`fleet-range-${fleetId}`)).toBeVisible()
+    await expect(page.getByTestId('vitals-fuel-tons')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('vitals-fuel-range')).toBeVisible()
 
     // 2. Burn to the home station and dock.
     //
@@ -96,8 +95,9 @@ test.describe('refuel commit — wire to click, double-submit guard', () => {
         `regression, not a seed`,
     ).toBeTruthy()
 
-    await selectBody(page, stationId!)
-    await burnToSelectionAndDock(page, fleetId, 600_000)
+    // Current spawn is already station-attached; inspect its actual services.
+    await expect(page.getByTestId('vitals-state-pill')).toContainText(/docked/i)
+    await openObjectDetails(page, stationId!)
 
     // 3. Scenario: Refuel is offered while docked at a station.
     await expect(page.getByTestId('refuel-section')).toBeVisible({ timeout: 20_000 })

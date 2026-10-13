@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import React from 'react'
 import { buildSceneModel, type SceneModel } from './space-scene'
 import { viewBasisOf, projectMarks, hitTargetTransform } from './space-projection'
 import { unprojectToViewPlane, drawOrbitPosition } from '@/lib/space/draw'
 import { panBound } from './space-camera'
 import type { Burn } from '@/lib/types/fleet'
+
+// Resolve the real dynamically imported world before fake-clock interaction.
+vi.mock('next/dynamic', async () => { const { SpaceWorld } = await import('./webgl/SpaceWorld'); return { default: () => SpaceWorld } })
 
 // RED-PHASE SUITE — tasks 2.4, 4.3a, 4.3b, 4.6, 4.8, 4.9 (design.md Decision
 // 3, decided option B; Decision 7). SpaceStage is REAL here — the transform
@@ -52,6 +55,13 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers()
 })
+
+async function ready() {
+  if (vi.isFakeTimers()) {
+    await act(async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); vi.advanceTimersToNextFrame(); for (let i = 0; i < 20; i++) await Promise.resolve() })
+    expect(screen.getByTestId('space-canvas')).toHaveAttribute('data-renderer-ready', 'true')
+  } else await waitFor(() => expect(screen.getByTestId('space-canvas')).toHaveAttribute('data-renderer-ready', 'true'))
+}
 
 function handRolledClock(getNow: () => number) {
   return { now: getNow, anchor: vi.fn(), hasReading: () => true, reading: () => null }
@@ -146,7 +156,7 @@ describe('SpaceStage + the transform loop — task 2.4', () => {
   // Scenario: Focus survives the view's animation frames (restated
   // rAF-driven, task 2.4 — the old rerender-worldTime loop is removed;
   // `SpaceStage.interaction.test.tsx` no longer carries this scenario).
-  it("Scenario: Focus survives the view's animation frames", () => {
+  it("Scenario: Focus survives the view's animation frames", async () => {
     vi.useFakeTimers()
     let simTime = T0
     const inputs = movingBodyInputs()
@@ -162,6 +172,7 @@ describe('SpaceStage + the transform loop — task 2.4', () => {
         frameSource={frameSourceOf(inputs, () => simTime)}
       />,
     )
+    await ready()
     const hit = screen.getByTestId('body-hit-feat-body-0')
     act(() => hit.focus())
     expect(document.activeElement).toBe(hit)
@@ -181,7 +192,7 @@ describe('SpaceStage + the transform loop — task 2.4', () => {
 })
 
 describe('SpaceStage + the transform loop — task 4.3a: capturing the registry', () => {
-  it('each SpaceStage mount creates exactly ONE registry, sized to its pickable and own-fleet marks', () => {
+  it('each SpaceStage mount creates exactly ONE registry, sized to its pickable and own-fleet marks', async () => {
     const inputs = movingBodyInputs()
     const coarseScene = buildSceneModel({ ...inputs, worldTimeMs: T0 })
     render(
@@ -195,6 +206,7 @@ describe('SpaceStage + the transform loop — task 4.3a: capturing the registry'
         frameSource={null}
       />,
     )
+    await ready()
     expect(registries).toHaveLength(1)
     const registrable = coarseScene.marks.filter((m) => m.pickable || m.kind === 'fleet').length
     expect(registries[0]!.size).toBe(registrable)
@@ -203,7 +215,7 @@ describe('SpaceStage + the transform loop — task 4.3a: capturing the registry'
 
 describe('SpaceStage + the transform loop — task 4.3b', () => {
   // Scenario: A hit target tracks its mark on every frame
-  it('Scenario: A hit target tracks its mark on every frame', () => {
+  it('Scenario: A hit target tracks its mark on every frame', async () => {
     vi.useFakeTimers()
     let simTime = T0
     const inputs = burningFleetInputs()
@@ -219,6 +231,7 @@ describe('SpaceStage + the transform loop — task 4.3b', () => {
         frameSource={frameSourceOf(inputs, () => simTime)}
       />,
     )
+    await ready()
     const camera = JSON.parse(screen.getByTestId('space-canvas-region').getAttribute('data-camera')!)
     const basis = viewBasisOf(camera, { width: W, height: H })
 
@@ -263,11 +276,12 @@ describe('SpaceStage + the transform loop — task 4.6', () => {
 
   // Scenario: A mark crossing the viewport edge gains or loses its
   // off-screen affordance within a second
-  it('Scenario: A mark crossing the viewport edge gains or loses its off-screen affordance within a second', () => {
+  it('Scenario: A mark crossing the viewport edge gains or loses its off-screen affordance within a second', async () => {
     const near = sceneWithBodyAt(20, T0)
     const { rerender } = render(
       <SpaceStage systemId="sys_1" scene={near} extent={EXTENT} worldTime={T0} scale={1} selection={null} frameSource={null} />,
     )
+    await ready()
     expect(screen.queryByTestId('offscreen-feat-body-0'), 'the body starts on-screen').toBeNull()
 
     // A coarse tick lands a new scene with the body now far outside the
@@ -290,7 +304,7 @@ describe('SpaceStage + the transform loop — task 4.6', () => {
 describe('SpaceStage + the transform loop — task 4.8', () => {
   // Scenario (SDET, task 4.8's own test): a point pick after a simulated
   // resize resolves against the post-resize basis, the sole basis authority.
-  it('a point pick after a resize resolves against the POST-resize basis', () => {
+  it('a point pick after a resize resolves against the POST-resize basis', async () => {
     vi.useFakeTimers()
     const onSelect = vi.fn()
     const coarseScene = emptySceneModel()
@@ -306,6 +320,7 @@ describe('SpaceStage + the transform loop — task 4.8', () => {
         frameSource={null}
       />,
     )
+    await ready()
     W = 600
     H = 400
     act(() => vi.advanceTimersToNextFrame())
@@ -325,7 +340,7 @@ describe('SpaceStage + the transform loop — task 4.8', () => {
 describe('SpaceStage + the transform loop — task 4.9', () => {
   // `onFocusMark`/`reframeOn` and the off-screen chip both read the
   // transform loop's live mark ref, not the coarse-rendered scene.marks.
-  it('the off-screen chip reframes to the LIVE mark position published by the loop, not the stale coarse one', () => {
+  it('the off-screen chip reframes to the LIVE mark position published by the loop, not the stale coarse one', async () => {
     vi.useFakeTimers()
     let simTime = T0
     const elements = { parentId: 'feat-star', radius: 5_000, periodMs: 100_000, phase: 0, inclination: 0, node: 0 }
@@ -362,6 +377,7 @@ describe('SpaceStage + the transform loop — task 4.9', () => {
         frameSource={frameSourceOf(inputs, () => simTime)}
       />,
     )
+    await ready()
     expect(screen.getByTestId('offscreen-feat-far'), 'a body 5000 units out must start off-screen').toBeInTheDocument()
 
     simTime = T0 + 25_000

@@ -40,7 +40,12 @@ import { toast } from '@/lib/toast'
 import type { Galaxy } from '@/lib/types/galaxy'
 import type { Fleet } from '@/lib/types/fleet'
 import { SHIP_MODE_PARKED } from '@/lib/types/fleet'
-import { stubUnsupported } from '@/components/render-guard/test-canvas'
+type TestRendererPhase = 'pending' | 'ready' | 'unavailable' | 'interrupted' | 'disposed'
+
+function stubUnsupported() {
+  graphBehavior.phase = 'unavailable'
+  return () => { graphBehavior.phase = 'ready' }
+}
 
 // Spies the mocked graph hands back through onReady (recenter/focusSystem) so we
 // can assert the controls drive the controller; graphPropsSpy captures the fleet
@@ -57,7 +62,7 @@ const { recenterSpy, focusSpy, focusPointSpy, graphPropsSpy, pushSpy, graphBehav
     // synchronously (simulating a creation failure that survived the
     // pre-flight probe, e.g. FG3D's own internal construction throw) without
     // needing a second mock module. Reset to false in beforeEach.
-    graphBehavior: { throwOnRender: false },
+    graphBehavior: { throwOnRender: false, phase: 'ready' as TestRendererPhase },
   }),
 )
 
@@ -102,26 +107,37 @@ vi.mock('@/components/galaxy/GalaxyGraph', async () => {
       galaxy,
       onSelect,
       onReady,
+      onController,
+      onRendererState,
       fleetSystemIds,
       homeSystemId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }: any) => {
       graphPropsSpy({ fleetSystemIds, homeSystemId })
-      // SDET-added: a real (mock) canvas exposed via the controller's
-      // `canvas()` accessor — GalaxyView wires
-      // `setGuardCanvas(controller.canvas?.() ?? null)` from this, so a test
-      // can dispatch a genuine `webglcontextlost`/`webglcontextrestored` on
-      // the SAME element the production guard attaches its listeners to,
-      // without touching the real FG3D mount path (reserved for Playwright).
+      // Container tests receive owner snapshots; actual candidate wiring is
+      // exercised independently by GalaxyGraph.test.tsx.
       const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
+      const callbacks = React.useRef({ onReady, onController, onRendererState })
+      callbacks.current = { onReady, onController, onRendererState }
       React.useEffect(() => {
-        onReady?.({
-          recenter: recenterSpy,
-          focusSystem: focusSpy,
-          focusPoint: focusPointSpy,
-          canvas: () => canvasRef.current,
-        })
-      }, [onReady])
+        const controller = {
+          recenter: recenterSpy, focusSystem: focusSpy, focusPoint: focusPointSpy,
+          canvas: () => canvasRef.current, pause: vi.fn(), resume: vi.fn(),
+          retry: () => callbacks.current.onRendererState?.({ phase: 'ready', backend: 'webgpu', retrying: false }),
+        }
+        callbacks.current.onController?.(controller)
+        callbacks.current.onRendererState?.({ phase: graphBehavior.phase, backend: 'webgpu', retrying: false })
+        if (graphBehavior.phase === 'ready') callbacks.current.onReady?.(controller)
+        const canvas = canvasRef.current
+        const lost = () => callbacks.current.onRendererState?.({ phase: 'interrupted', backend: 'webgl2', retrying: false })
+        const restored = () => callbacks.current.onRendererState?.({ phase: 'ready', backend: 'webgl2', retrying: false })
+        canvas?.addEventListener('webglcontextlost', lost)
+        canvas?.addEventListener('webglcontextrestored', restored)
+        return () => {
+          canvas?.removeEventListener('webglcontextlost', lost)
+          canvas?.removeEventListener('webglcontextrestored', restored)
+        }
+      }, [])
       // add-renderer-availability-states: simulates a construction throw
       // that survives the pre-flight probe (three/FG3D's own internal
       // throw) — the boundary GalaxyView wraps this component in must
@@ -145,7 +161,7 @@ vi.mock('@/components/galaxy/GalaxyGraph', async () => {
 })
 
 // Defensive: never let the real WebGL renderer load even if something imports it.
-vi.mock('react-force-graph-3d', () => ({ default: () => null }))
+
 
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
 
@@ -281,6 +297,7 @@ describe('GalaxyView', () => {
     vi.clearAllMocks()
     sessionStorage.clear()
     graphBehavior.throwOnRender = false
+  graphBehavior.phase = 'ready'
     // Default: no fleets, inert command mutations.
     mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
     mockUseCutDrive.mockReturnValue({ mutate: cutDriveMutate, isPending: false } as unknown as ReturnType<typeof useCutDrive>)
@@ -304,11 +321,11 @@ describe('GalaxyView', () => {
     expect(panel).toHaveTextContent('Dead zone')
   })
 
-  it('shows the inspector empty state until a node is selected', () => {
+  it('shows the inspector empty state until a node is selected', async () => {
     mockGalaxyState()
     renderView()
 
-    expect(screen.getByTestId('inspector')).toHaveTextContent(/select a system/i)
+    await waitFor(() => expect(screen.getByTestId('inspector')).toHaveTextContent(/select a system/i))
     expect(screen.queryByTestId('inspector-name')).not.toBeInTheDocument()
   })
 
@@ -381,8 +398,9 @@ describe('GalaxyView', () => {
     mockGalaxyState()
     renderView()
 
-    // Ensure onReady has run (graph mounted).
+    // Mount precedes the owner-ready effect; wait for usable controls.
     await screen.findByTestId('mock-graph')
+    await waitFor(() => expect(screen.getByTestId('galaxy-recenter')).toBeEnabled())
     fireEvent.click(screen.getByTestId('galaxy-recenter'))
 
     await waitFor(() => expect(recenterSpy).toHaveBeenCalled())
@@ -706,6 +724,43 @@ describe('GalaxyView', () => {
     expect(vi.mocked(toast.error)).not.toHaveBeenCalled()
   })
 
+  it('submits only one galaxy jump when activated twice in the same task', () => {
+    mockGalaxyState()
+    mockUseMyFleets.mockReturnValue({ data: [{
+      ...parkedFleet('fleet_1', 'sys-0'), attachedTo: 'gate-sys-9', laneId: 'lane-sys0-sys9',
+    }] } as unknown as ReturnType<typeof useMyFleets>)
+    jumpMutate.mockImplementation(() => undefined)
+    renderView()
+
+    const button = screen.getByTestId('fleet-cmd-jump-fleet_1')
+    button.click()
+    button.click()
+
+    expect(jumpMutate).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['success', 'error'] as const)('allows another galaxy jump after the previous request settles with %s', (outcome) => {
+    mockGalaxyState()
+    mockUseMyFleets.mockReturnValue({ data: [{
+      ...parkedFleet('fleet_1', 'sys-0'), attachedTo: 'gate-sys-9', laneId: 'lane-sys0-sys9',
+    }] } as unknown as ReturnType<typeof useMyFleets>)
+    jumpMutate.mockImplementation(() => undefined)
+    renderView()
+    const button = screen.getByTestId('fleet-cmd-jump-fleet_1')
+    fireEvent.click(button)
+    const callbacks = jumpMutate.mock.calls[0]![1] as {
+      onSuccess: () => void
+      onError: (error: Error) => void
+      onSettled: () => void
+    }
+    if (outcome === 'success') callbacks.onSuccess()
+    else callbacks.onError(new Error('Temporary failure'))
+    callbacks.onSettled()
+    fireEvent.click(button)
+
+    expect(jumpMutate).toHaveBeenCalledTimes(2)
+  })
+
   // --- Rejection copy mapping (replace-observation-with-sightings tasks.md
   // 4.16; galaxy-view "Jump Commit" — "A failed jump commit toasts the
   // reason" / "A failure with no distinguishable reason still toasts
@@ -818,7 +873,7 @@ describe('GalaxyView', () => {
       restoreCanvas = null
     })
 
-    it('shows a named unsupported state when the rendering context cannot be created, with no uncaught error, and never mounts the graph (Scenario: Context creation failure shows a named unsupported state)', async () => {
+    it('shows a named unsupported state when the rendering context cannot be created, with no uncaught error, without a capability preflight (Scenario: Context creation failure shows a named unsupported state)', async () => {
       restoreCanvas = stubUnsupported()
       mockGalaxyState()
       expect(() => renderView()).not.toThrow()
@@ -826,7 +881,7 @@ describe('GalaxyView', () => {
       expect(await screen.findByTestId('renderer-unsupported')).toHaveTextContent(
         /browser|graphics hardware|webgl|gpu/i,
       )
-      expect(screen.queryByTestId('mock-graph')).not.toBeInTheDocument()
+      expect(screen.getByTestId('intel-panel')).toBeInTheDocument()
     })
 
     it('is independent of the galaxy data read: the galaxy read succeeds, but the unsupported state still shows because rendering cannot be created (Scenario: The unsupported state is independent of the galaxy data read)', async () => {
@@ -983,6 +1038,8 @@ describe('GalaxyView', () => {
       expect(screen.getByTestId('mock-graph')).toBeInTheDocument()
       expect(screen.getByTestId('mock-graph-canvas')).toBe(canvas)
       expect(document.body.contains(canvas)).toBe(true)
+      fireEvent(canvas, new Event('webglcontextrestored'))
+      await waitFor(() => expect(screen.queryByTestId('renderer-interrupted')).not.toBeInTheDocument())
     })
 
     it('converts an unexpected render-phase throw (surviving the probe) to the unsupported state via the boundary — intel panel, inspector, and the container remain (Scenario: An unexpected rendering error is contained to the canvas region)', async () => {

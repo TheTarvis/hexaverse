@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import React from 'react'
 import type { SceneModel } from '../space-scene'
 import { defaultCamera, type SpaceCamera } from '../space-camera'
@@ -98,9 +98,18 @@ vi.mock('three', async (original) => {
       }
     }
   }
-  class WebGLRenderer {
+  return { ...actual, PerspectiveCamera }
+})
+
+vi.mock('@/components/render-guard/renderer-candidate', async () => {
+  const THREE = await import('three')
+  class RecordingCandidate {
     observed = new Set<import('three').BufferGeometry>()
-    constructor() { recorder.renderers.push(this) }
+    constructor(readonly canvas: HTMLCanvasElement) { recorder.renderers.push(this) }
+    init = async () => {}
+    backend = () => 'webgpu' as const
+    resize() {}
+    onLoss = () => () => {}
     setClearColor() {}
     setPixelRatio() {}
     setSize() {}
@@ -109,20 +118,21 @@ vi.mock('three', async (original) => {
         const geometry = (object as import('three').Mesh).geometry
         if (geometry && !this.observed.has(geometry)) {
           this.observed.add(geometry)
-          geometry.addEventListener('dispose', () => { recorder.disposedGeometries += 1 })
+          geometry.addEventListener('dispose', async () => { recorder.disposedGeometries += 1 })
         }
       })
-      const meshes = scene.children.filter((o): o is import('three').Mesh => o instanceof actual.Mesh)
+      const meshes = scene.children.filter((o): o is import('three').Mesh => o instanceof THREE.Mesh)
       recorder.renderCalls.push({
         meshCount: meshes.length,
-        lineCount: scene.children.filter((o) => o instanceof actual.Line).length,
+        lineCount: scene.children.filter((o) => o instanceof THREE.Line).length,
         meshes: meshes.map((m) => ({ position: { x: m.position.x, y: m.position.y, z: m.position.z }, scale: m.scale.x })),
       })
     }
     dispose() { recorder.disposedRenderers += 1 }
   }
-  return { ...actual, PerspectiveCamera, WebGLRenderer }
+  return { createRendererCandidate: ({ canvas }: { canvas: HTMLCanvasElement }) => new RecordingCandidate(canvas) }
 })
+const settle = async () => { await act(async () => { for (let i = 0; i < 12; i++) await Promise.resolve() }) }
 
 import { SpaceWorld, BODY_DRAW_SCALE } from './SpaceWorld'
 
@@ -167,17 +177,18 @@ beforeEach(() => {
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
 })
 
-describe('SpaceWorld — what it actually draws', () => {
-  it('SDET-added: draws one mesh per scene mark, at the served position', () => {
+describe('SpaceWorld — what it actually draws', async () => {
+  it('SDET-added: draws one mesh per scene mark, at the served position', async () => {
     const scene = sceneOf()
     render(<SpaceWorld canvas={usableCanvas()} frameRef={frameOf(scene, defaultCamera(EXTENT))} extent={EXTENT} />)
+    await settle()
 
     expect(recorder.renderers, 'a usable context must produce a renderer').toHaveLength(1)
     expect(recorder.renderCalls, 'one frame must have been drawn').toHaveLength(1)
     expect(recorder.renderCalls[0]!.meshCount).toBe(scene.marks.length)
   })
 
-  it('SDET-added: a mark never renders smaller than the floor its extent sets', () => {
+  it('SDET-added: a mark never renders smaller than the floor its extent sets', async () => {
     // A body of radius 1.2 in a system 658 units across is a sub-pixel dot;
     // the floor is what keeps a distant gate clickable. Both the served
     // radius and the floor are exercised — a scale that ignored either one
@@ -192,6 +203,7 @@ describe('SpaceWorld — what it actually draws', () => {
     const { container } = render(
       <SpaceWorld canvas={usableCanvas()} frameRef={frameOf(scene, defaultCamera(EXTENT))} extent={EXTENT} />,
     )
+    await settle()
     expect(container.innerHTML, 'the world renders no DOM of its own').toBe('')
 
     expect(meshAt({ x: 0, y: 0, z: 0 }).scale).toBeCloseTo(floor * 10 * BODY_DRAW_SCALE, 9)
@@ -201,12 +213,13 @@ describe('SpaceWorld — what it actually draws', () => {
     ).toBeCloseTo(floor, 9)
   })
 
-  it('SDET-added: selection preserves the model size', () => {
+  it('SDET-added: selection preserves the model size', async () => {
     const at = { x: 18, y: -3, z: -15 } // feat-body-0's served position
     const base = sceneOf()
     const first = render(
       <SpaceWorld canvas={usableCanvas()} frameRef={frameOf(base, defaultCamera(EXTENT))} extent={EXTENT} />,
     )
+    await settle()
     const unselected = meshAt(at).scale
     first.unmount()
 
@@ -215,10 +228,11 @@ describe('SpaceWorld — what it actually draws', () => {
       marks: base.marks.map((m) => (m.id === 'feat-body-0' ? { ...m, selected: true } : m)),
     })
     render(<SpaceWorld canvas={usableCanvas()} frameRef={frameOf(selected, defaultCamera(EXTENT))} extent={EXTENT} />)
+    await settle()
     expect(meshAt(at).scale, 'selection uses the reticle without enlarging the model').toBe(unselected)
   })
 
-  it('SDET-added: draws one line per served curve, and none for a degenerate one', () => {
+  it('SDET-added: draws one line per served curve, and none for a degenerate one', async () => {
     const withCurve = sceneOf({
       curves: [
         {
@@ -236,10 +250,11 @@ describe('SpaceWorld — what it actually draws', () => {
       ],
     })
     render(<SpaceWorld canvas={usableCanvas()} frameRef={frameOf(withCurve, defaultCamera(EXTENT))} extent={EXTENT} />)
+    await settle()
     expect(recorder.renderCalls[0]!.lineCount).toBe(1)
   })
 
-  it('SDET-added: places the eye where space-projection puts it, so a mark and its hit target agree', () => {
+  it('SDET-added: places the eye where space-projection puts it, so a mark and its hit target agree', async () => {
     // THE assertion this whole file exists for. The drawn scene and the DOM
     // hit layer are two independent projections of the same world; they
     // agree only while the renderer's camera is the picking basis's camera.
@@ -248,6 +263,7 @@ describe('SpaceWorld — what it actually draws', () => {
     // play.
     const camera = defaultCamera(EXTENT)
     render(<SpaceWorld canvas={usableCanvas()} frameRef={frameOf(sceneOf(), camera)} extent={EXTENT} />)
+    await settle()
 
     const basis = viewBasisOf(camera, { width: 1200, height: 900 })
     const drawn = recorder.cameras.at(-1)!
@@ -264,7 +280,7 @@ describe('SpaceWorld — what it actually draws', () => {
     expect(drawn.far).toBeGreaterThan(drawn.near)
   })
 
-  it('SDET-added: announces its first frame exactly once', () => {
+  it('SDET-added: announces its first frame exactly once', async () => {
     const onFirstFrame = vi.fn()
     render(
       <SpaceWorld
@@ -274,15 +290,17 @@ describe('SpaceWorld — what it actually draws', () => {
         onFirstFrame={onFirstFrame}
       />,
     )
+    await settle()
     expect(onFirstFrame).toHaveBeenCalledTimes(1)
   })
 
-  it('SDET-added: releases the renderer and its geometry on unmount', () => {
+  it('SDET-added: releases the renderer and its geometry on unmount', async () => {
     // A view the player navigates away from and back to must not leak a
     // context per visit — browsers hand out a small, fixed number.
     const { unmount } = render(
       <SpaceWorld canvas={usableCanvas()} frameRef={frameOf(sceneOf(), defaultCamera(EXTENT))} extent={EXTENT} />,
     )
+    await settle()
     expect(recorder.disposedRenderers).toBe(0)
     unmount()
     expect(recorder.disposedRenderers).toBe(1)

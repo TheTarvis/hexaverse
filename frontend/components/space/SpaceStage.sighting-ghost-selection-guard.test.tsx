@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 
 // RED-PHASE ADDENDUM — openspec change add-scan-and-sightings-surface,
@@ -117,8 +117,9 @@ beforeEach(() => {
   }
 })
 
-function stage(over: Record<string, unknown> = {}) {
-  return render(
+async function stage(over: Record<string, unknown> = {}) {
+  const available = vi.fn()
+  const mounted = render(
     <SpaceStage
       systemId="sys_-7_17"
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -130,15 +131,18 @@ function stage(over: Record<string, unknown> = {}) {
       scale={1}
       // fix-world-time-render-loop, task 4.7 migration: static-scene mode.
       frameSource={null}
+      onAvailabilityChange={available}
       {...over}
     />,
   )
+  await waitFor(() => expect(available).toHaveBeenLastCalledWith(true))
+  return mounted
 }
 
 describe('SpaceStage — the ghost-selection guard (system-space-view "A Ghost Is Not a Member of the Space View\'s Selection, and a Burn Never Consumes One")', () => {
   // Scenario: A click on a ghost does not become a point selection.
-  it('renders the ghost mark with the space-affordance attribute, and a click on it never becomes a point selection', () => {
-    stage()
+  it('renders the ghost mark with the space-affordance attribute, and a click on it never becomes a point selection', async () => {
+    await stage()
 
     // (1) The ghost's own DOM element must exist AT ALL — the first, most
     // basic red: nothing renders for a `kind: 'sighting'` mark today.
@@ -171,8 +175,8 @@ describe('SpaceStage — the ghost-selection guard (system-space-view "A Ghost I
   // ghost present there creates one, so the negative assertion above is not
   // vacuous (a callback that is simply never wired at all would pass both
   // cases identically).
-  it('SDET control: the identical gesture over empty canvas space (no ghost, no body) does create a point selection', () => {
-    stage({ scene: { ...scene, marks: marks.filter((m) => m.kind !== 'sighting') } })
+  it('SDET control: the identical gesture over empty canvas space (no ghost, no body) does create a point selection', async () => {
+    await stage({ scene: { ...scene, marks: marks.filter((m) => m.kind !== 'sighting') } })
     const canvas = screen.getByTestId('space-canvas-region')
     const press = { pointerId: 2, isPrimary: true, button: 0, clientX: 50, clientY: 50 }
     canvas.dispatchEvent(new PointerEvent('pointerdown', { ...press, bubbles: true, cancelable: true }))
@@ -186,8 +190,8 @@ describe('SpaceStage — the ghost-selection guard (system-space-view "A Ghost I
 
   // SDET-added: system-space-view "A ghost's asOf label reads as a formatted
   // stamp, on the mark and on its facts surface" (mark half).
-  it('SDET-added: the ghost mark\'s sr-only asOf label is a world-ms-instant figure carrying its raw served value', () => {
-    const { container } = stage()
+  it('SDET-added: the ghost mark\'s sr-only asOf label is a world-ms-instant figure carrying its raw served value', async () => {
+    const { container } = await stage()
     const label = screen.getByTestId(`sighting-mark-asof-${RECORD_ID}`)
     expect(label).toHaveAttribute('data-unit', 'world-ms-instant')
     expect(label).toHaveAttribute('data-raw', '42000')
@@ -196,8 +200,8 @@ describe('SpaceStage — the ghost-selection guard (system-space-view "A Ghost I
     assertFiguresMatchModule(container, { scale: 1 })
   })
 
-  it('SDET-added: on a scale-less mount the ghost mark\'s asOf still renders its T+ portion, with an absent suffix', () => {
-    const { container } = stage({ scale: undefined })
+  it('SDET-added: on a scale-less mount the ghost mark\'s asOf still renders its T+ portion, with an absent suffix', async () => {
+    const { container } = await stage({ scale: undefined })
     const label = screen.getByTestId(`sighting-mark-asof-${RECORD_ID}`)
     expect(label).toHaveAttribute('data-raw', '42000')
     expect(label.textContent).toContain('×—')
@@ -210,7 +214,7 @@ describe('SpaceStage — the ghost-selection guard (system-space-view "A Ghost I
   // this repo asserted `sighting-facts` at all before this change (verified
   // by grep), so this is new coverage, not a migration.
   it('SDET-added: hovering a ghost shows the sighting-facts surface with a world-ms-instant asOf figure', async () => {
-    const { container } = stage()
+    const { container } = await stage()
     const ghost = screen.getByTestId(`sighting-mark-${RECORD_ID}`)
     fireEvent.pointerOver(ghost)
     const facts = await screen.findByTestId('sighting-facts')

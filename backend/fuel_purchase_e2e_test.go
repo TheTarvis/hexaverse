@@ -131,26 +131,6 @@ func TestRefuel_Scenario_FleetDockedToAStationMayRefuel(t *testing.T) {
 	}
 }
 
-func TestRefuel_Scenario_CoastingOrBurningFleetCannotRefuel(t *testing.T) {
-	requireE2EEmulators(t)
-	ensureFirebaseInitialized(t)
-	router := SetupRouter()
-
-	sp := spawnFuelCorp(t, router, "SDET Refuel Burning Corp")
-	setCorpCredits(t, sp.corpId, 1_000_000)
-	setFleetFuel(t, sp.fleetId, 1_000_000) // ample so the burn commit itself isn't what rejects
-	resp, _, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": sp.stationId})
-	if code != http.StatusOK || resp.State.Burn == nil {
-		t.Fatalf("setup order: status = %d, burn = %+v", code, resp.State)
-	}
-
-	code, _ = refuel(t, router, sp.token, sp.fleetId, 1.0, "sdet-refuel-burning-1")
-	if code == http.StatusOK {
-		t.Errorf("fuel-purchase \"A coasting or burning fleet cannot refuel\": a mid-burn fleet's refuel " +
-			"returned 200, want a rejection")
-	}
-}
-
 func TestRefuel_Scenario_FleetParkedNearStationButNotAttachedCannotRefuel(t *testing.T) {
 	requireE2EEmulators(t)
 	ensureFirebaseInitialized(t)

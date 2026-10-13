@@ -1,12 +1,15 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 import {
-  burnToSelectionAndDock,
   captureInteriors,
   capturePosts,
-  selectFirstBodyMatching,
+  prepareCommandHud,
+  openObjectDetails,
   wakeNewCorp,
 } from '../helpers/space-view'
+import { emulatorSignIn } from '../helpers/firebase-emulator'
+import { arrangePointPark, commitServedBurn } from '../helpers/served-movement'
+import type { Fleet } from '../../lib/types/fleet'
 import {
   captureCorporationId,
   captureScanTargets,
@@ -35,6 +38,37 @@ import {
  */
 const cfg = resolveE2EConfig()
 
+async function openScanTab(page: Page): Promise<void> {
+  if (await page.getByTestId('console-dock-open').isVisible()) {
+    await page.getByTestId('console-dock-open').click()
+  }
+  await page.getByTestId('console-tab-scan').click()
+  await expect(page.getByTestId('scan-control')).toBeVisible()
+}
+
+// Spawn is now station-docked. Arrange an actual free-space park through
+// production orders, then require the server's real target list to be empty.
+// No mock scan response, Firestore mutation, or client kinematics is involved.
+async function parkOutsideScanRange(
+  page: Page,
+  fleetId: string,
+  email: string,
+  password: string,
+): Promise<void> {
+  const { idToken } = await emulatorSignIn(cfg.emulator!, email, password)
+  const headers = { Authorization: `Bearer ${idToken}` }
+  const fleetURL = `${cfg.apiURL}/v1/fleets/${fleetId}`
+  const initialRead = await page.request.get(fleetURL, { headers })
+  expect(initialRead.ok()).toBe(true)
+  const initial = (await initialRead.json()) as Fleet
+  await arrangePointPark(page, fleetId, { ...initial.position, Y: initial.position.Y + 2_000 }, idToken)
+  const targets = await page.request.get(`${fleetURL}/scan-targets`, { headers })
+  expect(targets.ok()).toBe(true)
+  expect((await targets.json()).targets, 'the off-plane point must have no eligible scan hosts').toHaveLength(0)
+  await page.reload()
+  await prepareCommandHud(page)
+}
+
 test.use({ storageState: { cookies: [], origins: [] } })
 test.setTimeout(1_800_000)
 
@@ -56,24 +90,12 @@ test.describe('the focused-scan journey, end to end through the space view', () 
       .not.toBeNull()
     const corpId = corpBox.id!
 
-    // -------------------------------------------- 1b. dock at the station
-    // REVISED 2026-09-03 (test-dispute adjudicated: a genuine arrangement
-    // defect, not a spec misread). A freshly spawned fleet sits at an
-    // unattached point park with nothing inside focused-scan range — its
-    // served target set is legitimately empty there, which is why the
-    // clean-sweep leg below needs a docked host to sweep at all. Burning to
-    // the home station and docking (reusing `burnToSelectionAndDock`,
-    // exactly as this file's own third test already does) BEFORE opening
-    // the scan control gives the fleet a host at distance zero — always an
-    // eligible target (`focused-scan`'s own self-sweep/belt-member
-    // exclusions exploit the identical zero-distance guarantee) — and is
-    // what actually produces the M3 clean-sweep record this leg asserts.
+    // Current spawn already attaches the fleet to the home station.
     const home = await interiors.get(homeSystemId)
-    expect(home, `no interior read for ${homeSystemId} was captured off the wire`).toBeTruthy()
-    const stationId = home!.features.find((f) => f.type === 'station')?.id
-    expect(stationId, 'this freshly generated home system served no station feature').toBeTruthy()
-    await selectFirstBodyMatching(page, stationId!)
-    await burnToSelectionAndDock(page, fleetId)
+    const stationId = home.features.find((f) => f.type === 'station')?.id
+    expect(stationId, 'the home system must serve its station').toBeTruthy()
+    await expect(page.getByTestId('vitals-fleet-cell')).toContainText(/docked/i)
+    await openScanTab(page)
 
     // ------------------------------------------------- 2. read the served
     //    target list — the served list IS the fixture (link8b-impl-
@@ -116,27 +138,12 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     // the LOG ROW below, never to the report's own filed-vs-fizzled text.
     expect(reportText.toLowerCase()).toMatch(/filed/)
 
-    // -------------------------------------------------------- 5. the log,
-    //    opened via the REPORT's own affordance (system-space-view "A sweep
-    //    that minted records reports and links to the log") — not the
-    //    "Console" control this journey exercises later (leg 9).
-    //    add-console-dock (3.2): the dock is collapsed here (it opens
-    //    collapsed on every mount and nothing above expands it).
-    //    REVISED keep-console-tab-content-mounted (3.4): the log is NOT
-    //    unmounted while collapsed any more — it is mounted, hidden, and has
-    //    read since view open. The row asserted below is listed only because the
-    //    settle re-read ran (the sweep's settling read invalidates the unfiltered
-    //    pile); the link's click only shows the tab and issues no pile request.
-    //    This is the end-to-end form of the closure of
-    //    `drift-sighting-log-not-reread-after-sweep-settles.md`. Do not expand
-    //    the dock earlier in this test.
-    await expect(
-      page.getByTestId('console-dock-open'),
-      'precondition: the dock is collapsed before the report link is used',
-    ).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByTestId('sighting-log'), 'the log is not shown while the dock is collapsed').toBeHidden()
+    // The report lives in the Scan tab. Its link switches to Log and
+    // transfers focus while the mounted log contains the settled record.
+    await expect(page.getByTestId('console-tab-scan')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByTestId('sighting-log')).toBeHidden()
     await page.getByTestId('scan-report').getByRole('button', { name: /open the sighting log/i }).click()
-    // "A settled sweep's report link expands a collapsed dock to the Log tab"
+    // The report link activates Log and transfers focus to its tab.
     await expect(page.getByTestId('console-dock-collapse'), 'the report link expanded the dock').toBeVisible({
       timeout: 10_000,
     })
@@ -172,13 +179,14 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     })
     await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 10_000 })
     await expect(
-      page.getByTestId(`fleet-row-${fleetId}`),
+      page.getByTestId('vitals-fleet-id'),
       'sighting-log "Closing the log returns to the view intact": the same acting fleet must still be selected',
-    ).toHaveAttribute('data-active', 'true')
+    ).toHaveText(fleetId)
 
     // ------------------------------------------- 6. double-submit (10.3)
     // A REAL double-click, counting POSTs to /scan on the wire — the leg
     // `use-refuel.test.tsx`'s hand-held harness could not have caught.
+    await openScanTab(page)
     scanPosts.length = 0
     // Still docked (see the comment on `chosen` above) — nearest, not farthest.
     const secondTarget = await openScanControlAndPickNearestTarget(page, fleetId, scanTargetsByFleet)
@@ -220,30 +228,26 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     })
     await page.getByTestId('scan-report-dismiss').click()
 
-    // -------------------------------------- 8. canvas-unavailable (10.6)
-    // Forcing the renderer's unsupported state is the same technique this
-    // repo's own `SpaceStage.renderer.test.tsx` covers at the unit level;
-    // here it is enough to confirm the SCAN SURFACE stays usable while the
-    // canvas region reports itself unavailable — WebGL context loss is
-    // simulated by stripping getContext.
-    await page.evaluate(() => {
-      const proto = HTMLCanvasElement.prototype as unknown as { getContext: (type: string) => unknown }
-      const original = proto.getContext
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(proto as any).getContext = () => null
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(window as any).__restoreGetContext = original
+    // Block both renderer candidates in the next document. An evaluate
+    // patch before reload alone would be lost with the old document.
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('scan-block-renderer') !== 'true') return
+      Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined })
+      const original = HTMLCanvasElement.prototype.getContext
+      HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...args: unknown[]) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') return null
+        return Reflect.apply(original, this, [type, ...args])
+      } as typeof original
     })
+    await page.evaluate(() => sessionStorage.setItem('scan-block-renderer', 'true'))
     await page.reload()
-    await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByTestId('scan-control')).toBeVisible({ timeout: 20_000 })
-    // "A reload shows the dock collapsed" (add-console-dock 3.2): the dock was
-    // collapsed at the end of leg 5, so this proves nothing about a reload on
-    // its own; the expansion below (leg 9) then re-proves it with the dock
-    // opened first and a reload in between.
+    await prepareCommandHud(page)
+    await expect(page.getByTestId('renderer-unsupported').filter({ hasText: 'system' })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByTestId('console-dock-open')).toBeVisible({ timeout: 10_000 })
     await expect(page.getByTestId('console-dock-region')).toBeHidden()
-    await expect(page.getByTestId('console-tab-log')).toBeHidden()
+    await openScanTab(page)
+    await expect(page.getByTestId('scan-target-select')).toContainText(stationId!)
+    await page.evaluate(() => sessionStorage.removeItem('scan-block-renderer'))
 
     // ------------------------------------------------- 9. mount-path (10.7)
     // Seed a target-naming fixture (10.2b/10.2c) — the ordinary journey
@@ -273,6 +277,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     await page.goto('/')
     await page.goto(`/systems/${homeSystemId}`)
     await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
+    await prepareCommandHud(page)
     await expect(page.getByTestId(`sighting-mark-${seededRecordId}`), 'the seeded ghost is drawn on first render').toBeVisible({
       timeout: 20_000,
     })
@@ -282,6 +287,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
       timeout: 10_000,
     })
     await page.getByTestId('console-dock-open').click()
+    await page.getByTestId('console-tab-log').click()
     await expect(page.getByTestId('console-tab-log')).toBeFocused({ timeout: 10_000 })
     await expect(page.getByTestId(`sighting-row-${seededRecordId}`), 'the seeded record is in the log on mount').toBeVisible(
       { timeout: 20_000 },
@@ -291,6 +297,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     // here, a reload comes back collapsed — the toggle-reload leg of old.
     await page.reload()
     await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
+    await prepareCommandHud(page)
     await expect(page.getByTestId('console-dock-open'), 'a reload shows the dock collapsed').toBeVisible({
       timeout: 20_000,
     })
@@ -311,7 +318,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
 
     const home = await interiors.get(homeSystemId)
     expect(home).toBeTruthy()
-    const hostId = await selectFirstBodyMatching(page, 'feat-').catch(() => home!.features[0]!.id)
+    const hostId = home.features.find((feature) => feature.type !== 'star')!.id
 
     const actionId = 'e2e-ghost-action-' + Date.now()
     const targetId = 'e2e-ghost-target-' + Date.now()
@@ -330,6 +337,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
 
     await page.reload()
     await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
+    await prepareCommandHud(page)
     const ghost = page.getByTestId(`sighting-mark-${recordId}`)
     await expect(ghost).toBeVisible({ timeout: 20_000 })
 
@@ -350,6 +358,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     // "The row for an activated ghost is highlighted when the tab is next
     // shown": expand through the "Console" control, then read the row.
     await page.getByTestId('console-dock-open').click()
+    await page.getByTestId('console-tab-log').click()
     const row = page.getByTestId(`sighting-row-${recordId}`)
     await expect(row).toBeVisible({ timeout: 10_000 })
     await expect(row, 'the activated ghost\'s row is highlighted when the tab is shown').toHaveAttribute(
@@ -363,6 +372,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     // click must be what highlights it.
     await page.reload()
     await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
+    await prepareCommandHud(page)
     await expect(ghost).toBeVisible({ timeout: 20_000 })
     await expect(
       ghost,
@@ -372,6 +382,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
       timeout: 10_000,
     })
     await page.getByTestId('console-dock-open').click()
+    await page.getByTestId('console-tab-log').click()
     await expect(row).toBeVisible({ timeout: 10_000 })
     await expect(row, 'precondition: the row is not highlighted before it is clicked').not.toHaveAttribute(
       'data-highlighted',
@@ -385,22 +396,25 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     )
   })
 
-  test('the burn to the home station leg still docks normally (regression: scan control mounts beside, not inside, the fleet panel)', async ({
-    page,
-  }) => {
+  // The current HUD intentionally retires the visible Burn/fleet command
+  // panel. This checks its replacement inspection surface and the independent
+  // Scan tab; movement execution remains covered at unit/backend level.
+  test('station inspection and Plot course preserve the independent Scan tab while legacy commands stay hidden', async ({ page }) => {
     test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
     const interiors = captureInteriors(page)
-    const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Scan-Beside-Panel', 'scan-beside-panel')
+    const { homeSystemId } = await wakeNewCorp(page, 'E2E Scan-Beside-Panel', 'scan-beside-panel')
     const home = await interiors.get(homeSystemId)
-    expect(home).toBeTruthy()
-    const stationId = home!.features.find((f) => f.type === 'station')?.id
-    test.skip(!stationId, 'no station in this freshly generated system')
-    await selectFirstBodyMatching(page, stationId!)
-    await burnToSelectionAndDock(page, fleetId)
-    // The scan control and the docked-fleet-actions panel are BOTH present
-    // at once — they are siblings, not nested (system-space-view §1.10).
-    await expect(page.getByTestId('scan-control')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByTestId('space-fleet-panel')).toBeVisible({ timeout: 10_000 })
+    const stationId = home.features.find((f) => f.type === 'station')?.id
+    expect(stationId, 'the home system must serve a station').toBeTruthy()
+    const details = await openObjectDetails(page, stationId!)
+    await expect(details).toContainText(stationId!)
+    await page.getByTestId('details-plot').click()
+    await expect(page.getByTestId('system-index-toggle')).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByTestId('preview-panel')).toBeHidden()
+    await expect(page.getByTestId('burn-button')).toBeHidden()
+    await expect(page.getByTestId('space-fleet-panel')).toBeHidden()
+    await openScanTab(page)
+    await expect(page.getByTestId('scan-target-select')).toContainText(stationId!)
   })
 
   // Task 10.2d (link8b-adversary-r8, ruling F5) — the mid-burn leg the
@@ -417,87 +431,40 @@ test.describe('the focused-scan journey, end to end through the space view', () 
 
     const interiors = captureInteriors(page)
     const scanTargetsByFleet = captureScanTargets(page)
-    const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Scan-Mid-Burn', 'scan-mid-burn')
+    const { homeSystemId, fleetId, email, password } = await wakeNewCorp(page, 'E2E Scan-Mid-Burn', 'scan-mid-burn')
 
     const home = await interiors.get(homeSystemId)
     expect(home, `no interior read for ${homeSystemId} was captured`).toBeTruthy()
     const stationId = home!.features.find((f) => f.type === 'station')?.id
     expect(stationId, 'this freshly generated home system served no station feature').toBeTruthy()
 
-    // REVISED 2026-09-04 (test-dispute adjudicated: a genuine arrangement
-    // defect, not a spec misread or a product defect — the diagnosis in
-    // link8b-impl-contract's own gate record). The served scan-target list
-    // is refetched ONLY on a small, closed set of triggers
-    // (`system-space-view` "Realtime Refetch Rules While the Space View Is
-    // Open"): mount, an attachment change, a landed burn/jump, an
-    // acting-fleet change, an SSE reconnect, and a 20s baseline poll
-    // (`BOARD_POLL_MS`, `lib/realtime.ts`). Committing a burn is not one of
-    // them — `useOrder`'s own `onSuccess` (`hooks/use-fleets.ts`)
-    // invalidates only the fleet reads, never `scanTargets` — so the page
-    // the control shows for the ENTIRE burn, right up until it lands, is
-    // exactly whatever was last fetched, absent a poll tick landing in
-    // between. The FIRST scan-targets read — fired the instant this
-    // fleet's `ScanControl` mounts, right after spawn, long before the
-    // station is even selected — is captured below and asserted empty: a
-    // freshly spawned fleet at its unattached point park has nothing in
-    // focused-scan range yet (the same convention `burnToSelectionAndDock`'s
-    // own comment above, and OQ12, both already rely on). That is an
-    // already-resolved fact at the moment we read it, not a live sample
-    // that has to land in a lucky window.
-    //
-    // The ORIGINAL leg instead waited on the RENDERED "No host is in
-    // range" text with a 20-SECOND timeout — the exact width of
-    // `BOARD_POLL_MS` — so on any run where the preceding steps (spawn,
-    // select, preview, commit) had already burned through most of that
-    // poll's own 20s cycle before reaching this line, the poll's very next
-    // tick could land WHILE Playwright was still polling for the text,
-    // silently replacing the still-correct empty page with a fresh
-    // (already in-range) one mid-wait. Two passing runs (42.8s, 21.8s) and
-    // one failing run against byte-identical production code is exactly
-    // that signature: not every run's cumulative overhead crosses a poll
-    // tick before this assertion, but some do — a race against the SUITE'S
-    // OWN wall-clock overhead, never against the burn's progress as such.
-    //
-    // The fix below does not try to catch a luckier millisecond. It reads
-    // the pre-burn response directly — already resolved, no live wait
-    // involved — as the proof the empty state genuinely existed while
-    // under way (nothing between here and the burn commit can have
-    // refetched it, per the trigger list above), then checks the DOM with
-    // a SHORT timeout (5s — a quarter of the 20s poll, and generous for a
-    // render flush of data already sitting in the query cache) purely to
-    // confirm the empty state is what actually painted, never to wait out
-    // a race.
-    await expect
-      .poll(() => scanTargetsByFleet.has(fleetId), {
-        timeout: 30_000,
-        message: `no scan-targets response was captured for fleet ${fleetId} before the burn — cannot prove the empty state was genuine`,
-      })
-      .toBe(true)
-    const preBurnTargets = scanTargetsByFleet.get(fleetId) ?? []
-    expect(
-      preBurnTargets,
-      'a freshly spawned fleet at its unattached point park must have nothing in focused-scan range yet — this ' +
-        'is the page the control keeps showing for the whole burn, since committing a burn is not one of the ' +
-        "scan-target list's own refetch triggers",
-    ).toHaveLength(0)
+    await parkOutsideScanRange(page, fleetId, email, password)
+    scanTargetsByFleet.delete(fleetId)
+    // A fresh document mounts ScanControl and reads the actual free-space
+    // targets. This establishes the empty precondition before a return burn.
+    await page.reload()
+    await prepareCommandHud(page)
+    await openScanTab(page)
+    await expect.poll(() => scanTargetsByFleet.has(fleetId), { timeout: 30_000 }).toBe(true)
+    expect(scanTargetsByFleet.get(fleetId)).toHaveLength(0)
+    await expect(page.getByText('No host is in range to sweep.')).toBeVisible()
+    await page.getByTestId('console-dock-collapse').click()
 
-    // Select the station and commit the burn, WITHOUT waiting for it to
-    // land — `burnToSelectionAndDock` waits all the way to "Docked", which
-    // is exactly the arrangement this leg exists to avoid.
-    await selectFirstBodyMatching(page, stationId!)
-    await expect(page.getByTestId('preview-panel')).toBeVisible({ timeout: 60_000 })
-    await page.getByTestId('burn-button').click()
-    const row = page.getByTestId(`fleet-row-${fleetId}`)
-    await expect(row, 'the burn must actually be under way before the mid-burn assertion means anything').toContainText(
-      /under way/i,
-      { timeout: 30_000 },
-    )
-
-    // MID-BURN: the scan control is open and legitimately empty — the
-    // pre-burn page captured above is still the cache entry (burn-commit
-    // triggers no scan-target refetch of its own), so the DOM's next paint
-    // after "Under way" lands must reflect it — a short timeout, not a
-    // long one, is what proves that (see the comment above `preBurnTargets`).
+    // API movement is fixture setup only: this leg proves Scan refresh,
+    // not the retired Burn control. The low commanded acceleration leaves
+    // time to mount the real mid-burn empty state before approaching the host.
+    const { idToken } = await emulatorSignIn(cfg.emulator!, email, password)
+    await commitServedBurn(page, fleetId, { bodyId: stationId, accel: 1 }, idToken)
+    scanTargetsByFleet.delete(fleetId)
+    await page.reload()
+    await prepareCommandHud(page)
+    const row = page.getByTestId('vitals-fleet-cell')
+    await expect(row).toContainText(/under way/i, { timeout: 30_000 })
+    await openScanTab(page)
+    await expect.poll(() => scanTargetsByFleet.has(fleetId), { timeout: 30_000 }).toBe(true)
+    expect(scanTargetsByFleet.get(fleetId), 'the real mid-burn target set must be empty').toHaveLength(0)
+    // The mounted control has an actual empty response while movement is
+    // active. From this assertion onward, no navigation or user action.
     await expect(page.getByTestId('scan-control')).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText('No host is in range to sweep.')).toBeVisible({ timeout: 5_000 })
 

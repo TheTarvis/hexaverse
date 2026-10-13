@@ -1,12 +1,14 @@
+import { arrangeBodyDock } from '../helpers/served-movement'
+import { emulatorSignIn } from '../helpers/firebase-emulator'
 import { test, expect } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 import {
-  burnToSelectionAndDock,
   captureInteriors,
   digits,
   holdKindTons,
   mineableBodyId,
-  selectBody,
+  openObjectDetails,
+  prepareCommandHud,
   stationFeatureId,
   wakeNewCorp,
 } from '../helpers/space-view'
@@ -86,7 +88,8 @@ test.describe('the vertical slice', () => {
     const interiors = captureInteriors(page)
 
     // 1. Sign up and wake onto the home system's space view.
-    const { homeSystemId, fleetId } = await wakeNewCorp(page, 'E2E Prospector', 'slice')
+    const { homeSystemId, fleetId, email, password } = await wakeNewCorp(page, 'E2E Prospector', 'slice')
+    const { idToken } = await emulatorSignIn(cfg.emulator!, email, password)
 
     // The hull's hold is NOT empty from spawn: `add-fuel-as-cargo` grants
     // starting fuel, and fuel occupies the same cargo pool as mined ore
@@ -118,8 +121,8 @@ test.describe('the vertical slice', () => {
     // 3. SELECT the lode and BURN to it. Selecting the body IS naming the
     //    target (design.md Decision 12: "targets are named by body id from
     //    the interior read, not by picking a tile").
-    await selectBody(page, lodeId!)
-    await burnToSelectionAndDock(page, fleetId, 600_000)
+    await arrangeBodyDock(page, fleetId, lodeId!, idToken)
+    await page.reload(); await prepareCommandHud(page)
 
     // 4. MINE a minimum-size run and watch the MINED RESOURCE — not the
     //    aggregate hold — fill at the eta. See carry-over 1 in the header.
@@ -178,8 +181,9 @@ test.describe('the vertical slice', () => {
     //    Commit*, "the fleet's cargo and the requester's credit balance both
     //    reflect the sale's effect without a page navigation").
     expect(stationId, `the home system's interior read carried no station body`).toBeTruthy()
-    await selectBody(page, stationId!)
-    await burnToSelectionAndDock(page, fleetId, 600_000)
+    await arrangeBodyDock(page, fleetId, stationId!, idToken)
+    await page.reload(); await prepareCommandHud(page)
+    await openObjectDetails(page, stationId!)
 
     await expect(page.getByTestId('sell-section')).toBeVisible({ timeout: 20_000 })
     const balanceBefore = await digits(page, 'balance-value')
@@ -215,12 +219,16 @@ test.describe('the vertical slice', () => {
     const gate = gates[0]
     expect(gate.id, `the gate toward ${gate.destSystemId} was served with no body id`).toBeTruthy()
 
-    await selectBody(page, gate.id!)
-    await burnToSelectionAndDock(page, fleetId, 900_000)
+    await arrangeBodyDock(page, fleetId, gate.id!, idToken, 900_000)
+    await page.reload(); await prepareCommandHud(page)
 
     // JUMP — offered the instant the fleet is attached to the gate, no
     // charted-lane precondition, commits naming the attached gate's laneId
     // straight off the already-open interior read.
+    // The current system HUD hides Jump; the galaxy roster exposes the live command.
+    await page.getByTestId('nav-home').click()
+    await page.waitForURL((url) => url.pathname === '/', { timeout: 20_000 })
+    await expect(page.getByTestId(`fleet-row-${fleetId}`)).toBeVisible({ timeout: 20_000 })
     const jump = page.getByTestId(`fleet-cmd-jump-${fleetId}`)
     await expect(jump).toBeVisible({ timeout: 20_000 })
     await jump.click()

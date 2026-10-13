@@ -18,7 +18,7 @@ vi.mock('firebase/auth', () => ({
 }))
 vi.mock('@/lib/firebase', () => ({ auth: { app: 'stub' } }))
 
-import DevLoginPage, { tokenFromHash } from './page'
+import DevLoginPage from './page'
 
 describe('/dev/login', () => {
   beforeEach(() => {
@@ -31,12 +31,6 @@ describe('/dev/login', () => {
   })
   afterEach(() => {
     vi.unstubAllEnvs()
-  })
-
-  it('reads the token from the fragment only', () => {
-    expect(tokenFromHash('#token=abc.def.')).toBe('abc.def.')
-    expect(tokenFromHash('#other=1')).toBeNull()
-    expect(tokenFromHash('')).toBeNull()
   })
 
   it('is not found outside a development build', () => {

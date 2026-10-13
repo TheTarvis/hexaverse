@@ -13,6 +13,7 @@ export interface IndexedObject {
   group: string
   x: number
   y: number
+  starClass?: string
   className?: string
   knownFrom?: string
   resources?: string
@@ -113,9 +114,10 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
       </aside>
       {(detailObject || detailContent) && <aside style={!detailObject ? { display: 'none' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.name}` : undefined}>
         {detailObject && <header className={styles.detailsHeader}><p className={styles.eyebrow}>SELECTED {fleetFacts ? 'FLEET' : detailObject.group === 'Stations' ? 'STATION' : detailObject.group === 'Worlds' ? 'WORLD' : 'OBJECT'}</p><Button autoFocus plain className={styles.detailsClose} data-testid="details-back" aria-label="Close details and return to objects" title="Back to objects" onClick={closeDetails}>←</Button></header>}
-        <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && <span aria-hidden="true" className={`${styles.portrait} ${styles[detailObject.className ?? 'rock']}`} />}</><div><h3>{detailObject.name}</h3><p className={styles.muted}>{detailObject.kind}</p></div></div>
+        <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && detailObject.kind !== 'star' && <span aria-hidden="true" className={`${styles.portrait} ${styles[detailObject.className ?? 'rock']}`} />}</><div><h3>{detailObject.name}</h3><p className={styles.muted}>{detailObject.kind}</p></div></div>
         {open && fleetFacts && <SpacecraftPreview key={`fleet:${fleetFacts.id}`} kind="ship" objectId={fleetFacts.id} label={fleetFacts.id} accentColor={fleetFacts.mode === 0 ? 0xffb454 : fleetFacts.mode === 2 ? 0xc4b5fd : 0x4ade80} />}
         {open && !fleetFacts && detailObject.kind === 'station' && <SpacecraftPreview key={`station:${detailObject.name}`} kind="station" objectId={detailObject.name} label={detailObject.name} accentColor={0x67e8f9} />}
+        {open && !fleetFacts && detailObject.kind === 'star' && <SpacecraftPreview key={`star:${detailObject.name}:${detailObject.starClass ?? ''}`} kind="star" objectId={detailObject.name} starClass={detailObject.starClass} label={detailObject.name} accentColor={0xffffff} />}
         {open && selectedPlanet && <SpacecraftPreview key={`${selectedPlanet}:${detailObject.name}`} kind={selectedPlanet} objectId={detailObject.name} label={detailObject.name} accentColor={0xffffff} />}
         {fleetFacts ? <dl className={styles.objectFacts}><dt>Activity</dt><dd>{fleetFacts.activity}</dd><dt>System</dt><dd>{fleetFacts.systemLabel}</dd>{fleetFacts.attachedTo && <><dt>Attached host</dt><dd>{fleetFacts.attachedTo}</dd></>}<dt>Ships</dt><dd>{fleetFacts.shipCount ?? 'Unavailable'}</dd></dl> : <dl className={styles.objectFacts}><dt>Known from</dt><dd>{detailObject.knownFrom ?? 'Astronomical observation'}</dd><dt>Resources</dt><dd>{detailObject.resources ?? 'Not surveyed — inspect or scan this host.'}</dd><dt>Fleets here</dt><dd>{detailObject.fleets?.length ? detailObject.fleets.join(', ') : 'No known fleets'}</dd>{detailObject.group === 'Stations' && <><dt>Services</dt><dd>Sell cargo · Purchase fuel while docked</dd></>}</dl>}</>}
           <div className={styles.detailServices} style={fleetFacts || detailObject?.name !== detailContentFor ? { display: 'none' } : undefined}>{detailContent}</div>

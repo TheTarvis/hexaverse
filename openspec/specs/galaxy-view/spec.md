@@ -144,6 +144,8 @@ available) if the galaxy read fails.
 - **THEN** an error panel is shown instead of the renderer
 
 ### Requirement: Renderer Unavailability Is an Explicit State
+Rendering-context creation in this requirement includes asynchronous renderer initialization and first-frame submission. Unavailability means neither the WebGPU primary backend nor its WebGL2 compatibility backend can initialize and present the view; a WebGL capability probe alone SHALL NOT reject usable WebGPU. Pending initialization SHALL show a loading state until a frame is presented or failure is reported under the 15-second initialization and 15-second eligible first-presentation budgets in *Asynchronous Renderer Attempt Ownership*. Primary initialization or first-frame failure SHALL attempt fresh compatibility rendering; terminal failure SHALL end loading in the local retriable state. Initialization rejection SHALL follow the same local containment, panel usability and data-error precedence rules below.
+
 IF a rendering context for the galaxy graph cannot be created, THEN the
 system SHALL show an explicit unsupported state in place of the graph's
 canvas region, naming the failure as a browser- or graphics-hardware-
@@ -185,7 +187,7 @@ rendering-capability failure, never by a failure of the galaxy data read.
 #### Scenario: Context creation failure shows a named unsupported state
 - **WHEN** a rendering context for the galaxy graph cannot be created
 - **THEN** the graph's canvas region shows an explicit unsupported state
-  naming WebGL or GPU unavailability as the cause
+  naming browser or GPU unavailability as the cause
 - **AND** no uncaught error is thrown
 
 #### Scenario: Surrounding galaxy affordances remain usable
@@ -268,6 +270,8 @@ rendering-capability failure, never by a failure of the galaxy data read.
   remain mounted and usable
 
 ### Requirement: Lost Rendering Context Recovers Without Navigation
+Rendering-context loss includes WebGPU device loss and WebGL2 compatibility context loss. A lost WebGPU device or post-readiness frame failure SHALL remain interrupted until explicit retry recreates the renderer; it SHALL NOT wait for a WebGL restoration event or start an automatic retry loop. Compatibility context restoration SHALL retain the automatic live-state recovery described below. Creation, loss and restoration diagnostics SHALL identify the backend and distinguish asynchronous initialization failure from runtime loss without exposing raw diagnostics in player-facing text.
+
 WHEN the galaxy graph's rendering context is lost at runtime, the system
 SHALL show an interrupted state in the graph's canvas region without an
 uncaught error; WHEN the lost context is restored, the system SHALL resume
@@ -276,7 +280,7 @@ system/fleet state, never a stale pre-loss frame — without a page
 navigation; and IF the context is not restored, the interrupted state SHALL
 persist and SHALL offer a retry affordance that attempts to re-establish the
 rendering context. Restore failure means an error thrown while
-re-establishing rendering after `webglcontextrestored` fires; a context
+re-establishing compatibility rendering after its context-restored event; a context
 that simply never restores is not itself a recordable failure event.
 Retrying SHALL release the prior attempt's renderer resources and event
 listeners before creating a new context, and SHALL hold no more than one
@@ -369,6 +373,19 @@ browser-reported diagnostic message.
   diagnostic message (e.g. `webglcontextcreationerror`'s `statusMessage`)
 - **AND** the recording does not itself throw or block the unsupported/
   interrupted state from rendering
+
+#### Scenario: WebGPU device loss requires explicit recreation
+- **GIVEN** the view has presented frames using WebGPU
+- **WHEN** its GPU device is lost
+- **THEN** drawing stops and the interrupted state preserves the current selection and surrounding panel state
+- **AND** no automatic retry or context-restoration wait begins
+- **AND** invoking retry recreates the renderer and its first successful frame uses the newest available view data without navigation
+
+#### Scenario: Asynchronous retry rejection remains contained
+- **GIVEN** a device loss has interrupted the view
+- **WHEN** retry's asynchronous initialization rejects after both backends fail
+- **THEN** the interrupted state remains retriable with surrounding panels usable
+- **AND** no rejection escapes and no second attempt starts while retry is pending
 
 ### Requirement: Renderer Unavailability States Are Accessible
 WHEN the galaxy graph's canvas region shows the unsupported or interrupted

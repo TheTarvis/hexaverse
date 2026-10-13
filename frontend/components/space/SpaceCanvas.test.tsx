@@ -1,16 +1,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { SpaceWorld } from './webgl/SpaceWorld'
+import { defaultCamera } from './space-camera'
+import { viewBasisOf } from './space-projection'
 import React from 'react'
 import { stubUnsupported } from '@/components/render-guard/test-canvas'
-import { SpaceCanvas } from './SpaceCanvas'
+import { SpaceCanvas, type SpaceRendererBindings } from './SpaceCanvas'
 
-// Implementer-authored (openspec build-production-space-view, tasks.md 6.1).
-// `SpaceStage.renderer.test.tsx` covers this composition through the stage;
-// what is pinned HERE is the slot's own contract, at the seam its consumers
-// depend on: the world is mounted against the SAME canvas element the guard
-// listens on, the interactive layers exist only while the context is live,
-// and availability is reported for `status === 'live'` — never for
-// "not unsupported", which would keep offering commands mid-interruption.
+const camera = defaultCamera(100)
+const frameRef = { current: { camera, scene: { marks: [], curves: [], beltFields: [], orbitRings: [], omissions: [], positionTimeMs: 0, decorativeTimeMs: 0 }, basis: viewBasisOf(camera, { width: 320, height: 200 }), projected: new Map() } }
+const world = (canvas: HTMLCanvasElement, bindings: SpaceRendererBindings) => <SpaceWorld canvas={canvas} frameRef={frameRef} extent={100} {...bindings} />
 
 let restore: (() => void) | null = null
 afterEach(() => {
@@ -23,9 +22,9 @@ describe('SpaceCanvas', () => {
     const seen: HTMLCanvasElement[] = []
     render(
       <SpaceCanvas
-        renderWorld={(canvas) => {
+        renderWorld={(canvas, bindings) => {
           seen.push(canvas)
-          return null
+          return world(canvas, bindings)
         }}
       >
         <div data-testid="layers" />
@@ -34,12 +33,12 @@ describe('SpaceCanvas', () => {
     const canvas = await screen.findByTestId('space-canvas')
     await waitFor(() => expect(seen.length).toBeGreaterThan(0))
     expect(seen[0], 'the world must attach to the element the guard listens on').toBe(canvas)
-    expect(screen.getByTestId('layers')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('layers')).toBeInTheDocument())
   })
 
   it('reports availability to its consumer', async () => {
     const onAvailabilityChange = vi.fn()
-    render(<SpaceCanvas onAvailabilityChange={onAvailabilityChange} />)
+    render(<SpaceCanvas renderWorld={world} onAvailabilityChange={onAvailabilityChange} />)
     await waitFor(() => expect(onAvailabilityChange).toHaveBeenCalledWith(true))
   })
 
@@ -47,7 +46,7 @@ describe('SpaceCanvas', () => {
     restore = stubUnsupported()
     const onAvailabilityChange = vi.fn()
     render(
-      <SpaceCanvas onAvailabilityChange={onAvailabilityChange}>
+      <SpaceCanvas renderWorld={world} onAvailabilityChange={onAvailabilityChange}>
         <div data-testid="layers" />
       </SpaceCanvas>,
     )
@@ -59,7 +58,7 @@ describe('SpaceCanvas', () => {
 
   it('names this view as the failing surface, never the retired board', async () => {
     restore = stubUnsupported()
-    render(<SpaceCanvas />)
+    render(<SpaceCanvas renderWorld={world} />)
     const notice = await screen.findByTestId('renderer-unsupported')
     expect(notice.getAttribute('data-surface')).toBe('space')
   })

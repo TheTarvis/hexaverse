@@ -1,3 +1,5 @@
+import { arrangeBodyDock } from '../helpers/served-movement'
+import { emulatorSignIn } from '../helpers/firebase-emulator'
 import { test, expect, type Locator, type Page, type Request } from '@playwright/test'
 import { resolveE2EConfig } from '../config/env'
 import type { InteriorCapture } from '../helpers/space-view'
@@ -7,11 +9,16 @@ import {
   digits,
   holdKindTons,
   mineableBodyId,
-  selectBody,
+  openObjectDetails,
+  prepareCommandHud,
+  wakeNewCorp,
   selectFirstBodyMatching,
   stationFeatureId,
 } from '../helpers/space-view'
 
+// Current HUD: Burn is intentionally hidden; its guard remains unit/backend
+// coverage. This browser file asserts that absence and retains real visible
+// mine/sale/refuel/jump guards. API docking is setup only, never UI Burn proof.
 /**
  * RED-PHASE SUITE — openspec change `build-production-space-view`,
  * tasks.md 8.5. Covers, at BROWSER LEVEL and only at browser level:
@@ -182,6 +189,7 @@ async function expectAllSettled2xx(seen: Recorded[], what: string): Promise<void
  * TWO ACTIVATIONS, ONE TICK. The whole point of this file.
  */
 async function doubleActivateInOneTick(locator: Locator): Promise<void> {
+  await expect(locator).toBeVisible({ timeout: 10_000 })
   await expect(locator).toBeEnabled()
   await locator.evaluate((el: HTMLElement) => {
     el.click()
@@ -189,24 +197,12 @@ async function doubleActivateInOneTick(locator: Locator): Promise<void> {
   })
 }
 
+const fixtureTokens = new WeakMap<Page, string>()
 async function signUpAndWake(page: Page, tag: string): Promise<string> {
-  const email = `e2e+${tag}-${Date.now()}@hexaverse.test`
-  const password = 'e2ePassword123!'
-  await page.goto('/login?signUp=true')
-  await page.getByTestId('login-email').fill(email)
-  await page.getByTestId('login-password').fill(password)
-  await page.getByTestId('login-confirm-password').fill(password)
-  await page.getByTestId('login-submit').click()
-  await expect(page.getByTestId('wake-up-flow')).toBeVisible({ timeout: 15_000 })
-  await page.getByTestId('wake-name-input').fill(`E2E ${tag}`)
-  await page.getByTestId('wake-submit').click()
-  // 60s — see `wakeNewCorp` in ../helpers/space-view.ts for why.
-  await page.waitForURL(/\/systems\/[^/]+$/, { timeout: 60_000 })
-  await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 20_000 })
-
-  const rows = page.getByTestId('fleet-roster').locator('[data-testid^="fleet-row-"]')
-  await expect(rows).toHaveCount(1, { timeout: 15_000 })
-  return (await rows.first().getAttribute('data-testid'))!.replace('fleet-row-', '')
+  const corp = await wakeNewCorp(page, `E2E ${tag}`, tag)
+  const { idToken } = await emulatorSignIn(cfg.emulator!, corp.email, corp.password)
+  fixtureTokens.set(page, idToken)
+  return corp.fleetId
 }
 
 /**
@@ -223,11 +219,14 @@ async function signUpAndWake(page: Page, tag: string): Promise<string> {
  * and are still clicked as such.
  */
 async function burnToBodyAndDock(page: Page, fleetId: string, prefix: string): Promise<void> {
-  await selectFirstBodyMatching(page, prefix)
-  await page.getByTestId('burn-button').click()
-  const row = page.getByTestId(`fleet-row-${fleetId}`)
-  await expect(row).toContainText(/under way/i, { timeout: 20_000 })
-  await expect(row).toContainText(/docked/i, { timeout: 600_000 })
+  const bodyId = await selectFirstBodyMatching(page, prefix)
+  const token = fixtureTokens.get(page)!
+  const read = await page.request.get(`${cfg.apiURL}/v1/fleets/${fleetId}`, { headers: { Authorization: `Bearer ${token}` } })
+  expect(read.ok()).toBe(true)
+  const current = await read.json() as { attachedTo?: string }
+  if (current.attachedTo !== bodyId) await arrangeBodyDock(page, fleetId, bodyId, token)
+  await page.reload(); await prepareCommandHud(page)
+  if (prefix === 'feat-station') await openObjectDetails(page, bodyId)
 }
 
 /**
@@ -256,59 +255,22 @@ async function burnToMineableBodyAndDock(
   expect(home, `no interior read for ${homeId} was captured off the wire`).toBeTruthy()
   const lodeId = mineableBodyId(home!, stationFeatureId(home!) ?? undefined)
   expect(lodeId, `the home system's interior read carried no mineable body (home ${homeId})`).toBeTruthy()
-  await selectBody(page, lodeId!)
-  await page.getByTestId('burn-button').click()
-  const row = page.getByTestId(`fleet-row-${fleetId}`)
-  await expect(row).toContainText(/under way/i, { timeout: 20_000 })
-  await expect(row).toContainText(/docked/i, { timeout: 600_000 })
+  await arrangeBodyDock(page, fleetId, lodeId!, fixtureTokens.get(page)!)
+  await page.reload(); await prepareCommandHud(page)
 }
 
 test.describe('space view — synchronous double-submit guards', () => {
-  test('Scenario: Two activations in one tick submit one burn order', async ({ page }) => {
-    test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
+  test('Current HUD does not offer the retired burn submit control', async ({ page }) => {
     const orders = recordPosts(page, /\/v1\/fleets\/[^/]+\/orders$/)
-    const fleetId = await signUpAndWake(page, 'burnguard')
-
-    // Any body will do; the guard is about the control, not the target. Two
-    // are captured because the release check below needs a genuinely NEW
-    // command, and an order to the body the fleet is already docked at is not
-    // reliably one.
-    const bodyIds = await bodyIdsMatching(page, 'feat-body-')
-    expect(bodyIds.length, 'a generated system carries several ordinary bodies').toBeGreaterThan(1)
-    await selectBody(page, bodyIds[0])
-    await expect(page.getByTestId('burn-button')).toBeEnabled()
-
-    await doubleActivateInOneTick(page.getByTestId('burn-button'))
-
-    await expect(page.getByTestId(`fleet-row-${fleetId}`)).toContainText(/under way/i, {
-      timeout: 20_000,
-    })
-    expect(
-      orders.length,
-      `expected exactly one /orders request from two same-tick activations, got ${orders.length}: ${JSON.stringify(orders.map((o) => o.body))}`,
-    ).toBe(1)
-    await expectAllSettled2xx(orders, '/orders')
-
-    // Scenario: The guard releases when the request settles or fails — a
-    // later, genuinely new command goes through.
-    await expect(page.getByTestId(`fleet-row-${fleetId}`)).toContainText(/docked/i, { timeout: 600_000 })
-    await selectBody(page, bodyIds[1])
-    await page.getByTestId('burn-button').click()
-    await expect.poll(() => orders.length, { timeout: 20_000 }).toBe(2)
-    // RULING 51 — READ BEFORE "FIXING" A RED HERE. This is the one command in
-    // the file with no `/under way/` wait after the click, so until this
-    // change it could only ever assert a COUNT: a refused command was
-    // invisible. The sequence it drives — burn, dock, immediately order again
-    // — is verbatim the one `defect-post-dock-burn-cost-drift.md` names as
-    // producing `ErrQuotedCapExceeded`. If this goes red with a `409` carrying
-    // "solved fuel cost exceeds the requested maxFuelTons cap", that is that
-    // defect, it is OUT OF SCOPE here, and the ruling is: record it against
-    // the defect file, report the red, stop. Do NOT widen
-    // `BURN_FUEL_ALLOWANCE` (RULING 41 forbids it) and do NOT relax, scope
-    // down or delete this assertion — a `409`'d command is not a successful
-    // one, and a visibility check that only ever shows green is not
-    // visibility.
-    await expectAllSettled2xx(orders, '/orders')
+    await signUpAndWake(page, 'retired-burn')
+    const bodies = await bodyIdsMatching(page, 'feat-body-')
+    expect(bodies.length).toBeGreaterThan(0)
+    const details = await openObjectDetails(page, bodies[0])
+    await details.getByTestId('details-plot').click({ timeout: 10_000 })
+    await expect(page.getByTestId('burn-button')).toBeHidden()
+    expect(orders).toEqual([])
+    // Same-tick Burn guard remains in SpaceCommandPanel.test.tsx and
+    // use-submit-guard.test.tsx; no claim of a current UI Burn path.
   })
 
   test('Scenario: Two activations in one tick submit one mine run', async ({ page }) => {
@@ -454,13 +416,13 @@ test.describe('space view — synchronous double-submit guards', () => {
     const homeId = new URL(page.url()).pathname.split('/').pop()!
     const gate = ((await interiors.get(homeId)).laneGates ?? [])[0]
     expect(gate?.id, `the interior read for ${homeId} served no lane-gate body id`).toBeTruthy()
-    await selectBody(page, gate.id!)
-    await expect(page.getByTestId('gate-facts')).toBeVisible({ timeout: 20_000 })
-    await page.getByTestId('burn-button').click()
-    const row = page.getByTestId(`fleet-row-${fleetId}`)
-    await expect(row).toContainText(/under way/i, { timeout: 20_000 })
-    await expect(row).toContainText(/docked/i, { timeout: 900_000 })
+    await arrangeBodyDock(page, fleetId, gate.id!, fixtureTokens.get(page)!, 900_000)
+    await page.reload(); await prepareCommandHud(page)
 
+    // The current system HUD hides Jump; the galaxy roster exposes the live command.
+    await page.getByTestId('nav-home').click()
+    await page.waitForURL((url) => url.pathname === '/', { timeout: 20_000 })
+    await expect(page.getByTestId(`fleet-row-${fleetId}`)).toBeVisible({ timeout: 20_000 })
     await doubleActivateInOneTick(page.getByTestId(`fleet-cmd-jump-${fleetId}`))
 
     await expect.poll(() => jumps.length, { timeout: 20_000 }).toBeGreaterThan(0)

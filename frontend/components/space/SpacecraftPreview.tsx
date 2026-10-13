@@ -8,11 +8,12 @@ export interface SpacecraftPreviewProps {
   kind: PreviewKind
   objectId: string
   label: string
+  starClass?: string
   accentColor: number
 }
 
-export function SpacecraftPreview({ kind, objectId, label, accentColor }: SpacecraftPreviewProps) {
-  const canvas = useRef<HTMLCanvasElement>(null)
+export function SpacecraftPreview({ kind, objectId, label, accentColor, starClass }: SpacecraftPreviewProps) {
+  const canvas = useRef<HTMLDivElement>(null)
   const surface = useRef<HTMLDivElement>(null)
   const controller = useRef<SpacecraftPreviewController | null>(null)
   const drag = useRef<{ id: number; x: number; y: number } | null>(null)
@@ -26,7 +27,11 @@ export function SpacecraftPreview({ kind, objectId, label, accentColor }: Spacec
   useEffect(() => {
     if (!canvas.current || !surface.current) return
     let live = true
-    const instance = createSpacecraftPreview(canvas.current, kind, currentAccent.current, next => { if (live) setStatus(next) }, objectId)
+    const instance = createSpacecraftPreview(document.createElement('canvas'), kind, currentAccent.current, next => { if (live) setStatus(next) }, objectId, {
+      starClass, createCanvas: () => document.createElement('canvas'), onCanvas: next => {
+        next.setAttribute('aria-hidden', 'true'); next.className = 'h-full w-full'; canvas.current?.replaceChildren(next)
+      },
+    })
     controller.current = instance
     const observer = new ResizeObserver(entries => {
       const rect = entries[0]?.contentRect
@@ -36,7 +41,7 @@ export function SpacecraftPreview({ kind, objectId, label, accentColor }: Spacec
     const rect = surface.current.getBoundingClientRect()
     instance.resize(rect.width, rect.height)
     return () => { live = false; drag.current = null; observer.disconnect(); instance.dispose(); controller.current = null }
-  }, [kind, objectId])
+  }, [kind, objectId, starClass])
   const endDrag = (event: PointerEvent<HTMLDivElement>) => {
     event.stopPropagation()
     if (drag.current?.id !== event.pointerId) return
@@ -69,9 +74,10 @@ export function SpacecraftPreview({ kind, objectId, label, accentColor }: Spacec
         if (event.key === 'Home') controller.current?.reset()
         else controller.current?.rotate(...delta[event.key]!)
       }}>
-      <canvas ref={canvas} aria-hidden="true" className="h-full w-full" style={{ visibility: status === 'unavailable' ? 'hidden' : 'visible' }} />
+      <div ref={canvas} aria-hidden="true" className="h-full w-full" style={{ visibility: status === 'unavailable' ? 'hidden' : 'visible' }} />
     </div>
-    <p role="status" aria-live="polite" className="text-xs text-zinc-600 dark:text-zinc-400">{status === 'loading' ? 'Loading model preview…' : status === 'fallback' ? 'Simplified model preview.' : status === 'unavailable' ? 'Model preview unavailable.' : ''}</p>
+    <p role="status" aria-live="polite" className="text-xs text-zinc-600 dark:text-zinc-400">{status === 'loading' ? 'Loading model preview…' : status === 'fallback' ? 'Simplified model preview.' : status === 'unavailable' ? 'Model preview unavailable.' : status === 'interrupted' ? 'Model preview interrupted.' : ''}</p>
+    {(status === 'unavailable' || status === 'interrupted') && <Button plain data-testid="spacecraft-preview-retry" onClick={() => controller.current?.retry()}>Retry preview</Button>}
     <div className="flex items-center justify-between gap-2">
       <p id={instructions} className="text-xs text-zinc-600 dark:text-zinc-400">Drag or use arrow keys to rotate. Home resets.</p>
       <Button plain style={{ color: 'var(--command-ink)' }} data-testid="spacecraft-preview-reset" onClick={() => controller.current?.reset()}>Reset view</Button>

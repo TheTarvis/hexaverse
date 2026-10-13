@@ -45,7 +45,7 @@ import { test, expect, type Page } from '@playwright/test'
  * and `smoke.spec.ts` already establish this pattern for the galaxy view).
  *
  * WHY NO EXPLICIT "WAIT FOR ANIMATION" STEP. The galaxy's renderer
- * (`react-force-graph-3d`) runs its own `requestAnimationFrame` loop
+ * (the shared Three renderer) runs its `requestAnimationFrame` loop
  * unconditionally from the moment `<GalaxyGraph>` mounts for as long as the
  * render guard reports `'live'` — nothing in this walk ever suspends it
  * (`GalaxyView.tsx`'s `guard.status`). So "the view is mounted and
@@ -141,10 +141,11 @@ async function loadAnimatingGalaxyView(page: Page): Promise<FleetListEnvelope> {
   await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 })
   await expect(page.getByTestId('galaxy-view')).toBeVisible({ timeout: 20_000 })
   // The canvas element itself, not just the wrapping testid — a real,
-  // running `react-force-graph-3d` renderer, the same wait
+  // running Three renderer, the same wait
   // `renderer-availability.spec.ts` uses (its own hardening note: the
   // wrapper testid can appear a beat before FG3D's canvas child does).
   await page.waitForSelector('[data-testid="galaxy-graph"] canvas', { timeout: 20_000 })
+  await expect(page.getByTestId('graph-loading')).toBeHidden({ timeout: 20_000 })
   await expect(page.getByTestId('fleet-roster')).toBeVisible({ timeout: 20_000 })
   return fleetList
 }
