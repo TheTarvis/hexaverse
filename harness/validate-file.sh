@@ -6,9 +6,9 @@
 # exits non-zero with diagnostics on stderr — nothing about it knows what an
 # agent is, so every caller uses the same one:
 #
-#   Claude Code   tools/hook-post-edit.sh, wired as a PostToolUse hook
+#   Claude Code   harness/hook-post-edit.sh, wired as a PostToolUse hook
 #   Codex / other AGENTS.md tells the agent to run this after editing
-#   you          bash tools/validate-file.sh backend/session/store.go
+#   you          bash harness/validate-file.sh backend/session/store.go
 #   CI / git      call it on the changed-file list
 #
 # The point is to collapse the edit -> run a check -> read the error -> fix
@@ -29,17 +29,18 @@ REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || { cd 
 
 QUIET=0
 SLOW=0
-PROJECT_CHECKS=1
+PROJECT_CHECKS=0
 PATHS=()
 for arg in "$@"; do
   case "$arg" in
     --quiet) QUIET=1 ;;
     --slow)  SLOW=1 ;;
     --no-project-checks) PROJECT_CHECKS=0 ;;
+    --project-checks) PROJECT_CHECKS=1 ;;
     -h|--help)
       sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       echo
-      echo "Usage: bash tools/validate-file.sh [--quiet] [--slow] <path>..."
+      echo "Usage: bash harness/validate-file.sh [--quiet] [--slow] [--project-checks] <path>..."
       exit 0
       ;;
     -*) echo "unknown flag: $arg" >&2; exit 2 ;;
@@ -127,57 +128,10 @@ $(echo "$out" | head -10)"
         fi
       fi
       ;;
-    *-consolidated.md|*-reduced.md)
-      # The reducer gate, fired by the edit that wrote the reduction. A
-      # consolidated findings file is exactly where evidence goes missing, and
-      # the author is the only one who can still cheaply put it back.
-      #
-      # --verify-header additionally pins the sources by hash: "these quotes
-      # match" is only evidence when it is a statement about the files that
-      # were actually reduced, not about whatever those paths hold today.
-      if have python3 && [[ -f "$REPO_ROOT/harness/check-quote-fidelity.py" ]]; then
-        if ! out="$(cd "$REPO_ROOT" && python3 harness/check-quote-fidelity.py "$rel" --verify-header 2>&1)"; then
-          fail "$rel: quote fidelity
-$(echo "$out" | head -24)"
-        else
-          note "$rel: quote fidelity ok"
-        fi
-      fi
-      ;;
-    */handoffs/*.md)
-      # An index that has gone stale is worse than no index: delegations are
-      # told to read it instead of the source, so it silently hands them the
-      # previous revision. Only files that already have one are checked —
-      # indexing is a decision (harness/reduction-economics.py), not a default.
-      if have python3 && [[ -f "${abs%.md}-index.md" && -f "$REPO_ROOT/harness/handoff-index.py" ]]; then
-        if ! out="$(cd "$REPO_ROOT" && python3 harness/handoff-index.py --check "$rel" 2>&1)"; then
-          fail "$rel: handoff index is stale
-$(echo "$out" | head -6)
-    fix: python3 harness/handoff-index.py $rel"
-        else
-          note "$rel: handoff index current"
-        fi
-      fi
-      # Editing a pinned SOURCE is what makes a reduction stale, and this hook
-      # fires on the file that was edited, never on the reduction downstream of
-      # it. Re-verify every receipt naming this path, at the moment the drift is
-      # caused rather than whenever someone next happens to touch the reduction.
-      if have python3 && [[ -f "$REPO_ROOT/harness/check-quote-fidelity.py" ]]; then
-        while IFS= read -r red; do
-          [[ -n "$red" ]] || continue
-          relred="${red#"$REPO_ROOT"/}"
-          if ! out="$(cd "$REPO_ROOT" && python3 harness/check-quote-fidelity.py "$relred" --verify-header 2>&1)"; then
-            fail "$relred: pins $rel, and this edit changed it
-$(echo "$out" | tail -12)"
-          fi
-        done < <(grep -rl --include='*-consolidated.md' --include='*-reduced.md' \
-                      -F "source=$rel " "$(dirname "$abs")" 2>/dev/null)
-      fi
-      ;;
     *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs)
       # Deliberately not linted per-edit: eslint pays a Node + config load on
       # every keystroke-sized change, and tsc has to build the whole program to
-      # say anything true about one file. Both belong in tools/check.sh.
+      # say anything true about one file. Both belong in harness/check.sh.
       if [[ $SLOW -eq 1 ]] && [[ -d "$REPO_ROOT/frontend/node_modules" ]]; then
         if ! out="$(cd "$REPO_ROOT/frontend" && npx --no-install eslint --cache "$abs" 2>&1)"; then
           fail "$rel: eslint
@@ -187,13 +141,13 @@ $(echo "$out" | head -15)"
       ;;
   esac
 
-  # This repo's own checks (tools/check-*.sh) were written as PostToolUse hooks
+  # This repo's own checks (harness/check-*.sh) were written as PostToolUse hooks
   # — they read the hook envelope on stdin and self-filter by path — but were
   # never wired to one, so they have been dormant. Synthesising the envelope
   # here runs them for every client and every caller, not only Claude Code,
   # and keeps their single definition in one place.
   if [[ $PROJECT_CHECKS -eq 1 ]]; then
-    for chk in "$REPO_ROOT"/tools/check-*.sh; do
+    for chk in "$REPO_ROOT"/harness/check-*.sh; do
       [[ -f "$chk" ]] || continue
       grep -q 'tool_input' "$chk" 2>/dev/null || continue
       if ! out="$(printf '{"tool_input":{"file_path":"%s"}}' "$abs" | bash "$chk" 2>&1)"; then

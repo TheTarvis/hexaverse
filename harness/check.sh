@@ -94,7 +94,7 @@ if [[ $want_frontend -eq 1 ]]; then
   fi
   if [[ $want_lint -eq 1 ]]; then
     run_step "frontend: tsc"     npx --no-install tsc --noEmit || [[ $KEEP_GOING -eq 1 ]] || exit 1
-    run_step "frontend: eslint"  npx --no-install next lint --quiet || [[ $KEEP_GOING -eq 1 ]] || exit 1
+    run_step "frontend: eslint"  npx --no-install eslint . --quiet || [[ $KEEP_GOING -eq 1 ]] || exit 1
   fi
   if [[ $want_test -eq 1 ]]; then
     run_step "frontend: vitest"  npx --no-install vitest run --reporter=basic || [[ $KEEP_GOING -eq 1 ]] || exit 1
@@ -102,25 +102,6 @@ if [[ $want_frontend -eq 1 ]]; then
   cd "$REPO_ROOT"
 fi
 
-# Rulings indexes, for active changes only. A WARNING, never a failure: a stale
-# index is the orchestrator's to fix at its next verdict commit, and it must not
-# block a developer's commit. The hard gate is `openspec-rulings-index.py
-# --check <id>` at the verdict commit itself.
-if [[ $want_lint -eq 1 && -d "$REPO_ROOT/docs/handoffs" ]]; then
-  stale=()
-  for change in "$REPO_ROOT"/openspec/changes/*/; do
-    id="$(basename "$change")"
-    [[ "$id" == "archive" ]] && continue
-    [[ -f "$REPO_ROOT/docs/handoffs/$id-rulings.md" ]] || continue
-    python3 "$SCRIPT_DIR/openspec-rulings-index.py" --check "$id" >/dev/null 2>&1 || stale+=("$id")
-  done
-  if [[ ${#stale[@]} -gt 0 ]]; then
-    echo
-    echo "──── handoffs: rulings index ────"
-    echo "  ! stale (not a failure): ${stale[*]}" >&2
-    echo "    run: python3 tools/openspec-rulings-index.py ${stale[*]}" >&2
-  fi
-fi
 
 echo
 if [[ ${#failed[@]} -eq 0 ]]; then

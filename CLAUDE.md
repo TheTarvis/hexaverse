@@ -1,414 +1,76 @@
-# CLAUDE.md
+# Hexaverse
 
-This file provides guidance to Claude Code (claude.ai/code) when working with
-code in this repository.
+Hexaverse is a multiplayer space game in a procedurally generated galaxy.
+Players control fleets, explore under fog of war, mine resources and trade at
+stations. The simulation advances asynchronously on a server-authoritative
+world clock. Local 3D views use WebGPU.
 
-> **Setup state (2026-07-02):** bootstrap has run — placeholders substituted,
-> GCP/Firebase provisioned (dev = `hexaverse-game-dev`; prod = `hexaverse`,
-> the reused pre-Volt project), local build/tests green. The **User profile**
-> section below still needs the `/onboard` discovery conversation. Remove
-> this blockquote once that's done.
+## Sources of truth
 
-## Purpose
+Code and tests describe implemented behavior. `GLOSSARY.md` defines domain
+terms. For gameplay architecture and cross-domain relationships, read
+`docs/game-architecture.md`. `docs/vision.md`, `docs/lore.md`, `docs/specs/`
+and `docs/plans/` retain design context; historical checklists and unimplemented
+ideas are references, not an active backlog. The old implementation is archived
+at `archive/pre-volt-reset` and commit `bf9c637`.
 
-Hexaverse is a **multiplayer space-colonization game on a procedurally
-generated hex-grid galaxy** — fog of war, colonies, resource tiles, real-time
-interaction between players. This repo is the 2026-07-01 rebuild of that game
-on the Volt platform skeleton (hexaverse is the first fork / guinea pig for
-Volt). Which gameplay features survive the rebuild, and in what order, is
-still to be decided with Travis — that's part of the pending `/onboard`
-discovery conversation.
+## Game conventions
 
-The previous implementation (Next.js + Three.js client, Go websocket server)
-is archived: GitHub branch `archive/pre-volt-reset` and the "Checkpoint"
-commit at the root of `main` (`git show bf9c637`). Gameplay design lives there
-at `client/docs/Gameplay.mdc`. The old realtime layer was raw websockets; the
-Volt platform provides SSE + Pub/Sub instead.
+- Domain code uses `common.WorldClock()` and `WorldMillis`; inject time in tests.
+- Go owns continuous-space physics. The sole Go/TypeScript rule mirror is
+  `backend/market` and `frontend/lib/market`, pinned by shared fixtures.
+  `fixtures/determinism-register.json` records the other packages' ownership.
+- Corporations are player identities, linked to Firebase accounts. Ownership
+  and fog filtering happen on the server; foreign fleets outside coverage
+  read as absent. Handlers use `middlewares.ResolveCorporation`.
+- Action verbs use `action.Commit` and registered resolvers. Movement and
+  sensors have separate single-slot channels. Instant verbs such as spawn
+  and sell keep their existing transactional behavior.
+- Handlers call services, services own their DAOs; cross-domain calls go
+  through services. Frontend components use hooks, services and `apiClient`.
 
-## Stack
+## Stack and layout
 
-- **Frontend**: Next.js 15 (App Router) + Tailwind v4 + Catalyst UI + React
-  Query, Firebase Auth, vitest. Deployed on Vercel.
-- **Backend**: Go (1.24+) + Gin on Cloud Run. Firestore, Pub/Sub, SSE realtime.
-- **Agent**: `claude-agent/` — Python/FastAPI Claude tool-calling agent on
-  Cloud Run; streams SSE to the frontend and calls the Go backend with the
-  user's own Firebase token (token passthrough).
-- **Database**: Firestore (Firebase emulator for local dev).
-- **Infra**: Terraform in `infra/`. One GCP project per environment
-  (`GCP_PROJECT_DEV`, `GCP_PROJECT_PROD`). CI/CD via GitLab.
+- `frontend/`: Next.js, TypeScript, Tailwind, Catalyst, Firebase Auth and React
+  Query. Read `frontend/CLAUDE.md` before frontend changes.
+- `backend/`: Go, Gin, Firestore, Pub/Sub and SSE. Read `backend/CLAUDE.md`.
+- `claude-agent/`: Python agent service; see `claude-agent/CLAUDE.md`.
+- `infra/`: Terraform and GitLab CI; see `infra/CLAUDE.md`.
+- `bootstrap/`: project configuration; see `bootstrap/README.md`.
+- `scripts/dev/`: emulator wrappers and admin helpers. For emulator users,
+  run `cd frontend && npm run users -- …`.
+- `harness/skills/`: unmodified published Matt Pocock skills and local `spinup`,
+  shared through `.claude/skills` and `.agents/skills`.
+- `harness/utilities/`: standalone onboarding, scaffolding and check commands.
 
-## Repo layout — where the real guidance lives
+## Development
 
-Each service has its own CLAUDE.md with the patterns, gotchas, and testing
-conventions for that codebase. **Read the relevant one before working there.**
+Run root commands from the repository root. `npm run install:all` installs
+service dependencies. Start `npm run firebase:emulators`, `npm run dev:backend`
+and `npm run dev:frontend` in separate terminals; `npm run dev:agent` starts
+the agent service. Invoke `spinup` to restart these services in GoLand Run tabs.
+Test runners own the test emulators' lifecycle.
 
-- `package.json` (root) — npm scripts orchestrating everything (`dev:*`,
-  `test:*`, `firebase:*`, `install:all`). Run `npm install` at the root once
-  to get `concurrently` + `firebase-tools`. `.run/` holds JetBrains run
-  configurations for these scripts; `scripts/dev/with-test-emulators.sh`
-  auto-starts/reuses the test emulators around e2e/integration runs;
-  `scripts/dev/admin/` grants the `admin: true` Firebase custom claim (see
-  its README). Emulator accounts on the dev or test cluster (create, find,
-  bearer token, password-less browser sign-in via `/dev/login`):
-  `cd frontend && npm run users -- …` — the `/dev-users` skill.
-- `backend/` — Go service. See `backend/CLAUDE.md` (domain package shape,
-  handler→service→DAO layering, events, sentinel errors, emulator testing).
-- `frontend/` — Next.js app. See `frontend/CLAUDE.md` (component→hook→service→
-  apiClient layering, query-key factory, Catalyst-only UI, color system).
-  `frontend/e2e/` — Playwright suite against an isolated test stack
-  (`cd frontend && npm run e2e`); see `frontend/e2e/README.md`.
-- `claude-agent/` — agent service. See `claude-agent/CLAUDE.md` (agent loop,
-  adding tools, persistence hooks).
-- `infra/` — Terraform + CI runner images. See `infra/CLAUDE.md` (secrets
-  flow, Pub/Sub wiring, setup-gcp.sh vs Terraform split).
-- `bootstrap/` — fork-time setup. `config.env` + `init.sh` substitute
-  placeholder values across the repo and write `frontend/.env.local`.
-- `harness/` — everything the coding agents share, owned by no single client:
-  the `check-*` quality gate, the OpenSpec validators, `validate-file.sh`
-  (post-edit check — Claude runs it from a hook, Codex runs it by instruction,
-  you run it by hand), `check-quote-fidelity.py` (the reducer gate, which also
-  pins a reduction's sources by hash), `handoff-index.py` (section map + line
-  ranges for any handoff too big to read whole) and `reduction-economics.py`
-  (whether reducing a handoff repays the reducer, or you should just index it),
-  and `agent-token-usage.py` (what the harness costs), plus `skills/`, `agents/`
-  (the OpenSpec team) and `commands/`. This is the real directory; write new
-  references as `harness/<name>`. `tools` and `.claude/scripts` are compat
-  symlinks to it so older references still resolve.
-- `.claude/` — Claude Code's own configuration, and nothing else: `settings.json`
-  (hooks, permissions) and the `openspec-team` Workflow (`workflows/`). Its
-  `skills`, `agents` and `commands` entries are symlinks into `harness/`, the
-  same files Codex reaches through `.agents/skills`; see `AGENTS.md`.
-- `scripts/` — ops scripts. `decommission-old-hexaverse.sh` tears down the
-  pre-Volt implementation's resources inside the `hexaverse` prod project
-  (dry-run by default; explicit 2026-07-02 inventory — never touches the
-  Volt stack). `cleanup-firestore.sh` / `cleanup-pubsub.sh` were brought
-  from Flywheel and are **not yet adapted** to hexaverse.
-- `firebase.json`, `firebase.test.json` — emulator and deploy config
-  (test emulators: Firestore 20242, Auth 20241, Pub/Sub 20244).
-- `docs/` — project docs. `docs/testing-tiers.md` is the single definition of
-  every test suite, its cost, and when it runs (per-commit gate vs. archive
-  gate); `docs/handoffs/` is the OpenSpec team's durable per-change state
-  (panel reports, adversary rounds, rulings, impl contracts, coverage tables,
-  journey records — see its README).
+Ports derive from `ports.env` through `harness/ports.py`; `npm run ports` shows
+the current lane. `bash harness/check.sh` runs backend/frontend static and
+unit checks. `docs/testing-tiers.md` lists test commands and emulator constraints.
+After editing a file, run `bash harness/validate-file.sh <path>`.
+For CRUD scaffolding, run `python3 harness/utilities/new-domain/new_domain.py
+<singular> [plural]` and apply its printed wiring steps.
 
-## Commands
+Dev GCP project: `hexaverse-game-dev`; prod: `hexaverse`, with domain
+`hexaverse.io`. The prod project still includes pre-Volt resources. Read
+`scripts/decommission-old-hexaverse.sh` before any legacy-resource cleanup.
 
-Quality gate — `/check` runs the full harness (changed-file validators:
-data-testid, test-file coverage, param helpers, raw-fetch, color compliance;
-plus lint, vitest, `go vet` + `go test -short`, agent lint/tests, npm audit,
-govulncheck). It never boots a stack: the full emulator suite and Playwright
-are `--backend-tests` / `--e2e` only (tiers 3 and 4 in `docs/testing-tiers.md`):
+## Agent skills
 
-```bash
-python3 .claude/skills/code-quality-checks/check.py   # flags: --files-only --lint --backend-tests --e2e ... (see /check)
-bash harness/check.sh              # fast bash gate only: --backend --frontend --lint --test --keep-going
-```
+- Issue tracker: local Markdown under `.scratch/`; see
+  `docs/agents/issue-tracker.md`.
+- Triage labels: upstream defaults; see `docs/agents/triage-labels.md`.
+- Domain docs: root `GLOSSARY.md` and, when warranted, `docs/adr/`; see
+  `docs/agents/domain.md`.
 
-Commit with `/commit` — one conventional commit for the whole working tree,
-type-prefixed bullets per change, `Impact:` trailer (see
-`harness/skills/commit/SKILL.md`).
-
-Backend (`cd backend`):
-
-```bash
-make run                                   # run locally (localhost:20201)
-make test                                  # unit tests (go test -short ./...)
-go test ./widgets/ -run TestName -short    # single test
-make generate                              # regen mocks after editing a DAO interface
-make emulators-bg / stop-emulators         # Firebase emulators in background
-```
-
-Frontend (`cd frontend`):
-
-```bash
-npm run dev                                # localhost:20200
-npm run lint                               # ESLint + tsc
-npx vitest run                             # tests, one-shot
-npx vitest run path/to/file.test.tsx       # single file
-```
-
-Claude agent (`cd claude-agent`):
-
-```bash
-uv sync && uv run python -m src.main       # server at :20202
-uv run pytest                              # tests
-uv run ruff check src tests && uv run pyright src
-```
-
-Infra (`cd infra/terraform`):
-
-```bash
-terraform plan -var-file=environments/dev.tfvars    # always plan first
-terraform apply -var-file=environments/dev.tfvars
-```
-
-Scaffold a new CRUD domain end-to-end (backend six-file package + frontend
-type/service/hook/page + wiring snippets): `/new-domain <singular> [plural]`.
-Apply **all** printed wiring edits before building — the scaffold references
-pubsub constants that don't exist until you do.
-
-## Architecture — the cross-service picture
-
-- **Auth is Firebase ID tokens everywhere.** Frontend gets a token via
-  Firebase Auth; `apiClient` attaches and refreshes it. Backend middleware
-  verifies it and exposes the account via `common.Actor(c)`. The claude-agent
-  verifies the same token and passes it through to the backend, so the agent
-  inherits the user's permissions — no service-account path.
-- **Events flow through Pub/Sub.** Backend services publish typed envelopes
-  (constants in `backend/common/pubsub.go`); Terraform-defined push
-  subscriptions deliver them back to backend `/v1/push/*` routes, verified by
-  OIDC middleware. SSE (`backend/sse/`) broadcasts to logical channels for
-  realtime UI.
-- **Both codebases are strictly layered** — handler→service→DAO in Go,
-  component→hook→service→apiClient in TS. Never skip a layer; cross-domain
-  calls go through services, not DAOs.
-- **Environments**: dev = `hexaverse-game-dev`; prod = `hexaverse` — the
-  reused pre-Volt project, which still hosts the old implementation's
-  resources until `scripts/decommission-old-hexaverse.sh` is run. Both live
-  under wilson.travis.t@gmail.com (gcloud config `hexaverse`, not the
-  default). Prod domain `hexaverse.io`; dev uses the Vercel default URL.
-  `setup-gcp.sh` creates the per-env project shell once; Terraform manages
-  everything inside it. GitLab pipeline: verify-dev → deploy-dev → manual
-  promote → deploy-prod.
-
-## Bootstrap & onboarding
-
-After forking:
-
-1. `cp bootstrap/config.example.env bootstrap/config.env` and fill in values.
-2. `bash bootstrap/init.sh` — substitutes placeholders, writes
-   `frontend/.env.local`.
-3. Run `/onboard` — probes prereqs, auth, build, tests; writes a personal
-   `onboarding_checklist.md` (gitignored). Re-runnable.
-
-Local dev loop (three terminals, from the repo root):
-
-```bash
-# 1. Firebase dev emulators (firebase.json — auth :20211, firestore :20212)
-npm run firebase:emulators
-
-# 2. Backend (:20201)
-npm run dev:backend
-
-# 3. Frontend (:20200)
-npm run dev:frontend
-```
-
-`npm run dev` runs frontend + backend concurrently in one terminal. E2E
-(`cd frontend && npm run e2e`) needs none of these — it boots its own
-isolated stack (test emulators, `ENV=test` backend on :20232, frontend on
-:20230).
-
-## Spec-driven development (OpenSpec)
-
-Behavior is specified before it is built, in [OpenSpec](https://openspec.dev/)
-format under `openspec/`: `specs/<capability>/spec.md` is what the code does
-today, `changes/<change-id>/` (proposal, design, spec deltas, tasks) is what
-is about to change, and `openspec archive` folds a shipped change back into
-`specs/`. The CLI is `@fission-ai/openspec` (`npm i -g`); agents install it
-themselves if missing.
-
-- `/opsx:propose | explore | apply | update | sync | archive` — the single-agent
-  workflow: one change at a time, driven in this session.
-- `/team <design doc | request | change-id> [--implement] [--brownfield
-  <caps>] [--greenfield] [--workflow]` — the multi-agent team in
-  `harness/agents/` (analyst, spec writer, specialist review panel,
-  validator, adversary, and an optional strict-TDD implementation crew).
-  `--workflow` runs the same pipeline as the deterministic `openspec-team`
-  Workflow. Read `harness/agents/README.md` first.
-- `python3 harness/openspec-reconcile.py` before archiving — catches
-  the MODIFIED-block omissions that `validate --strict` misses and
-  `archive` refuses.
-- `/team --chain docs/plans/<chain>/chain.md` implements already-authored
-  changes in archive order, one fresh orchestrator per link, verifying each
-  link's adversary verdict by diff before building it.
-- Testing during implementation follows `docs/testing-tiers.md`: the
-  per-commit gate never boots a stack; the Playwright journey and the full
-  emulator suite run once per change, at archive time, with the tree locked.
-
-Format rules live in `harness/skills/openspec-conventions/`; the team's
-operating rules (spec-first, no vibe coding, adversary is non-skippable)
-in `harness/skills/openspec-team-workflow/`.
-
-
-## User profile
-
-*(pending — fill via the `/onboard` discovery conversation: role, background,
-time/budget constraints, what's deliberately out of scope for the rebuild)*
-Solo project of Travis Wilson.
-
-## Domain quick-reference
-
-*(filled as the rebuild lands milestones — see `docs/plans/build-order.md`.
-The richest design source is the archived gameplay doc —
-`git show bf9c637:client/docs/Gameplay.mdc`.)*
-
-**Backend domains built (M1–M11):**
-
-- **`common/worldtime.go`** — the injectable simulation clock (#0005 contract,
-  pulled forward). `WorldClock()` / `NewWorldTime(epoch, scale)`; all stored
-  stamps are `WorldMillis`. Domain code never calls `time.Now()`; tests inject.
-- **`galaxy/`** (#0001, *implemented*) — generate-once + read. Deterministic
-  generator (`Generate(seed, params)`): simplex-noise regions, Poisson-disc
-  placement, relative-neighbourhood lanes, per-system major-body skeleton.
-  Persists `galaxies/{id}` + `systems/`/`lanes/` subcollections behind a live
-  pointer. `GET /v1/galaxy`. Seed via `make seed` / `cmd/seed`;
-  `cmd/seed start-area` writes `frontend/public/galaxy/start-area.json`.
-- **`system/`** (#0003 part 1) — lazy per-system interiors. `Generate` extends
-  the galaxy skeleton (same `galaxy.SystemSeed`) with belts/moons/hazards,
-  dialed by region character. Create-if-absent under
-  `galaxies/{gid}/systems/{sid}/interior` + `features/`. `GET /v1/systems/:id`
-  materializes on first read (dev trigger; TODO #0008 arrival). Unfogged (M6).
-- **`space/`** (the lattice's successor) — pure continuous-space kinematics,
-  Go-sole-authority with no TypeScript mirror by design. `Vec3`, `Orbit`
-  (radius/period/phase/inclination/node), `Park`, `Burn`, `ShipState`, the
-  brachistochrone `FlightSeconds`, `StateAt`, and `SubTurns`/`PhaseIndexOf` —
-  a pinned trig table, never runtime `atan2`. It REPLACED a ring-and-slot
-  lattice — two Go packages holding the lattice core and its schedule, hop
-  metric, movement solves, lane gates and line-of-sight, their two TypeScript
-  mirrors, their two fixture directories and their own capability — all
-  **deleted 2026-09-04** (openspec `delete-the-lattice`). Do not go looking
-  for them; nothing has a ring or a slot any more. A
-  body's position is its orbital element set, a fleet's is a solved `Vec3`,
-  and a lane gate is a body like any other. Go↔TS mirroring survives at
-  exactly one pair — `backend/market` ↔ `frontend/lib/market`
-  (`fixtures/market/mirror-map.json`); every other rule-bearing Go package is
-  registered anti-mirror. The renderer draws continuous space
-  (`frontend/components/space/`, WebGL in `webgl/`).
-- **`fleet/`** (#0004, *implemented*) — the map-mover. Motion is a continuous
-  `space.ShipState` (parked / burning / in lane transit), `corporationId` from day one (dev-seeded through M8;
-  **ownership real since M9** — spawn is the only fleet-minter now).
-  `POST /v1/fleets/:id/orders|cancel`, `GET /v1/fleets/:id` (arrival resolved
-  opportunistically on read — no scheduler). `SeedFleet` survives as spawn's
-  placement primitive (the `/dev-seed` route retired at M9). Since
-  M5 the burn order **commits through `action.Commit`** (`type:"burn"`); fleet
-  still owns motion state (`BurnResolver` settles it at resolve). Two action
-  **channels** since the 2026-07-14 beam revision (#0006 Decision #19):
-  `activeActionId` (movement) + `activeScanId` (sensor) — a burning fleet can
-  scan; each channel stays single-slot. Routing runs over the corp's
-  **charted lanes** (per-lane docs), not tier-derived incidence.
-- **`action/`** (#0005) — the async spine every verb rides. Generic `Action`
-  (`running→done|cancelled`), commit-time ETA, single-slot claim, inbox
-  (`GET /v1/actions?actor&status`, `POST /v1/actions/:id/acknowledge|cancel`).
-  `ResolveDue(scope)`/`ResolveActive(actor)`/`ResolveAllDue` are ETA-ordered
-  folds any read runs; per-type `ResolveFunc` registered by verbs (fleet imports
-  action, never the reverse). Exactly-once ledger at `deltas/{scope}/entries/
-  {actionId}` (doc id = actionId, created in the resolve txn); `remaining(T)` =
-  fold of `effectAt ≤ T`, no materialized field. Kinematic resolvers settle actor
-  state, mutating ones append a delta. Completion → `ActionCompleted` →
-  `action-events` → `/v1/push/sse-action` → SSE(channel=scope). The **sweep**
-  (`POST /v1/push/action-sweep`, OIDC) is a liveness floor — Cloud Scheduler
-  ~15 min in `scheduler.tf`; correctness never depends on it. Composite indexes
-  `(scope|actor|status, status, eta)` in `firestore-indexes.tf` (Travis must
-  `terraform apply`). Mine (M10) is the first real mutating writer.
-- **`observation/`** (#0006, *built M6, spec still `accepted`*) — per-Corporation
-  fog. The observation atom (graph-tier `systemId→tier`
-  `starVisible|rumored|surveyed|explored`, monotonic; board-tier per-feature
-  memory) + the **fog-filter service** every read projects through
-  (`galaxy`/`system`/`fleet` handlers take `.WithFog(...)`; server-side only, no
-  ship-and-hide). Scan (revised 2026-07-14, #0006 Decisions #15–#24) is a
-  **radial echo riding the fleet** on the #0005 dispatch, on the sensor
-  channel: echoes return by distance, and the running scan's growing **echo
-  radius — centred on the unit's live position** — joins the corp's live
-  coverage per read (Decision #23 — `observation.Coverage`; no partial mints).
-  Resolution still mints once at eta: `asOf: eta` observations for the
-  unoccluded features from the fleet's eta position (the star occludes —
-  occlusion is `proximity-disclosure`'s rule, in R³), charts
-  **all the system's lanes** + rumors far endpoints (lanes-by-scanning; travel
-  charts only lanes ridden, spawn charts none), grants **no graph tier**
-  (`surveyed` is market-reserved; ladder in play: starVisible→rumored→explored),
-  and **fizzles** if the fleet left the origin system. Board reads split into
-  three bands (astronomical free / live inside the **LOS-filtered** sensor
-  union / remembered elsewhere, geometry live + activity frozen at `asOf`).
-  Fleet reads carry **audience fog** (own fleets never fogged; a foreign fleet
-  outside your live union — or behind a planet — reads 404). Ambient-on-move
-  reveals at movement resolution, LOS-filtered. Params in
-  `observation/params.go` / `common.Tuning()` (beam width knobs).
-  `RevealArrival` (spawn) writes home `explored` only — the first home scan
-  finds the roads.
-- **`corporations/`** (#0009, *implemented*) — spawn & identity. The
-  **Corporation** is the auth-account-linked player entity (the mind's lineage);
-  fleets carry `corporationId`, the fog store keys on it. `Spawn(accountId, name)`
-  orchestrates through the live galaxy/fleet/fog singletons: corp doc + account
-  pointer commit in **one transaction** (`corporations/{corpId}` +
-  `corpByAccount/{accountId}`, the uniqueness anchor), then the hull
-  (`fleet.SeedFleet` at a continuous home position) + initial fog (`observation.RevealArrival`:
-  home `explored` **only** — no lanes, revised 2026-07-14 per #0006 Decision
-  #17; scanning home is the first taught verb) follow — **idempotent per
-  account** heals a partial spawn. `POST /v1/corporations` (idempotent), `GET
-  /v1/corporations/me`. Site selection (`siteselection.go`): mineable-skeleton ∧
-  ≥`minSpawnDistance` graph-hops from living corps' explored sets ∧
-  periphery-weighted, account-seeded pick (knobs in `params.go`, placeholder
-  constants). **The ownership seam:** `middlewares.ResolveCorporation` resolves
-  account→living-corp into `common.ActorCorp` (`CorpIdKey`), the one function
-  every fogged read already keyed on. Death invariant (`diedAt` only at zero
-  fleets) recorded + enforced; no slice path reaches it. Spawn is **instant**, not
-  a #0005 action. Frontend: corpless → wake-up flow (name → spawn → galaxy).
-  **Since M11** spawn healing also provisions the home station + the opening
-  credit grant, and **`GET /me` runs the same healing pass** — the migration
-  mechanism, so a pre-M11 corp heals on its next session bootstrap with no
-  backfill script. An `assetsCompleteAt` marker short-circuits a healed corp.
-- **`mine/`** (#0010, *implemented M10*) — the action spine's first mutating
-  verb. `POST /v1/fleets/:id/mine {featureId,kind,tons}` commits on the
-  **movement** channel (a run gates move + mine, never scan); the resolver
-  appends a delta at eta and credits `fleet.Cargo`. Per-lode remaining is the
-  #0005 fold, never a stored field, bounded by construction (`MinRunTons` × a
-  named ceiling — Decision #18). Since M11 a mine command naming a **station**
-  is rejected with its own reason (dockable, never mineable).
-- **`stations/`** (#0011, *implemented M11*) — the NPC trading post, one per
-  spawn home and nowhere else. Its own store
-  (`galaxies/{gid}/systems/{sid}/station/meta`, create-if-absent) — NOT the
-  interior's feature subcollection, whose one-shot atomic claim has no
-  add-a-feature path, and whose `system.Feature` deliberately has no owner
-  field. `OwnerCorpId` empty = NPC (present from day one so player ownership is
-  a value change, never a retrofit). The orbit is **derived, never rolled**:
-  a pure function of (systemId, galaxy seed, skeleton) —
-  `system.StationContinuousOrbit`, a full orbital element set, never persisted
-  on the station doc — and **prograde with its system's disk** via the one
-  exported `system.DominantOrbitDirection` the interior generator itself uses.
-  Spliced
-  into `GetOrCreateInterior` **ungated** (that seam has no requester — arrival
-  settlement runs under the OIDC sweep), gated only at the requester-scoped
-  reads; **excluded from `fog_source.Features`**, which is what keeps
-  `observation` untouched (no scan mints a station observation, and it occludes
-  nothing). Degrades to no-station rather than failing an interior read.
-- **`market/`** (#0011, *implemented M11*) — credits, demand, and the sell
-  verb. **Credits** live on the corp doc as a materialized `int64`
-  (`corporations/credits.go`) — the one deliberate exception to #0005's
-  fold-of-deltas pattern, because a credit ledger accrues forever; the
-  reconciliation invariant is what keeps that safe (checkpointed **windowed**
-  fold, compound `(worldTime, docId)` cursor since the doc id is a client key
-  with no chronology, plus an O(1) write-time chain check and a divergence
-  halt that only an `adjustment` entry clears). Mutation is idempotent by a
-  client operation key scoped **per corporation** (`corporations/{id}/ledger/
-  {opKey}`), format-constrained, with `spawn:` reserved. Demand is a **uniform
-  ordered entry list** under an opaque venue key — the NPC floor is the entry
-  of last resort, not a fallback branch — so M12's player asks join the same
-  fold. `GET /v1/market/board` (point-read fan-out, no new index),
-  `POST /v1/fleets/:id/sell` — **instant, no action, no ETA**, settling in ONE
-  transaction that composes three domains' **two-phase** primitives (Firestore
-  forbids a read after a write, so every prepare runs before every apply).
-  Per-portion floored rounding pinned cross-stack by
-  `fixtures/market/cases.json`. Knobs in `market/params.go`.
-  **Cloud Scheduler `credit-reconcile` (hourly) in `scheduler.tf` — Travis must
-  `terraform apply`;** and note the route inherits the long-standing
-  `pushAudience = "flywheel-backend"` bug (`middlewares/oidc.go:13`) that 401s
-  every `/v1/push` OIDC in prod until that constant is fixed.
-
-**Next:** the M11 slice e2e (mine → sell at home → spot a premium three lanes
-over → haul it → the profit lands), then M12's player exchange — player asks
-join `market`'s existing demand-entry fold under the same venue key, and the
-listing fee becomes this economy's first credit sink (M11 is a pure faucet).
-
-- Core loop from the original design: players spawn colonies on a hex-grid
-  galaxy (spaced 8–25 tiles apart), explore under fog of war (scan radius
-  around units/bases), and compete over procedurally generated terrain
-  (star-rich sectors, dead zones, galactic barriers as choke points).
-
-## Project conventions
-
-- Domain-specific patterns live in the per-directory CLAUDE.md files — keep
-  them updated there, not here.
-- New CRUD domains via `/new-domain`, not hand-rolled files.
-- Run `/check` before commits; `terraform fmt` before committing infra.
-- New project docs go in `docs/`.
+Use the imported workflows as shipped. Keep project configuration outside the
+imported skills. `harness/README.md` documents provenance, integrity checks and
+explicit upstream updates. New work uses these workflows; the OpenSpec team,
+its handoffs and archive gates have been retired.

@@ -6,7 +6,7 @@ bootstrap/config.env
 frontend/.env.local
 frontend/.env.production.local
 
-# Per-developer onboarding state (refreshed by /onboard)
+# Per-developer onboarding state (refreshed by the onboarding probe)
 onboarding_checklist.md
 
 # Node (root workspace: concurrently + firebase-tools)

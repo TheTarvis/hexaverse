@@ -17,11 +17,11 @@ backend/
 └── go.mod
 ```
 
-User-defined domains (e.g. `widgets/`, `posts/`) sit alongside `account/`. Scaffold them with `/new-domain <name>` — see `.claude/skills/new-domain/`.
+User-defined domains (e.g. `widgets/`, `posts/`) sit alongside `account/`. Scaffold them with `python3 harness/utilities/new-domain/new_domain.py <name>` — see `harness/utilities/new-domain/`.
 
 ## Domain package shape
 
-Every domain follows the same six-file layout. The canonical templates live at `.claude/skills/new-domain/templates/backend/`:
+Every domain follows the same six-file layout. The canonical templates live at `harness/utilities/new-domain/templates/backend/`:
 
 ```
 <plural>/
@@ -33,11 +33,11 @@ Every domain follows the same six-file layout. The canonical templates live at `
 └── handler.go       # HTTP. Maps URL → service call, errors → status codes.
 ```
 
-Add a new domain via `/new-domain <singular> [plural]`, then apply the wiring snippets the script prints (router.go, common/pubsub.go, query-keys.ts, services/index.ts).
+Add a new domain via `python3 harness/utilities/new-domain/new_domain.py <singular> [plural]`, then apply the wiring snippets the script prints (router.go, common/pubsub.go, query-keys.ts, services/index.ts).
 
 ## Patterns to follow
 
-> Code examples below use a `widget` domain. Run `/new-domain widget` if you want to follow along — `account/` is the only baseline domain in this skeleton, and it's identity-specific, so it doesn't show the full CRUD pattern.
+> Code examples below use a `widget` domain. Run `python3 harness/utilities/new-domain/new_domain.py widget` if you want to follow along — `account/` is the only baseline domain in this skeleton, and it's identity-specific, so it doesn't show the full CRUD pattern.
 
 **Edge → service → DAO.** Handlers parse input and format output. Services hold business logic. DAOs do Firestore I/O. Never put logic in handlers; never let handlers call DAOs directly.
 
@@ -72,16 +72,9 @@ func NewServiceWithDao(dao Dao) *Service { return &Service{dao: dao} }  // for t
 - The root `hexaverse` package's e2e suite wipes and re-seeds the test emulator project once in `TestMain` (guarded on `ENV=TEST` + a non-real project id + loopback emulator hosts). It therefore needs no pre-seeded galaxy — but don't run it at the same time as the frontend Playwright suite; they share one emulator project.
 - Because that root-package `TestMain` wipes the shared emulator project, the full suite runs with `-p 1` (`npm run test:backend:all`); package-level tests (`go test ./<pkg>/...`) seed documents under names unique to the test file and clean only those.
 
-### Test tiers (see `docs/testing-tiers.md` — the source of truth)
-
-| When | Run |
-| --- | --- |
-| Per task | `go vet ./... && go test -short ./<pkg>/...` for the packages you touched |
-| Per task that touches persistence | `go test ./<pkg>/...` with the test emulator up (`npm run firebase:emulators:test`) |
-| Per commit | `bash harness/check.sh --backend` |
-| Once per change, at archive time | `npm run test:backend:all` (the whole emulator suite; minutes, and grows with every test) |
-
-Never run the full suite as a per-task check or as a "confirming rerun", and never raise its `-timeout` to make it pass — an overrun is a growing suite; report it.
+For test commands and emulator requirements, see `docs/testing-tiers.md`.
+Use targeted package tests while developing and keep the full backend suite
+serial with browser tests because both wipe the shared emulator project.
 
 ## Errors
 
@@ -102,7 +95,7 @@ default:                           c.JSON(http.StatusOK, widget)
 
 ## Gotchas
 
-- **First `go build` after `/new-domain` will fail until you wire pubsub.** The scaffolded `service.go` references `common.<Singular>Created/Updated/Deleted` and `common.Topic<Singular>Events`, which don't exist until you apply the printed wiring snippet to `common/pubsub.go`. Apply all four wiring edits before building.
+- **First `go build` after scaffolding a domain will fail until you wire pubsub.** The scaffolded `service.go` references `common.<Singular>Created/Updated/Deleted` and `common.Topic<Singular>Events`, which don't exist until you apply the printed wiring snippet to `common/pubsub.go`. Apply all four wiring edits before building.
 - **Firestore document size limit**: 1 MB. Don't store blobs.
 - **Firestore batch limit**: 500 writes. Chunk if you exceed.
 - **Context.** Always pass `ctx` through every call. The tracer middleware puts a request-scoped logger in it; downstream `log.Ctx(ctx)` uses it.

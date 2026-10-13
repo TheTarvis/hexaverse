@@ -31,15 +31,12 @@ token audience the suite relies on (see the shared-project note below).
 `npm run e2e:ui` is the one command that does **not** auto-start an emulator
 (interactive mode) — have one running for it.
 
-## When it runs, and what a spec is
+## Running browser tests
 
-This suite is **tier 4** in `docs/testing-tiers.md`: it runs once per change at
-archive time, never as a per-task check and never as a confirming rerun. A
-change contributes **one journey spec** that walks its whole slice in order and
-asserts at every step; per-scenario and edge-case coverage lives in vitest.
-Fixtures are provisioned once per spec file (`test.beforeAll`), not per test.
-Retries are zero locally (two in CI) so a hung test fails in one minute. Never
-raise a timeout to get a run green — report the overrun instead.
+See `docs/testing-tiers.md` for commands and dependencies. Use browser tests
+for behavior that requires a browser and stack; Vitest covers isolated components
+and hooks. Shared read-only fixtures can use `test.beforeAll`. Diagnose timeouts
+before changing their budgets.
 
 ## What a run does
 
@@ -168,7 +165,7 @@ e2e/
 The same helpers drive the **dev** stack too: `npm run users -- ensure` seeds
 `dev@hexaverse.test` on the dev emulator, `-- token` gets a bearer token for
 `:20201`, and `-- login-url` prints a one-shot `/dev/login#token=…` URL that
-signs a browser in without a password (see `.claude/skills/dev-users/`).
+signs a browser in without a password (run `npm run users -- --help` for options).
 
 Conventions for new specs:
 

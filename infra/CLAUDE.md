@@ -38,7 +38,7 @@ Two GCP-touching scripts in this repo, with a clean split:
 - **`bootstrap/setup-gcp.sh`** runs once per env at fork time. It provisions the *project shell*: `gcloud projects create`, billing link, API enable, Firestore database create, `firebase projects:addfirebase`, web app create, SDK config pull. The output (project ID + Firebase web-app config) feeds back into `config.env`. After this runs, the GCP project exists and Firebase is wired up.
 - **Terraform** runs every time infra changes. It manages everything *inside* the project: Cloud Run service, Firestore composite indexes, Pub/Sub topics + subscriptions, Secret Manager secrets, GCS buckets, Cloud Scheduler jobs, IAM. Terraform assumes the project already exists.
 
-Order of operations on a fresh fork: `setup-gcp.sh dev` → `setup-gcp.sh prod` → `bootstrap/init.sh` (placeholder substitution) → `terraform apply -var-file=environments/dev.tfvars` → repeat for prod when you're ready to deploy. (`/onboard` walks you through the first three; `terraform apply` is left manual since plan-then-apply is what you want for infra changes.)
+Order of operations on a fresh fork: `setup-gcp.sh dev` → `setup-gcp.sh prod` → `bootstrap/init.sh` (placeholder substitution) → `terraform apply -var-file=environments/dev.tfvars` → repeat for prod when you're ready to deploy. See `bootstrap/README.md` for setup and the onboarding probe; review Terraform plans before applying.
 
 ## Common operations
 

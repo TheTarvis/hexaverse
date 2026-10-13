@@ -11,7 +11,7 @@ frontend/
 │   ├── page.tsx          # Home
 │   └── login/            # Public auth pages (no app shell)
 │                         # Domain pages (e.g. app/widgets/) are scaffolded
-│                         # by /new-domain.
+│                         # by the new-domain utility.
 ├── components/
 │   ├── catalyst/         # 50+ UI primitives — use these, don't build your own
 │   ├── account-provider.tsx
@@ -32,11 +32,11 @@ frontend/
 
 ## Adding a new domain
 
-Run `/new-domain <singular> [plural]`. It renders the four frontend templates from `.claude/skills/new-domain/templates/frontend/` to `lib/types/<singular>.ts`, `lib/services/<singular>-service.ts`, `hooks/use-<plural>.ts`, and `app/<plural>/page.tsx`, and prints the wiring snippets to add to `lib/query-keys.ts` and `lib/services/index.ts`.
+Run `python3 harness/utilities/new-domain/new_domain.py <singular> [plural]`. It renders the four frontend templates from `harness/utilities/new-domain/templates/frontend/` to `lib/types/<singular>.ts`, `lib/services/<singular>-service.ts`, `hooks/use-<plural>.ts`, and `app/<plural>/page.tsx`, and prints the wiring snippets to add to `lib/query-keys.ts` and `lib/services/index.ts`.
 
 ## Patterns
 
-> Code examples below use a `widget` domain. Run `/new-domain widget` if you want to follow along — the baseline skeleton ships only the `account` identity domain, which doesn't show the full CRUD pattern.
+> Code examples below use a `widget` domain. Run `python3 harness/utilities/new-domain/new_domain.py widget` if you want to follow along — the baseline skeleton ships only the `account` identity domain, which doesn't show the full CRUD pattern.
 
 **API calls go through `apiClient`, not raw `fetch`.** It handles auth token refresh and 401 retry automatically.
 ```ts
@@ -91,15 +91,9 @@ Page background dark mode is `zinc-700`, **not** `zinc-900`. Cards are lighter t
 
 Vitest + Testing Library. Run `npx vitest run` for one-shot, `npx vitest` for watch. Add `data-testid` to interactive elements you want to assert on.
 
-### Test tiers (see `docs/testing-tiers.md` — the source of truth)
-
-| When | Run |
-| --- | --- |
-| Per task | `npx vitest run <files you touched>` and `npx tsc --noEmit` |
-| Per commit | `bash harness/check.sh --frontend` (tsc, eslint, the whole vitest suite; seconds) |
-| Once per change, at archive time | `npm run e2e` — the Playwright journey (minutes plus a stack boot) |
-
-Playwright is **one journey spec per change**, written after every task is checked, run once at archive time, never per task and never as a confirming rerun. Per-scenario and edge-case coverage belongs in vitest against the component or hook. Playwright fixtures are provisioned once per spec file (`test.beforeAll`), not per test. Never raise a Playwright timeout to make a suite pass.
+For test commands and dependencies, see `docs/testing-tiers.md`. Use Vitest
+for isolated component and hook behavior and Playwright for browser interactions.
+Provision shared read-only fixtures once per spec file.
 
 ## Common gotchas
 

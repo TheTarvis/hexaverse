@@ -1,5 +1,0 @@
-# red-suite handoff manifest for surface-commit-stranding-warning
-# recorded 2026-10-04T15:32:51Z
-# verify with: bash harness/openspec-red-manifest.sh verify surface-commit-stranding-warning
-c2b6118e4ce144317b4e622af31901ab0318cafef7de1d9e2eafa39d78c54e3e  frontend/components/space/SpaceCommandPanel.test.tsx
-a1dca609aef3d621bfabde9cce81430ff3af405c2a2db5a1c0d1d03ee75c3144  frontend/components/space/SystemSpaceView.stranding-notice.test.tsx

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Claude Code adapter for tools/validate-file.sh.
+# Claude Code adapter for harness/validate-file.sh.
 #
 # Wired as a PostToolUse hook in .claude/settings.json. Reads the hook's JSON
 # envelope on stdin, pulls out whichever field carries the edited path, and
@@ -9,7 +9,7 @@
 #
 # This file is the ONLY Claude-specific piece of the gate, and it is deliberately
 # thin. Claude hooks do not configure Codex or any other client — AGENTS.md says
-# so — and the rule those clients follow is "run tools/validate-file.sh after
+# so — and the rule those clients follow is "run harness/validate-file.sh after
 # editing", which is the same code path with no adapter at all.
 #
 # A hook must never be the reason a turn dies: any failure to parse the envelope
@@ -52,7 +52,7 @@ for v in seen:
 [[ ${#files[@]} -eq 0 ]] && exit 0
 
 cd "$REPO_ROOT" || exit 0
-if ! out="$(bash tools/validate-file.sh --quiet "${files[@]}" 2>&1)"; then
+if ! out="$(bash harness/validate-file.sh --quiet "${files[@]}" 2>&1)"; then
   echo "$out" >&2
   exit 2
 fi

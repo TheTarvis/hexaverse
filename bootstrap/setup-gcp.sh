@@ -16,7 +16,7 @@
 # Logs go to stderr. Stdout emits a single normalized JSON line at the end:
 #   {"projectId":"...","apiKey":"...","authDomain":"...","storageBucket":"...",
 #    "messagingSenderId":"...","appId":"..."}
-# The caller (typically /onboard) parses this and writes the keys back into
+# The caller parses this and writes the keys back into
 # bootstrap/config.env under the FIREBASE_*_DEV or FIREBASE_*_PROD block.
 #
 # Usage:
@@ -43,7 +43,7 @@ CONFIG="$REPO_ROOT/bootstrap/config.env"
 
 if [[ ! -f "$CONFIG" ]]; then
   echo "config.env not found at $CONFIG" >&2
-  echo "Copy bootstrap/config.example.env first, or run /onboard." >&2
+  echo "Copy bootstrap/config.example.env first and fill in the required values." >&2
   exit 1
 fi
 

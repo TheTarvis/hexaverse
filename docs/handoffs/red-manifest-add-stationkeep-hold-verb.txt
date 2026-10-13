@@ -1,9 +1,0 @@
-# red-suite handoff manifest for add-stationkeep-hold-verb
-# recorded 2026-09-02T16:58:32Z
-# verify with: bash .claude/scripts/openspec-red-manifest.sh verify add-stationkeep-hold-verb
-e1108db577d4168dcf94662f038b304407fee194adfbd34d1a09eb394dd3103e  backend/fleet/stationkeep_hold_release_test.go
-716b1460c63e6ef76987fa8fe67b62eed95b6d267f828dc02302160aec7d5938  backend/fleet/stationkeep_settlement_consumers_test.go
-38d1223f0ba57c77dc07c27afbb9e3f17c50d848585c7fbe6e42abbc57b43854  backend/fleet/stationkeep_testsupport_test.go
-2e186d4e0733d45c7a5a7100dbae47b1432ef3b0aab75413f97d1be639657a78  backend/space/codec_stationkeep_park_test.go
-9af9b6fd99acf4c960427a688d78bf6b9a59782c99050f6ea449c37aafdb9861  backend/space/stationkeep_dry_instant_fold_test.go
-bc8cb5b82e39b13145608e7866f896e9f992a53c2e070f0c52d2e980db9b1008  backend/stationkeep_e2e_helpers_test.go

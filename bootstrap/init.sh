@@ -58,23 +58,16 @@ fi
 # Build a NUL-delimited file list with `find`. We allowlist file types (no
 # binaries) and skip generated/tooling directories.
 #
-# NOTE: this sweep includes harness/ on purpose - the new-domain templates and
-# the onboarding checklist template carry real placeholders that must be
-# substituted at fork time. The hazard is a harness file that mentions a
-# placeholder *as a literal* (code that matches on it, or prose explaining
-# it): a bare {{KEY}} there gets rewritten and the file silently breaks.
-# Build such tokens at runtime instead - see NAME_TOKEN in
-# harness/skills/onboard/onboard.py and SLUG_TOKEN in
-# harness/skills/new-domain/new_domain.py.
+# Local utility templates are substituted; imported skills and their lock are not.
 collect_files() {
   find . \
-    \( -path './node_modules' -o -path './.git' -o -path './.next' -o -path './.idea' -o -path './.venv' -o -path './bootstrap' \) -prune \
+    \( -path './node_modules' -o -path './.git' -o -path './.next' -o -path './.idea' -o -path './.venv' -o -path './bootstrap' -o -path './harness/skills' -o -path './harness/skills-lock.json' \) -prune \
     -o -type f \( \
          -name '*.go' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.mjs' \
       -o -name '*.json' -o -name '*.tf' -o -name '*.yml' -o -name '*.yaml' \
       -o -name '*.xml' \
       -o -name '*.mod' -o -name '*.sum' -o -name 'Makefile' -o -name '*.sh' \
-      -o -name '*.md' -o -name '*.example' \
+      -o -name '*.md' -o -name '*.example' -o -name '*.tmpl' \
       -o -name '*.toml' -o -name '*.py' -o -name 'Dockerfile' \
     \) -print0
 }

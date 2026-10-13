@@ -1,13 +1,15 @@
 ---
 name: spinup
-description: Clean-restart this checkout's dev stack (Firebase emulators, backend, frontend, agent, and test emulators) in GoLand Run tabs. Use for /spinup, $spinup, or a request to start or restart the local dev environment.
+description: Clean-restart this checkout's dev stack (dev Firebase emulators, backend, frontend, and agent) in GoLand Run tabs. Use for /spinup, $spinup, or a request to start or restart the local dev environment.
 ---
 
 # Spinup — restart the dev stack in GoLand
 
-Run this workflow from the target repository root. `$startup` uses this same
-workflow through `harness/skills/startup/SKILL.md`. Keep the procedure here so
-Claude Code and Codex share one implementation.
+Run this workflow from the target repository root. Claude Code and Codex share
+this implementation.
+
+Test runners own the test emulators' startup and shutdown. Leave their
+configurations and ports untouched during spinup.
 
 ## Preflight
 
@@ -20,7 +22,7 @@ Claude Code and Codex share one implementation.
    configure Codex's MCP connections.
 3. Call `get_run_configurations` for this project before stopping processes.
    Confirm these configurations exist: `firebase:emulators`, `dev:backend`,
-   `dev:frontend`, `dev:agent`, and `firebase:emulators:test`.
+   `dev:frontend`, and `dev:agent`.
    If the MCP is unavailable, the project is not open in GoLand, or a required
    configuration is missing, report the specific blocker before killing
    anything. Preserve IDE Run tabs; do not silently switch to shell servers.
@@ -28,20 +30,20 @@ Claude Code and Codex share one implementation.
    `python3 harness/ports.py env`. The latter provides shell assignments; use
    `eval "$(python3 harness/ports.py env)"` in an explicitly selected Bash shell
    when shell variables are needed. Do not use stale hardcoded ports or paths.
-5. Read `package.json`, `firebase.json`, and `firebase.test.json` to identify
-   the emulators actually launched by each configuration. A port in the lane
+5. Read `package.json` and `firebase.json` to identify
+   the emulators actually launched by `firebase:emulators`. A port in the lane
    table alone does not mean a service is enabled. Check only enabled
    emulators; Chartz uses Postgres and has no Firestore emulator.
 
 ## Stop the services being restarted
 
 Build an exact port list from `$PORT_FRONTEND`, `$PORT_BACKEND`, `$PORT_AGENT`,
-and both sets of enabled emulator ports, including their UI (when enabled),
+and the enabled dev emulator ports, including their UI (when enabled),
 hub, logging, and Firestore websocket ports (when Firestore is enabled).
 The Firebase hub and logging ports come from the lane even if implicit in
 the Firebase configuration. Verify every selected port belongs to this
 checkout's lane. Do not sweep every allocated port: database containers,
-Storybook, and test fixture servers are separate dependencies or workflows.
+test emulators, and test fixture servers are separate dependencies or workflows.
 
 Survey listeners with `lsof -nP -iTCP:<port> -sTCP:LISTEN` and inspect the
 holder's command and working directory. If a holder clearly belongs to
@@ -63,16 +65,16 @@ port is still held. Do not launch over a surviving listener.
    `fullOutputPath` for diagnostics. Poll each enabled dev emulator's service
    port with `nc -z localhost <port>` for up to 60 seconds before launching
    dependent services. A failed dependency stops dependent launches.
-3. Launch `dev:backend`, `dev:frontend`, `dev:agent`, and
-   `firebase:emulators:test` in parallel using the current client's tools.
+3. Launch `dev:backend`, `dev:frontend`, and `dev:agent`
+   in parallel using the current client's tools.
    Pass `waitForExit: false` and the same `projectPath` for each launch.
-4. Poll `$PORT_BACKEND`, `$PORT_FRONTEND`, `$PORT_AGENT`, and every enabled
-   test emulator's service port for up to 90 seconds. Use short polling calls
+4. Poll `$PORT_BACKEND`, `$PORT_FRONTEND`, and `$PORT_AGENT`
+   for up to 90 seconds. Use short polling calls
    so progress updates remain possible. A successful launch response alone
    does not prove readiness.
 5. For a launch error or readiness timeout, read that configuration's
    `fullOutputPath` and report the actual error. Do not relaunch blindly.
 
 Report a short service/port/status table, any killed PIDs, and failures with
-their reasons. Include the resolved dev emulator UI URL when enabled, and
-the test UI URL only when `firebase.test.json` enables it.
+their reasons. Include the resolved frontend URL and dev emulator UI URL
+when enabled.
