@@ -30,6 +30,7 @@
 // run. The run itself is resolved by the mounting view and handed down as
 // `mineRunning`, so this panel takes no second read of it.
 
+import { HudPanel } from '@/components/hud/GameHud'
 import { useId, useState } from 'react'
 import { Button } from '@/components/catalyst/button'
 import { Figure } from '@/components/figure/Figure'
@@ -109,10 +110,6 @@ interface CommitFigures {
   previewedDeltaV?: number
 }
 
-const PANEL_BASE =
-  'pointer-events-auto w-72 max-w-[85vw] self-start rounded-xl border p-3 shadow-lg backdrop-blur'
-const PANEL_OK = 'border-zinc-200 bg-zinc-50/90 dark:border-zinc-800/50 dark:bg-white/[0.12]'
-const PANEL_UNAFFORDABLE = 'border-amber-500/60 bg-amber-500/10 text-amber-200'
 const LABEL = 'font-mono text-[11px] font-medium tracking-wide text-zinc-400 uppercase'
 
 function differs(a: number | undefined, b: number | undefined): boolean {
@@ -229,9 +226,10 @@ export function SpaceCommandPanel({
       differs(commit.deltaV, commit.previewedDeltaV))
 
   return (
-    <section
+    <HudPanel
       data-testid="preview-panel"
-      className={`${PANEL_BASE} ${unaffordable ? PANEL_UNAFFORDABLE : PANEL_OK}`}
+      tone={unaffordable ? 'warning' : 'default'}
+      className="w-72 max-w-full self-start p-3"
     >
       <span className={LABEL}>Course</span>
 
@@ -441,7 +439,7 @@ export function SpaceCommandPanel({
           Jump
         </Button>
       )}
-    </section>
+    </HudPanel>
   )
 }
 

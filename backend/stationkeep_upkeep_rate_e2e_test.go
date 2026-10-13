@@ -258,11 +258,11 @@ func TestUpkeepRate_Scenario_AFleetWithNoHostBodyCarriesNoRate(t *testing.T) {
 	orbitKeys, _ := rosterKeys(t, router, ref.token, ref.fleetId)
 
 	sp := spawnFuelCorp(t, router, "SDET Upkeep Rate Absence Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 	setFleetFuel(t, sp.fleetId, 1_000_000)
 
-	// A fresh spawn is a motionless `point` park (fleet.SeedFleet: "Seeding
-	// SHALL place a point park") — the third host-less state, available before
-	// anything else happens to this fleet.
+	// The explicitly arranged point park is hostless; the genuine fresh
+	// spawn above remains a station-hosted orbit until this fixture changes it.
 	pointKeys, _ := rosterKeys(t, router, sp.token, sp.fleetId)
 
 	if _, _, code := postOrder(t, router, sp.token, sp.fleetId, pointOrder()); code != http.StatusOK {

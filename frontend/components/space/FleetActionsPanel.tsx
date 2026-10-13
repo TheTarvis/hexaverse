@@ -19,6 +19,7 @@
 // is rule-bearing (a floor clamp and a non-positive-period branch) and a
 // client copy of it is the mirror `space-kinematics` forbids.
 
+import { HudPanel } from '@/components/hud/GameHud'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/catalyst/badge'
 import { Button } from '@/components/catalyst/button'
@@ -42,6 +43,7 @@ import {
 import { newOperationKey } from '@/lib/services/market-service'
 import { toast } from '@/lib/toast'
 import { PARK_KIND_ORBIT, PARK_KIND_STATIONKEEP, type Fleet } from '@/lib/types/fleet'
+import type { GuideSale, GuideRefuel } from '@/lib/command-onboarding'
 import type { Station, VenueQuotes } from '@/lib/types/market'
 import type { ResourceDeposit, ResourceKind } from '@/lib/types/system-space'
 
@@ -68,6 +70,10 @@ export interface FleetActionsPanelProps {
   worldTime: number
   /** The mounting view's served world-clock scale — see contract §6. */
   scale: number | undefined
+  onSaleAccepted?: (sale: GuideSale) => void
+  onRefuelAccepted?: (purchase: GuideRefuel) => void
+  tutorialSample?: boolean
+  onMineAccepted?: (accepted: { fleetId: string; featureId: string; actionId: string; kind: ResourceKind; tons: number; cargoBefore: number }) => void
 }
 
 const SECTION = 'mt-3 border-t border-dashed border-white/15 pt-3'
@@ -88,6 +94,10 @@ export function FleetActionsPanel({
   credits,
   worldTime,
   scale,
+  tutorialSample = false,
+  onMineAccepted,
+  onSaleAccepted,
+  onRefuelAccepted,
 }: FleetActionsPanelProps) {
   const fleetId = fleet?.id ?? ''
   const systemId = fleet?.systemId ?? ''
@@ -146,6 +156,15 @@ export function FleetActionsPanel({
   const [mineKind, setMineKind] = useState<ResourceKind | null>(null)
   const activeMineKind = mineKind && mineable.some((r) => r.kind === mineKind) ? mineKind : richest
   const [mineTons, setMineTons] = useState<number>(freeHold)
+  const sampleDefaulted = useRef(false)
+  useEffect(() => {
+    if (tutorialSample && !sampleDefaulted.current && freeHold >= 1) {
+      // A suggested sample, not a client-side minimum; the server validates runs.
+      setMineTons(Math.min(10, freeHold))
+      sampleDefaulted.current = true
+    }
+    if (!tutorialSample) sampleDefaulted.current = false
+  }, [tutorialSample, freeHold])
   const [committedEta, setCommittedEta] = useState<number | null>(null)
 
   const mineEta = running ?? (committedEta ? { id: '', eta: committedEta } : null)
@@ -159,12 +178,14 @@ export function FleetActionsPanel({
     // Synchronously, within THIS invocation — never a state flip that
     // reaches `disabled` a render later.
     if (!mineGuard.claim()) return
+    const cargoBefore = held[activeMineKind] ?? 0
     mine.mutate(
       { fleetId: fleet.id, request: { featureId: dockedFeature.id, kind: activeMineKind, tons: mineTons } },
       {
-        onSuccess: (result: { eta?: number } | undefined) => {
+        onSuccess: (result: { actionId?: string; eta?: number } | undefined) => {
           mineGuard.release()
           if (typeof result?.eta === 'number') setCommittedEta(result.eta)
+          if (result?.actionId) onMineAccepted?.({ fleetId: fleet.id, featureId: dockedFeature.id, actionId: result.actionId, kind: activeMineKind, tons: mineTons, cargoBefore })
           toast.success('Mining run committed.')
         },
         onError: (error: unknown) => {
@@ -247,7 +268,8 @@ export function FleetActionsPanel({
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
+          onSaleAccepted?.({ fleetId: fleet.id, featureId: station.featureId, kind: activeSellKind, result })
           sellGuard.release()
           setPriceChange(null)
           toast.success('Sale settled.')
@@ -281,7 +303,8 @@ export function FleetActionsPanel({
     refuel.mutate(
       { fleetId: fleet.id, request: { tons: refuelTons, operationKey } },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
+          if (station) onRefuelAccepted?.({ fleetId: fleet.id, featureId: station.featureId, fuelBefore: held.fuel ?? 0, result })
           refuelGuard.release()
           toast.success('Refuelled.')
         },
@@ -318,16 +341,16 @@ export function FleetActionsPanel({
 
   if (!fleet) {
     return (
-      <aside data-testid="space-fleet-panel" className="flex w-72 max-w-[85vw] flex-col">
+      <HudPanel as="aside" data-testid="space-fleet-panel" className="flex w-72 max-w-[85vw] flex-col">
         <p className="text-[11px] text-zinc-500">No fleet selected.</p>
-      </aside>
+      </HudPanel>
     )
   }
 
   return (
-    <aside
+    <HudPanel as="aside"
       data-testid="space-fleet-panel"
-      className="pointer-events-auto flex w-72 max-w-[85vw] flex-col self-start rounded-xl border border-zinc-200 bg-zinc-50/90 p-3 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]"
+      className="flex w-72 max-w-full flex-col self-start p-3"
     >
       {/* The credit-balance readout and the cargo-hold readout RE-HOMED to
           the vitals strip (openspec change `add-vitals-strip`, RULING 7 —
@@ -558,8 +581,8 @@ export function FleetActionsPanel({
         </div>
       )}
 
-      {/* ----------------------------------------- ending a burn */}
-      <div className={`${SECTION} flex gap-2`}>
+      {/* TODO(HUD-HIDDEN-CLEANUP): Cut drive / Stop and their otherwise empty panel shell are CSS-hidden in the live system HUD. Retire this row and unused hooks after replacement controls land; retain resource actions. */}
+      <div data-testid="fleet-flight-controls" className={`${SECTION} flex gap-2`}>
         <Button
           type="button"
           data-testid={`fleet-cmd-cut-drive-${fleet.id}`}
@@ -589,7 +612,7 @@ export function FleetActionsPanel({
           Stop
         </Button>
       </div>
-    </aside>
+    </HudPanel>
   )
 }
 

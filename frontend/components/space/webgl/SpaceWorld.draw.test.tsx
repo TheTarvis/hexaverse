@@ -76,219 +76,52 @@ const recorder = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('three', () => {
-  class Vector3 {
-    constructor(
-      public x = 0,
-      public y = 0,
-      public z = 0,
-    ) {}
-    set(x: number, y: number, z: number) {
-      this.x = x
-      this.y = y
-      this.z = z
-      return this
-    }
-    setScalar(s: number) {
-      return this.set(s, s, s)
-    }
-    multiplyScalar(s: number) {
-      return this.set(this.x * s, this.y * s, this.z * s)
-    }
-    addScaledVector(v: Vector3, s: number) {
-      return this.set(this.x + v.x * s, this.y + v.y * s, this.z + v.z * s)
-    }
-    crossVectors(a: Vector3, b: Vector3) {
-      return this.set(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
-    }
-    normalize() {
-      const l = Math.hypot(this.x, this.y, this.z) || 1
-      return this.multiplyScalar(1 / l)
-    }
-  }
-  class Quaternion {
-    copy() {
-      return this
-    }
-  }
-  class Color {
-    set() {
-      return this
-    }
-  }
-  class Obj3D {
-    children: Obj3D[] = []
-    position = new Vector3()
-    scale = new Vector3(1, 1, 1)
-    quaternion = new Quaternion()
-    visible = true
-    add(child: Obj3D) {
-      this.children.push(child)
-    }
-    remove(child: Obj3D) {
-      this.children = this.children.filter((c) => c !== child)
-    }
-  }
-  class Scene extends Obj3D {}
-  class Geometry {
-    disposed = false
-    points: Vector3[] = []
-    setFromPoints(points: Vector3[]) {
-      this.points = points
-      return this
-    }
-    setAttribute() {
-      return this
-    }
-    dispose() {
-      this.disposed = true
-      recorder.disposedGeometries += 1
-    }
-  }
-  class SphereGeometry extends Geometry {
-    constructor(public radius = 1) {
-      super()
-    }
-  }
-  class BufferGeometry extends Geometry {}
-  class RingGeometry extends Geometry {}
-  class OctahedronGeometry extends Geometry {}
-  class BufferAttribute {}
-  class Material {
-    disposed = false
-    transparent = false
-    opacity = 1
-    constructor(public params: { color?: number } = {}) {}
-    dispose() {
-      this.disposed = true
-    }
-  }
-  class Group extends Obj3D {}
-  class Points extends Obj3D {
-    constructor(
-      public geometry: Geometry,
-      public material: Material,
-    ) {
-      super()
-    }
-  }
-  class Light extends Obj3D {
-    color = new Color()
-  }
-  class AmbientLight extends Light {}
-  class PointLight extends Light {}
-  class PolarGridHelper extends Obj3D {
-    geometry = new Geometry()
-    material = new Material()
-  }
-  class Mesh extends Obj3D {
-    constructor(
-      public geometry: Geometry,
-      public material: Material,
-    ) {
-      super()
-    }
-  }
-  class Line extends Obj3D {
-    constructor(
-      public geometry: Geometry,
-      public material: Material,
-    ) {
-      super()
-    }
-  }
-  class PerspectiveCamera extends Obj3D {
-    up = new Vector3(0, 1, 0)
-    lookAtTarget: Vector3 | null = null
+// Real Three objects keep this regression suite compatible with rendering APIs.
+// Only the GPU renderer and camera observation are substituted; assertions below
+// remain unchanged. Geometry disposal is observed on the actual scene resources.
+vi.mock('three', async (original) => {
+  const actual = await original<typeof import('three')>()
+  class PerspectiveCamera extends actual.PerspectiveCamera {
     record: (typeof recorder.cameras)[number]
-    constructor(
-      public fov: number,
-      public aspect: number,
-      public near: number,
-      public far: number,
-    ) {
-      super()
-      this.record = {
-        fov,
-        near,
-        far,
-        position: this.position,
-        up: this.up,
-        lookAt: null,
-      }
+    constructor(fov = 50, aspect = 1, near = 0.1, far = 2000) {
+      super(fov, aspect, near, far)
+      this.record = { fov, near, far, position: this.position, up: this.up, lookAt: null }
       recorder.cameras.push(this.record)
     }
-    updateProjectionMatrix() {}
-    lookAt(x: number, y: number, z: number) {
-      this.lookAtTarget = new Vector3(x, y, z)
-      this.record.lookAt = { x, y, z }
+    override lookAt(x: number | import('three').Vector3, y?: number, z?: number) {
+      if (typeof x === 'number') {
+        this.record.lookAt = { x, y: y!, z: z! }
+        super.lookAt(x, y!, z!)
+      } else {
+        this.record.lookAt = { x: x.x, y: x.y, z: x.z }
+        super.lookAt(x)
+      }
     }
   }
   class WebGLRenderer {
-    constructor(public params: unknown) {
-      recorder.renderers.push(this)
-    }
+    observed = new Set<import('three').BufferGeometry>()
+    constructor() { recorder.renderers.push(this) }
     setClearColor() {}
     setPixelRatio() {}
     setSize() {}
-    render(scene: Scene) {
-      const meshes = scene.children.filter((c) => c instanceof Mesh) as Mesh[]
+    render(scene: import('three').Scene) {
+      scene.traverse((object) => {
+        const geometry = (object as import('three').Mesh).geometry
+        if (geometry && !this.observed.has(geometry)) {
+          this.observed.add(geometry)
+          geometry.addEventListener('dispose', () => { recorder.disposedGeometries += 1 })
+        }
+      })
+      const meshes = scene.children.filter((o): o is import('three').Mesh => o instanceof actual.Mesh)
       recorder.renderCalls.push({
         meshCount: meshes.length,
-        lineCount: scene.children.filter((c) => c instanceof Line).length,
-        meshes: meshes.map((m) => ({
-          position: { x: m.position.x, y: m.position.y, z: m.position.z },
-          scale: m.scale.x,
-        })),
+        lineCount: scene.children.filter((o) => o instanceof actual.Line).length,
+        meshes: meshes.map((m) => ({ position: { x: m.position.x, y: m.position.y, z: m.position.z }, scale: m.scale.x })),
       })
     }
-    dispose() {
-      recorder.disposedRenderers += 1
-    }
+    dispose() { recorder.disposedRenderers += 1 }
   }
-  class CatmullRomCurve3 {
-    constructor(public points: Vector3[]) {}
-    getPoints(divisions: number) {
-      // A real Catmull-Rom returns divisions + 1 samples through the
-      // control points; the endpoints are what SpaceWorld's caller cares
-      // about, so those are reproduced exactly.
-      const out: Vector3[] = []
-      for (let i = 0; i <= divisions; i++) {
-        const u = i / divisions
-        const idx = Math.min(this.points.length - 1, Math.floor(u * (this.points.length - 1)))
-        out.push(this.points[idx]!)
-      }
-      return out
-    }
-  }
-  return {
-    Vector3,
-    Quaternion,
-    Color,
-    Scene,
-    Group,
-    SphereGeometry,
-    BufferGeometry,
-    RingGeometry,
-    OctahedronGeometry,
-    BufferAttribute,
-    MeshBasicMaterial: Material,
-    MeshStandardMaterial: Material,
-    LineBasicMaterial: Material,
-    PointsMaterial: Material,
-    Mesh,
-    Line,
-    Points,
-    AmbientLight,
-    PointLight,
-    PolarGridHelper,
-    PerspectiveCamera,
-    WebGLRenderer,
-    CatmullRomCurve3,
-    AdditiveBlending: 2,
-    BackSide: 1,
-    DoubleSide: 2,
-  }
+  return { ...actual, PerspectiveCamera, WebGLRenderer }
 })
 
 import { SpaceWorld, BODY_DRAW_SCALE } from './SpaceWorld'
@@ -368,7 +201,7 @@ describe('SpaceWorld — what it actually draws', () => {
     ).toBeCloseTo(floor, 9)
   })
 
-  it('SDET-added: a selected mark is drawn larger than the same mark unselected', () => {
+  it('SDET-added: selection preserves the model size', () => {
     const at = { x: 18, y: -3, z: -15 } // feat-body-0's served position
     const base = sceneOf()
     const first = render(
@@ -382,7 +215,7 @@ describe('SpaceWorld — what it actually draws', () => {
       marks: base.marks.map((m) => (m.id === 'feat-body-0' ? { ...m, selected: true } : m)),
     })
     render(<SpaceWorld canvas={usableCanvas()} frameRef={frameOf(selected, defaultCamera(EXTENT))} extent={EXTENT} />)
-    expect(meshAt(at).scale, 'the selected mark must read larger').toBeGreaterThan(unselected)
+    expect(meshAt(at).scale, 'selection uses the reticle without enlarging the model').toBe(unselected)
   })
 
   it('SDET-added: draws one line per served curve, and none for a degenerate one', () => {

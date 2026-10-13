@@ -79,8 +79,10 @@ const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: s
     // maintenance under the guard's own stated procedure — not a test
     // change requiring a fresh cause adjudication, and not a violation of
     // test immutability.
+    // Archive maintenance 2026-10-12: same baseline-identical expressions;
+    // parent adjudicated relocation from [837, 838, 894, 895, 1055].
     file: 'frontend/components/space/SpaceStage.tsx',
-    lines: [837, 838, 894, 895, 1055],
+    lines: [877, 878, 934, 935, 1096],
     ruling: 'RULING 10 / RULING 25 / D2',
     note: 'bearing/speed hover-facts toFixed — no covering requirement anywhere; filed as defect-hover-facts-unspecced.md, not fixed here',
   },
@@ -91,9 +93,15 @@ const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: s
     // landed. Anchor verified by grep against the live file; same single
     // reviewed site (the memo key, never rendered to a player).
     file: 'frontend/components/space/webgl/SpaceWorld.tsx',
-    lines: [201],
+    lines: [196],
     ruling: 'not a player-facing figure / D2',
     note: 'toFixed(4) builds a memo key, never rendered to a player',
+  },
+  {
+    file: 'frontend/components/space/storyboard/SystemStoryboard.tsx',
+    lines: [155],
+    ruling: 'figure-formatting: rounding exception list permits non-player-facing values; archive review 2026-10-12',
+    note: 'SVG dust circle cx/cy coordinate serialization, not a displayed numeric figure',
   },
 ]
 

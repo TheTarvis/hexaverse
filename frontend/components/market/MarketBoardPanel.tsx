@@ -9,6 +9,7 @@
 // a row selection MEANS. That is why it takes onSelectSystem rather than
 // reaching for a router or a selection store.
 
+import { HudPanel } from '@/components/hud/GameHud'
 import { useMemo, useState } from 'react'
 
 import { Badge } from '@/components/catalyst/badge'
@@ -55,39 +56,39 @@ export function MarketBoardPanel({
 
   if (isLoading) {
     return (
-      <section data-testid="market-board-panel" className="rounded-lg bg-zinc-50 p-3 dark:bg-white/[0.12]">
+      <HudPanel data-testid="market-board-panel" className="p-3">
         <Header />
         <Text data-testid="market-board-loading" className="!text-zinc-500">
           Reading the market…
         </Text>
-      </section>
+      </HudPanel>
     )
   }
 
   if (isError) {
     return (
-      <section data-testid="market-board-panel" className="rounded-lg bg-zinc-50 p-3 dark:bg-white/[0.12]">
+      <HudPanel data-testid="market-board-panel" className="p-3">
         <Header />
         <Text data-testid="market-board-error" className="!text-zinc-500">
           Market data is unavailable right now.
         </Text>
-      </section>
+      </HudPanel>
     )
   }
 
   if (!activeKind || rows.length === 0) {
     return (
-      <section data-testid="market-board-panel" className="rounded-lg bg-zinc-50 p-3 dark:bg-white/[0.12]">
+      <HudPanel data-testid="market-board-panel" className="p-3">
         <Header />
         <Text data-testid="market-board-empty" className="!text-zinc-500">
           No charted stations yet. Scan a neighbouring system to find one.
         </Text>
-      </section>
+      </HudPanel>
     )
   }
 
   return (
-    <section data-testid="market-board-panel" className="rounded-lg bg-zinc-50 p-3 dark:bg-white/[0.12]">
+    <HudPanel data-testid="market-board-panel" className="p-3">
       <Header />
 
       <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Resource kind">
@@ -120,7 +121,7 @@ export function MarketBoardPanel({
               data-testid={`market-row-${row.systemId}`}
               onClick={() => onSelectSystem?.(row.systemId)}
               disabled={!onSelectSystem}
-              className="flex w-full items-center justify-between gap-3 rounded px-2 py-1.5 text-left hover:bg-zinc-200 disabled:cursor-default dark:hover:bg-white/[0.14]"
+              className="flex w-full flex-wrap items-center justify-between gap-3 rounded px-2 py-1.5 text-left hover:bg-zinc-200 disabled:cursor-default dark:hover:bg-white/[0.14]"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate font-mono text-xs text-zinc-900 dark:text-white">
@@ -132,7 +133,7 @@ export function MarketBoardPanel({
                   </span>
                 )}
               </span>
-              <span className="flex shrink-0 items-center gap-2">
+              <span className="flex min-w-0 flex-wrap items-center gap-2">
                 {/* The request-vs-floor distinction is carried by an icon AND a
                     label, never by colour alone — a colour-only cue is invisible
                     to a colourblind player and to a screen reader. */}
@@ -166,7 +167,7 @@ export function MarketBoardPanel({
           </li>
         ))}
       </ul>
-    </section>
+    </HudPanel>
   )
 }
 
@@ -197,7 +198,8 @@ function rank(
 ): Row[] {
   if (!board || !kind) return []
 
-  const priceOf = (venue: VenueQuotes) => {
+  const priceOf = (venue: VenueQuotes | undefined) => {
+    if (!venue) return null
     const quote = venue.quotes.find((q) => q.kind === kind)
     if (!quote) return null
     const price = bestPriceFor(quote.entries)
@@ -210,7 +212,7 @@ function rank(
   }
 
   const here = homeSystemId
-    ? (priceOf(board.venues.find((v) => v.systemId === homeSystemId) ?? ({} as VenueQuotes))?.price ??
+    ? (priceOf(board.venues.find((v) => v.systemId === homeSystemId))?.price ??
       null)
     : null
 

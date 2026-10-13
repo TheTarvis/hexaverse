@@ -263,6 +263,27 @@ describe('LayoutWrapper', () => {
     expect(screen.queryByTestId('oauth-admin-content')).not.toBeInTheDocument()
   })
 
+  it('The dev-only emulator sign-in route (/dev/login) renders bare for a logged-out visitor, never redirected', () => {
+    vi.mocked(usePathname).mockReturnValue('/dev/login')
+    vi.mocked(useAccountContext).mockReturnValue({
+      user: null,
+      authLoading: false,
+      account: null,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useAccountContext>)
+
+    render(
+      <LayoutWrapper>
+        <div data-testid="dev-login-content">Signing in…</div>
+      </LayoutWrapper>
+    )
+
+    // The route signs the browser in from a token in its own effect; a redirect
+    // to /login from this wrapper would win the race and the effect would never run.
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.getByTestId('dev-login-content')).toBeInTheDocument()
+  })
+
   // SDET-added: same boundary probe against the other public-route prefix named
   // in the spec ('/spike' vs. '/spike-internal').
   it('SDET-added: /spike-internal is gated, not treated as the public /spike route', () => {

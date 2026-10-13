@@ -2,7 +2,7 @@
 # (docker build -f backend/Dockerfile, context = repo root's backend/).
 
 # Build stage
-FROM golang:1.26 AS builder
+FROM golang:1.26.9 AS builder
 
 WORKDIR /src
 

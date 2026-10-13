@@ -11,6 +11,27 @@ import type { SceneMark, SceneModel } from './space-scene'
 /** The vertical field of view, as tan(fov / 2). */
 export const TAN_HALF_FOV = Math.tan((70 * Math.PI) / 360)
 
+// Shared by WebGL silhouettes and DOM picking so zoom never separates them.
+export const STAR_DRAW_SCALE = 1.3
+export const BODY_DRAW_SCALE = 2.2
+export const MARK_FLOOR_DIV = 400
+export function drawScaleFor(kind: SceneMark['kind']): number {
+  return kind === 'star' ? STAR_DRAW_SCALE : BODY_DRAW_SCALE
+}
+export function drawRadiusFor(mark: SceneMark, extent: number): number {
+  return Math.max(mark.radius * drawScaleFor(mark.kind), extent / MARK_FLOOR_DIV)
+}
+
+/** Approximate projected silhouette diameter, with a usable distant target. */
+export function hitDiameter(entry: ProjectedMark, basis: DrawViewBasis, extent = 0): number {
+  const radius = drawRadiusFor(entry.mark, extent) * (entry.mark.kind === 'gate' ? 1.4 : 1)
+  const depth = entry.screen.depth
+  if (!(depth > 0) || !Number.isFinite(radius)) return 24
+  // Tangent of the sphere's apparent angular radius (rather than its equator).
+  const distance = Math.sqrt(Math.max(depth * depth - radius * radius, 0.000001))
+  return Math.max(24, Math.min(2 * Math.hypot(basis.widthPx, basis.heightPx), radius * basis.heightPx / (distance * basis.tanHalfFov)))
+}
+
 export function viewBasisOf(
   camera: SpaceCamera,
   viewport: { width: number; height: number },

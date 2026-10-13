@@ -37,9 +37,11 @@ import {
   type DrawOrbitElements,
   type DrawVec3,
 } from '@/lib/space/draw'
-import { TAN_HALF_FOV } from '../space-projection'
+import { TAN_HALF_FOV, MARK_FLOOR_DIV, drawRadiusFor } from '../space-projection'
 import type { SceneMark, SceneModel } from '../space-scene'
 import type { SpaceFrame } from '../space-transform-loop'
+import { createSpacecraftModel, loadSpacecraftAsset, type SpacecraftKind } from './spacecraft-art'
+import { advancePlanetClouds, createPlanetModel, planetKind, createRadialGlowTexture, createHexGrid, createBackdropMaterial } from './scene-art'
 
 export interface SpaceWorldProps {
   canvas: HTMLCanvasElement
@@ -69,14 +71,7 @@ export interface SpaceWorldProps {
  * Every mark is drawn at its served radius times ONE of these — purely a
  * silhouette choice, never read back — and never below `extent / MARK_FLOOR_DIV`.
  */
-export const STAR_DRAW_SCALE = 1.3
-export const BODY_DRAW_SCALE = 2.2
-export const MARK_FLOOR_DIV = 400
-export const SELECTED_DRAW_SCALE = 1.25
-
-export function drawScaleFor(kind: SceneMark['kind']): number {
-  return kind === 'star' ? STAR_DRAW_SCALE : BODY_DRAW_SCALE
-}
+export { STAR_DRAW_SCALE, BODY_DRAW_SCALE, MARK_FLOOR_DIV, drawScaleFor } from '../space-projection'
 
 // --- palette --------------------------------------------------------------------
 
@@ -218,19 +213,21 @@ export function SpaceWorld({
     // `getExtension` and nothing else, and a half-constructed renderer would
     // still attach its own context-lost/restored listeners to this canvas —
     // and then throw from inside them, outside any React boundary.
-    const probe = canvas.getContext('webgl2') as WebGL2RenderingContext | null
+    // Context attributes are fixed by the first request, before Three reuses
+    // this context. Reserve the stencil buffer used by the hex silhouette mask.
+    const probe = canvas.getContext('webgl2', { stencil: true }) as WebGL2RenderingContext | null
     if (!probe || typeof probe.createProgram !== 'function') return
 
     let renderer: THREE.WebGLRenderer
     try {
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false })
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, stencil: true })
     } catch {
       // No usable context here (jsdom, or a driver that refused): the guard
       // owns that state — this module simply does not draw.
       return
     }
     rendererRef.current = renderer
-    renderer.setClearColor(0x05060a, 1)
+    renderer.setClearColor(0x071324, 1)
     renderer.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2))
 
     const world = new THREE.Scene()
@@ -244,13 +241,18 @@ export function SpaceWorld({
     const sharedGeometry = [sphere, wireSphere, octahedron]
 
     // --- light -------------------------------------------------------------
-    world.add(new THREE.AmbientLight(0x8890b0, 0.35))
+    world.add(new THREE.AmbientLight(0xa8c5ed, 0.65))
     const starLight = new THREE.PointLight(STAR_TINT_DEFAULT, 3.2, 0, 0)
     world.add(starLight)
 
     // --- decoration, all under one group -----------------------------------
     const decor = new THREE.Group()
     world.add(decor)
+
+    const backdrop = new THREE.Mesh(sphere, createBackdropMaterial())
+    backdrop.scale.setScalar(extent * 40)
+    backdrop.renderOrder = -1000
+    decor.add(backdrop)
 
     // Starfield — a far shell of unattenuated points, seeded so it is the
     // same sky every mount.
@@ -280,14 +282,16 @@ export function SpaceWorld({
       )
     }
 
-    // Faint ecliptic grid — a depth reference for the free-space pick plane.
-    {
-      const grid = new THREE.PolarGridHelper(extent, 12, 8, 96, 0x1c2438, 0x141a2c)
-      const material = grid.material as THREE.Material
-      material.transparent = true
-      material.opacity = 0.35
-      decor.add(grid)
-    }
+    // One decorative XZ plane; picking continues to use continuous space.
+    const grid = createHexGrid(extent)
+    const gridMaterial = grid.material as THREE.LineBasicMaterial
+    // Bodies straddle XZ, so depth alone lets the plane cut across their
+    // lower hemispheres. Their opaque silhouettes mask decorative lines.
+    gridMaterial.stencilWrite = true
+    gridMaterial.stencilRef = 1
+    gridMaterial.stencilFunc = THREE.NotEqualStencilFunc
+    const gridOpacity = gridMaterial.opacity
+    decor.add(grid)
 
     // Selection reticle — a camera-facing ring riding the selected mark.
     const reticle = new THREE.Mesh(
@@ -326,8 +330,15 @@ export function SpaceWorld({
       kind: SceneMark['kind']
       /** A fleet's served mode: its tint, so a mode change rebuilds the mesh. */
       variant: number | undefined
+      bodyType: string | undefined
+      starClass: string | undefined
     }
     const meshes = new Map<string, MarkEntry>()
+    let rendererLive = true
+    const assets = new Map<SpacecraftKind, Promise<THREE.Group | null>>()
+    const sources = new Map<SpacecraftKind, THREE.Group>()
+    const spacecraftKind = (mark: SceneMark): SpacecraftKind | null =>
+      mark.kind === 'fleet' ? 'ship' : mark.kind === 'body' && mark.bodyType === 'station' ? 'station' : null
     const lines: THREE.Line[] = []
     /** Decorative streaks rebuilt every frame: the path ahead, drift headings. */
     const streaks: THREE.Line[] = []
@@ -368,9 +379,34 @@ export function SpaceWorld({
       const tint = tintOf(mark)
       const type = mark.bodyType ?? ''
       if (mark.kind === 'star') {
-        const mesh = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({ color: tint }))
-        mesh.add(halo(tint, 0.16, 1.9))
-        mesh.add(halo(tint, 0.06, 3.2))
+        const surface = new THREE.MeshBasicMaterial({ color: tint })
+        // Static local-space granulation: the luminous surface stays attached
+        // to the sphere across camera motion without an extra animation clock.
+        surface.onBeforeCompile = shader => {
+          shader.vertexShader = 'varying vec3 vStellarPosition;\n' + shader.vertexShader
+          shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
+            '#include <begin_vertex>\nvStellarPosition = position;')
+          shader.fragmentShader = 'varying vec3 vStellarPosition;\n' + shader.fragmentShader
+          shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
+            #include <color_fragment>
+            vec3 p = normalize(vStellarPosition);
+            float broad = sin(p.x * 13.0 + sin(p.y * 17.0)) * sin(p.z * 15.0 + sin(p.x * 11.0));
+            float grain = sin(p.x * 53.0 + sin(p.z * 39.0)) * sin(p.y * 47.0 + sin(p.x * 37.0));
+            diffuseColor.rgb = pow(diffuseColor.rgb, vec3(1.65)) * (0.94 + broad * 0.12 + grain * 0.04);
+          `)
+        }
+        const mesh = new THREE.Mesh(sphere, surface)
+        const corona = new THREE.Color(tint)
+        corona.setRGB(corona.r ** 4, corona.g ** 4, corona.b ** 4)
+        const glowMap = createRadialGlowTexture()
+        for (const [scale, opacity] of [[7.5, 0.95], [4, 1.0]]) {
+          const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: glowMap, color: corona, transparent: true,
+            blending: THREE.AdditiveBlending, depthWrite: false, opacity,
+          }))
+          glow.scale.set(scale!, scale!, 1)
+          mesh.add(glow)
+        }
         return mesh
       }
       if (WIRE_KINDS.has(mark.kind)) {
@@ -378,6 +414,14 @@ export function SpaceWorld({
           wireSphere,
           new THREE.MeshBasicMaterial({ color: tint, wireframe: true, transparent: true, opacity: 0.8 }),
         )
+      }
+      const modelKind = spacecraftKind(mark)
+      if (modelKind) return createSpacecraftModel(modelKind, tint, sources.get(modelKind))
+      // Anonymous contacts never inherit incidental served body decoration.
+      if (mark.kind === 'contact') {
+        const mesh = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({ color: tint }))
+        mesh.add(halo(tint, 0.22, 2.4))
+        return mesh
       }
       if (FACETED_TYPES.has(type)) {
         const mesh = new THREE.Mesh(
@@ -393,13 +437,14 @@ export function SpaceWorld({
         mesh.add(halo(tint, 0.12, 2.6))
         return mesh
       }
+      const planet = planetKind(type)
+      if (planet) return createPlanetModel(planet, mark.id, sphere)
       if (LIT_TYPES.has(type)) {
-        return new THREE.Mesh(
-          sphere,
-          new THREE.MeshStandardMaterial({ color: tint, roughness: 0.85, metalness: 0.05 }),
-        )
+        return new THREE.Mesh(sphere, new THREE.MeshStandardMaterial({
+          color: tint, roughness: 0.85, metalness: 0.05,
+        }))
       }
-      if (mark.kind === 'fleet' || mark.kind === 'contact') {
+      if (mark.kind === 'fleet') {
         const mesh = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({ color: tint }))
         mesh.add(halo(tint, 0.22, 2.4))
         return mesh
@@ -411,17 +456,47 @@ export function SpaceWorld({
       )
     }
 
-    const disposeMesh = (mesh: THREE.Mesh) => {
-      ;(mesh.material as THREE.Material).dispose()
-      for (const child of mesh.children) {
-        if (child instanceof THREE.Mesh) (child.material as THREE.Material).dispose()
+    // Materials/maps are mesh-owned; geometries may be shared across marks.
+    // A single traversal at teardown also avoids disposing cached decor twice.
+    const disposeResources = (root: THREE.Object3D, geometry: boolean, closeImages = false) => {
+      const materials = new Set<THREE.Material>()
+      const textures = new Set<THREE.Texture>()
+      const geometries = new Set<THREE.BufferGeometry>()
+      root.traverse(object => {
+        if (!(object instanceof THREE.Mesh || object instanceof THREE.Sprite || object instanceof THREE.Line || object instanceof THREE.Points)) return
+        if (!(object instanceof THREE.Sprite) && (geometry || !sharedGeometry.includes(object.geometry as THREE.SphereGeometry))) geometries.add(object.geometry)
+        const list = Array.isArray(object.material) ? object.material : [object.material]
+        for (const material of list) {
+          materials.add(material)
+          for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value)
+        }
+      })
+      const images = new Set<ImageBitmap>()
+      for (const texture of textures) {
+        if (closeImages && typeof ImageBitmap !== 'undefined' && texture.image instanceof ImageBitmap) images.add(texture.image)
+        texture.dispose()
       }
+      for (const image of images) image.close()
+      for (const material of materials) material.dispose()
+      for (const item of geometries) item.dispose()
     }
+    const disposeMesh = (mesh: THREE.Mesh) => disposeResources(mesh, false)
 
     const drawRadiusOf = (mark: SceneMark): number =>
-      Math.max(mark.radius * drawScaleFor(mark.kind), floor)
+      drawRadiusFor(mark, extent)
 
-    const syncMarks = () => {
+    const stencilModel = (root: THREE.Mesh) => root.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (material.transparent) { material.depthWrite = false; continue }
+        if (!object.geometry.getAttribute('position')) continue
+        material.stencilWrite = true
+        material.stencilRef = 1
+        material.stencilZPass = THREE.ReplaceStencilOp
+      }
+    })
+
+    const syncMarks = (cloudDelta: number) => {
       const live = new Set<string>()
       let selected: { mark: SceneMark; radius: number } | null = null
       let acting: { mark: SceneMark; radius: number } | null = null
@@ -429,19 +504,71 @@ export function SpaceWorld({
         live.add(mark.id)
         let entry = meshes.get(mark.id)
         const variant = mark.kind === 'fleet' ? mark.fleetMode : undefined
-        if (!entry || entry.kind !== mark.kind || entry.variant !== variant) {
+        if (!entry || entry.kind !== mark.kind || entry.variant !== variant || entry.bodyType !== mark.bodyType || entry.starClass !== mark.starClass) {
+          const previousIndex = entry ? world.children.indexOf(entry.mesh) : -1
           if (entry) {
             world.remove(entry.mesh)
             disposeMesh(entry.mesh)
           }
-          entry = { mesh: buildMesh(mark), kind: mark.kind, variant }
+          entry = { mesh: buildMesh(mark), kind: mark.kind, variant, bodyType: mark.bodyType, starClass: mark.starClass }
+          stencilModel(entry.mesh)
           meshes.set(mark.id, entry)
           world.add(entry.mesh)
+          if (previousIndex >= 0) {
+            world.children.splice(world.children.indexOf(entry.mesh), 1)
+            world.children.splice(previousIndex, 0, entry.mesh)
+          }
+          const modelKind = spacecraftKind(mark)
+          if (modelKind && !sources.has(modelKind)) {
+            let pending = assets.get(modelKind)
+            if (!pending) {
+              pending = loadSpacecraftAsset(modelKind).then(source => {
+                if (!rendererLive) { disposeResources(source, true, true); return null }
+                // Decode success does not imply usable geometry. Validate the same
+                // normalization path before publishing a source to synchronous
+                // appearance rebuilds; a bad source becomes a cached failure.
+                try {
+                  const probe = createSpacecraftModel(modelKind, tintOf(mark), source)
+                  disposeMesh(probe)
+                } catch {
+                  disposeResources(source, true, true)
+                  return null
+                }
+                sources.set(modelKind, source)
+                return source
+              }).catch(() => null)
+              assets.set(modelKind, pending)
+            }
+            const subscribed = entry
+            void pending.then(source => {
+              if (!source || !rendererLive || meshes.get(mark.id) !== subscribed) return
+              let replacement: THREE.Mesh
+              try { replacement = createSpacecraftModel(modelKind, tintOf(mark), source) }
+              catch { return } // A decoded but unusable model retains its fallback.
+              replacement.position.copy(subscribed.mesh.position)
+              replacement.scale.copy(subscribed.mesh.scale)
+              stencilModel(replacement)
+              const index = world.children.indexOf(subscribed.mesh)
+              world.remove(subscribed.mesh)
+              disposeMesh(subscribed.mesh)
+              subscribed.mesh = replacement
+              world.add(replacement)
+              world.children.splice(world.children.indexOf(replacement), 1)
+              world.children.splice(index, 0, replacement)
+            })
+          }
         }
         const mesh = entry.mesh
         mesh.position.set(mark.position.x, mark.position.y, mark.position.z)
         const size = drawRadiusOf(mark)
-        mesh.scale.setScalar(mark.selected ? size * SELECTED_DRAW_SCALE : size)
+        mesh.scale.setScalar(size)
+        if (mark.selected && mark.bodyType === 'gas_giant' && cloudDelta > 0) {
+          const frame = frameRef.current!
+          const screen = frame.projected.get(mark.id)?.screen
+          const depth = mesh.position.distanceTo(view.position)
+          const diameterPx = mesh.scale.x * frame.basis.heightPx / (Math.max(depth, 0.001) * TAN_HALF_FOV)
+          if (screen?.onScreen && diameterPx >= 80) advancePlanetClouds(mesh, cloudDelta)
+        }
         if (mark.kind === 'star') {
           starLight.position.set(mark.position.x, mark.position.y, mark.position.z)
           starLight.color.set(tintOf(mark))
@@ -467,7 +594,7 @@ export function SpaceWorld({
         reticle.visible = false
       }
 
-      if (acting) {
+      if (acting && !liveScene.marks.some(mark => mark.selected)) {
         const { mark, radius } = acting
         const pulse = 2.2 + Math.sin(liveScene.decorativeTimeMs / 340) * 0.1
         actingRing.position.set(mark.position.x, mark.position.y, mark.position.z)
@@ -637,7 +764,12 @@ export function SpaceWorld({
       }
     }
 
+    const motionPreference = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')
+    let previousCloudFrame = performance.now()
     const draw = () => {
+      const now = performance.now()
+      const cloudDelta = !document.hidden && !motionPreference?.matches ? Math.min((now - previousCloudFrame) / 1000, 0.1) : 0
+      previousCloudFrame = now
       const published = frameRef.current
       if (!published) {
         // No frame has been built yet — render nothing, announce nothing,
@@ -655,8 +787,15 @@ export function SpaceWorld({
       view.up.set(basis.up.x, basis.up.y, basis.up.z)
       const target = published.camera.target
       view.lookAt(target.x, target.y, target.z)
+      // Follow the published camera only; no extra clock, allocations or state.
+      backdrop.position.copy(view.position)
+      const distance = Math.hypot(basis.eye.x - target.x, basis.eye.y - target.y, basis.eye.z - target.z)
+      const elevation = Math.abs(basis.eye.y - target.y) / Math.max(distance, 0.001)
+      const distanceFade = 1 / (1 + (distance / Math.max(extent, 0.001)) ** 2)
+      const angleFade = THREE.MathUtils.smoothstep(elevation, 0.035, 0.55)
+      gridMaterial.opacity = gridOpacity * THREE.MathUtils.clamp(distanceFade * angleFade, 0, 1)
 
-      syncMarks()
+      syncMarks(cloudDelta)
       syncCurves()
       syncRings()
       syncBelts()
@@ -669,24 +808,19 @@ export function SpaceWorld({
     }
 
     const disposeAll = () => {
+      if (!rendererLive) return
+      rendererLive = false
       cancelAnimationFrame(frameId)
-      for (const [, entry] of meshes) disposeMesh(entry.mesh)
-      for (const line of lines) disposeLine(line)
-      for (const line of streaks) disposeLine(line)
-      for (const [, line] of rings) {
-        line.geometry.dispose()
-        ;(line.material as THREE.Material).dispose()
-      }
-      for (const [, points] of belts) {
-        points.geometry.dispose()
-        ;(points.material as THREE.Material).dispose()
-      }
-      for (const child of decor.children) {
-        const drawable = child as { geometry?: { dispose(): void }; material?: THREE.Material }
-        drawable.geometry?.dispose()
-        drawable.material?.dispose()
-      }
-      for (const geometry of sharedGeometry) geometry.dispose()
+      // Shared geometry might no longer be attached after its last mark was
+      // removed. Dispose it explicitly, excluding it from the scene traversal.
+      const attachedShared = new Set<THREE.BufferGeometry>()
+      world.traverse(object => {
+        if (object instanceof THREE.Mesh && sharedGeometry.includes(object.geometry as THREE.SphereGeometry)) attachedShared.add(object.geometry)
+      })
+      disposeResources(world, true)
+      for (const source of sources.values()) disposeResources(source, true, true)
+      sources.clear()
+      for (const geometry of sharedGeometry) if (!attachedShared.has(geometry)) geometry.dispose()
       // dispose() also detaches three's own context-lost/restored listeners
       // from the canvas — without it a renderer that failed to draw would
       // keep reacting to a restore it can no longer serve.

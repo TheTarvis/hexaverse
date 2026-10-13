@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math"
@@ -12,7 +13,6 @@ import (
 	"hexaverse/space"
 	"hexaverse/system"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -1780,6 +1780,16 @@ func (s *Service) Cancel(ctx context.Context, id string) (*Fleet, error) {
 // star's configured clearance radius — the star is excluded by geometry
 // alone (design.md Decision 14), with no destination-identity special case.
 func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string, at space.Vec3, starSize float64) (*Fleet, error) {
+	return s.seedFleet(ctx, systemID, corporationID, at, starSize, "")
+}
+
+// SeedFleetAtStation creates only a new fleet, attached to its home station.
+// Existing fleets are returned unchanged, including on spawn-healing retries.
+func (s *Service) SeedFleetAtStation(ctx context.Context, systemID, corporationID, stationID string) (*Fleet, error) {
+	return s.seedFleet(ctx, systemID, corporationID, space.Vec3{}, 0, stationID)
+}
+
+func (s *Service) seedFleet(ctx context.Context, systemID, corporationID string, at space.Vec3, starSize float64, stationID string) (*Fleet, error) {
 	existing, err := s.dao.ListByCorporation(ctx, corporationID)
 	if err != nil {
 		return nil, err
@@ -1788,27 +1798,41 @@ func (s *Service) SeedFleet(ctx context.Context, systemID, corporationID string,
 		return &existing[0], nil
 	}
 
-	if at.Length() <= space.StarClearanceRadius(starSize) {
+	if stationID == "" && at.Length() <= space.StarClearanceRadius(starSize) {
 		return nil, ErrSeedInsideClearance
 	}
 
 	now := s.clock.Now()
+	park := &space.Park{Kind: space.ParkPoint, Point: at}
+	if stationID != "" {
+		bt, err := s.bodiesFor(ctx, systemID)
+		if err != nil {
+			return nil, err
+		}
+		body, ok := bt.Body(stationID)
+		if !ok {
+			return nil, space.ErrUnknownBody
+		}
+		radius := space.InsertionStandoff(body)
+		park = &space.Park{Kind: space.ParkOrbit, BodyId: stationID, Radius: radius, PeriodMs: space.InsertionPeriod(radius), EpochMs: now}
+		if _, err := park.Position(bt, now); err != nil {
+			return nil, err
+		}
+	}
 	f := &Fleet{
-		Id:            "fleet_" + uuid.NewString(),
+		Id:            fmt.Sprintf("fleet_seed_%x", sha256.Sum256([]byte(corporationID))),
 		CorporationId: corporationID,
 		SystemId:      systemID,
-		// Seeding SHALL place a point park (never stationkeep, which would
-		// start charging upkeep before the corp's first order).
-		State:     space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkPoint, Point: at}},
-		Ships:     []ShipEntry{{Class: ClassSeed}},
-		Cargo:     map[string]float64{},
-		CreatedAt: now,
-		UpdatedAt: now,
+		// New station spawns use a free host orbit; legacy callers use a
+		// point park. Neither charges upkeep before the first order.
+		State:      space.ShipState{Mode: space.ModeParked, Park: park},
+		AttachedTo: stationID,
+		Ships:      []ShipEntry{{Class: ClassSeed}},
+		Cargo:      map[string]float64{},
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
-	if err := s.dao.Save(ctx, *f); err != nil {
-		return nil, err
-	}
-	return f, nil
+	return s.dao.CreateIfAbsent(ctx, *f)
 }
 
 // resolveDue runs the authoritative settle for a fleet whose active action

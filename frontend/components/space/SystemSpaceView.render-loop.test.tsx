@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, screen, act } from '@testing-library/react'
+import { render as rtlRender, screen, act, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React, { Profiler } from 'react'
 
@@ -243,6 +243,9 @@ describe('SystemSpaceView + the transform loop — task 2.1', () => {
     try {
       const onRender = vi.fn()
       renderProfiled(onRender)
+      await settle()
+      // Fleet following keeps the ship centered; use the overview to test screen motion.
+      fireEvent.click(screen.getByTestId('camera-recenter'))
       await settle()
       onRender.mockClear()
 

@@ -387,13 +387,17 @@ func errorMessage(w *httptest.ResponseRecorder) string {
 // quoted-cap suite must stay red or green on the CAP's account, never on the
 // preview's.
 //
-// A fresh spawn is a motionless `point` park (fleet.SeedFleet), so the
+// Callers explicitly arrange a motionless point park, so the
 // restored origin is the IDENTICAL origin and — with a point target, which
 // does not move either — the second solve is the identical solve. That
 // premise is asserted, not assumed, by every caller through the returned
 // cost being re-checked against the second commit's own burn.
 func solvedFuelCostOfCommit(t *testing.T, router http.Handler, sp fuelSpawn, order map[string]any) float64 {
 	t.Helper()
+	initial, _, code := fuelGetFleet(t, router, sp.token, sp.fleetId)
+	if code != http.StatusOK || initial.State.Park == nil || initial.State.Park.Kind != space.ParkPoint || initial.AttachedTo != "" {
+		t.Fatal("cost probe requires explicitly arranged unattached point park")
+	}
 	pristine := snapshotFleetMotion(t, sp.fleetId)
 	setFleetFuel(t, sp.fleetId, 1_000_000)
 

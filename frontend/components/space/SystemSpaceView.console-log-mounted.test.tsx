@@ -247,7 +247,13 @@ const region = () => screen.getByTestId('console-dock-region')
 const panel = () => screen.getByTestId('console-panel-log')
 const row = (id: string) => within(panel()).getByTestId(`sighting-row-${id}`)
 
-function expand() { fireEvent.click(open()) }
+// Since `move-scan-control-to-console-dock` a fresh expand shows the Scan tab;
+// this file is about the Log panel, so the helper selects it too. Selecting a
+// tab issues nothing, so every request count here is unchanged.
+function expand() {
+  fireEvent.click(open())
+  fireEvent.click(screen.getByTestId('console-tab-log'))
+}
 function collapse() { fireEvent.click(collapseBtn()) }
 
 /** Expand, wait for the log's rows inside the panel, collapse, flush. Leaves "the first read has been answered" true under both builds. */
@@ -484,9 +490,14 @@ describe('Task 1.8 - showing the log tab issues no request', () => {
     renderView()
     await settleFirstRead('A')
     await screen.findByTestId('scan-report')
+    // The report lives in the Scan tab now. `settleFirstRead` left Log as the
+    // remembered tab, so re-open and select Scan, then follow the report's link.
+    fireEvent.click(open())
+    fireEvent.click(screen.getByTestId('console-tab-scan'))
+    expect(screen.getByTestId('console-tab-scan')).toHaveAttribute('aria-selected', 'true')
     const snapshot = pileRequests().length
     await user.click(screen.getByRole('button', { name: 'Open the sighting log' }))
-    expect(region(), 'checkpoint: the dock expanded').not.toHaveAttribute('hidden')
+    expect(region(), 'checkpoint: the dock is expanded').not.toHaveAttribute('hidden')
     expect(screen.getByTestId('console-tab-log')).toHaveAttribute('aria-selected', 'true')
     expect(pileRequests().length, 'the report link issued a pile request').toBe(snapshot)
   })

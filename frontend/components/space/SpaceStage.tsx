@@ -20,10 +20,9 @@
 // of taking the surrounding panels down with it.
 //
 // CAMERA STATE LIVES HERE, and survives everything except a change of
-// system: a selection change, a realtime refetch landing new positions, and
-// every animation frame leave it exactly as the player left it. A new
-// `systemId` is a new view, and resets it to the default framing with no
-// transition.
+// system. A focused fleet supplies the live pivot; orbit and zoom retain
+// following, while pan, recenter and other-object focus release it. A new
+// system resets framing before applying its initial fleet focus.
 
 import dynamic from 'next/dynamic'
 import {
@@ -51,6 +50,7 @@ import {
   beginDrag,
   clampCamera,
   defaultCamera,
+  fleetCamera,
   isGesture,
   orbitByPixels,
   orbitBySteps,
@@ -126,6 +126,9 @@ export interface SpaceStageProps {
    * member of `selection` (it is not a burn target), so this is separate
    * state held beside it, exactly as the ghost highlight is.
    */
+  initialFocusFleetId?: string | null
+  focusFleetRequest?: { fleetId: string; sequence: number } | null
+  focusBodyRequest?: { bodyId: string; sequence: number } | null
   actingFleetId?: string | null
   onActivateFleet?: (fleetId: string) => void
   /**
@@ -171,13 +174,25 @@ export function SpaceStage({
   onFirstFrame,
   highlightedGhostId = null,
   onHighlightGhost,
+  initialFocusFleetId = null,
+  focusFleetRequest = null,
+  focusBodyRequest = null,
   actingFleetId = null,
   onActivateFleet,
   frameSource,
 }: SpaceStageProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState(true)
-  const [camera, setCamera] = useState<SpaceCamera>(() => defaultCamera(extent))
+  const [camera, storeCamera] = useState<SpaceCamera>(() => defaultCamera(extent))
+  const frameRef = useRef<SpaceFrame | null>(null)
+  const setCamera = useCallback((next: SpaceCamera | ((prev: SpaceCamera) => SpaceCamera)) => {
+    storeCamera(prev => {
+      const live = frameRef.current?.camera
+      const current = prev.followFleetId && live?.followFleetId === prev.followFleetId
+        ? { ...prev, target: live.target, distance: live.distance } : prev
+      return typeof next === 'function' ? next(current) : next
+    })
+  }, [])
   const [drawWorldTime, setDrawWorldTime] = useState(worldTime)
   const [focusedMarkId, setFocusedMarkId] = useState<string | null>(null)
   const [hoveredContactId, setHoveredContactId] = useState<string | null>(null)
@@ -195,10 +210,34 @@ export function SpaceStage({
     setCamera(defaultCamera(extent))
   }
 
+  // One request per system entry: later fleet refetches never fight camera input.
+  const entryFocus = useRef<string | null>(null)
+  const entryKey = `${systemId}::${initialFocusFleetId}`
+  const entryMark = initialFocusFleetId ? scene.marks.find(mark => mark.kind === 'fleet' && mark.id === initialFocusFleetId) : null
+  if (entryMark && entryFocus.current !== entryKey) {
+    entryFocus.current = entryKey
+    setCamera(fleetCamera(extent, entryMark.id, entryMark.followAnchor?.position ?? entryMark.position))
+  }
+
+  const fleetRequest = useRef<string | null>(null)
+  const fleetRequestKey = focusFleetRequest ? `${systemId}:${focusFleetRequest.fleetId}:${focusFleetRequest.sequence}` : null
+  const fleetMark = focusFleetRequest ? scene.marks.find(mark => mark.kind === 'fleet' && mark.id === focusFleetRequest.fleetId) : null
+  if (fleetMark && fleetRequestKey !== fleetRequest.current) {
+    fleetRequest.current = fleetRequestKey
+    setCamera(fleetCamera(extent, fleetMark.id, fleetMark.followAnchor?.position ?? fleetMark.position))
+  }
+
+  const focusedRequest = useRef<string | null>(null)
+  const requestKey = focusBodyRequest ? `${systemId}:${focusBodyRequest.bodyId}:${focusBodyRequest.sequence}` : null
+  const requestedMark = focusBodyRequest ? scene.marks.find(mark => mark.id === focusBodyRequest.bodyId && mark.kind !== 'fleet') : null
+  if (requestedMark && requestKey !== focusedRequest.current) {
+    focusedRequest.current = requestKey
+    setCamera(clampCamera({ ...defaultCamera(extent), target: { ...requestedMark.position } }, extent))
+  }
+
   // THE transform loop's published frame (design.md Decision 3, decided
   // option B) — written by the loop, read by `pickAt`, the pan-by-pixels
   // gesture, and the focus/off-screen-chip reframe (Decision 3, Decision 7).
-  const frameRef = useRef<SpaceFrame | null>(null)
   const cameraRef = useRef(camera)
   cameraRef.current = camera
   const staticSceneRef = useRef(scene)
@@ -211,6 +250,7 @@ export function SpaceStage({
   )
 
   const loop = useSpaceTransformLoop({
+    extent,
     enabled: available,
     host,
     registry,
@@ -263,12 +303,12 @@ export function SpaceStage({
 
   const reframeOn = useCallback(
     (position: DrawVec3) => {
-      setCamera((prev) => clampCamera({ ...prev, target: { ...position } }, extent))
+      setCamera((prev) => clampCamera({ ...prev, followFleetId: undefined, target: { ...position } }, extent))
     },
-    [extent],
+    [extent, setCamera],
   )
 
-  const recenter = useCallback(() => setCamera(defaultCamera(extent)), [extent])
+  const recenter = useCallback(() => setCamera(defaultCamera(extent)), [extent, setCamera])
 
   // --- picking -------------------------------------------------------------
 
@@ -348,7 +388,7 @@ export function SpaceStage({
         setCamera((prev) => orbitByPixels(prev, dx, dy))
       }
     },
-    [extent],
+    [extent, setCamera],
   )
 
   const finishGesture = useCallback(
@@ -374,7 +414,7 @@ export function SpaceStage({
       if (!available) return
       setCamera((prev) => zoomByWheel(prev, e.deltaY, extent))
     },
-    [available, extent],
+    [available, extent, setCamera],
   )
 
   // --- touch ---------------------------------------------------------------
@@ -422,7 +462,7 @@ export function SpaceStage({
       if (!isGesture(gesture.tracker)) return
       setCamera((prev) => orbitByPixels(prev, dx, dy))
     },
-    [extent],
+    [extent, setCamera],
   )
 
   const cameraJson = JSON.stringify(camera)
@@ -621,6 +661,7 @@ function SpaceLayers({
   const contacts = projected.filter((p) => p.mark.kind === 'contact')
   const sightings = projected.filter((p) => p.mark.kind === 'sighting')
   const fleets = projected.filter((p) => p.mark.kind === 'fleet')
+  const hasSelectedObject = marks.some(mark => mark.selected)
 
   const panAtLimit = (right: number, up: number): boolean => {
     const next = panBySteps(camera, right, up, extent)
@@ -672,7 +713,6 @@ function SpaceLayers({
           'pointer-events-auto absolute left-0 top-0 rounded-full' +
           ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
         }
-        style={{ width: 24, height: 24 }}
         onFocus={() => onFocusMark(mark.id)}
         onBlur={onBlurMark}
         onKeyDown={(e) => {
@@ -906,6 +946,7 @@ function SpaceLayers({
       <div className="pointer-events-none absolute inset-0">
         {fleets.map(({ mark }) => {
           const acting = mark.id === actingFleetId
+          const showActingRing = acting && !hasSelectedObject
           return (
             <button
               key={mark.id}
@@ -915,12 +956,12 @@ function SpaceLayers({
               data-testid={`fleet-mark-${mark.id}`}
               data-acting={acting ? 'true' : 'false'}
               aria-label={`Fleet ${mark.id}`}
-              aria-pressed={acting}
+              aria-pressed={showActingRing}
               className={
                 'pointer-events-auto absolute left-0 top-0 h-5 w-5 cursor-pointer rounded-full' +
                 ' border border-emerald-300/40 hover:border-emerald-200/90 hover:bg-emerald-300/10' +
                 ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400' +
-                (acting ? ' ring-2 ring-emerald-400/70' : '')
+                (showActingRing ? ' ring-2 ring-emerald-400/70' : '')
               }
               onPointerOver={() => onHoverFleet(mark.id)}
               onPointerOut={() => onHoverFleet(null)}
@@ -944,8 +985,8 @@ function SpaceLayers({
         )
       })()}
 
-      {/* --- off-screen reach: pointer AND touch --- */}
-      <div className="pointer-events-none absolute inset-0">
+      {/* TODO(HUD-HIDDEN-CLEANUP): Off-screen pointers are CSS-hidden in the live system HUD due to label noise. Review other stage consumers before removing this renderer and its positioning logic. */}
+      <div data-testid="space-offscreen-reach" data-empty={offScreen.length === 0} className="pointer-events-none absolute inset-0">
         {offScreen.map(({ mark }) => (
           <button
             key={mark.id}

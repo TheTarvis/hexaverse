@@ -36,6 +36,7 @@ import (
 // needs.
 func commitKnownBurn(t *testing.T, router http.Handler, sp fuelSpawn, orderBody map[string]any, seeded float64) (*space.Burn, float64) {
 	t.Helper()
+	arrangeStationaryPoint(t, router, sp) // Explicit nonzero-burn fixture, not spawn placement.
 	setFleetFuel(t, sp.fleetId, seeded)
 	resp, _, code := postOrder(t, router, sp.token, sp.fleetId, orderBody)
 	if code != http.StatusOK {
@@ -45,6 +46,9 @@ func commitKnownBurn(t *testing.T, router http.Handler, sp fuelSpawn, orderBody 
 		t.Fatalf("commitKnownBurn: response is not a Burn: %+v", resp.State)
 	}
 	cost := expectedFuelCostTons(resp.State.Burn, 1)
+	if resp.State.Burn.Length <= 0 || cost <= 0 {
+		t.Fatal("refund fixture requires nonzero curve and debit")
+	}
 	return resp.State.Burn, cost
 }
 
@@ -54,7 +58,7 @@ func TestDiscardRefund_Scenario_CuttingImmediatelyAfterCommitRefundsNearlyFullCo
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Cut-Immediately Corp")
-	_, cost := commitKnownBurn(t, router, sp, map[string]any{"bodyId": sp.stationId}, 1_000_000)
+	_, cost := commitKnownBurn(t, router, sp, affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), 1_000_000)
 	fuelAfterCommit := fleetCargoFuel(t, sp.fleetId)
 
 	// "Immediately" — no forced arrival, no rewind: cut as fast as this
@@ -80,7 +84,7 @@ func TestDiscardRefund_Scenario_CuttingJustBeforeArrivalRefundsAlmostNothing(t *
 
 	sp := spawnFuelCorp(t, router, "SDET Cut-Just-Before-Arrival Corp")
 	const seeded = 1_000_000.0
-	_, cost := commitKnownBurn(t, router, sp, map[string]any{"bodyId": sp.stationId}, seeded)
+	_, cost := commitKnownBurn(t, router, sp, affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), seeded)
 	fuelAfterCommit := fleetCargoFuel(t, sp.fleetId)
 	// Non-vacuity: "refunds almost nothing" is satisfied trivially (refunded
 	// == 0) if debit-at-commit does not exist at all yet — a real debit
@@ -123,7 +127,7 @@ func TestDiscardRefund_Scenario_RetargetingMidBurnRefundsTheDiscardedBurnsUnspen
 
 	sp := spawnFuelCorp(t, router, "SDET Retarget Refund Corp")
 	const seeded = 1_000_000.0
-	_, firstCost := commitKnownBurn(t, router, sp, map[string]any{"bodyId": sp.stationId}, seeded)
+	_, firstCost := commitKnownBurn(t, router, sp, affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), seeded)
 	fuelBeforeRetarget := fleetCargoFuel(t, sp.fleetId)
 	if fuelBeforeRetarget >= seeded {
 		t.Fatalf("fixture invariant broken: fuel before retarget = %v, want strictly less than the seeded %v — "+
@@ -176,7 +180,7 @@ func TestDiscardRefund_Scenario_StopInPlaceSupersedesActiveBurnRefundsBeforeChar
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Stop Supersedes Burn Corp")
-	_, firstCost := commitKnownBurn(t, router, sp, map[string]any{"bodyId": sp.stationId}, 1_000_000)
+	_, firstCost := commitKnownBurn(t, router, sp, affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), 1_000_000)
 	fuelBeforeStop := fleetCargoFuel(t, sp.fleetId)
 
 	w := doJSON(t, router, http.MethodPost, "/v1/fleets/"+sp.fleetId+"/stop", sp.token, nil, nil)
@@ -201,7 +205,7 @@ func TestDiscardRefund_Scenario_StopInPlaceFreeBelowFloorBranchStillRefundsAPrec
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Stop Below-Floor Refund Corp")
-	_, firstCost := commitKnownBurn(t, router, sp, map[string]any{"bodyId": sp.stationId}, 1_000_000)
+	_, firstCost := commitKnownBurn(t, router, sp, affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), 1_000_000)
 	fuelBeforeStop := fleetCargoFuel(t, sp.fleetId)
 
 	// Force the burn to its OWN stored arrival instant minus a hair, then
@@ -243,7 +247,7 @@ func TestDiscardRefund_Scenario_RefundIsSymmetricWithStoredDebitedCostNotARoster
 
 	sp := spawnFuelCorp(t, router, "SDET Refund Symmetry Corp")
 	const seeded = 1_000_000.0
-	_, originalCost := commitKnownBurn(t, router, sp, map[string]any{"bodyId": sp.stationId}, seeded)
+	_, originalCost := commitKnownBurn(t, router, sp, affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), seeded)
 	fuelBeforeCut := fleetCargoFuel(t, sp.fleetId)
 	if fuelBeforeCut >= seeded {
 		t.Fatalf("fixture invariant broken: fuel before cut = %v, want strictly less than the seeded %v — this "+
@@ -285,7 +289,8 @@ func TestCutDrive_Scenario_CuttingABurnCreditsItsUnspentFuel(t *testing.T) {
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Cut Drive Credits Fuel Corp")
-	_, cost := commitKnownBurn(t, router, sp, map[string]any{"bodyId": sp.stationId}, 1_000_000)
+	arrangeStationaryPoint(t, router, sp)
+	_, cost := commitKnownBurn(t, router, sp, affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), 1_000_000)
 	if cost <= 0 {
 		t.Fatalf("fixture invariant broken: learned cost = %v, want > 0 (this scenario needs a nonzero "+
 			"already-debited fuel cost to refund)", cost)
@@ -311,7 +316,7 @@ func TestFleetCancel_Scenario_CancellingAMidBurnFleetRefundsUnspentFuel(t *testi
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Fleet Cancel Refund Corp")
-	_, cost := commitKnownBurn(t, router, sp, map[string]any{"bodyId": sp.stationId}, 1_000_000)
+	_, cost := commitKnownBurn(t, router, sp, affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), 1_000_000)
 	before := fleetCargoFuel(t, sp.fleetId)
 
 	w := doJSON(t, router, http.MethodPost, "/v1/fleets/"+sp.fleetId+"/cancel", sp.token, nil, nil)
@@ -333,7 +338,7 @@ func TestActionCancel_Scenario_CancellingTheRunningActionRefundsUnspentFuel(t *t
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Action Cancel Refund Corp")
-	_, cost := commitKnownBurn(t, router, sp, map[string]any{"bodyId": sp.stationId}, 1_000_000)
+	_, cost := commitKnownBurn(t, router, sp, affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), 1_000_000)
 	before := fleetCargoFuel(t, sp.fleetId)
 
 	actionId := fuelRunningActionId(t, router, sp)

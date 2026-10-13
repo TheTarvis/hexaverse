@@ -111,9 +111,10 @@ func TestHoldVerb_Scenario_TheThreeNamedRejectionsAre409AndDistinguishableOverHT
 	ensureFirebaseInitialized(t)
 	router := SetupRouter()
 
-	// (a) release against a fleet that is not station-keeping (a fresh
-	//     spawn's point park).
+	// (a) release against a fleet that is not station-keeping (an explicitly
+	//     arranged point park).
 	notHolding := spawnFuelCorp(t, router, "SDET Reject Not Holding Corp")
+	arrangeStationaryPoint(t, router, notHolding)
 	setFleetFuel(t, notHolding.fleetId, reserveTons(t)+50)
 	releaseReason := conflictReason(t, postRelease(t, router, notHolding.token, notHolding.fleetId),
 		"release against a fleet that is not station-keeping")

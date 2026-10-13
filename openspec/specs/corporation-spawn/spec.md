@@ -453,70 +453,49 @@ the cost of a full healing pass.
 
 ### Requirement: One Starting Hull at a Deterministic Home Park
 
-The system SHALL, on fresh spawn, seed exactly one fleet for the new
-corporation in its chosen home system via `fleet.SeedFleet`, parked at a
-position deterministic from the account id, so a healed retry places the
-hull at the same position — never re-seeding a second hull for an account
-whose corporation already has one (see "Spawn Asset Healing").
+The system SHALL seed exactly one fleet for a fresh corporation in its chosen home system, attached to its provisioned home station in a free host orbit using that station's insertion standoff and period at the seeding clock epoch. Its position SHALL resolve from the served station and orbit rather than an account-derived point park. Spawn healing SHALL preserve an existing fleet's identity, state and attachment, never reposition it or seed a second hull. The orbit SHALL charge no stationkeeping upkeep before the first order. Concurrent seeding or healing attempts for the same corporation SHALL converge atomically on one stored hull identity and return that winner without overwriting its state; a failed create/read SHALL propagate an error rather than returning an unsaved candidate.
 
 #### Scenario: The starting hull is deterministic per account
-
-- **WHEN** a fresh spawn seeds the starting hull for an account
-- **THEN** its position derives deterministically from that account id, so a
-  later healing retry for the same account reproduces the identical position
+- **WHEN** a fresh spawn seeds a starting hull and a later healing retry runs for the same account
+- **THEN** the initial hull is attached to its home station in that station's insertion orbit
+- **AND** the retry returns the same hull without changing its stored state or attachment, including when it has moved since spawn
 
 #### Scenario: The starting hull never lands inside the star's clearance
-
 - **WHEN** a starting hull is seeded
-- **THEN** its position lies outside the home system star's configured
-  clearance radius
+- **THEN** its position lies outside the home system star's configured clearance radius
+
+#### Scenario: Starting orbit requires no upkeep
+- **WHEN** the newly seeded hull is read before any player order
+- **THEN** its park is a free station-hosted orbit, not stationkeeping, and no stationkeeping fuel upkeep is charged
+
+#### Scenario: Concurrent missing-hull healing returns one winner
+- **GIVEN** two bootstrap requests for the same corporation both observe no hull
+- **WHEN** their station-hosted seeding attempts overlap
+- **THEN** both successful requests return the same stored fleet id and exactly one hull exists for that corporation
+- **AND** the starting-fuel grant is credited exactly once to that winning hull
+
+#### Scenario: Losing seed preserves winner movement and fuel
+- **GIVEN** another seed attempt has created the winning hull and its stored state, attachment or fuel has subsequently changed
+- **WHEN** a competing seed attempt loses atomic creation
+- **THEN** it returns the persisted winner without overwriting any of those changes with its candidate's spawn defaults
+
+#### Scenario: Failed atomic seed cannot fabricate success
+- **WHEN** atomic hull creation fails for a reason other than an existing winner, or reading the existing winner fails
+- **THEN** seeding returns an error and does not return its unsaved candidate or mark spawn assets complete
 
 ### Requirement: Starting Fuel Is a Configured Constant, Guarded By a Reachability Sample
-The system SHALL grant a fresh corporation's starting hull a configured
-constant amount of `fuel` (`FuelParams.StartingFuelTons`), never a
-spawn-time solve against the kinematics package, which would make the
-grant non-deterministic across a tuning change and couple spawn to
-`space`'s implementation. Because a freshly spawned hull is seeded
-unattached, at a `point` park ("Spawn Fleet Seeding Places a Park"), and
-sale and refuel both require attachment, and attachment requires a burn,
-and a burn requires fuel — a starting grant of zero would deadlock a fresh
-corporation permanently at spawn. This constant SHALL be validated by a
-generated-sample invariant test, in the spirit of `system-interior`'s
-size/tonnage guards: over a large sample of seeded accounts, the
-configured starting-fuel constant SHALL afford the fuel-priced burn
-`space.SolveBurn` solves from that account's deterministic spawn park to
-its home system's station. A constant that fails the sample for any
-sampled account is a tuning defect in the constant's value, to be
-corrected by moving the constant — never a spec change to this
-requirement. **This guard deliberately prices the reachability check at
-the fleet's `DerivedAccelCeiling`, the one carve-out from
-`fleet-movement`'s floor-pricing rule for every other reachability
-judgment this change defines** ("A Burn Commit Warns...", "Fleet Read
-Reports an Estimated Maximum Range..."): an order that omits an explicit
-commanded acceleration defaults to the fleet's ceiling ("An omitted
-commanded acceleration defaults to the fleet's ceiling"), so the ceiling —
-not the floor — is what a fresh corporation's actual, unmodified default
-spawn-to-station order would cost. A floor-priced guard here would certify
-a starting-fuel constant under which that default first order is
-unaffordable, reopening exactly the spawn-time deadlock this requirement
-exists to prevent.
+
+The system SHALL grant a fresh corporation's starting hull the configured constant amount of fuel, FuelParams.StartingFuelTons, exactly once. The grant SHALL NOT depend on a spawn-time kinematic solve. Because the hull starts attached to its home station, it SHALL have immediate access to that station's attachment-gated services without needing a burn to the host it already occupies. A generated sample of seeded accounts spanning spawnable systems SHALL verify the configured grant and resolvable, clearance-safe station attachment for every sampled hull. This replaces the former unattached point-spawn burn-to-station premise; it SHALL NOT introduce a special zero-length burn or weaken ordinary burn pricing or refusal rules.
 
 #### Scenario: A seeded hull can reach its home station on its starting fuel
-- **WHEN** a fresh corporation's starting hull, seeded at its deterministic
-  spawn park, is solved a burn to its home system's station at its
-  acceleration ceiling
-- **THEN** that burn's fuel cost, priced per `fleet-movement`'s "A Burn's
-  Fuel Cost Scales With Roster Hull Count, Never Loaded Mass," does not
-  exceed the corporation's configured starting-fuel grant
+- **WHEN** a fresh corporation's starting hull is seeded
+- **THEN** it is already attached in a resolvable orbit around its home station and carries exactly the configured starting-fuel grant
+- **AND** access to station services needs no initial station-targeted burn or fuel debit
 
 #### Scenario: The guarantee is checked over a generated sample, not one fixture account
-- **WHEN** the starting-fuel reachability check is run over a large,
-  generated sample of seeded accounts spanning the galaxy's spawnable
-  systems
-- **THEN** every sampled account's spawn-to-home-station burn is
-  affordable on the configured starting-fuel constant, and a sample
-  member that fails is treated as a signal to retune the constant, not to
-  relax this requirement
+- **WHEN** the starting-fuel and station-access check runs over a large generated sample of accounts spanning the galaxy's spawnable systems
+- **THEN** every sampled hull has the configured grant exactly once and a resolvable station-hosted orbit outside star clearance
+- **AND** a sample member lacking its station, grant or valid orbit fails the check rather than accepting a geometry refusal as success
 
 ## Notes for future maintainers
 

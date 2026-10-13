@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 
@@ -405,4 +405,16 @@ describe('ScanControl — the settled report (system-space-view "A Settled Sweep
       expect.anything(),
     )
   })
+})
+
+it('passes the accepted fleet receipt to the tutorial only after a successful scan commit', () => {
+  scanTargets.data = { targets: [{ hostId: 'body', kind: 'body', durationMs: 1000 }] }
+  const onCommitAccepted = vi.fn()
+  control({ onCommitAccepted })
+  fireEvent.click(screen.getByTestId('scan-commit-button'))
+  expect(onCommitAccepted).not.toHaveBeenCalled()
+  const options = scanMutation.mutate.mock.calls[0][1]
+  const receipt = { id: 'fleet', activeScanId: 'accepted-scan' }
+  act(() => options.onSuccess(receipt))
+  expect(onCommitAccepted).toHaveBeenCalledWith(receipt)
 })

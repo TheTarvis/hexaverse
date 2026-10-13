@@ -198,6 +198,18 @@ func rewindHoldWindowPastDryInstant(t *testing.T, fleetId string, marginMs int64
 // debited some.
 func arriveInOrbitAround(t *testing.T, router http.Handler, sp fuelSpawn, bodyId string, fuelTons float64) {
 	t.Helper()
+	// Reuse an already-established matching free orbit. This setup helper promises
+	// an orbit, not an unnecessary burn back to the station spawn already occupies.
+	current, _, status := fuelGetFleet(t, router, sp.token, sp.fleetId)
+	if status != http.StatusOK {
+		t.Fatalf("orbit fixture initial read: %d", status)
+	}
+	if current.AttachedTo == bodyId && current.State.Mode == space.ModeParked && current.State.Park != nil && current.State.Park.Kind == space.ParkOrbit && current.State.Park.BodyId == bodyId {
+		requireNoActiveMovementAction(t, sp.fleetId)
+		setFleetFuel(t, sp.fleetId, fuelTons)
+		return
+	}
+
 	setFleetFuel(t, sp.fleetId, 5_000_000)
 	orderResp, _, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": bodyId})
 	if code != http.StatusOK || orderResp.State.Burn == nil {

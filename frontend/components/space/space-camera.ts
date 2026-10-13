@@ -19,6 +19,9 @@
 // SHAPE is the requirement.
 
 export interface SpaceCamera {
+  /** Live fleet pivot, resolved by the transform loop. */
+  followFleetId?: string
+
   /** Rotation about the world Y axis, radians. */
   yaw: number
   /** Elevation above the ecliptic, radians, clamped. */
@@ -90,6 +93,21 @@ export function defaultCamera(extent: number): SpaceCamera {
     pitch: DEFAULT_PITCH,
     distance: extent * DEFAULT_DISTANCE_MULT,
     target: { x: 0, y: 0, z: 0 },
+  }
+}
+
+/** Start behind the fleet, looking inward toward the star, slightly above its plane. */
+export function fleetCamera(extent: number, fleetId: string, position: SpaceCamera['target']): SpaceCamera {
+  const horizontal = Math.hypot(position.x, position.z)
+  return {
+    ...clampCamera({
+      ...defaultCamera(extent),
+      yaw: horizontal > 0 ? Math.atan2(position.x, position.z) : DEFAULT_YAW,
+      pitch: Math.atan2(position.y, horizontal) + 0.2,
+      distance: extent * 0.3,
+      target: { ...position },
+    }, extent),
+    followFleetId: fleetId,
   }
 }
 
@@ -183,7 +201,7 @@ function panBy(camera: SpaceCamera, alongRight: number, alongUp: number, bound: 
     y: camera.target.y + right.y * alongRight + up.y * alongUp,
     z: camera.target.z + right.z * alongRight + up.z * alongUp,
   }
-  return { ...camera, target: clampTarget(camera.target, next, bound) }
+  return { ...camera, followFleetId: undefined, target: clampTarget(camera.target, next, bound) }
 }
 
 export function panByPixels(
@@ -260,6 +278,7 @@ export function clampCamera(camera: SpaceCamera, extent: number): SpaceCamera {
   const { min, max } = zoomRange(extent)
   const bound = panBound(extent)
   return {
+    ...camera,
     yaw: wrapAngle(camera.yaw),
     pitch: clampNumber(camera.pitch, PITCH_MIN, PITCH_MAX),
     distance: clampNumber(camera.distance, min, max),

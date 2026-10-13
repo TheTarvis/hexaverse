@@ -83,8 +83,8 @@ func TestStopFreeBranch_Scenario_StoppingAtOrBelowTheSpeedFloorPersistsItsPointP
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Stop Free Branch No Action Corp")
-	// A fresh spawn is a `point` park at zero velocity (fleet.SeedFleet:
-	// "Seeding SHALL place a point park"), which is exactly at-or-below the
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
+	// The explicit point fixture has zero velocity, exactly at-or-below the
 	// stop-in-place speed floor. Attach it to its home station so the
 	// "cleared attachedTo" half is observable.
 	dockFleetAtStation(t, sp)

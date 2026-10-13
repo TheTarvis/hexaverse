@@ -61,6 +61,25 @@ describe('MarketBoardPanel', () => {
     expect(screen.queryByTestId('market-spread-sys-rich')).not.toBeInTheDocument()
   })
 
+  it('keeps prices and selection usable when the current system has no market venue', async () => {
+    const onSelectSystem = vi.fn()
+    render(<MarketBoardPanel board={board} homeSystemId="sys-without-station" onSelectSystem={onSelectSystem} />)
+    expect(screen.getByTestId('market-price-sys-rich')).toHaveTextContent('140 cr/t')
+    expect(screen.queryByTestId('market-spread-sys-rich')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('market-row-sys-rich'))
+    expect(onSelectSystem).toHaveBeenCalledWith('sys-rich')
+    await userEvent.click(screen.getByTestId('market-kind-water'))
+    expect(screen.getByTestId('market-price-sys-home')).toHaveTextContent('8 cr/t')
+  })
+
+  it('removes the comparison when a refreshed board no longer includes the local venue', () => {
+    const { rerender } = render(<MarketBoardPanel board={board} homeSystemId="sys-home" />)
+    expect(screen.getByTestId('market-spread-sys-rich')).toHaveTextContent('+40%')
+    rerender(<MarketBoardPanel board={{ ...board, venues: board.venues.filter(v => v.systemId !== 'sys-home') }} homeSystemId="sys-home" />)
+    expect(screen.getByTestId('market-price-sys-rich')).toHaveTextContent('140 cr/t')
+    expect(screen.queryByTestId('market-spread-sys-rich')).not.toBeInTheDocument()
+  })
+
   it('distinguishes a premium request from the floor by more than colour', () => {
     render(<MarketBoardPanel board={board} />)
 

@@ -1,4 +1,4 @@
-FROM golang:1.26.6
+FROM golang:1.26.9
 
 # Install Java (required for Firebase emulators), Node.js, PostgreSQL client, and Firebase tools.
 # qemu-user-static provides the arm64 leg of the cross-target determinism matrix

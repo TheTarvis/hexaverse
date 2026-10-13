@@ -32,8 +32,8 @@ import (
 // preview agrees with itself.
 //
 // WHY THE TWO CALLS ARE COMPARABLE AT ALL, given a real clock advances
-// between them: the fixture is a fresh spawn (a motionless `point` park —
-// fleet.SeedFleet) ordered to a fixed POINT. space.BuildCurve depends on the
+// between them: the fixture explicitly arranges a stationary point park
+// at the served origin, ordered to a fixed POINT. space.BuildCurve depends on the
 // world time only through the target's position, which for a point target is
 // constant, so the curve, its length, the brachistochrone flight duration
 // (space.QuantizeArrival adds ceil(flightSeconds*1000) to departMs, a
@@ -49,6 +49,7 @@ func TestPreview_Scenario_APreviewReturnsTheSameCurveEtaAndCostACommitWouldProdu
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Preview Parity Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 	setFleetFuel(t, sp.fleetId, 1_000_000)
 
 	beforePreview := worldNow()
@@ -158,8 +159,8 @@ func TestPreview_Scenario_RepeatedPreviewsOfAFleetWithNothingDueWriteNothing(t *
 	sp := spawnFuelCorp(t, router, "SDET Preview Idempotence Corp")
 	setFleetFuel(t, sp.fleetId, 1_000_000)
 
-	// The fixture MUST have nothing due: a fresh spawn is a motionless point
-	// park with no action at all. Asserted, not assumed — a fleet with a due
+	// The fixture MUST have nothing due: a fresh spawn is a free station orbit
+	// with no movement action or stationkeeping upkeep. Asserted, not assumed — a fleet with a due
 	// arrival would let a settling write pass as "the preview wrote nothing"
 	// only by accident of ordering.
 	requireNoActiveMovementAction(t, sp.fleetId)
@@ -479,6 +480,7 @@ func TestPreview_Scenario_ReportsAnUnaffordableTargetAsSuch(t *testing.T) {
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Preview Unaffordable Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 
 	// Affordable arrangement first — the reference the unaffordable one is
 	// diffed against. The fleet does not move between the two calls (a preview
@@ -546,6 +548,7 @@ func TestPreview_Scenario_ReportsTheStrandingWarningWhenItWouldApply(t *testing.
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Preview Stranding Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 
 	// Baseline: ample fuel remaining after the burn, so the fleet can still
 	// reach a station or gate at the acceleration floor — no warning.

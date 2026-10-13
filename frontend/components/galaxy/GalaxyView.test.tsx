@@ -444,6 +444,28 @@ describe('GalaxyView', () => {
     expect(countdown).toHaveTextContent(/^11m \d{1,2}s left$/)
   })
 
+  it('keeps a transit fleet selected in the galaxy vitals and offers destination navigation', async () => {
+    mockGalaxyState()
+    const traveling = { ...parkedFleet('fleet_transit', 'sys-0'), scale: 1, jump: { laneId: 'lane-0', destSystemId: 'sys-1', departMs: 0, arriveMs: 660_000 } }
+    mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
+    renderView()
+    expect(screen.getByTestId('fleet-location-panel')).toHaveTextContent('Axion → Borealis')
+    expect(screen.getByTestId('galaxy-vitals')).toHaveTextContent('fleet_transit')
+    await screen.findByTestId('mock-graph')
+    fireEvent.click(screen.getByTestId('focus-selected-fleet'))
+    expect(focusSpy).toHaveBeenCalledWith('sys-1')
+    fireEvent.click(screen.getByTestId('open-fleet-system'))
+    expect(pushSpy).toHaveBeenCalledWith('/systems/sys-1')
+  })
+
+  it('focuses a local fleet by opening its system directly', () => {
+    mockGalaxyState()
+    mockUseMyFleets.mockReturnValue({ data: [parkedFleet('fleet_focus', 'sys-0')] } as unknown as ReturnType<typeof useMyFleets>)
+    renderView()
+    fireEvent.click(screen.getByTestId('focus-selected-fleet'))
+    expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0')
+  })
+
   // burn has no target-naming surface at the galaxy tier (design.md Decision
   // 12: "Targets are named by body id from the interior read" — which only
   // exists once a system board is open) — the roster's Burn command sends

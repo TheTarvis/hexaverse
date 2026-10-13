@@ -202,7 +202,12 @@ const canvas = () => screen.getByTestId('space-canvas-region')
 const chevron = () => screen.getByTestId('vitals-fleet-chevron')
 const refreshControl = () => within(screen.getByTestId('console-panel-log')).getByRole('button', { name: 'Refresh sighting log' })
 
-function expand() { fireEvent.click(open()) }
+// Since `move-scan-control-to-console-dock` a fresh expand shows the Scan tab;
+// these rows are about the Log panel, so the helper selects it too.
+function expand() {
+  fireEvent.click(open())
+  fireEvent.click(screen.getByTestId('console-tab-log'))
+}
 const clearSpies = () => {
   shared.refetch.mockClear()
   shared.fetchNextPage.mockClear()

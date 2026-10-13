@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"hexaverse/space"
+	"hexaverse/system"
 
 	"go.uber.org/mock/gomock"
 )
@@ -66,9 +67,9 @@ func TestSeedFleet_Scenario_FirstCallCreatesAPointPark(t *testing.T) {
 
 	dao.EXPECT().ListByCorporation(gomock.Any(), "corp-1").Return(nil, nil)
 	var saved Fleet
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) error {
+	dao.EXPECT().CreateIfAbsent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) (*Fleet, error) {
 		saved = f
-		return nil
+		return &f, nil
 	})
 
 	got, err := svc.SeedFleet(context.Background(), "sys-0", "corp-1", at, starSize)
@@ -117,5 +118,41 @@ func TestSeedFleet_Scenario_AtExactlyTheClearanceBoundaryRejected(t *testing.T) 
 	_, err := svc.SeedFleet(context.Background(), "sys-0", "corp-1", space.Vec3{X: clearance}, starSize)
 	if err == nil {
 		t.Fatal("SeedFleet accepted a position exactly AT the star's clearance radius, want rejection (\"at or inside\")")
+	}
+}
+
+func TestSeedFleetAtStation_DocksNewFleetWithoutUpkeepAndPreservesExisting(t *testing.T) {
+	clk := &fakeClock{now: 100}
+	svc, dao, _, ctrl := newSvc(t, clk)
+	defer ctrl.Finish()
+	bt := testBodyTable(t, "sys-0", 6, system.Feature{Id: "feat-station", Type: system.FeatureStation, Size: 1, SpaceDoc: space.EncodeOrbit(space.Orbit{ParentId: "feat-star", Radius: 60, PeriodMs: 10000})})
+	svc.WithBodies(stubBodySourceFixed{bt: bt})
+	dao.EXPECT().ListByCorporation(gomock.Any(), "corp").Return(nil, nil)
+	var saved Fleet
+	dao.EXPECT().CreateIfAbsent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) (*Fleet, error) { saved = f; return &f, nil })
+	got, err := svc.SeedFleetAtStation(context.Background(), "sys-0", "corp", "feat-station")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AttachedTo != "feat-station" || got.State.Park.Kind != space.ParkOrbit || got.State.Park.BodyId != "feat-station" {
+		t.Fatalf("not docked: %+v", got)
+	}
+	if _, err := got.State.Park.Position(bt, clk.now); err != nil {
+		t.Fatal(err)
+	}
+	saved.AttachedTo = "elsewhere"
+	dao.EXPECT().ListByCorporation(gomock.Any(), "corp").Return([]Fleet{saved}, nil)
+	again, err := svc.SeedFleetAtStation(context.Background(), "sys-0", "corp", "feat-station")
+	if err != nil || again.AttachedTo != "elsewhere" {
+		t.Fatalf("retry moved fleet: %+v %v", again, err)
+	}
+}
+
+func TestSeedFleetAtStation_MissingStationDoesNotSave(t *testing.T) {
+	svc, dao, _, ctrl := newSvc(t, &fakeClock{})
+	defer ctrl.Finish()
+	dao.EXPECT().ListByCorporation(gomock.Any(), "corp").Return(nil, nil)
+	if _, err := svc.SeedFleetAtStation(context.Background(), "sys-0", "corp", "feat-station"); err == nil {
+		t.Fatal("missing station accepted")
 	}
 }

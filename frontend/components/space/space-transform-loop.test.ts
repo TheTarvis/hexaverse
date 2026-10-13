@@ -9,7 +9,7 @@ import {
 } from './space-transform-loop'
 import { hitTargetTransform } from './space-projection'
 import type { SceneModel } from './space-scene'
-import { defaultCamera } from './space-camera'
+import { fleetCamera, orbitBySteps, panBySteps, zoomBySteps, defaultCamera } from './space-camera'
 
 // RED-PHASE SUITE — tasks 4.2, 4.3, 4.3a, 4.6, 4.8 (design.md Decision 3,
 // decided option B). The transform writer, extracted from GL construction,
@@ -330,4 +330,91 @@ describe('startSpaceTransformLoop — one frame runs synchronously before the fi
     expect(el.style.transform).toContain('-9999px')
     handle.stop()
   })
+})
+
+
+it('follows the live fleet every frame without React updates, preserves orbit/zoom, and releases on pan', () => {
+  const fleet = { id: 'fleet', kind: 'fleet' as const, position: { x: 20, y: 0, z: 10 }, radius: 1, pickable: false, selected: false }
+  const staticSceneRef = { current: { ...staticScene(), marks: [fleet] } }
+  const cameraRef = { current: fleetCamera(EXTENT, fleet.id, fleet.position) }
+  const frameRef: { current: SpaceFrame | null } = { current: null }
+  const onViewChange = vi.fn()
+  const loop = startSpaceTransformLoop({ host: host(), registry: createHitTargetRegistry(), cameraRef, frameRef, source: null, staticSceneRef, onViewChange })
+  const moved = { x: 30, y: 2, z: 15 }
+  staticSceneRef.current = { ...staticSceneRef.current, marks: [{ ...fleet, position: moved }] }
+  fireNextFrame()
+  expect(frameRef.current?.camera.target).toEqual(moved)
+  expect(onViewChange).toHaveBeenCalledTimes(1)
+  cameraRef.current = zoomBySteps(orbitBySteps(frameRef.current!.camera, 2, 1), 1, EXTENT)
+  fireNextFrame()
+  expect(frameRef.current?.camera.yaw).toBe(cameraRef.current.yaw)
+  expect(frameRef.current?.camera.distance).toBe(cameraRef.current.distance)
+  expect(frameRef.current?.camera.target).toEqual(moved)
+  cameraRef.current = panBySteps(frameRef.current!.camera, 1, 0, EXTENT)
+  const panned = cameraRef.current.target
+  staticSceneRef.current = { ...staticSceneRef.current, marks: [{ ...fleet, position: { x: 40, y: 0, z: 20 } }] }
+  fireNextFrame()
+  expect(frameRef.current?.camera.target).toEqual(panned)
+  cameraRef.current = fleetCamera(EXTENT, fleet.id, fleet.position)
+  fireNextFrame()
+  expect(frameRef.current?.camera.target).toEqual({ x: 40, y: 0, z: 20 })
+  loop.stop()
+})
+
+
+it('frames the parked orbital envelope and blends arrival/departure without changing orientation', () => {
+  let now = 0
+  vi.spyOn(performance, 'now').mockImplementation(() => now)
+  const fleet = { id: 'fleet', kind: 'fleet' as const, position: { x: 20, y: 0, z: 10 }, radius: 1, pickable: false, selected: false }
+  const staticSceneRef: { current: SceneModel } = { current: { ...staticScene(), marks: [fleet] } }
+  const cameraRef = { current: fleetCamera(EXTENT, fleet.id, fleet.position) }
+  const frameRef: { current: SpaceFrame | null } = { current: null }
+  const loop = startSpaceTransformLoop({ host: host(), registry: createHitTargetRegistry(), cameraRef, frameRef, source: null, staticSceneRef })
+  const anchor = { id: 'planet', position: { x: 40, y: 0, z: 10 }, radius: 25 }
+  staticSceneRef.current = { ...staticSceneRef.current, marks: [{ ...fleet, followAnchor: anchor }] }
+  fireNextFrame()
+  expect(frameRef.current?.camera.target).toEqual(fleet.position)
+  now = 325
+  fireNextFrame()
+  expect(frameRef.current?.camera.target.x).toBeCloseTo(30)
+  now = 650
+  fireNextFrame()
+  expect(frameRef.current?.camera.target).toEqual(anchor.position)
+  expect(frameRef.current!.camera.distance).toBeGreaterThan(50)
+  staticSceneRef.current = { ...staticSceneRef.current, marks: [{ ...fleet, position: { x: 48, y: 0, z: 10 }, followAnchor: anchor }] }
+  fireNextFrame()
+  expect(frameRef.current?.camera.target).toEqual(anchor.position)
+  expect(frameRef.current?.camera.yaw).toBe(cameraRef.current.yaw)
+  expect(frameRef.current?.camera.pitch).toBe(cameraRef.current.pitch)
+  staticSceneRef.current = { ...staticSceneRef.current, marks: [fleet] }
+  fireNextFrame()
+  expect(frameRef.current?.camera.target).toEqual(anchor.position)
+  now = 1300
+  fireNextFrame()
+  expect(frameRef.current?.camera.target).toEqual(fleet.position)
+  loop.stop()
+})
+
+it('sizes hit targets to the projected model, updates with zoom, and keeps distant targets usable', () => {
+  const mark = { id: 'gas', kind: 'body', bodyType: 'gas_giant', radius: 2, position: { x: 0, y: 0, z: 0 }, selected: false, pickable: true } as const
+  const scene = { ...staticScene(), marks: [mark] }
+  const cameraRef = { current: { ...defaultCamera(100), distance: 30 } }
+  const frameRef: { current: SpaceFrame | null } = { current: null }
+  const el = document.createElement('button')
+  const registry = createHitTargetRegistry()
+  registry.refFor(mark.id)(el)
+  const loop = startSpaceTransformLoop({ extent: 100, host: host(), registry, cameraRef, frameRef, source: null, staticSceneRef: { current: scene } })
+  const diameter = parseFloat(el.style.width)
+  expect(diameter).toBeGreaterThan(180)
+  expect(el.style.height).toBe(el.style.width)
+  const late = document.createElement('button')
+  applyHitTransform(frameRef.current, mark.id, late)
+  expect(late.style.width).toBe(el.style.width)
+  cameraRef.current = { ...cameraRef.current, distance: 60 }
+  loop.refresh()
+  expect(parseFloat(el.style.width)).toBeCloseTo(diameter / 2, -1)
+  cameraRef.current = { ...cameraRef.current, distance: 10000 }
+  loop.refresh()
+  expect(el.style.width).toBe('24px')
+  loop.stop()
 })

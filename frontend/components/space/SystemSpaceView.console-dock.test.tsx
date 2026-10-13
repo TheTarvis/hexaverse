@@ -403,7 +403,8 @@ describe('SystemSpaceView + ConsoleDock - task 2.6 the Tab walk on the view', ()
     expectExpanded()
     screen.getByTestId('vitals-fleet-chevron').focus()
     await user.tab()
-    expect(document.activeElement).toBe(tab())
+    // the selected tab is the one in the tab order (roving tabindex); a fresh expand selects Scan
+    expect(document.activeElement).toBe(screen.getByRole('tab', { selected: true }))
     await user.tab()
     expect(document.activeElement).toBe(collapseBtn())
   })
@@ -429,6 +430,7 @@ describe('SystemSpaceView + ConsoleDock - task 2.7 the log\'s placement', () => 
 
     await user.click(open())
     expectExpanded()
+    await user.click(tab())
     noToggle()
 
     // the log, its rows and its controls are inside the Log panel and nowhere else
@@ -459,6 +461,7 @@ describe('SystemSpaceView + ConsoleDock - task 2.8 the log\'s three states in th
     mount()
     await user.click(open())
     expectExpanded()
+    await user.click(tab())
     const inPanel = within(panel())
     if (name === 'loading') {
       expect(inPanel.getByText('Reading the pile…')).toBeInTheDocument()
@@ -478,12 +481,15 @@ describe('SystemSpaceView + ConsoleDock - task 2.8 the log\'s three states in th
 describe('SystemSpaceView + ConsoleDock - task 2.9 the settled report\'s link', () => {
   const LINK = { name: 'Open the sighting log' }
 
-  it('Scenario: A settled sweep\'s report link expands a collapsed dock to the Log tab / Scenario: The report\'s link to the log moves focus to the Log tab (dock collapsed)', async () => {
+  it('Scenario: A settled sweep\'s report link selects the Log tab / Scenario: The report\'s link to the log moves focus to the Log tab (dock expanded on Scan — the report lives in the Scan tab, so the link is reachable only there)', async () => {
     scanState.settled = SETTLED_SCAN
     const user = userEvent.setup()
     mount()
     expectCollapsed()
-    expect(screen.getByTestId('scan-report')).toBeInTheDocument()
+    await user.click(open())
+    expectExpanded()
+    expect(screen.getByTestId('console-tab-scan')).toHaveAttribute('aria-selected', 'true')
+    expect(within(screen.getByTestId('console-panel-scan')).getByTestId('scan-report')).toBeInTheDocument()
     await user.click(screen.getByRole('button', LINK))
     expectExpanded()
     expect(tab()).toHaveAttribute('aria-selected', 'true')

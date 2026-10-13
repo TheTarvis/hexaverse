@@ -229,27 +229,15 @@ func TestFleetRead_Scenario_DockedFleetWithFullTankNeverReadsStrandedDueToTooClo
 	sp := spawnFuelCorp(t, router, "SDET Docked Too-Close-To-Solve Corp")
 	setFleetFuel(t, sp.fleetId, 1_000_000)
 
-	// Fly for real to the home station, then time-travel the arrival into
-	// the past (forceBurnArrivalPast) rather than waiting out the real
-	// wall-clock flight duration — see that helper's doc comment. The fleet
-	// genuinely settles through the production BurnResolver, landing
-	// AttachedTo == the station's own feature id.
-	orderResp, _, code := postOrder(t, router, sp.token, sp.fleetId, map[string]any{"bodyId": sp.stationId})
-	if code != http.StatusOK {
-		t.Fatalf("order to home station: status = %d", code)
-	}
-	if orderResp.State.Burn == nil {
-		t.Fatalf("order response is not a Burn: %+v", orderResp.State)
-	}
-	forceBurnArrivalPast(t, sp.fleetId)
-	setFleetFuel(t, sp.fleetId, 1_000_000) // restore a full tank post-"arrival" (a debited commit already spent some)
+	// Spawn already provides the genuine station-attached insertion orbit.
+	// No redundant burn to the occupied host is needed for this read scenario.
 
 	typed, body, code := fuelGetFleet(t, router, sp.token, sp.fleetId)
 	if code != http.StatusOK {
-		t.Fatalf("GET fleet (post-arrival): status = %d", code)
+		t.Fatalf("GET fleet (station-hosted): status = %d", code)
 	}
 	if typed.AttachedTo != sp.stationId {
-		t.Fatalf("fixture invariant broken: fleet is not docked at its home station after the forced arrival "+
+		t.Fatalf("fixture invariant broken: fleet is not docked at its home station "+
 			"(attachedTo = %q, want %q) — cannot exercise the too-close-to-solve rule without genuinely being "+
 			"there", typed.AttachedTo, sp.stationId)
 	}
@@ -274,6 +262,7 @@ func TestBurnCommitWarning_Scenario_LeavesUnableToReachAnyStationEvenAtFloorStil
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Stranding Warning Corp")
+	arrangeStationaryPoint(t, router, sp)                 // Explicit scenario premise; real spawn remains station-hosted.
 	far := space.Vec3{X: 500_000, Y: 500_000, Z: 500_000} // far from the home station and any gate
 
 	// POST-HANDOFF REVISION (SDET, 2026-09-02). Cause: developer-reported,
@@ -294,9 +283,8 @@ func TestBurnCommitWarning_Scenario_LeavesUnableToReachAnyStationEvenAtFloorStil
 	// ACCEPTED and must carry a stranding warning. Only the arrangement
 	// moved: the priced burn and the funded figure now come from the SAME
 	// fleet at the SAME origin, using the snapshot/restore pattern the
-	// ErrArcTooShort test below already established. A fresh spawn is a
-	// motionless `point` park (fleet.SeedFleet: "Seeding SHALL place a point
-	// park"), so restoring the snapshot restores the IDENTICAL origin and the
+	// ErrArcTooShort test below already established. The explicit fixture is a
+	// motionless point park, so restoring the snapshot restores the IDENTICAL origin and the
 	// second solve is the identical solve — no drift margin is needed, and
 	// none is taken. The premise is asserted as a fixture invariant below
 	// rather than argued here, so if it ever breaks again it fails by name
@@ -456,6 +444,7 @@ func TestBurnCommitWarning_Scenario_ACandidateTooCloseToSolveCountsAsReachableAt
 	// correctly unaffordable, which is exactly what forces the evaluation
 	// onto the ErrArcTooShort branch this test exists to pin.
 	sp := spawnFuelCorp(t, router, "SDET ErrArcTooShort Test Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 	gateBodyId, _ := gateBodyIdFor(t, sp)
 	pristine := snapshotFleetMotion(t, sp.fleetId)
 	setFleetFuel(t, sp.fleetId, 1_000_000)

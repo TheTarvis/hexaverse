@@ -143,6 +143,8 @@ func (s *Service) GetOrCreateInterior(ctx context.Context, systemID string) (*Ge
 			if winner == nil {
 				return nil, fmt.Errorf("interior claimed but not readable for %s", systemID)
 			}
+			s.spliceStation(ctx, winner)
+			s.applyContinuousCascade(ctx, systemID, winner)
 			return winner, nil
 		}
 		return nil, err

@@ -85,6 +85,8 @@ export interface SceneMark {
    * the facts card, and bears on no rule.
    */
   fleetMode?: 0 | 1 | 2
+  /** Stable parked camera pivot and local orbital envelope; never gameplay state. */
+  followAnchor?: { id: string; position: DrawVec3; radius: number }
   /** Own fleets under a burn only — the burn's served `ArriveMs`, for the facts card's countdown. */
   arriveMs?: number
   /** Sighting ghosts only — the record's `asOf`, for its label. */
@@ -231,10 +233,31 @@ function beltMemberCount(bodyId: string): number {
 }
 
 interface BodyLike {
+  type?: string
   id: string
   size: number
   space: Vec3
   orbitElements?: { parentId: string; radius: number; periodMs: number; phase: number; inclination: number; node: number }
+}
+
+/** Follow the outermost disclosed non-star host, never its nested revolutions. */
+function parkedFollowAnchor(fleet: SceneFleet, bodies: Map<string, BodyLike>, positionOf: (id: string) => DrawVec3): SceneMark['followAnchor'] {
+  const park = fleet.state?.Mode === 1 ? fleet.state.Park : null
+  if (!park || park.Kind === PARK_KIND_POINT) return undefined
+  let body = bodies.get(park.BodyId)
+  if (!body || body.type === 'star') return undefined
+  let radius = Math.max(0, park.Radius ?? 0) + Math.hypot(park.Offset?.X ?? 0, park.Offset?.Y ?? 0, park.Offset?.Z ?? 0)
+  const visited = new Set<string>()
+  while (body.orbitElements) {
+    visited.add(body.id)
+    const parent = bodies.get(body.orbitElements.parentId)
+    if (!parent || parent.type === 'star' || visited.has(parent.id)) break
+    radius += Math.max(0, body.orbitElements.radius)
+    body = parent
+  }
+  const position = positionOf(body.id)
+  if (isDrawOrigin(position)) return undefined
+  return { id: body.id, position, radius: Math.max(body.size, radius + FLEET_MARK_RADIUS) }
 }
 
 /**
@@ -384,6 +407,7 @@ export function buildSceneModel(input: SceneInput): SceneModel {
     const mode = fleet.state?.Mode
     const fleetMode: 0 | 1 | 2 | undefined = mode === 0 || mode === 1 || mode === 2 ? mode : undefined
     const burn = mode === 0 ? fleet.state?.Burn : null
+    const followAnchor = parkedFollowAnchor(fleet, bodies, positionOf)
     const driftVelocity = mode === 2 ? toDraw(fleet.state?.Drift?.Velocity) : null
     marks.push({
       id: fleet.id,
@@ -397,6 +421,7 @@ export function buildSceneModel(input: SceneInput): SceneModel {
       // never a selection.
       pickable: false,
       selected: false,
+      ...(followAnchor ? { followAnchor } : {}),
       ...(fleetMode !== undefined ? { fleetMode } : {}),
       ...(burn ? { arriveMs: burn.ArriveMs } : {}),
       ...(driftVelocity ? { velocity: driftVelocity } : {}),

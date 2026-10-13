@@ -68,6 +68,7 @@ func TestQuotedCap_Scenario_ACommitAboveTheCapIsRejectedAndCarriesTheTrueCost(t 
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Quoted Cap Over-Cap Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 	cost := solvedFuelCostOfCommit(t, router, sp, pointOrder())
 
 	// "GIVEN a fleet with more than enough fuel for the order" — so the
@@ -127,6 +128,7 @@ func TestQuotedCap_Scenario_ACommitExactlyAtTheCapSucceeds(t *testing.T) {
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Quoted Cap Exactly-At Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 	cost := solvedFuelCostOfCommit(t, router, sp, pointOrder())
 	setFleetFuel(t, sp.fleetId, cost*1000)
 
@@ -189,6 +191,7 @@ func TestQuotedCap_Scenario_ACapOfExactlyZeroIsAPresentCap(t *testing.T) {
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Quoted Cap Zero Corp")
+	arrangeStationaryPoint(t, router, sp) // Stable cost-probe premise, not spawn behavior.
 	cost := solvedFuelCostOfCommit(t, router, sp, pointOrder())
 	if !(cost > 0) {
 		t.Fatalf("fixture invariant: the order's solved fuel cost is %v, want strictly positive — a zero "+

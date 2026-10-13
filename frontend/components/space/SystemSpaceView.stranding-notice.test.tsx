@@ -508,6 +508,8 @@ const BASE_LOG = ['listMine#0 answer', 'order#0 answer']
 const CONFIRMED_LOG = [...BASE_LOG, 'listMine#1 answer']
 
 beforeEach(() => {
+  // Each scenario starts with A selected; cross-route selection now survives unmounts.
+  sessionStorage.clear()
   vi.clearAllMocks()
   Object.values(mocks).forEach((m) => m.mockReset())
   vi.useFakeTimers()

@@ -195,6 +195,17 @@ beforeEach(() => {
 // -------------------------------------------------------------------- mine
 
 describe('FleetActionsPanel — the mine offer', () => {
+  it('suggests a modest ten-tonne tutorial sample without replacing player input', async () => {
+    const user = userEvent.setup()
+    const { rerender } = panel({ tutorialSample: true })
+    expect(screen.getByTestId('mine-tons-input')).toHaveValue(10)
+    await user.clear(screen.getByTestId('mine-tons-input'))
+    await user.type(screen.getByTestId('mine-tons-input'), '12')
+    type Props = React.ComponentProps<typeof FleetActionsPanel>
+    rerender(<FleetActionsPanel fleet={fleet() as Props['fleet']} dockedFeature={ORE_BODY as Props['dockedFeature']} interiorFailed={false} station={null} stationQuotes={null} credits={1000} canvasAvailable worldTime={T0 + 1} scale={1} tutorialSample />)
+    expect(screen.getByTestId('mine-tons-input')).toHaveValue(12)
+  })
+
   // Scenario: Mine is offered while docked at a resource-bearing body
   it('Scenario: Mine is offered while docked at a resource-bearing body', () => {
     panel()
@@ -977,4 +988,25 @@ describe('FleetActionsPanel — a stop refused for the star clearance', () => {
     expect(new Set(shown).size).toBe(2)
     stop.mutate.mockReset()
   })
+})
+
+
+it('reports tutorial trade evidence only after successful server responses', async () => {
+  const onSaleAccepted = vi.fn()
+  const onRefuelAccepted = vi.fn()
+  const saleResult = { fills: [{ source: 'floor', tons: 10, unitPrice: 5, proceeds: 50 }], totalProceeds: 50, cargo: { fuel: 6, metals: 0 }, balance: 1050, worldTime: T0 }
+  const refuelResult = { cost: 5, cargo: { fuel: 7 }, balance: 1045, worldTime: T0 }
+  panel({ fleet: fleet({ attachedTo: STATION.featureId }), dockedFeature: STATION_BODY, station: STATION, stationQuotes: QUOTES, onSaleAccepted, onRefuelAccepted })
+  await userEvent.click(screen.getByTestId('sell-button'))
+  expect(onSaleAccepted).not.toHaveBeenCalled()
+  const saleCallbacks = sell.mutate.mock.calls[0][1]
+  saleCallbacks.onError(new Error('failed'))
+  expect(onSaleAccepted).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByTestId('sell-button'))
+  sell.mutate.mock.calls[1][1].onSuccess(saleResult)
+  expect(onSaleAccepted).toHaveBeenCalledWith({ fleetId: 'fleet_1', featureId: STATION.featureId, kind: 'metals', result: saleResult })
+  await userEvent.click(screen.getByTestId('refuel-button'))
+  expect(onRefuelAccepted).not.toHaveBeenCalled()
+  refuel.mutate.mock.calls[0][1].onSuccess(refuelResult)
+  expect(onRefuelAccepted).toHaveBeenCalledWith({ fleetId: 'fleet_1', featureId: STATION.featureId, fuelBefore: 6, result: refuelResult })
 })

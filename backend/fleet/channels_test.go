@@ -27,7 +27,7 @@ func TestSeedFleet_Scenario_SensorChannelPersistsDeclaredAndUnwritten(t *testing
 	defer ctrl.Finish()
 
 	dao.EXPECT().ListByCorporation(gomock.Any(), "dev-corp").Return(nil, nil)
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
+	dao.EXPECT().CreateIfAbsent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) (*Fleet, error) { return &f, nil })
 
 	bodies := testBodyTable(t, "sys-0", 6.0)
 	f, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", space.Vec3{X: 30}, bodies.StarSize())

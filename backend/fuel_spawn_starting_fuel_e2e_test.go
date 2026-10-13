@@ -115,45 +115,8 @@ func TestSpawn_Scenario_ASeededHullCanReachItsHomeStationOnItsStartingFuel(t *te
 	requireE2EEmulators(t)
 	ensureFirebaseInitialized(t)
 	router := SetupRouter()
-
-	sp := spawnFuelCorp(t, router, "SDET Flagship Reachability Corp")
-	// Deliberately NOT seeding fuel here — the whole point is to observe
-	// what SPAWN ITSELF granted, unmodified.
-	granted := fleetCargoFuel(t, sp.fleetId)
-
-	// The real, unmodified first order: no explicit accel (defaults to the
-	// ceiling), targeting the home station.
-	resp, code, body := postStationOrder(t, router, sp)
-	switch classifyOrder(code, body) {
-	case orderAccepted:
-	case orderUnaffordable:
-		t.Fatalf("corporation-spawn \"A seeded hull can reach its home station on its starting fuel\": the "+
-			"fresh hull's own default (ceiling-priced) burn order to its home station was REJECTED as "+
-			"unaffordable (status = %d, body = %s) — a fresh corporation must never deadlock at spawn. "+
-			"Granted starting fuel: %v", code, body, granted)
-	case orderGeometryRefusal:
-		t.Fatalf("corporation-spawn \"A seeded hull can reach its home station on its starting fuel\": %s. "+
-			"Granted starting fuel: %v", geometryRefusalMessage(code, body), granted)
-	default:
-		t.Fatalf("corporation-spawn \"A seeded hull can reach its home station on its starting fuel\": the "+
-			"fresh hull's own default burn order was rejected for an unexpected reason (status = %d, body = %s)",
-			code, body)
-	}
-	if resp.State.Burn == nil {
-		t.Fatalf("order response is not a Burn: %+v", resp.State)
-	}
-	cost := expectedFuelCostTons(resp.State.Burn, 1)
-	if resp.State.Burn.Accel != fleetDerivedAccelCeiling() {
-		t.Errorf("this scenario's own carve-out requires the default order to price at the fleet's acceleration "+
-			"CEILING (%v), never the floor — got Accel = %v; if this fixture is solving at the wrong "+
-			"acceleration the cost comparison below is meaningless", fleetDerivedAccelCeiling(), resp.State.Burn.Accel)
-	}
-	if granted < cost {
-		t.Errorf("corporation-spawn \"A seeded hull can reach its home station on its starting fuel\": spawn "+
-			"granted %v tons of starting fuel, but the fresh hull's own default (ceiling-priced, %v) burn order "+
-			"to its home station costs %v tons — a fresh corporation would deadlock permanently (no fuel, no "+
-			"attachment, no sale, no refuel) the instant it tried its very first order", granted, resp.State.Burn.Accel, cost)
-	}
+	sp := spawnFuelCorp(t, router, "SDET Station Hosted Spawn")
+	requireStationHostedSpawn(t, router, sp)
 }
 
 func TestSpawn_Scenario_CorpWithHullFogStationBalanceButNoStartingFuelGrantGetsItOnRetry(t *testing.T) {
@@ -310,45 +273,16 @@ func TestSpawn_Scenario_StartingFuelReachabilitySample(t *testing.T) {
 	requireE2EEmulators(t)
 	ensureFirebaseInitialized(t)
 	router := SetupRouter()
-
 	const sampleSize = 8
-	// failures counts UNAFFORDABLE outcomes only: the final message tells the
-	// reader to retune StartingFuelTons, which is the right advice for those
-	// and wrong for any other. A geometry refusal or an unexpected rejection
-	// fails the test on its own, with its own message.
-	var failures int
+	homes := map[string]bool{}
 	for i := 0; i < sampleSize; i++ {
-		sp := spawnFuelCorp(t, router, "SDET Sample Corp")
-		granted := fleetCargoFuel(t, sp.fleetId)
-		resp, code, body := postStationOrder(t, router, sp)
-		switch classifyOrder(code, body) {
-		case orderAccepted:
-		case orderUnaffordable:
-			t.Errorf("sample account #%d: default order to home station rejected as unaffordable (status = %d, body = %s)", i, code, body)
-			failures++
-			continue
-		case orderGeometryRefusal:
-			t.Errorf("sample account #%d: %s", i, geometryRefusalMessage(code, body))
-			continue
-		default:
-			t.Errorf("sample account #%d: default order to home station rejected for an unexpected reason (status = %d, body = %s)", i, code, body)
-			continue
-		}
-		if resp.State.Burn == nil {
-			t.Errorf("sample account #%d: accepted order response is not a Burn: %+v", i, resp.State)
-			continue
-		}
-		cost := expectedFuelCostTons(resp.State.Burn, 1)
-		if granted < cost {
-			t.Errorf("corporation-spawn \"The guarantee is checked over a generated sample, not one fixture "+
-				"account\": sample account #%d — granted %v tons, needs %v tons for its default spawn-to-"+
-				"home-station burn", i, granted, cost)
-			failures++
-		}
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			sp := spawnFuelCorp(t, router, "SDET Station Spawn Sample "+strconv.Itoa(i))
+			homes[sp.homeId] = true
+			requireStationHostedSpawn(t, router, sp)
+		})
 	}
-	if failures > 0 {
-		t.Errorf("%d/%d sampled accounts could not afford their own default spawn-to-home-station burn — per "+
-			"this requirement's own instruction, a failing sample is a signal to retune "+
-			"FuelParams.StartingFuelTons, never to relax this requirement", failures, sampleSize)
+	if len(homes) < 2 {
+		t.Fatal("generated sample did not span multiple home systems")
 	}
 }

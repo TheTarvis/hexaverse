@@ -6,6 +6,11 @@ import { apiClient } from '../api-client'
 import type { ActionList, GameAction } from '../types/action'
 
 class ActionService {
+  async get(actionId: string): Promise<GameAction> {
+    const response = await apiClient.get<GameAction>(`/v1/actions/${encodeURIComponent(actionId)}`)
+    return response.data
+  }
+
   // GET /v1/actions?actor=&status=running — the actor's running actions.
   async listRunning(actorId: string): Promise<GameAction[]> {
     const response = await apiClient.get<ActionList>(

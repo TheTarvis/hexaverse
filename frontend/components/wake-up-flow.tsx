@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { corporationService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
+import { newGuide, saveGuide, guideSnapshot, parseGuide } from '@/lib/command-onboarding'
 import { toast } from '@/lib/toast'
 import { Button } from '@/components/catalyst/button'
 import { Input } from '@/components/catalyst/input'
@@ -31,6 +32,9 @@ export function WakeUpFlow() {
     mutationFn: (n: string) => corporationService.spawn({ name: n }),
     onSuccess: (res: SpawnResult) => {
       if (res.homeSystem?.id) {
+        if (res.corporation?.id && res.fleet?.id && !parseGuide(guideSnapshot(res.corporation.id), res.corporation.id)) {
+          saveGuide(newGuide(res.corporation.id, res.fleet.id, res.homeSystem.id))
+        }
         // Flip the gate: the corp now exists, and the new hull should appear.
         // Guarded inside this branch (D5) so a malformed response (no home
         // system id) does not flip the gate and unmount this flow before a

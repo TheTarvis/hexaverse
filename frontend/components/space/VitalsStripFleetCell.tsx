@@ -17,7 +17,11 @@
 // would be provable only at the archive gate against a Catalyst `<select>`/
 // `listbox`. The visual tokens still match the rest of the strip's palette.
 
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
+import { HudPanel } from '@/components/hud/GameHud'
+import { Button } from '@/components/catalyst/button'
+import { SpacecraftPreview } from './SpacecraftPreview'
 import { VitalsStripPill } from './VitalsStripPill'
 import type { RosterRowStatus } from '@/components/fleet/roster-status'
 import { ABSENT_FIGURE } from '@/lib/format'
@@ -63,9 +67,41 @@ export function VitalsStripFleetCell({
   worldTime,
 }: VitalsStripFleetCellProps) {
   const [open, setOpen] = useState(false)
+  const [inspectedId, setInspectedId] = useState<string | null>(null)
+  const inspectorClose = useRef<HTMLButtonElement>(null)
+  const inspecting = !fleetsFailed && acting?.id === inspectedId && ownedFleets.some(fleet => fleet.id === inspectedId)
+  const inspectable = !fleetsFailed && acting && ownedFleets.some(fleet => fleet.id === acting.id) ? acting : null
+  useEffect(() => {
+    if (!inspecting) setInspectedId(null)
+    else inspectorClose.current?.focus()
+  }, [inspecting])
   const [justSelectedId, setJustSelectedId] = useState<string | null>(null)
   const chevronRef = useRef<HTMLButtonElement>(null)
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const [menuPosition, setMenuPosition] = useState({ left: 12, bottom: 56, width: 440, maxHeight: 320 })
+
+  // Escape scroll-container clipping while staying anchored to the chevron.
+  useLayoutEffect(() => {
+    if (!open && !inspecting) return
+    const place = () => {
+      const rect = chevronRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const width = Math.min(440, window.innerWidth - 24)
+      setMenuPosition({
+        left: Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)),
+        bottom: window.innerHeight - rect.top + 4,
+        width,
+        maxHeight: Math.max(40, Math.min(320, rect.top - 16)),
+      })
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open, inspecting])
 
   // A failed refetch empties the menu rather than freezing its last-served
   // membership or destinations (*A Failed Own-Fleets Refetch Empties the
@@ -77,6 +113,13 @@ export function VitalsStripFleetCell({
     if (open) itemRefs.current[0]?.focus()
   }, [open])
 
+  const inspect = () => {
+    if (!inspectable) return
+    setOpen(false)
+    setInspectedId(inspectable.id)
+  }
+  const closeInspector = () => { setInspectedId(null); chevronRef.current?.focus() }
+  const openMenu = () => { setInspectedId(null); setOpen(true) }
   const closeAndReturnFocus = () => {
     setOpen(false)
     chevronRef.current?.focus()
@@ -92,23 +135,24 @@ export function VitalsStripFleetCell({
   const onChevronKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
-      setOpen(true)
+      openMenu()
     } else if (event.key === 'Escape' && open) {
       event.preventDefault()
       closeAndReturnFocus()
     }
   }
 
-  const onItemKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number, fleet: Fleet) => {
+  const onItemKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number, fleet?: Fleet) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      itemRefs.current[(index + 1) % entries.length]?.focus()
+      itemRefs.current[(index + 1) % (entries.length + (inspectable ? 1 : 0))]?.focus()
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
-      itemRefs.current[(index - 1 + entries.length) % entries.length]?.focus()
+      itemRefs.current[(index - 1 + entries.length + (inspectable ? 1 : 0)) % (entries.length + (inspectable ? 1 : 0))]?.focus()
     } else if (event.key === 'Enter') {
       event.preventDefault()
-      choose(fleet)
+      if (fleet) choose(fleet)
+      else inspect()
     } else if (event.key === 'Escape') {
       event.preventDefault()
       closeAndReturnFocus()
@@ -139,16 +183,17 @@ export function VitalsStripFleetCell({
           aria-expanded={open}
           aria-label={chevronLabel}
           className="rounded border border-zinc-300 px-1 py-0.5 font-mono text-[10px] text-zinc-600 hover:bg-zinc-200 dark:border-white/[0.12] dark:text-zinc-400 dark:hover:bg-white/[0.14]"
-          onClick={() => setOpen((was) => !was)}
+          onClick={() => { if (open) setOpen(false); else openMenu() }}
           onKeyDown={onChevronKeyDown}
         >
           ▾
         </button>
-        {open && (
-          <div
+        {open && createPortal(
+          <HudPanel as="div"
             role="menu"
             data-testid="vitals-fleet-menu"
-            className="absolute bottom-full left-0 z-10 mb-1 flex min-w-max flex-col rounded-md border border-zinc-300 bg-zinc-50 py-1 shadow-lg dark:border-white/[0.12] dark:bg-zinc-700"
+            className="fixed z-[60] flex flex-col overflow-y-auto py-1"
+            style={menuPosition}
           >
             {entries.map((fleet, index) => (
               <button
@@ -159,16 +204,38 @@ export function VitalsStripFleetCell({
                   itemRefs.current[index] = el
                 }}
                 data-testid={`vitals-fleet-menu-item-${fleet.id}`}
-                className="whitespace-nowrap px-2 py-1 text-left font-mono text-[11px] text-zinc-900 hover:bg-zinc-200 dark:text-white dark:hover:bg-white/[0.14]"
+                className="break-words px-2 py-1 text-left font-mono text-[11px] text-zinc-900 hover:bg-white/10"
                 onClick={() => choose(fleet)}
                 onKeyDown={(event) => onItemKeyDown(event, index, fleet)}
               >
                 {fleetMenuLabel(fleet, systemNames)}
               </button>
             ))}
-          </div>
+            {inspectable && <button type="button" role="menuitem" data-testid="vitals-fleet-inspect"
+              ref={element => { itemRefs.current[entries.length] = element }}
+              className="break-words border-t border-zinc-200 px-2 py-1 text-left font-mono text-[11px] text-zinc-900 hover:bg-white/10 dark:border-white/[0.12] dark:text-white"
+              onClick={inspect} onKeyDown={event => onItemKeyDown(event, entries.length)}>
+              Inspect current fleet {inspectable.id}
+            </button>}
+          </HudPanel>, document.body
         )}
       </div>
+      {inspecting && acting && createPortal(
+        <HudPanel as="section" role="region" aria-label={`Fleet ${acting.id} details`}
+          data-testid="fleet-inspector" className="fixed z-[60] overflow-y-auto p-3" style={{ ...menuPosition, maxHeight: Math.max(menuPosition.maxHeight, 200) }}
+          onKeyDown={event => {
+            if (event.key !== 'Escape') return
+            event.preventDefault(); event.stopPropagation(); closeInspector()
+          }}>
+          <header className="flex items-center justify-between gap-2">
+            <h3 className="break-all font-mono text-sm">{acting.id}</h3>
+            <Button plain style={{ color: 'var(--command-ink)' }} ref={inspectorClose} data-testid="fleet-inspector-close" aria-label="Close fleet details" onClick={closeInspector}>Close</Button>
+          </header>
+          <SpacecraftPreview key={`ship:${acting.id}`} kind="ship" objectId={acting.id} label={acting.id}
+            accentColor={acting.state.Mode === 0 ? 0xffb454 : acting.state.Mode === 2 ? 0xc4b5fd : 0x4ade80} />
+          <VitalsStripPill status={status} stranded={stranded} scale={scale} worldTime={worldTime} />
+        </HudPanel>, document.body
+      )}
       <VitalsStripPill status={status} stranded={stranded} scale={scale} worldTime={worldTime} />
     </div>
   )

@@ -125,6 +125,10 @@ describe('WakeUpFlow', () => {
     // The new player is dropped straight onto their home system's hex board.
     await waitFor(() => expect(pushSpy).toHaveBeenCalledWith('/systems/sys-9'))
     expect(sessionStorage.getItem('wakeFocus')).toBe('sys-9')
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      'hexaverse:command-guide:v1:corp_1',
+      expect.stringContaining('"fleetId":"fleet_1"'),
+    )
   })
 
   it('Scenario: A malformed success response does not leave the flow silently stuck', async () => {

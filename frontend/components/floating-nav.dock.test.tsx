@@ -51,7 +51,9 @@ describe('FloatingNav beside the dock', () => {
         <ConsoleDock
           expanded
           openSeq={1}
+          selectedTab="log"
           onOpen={() => {}}
+          onSelectTab={() => {}}
           onCollapse={() => {}}
           strip={<div data-testid="vitals-strip" />}
           tabs={[{ id: 'log', label: 'Log', content: null }]}

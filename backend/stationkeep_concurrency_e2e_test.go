@@ -204,7 +204,12 @@ func TestSettleFirst_Scenario_ASettlementWriteRacingARefuelNeverDiscardsThePurch
 	sp := spawnFuelCorp(t, router, "SDET Settle-vs-Refuel Race Corp")
 	setCorpCredits(t, sp.corpId, 1_000_000)
 	startFuel := reserve + 100
-	arriveInOrbitAround(t, router, sp, sp.stationId, startFuel)
+	// The real fresh spawn already occupies this attached free station orbit.
+	initial, _, initialCode := fuelGetFleet(t, router, sp.token, sp.fleetId)
+	if initialCode != http.StatusOK || initial.State.Park == nil || initial.State.Park.Kind != space.ParkOrbit || initial.AttachedTo != sp.stationId {
+		t.Fatal("race fixture requires attached home orbit")
+	}
+	setFleetFuel(t, sp.fleetId, startFuel)
 	if w := postHold(t, router, sp.token, sp.fleetId); w.Code != http.StatusOK {
 		t.Fatalf("arranging the hold: status = %d, body = %s", w.Code, w.Body.String())
 	}

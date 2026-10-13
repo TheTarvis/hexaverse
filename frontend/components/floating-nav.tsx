@@ -4,7 +4,7 @@
 // full-bleed canvas with floating cards — there is NO sidebar shell. This card
 // carries the cross-view navigation + account controls, floating bottom-left
 // over whatever canvas is mounted (the galaxy or a system board). It mirrors the
-// other floating panels' look (the shared PANEL treatment).
+// other floating panels through the shared HudPanel presentation.
 //
 // Raised clear of the system view's console dock (openspec
 // `add-console-dock`): the nav follows the dock's published height through
@@ -14,13 +14,11 @@
 // of the strip's fleet cell and its chevron.
 
 import Link from 'next/link'
+import { HudPanel } from '@/components/hud/GameHud'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/catalyst/button'
 import { useAccountContext } from '@/components/account-provider'
 import { CONSOLE_DOCK_LANE_LEFT_CENTER } from '@/lib/console-dock-layout'
-
-const PANEL =
-  'pointer-events-auto rounded-xl border border-zinc-200 bg-zinc-50/90 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]'
 
 export function FloatingNav() {
   const pathname = usePathname()
@@ -30,7 +28,7 @@ export function FloatingNav() {
   const onGalaxy = pathname === '/'
 
   return (
-    <div className={`${PANEL} fixed ${CONSOLE_DOCK_LANE_LEFT_CENTER} left-4 z-50 flex flex-col gap-1.5 p-3`} data-testid="floating-nav">
+    <HudPanel as="div" tone="navigation" className={`fixed ${CONSOLE_DOCK_LANE_LEFT_CENTER} left-4 z-50 flex flex-col gap-1.5 p-3`} data-testid="floating-nav">
       <Link
         href="/"
         data-testid="nav-home"
@@ -52,6 +50,6 @@ export function FloatingNav() {
           Sign out
         </Button>
       </div>
-    </div>
+    </HudPanel>
   )
 }

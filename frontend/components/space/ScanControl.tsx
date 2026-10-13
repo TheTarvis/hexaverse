@@ -17,6 +17,12 @@
 // keeping the capability boundary and the file boundary aligned is the
 // whole point of the split.
 //
+// HOME: the console dock's Scan tab (openspec change
+// `move-scan-control-to-console-dock`, `system-console`). The panel stays
+// mounted while its tab is hidden, so its error live region goes through
+// `ConsoleLivePortal` to the dock's outlet outside the hidden subtree;
+// standalone (tests) the portal renders it in place.
+//
 // EVERY TARGET, DURATION AND REASON CODE IS SERVED. No range or occlusion
 // predicate is computed here — a body absent from the served set is simply
 // never offered, whatever the interior read shows.
@@ -24,6 +30,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/catalyst/button'
 import { figureAttrs, Figure } from '@/components/figure/Figure'
+import { ConsoleLivePortal } from './ConsoleDock'
 import { useCancelAction, useRunningScan, useAcknowledgeAction } from '@/hooks/use-actions'
 import { useScan, useScanTargets, useSettledScan } from '@/hooks/use-scan'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
@@ -62,7 +69,7 @@ export interface ScanControlProps {
    */
   committedPending?: boolean
   /** Marks the moment a commit was accepted, for the caller's own marker. */
-  onCommitAccepted?: () => void
+  onCommitAccepted?: (fleet: Fleet) => void
   /**
    * F11-1's early-settle exit (link8b-adversary-r11), scoped per the F11-2
    * post-repair ruling (2026-09-03): true only while an empty target set
@@ -126,9 +133,9 @@ export function ScanControl({
     scan.mutate(
       { hostId: activeHostId },
       {
-        onSuccess: () => {
+        onSuccess: (accepted) => {
           guard.release()
-          onCommitAccepted?.()
+          onCommitAccepted?.(accepted)
         },
         onError: (error: unknown) => {
           guard.release()
@@ -168,7 +175,7 @@ export function ScanControl({
 
   if (!fleet) {
     return (
-      <aside data-testid="scan-control" className="flex w-72 max-w-[85vw] flex-col">
+      <aside data-testid="scan-control" className="flex flex-col p-3">
         <p className="text-[11px] text-zinc-500">No fleet selected.</p>
       </aside>
     )
@@ -179,21 +186,20 @@ export function ScanControl({
   const settling = runningEta !== null && runningEta <= worldTime
 
   return (
-    <aside
-      data-testid="scan-control"
-      className="pointer-events-auto flex w-72 max-w-[85vw] flex-col self-start rounded-xl border border-zinc-200 bg-zinc-50/90 p-3 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]"
-    >
+    <aside data-testid="scan-control" className="flex flex-col p-3">
       <span className="font-mono text-[11px] font-medium uppercase tracking-wide text-zinc-400">
         Focused Scan
       </span>
-      <span
-        className="sr-only"
-        role="status"
-        aria-live="assertive"
-        data-testid="scan-error-live-region"
-      >
-        {errorAnnouncement}
-      </span>
+      <ConsoleLivePortal>
+        <span
+          className="sr-only"
+          role="status"
+          aria-live="assertive"
+          data-testid="scan-error-live-region"
+        >
+          {errorAnnouncement}
+        </span>
+      </ConsoleLivePortal>
 
       {runningScan.isError ? (
         <div className="mt-2 text-[11px] text-zinc-500">

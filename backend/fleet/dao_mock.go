@@ -40,6 +40,21 @@ func (m *MockDao) EXPECT() *MockDaoMockRecorder {
 	return m.recorder
 }
 
+// CreateIfAbsent mocks base method.
+func (m *MockDao) CreateIfAbsent(ctx context.Context, candidate Fleet) (*Fleet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateIfAbsent", ctx, candidate)
+	ret0, _ := ret[0].(*Fleet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateIfAbsent indicates an expected call of CreateIfAbsent.
+func (mr *MockDaoMockRecorder) CreateIfAbsent(ctx, candidate any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateIfAbsent", reflect.TypeOf((*MockDao)(nil).CreateIfAbsent), ctx, candidate)
+}
+
 // Get mocks base method.
 func (m *MockDao) Get(ctx context.Context, id string) (*Fleet, error) {
 	m.ctrl.T.Helper()

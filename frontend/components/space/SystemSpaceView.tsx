@@ -33,6 +33,10 @@
 // the interior read has failed, at the FLEET read's served scale, because
 // that is then the only clock on screen.
 
+import { Button } from '@/components/catalyst/button'
+import { useSelectedFleet } from '@/hooks/use-selected-fleet'
+import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
+import { HudRoot, HudHeading, HudColumn } from '@/components/hud/GameHud'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -42,6 +46,11 @@ import { useCorporationOptional, useCorporationSessionOptional } from '@/compone
 import { useRunningMine, useRunningScan } from '@/hooks/use-actions'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import { useBurnPreview } from '@/hooks/use-burn-preview'
+import { confirmGuideSale, confirmGuideRefuel } from '@/lib/command-onboarding'
+import { useCommandGuide } from '@/hooks/use-command-guide'
+import { SystemObjectIndex } from './SystemObjectIndex'
+import { RecoveryTransmission } from './RecoveryTransmission'
+import commandStyles from './command-view.module.css'
 import { useMyFleets } from '@/hooks/use-fleets'
 import { useMarketBoard, useStation } from '@/hooks/use-market'
 import { useReducedMotion } from '@/hooks/use-reduced-motion'
@@ -49,13 +58,13 @@ import { useScanTargets, useSettledScan } from '@/hooks/use-scan'
 import { useSightings } from '@/hooks/use-sightings'
 import { useSystemSpace } from '@/hooks/use-system-space'
 import { useCoarseWorldTime, useWorldClock, wallMsUntil, type WorldClock } from '@/lib/client-clock'
-import { CONSOLE_DOCK_LANE_COLUMN, CONSOLE_DOCK_LANE_LEFT_CENTER } from '@/lib/console-dock-layout'
+import { CONSOLE_DOCK_LANE_LEFT_CENTER } from '@/lib/console-dock-layout'
 import { queryKeys } from '@/lib/query-keys'
 import { BOARD_POLL_MS, ETA_CUSHION_MS } from '@/lib/realtime'
 import type { Fleet } from '@/lib/types/fleet'
 import type { Station, VenueQuotes } from '@/lib/types/market'
 import type { Sighting } from '@/lib/types/sighting'
-import { ConsoleDock, ConsolePanelWaiting, type ConsoleTabId } from './ConsoleDock'
+import { ConsoleDock, ConsolePanelWaiting, isConsoleTabId, type ConsoleTabId } from './ConsoleDock'
 import { FleetActionsPanel } from './FleetActionsPanel'
 import { ScanControl } from './ScanControl'
 import { SightingLog } from './SightingLog'
@@ -273,7 +282,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const creditsShown: number | null = sessionFailed ? null : (sessionCorporation?.credits ?? null)
 
   const [selection, setSelection] = useState<SpaceSelection | null>(null)
-  const [actingFleetId, setActingFleetId] = useState<string | null>(null)
+  const [inspectedFleetId, setInspectedFleetId] = useState<string | null>(null)
+  useEffect(() => { setInspectedFleetId(null) }, [systemId, selection])
+  const [fleetFocus, setFleetFocus] = useState<{ fleetId: string; sequence: number } | null>(null)
+  const [objectIndexOpen, setObjectIndexOpen] = useState(false)
+  const [discoveredGuide, setDiscoveredGuide] = useState<string | null>(null)
+  const [guideFocus, setGuideFocus] = useState<{ bodyId: string; sequence: number } | null>(null)
   const [canvasAvailable, setCanvasAvailable] = useState(true)
   const [firstFrame, setFirstFrame] = useState(false)
   const [announcement, setAnnouncement] = useState('')
@@ -297,9 +311,21 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // The console dock's state, reset on every mount (a cross-system navigation
   // remounts the view). `openDockOn` is the one entry point that expands it:
   // open-only by construction, so the report's link can never toggle it shut.
-  const [dock, setDock] = useState<{ expanded: boolean; openSeq: number }>({ expanded: false, openSeq: 0 })
-  const openDockOn = useCallback((_tab: ConsoleTabId) => {
-    setDock((d) => ({ expanded: true, openSeq: d.openSeq + 1 }))
+  // `tab` is the selected tab: the first tab in bar order until a selection is
+  // made, then remembered across collapses — the "Console" control re-opens on
+  // it. Only a member of the closed `ConsoleTabId` set is ever stored.
+  const [dock, setDock] = useState<{ expanded: boolean; openSeq: number; tab: ConsoleTabId }>({
+    expanded: false,
+    openSeq: 0,
+    tab: 'scan',
+  })
+  const openDockOn = useCallback((tab: ConsoleTabId) => {
+    if (!isConsoleTabId(tab)) return
+    setDock((d) => ({ expanded: true, openSeq: d.openSeq + 1, tab }))
+  }, [])
+  const selectDockTab = useCallback((tab: ConsoleTabId) => {
+    if (!isConsoleTabId(tab)) return
+    setDock((d) => ({ ...d, tab }))
   }, [])
   const collapseDock = useCallback(() => setDock((d) => ({ ...d, expanded: false })), [])
   // The Log tab's content latch: opens at the first render of this mount in
@@ -319,8 +345,53 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     () => allFleets.filter((f) => f.systemId === systemId && !isInTransit(f)),
     [allFleets, systemId],
   )
-  const acting =
-    allFleets.find((f) => f.id === actingFleetId) ?? here[0] ?? null
+  const indexedFleets = useMemo(
+    () => fleets.isError || fleets.isLoading ? [] : here.filter(fleet => fleet.own === true),
+    [here, fleets.isError, fleets.isLoading],
+  )
+  useEffect(() => {
+    if (inspectedFleetId && !indexedFleets.some(fleet => fleet.id === inspectedFleetId)) setInspectedFleetId(null)
+  }, [indexedFleets, inspectedFleetId])
+  const commandGuide = useCommandGuide(corporation?.id ?? null, allFleets, fleets.isError)
+  const saveCommandGuide = commandGuide.save
+  const guide = commandGuide.guide
+  const enrolledHere = guide && guide.phase !== 'dismissed' && guide.systemId === systemId
+  const { fleet: acting, select: setActingFleetId } = useSelectedFleet(allFleets, enrolledHere ? guide.fleetId : here[0]?.id ?? null, fleets.isError)
+  const actingRemote = !!acting && (isInTransit(acting) || acting.systemId !== systemId)
+  const guiding = !actingRemote && !!enrolledHere && acting?.id === guide.fleetId && !fleets.isError
+  const discoveryKey = guide ? `${guide.fleetId}:${guide.systemId}` : null
+  const discovering = guiding && (guide?.phase === 'target' || guide?.phase === 'objects')
+  const discoveryStarted = discovering && discoveredGuide === discoveryKey
+  function openObjectIndex(open: boolean) {
+    setObjectIndexOpen(open)
+    if (open && discovering) {
+      setDiscoveredGuide(discoveryKey)
+      if (guide?.phase === 'objects') {
+        if (station) {
+          setSelection({ bodyId: station.featureId })
+          setGuideFocus(previous => ({ bodyId: station.featureId, sequence: (previous?.sequence ?? 0) + 1 }))
+        }
+        saveCommandGuide({ ...guide, phase: 'station', stationId: station?.featureId ?? null })
+      }
+    }
+  }
+
+  const refreshGuideInterior = interior.refetch
+  useEffect(() => {
+    if (!guiding || guide?.phase !== 'contacts') return
+    let cancelled = false
+    void refreshGuideInterior().then(result => {
+      if (cancelled || result.isError) return
+      const destination = result.data?.features.find(body => body.type !== 'station' && body.id !== acting?.attachedTo && body.resources?.length)
+      if (destination) {
+        setDiscoveredGuide(null)
+        saveCommandGuide({ ...guide, phase: 'target', targetId: destination.id })
+        collapseDock()
+      }
+    })
+    return () => { cancelled = true }
+  }, [guiding, guide, acting?.attachedTo, refreshGuideInterior, saveCommandGuide, collapseDock])
+
   // Read inside an effect below without becoming a dependency of it.
   const actingIdRef = useRef(acting?.id ?? null)
   actingIdRef.current = acting?.id ?? null
@@ -369,6 +440,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   }, [refetchGhostFeed, qc])
   const handleCommitAccepted = useCallback(
     (commit: AcceptedBurnCommit) => {
+      if (guide && guiding && guide.targetId && commit.fleetId === guide.fleetId && commit.selectionKey === selectionKey({ bodyId: guide.targetId }) && commit.departMs !== null && ['target', 'travel'].includes(guide.phase)) {
+        saveCommandGuide({ ...guide, phase: 'travel', acceptedAt: commit.departMs })
+      }
+      if (guide && guiding && guide.stationId && commit.fleetId === guide.fleetId && commit.selectionKey === selectionKey({ bodyId: guide.stationId }) && commit.departMs !== null && ['return', 'returning'].includes(guide.phase)) {
+        saveCommandGuide({ ...guide, phase: 'returning', acceptedAt: commit.departMs })
+      }
       const state = qc.getQueryState(queryKeys.fleets.mine())
       const answered = state?.fetchStatus === 'idle' && state.status === 'success'
       const readsAtAcceptance = answered ? null : state?.dataUpdateCount
@@ -383,7 +460,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         },
       }))
     },
-    [qc],
+    [qc, guide, guiding, saveCommandGuide],
   )
   const actingRunningScan = useRunningScan(acting?.id ?? null)
   const commitPendingMarker = useQuery<number | null>({
@@ -714,6 +791,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
 
   const selectFleet = useCallback(
     (fleet: Fleet) => {
+      setActingFleetId(fleet.id)
+      setFleetFocus(previous => ({ fleetId: fleet.id, sequence: (previous?.sequence ?? 0) + 1 }))
       if (isInTransit(fleet)) {
         router.push('/')
         return
@@ -722,9 +801,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         router.push(`/systems/${fleet.systemId}`)
         return
       }
-      setActingFleetId(fleet.id)
     },
-    [router, systemId],
+    [router, systemId, setActingFleetId],
   )
 
   // --- derived panel inputs ------------------------------------------------
@@ -761,7 +839,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // Fleet Cell's State Pill Is a Projection of the Shared Roster
   // Derivation*).
   const vitalsStatus =
-    fleets.isError || !acting ? null : rosterRowStatus(acting, worldTime, nameOf, runningMine, resolveBody)
+    fleets.isError || !acting ? null : rosterRowStatus(acting, worldTime, nameOf, runningMine, actingRemote ? undefined : resolveBody)
 
   // --- the station-anchored inputs ----------------------------------------
   //
@@ -832,11 +910,85 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   ) : (
     <ConsolePanelWaiting />
   )
+  const stationActionsHost = acting && !actingRemote && (dockedFeature?.type === 'station' || acting.attachedTo === stationRead.data?.featureId) ? acting.attachedTo : null
+  const marketNotices = <>
+{stationFailed && (
+          <div
+            data-testid="station-unavailable"
+            className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
+          >
+            <p className="text-zinc-600 dark:text-zinc-400">
+              The station read failed, so trading here is unavailable. Retry the read to sell or
+              refuel.
+            </p>
+            <button
+              type="button"
+              data-testid="station-retry"
+              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300"
+              onClick={() => void stationRead.refetch()}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* The board read failed — sell alone is withdrawn. Refuel stays: its
+            cost preview comes from the fleet's OWN served fuel price. */}
+        {boardFailed && !stationFailed && (
+          <div
+            data-testid="market-board-unavailable"
+            className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
+          >
+            <p className="text-zinc-600 dark:text-zinc-400">
+              The price board could not be read, so selling is unavailable. Refuelling still works.
+            </p>
+            <button
+              type="button"
+              data-testid="market-board-retry"
+              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300"
+              onClick={() => void boardRead.refetch()}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+  </>
+  const fleetActions = (
+    <FleetActionsPanel
+          fleet={acting}
+          onSaleAccepted={(sale) => {
+            if (guide && guiding) { const next = confirmGuideSale(guide, sale); if (next !== guide) saveCommandGuide(next) }
+          }}
+          onRefuelAccepted={(purchase) => {
+            if (guide && guiding) { const next = confirmGuideRefuel(guide, purchase); if (next !== guide) saveCommandGuide(next) }
+          }}
+          tutorialSample={guiding && guide?.phase === 'mine'}
+          onMineAccepted={(accepted) => {
+            if (guide && guiding && accepted.fleetId === guide.fleetId && accepted.featureId === guide.targetId && guide.phase === 'mine' && accepted.tons >= 1) {
+              saveCommandGuide({ ...guide, phase: 'extraction', mineActionId: accepted.actionId, resource: accepted.kind, cargoBefore: accepted.cargoBefore })
+            }
+          }}
+          dockedFeature={dockedFeature}
+          interiorFailed={interiorFailed}
+          station={station}
+          stationQuotes={stationQuotes}
+          credits={credits}
+          canvasAvailable={canvasAvailable}
+          worldTime={worldTime}
+          scale={servedScale}
+        />
+  )
+
   return (
-    <div
+    <HudRoot
       data-testid="space-view"
-      className="relative h-dvh w-full overflow-hidden bg-[#05060a]"
+      className={commandStyles.commandView}
     >
+      <HudHeading className={commandStyles.identity} data-testid="command-system-identity"
+        eyebrow="Local space / Command network"
+        title={systemNames[systemId] ?? systemId}
+        detail={fleets.isError ? 'Fleet telemetry unavailable' : fleets.isLoading ? 'Synchronizing fleets…' : `${allFleets.length} fleets · ${allFleets.reduce((count, fleet) => count + (fleet.roster?.ships.length ?? 0), 0)} ships`}
+      />
       {/* The live world clock, exposed so the served scale it runs at is
           observable rather than assumed. */}
       <span
@@ -911,11 +1063,14 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               worldTime={worldTime}
               scale={servedScale}
               selection={selection}
-              onSelect={(picked) => setSelection((current) => toggleSelection(current, picked))}
+              onSelect={(picked) => { setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)) }}
               onAvailabilityChange={setCanvasAvailable}
               onFirstFrame={handleFirstFrame}
               highlightedGhostId={highlightedGhostId}
               onHighlightGhost={setHighlightedGhostId}
+              focusBodyRequest={guideFocus}
+              initialFocusFleetId={!actingRemote && !fleets.isError ? acting?.id : null}
+              focusFleetRequest={canvasAvailable && !interiorFailed && !interior.isLoading && fleetFocus && indexedFleets.some(fleet => fleet.id === fleetFocus.fleetId) && scene.marks.some(mark => mark.kind === 'fleet' && mark.id === fleetFocus.fleetId) ? fleetFocus : null}
               actingFleetId={acting?.id ?? null}
               onActivateFleet={setActingFleetId}
               frameSource={frameSource}
@@ -949,6 +1104,63 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         )}
       </div>
 
+      {guiding && guide && acting && !dock.expanded && !(discoveryStarted && !interiorFailed) && (
+        <RecoveryTransmission
+          guide={guide}
+          fleet={acting}
+          bodies={interior.data?.features ?? []}
+          station={station}
+          stationFailed={stationFailed || stationRead.isLoading}
+          interiorFailed={interiorFailed || interior.isLoading}
+          actionFailed={commandGuide.actionFailed}
+          onRetryAction={() => void commandGuide.retryAction()}
+          onSave={commandGuide.save}
+          onTarget={(bodyId) => { setInspectedFleetId(null); setSelection({ bodyId }); openObjectIndex(true) }}
+          onScan={() => openDockOn('scan')}
+          onObjects={() => openObjectIndex(true)}
+        />
+      )}
+      {guiding && guide && <aside className={commandStyles.objectiveCard} aria-label="Current objective"><span className={commandStyles.signal}>CURRENT OBJECTIVE</span><p role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</p></aside>}
+      <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={guiding && guide?.phase === 'wake' ? { display: 'none' } : undefined}>
+        <SystemObjectIndex
+          key={systemId}
+          systemName={systemNames[systemId] ?? systemId}
+          objects={[
+            ...[...(interior.data?.features ?? [])].sort((a, b) => Number(b.type === 'station') - Number(a.type === 'station')).map(body => ({ name: body.id, knownFrom: 'System telemetry', kind: body.type.replaceAll('_', ' '), group: body.type === 'star' ? 'Stars' : body.type === 'station' ? 'Stations' : body.type === 'belt' ? 'Resource sites' : body.type === 'moon' ? 'Moons' : 'Worlds', x: 0, y: 0, className: body.type === 'gas_giant' ? 'gas' : body.type === 'ice' ? 'ice' : 'rock', resources: body.resources === undefined ? undefined : body.resources.length ? body.resources.map(resource => resource.kind).join(', ') : 'No disclosed deposits', fleets: fleets.isError ? ['Fleet telemetry unavailable'] : here.filter(fleet => !fleet.jump && fleet.attachedTo === body.id).map(fleet => `Fleet ${fleet.id.slice(-6)}`) })),
+            ...(interior.data?.laneGates ?? []).map(gate => ({ name: gate.id, knownFrom: 'System telemetry', kind: `Gate to ${systemNames[gate.destSystemId] ?? gate.destSystemId}`, group: 'Lane gates', x: 0, y: 0, resources: 'Not a resource site' })),
+            ...indexedFleets.map(fleet => ({ name: fleet.id, kind: 'fleet', group: 'Fleets', x: 0, y: 0, fleet: {
+              id: fleet.id, mode: fleet.state?.Mode,
+              activity: rosterRowStatus(fleet, worldTime, nameOf, fleet.id === acting?.id ? runningMine : undefined, resolveBody).activity,
+              systemLabel: systemNames[fleet.systemId] ?? fleet.systemId,
+              ...(fleet.attachedTo ? { attachedTo: fleet.attachedTo } : {}),
+              ...(fleet.roster ? { shipCount: fleet.roster.ships.length } : {}),
+            } })),
+          ]}
+          detailContent={stationActionsHost ? <>{marketNotices}{fleetActions}</> : undefined}
+          detailContentFor={stationActionsHost ?? undefined}
+          selected={selection?.bodyId ?? null}
+          selectedFleetId={inspectedFleetId}
+          onSelectFleet={setInspectedFleetId}
+          onFocusFleet={fleetId => {
+            if (!canvasAvailable || interiorFailed || interior.isLoading || !indexedFleets.some(fleet => fleet.id === fleetId) || !scene.marks.some(mark => mark.kind === 'fleet' && mark.id === fleetId)) return
+            setFleetFocus(previous => ({ fleetId, sequence: (previous?.sequence ?? 0) + 1 }))
+          }}
+          fleetsLoading={fleets.isLoading}
+          fleetsFailed={fleets.isError}
+          onRetryFleets={() => void fleets.refetch()}
+          tutorialTarget={guiding ? guide?.phase === 'station' ? guide.stationId : guide?.targetId : null}
+          open={objectIndexOpen}
+          onOpen={openObjectIndex}
+          onSelect={id => { setInspectedFleetId(null); setSelection({ bodyId: id }) }}
+          onFocus={() => { if (selection?.bodyId) setGuideFocus(previous => ({ bodyId: selection.bodyId!, sequence: (previous?.sequence ?? 0) + 1 })) }}
+          canPlot={!!acting && !actingRemote && !!selection?.bodyId && interior.data?.features.find(body => body.id === selection.bodyId)?.type !== 'star'}
+          onPlot={() => setObjectIndexOpen(false)}
+          loading={interior.isLoading}
+          failed={interiorFailed}
+          onRetry={() => void interior.refetch()}
+          disabled={!canvasAvailable || interiorFailed || interior.isLoading || (!!inspectedFleetId && !scene.marks.some(mark => mark.kind === 'fleet' && mark.id === inspectedFleetId))}
+        />
+      </div>
       {/* The command column floats over the canvas, top-right, scrolling
           within the viewport when it outgrows it. The gaps between panels
           pass pointer events through to the stage. Bottom inset raised above
@@ -956,9 +1168,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           `lib/console-dock-layout`) — its own [&>*]:pointer-events-auto children
           would otherwise sit over the strip's clock and credits cells and
           eat their pointer events. */}
-      <div
+      <HudColumn
         data-testid="space-command-column"
-        className={`pointer-events-none absolute top-4 ${CONSOLE_DOCK_LANE_COLUMN} right-4 flex w-72 max-w-[85vw] flex-col gap-3 overflow-y-auto [&>*]:pointer-events-auto`}
+        side="left"
+        style={objectIndexOpen || (guiding && guide?.phase === 'wake') ? { display: 'none' } : undefined}
+        dockAware
+        className={commandStyles.systemColumn}
       >
         {fleets.isError && (
           <div
@@ -977,6 +1192,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           </div>
         )}
 
+        {/* TODO(HUD-HIDDEN-CLEANUP): Standalone Focus fleet is CSS-hidden; remove this render path when its replacement lands. */}
+        {acting && !actingRemote && <Button color="cyan" data-testid="system-focus-fleet" disabled={!canvasAvailable || fleets.isError} onClick={() => setFleetFocus(previous => ({ fleetId: acting.id, sequence: (previous?.sequence ?? 0) + 1 }))}>Focus fleet</Button>}
+        {actingRemote && acting ? <FleetLocationPanel fleet={acting} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleets.isError} onOpen={id => router.push(`/systems/${id}`)} /> : <>
+        {/* TODO(HUD-HIDDEN-CLEANUP): Legacy Course card is CSS-hidden; retire this wiring after the burn-flow rebuild. */}
         <SpaceCommandPanel
           fleet={acting}
           selection={selection}
@@ -995,84 +1214,23 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           selectionCommitted={selectionCommitted}
         />
 
-        <FleetActionsPanel
-          fleet={acting}
-          dockedFeature={dockedFeature}
-          interiorFailed={interiorFailed}
-          station={station}
-          stationQuotes={stationQuotes}
-          credits={credits}
-          canvasAvailable={canvasAvailable}
-          worldTime={worldTime}
-          scale={servedScale}
-        />
+        {!stationActionsHost && fleetActions}
 
-        {/* A SIBLING of FleetActionsPanel, never nested inside it
-            (link8b-impl-contract.md §1.10) — a sweep needs no attachment,
-            so `docked-fleet-actions`' own capability boundary stays out of
-            it. Remains invokable while the canvas is unavailable, per its
-            own component's data anchoring (`fleet`'s own served state and
-            the server-served target list, never a canvas selection). */}
-        <ScanControl
-          fleet={acting}
-          worldTime={worldTime}
-          scale={servedScale}
-          onOpenLog={openLog}
-          committedPending={committedPending}
-          onCommitAccepted={markScanCommitAccepted}
-          earlySettleHandoff={earlySettleHandoff}
-        />
+
+        </>}
 
         {/* The station read failed — the offers it anchors are withdrawn,
             and their absence is attributed to THAT, never to the system
             having nothing to trade with. A system with no station at all
             (the 404 above) shows nothing here. */}
-        {stationFailed && (
-          <div
-            data-testid="station-unavailable"
-            className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
-          >
-            <p className="text-zinc-600 dark:text-zinc-400">
-              The station read failed, so trading here is unavailable. Retry the read to sell or
-              refuel.
-            </p>
-            <button
-              type="button"
-              data-testid="station-retry"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300"
-              onClick={() => void stationRead.refetch()}
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* The board read failed — sell alone is withdrawn. Refuel stays: its
-            cost preview comes from the fleet's OWN served fuel price. */}
-        {boardFailed && !stationFailed && (
-          <div
-            data-testid="market-board-unavailable"
-            className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
-          >
-            <p className="text-zinc-600 dark:text-zinc-400">
-              The price board could not be read, so selling is unavailable. Refuelling still works.
-            </p>
-            <button
-              type="button"
-              data-testid="market-board-retry"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300"
-              onClick={() => void boardRead.refetch()}
-            >
-              Retry
-            </button>
-          </div>
-        )}
+        {!stationActionsHost && marketNotices}
 
         {/* This view owns the fleet commands — they live on the two panels
             above — so the roster here renders selection and status only
             (`fleet-roster`: "The roster renders no commands on a view that
             owns them itself"). No `isChartedGate` stub: withholding jump by
             asserting a falsehood is what the live requirement forbids. */}
+        {/* TODO(HUD-HIDDEN-CLEANUP): System roster is CSS-hidden; remove this usage after fleet UI redesign, preserving other shared consumers. */}
         <FleetRoster
           worldTime={worldTime}
           scale={servedScale}
@@ -1081,7 +1239,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           currentSystemId={systemId}
           onSelect={selectFleet}
         />
-      </div>
+      </HudColumn>
 
       {/* The console dock (openspec change `add-console-dock`,
           `system-console`) — the LAST child of the view, full-width across
@@ -1091,9 +1249,43 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       <ConsoleDock
         expanded={dock.expanded}
         openSeq={dock.openSeq}
+        selectedTab={dock.tab}
         onOpen={openDockOn}
+        onSelectTab={selectDockTab}
         onCollapse={collapseDock}
-        tabs={[{ id: 'log', label: 'Log', content: logTabContent }]}
+        tabs={[
+          {
+            id: 'scan',
+            label: 'Scan',
+            // The focused-scan surface (openspec change
+            // `move-scan-control-to-console-dock`). Never nested inside
+            // FleetActionsPanel (link8b-impl-contract.md §1.10) — a sweep
+            // needs no attachment, so `docked-fleet-actions`' own capability
+            // boundary stays out of it. Remains invokable while the canvas is
+            // unavailable, per its own data anchoring (`fleet`'s own served
+            // state and the server-served target list, never a canvas
+            // selection). Mounted in both dock states; its error live region
+            // is portalled out of the hidden subtree by the dock's outlet.
+            content: (
+              <ScanControl
+                fleet={acting}
+                worldTime={worldTime}
+                scale={servedScale}
+                onOpenLog={openLog}
+                committedPending={committedPending}
+                onCommitAccepted={(accepted) => {
+                  markScanCommitAccepted()
+                  if (guiding && guide?.phase === 'scan' && accepted?.id === guide.fleetId && accepted.activeScanId) {
+                    saveCommandGuide({ ...guide, phase: 'scanning', scanActionId: accepted.activeScanId })
+                    collapseDock()
+                  }
+                }}
+                earlySettleHandoff={earlySettleHandoff}
+              />
+            ),
+          },
+          { id: 'log', label: 'Log', content: logTabContent },
+        ]}
         strip={
         <VitalsStrip
           acting={acting}
@@ -1112,7 +1304,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
         }
       />
-    </div>
+    </HudRoot>
   )
 }
 

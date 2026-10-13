@@ -12,7 +12,10 @@ import { Text } from '@/components/catalyst/text'
 
 // Routes that should NOT be gated at all (e.g. login, OAuth callbacks, spikes).
 // `/spike` stays here for the remaining audio spike.
-const PUBLIC_ROUTES = ['/login', '/oauth', '/spike']
+// `/dev` holds the dev-only emulator sign-in route (`/dev/login`), which gates
+// itself with `notFound()` outside development; it must render ungated, or the
+// logged-out redirect below wins the race against its sign-in effect.
+const PUBLIC_ROUTES = ['/login', '/oauth', '/spike', '/dev']
 
 // D11: matching is by full path segment, never bare string prefix, so a route
 // that merely starts with the same characters (e.g. `/oauth-admin`) is not

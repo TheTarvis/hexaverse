@@ -22,6 +22,14 @@
 // The heavy, three-dependent renderer is pulled in via next/dynamic({ssr:false})
 // so three.js stays off the SSR/initial-render path entirely.
 
+import { useSelectedFleet } from '@/hooks/use-selected-fleet'
+import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
+import { VitalsStrip } from '@/components/space/VitalsStrip'
+import { rosterRowStatus } from '@/components/fleet/roster-status'
+import { useCorporationSessionOptional } from '@/components/corporation-provider'
+import { BOARD_POLL_MS } from '@/lib/realtime'
+
+import { HudRoot, HudPanel, HudHeading, HudColumn } from '@/components/hud/GameHud'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -94,14 +102,10 @@ function RegionDot({ region }: { region: Region }) {
   )
 }
 
-const PANEL =
-  'pointer-events-auto rounded-xl border border-zinc-200 bg-zinc-50/90 p-4 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]'
-
 export function GalaxyView() {
   const { data: galaxy, isLoading, isError, error, isStartArea } = useGalaxy()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [activeFleetId, setActiveFleetId] = useState<string | null>(null)
   const [graphReady, setGraphReady] = useState(false)
   const controllerRef = useRef<GalaxyGraphController | null>(null)
   const router = useRouter()
@@ -188,10 +192,15 @@ export function GalaxyView() {
   // presence-marker/recenter source (components/galaxy/presence.ts).
   // Disabled on the logged-out start area (no auth token, and nothing to
   // command).
-  const { data: myFleets, scale: envelopeScale, worldTime: envelopeWorldTime } = useMyFleets({
+  const { data: myFleets, scale: envelopeScale, worldTime: envelopeWorldTime, isError: fleetsFailed } = useMyFleets({
     enabled: !isStartArea,
+    refetchInterval: BOARD_POLL_MS,
   })
   const ownFleets = useMemo(() => myFleets ?? [], [myFleets])
+  const { fleet: activeFleet, select: setActiveFleetId } = useSelectedFleet(ownFleets, null, fleetsFailed)
+  const activeFleetId = activeFleet?.id ?? null
+  const session = useCorporationSessionOptional()
+  const systemNames = useMemo(() => Object.fromEntries((galaxy?.nodes ?? []).map(n => [n.id, n.name])), [galaxy])
   // Live clock (for the roster's countdowns) anchored to the fleet read's
   // served scale (openspec change `fix-world-time-render-loop`, task 3.4;
   // `defect-galaxy-view-clock-ignores-served-scale.md`, USER RULING 4). The
@@ -278,8 +287,9 @@ export function GalaxyView() {
   // system — a jump is atomic and single-hop, so a mid-jump fleet has no
   // other point on this graph to show (design.md Decision 10).
   const handleShowFleet = useCallback((fleet: Fleet) => {
-    setSelectedId(fleet.systemId)
-    controllerRef.current?.focusSystem(fleet.systemId)
+    const target = fleet.jump?.destSystemId ?? fleet.systemId
+    setSelectedId(target)
+    controllerRef.current?.focusSystem(target)
   }, [])
 
   // On the first mount after waking (#0009): select home and glide the camera to
@@ -305,10 +315,11 @@ export function GalaxyView() {
   const stop = useStop()
   const handleBurn = useCallback(
     (fleet: Fleet) => {
+      setActiveFleetId(fleet.id)
       toast.error('Open the system view to choose a target')
       router.push(`/systems/${fleet.systemId}`)
     },
-    [router],
+    [router, setActiveFleetId],
   )
   const handleCutDrive = useCallback(
     (fleet: Fleet) => {
@@ -371,30 +382,30 @@ export function GalaxyView() {
 
   if (isLoading) {
     return (
-      <div data-testid="galaxy-view" className="relative h-dvh w-full overflow-hidden bg-[#05070d]">
+      <HudRoot data-testid="galaxy-view">
         <GraphFallback label="Charting the galaxy…" />
-      </div>
+      </HudRoot>
     )
   }
 
   if (isError || !galaxy) {
     return (
-      <div
+      <HudRoot
         data-testid="galaxy-view"
-        className="relative grid h-dvh w-full place-items-center overflow-hidden bg-[#05070d] px-6"
+        className="grid place-items-center px-6"
       >
-        <div className={PANEL}>
+        <HudPanel className="p-4">
           <Subheading className="!text-white">Couldn’t load the galaxy</Subheading>
           <Text className="mt-1 !text-zinc-400">
             {error?.message ?? 'The galaxy read failed. Try again shortly.'}
           </Text>
-        </div>
-      </div>
+        </HudPanel>
+      </HudRoot>
     )
   }
 
   return (
-    <div data-testid="galaxy-view" className="relative h-dvh w-full overflow-hidden bg-[#05070d]">
+    <HudRoot data-testid="galaxy-view">
       {/* add-renderer-availability-states — the graph's canvas region only,
           per design.md's composition snippet: the intel panel, roster, and
           inspector below sit OUTSIDE this boundary, untouched by whether the
@@ -479,8 +490,8 @@ export function GalaxyView() {
 
       {/* Overlay layer — panels catch pointer events, the gap between lets the
           graph receive orbit/pan/zoom/clicks. */}
-      <div className="pointer-events-none absolute inset-0 flex justify-between gap-4 p-4">
-        <div className="flex flex-col gap-4 self-start">
+      <div className="pointer-events-none absolute inset-0">
+        <HudColumn side="left" paired data-testid="galaxy-command-column">
           <IntelPanel
             galaxy={galaxy}
             isStartArea={isStartArea}
@@ -488,6 +499,7 @@ export function GalaxyView() {
             onRecenter={handleRecenter}
             available={canvasAvailable}
           />
+          {activeFleet && <FleetLocationPanel fleet={activeFleet} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleetsFailed} onFocus={id => activeFleet.jump ? handleSelectSystemId(id) : handleEnterSystem(id)} onOpen={handleEnterSystem} />}
           {/* This view mounts no command panel of its own, so the roster
               rows ARE the fleet command surface here — declared explicitly
               (fleet-roster: "The Roster Row Is the Fleet Command Surface
@@ -514,27 +526,34 @@ export function GalaxyView() {
               presents; this view decides that a row selection FOCUSES that
               system on the graph. */}
           {!isStartArea && (
-            <div className={PANEL}>
-              <MarketBoardPanel
-                board={marketBoard.data}
-                isLoading={marketBoard.isLoading}
-                isError={marketBoard.isError}
-                homeSystemId={homeSystemId}
-                onSelectSystem={handleSelectSystemId}
-              />
-            </div>
+            <MarketBoardPanel
+              board={marketBoard.data}
+              isLoading={marketBoard.isLoading}
+              isError={marketBoard.isError}
+              homeSystemId={homeSystemId}
+              onSelectSystem={handleSelectSystemId}
+            />
           )}
-        </div>
-        <Inspector
-          node={selected}
-          connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
-          stationQuotes={selectedStationQuotes}
-          onEnter={isStartArea ? null : handleEnterSystem}
-          available={canvasAvailable}
-          hasOwnFleet={ownFleets.length > 0}
-        />
+        </HudColumn>
+        <HudColumn paired data-testid="galaxy-inspector-column">
+          <Inspector
+            node={selected}
+            connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
+            stationQuotes={selectedStationQuotes}
+            onEnter={isStartArea ? null : handleEnterSystem}
+            available={canvasAvailable}
+            hasOwnFleet={ownFleets.length > 0}
+          />
+        </HudColumn>
       </div>
-    </div>
+      {!isStartArea && <div className="absolute inset-x-0 bottom-0 overflow-x-auto" data-testid="galaxy-vitals">
+        <VitalsStrip acting={activeFleet} ownedFleets={ownFleets} fleetsFailed={!!fleetsFailed}
+          status={!fleetsFailed && activeFleet ? rosterRowStatus(activeFleet, worldTime, id => systemNames[id] ?? id) : null}
+          onSelectFleet={f => { setActiveFleetId(f.id); handleShowFleet(f) }} systemNames={systemNames}
+          credits={session.isError ? null : session.corporation?.credits ?? null} scale={servedScale}
+          worldTime={worldTime} serverWorldTime={servedWorldTime} />
+      </div>}
+    </HudRoot>
   )
 }
 
@@ -558,19 +577,16 @@ function IntelPanel({
   available: boolean
 }) {
   return (
-    <aside
+    <HudPanel as="aside"
       data-testid="intel-panel"
-      className={`${PANEL} flex w-72 max-w-[80vw] flex-col gap-4 self-start`}
+      className="flex flex-col gap-4 p-4"
     >
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <Heading level={2} className="!text-base !text-white">
-            {isStartArea ? 'Start Area' : 'Live Galaxy'}
-          </Heading>
-          <p className="mt-0.5 font-mono text-[11px] text-zinc-400">
-            {isStartArea ? 'Frozen · read-only' : 'Live · your galaxy'}
-          </p>
-        </div>
+        <HudHeading
+          eyebrow="Command network"
+          title={isStartArea ? 'Start Area' : 'Live Galaxy'}
+          detail={isStartArea ? 'Frozen · read-only' : 'Live · your galaxy'}
+        />
         <Button
           plain
           onClick={onRecenter}
@@ -605,9 +621,9 @@ function IntelPanel({
       </div>
 
       {isStartArea && (
-        <div
+        <HudPanel as="div" tone="inset"
           data-testid="signin-prompt"
-          className="rounded-lg border border-zinc-200 bg-zinc-100/70 p-3 dark:border-zinc-800/50 dark:bg-black/30"
+          className="p-3"
         >
           <Text className="!text-xs !text-zinc-300">
             You’re exploring the frozen start area. <Strong className="!text-white">Sign in</Strong>{' '}
@@ -616,18 +632,18 @@ function IntelPanel({
           <TextLink href="/login" className="mt-1 inline-block text-xs !text-sky-400">
             Sign in →
           </TextLink>
-        </div>
+        </HudPanel>
       )}
-    </aside>
+    </HudPanel>
   )
 }
 
 function StatTile({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-zinc-100/60 px-3 py-2 dark:border-zinc-800/50 dark:bg-black/20">
+    <HudPanel as="div" tone="inset" className="min-w-0 px-3 py-2">
       <div className="font-mono text-xl leading-none text-white">{value}</div>
       <div className="mt-1 text-[11px] tracking-wide text-zinc-400 uppercase">{label}</div>
-    </div>
+    </HudPanel>
   )
 }
 
@@ -659,9 +675,9 @@ function Inspector({
 }) {
   if (!node) {
     return (
-      <aside
+      <HudPanel as="aside"
         data-testid="inspector"
-        className={`${PANEL} flex w-72 max-w-[80vw] flex-col self-start`}
+        className="flex flex-col p-4"
       >
         <p className="text-sm text-zinc-400">
           {available
@@ -670,14 +686,14 @@ function Inspector({
               ? 'Select an own fleet in the roster to inspect its system.'
               : 'Select an own fleet in the roster, or wait until the graph is available to pick any other system.'}
         </p>
-      </aside>
+      </HudPanel>
     )
   }
 
   return (
-    <aside
+    <HudPanel as="aside"
       data-testid="inspector"
-      className={`${PANEL} flex w-72 max-w-[80vw] flex-col gap-3 self-start`}
+      className="flex flex-col gap-3 p-4"
     >
       <div>
         <Heading level={2} data-testid="inspector-name" className="!text-base !text-white">
@@ -693,14 +709,14 @@ function Inspector({
       </div>
 
       <dl className="grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-lg border border-zinc-200 bg-zinc-100/60 px-3 py-2 dark:border-zinc-800/50 dark:bg-black/20">
+        <HudPanel as="div" tone="inset" className="min-w-0 px-3 py-2">
           <dt className="text-[11px] tracking-wide text-zinc-400 uppercase">Lanes</dt>
           <dd className="font-mono text-white">{connections}</dd>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-zinc-100/60 px-3 py-2 dark:border-zinc-800/50 dark:bg-black/20">
+        </HudPanel>
+        <HudPanel as="div" tone="inset" className="min-w-0 px-3 py-2">
           <dt className="text-[11px] tracking-wide text-zinc-400 uppercase">Star</dt>
           <dd className="font-mono text-white">Class {node.skeleton.starClass}</dd>
-        </div>
+        </HudPanel>
       </dl>
 
       {/* Drill-in to the tactical board (#0002 Follow-ups 2026-07-11 —
@@ -727,13 +743,13 @@ function Inspector({
         ) : (
           <ul className="flex flex-col gap-1">
             {node.skeleton.bodies.map((b, i) => (
-              <li
+              <HudPanel as="li" tone="inset"
                 key={i}
-                className="flex items-center justify-between rounded-md border border-zinc-200 bg-zinc-100/50 px-2.5 py-1.5 text-sm text-white dark:border-zinc-800/50 dark:bg-black/20"
+                className="flex flex-wrap items-center justify-between gap-1 px-2.5 py-1.5 text-sm"
               >
                 <span className="capitalize">{b.type.replace('_', ' ')}</span>
                 <span className="font-mono text-xs text-zinc-400">ring {b.ring}</span>
-              </li>
+              </HudPanel>
             ))}
           </ul>
         )}
@@ -755,10 +771,10 @@ function Inspector({
               )
               if (!top) return null
               return (
-                <li
+                <HudPanel as="li" tone="inset"
                   key={q.kind}
                   data-testid={`inspector-quote-${q.kind}`}
-                  className="flex items-center justify-between rounded-md border border-zinc-200 bg-zinc-100/50 px-2.5 py-1.5 text-sm text-white dark:border-zinc-800/50 dark:bg-black/20"
+                  className="flex flex-wrap items-center justify-between gap-1 px-2.5 py-1.5 text-sm"
                 >
                   <span className="flex items-center gap-1.5">
                     {/* Request vs floor carried by a glyph and a word, never by
@@ -774,7 +790,7 @@ function Inspector({
                   <span className="font-mono text-xs text-zinc-300 tabular-nums">
                     {top.unitPrice} cr/t
                   </span>
-                </li>
+                </HudPanel>
               )
             })}
           </ul>
@@ -786,7 +802,7 @@ function Inspector({
           Uncharted — survey or travel to chart subspace routes and reveal its worth.
         </p>
       )}
-    </aside>
+    </HudPanel>
   )
 }
 

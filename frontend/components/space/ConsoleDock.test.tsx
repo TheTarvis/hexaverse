@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React, { useState, type ReactNode } from 'react'
-import { ConsoleDock } from './ConsoleDock'
+import { ConsoleDock, type ConsoleTabId } from './ConsoleDock'
 
 // RED-PHASE TESTS - openspec change add-console-dock, tasks 1.1-1.5
 // (system-console: "The Console Dock Extends Beneath the Strip...", "The Dock
@@ -22,12 +22,18 @@ function Harness({
   label?: string
   children?: ReactNode
 }) {
-  const [state, setState] = useState({ expanded: initialExpanded, openSeq: 0 })
+  const [state, setState] = useState<{ expanded: boolean; openSeq: number; tab: ConsoleTabId }>({
+    expanded: initialExpanded,
+    openSeq: 0,
+    tab: 'log',
+  })
   return (
     <ConsoleDock
       expanded={state.expanded}
       openSeq={state.openSeq}
-      onOpen={() => setState((d) => ({ expanded: true, openSeq: d.openSeq + 1 }))}
+      selectedTab={state.tab}
+      onOpen={(tab) => setState((d) => ({ expanded: true, openSeq: d.openSeq + 1, tab }))}
+      onSelectTab={(tab) => setState((d) => ({ ...d, tab }))}
       onCollapse={() => setState((d) => ({ ...d, expanded: false }))}
       strip={
         <div data-testid="vitals-strip">

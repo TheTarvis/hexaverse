@@ -75,6 +75,21 @@ describe('VitalsStripFleetCell — identity (contract §7.1)', () => {
 })
 
 describe('VitalsStripFleetCell — chevron menu membership (contract, RULING 19)', () => {
+  it('places the menu outside the scroll container and above its trigger', async () => {
+    const { container, unmount } = cell()
+    container.style.overflowX = 'auto'
+    const trigger = screen.getByTestId('vitals-fleet-chevron')
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 600, right: 120, bottom: 620, width: 20, height: 20, x: 100, y: 600, toJSON: () => ({}) })
+    await userEvent.click(trigger)
+    const menu = screen.getByTestId('vitals-fleet-menu')
+    expect(menu.parentElement).toBe(document.body)
+    expect(container).not.toContainElement(menu)
+    expect(menu.style.bottom).toBe(`${window.innerHeight - 600 + 4}px`)
+    expect(screen.getAllByRole('menuitem')[0]).toHaveFocus()
+    unmount()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
   it('Scenario: The chevron\'s menu lists every fleet the requester owns, regardless of system or lane', async () => {
     cell({
       ownedFleets: [fleet({ id: 'a', systemId: 'sys-0' }), fleet({ id: 'b', systemId: 'sys-1' }), fleet({ id: 'c', jump: { laneId: 'l1', destSystemId: 'sys-1', departMs: 0, arriveMs: 1 } })],

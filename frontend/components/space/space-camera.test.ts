@@ -1,3 +1,5 @@
+import { fleetCamera } from './space-camera'
+import { viewBasisOf } from './space-projection'
 import { describe, it, expect } from 'vitest'
 
 // RED-PHASE SUITE — openspec change `build-production-space-view`,
@@ -421,3 +423,19 @@ function advanceAndTrack(x0: number, y0: number, x1: number, y1: number) {
   advanceDrag(d, x1, y1)
   return d
 }
+
+
+it('frames the fleet in front of the star from slightly above, with a finite origin fallback', () => {
+  for (const position of [{ x: 50, y: 2, z: 10 }, { x: -30, y: 0, z: -40 }]) {
+    const camera = fleetCamera(100, 'fleet', position)
+    const basis = viewBasisOf(camera, { width: 1200, height: 900 })
+    expect(camera.target).toEqual(position)
+    expect(camera.followFleetId).toBe('fleet')
+    const outward = { x: basis.eye.x - position.x, y: basis.eye.y - position.y, z: basis.eye.z - position.z }
+    const alignment = (outward.x * position.x + outward.y * position.y + outward.z * position.z) / (camera.distance * Math.hypot(position.x, position.y, position.z))
+    expect(alignment).toBeGreaterThan(0.97)
+    expect(basis.eye.y).toBeGreaterThan(position.y)
+  }
+  const origin = fleetCamera(100, 'fleet', { x: 0, y: 0, z: 0 })
+  expect(Number.isFinite(origin.yaw) && Number.isFinite(origin.pitch)).toBe(true)
+})

@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"hexaverse/common"
+	"hexaverse/fleet"
+	"hexaverse/stations"
+	"hexaverse/system"
 
 	"cloud.google.com/go/firestore"
 )
@@ -17,6 +20,7 @@ const testStartingCredits = int64(1000)
 // many times — enough to prove idempotency without standing up the real station
 // store inside the corporation tests.
 type fakeStations struct {
+	delegate StationSource
 	mu       sync.Mutex
 	provided map[string]int
 	err      error
@@ -26,13 +30,16 @@ func newFakeStations() *fakeStations {
 	return &fakeStations{provided: map[string]int{}}
 }
 
-func (f *fakeStations) EnsureStation(_ context.Context, systemID string) error {
+func (f *fakeStations) EnsureStation(ctx context.Context, systemID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {
 		return f.err
 	}
 	f.provided[systemID]++
+	if f.delegate != nil {
+		return f.delegate.EnsureStation(ctx, systemID)
+	}
 	return nil
 }
 
@@ -52,9 +59,13 @@ func (f *fakeStations) systems() int {
 // and a live credit store.
 func marketStack(t *testing.T) (*Service, *fakeStations, *firestore.Client, *fakeClock) {
 	t.Helper()
-	corpSvc, _, _, clk := spawnStack(t)
+	corpSvc, fogSvc, graph, clk := spawnStack(t)
 	fs, client := common.SetupFirestoreTestDAO(t)
 	st := newFakeStations()
+	realStations := stations.NewServiceWith(stations.NewDaoWithClient(fs), graph, fogSvc, clk)
+	st.delegate = realStations
+	bodies := system.NewServiceWith(system.NewDaoWithClient(fs), graph, clk).WithStations(realStations)
+	corpSvc.fleets.(*fleet.Service).WithBodies(bodies)
 	corpSvc.WithCreditStore(NewCreditStoreWith(fs)).WithMarket(st, testStartingCredits)
 	return corpSvc, st, client, clk
 }

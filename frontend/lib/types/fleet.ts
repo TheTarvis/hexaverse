@@ -140,6 +140,8 @@ export interface FleetRoster {
 }
 
 export interface Fleet {
+  /** Accepted sensor action, owner-only; used to follow the exact tutorial scan. */
+  activeScanId?: string
   id: string
   corporationId: string
   systemId: string

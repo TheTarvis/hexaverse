@@ -42,6 +42,7 @@ func TestBurnCostScaling_Scenario_LargerRosterPaysProportionallyLargerFuelBill(t
 	// test in this file already does it: ONE fleet, rewound to its
 	// pristine position between two commits, varying ONLY the roster.
 	sp := spawnFuelCorp(t, router, "SDET Roster Scaling Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 	pristine := snapshotFleetMotion(t, sp.fleetId)
 
 	target := space.Vec3{X: 5000, Y: 0, Z: 0}
@@ -112,6 +113,7 @@ func TestBurnCostScaling_Scenario_DoublingCargoMassChangesNeitherAccelerationNor
 	// its raw `state`/`attachedTo` between attempts — is what isolates
 	// "cargo mass" as the only variable.
 	sp := spawnFuelCorp(t, router, "SDET Mass-Independence Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 	pristine := snapshotFleetMotion(t, sp.fleetId)
 
 	target := space.Vec3{X: 5000, Y: 0, Z: 0}
@@ -207,6 +209,7 @@ func TestBurnCostScaling_Scenario_FuelCostAndCargoCapacityScaleTogetherLeavingRa
 	// fleet, rewound between two commits, varying ONLY the roster (and the
 	// fuel fill, which is derived from the roster's own capacity).
 	sp := spawnFuelCorp(t, router, "SDET Range-Independence Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 	pristine := snapshotFleetMotion(t, sp.fleetId)
 
 	target := space.Vec3{X: 5000, Y: 0, Z: 0}

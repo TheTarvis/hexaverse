@@ -91,12 +91,13 @@ func TestBurnCommitAffordability_Scenario_AffordableBurnDebitsFuelAtTheInstantOf
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Affordable Burn Corp")
+	arrangeStationaryPoint(t, router, sp)
 	const seeded = 1_000_000.0 // deliberately enormous: affordability is not in question here
 	setFleetFuel(t, sp.fleetId, seeded)
 
 	var resp fuelFleetDTO
 	w := doJSON(t, router, http.MethodPost, "/v1/fleets/"+sp.fleetId+"/orders", sp.token,
-		map[string]any{"bodyId": sp.stationId}, &resp)
+		affordableNearbyOrder(t, router, sp.token, sp.fleetId, 1000), &resp)
 	if w.Code != http.StatusOK {
 		t.Fatalf("POST /v1/fleets/%s/orders: status = %d, body = %s", sp.fleetId, w.Code, w.Body.String())
 	}

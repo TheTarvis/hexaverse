@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, screen, waitFor, act } from '@testing-library/react'
+import { render as rtlRender, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
@@ -744,6 +744,17 @@ describe('SystemSpaceView — the data fan-in', () => {
     expect(screen.getByTestId('fleet-row-fleet_1')).toBeInTheDocument()
   })
 
+  it('retains a transit fleet in vitals and replaces local commands with destination guidance', () => {
+    setReads({}, { data: [dockedFleet({ jump: { laneId: 'lane', destSystemId: 'destination', departMs: T0, arriveMs: T0 + 60000 } })] })
+    view()
+    expect(screen.getByTestId('fleet-location-panel')).toHaveTextContent('In transit')
+    expect(screen.getByTestId('vitals-strip')).toHaveTextContent('fleet_1')
+    expect(screen.queryByTestId('preview-panel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('space-fleet-panel')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('open-fleet-system'))
+    expect(push).toHaveBeenCalledWith('/systems/destination')
+  })
+
   // Scenario: The view reads the open system's station and the market
   // board. PRE-EXISTING requirement text, reproduced verbatim in this
   // change's MODIFIED delta — and, found while authoring this red suite, a
@@ -1314,4 +1325,130 @@ describe('SystemSpaceView — the vitals strip is mounted and fed from the view\
     expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1150')
     expect(push, 'no navigation on a settled refuel').not.toHaveBeenCalled()
   })
+})
+
+
+it('opens real object details, selects without an order, and hands plotting to the existing course panel', async () => {
+  view()
+  await userEvent.click(screen.getByTestId('system-index-toggle'))
+  await userEvent.click(screen.getByTestId('index-feat-body-0'))
+  expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
+  expect(screen.getByRole('complementary', { name: 'Details for feat-body-0' })).toHaveTextContent('metals')
+  expect(screen.getByTestId('space-command-column')).not.toBeVisible()
+  expect(mutations.order.mutate).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByTestId('index-focus'))
+  expect(mutations.order.mutate).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByTestId('details-plot'))
+  expect(screen.getByTestId('space-command-column')).toBeVisible()
+  expect(mutations.order.mutate).not.toHaveBeenCalled()
+})
+
+it('withholds cached object details after interior failure and offers retry', async () => {
+  setReads({ isError: true })
+  view()
+  await userEvent.click(screen.getByTestId('system-index-toggle'))
+  expect(screen.queryByTestId('index-feat-body-0')).not.toBeInTheDocument()
+  expect(screen.getByText('System objects are unavailable.')).toBeVisible()
+  await userEvent.click(screen.getByTestId('index-retry'))
+  expect(interiorRefetch).toHaveBeenCalled()
+})
+
+it.each(['system-index-toggle', 'guide-target'])('advances object discovery through %s without issuing an order', async entry => {
+  const { newGuide, saveGuide } = await import('@/lib/command-onboarding')
+  const guide = { ...newGuide('corp-1', 'fleet_1', SYSTEM_ID), phase: 'target' as const, targetId: 'feat-body-0' }
+  vi.mocked(localStorage.getItem).mockImplementation(key => key === 'hexaverse:command-guide:v1:corp-1' ? JSON.stringify(guide) : null)
+  try {
+    view()
+    expect(screen.getByTestId('recovery-copy')).toHaveTextContent('Contact found. Let’s test your engines.')
+    expect(screen.getByTestId('live-object-browser')).toHaveAttribute('data-attention', 'true')
+    await userEvent.click(screen.getByTestId(entry))
+    expect(screen.queryByTestId('recovery-transmission')).not.toBeInTheDocument()
+    expect(screen.getByTestId('tutorial-objective')).toHaveTextContent('Complete tutorial · 0/1')
+    expect(screen.getByTestId('system-index-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('live-object-browser')).toHaveAttribute('data-attention', 'false')
+    await userEvent.click(screen.getByTestId('system-index-toggle'))
+    expect(screen.queryByTestId('recovery-transmission')).not.toBeInTheDocument()
+    expect(mutations.order.mutate).not.toHaveBeenCalled()
+  } finally {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+    act(() => saveGuide({ ...guide, phase: 'dismissed' }))
+  }
+})
+
+
+it.each(['wake', 'target', 'done'] as const)('shows tutorial objective from %s with the correct completion count', async phase => {
+  const { newGuide } = await import('@/lib/command-onboarding')
+  const guide = { ...newGuide('corp-1', 'fleet_1', SYSTEM_ID), phase, targetId: 'feat-body-0', acceptedAt: 1, mineActionId: 'mine-1', resource: 'metals', stationId: 'station-1' }
+  vi.mocked(localStorage.getItem).mockImplementation(key => key === 'hexaverse:command-guide:v1:corp-1' ? JSON.stringify(guide) : null)
+  try {
+    view()
+    expect(screen.getByTestId('tutorial-objective')).toHaveTextContent(`Complete tutorial · ${phase === 'done' ? '1/1' : '0/1'}`)
+  } finally {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+  }
+})
+
+it.each(['system-index-toggle', 'guide-objects'])('introduces the station then scanning through %s', async entry => {
+  const { newGuide } = await import('@/lib/command-onboarding')
+  const guide = { ...newGuide('corp-1', 'fleet_1', SYSTEM_ID), phase: 'objects' as const }
+  const values = new Map([['hexaverse:command-guide:v1:corp-1', JSON.stringify(guide)]])
+  vi.mocked(localStorage.getItem).mockImplementation(key => values.get(key) ?? null)
+  vi.mocked(localStorage.setItem).mockImplementation((key, value) => { values.set(key, value) })
+  try {
+    view()
+    await userEvent.click(screen.getByTestId(entry))
+    expect(screen.getByTestId('recovery-transmission')).toHaveAttribute('data-phase', 'station')
+    expect(screen.getByTestId('recovery-copy')).toHaveTextContent('home port')
+    expect(screen.getByTestId('system-index-toggle')).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(screen.getByTestId('guide-introduce-scan'))
+    expect(screen.getByTestId('recovery-copy')).toHaveTextContent('Let’s scan')
+    expect(mutations.order.mutate).not.toHaveBeenCalled()
+  } finally {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+    vi.mocked(localStorage.setItem).mockImplementation(() => {})
+  }
+})
+
+it('waits for refreshed resource data after scan completion before offering travel', async () => {
+  const { newGuide } = await import('@/lib/command-onboarding')
+  const guide = { ...newGuide('corp-1', 'fleet_1', SYSTEM_ID), phase: 'contacts' as const, scanActionId: 'scan-1' }
+  const values = new Map([['hexaverse:command-guide:v1:corp-1', JSON.stringify(guide)]])
+  vi.mocked(localStorage.getItem).mockImplementation(key => values.get(key) ?? null)
+  vi.mocked(localStorage.setItem).mockImplementation((key, value) => { values.set(key, value) })
+  let resolveRead!: (value: unknown) => void
+  interiorRefetch.mockReturnValue(new Promise(resolve => { resolveRead = resolve }))
+  setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+  try {
+    view()
+    expect(screen.getByTestId('recovery-transmission')).toHaveAttribute('data-phase', 'contacts')
+    expect(screen.queryByTestId('guide-target')).not.toBeInTheDocument()
+    await act(async () => resolveRead({ data: INTERIOR, isError: false }))
+    await waitFor(() => expect(screen.getByTestId('recovery-transmission')).toHaveAttribute('data-phase', 'target'))
+    expect(JSON.parse(values.get('hexaverse:command-guide:v1:corp-1')!).targetId).toBe('feat-body-0')
+  } finally {
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+    vi.mocked(localStorage.setItem).mockImplementation(() => {})
+    interiorRefetch.mockReset()
+  }
+})
+
+it('keeps docked station services in station details and preserves quantities across closing', async () => {
+  setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+  view()
+  expect(screen.getByTestId('sell-section')).not.toBeVisible()
+  expect(screen.getByTestId('refuel-section')).not.toBeVisible()
+  await userEvent.click(screen.getByTestId('system-index-toggle'))
+  await userEvent.click(screen.getByTestId(`index-${STATION.featureId}`))
+  const details = screen.getByRole('complementary', { name: `Details for ${STATION.featureId}` })
+  expect(details).toContainElement(screen.getByTestId('sell-section'))
+  expect(screen.getByTestId('refuel-section')).toBeVisible()
+  fireEvent.change(screen.getByTestId('refuel-tons-input'), { target: { value: '3' } })
+  await userEvent.click(screen.getByTestId('index-feat-body-0'))
+  expect(screen.getByTestId('refuel-section')).not.toBeVisible()
+  await userEvent.click(screen.getByTestId(`index-${STATION.featureId}`))
+  expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
+  await userEvent.click(screen.getByTestId('system-index-toggle'))
+  expect(screen.getByTestId('refuel-section')).not.toBeVisible()
+  await userEvent.click(screen.getByTestId('system-index-toggle'))
+  expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
 })

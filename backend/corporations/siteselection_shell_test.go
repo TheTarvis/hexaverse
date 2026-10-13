@@ -336,3 +336,11 @@ func TestSpawnHealing_Scenario_CorporationHomedInFailingSystemKeepsItsHome(t *te
 		}
 	})
 }
+
+func (f *healFleets) SeedFleetAtStation(ctx context.Context, systemID, corporationID, stationID string) (*fleet.Fleet, error) {
+	hull, err := f.SeedFleet(ctx, systemID, corporationID, space.Vec3{}, 0)
+	if hull != nil {
+		hull.AttachedTo = stationID
+	}
+	return hull, err
+}

@@ -157,8 +157,9 @@ func TestRefuel_Scenario_FleetParkedNearStationButNotAttachedCannotRefuel(t *tes
 	router := SetupRouter()
 
 	sp := spawnFuelCorp(t, router, "SDET Refuel Not-Attached Corp")
+	arrangeStationaryPoint(t, router, sp) // Explicit scenario premise; real spawn remains station-hosted.
 	setCorpCredits(t, sp.corpId, 1_000_000)
-	// Deliberately NOT docked (spawn's own rim park is not the station) —
+	// Explicitly arranged point park with attachment cleared —
 	// this is the routine "not docked" case, distinct from actively
 	// burning/coasting.
 	code, _ := refuel(t, router, sp.token, sp.fleetId, 1.0, "sdet-refuel-not-attached-1")

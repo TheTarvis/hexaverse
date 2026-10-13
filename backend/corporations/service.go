@@ -11,6 +11,7 @@ import (
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
 	"hexaverse/space"
+	"hexaverse/stations"
 
 	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
@@ -54,6 +55,7 @@ type GraphSource interface {
 // fleet-count question. Cross-domain through the service, never the DAO.
 type FleetSource interface {
 	SeedFleet(ctx context.Context, systemID, corporationID string, at space.Vec3, starSize float64) (*fleet.Fleet, error)
+	SeedFleetAtStation(ctx context.Context, systemID, corporationID, stationID string) (*fleet.Fleet, error)
 	ListForCorp(ctx context.Context, corporationID string) ([]fleet.Fleet, error)
 	// HomeGeometry resolves a system's continuous extent and star size — what
 	// homeSpawnPosition needs to derive a deterministic spawn park (design.md
@@ -303,16 +305,24 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*Sp
 		return nil, fmt.Errorf("%w: corporation %s has no recorded home system", ErrNotFound, corp.Id)
 	}
 
+	if err := s.ensureStation(ctx, home); err != nil {
+		return nil, err
+	}
 	var hull *fleet.Fleet
 	if len(fleets) > 0 {
 		hull = &fleets[0]
 	} else {
-		extent, starSize, err := s.fleets.HomeGeometry(ctx, home)
-		if err != nil {
-			return nil, err
+		if s.stations != nil {
+			hull, err = s.fleets.SeedFleetAtStation(ctx, home, corp.Id, stations.StationFeatureId)
+		} else {
+			// Legacy service stacks without the station domain retain point spawning.
+			extent, starSize, geometryErr := s.fleets.HomeGeometry(ctx, home)
+			if geometryErr != nil {
+				return nil, geometryErr
+			}
+			at := homeSpawnPosition(corp.AccountId, extent)
+			hull, err = s.fleets.SeedFleet(ctx, home, corp.Id, at, starSize)
 		}
-		at := homeSpawnPosition(corp.AccountId, extent)
-		hull, err = s.fleets.SeedFleet(ctx, home, corp.Id, at, starSize)
 		if err != nil {
 			return nil, err
 		}
@@ -324,9 +334,6 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*Sp
 
 	// #0011: the home station and the opening balance are spawn assets too, and
 	// heal on the same idempotent pass every other asset does.
-	if err := s.ensureStation(ctx, home); err != nil {
-		return nil, err
-	}
 	if err := s.ensureOpeningGrant(ctx, corp, now); err != nil {
 		return nil, err
 	}

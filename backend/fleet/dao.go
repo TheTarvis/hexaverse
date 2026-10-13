@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"hexaverse/common"
 	"hexaverse/space"
@@ -20,6 +21,7 @@ const firestoreCollection = "fleets"
 type Dao interface {
 	Get(ctx context.Context, id string) (*Fleet, error)
 	Save(ctx context.Context, f Fleet) error
+	CreateIfAbsent(ctx context.Context, candidate Fleet) (*Fleet, error)
 	// ListByCorporation returns every fleet owned by a corporation — the input to
 	// the fog domain's live sensor-union (coverage) computation.
 	ListByCorporation(ctx context.Context, corporationID string) ([]Fleet, error)
@@ -93,6 +95,29 @@ func hydrateState(_ context.Context, f *Fleet, id string) error {
 func (dao *DaoImpl) Save(ctx context.Context, f Fleet) error {
 	f.StateDoc = EncodeKinematicState(f.State)
 	return dao.db.Set(ctx, firestoreCollection, f.Id, f)
+}
+
+// CreateIfAbsent atomically claims a starter identity across service instances.
+// A losing candidate never overwrites the persisted winner's state or cargo.
+func (dao *DaoImpl) CreateIfAbsent(ctx context.Context, candidate Fleet) (*Fleet, error) {
+	candidate.StateDoc = EncodeKinematicState(candidate.State)
+	if err := dao.db.Create(ctx, firestoreCollection, candidate.Id, candidate); err != nil {
+		if status.Code(err) != codes.AlreadyExists {
+			return nil, err
+		}
+		winner, err := dao.Get(ctx, candidate.Id)
+		if err != nil {
+			return nil, err
+		}
+		if winner == nil {
+			return nil, fmt.Errorf("starter fleet claimed but not readable: %s", candidate.Id)
+		}
+		if winner.CorporationId != candidate.CorporationId {
+			return nil, fmt.Errorf("starter fleet ownership mismatch: %s", candidate.Id)
+		}
+		return winner, nil
+	}
+	return &candidate, nil
 }
 
 func (dao *DaoImpl) ListByCorporation(ctx context.Context, corporationID string) ([]Fleet, error) {

@@ -1,0 +1,123 @@
+/* Approved command-view art direction, scoped to the live system. */
+.commandView { isolation: isolate; }
+.identity { position: absolute; top: 28px; left: 32px; pointer-events: none; z-index: 10; }
+.commandView .systemColumn { top: 178px; left: 32px; right: auto; bottom: calc(var(--console-dock-height, 56px) + 170px); }
+.transmission { position: absolute; left: 32px; bottom: calc(var(--console-dock-height, 56px) + 150px); width: min(400px, 36vw); padding: 12px; background: linear-gradient(90deg, #03070cd9, #03070c70); color: var(--command-ink); text-shadow: 0 2px 10px #000; }
+.signal { display: flex; align-items: center; justify-content: space-between; color: var(--command-signal); font: 10px ui-monospace, monospace; letter-spacing: .15em; }
+.signal button { color: var(--command-muted); }
+.transmission > p { margin: 12px 0 18px; font-size: 19px; font-weight: 300; line-height: 1.6; }
+.checks { display: flex; gap: 16px; margin: 0 0 18px; padding: 0; list-style: none; font: 10px/1.6 ui-monospace, monospace; color: var(--command-signal); }
+.transmission > small { display: block; margin-top: 10px; color: var(--command-muted); font-size: 9px; }
+.transmission > button { border-radius: 3px; font-size: 11px; letter-spacing: .05em; }
+@media (max-width: 760px) {
+  .identity { top: 18px; left: 16px; }
+  .identity h1 { font-size: 22px; }
+  .commandView .systemColumn { top: 165px; left: 12px; right: auto; width: min(260px, 65vw); }
+  .transmission { left: 12px; bottom: calc(var(--console-dock-height, 56px) + 155px); width: calc(100% - 24px); max-height: 210px; overflow-y: auto; z-index: 20; border-top: 1px solid #76e3ef40; background: #08121df2; }
+  .transmission > p { font-size: 14px; }
+}
+
+.commandView [data-testid='console-dock-open'], .commandView [data-testid='console-dock-region'], .commandView [data-testid='vitals-fleet-menu'] { background: #08121df2; color: var(--command-ink); border-color: #76e3ef30; }
+.commandView [data-testid='space-offscreen-reach'] { top: 140px; right: auto; bottom: calc(var(--console-dock-height, 56px) + 480px); width: 190px; overflow-y: auto; pointer-events: auto; }
+.commandView [data-testid='space-offscreen-reach'][data-empty='true'] { display: none; }
+.commandView [data-testid='burn-button']:not(:disabled), .commandView [data-testid='mine-button']:not(:disabled) { background: #0c879b; color: white; }
+@media (max-width: 760px) {
+  .commandView [data-testid='space-offscreen-reach'] { top: 120px; width: 100px; max-height: 160px; bottom: auto; height: 160px; }
+  .commandView [data-testid='space-offscreen-reach'] button { max-width: 84px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+}
+
+.objectBrowser { position: absolute; z-index: 25; top: 125px; left: 32px; bottom: calc(var(--console-dock-height, 56px) + 180px); width: 280px; pointer-events: none; display: flex; flex-direction: column; }
+.objectBrowser > * { pointer-events: auto; }
+.commandView [data-testid='space-offscreen-reach'] { left: auto; right: 16px; }
+@media (max-width: 760px) {
+  .objectBrowser { top: 112px; left: 12px; width: min(280px, calc(100vw - 24px)); }
+}
+
+
+/* Keep the recovery briefing in the player's eyeline instead of the command stack. */
+.commandView .transmission { left: 50%; top: 50%; bottom: auto; transform: translate(-50%, -50%); width: min(520px, calc(100% - 32px)); max-height: calc(100% - 240px); overflow-y: auto; padding: 24px 28px; z-index: 20; background: #071019ed; border: 1px solid #76e3ef22; border-top: 1px solid #76e3ef70; backdrop-filter: blur(10px); text-align: center; }
+.transmission .signal { text-align: left; }
+.transmission .checks { justify-content: center; flex-wrap: wrap; }
+.transmission[data-phase='wake'] .checks, .transmission[data-phase='wake'] > small { display: none; }
+.transmission[data-phase='wake'] > p { font-size: 24px; line-height: 1.6; }
+.commandView:has(.transmission[data-phase='wake']) [data-testid='space-offscreen-reach'] { display: none; }
+@media (max-width: 760px) {
+  .commandView .transmission { padding: 18px; max-height: calc(100% - 270px); }
+  .transmission[data-phase='wake'] > p { font-size: 20px; }
+}
+
+/* Guide the eye to the real control as well as the briefing shortcut. */
+.objectBrowser[data-attention='true'] [data-testid='system-index-toggle'] {
+  outline: 2px solid #76e3ef;
+  animation: objectsBeacon 1.6s ease-in-out infinite;
+}
+@keyframes objectsBeacon {
+  0%, 100% { box-shadow: 0 0 0 0 #76e3ef00, 0 0 8px #76e3ef30; }
+  50% { box-shadow: 0 0 0 8px #76e3ef65, 0 0 32px #76e3ef80, inset 0 0 16px #76e3ef25; }
+}
+.objectiveCard {
+  position: absolute;
+  top: 125px;
+  right: 32px;
+  width: 280px;
+  max-width: calc(100vw - 64px);
+  z-index: 24;
+  border-left: 1px solid #76e3ef70;
+  color: #a7c4d1;
+  background: #071019ed;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.transmission[data-phase='objects'] .checks,
+.transmission[data-phase='station'] .checks,
+.transmission[data-phase='scan'] .checks,
+.transmission[data-phase='scanning'] .checks,
+.transmission[data-phase='contacts'] .checks,
+.transmission[data-phase='objects'] > small,
+.transmission[data-phase='station'] > small,
+.transmission[data-phase='scan'] > small,
+.transmission[data-phase='scanning'] > small,
+.transmission[data-phase='contacts'] > small,
+.transmission[data-phase='target'] .checks,
+.transmission[data-phase='target'] > small { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .objectBrowser[data-attention='true'] [data-testid='system-index-toggle'] { animation: none; }
+}
+
+/*
+ * TODO(HUD-HIDDEN-CLEANUP): Retired live system HUD surfaces, hidden during
+ * the guided-flow redesign. Remove obsolete render paths, styles, and unused
+ * wiring when replacements land; check shared/storyboard consumers first.
+ * These are removal candidates, not ordinary conditional visibility.
+ */
+/* HUD-HIDDEN-CLEANUP: Off-screen object pointers — noisy stacked labels. */
+.commandView [data-testid='space-offscreen-reach'],
+/* HUD-HIDDEN-CLEANUP: Standalone Focus fleet button — retired HUD action. */
+.commandView [data-testid='system-focus-fleet'],
+/* HUD-HIDDEN-CLEANUP: System Fleets card — hidden pending fleet UI redesign. */
+.commandView [data-testid='fleet-roster'],
+/* HUD-HIDDEN-CLEANUP: Legacy Course card — awaiting replacement burn flow. */
+.commandView [data-testid='preview-panel'],
+/* HUD-HIDDEN-CLEANUP: Cut drive / Stop row — awaiting replacement controls. */
+.commandView [data-testid='fleet-flight-controls'],
+/* HUD-HIDDEN-CLEANUP: Empty shell left by the retired flight controls. */
+.commandView [data-testid='space-fleet-panel']:has(> [data-testid='fleet-flight-controls']:only-of-type) {
+  display: none;
+}
+
+.objectiveCard > p { margin-top: 10px; }
+@media (max-width: 960px) {
+  .commandView .objectiveCard {
+    top: auto;
+    bottom: calc(var(--console-dock-height, 56px) + 16px);
+    left: auto;
+    right: 16px;
+    width: 280px;
+    max-width: calc(100vw - 32px);
+  }
+}
+@media (max-width: 600px) {
+  .commandView:has(.objectiveCard) .objectBrowser { bottom: calc(var(--console-dock-height, 56px) + 300px); }
+  .commandView .objectiveCard { bottom: calc(var(--console-dock-height, 56px) + 170px); }
+}

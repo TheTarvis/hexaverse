@@ -74,8 +74,12 @@ which instrument disappeared.
 The strip SHALL NOT render any control that commits, cancels, or otherwise
 mutates server state. The one interactive affordance the strip MAY render is
 the fleet cell's chevron (*The Fleet Cell Names the Acting Fleet and
-Delegates a Switch to the Mounting View*), which changes only which fleet
-the mounting view is commanding and issues no mutation.
+Delegates a Switch to the Mounting View*). Its menu offers fleet-switch
+entries and, when eligible, an explicit Inspect current fleet action that
+opens a separate nonmodal inspection panel. Neither operation issues a
+mutation; inspection changes neither the acting fleet nor the space-view
+target selection. The inspection panel is outside the strip and its menu,
+so its orientation and close controls are not additional strip controls.
 
 #### Scenario: A docked fleet's strip offers no trade verb
 - **WHEN** the acting fleet is docked at a station with cargo aboard
@@ -116,7 +120,7 @@ Because the own-fleets read's error surface belongs to the fleet panel, not
 the strip (*The Strip Survives a Failed Own-Fleets Read*), the strip does
 not distinguish "no fleets" from "read failed" in its menu; that ambiguity
 is a deliberate consequence of the ownership split, not an oversight.
-Each menu entry SHALL name its fleet by its served id and the display name of the
+Each fleet-switch menu entry SHALL name its fleet by its served id and the display name of the
 system it is in — resolved from the galaxy read, falling back to the raw
 system id when that read has not resolved — and, for a fleet in lane
 transit, that it is under way between systems, so a player choosing an
@@ -129,6 +133,21 @@ choosing a fleet in the open system sets it acting, focus SHALL return to
 the chevron, and the chevron's accessible name SHALL name the now-acting
 fleet, so a keyboard or screen-reader user is told the switch took effect
 without a second announcing surface.
+
+In addition to fleet-switch entries, the menu SHALL offer one explicitly
+labelled Inspect current fleet action exactly when the latest own-fleets
+read is successful and the acting fleet remains a member of that served
+owned-fleet set. Its accessible name SHALL include the acting fleet's served
+id. This action SHALL close the menu and open the persistent nonmodal
+inspection panel outside the strip without invoking the fleet-switch callback,
+navigating, changing the acting fleet or target selection, or issuing a game
+command. Initial focus SHALL move to the inspector's close control; closing
+it or pressing Escape SHALL restore focus to the chevron. A failed own-fleets
+read, absent acting fleet or acting fleet absent from the latest served set
+SHALL offer no inspection action. Changing the acting fleet or losing that
+eligibility SHALL close any open inspector. Fleet-switch entries retain all
+existing membership, destination and callback semantics; references to
+choosing a fleet below mean choosing a fleet-switch entry, not inspection.
 
 #### Scenario: Choosing a fleet in this system sets it acting
 - **WHEN** a fleet in the open system is chosen from the chevron
@@ -156,8 +175,10 @@ without a second announcing surface.
 
 #### Scenario: A sole owned fleet leaves the chevron's menu with one entry
 - **WHEN** the requester owns exactly one fleet
-- **THEN** the chevron's menu holds exactly that one entry, and choosing it
-  changes nothing
+- **THEN** the chevron's menu holds exactly that one fleet-switch entry,
+  and choosing it changes nothing
+- **AND** the separate Inspect current fleet action is present only when
+  the acting fleet meets the inspection eligibility above
 
 #### Scenario: The chevron survives the no-acting-fleet state
 - **WHEN** the view renders with no own fleet in the open system
@@ -176,6 +197,19 @@ without a second announcing surface.
 - **THEN** the chevron's menu offers no entry whose destination is drawn
   from that read, never the membership or destinations from an earlier
   successful read presented as current
+
+#### Scenario: Inspect current fleet opens details without switching
+- **GIVEN** a successful own-fleets read containing the acting fleet
+- **WHEN** the player invokes Inspect current fleet by pointer or keyboard
+- **THEN** the menu closes and the separate nonmodal inspector opens for that fleet
+- **AND** focus moves to its close control without invoking the switching callback, navigating, changing target selection or issuing a game command
+- **AND** closing the inspector or pressing Escape restores focus to the chevron
+
+#### Scenario: Inspection follows current served ownership
+- **WHEN** the acting fleet changes, disappears from the latest owned-fleet set, becomes absent, or the latest own-fleets read fails
+- **THEN** any open fleet inspector closes
+- **AND** the inspection action is absent unless the current acting fleet is a member of the latest successful owned-fleet read
+- **AND** a failed read leaves the same empty menu as an empty owned-fleet set
 
 ### Requirement: The Fleet Cell's Chevron and Menu Are Keyboard-Operable
 
@@ -1490,7 +1524,7 @@ Showing, hiding and re-showing the Log tab SHALL issue no network request. The l
 
 ### Requirement: Escape Collapses the Expanded Dock
 
-WHEN Escape is pressed while the dock is expanded, anywhere in the system space view, the dock SHALL collapse, unless the fleet cell's open menu takes the key as *The Fleet Cell's Chevron and Menu Are Keyboard-Operable* has it do, in which case the dock SHALL NOT collapse. This requirement states the outcome while that menu is closed and while it is open with keyboard focus on the chevron or on one of its entries; it does not state what Escape does to the dock while the menu is open with keyboard focus elsewhere. One press of Escape SHALL do one thing: a repeated keydown of a held Escape that closed the menu SHALL NOT also collapse the dock. A collapse, by Escape or by the collapse control, SHALL NOT move keyboard focus that is outside the tab bar and the panel; with focus inside them, focus moves to the "Console" control as *The Dock Is Keyboard-Operable* states. A collapse by Escape SHALL change no space-view selection and no acting fleet and SHALL issue no request, and a text field or a select that held focus SHALL keep its value. While the dock is collapsed, Escape SHALL leave it collapsed and SHALL change no space-view selection and no acting fleet; what Escape does to the fleet cell's menu is that requirement's alone.
+WHEN Escape is pressed while the dock is expanded, anywhere in the system space view, the dock SHALL collapse, unless the fleet cell's open menu takes the key as *The Fleet Cell's Chevron and Menu Are Keyboard-Operable* has it do, in which case the dock SHALL NOT collapse. The same exception applies when Escape is pressed with focus inside the open own-fleet inspector: that press SHALL close only the inspector and return focus to the fleet chevron, leaving the dock expanded. An open inspector with focus elsewhere does not claim Escape. This requirement states the outcome while that menu is closed and while it is open with keyboard focus on the chevron or on one of its entries; it does not state what Escape does to the dock while the menu is open with keyboard focus elsewhere. One press of Escape SHALL do one thing: a repeated keydown of a held Escape that closed the menu or own-fleet inspector SHALL NOT also collapse the dock. After Escape is released, a fresh press follows the existing dock behavior when neither surface claims it. A collapse, by Escape or by the collapse control, SHALL NOT move keyboard focus that is outside the tab bar and the panel; with focus inside them, focus moves to the "Console" control as *The Dock Is Keyboard-Operable* states. A collapse by Escape SHALL change no space-view selection and no acting fleet and SHALL issue no request, and a text field or a select that held focus SHALL keep its value. While the dock is collapsed, Escape SHALL leave it collapsed and SHALL change no space-view selection and no acting fleet; what Escape does to the fleet cell's menu is that requirement's alone.
 
 #### Scenario: Escape with focus inside the dock collapses it and moves focus to the Console control
 - **GIVEN** the dock is expanded with keyboard focus on the Log tab
@@ -1552,6 +1586,18 @@ WHEN Escape is pressed while the dock is expanded, anywhere in the system space 
 - **WHEN** Escape is pressed and held so that its keydown repeats
 - **THEN** the menu closes
 - **AND** the dock is still expanded
+
+#### Scenario: Escape closes the fleet inspector without collapsing the dock
+- **GIVEN** the dock is expanded and the own-fleet inspector is open with keyboard focus inside it
+- **WHEN** Escape is pressed
+- **THEN** the inspector closes and focus returns to the fleet chevron
+- **AND** the dock remains expanded without changing selection, acting fleet or issuing a request
+- **AND** after release a fresh Escape press collapses the dock with focus remaining on the chevron
+
+#### Scenario: Held Escape closes only the fleet inspector
+- **GIVEN** the dock is expanded and the own-fleet inspector is open with keyboard focus inside it
+- **WHEN** Escape is pressed and held so that its keydown repeats after focus returns to the chevron
+- **THEN** the inspector closes but the dock remains expanded for every repeat of that held press
 
 ### Requirement: Activating the Dock Changes No Space-View Selection
 

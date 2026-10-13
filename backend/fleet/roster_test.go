@@ -25,9 +25,9 @@ func TestSeedFleet_Scenario_CarriesDefaultRoster(t *testing.T) {
 
 	var saved Fleet
 	dao.EXPECT().ListByCorporation(gomock.Any(), "dev-corp").Return(nil, nil)
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) error {
+	dao.EXPECT().CreateIfAbsent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) (*Fleet, error) {
 		saved = f
-		return nil
+		return &f, nil
 	})
 
 	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", space.Vec3{X: 100}, 6.0); err != nil {
@@ -81,9 +81,9 @@ func TestSeedFleet_Scenario_FreshCargoPoolIsEmpty(t *testing.T) {
 
 	var saved Fleet
 	dao.EXPECT().ListByCorporation(gomock.Any(), "dev-corp").Return(nil, nil)
-	dao.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) error {
+	dao.EXPECT().CreateIfAbsent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, f Fleet) (*Fleet, error) {
 		saved = f
-		return nil
+		return &f, nil
 	})
 	if _, err := svc.SeedFleet(context.Background(), "sys-0", "dev-corp", space.Vec3{X: 100}, 6.0); err != nil {
 		t.Fatal(err)

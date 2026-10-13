@@ -507,3 +507,27 @@ describe('space-scene — a failed interior read', () => {
     expect(s.beltFields).toEqual([])
   })
 })
+
+
+it('anchors a moon-docked fleet to its planet, excluding both local revolutions', () => {
+  const moon = { ...PLANET, id: 'moon', type: 'moon', size: 0.5, orbitElements: { ...PLANET.orbitElements, parentId: PLANET.id, radius: 8, periodMs: 2000 } }
+  const fleet = parkedFleet('fleet', moon.id)
+  const system = interior({ features: [STAR, PLANET, moon] })
+  for (const worldTimeMs of [T0, T0 + 500]) {
+    const scene = build({ interior: system, fleets: [fleet], worldTimeMs })
+    const mark = scene.marks.find(m => m.id === fleet.id)!
+    expect(mark.followAnchor?.id).toBe(PLANET.id)
+    expect(mark.followAnchor?.position).toEqual(scene.marks.find(m => m.id === PLANET.id)?.position)
+    expect(mark.followAnchor!.radius).toBeGreaterThanOrEqual(13)
+    expect(mark.position).not.toEqual(mark.followAnchor?.position)
+  }
+  const departure = build({ interior: system, fleets: [burningFleet()] })
+  expect(departure.marks.find(m => m.kind === 'fleet')?.followAnchor).toBeUndefined()
+})
+
+it('uses the direct planet host and falls back to fleet tracking for missing hosts', () => {
+  const parked = build({ fleets: [parkedFleet()] }).marks.find(m => m.kind === 'fleet')!
+  expect(parked.followAnchor?.id).toBe(PLANET.id)
+  const unknown = build({ fleets: [parkedFleet('unknown', 'missing')] }).marks.find(m => m.kind === 'fleet')!
+  expect(unknown.followAnchor).toBeUndefined()
+})

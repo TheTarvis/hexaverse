@@ -30,6 +30,7 @@
 // because both views already run one and the roster must tick in step with
 // the picture.
 
+import { HudPanel } from '@/components/hud/GameHud'
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Fleet } from '@/lib/types/fleet'
@@ -43,9 +44,6 @@ import { queryKeys } from '@/lib/query-keys'
 import { toast } from '@/lib/toast'
 import { rosterRowStatus, type StatusTone } from './roster-status'
 import { rosterCommandVisibility, rosterMineGate, type IsChartedGate } from './roster-commands'
-
-const PANEL =
-  'pointer-events-auto rounded-xl border border-zinc-200 bg-zinc-50/90 shadow-lg backdrop-blur dark:border-zinc-800/50 dark:bg-white/[0.12]'
 
 const TONE_DOT: Record<StatusTone, string> = {
   idle: 'bg-zinc-400',
@@ -125,7 +123,7 @@ export function FleetRoster({
   // every tick, so a label/gate lifts at eta without waiting for a cache event.
   const minesByActor = useMemo(() => {
     const m = new Map<string, GameAction>()
-    for (const [, actions] of qc.getQueriesData<GameAction[]>({ queryKey: queryKeys.actions.all })) {
+    for (const [, actions] of qc.getQueriesData<GameAction[]>({ queryKey: queryKeys.actions.runningAll() })) {
       for (const a of actions ?? []) {
         if (a.type === 'mine' && a.status === 'running') m.set(a.actor, a)
       }
@@ -147,7 +145,7 @@ export function FleetRoster({
   const nameOf = (id: string) => nameById.get(id) ?? id
 
   return (
-    <aside data-testid="fleet-roster" className={`${PANEL} flex w-72 max-w-[85vw] flex-col self-start`}>
+    <HudPanel as="aside" data-testid="fleet-roster" className="flex w-72 max-w-full flex-col self-start">
       <button
         type="button"
         data-testid="fleet-roster-toggle"
@@ -173,7 +171,7 @@ export function FleetRoster({
             // cancel-mine control, which its panel owns too.
             const rowOwnsCommands = commandOwner === 'roster'
             const active = f.id === activeFleetId
-            const here = !!currentSystemId && f.systemId === currentSystemId
+            const here = !!currentSystemId && f.systemId === currentSystemId && !f.jump
 
             return (
               <li key={f.id} className="px-4 py-2.5">
@@ -181,8 +179,9 @@ export function FleetRoster({
                   type="button"
                   data-testid={`fleet-row-${f.id}`}
                   data-active={active}
+                  aria-pressed={active}
                   onClick={() => onSelect?.(f)}
-                  className={`flex w-full flex-col gap-0.5 text-left ${active ? 'text-white' : ''}`}
+                  className={`flex w-full flex-col gap-0.5 text-left ${active ? 'bg-cyan-400/10 text-white ring-1 ring-cyan-400/30' : ''}`}
                 >
                   <span className="flex items-center gap-2">
                     <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[status.tone]}`} />
@@ -313,7 +312,7 @@ export function FleetRoster({
           })}
         </ul>
       )}
-    </aside>
+    </HudPanel>
   )
 }
 

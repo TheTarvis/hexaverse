@@ -148,3 +148,12 @@ describe('SpaceStage — the own-fleet mark is an affordance, never a selection'
     expect(screen.queryByTestId('fleet-facts')).toBeNull()
   })
 })
+
+it('hides the acting-fleet selection styling while a body is selected', () => {
+  stage({ scene: { ...scene, marks: marks.map(mark => ({ ...mark, selected: mark.id === 'feat-body-0' })) } as never })
+  const fleet = screen.getByTestId('fleet-mark-fleet-1')
+  expect(fleet).toHaveAttribute('data-acting', 'true')
+  expect(fleet).toHaveAttribute('aria-pressed', 'false')
+  expect(fleet).not.toHaveClass('ring-2')
+  expect(screen.getByTestId('body-hit-feat-body-0')).toHaveAttribute('aria-pressed', 'true')
+})

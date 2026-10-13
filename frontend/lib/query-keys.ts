@@ -84,7 +84,9 @@ export const queryKeys = {
     // indicator (#0006): the committed beam + its eta countdown. The scan
     // mutation invalidates it; past-eta entries hide client-side (worldTime).
     all: ['actions'] as const,
-    running: (actorId: string) => [...queryKeys.actions.all, 'running', actorId] as const,
+    detail: (corporationId: string, actionId: string) => [...queryKeys.actions.all, 'detail', corporationId, actionId] as const,
+    runningAll: () => [...queryKeys.actions.all, 'running'] as const,
+    running: (actorId: string) => [...queryKeys.actions.runningAll(), actorId] as const,
     // The type-filtered settled inbox (add-scan-and-sightings-surface,
     // task 4.7): `GET /v1/actions?actor=&status=done&type=scan`, the settled
     // sweep report's own read. Keyed separately from `running` so the two

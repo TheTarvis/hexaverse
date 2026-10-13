@@ -1,0 +1,131 @@
+'use client'
+
+import { planetKind } from './webgl/scene-art'
+import { SpacecraftPreview } from './SpacecraftPreview'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Button } from '@/components/catalyst/button'
+import { Input } from '@/components/catalyst/input'
+import styles from './system-object-index.module.css'
+
+export interface IndexedObject {
+  name: string
+  kind: string
+  group: string
+  x: number
+  y: number
+  className?: string
+  knownFrom?: string
+  resources?: string
+  fleets?: string[]
+  fleet?: {
+    id: string
+    mode?: 0 | 1 | 2
+    activity: string
+    systemLabel: string
+    attachedTo?: string
+    shipCount?: number
+  }
+}
+
+/** Shared object browser. Opening details never issues a command. */
+export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, onFocus, offscreen, onOffscreen, canPlot = false, onPlot, systemName = 'System', detailContent, detailContentFor, tutorialTarget, plotHint, loading = false, failed = false, onRetry, disabled = false, selectedFleetId, onSelectFleet, onFocusFleet, fleetsLoading = false, fleetsFailed = false, onRetryFleets }: {
+  selectedFleetId?: string | null
+  onSelectFleet?: (fleetId: string) => void
+  onFocusFleet?: (fleetId: string) => void
+  fleetsLoading?: boolean
+  fleetsFailed?: boolean
+  onRetryFleets?: () => void
+  detailContent?: ReactNode
+  detailContentFor?: string
+  systemName?: string
+  tutorialTarget?: string | null
+  plotHint?: string
+  loading?: boolean
+  failed?: boolean
+  onRetry?: () => void
+  disabled?: boolean
+  canPlot?: boolean
+  onPlot?: () => void
+  objects: IndexedObject[]
+  selected: string | null
+  open: boolean
+  onOpen: (open: boolean) => void
+  onSelect: (name: string) => void
+  onFocus: () => void
+  offscreen?: boolean
+  onOffscreen?: () => void
+}) {
+  const [details, setDetails] = useState<string | null>(null)
+  const expandButtons = useRef(new Map<string, HTMLElement>())
+  const searchRef = useRef<HTMLInputElement>(null)
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const rowKey = (object: IndexedObject) => JSON.stringify([object.fleet ? 'fleet' : 'body', object.fleet?.id ?? object.name])
+  const available = objects.filter(object => object.fleet ? !fleetsFailed && !fleetsLoading : !failed && !loading)
+  const fleetDetail = details?.startsWith('["fleet",') ?? false
+  const detailObject = details ? available.find(object => fleetDetail
+    ? !!object.fleet && object.fleet.id === selectedFleetId && rowKey(object) === details
+    : !object.fleet && object.name === selected) : undefined
+  const fleetFacts = detailObject?.fleet
+  const selectedPlanet = detailObject && !fleetFacts ? planetKind(detailObject.kind) : null
+  const previousSelected = useRef(selected)
+  useEffect(() => {
+    if (previousSelected.current !== selected && fleetDetail) setDetails(selected ? JSON.stringify(['body', selected]) : null)
+    previousSelected.current = selected
+  }, [selected, fleetDetail])
+  useEffect(() => {
+    if (!fleetDetail || detailObject) return
+    setDetails(null)
+    if (open) searchRef.current?.focus()
+  }, [fleetDetail, detailObject, open])
+  function closeDetails() {
+    setDetails(null)
+    if (details) requestAnimationFrame(() => (expandButtons.current.get(details) ?? searchRef.current ?? toggleRef.current)?.focus())
+  }
+  const [search, setSearch] = useState('')
+  const matches = available.filter(object => `${object.name} ${object.kind}`.toLowerCase().includes(search.trim().toLowerCase()))
+  return <div className={styles.indexShell}>
+    <Button plain ref={toggleRef} data-testid="system-index-toggle" aria-expanded={open} aria-controls="system-index" onClick={() => onOpen(!open)}>⌕ Objects · {available.length} <span>{open ? '−' : '+'}</span></Button>
+    {/* Keep embedded command state mounted while its drawer is closed. */}
+    {(open || detailContent) && <div style={!open ? { display: 'none' } : undefined} className={styles.indexPanels} data-details={!!detailObject} onKeyDown={event => {
+      if (event.key !== 'Escape') return
+      event.stopPropagation()
+      if (details) closeDetails()
+      else { onOpen(false); document.querySelector<HTMLElement>('[data-testid="system-index-toggle"]')?.focus() }
+    }}>
+      <aside id="system-index" className={styles.systemIndex} aria-label="System index">
+        <p className={styles.eyebrow}>{systemName} / KNOWN OBJECTS</p>
+        <Input ref={searchRef} autoFocus data-testid="system-index-search" aria-label="Find a system object" placeholder="Find a world, station, fleet…" value={search} onChange={event => setSearch(event.target.value)} />
+        {loading && <p role="status">Loading system objects…</p>}
+        {failed && <div role="alert"><p>System objects are unavailable.</p><Button plain data-testid="index-retry" onClick={onRetry}>Retry</Button></div>}
+        {fleetsLoading && <p role="status">Loading fleets…</p>}
+        {fleetsFailed && <div role="alert"><p>Fleet telemetry is unavailable.</p><Button plain data-testid="index-fleets-retry" onClick={onRetryFleets}>Retry fleets</Button></div>}
+        {Array.from(new Set(available.map(object => object.group))).map(group => {
+          const rows = matches.filter(object => object.group === group)
+          return rows.length > 0 && <section key={group}><p className={styles.eyebrow}>{group}</p>{rows.map(object => <div key={rowKey(object)} className={styles.indexRow} data-selected={object.fleet ? selectedFleetId === object.fleet.id : !fleetDetail && selected === object.name}>
+            <Button plain ref={el => { if (el) expandButtons.current.set(rowKey(object), el); else expandButtons.current.delete(rowKey(object)) }} data-testid={object.fleet ? `index-fleet-${object.fleet.id}` : `index-${object.name}`} aria-expanded={!!detailObject && rowKey(detailObject) === rowKey(object)} aria-controls="object-details" onClick={() => { if (object.fleet) onSelectFleet?.(object.fleet.id); else onSelect(object.name); setDetails(detailObject && rowKey(detailObject) === rowKey(object) ? null : rowKey(object)) }}>
+              <span className={styles.rowCopy}><strong>{object.name}</strong><small>{object.kind}{object.name === tutorialTarget ? ' · Tutorial destination' : ''}</small></span>
+              <span aria-hidden="true" className={styles.rowChevron}>{detailObject && rowKey(detailObject) === rowKey(object) ? '‹' : '›'}</span>
+            </Button>
+          </div>)}</section>
+        })}
+        {!loading && !failed && !fleetsLoading && !fleetsFailed && matches.length === 0 && <p role="status">{available.length ? 'No known objects match. Try a name or type.' : 'No objects have been disclosed in this system.'}</p>}
+        <small className={styles.muted}>Select an object to open or close its details.</small>
+      </aside>
+      {(detailObject || detailContent) && <aside style={!detailObject ? { display: 'none' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.name}` : undefined}>
+        {detailObject && <header className={styles.detailsHeader}><p className={styles.eyebrow}>SELECTED {fleetFacts ? 'FLEET' : detailObject.group === 'Stations' ? 'STATION' : detailObject.group === 'Worlds' ? 'WORLD' : 'OBJECT'}</p><Button autoFocus plain className={styles.detailsClose} data-testid="details-back" aria-label="Close details and return to objects" title="Back to objects" onClick={closeDetails}>←</Button></header>}
+        <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && <span aria-hidden="true" className={`${styles.portrait} ${styles[detailObject.className ?? 'rock']}`} />}</><div><h3>{detailObject.name}</h3><p className={styles.muted}>{detailObject.kind}</p></div></div>
+        {open && fleetFacts && <SpacecraftPreview key={`fleet:${fleetFacts.id}`} kind="ship" objectId={fleetFacts.id} label={fleetFacts.id} accentColor={fleetFacts.mode === 0 ? 0xffb454 : fleetFacts.mode === 2 ? 0xc4b5fd : 0x4ade80} />}
+        {open && !fleetFacts && detailObject.kind === 'station' && <SpacecraftPreview key={`station:${detailObject.name}`} kind="station" objectId={detailObject.name} label={detailObject.name} accentColor={0x67e8f9} />}
+        {open && selectedPlanet && <SpacecraftPreview key={`${selectedPlanet}:${detailObject.name}`} kind={selectedPlanet} objectId={detailObject.name} label={detailObject.name} accentColor={0xffffff} />}
+        {fleetFacts ? <dl className={styles.objectFacts}><dt>Activity</dt><dd>{fleetFacts.activity}</dd><dt>System</dt><dd>{fleetFacts.systemLabel}</dd>{fleetFacts.attachedTo && <><dt>Attached host</dt><dd>{fleetFacts.attachedTo}</dd></>}<dt>Ships</dt><dd>{fleetFacts.shipCount ?? 'Unavailable'}</dd></dl> : <dl className={styles.objectFacts}><dt>Known from</dt><dd>{detailObject.knownFrom ?? 'Astronomical observation'}</dd><dt>Resources</dt><dd>{detailObject.resources ?? 'Not surveyed — inspect or scan this host.'}</dd><dt>Fleets here</dt><dd>{detailObject.fleets?.length ? detailObject.fleets.join(', ') : 'No known fleets'}</dd>{detailObject.group === 'Stations' && <><dt>Services</dt><dd>Sell cargo · Purchase fuel while docked</dd></>}</dl>}</>}
+          <div className={styles.detailServices} style={fleetFacts || detailObject?.name !== detailContentFor ? { display: 'none' } : undefined}>{detailContent}</div>
+        </div>
+        {detailObject && <div className={styles.indexActions}>
+          <Button plain data-testid="index-focus" disabled={disabled} onClick={() => { if (fleetFacts) onFocusFleet?.(fleetFacts.id); else onFocus() }}>Focus {detailObject.name} ⌖</Button>
+          {!fleetFacts && (canPlot ? <Button color="cyan" className={styles.primary} data-testid="details-plot" disabled={disabled} onClick={onPlot}>Plot course ↗</Button> : plotHint ? <small className={styles.muted}>{plotHint}</small> : null)}
+          {!fleetFacts && onOffscreen && <Button plain data-testid="simulate-offscreen" aria-pressed={offscreen} onClick={onOffscreen}>Preview off-screen locator</Button>}
+        </div>}
+      </aside>}
+    </div>}
+  </div>
+}

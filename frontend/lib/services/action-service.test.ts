@@ -22,6 +22,12 @@ const running: GameAction = {
 describe('actionService', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  it('reads the exact action through the authenticated API client', async () => {
+    mockGet.mockResolvedValue({ data: running } as never)
+    expect(await actionService.get('mine/a')).toEqual(running)
+    expect(mockGet).toHaveBeenCalledWith('/v1/actions/mine%2Fa')
+  })
+
   it('lists an actor’s running actions via the inbox read', async () => {
     mockGet.mockResolvedValue({ data: { actions: [running], worldTime: 1_000 } } as never)
 

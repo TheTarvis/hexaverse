@@ -620,6 +620,7 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 // position and worldTime, so the client can render immediately. `own` tells
 // the client whether it may drive this fleet.
 type fleetDTO struct {
+	ActiveScanId  string          `json:"activeScanId,omitempty"`
 	Id            string          `json:"id"`
 	CorporationId string          `json:"corporationId"`
 	SystemId      string          `json:"systemId"`
@@ -800,7 +801,12 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 		}
 	}
 
+	scanID := ""
+	if own {
+		scanID = f.ActiveScanId
+	}
 	return fleetDTO{
+		ActiveScanId:  scanID,
 		Id:            f.Id,
 		CorporationId: f.CorporationId,
 		SystemId:      f.SystemId,

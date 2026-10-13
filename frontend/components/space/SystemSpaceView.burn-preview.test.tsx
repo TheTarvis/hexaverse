@@ -564,7 +564,7 @@ describe('SystemSpaceView — a running mine withholds the preview (lift-burn-pr
 
 describe('SystemSpaceView — lane transit and the fleet\'s own host (3.6-3.10)', () => {
   // 3.6 (regression guard)
-  it('Scenario: A fleet in lane transit requests no preview — (regression guard) figures go, nothing presented as failed, Burn unchanged, one hand-off navigation', async () => {
+  it('Scenario: A fleet in lane transit requests no preview — (regression guard) figures go, nothing presented as failed, destination guidance replaces Burn, one hand-off navigation', async () => {
     mount([fleet('fleet_1')])
     await flush(0)
     await click('fleet-row-fleet_1')
@@ -583,7 +583,8 @@ describe('SystemSpaceView — lane transit and the fleet\'s own host (3.6-3.10)'
     await flush(SEVERAL)
     expect(previewCalls().length, 'no further request for that selection').toBe(before)
     expectNothingPresentedAsFailed()
-    expect(burn().disabled, 'the burn command\'s availability is unchanged').toBe(false)
+    expect(screen.queryByTestId('burn-button')).not.toBeInTheDocument()
+    expect(screen.getByTestId('fleet-location-panel')).toHaveTextContent('View destination')
     expect(mocks.push).toHaveBeenCalledTimes(1)
     expect(mocks.push).toHaveBeenCalledWith('/')
   })

@@ -872,7 +872,9 @@ describe('SystemSpaceView + ScanControl — real network-level scan-target refet
         'action id it would need arrives only with the running-status read',
     ).not.toBeInTheDocument()
     expect(
-      within(screen.getByTestId('scan-control')).queryByRole('button', { name: /cancel/i }),
+      // `hidden: true`: the control sits in a dock tab that may be hidden, and a
+      // role query that skips hidden elements would pass with a cancel button present.
+      within(screen.getByTestId('scan-control')).queryByRole('button', { name: /cancel/i, hidden: true }),
       'no cancel-labelled control of any kind may render inside scan-control while the window is open',
     ).not.toBeInTheDocument()
     expect(

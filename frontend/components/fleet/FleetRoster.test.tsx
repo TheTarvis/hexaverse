@@ -250,6 +250,15 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
 
   // board-view ADDED "Running Mine Gates the Fleet Panel's Commands"
   describe('the running-mine gate', () => {
+    it('keeps running-mine controls usable when exact action reports share the cache', () => {
+      setFleets([fleet('f1', 'sys-0', parkState(), { attachedTo: 'gate-1' })])
+      seedRunningMine('f1', 90_000)
+      qc.setQueryData(queryKeys.actions.detail('corp', 'report'), { id: 'report', type: 'mine', status: 'done' })
+      render(<FleetRoster scale={1} worldTime={30_000} />)
+      expect(screen.getByTestId('fleet-cmd-burn-f1')).toBeDisabled()
+      expect(screen.getByTestId('fleet-cmd-cancel-mine-f1')).toBeInTheDocument()
+    })
+
     function seedRunningMine(fleetId: string, eta: number) {
       const mineAction: GameAction = {
         id: 'action_mine',
