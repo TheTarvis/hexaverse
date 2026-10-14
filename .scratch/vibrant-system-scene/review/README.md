@@ -2,6 +2,10 @@
 
 The scene now has stronger palette separation, tighter star glow, recognizable rocky belts, subdued grid lines and passive object labels. These are implementation and validation observations; final art-direction acceptance remains the user's review of the rendered views.
 
+A subsequent user-requested [gas-cloud shader follow-up](../gas-cloud-review/README.md)
+adds varied cloud morphologies and motion. The comparisons below retain the
+initial scene-pass captures; the follow-up has its own current images and videos.
+
 ## Matched views
 
 Each pair uses identical disclosed wire data, 1440×1000 viewport, reduced motion, zero world clock/scale, and the same camera gestures. Baseline code is `8a8e6f43`. After code is integration `2b33d9b` plus the validation pass's ship diffuse response lift and passive-label density correction. Camera JSON and actual backend are recorded in the adjacent metrics files; all six camera/backend pairs were checked for equality.

@@ -28,3 +28,12 @@ checks passed. [Independent reviews](review/code-review.md) returned zero
 Standards findings and zero Spec findings. [Rendered comparisons](review/README.md)
 include the observations and supported-backend evidence. Implementation worktrees
 were cleaned up.
+
+## Gas-cloud follow-up
+
+After screenshot review, the user requested more distinct dynamic gas-giant
+surfaces. [The shader follow-up](gas-cloud-review/README.md) adds four seeded
+cloud morphologies, differential jets and local storm shear, plus bounded
+unselected animation. Both real rendering backends passed the cloud and system
+journeys; all 2,213 frontend tests, TypeScript, ESLint and project file checks
+passed. No implementation worktrees were needed for this refinement.

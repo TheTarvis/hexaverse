@@ -187,7 +187,7 @@ describe('refresh-system-scene-art actual Three scene integration', () => {
   })
 })
 
-it('only advances a selected, visible gas giant large enough to inspect', async () => {
+it('advances visible gas clouds without selection and freezes hidden, distant or reduced-motion views', async () => {
   const art = await import('./scene-art')
   const advance = vi.spyOn(art, 'advancePlanetClouds')
   const gas = { ...mark('gas', 'gas_giant'), selected: true }
@@ -205,12 +205,29 @@ it('only advances a selected, visible gas giant large enough to inspect', async 
   expect(advance).toHaveBeenCalledWith(bodies()[0], expect.closeTo(0.04))
   expect(advance.mock.calls.some(([mesh]) => mesh === bodies()[1])).toBe(false)
   advance.mockClear()
-  gas.selected = false; await step(); expect(advance).not.toHaveBeenCalled()
+  gas.selected = false; await step(); expect(advance).toHaveBeenCalledWith(bodies()[0], expect.closeTo(0.04))
+  advance.mockClear()
   gas.selected = true; preference.matches = true; await step(); expect(advance).not.toHaveBeenCalled()
   preference.matches = false; hidden.mockReturnValue(true); await step(); expect(advance).not.toHaveBeenCalled()
   hidden.mockReturnValue(false); now += 40
   await h.step({ ...h.frameRef.current.camera, distance: 1000 }); expect(advance).not.toHaveBeenCalled()
   h.frameRef.current.projected = new Map(); await step(); expect(advance).not.toHaveBeenCalled()
+})
+
+it('bounds animated cloud detail in crowded views while prioritizing the selected giant', async () => {
+  const art = await import('./scene-art')
+  const advance = vi.spyOn(art, 'advancePlanetClouds')
+  let now = 100
+  vi.spyOn(performance, 'now').mockImplementation(() => now)
+  vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  const giants = Array.from({ length: 8 }, (_, i) => ({ ...mark(`giant-${i}`, 'gas_giant'), selected: i === 7 }))
+  const h = await mount(giants)
+  h.frameRef.current.projected = new Map(giants.map(gas => [gas.id, { mark: gas, screen: { x: 600, y: 450, onScreen: true, depth: 10 } }]))
+  advance.mockClear()
+  now += 40; await h.step()
+  expect(advance.mock.calls.length).toBeGreaterThan(1)
+  expect(advance.mock.calls.length).toBeLessThan(giants.length)
+  expect(advance).toHaveBeenCalledWith(bodies()[7], expect.closeTo(0.04))
 })
 
 const beltField = (memberCount = 10000): SceneModel['beltFields'][number] => ({

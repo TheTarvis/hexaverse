@@ -492,6 +492,13 @@ export function SpaceWorld({
       const live = new Set<string>()
       let selected: { mark: SceneMark; radius: number } | null = null
       let acting: { mark: SceneMark; radius: number } | null = null
+      // Animate nearby visible giants without selection, but bound decorative
+      // updates in crowded systems and give the inspected world first priority.
+      const cloudIds = new Set(cloudDelta > 0 ? liveScene.marks.filter(mark => {
+        if (mark.bodyType !== 'gas_giant' || !frameRef.current?.projected.get(mark.id)?.screen.onScreen) return false
+        const depth = Math.hypot(mark.position.x - view.position.x, mark.position.y - view.position.y, mark.position.z - view.position.z)
+        return drawRadiusOf(mark) * frameRef.current.basis.heightPx / (Math.max(depth, 0.001) * TAN_HALF_FOV) >= 48
+      }).sort((a, b) => Number(b.selected) - Number(a.selected)).slice(0, 3).map(mark => mark.id) : [])
       for (const mark of liveScene.marks) {
         live.add(mark.id)
         let entry = meshes.get(mark.id)
@@ -554,13 +561,7 @@ export function SpaceWorld({
         mesh.position.set(mark.position.x, mark.position.y, mark.position.z)
         const size = drawRadiusOf(mark)
         mesh.scale.setScalar(size)
-        if (mark.selected && mark.bodyType === 'gas_giant' && cloudDelta > 0) {
-          const frame = frameRef.current!
-          const screen = frame.projected.get(mark.id)?.screen
-          const depth = mesh.position.distanceTo(view.position)
-          const diameterPx = mesh.scale.x * frame.basis.heightPx / (Math.max(depth, 0.001) * TAN_HALF_FOV)
-          if (screen?.onScreen && diameterPx >= 80) advancePlanetClouds(mesh, cloudDelta)
-        }
+        if (cloudIds.has(mark.id)) advancePlanetClouds(mesh, cloudDelta)
         if (mark.kind === 'star') {
           if (cloudDelta > 0) stars.get(mesh)?.advance(cloudDelta)
           starLight.position.set(mark.position.x, mark.position.y, mark.position.z)
