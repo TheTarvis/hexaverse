@@ -25,15 +25,17 @@ export function createStarModel(options: { objectId: string; starClass?: string;
   surface.colorNode = plasma.mul(cells.mul(0.65).add(grain.mul(0.14)).add(filaments.mul(0.2)).add(0.68))
   const geometry = options.geometry ?? new THREE.SphereGeometry(1, 48, 32)
   const mesh = new THREE.Mesh(geometry, surface)
-  const coronaMaterial = new SpriteNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: tint, opacity: 0.5 })
+  const coronaMaterial = new SpriteNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: tint, opacity: 0.22 })
   const v = uv().sub(0.5).mul(2)
   const radius = length(v)
   const angle = atan(v.y, v.x)
-  const tendrils = sin(angle.mul(11).add(drift)).mul(cos(angle.mul(7).sub(drift.mul(0.6)))).mul(0.065).add(1)
-  coronaMaterial.opacityNode = smoothstep(0.35, 1, radius.mul(tendrils)).oneMinus().pow(3).mul(0.42)
+  const tendrils = sin(angle.mul(11).add(drift)).mul(cos(angle.mul(7).sub(drift.mul(0.6)))).mul(0.035).add(1)
+  // Keep a bright limb close to the photosphere, then fade quickly. The
+  // compact, faint outer glow leaves nearby spacecraft silhouettes readable.
+  coronaMaterial.opacityNode = smoothstep(0.5, 1, radius.mul(tendrils)).oneMinus().pow(3).mul(0.22)
   coronaMaterial.colorNode = vec3(tint.r, tint.g, tint.b)
   const corona = new THREE.Sprite(coronaMaterial)
-  corona.scale.set(4.8, 4.8, 1)
+  corona.scale.set(3.6, 3.6, 1)
   corona.raycast = () => {}
   mesh.add(corona)
   let disposed = false

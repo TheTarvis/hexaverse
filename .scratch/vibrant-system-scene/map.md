@@ -54,3 +54,11 @@ record brighter reflected panels, cool grazing highlights and surface-fitting
 ring, spoke and hub lights. Both rendering backends passed the station and ship
 journeys; all 2,217 frontend tests, TypeScript, ESLint and project file checks
 passed. The baseline checkout was used only for matching captures and removed.
+
+## Star-halo follow-up and whole-scene check
+
+The user approved a tighter, softer star halo. [Matched halo comparisons](halo-review/README.md)
+record the reduced glare near ships and stations, with final representative and
+crowded-system captures. Both actual GPU backends passed all three journeys
+without skips. All 2,217 frontend tests, TypeScript, ESLint and explicit project
+file checks passed. The temporary baseline checkout was removed.
