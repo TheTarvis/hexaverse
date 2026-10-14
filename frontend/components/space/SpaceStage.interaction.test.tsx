@@ -780,7 +780,9 @@ describe('SpaceStage — compact object annotations', () => {
 
 describe('SpaceStage — annotation placement', () => {
   it('restrains passive labels in a dense view while selected and hovered objects remain disclosed', async () => {
-    const crowded = Array.from({ length: 48 }, (_, index) => ({ ...marks[1], id: `dense-${index}`, bodyType: 'rocky', position: { x: (index % 8 - 3.5) * 45, y: (Math.floor(index / 8) - 2.5) * 30, z: 0 }, selected: index === 47 }))
+    // Density and disclosure use lightweight valid bodies; procedural planet
+    // texture construction belongs to art coverage, not this interaction seam.
+    const crowded = Array.from({ length: 48 }, (_, index) => ({ ...marks[1], id: `dense-${index}`, bodyType: 'debris', position: { x: (index % 8 - 3.5) * 45, y: (Math.floor(index / 8) - 2.5) * 30, z: 0 }, selected: index === 47 }))
     await stage({ scene: { ...scene, marks: crowded }, selection: { bodyId: 'dense-47' } })
     const selected = screen.getByTestId('space-annotation-dense-47')
     await waitFor(() => expect(selected).toBeVisible())
@@ -793,7 +795,7 @@ describe('SpaceStage — annotation placement', () => {
     const id = suppressed.dataset.testid!.replace('space-annotation-', '')
     fireEvent.pointerOver(screen.getByTestId(`body-hit-${id}`))
     await waitFor(() => expect(suppressed).toBeVisible())
-    expect(suppressed).toHaveTextContent('rocky')
+    expect(suppressed).toHaveTextContent('debris')
     expect(selected).toBeVisible()
     expect(visible().length).toBeLessThan(crowded.length / 2)
   })
