@@ -29,4 +29,4 @@ classification, identity, motion and disposal interfaces remain unchanged.
 Validation: focused art/star/SpaceWorld art/WebGPU suites passed (34 tests);
 expanded the existing texture-continuity contract to every world classification
 and both poles. ESLint and frontend TypeScript checks passed. Ran
-`harness/validate-file.sh` after edits. Browser art assessment remains in ticket 06.
+`harness/validate-file.sh` after edits. Browser art assessment remains in [ticket 05](05-browser-validation.md).
