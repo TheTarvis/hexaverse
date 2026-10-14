@@ -8,6 +8,8 @@ Spec: [spec.md](spec.md). Integration branch: `feat/vibrant-system-scene`. Base:
 
 The approved spec supplies testing seams and scope. Tickets were missing and were derived from that scope before implementation.
 
+- [Ticket 02](issues/02-spacecraft-art.md) resolved in `23e8f1f`: hull lighting contrast and restrained running lights, with 38 relevant tests and scoped static checks passing. Integrated browser review follows ticket 05.
+
 ## Fog
 
 Visual review must record observed limitations and available backend/browser capabilities.
