@@ -3,6 +3,10 @@
 // Per-domain blocks are added by `/new-domain`.
 
 export const queryKeys = {
+  discovery: {
+    all: ["discovery"] as const,
+    survey: (fleetId: string) => [...queryKeys.discovery.all, "survey", fleetId] as const,
+  },
   accounts: {
     all: ['accounts'] as const,
     details: () => [...queryKeys.accounts.all, 'detail'] as const,

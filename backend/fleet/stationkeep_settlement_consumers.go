@@ -329,5 +329,6 @@ func (s *Service) applyMidHoldSettlement(ctx context.Context, plan *FuelCreditPl
 
 	plan.newFuel = credited
 	plan.newStateDoc = EncodeKinematicState(parkedState(restamped))
+	plan.surveyAt = now
 	return nil
 }

@@ -192,7 +192,9 @@ type ActorStateFunc func(actorData map[string]interface{}) (map[string]interface
 // inside the resolve transaction; the resolver must not perform its own writes —
 // it returns a ResolveResult that action applies atomically with the status flip.
 type Resolution struct {
-	Action Action
+	ReadDocument func(path []string, target interface{}) (bool, error)
+	ScopeActions func() ([]Action, error)
+	Action       Action
 	// At is the effect time — the action's frozen Eta. Kinematics evaluate here;
 	// deltas fold ≤ here. A scan resolved hours late still mints an asOf:eta
 	// snapshot (#0005 acceptance).

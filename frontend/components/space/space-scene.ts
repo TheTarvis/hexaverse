@@ -339,6 +339,7 @@ export function buildSceneModel(input: SceneInput): SceneModel {
     }
     marks.push({
       id: feature.id,
+      name: feature.name,
       kind,
       position,
       radius: feature.size,

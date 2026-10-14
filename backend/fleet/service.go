@@ -234,10 +234,12 @@ type ServiceInterface interface {
 }
 
 type Service struct {
-	dao     Dao
-	actions action.CommitInterface
-	clock   common.WorldTime
-	params  MovementParams
+	discovery      DiscoverySource
+	surveyDuration common.WorldMillis
+	dao            Dao
+	actions        action.CommitInterface
+	clock          common.WorldTime
+	params         MovementParams
 	// classStats is the roster stats table burn ETA / capacity computations
 	// derive through (#0010 "Derived Fleet Speed" / "Derived Cargo Capacity
 	// and Mining Rate").
@@ -310,6 +312,22 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 	f, err := s.load(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if f.Survey != nil {
+		if s.clock.Now() >= f.Survey.ArriveMs {
+			return s.resolveDue(ctx, f)
+		}
+		bt, err := s.bodiesFor(ctx, f.SystemId)
+		if err != nil {
+			return nil, err
+		}
+		probe := action.Action{Scope: f.SystemId, Eta: s.clock.Now(), Params: map[string]interface{}{"bodyId": f.Survey.BodyId}}
+		if !surveyValid(bt, f, probe) {
+			if _, err := s.actions.Cancel(ctx, f.ActiveScanId, map[string]interface{}{"survey": nil, "lastSurveyOutcome": "Survey cancelled: left range, departed, or target unavailable"}); err != nil && !errors.Is(err, action.ErrNotRunning) {
+				return nil, err
+			}
+			return s.load(ctx, id)
+		}
 	}
 	// Every decision this read feeds reads `cargo.fuel` — the roster's
 	// FreeHold (handler.go), the estimated maximum range, and the persistent
@@ -409,6 +427,11 @@ func (s *Service) ListForCorp(ctx context.Context, corporationID string) ([]Flee
 
 	bySystem := make(map[string][]int, len(fleets))
 	for i := range fleets {
+		if fleets[i].Survey != nil {
+			if fresh, err := s.Get(ctx, fleets[i].Id); err == nil {
+				fleets[i] = *fresh
+			}
+		}
 		bySystem[fleets[i].SystemId] = append(bySystem[fleets[i].SystemId], i)
 	}
 
@@ -1525,12 +1548,21 @@ func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error) {
 		}
 	}
 
+	galaxyID := ""
+	if source, ok := s.graph.(interface {
+		LiveIdentity(context.Context) (string, error)
+	}); ok {
+		galaxyID, err = source.LiveIdentity(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
 	a, err := s.actions.Commit(ctx, action.CommitSpec{
 		Type:            jumpType,
 		Actor:           id,
 		ActorCollection: actorCollection,
 		Scope:           f.SystemId,
-		Params:          map[string]interface{}{"laneId": laneId, "destSystemId": destId},
+		Params:          map[string]interface{}{"laneId": laneId, "destSystemId": destId, "galaxyId": galaxyID},
 		Eta:             eta,
 		ActorStateFunc: func(actorData map[string]interface{}) (map[string]interface{}, error) {
 			merge := map[string]interface{}{"jump": *jump, "updatedAt": int64(now)}

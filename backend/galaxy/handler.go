@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"hexaverse/common"
+	"hexaverse/discovery"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -119,10 +120,12 @@ type skeletonDTO struct {
 }
 
 type systemDTO struct {
-	Id     string `json:"id"`
-	Coords Coords `json:"coords"`
-	Name   string `json:"name"`
-	Region Region `json:"region"`
+	CatalogueRef string            `json:"catalogueRef"`
+	Discovery    *discovery.Record `json:"discovery,omitempty"`
+	Id           string            `json:"id"`
+	Coords       Coords            `json:"coords"`
+	Name         string            `json:"name"`
+	Region       Region            `json:"region"`
 	// Tier is the requester's monotonic subspace knowledge over the free star map
 	// (#0006 replaces the discovered stub): starVisible | rumored | surveyed |
 	// explored. Absent observation ⇒ starVisible. The star layer renders regardless.
@@ -165,9 +168,9 @@ func ToDTO(gen *GeneratedGalaxy, now common.WorldMillis, tiers map[string]string
 			tier = t
 		}
 		systems[i] = systemDTO{
-			Id:       s.Id,
-			Coords:   s.Coords,
-			Name:     s.Name,
+			Id:     s.Id,
+			Coords: s.Coords,
+			Name:   s.Name, CatalogueRef: CatalogueReference(gen.Galaxy.Id, s.Id), Discovery: s.Discovery,
 			Region:   s.Region,
 			Tier:     tier,
 			Skeleton: skeletonDTO{StarClass: s.Skeleton.StarClass, Bodies: bodies},

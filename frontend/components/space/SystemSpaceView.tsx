@@ -1,5 +1,7 @@
 'use client'
 
+import { CelestialActions } from './CelestialActions'
+
 // SystemSpaceView — the continuous-R³ per-system view (openspec change
 // `build-production-space-view`, `system-space-view`: *System Space View
 // Route and Data Fan-In*, *Realtime Refetch Rules While the Space View Is
@@ -826,14 +828,14 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const resolveBody = useCallback(
     (bodyId: string): ResolvedBody | null => {
       const feature = interior.data?.features.find((f) => f.id === bodyId)
-      if (feature) return { kind: 'feature', type: feature.type, id: feature.id }
+      if (feature) return { kind: 'feature', type: feature.type, id: feature.id, name: feature.name }
       const gate = interior.data?.laneGates.find((g) => g.id === bodyId)
       if (gate) return { kind: 'gate', destSystemId: gate.destSystemId }
       return null
     },
     [interior.data],
   )
-  const nameOf = useCallback((id: string) => systemNames[id] ?? id, [systemNames])
+  const nameOf = useCallback((id: string) => interior.data?.features.find(body => body.id === id)?.name ?? systemNames[id] ?? id, [systemNames, interior.data])
   // The strip's pill: null whenever the own-fleets read's most recent
   // attempt has failed, or there is no acting fleet to derive from — the
   // SAME projection the roster row runs through (`system-console`'s *The
@@ -1128,8 +1130,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           key={systemId}
           systemName={systemNames[systemId] ?? systemId}
           objects={[
-            ...[...(interior.data?.features ?? [])].sort((a, b) => Number(b.type === 'station') - Number(a.type === 'station')).map(body => ({ name: body.id, starClass: body.type === 'star' ? interior.data?.starClass : undefined, knownFrom: 'System telemetry', kind: body.type.replaceAll('_', ' '), group: body.type === 'star' ? 'Stars' : body.type === 'station' ? 'Stations' : body.type === 'belt' ? 'Resource sites' : body.type === 'moon' ? 'Moons' : 'Worlds', x: 0, y: 0, className: body.type === 'gas_giant' ? 'gas' : body.type === 'ice' ? 'ice' : 'rock', resources: body.resources === undefined ? undefined : body.resources.length ? body.resources.map(resource => resource.kind).join(', ') : 'No disclosed deposits', fleets: fleets.isError ? ['Fleet telemetry unavailable'] : here.filter(fleet => !fleet.jump && fleet.attachedTo === body.id).map(fleet => `Fleet ${fleet.id.slice(-6)}`) })),
-            ...(interior.data?.laneGates ?? []).map(gate => ({ name: gate.id, knownFrom: 'System telemetry', kind: `Gate to ${systemNames[gate.destSystemId] ?? gate.destSystemId}`, group: 'Lane gates', x: 0, y: 0, resources: 'Not a resource site' })),
+            ...[...(interior.data?.features ?? [])].sort((a, b) => Number(b.type === 'station') - Number(a.type === 'station')).map(body => ({ name: body.id, label: body.name, catalogueRef: body.catalogueRef, enclosingStar: systemNames[systemId], starClass: body.type === 'star' ? interior.data?.starClass : undefined, knownFrom: 'System telemetry', kind: body.type.replaceAll('_', ' '), group: body.type === 'star' ? 'Stars' : body.type === 'station' ? 'Stations' : body.type === 'belt' ? 'Resource sites' : body.type === 'moon' ? 'Moons' : 'Worlds', x: 0, y: 0, className: body.type === 'gas_giant' ? 'gas' : body.type === 'ice' ? 'ice' : 'rock', resources: body.resources === undefined ? undefined : body.resources.length ? body.resources.map(resource => resource.kind).join(', ') : 'No disclosed deposits', fleets: fleets.isError ? ['Fleet telemetry unavailable'] : here.filter(fleet => !fleet.jump && fleet.attachedTo === body.id).map(fleet => `Fleet ${fleet.id.slice(-6)}`) })),
+            ...(interior.data?.laneGates ?? []).map(gate => ({ name: gate.id, label: `Gate to ${systemNames[gate.destSystemId] ?? gate.destSystemId}`, knownFrom: 'System telemetry', kind: `Gate to ${systemNames[gate.destSystemId] ?? gate.destSystemId}`, group: 'Lane gates', x: 0, y: 0, resources: 'Not a resource site' })),
             ...indexedFleets.map(fleet => ({ name: fleet.id, kind: 'fleet', group: 'Fleets', x: 0, y: 0, fleet: {
               id: fleet.id, mode: fleet.state?.Mode,
               activity: rosterRowStatus(fleet, worldTime, nameOf, fleet.id === acting?.id ? runningMine : undefined, resolveBody).activity,
@@ -1138,8 +1140,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               ...(fleet.roster ? { shipCount: fleet.roster.ships.length } : {}),
             } })),
           ]}
-          detailContent={stationActionsHost ? <>{marketNotices}{fleetActions}</> : undefined}
-          detailContentFor={stationActionsHost ?? undefined}
+          detailContent={stationActionsHost || (objectIndexOpen && selection?.bodyId) ? <>{stationActionsHost && <div style={stationActionsHost !== selection?.bodyId ? { display: "none" } : undefined}>{marketNotices}{fleetActions}</div>}{objectIndexOpen && interior.data?.features.filter(body => body.id === selection?.bodyId).map(body => <CelestialActions key={`${systemId}:${body.id}`} systemId={systemId} body={body} fleetId={acting && !actingRemote ? acting.id : null} onSettled={() => { void interior.refetch(); void fleets.refetch() }} />)}</> : undefined}
+          detailContentFor={selection?.bodyId ?? stationActionsHost ?? undefined}
           selected={selection?.bodyId ?? null}
           selectedFleetId={inspectedFleetId}
           onSelectFleet={setInspectedFleetId}

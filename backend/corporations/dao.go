@@ -161,6 +161,9 @@ func (dao *DaoImpl) CorpIdForAccount(ctx context.Context, accountId string) (str
 }
 
 func (dao *DaoImpl) CreateWithPointer(ctx context.Context, corp Corporation) error {
+	return dao.CreateWithPointerAndHome(ctx, corp, nil)
+}
+func (dao *DaoImpl) CreateWithPointerAndHome(ctx context.Context, corp Corporation, grant func(context.Context, *firestore.Transaction) error) error {
 	if corp.HomeSystemId == "" {
 		// The home of record and its reservation commit WITH the corp or not at
 		// all; a corp doc without one would be unhealable and unreserved.
@@ -188,6 +191,11 @@ func (dao *DaoImpl) CreateWithPointer(ctx context.Context, corp Corporation) err
 		}
 		if claimSnap != nil && claimSnap.Exists() {
 			return ErrSiteReserved
+		}
+		if grant != nil {
+			if err := grant(ctx, tx); err != nil {
+				return err
+			}
 		}
 		if err := tx.Set(corpRef, corp); err != nil {
 			return err

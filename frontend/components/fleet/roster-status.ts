@@ -53,7 +53,7 @@ export type ActivityKind =
 
 // A resolved body reference, or null when neither collection matched.
 export type ResolvedBody =
-  | { kind: 'feature'; type: string; id: string }
+  | { kind: 'feature'; type: string; id: string; name?: string }
   | { kind: 'gate'; destSystemId: string }
 
 // Supplied by the mounting view; checks BOTH interior collections.
@@ -117,7 +117,7 @@ function parkKindToMode(kind: ParkKind): ParkMode {
 function resolveLabel(id: string, nameOf: NameOf, resolveBody?: ResolveBody): string {
   const hit = resolveBody ? resolveBody(id) : null
   if (!hit) return id
-  if (hit.kind === 'feature') return `${hit.type} ${hit.id}`
+  if (hit.kind === 'feature') return hit.name ?? `${hit.type} ${hit.id}`
   return `Gate ${nameOf(hit.destSystemId)}`
 }
 

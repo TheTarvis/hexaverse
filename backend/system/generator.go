@@ -141,6 +141,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		features = append(features, hazardFeature(fmt.Sprintf("feat-hazard-%d", i), sysDir, r, params, r2))
 	}
 
+	assignGeneratedNames(seed, features)
 	return GeneratedInterior{
 		Interior: SystemInterior{
 			Seed:      seed,

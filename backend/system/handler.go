@@ -105,6 +105,12 @@ func (h *Handler) GetInterior(c *gin.Context) {
 	// authenticated requester — no per-requester band computed, no body
 	// omitted (replace-observation-with-sightings design.md Decisions 4/5).
 	features := projectUnfogged(gen)
+	for i := range features {
+		f := &features[i]
+		if f.Discovery != nil {
+			f.CanName = common.ActorCorp(c) != "" && f.Discovery.EntitledCorpId == common.ActorCorp(c) && f.Discovery.FirstPlayerName == nil && !f.NamingProtected
+		}
+	}
 
 	// Continuous position/size (task 4.7) and the requester corporation's
 	// own live contact union (task 4.5, system-interior "Foreign Presence

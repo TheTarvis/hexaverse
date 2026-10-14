@@ -35,7 +35,23 @@ export interface OrbitElements {
 }
 
 /** A body in the interior read: a star, planet, moon, belt, or station. */
+export interface DiscoveryAttribution { corporationId: string; at: number }
+export interface DiscoveryRecord {
+  ownerCorpId?: string
+  firstArrival?: DiscoveryAttribution
+  firstSurvey?: DiscoveryAttribution
+  firstPlayerName?: DiscoveryAttribution
+  generatedName?: string
+}
+
 export interface SpaceBody {
+  canName?: boolean
+  discovery?: DiscoveryRecord
+  name?: string
+  generatedName?: string
+  catalogueRef?: string
+  namingProtected?: boolean
+  ownerCorpId?: string
   id: string
   type: string
   resources?: ResourceDeposit[]

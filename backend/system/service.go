@@ -53,6 +53,7 @@ type StationSource interface {
 }
 
 type Service struct {
+	discovery DiscoverySource
 	dao       Dao
 	galaxySvc galaxy.ServiceInterface
 	clock     common.WorldTime
@@ -111,6 +112,9 @@ func (s *Service) GetOrCreateInterior(ctx context.Context, systemID string) (*Ge
 	} else if gen != nil {
 		s.spliceStation(ctx, gen)
 		s.applyContinuousCascade(ctx, systemID, gen)
+		if err := s.projectDiscovery(ctx, galaxyID, gen); err != nil {
+			return nil, err
+		}
 		return gen, nil
 	}
 
@@ -129,6 +133,7 @@ func (s *Service) GetOrCreateInterior(ctx context.Context, systemID string) (*Ge
 	gen := Generate(seed, string(node.Region), node.Skeleton, s.params)
 	gen.Interior.SystemId = systemID
 	gen.Interior.CreatedAt = s.clock.Now()
+	prepareNames(galaxyID, node, &gen)
 
 	// TODO(#0008): arrival via a lane is the real "Explored" trigger; until then
 	// the read endpoint materializes on first request. Create-if-absent makes a
@@ -145,6 +150,9 @@ func (s *Service) GetOrCreateInterior(ctx context.Context, systemID string) (*Ge
 			}
 			s.spliceStation(ctx, winner)
 			s.applyContinuousCascade(ctx, systemID, winner)
+			if err := s.projectDiscovery(ctx, galaxyID, winner); err != nil {
+				return nil, err
+			}
 			return winner, nil
 		}
 		return nil, err
@@ -154,6 +162,9 @@ func (s *Service) GetOrCreateInterior(ctx context.Context, systemID string) (*Ge
 		Int("features", len(gen.Features)).Msg("Generated system interior")
 	s.spliceStation(ctx, &gen)
 	s.applyContinuousCascade(ctx, systemID, &gen)
+	if err := s.projectDiscovery(ctx, galaxyID, &gen); err != nil {
+		return nil, err
+	}
 	return &gen, nil
 }
 

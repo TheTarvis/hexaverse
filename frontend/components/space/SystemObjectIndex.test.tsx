@@ -58,3 +58,14 @@ it('updates an open detail panel when selection changes outside the index', () =
   expect(screen.getByRole('complementary', { name: 'Details for gate' })).toBeInTheDocument()
   expect(screen.queryByRole('complementary', { name: 'Details for planet' })).not.toBeInTheDocument()
 })
+
+it('finds a renamed body by catalogue reference while selection retains its identity', () => {
+  const onSelect = vi.fn()
+  render(<SystemIndex objects={[{ name: 'feat-body-0', label: 'Silver Haven', catalogueRef: 'HX-7K2 III', enclosingStar: 'Bright Star', kind: 'Rocky', group: 'Worlds', x: 0, y: 0 }]} selected="feat-body-0" open onOpen={vi.fn()} onSelect={onSelect} onFocus={vi.fn()} />)
+  fireEvent.change(screen.getByTestId('system-index-search'), { target: { value: 'HX-7K2 III' } })
+  expect(screen.getByTestId('index-feat-body-0')).toHaveTextContent('Silver Haven')
+  expect(screen.getByTestId('index-feat-body-0')).toHaveTextContent('Bright Star')
+  fireEvent.click(screen.getByTestId('index-feat-body-0'))
+  expect(onSelect).toHaveBeenCalledWith('feat-body-0')
+  expect(screen.getByRole('heading', { name: 'Silver Haven' })).toBeInTheDocument()
+})

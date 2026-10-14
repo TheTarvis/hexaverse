@@ -61,14 +61,15 @@ func registrationScanProductionFilesOnly(fi fs.FileInfo) bool {
 }
 
 // registrationEntryPoints is the complete set of top-level functions in this
-// package permitted to call action.Service.RegisterResolver. Both are
+// package permitted to call action.Service.RegisterResolver. All are
 // invoked exclusively from router.go's composition root; neither is a
-// constructor. Adding a name here is a deliberate act that must be justified
+// constructor. Survey adds a distinct sensor-channel verb in the discovery-naming spec. Adding a name here is a deliberate act that must be justified
 // by a spec decision, exactly as RegisterScanResolver's own doc comment
 // justifies its existence.
 var registrationEntryPoints = map[string]bool{
-	"RegisterResolvers":    true,
-	"RegisterScanResolver": true,
+	"RegisterResolvers":      true,
+	"RegisterSurveyResolver": true,
+	"RegisterScanResolver":   true,
 }
 
 // registerResolverCallSite is one `<something>.RegisterResolver(...)` call

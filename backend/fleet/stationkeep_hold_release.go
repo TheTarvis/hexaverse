@@ -551,6 +551,10 @@ func (dao *DaoImpl) RunFleetTx(ctx context.Context, id string, fn func(*Fleet) (
 		if merge == nil {
 			return nil
 		}
+		merge, err = surveyTransition(snap.Data(), merge, asWorldMillis(merge["updatedAt"]))
+		if err != nil {
+			return err
+		}
 		return tx.Set(ref, merge, firestore.MergeAll)
 	})
 }

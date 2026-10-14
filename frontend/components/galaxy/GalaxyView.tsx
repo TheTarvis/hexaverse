@@ -575,6 +575,9 @@ function Inspector({
         <Heading level={2} data-testid="inspector-name" className="!text-base !text-white">
           {node.name}
         </Heading>
+        {node.catalogueRef && <p className="text-xs text-zinc-600 dark:text-zinc-400">{node.catalogueRef}</p>}
+        {node.discovery?.firstArrival && <p className="text-xs">First arrival: {node.discovery.firstArrival.corporationId}</p>}
+        {node.discovery?.ownerCorpId && <p className="text-xs">Owner: {node.discovery.ownerCorpId}</p>}
         <p
           data-testid="inspector-region"
           className="mt-1 flex items-center gap-2 text-sm text-zinc-300"

@@ -99,8 +99,9 @@ type transactionalCanceler interface {
 }
 
 type DaoImpl struct {
-	db    common.FirestoreService
-	clock common.WorldTime
+	transitions map[string]ActorTransition
+	db          common.FirestoreService
+	clock       common.WorldTime
 }
 
 func NewDao() Dao { return &DaoImpl{db: common.NewFirestoreService(), clock: common.WorldClock()} }
@@ -215,6 +216,10 @@ func (dao *DaoImpl) commitTx(ctx context.Context, a Action, resolve func(actorDa
 		if err != nil {
 			return err
 		}
+		merged, err = dao.transition(a.ActorCollection, actorSnap.Data(), merged, a.CommittedAt)
+		if err != nil {
+			return err
+		}
 		if err := tx.Create(dao.actionRef(a.Id), a); err != nil {
 			return fmt.Errorf("creating action: %w", err)
 		}
@@ -263,6 +268,10 @@ func (dao *DaoImpl) cancelTx(ctx context.Context, id string, resolve func(a Acti
 			return err
 		}
 		merged, err := resolve(a, actorSnap.Data())
+		if err != nil {
+			return err
+		}
+		merged, err = dao.transition(a.ActorCollection, actorSnap.Data(), merged, dao.clock.Now())
 		if err != nil {
 			return err
 		}
@@ -344,12 +353,49 @@ func (dao *DaoImpl) ResolveOne(ctx context.Context, id string, resolve ResolveFu
 			Action:      a,
 			At:          a.Eta,
 			DecodeActor: actorSnap.DataTo,
-			Remaining:   func(t common.WorldMillis) (float64, error) { return dao.foldDeltasTx(ctx, tx, ledgerKey, t) },
+			ReadDocument: func(path []string, target interface{}) (bool, error) {
+				ref, err := dao.refFromPath(path)
+				if err != nil {
+					return false, err
+				}
+				snap, err := tx.Get(ref)
+				if status.Code(err) == codes.NotFound {
+					return false, nil
+				}
+				if err != nil {
+					return false, err
+				}
+				return true, snap.DataTo(target)
+			},
+			ScopeActions: func() ([]Action, error) {
+				it := tx.Documents(dao.db.Collection(actionsCollection).Where("scope", "==", a.Scope))
+				defer it.Stop()
+				out := []Action{}
+				for {
+					snap, err := it.Next()
+					if err == iterator.Done {
+						return out, nil
+					}
+					if err != nil {
+						return nil, err
+					}
+					var other Action
+					if err := snap.DataTo(&other); err != nil {
+						return nil, err
+					}
+					out = append(out, other)
+				}
+			},
+			Remaining: func(t common.WorldMillis) (float64, error) { return dao.foldDeltasTx(ctx, tx, ledgerKey, t) },
 		})
 		if err != nil {
 			return err
 		}
 
+		res.ActorState, err = dao.transition(a.ActorCollection, actorSnap.Data(), res.ActorState, a.Eta)
+		if err != nil {
+			return err
+		}
 		// --- writes ---
 		if err := tx.Update(ref, []firestore.Update{
 			{Path: "status", Value: string(StatusDone)},

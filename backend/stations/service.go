@@ -6,6 +6,7 @@ import (
 
 	"hexaverse/charts"
 	"hexaverse/common"
+	"hexaverse/discovery"
 	"hexaverse/galaxy"
 	"hexaverse/system"
 
@@ -42,6 +43,9 @@ type ServiceInterface interface {
 }
 
 type Service struct {
+	discovery interface {
+		Records(context.Context, string) ([]discovery.Record, error)
+	}
 	dao   Dao
 	graph GraphSource
 	tiers TierSource
@@ -119,7 +123,23 @@ func (s *Service) Get(ctx context.Context, systemID string) (*Station, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.dao.Get(ctx, meta.Id, systemID)
+	station, err := s.dao.Get(ctx, meta.Id, systemID)
+	if err != nil || station == nil {
+		return station, err
+	}
+	if s.discovery != nil {
+		records, err := s.discovery.Records(ctx, meta.Id)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range records {
+			if r.SystemId == systemID && r.BodyId == StationFeatureId {
+				station.Name = r.Name
+				station.OwnerCorpId = r.OwnerCorpId
+			}
+		}
+	}
+	return station, nil
 }
 
 func (s *Service) GetVisible(ctx context.Context, corpID, systemID string) (*Station, error) {
@@ -189,7 +209,20 @@ func FeatureOf(st *Station) *system.Feature {
 	return &system.Feature{
 		Id:          st.FeatureId,
 		Type:        system.FeatureStation,
-		Name:        "Trading Station",
+		Name:        stationName(st),
 		OwnerCorpId: st.OwnerCorpId,
 	}
+}
+
+func stationName(st *Station) string {
+	if st.Name != "" {
+		return st.Name
+	}
+	return "Trading Station"
+}
+func (s *Service) WithDiscovery(d interface {
+	Records(context.Context, string) ([]discovery.Record, error)
+}) *Service {
+	s.discovery = d
+	return s
 }

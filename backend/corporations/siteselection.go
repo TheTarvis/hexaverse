@@ -203,6 +203,9 @@ func (w *spawnWalk) qualify(ctx context.Context, ring []string) ([]galaxy.System
 	}
 	var out []galaxy.System
 	for _, sys := range systems {
+		if sys.Discovery != nil && sys.Discovery.OwnerCorpId != "" {
+			continue
+		}
 		if w.params.RequireMineable && !galaxy.HasMineableBody(&sys) {
 			continue
 		}

@@ -147,6 +147,8 @@ func (s *Service) PrepareCargoDebitInTx(
 // transaction) — the primitive corporation-spawn's starting-fuel grant and
 // the refuel verb both compose inside the ONE transaction each of THEM owns.
 type FuelCreditPlan struct {
+	surveyData     map[string]interface{}
+	surveyAt       common.WorldMillis
 	ref            *firestore.DocumentRef
 	newFuel        float64
 	freeHoldBefore float64
@@ -188,7 +190,7 @@ func (dao *DaoImpl) PrepareFuelCreditInTx(
 		return nil, fmt.Errorf("decoding fleet: %w", err)
 	}
 	return &FuelCreditPlan{
-		ref: ref, Fleet: f,
+		ref: ref, Fleet: f, surveyData: snap.Data(),
 		freeHoldBefore: FreeHold(f, DefaultClassStats()),
 		newFuel:        f.Cargo["fuel"] + tons,
 	}, nil
@@ -226,6 +228,11 @@ func (p *FuelCreditPlan) Apply(tx *firestore.Transaction) error {
 	// nor the restamp visible.
 	if p.newStateDoc != nil {
 		data["state"] = p.newStateDoc
+		var err error
+		data, err = surveyTransition(p.surveyData, data, p.surveyAt)
+		if err != nil {
+			return err
+		}
 	}
 	if err := tx.Set(p.ref, data, firestore.MergeAll); err != nil {
 		return fmt.Errorf("crediting fuel: %w", err)

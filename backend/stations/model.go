@@ -15,6 +15,7 @@ import "hexaverse/common"
 // Ownership also belongs on the entity that actually has an owner; system.Feature
 // deliberately has no owner field.
 type Station struct {
+	Name string `json:"name" firestore:"name,omitempty"`
 	// SystemId is BOTH the home system and the station's own identity: at most
 	// one station exists per system, so the system id is already a unique station
 	// identifier with nothing new to invent. This is the "venue" key the price

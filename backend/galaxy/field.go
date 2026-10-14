@@ -310,11 +310,12 @@ func (f *Field) SystemAt(c Cell) *System {
 func (f *Field) systemOf(c candidate) System {
 	id := SystemIdFor(c.cell)
 	return System{
-		Id:       id,
-		Coords:   c.coords,
-		Name:     systemName(f.seed, c.cell),
-		Region:   c.region,
-		Skeleton: rollSkeleton(SystemSeed(f.seed, id), c.region, f.params),
+		Id:            id,
+		Coords:        c.coords,
+		Name:          systemName(f.seed, c.cell),
+		GeneratedName: systemName(f.seed, c.cell),
+		Region:        c.region,
+		Skeleton:      rollSkeleton(SystemSeed(f.seed, id), c.region, f.params),
 	}
 }
 

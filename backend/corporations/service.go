@@ -8,6 +8,7 @@ import (
 
 	"hexaverse/charts"
 	"hexaverse/common"
+	"hexaverse/discovery"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
 	"hexaverse/space"
@@ -107,6 +108,10 @@ type ServiceInterface interface {
 }
 
 type Service struct {
+	discovery interface {
+		EnsureHome(context.Context, string, string, string) error
+		HomeInTx(context.Context, *firestore.Transaction, string, string, string, string, common.WorldMillis) error
+	}
 	dao    Dao
 	graph  GraphSource
 	fleets FleetSource
@@ -244,7 +249,23 @@ func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResu
 			CreatedAt:    s.clock.Now(),
 			HomeSystemId: site.Id,
 		}
-		err = s.dao.CreateWithPointer(ctx, corp)
+		if creator, ok := s.dao.(interface {
+			CreateWithPointerAndHome(context.Context, Corporation, func(context.Context, *firestore.Transaction) error) error
+		}); ok && s.discovery != nil {
+			meta, e := s.graph.LiveGalaxyMeta(ctx)
+			if e != nil {
+				return nil, e
+			}
+			err = creator.CreateWithPointerAndHome(ctx, corp, func(ctx context.Context, tx *firestore.Transaction) error {
+				e := s.discovery.HomeInTx(ctx, tx, meta.Id, site.Id, corp.Id, corp.Name, corp.CreatedAt)
+				if errors.Is(e, discovery.ErrConflict) {
+					return ErrSiteReserved
+				}
+				return e
+			})
+		} else {
+			err = s.dao.CreateWithPointer(ctx, corp)
+		}
 		switch {
 		case err == nil:
 			log.Info().Ctx(ctx).Str("corpId", corp.Id).Str("accountId", accountId).
@@ -307,6 +328,11 @@ func (s *Service) ensureSpawnAssets(ctx context.Context, corp *Corporation) (*Sp
 
 	if err := s.ensureStation(ctx, home); err != nil {
 		return nil, err
+	}
+	if s.discovery != nil {
+		if err := s.discovery.EnsureHome(ctx, home, corp.Id, corp.Name); err != nil {
+			return nil, err
+		}
 	}
 	var hull *fleet.Fleet
 	if len(fleets) > 0 {
@@ -592,4 +618,12 @@ func (s *Service) claimedSpace(ctx context.Context, exceptCorpID string) (map[st
 		}
 	}
 	return claimed, nil
+}
+
+func (s *Service) WithDiscovery(d interface {
+	EnsureHome(context.Context, string, string, string) error
+	HomeInTx(context.Context, *firestore.Transaction, string, string, string, string, common.WorldMillis) error
+}) *Service {
+	s.discovery = d
+	return s
 }

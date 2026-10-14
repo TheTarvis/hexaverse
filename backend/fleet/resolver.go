@@ -9,6 +9,7 @@ import (
 	"hexaverse/charts"
 	"hexaverse/common"
 	"hexaverse/disclosure"
+	"hexaverse/discovery"
 	"hexaverse/sightings"
 	"hexaverse/space"
 	"hexaverse/system"
@@ -370,6 +371,16 @@ func JumpResolver(_ context.Context, r action.Resolution) (action.ResolveResult,
 	// (replace-observation-with-sightings design.md Decision 1). Pure
 	// w.r.t. Firestore, so a zero-value Service is safe to call it on.
 	writes := (&charts.Service{}).ArrivalWrites(f.CorporationId, destId, []string{laneId}, r.At)
+	if gid, ok := r.Action.Params["galaxyId"].(string); ok && gid != "" && r.ReadDocument != nil {
+		path := []string{discovery.Collection, discovery.Key(gid, destId, "feat-star")}
+		var record discovery.Record
+		if _, err := r.ReadDocument(path, &record); err != nil {
+			return action.ResolveResult{}, err
+		}
+		if record.FirstArrival == nil || r.At < record.FirstArrival.At {
+			writes = append(writes, action.DocWrite{Path: path, Data: map[string]interface{}{"galaxyId": gid, "systemId": destId, "bodyId": "feat-star", "firstArrival": discovery.Attribution{CorporationId: f.CorporationId, At: r.At}}})
+		}
+	}
 
 	return action.ResolveResult{
 		Outcome: fmt.Sprintf("jumped to %s", destId),

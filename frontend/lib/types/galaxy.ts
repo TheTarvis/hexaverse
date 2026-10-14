@@ -33,6 +33,8 @@ export interface WireSystem {
   id: string
   coords: { x: number; y: number; z: number }
   name: string
+  catalogueRef?: string
+  discovery?: import("./system-space").DiscoveryRecord
   region: Region
   // The requester's subspace tier over the free star map (#0006). The star layer
   // (position, region, skeleton) renders regardless of tier.
@@ -73,6 +75,8 @@ export interface WireGalaxy {
 export interface GalaxyNode {
   id: string
   name: string
+  catalogueRef?: string
+  discovery?: import("./system-space").DiscoveryRecord
   region: Region
   tier: SubspaceTier
   skeleton: Skeleton

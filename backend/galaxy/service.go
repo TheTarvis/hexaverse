@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"hexaverse/common"
+	"hexaverse/discovery"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -66,6 +67,9 @@ type ServiceInterface interface {
 }
 
 type Service struct {
+	discovery interface {
+		Records(context.Context, string) ([]discovery.Record, error)
+	}
 	dao   Dao
 	clock common.WorldTime
 
@@ -319,6 +323,9 @@ func (s *Service) GetLive(ctx context.Context) (*GeneratedGalaxy, error) {
 		return nil, err
 	}
 
+	if err := s.projectDiscovery(ctx, id, systems); err != nil {
+		return nil, err
+	}
 	return &GeneratedGalaxy{Galaxy: *meta, Systems: systems, Lanes: lanes}, nil
 }
 
@@ -355,7 +362,11 @@ func (s *Service) GetLiveSystem(ctx context.Context, systemID string) (*System, 
 	if sys == nil {
 		return nil, ErrSystemNotFound
 	}
-	return sys, nil
+	nodes := []System{*sys}
+	if err := s.projectDiscovery(ctx, id, nodes); err != nil {
+		return nil, err
+	}
+	return &nodes[0], nil
 }
 
 // NeighborsOf returns the systems one materialized lane away.
@@ -414,5 +425,51 @@ func (s *Service) GetLiveSystems(ctx context.Context, systemIDs []string) ([]Sys
 	if id == "" {
 		return nil, ErrNoLiveGalaxy
 	}
-	return s.dao.GetSystems(ctx, id, systemIDs)
+	nodes, err := s.dao.GetSystems(ctx, id, systemIDs)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.projectDiscovery(ctx, id, nodes); err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
+func (s *Service) LiveIdentity(ctx context.Context) (string, error) {
+	meta, err := s.LiveGalaxyMeta(ctx)
+	if err != nil {
+		return "", err
+	}
+	return meta.Id, nil
+}
+func (s *Service) WithDiscovery(d interface {
+	Records(context.Context, string) ([]discovery.Record, error)
+}) *Service {
+	s.discovery = d
+	return s
+}
+func (s *Service) projectDiscovery(ctx context.Context, gid string, nodes []System) error {
+	if s.discovery == nil {
+		return nil
+	}
+	records, err := s.discovery.Records(ctx, gid)
+	if err != nil {
+		return err
+	}
+	names := map[string]discovery.Record{}
+	for _, r := range records {
+		if r.BodyId == "feat-star" {
+			names[r.SystemId] = r
+		}
+	}
+	for i := range nodes {
+		if r, ok := names[nodes[i].Id]; ok {
+			nodes[i].Discovery = &r
+			if r.Name != "" {
+				nodes[i].Name = r.Name
+			}
+		}
+		nodes[i].CatalogueRef = CatalogueReference(gid, nodes[i].Id)
+	}
+	return nil
 }

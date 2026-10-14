@@ -51,6 +51,8 @@ func SetupFirestoreTestClient(t *testing.T) *firestore.Client {
 //     accumulating. This is what stops the registry from being one more
 //     hand-maintained list kept in sync by memory.
 var RegisteredTopLevelCollections = []string{
+	"discovery_records",
+	"astronomical_names",
 	"accounts",        // backend/account/dao.go
 	"actions",         // backend/action/dao.go
 	"corpByAccount",   // backend/corporations/dao.go

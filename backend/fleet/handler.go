@@ -47,6 +47,8 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 		g.POST("/:fleetId/stop", h.Stop)
 		g.POST("/:fleetId/jump", h.Jump)
 		g.POST("/:fleetId/scan", h.Scan)
+		g.POST("/:fleetId/survey", h.Survey)
+		g.GET("/:fleetId/survey", h.SurveyOptions)
 		g.GET("/:fleetId/scan-targets", h.ScanTargets)
 		g.POST("/:fleetId/hold", h.Hold)
 		g.POST("/:fleetId/release", h.Release)
@@ -562,6 +564,8 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet is in lane transit"})
 	case errors.Is(err, ErrJumpNotAttached):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrSurveyTarget):
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrScanHostUnresolved):
 		// A hostId naming a foreign fleet is rejected through this exact
 		// same branch as an unresolvable one — same status, same body, no
@@ -620,6 +624,7 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 // position and worldTime, so the client can render immediately. `own` tells
 // the client whether it may drive this fleet.
 type fleetDTO struct {
+	Survey        *SurveyWindow   `json:"survey,omitempty"`
 	ActiveScanId  string          `json:"activeScanId,omitempty"`
 	Id            string          `json:"id"`
 	CorporationId string          `json:"corporationId"`
@@ -806,7 +811,7 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 		scanID = f.ActiveScanId
 	}
 	return fleetDTO{
-		ActiveScanId:  scanID,
+		ActiveScanId: scanID, Survey: f.Survey,
 		Id:            f.Id,
 		CorporationId: f.CorporationId,
 		SystemId:      f.SystemId,

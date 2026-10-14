@@ -2,6 +2,7 @@ package galaxy
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -30,5 +31,5 @@ func systemName(seed int64, cell Cell) string {
 	b.WriteString(nameNuclei[r.Intn(len(nameNuclei))])
 	b.WriteString(nameCodas[r.Intn(len(nameCodas))])
 	// Onsets are already capitalized and the rest lowercase — no re-casing needed.
-	return fmt.Sprintf("%s%s", b.String(), nameSuffixes[r.Intn(len(nameSuffixes))])
+	return fmt.Sprintf("%s%s %s.%s", b.String(), nameSuffixes[r.Intn(len(nameSuffixes))], strconv.FormatInt(int64(cell.X), 36), strconv.FormatInt(int64(cell.Y), 36))
 }

@@ -88,7 +88,7 @@ func TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse(t *testing.T) {
 		// here: it lives on the `system.Feature` domain model and has never
 		// been on this DTO, so there is nothing to preserve.
 		assertKeySet(t, "fogFeatureDTO", keys, []string{
-			"id", "type", "resources", "effects", "space", "size", "orbitElements",
+			"id", "type", "resources", "effects", "space", "size", "orbitElements", "catalogueRef", "generatedName", "name", "namingProtected", "ownerCorpId", "canName", "discovery",
 		})
 	})
 

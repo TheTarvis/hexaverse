@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"hexaverse/common"
+	"hexaverse/discovery"
 )
 
 // Region is a system's noise-driven regional character. star_rich sectors
@@ -69,11 +70,14 @@ type Skeleton struct {
 
 // System is a node in the galactic graph.
 type System struct {
-	Id       string   `json:"id" firestore:"id"`
-	Coords   Coords   `json:"coords" firestore:"coords"`
-	Name     string   `json:"name" firestore:"name"`
-	Region   Region   `json:"region" firestore:"region"`
-	Skeleton Skeleton `json:"skeleton" firestore:"skeleton"`
+	CatalogueRef  string            `json:"catalogueRef" firestore:"-"`
+	Discovery     *discovery.Record `json:"discovery,omitempty" firestore:"-"`
+	Id            string            `json:"id" firestore:"id"`
+	Coords        Coords            `json:"coords" firestore:"coords"`
+	Name          string            `json:"name" firestore:"name"`
+	GeneratedName string            `json:"generatedName" firestore:"generatedName"`
+	Region        Region            `json:"region" firestore:"region"`
+	Skeleton      Skeleton          `json:"skeleton" firestore:"skeleton"`
 }
 
 // Lane is an edge in the galactic graph — topology only. Travel cost is a

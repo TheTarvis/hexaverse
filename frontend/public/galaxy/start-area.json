@@ -17,13 +17,14 @@
   },
   "systems": [
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-1.-1",
       "id": "sys_-1_-1",
       "coords": {
         "x": -24.03043510955252,
         "y": -30.57096682542288,
         "z": -51.12152099609375
       },
-      "name": "Velien II",
+      "name": "Velien II -1.-1",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -57,13 +58,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-1.-2",
       "id": "sys_-1_-2",
       "coords": {
         "x": -65.84580108495481,
         "y": -132.3754770643731,
         "z": 65.28480529785156
       },
-      "name": "Beleen II",
+      "name": "Beleen II -1.-2",
       "region": "star_rich",
       "tier": "explored",
       "skeleton": {
@@ -101,13 +103,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-1.2",
       "id": "sys_-1_2",
       "coords": {
         "x": -44.99288072012116,
         "y": 163.23874586371613,
         "z": 12.9461669921875
       },
-      "name": "Itheiub Nexus",
+      "name": "Itheiub Nexus -1.2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -133,13 +136,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-1.3",
       "id": "sys_-1_3",
       "coords": {
         "x": -33.01971567746273,
         "y": 264.43451567245006,
         "z": 42.15080261230469
       },
-      "name": "Belaux III",
+      "name": "Belaux III -1.3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -157,13 +161,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-1.4",
       "id": "sys_-1_4",
       "coords": {
         "x": -21.120720788246558,
         "y": 352.2529708835852,
         "z": -29.295730590820312
       },
-      "name": "Xaneios",
+      "name": "Xaneios -1.4",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -189,13 +194,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-1.5",
       "id": "sys_-1_5",
       "coords": {
         "x": -51.23950862825518,
         "y": 402.7184716199367,
         "z": -26.622390747070312
       },
-      "name": "Zoraub",
+      "name": "Zoraub -1.5",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -221,13 +227,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-2.-1",
       "id": "sys_-2_-1",
       "coords": {
         "x": -79.99989487807059,
         "y": -14.661289886866754,
         "z": 65.94520568847656
       },
-      "name": "Thaleune",
+      "name": "Thaleune -2.-1",
       "region": "star_rich",
       "tier": "explored",
       "skeleton": {
@@ -257,13 +264,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-2.-2",
       "id": "sys_-2_-2",
       "coords": {
         "x": -151.12845365722262,
         "y": -119.73663626775618,
         "z": 60.72441101074219
       },
-      "name": "Xanaeen Prime",
+      "name": "Xanaeen Prime -2.-2",
       "region": "star_rich",
       "tier": "explored",
       "skeleton": {
@@ -293,13 +301,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-2.-3",
       "id": "sys_-2_-3",
       "coords": {
         "x": -88.47948356790485,
         "y": -178.77895415805426,
         "z": -27.18017578125
       },
-      "name": "Talaeeth",
+      "name": "Talaeeth -2.-3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -333,13 +342,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-2.0",
       "id": "sys_-2_0",
       "coords": {
         "x": -125.51367123158238,
         "y": 2.9194225819991915,
         "z": 31.728286743164062
       },
-      "name": "Caeiois Prime",
+      "name": "Caeiois Prime -2.0",
       "region": "star_rich",
       "tier": "explored",
       "skeleton": {
@@ -365,13 +375,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-2.1",
       "id": "sys_-2_1",
       "coords": {
         "x": -115.87322551209557,
         "y": 154.9723528625012,
         "z": 38.508453369140625
       },
-      "name": "Axoorn",
+      "name": "Axoorn -2.1",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -385,13 +396,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-2.2",
       "id": "sys_-2_2",
       "coords": {
         "x": -120.87217186131056,
         "y": 228.70320269224413,
         "z": 5.3743743896484375
       },
-      "name": "Xanioeth Minor",
+      "name": "Xanioeth Minor -2.2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -405,13 +417,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-2.3",
       "id": "sys_-2_3",
       "coords": {
         "x": -124.68148110494911,
         "y": 270.2624713069369,
         "z": -2.728271484375
       },
-      "name": "Ithouis Prime",
+      "name": "Ithouis Prime -2.3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -449,13 +462,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-2.4",
       "id": "sys_-2_4",
       "coords": {
         "x": -141.76982620868492,
         "y": 353.976436669158,
         "z": -26.021347045898438
       },
-      "name": "Taloub II",
+      "name": "Taloub II -2.4",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -477,13 +491,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-2.5",
       "id": "sys_-2_5",
       "coords": {
         "x": -79.62038742714843,
         "y": 462.91916118305136,
         "z": 17.820816040039062
       },
-      "name": "Keleiorn III",
+      "name": "Keleiorn III -2.5",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -509,13 +524,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-3.-1",
       "id": "sys_-3_-1",
       "coords": {
         "x": -233.99623677077616,
         "y": -14.75104647864837,
         "z": 38.78593444824219
       },
-      "name": "Ophiour",
+      "name": "Ophiour -3.-1",
       "region": "star_rich",
       "tier": "explored",
       "skeleton": {
@@ -533,13 +549,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-3.-3",
       "id": "sys_-3_-3",
       "coords": {
         "x": -172.6927409428875,
         "y": -223.14661970592616,
         "z": 20.076904296875
       },
-      "name": "Seraeai",
+      "name": "Seraeai -3.-3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -557,13 +574,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-3.0",
       "id": "sys_-3_0",
       "coords": {
         "x": -190.28486839365587,
         "y": 26.382412364628475,
         "z": -51.8927001953125
       },
-      "name": "Velyen Minor",
+      "name": "Velyen Minor -3.0",
       "region": "star_rich",
       "tier": "explored",
       "skeleton": {
@@ -597,13 +615,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-3.1",
       "id": "sys_-3_1",
       "coords": {
         "x": -176.69450086036102,
         "y": 126.03220570702055,
         "z": -20.025405883789062
       },
-      "name": "Axoyr III",
+      "name": "Axoyr III -3.1",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -637,13 +656,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-3.2",
       "id": "sys_-3_2",
       "coords": {
         "x": -180.01035340412002,
         "y": 211.03773294792842,
         "z": -10.304336547851562
       },
-      "name": "Xanioax II",
+      "name": "Xanioax II -3.2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -661,13 +681,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-3.3",
       "id": "sys_-3_3",
       "coords": {
         "x": -197.9642448747661,
         "y": 297.60960837587305,
         "z": -57.496490478515625
       },
-      "name": "Rhoeeth",
+      "name": "Rhoeeth -3.3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -701,13 +722,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-3.4",
       "id": "sys_-3_4",
       "coords": {
         "x": -185.09786832357372,
         "y": 389.28083310884955,
         "z": -58.374176025390625
       },
-      "name": "Ithyion II",
+      "name": "Ithyion II -3.4",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -737,13 +759,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.-3.5",
       "id": "sys_-3_5",
       "coords": {
         "x": -219.5278956503983,
         "y": 419.473660833136,
         "z": 48.9959716796875
       },
-      "name": "Kelouen Prime",
+      "name": "Kelouen Prime -3.5",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -777,13 +800,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.0.-1",
       "id": "sys_0_-1",
       "coords": {
         "x": 6.176022810292974,
         "y": -59.32728831196546,
         "z": 13.87054443359375
       },
-      "name": "Nyxiour",
+      "name": "Nyxiour 0.-1",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -813,13 +837,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.0.-2",
       "id": "sys_0_-2",
       "coords": {
         "x": 17.077094823108208,
         "y": -147.48313757127485,
         "z": -6.2810516357421875
       },
-      "name": "Nyxuara",
+      "name": "Nyxuara 0.-2",
       "region": "barrier",
       "tier": "explored",
       "skeleton": {
@@ -841,13 +866,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.0.-3",
       "id": "sys_0_-3",
       "coords": {
         "x": 71.55025831085044,
         "y": -213.5147538855233,
         "z": 75.80497741699219
       },
-      "name": "Rhouon Nexus",
+      "name": "Rhouon Nexus 0.-3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -861,13 +887,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.0.0",
       "id": "sys_0_0",
       "coords": {
         "x": 17.02332463366667,
         "y": 63.58348810826673,
         "z": -9.179000854492188
       },
-      "name": "Caeeorn",
+      "name": "Caeeorn 0.0",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -889,13 +916,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.0.1",
       "id": "sys_0_1",
       "coords": {
         "x": 1.854690999649099,
         "y": 127.71562060184843,
         "z": -47.80296325683594
       },
-      "name": "Serais",
+      "name": "Serais 0.1",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -925,13 +953,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.0.2",
       "id": "sys_0_2",
       "coords": {
         "x": 38.65429099204326,
         "y": 209.35219144918614,
         "z": 36.161956787109375
       },
-      "name": "Voruix",
+      "name": "Voruix 0.2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -957,13 +986,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.0.3",
       "id": "sys_0_3",
       "coords": {
         "x": 68.1446150871693,
         "y": 277.64698761604814,
         "z": 55.337982177734375
       },
-      "name": "Rhoaune Nexus",
+      "name": "Rhoaune Nexus 0.3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -997,13 +1027,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.0.4",
       "id": "sys_0_4",
       "coords": {
         "x": 62.5271738823375,
         "y": 374.2570633493104,
         "z": 45.15411376953125
       },
-      "name": "Serour",
+      "name": "Serour 0.4",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1025,13 +1056,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.1.-1",
       "id": "sys_1_-1",
       "coords": {
         "x": 122.94402679251414,
         "y": -17.68475266362811,
         "z": 3.3367919921875
       },
-      "name": "Lyraeon",
+      "name": "Lyraeon 1.-1",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1053,13 +1085,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.1.-3",
       "id": "sys_1_-3",
       "coords": {
         "x": 122.98028432253727,
         "y": -203.5654843275499,
         "z": 42.15080261230469
       },
-      "name": "Belaux III",
+      "name": "Belaux III 1.-3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1097,13 +1130,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.1.0",
       "id": "sys_1_0",
       "coords": {
         "x": 91.85720722235936,
         "y": 55.551917558422474,
         "z": -29.474334716796875
       },
-      "name": "Rhoyon Minor",
+      "name": "Rhoyon Minor 1.0",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1129,13 +1163,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.1.1",
       "id": "sys_1_1",
       "coords": {
         "x": 131.9695648904475,
         "y": 125.42903317457711,
         "z": -51.12152099609375
       },
-      "name": "Velien II",
+      "name": "Velien II 1.1",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1153,13 +1188,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.1.2",
       "id": "sys_1_2",
       "coords": {
         "x": 135.06188251740772,
         "y": 201.54647269569898,
         "z": -55.523681640625
       },
-      "name": "Rhoioella",
+      "name": "Rhoioella 1.2",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1185,13 +1221,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.1.3",
       "id": "sys_1_3",
       "coords": {
         "x": 92.08882089960038,
         "y": 290.87316915858605,
         "z": -51.46659851074219
       },
-      "name": "Beloai III",
+      "name": "Beloai III 1.3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1225,13 +1262,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.1.4",
       "id": "sys_1_4",
       "coords": {
         "x": 148.62106664786393,
         "y": 336.1318206375411,
         "z": 35.2410888671875
       },
-      "name": "Zoreara Prime",
+      "name": "Zoreara Prime 1.4",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1249,13 +1287,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.1.5",
       "id": "sys_1_5",
       "coords": {
         "x": 99.44368617243217,
         "y": 447.2613169904696,
         "z": 55.35865783691406
       },
-      "name": "Axeiion",
+      "name": "Axeiion 1.5",
       "region": "barrier",
       "tier": "explored",
       "skeleton": {
@@ -1285,13 +1324,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.2.-1",
       "id": "sys_2_-1",
       "coords": {
         "x": 181.62877358406374,
         "y": -13.325967070307755,
         "z": -72.89749145507812
       },
-      "name": "Xanyune",
+      "name": "Xanyune 2.-1",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1329,13 +1369,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.2.-2",
       "id": "sys_2_-2",
       "coords": {
         "x": 191.12782813868944,
         "y": -83.29679730775587,
         "z": 5.3743743896484375
       },
-      "name": "Xanioeth Minor",
+      "name": "Xanioeth Minor 2.-2",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1365,13 +1406,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.2.-3",
       "id": "sys_2_-3",
       "coords": {
         "x": 164.30660171195603,
         "y": -176.93512518412265,
         "z": -72.49885559082031
       },
-      "name": "Quauyr Nexus",
+      "name": "Quauyr Nexus 2.-3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1393,13 +1435,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.2.0",
       "id": "sys_2_0",
       "coords": {
         "x": 158.58241424398122,
         "y": 50.2931657718674,
         "z": 38.19000244140625
       },
-      "name": "Zoryix Nexus",
+      "name": "Zoryix Nexus 2.0",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1425,13 +1468,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.2.1",
       "id": "sys_2_1",
       "coords": {
         "x": 215.4647543832817,
         "y": 93.46092387991193,
         "z": -48.263702392578125
       },
-      "name": "Caeyara Nexus",
+      "name": "Caeyara Nexus 2.1",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1445,13 +1489,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.2.2",
       "id": "sys_2_2",
       "coords": {
         "x": 160.87154634277738,
         "y": 192.26336373224382,
         "z": 60.72441101074219
       },
-      "name": "Xanaeen Prime",
+      "name": "Xanaeen Prime 2.2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1481,13 +1526,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.2.3",
       "id": "sys_2_3",
       "coords": {
         "x": 165.28270920068312,
         "y": 303.6321890250131,
         "z": 16.978836059570312
       },
-      "name": "Axyesh",
+      "name": "Axyesh 2.3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1505,13 +1551,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.2.4",
       "id": "sys_2_4",
       "coords": {
         "x": 211.8914157244403,
         "y": 386.5644850129338,
         "z": -69.23164367675781
       },
-      "name": "Axeiune Nexus",
+      "name": "Axeiune Nexus 2.4",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1529,13 +1576,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.2.5",
       "id": "sys_2_5",
       "coords": {
         "x": 180.77358823872456,
         "y": 429.1132639018604,
         "z": -57.32170104980469
       },
-      "name": "Ithaeune",
+      "name": "Ithaeune 2.5",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1569,13 +1617,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.3.-1",
       "id": "sys_3_-1",
       "coords": {
         "x": 291.305499139639,
         "y": -29.967794292979455,
         "z": -20.025405883789062
       },
-      "name": "Axoyr III",
+      "name": "Axoyr III 3.-1",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1613,13 +1662,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.3.-2",
       "id": "sys_3_-2",
       "coords": {
         "x": 289.9447423332321,
         "y": -117.11381087433548,
         "z": -64.84107971191406
       },
-      "name": "Lyryax",
+      "name": "Lyryax 3.-2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1637,13 +1687,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.3.-3",
       "id": "sys_3_-3",
       "coords": {
         "x": 270.0357551252339,
         "y": -170.39039162412698,
         "z": -57.496490478515625
       },
-      "name": "Rhoeeth",
+      "name": "Rhoeeth 3.-3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1669,13 +1720,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.3.0",
       "id": "sys_3_0",
       "coords": {
         "x": 279.38789793663784,
         "y": 42.06584958050138,
         "z": -7.1424102783203125
       },
-      "name": "Talaeeth Minor",
+      "name": "Talaeeth Minor 3.0",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1693,13 +1745,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.3.1",
       "id": "sys_3_1",
       "coords": {
         "x": 234.00376322922384,
         "y": 141.24895352135164,
         "z": 38.78593444824219
       },
-      "name": "Ophiour",
+      "name": "Ophiour 3.1",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1729,13 +1782,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.3.2",
       "id": "sys_3_2",
       "coords": {
         "x": 295.3515987466636,
         "y": 157.98425597332397,
         "z": 50.34111022949219
       },
-      "name": "Seraeai Nexus",
+      "name": "Seraeai Nexus 3.2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1769,13 +1823,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.3.3",
       "id": "sys_3_3",
       "coords": {
         "x": 295.3072590571125,
         "y": 244.85338029407384,
         "z": 20.076904296875
       },
-      "name": "Seraeai",
+      "name": "Seraeai 3.3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1793,13 +1848,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.3.4",
       "id": "sys_3_4",
       "coords": {
         "x": 286.3768523275228,
         "y": 345.4472645613331,
         "z": -31.583480834960938
       },
-      "name": "Caeoara",
+      "name": "Caeoara 3.4",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1825,13 +1881,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.3.5",
       "id": "sys_3_5",
       "coords": {
         "x": 298.5356735250977,
         "y": 444.20300666551844,
         "z": -69.8876953125
       },
-      "name": "Velyyr",
+      "name": "Velyyr 3.5",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -1869,13 +1926,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.4.-1",
       "id": "sys_4_-1",
       "coords": {
         "x": 387.4339719871424,
         "y": -68.05059720796963,
         "z": 16.24267578125
       },
-      "name": "Draeade Minor",
+      "name": "Draeade Minor 4.-1",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1897,13 +1955,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.4.-2",
       "id": "sys_4_-2",
       "coords": {
         "x": 321.08610145157036,
         "y": -116.92705067036052,
         "z": 37.90641784667969
       },
-      "name": "Zoraeorn III",
+      "name": "Zoraeorn III 4.-2",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1929,13 +1988,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.4.-3",
       "id": "sys_4_-3",
       "coords": {
         "x": 339.67678377812473,
         "y": -232.25822927489185,
         "z": 60.46318054199219
       },
-      "name": "Zorayr II",
+      "name": "Zorayr II 4.-3",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1961,13 +2021,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.4.0",
       "id": "sys_4_0",
       "coords": {
         "x": 353.8870909337921,
         "y": 47.87779082528252,
         "z": 15.45806884765625
       },
-      "name": "Itheon III",
+      "name": "Itheon III 4.0",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -1981,13 +2042,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.4.1",
       "id": "sys_4_1",
       "coords": {
         "x": 359.7300009085933,
         "y": 85.73326252999951,
         "z": -49.1314697265625
       },
-      "name": "Myryon",
+      "name": "Myryon 4.1",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -2017,13 +2079,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.4.2",
       "id": "sys_4_2",
       "coords": {
         "x": 382.20085309153046,
         "y": 161.33920524555776,
         "z": -0.761566162109375
       },
-      "name": "Draeiix",
+      "name": "Draeiix 4.2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -2057,13 +2120,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.4.3",
       "id": "sys_4_3",
       "coords": {
         "x": 388.8794975582492,
         "y": 272.59959717541255,
         "z": -26.647262573242188
       },
-      "name": "Xanour",
+      "name": "Xanour 4.3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -2101,13 +2165,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.4.4",
       "id": "sys_4_4",
       "coords": {
         "x": 384.93475973005457,
         "y": 383.216916342447,
         "z": -61.539306640625
       },
-      "name": "Keliub",
+      "name": "Keliub 4.4",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -2129,13 +2194,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.5.-1",
       "id": "sys_5_-1",
       "coords": {
         "x": 455.4186328260438,
         "y": -21.36042085272237,
         "z": 25.513687133789062
       },
-      "name": "Ithaeis II",
+      "name": "Ithaeis II 5.-1",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -2153,13 +2219,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.5.-2",
       "id": "sys_5_-2",
       "coords": {
         "x": 403.0240968707326,
         "y": -82.4241609489187,
         "z": -59.792633056640625
       },
-      "name": "Myriax III",
+      "name": "Myriax III 5.-2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -2197,13 +2264,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.5.-3",
       "id": "sys_5_-3",
       "coords": {
         "x": 396.2033179471935,
         "y": -162.6081233178461,
         "z": 51.47697448730469
       },
-      "name": "Zoryis",
+      "name": "Zoryis 5.-3",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -2233,13 +2301,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.5.1",
       "id": "sys_5_1",
       "coords": {
         "x": 439.48278969145224,
         "y": 99.6409056514037,
         "z": 73.58184814453125
       },
-      "name": "Myryub II",
+      "name": "Myryub II 5.1",
       "region": "dead",
       "tier": "explored",
       "skeleton": {
@@ -2253,13 +2322,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.5.2",
       "id": "sys_5_2",
       "coords": {
         "x": 460.71921276729756,
         "y": 174.6487746394201,
         "z": -73.83499145507812
       },
-      "name": "Quaeesh",
+      "name": "Quaeesh 5.2",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -2297,13 +2367,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.5.3",
       "id": "sys_5_3",
       "coords": {
         "x": 423.48911276681275,
         "y": 299.15336743435114,
         "z": 14.484024047851562
       },
-      "name": "Serioux",
+      "name": "Serioux 5.3",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -2329,13 +2400,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.5.4",
       "id": "sys_5_4",
       "coords": {
         "x": 439.6946976812501,
         "y": 341.61019896849547,
         "z": 57.32933044433594
       },
-      "name": "Thalyax II",
+      "name": "Thalyax II 5.4",
       "region": "normal",
       "tier": "explored",
       "skeleton": {
@@ -2349,13 +2421,14 @@
       }
     },
     {
+      "catalogueRef": "HX-M5QWYX3TORQXE5C7MFZGKYI.5.5",
       "id": "sys_5_5",
       "coords": {
         "x": 405.85394950686685,
         "y": 431.5803760560741,
         "z": 16.88201904296875
       },
-      "name": "Velioune III",
+      "name": "Velioune III 5.5",
       "region": "barrier",
       "tier": "explored",
       "skeleton": {

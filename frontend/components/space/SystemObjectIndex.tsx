@@ -9,6 +9,9 @@ import styles from './system-object-index.module.css'
 
 export interface IndexedObject {
   name: string
+  label?: string
+  catalogueRef?: string
+  enclosingStar?: string
   kind: string
   group: string
   x: number
@@ -83,7 +86,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
     if (details) requestAnimationFrame(() => (expandButtons.current.get(details) ?? searchRef.current ?? toggleRef.current)?.focus())
   }
   const [search, setSearch] = useState('')
-  const matches = available.filter(object => `${object.name} ${object.kind}`.toLowerCase().includes(search.trim().toLowerCase()))
+  const matches = available.filter(object => `${object.label ?? object.name} ${object.catalogueRef ?? ""} ${object.kind}`.toLowerCase().includes(search.trim().toLowerCase()))
   return <div className={styles.indexShell}>
     <Button plain ref={toggleRef} data-testid="system-index-toggle" aria-expanded={open} aria-controls="system-index" onClick={() => onOpen(!open)}>⌕ Objects · {available.length} <span>{open ? '−' : '+'}</span></Button>
     {/* Keep embedded command state mounted while its drawer is closed. */}
@@ -104,7 +107,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
           const rows = matches.filter(object => object.group === group)
           return rows.length > 0 && <section key={group}><p className={styles.eyebrow}>{group}</p>{rows.map(object => <div key={rowKey(object)} className={styles.indexRow} data-selected={object.fleet ? selectedFleetId === object.fleet.id : !fleetDetail && selected === object.name}>
             <Button plain ref={el => { if (el) expandButtons.current.set(rowKey(object), el); else expandButtons.current.delete(rowKey(object)) }} data-testid={object.fleet ? `index-fleet-${object.fleet.id}` : `index-${object.name}`} aria-expanded={!!detailObject && rowKey(detailObject) === rowKey(object)} aria-controls="object-details" onClick={() => { if (object.fleet) onSelectFleet?.(object.fleet.id); else onSelect(object.name); setDetails(detailObject && rowKey(detailObject) === rowKey(object) ? null : rowKey(object)) }}>
-              <span className={styles.rowCopy}><strong>{object.name}</strong><small>{object.kind}{object.name === tutorialTarget ? ' · Tutorial destination' : ''}</small></span>
+              <span className={styles.rowCopy}><strong>{object.label ?? object.name}</strong><small>{object.enclosingStar && `${object.enclosingStar} · `}{object.catalogueRef && `${object.catalogueRef} · `}{object.kind}{object.name === tutorialTarget ? ' · Tutorial destination' : ''}</small></span>
               <span aria-hidden="true" className={styles.rowChevron}>{detailObject && rowKey(detailObject) === rowKey(object) ? '‹' : '›'}</span>
             </Button>
           </div>)}</section>
@@ -112,18 +115,18 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
         {!loading && !failed && !fleetsLoading && !fleetsFailed && matches.length === 0 && <p role="status">{available.length ? 'No known objects match. Try a name or type.' : 'No objects have been disclosed in this system.'}</p>}
         <small className={styles.muted}>Select an object to open or close its details.</small>
       </aside>
-      {(detailObject || detailContent) && <aside style={!detailObject ? { display: 'none' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.name}` : undefined}>
+      {(detailObject || detailContent) && <aside style={!detailObject ? { display: 'none' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.label ?? detailObject.name}` : undefined}>
         {detailObject && <header className={styles.detailsHeader}><p className={styles.eyebrow}>SELECTED {fleetFacts ? 'FLEET' : detailObject.group === 'Stations' ? 'STATION' : detailObject.group === 'Worlds' ? 'WORLD' : 'OBJECT'}</p><Button autoFocus plain className={styles.detailsClose} data-testid="details-back" aria-label="Close details and return to objects" title="Back to objects" onClick={closeDetails}>←</Button></header>}
-        <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && detailObject.kind !== 'star' && <span aria-hidden="true" className={`${styles.portrait} ${styles[detailObject.className ?? 'rock']}`} />}</><div><h3>{detailObject.name}</h3><p className={styles.muted}>{detailObject.kind}</p></div></div>
+        <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && detailObject.kind !== 'star' && <span aria-hidden="true" className={`${styles.portrait} ${styles[detailObject.className ?? 'rock']}`} />}</><div><h3>{detailObject.label ?? detailObject.name}</h3>{detailObject.catalogueRef && <p>{detailObject.catalogueRef}</p>}<p className={styles.muted}>{detailObject.kind}</p></div></div>
         {open && fleetFacts && <SpacecraftPreview key={`fleet:${fleetFacts.id}`} kind="ship" objectId={fleetFacts.id} label={fleetFacts.id} accentColor={fleetFacts.mode === 0 ? 0xffb454 : fleetFacts.mode === 2 ? 0xc4b5fd : 0x4ade80} />}
-        {open && !fleetFacts && detailObject.kind === 'station' && <SpacecraftPreview key={`station:${detailObject.name}`} kind="station" objectId={detailObject.name} label={detailObject.name} accentColor={0x67e8f9} />}
-        {open && !fleetFacts && detailObject.kind === 'star' && <SpacecraftPreview key={`star:${detailObject.name}:${detailObject.starClass ?? ''}`} kind="star" objectId={detailObject.name} starClass={detailObject.starClass} label={detailObject.name} accentColor={0xffffff} />}
-        {open && selectedPlanet && <SpacecraftPreview key={`${selectedPlanet}:${detailObject.name}`} kind={selectedPlanet} objectId={detailObject.name} label={detailObject.name} accentColor={0xffffff} />}
+        {open && !fleetFacts && detailObject.kind === 'station' && <SpacecraftPreview key={`station:${detailObject.name}`} kind="station" objectId={detailObject.name} label={detailObject.label ?? detailObject.name} accentColor={0x67e8f9} />}
+        {open && !fleetFacts && detailObject.kind === 'star' && <SpacecraftPreview key={`star:${detailObject.name}:${detailObject.starClass ?? ''}`} kind="star" objectId={detailObject.name} starClass={detailObject.starClass} label={detailObject.label ?? detailObject.name} accentColor={0xffffff} />}
+        {open && selectedPlanet && <SpacecraftPreview key={`${selectedPlanet}:${detailObject.name}`} kind={selectedPlanet} objectId={detailObject.name} label={detailObject.label ?? detailObject.name} accentColor={0xffffff} />}
         {fleetFacts ? <dl className={styles.objectFacts}><dt>Activity</dt><dd>{fleetFacts.activity}</dd><dt>System</dt><dd>{fleetFacts.systemLabel}</dd>{fleetFacts.attachedTo && <><dt>Attached host</dt><dd>{fleetFacts.attachedTo}</dd></>}<dt>Ships</dt><dd>{fleetFacts.shipCount ?? 'Unavailable'}</dd></dl> : <dl className={styles.objectFacts}><dt>Known from</dt><dd>{detailObject.knownFrom ?? 'Astronomical observation'}</dd><dt>Resources</dt><dd>{detailObject.resources ?? 'Not surveyed — inspect or scan this host.'}</dd><dt>Fleets here</dt><dd>{detailObject.fleets?.length ? detailObject.fleets.join(', ') : 'No known fleets'}</dd>{detailObject.group === 'Stations' && <><dt>Services</dt><dd>Sell cargo · Purchase fuel while docked</dd></>}</dl>}</>}
           <div className={styles.detailServices} style={fleetFacts || detailObject?.name !== detailContentFor ? { display: 'none' } : undefined}>{detailContent}</div>
         </div>
         {detailObject && <div className={styles.indexActions}>
-          <Button plain data-testid="index-focus" disabled={disabled} onClick={() => { if (fleetFacts) onFocusFleet?.(fleetFacts.id); else onFocus() }}>Focus {detailObject.name} ⌖</Button>
+          <Button plain data-testid="index-focus" disabled={disabled} onClick={() => { if (fleetFacts) onFocusFleet?.(fleetFacts.id); else onFocus() }}>Focus {detailObject.label ?? detailObject.name} ⌖</Button>
           {!fleetFacts && (canPlot ? <Button color="cyan" className={styles.primary} data-testid="details-plot" disabled={disabled} onClick={onPlot}>Plot course ↗</Button> : plotHint ? <small className={styles.muted}>{plotHint}</small> : null)}
           {!fleetFacts && onOffscreen && <Button plain data-testid="simulate-offscreen" aria-pressed={offscreen} onClick={onOffscreen}>Preview off-screen locator</Button>}
         </div>}

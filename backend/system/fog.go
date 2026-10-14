@@ -2,6 +2,7 @@ package system
 
 import (
 	"hexaverse/common"
+	"hexaverse/discovery"
 	"hexaverse/space"
 )
 
@@ -21,8 +22,15 @@ import (
 // `system.Feature` itself, so there is no second representation left for a
 // caller to be reading.
 type fogFeatureDTO struct {
-	Id   string      `json:"id"`
-	Type FeatureType `json:"type"`
+	Discovery       *discovery.Record `json:"discovery,omitempty"`
+	CanName         bool              `json:"canName"`
+	Id              string            `json:"id"`
+	Type            FeatureType       `json:"type"`
+	Name            string            `json:"name"`
+	GeneratedName   string            `json:"generatedName"`
+	CatalogueRef    string            `json:"catalogueRef"`
+	OwnerCorpId     string            `json:"ownerCorpId,omitempty"`
+	NamingProtected bool              `json:"namingProtected"`
 	// Resources/Effects are the feature's full composition/threat detail —
 	// unconditional, never gated on a stored observation's detail.
 	Resources []Resource `json:"resources,omitempty"`
@@ -105,7 +113,9 @@ func projectUnfogged(gen *GeneratedInterior) []fogFeatureDTO {
 	for i := range gen.Features {
 		f := &gen.Features[i]
 		out = append(out, fogFeatureDTO{
-			Id: f.Id, Type: f.Type,
+			Id: f.Id, Type: f.Type, Discovery: f.Discovery,
+			Name: f.Name, GeneratedName: f.GeneratedName, CatalogueRef: f.CatalogueRef,
+			OwnerCorpId: f.OwnerCorpId, NamingProtected: f.NamingProtected,
 			Resources: f.Resources, Effects: f.Effects, Size: f.Size,
 			OrbitElements: orbitElementsOf(f.Space),
 		})

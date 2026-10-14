@@ -2,6 +2,7 @@ package system
 
 import (
 	"hexaverse/common"
+	"hexaverse/discovery"
 	"hexaverse/space"
 )
 
@@ -96,15 +97,16 @@ type Effects struct {
 // names its parent in Space.ParentId, and the star itself is the one
 // parentless body and carries no element set at all.
 type Feature struct {
-	Id        string      `json:"id" firestore:"id"`
-	Type      FeatureType `json:"type" firestore:"type"`
-	Name      string      `json:"name,omitempty" firestore:"name,omitempty"`
-	Resources []Resource  `json:"resources,omitempty" firestore:"resources,omitempty"`
-	Effects   *Effects    `json:"effects,omitempty" firestore:"effects,omitempty"`
-	// OwnerCorpId is DTO-only (`firestore:"-"` — never persisted, no schema
-	// change): it is populated solely on the station feature spliced into a read
-	// from the station store, which is the one feature family that has an owner.
-	// Generated features leave it empty, and nothing in this package writes it.
+	Discovery       *discovery.Record `json:"discovery,omitempty" firestore:"-"`
+	Id              string            `json:"id" firestore:"id"`
+	Type            FeatureType       `json:"type" firestore:"type"`
+	Name            string            `json:"name,omitempty" firestore:"name,omitempty"`
+	GeneratedName   string            `json:"generatedName" firestore:"generatedName"`
+	CatalogueRef    string            `json:"catalogueRef" firestore:"catalogueRef"`
+	NamingProtected bool              `json:"namingProtected" firestore:"namingProtected"`
+	Resources       []Resource        `json:"resources,omitempty" firestore:"resources,omitempty"`
+	Effects         *Effects          `json:"effects,omitempty" firestore:"effects,omitempty"`
+	// OwnerCorpId is projected from corporate claim authority (or the station store), never persisted on generated geometry.
 	OwnerCorpId string `json:"ownerCorpId,omitempty" firestore:"-"`
 
 	// --- orbital element set (add-orbital-system-bodies) -------------------

@@ -21,6 +21,8 @@ export function adaptGalaxy(wire: WireGalaxy): Galaxy {
   const nodes: GalaxyNode[] = wire.systems.map((s) => ({
     id: s.id,
     name: s.name,
+    catalogueRef: s.catalogueRef,
+    discovery: s.discovery,
     region: s.region,
     tier: s.tier,
     skeleton: s.skeleton,

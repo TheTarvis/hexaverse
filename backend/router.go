@@ -12,6 +12,7 @@ import (
 	"hexaverse/common"
 	"hexaverse/config"
 	"hexaverse/corporations"
+	"hexaverse/discovery"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
 	"hexaverse/health"
@@ -29,7 +30,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func SetupRouter() *gin.Engine {
+func SetupRouter() *gin.Engine { return setupRouterWithClock(common.WorldClock()) }
+
+func setupRouterWithClock(clock common.WorldTime) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
@@ -91,10 +94,9 @@ func SetupRouter() *gin.Engine {
 	// The action spine (#0005) and the verbs share ONE action.Service instance so
 	// the resolvers each verb registers are the same ones the sweep and reads
 	// dispatch through. Construct it explicitly, wire resolvers, then hand it out.
-	clock := common.WorldClock()
-	systemSvc := system.NewService()
 	galaxySvc := galaxy.NewService()
-	actionSvc := action.NewService()
+	systemSvc := system.NewServiceWith(system.NewDao(), galaxySvc, clock)
+	actionSvc := action.NewServiceWith(action.NewDaoWith(common.NewFirestoreService(), clock), clock, common.PubSub())
 	// systemSvc doubles as fleet's BodySource (its BodyTable method,
 	// migrate-fleet-to-continuous-burns design.md Decision 16) — the same
 	// concrete service instance every other domain already shares.
@@ -151,9 +153,15 @@ func SetupRouter() *gin.Engine {
 	fuelParams := fleet.DefaultFuelParams()
 	fleetSvc.WithFuelParams(fuelParams)
 
+	discoverySvc := discovery.NewService(galaxySvc, systemSvc, clock)
+	stationSvc.WithDiscovery(discoverySvc)
+	systemSvc.WithDiscovery(discoverySvc)
+	fleetSvc.WithDiscovery(discoverySvc)
+	fleet.RegisterSurveyResolver(actionSvc, systemSvc, discoverySvc)
+	galaxySvc.WithDiscovery(discoverySvc)
 	corpSvc := corporations.NewService(galaxySvc, fleetSvc, fogSvc).
 		WithMarket(stationSvc, marketParams.StartingCredits).
-		WithFuelParams(fuelParams)
+		WithFuelParams(fuelParams).WithDiscovery(discoverySvc)
 	corpHandler := corporations.NewHandler(corpSvc)
 
 	authorized := v1.Group("/")
@@ -175,7 +183,8 @@ func SetupRouter() *gin.Engine {
 
 	// Domain handlers: register them here. Use `/new-domain <name>` to scaffold one.
 	corpHandler.RegisterRoutes(authorized, strictLimit)
-	galaxy.NewHandler().WithFog(galaxyFogAdapter{fogSvc}).RegisterRoutes(authorized)
+	discovery.NewHandler(discoverySvc).RegisterRoutes(authorized)
+	galaxy.NewHandlerWith(galaxySvc, clock).WithFog(galaxyFogAdapter{fogSvc}).RegisterRoutes(authorized)
 	system.NewHandlerWith(systemSvc, clock).WithActions(actionSvc).WithContacts(systemSvc).RegisterRoutes(authorized)
 
 	// The action inbox authorizes through the actor→corporation seam

@@ -62,7 +62,9 @@ type ScanWindow struct {
 // (#0004 Decision #8). The fleet persists across systems, carrying its current
 // systemId, so it is top-level (not nested under system).
 type Fleet struct {
-	Id string `json:"id" firestore:"id"`
+	LastSurveyOutcome string        `json:"lastSurveyOutcome,omitempty" firestore:"lastSurveyOutcome,omitempty"`
+	Survey            *SurveyWindow `json:"survey,omitempty" firestore:"survey,omitempty"`
+	Id                string        `json:"id" firestore:"id"`
 	// CorporationId is carried from day one (dev-seeded until #0009), so
 	// ownership enforcement in M9 is not a retrofit.
 	CorporationId string `json:"corporationId" firestore:"corporationId"`
