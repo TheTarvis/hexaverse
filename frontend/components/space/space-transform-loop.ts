@@ -16,6 +16,7 @@
 // hit targets and off-screen chips (design.md Decision 7).
 
 import { useEffect, useMemo, useRef } from 'react'
+import { placeAnnotations } from './space-annotations'
 import type { WorldClock } from '@/lib/client-clock'
 import type { DrawViewBasis } from '@/lib/space/draw'
 import type { SpaceCamera } from './space-camera'
@@ -117,6 +118,7 @@ export interface SpaceTransformLoopOptions {
   /** `viewport = host.clientWidth || 1, host.clientHeight || 1`. */
   host: HTMLElement
   registry: HitTargetRegistry
+  annotationRegistry?: HitTargetRegistry
   cameraRef: { readonly current: SpaceCamera }
   /** Written by the loop, read by everyone else. */
   frameRef: { current: SpaceFrame | null }
@@ -142,7 +144,7 @@ export interface TransformLoopHandle {
 }
 
 export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): TransformLoopHandle {
-  const { host, registry, cameraRef, frameRef, source, staticSceneRef, onViewChange, extent = 0 } = options
+  const { host, registry, annotationRegistry, cameraRef, frameRef, source, staticSceneRef, onViewChange, extent = 0 } = options
 
   let rafId = 0
   let warned = false
@@ -199,6 +201,7 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
     const frame = { scene, camera, basis, projected, extent }
     for (const [id, el] of registry.entries()) applyHitTransform(frame, id, el)
 
+    if (annotationRegistry) placeAnnotations(frame, annotationRegistry)
     frameRef.current = frame
 
     if (requestedCamera !== lastCamera || width !== lastWidth || height !== lastHeight) {
@@ -265,7 +268,7 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
 export function useSpaceTransformLoop(
   options: Omit<SpaceTransformLoopOptions, 'host'> & { host: HTMLElement | null; enabled: boolean },
 ): { refresh(): void } {
-  const { host, enabled, registry, cameraRef, frameRef, source, staticSceneRef, onViewChange, extent = 0 } = options
+  const { host, enabled, registry, annotationRegistry, cameraRef, frameRef, source, staticSceneRef, onViewChange, extent = 0 } = options
   const handleRef = useRef<TransformLoopHandle | null>(null)
 
   useEffect(() => {
@@ -273,6 +276,7 @@ export function useSpaceTransformLoop(
     const handle = startSpaceTransformLoop({
       host,
       registry,
+      annotationRegistry,
       cameraRef,
       frameRef,
       source,
@@ -289,7 +293,7 @@ export function useSpaceTransformLoop(
     // the whole mount, so they never belong in this array; onViewChange is a
     // setState function, also stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, host, registry, source, extent])
+  }, [enabled, host, registry, annotationRegistry, source, extent])
 
   return useMemo(
     () => ({

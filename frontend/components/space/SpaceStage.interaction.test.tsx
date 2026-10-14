@@ -763,3 +763,65 @@ describe('SpaceStage — a contact\'s served velocity is displayed', () => {
     }
   })
 })
+
+
+describe('SpaceStage — compact object annotations', () => {
+  it('shows an identifier beside a disclosed body and reveals classification on hover', async () => {
+    await stage({ scene: { ...scene, marks: marks.map(mark => mark.id === 'feat-body-0' ? { ...mark, bodyType: 'rocky' } : mark) } })
+    const label = screen.getByTestId('space-annotation-feat-body-0')
+    expect(label).toHaveTextContent('feat-body-0')
+    expect(label).not.toHaveTextContent('rocky')
+    fireEvent.pointerOver(screen.getByTestId('body-hit-feat-body-0'))
+    expect(label).toHaveTextContent('rocky')
+    expect(label).toHaveStyle({ pointerEvents: 'none' })
+  })
+})
+
+
+describe('SpaceStage — annotation placement', () => {
+  it('keeps the selected object labeled in a crowd and suppresses colliding labels', async () => {
+    const crowded = Array.from({ length: 12 }, (_, index) => ({ ...marks[1], id: `world-${index}`, position: { x: 0, y: 0, z: 0 }, selected: index === 11 }))
+    await stage({ scene: { ...scene, marks: crowded }, selection: { bodyId: 'world-11' } })
+    await waitFor(() => expect(screen.getByTestId('space-annotation-world-11')).toBeVisible())
+    expect(screen.getAllByTestId(/^space-annotation-/).filter(el => el.style.visibility === 'visible').length).toBeLessThan(12)
+    fireEvent.pointerOver(screen.getByTestId('body-hit-world-10'))
+    await waitFor(() => expect(screen.getByTestId('space-annotation-world-10')).toBeVisible())
+    expect(screen.getByTestId('space-annotation-world-11')).toBeVisible()
+  })
+
+  it('tracks camera movement without losing touch and keyboard selection', async () => {
+    await stage()
+    const label = screen.getByTestId('space-annotation-feat-body-0')
+    await waitFor(() => expect(label).toBeVisible())
+    const before = label.style.transform
+    fireEvent.keyDown(screen.getByTestId('camera-orbit'), { key: 'ArrowRight' })
+    await waitFor(() => expect(label.style.transform).not.toBe(before))
+    const hit = screen.getByTestId('body-hit-feat-body-0')
+    fireEvent.touchStart(hit, { touches: [{ identifier: 1, clientX: 300, clientY: 300 }] })
+    fireEvent.touchEnd(hit, { changedTouches: [{ identifier: 1, clientX: 300, clientY: 300 }] })
+    expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-0' })
+    onSelect.mockClear()
+    hit.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-0' })
+  })
+
+  it('uses a disclosed name without adding contact identity to annotations', async () => {
+    await stage({ scene: { ...scene, marks: marks.map(mark => mark.id === 'feat-body-0' ? { ...mark, name: 'Pelagos' } : mark) } })
+    expect(screen.getByTestId('space-annotation-feat-body-0')).toHaveTextContent('Pelagos')
+    expect(screen.queryByTestId('space-annotation-contact-0')).toBeNull()
+  })
+})
+
+
+it('keeps long annotations inside the viewport near its right edge', async () => {
+  await stage({ scene: { ...scene, marks: [{ ...marks[1], name: 'A very long disclosed world name', position: { x: 220, y: 4, z: -60 } }] } })
+  const label = screen.getByTestId('space-annotation-feat-body-0')
+  await waitFor(() => expect(label).toBeVisible())
+  const coords = label.style.transform.match(/translate3d\(([^p]+)px, ([^p]+)px/)
+  expect(coords).not.toBeNull()
+  expect(Number(coords![1])).toBeGreaterThanOrEqual(8)
+  expect(Number(coords![1]) + 160).toBeLessThanOrEqual(W - 8)
+  expect(Number(coords![2])).toBeGreaterThanOrEqual(8)
+  expect(Number(coords![2]) + 26).toBeLessThanOrEqual(H - 8)
+})

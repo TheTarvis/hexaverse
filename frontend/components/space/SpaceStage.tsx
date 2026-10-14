@@ -42,6 +42,7 @@ import { formatByUnit, formatInstant, instantScaleLabel } from '@/lib/format'
 import { unprojectToViewPlane, type DrawVec3, type DrawViewBasis } from '@/lib/space/draw'
 import { SpaceCanvas } from './SpaceCanvas'
 import { projectMarks } from './space-projection'
+import { placeAnnotations } from './space-annotations'
 import {
   advanceDrag,
   atOrbitLimit,
@@ -199,6 +200,7 @@ export function SpaceStage({
   const [focusedMarkId, setFocusedMarkId] = useState<string | null>(null)
   const [hoveredContactId, setHoveredContactId] = useState<string | null>(null)
   const [hoveredGhostId, setHoveredGhostId] = useState<string | null>(null)
+  const [hoveredBodyId, setHoveredBodyId] = useState<string | null>(null)
   const [hoveredFleetId, setHoveredFleetId] = useState<string | null>(null)
   const [viewBasis, setViewBasis] = useState<DrawViewBasis | null>(null)
 
@@ -251,7 +253,13 @@ export function SpaceStage({
     createHitTargetRegistry((id, el) => applyHitTransform(frameRef.current, id, el)),
   )
 
+  const [annotationRegistry] = useState(() => createHitTargetRegistry())
+  useLayoutEffect(() => {
+    placeAnnotations(frameRef.current, annotationRegistry)
+  })
+
   const loop = useSpaceTransformLoop({
+    annotationRegistry,
     extent,
     // Publishing current scene state must precede the first GPU frame and
     // continue during recovery; only canvas input is gated by readiness.
@@ -507,6 +515,9 @@ export function SpaceStage({
           scale={scale}
           viewBasis={viewBasis}
           registry={registry}
+          annotationRegistry={annotationRegistry}
+          hoveredBodyId={hoveredBodyId}
+          onHoverBody={setHoveredBodyId}
           selection={selection}
           focusedMarkId={focusedMarkId}
           hoveredContactId={hoveredContactId}
@@ -599,6 +610,9 @@ interface SpaceLayersProps {
   /** Each pickable/own-fleet target registers itself here (task 4.3a); the
    * loop reads the registry to write every element's live position. */
   registry: HitTargetRegistry
+  annotationRegistry: HitTargetRegistry
+  hoveredBodyId: string | null
+  onHoverBody: (id: string | null) => void
   selection: SpaceSelection | null
   focusedMarkId: string | null
   hoveredContactId: string | null
@@ -628,6 +642,9 @@ function SpaceLayers({
   scale,
   viewBasis,
   registry,
+  annotationRegistry,
+  hoveredBodyId,
+  onHoverBody,
   selection,
   focusedMarkId,
   hoveredContactId,
@@ -716,12 +733,14 @@ function SpaceLayers({
         ref={registry.refFor(mark.id)}
         data-testid={`body-hit-${mark.id}`}
         data-body-id={mark.id}
-        aria-label={mark.id}
+        aria-label={mark.name || mark.id}
         aria-pressed={mark.selected}
         className={
           'pointer-events-auto absolute left-0 top-0 rounded-full' +
           ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
         }
+        onPointerOver={() => onHoverBody(mark.id)}
+        onPointerOut={() => onHoverBody(null)}
         onFocus={() => onFocusMark(mark.id)}
         onBlur={onBlurMark}
         onKeyDown={(e) => {
@@ -856,6 +875,29 @@ function SpaceLayers({
       <div className="pointer-events-none absolute inset-0">
         {bodies.map(hitButton)}
         {gates.map(hitButton)}
+      </div>
+
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        {projected.filter(({ mark }) => ['star', 'body', 'belt', 'gate', 'fleet'].includes(mark.kind)).map(({ mark }) => {
+          const selected = mark.selected || selection?.bodyId === mark.id || actingFleetId === mark.id
+          const hovered = hoveredBodyId === mark.id || focusedMarkId === mark.id || hoveredFleetId === mark.id
+          const detailed = selected || hovered
+          return (
+            <div
+              key={mark.id}
+              ref={annotationRegistry.refFor(mark.id)}
+              data-testid={`space-annotation-${mark.id}`}
+              data-priority={selected ? 2 : hovered ? 1 : 0}
+              className={'absolute left-0 top-0 max-w-40 rounded border px-2 py-1 text-[10px] leading-4 shadow-sm ' +
+                (selected ? 'border-cyan-300/70 bg-slate-950/90 text-cyan-100' : detailed ? 'border-white/30 bg-slate-950/90 text-white' : 'border-white/10 bg-slate-950/65 text-slate-300')}
+              style={{ pointerEvents: 'none', visibility: 'hidden' }}
+            >
+              <div className="truncate">{mark.name || mark.id}</div>
+              {detailed && (mark.bodyType || mark.starClass) && <div className="text-slate-400">{[mark.bodyType, mark.starClass].filter(Boolean).join(' · ').replaceAll('_', ' ')}</div>}
+              {detailed && mark.kind === 'fleet' && <div className="text-slate-400">{mark.fleetMode === 0 ? 'Under way' : mark.fleetMode === 1 ? 'Parked' : mark.fleetMode === 2 ? 'Drifting' : 'Status unknown'}</div>}
+            </div>
+          )
+        })}
       </div>
 
       {/* --- contacts: drawn, never pickable, with their SERVED velocity

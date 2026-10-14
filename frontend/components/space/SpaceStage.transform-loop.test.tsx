@@ -192,7 +192,7 @@ describe('SpaceStage + the transform loop — task 2.4', () => {
 })
 
 describe('SpaceStage + the transform loop — task 4.3a: capturing the registry', () => {
-  it('each SpaceStage mount creates exactly ONE registry, sized to its pickable and own-fleet marks', async () => {
+  it('keeps annotation placement separate from the pickable and own-fleet hit targets', async () => {
     const inputs = movingBodyInputs()
     const coarseScene = buildSceneModel({ ...inputs, worldTimeMs: T0 })
     render(
@@ -207,9 +207,10 @@ describe('SpaceStage + the transform loop — task 4.3a: capturing the registry'
       />,
     )
     await ready()
-    expect(registries).toHaveLength(1)
+    expect(registries).toHaveLength(2)
     const registrable = coarseScene.marks.filter((m) => m.pickable || m.kind === 'fleet').length
     expect(registries[0]!.size).toBe(registrable)
+    expect(registries[1]!.size).toBe(coarseScene.marks.filter(mark => ['star', 'body', 'belt', 'gate', 'fleet'].includes(mark.kind)).length)
   })
 })
 
@@ -235,6 +236,8 @@ describe('SpaceStage + the transform loop — task 4.3b', () => {
     const camera = JSON.parse(screen.getByTestId('space-canvas-region').getAttribute('data-camera')!)
     const basis = viewBasisOf(camera, { width: W, height: H })
 
+    const annotation = screen.getByTestId('space-annotation-fleet-1')
+    const beforeAnnotation = annotation.style.transform
     for (const t of [T0 + 16, T0 + 32, T0 + 48]) {
       simTime = t
       act(() => vi.advanceTimersToNextFrame())
@@ -245,6 +248,8 @@ describe('SpaceStage + the transform loop — task 4.3b', () => {
       )
       expect(screen.getByTestId('fleet-mark-fleet-1').style.transform).toBe(expected)
     }
+    expect(annotation).toBeVisible()
+    expect(annotation.style.transform).not.toBe(beforeAnnotation)
   })
 })
 

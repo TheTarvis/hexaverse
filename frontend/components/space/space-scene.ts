@@ -62,6 +62,8 @@ export type SceneMarkKind =
   | 'point-selection'
 
 export interface SceneMark {
+  /** Optional disclosed display name; current interior reads use identifiers. */
+  name?: string
   id: string
   kind: SceneMarkKind
   position: DrawVec3
