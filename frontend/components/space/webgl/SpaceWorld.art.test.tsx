@@ -26,9 +26,9 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 const mark = (id: string, type: string): SceneMark => ({ id, kind: 'body', bodyType: type, radius: 2, position: { x: 20, y: 1, z: 10 }, selected: false, pickable: true })
-async function mount(marks: SceneMark[]) {
+async function mount(marks: SceneMark[], beltFields: SceneModel['beltFields'] = []) {
   const camera = defaultCamera(100)
-  const scene: SceneModel = { marks, curves: [], beltFields: [], orbitRings: [], positionTimeMs: 0, decorativeTimeMs: 0, omissions: [] }
+  const scene: SceneModel = { marks, curves: [], beltFields, orbitRings: [], positionTimeMs: 0, decorativeTimeMs: 0, omissions: [] }
   const frameRef: { current: SpaceFrame } = { current: { camera, scene, basis: viewBasisOf(camera, { width: 1200, height: 900 }), projected: new Map() } }
   const canvas = document.createElement('canvas')
   vi.spyOn(canvas, 'getContext').mockReturnValue({ createProgram: vi.fn() } as unknown as WebGLRenderingContext)
@@ -211,4 +211,97 @@ it('only advances a selected, visible gas giant large enough to inspect', async 
   hidden.mockReturnValue(false); now += 40
   await h.step({ ...h.frameRef.current.camera, distance: 1000 }); expect(advance).not.toHaveBeenCalled()
   h.frameRef.current.projected = new Map(); await step(); expect(advance).not.toHaveBeenCalled()
+})
+
+const beltField = (memberCount = 10000): SceneModel['beltFields'][number] => ({
+  bodyId: 'rocky-belt', center: { x: 0, y: 0, z: 0 }, memberCount,
+  elements: { parentId: 'star', radius: 100, periodMs: 10000, phase: 0, inclination: 0, node: 0 },
+  ringCenter: { x: 40, y: 12, z: -30 },
+})
+function rockyBelts() {
+  const found: THREE.InstancedMesh[] = []
+  world().traverse(object => { if (object instanceof THREE.InstancedMesh) found.push(object) })
+  return found
+}
+it('renders bounded rocky belt detail along the served orbit and follows its parent', async () => {
+  const field = beltField()
+  const h = await mount([], [field])
+  expect(rockyBelts()).toHaveLength(1)
+  const rocks = rockyBelts()[0]!
+  expect(rocks.count).toBeGreaterThan(0)
+  expect(rocks.count).toBeLessThanOrEqual(512)
+  expect(rocks.position.toArray()).toEqual([40, 12, -30])
+  const matrix = new THREE.Matrix4(), position = new THREE.Vector3()
+  for (let i = 0; i < rocks.count; i++) {
+    rocks.getMatrixAt(i, matrix)
+    position.setFromMatrixPosition(matrix)
+    expect(Math.hypot(position.x, position.z)).toBeGreaterThanOrEqual(94.99)
+    expect(Math.hypot(position.x, position.z)).toBeLessThanOrEqual(105.01)
+    expect(Math.abs(position.y)).toBeLessThanOrEqual(1.21)
+  }
+  field.ringCenter = { x: -20, y: 4, z: 15 }
+  await h.step()
+  expect(rockyBelts()[0]).toBe(rocks)
+  expect(rocks.position.toArray()).toEqual([-20, 4, 15])
+  const hits: THREE.Intersection[] = []
+  rocks.raycast(new THREE.Raycaster(), hits)
+  expect(hits).toEqual([])
+})
+
+it('rebuilds refreshed belt orbits and releases instance resources before remount', async () => {
+  const field = beltField(128)
+  const h = await mount([], [field])
+  const original = rockyBelts()[0]!
+  const disposed = vi.spyOn(original, 'dispose')
+  const geometryDisposed = vi.spyOn(original.geometry, 'dispose')
+  const materialDisposed = vi.spyOn(original.material as THREE.Material, 'dispose')
+  field.elements = { ...field.elements, radius: 60 }
+  field.memberCount = 32
+  await h.step()
+  const refreshed = rockyBelts()[0]!
+  expect(refreshed).not.toBe(original)
+  expect(refreshed.count).toBe(32)
+  expect(disposed).toHaveBeenCalledTimes(1)
+  expect(geometryDisposed).toHaveBeenCalledTimes(1)
+  expect(materialDisposed).toHaveBeenCalledTimes(1)
+  const appearance = Array.from(refreshed.instanceMatrix.array)
+  const instanceDisposed = vi.spyOn(refreshed, 'dispose')
+  h.scene.beltFields = []
+  await h.step()
+  expect(rockyBelts()).toEqual([])
+  expect(instanceDisposed).toHaveBeenCalledTimes(1)
+  h.scene.beltFields = [field]
+  await h.step()
+  const remounted = rockyBelts()[0]!
+  expect(Array.from(remounted.instanceMatrix.array)).toEqual(appearance)
+  const remountedDisposed = vi.spyOn(remounted, 'dispose')
+  h.unmount()
+  expect(remountedDisposed).toHaveBeenCalledTimes(1)
+  expect(instanceDisposed).toHaveBeenCalledTimes(1)
+  expect(disposed).toHaveBeenCalledTimes(1)
+})
+
+it('keeps the tactical grid behind opaque belt silhouettes', async () => {
+  await mount([], [beltField(32)])
+  const material = rockyBelts()[0]!.material as THREE.Material
+  const gridMaterial = grid().material as THREE.LineBasicMaterial
+  expect(material.transparent).toBe(false)
+  expect(material.stencilWrite).toBe(true)
+  expect(material.stencilZPass).toBe(THREE.ReplaceStencilOp)
+  expect(gridMaterial.stencilFunc).toBe(THREE.EqualStencilFunc)
+  expect(gridMaterial.stencilRef).not.toBe(material.stencilRef)
+})
+
+it('keeps the main belt target aligned and releases its owned rock on removal', async () => {
+  const h = await mount([mark('belt-target', 'belt')])
+  const target = bodies()[0]!
+  expect(target.position.toArray()).toEqual([20, 1, 10])
+  expect(target.scale.x).toBe(2 * BODY_DRAW_SCALE)
+  const disposed = vi.spyOn(target.geometry, 'dispose')
+  h.scene.marks = []
+  await h.step()
+  expect(bodies()).toEqual([])
+  expect(disposed).toHaveBeenCalledTimes(1)
+  h.unmount()
+  expect(disposed).toHaveBeenCalledTimes(1)
 })
