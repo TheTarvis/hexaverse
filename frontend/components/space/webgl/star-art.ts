@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { MeshBasicNodeMaterial, SpriteNodeMaterial } from 'three/webgpu'
-import { uniform, positionLocal, sin, vec3, uv, length, smoothstep, atan, cos } from 'three/tsl'
+import { uniform, positionLocal, sin, vec3, uv, length, smoothstep, atan, cos, mix } from 'three/tsl'
 export interface StarModel { mesh: THREE.Mesh; advance(seconds: number): void; dispose(): void }
 const PALETTE: Record<string, number> = { O: 0x9bb0ff, B: 0xaabfff, A: 0xcad7ff, F: 0xf8f3e6, G: 0xffe7b8, K: 0xffc98a, M: 0xff9f6a }
 export function stellarTint(starClass?: string): number { return PALETTE[(starClass ?? '').charAt(0).toUpperCase()] ?? 0xffd9a0 }
@@ -18,18 +18,22 @@ export function createStarModel(options: { objectId: string; starClass?: string;
   const grain = sin(q.x.mul(67).add(sin(q.z.mul(49)).mul(2))).mul(sin(q.y.mul(59).sub(drift.mul(1.3))))
   const tint = new THREE.Color(stellarTint(options.starClass))
   const surface = new MeshBasicNodeMaterial({ color: tint })
-  surface.colorNode = vec3(tint.r, tint.g, tint.b).mul(broad.mul(0.18).add(grain.mul(0.11)).add(0.87))
+  // Dark convection cells and bright filaments stay legible under tone mapping.
+  const cells = smoothstep(-0.55, 0.65, broad)
+  const filaments = grain.abs().oneMinus().pow(6)
+  const plasma = mix(vec3(tint.r, tint.g, tint.b), vec3(1, 0.98, 0.94), filaments.mul(0.35))
+  surface.colorNode = plasma.mul(cells.mul(0.65).add(grain.mul(0.14)).add(filaments.mul(0.2)).add(0.68))
   const geometry = options.geometry ?? new THREE.SphereGeometry(1, 48, 32)
   const mesh = new THREE.Mesh(geometry, surface)
-  const coronaMaterial = new SpriteNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: tint, opacity: 0.8 })
+  const coronaMaterial = new SpriteNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: tint, opacity: 0.5 })
   const v = uv().sub(0.5).mul(2)
   const radius = length(v)
   const angle = atan(v.y, v.x)
   const tendrils = sin(angle.mul(11).add(drift)).mul(cos(angle.mul(7).sub(drift.mul(0.6)))).mul(0.065).add(1)
-  coronaMaterial.opacityNode = smoothstep(0.22, 1, radius.mul(tendrils)).oneMinus().pow(3).mul(0.72)
+  coronaMaterial.opacityNode = smoothstep(0.35, 1, radius.mul(tendrils)).oneMinus().pow(3).mul(0.42)
   coronaMaterial.colorNode = vec3(tint.r, tint.g, tint.b)
   const corona = new THREE.Sprite(coronaMaterial)
-  corona.scale.set(7.5, 7.5, 1)
+  corona.scale.set(4.8, 4.8, 1)
   corona.raycast = () => {}
   mesh.add(corona)
   let disposed = false
