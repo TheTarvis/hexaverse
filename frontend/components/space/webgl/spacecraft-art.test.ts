@@ -52,6 +52,27 @@ function bounded(root: THREE.Mesh) {
   return size
 }
 describe('add-ship-station-models real Three geometry', () => {
+  it.each(['ship', 'station'] as const)('Scenario: %s hull receives lighting while dedicated running lights retain their texture', async kind => {
+    const { createSpacecraftModel } = await art()
+    const hullMap = new THREE.DataTexture(new Uint8Array([90, 130, 170, 255]), 1, 1)
+    const lightMap = new THREE.DataTexture(new Uint8Array([255, 200, 140, 255]), 1, 1)
+    const hull = new THREE.MeshStandardMaterial({ map: hullMap, emissiveMap: hullMap.clone(), emissive: 0xffffff })
+    const lights = new THREE.MeshStandardMaterial({ emissiveMap: lightMap, emissive: 0xffffff })
+    const source = new THREE.Group()
+    source.add(new THREE.Mesh(new THREE.BoxGeometry(4, 2, 8), hull))
+    source.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), lights))
+    const model = createSpacecraftModel(kind, 0x4ade80, source)
+    const materials = [...resources(model).materials].filter((material): material is THREE.MeshStandardMaterial => material instanceof THREE.MeshStandardMaterial)
+    const renderedHull = materials.find(material => material.map?.image === hullMap.image)!
+    const renderedLights = materials.find(material => material.emissiveMap?.image === lightMap.image)!
+    // The imported diffuse atlas must not light every shadow-facing hull panel.
+    // A separately authored light atlas still contributes without incident light.
+    expect(renderedHull.emissiveMap).toBeNull()
+    expect(renderedHull.emissive.getHex()).toBe(0)
+    expect(renderedLights.emissive.getHex()).toBe(lights.emissive.getHex())
+    expect(hull.emissiveMap?.image).toBe(hullMap.image)
+    bounded(model)
+  })
   it.each(['ship', 'station'] as const)('Scenario: %s at gameplay and close zoom — bounded multipart lit fallback', async kind => {
     const { createSpacecraftModel } = await art()
     const model = createSpacecraftModel(kind, 0xffb454)

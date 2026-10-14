@@ -23,8 +23,22 @@ function cloneAsset(source: THREE.Group): THREE.Group {
     if (copy) return copy
     copy = original.clone()
     materials.set(original, copy)
+    // The bundled GLBs use the diffuse atlas as an all-over emissive lift.
+    // Restore incident-light shading so panel texture survives on sunlit hulls
+    // and the night side has depth. Dedicated light atlases remain emissive.
+    const diffuseGlow = original instanceof THREE.MeshStandardMaterial &&
+      original.map && original.emissiveMap && original.map.image === original.emissiveMap.image
+    if (copy instanceof THREE.MeshStandardMaterial) {
+      copy.metalness = Math.min(copy.metalness, 0.42)
+      copy.roughness = THREE.MathUtils.clamp(copy.roughness, 0.32, 0.58)
+      if (diffuseGlow) {
+        copy.emissiveMap = null
+        copy.emissive.set(0)
+      }
+    }
     for (const [key, value] of Object.entries(original)) {
       if (!(value instanceof THREE.Texture)) continue
+      if (key === 'emissiveMap' && diffuseGlow) continue
       let texture = textures.get(value)
       if (!texture) { texture = value.clone(); textures.set(value, texture) }
       Object.assign(copy, { [key]: texture })
@@ -87,8 +101,8 @@ function normalize(group: THREE.Group, radius: number) {
 
 function fallback(kind: SpacecraftKind, accent: THREE.MeshStandardMaterial): THREE.Group {
   const group = new THREE.Group()
-  const plate = new THREE.MeshStandardMaterial({ color: 0xb8cbd9, metalness: 0.48, roughness: 0.46 })
-  const recess = new THREE.MeshStandardMaterial({ color: 0x263746, metalness: 0.35, roughness: 0.65 })
+  const plate = new THREE.MeshStandardMaterial({ color: 0xcbdce8, metalness: 0.42, roughness: 0.36 })
+  const recess = new THREE.MeshStandardMaterial({ color: 0x1d2a38, metalness: 0.25, roughness: 0.58 })
   const add = (geometry: THREE.BufferGeometry, material: THREE.Material, x = 0, y = 0, z = 0) => {
     const mesh = new THREE.Mesh(geometry, material)
     mesh.position.set(x, y, z)
@@ -137,7 +151,7 @@ function fallback(kind: SpacecraftKind, accent: THREE.MeshStandardMaterial): THR
 
 export function createSpacecraftModel(kind: SpacecraftKind, accentColor: number, asset?: THREE.Group): THREE.Mesh {
   const root = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: accentColor, depthWrite: false }))
-  const accent = new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.65, metalness: 0.2, roughness: 0.5 })
+  const accent = new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.95, metalness: 0.15, roughness: 0.36 })
   if (asset) {
     try { root.add(normalize(cloneAsset(asset), 0.9)) }
     catch (error) {
@@ -158,6 +172,9 @@ export function createSpacecraftModel(kind: SpacecraftKind, accentColor: number,
     }
     const strip = (sample: (step: number, edge: number) => [number, number], steps: number) => {
       for (let i = 0; i < steps; i++) {
+        // Short gaps turn painted rails into restrained running lights while
+        // keeping the same surface fit and object silhouette.
+        if (i % 4 === 3) continue
         const points = [[i, -1], [i, 1], [i + 1, -1], [i + 1, 1]].map(([step, edge]) => {
           const [x, z] = sample(step!, edge!)
           return surface(x, z)
