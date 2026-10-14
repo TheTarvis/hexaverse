@@ -10,6 +10,9 @@ A later [spacecraft and label-placement pass](../spacecraft-review/README.md)
 addresses shadow-facing hull readability and labels over neighboring surfaces,
 with matching before/after captures at normal and closer zoom.
 
+The [station visibility pass](../station-review/README.md) adds clearer ring and
+hub panels plus fitted running lights, with sunlit and shadow-facing comparisons.
+
 ## Matched views
 
 Each pair uses identical disclosed wire data, 1440×1000 viewport, reduced motion, zero world clock/scale, and the same camera gestures. Baseline code is `8a8e6f43`. After code is integration `2b33d9b` plus the validation pass's ship diffuse response lift and passive-label density correction. Camera JSON and actual backend are recorded in the adjacent metrics files; all six camera/backend pairs were checked for equality.

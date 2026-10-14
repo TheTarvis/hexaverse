@@ -90,7 +90,7 @@ describe('add-ship-station-models real Three geometry', () => {
     if (kind === 'ship') expect(size.z).toBeGreaterThan(size.y * 1.5)
     else expect(size.x).toBeGreaterThan(size.y)
   })
-  it('Scenario: Repeated frames and multiple marks — imported resources are centered, normalized and independent', async () => {
+  it.each(['ship', 'station'] as const)('Scenario: Repeated %s marks — imported resources are centered, normalized and independent', async kind => {
     const { createSpacecraftModel, SPACECRAFT_ASSET_URLS } = await art()
     expect(SPACECRAFT_ASSET_URLS).toEqual({ ship: '/models/space/utility-ship.glb', station: '/models/space/orbital-station.glb' })
     const source = new THREE.Group()
@@ -100,8 +100,8 @@ describe('add-ship-station-models real Three geometry', () => {
     const a = new THREE.Mesh(geometry, material), b = new THREE.Mesh(geometry, material)
     a.position.set(12, 8, -20); b.position.set(14, 8, -20); source.add(a, b)
     const before = JSON.stringify(source.toJSON())
-    const first = createSpacecraftModel('ship', 0x4ade80, source)
-    const second = createSpacecraftModel('ship', 0xc4b5fd, source)
+    const first = createSpacecraftModel(kind, 0x4ade80, source)
+    const second = createSpacecraftModel(kind, 0xc4b5fd, source)
     bounded(first); bounded(second)
     expect(JSON.stringify(source.toJSON())).toBe(before)
     const original = resources(source), one = resources(first), two = resources(second)

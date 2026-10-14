@@ -46,3 +46,11 @@ lights, plus labels that avoid nearby object silhouettes. Both actual rendering
 backends passed the spacecraft and existing system journeys. All 2,216 frontend
 tests, TypeScript, ESLint and project file checks passed. The baseline checkout
 was used only for matching screenshots and removed afterward.
+
+## Station follow-up
+
+The user requested stations next. [Matched station views](station-review/README.md)
+record brighter reflected panels, cool grazing highlights and surface-fitting
+ring, spoke and hub lights. Both rendering backends passed the station and ship
+journeys; all 2,217 frontend tests, TypeScript, ESLint and project file checks
+passed. The baseline checkout was used only for matching captures and removed.

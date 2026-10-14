@@ -24,7 +24,7 @@ function cloneAsset(source: THREE.Group, kind: SpacecraftKind): THREE.Group {
     let copy = materials.get(original)
     if (copy) return copy
     // NodeMaterial.copy accepts the compatible physical material properties.
-    copy = kind === 'ship' && original instanceof THREE.MeshStandardMaterial
+    copy = original instanceof THREE.MeshStandardMaterial
       ? new MeshStandardNodeMaterial().copy(original as unknown as MeshStandardNodeMaterial)
       : original.clone()
     materials.set(original, copy)
@@ -34,9 +34,9 @@ function cloneAsset(source: THREE.Group, kind: SpacecraftKind): THREE.Group {
     const diffuseGlow = original instanceof THREE.MeshStandardMaterial &&
       original.map && original.emissiveMap && original.map.image === original.emissiveMap.image
     if (copy instanceof THREE.MeshStandardMaterial || copy instanceof MeshStandardNodeMaterial) {
-      // Small ship plates need a little more reflected-light response at play
-      // distance. Keep atlas contrast and directional shadows; no hull glow.
-      if (kind === 'ship') copy.color.multiplyScalar(1.6)
+      // Lift reflected hull panels at play distance while retaining atlas
+      // contrast. Stations have larger plates and need less lift than ships.
+      copy.color.multiplyScalar(kind === 'ship' ? 1.6 : 1.3)
       copy.metalness = Math.min(copy.metalness, 0.42)
       copy.roughness = THREE.MathUtils.clamp(copy.roughness, 0.32, 0.58)
       if (diffuseGlow) {
@@ -46,9 +46,9 @@ function cloneAsset(source: THREE.Group, kind: SpacecraftKind): THREE.Group {
       if (copy instanceof MeshStandardNodeMaterial) {
         // Lift dark atlas panels through reflected color while keeping recesses
         // dark. A narrow, cool grazing highlight reveals the shadow silhouette.
-        copy.colorNode = materialColor.rgb.max(0).pow(0.7)
+        copy.colorNode = materialColor.rgb.max(0).pow(kind === 'ship' ? 0.7 : 0.75)
         const rim = normalView.normalize().dot(positionViewDirection.normalize()).abs().oneMinus().pow(3)
-        copy.emissiveNode = materialEmissive.add(vec3(0.32, 0.46, 0.6).mul(rim).mul(0.45))
+        copy.emissiveNode = materialEmissive.add(vec3(0.32, 0.46, 0.6).mul(rim).mul(kind === 'ship' ? 0.45 : 0.3))
       }
     }
     for (const [key, value] of Object.entries(original)) {
@@ -219,11 +219,34 @@ export function createSpacecraftModel(kind: SpacecraftKind, accentColor: number,
         }, 16)
       }
     } else {
+      // Fit the outer rail to the actual ring, including variations in its
+      // plated rim. Each angular row probes at most three radii once.
+      const profile = new Map<number, number | null>()
       strip((step, edge) => {
         const angle = step * Math.PI * 2 / 64
-        const radius = 0.75 + edge * 0.013
-        return [Math.cos(angle) * radius, Math.sin(angle) * radius]
+        if (!profile.has(step)) {
+          const radius = [0.75, 0.7, 0.8].find(candidate => surface(Math.cos(angle) * candidate, Math.sin(angle) * candidate))
+          profile.set(step, radius ?? null)
+        }
+        const radius = profile.get(step)
+        if (radius == null) return null
+        return [Math.cos(angle) * (radius + edge * 0.018), Math.sin(angle) * (radius + edge * 0.018)]
       }, 64)
+      // Small spoke rails and a hub crown make the ring's internal structure
+      // readable. Missing surfaces simply omit the paint; no floating lights.
+      for (let spoke = 0; spoke < 8; spoke++) {
+        const angle = spoke * Math.PI / 4
+        strip((step, edge) => {
+          const radius = 0.24 + step * 0.42 / 24
+          const offset = edge * 0.018
+          return [Math.cos(angle) * radius - Math.sin(angle) * offset, Math.sin(angle) * radius + Math.cos(angle) * offset]
+        }, 24)
+      }
+      strip((step, edge) => {
+        const angle = step * Math.PI * 2 / 24
+        const radius = 0.1 + edge * 0.008
+        return [Math.cos(angle) * radius, Math.sin(angle) * radius]
+      }, 24)
     }
     const paint = new THREE.BufferGeometry()
     paint.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
