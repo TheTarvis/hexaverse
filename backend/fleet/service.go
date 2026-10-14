@@ -326,7 +326,10 @@ func (s *Service) Get(ctx context.Context, id string) (*Fleet, error) {
 			if _, err := s.actions.Cancel(ctx, f.ActiveScanId, map[string]interface{}{"survey": nil, "lastSurveyOutcome": "Survey cancelled: left range, departed, or target unavailable"}); err != nil && !errors.Is(err, action.ErrNotRunning) {
 				return nil, err
 			}
-			return s.load(ctx, id)
+			f, err = s.load(ctx, id)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	// Every decision this read feeds reads `cargo.fuel` — the roster's

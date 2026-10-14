@@ -69,6 +69,7 @@ type ServiceInterface interface {
 type Service struct {
 	discovery interface {
 		Records(context.Context, string) ([]discovery.Record, error)
+		Record(context.Context, string, string, string) (*discovery.Record, error)
 	}
 	dao   Dao
 	clock common.WorldTime
@@ -444,6 +445,7 @@ func (s *Service) LiveIdentity(ctx context.Context) (string, error) {
 }
 func (s *Service) WithDiscovery(d interface {
 	Records(context.Context, string) ([]discovery.Record, error)
+	Record(context.Context, string, string, string) (*discovery.Record, error)
 }) *Service {
 	s.discovery = d
 	return s
@@ -452,9 +454,21 @@ func (s *Service) projectDiscovery(ctx context.Context, gid string, nodes []Syst
 	if s.discovery == nil {
 		return nil
 	}
-	records, err := s.discovery.Records(ctx, gid)
-	if err != nil {
-		return err
+	var records []discovery.Record
+	if len(nodes) == 1 {
+		record, err := s.discovery.Record(ctx, gid, nodes[0].Id, "feat-star")
+		if err != nil {
+			return err
+		}
+		if record != nil {
+			records = append(records, *record)
+		}
+	} else {
+		var err error
+		records, err = s.discovery.Records(ctx, gid)
+		if err != nil {
+			return err
+		}
 	}
 	names := map[string]discovery.Record{}
 	for _, r := range records {

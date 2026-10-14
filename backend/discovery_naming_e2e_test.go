@@ -13,6 +13,7 @@ import (
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
 	"hexaverse/space"
+	"hexaverse/system"
 
 	"cloud.google.com/go/firestore"
 )
@@ -26,6 +27,7 @@ func TestDiscoveryHomeNamesAndOwnership(t *testing.T) {
 	var spawn struct {
 		Corporation struct{ Id string }
 		HomeSystem  struct{ Id, Name string }
+		Fleet       struct{ Id string }
 	}
 	w := doJSON(t, router, http.MethodPost, "/v1/corporations", token, map[string]any{"name": "Discovery Journey"}, &spawn)
 	if w.Code != http.StatusOK {
@@ -66,6 +68,9 @@ func TestDiscoveryHomeNamesAndOwnership(t *testing.T) {
 	if !star || !station {
 		t.Fatal("home star/station missing")
 	}
+	requireDiscoveryStatus(t, doJSON(t, router, http.MethodPost, "/v1/fleets/"+spawn.Fleet.Id+"/survey", token, map[string]any{"bodyId": "missing-body"}, nil), 404)
+	requireDiscoveryStatus(t, doJSON(t, router, http.MethodPost, "/v1/systems/missing-system/bodies/feat-star/name", token, map[string]any{"name": "Unreachable Haven", "confirmed": true}, nil), 404)
+
 }
 
 type discoveryClock struct{ at common.WorldMillis }
@@ -104,7 +109,15 @@ func parkDiscoveryFleet(t *testing.T, player discoveryPlayer, sid, bid string, a
 	f.SystemId = sid
 	f.Jump = nil
 	f.AttachedTo = bid
-	f.State = space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkOrbit, BodyId: bid, Radius: 15, PeriodMs: 60000, EpochMs: at}}
+	radius := 15.0
+	if bid == "feat-star" {
+		node, err := galaxy.NewService().GetLiveSystem(context.Background(), sid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		radius = space.StarClearanceRadius(system.StarSize(node.Skeleton.StarClass)) + 2
+	}
+	f.State = space.ShipState{Mode: space.ModeParked, Park: &space.Park{Kind: space.ParkOrbit, BodyId: bid, Radius: radius, PeriodMs: 60000, EpochMs: at}}
 	if err := dao.Save(context.Background(), *f); err != nil {
 		t.Fatal(err)
 	}
@@ -447,5 +460,45 @@ func TestDiscoverySurveyRejectsExcursionBetweenValidEndpoints(t *testing.T) {
 	requireDiscoveryStatus(t, doJSON(t, router, http.MethodGet, "/v1/fleets/"+player.fleet+"/survey", player.token, nil, &options), 200)
 	if options.SensorBusy || !strings.Contains(options.Outcome, "cancelled") {
 		t.Fatalf("invalid survey did not release slot with a reason: %+v", options)
+	}
+}
+
+func TestDiscoverySurveyMovementInsideRangeCompletes(t *testing.T) {
+	requireE2EEmulators(t)
+	ensureFirebaseInitialized(t)
+	clock := &discoveryClock{common.WorldClock().Now()}
+	router := setupRouterWithClock(clock)
+	player := spawnDiscoveryPlayer(t, router, "Moving Survey")
+	parkDiscoveryFleet(t, player, player.home, "feat-star", clock.at)
+	requireDiscoveryStatus(t, doJSON(t, router, http.MethodPost, "/v1/fleets/"+player.fleet+"/survey", player.token, map[string]any{"bodyId": "feat-star"}, nil), 200)
+	requireDiscoveryStatus(t, doJSON(t, router, http.MethodPost, "/v1/fleets/"+player.fleet+"/orders", player.token, map[string]any{"point": space.Vec3{X: 20}}, nil), 200)
+	clock.at += 30001
+	if discoveryBody(t, router, player.token, player.home, "feat-star")["canName"] != true {
+		t.Fatal("movement within range prevented a valid survey")
+	}
+}
+
+func TestDiscoveryForeignHomeSurveyPreservesOwnerAndNamingRights(t *testing.T) {
+	requireE2EEmulators(t)
+	ensureFirebaseInitialized(t)
+	clock := &discoveryClock{common.WorldClock().Now()}
+	router := setupRouterWithClock(clock)
+	owner := spawnDiscoveryPlayer(t, router, "Home Authority")
+	visitor := spawnDiscoveryPlayer(t, router, "Home Visitor")
+	parkDiscoveryFleet(t, visitor, owner.home, "feat-star", clock.at)
+	requireDiscoveryStatus(t, doJSON(t, router, http.MethodPost, "/v1/fleets/"+visitor.fleet+"/survey", visitor.token, map[string]any{"bodyId": "feat-star"}, nil), 200)
+	clock.at += 30001
+	body := discoveryBody(t, router, visitor.token, owner.home, "feat-star")
+	if body["ownerCorpId"] != owner.corp || body["canName"] != false {
+		t.Fatal("foreign survey took an existing home claim")
+	}
+	if discoveryBody(t, router, owner.token, owner.home, "feat-star")["canName"] != false {
+		t.Fatal("foreign survey unlocked the owner's entitlement")
+	}
+	parkDiscoveryFleet(t, owner, owner.home, "feat-star", clock.at)
+	requireDiscoveryStatus(t, doJSON(t, router, http.MethodPost, "/v1/fleets/"+owner.fleet+"/survey", owner.token, map[string]any{"bodyId": "feat-star"}, nil), 200)
+	clock.at += 30001
+	if discoveryBody(t, router, owner.token, owner.home, "feat-star")["canName"] != true {
+		t.Fatal("owner's own survey did not unlock naming")
 	}
 }

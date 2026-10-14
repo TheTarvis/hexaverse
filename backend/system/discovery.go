@@ -2,6 +2,7 @@ package system
 
 import (
 	"context"
+	"errors"
 
 	"hexaverse/discovery"
 	"hexaverse/galaxy"
@@ -43,6 +44,9 @@ func (s *Service) projectDiscovery(ctx context.Context, gid string, gen *Generat
 }
 func (s *Service) DiscoveryTargets(ctx context.Context, sid string) ([]discovery.Target, error) {
 	gen, err := s.GetOrCreateInterior(ctx, sid)
+	if errors.Is(err, ErrNotFound) || errors.Is(err, galaxy.ErrSystemNotFound) || errors.Is(err, galaxy.ErrNoLiveGalaxy) {
+		return nil, discovery.ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}

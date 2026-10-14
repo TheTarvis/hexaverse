@@ -564,6 +564,8 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "fleet is in lane transit"})
 	case errors.Is(err, ErrJumpNotAttached):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrSurveyTargetNotFound):
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrSurveyTarget):
 		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, ErrScanHostUnresolved):

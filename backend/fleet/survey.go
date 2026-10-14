@@ -17,6 +17,7 @@ const surveyType = "survey"
 const DefaultSurveyDuration common.WorldMillis = 30000
 
 var ErrSurveyTarget = errors.New("survey requires an eligible celestial body within range")
+var ErrSurveyTargetNotFound = errors.New("survey target does not exist in this system")
 
 type SurveySegment struct {
 	From  common.WorldMillis     `json:"-" firestore:"from"`
@@ -59,6 +60,9 @@ func (s *Service) Survey(ctx context.Context, id, bodyID string) (*Fleet, error)
 		return nil, ErrFleetInTransit
 	}
 	target, err := s.discovery.Target(ctx, f.SystemId, bodyID)
+	if errors.Is(err, discovery.ErrNotFound) {
+		return nil, ErrSurveyTargetNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
