@@ -80,7 +80,8 @@ describe('SpaceStage — the state it publishes', () => {
       />,
     )
     await waitFor(() => expect(onAvailabilityChange).toHaveBeenCalledWith(true))
-    expect(onFirstFrame).toHaveBeenCalled()
+    // Availability is reported before the parent's first-frame effect commits.
+    await waitFor(() => expect(onFirstFrame).toHaveBeenCalled())
   })
 
   it('publishes an empty selection rather than a stale one when nothing is selected', () => {
