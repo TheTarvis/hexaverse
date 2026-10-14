@@ -1,6 +1,6 @@
 # Deterministic world palettes and controlled luminous stars
 
-Status: ready-for-agent
+Status: claimed
 Type: task
 Blocked by: none
 Spec: ../spec.md
