@@ -38,11 +38,15 @@ export function createSurfaceTexture(bodyType: string, seed: string): THREE.Data
   const width = 256, height = 128, key = seedOf(seed)
   const data = new Uint8Array(width * height * 4)
   const gasPalettes = [
-    [[113, 68, 42], [238, 211, 160]],
-    [[75, 108, 126], [203, 225, 225]],
-    [[131, 93, 65], [245, 224, 189]],
+    [[106, 45, 29], [249, 206, 139]],
+    [[25, 70, 123], [167, 225, 239]],
+    [[67, 42, 112], [225, 172, 216]],
+    [[25, 88, 88], [169, 226, 195]],
+    [[117, 67, 35], [246, 228, 183]],
   ]
   const gas = gasPalettes[key % gasPalettes.length]!
+  // Art styles are fixed by identity, not new climate or habitability facts.
+  const oceanStyle = key % 3 !== 0
   for (let row = 0; row < height; row++) for (let col = 0; col < width; col++) {
     const latitude = Math.PI * row / (height - 1)
     const longitude = 2 * Math.PI * col / width
@@ -52,20 +56,37 @@ export function createSurfaceTexture(bodyType: string, seed: string): THREE.Data
     let low: number[], high: number[], blend: number
     if (bodyType === 'gas_giant') {
       const turbulence = terrain(x * 6, y * 14, z * 6, key)
-      const band = latitude * 32 + turbulence * 3.8
-      blend = 0.52 + 0.25 * Math.sin(band) + 0.12 * Math.sin(band * 2.7 + broad * 4) + (fine - 0.5) * 0.1
+      const band = latitude * (24 + key % 9) + turbulence * 5.6
+      blend = THREE.MathUtils.clamp(0.48 + 0.32 * Math.sin(band) + 0.16 * Math.sin(band * 2.7 + broad * 6) + (fine - 0.5) * 0.12, 0, 1)
       low = gas[0]!; high = gas[1]!
     } else if (bodyType === 'rocky') {
       const ridge = 1 - Math.abs(terrain(x * 15, y * 15, z * 15, key) * 2 - 1)
-      blend = THREE.MathUtils.clamp((broad - 0.28) * 2.1 + ridge * 0.13 + (fine - 0.5) * 0.14, 0, 1)
-      low = [49, 48, 46]; high = [208, 164 + key % 25, 113 + key % 35]
+      if (oceanStyle) {
+        // Broad continents, shallow cyan coasts and dark blue deep water.
+        const elevation = broad + (ridge - 0.5) * 0.075
+        if (elevation < 0.48) {
+          blend = THREE.MathUtils.smoothstep(elevation, 0.3, 0.48)
+          low = [8, 30, 86]; high = [22, 133, 167]
+        } else if (elevation < 0.5) {
+          blend = THREE.MathUtils.smoothstep(elevation, 0.48, 0.5)
+          low = [177, 181, 104]; high = [42, 116, 59]
+        } else {
+          blend = THREE.MathUtils.clamp((elevation - 0.5) * 4.4 + (fine - 0.5) * 0.18, 0, 1)
+          low = [28, 83, 44]; high = [131, 157, 90]
+        }
+      } else {
+        // Rust dunes and darker volcanic ridges retain a separate warm identity.
+        blend = THREE.MathUtils.clamp((broad - 0.25) * 2.3 + ridge * 0.12 + (fine - 0.5) * 0.19, 0, 1)
+        low = [78, 27, 22]; high = [231, 120 + key % 23, 57]
+      }
     } else if (bodyType === 'ice') {
-      const fracture = Math.pow(1 - Math.abs(broad * 2 - 1), 12)
-      blend = THREE.MathUtils.clamp(0.9 - fracture * 0.65 + (fine - 0.5) * 0.12, 0, 1)
-      low = [52, 104, 139]; high = [218, 239, 243]
+      const fractures = terrain(x * 12, y * 12, z * 12, key)
+      const fracture = Math.pow(1 - Math.abs(fractures * 2 - 1), 22)
+      blend = THREE.MathUtils.clamp(0.94 - fracture * 0.62 - broad * 0.12 + (fine - 0.5) * 0.14, 0, 1)
+      low = [28, 86, 137]; high = [226, 244, 250]
     } else {
       blend = THREE.MathUtils.clamp((broad - 0.2) * 1.65 + (fine - 0.5) * 0.2, 0, 1)
-      low = [65, 64, 69]; high = [197, 193, 186]
+      low = [42, 46, 61]; high = [195, 195, 204]
     }
     const offset = (row * width + col) * 4
     for (let channel = 0; channel < 3; channel++) data[offset + channel] = Math.round(THREE.MathUtils.lerp(low[channel]!, high[channel]!, blend))
@@ -98,9 +119,14 @@ export function advancePlanetClouds(mesh: THREE.Mesh, seconds: number): void {
 
 /** Shared by the system map and inspector; the object ID fixes its surface. */
 export function createPlanetModel(kind: PlanetKind, objectId: string, geometry: THREE.SphereGeometry): THREE.Mesh {
+  const surface = createSurfaceTexture(kind, objectId)
   const mesh = new THREE.Mesh(geometry, new MeshStandardNodeMaterial({
-    color: 0xffffff, map: createSurfaceTexture(kind, objectId),
-    roughness: kind === 'ice' ? 0.65 : 0.9, metalness: 0,
+    color: 0xffffff, map: surface,
+    // Reuse the owned surface map: no extra per-body texture or disposal path.
+    bumpMap: kind === 'gas_giant' ? null : surface,
+    bumpScale: kind === 'ice' ? 0.018 : 0.035,
+    roughness: kind === 'ice' ? 0.48 : kind === 'gas_giant' ? 0.82 : 0.76,
+    metalness: 0,
   }))
   if (kind === 'gas_giant') {
     const time = uniform(0)
@@ -113,8 +139,8 @@ export function createPlanetModel(kind: PlanetKind, objectId: string, geometry: 
 
   }
   if (kind === 'rocky') {
-    const atmosphere = new THREE.Mesh(geometry, createAtmosphereMaterial())
-    atmosphere.scale.setScalar(1.025)
+    const atmosphere = new THREE.Mesh(geometry, createAtmosphereMaterial(seedOf(objectId) % 3 === 0 ? 0xe69668 : 0x58b8ee))
+    atmosphere.scale.setScalar(1.018)
     mesh.add(atmosphere)
   }
   return mesh
@@ -162,15 +188,16 @@ export function createHexGrid(extent: number): THREE.LineSegments {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
   return new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
-    color: 0x24768e, vertexColors: true, transparent: true, opacity: 0.3, depthWrite: false,
+    color: 0x355463, vertexColors: true, transparent: true, opacity: 0.16, depthWrite: false,
   }))
 }
 
 /** A restrained scattering rim; its parent supplies position and draw scale. */
-export function createAtmosphereMaterial(): MeshBasicNodeMaterial {
+export function createAtmosphereMaterial(tint = 0x58b8ee): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
-  material.colorNode = vec3(0.16, 0.48, 0.7)
-  material.opacityNode = normalView.normalize().dot(positionViewDirection.normalize()).max(0).oneMinus().pow(5).mul(0.48)
+  const color = new THREE.Color(tint)
+  material.colorNode = vec3(color.r, color.g, color.b)
+  material.opacityNode = normalView.normalize().dot(positionViewDirection.normalize()).max(0).oneMinus().pow(6).mul(0.32)
   return material
 }
 
@@ -180,6 +207,9 @@ export function createBackdropMaterial(): MeshBasicNodeMaterial {
   const d = positionLocal.normalize()
   const ribbon = exp(d.y.add(0.22).add(sin(d.x.mul(4).add(d.z.mul(2))).mul(0.16)).mul(3.8).pow(2).negate())
   const cloud = sin(d.x.mul(7).add(d.z.mul(5))).mul(sin(d.z.mul(8).sub(d.y.mul(6)))).mul(0.22).add(0.55)
-  material.colorNode = vec3(0.0015, 0.004, 0.012).add(vec3(0.003, 0.012, 0.032).mul(ribbon).mul(cloud))
+  const violet = exp(d.z.sub(0.35).add(d.x.mul(0.4)).mul(4).pow(2).negate())
+  material.colorNode = vec3(0.001, 0.002, 0.006)
+    .add(vec3(0.004, 0.018, 0.026).mul(ribbon).mul(cloud))
+    .add(vec3(0.018, 0.003, 0.024).mul(violet).mul(ribbon).mul(cloud))
   return material
 }

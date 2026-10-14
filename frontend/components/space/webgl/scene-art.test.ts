@@ -49,6 +49,12 @@ describe('refresh-system-scene-art texture and geometry contract', () => {
     expect(Math.max(...rows) - Math.min(...rows)).toBeGreaterThan(10)
     const middle = Array.from({ length: 256 }, (_, x) => data[(64 * 256 + x) * 4]!)
     expect(new Set(middle).size).toBeGreaterThan(3)
+    texture.dispose()
+  })
+
+  it.each(['gas_giant', 'rocky', 'ice', 'moon'])('Scenario: Surface wraps continuously — %s', (type) => {
+    const texture = createSurfaceTexture(type, 'banded-world')!
+    const data = pixels(texture)
     // The seam must be no more conspicuous than ordinary adjacent samples.
     let seam = 0; let interior = 0
     for (let y = 0; y < 128; y++) {
@@ -56,6 +62,11 @@ describe('refresh-system-scene-art texture and geometry contract', () => {
       for (let x = 1; x < 256; x++) interior += Math.abs(data[(y * 256 + x) * 4]! - data[(y * 256 + x - 1) * 4]!)
     }
     expect(seam / 128).toBeLessThanOrEqual(interior / (128 * 255) * 3 + 2)
+    // A sphere has one point at each pole; longitude must not change it.
+    for (const y of [0, 127]) {
+      const pole = Array.from(data.slice(y * 256 * 4, y * 256 * 4 + 4))
+      for (let x = 1; x < 256; x++) expect(Array.from(data.slice((y * 256 + x) * 4, (y * 256 + x) * 4 + 4))).toEqual(pole)
+    }
     texture.dispose()
   })
 
