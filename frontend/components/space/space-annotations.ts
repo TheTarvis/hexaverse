@@ -5,6 +5,10 @@ import type { HitTargetRegistry, SpaceFrame } from './space-transform-loop'
 export function placeAnnotations(frame: SpaceFrame | null, registry: HitTargetRegistry): void {
   if (!frame) return
   const occupied: { x: number; y: number; width: number; height: number }[] = []
+  const surfaces = [...frame.projected.values()]
+    .filter(entry => entry.screen.depth > 0 && Number.isFinite(entry.screen.x) && Number.isFinite(entry.screen.y) && ['star', 'body', 'belt', 'gate', 'fleet'].includes(entry.mark.kind))
+    .map(entry => ({ x: entry.screen.x, y: entry.screen.y, radius: hitDiameter(entry, frame.basis, frame.extent) / 2 + 3 }))
+    .filter(surface => surface.x + surface.radius >= 0 && surface.x - surface.radius <= frame.basis.widthPx && surface.y + surface.radius >= 0 && surface.y - surface.radius <= frame.basis.heightPx)
   // Collision-free text can still blanket a dense system. Reserve most of the
   // viewport for surfaces, and let active inspection bypass the passive budget.
   const passiveBudget = Math.max(8, Math.min(18, Math.floor(frame.basis.widthPx * frame.basis.heightPx / 90_000)))
@@ -32,15 +36,30 @@ export function placeAnnotations(frame: SpaceFrame | null, registry: HitTargetRe
       { x: entry.screen.x - width / 2, y: entry.screen.y + gap },
       { x: entry.screen.x - width / 2, y: entry.screen.y - gap - height },
     ]
-    for (const candidate of candidates) {
-      const x = Math.max(margin, Math.min(frame.basis.widthPx - width - margin, candidate.x))
-      const y = Math.max(margin, Math.min(frame.basis.heightPx - height - margin, candidate.y))
-      if (occupied.some(rect => x < rect.x + rect.width + 4 && x + width + 4 > rect.x && y < rect.y + rect.height + 4 && y + height + 4 > rect.y)) continue
-      el.style.transform = `translate3d(${x}px, ${y}px, 0px)`
-      el.style.visibility = 'visible'
-      occupied.push({ x, y, width, height })
-      if (passive) passiveCount++
-      break
+    const placements = candidates.map(candidate => ({
+      x: Math.max(margin, Math.min(frame.basis.widthPx - width - margin, candidate.x)),
+      y: Math.max(margin, Math.min(frame.basis.heightPx - height - margin, candidate.y)),
+    }))
+    // Passive names yield to object surfaces. Active inspection first seeks
+    // clear space too, then keeps its disclosure visible if the view is packed.
+    const attempts = passive ? [true] : [true, false]
+    let placed = false
+    for (const avoidSurfaces of attempts) {
+      for (const { x, y } of placements) {
+        if (occupied.some(rect => x < rect.x + rect.width + 4 && x + width + 4 > rect.x && y < rect.y + rect.height + 4 && y + height + 4 > rect.y)) continue
+        if (avoidSurfaces && surfaces.some(surface => {
+          const dx = surface.x - Math.max(x, Math.min(x + width, surface.x))
+          const dy = surface.y - Math.max(y, Math.min(y + height, surface.y))
+          return dx * dx + dy * dy < surface.radius * surface.radius
+        })) continue
+        el.style.transform = `translate3d(${x}px, ${y}px, 0px)`
+        el.style.visibility = 'visible'
+        occupied.push({ x, y, width, height })
+        if (passive) passiveCount++
+        placed = true
+        break
+      }
+      if (placed) break
     }
   }
 }

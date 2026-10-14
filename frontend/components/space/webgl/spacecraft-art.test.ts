@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
+import { MeshStandardNodeMaterial } from 'three/webgpu'
 
 type Kind = 'ship' | 'station'
 interface Art {
@@ -62,7 +63,7 @@ describe('add-ship-station-models real Three geometry', () => {
     source.add(new THREE.Mesh(new THREE.BoxGeometry(4, 2, 8), hull))
     source.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), lights))
     const model = createSpacecraftModel(kind, 0x4ade80, source)
-    const materials = [...resources(model).materials].filter((material): material is THREE.MeshStandardMaterial => material instanceof THREE.MeshStandardMaterial)
+    const materials = [...resources(model).materials].filter((material): material is THREE.MeshStandardMaterial | MeshStandardNodeMaterial => material instanceof THREE.MeshStandardMaterial || material instanceof MeshStandardNodeMaterial)
     const renderedHull = materials.find(material => material.map?.image === hullMap.image)!
     const renderedLights = materials.find(material => material.emissiveMap?.image === lightMap.image)!
     // The imported diffuse atlas must not light every shadow-facing hull panel.

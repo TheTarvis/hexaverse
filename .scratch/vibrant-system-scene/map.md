@@ -37,3 +37,12 @@ cloud morphologies, differential jets and local storm shear, plus bounded
 unselected animation. Both real rendering backends passed the cloud and system
 journeys; all 2,213 frontend tests, TypeScript, ESLint and project file checks
 passed. No implementation worktrees were needed for this refinement.
+
+## Spacecraft and label follow-up
+
+The user approved the next visibility pass. [Matched spacecraft views](spacecraft-review/README.md)
+record reflected panel contrast, grazing highlights and hull-fitting running
+lights, plus labels that avoid nearby object silhouettes. Both actual rendering
+backends passed the spacecraft and existing system journeys. All 2,216 frontend
+tests, TypeScript, ESLint and project file checks passed. The baseline checkout
+was used only for matching screenshots and removed afterward.

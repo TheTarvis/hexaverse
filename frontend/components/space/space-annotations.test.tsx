@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
+import { defaultCamera } from './space-camera'
+import { viewBasisOf } from './space-projection'
+import { unprojectToViewPlane } from '@/lib/space/draw'
 
 // Annotation behavior is observed through the approved public SpaceStage seam.
 // Keep this companion suite with space-annotations.ts for file organization;
@@ -78,6 +81,45 @@ async function stage(over: Record<string, unknown> = {}) {
 }
 
 describe('SpaceStage — annotation placement', () => {
+  it('places a passive label in clear space instead of across a neighboring world', async () => {
+    const basis = viewBasisOf(defaultCamera(EXTENT), { width: W, height: H })
+    const origin = { x: 0, y: 0, z: 0 }
+    const target = { ...marks[1], id: 'target', radius: 6, position: origin }
+    const neighbor = { ...marks[1], id: 'neighbor', radius: 10, position: unprojectToViewPlane(670, 450, basis, origin) }
+    await stage({ scene: { ...scene, marks: [target, neighbor] } })
+    const label = screen.getByTestId('space-annotation-target')
+    await waitFor(() => expect(label).toBeVisible())
+    // The right-hand position would cover the world centered at x=670.
+    const x = Number(label.style.transform.match(/translate3d\(([-\d.]+)px/)![1])
+    expect(x).toBeLessThan(600)
+  })
+
+  it('suppresses a boxed-in passive label but discloses it when the object is hovered', async () => {
+    const basis = viewBasisOf(defaultCamera(EXTENT), { width: W, height: H })
+    const origin = { x: 0, y: 0, z: 0 }
+    const target = { ...marks[1], id: 'boxed-target', bodyType: 'debris', radius: 6, position: origin }
+    const neighbors = [[670, 450], [530, 450], [600, 520], [600, 380]].map(([x, y], i) => ({
+      ...marks[1], id: `neighbor-${i}`, radius: 10, position: unprojectToViewPlane(x!, y!, basis, origin),
+    }))
+    await stage({ scene: { ...scene, marks: [target, ...neighbors] } })
+    const label = screen.getByTestId('space-annotation-boxed-target')
+    expect(label).not.toBeVisible()
+    fireEvent.pointerOver(screen.getByTestId('body-hit-boxed-target'))
+    await waitFor(() => expect(label).toBeVisible())
+    expect(label).toHaveTextContent('debris')
+  })
+
+  it('avoids the visible edge of a world whose center is outside the viewport', async () => {
+    const basis = viewBasisOf(defaultCamera(EXTENT), { width: W, height: H })
+    const origin = { x: 0, y: 0, z: 0 }
+    const target = { ...marks[1], id: 'edge-target', radius: 3.4, position: unprojectToViewPlane(1070, 450, basis, origin) }
+    const neighbor = { ...marks[1], id: 'clipped-world', radius: 17, position: unprojectToViewPlane(1220, 450, basis, origin) }
+    await stage({ scene: { ...scene, marks: [target, neighbor] } })
+    const label = screen.getByTestId('space-annotation-edge-target')
+    await waitFor(() => expect(label).toBeVisible())
+    expect(Number(label.style.transform.match(/translate3d\(([-\d.]+)px/)![1])).toBeLessThan(1070)
+  })
+
   it('restrains passive labels in a dense view while selected and hovered objects remain disclosed', async () => {
     // Density and disclosure use lightweight valid bodies; procedural planet
     // texture construction belongs to art coverage, not this interaction seam.

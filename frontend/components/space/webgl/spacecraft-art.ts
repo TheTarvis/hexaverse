@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { MeshStandardNodeMaterial } from 'three/webgpu'
+import { materialColor, materialEmissive, normalView, positionViewDirection, vec3 } from 'three/tsl'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 
@@ -21,14 +23,17 @@ function cloneAsset(source: THREE.Group, kind: SpacecraftKind): THREE.Group {
   const materialOf = (original: THREE.Material) => {
     let copy = materials.get(original)
     if (copy) return copy
-    copy = original.clone()
+    // NodeMaterial.copy accepts the compatible physical material properties.
+    copy = kind === 'ship' && original instanceof THREE.MeshStandardMaterial
+      ? new MeshStandardNodeMaterial().copy(original as unknown as MeshStandardNodeMaterial)
+      : original.clone()
     materials.set(original, copy)
     // The bundled GLBs use the diffuse atlas as an all-over emissive lift.
     // Restore incident-light shading so panel texture survives on sunlit hulls
     // and the night side has depth. Dedicated light atlases remain emissive.
     const diffuseGlow = original instanceof THREE.MeshStandardMaterial &&
       original.map && original.emissiveMap && original.map.image === original.emissiveMap.image
-    if (copy instanceof THREE.MeshStandardMaterial) {
+    if (copy instanceof THREE.MeshStandardMaterial || copy instanceof MeshStandardNodeMaterial) {
       // Small ship plates need a little more reflected-light response at play
       // distance. Keep atlas contrast and directional shadows; no hull glow.
       if (kind === 'ship') copy.color.multiplyScalar(1.6)
@@ -37,6 +42,13 @@ function cloneAsset(source: THREE.Group, kind: SpacecraftKind): THREE.Group {
       if (diffuseGlow) {
         copy.emissiveMap = null
         copy.emissive.set(0)
+      }
+      if (copy instanceof MeshStandardNodeMaterial) {
+        // Lift dark atlas panels through reflected color while keeping recesses
+        // dark. A narrow, cool grazing highlight reveals the shadow silhouette.
+        copy.colorNode = materialColor.rgb.max(0).pow(0.7)
+        const rim = normalView.normalize().dot(positionViewDirection.normalize()).abs().oneMinus().pow(3)
+        copy.emissiveNode = materialEmissive.add(vec3(0.32, 0.46, 0.6).mul(rim).mul(0.45))
       }
     }
     for (const [key, value] of Object.entries(original)) {
@@ -170,16 +182,18 @@ export function createSpacecraftModel(kind: SpacecraftKind, accentColor: number,
     const vertices: number[] = []
     const surface = (x: number, z: number) => {
       ray.set(new THREE.Vector3(x, 1.1, z), new THREE.Vector3(0, -1, 0))
-      const hit = ray.intersectObject(root, true)[0]
+      const hit = ray.intersectObject(root.children[0]!, true)[0]
       return hit ? [x, hit.point.y + 0.008, z] : null
     }
-    const strip = (sample: (step: number, edge: number) => [number, number], steps: number) => {
+    const strip = (sample: (step: number, edge: number) => [number, number] | null, steps: number) => {
       for (let i = 0; i < steps; i++) {
         // Short gaps turn painted rails into restrained running lights while
         // keeping the same surface fit and object silhouette.
         if (i % 4 === 3) continue
         const points = [[i, -1], [i, 1], [i + 1, -1], [i + 1, 1]].map(([step, edge]) => {
-          const [x, z] = sample(step!, edge!)
+          const coordinate = sample(step!, edge!)
+          if (!coordinate) return null
+          const [x, z] = coordinate
           return surface(x, z)
         })
         if (points.some(point => !point)) continue
@@ -189,7 +203,21 @@ export function createSpacecraftModel(kind: SpacecraftKind, accentColor: number,
     if (kind === 'ship') {
       const bounds = new THREE.Box3().setFromObject(root)
       const railOffset = Math.min(0.4, Math.min(-bounds.min.x, bounds.max.x) * 0.8)
-      for (const side of [-1, 1]) strip((step, edge) => [side * railOffset + edge * 0.022, 0.12 + step * 0.025], 16)
+      const start = bounds.min.z * 0.75, span = (bounds.max.z - bounds.min.z) * 0.75
+      for (const side of [-1, 1]) {
+        const profile = new Map<number, number | null>()
+        strip((step, edge) => {
+          const z = start + step * span / 16
+          if (!profile.has(step)) {
+            // Probe inward at most three times per row; cache the result so
+            // light corners follow a narrow prow as well as wider hull plates.
+            const x = [1, 0.55, 0.22].map(fraction => side * railOffset * fraction).find(candidate => surface(candidate, z))
+            profile.set(step, x ?? null)
+          }
+          const x = profile.get(step)!
+          return x === null ? null : [x + edge * 0.028, z]
+        }, 16)
+      }
     } else {
       strip((step, edge) => {
         const angle = step * Math.PI * 2 / 64
