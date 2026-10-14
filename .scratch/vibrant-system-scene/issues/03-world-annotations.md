@@ -1,6 +1,6 @@
 # Prioritized compact world-attached annotations
 
-Status: claimed
+Status: resolved
 Type: task
 Blocked by: none
 Spec: ../spec.md
@@ -17,4 +17,4 @@ Use the spec-approved scene renderer/art, spacecraft integration, stage interact
 
 Implemented passive compact annotations for disclosed stars, bodies, belts, gates and own fleets in SpaceStage. Served scene names take precedence over identifiers; current wire data supplies identifiers. Selected, hovered and keyboard-focused objects receive placement priority and disclosed classification/activity detail. The existing transform loop places labels on each drawn frame, suppresses collisions and clamps labels within the viewport. Contact/sighting identities are never promoted into object annotations.
 
-Validation: stage interaction, lifecycle, fleet, sighting selection guard and transform loop tests; frontend TypeScript and targeted ESLint; per-file harness validation. Browser art review remains part of ticket 04 / final spec validation.
+Implemented in `56cde64` and merged into `feat/vibrant-system-scene`. Validation: all 111 stage interaction, lifecycle, fleet, sighting selection guard and transform loop tests passed, along with frontend TypeScript, scoped ESLint and file validators. Integrated browser art and interaction review follows [ticket 05](05-browser-validation.md).
