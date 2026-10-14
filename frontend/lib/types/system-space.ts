@@ -74,6 +74,8 @@ export interface SpaceBody {
  * reconstruct or default it.
  */
 export interface SpaceLaneGate {
+  name?: string
+  catalogueRef?: string
   id: string
   destSystemId: string
   laneId: string

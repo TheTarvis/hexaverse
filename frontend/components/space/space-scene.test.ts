@@ -531,3 +531,11 @@ it('uses the direct planet host and falls back to fleet tracking for missing hos
   const unknown = build({ fleets: [parkedFleet('unknown', 'missing')] }).marks.find(m => m.kind === 'fleet')!
   expect(unknown.followAnchor).toBeUndefined()
 })
+
+
+it('uses shared public names for celestial and gate scene labels without changing identity', () => {
+  const scene = build({ interior: interior({ features: [{ ...STAR, name: 'Bright Haven' }, { ...PLANET, name: 'Silver Reach' }], laneGates: [{ ...GATE, name: 'Gate to Amber Star' }] }) } as Partial<SceneInput>)
+  expect(markById(scene, STAR.id)?.name).toBe('Bright Haven')
+  expect(markById(scene, PLANET.id)?.name).toBe('Silver Reach')
+  expect(markById(scene, GATE.id)?.name).toBe('Gate to Amber Star')
+})

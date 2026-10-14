@@ -15,6 +15,8 @@ import (
 // world is `Space`/`OrbitElements`, resolved through the same body table
 // every other continuous position folds through.
 type LaneGate struct {
+	Name         string `json:"name"`
+	CatalogueRef string `json:"catalogueRef"`
 	// Id is this gate BODY's id in the system's own body table — the string
 	// a burn order names as its `bodyId` and the string `fleet.AttachedTo`
 	// reports once that burn settles (openspec build-production-space-view
@@ -110,9 +112,11 @@ func (s *Service) LaneGates(ctx context.Context, systemID string) ([]LaneGate, e
 
 	var self *galaxy.System
 	coords := make(map[string]galaxy.Coords, len(gal.Systems))
+	names := make(map[string]string, len(gal.Systems))
 	for i := range gal.Systems {
 		sys := &gal.Systems[i]
 		coords[sys.Id] = sys.Coords
+		names[sys.Id] = sys.Name
 		if sys.Id == systemID {
 			self = sys
 		}
@@ -140,6 +144,8 @@ func (s *Service) LaneGates(ctx context.Context, systemID string) ([]LaneGate, e
 		}
 		gates = append(gates, LaneGate{
 			Id:           gateId(nb),
+			Name:         "Gate to " + names[nb],
+			CatalogueRef: galaxy.CatalogueReference(gal.Galaxy.Id, systemID) + " / " + galaxy.CatalogueReference(gal.Galaxy.Id, nb),
 			DestSystemId: nb,
 			LaneId:       galaxy.LaneIdBetween(systemID, nb),
 		})

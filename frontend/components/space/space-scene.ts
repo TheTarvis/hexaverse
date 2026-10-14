@@ -377,6 +377,7 @@ export function buildSceneModel(input: SceneInput): SceneModel {
     }
     marks.push({
       id: gate.id,
+      name: gate.name,
       kind: 'gate',
       position,
       radius: gate.size,

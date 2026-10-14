@@ -109,7 +109,7 @@ func TestInteriorRead_LatticeOnlyFieldsAreAbsentFromTheResponse(t *testing.T) {
 		// interior_gate_body_id_e2e_test.go pins the equality that makes
 		// this key load-bearing rather than decorative.
 		assertKeySet(t, "LaneGate", keys, []string{
-			"id", "destSystemId", "laneId", "space", "size", "orbitElements",
+			"id", "destSystemId", "laneId", "space", "size", "orbitElements", "name", "catalogueRef",
 		})
 	})
 

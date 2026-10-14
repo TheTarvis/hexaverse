@@ -22,6 +22,8 @@ func Key(galaxyID, systemID, bodyID string) string {
 
 type Dao interface {
 	Records(context.Context, string) ([]Record, error)
+	SystemRecords(context.Context, string, string) ([]Record, error)
+	Record(context.Context, string, string, string) (*Record, error)
 	HomeInTx(context.Context, *firestore.Transaction, string, string, string, string, common.WorldMillis) error
 	Home(context.Context, string, string, string, string, common.WorldMillis) error
 	Name(context.Context, Target, string, string, common.WorldMillis) (*Record, error)
@@ -33,7 +35,19 @@ func NewDao() Dao                                     { return &DaoImpl{common.N
 func NewDaoWithClient(db common.FirestoreService) Dao { return &DaoImpl{db} }
 
 func (d *DaoImpl) Records(ctx context.Context, galaxyID string) ([]Record, error) {
-	it := d.db.Collection(Collection).Where("galaxyId", "==", galaxyID).Documents(ctx)
+	return d.records(ctx, galaxyID, "")
+}
+
+func (d *DaoImpl) SystemRecords(ctx context.Context, gid, sid string) ([]Record, error) {
+	return d.records(ctx, gid, sid)
+}
+
+func (d *DaoImpl) records(ctx context.Context, galaxyID, systemID string) ([]Record, error) {
+	query := d.db.Collection(Collection).Where("galaxyId", "==", galaxyID)
+	if systemID != "" {
+		query = query.Where("systemId", "==", systemID)
+	}
+	it := query.Documents(ctx)
 	defer it.Stop()
 	out := []Record{}
 	for {
@@ -151,4 +165,19 @@ func (d *DaoImpl) Name(ctx context.Context, target Target, cid, name string, at 
 		return nil
 	})
 	return out, err
+}
+
+func (d *DaoImpl) Record(ctx context.Context, gid, sid, bid string) (*Record, error) {
+	snap, err := d.db.Get(ctx, Collection, Key(gid, sid, bid))
+	if status.Code(err) == codes.NotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var r Record
+	if err := snap.DataTo(&r); err != nil {
+		return nil, err
+	}
+	return &r, nil
 }

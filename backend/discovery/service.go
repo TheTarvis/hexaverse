@@ -91,3 +91,10 @@ func (s *Service) Targets(ctx context.Context, sid string) ([]Target, error) {
 func (s *Service) HomeInTx(ctx context.Context, tx *firestore.Transaction, gid, sid, cid, name string, at common.WorldMillis) error {
 	return s.dao.HomeInTx(ctx, tx, gid, sid, cid, name, at)
 }
+
+func (s *Service) SystemRecords(ctx context.Context, gid, sid string) ([]Record, error) {
+	return s.dao.SystemRecords(ctx, gid, sid)
+}
+func (s *Service) Record(ctx context.Context, gid, sid, bid string) (*Record, error) {
+	return s.dao.Record(ctx, gid, sid, bid)
+}

@@ -8,7 +8,7 @@ import (
 )
 
 type DiscoverySource interface {
-	Records(context.Context, string) ([]discovery.Record, error)
+	SystemRecords(context.Context, string, string) ([]discovery.Record, error)
 }
 
 func (s *Service) WithDiscovery(d DiscoverySource) *Service { s.discovery = d; return s }
@@ -16,7 +16,7 @@ func (s *Service) projectDiscovery(ctx context.Context, gid string, gen *Generat
 	if s.discovery == nil {
 		return nil
 	}
-	records, err := s.discovery.Records(ctx, gid)
+	records, err := s.discovery.SystemRecords(ctx, gid, gen.Interior.SystemId)
 	if err != nil {
 		return err
 	}

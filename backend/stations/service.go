@@ -44,7 +44,7 @@ type ServiceInterface interface {
 
 type Service struct {
 	discovery interface {
-		Records(context.Context, string) ([]discovery.Record, error)
+		Record(context.Context, string, string, string) (*discovery.Record, error)
 	}
 	dao   Dao
 	graph GraphSource
@@ -128,15 +128,13 @@ func (s *Service) Get(ctx context.Context, systemID string) (*Station, error) {
 		return station, err
 	}
 	if s.discovery != nil {
-		records, err := s.discovery.Records(ctx, meta.Id)
+		record, err := s.discovery.Record(ctx, meta.Id, systemID, StationFeatureId)
 		if err != nil {
 			return nil, err
 		}
-		for _, r := range records {
-			if r.SystemId == systemID && r.BodyId == StationFeatureId {
-				station.Name = r.Name
-				station.OwnerCorpId = r.OwnerCorpId
-			}
+		if record != nil {
+			station.Name = record.Name
+			station.OwnerCorpId = record.OwnerCorpId
 		}
 	}
 	return station, nil
@@ -221,7 +219,7 @@ func stationName(st *Station) string {
 	return "Trading Station"
 }
 func (s *Service) WithDiscovery(d interface {
-	Records(context.Context, string) ([]discovery.Record, error)
+	Record(context.Context, string, string, string) (*discovery.Record, error)
 }) *Service {
 	s.discovery = d
 	return s

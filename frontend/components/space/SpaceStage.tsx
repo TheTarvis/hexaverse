@@ -1044,7 +1044,7 @@ function SpaceLayers({
             type="button"
             {...{ [AFFORDANCE_ATTR]: '' }}
             data-testid={`offscreen-${mark.id}`}
-            aria-label={`Bring ${mark.id} into view`}
+            aria-label={`Bring ${mark.name || mark.id} into view`}
             className={
               'pointer-events-auto absolute left-4 rounded-full border border-white/20 bg-black/60 px-2 py-1 text-[10px] text-zinc-200' +
               ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
@@ -1060,7 +1060,7 @@ function SpaceLayers({
               onSelect({ bodyId: mark.id })
             }}
           >
-            {mark.id}
+            {mark.name || mark.id}
           </button>
         ))}
       </div>

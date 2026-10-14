@@ -372,14 +372,11 @@ func JumpResolver(_ context.Context, r action.Resolution) (action.ResolveResult,
 	// w.r.t. Firestore, so a zero-value Service is safe to call it on.
 	writes := (&charts.Service{}).ArrivalWrites(f.CorporationId, destId, []string{laneId}, r.At)
 	if gid, ok := r.Action.Params["galaxyId"].(string); ok && gid != "" && r.ReadDocument != nil {
-		path := []string{discovery.Collection, discovery.Key(gid, destId, "feat-star")}
-		var record discovery.Record
-		if _, err := r.ReadDocument(path, &record); err != nil {
+		arrival, err := (&discovery.Service{}).ArrivalWrites(r, gid, destId, f.CorporationId)
+		if err != nil {
 			return action.ResolveResult{}, err
 		}
-		if record.FirstArrival == nil || r.At < record.FirstArrival.At {
-			writes = append(writes, action.DocWrite{Path: path, Data: map[string]interface{}{"galaxyId": gid, "systemId": destId, "bodyId": "feat-star", "firstArrival": discovery.Attribution{CorporationId: f.CorporationId, At: r.At}}})
-		}
+		writes = append(writes, arrival...)
 	}
 
 	return action.ResolveResult{
