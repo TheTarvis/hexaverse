@@ -48,6 +48,20 @@ Measurements are 119 browser requestAnimationFrame intervals in each settled sce
 
 Camera gestures remained responsive in both scenes/backends. This sample did not reveal a material scheduling regression. The crowded screenshot remains a stress fixture, not a typical generated system distribution.
 
+## Final integration checks
+
+`bash harness/check.sh --frontend --keep-going` passed TypeScript, ESLint and
+all 2,212 tests across 163 files on integration `bca0dd7`. Explicit per-file
+project checks passed for every changed frontend file. The existing Stage-level
+annotation tests live in `space-annotations.test.tsx` to satisfy the matching-file
+check without changing their public seam or assertions. [Independent code
+reviews](code-review.md) found zero actionable findings on either axis.
+
+An intermediate test run exposed an [existing scan confirmation timing
+race](preexisting-scan-race.md). It was diagnosed and left outside this scene-art
+scope; the final integrated suite passed with production scan code unchanged.
+All implementation tickets are resolved and temporary worktrees were removed.
+
 ## Reproduction
 
 From the repository root, run:

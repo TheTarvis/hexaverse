@@ -42,3 +42,12 @@ consistent with the spec's requested screenshot review.
 
 Summary: Standards 0 findings; Spec 0 findings. Neither axis has an actionable
 issue.
+
+## Subsequent validation-only changes
+
+After the independent reviews, the dense annotation test's fixture changed from
+procedural rocky surfaces to lightweight disclosed debris. Four existing Stage
+annotation tests then moved to the matching `space-annotations.test.tsx` file.
+These changes preserve their public seam and assertions and do not change
+production behavior. Final TypeScript, ESLint, explicit project file checks and
+all 2,212 tests across 163 files passed.
