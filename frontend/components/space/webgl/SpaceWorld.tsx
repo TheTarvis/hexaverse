@@ -14,7 +14,7 @@
 // WHAT IT DRESSES THE SCENE WITH — lifted from the `/spike/space-3d` look:
 // a lit world (one ambient fill plus a point light riding the star), tinted
 // bodies by served feature type, an additive halo on the star, faint orbit
-// rings in each parent's frame, a jittered particle ring per belt, a far
+// rings in each parent's frame, instanced rocky detail per belt, a far
 // starfield shell and a faint ecliptic grid, and a camera-facing reticle on
 // the selection. All of it lives in a `decor` group so the world's DIRECT
 // children stay exactly one mesh per mark and one line per burn curve —
@@ -145,6 +145,8 @@ const STARFIELD_COUNT = 1400
 const ORBIT_RING_SAMPLES = 128
 const BELT_RADIAL_JITTER = 0.05
 const BELT_NORMAL_JITTER = 0.012
+// Presentation budget per belt, independent of the number of simulated members.
+const BELT_ROCK_LIMIT = 384
 
 const FOV_DEGREES = (Math.atan(TAN_HALF_FOV) * 360) / Math.PI
 
@@ -164,6 +166,31 @@ function seeded(seed: number): () => number {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0
     return state / 4294967296
   }
+}
+
+/** Owned faceted rock with all vertices inside the existing unit draw radius. */
+function rockGeometry(seed: number): THREE.BufferGeometry {
+  const rand = seeded(seed)
+  const geometry = new THREE.IcosahedronGeometry(1, 1)
+  const vertices = geometry.getAttribute('position')
+  const shapeSeed = rand() * Math.PI * 2
+  let maxRadius = 0
+  // Coherent deformation keeps duplicated vertices on adjoining facets together.
+  for (let i = 0; i < vertices.count; i++) {
+    const x = vertices.getX(i), y = vertices.getY(i), z = vertices.getZ(i)
+    const relief = 1 + 0.18 * Math.sin(x * 7 + shapeSeed) * Math.cos(y * 5 - z * 6)
+    vertices.setXYZ(i, x * relief, y * relief * 0.82, z * relief)
+    maxRadius = Math.max(maxRadius, Math.hypot(vertices.getX(i), vertices.getY(i), vertices.getZ(i)))
+  }
+  geometry.scale(1 / maxRadius, 1 / maxRadius, 1 / maxRadius)
+  geometry.computeVertexNormals()
+  const colors = new Float32Array(vertices.count * 3)
+  for (let i = 0; i < vertices.count; i += 3) {
+    const shade = 0.65 + rand() * 0.35
+    for (let j = 0; j < 3; j++) colors.set([shade, shade, shade], (i + j) * 3)
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  return geometry
 }
 
 function tintOf(mark: SceneMark): number {
@@ -215,8 +242,9 @@ export function SpaceWorld({
     const sharedGeometry = [sphere, wireSphere, octahedron]
 
     // --- light -------------------------------------------------------------
-    world.add(new THREE.AmbientLight(0xa8c5ed, 0.65))
-    const starLight = new THREE.PointLight(STAR_TINT_DEFAULT, 3.2, 0, 0)
+    world.add(new THREE.AmbientLight(0xa8c5ed, 0.23))
+    world.add(new THREE.HemisphereLight(0x9bbce8, 0x171523, 0.32))
+    const starLight = new THREE.PointLight(STAR_TINT_DEFAULT, 4.4, 0, 0)
     world.add(starLight)
 
     // --- decoration, all under one group -----------------------------------
@@ -323,7 +351,7 @@ export function SpaceWorld({
     /** Decorative streaks rebuilt every frame: the path ahead, drift headings. */
     const streaks: THREE.Line[] = []
     const rings = new Map<string, THREE.Line>()
-    const belts = new Map<string, THREE.Points>()
+    const belts = new Map<string, { mesh: THREE.InstancedMesh; variant: string }>()
     let frameId = 0
     let announced = false
     // The published frame's scene, refreshed at the top of every `draw()`
@@ -391,6 +419,11 @@ export function SpaceWorld({
         mesh.add(halo(tint, 0.12, 2.6))
         return mesh
       }
+      if (type === 'belt' || mark.kind === 'belt') {
+        return new THREE.Mesh(rockGeometry(hashOf(mark.id)), new THREE.MeshStandardMaterial({
+          color: tint, vertexColors: true, roughness: 0.9, metalness: 0.04, flatShading: true,
+        }))
+      }
       const planet = planetKind(type)
       if (planet) return createPlanetModel(planet, mark.id, sphere)
       if (LIT_TYPES.has(type)) {
@@ -419,6 +452,8 @@ export function SpaceWorld({
       root.traverse(object => {
         if (!(object instanceof THREE.Mesh || object instanceof THREE.Sprite || object instanceof THREE.Line || object instanceof THREE.Points)) return
         if (!(object instanceof THREE.Sprite) && (geometry || !sharedGeometry.includes(object.geometry as THREE.SphereGeometry))) geometries.add(object.geometry)
+        // Instance buffers are owned by the object, separately from geometry.
+        if (object instanceof THREE.InstancedMesh) object.dispose()
         const list = Array.isArray(object.material) ? object.material : [object.material]
         for (const material of list) {
           materials.add(material)
@@ -657,9 +692,11 @@ export function SpaceWorld({
           line = new THREE.Line(
             new THREE.BufferGeometry().setFromPoints(orbitSamples(ring.elements, ORBIT_RING_SAMPLES)),
             new THREE.LineBasicMaterial({
-              color: dim ? 0x223048 : 0x28324e,
+              color: dim ? 0x405068 : 0x4b6076,
               transparent: true,
-              opacity: dim ? 0.5 : 0.65,
+              opacity: dim ? 0.2 : 0.32,
+              depthWrite: false,
+              stencilWrite: true, stencilRef: 0, stencilFunc: THREE.EqualStencilFunc,
             }),
           )
           rings.set(key, line)
@@ -676,48 +713,61 @@ export function SpaceWorld({
       }
     }
 
-    // Belt fields: a jittered particle ring along the belt's served orbit,
+    // Belt fields: bounded rocky instances along the belt's served orbit,
     // in its parent's frame — never a mark, never pickable.
     const syncBelts = () => {
       const live = new Set<string>()
       for (const field of liveScene.beltFields) {
         live.add(field.bodyId)
-        let points = belts.get(field.bodyId)
-        if (!points) {
+        const variant = JSON.stringify([field.memberCount, field.elements])
+        const previous = belts.get(field.bodyId)
+        let rocks = previous?.mesh
+        if (previous && previous.variant !== variant) {
+          decor.remove(previous.mesh)
+          disposeResources(previous.mesh, true)
+          belts.delete(field.bodyId)
+          rocks = undefined
+        }
+        if (!rocks) {
           const rand = seeded(hashOf(field.bodyId))
           const period = field.elements.periodMs > 0 ? field.elements.periodMs : 1
           const a = toV(drawOrbitPosition(field.elements, 0))
           const b = toV(drawOrbitPosition(field.elements, period / 4))
           const normal = new THREE.Vector3().crossVectors(a, b).normalize()
-          const positions = new Float32Array(field.memberCount * 3)
-          for (let i = 0; i < field.memberCount; i++) {
+          const count = Number.isFinite(field.memberCount) ? THREE.MathUtils.clamp(Math.floor(field.memberCount), 0, BELT_ROCK_LIMIT) : 0
+          const geometry = rockGeometry(hashOf(field.bodyId))
+          rocks = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({
+            color: 0xffffff, vertexColors: true, roughness: 0.9, metalness: 0.04,
+            flatShading: true,
+          }), count)
+          const pose = new THREE.Object3D()
+          const palette = [0xafa291, 0x78695f, 0x9babbc, 0xbd896a]
+          for (let i = 0; i < count; i++) {
             const p = toV(drawOrbitPosition(field.elements, rand() * period))
             p.multiplyScalar(1 + (rand() - 0.5) * 2 * BELT_RADIAL_JITTER)
             p.addScaledVector(normal, (rand() - 0.5) * 2 * BELT_NORMAL_JITTER * field.elements.radius)
-            positions.set([p.x, p.y, p.z], i * 3)
+            pose.position.copy(p)
+            pose.rotation.set(rand() * Math.PI, rand() * Math.PI, rand() * Math.PI)
+            const size = Math.max(floor * 0.6, 0.6) * (0.45 + rand() * 0.8)
+            pose.scale.set(size * (0.7 + rand() * 0.6), size * (0.6 + rand() * 0.4), size)
+            pose.updateMatrix()
+            rocks.setMatrixAt(i, pose.matrix)
+            rocks.setColorAt(i, new THREE.Color(palette[Math.floor(rand() * palette.length)]!))
           }
-          const geometry = new THREE.BufferGeometry()
-          geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-          points = new THREE.Points(
-            geometry,
-            new THREE.PointsMaterial({
-              color: 0x6b6f82,
-              size: Math.max(floor * 0.6, 0.6),
-              sizeAttenuation: true,
-              transparent: true,
-              opacity: 0.8,
-            }),
-          )
-          belts.set(field.bodyId, points)
-          decor.add(points)
+          rocks.instanceMatrix.needsUpdate = true
+          if (rocks.instanceColor) rocks.instanceColor.needsUpdate = true
+          rocks.computeBoundingSphere()
+          rocks.raycast = () => {}
+          stencilModel(rocks)
+          belts.set(field.bodyId, { mesh: rocks, variant })
+          decor.add(rocks)
         }
-        points.position.set(field.ringCenter.x, field.ringCenter.y, field.ringCenter.z)
+        rocks.position.set(field.ringCenter.x, field.ringCenter.y, field.ringCenter.z)
       }
-      for (const [id, points] of belts) {
+      for (const [id, { mesh: rocks }] of belts) {
         if (live.has(id)) continue
-        decor.remove(points)
-        points.geometry.dispose()
-        ;(points.material as THREE.Material).dispose()
+        decor.remove(rocks)
+        disposeResources(rocks, true)
         belts.delete(id)
       }
     }
