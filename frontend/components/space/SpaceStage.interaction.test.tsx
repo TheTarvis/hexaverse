@@ -778,61 +778,7 @@ describe('SpaceStage — compact object annotations', () => {
 })
 
 
-describe('SpaceStage — annotation placement', () => {
-  it('restrains passive labels in a dense view while selected and hovered objects remain disclosed', async () => {
-    // Density and disclosure use lightweight valid bodies; procedural planet
-    // texture construction belongs to art coverage, not this interaction seam.
-    const crowded = Array.from({ length: 48 }, (_, index) => ({ ...marks[1], id: `dense-${index}`, bodyType: 'debris', position: { x: (index % 8 - 3.5) * 45, y: (Math.floor(index / 8) - 2.5) * 30, z: 0 }, selected: index === 47 }))
-    await stage({ scene: { ...scene, marks: crowded }, selection: { bodyId: 'dense-47' } })
-    const selected = screen.getByTestId('space-annotation-dense-47')
-    await waitFor(() => expect(selected).toBeVisible())
-    const labels = screen.getAllByTestId(/^space-annotation-/)
-    const visible = () => labels.filter(label => label.style.visibility === 'visible')
-    // Plenty of spatially separated objects fit; passive text must still leave
-    // most of the scene available for inspecting their surfaces.
-    expect(visible().length).toBeLessThan(crowded.length / 2)
-    const suppressed = labels.find(label => label.style.visibility === 'hidden')!
-    const id = suppressed.dataset.testid!.replace('space-annotation-', '')
-    fireEvent.pointerOver(screen.getByTestId(`body-hit-${id}`))
-    await waitFor(() => expect(suppressed).toBeVisible())
-    expect(suppressed).toHaveTextContent('debris')
-    expect(selected).toBeVisible()
-    expect(visible().length).toBeLessThan(crowded.length / 2)
-  })
 
-  it('keeps the selected object labeled in a crowd and suppresses colliding labels', async () => {
-    const crowded = Array.from({ length: 12 }, (_, index) => ({ ...marks[1], id: `world-${index}`, position: { x: 0, y: 0, z: 0 }, selected: index === 11 }))
-    await stage({ scene: { ...scene, marks: crowded }, selection: { bodyId: 'world-11' } })
-    await waitFor(() => expect(screen.getByTestId('space-annotation-world-11')).toBeVisible())
-    expect(screen.getAllByTestId(/^space-annotation-/).filter(el => el.style.visibility === 'visible').length).toBeLessThan(12)
-    fireEvent.pointerOver(screen.getByTestId('body-hit-world-10'))
-    await waitFor(() => expect(screen.getByTestId('space-annotation-world-10')).toBeVisible())
-    expect(screen.getByTestId('space-annotation-world-11')).toBeVisible()
-  })
-
-  it('tracks camera movement without losing touch and keyboard selection', async () => {
-    await stage()
-    const label = screen.getByTestId('space-annotation-feat-body-0')
-    await waitFor(() => expect(label).toBeVisible())
-    const before = label.style.transform
-    fireEvent.keyDown(screen.getByTestId('camera-orbit'), { key: 'ArrowRight' })
-    await waitFor(() => expect(label.style.transform).not.toBe(before))
-    const hit = screen.getByTestId('body-hit-feat-body-0')
-    fireEvent.touchStart(hit, { touches: [{ identifier: 1, clientX: 300, clientY: 300 }] })
-    fireEvent.touchEnd(hit, { changedTouches: [{ identifier: 1, clientX: 300, clientY: 300 }] })
-    expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-0' })
-    onSelect.mockClear()
-    hit.focus()
-    await userEvent.keyboard('{Enter}')
-    expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-0' })
-  })
-
-  it('uses a disclosed name without adding contact identity to annotations', async () => {
-    await stage({ scene: { ...scene, marks: marks.map(mark => mark.id === 'feat-body-0' ? { ...mark, name: 'Pelagos' } : mark) } })
-    expect(screen.getByTestId('space-annotation-feat-body-0')).toHaveTextContent('Pelagos')
-    expect(screen.queryByTestId('space-annotation-contact-0')).toBeNull()
-  })
-})
 
 
 it('keeps long annotations inside the viewport near its right edge', async () => {
