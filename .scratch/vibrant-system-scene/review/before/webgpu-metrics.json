@@ -1,0 +1,48 @@
+{
+  "diagnostics": [
+    "404 /v1/systems/sys_-1_-1/station",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "THREE.Renderer: \"renderAsync()\" has been deprecated. Use \"render()\" and \"await renderer.init();\" when creating the renderer.",
+    "THREE.AttributeNode: Vertex attribute \"position\" not found on geometry.",
+    "404 /v1/systems/sys_-1_-1/station",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "THREE.Renderer: \"renderAsync()\" has been deprecated. Use \"render()\" and \"await renderer.init();\" when creating the renderer.",
+    "THREE.AttributeNode: Vertex attribute \"position\" not found on geometry."
+  ],
+  "01-normal-high": {
+    "camera": "{\"yaw\":0.6,\"pitch\":0.72,\"distance\":81,\"target\":{\"x\":0,\"y\":0,\"z\":0}}",
+    "backend": "webgpu"
+  },
+  "normalScheduling": {
+    "medianMs": 16.699999999999818,
+    "p95Ms": 17.09999999999991,
+    "framesOver50Ms": 0,
+    "sampledFrames": 119
+  },
+  "02-normal-low": {
+    "camera": "{\"yaw\":0.6,\"pitch\":0.21999999999999986,\"distance\":81,\"target\":{\"x\":0,\"y\":0,\"z\":0}}",
+    "backend": "webgpu"
+  },
+  "03-selected-low": {
+    "camera": "{\"yaw\":0.6,\"pitch\":0.21999999999999986,\"distance\":81,\"target\":{\"x\":0,\"y\":0,\"z\":0}}",
+    "backend": "webgpu"
+  },
+  "04-close-low": {
+    "camera": "{\"yaw\":0.9000000000000002,\"pitch\":0.21999999999999986,\"distance\":53.144100000000016,\"target\":{\"x\":0,\"y\":0,\"z\":0}}",
+    "backend": "webgpu"
+  },
+  "05-close-high": {
+    "camera": "{\"yaw\":0.9000000000000002,\"pitch\":0.9200000000000002,\"distance\":53.144100000000016,\"target\":{\"x\":0,\"y\":0,\"z\":0}}",
+    "backend": "webgpu"
+  },
+  "06-crowded": {
+    "camera": "{\"yaw\":0.6,\"pitch\":0.72,\"distance\":81,\"target\":{\"x\":0,\"y\":0,\"z\":0}}",
+    "backend": "webgpu"
+  },
+  "crowdedScheduling": {
+    "medianMs": 16.699999999999818,
+    "p95Ms": 16.800000000000182,
+    "framesOver50Ms": 0,
+    "sampledFrames": 119
+  }
+}

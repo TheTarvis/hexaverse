@@ -779,6 +779,25 @@ describe('SpaceStage — compact object annotations', () => {
 
 
 describe('SpaceStage — annotation placement', () => {
+  it('restrains passive labels in a dense view while selected and hovered objects remain disclosed', async () => {
+    const crowded = Array.from({ length: 48 }, (_, index) => ({ ...marks[1], id: `dense-${index}`, bodyType: 'rocky', position: { x: (index % 8 - 3.5) * 45, y: (Math.floor(index / 8) - 2.5) * 30, z: 0 }, selected: index === 47 }))
+    await stage({ scene: { ...scene, marks: crowded }, selection: { bodyId: 'dense-47' } })
+    const selected = screen.getByTestId('space-annotation-dense-47')
+    await waitFor(() => expect(selected).toBeVisible())
+    const labels = screen.getAllByTestId(/^space-annotation-/)
+    const visible = () => labels.filter(label => label.style.visibility === 'visible')
+    // Plenty of spatially separated objects fit; passive text must still leave
+    // most of the scene available for inspecting their surfaces.
+    expect(visible().length).toBeLessThan(crowded.length / 2)
+    const suppressed = labels.find(label => label.style.visibility === 'hidden')!
+    const id = suppressed.dataset.testid!.replace('space-annotation-', '')
+    fireEvent.pointerOver(screen.getByTestId(`body-hit-${id}`))
+    await waitFor(() => expect(suppressed).toBeVisible())
+    expect(suppressed).toHaveTextContent('rocky')
+    expect(selected).toBeVisible()
+    expect(visible().length).toBeLessThan(crowded.length / 2)
+  })
+
   it('keeps the selected object labeled in a crowd and suppresses colliding labels', async () => {
     const crowded = Array.from({ length: 12 }, (_, index) => ({ ...marks[1], id: `world-${index}`, position: { x: 0, y: 0, z: 0 }, selected: index === 11 }))
     await stage({ scene: { ...scene, marks: crowded }, selection: { bodyId: 'world-11' } })

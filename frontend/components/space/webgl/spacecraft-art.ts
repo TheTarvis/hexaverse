@@ -14,7 +14,7 @@ export async function loadSpacecraftAsset(kind: SpacecraftKind): Promise<THREE.G
 }
 
 /** Clone GPU resources independently; immutable decoded image data stays shared. */
-function cloneAsset(source: THREE.Group): THREE.Group {
+function cloneAsset(source: THREE.Group, kind: SpacecraftKind): THREE.Group {
   const geometries = new Map<THREE.BufferGeometry, THREE.BufferGeometry>()
   const materials = new Map<THREE.Material, THREE.Material>()
   const textures = new Map<THREE.Texture, THREE.Texture>()
@@ -29,6 +29,9 @@ function cloneAsset(source: THREE.Group): THREE.Group {
     const diffuseGlow = original instanceof THREE.MeshStandardMaterial &&
       original.map && original.emissiveMap && original.map.image === original.emissiveMap.image
     if (copy instanceof THREE.MeshStandardMaterial) {
+      // Small ship plates need a little more reflected-light response at play
+      // distance. Keep atlas contrast and directional shadows; no hull glow.
+      if (kind === 'ship') copy.color.multiplyScalar(1.6)
       copy.metalness = Math.min(copy.metalness, 0.42)
       copy.roughness = THREE.MathUtils.clamp(copy.roughness, 0.32, 0.58)
       if (diffuseGlow) {
@@ -153,7 +156,7 @@ export function createSpacecraftModel(kind: SpacecraftKind, accentColor: number,
   const root = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: accentColor, depthWrite: false }))
   const accent = new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.95, metalness: 0.15, roughness: 0.36 })
   if (asset) {
-    try { root.add(normalize(cloneAsset(asset), 0.9)) }
+    try { root.add(normalize(cloneAsset(asset, kind), 0.9)) }
     catch (error) {
       root.geometry.dispose()
       ;(root.material as THREE.Material).dispose()

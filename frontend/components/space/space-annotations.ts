@@ -5,9 +5,20 @@ import type { HitTargetRegistry, SpaceFrame } from './space-transform-loop'
 export function placeAnnotations(frame: SpaceFrame | null, registry: HitTargetRegistry): void {
   if (!frame) return
   const occupied: { x: number; y: number; width: number; height: number }[] = []
-  const entries = [...registry.entries()].sort((a, b) => Number(b[1].dataset.priority) - Number(a[1].dataset.priority))
+  // Collision-free text can still blanket a dense system. Reserve most of the
+  // viewport for surfaces, and let active inspection bypass the passive budget.
+  const passiveBudget = Math.max(8, Math.min(18, Math.floor(frame.basis.widthPx * frame.basis.heightPx / 90_000)))
+  let passiveCount = 0
+  const rank = ([id, el]: [string, HTMLElement]) => {
+    const mark = frame.projected.get(id)?.mark
+    const keyObject = mark && (['star', 'fleet', 'gate'].includes(mark.kind) || mark.bodyType === 'station')
+    return Number(el.dataset.priority) * 2 + (keyObject ? 1 : 0)
+  }
+  const entries = [...registry.entries()].sort((a, b) => rank(b) - rank(a))
   for (const [id, el] of entries) {
     el.style.visibility = 'hidden'
+    const passive = Number(el.dataset.priority) === 0
+    if (passive && passiveCount >= passiveBudget) continue
     const entry = frame.projected.get(id)
     if (!entry?.screen.onScreen) continue
     const width = Math.min(160, el.offsetWidth || Math.max(70, (el.textContent?.length ?? 0) * 6 + 16))
@@ -28,6 +39,7 @@ export function placeAnnotations(frame: SpaceFrame | null, registry: HitTargetRe
       el.style.transform = `translate3d(${x}px, ${y}px, 0px)`
       el.style.visibility = 'visible'
       occupied.push({ x, y, width, height })
+      if (passive) passiveCount++
       break
     }
   }
