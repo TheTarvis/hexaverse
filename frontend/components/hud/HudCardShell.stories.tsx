@@ -1,0 +1,154 @@
+import type { Meta, StoryObj } from '@storybook/nextjs-vite'
+import { expect, fn, within } from 'storybook/test'
+import clsx from 'clsx'
+import { HudCardShell, type HudCardShellProps } from './HudCardShell'
+import styles from './hud-card-shell.stories.module.css'
+
+type StoryArgs = HudCardShellProps & {
+  showClose: boolean
+  showContentBounds: boolean
+}
+
+const meta = {
+  title: 'HUD/Card Shell',
+  component: HudCardShell,
+  tags: ['autodocs'],
+  args: {
+    title: 'Inspector',
+    onClose: fn(),
+    closeLabel: 'Close inspector',
+    showClose: true,
+    showContentBounds: false,
+    lighting: 'signal',
+    paused: false,
+    style: { width: 320, maxWidth: '100%', height: 440 },
+  },
+  argTypes: {
+    title: { control: 'text' },
+    showClose: { control: 'boolean' },
+    showContentBounds: { control: 'boolean' },
+    lighting: { control: 'radio', options: ['signal', 'none'] },
+    paused: { control: 'boolean' },
+    onClose: { control: false },
+    children: { control: false },
+    contentClassName: { control: false },
+    className: { control: false },
+  },
+  decorators: [
+    (Story) => <div className={clsx('dark', styles.stage)}><Story /></div>,
+  ],
+  render: ({ showClose, showContentBounds, onClose, contentClassName, ...args }) => (
+    <HudCardShell
+      {...args}
+      {...(showClose && onClose ? { onClose } : {})}
+      contentClassName={clsx(contentClassName, showContentBounds && styles.contentBounds)}
+    />
+  ),
+} satisfies Meta<StoryArgs>
+
+export default meta
+type Story = StoryObj<typeof meta>
+
+export const Tall: Story = {}
+
+export const Plain: Story = { args: { lighting: 'none' } }
+
+export const Wide: Story = {
+  args: {
+    title: 'Travel review',
+    closeLabel: 'Close travel review',
+    style: { width: 560, maxWidth: '100%', height: 240 },
+  },
+}
+
+export const Headerless: Story = {
+  args: {
+    title: '',
+    'aria-label': 'Quick actions',
+    showClose: false,
+    style: { width: 560, maxWidth: '100%', minHeight: 88 },
+  },
+}
+
+export const Narrow: Story = {
+  args: {
+    style: { width: 280, maxWidth: '100%', height: 380 },
+  },
+}
+
+export const LongTitle: Story = {
+  args: {
+    title: 'An exceptionally long inspected object title',
+  },
+}
+
+export const ScrollingContent: Story = {
+  args: {
+    title: 'Scroll study',
+    closeLabel: 'Close scroll study',
+    style: { width: 320, maxWidth: '100%', height: 300 },
+    children: Array.from({ length: 12 }, (_, index) => (
+      <p key={index} className={styles.sampleRow}>
+        Sample content {index + 1}
+      </p>
+    )),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const shell = canvas.getByRole('region', { name: 'Scroll study' })
+    const viewport = canvas.getByText('Sample content 1').parentElement!
+    const frameWidth = parseFloat(getComputedStyle(shell).getPropertyValue('--hud-frame-width'))
+    try {
+      viewport.scrollTop = viewport.scrollHeight / 2
+      const bounds = viewport.getBoundingClientRect()
+      const frame = shell.getBoundingClientRect()
+      // The clipping boundary meets the inner frame; content padding scrolls away.
+      await expect(bounds.top - frame.top).toBeCloseTo(frameWidth, 0)
+      await expect(frame.bottom - bounds.bottom).toBeCloseTo(frameWidth, 0)
+      await expect(getComputedStyle(viewport).clipPath).not.toBe('none')
+      await expect(viewport.scrollTop).toBeGreaterThan(0)
+    } finally {
+      viewport.scrollTop = 0
+    }
+  },
+}
+
+export const SizeComparison: Story = {
+  render: ({ showClose, showContentBounds, onClose, lighting = 'signal', paused = false }) => {
+    const closeProps = showClose && onClose ? { onClose } : {}
+    const contentClassName = showContentBounds ? styles.contentBounds : ''
+
+    return (
+      <div className={styles.comparison}>
+        <HudCardShell
+          title="Inspector"
+          lighting={lighting}
+          paused={paused}
+          {...closeProps}
+          closeLabel="Close inspector"
+          contentClassName={contentClassName}
+          className={styles.tall}
+        />
+        <div className={styles.stack}>
+          <HudCardShell
+            title="Travel review"
+            lighting={lighting}
+            paused={paused}
+            {...closeProps}
+            closeLabel="Close travel review"
+            contentClassName={contentClassName}
+            className={styles.wide}
+          />
+          <HudCardShell
+            aria-label="Quick actions"
+            lighting={lighting}
+            paused={paused}
+            contentClassName={contentClassName}
+            className={styles.strip}
+          />
+        </div>
+      </div>
+    )
+  },
+  args: { showContentBounds: true },
+}

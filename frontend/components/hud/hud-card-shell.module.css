@@ -1,0 +1,189 @@
+.shell {
+  --hud-frame-cut: 20px;
+  --hud-frame-width: 5px;
+  --hud-content-padding: 24px;
+  --hud-content-side-padding: 16px;
+  --hud-inner-cut: calc(var(--hud-frame-cut) - var(--hud-frame-width) * 0.58578644);
+  --hud-outline: polygon(
+    var(--hud-frame-cut) 0, calc(100% - var(--hud-frame-cut)) 0,
+    100% var(--hud-frame-cut), 100% calc(100% - var(--hud-frame-cut)),
+    calc(100% - var(--hud-frame-cut)) 100%, var(--hud-frame-cut) 100%,
+    0 calc(100% - var(--hud-frame-cut)), 0 var(--hud-frame-cut)
+  );
+
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 72px;
+  color: #d5e7f1;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 14px;
+  color-scheme: dark;
+  filter: drop-shadow(0 12px 20px rgb(0 0 0 / 32%));
+}
+
+.shell::before,
+.shell::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  clip-path: var(--hud-outline);
+}
+
+.shell::before {
+  inset: 0;
+  z-index: -3;
+  background: linear-gradient(145deg, #a4bfcd, #415c70 38%, #243b4e 65%, #7f9eaf);
+}
+
+.shell::after {
+  inset: 1px;
+  z-index: -2;
+  background: linear-gradient(135deg, #43596b, #273c4e 45%, #3d5364);
+}
+
+.surface {
+  position: absolute;
+  inset: var(--hud-frame-width);
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(135deg, #0b1621, #080f18);
+}
+
+/* Offset the 45-degree corners by the same distance as the straight edges. */
+.surface,
+.content {
+  clip-path: polygon(
+    var(--hud-inner-cut) 0, calc(100% - var(--hud-inner-cut)) 0,
+    100% var(--hud-inner-cut), 100% calc(100% - var(--hud-inner-cut)),
+    calc(100% - var(--hud-inner-cut)) 100%, var(--hud-inner-cut) 100%,
+    0 calc(100% - var(--hud-inner-cut)), 0 var(--hud-inner-cut)
+  );
+}
+
+.lights {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lights svg {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  stroke: #b1edff;
+  stroke-width: 3;
+  stroke-linecap: square;
+  filter: drop-shadow(0 0 3px rgb(44 194 255 / 65%));
+}
+
+.topLeft { top: 0; left: 0; }
+.topRight { top: 0; right: 0; transform: rotate(90deg); }
+.bottomRight { bottom: 0; right: 0; transform: rotate(180deg); }
+.bottomLeft { bottom: 0; left: 0; transform: rotate(270deg); }
+
+.title {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  max-width: calc(100% - 112px);
+  margin: 0;
+  padding: 4px 19px;
+  background: linear-gradient(120deg, #7493a8, #314a5f 55%, #6d8a9e);
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+  color: #c0eaff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.title::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  z-index: -1;
+  background: #09131e;
+  clip-path: polygon(11px 0, calc(100% - 11px) 0, 100% 50%, calc(100% - 11px) 100%, 11px 100%, 0 50%);
+}
+
+.title span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell .close {
+  position: absolute;
+  z-index: 2;
+  top: -10px;
+  right: -10px;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #b1edff;
+  cursor: pointer;
+}
+
+.shell .close:hover {
+  color: #e4f8ff;
+}
+
+.shell .close:focus-visible {
+  outline: 2px solid #a5e9ff;
+  outline-offset: 3px;
+}
+
+.shell .close svg {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  color: inherit;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 3px rgb(44 194 255 / 65%));
+}
+
+.body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--hud-frame-width);
+  overflow: hidden;
+}
+
+.content {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  padding: calc(var(--hud-content-padding) - var(--hud-frame-width)) calc(var(--hud-content-side-padding) - var(--hud-frame-width));
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #435d70 #0b1621;
+}
+
+@media (forced-colors: active) {
+  .shell { border: 1px solid CanvasText; filter: none; }
+  .shell::before, .shell::after, .lights { display: none; }
+  .title { background: Canvas; color: CanvasText; clip-path: none; border: 1px solid CanvasText; }
+}

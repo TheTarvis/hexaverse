@@ -2,7 +2,7 @@ import type * as THREE from 'three'
 import { createRendererCandidate, type RendererBackend, type RendererCandidate, type RendererCandidateFactory } from './renderer-candidate'
 export type { RendererBackend } from './renderer-candidate'
 export type RendererPhase = 'pending' | 'ready' | 'unavailable' | 'interrupted' | 'disposed'
-export type RendererSurface = 'space' | 'preview' | 'galaxy' | 'intel-spike' | 'space-spike'
+export type RendererSurface = 'space' | 'preview' | 'galaxy' | 'intel-spike' | 'space-spike' | 'hud'
 export interface RendererSnapshot { phase: RendererPhase; backend: RendererBackend | null; retrying: boolean }
 export interface RendererOwner {
   snapshot(): RendererSnapshot

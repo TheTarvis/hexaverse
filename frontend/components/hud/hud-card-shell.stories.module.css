@@ -1,0 +1,40 @@
+.stage {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 48px 32px;
+  background-color: #050c14;
+  background-image:
+    radial-gradient(ellipse at 15% 10%, rgb(33 77 104 / 25%), transparent 50%),
+    radial-gradient(circle at 30px 70px, #527387 0.7px, transparent 1px),
+    radial-gradient(circle at 110px 30px, #a8c7d9 0.5px, transparent 1px);
+  background-size: auto, 191px 173px, 263px 241px;
+}
+
+/* Show the resting content inset within the frame-aligned scroll viewport. */
+.contentBounds::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--hud-content-padding) - var(--hud-frame-width));
+  inset-inline: calc(var(--hud-content-side-padding) - var(--hud-frame-width));
+  border: 1px dashed #c89845;
+  pointer-events: none;
+}
+
+.comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 560px);
+  gap: 40px;
+  align-items: start;
+  max-width: 920px;
+}
+
+.stack { display: flex; flex-direction: column; gap: 40px; min-width: 0; }
+.tall { height: 440px; }
+.wide { height: 240px; }
+.strip { min-height: 88px; }
+.sampleRow { flex-shrink: 0; padding: 12px; border: 1px solid #31485a; }
+
+@media (max-width: 640px) {
+  .stage { padding: 40px 24px; }
+  .comparison { grid-template-columns: minmax(0, 1fr); }
+}
