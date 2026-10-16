@@ -169,7 +169,7 @@ function seeded(seed: number): () => number {
 }
 
 /** Owned faceted rock with all vertices inside the existing unit draw radius. */
-function rockGeometry(seed: number): THREE.BufferGeometry {
+export function rockGeometry(seed: number): THREE.BufferGeometry {
   const rand = seeded(seed)
   const geometry = new THREE.IcosahedronGeometry(1, 1)
   const vertices = geometry.getAttribute('position')

@@ -87,6 +87,30 @@ describe('WakeUpFlow', () => {
     expect(screen.getByTestId('wake-name-input')).toHaveFocus()
   })
 
+  it('rejects an overlong pasted name without truncating it or submitting', () => {
+    renderWithClient()
+    const input = screen.getByTestId('wake-name-input')
+    fireEvent.change(input, { target: { value: 'W'.repeat(41) } })
+    expect(input).toHaveValue('W'.repeat(41))
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(input).toHaveAccessibleDescription(/41\/40 characters/)
+    expect(screen.getByText(/41\/40 characters/)).toBeInTheDocument()
+    expect(screen.getByTestId('wake-submit')).toBeDisabled()
+    fireEvent.submit(input.closest('form')!)
+    expect(mockSpawn).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: 'W'.repeat(40) } })
+    expect(screen.getByTestId('wake-submit')).not.toBeDisabled()
+  })
+
+  it.each(['É', '🚀', 'E\u0301'])('counts normalized Unicode code points for %s', async letter => {
+    mockSpawn.mockResolvedValue(spawnResult)
+    renderWithClient()
+    fireEvent.change(screen.getByTestId('wake-name-input'), { target: { value: `  ${letter.repeat(40)}  ` } })
+    expect(screen.getByText('40/40 characters')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('wake-submit'))
+    await waitFor(() => expect(mockSpawn).toHaveBeenCalledWith({ name: letter.repeat(40).normalize('NFC') }))
+  })
+
   it('Scenario: A spawn failure leaves the flow visible with an error shown', async () => {
     mockSpawn.mockRejectedValue(new Error('The hull failed to boot.'))
     renderWithClient()

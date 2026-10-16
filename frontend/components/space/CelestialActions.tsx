@@ -6,6 +6,8 @@ import { Input } from '@/components/catalyst/input'
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '@/components/catalyst/dialog'
 import { useCelestialName, useSurvey, useSurveyOptions } from '@/hooks/use-discovery'
 import type { SpaceBody } from '@/lib/types/system-space'
+import { MAX_PLAYER_NAME_LENGTH, playerNameLength } from '@/lib/naming'
+import { Description, Field, Label } from '@/components/catalyst/fieldset'
 
 export function CelestialActions({ systemId, body, fleetId, onSettled }: {
   systemId: string
@@ -20,6 +22,9 @@ export function CelestialActions({ systemId, body, fleetId, onSettled }: {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [preview, setPreview] = useState<string | null>(null)
+  const normalizedDraft = draft.normalize('NFC').trim().replace(/\s+/g, ' ')
+  const draftLength = playerNameLength(normalizedDraft)
+  const validLength = draftLength >= 3 && draftLength <= MAX_PLAYER_NAME_LENGTH
   const wasSurveying = useRef(false)
   const settleRef = useRef(onSettled)
   settleRef.current = onSettled
@@ -57,10 +62,10 @@ export function CelestialActions({ systemId, body, fleetId, onSettled }: {
     <Dialog open={open} onClose={setOpen}>
       <DialogTitle>Name {body.name ?? body.catalogueRef}</DialogTitle>
       <DialogDescription>The first confirmed name is permanent.</DialogDescription>
-      <DialogBody>{preview === null ? <><label htmlFor="celestial-name">Name</label><Input id="celestial-name" data-testid="celestial-name" value={draft} onChange={event => setDraft(event.target.value)} /><p>3–40 characters: Latin letters, numbers, spaces, apostrophes, and hyphens.</p></> : <p data-testid="name-preview">Everyone will see: <strong>{preview}</strong></p>}{naming.isError && <p role="alert">{naming.error.message}</p>}</DialogBody>
+      <DialogBody>{preview === null ? <Field><Label>Name</Label><Input id="celestial-name" data-testid="celestial-name" invalid={draftLength > 0 && !validLength} value={draft} onChange={event => setDraft(event.target.value)} /><Description>{draftLength}/{MAX_PLAYER_NAME_LENGTH} characters. Use 3–{MAX_PLAYER_NAME_LENGTH} characters: Latin letters, numbers, spaces, apostrophes, and hyphens.</Description></Field> : <p data-testid="name-preview">Everyone will see: <strong>{preview}</strong></p>}{naming.isError && <p role="alert">{naming.error.message}</p>}</DialogBody>
       <DialogActions>
         <Button plain onClick={() => setOpen(false)}>Cancel</Button>
-        {preview === null ? <Button data-testid="preview-name" disabled={!draft.trim()} onClick={() => setPreview(draft.trim().replace(/\s+/g, ' '))}>Preview</Button> : <><Button plain onClick={() => setPreview(null)}>Edit</Button><Button data-testid="confirm-name" disabled={naming.isPending} onClick={() => naming.mutate({ systemId, bodyId: body.id, name: preview }, { onSuccess: () => setOpen(false) })}>Confirm permanent name</Button></>}
+        {preview === null ? <Button data-testid="preview-name" disabled={!validLength} onClick={() => setPreview(normalizedDraft)}>Preview</Button> : <><Button plain onClick={() => setPreview(null)}>Edit</Button><Button data-testid="confirm-name" disabled={naming.isPending} onClick={() => naming.mutate({ systemId, bodyId: body.id, name: preview }, { onSuccess: () => setOpen(false) })}>Confirm permanent name</Button></>}
       </DialogActions>
     </Dialog>
   </div>

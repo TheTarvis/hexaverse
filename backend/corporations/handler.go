@@ -89,6 +89,8 @@ func (h *Handler) Spawn(c *gin.Context) {
 	switch {
 	case errors.Is(err, ErrNameRequired):
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+	case errors.Is(err, ErrNameTooLong):
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": ErrNameTooLong.Error()})
 	case errors.Is(err, ErrForbidden):
 		c.AbortWithStatus(http.StatusForbidden)
 	case errors.Is(err, ErrNoSpawnSite):

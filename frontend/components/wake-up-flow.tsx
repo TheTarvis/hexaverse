@@ -14,6 +14,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { MAX_PLAYER_NAME_LENGTH, playerNameLength } from '@/lib/naming'
+import { Description, Field } from '@/components/catalyst/fieldset'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { corporationService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
@@ -62,8 +64,10 @@ export function WakeUpFlow() {
     },
   })
 
-  const trimmed = name.trim()
-  const canSubmit = trimmed.length > 0 && !spawn.isPending
+  const trimmed = name.trim().normalize('NFC')
+  const nameLength = playerNameLength(trimmed)
+  const nameTooLong = nameLength > MAX_PLAYER_NAME_LENGTH
+  const canSubmit = nameLength > 0 && !nameTooLong && !spawn.isPending
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,16 +91,21 @@ export function WakeUpFlow() {
         </p>
 
         <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-3">
-          <Input
-            data-testid="wake-name-input"
-            aria-label="Corporation name"
-            placeholder="Name your lineage"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-            maxLength={60}
-            disabled={spawn.isPending}
-          />
+          <Field>
+            <Input
+              data-testid="wake-name-input"
+              aria-label="Corporation name"
+              invalid={nameTooLong}
+              placeholder="Name your lineage"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              disabled={spawn.isPending}
+            />
+            <Description style={{ color: nameTooLong ? '#f87171' : '#9ca3af' }}>
+              {nameLength}/{MAX_PLAYER_NAME_LENGTH} characters{nameTooLong ? ' — shorten your name to continue.' : ''}
+            </Description>
+          </Field>
           <Button type="submit" color="cyan" disabled={!canSubmit} data-testid="wake-submit">
             {spawn.isPending ? 'Waking…' : 'Wake'}
           </Button>

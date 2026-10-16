@@ -1,0 +1,14 @@
+.stage {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 48px 24px;
+  background: radial-gradient(ellipse at top left, #102330, #050c14 65%);
+}
+.card { width: 420px; max-width: 100%; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(48px, 1fr)); gap: 16px 12px; margin: 0; padding: 0; list-style: none; }
+.sample { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+.sizeGroup { display: flex; flex-direction: column; gap: 12px; }
+.textSample { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 480px) {
+  .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

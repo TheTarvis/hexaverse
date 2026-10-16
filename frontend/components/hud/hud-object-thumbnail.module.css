@@ -1,0 +1,21 @@
+.thumbnail {
+  display: block;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.frame { position: relative; display: grid; place-items: center; }
+.placeholder { color: #7892a5; }
+.image { position: absolute; inset: 0; width: 32px; height: 32px; object-fit: contain; }
+.loading { opacity: 0; }
+
+/* A static nonfigurative return; it conveys no object class or hull count. */
+.unresolved {
+  background:
+    radial-gradient(ellipse 10px 9px at 48% 50%, rgb(178 237 255 / 88%), rgb(112 190 219 / 30%) 48%, transparent 90%),
+    radial-gradient(ellipse 6px 6px at 25% 25%, rgb(170 228 247 / 48%), transparent 90%),
+    radial-gradient(ellipse 4px 4px at 76% 75%, rgb(170 228 247 / 50%), transparent 90%);
+  filter: blur(0.6px);
+}

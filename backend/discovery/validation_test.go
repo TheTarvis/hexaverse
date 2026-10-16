@@ -1,6 +1,20 @@
 package discovery
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestCelestialNameLengthBoundary(t *testing.T) {
+	for _, letter := range []string{"W", "É", "E\u0301"} {
+		if _, err := ValidateName("  " + strings.Repeat(letter, 40) + "  "); err != nil {
+			t.Errorf("40 normalized code points rejected: %v", err)
+		}
+		if _, err := ValidateName(strings.Repeat(letter, 41)); err == nil {
+			t.Error("41 normalized code points accepted")
+		}
+	}
+}
 
 func TestCelestialNameValidation(t *testing.T) {
 	for _, input := range []string{"Io", "A!pha", "🚀 World", "An Admin Star", "Official Support", "Fuck Haven", "This name is certainly much longer than forty characters"} {

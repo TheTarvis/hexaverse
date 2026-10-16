@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"hexaverse/charts"
 	"hexaverse/common"
@@ -17,12 +18,14 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/text/unicode/norm"
 )
 
 var (
 	ErrNotFound       = errors.New("corporation not found")
 	ErrForbidden      = errors.New("forbidden")
 	ErrNameRequired   = errors.New("corporation name is required")
+	ErrNameTooLong    = fmt.Errorf("corporation name must be at most %d characters", common.MaxPlayerNameLength)
 	ErrHasLivingFleet = errors.New("corporation still has a living fleet")
 )
 
@@ -209,7 +212,7 @@ func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResu
 	if accountId == "" {
 		return nil, ErrForbidden
 	}
-	name = strings.TrimSpace(name)
+	name = norm.NFC.String(strings.TrimSpace(name))
 	if name == "" {
 		return nil, ErrNameRequired
 	}
@@ -225,6 +228,12 @@ func (s *Service) Spawn(ctx context.Context, accountId, name string) (*SpawnResu
 			return s.ensureSpawnAssets(ctx, corp)
 		}
 		// Dangling pointer (corp doc gone) — fall through and mint a fresh one.
+	}
+
+	// Existing corporations retain their names on idempotent retries. The limit
+	// applies only when creating a new corporation, before any spawn writes.
+	if utf8.RuneCountInString(name) > common.MaxPlayerNameLength {
+		return nil, ErrNameTooLong
 	}
 
 	// Fresh wake. Site selection runs BEFORE the corp commit: a wake that cannot

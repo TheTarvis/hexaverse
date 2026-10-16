@@ -1,0 +1,23 @@
+.facts {
+  --hud-label-font-size: 11px;
+  --hud-body-font-size: 13px;
+  --hud-value-font-size: 15px;
+
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 72px), 1fr));
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+
+.fact { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.term,
+.details {
+  grid-column: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow-wrap: anywhere;
+}

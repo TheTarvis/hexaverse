@@ -1,0 +1,74 @@
+[
+  {
+    "id": "graphics-webgpu-canvas--basic-scene",
+    "backend": "webgl2",
+    "width": 1200,
+    "height": 420,
+    "label": "Example scene",
+    "errors": []
+  },
+  {
+    "id": "graphics-model-view--lane-gate",
+    "backend": "webgl2",
+    "width": 1200,
+    "height": 520,
+    "label": "Lane gate",
+    "errors": []
+  },
+  {
+    "id": "graphics-model-view--closed",
+    "backend": "webgl2",
+    "width": 1200,
+    "height": 520,
+    "label": "Lane gate",
+    "errors": []
+  },
+  {
+    "id": "graphics-model-view--ship",
+    "backend": "webgl2",
+    "width": 1200,
+    "height": 520,
+    "label": "Utility ship",
+    "errors": []
+  },
+  {
+    "id": "graphics-model-view--station",
+    "backend": "webgl2",
+    "width": 1200,
+    "height": 520,
+    "label": "Orbital station",
+    "errors": []
+  },
+  {
+    "id": "graphics-model-view--back",
+    "backend": "webgl2",
+    "width": 1200,
+    "height": 520,
+    "label": "Lane gate",
+    "errors": []
+  },
+  {
+    "id": "graphics-model-view--side",
+    "backend": "webgl2",
+    "width": 1200,
+    "height": 520,
+    "label": "Lane gate",
+    "errors": []
+  },
+  {
+    "id": "graphics-model-view--narrow",
+    "backend": "webgl2",
+    "width": 280,
+    "height": 320,
+    "label": "Lane gate",
+    "errors": []
+  },
+  {
+    "id": "graphics-model-view--in-hud-card",
+    "backend": "webgl2",
+    "width": 388,
+    "height": 340,
+    "label": "Lane gate",
+    "errors": []
+  }
+]

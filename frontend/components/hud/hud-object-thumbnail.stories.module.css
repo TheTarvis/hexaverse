@@ -1,0 +1,8 @@
+.stage { box-sizing: border-box; min-height: 100vh; padding: 48px 24px; background: radial-gradient(ellipse at top left, #102330, #050c14 65%); }
+.card { width: 380px; max-width: 100%; }
+.narrow { width: 280px; max-width: 100%; }
+.list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.row + .row { border-top: 1px solid #31485a; padding-top: 10px; }
+.identity { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.comparison { display: flex; flex-wrap: wrap; align-items: start; gap: 40px; }

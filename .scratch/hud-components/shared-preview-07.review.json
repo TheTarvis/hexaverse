@@ -1,0 +1,70 @@
+{
+  "stories": [
+    {
+      "id": "graphics-model-view--lane-gate",
+      "backend": "webgl2",
+      "width": 1100,
+      "height": 520,
+      "label": "Lane gate",
+      "errors": []
+    },
+    {
+      "id": "graphics-model-view--ship",
+      "backend": "webgl2",
+      "width": 384,
+      "height": 165,
+      "label": "Utility ship model",
+      "errors": []
+    },
+    {
+      "id": "graphics-game-preview--ship",
+      "backend": "webgl2",
+      "width": 384,
+      "height": 165,
+      "label": "Utility ship model",
+      "errors": []
+    },
+    {
+      "id": "graphics-model-view--station",
+      "backend": "webgl2",
+      "width": 384,
+      "height": 165,
+      "label": "Orbital station model",
+      "errors": []
+    },
+    {
+      "id": "graphics-game-preview--station",
+      "backend": "webgl2",
+      "width": 384,
+      "height": 165,
+      "label": "Orbital station model",
+      "errors": []
+    },
+    {
+      "id": "graphics-game-preview--gas-giant",
+      "backend": "webgl2",
+      "width": 384,
+      "height": 165,
+      "label": "Gas giant model",
+      "errors": []
+    },
+    {
+      "id": "graphics-game-preview--star",
+      "backend": "webgl2",
+      "width": 384,
+      "height": 165,
+      "label": "Star model",
+      "errors": []
+    },
+    {
+      "id": "graphics-game-preview--narrow",
+      "backend": "webgl2",
+      "width": 240,
+      "height": 200,
+      "label": "Utility ship model",
+      "errors": []
+    }
+  ],
+  "productionPixelParity": true,
+  "sharedFailureNotice": true
+}

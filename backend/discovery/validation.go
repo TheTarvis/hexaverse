@@ -6,6 +6,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"hexaverse/common"
+
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -18,8 +20,8 @@ var prohibited = map[string]bool{"fuck": true, "shit": true, "cunt": true, "nigg
 
 func ValidateName(input string) (string, error) {
 	name := strings.Join(strings.Fields(norm.NFC.String(input)), " ")
-	if n := utf8.RuneCountInString(name); n < 3 || n > 40 {
-		return "", fmt.Errorf("%w: use 3–40 characters", ErrInvalid)
+	if n := utf8.RuneCountInString(name); n < 3 || n > common.MaxPlayerNameLength {
+		return "", fmt.Errorf("%w: use 3–%d characters", ErrInvalid, common.MaxPlayerNameLength)
 	}
 	for _, r := range name {
 		if !(unicode.Is(unicode.Latin, r) || r >= '0' && r <= '9' || r == ' ' || r == '\'' || r == '-') {

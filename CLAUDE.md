@@ -69,6 +69,8 @@ Dev GCP project: `hexaverse-game-dev`; prod: `hexaverse`, with domain
 - Triage labels: upstream defaults; see `docs/agents/triage-labels.md`.
 - Domain docs: root `GLOSSARY.md` and, when warranted, `docs/adr/`; see
   `docs/agents/domain.md`.
+- Object art: before designing or revising manufactured models, materials or
+  effects, read `docs/art-direction.md` for shared style profiles and revision tracking.
 
 Use the imported workflows as shipped. Keep project configuration outside the
 imported skills. `harness/README.md` documents provenance, integrity checks and

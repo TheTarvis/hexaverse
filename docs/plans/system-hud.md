@@ -1,5 +1,288 @@
 # System HUD — Scoping
 
+## Task-first design interview — 2026-10-14
+
+Variant D is the current preferred reference, but its layout is not a
+constraint on this interview. Define the required player tasks and decisions
+before choosing card arrangements or persistent HUD surfaces.
+
+**Confirmed by Travis in this round:**
+
+- Model finding objects (browse, search and filter), inspecting them,
+  choosing a command fleet, issuing orders and monitoring progress.
+- Use **travel** for moving a whole fleet to a destination, including a
+  point in empty space. This does not mean transferring ships between fleets.
+- Start with two end-to-end scenarios: find and compare resource-bearing
+  objects, then send a fleet; and review fleets, choose an available fleet,
+  then issue its next order.
+- Phones support full completion of those tasks in portrait orientation.
+  Cards must contain enough information to make the decision without
+  relying on the map. The map can supplement that information.
+- Focused choices may use temporary overlays. Avoid requiring several
+  panels to remain open together, and keep finding and issuing orders quick.
+
+**Confirmed in the next round:**
+
+- Reasons for travel include engaging in combat, docking at a station,
+  hiding a fleet within the system and mining minerals. Destination
+  information must support these different decisions; mining is not the
+  sole model for destination selection.
+- Support goal-oriented object filtering alongside name search and object
+  types, retaining search, filters and list position when returning from
+  details.
+- Once travel is committed, its ETA belongs to the fleet's activity rather
+  than a persistent travel-planning card. Planning and ongoing fleet status
+  are separate responsibilities.
+
+**Confirmed card navigation and command flow:**
+
+- Cards and the searchable text list present the same filtered objects.
+  Preserve filters and selection when switching views. Mobile supports
+  swiping through detail cards; desktop provides previous/next controls
+  and keyboard navigation through the same results.
+- Destination cards offer travel alone and, when supported, travel with an
+  explicit activity on arrival, such as Travel and mine or Travel and dock.
+  The review states the intended outcome. Combat initiation requires its
+  own rules before an automatic attack-on-arrival action can be accepted.
+  These are UX requirements, not claims that chained orders exist today.
+- While browsing destinations, a compact command-fleet control shows its
+  name and current activity, including destination and ETA during travel.
+  Opening it shows the fleet's full card; full fleet details do not need to
+  remain beside each destination card.
+- Swiping changes only the inspected object within the current filtered
+  results (for example Station 1, Station 2, Station 3). It does not issue
+  an order or enter course review.
+
+**Scanning and stealth clarification from Travis:**
+
+- Include scanning in the HUD's action inventory. Its entry points and
+  status requirements are confirmed below.
+- Intended stealth is a cat-and-mouse interaction: a non-burning fleet is
+  hidden; burning reveals a contact, which an opponent must scan to learn
+  what it is; scanning exposes the scanner in turn. Exactly what a scan
+  identifies remains open.
+- For this HUD discussion, hiding can mean remaining docked, stationed or
+  orbiting somewhere. It does not yet require a separate Hide command.
+- Current code masks attached fleets and has scan-produced sightings;
+  this does not establish the broader intended rule that every non-burning
+  fleet is hidden. Preserve that distinction when implementing this design.
+- The proposed purpose-specific card fields have not yet been accepted.
+  In particular, reliable remaining mineral quantities and enemy combat
+  strength are not currently served facts; requirements must distinguish
+  desired information from available information.
+
+**Confirmed scanning HUD scope:**
+
+- Support starting an area scan from the fleet card and starting a scan
+  of a contact or location from its inspected card. Identify the acting
+  fleet and what is being scanned.
+- Show scan details, ETA, completion percentage and results when complete.
+- Visible burns remain unknown contacts until scanning supplies more
+  information. Cards distinguish observed facts and observation age from
+  information the player has not learned.
+- Defer stealth-breaking rules, scan exposure and detailed range rules to
+  another session. Travis clarified that scanning a ship exposes the
+  scanner, whereas scanning an asteroid does not; do not generalize all
+  scanning as exposing the fleet or add an exposure-review requirement in
+  this HUD session.
+
+**Still open:** the information required for each decision, precise object
+filters, card/list navigation and comparison, transitions between tasks,
+and which information persists.
+Earlier layout choices below remain context rather than constraints.
+
+### Narrowed interview: travel first
+
+Travis requested stopping expansion of the action inventory and breaking
+down one action before adding more. Focus next on **Travel here**, from
+destination inspection through review, explicit commit and fleet-owned
+progress. Work through this interaction one decision at a time. Other
+activities remain parked; their inclusion does not settle their flows.
+
+**Confirmed travel review:** choosing Travel here replaces the destination's
+details with a compact review in the same card. Show fleet → destination,
+arrival duration, fuel cost, fuel remaining and an explicit Start travel
+action. Back returns to destination details with the filtered results and
+browsing position preserved. Do not stack the full destination details and
+the trip review within the card.
+
+**Confirmed successful commit:** after Start travel succeeds, replace the
+review with the command fleet's normal status card, showing destination,
+progress, arrival countdown and Stop travel. This is the same fleet card
+opened from the compact fleet control, not a separate trip-tracking card.
+The player can resume browsing or dismiss it.
+
+**Confirmed blocked travel:** keep the review visible, explain the blocker
+beside a disabled Start travel action, and retain Back navigation. For an
+insufficient-fuel trip, show fuel needed, fuel aboard and the shortfall
+rather than a misleading negative fuel-remaining figure. Apply the same
+inline-blocker pattern when the fleet is unavailable.
+
+**Confirmed fleet switching during review:** tapping the fleet name opens
+a compact fleet picker. Choosing a different fleet preserves the destination
+and recalculates the trip. Show the newly selected fleet and updated estimate
+before enabling Start travel again; blocked trips remain disabled with their
+reason. Fleet switching does not commit travel.
+
+The final inventory round confirmed the following for later work:
+
+- Include refuelling, selling cargo at stations, gate travel and stopping
+  or cancelling activities. Combat controls require a separate session.
+- Fleet details show movement/mining and concurrent scanning separately,
+  each with progress, ETA and applicable controls; the compact fleet control
+  can summarize both.
+- Completed scans show Results ready on the fleet and a completion event
+  opening the report, without replacing the current inspection. Retain
+  reports for later access, including explicit nothing-detected results.
+
+## Design interview reopened — 2026-10-14
+
+The current UI and a space-strategy reference prompted a fresh HUD review.
+The September layout below remains historical design context; its specific
+placements are not newly ratified by this interview.
+
+**Confirmed by Travis:**
+
+- Borrow the reference's layout principles: a dominant map, compact persistent
+  status, readable labels, and contextual selection panels.
+- The redesign may change selection, inspection and command interactions,
+  as well as visual styling.
+- A fleet overview shows which fleets need attention and what the others are
+  doing, while the player inspects an individual fleet. Problems, completed
+  activities and progress should be visible without inspecting every fleet.
+- Ordinary commands target one fleet at a time. Ships are managed within
+  their fleet; commanding multiple fleets together is a separate design topic.
+- The fleet overview includes owned fleets across systems, with navigation
+  to their locations.
+- The compact fleet overview is visible by default, can be collapsed, and
+  supports filtering and scrolling as fleet count grows. Rows show fleet
+  name, location, activity, progress or ETA, and attention flags.
+- Selecting a fleet in the overview shows its details and commands without
+  moving the camera. A separate Go to fleet action opens its system and
+  centers it.
+- Players can select system objects through the HUD without clicking the
+  canvas. Object details include fleets and bodies.
+- The HUD communicates events such as fleet arrival and a detected unknown
+  engine burn. Notifications distinguish urgency: a fleet under attack
+  demands a prominent alarm; arrival is informational.
+- Critical alerts stay prominent until acknowledged. Informational events
+  appear briefly and remain in event history. Acknowledging an attack clears
+  its alarm presentation, but not the fleet's ongoing danger indicator.
+- A compact, searchable system object browser is visible by default, with
+  filters for crowded systems. It includes known bodies, stations, gates,
+  fleets and detected contacts. The browser and fleet overview are collapsible.
+  Selecting an object opens details without moving the camera.
+- Inspecting an object does not change the fleet receiving commands. Actions
+  clearly identify that fleet and relate it to the inspected target. This
+  also applies when inspecting another fleet or an unknown contact.
+- Fleet rows stay in a stable order. Badges and notifications convey danger;
+  needs-attention filtering or sorting is optional.
+- Mobile is a design target: players should be able to play almost as easily
+  as on a larger screen. The historical laptop-only scope below is reopened.
+- Inspection leads with decision-relevant facts, using a small identifying
+  visual. Large artwork and deeper statistics are available on expansion.
+  Fleet details prioritize activity, destination, ETA, fuel and cargo; bodies
+  prioritize known resources and nearby activity; contacts prioritize what
+  was detected, where and how recently, with uncertainty explicit.
+- An unknown engine burn normally produces an inspectable warning; a
+  confirmed attack produces a critical alarm.
+- Phones support the same core gameplay capabilities as larger screens,
+  with an arrangement adapted to the device.
+- Mobile starts with the map. Selecting an object opens a drawer version
+  of the HUD, where the player can inspect and navigate between HUD content.
+  Persistent Fleets / Objects / Events controls opening a bottom sheet were
+  proposed, but the drawer-on-selection flow is Travis's preferred direction.
+- Choosing a travel destination opens a course preview identifying the fleet,
+  target, arrival time and fuel cost. Travel starts only through a separate
+  explicit commit action, on desktop and mobile.
+- The system object list and inspector are one browser. Selecting a row
+  replaces the list with details; Back restores the list's filter, search
+  and scroll position. The same navigation works inside the phone drawer.
+- Owned-fleet details provide an explicit Command this fleet button. The
+  command fleet stays visible while the player browses other objects;
+  camera focus remains a separate Go to action.
+- A target's command area explicitly shows Command fleet → Target above
+  the available actions, including during course review. Selecting the target
+  alone does not issue a command or transfer command to an inspected fleet.
+- Fleet status and controls appear once, inside the combined browser when
+  inspecting the command fleet. The separate persistent command card was
+  rejected as duplicating that view. A compact command selector remains
+  visible and opens the fleet's status and controls directly; target inspection
+  replaces those details rather than adding another panel.
+
+**Provisional layout, pending visual prototype review:** fleet overview,
+combined object browser/inspector, persistent command-fleet status and actions,
+compact global status and notifications, and a dominant map. The combined
+browser supersedes the earlier proposal for separate object-list and detail
+panels. Travis requested a visual prototype before committing to placements.
+Desktop and phone layouts must both be reviewable.
+
+**Rejected default:** automatically sorting the fleet overview by problems,
+then completed activities, then ongoing work. Use stable rows and separate
+notifications instead.
+
+**Attention model:** monitor all owned fleets across systems while issuing
+commands to one fleet at a time. Travis highlighted fuel, mining, scanning,
+local travel and inter-system travel, with an arbitrary number of fleets,
+each containing one or more ships.
+
+**Prototype question:** which desktop arrangement best supports monitoring,
+inspection and commands, and how should its drawer adapt to a phone? Compare
+three structural variants on the existing HUD studio route using simulated
+multi-fleet data. Layout acceptance waits for Travis's visual review.
+
+**Unresolved:** exact placements and mobile drawer behavior pending prototype
+review, detailed flows for individual activities, and large-fleet scaling.
+
+### Prototype review
+
+**First review: rejected.** Travis found the mobile layout wasteful and all
+three desktop variants visually flat and neutral. None is an accepted layout.
+The next pass keeps the settled interaction model but revisits presentation:
+an edge-to-edge mobile drawer, one compact command header, report rows instead
+of tall event cards, and a more expressive space-strategy visual direction.
+Metallic framing, faction crests, illuminated controls, stronger color roles
+and layered panel materials are prototype proposals awaiting review.
+
+Run `npm run dev:frontend` from the repository root if the frontend is not
+already running. Open `/dev/system-storyboard/hud?variant=A` on its local
+port (20200 in this checkout). The original studio without a variant remains
+available. All variants are development-only, with fictional data and commands
+held in memory; reload or Reset restores the initial scenario.
+
+- **A — Bridge:** vertically stacked fleet and object lists on the left,
+  object details and fleet controls replace the object list; blue framing.
+- **B — Operations:** fleet and object rails on opposite sides of the map,
+  object details replace the object rail; industrial amber instruments.
+- **C — Console:** horizontal fleet watch along the bottom, object browser
+  on the left, details and fleet controls within the browser; violet panels.
+
+All three now use an edge-to-edge bottom drawer on phones. Event history fits
+its content up to the available height, with scrolling for longer histories;
+other sections use a taller drawer with an explicit expand control. Drawer
+navigation and the command fleet share two compact header rows, without a
+separate event-page heading. The map remains visible above the event history.
+The drawer has Fleets, Objects and Events sections. Inspection replaces its
+source list within that section, with Back returning to the retained list.
+After selecting Command this fleet, Choose a target opens the object list
+with all object types shown. The command-fleet identity stays visible in
+the drawer header; on desktop it also appears in the top status bar.
+
+Use the floating arrows or keyboard left/right arrows to switch variants;
+the URL preserves the choice. Phone preview constrains the viewport to 390px;
+the same layouts also respond to actual phone-sized browser windows.
+Study state exposes the command fleet, inspection, camera, fleet activities,
+course preview and events. The visual system and simplified map are prototype
+assets, not a replacement for the live 3D renderer.
+
+Review the distinction between inspecting and taking command, navigation to a
+remote fleet, acknowledgement of an attack while danger continues, and the
+course preview / commit / simulated arrival sequence. Scan, mining and fuel
+purchases have illustrative controls; this is a layout study, not complete
+gameplay implementation. No layout has been selected for production.
+
+---
+
 > **Status: scoping (2026-09-08).** The system view's chrome is reorganised
 > around three surfaces — an **in-system list**, **figures on the arc**, and a
 > **console dock whose collapsed state is the vitals strip**. The direction
