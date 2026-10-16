@@ -201,7 +201,7 @@ test('raw path validation rejects encoded traversal, separators, debug/admin/pus
   assert.equal(seen.length, count, 'denied requests never reach any upstream')
 })
 
-test('only exact four browser Auth REST POST routes reach the emulator', async () => {
+test('email and session Auth REST POST routes reach only the emulator', async () => {
   for (const path of ['/identitytoolkit.googleapis.com/v1/accounts:signUp', '/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword', '/identitytoolkit.googleapis.com/v1/accounts:lookup', '/securetoken.googleapis.com/v1/token']) {
     assert.equal((await request(path)).status, 404)
     const signup = path.endsWith(':signUp')
@@ -224,7 +224,7 @@ test('email signup permits only its exact POST path and trusted origin, never ad
   }
   for (const path of [`${signup}/extra`, `${signup}/`, signup.replace(':', '%3A'), signup.toLowerCase(),
     '/identitytoolkit.googleapis.com/v1/accounts:update', '/identitytoolkit.googleapis.com/v1/accounts:sendOobCode',
-    '/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp', '/emulator/v1/projects/fixture/accounts']) {
+    '/emulator/v1/projects/fixture/accounts']) {
     assert.equal((await request(path, { method: 'POST' })).status, 404)
   }
   for (const origin of [undefined, 'null', 'https://other.example']) {
@@ -238,6 +238,37 @@ test('email signup permits only its exact POST path and trusted origin, never ad
     assert.equal((await request(signup, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } })).status, 400)
   }
   assert.equal(seen.length, count, 'restricted signup variants never reach an upstream')
+})
+
+test('approved simulated Google helper and IdP requests forward only their exact constrained flow', async () => {
+  const base = { apiKey: 'demo-api-key', appName: '[DEFAULT]', v: '12.15.0' }
+  const handler = `/emulator/auth/handler?${new URLSearchParams({ ...base, authType: 'signInViaPopup', providerId: 'google.com', redirectUrl: `${origin}/login`, scopes: 'profile', eventId: '1234567890' })}`
+  const iframe = `/emulator/auth/iframe?${new URLSearchParams({ ...base, eid: 'p' })}`
+  for (const path of [handler, iframe]) {
+    const response = await request(path)
+    assert.equal(response.status, 200)
+    assert.equal(JSON.parse(response.body).service, 'auth')
+    for (const method of ['HEAD', 'POST', 'PUT', 'DELETE']) assert.equal((await request(path, { method })).status, 404)
+    assert.equal((await request(path + '&tenantId=other')).status, 400)
+  }
+  const claims = { sub: 'fixture-google-subject', iss: '', aud: '', exp: 0, iat: 0, email: 'fixture@example.test', email_verified: true }
+  const body = { requestUri: `${origin}/emulator/auth/handler?${new URLSearchParams({ providerId: 'google.com', id_token: JSON.stringify(claims) })}`,
+    sessionId: 'ValueNotUsedByAuthEmulator', returnSecureToken: true, returnIdpCredential: true }
+  const idp = '/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=demo-api-key'
+  // Other tests deliberately use a tiny256-byte body budget. The IdP envelope
+  // contains an encoded simulated identity and needs a realistic fixture budget.
+  const ssoPort = await listen(createPreviewGateway({ previewOrigin: origin, expiresAt: futureExpiry(), authPort: servers[2].address().port, maxBodyBytes: 4096 }))
+  const idpRequest = (target, payload) => request(target, { port: ssoPort, method: 'POST', body: JSON.stringify(payload), headers: { 'content-type': 'application/json' } })
+  const response = await idpRequest(idp, body)
+  assert.equal(response.status, 200)
+  assert.equal(JSON.parse(response.body).service, 'auth')
+  const count = seen.length
+  for (const extra of [{ idToken: 'fixture-linking' }, { tenantId: 'other' }, { requestUri: body.requestUri.replace(origin, 'https://other.example') }]) {
+    assert.equal((await idpRequest(idp, { ...body, ...extra })).status, 400)
+  }
+  assert.equal((await idpRequest(idp.replace('demo-api-key', 'other-key'), body)).status, 400)
+  assert.equal((await request(handler.replace('google.com', 'other.com'))).status, 400)
+  assert.equal(seen.length, count, 'unapproved SSO variants never reach Auth')
 })
 
 test('browser gameplay routes forward bearer, cookies, query and body; strip spoofed forwarding/hop headers', async () => {

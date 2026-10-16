@@ -194,3 +194,21 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Exact Google allowlist/Oct19 00:00UTC expiry unchanged; no token/production/data/
   purchase change. SSO requested but additional local impersonation/account-linking
   implications require concrete approval; see docs/phone-preview.md.
+
+
+## Simulated Google SSO approved and live
+
+- User explicitly approved emulator existing-account/claims/provider-link effects.
+  `/login` now offers Continue with Google and explains the simulated picker.
+- Exact helper GETs and IdP POST are constrained by sso-policy.mjs; Google only,
+  installed SDK12.15.0, same-origin callback, bounded known queries/fake identity
+  body. No admin/reset/production expansion. Outer allowlist and expiry unchanged.
+- Login/auth48 and gateway/policy23 tests, type/lint/build/validators pass. Desktop
+  popup/iframe and cancellation verified; redirect helper rendered at390px. Live
+  login390px has no overflow. No identity selection or credential submission.
+- Live helper200, bad helper/IdP400, wrong method/admin404; anonymous external
+  login/helper302 to ngrok OAuth. Actual phone sign-in/restore/refresh still pending.
+- Gateway20204 now targets isolated SSO frontend20209; source pointer
+  /tmp/hexaverse-sso-preview-root.txt. Same b0f42be art baseline; newer local art
+  remains unpublished. Temporary QA20208 stopped, browser viewport restored.
+- No push, spend, Meshy reference upload or comparison publication.

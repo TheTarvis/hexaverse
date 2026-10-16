@@ -63,8 +63,7 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const redirect = sanitizeRedirect(searchParams.get('redirect'))
   const phonePreview = process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true'
-  // Preview supports user-entered email signup/sign-in against the emulator;
-  // Google SSO remains excluded from its narrow gateway.
+  // Preview uses the same email and simulated Google flows against the emulator.
   const [isSignUp, setIsSignUp] = useState(searchParams.get('signUp') === 'true')
 
   // D13/M1 — a failed/cancelled mobile Google-redirect sign-in surfaces here,
@@ -105,7 +104,6 @@ function LoginForm() {
   }
 
   async function handleGoogle() {
-    if (phonePreview) return
     setError('')
     setLoading(true)
     try {
@@ -176,7 +174,6 @@ function LoginForm() {
           </Button>
         </form>
 
-        {!phonePreview && <>
         <div className="my-6 flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
           <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800/50" />
           OR
@@ -186,7 +183,7 @@ function LoginForm() {
         <Button outline onClick={handleGoogle} disabled={loading} className="w-full">
           <GoogleIcon className="size-5" /> Continue with Google
         </Button>
-        </>}
+        {phonePreview && <Text className="mt-2 text-center text-xs">Google opens the simulated test identity picker.</Text>}
 
         <Text className="mt-6 text-center">
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}

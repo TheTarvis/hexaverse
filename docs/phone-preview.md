@@ -2,9 +2,10 @@
 
 Status: protected preview active, 2026-10-16. Current user-approved endpoint is
 https://gulf-identity-scrap.ngrok-free.dev/ for exact Google identity
-wilson.travis.t@gmail.com until2026-10-19T00:00:00Z, with no paid charges.
-Email signup is now approved and available at `/login?signUp=true`; Travis enters
-his own test credentials. Earlier proposal/activation sections below are historical
+wilson.travis.t@gmail.com until 2026-10-19T00:00:00Z, with no paid charges.
+Email signup is approved at `/login?signUp=true`; simulated Google sign-in is now
+available at `/login`. Travis enters his own test credentials or chooses the
+emulator identity himself. Earlier proposal/activation sections below are historical
 checkpoints; the latest signup/SSO checkpoint controls current access scope.
 
 ## Current environment
@@ -332,3 +333,43 @@ change is needed, but the additional local access implications need explicit rev
 No SSO/helper/IdP route was enabled and no OAuth grant accepted. Before any SSO
 exposure, approve its concrete existing-account effects or a separately isolated
 emulator identity store, and constrain provider/query/redirect/body parameters.
+
+
+## Approved simulated Google SSO — current checkpoint
+
+Travis explicitly approved the simulated picker and its existing-account access,
+custom-claim and provider/password-linking effects after those implications were
+explained. The same protected endpoint now exposes exactly GET
+`/emulator/auth/handler`, GET `/emulator/auth/iframe`, and POST
+`/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp`. The exact outer Google
+identity allowlist and `2026-10-19T00:00:00Z` cutoff are unchanged. This is local
+Firebase simulation, separate from ngrok's real Google entrance.
+
+`sso-policy.mjs` pins the installed Firebase12.15.0 SDK: unique known query keys,
+demo API key, default app, Google/profile provider, same-origin `/login` callback,
+and bounded popup/redirect parameters. IdP POST requires the exact four SDK fields,
+same-origin handler URI and emulator fake-Google JSON claims; linking, tenant,
+access-token, real-JWT, arbitrary custom claims and unknown fields are rejected.
+This constrains transport, not identity ownership. Emulator admin, production,
+reset-password and other provider routes remain blocked.
+
+Verification: login24 plus auth-hook24 tests, gateway18 plus SSO-policy5 tests,
+TypeScript, scoped lint, validators and isolated Next build pass. Actual desktop
+popup and iframe loaded through the QA gateway; popup cancellation returned to a
+usable login form. Redirect helper rendered at390×844 without selecting an identity.
+Live login also has no horizontal overflow at390px. A viewport does not simulate
+mobile user-agent behavior: full SDK redirect/return on actual iOS remains unverified.
+No identity was selected, credentials entered, account created or IdP sign-in submitted.
+
+Live loopback checks: login/helper200, malformed helper/IdP400, wrong helper method
+and admin404. Anonymous external login/helper requests still return302 to
+`idp.ngrok.com`. Successful game sign-in, restore and refresh await Travis's phone
+verification at https://gulf-identity-scrap.ngrok-free.dev/login.
+
+The isolated SSO frontend listens on loopback20209; source pointer is
+`/tmp/hexaverse-sso-preview-root.txt`. It again uses b0f42be plus only login files,
+without environment files or later art candidates. Gateway20204 now forwards there;
+existing ngrok policy/process is unchanged. Frontend and gateway enforce the same
+cutoff. Temporary QA gateway20208 was stopped. These are foreground processes,
+not installed persistent services or guaranteed availability. No push, spend,
+production change or comparison-image publication occurred.

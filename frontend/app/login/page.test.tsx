@@ -409,12 +409,13 @@ describe('LoginPage', () => {
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument()
   })
 
-  it('phone preview offers email sign-in and signup while excluding Google SSO', async () => {
+  it('phone preview offers email sign-in/signup and explains its simulated Google option', async () => {
     vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', 'true')
     const { signIn, signUp, signInWithGoogle } = mockAccountContext()
     render(<LoginPage />)
     expect(screen.getByRole('heading', { name: 'Sign in to Hexaverse' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Continue with Google/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Continue with Google/ })).toBeInTheDocument()
+    expect(screen.getByText('Google opens the simulated test identity picker.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull()
     expect(screen.queryByTestId('login-confirm-password')).toBeNull()
@@ -432,7 +433,7 @@ describe('LoginPage', () => {
     const { signIn, signUp, signInWithGoogle } = mockAccountContext()
     render(<LoginPage />)
     expect(screen.getByRole('heading', { name: 'Create your Hexaverse account' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Continue with Google/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Continue with Google/ })).toBeInTheDocument()
     expect(screen.getByTestId('login-password')).toHaveAttribute('autocomplete', 'new-password')
     expect(screen.getByTestId('login-confirm-password')).toBeInTheDocument()
     fillCredentials('preview@example.com', 'preview-password')
@@ -441,6 +442,16 @@ describe('LoginPage', () => {
     await waitFor(() => expect(signUp).toHaveBeenCalledWith('preview@example.com', 'preview-password'))
     expect(signIn).not.toHaveBeenCalled()
     expect(signInWithGoogle).not.toHaveBeenCalled()
+  })
+
+  it('phone preview Google button invokes the existing provider flow', async () => {
+    vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', 'true')
+    const { signIn, signUp, signInWithGoogle } = mockAccountContext()
+    render(<LoginPage />)
+    fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }))
+    await waitFor(() => expect(signInWithGoogle).toHaveBeenCalledTimes(1))
+    expect(signIn).not.toHaveBeenCalled()
+    expect(signUp).not.toHaveBeenCalled()
   })
 
 })

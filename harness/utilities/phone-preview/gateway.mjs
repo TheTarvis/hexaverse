@@ -6,6 +6,7 @@ import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { ssoHelperAllowed, idpSignInAllowed } from './sso-policy.mjs'
 
 const ID = '[A-Za-z0-9_-]{1,180}'
 const api = (pattern) => new RegExp(`^/v1/${pattern}$`)
@@ -30,7 +31,10 @@ const authPaths = new Set([
   '/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword',
   '/identitytoolkit.googleapis.com/v1/accounts:lookup',
   '/securetoken.googleapis.com/v1/token',
+  '/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp',
 ])
+const ssoHelperPaths = new Set(['/emulator/auth/handler', '/emulator/auth/iframe'])
+const idpPath = '/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp'
 const signupPath = '/identitytoolkit.googleapis.com/v1/accounts:signUp'
 const signupFields = new Set(['email', 'password', 'returnSecureToken', 'clientType', 'captchaResponse', 'recaptchaVersion'])
 const appPages = new RegExp(`^(?:/|/login|/systems/${ID})$`)
@@ -59,6 +63,7 @@ export function previewRoute(method, target) {
   if (pathname.split('/').some(segment => segment === '.' || segment === '..')) return null
   const read = method === 'GET' || method === 'HEAD'
   if (read && (pathname === '/storybook' || pathname === '/storybook/' || storybookAsset.test(pathname))) return { service: 'storybook', path: target }
+  if (ssoHelperPaths.has(pathname)) return method === 'GET' ? { service: 'auth', path: target } : null
   if (authPaths.has(pathname)) return method === 'POST' ? { service: 'auth', path: target } : null
   if (pathname.startsWith('/api/')) {
     const path = pathname.slice(4)
@@ -159,6 +164,7 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     if ((origin && origin !== trusted.origin) || (request.method !== 'GET' && request.method !== 'HEAD' && origin !== trusted.origin)) return reject(response, 403)
     const route = previewRoute(request.method, request.url)
     if (!route || request.headers['x-http-method-override'] || request.headers['x-method-override']) return reject(response, 404)
+    if (route.service === 'auth' && ssoHelperPaths.has(route.path.split('?', 1)[0]) && !ssoHelperAllowed(route.path, trusted.origin)) return reject(response, 400)
     const declaredLength = Number(request.headers['content-length'] ?? 0)
     if (!Number.isSafeInteger(declaredLength) || declaredLength < 0 || declaredLength > maxBodyBytes) return reject(response, 413)
     if ((request.method === 'GET' || request.method === 'HEAD') && (declaredLength || request.headers['transfer-encoding'])) return reject(response, 404)
@@ -185,6 +191,13 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
         if (!request.headers['content-type']?.startsWith('application/json') || !body || Array.isArray(body) ||
           typeof body.email !== 'string' || !body.email.trim() || typeof body.password !== 'string' || !body.password ||
           Object.keys(body).some(key => !signupFields.has(key))) return reject(response, 400)
+      } catch { return reject(response, 400) }
+    }
+    if (route.service === 'auth' && route.path.split('?', 1)[0] === idpPath) {
+      try {
+        const query = new URL(route.path, trusted.origin).searchParams
+        if (!request.headers['content-type']?.startsWith('application/json') || query.get('key') !== 'demo-api-key' ||
+          [...query.keys()].length !== 1 || !idpSignInAllowed(JSON.parse(Buffer.concat(chunks, size).toString('utf8')), trusted.origin)) return reject(response, 400)
       } catch { return reject(response, 400) }
     }
     const headers = headersWithoutHop(request.headers)
