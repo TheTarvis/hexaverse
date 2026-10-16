@@ -96,3 +96,14 @@ never enter production commands. Final integrated checks are in progress.
 - Scene/view110 tests pass. Preview remains unexposed; no local ngrok process or
   agent4040 listener observed. No verified phone URL exists in this local session.
 - Approved domain migration underway, preserving numbered history and active scratch.
+
+## Activation / documentation follow-up
+
+- Weekend protected access approved until 2026-10-19T00:00:00Z for exact Google
+  identity wilson.travis.t@gmail.com; bounded shutdown c38d6a5 and polling 63bfc87 ready.
+- Explicitly approved email-only consent completed, but ngrok asks for a NEW account
+  and Terms of Service acceptance. Stopped before account creation/terms. Need the
+  existing sign-in method or user-completed account creation.
+- Plan/quota remain unverified; no endpoint/live URL. Latest isolated polling build passes.
+- Docs migration d47d657 complete; recoverable old-doc cleanup is now authorized
+  and in progress separately. Meshy reference upload remains blocked.

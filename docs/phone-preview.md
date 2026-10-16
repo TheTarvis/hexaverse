@@ -213,3 +213,12 @@ External deadline protection is implemented and tested:15 gateway cases plus
 seven build-helper cases pass. Current isolated game and Storybook builds pass
 and include the latest tap-layer/contrast fixes. No listeners are running on the
 preview ports. No account token or credential is recorded in this document.
+
+Latest activation check: Travis explicitly authorized the email-only Google consent,
+and Continue completed it. The next screen is **new ngrok account creation** for
+wilson.travis.t@gmail.com, including an unchecked Terms of Service acceptance.
+No terms were accepted or account created. This Google identity did not reach an
+existing account dashboard; the configured agent token's account is still unknown.
+Need the existing account's sign-in method or user-completed account creation before
+plan/quota verification. No tunnel, public endpoint, purchase or upgrade occurred.
+The isolated preview rebuild including reduced polling now passes.
