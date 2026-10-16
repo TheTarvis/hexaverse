@@ -1,5 +1,6 @@
 'use client'
 
+import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
 import { planetKind } from './webgl/scene-art'
 import { SpacecraftPreview } from './SpacecraftPreview'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -29,6 +30,14 @@ export interface IndexedObject {
     attachedTo?: string
     shipCount?: number
   }
+}
+
+/** The index consumes disclosed objects; anonymous contacts never load hull art. */
+function ObjectThumbnail({ object, className }: { object: IndexedObject; className?: string }) {
+  const kind = object.kind.trim().toLowerCase().replaceAll('_', ' ')
+  if (kind === 'contact' || kind === 'unresolved contact') return <HudObjectThumbnail analyzed={false} className={className} />
+  const category = object.fleet ? 'fleet' : kind === 'fleet' ? 'unknown' : object.group === 'Lane gates' ? 'gate' : object.kind
+  return <HudObjectThumbnail kind={category} className={className} />
 }
 
 /** Shared object browser. Opening details never issues a command. */
@@ -107,6 +116,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
           const rows = matches.filter(object => object.group === group)
           return rows.length > 0 && <section key={group}><p className={styles.eyebrow}>{group}</p>{rows.map(object => <div key={rowKey(object)} className={styles.indexRow} data-selected={object.fleet ? selectedFleetId === object.fleet.id : !fleetDetail && selected === object.name}>
             <Button plain ref={el => { if (el) expandButtons.current.set(rowKey(object), el); else expandButtons.current.delete(rowKey(object)) }} data-testid={object.fleet ? `index-fleet-${object.fleet.id}` : `index-${object.name}`} aria-expanded={!!detailObject && rowKey(detailObject) === rowKey(object)} aria-controls="object-details" onClick={() => { if (object.fleet) onSelectFleet?.(object.fleet.id); else onSelect(object.name); setDetails(detailObject && rowKey(detailObject) === rowKey(object) ? null : rowKey(object)) }}>
+              <ObjectThumbnail object={object} />
               <span className={styles.rowCopy}><strong>{object.label ?? object.name}</strong><small>{object.enclosingStar && `${object.enclosingStar} · `}{object.catalogueRef && `${object.catalogueRef} · `}{object.kind}{object.name === tutorialTarget ? ' · Tutorial destination' : ''}</small></span>
               <span aria-hidden="true" className={styles.rowChevron}>{detailObject && rowKey(detailObject) === rowKey(object) ? '‹' : '›'}</span>
             </Button>
@@ -117,7 +127,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
       </aside>
       {(detailObject || detailContent) && <aside style={!detailObject ? { display: 'none' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.label ?? detailObject.name}` : undefined}>
         {detailObject && <header className={styles.detailsHeader}><p className={styles.eyebrow}>SELECTED {fleetFacts ? 'FLEET' : detailObject.group === 'Stations' ? 'STATION' : detailObject.group === 'Worlds' ? 'WORLD' : 'OBJECT'}</p><Button autoFocus plain className={styles.detailsClose} data-testid="details-back" aria-label="Close details and return to objects" title="Back to objects" onClick={closeDetails}>←</Button></header>}
-        <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && detailObject.kind !== 'star' && <span aria-hidden="true" className={`${styles.portrait} ${styles[detailObject.className ?? 'rock']}`} />}</><div><h3>{detailObject.label ?? detailObject.name}</h3>{detailObject.catalogueRef && <p>{detailObject.catalogueRef}</p>}<p className={styles.muted}>{detailObject.kind}</p></div></div>
+        <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && detailObject.kind !== 'star' && <ObjectThumbnail object={detailObject} className={styles.portrait} />}</><div><h3>{detailObject.label ?? detailObject.name}</h3>{detailObject.catalogueRef && <p>{detailObject.catalogueRef}</p>}<p className={styles.muted}>{detailObject.kind}</p></div></div>
         {open && fleetFacts && <SpacecraftPreview key={`fleet:${fleetFacts.id}`} kind="ship" objectId={fleetFacts.id} label={fleetFacts.id} accentColor={fleetFacts.mode === 0 ? 0xffb454 : fleetFacts.mode === 2 ? 0xc4b5fd : 0x4ade80} />}
         {open && !fleetFacts && detailObject.kind === 'station' && <SpacecraftPreview key={`station:${detailObject.name}`} kind="station" objectId={detailObject.name} label={detailObject.label ?? detailObject.name} accentColor={0x67e8f9} />}
         {open && !fleetFacts && detailObject.kind === 'star' && <SpacecraftPreview key={`star:${detailObject.name}:${detailObject.starClass ?? ''}`} kind="star" objectId={detailObject.name} starClass={detailObject.starClass} label={detailObject.label ?? detailObject.name} accentColor={0xffffff} />}

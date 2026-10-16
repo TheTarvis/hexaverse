@@ -89,7 +89,7 @@ describe('refresh-system-scene-art actual Three scene integration', () => {
     await h.step()
     expect(bodies()).toHaveLength(0)
   })
-  it.each([['belt', 0x8a8d99], ['ruin', 0x9a86c4], ['debris', 0x6f6f7a]] as const)('Scenario: Other body types and missing features — preserves %s fallback', async (type, tint) => {
+  it.each([['belt', 0x8a8d99]] as const)('Scenario: Other body types and missing features — preserves %s fallback', async (type, tint) => {
     await mount([mark('fallback', type)])
     const material = surface(bodies()[0]!)
     expect(material).toBeInstanceOf(THREE.MeshStandardMaterial)
@@ -321,4 +321,70 @@ it('keeps the main belt target aligned and releases its owned rock on removal', 
   expect(disposed).toHaveBeenCalledTimes(1)
   h.unmount()
   expect(disposed).toHaveBeenCalledTimes(1)
+})
+
+
+it.each(['anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation'])('integrates %s art without changing served transforms and releases its owned resources', async type => {
+  const feature = mark('feature-target', type)
+  const h = await mount([feature])
+  const mesh = bodies()[0]!
+  expect(mesh.name).toBe(`feature:${type}`)
+  expect(mesh.position.toArray()).toEqual([20, 1, 10])
+  expect(mesh.scale.x).toBe(2 * BODY_DRAW_SCALE)
+  const resources = new Set<THREE.BufferGeometry | THREE.Material>()
+  mesh.traverse(object => {
+    if (!(object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Line || object instanceof THREE.Sprite)) return
+    if (!(object instanceof THREE.Sprite)) resources.add(object.geometry)
+    for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+      resources.add(material)
+      if (material.transparent) expect(material.depthWrite).toBe(false)
+      else if (object.geometry.getAttribute('position')) expect(material.stencilZPass).toBe(THREE.ReplaceStencilOp)
+    }
+  })
+  expect(mesh.children.length).toBeGreaterThan(0)
+  expect(resources.size).toBeGreaterThanOrEqual(2)
+  const releases = [...resources].map(resource => vi.spyOn(resource, 'dispose'))
+  await h.step()
+  expect(bodies()[0]).toBe(mesh)
+  feature.position = { x: -8, y: 3, z: 4 }
+  feature.selected = true
+  await h.step()
+  expect(mesh.position.toArray()).toEqual([-8, 3, 4])
+  h.scene.marks = []
+  await h.step()
+  releases.forEach(release => expect(release).toHaveBeenCalledTimes(1))
+  h.unmount()
+  releases.forEach(release => expect(release).toHaveBeenCalledTimes(1))
+})
+
+it('advances features only with published decorative time, while positions and classification refresh independently', async () => {
+  const feature = mark('discovery', 'anomaly')
+  const h = await mount([feature])
+  const mesh = bodies()[0]!
+  const rotations = () => {
+    const values: number[][] = []
+    mesh.traverse(object => values.push(object.rotation.toArray().slice(0, 3) as number[]))
+    return values
+  }
+  const initial = rotations()
+  h.scene.decorativeTimeMs = 2000
+  await h.step()
+  expect(rotations()).not.toEqual(initial)
+  const held = rotations()
+  h.scene.positionTimeMs = 9000
+  feature.position = { x: 30, y: 0, z: -2 }
+  await h.step()
+  expect(rotations()).toEqual(held)
+  expect(mesh.position.toArray()).toEqual([30, 0, -2])
+  h.scene.marks = [{ ...feature, bodyType: 'ruin' }]
+  await h.step()
+  expect(bodies()[0]).not.toBe(mesh)
+  expect(bodies()[0]!.name).toBe('feature:ruin')
+})
+
+it('never reveals feature art for an anonymous contact carrying incidental body metadata', async () => {
+  await mount([{ ...mark('anonymous', 'ruin'), kind: 'contact' }])
+  const mesh = bodies()[0]!
+  expect(mesh.name).not.toMatch(/^feature:/)
+  expect(mesh.children.some(child => child.name === 'assembly')).toBe(false)
 })

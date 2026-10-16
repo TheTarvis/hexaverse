@@ -9,8 +9,8 @@
 .eyebrow { font: 10px/1.6 ui-monospace, monospace; letter-spacing: .15em; color: var(--signal); }
 .muted, .indexRow small { color: var(--muted); }
 .indexRow { display: flex; margin-top: 4px; }
-.indexRow > button { width: 100%; min-height: 58px; justify-content: space-between; text-align: left; gap: 12px; padding: 10px 12px; border-radius: 0; }
-.rowCopy { min-width: 0; }
+.indexRow > button { width: 100%; min-height: 58px; align-items: center; justify-content: space-between; text-align: left; gap: 12px; padding: 10px 12px; border-radius: 0; }
+.rowCopy { flex: 1; min-width: 0; }
 .rowChevron { flex-shrink: 0; color: var(--signal); }
 .indexRow > button:hover { background: #76e3ef0c; }
 .indexRow strong, .indexRow small { display: block; overflow-wrap: anywhere; }
@@ -36,10 +36,7 @@
   .detailsBody { overflow: visible; }
   .detailsHeader { position: sticky; top: -16px; background: #071019; z-index: 1; }
 }
-.ice { background: radial-gradient(ellipse at 77% 73%, #010510d9 3%, transparent 67%), repeating-linear-gradient(166deg, #98b0e220 0 3px, #363d9b20 5px 8px, transparent 11px 15px), radial-gradient(circle at 28% 23%, #919dee, #415fb7 35%, #273566 66%, #070c1d 90%); }
-.gas { background: radial-gradient(ellipse at 80% 75%, #130c09ed, transparent 67%), repeating-linear-gradient(172deg, #ad8058 0 4px, #d0ae7b 5px 8px, #796250 10px 13px, #c2a788 14px 18px); }
-.rock { background: radial-gradient(ellipse at 70% 65%, #171218e6, transparent 75%), radial-gradient(ellipse at 30% 20%, #d3a283, #755444 35%, #37272b 70%, #130f17); }
-.portrait { width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; box-shadow: 0 0 0 5px #8ebce908, inset 1px 1px 3px #bed9ff6b; }
+.portrait { flex-shrink: 0; }
 .indexShell button { color: #dce6f0; }
 .indexShell > button, .indexRow[data-selected='true'] > button { color: var(--signal); }
 .indexShell .primary { color: white; }

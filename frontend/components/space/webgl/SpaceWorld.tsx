@@ -41,6 +41,7 @@ import { TAN_HALF_FOV, MARK_FLOOR_DIV, drawRadiusFor } from '../space-projection
 import type { SceneMark, SceneModel } from '../space-scene'
 import type { SpaceFrame } from '../space-transform-loop'
 import { createSpacecraftModel, loadSpacecraftAsset, type SpacecraftKind } from './spacecraft-art'
+import { advanceFeatureModel, createFeatureModel, featureArtKind } from './feature-art'
 import { advanceLaneGatePortal, createLaneGateModel, loadLaneGateAsset } from './lane-gate-art'
 import { advancePlanetClouds, createPlanetModel, planetKind, createHexGrid, createBackdropMaterial } from './scene-art'
 
@@ -428,6 +429,8 @@ export function SpaceWorld({
           color: tint, vertexColors: true, roughness: 0.9, metalness: 0.04, flatShading: true,
         }))
       }
+      const feature = mark.kind === 'body' ? featureArtKind(type) : null
+      if (feature) return createFeatureModel(feature, mark.id)
       const planet = planetKind(type)
       if (planet) return createPlanetModel(planet, mark.id, sphere)
       if (LIT_TYPES.has(type)) {
@@ -566,6 +569,7 @@ export function SpaceWorld({
         const size = drawRadiusOf(mark)
         mesh.scale.setScalar(size)
         if (mark.kind === 'gate') advanceLaneGatePortal(mesh, liveScene.decorativeTimeMs)
+        if (mark.kind === 'body' && featureArtKind(mark.bodyType ?? '')) advanceFeatureModel(mesh, liveScene.decorativeTimeMs)
         if (cloudIds.has(mark.id)) advancePlanetClouds(mesh, cloudDelta)
         if (mark.kind === 'star') {
           if (cloudDelta > 0) stars.get(mesh)?.advance(cloudDelta)

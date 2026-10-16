@@ -48,7 +48,7 @@ try {
   if (!address || typeof address === 'string') throw new Error('Thumbnail server has no TCP address')
   browser = await chromium.launch()
   await mkdir(output, { recursive: true })
-  for (const kind of ['fleet', 'station', 'rocky', 'resource-site', 'star', 'gas_giant', 'ice', 'moon']) {
+  for (const kind of ['fleet', 'station', 'rocky', 'resource-site', 'star', 'gas_giant', 'ice', 'moon', 'gate', 'anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation']) {
     const page = await browser.newPage({ viewport: { width: 128, height: 128 }, deviceScaleFactor: 1 })
     page.on('pageerror', error => console.error(error))
     page.on('console', message => { if (message.type() === 'error') console.error(message.text()) })

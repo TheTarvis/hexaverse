@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { SystemObjectIndex } from '@/components/space/SystemObjectIndex'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, within } from 'storybook/test'
 import { HudCardShell } from './HudCardShell'
@@ -15,7 +17,7 @@ const meta: Meta<{ kind: HudObjectKind; alt?: string }> = {
   parameters: {
     docs: { description: { component: 'C2 — 32px static thumbnails, using 128px transparent sources rendered offline from existing game art. Representative category images rather than per-object portraits. Decorative beside names; supply alt for standalone images. No model loading, canvas or GPU renderer is created by this component. These examples do not settle fleet-list composition.' } },
   },
-  argTypes: { kind: { control: 'select', options: ['fleet', 'station', 'rocky', 'resource-site', 'star', 'gas_giant', 'ice', 'moon'] } },
+  argTypes: { kind: { control: 'select', options: ['fleet', 'station', 'rocky', 'resource-site', 'star', 'gas_giant', 'ice', 'moon', 'gate', 'anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation'] } },
   decorators: [(Story) => <div className={`dark ${styles.stage}`}><Story /></div>],
 }
 
@@ -35,6 +37,16 @@ const celestialObjects: typeof objects = [
   { kind: 'gas_giant', name: 'Gas giant', description: 'Cloud bands' },
   { kind: 'ice', name: 'Ice world', description: 'Icy surface' },
   { kind: 'moon', name: 'Moon', description: 'Lunar surface' },
+]
+
+const featureObjects: typeof objects = [
+  { kind: 'gate', name: 'Lane gate', description: 'Manufactured gateway' },
+  { kind: 'anomaly', name: 'Anomaly', description: 'Unexplained phenomenon' },
+  { kind: 'ruin', name: 'Ruin', description: 'Derelict structure' },
+  { kind: 'nebula', name: 'Nebula', description: 'Diffuse cloud' },
+  { kind: 'gravity_well', name: 'Gravity well', description: 'Distorted field' },
+  { kind: 'debris', name: 'Debris', description: 'Industrial fragments' },
+  { kind: 'radiation', name: 'Radiation', description: 'Dispersed emission' },
 ]
 
 function ObjectSample({ narrow = false, longName = false, analyzed = true, entries = objects }: { narrow?: boolean; longName?: boolean; analyzed?: boolean; entries?: typeof objects }) {
@@ -136,5 +148,49 @@ export const ImageUnavailable: Story = {
     await expect(await canvas.findByRole('img', { name: 'Station thumbnail — image unavailable' })).toBeVisible()
     await expect(canvas.getByText('Aurelia Station')).toBeVisible()
     await expect(canvas.getByText('Station · Orbital')).toBeVisible()
+  },
+}
+
+
+export const SystemFeatures: Story = { render: () => <ObjectSample entries={featureObjects} /> }
+
+export const FeatureComparison: Story = {
+  parameters: { docs: { description: { story: 'Seven shared world-art categories at their actual 32px HUD size. Compare recognition on both panel surfaces; object status and ownership remain separate from the art.' } } },
+  render: () => (
+    <div className={styles.comparison}>
+      <ObjectSample entries={featureObjects} />
+      <div style={{ color: '#102432', background: '#e4edf2', padding: 16 }}>
+        <ul className={styles.list}>
+          {featureObjects.map(({ kind, name }) => <li key={kind} className={styles.row}><HudObjectThumbnail kind={kind} /><span>{name}</span></li>)}
+        </ul>
+      </div>
+    </div>
+  ),
+}
+
+export const UnsupportedCategory: Story = {
+  render: () => <HudCardShell title="Known object" lighting="none" className={styles.narrow}><HudObjectThumbnail kind="future feature" alt="Known object" /><HudText variant="secondary">No category image yet</HudText></HudCardShell>,
+}
+
+
+function FeatureObjectBrowser() {
+  const [selected, setSelected] = useState<string | null>(null)
+  const [open, setOpen] = useState(true)
+  const objects = featureObjects.map(({ kind, name }) => ({
+    name: `feature-${kind}`, label: name, kind: kind === 'gate' ? 'Gate to Borealis' : kind.replaceAll('_', ' '),
+    group: kind === 'gate' ? 'Lane gates' : 'Features', x: 0, y: 0,
+    knownFrom: 'System telemetry', resources: 'No disclosed deposits',
+  }))
+  return <SystemObjectIndex objects={objects} selected={selected} open={open} onOpen={setOpen} onSelect={setSelected} onFocus={() => {}} systemName="Borealis" />
+}
+
+export const InObjectBrowser: Story = {
+  parameters: { docs: { description: { story: 'Actual system browser: static art in rows and feature details. Selection opens details; it does not issue a command or create a GPU canvas.' } } },
+  render: () => <FeatureObjectBrowser />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await canvas.getByTestId('index-feature-gate').click()
+    await expect(canvas.getByRole('complementary', { name: 'Details for Lane gate' })).toBeVisible()
+    await expect(canvas.getByTestId('index-feature-gate')).toHaveAttribute('aria-expanded', 'true')
   },
 }

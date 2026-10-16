@@ -7,7 +7,17 @@ images and does not load models or create a renderer. Loading/failed images
 use a muted Heroicons Photo placeholder in the same 32px slot; object names
 and types remain the caller's content. Changing the object kind starts a fresh
 load attempt. This asset-availability state is separate from the diffuse
-unanalyzed-object visual.
+unanalyzed-object visual. Unknown category values use a generic Photo placeholder
+without requesting an image; they do not masquerade as another category. The
+canonical resolver accepts underscores or spaces (`gravity_well` / `gravity well`)
+and maps `belt` to `resource-site`. It does not classify every resource-bearing
+host as a resource site. Anonymous contacts must use `analyzed={false}`.
+
+The live system object browser uses these thumbnails in its rows and in detail
+headers for objects without an existing live preview. Planet, star, station and
+owned-fleet detail previews retain their shared 3D components. Dynamic gate
+labels are resolved through the disclosed `Lane gates` group, never by guessing
+an object category from its name. Fleet art requires explicit fleet metadata.
 
 Regenerate from the repository root with frontend dependencies and Playwright
 Chromium installed:
@@ -30,6 +40,11 @@ runs when displaying a card.
   `hud-{kind}-1` seeds. The rocky seed selects a dry surface.
 - Star uses `createStarModel`, a representative G-class tint and a corona
   scaled to fit the thumbnail crop. Clouds/plasma are captured at initial time.
+- Gate uses the accepted `lane-gate.glb` at full opening, including the shared
+  portal effect. Thumbnail generation does not modify the accepted model.
+- Anomaly, ruin, nebula, gravity well, debris and radiation use the same
+  deterministic feature-art factories as the world. Their representative seed,
+  decorative time and framing are fixed by the offline thumbnail source.
 - Resource site uses a representative cluster built from the same
   `rockGeometry` and material treatment as the world renderer.
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import { SystemObjectIndex as SystemIndex } from './SystemObjectIndex'
 
@@ -68,4 +68,44 @@ it('finds a renamed body by catalogue reference while selection retains its iden
   fireEvent.click(screen.getByTestId('index-feat-body-0'))
   expect(onSelect).toHaveBeenCalledWith('feat-body-0')
   expect(screen.getByRole('heading', { name: 'Silver Haven' })).toBeInTheDocument()
+})
+
+
+it('uses canonical feature thumbnails in actual index rows and nonplanet details', () => {
+  const objects = [
+    { name: 'gate-id', label: 'Gate to Borealis', kind: 'Gate to Borealis', group: 'Lane gates', x: 0, y: 0 },
+    ...['anomaly', 'ruin', 'nebula', 'gravity well', 'debris', 'radiation', 'belt'].map(kind => ({ name: kind, kind, group: 'Features', x: 0, y: 0 })),
+  ]
+  const props = { objects, open: true, onOpen: vi.fn(), onSelect: vi.fn(), onFocus: vi.fn() }
+  const { rerender } = render(<SystemIndex {...props} selected="gate-id" />)
+  expect(screen.getByTestId('index-gate-id').querySelector('img')).toHaveAttribute('src', expect.stringContaining('gate.png'))
+  fireEvent.click(screen.getByTestId('index-gate-id'))
+  expect(screen.getByRole('complementary', { name: 'Details for Gate to Borealis' }).querySelector('img')).toHaveAttribute('src', expect.stringContaining('gate.png'))
+  for (const kind of ['anomaly', 'ruin', 'nebula', 'gravity well', 'debris', 'radiation', 'belt']) {
+    const filename = kind === 'belt' ? 'resource-site' : kind.replaceAll(' ', '_')
+    expect(screen.getByTestId(`index-${kind}`).querySelector('img')).toHaveAttribute('src', expect.stringContaining(`${filename}.png`))
+    rerender(<SystemIndex {...props} selected={kind} />)
+    expect(screen.getByRole('complementary', { name: `Details for ${kind}` }).querySelector('img')).toHaveAttribute('src', expect.stringContaining(`${filename}.png`))
+  }
+  expect(screen.queryByRole('img')).not.toBeInTheDocument() // Decorative art must not repeat row names.
+})
+
+
+it('keeps contact thumbnails anonymous and unknown feature thumbnails generic', () => {
+  const objects = [
+    { name: 'presence', label: 'Unresolved contact', kind: 'contact', group: 'Contacts', x: 0, y: 0 },
+    { name: 'future', kind: 'future feature', group: 'Features', x: 0, y: 0 },
+    { name: 'fleet-label', kind: 'fleet', group: 'Fleets', x: 0, y: 0 },
+  ]
+  render(<SystemIndex objects={objects} selected="presence" open onOpen={vi.fn()} onSelect={vi.fn()} onFocus={vi.fn()} />)
+  const contact = screen.getByTestId('index-presence')
+  expect(contact.querySelector('img')).toBeNull()
+  expect(within(contact).queryByTitle('No category image')).toBeNull()
+  expect(within(contact).queryByTitle('Image unavailable')).toBeNull()
+  expect(within(screen.getByTestId('index-future')).getByTitle('No category image')).toBeInTheDocument()
+  expect(screen.getByTestId('index-fleet-label').querySelector('img')).toBeNull()
+  fireEvent.click(contact)
+  const details = screen.getByRole('complementary', { name: 'Details for Unresolved contact' })
+  expect(details.querySelector('img')).toBeNull()
+  expect(details.querySelector('canvas')).toBeNull()
 })

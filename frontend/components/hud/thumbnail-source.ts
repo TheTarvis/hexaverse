@@ -3,16 +3,29 @@ import * as THREE from 'three'
 import { createRendererCandidate } from '@/components/render-guard/renderer-candidate'
 import { createPlanetModel } from '@/components/space/webgl/scene-art'
 import { createSpacecraftModel, loadSpacecraftAsset } from '@/components/space/webgl/spacecraft-art'
+import { createLaneGateModel, loadLaneGateAsset } from '@/components/space/webgl/lane-gate-art'
+import { createFeatureModel, featureArtKind } from '@/components/space/webgl/feature-art'
 import { rockGeometry } from '@/components/space/webgl/SpaceWorld'
 import { createStarModel } from '@/components/space/webgl/star-art'
 import { addPreviewLights, disposeObjectResources } from '@/components/graphics/scene-resources'
 
-export async function renderHudThumbnail(kind: 'fleet' | 'station' | 'rocky' | 'gas_giant' | 'ice' | 'moon' | 'star' | 'resource-site', canvas: HTMLCanvasElement) {
+export type ThumbnailKind = 'fleet' | 'station' | 'rocky' | 'gas_giant' | 'ice' | 'moon' | 'star' | 'resource-site' | 'gate' | 'anomaly' | 'ruin' | 'nebula' | 'gravity_well' | 'debris' | 'radiation'
+
+export async function renderHudThumbnail(kind: ThumbnailKind, canvas: HTMLCanvasElement) {
   const scene = new THREE.Scene()
   addPreviewLights(scene)
   let source: THREE.Group | undefined
 
-  if (kind === 'fleet' || kind === 'station') {
+  const feature = featureArtKind(kind)
+  if (kind === 'gate') {
+    source = await loadLaneGateAsset()
+    const gate = createLaneGateModel(source)
+    // World art faces the overhead camera; return its aperture to the preview view.
+    gate.rotation.x = Math.PI / 2
+    scene.add(gate)
+  } else if (feature) {
+    scene.add(createFeatureModel(feature, `hud-${kind}-1`))
+  } else if (kind === 'fleet' || kind === 'station') {
     const modelKind = kind === 'fleet' ? 'ship' : 'station'
     source = await loadSpacecraftAsset(modelKind)
     scene.add(createSpacecraftModel(modelKind, 0x4fce92, source))
@@ -46,6 +59,19 @@ export async function renderHudThumbnail(kind: 'fleet' | 'station' | 'rocky' | '
   const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.01, 100)
   camera.position.set(3, 2, -3)
   camera.lookAt(0, 0, 0)
+  if (feature || kind === 'gate') {
+    // Fit the new compositions in camera space so thin silhouettes remain readable
+    // at the actual 32px display size, without changing accepted celestial crops.
+    camera.updateMatrixWorld(true)
+    const projected = new THREE.Box3().setFromObject(scene).applyMatrix4(camera.matrixWorldInverse)
+    const size = projected.getSize(new THREE.Vector3())
+    const half = Math.max(size.x, size.y) * 0.55
+    if (Number.isFinite(half) && half > 0) {
+      camera.left = camera.bottom = -half
+      camera.right = camera.top = half
+      camera.updateProjectionMatrix()
+    }
+  }
   const renderer = createRendererCandidate({ canvas, alpha: true, stencil: false, forceWebGL: true })
   let disposed = false
   const dispose = () => {
