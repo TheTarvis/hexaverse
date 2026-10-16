@@ -138,12 +138,15 @@ SSE must flush immediately, retain 30-second heartbeats, avoid buffering and omi
 query tokens from gateway/inspector logs. Current world polling still needs quota
 monitoring; SSE is not a substitute already wired into that view.
 
-Proposed duration: one foreground 60-minute pilot, then a separately agreed weekend
-cutoff after phone verification. Stop ngrok and gateway processes on cutoff or
+Updated proposed duration, pending the explicit access confirmation: through
+Sunday2026-10-18 at20:00 America/New_York, which is2026-10-19T00:00:00Z.
+Travis requested all-weekend access;60 minutes was only our earlier proposed pilot,
+not a provider limit. Do not activate or retain the old60-minute cutoff if this
+weekend scope is approved. Stop ngrok and gateway processes on cutoff or
 request, confirm the URL no longer reaches the app, and remove only temporary
 preview configuration. Do not install launch agents or background persistence.
 Mac awake/network availability is required; ngrok free endpoints do not expire
-on their own. A weekend-long service is therefore not enabled by a pilot approval.
+on their own. A duration request alone does not confirm the pending exact-identity access policy.
 
 ## Local preparation completed — 2026-10-16
 
@@ -166,5 +169,47 @@ project argument is not proof of the running backend environment.
 
 Gateway/helper tests pass18 cases, including Origin checks, forbidden routes,
 encoded traversal, confined static files, body limits and immediate SSE flushing.
-No tunnel or outer OAuth session has been created; identity/60-minute exposure
+No tunnel or outer OAuth session has been created; exact-identity/weekend exposure
 approval and actual account plan/quota remain pending.
+
+## Bounded weekend shutdown preparation
+
+The proposed weekend deadline remains pending access approval, not active. External
+HTTPS gateway launches require an explicit `--until` deadline; loopback-only QA
+can remain unbounded. Check wall-clock expiry before every request, close active
+connections/streams and stop listening at expiry, and refuse startup with an
+expired deadline. This bounds app/Storybook/API/Auth access even if the outer
+ngrok agent were accidentally left running. It does not claim a provider-side
+expiration feature or revoke an account credential.
+
+Keep ngrok, isolated frontend and gateway as foreground processes owned by this
+preview; install no launch agent, cron job, service or automatic restart. At cutoff
+stop those owned processes, verify ports20204/20205 have no listeners and verify
+the exact external URL cannot reach the application. Leave the user's ordinary
+development services untouched. Request checks fail closed after wake from sleep;
+the Mac must remain awake/online for availability during the approved window.
+No prior OAuth authorization extends the approved deadline automatically.
+
+Quota planning: `useSurveyOptions` currently polls every1 second while an owned
+fleet's celestial controls are mounted (`frontend/hooks/use-discovery.ts`). That
+single active query can use3,600 requests/hour;20,000 requests would cover less
+than5.6 hours before other requests/assets. Baseline world polling is20 seconds
+and selected burn-preview refresh is10 seconds. A weekend access window does not
+mean the free monthly request quota supports a continuously open game tab. Check
+remaining quota first, close idle tabs, and let limits stop access rather than
+automatically upgrading or buying capacity. No polling behavior changed here.
+
+## Activation state — 2026-10-16
+
+Travis explicitly approved protected game+Storybook access until2026-10-19T00:00:00Z,
+restricted to wilson.travis.t@gmail.com, with no paid charges. This supersedes the
+earlier proposed60-minute pilot and resolves the pending identity/duration decision.
+No endpoint is active yet. Existing-account Google sign-in reached a new consent
+screen granting ngrok the Google email address. Continue was not pressed: awaiting
+Travis's completion or explicit email-only consent authorization as requested.
+Account plan/quota remain unverified, so no tunnel has been launched.
+
+External deadline protection is implemented and tested:15 gateway cases plus
+seven build-helper cases pass. Current isolated game and Storybook builds pass
+and include the latest tap-layer/contrast fixes. No listeners are running on the
+preview ports. No account token or credential is recorded in this document.

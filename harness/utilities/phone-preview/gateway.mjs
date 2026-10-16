@@ -90,7 +90,7 @@ const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascr
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
   '.otf': 'font/otf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif',
   '.ico': 'image/x-icon', '.svg': 'image/svg+xml', '.glb': 'model/gltf-binary' }
-async function serveStorybook(request, response, directory) {
+async function serveStorybook(request, response, directory, expired) {
   const pathname = decodeURIComponent(request.url.split('?', 1)[0])
   if (pathname === '/storybook') {
     response.writeHead(308, { location: '/storybook/', 'cache-control': 'no-store' })
@@ -106,6 +106,7 @@ async function serveStorybook(request, response, directory) {
     if (!contentTypes[path.extname(file)]) return reject(response, 404)
     const info = await stat(file)
     if (!info.isFile()) return reject(response, 404)
+    if (expired()) return reject(response, 410)
     response.writeHead(200, { 'content-type': contentTypes[path.extname(file)] ?? 'application/octet-stream',
       'content-length': info.size, 'cache-control': 'private, max-age=0', 'x-content-type-options': 'nosniff' })
     if (request.method === 'HEAD') { response.end(); return }
@@ -118,7 +119,7 @@ async function serveStorybook(request, response, directory) {
 
 /** All upstream hosts are fixed loopback; only their numeric ports are configurable. */
 export function createPreviewGateway({ previewOrigin, frontendPort = 20205, backendPort = 20201, authPort = 20211,
-  storybookDirectory = defaultStorybookDirectory, maxBodyBytes = 1_048_576 } = {}) {
+  storybookDirectory = defaultStorybookDirectory, maxBodyBytes = 1_048_576, expiresAt, now = Date.now } = {}) {
   let trusted
   try { trusted = new URL(previewOrigin) } catch { throw new Error('Explicit previewOrigin is required') }
   // Local QA is an explicit alternative, never an additional allowed origin on
@@ -128,9 +129,23 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     /^http:\/\/127\.0\.0\.1:\d+\/?$/.test(previewOrigin)
   if ((trusted.protocol !== 'https:' && !localQA) || trusted.hostname.includes('*') || trusted.username || trusted.password ||
     trusted.pathname !== '/' || trusted.search || trusted.hash) throw new Error('previewOrigin must be HTTPS, or explicit HTTP 127.0.0.1 with a port for local QA; no wildcard, path or credentials')
+  if (!localQA && expiresAt === undefined) throw new Error('HTTPS preview requires an explicit UTC expiry deadline (--until)')
+  let deadline = Infinity
+  if (expiresAt !== undefined) {
+    if (typeof expiresAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(expiresAt)) throw new Error('Expiry must be an exact UTC ISO timestamp')
+    deadline = Date.parse(expiresAt)
+    const canonical = expiresAt.includes('.') ? expiresAt : expiresAt.replace('Z', '.000Z')
+    if (!Number.isFinite(deadline) || new Date(deadline).toISOString() !== canonical || deadline <= now() || deadline - now() > 7 * 24 * 60 * 60 * 1000) {
+      throw new Error('Expiry must be a valid future UTC timestamp no more than seven days away')
+    }
+  }
+  const expired = () => now() >= deadline
   const ports = { frontend: port(frontendPort), backend: port(backendPort), auth: port(authPort) }
   if (!Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1 || maxBodyBytes > 1_048_576) throw new Error('Invalid request body limit')
   const server = http.createServer(async (request, response) => {
+    // Check wall time on every request as well as using a timer: a delayed
+    // timer after sleep/event-loop contention cannot reopen the preview.
+    if (expired()) return reject(response, 410)
     // Binding is enforced by the launcher; keep imported use loopback-only too.
     if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress)) return reject(response, 403)
     // Never derive trust from Host or forwarding headers. Browsers must send
@@ -142,7 +157,7 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     const declaredLength = Number(request.headers['content-length'] ?? 0)
     if (!Number.isSafeInteger(declaredLength) || declaredLength < 0 || declaredLength > maxBodyBytes) return reject(response, 413)
     if ((request.method === 'GET' || request.method === 'HEAD') && (declaredLength || request.headers['transfer-encoding'])) return reject(response, 404)
-    if (route.service === 'storybook') return serveStorybook(request, response, storybookDirectory)
+    if (route.service === 'storybook') return serveStorybook(request, response, storybookDirectory, expired)
 
     // Browser request bodies are small JSON/form payloads. Bound them before
     // forwarding so a partial oversized mutation never reaches an upstream.
@@ -155,6 +170,7 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
         chunks.push(chunk)
       }
     } catch { return reject(response, 400) }
+    if (expired()) return reject(response, 410)
     const headers = headersWithoutHop(request.headers)
     for (const key of spoofHeaders) delete headers[key]
     for (const key of Object.keys(headers)) if (/^x-(?:middleware|invoke|nextjs)-/.test(key)) delete headers[key]
@@ -162,6 +178,7 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     if (route.service === 'backend' && headers.origin) headers.origin = 'http://localhost:20200'
     headers['content-length'] = size
     const upstream = http.request({ hostname: '127.0.0.1', port: ports[route.service], method: request.method, path: route.path, headers }, incoming => {
+      if (expired()) { incoming.destroy(); reject(response, 410); return }
       // Pipe each received chunk immediately; no compression or response buffer.
       response.writeHead(incoming.statusCode ?? 502, headersWithoutHop(incoming.headers))
       incoming.on('error', () => response.destroy())
@@ -177,22 +194,35 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
   })
   server.requestTimeout = 30_000
   server.headersTimeout = 15_000
+  let expiryTimer
+  if (Number.isFinite(deadline)) {
+    server.on('listening', () => {
+      expiryTimer = setTimeout(() => {
+        // Terminate established HTTP/SSE streams as well as refusing new peers.
+        server.closeAllConnections()
+        server.close()
+      }, Math.max(0, deadline - now()))
+      expiryTimer.unref()
+    })
+    server.on('close', () => clearTimeout(expiryTimer))
+  }
   // Isolated production Next needs no HMR; reject every upgrade explicitly.
   server.on('upgrade', (_request, socket) => socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'))
   return server
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const allowed = new Set(['--origin', '--port', '--frontend-port', '--backend-port', '--auth-port'])
+  const allowed = new Set(['--origin', '--until', '--port', '--frontend-port', '--backend-port', '--auth-port'])
   const args = {}
   for (let i = 2; i < process.argv.length; i += 2) {
-    if (!allowed.has(process.argv[i]) || !process.argv[i + 1]) throw new Error('Use --origin https://preview.example and optional numeric port flags')
-    args[process.argv[i]] = process.argv[i] === '--origin' ? process.argv[i + 1] : port(process.argv[i + 1])
+    if (!allowed.has(process.argv[i]) || !process.argv[i + 1]) throw new Error('Use --origin and --until UTC-ISO-deadline for HTTPS; optional numeric port flags')
+    args[process.argv[i]] = ['--origin', '--until'].includes(process.argv[i]) ? process.argv[i + 1] : port(process.argv[i + 1])
   }
-  const gateway = createPreviewGateway({ previewOrigin: args['--origin'], frontendPort: args['--frontend-port'], backendPort: args['--backend-port'], authPort: args['--auth-port'] })
+  const gateway = createPreviewGateway({ previewOrigin: args['--origin'], expiresAt: args['--until'], frontendPort: args['--frontend-port'], backendPort: args['--backend-port'], authPort: args['--auth-port'] })
   gateway.on('error', () => { console.error('Preview gateway could not listen'); process.exitCode = 1 })
   gateway.listen(args['--port'] ?? 20204, '127.0.0.1', () => {
     console.log(`Preview gateway listening on http://127.0.0.1:${gateway.address().port}; requires a separately authenticated outer gateway; never expose it bare`)
+    if (args['--until']) console.log(`Gateway access ends at ${args['--until']}; this does not stop or configure the external tunnel provider`)
   })
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { gateway.closeAllConnections(); gateway.close() })
 }

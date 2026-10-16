@@ -4,9 +4,11 @@ import http from 'node:http'
 import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { once } from 'node:events'
 import { createPreviewGateway, previewRoute } from './gateway.mjs'
 
 const origin = 'https://preview.example'
+const futureExpiry = () => new Date(Date.now() + 60 * 60 * 1000).toISOString()
 const seen = []
 const servers = []
 let gatewayPort
@@ -47,7 +49,7 @@ before(async () => {
   const frontendPort = await listen(fixture('frontend'))
   const backendPort = await listen(fixture('backend'))
   const authPort = await listen(fixture('auth'))
-  gatewayPort = await listen(createPreviewGateway({ previewOrigin: origin, frontendPort, backendPort, authPort, storybookDirectory, maxBodyBytes: 256 }))
+  gatewayPort = await listen(createPreviewGateway({ previewOrigin: origin, expiresAt: futureExpiry(), frontendPort, backendPort, authPort, storybookDirectory, maxBodyBytes: 256 }))
 })
 after(async () => {
   await Promise.all(servers.map(server => new Promise(resolve => { server.closeAllConnections(); server.close(resolve) })))
@@ -69,9 +71,9 @@ test('configuration requires an explicit secure or literal loopback QA origin an
   for (const value of [undefined, 'http://preview.example', 'http://0.0.0.0:20204', 'http://localhost:20204', 'http://127.1:20204',
     'http://127.0.0.1', 'https://*.example', 'http://127.0.0.1:20204/path', 'http://name:password@127.0.0.1:20204',
     'https://name:password@preview.example', 'https://preview.example/path', 'https://preview.example/?secret=a']) {
-    assert.throws(() => createPreviewGateway({ previewOrigin: value }))
+    assert.throws(() => createPreviewGateway({ previewOrigin: value, expiresAt: futureExpiry() }))
   }
-  for (const frontendPort of [0, -1, 65536, 'example.com', '20205/path']) assert.throws(() => createPreviewGateway({ previewOrigin: origin, frontendPort }))
+  for (const frontendPort of [0, -1, 65536, 'example.com', '20205/path']) assert.throws(() => createPreviewGateway({ previewOrigin: origin, expiresAt: futureExpiry(), frontendPort }))
   assert.equal(servers.at(-1).address().address, '127.0.0.1')
 })
 
@@ -85,6 +87,76 @@ test('explicit local QA origin accepts only its configured exact port and does n
     assert.equal((await request('/', { port: localPort, headers: { origin: wrong } })).status, 403)
   }
   assert.equal((await request('/', { headers: { origin: localOrigin } })).status, 403)
+})
+
+test('external mode requires a valid exact future UTC expiry within seven days; local QA may omit it', () => {
+  const wallTime = Date.parse('2026-10-16T10:00:00Z')
+  const options = { previewOrigin: origin, now: () => wallTime }
+  for (const expiresAt of [undefined, '', null, 'tomorrow', '2026-10-16', '2026-10-17T10:00:00+00:00',
+    '2026-10-17T10:00:00', '2026-02-30T10:00:00Z', '2026-10-16T10:00:00Z', '2026-10-15T10:00:00Z',
+    '2026-10-24T10:00:00Z']) assert.throws(() => createPreviewGateway({ ...options, expiresAt }))
+  for (const expiresAt of ['2026-10-19T00:00:00Z', '2026-10-19T00:00:00.123Z']) {
+    assert.doesNotThrow(() => createPreviewGateway({ ...options, expiresAt }))
+  }
+  assert.doesNotThrow(() => createPreviewGateway({ previewOrigin: 'http://127.0.0.1:20204' }))
+})
+
+test('wall-clock expiry denies requests even before the scheduled shutdown callback runs', async () => {
+  let wallTime = Date.parse('2026-10-16T10:00:00Z')
+  const deadline = '2026-10-16T11:00:00Z'
+  const expiredPort = await listen(createPreviewGateway({ previewOrigin: origin, expiresAt: deadline,
+    now: () => wallTime, frontendPort: servers[0].address().port }))
+  assert.equal((await request('/', { port: expiredPort })).status, 200)
+  const count = seen.length
+  wallTime = Date.parse(deadline)
+  assert.equal((await request('/', { port: expiredPort })).status, 410)
+  assert.equal((await request('/api/v1/accounts', { port: expiredPort, method: 'POST' })).status, 410)
+  assert.equal(seen.length, count)
+  assert.throws(() => createPreviewGateway({ previewOrigin: origin, expiresAt: deadline, now: () => wallTime }), /future/)
+})
+
+test('expiry while awaiting a request body or static filesystem lookup fails closed', async () => {
+  const start = Date.parse('2026-10-16T10:00:00Z'), deadline = '2026-10-16T11:00:00Z'
+  for (const [target, method] of [['/api/v1/accounts', 'POST'], ['/storybook/index.html', 'GET']]) {
+    let wallTime = start
+    const gateway = createPreviewGateway({ previewOrigin: origin, expiresAt: deadline, now: () => wallTime,
+      backendPort: servers[1].address().port, storybookDirectory: path.join(temporaryDirectory, 'storybook') })
+    const temporaryPort = await listen(gateway)
+    // The factory's request listener passes its first guard then yields while
+    // awaiting the body/filesystem. This listener advances the injected clock.
+    gateway.on('request', () => { wallTime = Date.parse(deadline) })
+    const count = seen.length
+    assert.equal((await request(target, { method, port: temporaryPort, ...(method === 'POST' ? { body: '{}' } : {}) })).status, 410)
+    assert.equal(seen.length, count, 'expired mutation must not reach the backend')
+  }
+})
+
+test('deadline closes an active SSE stream and listener; subsequent connections are refused', { timeout: 5000 }, async () => {
+  let upstreamClosed
+  const upstreamClosedPromise = new Promise(resolve => { upstreamClosed = resolve })
+  const fixturePort = await listen(http.createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/event-stream' })
+    response.write('data: connected\n\n')
+    response.on('close', upstreamClosed)
+  }))
+  const expiring = createPreviewGateway({ previewOrigin: origin, backendPort: fixturePort,
+    expiresAt: new Date(Date.now() + 700).toISOString() })
+  const closed = once(expiring, 'close')
+  const expiringPort = await listen(expiring)
+  let firstChunk = false
+  const streamClosed = new Promise((resolve, reject) => {
+    const connection = http.get({ hostname: '127.0.0.1', port: expiringPort,
+      path: '/api/v1/channels/fixture/stream?token=fake-expiry-fixture', headers: { origin } }, incoming => {
+      incoming.on('data', () => { firstChunk = true })
+      incoming.on('close', resolve)
+      incoming.on('error', () => {}) // Deliberate shutdown aborts the open body.
+    })
+    connection.on('error', reject)
+  })
+  await Promise.all([closed, streamClosed, upstreamClosedPromise])
+  assert.equal(firstChunk, true)
+  assert.equal(expiring.listening, false)
+  await assert.rejects(request('/', { port: expiringPort }), { code: 'ECONNREFUSED' })
 })
 
 test('raw path validation rejects encoded traversal, separators, debug/admin/push and unsupported methods', async () => {
