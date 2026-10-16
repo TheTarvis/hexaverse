@@ -5,6 +5,8 @@ Meshy: **30 / 2,600 credits spent**; balance verified **2,658**. No purchases or
 
 ## Done
 
+- Actual iOS emulator SSO sign-in confirmed by Travis on 2026-10-16: “Yup emulator
+  sso working.” Session persistence, token refresh and gameplay checks remain unverified.
 - Baseline commit 768fd90; baseline and updated frontend production builds pass.
 - grill-with-docs shared brief/glossary; Chrome screenshots and Meshy MCP verified.
 - Six procedural visuals, world integration, seven static thumbnails and object-browser art.
@@ -31,7 +33,8 @@ Meshy: **30 / 2,600 credits spent**; balance verified **2,658**. No purchases or
 - Ruin candidate still softer than gate; image-guided reference02 is saved locally.
 - Debris generated candidate rejected as production replacement; procedural fallback
   now has substantial hulls.
-- Integrated production interaction review and actual iOS testing remain. No hung operation.
+- Integrated production interaction review and actual iOS gameplay testing remain.
+  iOS emulator SSO sign-in is user-validated; session persistence/refresh remain unverified.
 
 ## Next
 
@@ -47,9 +50,9 @@ Meshy: **30 / 2,600 credits spent**; balance verified **2,658**. No purchases or
 - Automatic approval review blocked uploading ruin-reference-02.png to Meshy because
   it derives from the private gate reference. Explicit upload permission requested.
   Proposed operation costs 15 credits; **no upload or charge occurred** for this attempt.
-- Remote phone preview awaits explicit exposure approval and exact allowed Google
-  identity. Recommended temporary authenticated ngrok gateway routes app/API/narrow
-  Auth paths; see docs/phone-preview.md. No endpoint created.
+- Remote phone preview is approved and active behind the exact Google identity
+  restriction until Oct19 00UTC; actual iOS emulator SSO is user-validated.
+  Session persistence, token refresh and gameplay checks remain unverified.
 - Dock layout is the reversible current implementation; free placement/resizing remains
   an optional design choice, not a blocker for approved HUD work.
 - No browser/MCP authentication blocker. Server is configured but not attached to this
@@ -207,7 +210,8 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   popup/iframe and cancellation verified; redirect helper rendered at390px. Live
   login390px has no overflow. No identity selection or credential submission.
 - Live helper200, bad helper/IdP400, wrong method/admin404; anonymous external
-  login/helper302 to ngrok OAuth. Actual phone sign-in/restore/refresh still pending.
+  login/helper302 to ngrok OAuth. Actual iOS SSO was subsequently user-validated;
+  session persistence and token refresh remain unverified.
 - Gateway20204 now targets isolated SSO frontend20209; source pointer
   /tmp/hexaverse-sso-preview-root.txt. Same b0f42be art baseline; newer local art
   remains unpublished. Temporary QA20208 stopped, browser viewport restored.
@@ -226,4 +230,5 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Verified live after bootstrap and inspection command sessions exited: login,
   galaxy, Storybook200; API401; external login302 to ngrok OAuth. No rebuild/push.
 - Mac must remain logged in, awake and connected; backend/emulators and ngrok
-  quotas remain dependencies. Phone sign-in still pending. See phone-preview.md.
+  quotas remain dependencies. iOS SSO is now user-validated; persistence/refresh
+  and gameplay checks remain unverified. See phone-preview.md.

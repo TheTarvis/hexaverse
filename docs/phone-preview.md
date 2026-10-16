@@ -5,8 +5,10 @@ https://gulf-identity-scrap.ngrok-free.dev/ for exact Google identity
 wilson.travis.t@gmail.com until 2026-10-19T00:00:00Z, with no paid charges.
 Email signup is approved at `/login?signUp=true`; simulated Google sign-in is now
 available at `/login`. Travis enters his own test credentials or chooses the
-emulator identity himself. Earlier proposal/activation sections below are historical
-checkpoints; the latest signup/SSO checkpoint controls current access scope.
+emulator identity himself. Travis confirmed simulated SSO works on actual iOS on
+2026-10-16; session persistence, token refresh and gameplay checks remain unverified.
+Earlier proposal/activation sections below are historical checkpoints; the latest
+signup/SSO checkpoint controls current access scope.
 
 ## Current environment
 
@@ -358,13 +360,14 @@ TypeScript, scoped lint, validators and isolated Next build pass. Actual desktop
 popup and iframe loaded through the QA gateway; popup cancellation returned to a
 usable login form. Redirect helper rendered at390×844 without selecting an identity.
 Live login also has no horizontal overflow at390px. A viewport does not simulate
-mobile user-agent behavior: full SDK redirect/return on actual iOS remains unverified.
-No identity was selected, credentials entered, account created or IdP sign-in submitted.
+mobile user-agent behavior. Actual iOS sign-in was subsequently confirmed by Travis
+(see phone checkpoint below). During agent testing no identity was selected,
+credentials entered, account created or IdP sign-in submitted.
 
 Live loopback checks: login/helper200, malformed helper/IdP400, wrong helper method
 and admin404. Anonymous external login/helper requests still return302 to
-`idp.ngrok.com`. Successful game sign-in, restore and refresh await Travis's phone
-verification at https://gulf-identity-scrap.ngrok-free.dev/login.
+`idp.ngrok.com`. Travis subsequently confirmed actual iOS emulator SSO works;
+session persistence and token refresh remain unverified.
 
 The isolated SSO frontend listens on loopback20209; source pointer is
 `/tmp/hexaverse-sso-preview-root.txt`. It again uses b0f42be plus only login files,
@@ -408,4 +411,18 @@ To stop early: `launchctl bootout gui/501/local.hexaverse.weekend-preview`.
 This registration lasts only in the current macOS user session; logout/reboot,
 sleep, network loss, emulator/backend failure and ngrok quotas can still interrupt
 availability. No power settings changed and no always-on guarantee is implied.
-Actual phone game sign-in/restore/refresh remain pending.
+Actual iOS emulator SSO is now confirmed; session persistence, token refresh and
+gameplay checks remain unverified.
+
+
+## Actual iOS SSO checkpoint — 2026-10-16
+
+Travis reported from iOS: “Yup emulator sso working.” Record actual phone emulator
+SSO sign-in as user-validated. This is user-reported device evidence, distinct from
+the earlier agent desktop/viewport checks. It does not separately confirm session
+persistence after reload/reopen, token refresh, logout/re-login, corporation access,
+or gameplay interactions. Those checks remain unverified. No new identity details,
+account-creation result or broader gameplay acceptance are inferred.
+
+This documentation-only checkpoint leaves the running services, published artifacts,
+exact Google email restriction and `2026-10-19T00:00:00Z` cutoff unchanged.
