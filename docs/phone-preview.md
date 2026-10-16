@@ -373,3 +373,39 @@ existing ngrok policy/process is unchanged. Frontend and gateway enforce the sam
 cutoff. Temporary QA gateway20208 was stopped. These are foreground processes,
 not installed persistent services or guaranteed availability. No push, spend,
 production change or comparison-image publication occurred.
+
+
+## Temporary launchd supervision — current lifecycle checkpoint
+
+Repeatedly restarted foreground preview commands were owned by the Codex command
+runner. Available frontend logs show successful startup, without a crash traceback
+or recorded termination signal. Executor cleanup is the likely cause of earlier
+stops, not a proven signal-level diagnosis.
+
+At Travis's explicit request, the same preview now runs as temporary user-session
+launchd job `gui/501/local.hexaverse.weekend-preview`. Its supervisor has parent PID1;
+frontend, gateway and ngrok are children of that supervisor, independent of command
+sessions. No plist was installed in Library/LaunchAgents, no login-startup setting
+or OS security setting changed. Runtime files are private under
+`/tmp/hexaverse-weekend-supervision/`: `preview.plist`, `supervisor.py`, `config.json`,
+`events.log` and `errors.log`. Events record process lifecycle only; subprocess
+output is discarded, ngrok inspection/logging remain disabled, and no token is
+copied or read. Config hashes pin the existing gateway/policy, build identity and
+Storybook index before a child is started/restarted. There was no rebuild.
+
+Supervisor restarts failed child processes with bounded backoff before the original
+`2026-10-19T00:00:00Z` deadline. At the deadline it sends termination to all three
+owned process groups, including ngrok, then force-kills any survivor after five
+seconds. Gateway independently closes listeners/connections at the same deadline.
+A harmless four-second subprocess test verified deadline termination and that its
+child no longer existed. The installed job and all three processes were verified
+running in subsequent, separately completed command sessions; launchctl reports
+running and supervisor PPID1. Login/galaxy/Storybook200, unauthenticated API401 and
+external login302 to ngrok OAuth were rechecked. Exact email restriction and artifact
+set remain unchanged; no identity submission was performed.
+
+To stop early: `launchctl bootout gui/501/local.hexaverse.weekend-preview`.
+This registration lasts only in the current macOS user session; logout/reboot,
+sleep, network loss, emulator/backend failure and ngrok quotas can still interrupt
+availability. No power settings changed and no always-on guarantee is implied.
+Actual phone game sign-in/restore/refresh remain pending.

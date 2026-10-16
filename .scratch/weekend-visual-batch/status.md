@@ -212,3 +212,18 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   /tmp/hexaverse-sso-preview-root.txt. Same b0f42be art baseline; newer local art
   remains unpublished. Temporary QA20208 stopped, browser viewport restored.
 - No push, spend, Meshy reference upload or comparison publication.
+
+
+## Preview lifecycle detached from executor
+
+- Existing foreground processes belonged to Codex runner; available logs show
+  startup only, so executor cleanup is likely but no terminating signal proven.
+- Same build/policy now owned by temporary launchd user job
+  gui/501/local.hexaverse.weekend-preview, supervisor PPID1. No login-startup install.
+- Private runtime config/events: /tmp/hexaverse-weekend-supervision/. Child restart
+  backoff, pinned artifacts/policy, original Oct19 00UTC termination of all groups
+  including ngrok; gateway also independently expires. Harmless deadline test passes.
+- Verified live after bootstrap and inspection command sessions exited: login,
+  galaxy, Storybook200; API401; external login302 to ngrok OAuth. No rebuild/push.
+- Mac must remain logged in, awake and connected; backend/emulators and ngrok
+  quotas remain dependencies. Phone sign-in still pending. See phone-preview.md.
