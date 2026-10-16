@@ -59,13 +59,13 @@ All seven are wired into production world/HUD coverage; integration is not final
 
 | Category | Current production output | Acceptance / remaining work |
 | --- | --- | --- |
-| Gate | Accepted round07 two-half GLB and portal, new static thumbnail | Model/world accepted and preserved; thumbnail integrated, final 32px review provisional. |
-| Anomaly | Violet broken halo and diffuse echoes, matching thumbnail | Integrated draft; final world/32px art acceptance pending. |
+| Gate | Accepted round07 two-half GLB and portal, new static thumbnail | Model/world accepted and preserved; thumbnail reviewed at32px on dark/light and retained. |
+| Anomaly | Violet broken halo and diffuse echoes, matching thumbnail | Reviewed close/gameplay world and32px dark/light; retained as initial procedural delivery. |
 | Ruin | Local fractured armor/ribs, matching thumbnail | Provisional manufactured art. Soft Meshy01 candidate review-only; sharper image-guided generation blocked on upload approval. |
-| Nebula | Layered noisy filaments/ribbons and dark gaps, matching thumbnail | Integrated revised draft; final world/32px acceptance pending. |
-| Gravity well | Dark core and bent nested traces, matching thumbnail | Integrated distinct draft; final world/32px acceptance pending. |
+| Nebula | Layered noisy filaments/ribbons and dark gaps, matching thumbnail | Reviewed close/gameplay world and32px dark/light; revised filament treatment retained. |
+| Gravity well | Dark core and bent nested traces, matching thumbnail | Reviewed close/gameplay world and32px dark/light; distinct lens treatment retained. |
 | Debris | Jagged disconnected manufactured hull fragments, matching thumbnail | Provisional local art. Rounded intact-pod Meshy candidate rejected as production replacement. |
-| Radiation | Mint/gold streaks and particles on dark carriers, matching thumbnail | Integrated draft; low-resolution contrast and final world acceptance pending. |
+| Radiation | Mint/gold streaks and particles on dark carriers, matching thumbnail | Dark carriers strengthened after actual light-surface review; recaptured32px comparison now retains ray silhouette. |
 
 Functional HUD checkpoint62e392c passes418 combined tests. No known failing
 automated travel/workspace/scan test remains. Actual portrait production end-to-end
@@ -73,3 +73,8 @@ play and iOS are not verified; desktop/phone Storybook bounds are not equivalent
 Legacy broader action inventory and renderer-unavailable behavior still need
 manual integration review. Remote play is blocked by the unconfigured approved
 HTTPS route, emulator identity mismatch and pending exposure/identity decision.
+
+Latest review is an agent production choice within delegated art scope, not a new
+claim of Travis's personal approval. Ruin/debris remain provisional manufactured
+art pending higher-quality refinement. Radiation capture changed only its own PNG;
+all other14 source thumbnails remained byte-identical.
