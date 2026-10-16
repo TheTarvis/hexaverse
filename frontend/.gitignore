@@ -42,9 +42,12 @@ next-env.d.ts
 
 *storybook.log
 storybook-static
+/.storybook/phone-preview-static/
 
 # playwright e2e
 /test-results/
 /playwright-report/
 /playwright/.auth/
 /.next-e2e/
+/.next-phone-preview/
+/tsconfig.phone-preview.json

@@ -2,12 +2,19 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { getAnalytics, type Analytics } from 'firebase/analytics'
+import { phonePreviewConfig } from './phone-preview-config'
+
+const preview = phonePreviewConfig(
+  process.env.NEXT_PUBLIC_PHONE_PREVIEW,
+  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  typeof window !== 'undefined' ? window.location.origin : undefined,
+)
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  apiKey: preview ? 'demo-api-key' : process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   // OAuth requires a nonempty domain even when all auth traffic uses the
   // emulator. Local development does not require a provisioned Firebase app.
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || (
+  authDomain: preview ? `${preview.projectId}.firebaseapp.com` : process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || (
     process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
       ? `${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseapp.com`
       : undefined
@@ -30,8 +37,9 @@ if (!getApps().length) {
 const auth = getAuth(app)
 const db = getFirestore(app)
 
-// Connect to Firebase emulators in development
-if (process.env.NODE_ENV === 'development') {
+// Phone previews opt in explicitly, including production builds. On the server,
+// preview auth is unused; the browser binds it to the gateway's actual origin.
+if (preview ? !!preview.authEmulatorUrl : process.env.NODE_ENV === 'development') {
   // Track if we've already connected to avoid reconnection errors
   const globalAny = global as typeof globalThis & {
     __FIREBASE_AUTH_EMULATOR_CONNECTED__?: boolean
@@ -49,17 +57,18 @@ if (process.env.NODE_ENV === 'development') {
 
   if (!globalAny.__FIREBASE_AUTH_EMULATOR_CONNECTED__) {
     globalAny.__FIREBASE_AUTH_EMULATOR_CONNECTED__ = true
-    connectAuthEmulator(auth, `http://${emulatorHost}:${authPort}`, { disableWarnings: true })
+    connectAuthEmulator(auth, preview?.authEmulatorUrl ?? `http://${emulatorHost}:${authPort}`, { disableWarnings: true })
   }
 
-  if (!globalAny.__FIREBASE_FIRESTORE_EMULATOR_CONNECTED__) {
+  // The phone gateway exposes Auth only; all game data travels through /api.
+  if (!preview && !globalAny.__FIREBASE_FIRESTORE_EMULATOR_CONNECTED__) {
     globalAny.__FIREBASE_FIRESTORE_EMULATOR_CONNECTED__ = true
     connectFirestoreEmulator(db, emulatorHost, firestorePort)
   }
 }
 
 // Analytics only works in the browser and with a valid API key
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'demo-api-key') {
+if (!preview && typeof window !== 'undefined' && process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'demo-api-key') {
   try {
     analytics = getAnalytics(app)
   } catch (error) {

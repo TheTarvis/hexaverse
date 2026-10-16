@@ -144,3 +144,27 @@ request, confirm the URL no longer reaches the app, and remove only temporary
 preview configuration. Do not install launch agents or background persistence.
 Mac awake/network availability is required; ngrok free endpoints do not expire
 on their own. A weekend-long service is therefore not enabled by a pilot approval.
+
+## Local preparation completed — 2026-10-16
+
+The [preview utilities](../harness/utilities/phone-preview/README.md) now prepare
+a separate production frontend on loopback20205 and a deny-by-default gateway
+on loopback20204. Static Storybook is served at `/storybook/` from an isolated
+build. Browser verification through that actual prefix covered manager navigation,
+iframe JS, all14 thumbnail instances and the world scene with accepted gate GLB
+rendering on WebGPU. This confirms local prefix/asset compatibility, not ngrok,
+OAuth cookies or iOS. Exact root model paths forward to the isolated frontend.
+
+The game production build succeeded with explicit preview-only project identity,
+relative API and same-origin Auth settings. Its ignored TypeScript config/build
+cache prevents Next from modifying the ordinary tracked tsconfig. The frontend
+and gateway can run in explicit HTTP127.0.0.1 local QA mode; external mode still
+requires the exact HTTPS origin and a separately approved authentication gate.
+No `.env` files, users or data were changed. Effective backend project and test
+account identity still require verification before sign-in; the local build's
+project argument is not proof of the running backend environment.
+
+Gateway/helper tests pass18 cases, including Origin checks, forbidden routes,
+encoded traversal, confined static files, body limits and immediate SSE flushing.
+No tunnel or outer OAuth session has been created; identity/60-minute exposure
+approval and actual account plan/quota remain pending.

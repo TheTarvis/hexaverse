@@ -37,7 +37,7 @@ Meshy: **30 / 2,600 credits spent**; balance verified **2,658**. No purchases or
 
 - Resolve ruin image upload permission; choose/refine production ruin and debris.
 - Recheck all seven at world scale/32px, reduced motion, disposal and both renderer paths.
-- Production HUD checkpoint ready for local commit; no push authorized.
+- Production HUD checkpoint committed locally as62e392c; no push authorized.
 - Review integrated production interaction and real iOS usability after access approval.
 - Future design only: stealth/combat. Parking at arbitrary positions confirmed; existing
   physics/API already support it. HUD exposure is the gap; no tracking/engagement work.
@@ -67,3 +67,22 @@ Keep data/quotes/mutations in SystemSpaceView; presentation-only dock workspace,
 validated per-corporation local preferences, keyboard move controls and mobile launcher.
 Real course review/commit now uses existing server quote hooks. Prototype fuel estimates
 never enter production commands. Final integrated checks are in progress.
+
+## Latest local QA
+
+- Migration proposal a9b9274: docs/documentation-migration.md; no moves/deletes.
+- Fixed Cut drive access and docked station services during failed interior reads.
+- Real game phone390×844: objects→server-quoted travel review→Back, launcher/console
+  navigation verified without submitting orders; navigation/vitals overlap corrected.
+- Revised radiation dark carriers and regenerated thumbnail; other14 PNGs unchanged.
+- All seven reviewed in Chrome close/gameplay world and 32px light/dark comparison;
+  manufactured ruin/debris remain provisional; no blanket art acceptance.
+- Local /storybook prefix verified with actual manager/iframe/images and WebGPU world.
+  Isolated game build passes; gateway/build-helper18 tests pass. No public endpoint.
+- Updated HUD/world408 tests pass across22 files; additional vitals/art128 pass.
+  These overlapping runs are separate checks, not a unique combined count.
+- Preview-only email login verified through actual gateway; Google/signup excluded.
+  Preview/config43, login23, gateway/helper18 tests pass separately. Final isolated
+  build passes; ordinary tracked tsconfig unchanged. Temporary QA servers stopped.
+- Renderer-unavailable behavior has regression-test coverage, not a forced live
+  graphics-failure browser check. Real HTTPS/login/refresh/SSE/iOS remain pending.

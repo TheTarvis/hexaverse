@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  // The isolated preview launcher generates this config. Let Next adjust that
+  // ignored copy instead of rewriting the ordinary tracked tsconfig.json.
+  ...(process.env.PHONE_PREVIEW_TYPESCRIPT === 'true' ? {
+    typescript: { tsconfigPath: 'tsconfig.phone-preview.json' },
+  } : {}),
   // Let the Playwright e2e frontend build into its own dir (NEXT_DIST_DIR=.next-e2e)
   // so it doesn't share .next with the dev server. They inline different
   // NEXT_PUBLIC_* values (project id, emulator ports, API url); a shared build
@@ -42,6 +47,8 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
+    // Preview uses only same-origin emulator REST routes, never hosted OAuth.
+    if (process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true') return [];
     // Proxy Firebase Auth routes to Firebase Hosting
     // Required when using custom domains with Firebase Auth
     const firebaseProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;

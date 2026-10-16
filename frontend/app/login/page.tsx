@@ -62,7 +62,10 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = sanitizeRedirect(searchParams.get('redirect'))
-  const [isSignUp, setIsSignUp] = useState(searchParams.get('signUp') === 'true')
+  const phonePreview = process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true'
+  const [signUpMode, setIsSignUp] = useState(!phonePreview && searchParams.get('signUp') === 'true')
+  // The isolated preview gateway supports existing-account email sign-in only.
+  const isSignUp = !phonePreview && signUpMode
 
   // D13/M1 — a failed/cancelled mobile Google-redirect sign-in surfaces here,
   // through the same inline error surface and live region as any other
@@ -102,6 +105,7 @@ function LoginForm() {
   }
 
   async function handleGoogle() {
+    if (phonePreview) return
     setError('')
     setLoading(true)
     try {
@@ -172,6 +176,7 @@ function LoginForm() {
           </Button>
         </form>
 
+        {!phonePreview && <>
         <div className="my-6 flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
           <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800/50" />
           OR
@@ -192,6 +197,7 @@ function LoginForm() {
             {isSignUp ? 'Sign in' : 'Sign up'}
           </button>
         </Text>
+        </>}
       </div>
     </div>
   )

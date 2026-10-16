@@ -4,7 +4,11 @@ const config: StorybookConfig = {
   stories: ['../components/**/*.stories.@(ts|tsx)'],
   staticDirs: ['../public'],
   // Storybook copies staticDirs; Vite must not race a second public/ copy.
-  viteFinal: async config => ({ ...config, build: { ...config.build, copyPublicDir: false } }),
+  viteFinal: async config => ({
+    ...config,
+    ...(process.env.PHONE_PREVIEW_STORYBOOK === 'true' ? { base: '/storybook/' } : {}),
+    build: { ...config.build, copyPublicDir: false },
+  }),
   addons: ['@storybook/addon-docs', '@storybook/addon-a11y'],
   framework: {
     name: '@storybook/nextjs-vite',

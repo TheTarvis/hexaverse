@@ -362,3 +362,26 @@ describe('default apiClient', () => {
     expect(apiClient).toBeInstanceOf(ApiClient)
   })
 })
+
+
+describe('explicit phone-preview API origin', () => {
+  beforeEach(() => { (auth as any).currentUser = null })
+  afterEach(() => vi.unstubAllEnvs())
+  it('uses the gateway-relative API only for an explicitly opted-in default client', async () => {
+    vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', 'true')
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://inherited-api.example')
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } }))
+    await new ApiClient().get('/v1/account')
+    expect(fetch).toHaveBeenLastCalledWith('/api/v1/account', expect.objectContaining({ credentials: 'include' }))
+    vi.mocked(fetch).mockResolvedValue(new Response('{}', { headers: { 'Content-Type': 'application/json' } }))
+    await new ApiClient({ baseURL: 'http://127.0.0.1:20201' }).get('/v1/account')
+    expect(fetch).toHaveBeenLastCalledWith('http://127.0.0.1:20201/v1/account', expect.anything())
+  })
+  it('preserves the configured API in ordinary production builds', async () => {
+    vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', 'false')
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://normal-api.example')
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } }))
+    await new ApiClient().get('/v1/account')
+    expect(fetch).toHaveBeenLastCalledWith('https://normal-api.example/v1/account', expect.anything())
+  })
+})

@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   initializeApp: vi.fn(() => ({ name: '[DEFAULT]' })),
   connectAuthEmulator: vi.fn(),
+  connectFirestoreEmulator: vi.fn(),
+  getAnalytics: vi.fn(),
 }))
 
 vi.mock('firebase/app', () => ({ initializeApp: mocks.initializeApp, getApps: () => [] }))
 vi.mock('firebase/auth', () => ({ getAuth: () => ({}), connectAuthEmulator: mocks.connectAuthEmulator }))
-vi.mock('firebase/firestore', () => ({ getFirestore: () => ({}), connectFirestoreEmulator: vi.fn() }))
-vi.mock('firebase/analytics', () => ({ getAnalytics: vi.fn() }))
+vi.mock('firebase/firestore', () => ({ getFirestore: () => ({}), connectFirestoreEmulator: mocks.connectFirestoreEmulator }))
+vi.mock('firebase/analytics', () => ({ getAnalytics: mocks.getAnalytics }))
 vi.unmock('@/lib/firebase')
 
 function clearEmulatorLatches() {
@@ -25,6 +27,7 @@ describe('Firebase emulator OAuth configuration', () => {
     vi.resetModules()
     vi.clearAllMocks()
     clearEmulatorLatches()
+    vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', '')
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_API_KEY', 'demo-api-key')
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'example-emulator')
     vi.stubEnv('NODE_ENV', 'development')
@@ -66,4 +69,19 @@ describe('Firebase emulator OAuth configuration', () => {
     expect(mocks.initializeApp).toHaveBeenCalledWith(expect.objectContaining({ authDomain: undefined }))
     expect(mocks.connectAuthEmulator).not.toHaveBeenCalled()
   })
+})
+
+
+it('explicitly enables same-origin Auth emulator in an isolated production preview without Firestore or analytics', async () => {
+  vi.resetModules(); vi.clearAllMocks(); clearEmulatorLatches()
+  vi.stubEnv('NODE_ENV', 'production')
+  vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', 'true')
+  vi.stubEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'hexaverse-emulator')
+  vi.stubEnv('NEXT_PUBLIC_FIREBASE_API_KEY', 'inherited-public-config-key')
+  await import('@/lib/firebase')
+  expect(mocks.initializeApp).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'demo-api-key', projectId: 'hexaverse-emulator', authDomain: 'hexaverse-emulator.firebaseapp.com' }))
+  expect(mocks.connectAuthEmulator).toHaveBeenCalledWith(expect.anything(), window.location.origin, { disableWarnings: true })
+  expect(mocks.connectFirestoreEmulator).not.toHaveBeenCalled()
+  expect(mocks.getAnalytics).not.toHaveBeenCalled()
+  vi.unstubAllEnvs(); clearEmulatorLatches()
 })

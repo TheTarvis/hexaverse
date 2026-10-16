@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import LoginPage from './page'
 
@@ -50,7 +50,9 @@ function expectNoRawProviderLeak(text: string) {
 }
 
 describe('LoginPage', () => {
+  afterEach(() => vi.unstubAllEnvs())
   beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', '')
     vi.clearAllMocks()
     vi.mocked(useSearchParams).mockReturnValue(
       new URLSearchParams() as unknown as ReturnType<typeof useSearchParams>
@@ -406,4 +408,23 @@ describe('LoginPage', () => {
 
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument()
   })
+
+  it.each(['', 'signUp=true'])('phone preview supports only existing email sign-in despite query %s', async query => {
+    vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', 'true')
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams(query) as unknown as ReturnType<typeof useSearchParams>)
+    const { signIn, signUp, signInWithGoogle } = mockAccountContext()
+    render(<LoginPage />)
+    expect(screen.getByRole('heading', { name: 'Sign in to Hexaverse' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Continue with Google/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Sign up' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull()
+    expect(screen.queryByTestId('login-confirm-password')).toBeNull()
+    expect(screen.getByTestId('login-password')).toHaveAttribute('autocomplete', 'current-password')
+    fillCredentials('preview@example.com', 'preview-password')
+    fireEvent.click(screen.getByTestId('login-submit'))
+    await waitFor(() => expect(signIn).toHaveBeenCalledWith('preview@example.com', 'preview-password'))
+    expect(signUp).not.toHaveBeenCalled()
+    expect(signInWithGoogle).not.toHaveBeenCalled()
+  })
+
 })
