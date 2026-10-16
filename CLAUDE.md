@@ -8,14 +8,16 @@ world clock. Local 3D views use WebGPU.
 ## Sources of truth
 
 Code and tests describe implemented behavior. `GLOSSARY.md` defines domain
-terms. For design-source authority and concept discovery, read `docs/design-index.md`.
-Before sensing, signatures, stealth, parking or combat work, read
-`docs/stealth-combat.md`; before HUD layout, mobile interaction or travel-card
-work, read `docs/hud.md`. For gameplay architecture and cross-domain
-relationships, read
-`docs/game-architecture.md`. `docs/vision.md`, `docs/lore.md`, `docs/specs/`
-and `docs/plans/` retain design context; historical checklists and unimplemented
-ideas are references, not an active backlog. The old implementation is archived
+terms. Start with `docs/README.md` for canonical domain owners and authority.
+Before station, travel, sensing, combat, fleet, world, economy, discovery or
+async-action changes, read the relevant `docs/domains/` page linked there.
+Before HUD layout, mobile interaction or travel-card work, read `docs/hud.md`;
+before model/material/effect work, read `docs/art-direction.md`.
+`docs/game-architecture.md` locates code but includes historical milestones.
+`docs/specs/` and `docs/plans/` preserve history, not an active backlog.
+Scratch is ephemeral WIP, never gameplay authority; preserve accepted canonical
+decisions and referenced evidence before pruning completed implementation work.
+The old implementation is archived
 at `archive/pre-volt-reset` and commit `bf9c637`.
 
 ## Game conventions

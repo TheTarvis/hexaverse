@@ -1,5 +1,7 @@
 # Historical gameplay specs
 
+Current domain rules and open questions live in [canonical documentation](../README.md).
+
 These numbered documents preserve gameplay intent from the early rebuild.
 Their statuses and scenario markers describe that period; code and tests are
 the source of truth for current behavior. New work uses the Matt Pocock skills

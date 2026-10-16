@@ -83,6 +83,6 @@ iOS rendering or remote playability. Record the concrete access plan and require
 permissions in the operational checklist.
 
 Future stealth/combat controls consume server-disclosed information through existing
-ownership boundaries. [Stealth and combat](stealth-combat.md) records deferred
+ownership boundaries. [Sensors and stealth](domains/sensors-and-stealth.md) records deferred
 concepts; HUD arrangement must not expose absent entities, identify anonymous
 contacts or turn historical positions into live tracks.

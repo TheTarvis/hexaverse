@@ -1,5 +1,7 @@
 # Historical gameplay design
 
+Current domain rules and open questions live in [canonical documentation](../README.md).
+
 These notes preserve design decisions and experiments from before the Matt
 Pocock skills migration. Chain checklists, team commands and archive gates in
 older documents describe the retired workflow. Code and tests define current

@@ -10,6 +10,10 @@ superseded_by:  # filled in when this spec is retired
 
 # 0003 — System interior generation
 
+Historical spec. Current [world documentation](../domains/world.md) distinguishes
+surviving generation intent from retired hex geometry and the arrival-trigger gap.
+The numbered path remains for existing decision references.
+
 > Procedurally generate and persist a star system's **interior** — the
 > star-centered hex board of orbital sectors, populated by **bodies** (planets,
 > belts, moons, anomalies) with resources, hazards, and orbital elements — the
