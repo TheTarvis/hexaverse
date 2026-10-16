@@ -570,3 +570,37 @@ anonymous public root302 to idp.ngrok.com. The owned0600 diagnostic log remained
 zero bytes after healthy checks.29 synthetic gateway/SSO/diagnostics tests passed
 before activation. No authenticated edge session was exercised. ERR_NGROK_3004
 remains an open incident; this activation enables recurrence evidence, not a fix.
+
+
+## Mobile touch correction deployed — 2026-10-16 23:53 UTC
+
+Local commit0796429 fixes world-hit interception, unified touch pointer gestures,
+sheet isolation and compact phone map chrome. See docs/hud.md for diagnosis/tests
+and device-validation limits. Source /private/tmp/hexaverse-touch-preview-58mz5yd5
+is copied from the previous full-page snapshot with only seven runtime overlays,
+listed in its preview-source.json. Pointer: /tmp/hexaverse-touch-preview-root.txt.
+All57 public assets are byte-identical to the prior published build. Static protected
+Storybook remains unchanged; the new Touch Map fixture/evidence stay local.
+
+The supervisor was stopped23:53:42UTC; all owned groups stopped23:53:43.00UTC and
+the replacement supervisor started23:53:44.11UTC. Frontend53106, gateway53107 and
+ngrok53108 are supervised; the candidate-only20215 smoke listener was stopped.
+Only the frontend source command and its build/manifest pins changed. Build ID:
+`shZoojsNHZsEIOJCz0MoQ`. Gateway8157fb8ee473cd9f7fc5bc436451dc2edefd9a3789b69657c83fcbcb3fd281d0
+and diagnostic module105f687c3e650891e2095b9fcd1453aa434ccad1fb6a9a072a6e6bdf24617f74
+retain their exact hashes. Endpoint, Google exact-email policy, gateway routes,
+private error-only logging, disabled ngrok inspection/logging and Oct19 00UTC
+cutoff remain unchanged. All active source/build/policy pins match.
+
+Post-update checks: home/login/system pages return complete200 gzip HTML; protected
+Storybook200; debug404 and foreign-origin POST403; anonymous external root302 to
+idp.ngrok.com. The private diagnostic log remains0bytes. This does not exercise an
+authenticated iPhone session or prove ERR_NGROK_3004 fixed. Travis's fresh-link load
+report is recorded separately from touch usability; actual iPhone retest is pending.
+
+Final checks:1,063 HUD/space tests across64 files, TypeScript, scoped ESLint, file
+validators/diff checks and isolated production build pass. Trusted Chromium touch
+pan/pinch/taps/cancel and post-card/resize input pass; installed WebKit touch card
+open/close, map tap and zoom fallback pass; desktop docks/mouse orbit pass after
+resize. Physical iPhone/native iOS pinch remain unverified. No identity selection,
+live gameplay mutation, new art, upload or push occurred.

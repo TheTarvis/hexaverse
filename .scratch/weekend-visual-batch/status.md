@@ -364,3 +364,13 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Identity-free fixture only; no live commands or emulator identity selection.
 - Isolated preview source pointer: /tmp/hexaverse-touch-preview-root.txt. All57
   published assets remain byte-identical; protected Storybook remains unchanged.
+
+
+### Mobile touch update active23:53UTC
+
+-0796429 applied to the same protected preview, build shZoojsNHZsEIOJCz0MoQ.
+-1,063 tests/64 files, types/lint/validators/build and touch browser checks pass.
+- Candidate/active complete gzip HTML verified; anonymous OAuth restriction and
+  route blocks verified. Exact email/deadline/gateway diagnostics/art unchanged.
+- All source/build/policy pins match; diagnostic log0bytes. Actual iPhone retest
+  remains pending. Operations and source snapshot are in docs/phone-preview.md.
