@@ -819,7 +819,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     (fleet: Fleet) => {
       setActingFleetId(fleet.id)
       requestHudPanel('command')
-      setTravelReceipt(null)
+      setTravelReceipt(receipt => receipt?.fleet.id === fleet.id ? receipt : null)
       setTravelNotice(null)
       setFleetFocus(previous => ({ fleetId: fleet.id, sequence: (previous?.sequence ?? 0) + 1 }))
       if (isInTransit(fleet)) {
@@ -1288,7 +1288,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {!(travelMode === 'review' && objectIndexOpen && selection?.bodyId) && travelCard}
         {!travelMode && <div className={travelStyles.entry}>
           {selection && <Button color="cyan" data-testid="travel-review-entry" onClick={reviewTravel}>Travel here</Button>}
-          {acting && <Button outline data-testid="travel-status-entry" onClick={() => { setTravelReceipt(null); setTravelMode('status'); setTravelError(null); requestHudPanel('command') }}>Command fleet</Button>}
+          {acting && <Button outline data-testid="travel-status-entry" onClick={() => { setTravelReceipt(receipt => receipt?.fleet.id === acting.id ? receipt : null); setTravelMode('status'); setTravelError(null); requestHudPanel('command') }}>Command fleet</Button>}
         </div>}
       <HudColumn
         data-testid="space-command-column"

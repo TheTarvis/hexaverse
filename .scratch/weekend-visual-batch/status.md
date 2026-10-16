@@ -251,3 +251,36 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Same launchd service, exact Google email policy and Oct19 00UTC cutoff; all owned
   groups including tunnel still stopped by deadline supervision. No extra approval
   needed for this same-access mobile update; no identity/account action performed.
+
+
+## Focused phone gameplay QA resumed
+
+- Travis reports actual iPhone layout “Looks better” after88840bf. This confirms
+  perceived layout improvement, not completion of travel/trading/persistence checks.
+- Current work: isolated fleet selection, quote/Start/status/Stop and station-service
+  coverage; local Chrome portrait/landscape HUD and persisted layout review.
+- Existing emulator identities and Travis's test fleet state are excluded from QA.
+  Live preview remains on the same approved build, artwork, policy and expiry unless
+  a reproduced scoped fix passes isolated build and unchanged-art verification.
+
+
+## Focused gameplay QA result
+
+- Actual iPhone “Looks better” feedback recorded separately from gameplay acceptance.
+- Reproduced red integration case: closing/reopening accepted travel status before
+  fleet-read catch-up showed Ready and removed Stop. Preserved acceptance for the
+  same fleet; another fleet clears it and the next served read still supersedes it.
+- Four regression cases cover that window, same/different fleet selection, duplicate/
+  rejected Stop and retry, and next-read authority. Focused204 tests pass across
+  five files including50 FleetActionsPanel cases; types/lint/validators/build pass.
+- Chrome extension browser,375×667 and844×390: local in-memory travel Start/status/
+  Stop, insufficient fuel, passive close/reopen, fixture docking, fleet picker,
+  all-hidden recovery, show/hide/reorder and persisted preferences after reload pass.
+  No horizontal page overflow. Local gameplay fixture remains unexposed externally.
+- No real transaction, existing emulator identity or Travis fleet modification.
+  Actual iPhone gameplay/trading, session persistence and token refresh unverified.
+
+- Focused fix deployed after isolated production build and byte comparison of all57
+  public files; new source pointer /tmp/hexaverse-gameplay-preview-root.txt. Same
+  launchd supervision and cutoff, exact Google policy/gateway/static Storybook pins.
+  Post-reload login/Storybook200, anonymous external login302 to ngrok OAuth, no errors.

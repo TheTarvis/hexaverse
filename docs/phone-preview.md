@@ -448,3 +448,22 @@ Chrome identity-free HUD fixture checks and204 distinct relevant tests pass; see
 [hud.md](hud.md) for dimensions, actions and limits. Actual iPhone visual retest is
 still pending. No identity was selected or account created during implementation;
 Travis's earlier actual iOS SSO success remains a separate confirmed checkpoint.
+
+
+## iPhone feedback and travel-status correction — 2026-10-16
+
+Travis reports actual iPhone layout “Looks better”. Record perceived layout improvement
+separately from full gameplay, session persistence and token refresh verification.
+A focused isolated QA pass reproduced premature loss of accepted travel status after
+closing/reopening before a fleet refresh. The small status-retention correction is
+validated by four regression cases; no movement/backend rules or auth routes change.
+The protected frontend now reuses the prior published mobile/login source and changes only
+SystemSpaceView plus its tests; local-only gameplay fixture is not in the published
+build or static protected Storybook. Build/art checks and deployment details are
+recorded in the task board. Same exact-email policy and Oct19 00UTC cutoff apply.
+
+Current source pointer: `/tmp/hexaverse-gameplay-preview-root.txt`. Isolated build
+passes and all57 public files are byte-identical. Controlled supervisor reload
+retained the exact gateway/Google policy/static Storybook pins and cutoff. Subsequent
+login/Storybook checks return200, anonymous external login302 to ngrok OAuth, with no
+supervisor errors. No emulator identity selection or live gameplay mutation occurred.

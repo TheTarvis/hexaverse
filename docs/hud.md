@@ -106,8 +106,9 @@ Dismissal, guide progression, Objects/Command/Console switching, retained consol
 text, settings scroll/reset/close, fleet/account menus and map-selection hit testing
 passed. Briefing controls and landscape settings close were measured44×44; desktop
 1440×900 rendering was also inspected. This is viewport emulation, not iOS rendering
-or physical touch/keyboard/Safari-chrome verification. Actual iPhone visual retest
-remains pending; successful iOS emulator SSO was separately confirmed earlier.
+or physical touch/keyboard/Safari-chrome verification. Travis subsequently reported the actual iPhone layout “Looks better”; this confirms
+perceived layout improvement, not completion of gameplay or session checks.
+Successful iOS emulator SSO was separately confirmed earlier.
 
 204 distinct relevant component/integration tests pass, plus TypeScript, scoped
 lint, file validators and an isolated production build. Protected preview was updated
@@ -132,3 +133,27 @@ heading/launcher and briefing/panel overlap. After: local screenshots and DOM hi
 tests show separate bands and reachable controls. Chrome fixtures cannot certify
 Safari browser-chrome/safe-area behavior; that remains the concrete device retest.
 The local fixture is `http://127.0.0.1:20203/iframe.html?id=hud-mobile-system--onboarding&viewMode=story`.
+
+
+## Focused gameplay QA — 2026-10-16
+
+A reproduced integration failure showed accepted travel status being discarded when
+closed and reopened before the own-fleets read caught up: the card incorrectly
+returned to Ready and lost Stop. The status opener and same-fleet picker now retain
+the accepted response. Selecting another fleet clears it; the next served fleet
+read supersedes it through the existing read-counter rule. No movement rules changed.
+Four regression cases cover reopening, same/different fleet selection, duplicate
+and failed Stop with retry, and authority of the next served read. Focused suite:
+204 tests across travel integration, system integration, station actions, fleet
+picker and HUD preferences; types/scoped lint/validators and isolated build pass.
+
+Chrome local `HUD/Mobile System/Gameplay` fixture now composes the real travel card,
+fleet picker, workspace and navigation with explicitly in-memory journey state.
+375×667 and844×390 checks exercised affordable/insufficient fuel selection, explicit
+Start/status/Stop, passive closing/reopening, simulated station arrival, drawer
+switching and saved HUD visibility/dock order after reload. All-hidden recovery and
+reset remain reachable. Both widths have no horizontal page overflow. Fixture state
+is not proof of server physics, real transaction execution or actual iPhone gameplay.
+Station sell/refuel attachment, prices, pending/errors, successful refresh and retained
+quantity coverage ran in isolated component/system tests; live trading was not done.
+No existing emulator identity or Travis fleet state was selected or modified.
