@@ -132,3 +132,18 @@ Meshy private reference upload remains separately unapproved.
   Gateway reloaded with same protection/deadline; now200 with byte-identical JSON.
   Sibling/admin/push/env paths still404, outer unauthenticated access stillOAuth302.
   All16 gateway tests pass; user's phone refresh remains pending. No cookies reused.
+
+## Current visual/fallback follow-up
+
+- Native WebGPU close/gameplay lineup and actual32px dark/light comparison reviewed.
+  Gate and four natural categories retained as current delivery; ruin/debris remain
+  provisional against the accepted manufactured finish. No blanket art acceptance.
+- Real WebGL2 compatibility verified in a new reusable World Gate story. Controlled
+  double creation failure leaves readable notice/Retry and all seven static32px
+  thumbnails; Retry restores actual WebGPU world. Physical device loss/iOS unverified.
+- Story-only dark background corrected. Staged static build passes and is available
+  under protected Storybook; previous hashed assets retained for existing open tabs.
+- Current compact source-art evidence: comparison-04.png; this is not a world screenshot.
+- Bootstrap audit45 resources passes; API401 and invalid login/lookup/refresh JSON400
+  confirm narrow routing. No further public paths added. Valid remote game login and
+  token refresh still require actual user verification; no session cookie reused.

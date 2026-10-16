@@ -78,3 +78,44 @@ Latest review is an agent production choice within delegated art scope, not a ne
 claim of Travis's personal approval. Ruin/debris remain provisional manufactured
 art pending higher-quality refinement. Radiation capture changed only its own PNG;
 all other14 source thumbnails remained byte-identical.
+
+## Follow-up acceptance evidence — 2026-10-16
+
+- Actual Chrome 32px comparison: all14 dark/light images loaded at exactly32×32.
+  Gate hardware/portal remains recognizable; anomaly is a pale violet glow/arc,
+  nebula a wider filament cloud, gravity well a dark core with elliptical traces,
+  radiation a mint/amber radial burst. Glow categories have less contrast on light
+  surfaces; labels remain necessary. No new claim of Travis's final approval.
+- Actual production SpaceWorld lineup inspected at close35 and gameplay120 distance
+  on native WebGPU. Natural-category silhouettes remain distinct; small geometry
+  detail disappears at gameplay distance. Ruin/debris remain dark, angular drafts
+  whose finish does not yet match the accepted gate. Generated candidates remain
+  rejected as production replacements. No accepted gate/world/thumbnail changed.
+- Distant240 review also renders on native WebGPU; individual art is only a few
+  pixels. Category recognition at that zoom requires labels/static HUD or zooming
+  in. This is a documented limit, not a claim all models remain readable at any
+  distance; no gameplay radii or camera scale were changed to inflate the art.
+- New Feature Lineup Compatibility story intentionally rejects the first native
+  candidate, then uses the REAL WebGL2 backend. Chrome reports backend=webgl2 and
+  ready=true; all seven categories render through the same world factories.
+- New Renderer Recovery story intentionally fails BOTH initial candidate creations
+  at the existing factory injection boundary. Actual browser shows readable
+  Rendering unavailable/Retry, and seven loaded32px static thumbnails. Retry clears
+  the notice and renders the same scene on real WebGPU (ready=true). This is a
+  controlled creation-failure review, not physical GPU loss or iOS certification.
+- Corrected only this review story's background: a white Storybook surface hid
+  the white renderer notice heading; it now matches the game's dark space surface.
+  Production renderer logic remains unchanged. TypeScript, scoped lint and file
+  validators pass; staged static Storybook builds and reference audit pass.
+- Static prefixed Storybook compatibility story also renders on real WebGL2 via
+  a temporary exact-origin loopback QA gateway. The protected external gateway's
+  exact HTTPS Origin policy stays intact. Prior hashed assets retained on refresh.
+- comparison-04.png refreshes the compact dark/light128px + actual32px source-art
+  sheet with the CURRENT radiation thumbnail. It is explicitly a static composite,
+  not a native-world screenshot. Browser screenshots were emitted during review;
+  no generic screenshot/task-file attachment capability is exposed locally.
+- Protected preview's static bootstrap audit checks45 resources with zero failures,
+  including home/login/system HTML, CSS fonts, frozen galaxy and three production
+  GLBs. API requests without game credentials return401; invalid login/lookup/
+  refresh probes return JSON400 from Auth. This verifies routing, not valid login,
+  token refresh, SSE recovery or remote iPhone graphics. User feedback remains pending.

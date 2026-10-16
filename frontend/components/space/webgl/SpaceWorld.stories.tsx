@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { SpaceCanvas } from '../SpaceCanvas'
 import { defaultCamera } from '../space-camera'
@@ -6,10 +6,25 @@ import { viewBasisOf } from '../space-projection'
 import type { SceneMark } from '../space-scene'
 import type { SpaceFrame } from '../space-transform-loop'
 import { SpaceWorld } from './SpaceWorld'
+import { createRendererCandidate, type RendererCandidateFactory } from '@/components/render-guard/renderer-candidate'
+import { HudObjectThumbnail, type HudObjectKind } from '@/components/hud/HudObjectThumbnail'
 
-function GateWorld({ distance = 45, lineup = false }: { distance?: number; lineup?: boolean }) {
+function GateWorld({ distance = 45, lineup = false, rendererReview = 'auto' }: { distance?: number; lineup?: boolean; rendererReview?: 'auto' | 'compatibility' | 'recovery' }) {
   const host = useRef<HTMLDivElement>(null)
   const frameRef = useRef<SpaceFrame | null>(null)
+  // Story-only failure injection at the existing renderer boundary. Compatibility
+  // still uses a real WebGL2 renderer; recovery fails both initial candidates,
+  // then allows the normal renderer factory when the visitor presses Retry.
+  const rendererFactory = useMemo<RendererCandidateFactory | undefined>(() => {
+    if (rendererReview === 'auto') return undefined
+    let failures = 0
+    return options => {
+      if ((rendererReview === 'compatibility' && !options.forceWebGL) || (rendererReview === 'recovery' && failures++ < 2)) {
+        throw new Error('Intentional Storybook renderer creation failure')
+      }
+      return createRendererCandidate(options)
+    }
+  }, [rendererReview])
   useEffect(() => {
     const spacing = distance <= 40 ? 7 : 14
     const categories = ['anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation']
@@ -40,8 +55,11 @@ function GateWorld({ distance = 45, lineup = false }: { distance?: number; lineu
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
   }, [distance, lineup])
-  return <div ref={host} style={{ position: 'relative', width: '100%', height: lineup ? 'calc(100dvh - 64px)' : '100dvh' }}>
-    <SpaceCanvas renderWorld={(canvas, bindings) => <SpaceWorld canvas={canvas} frameRef={frameRef} extent={100} {...bindings} />} />
+  return <div ref={host} style={{ position: 'relative', width: '100%', height: lineup ? 'calc(100dvh - 64px)' : '100dvh', background: '#080e19', color: '#d6e2ef' }}>
+    <SpaceCanvas rendererFactory={rendererFactory} renderWorld={(canvas, bindings) => <SpaceWorld canvas={canvas} frameRef={frameRef} extent={100} {...bindings} />} />
+    {rendererReview === 'recovery' && <aside aria-label="Static object categories during renderer recovery" style={{ position: 'absolute', top: 16, left: 16, padding: 12, color: '#d6e2ef', background: '#102030', display: 'flex', gap: 12, zIndex: 1 }}>
+      {(['gate', 'anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation'] satisfies HudObjectKind[]).map(kind => <span key={kind} style={{ display: 'grid', justifyItems: 'center', gap: 4 }}><HudObjectThumbnail kind={kind} /><span>{kind.replaceAll('_', ' ')}</span></span>)}
+    </aside>}
     {lineup && <p style={{ position: 'absolute', top: '100%', left: 0, right: 0, minHeight: 64, margin: 0, padding: '10px 16px', background: '#080e19', color: '#d6e2ef', fontSize: 13 }}>Back: accepted lane gate. Middle row, left to right: anomaly · ruin · nebula. Front row: gravity well · debris · radiation.</p>}
   </div>
 }
@@ -64,3 +82,11 @@ export const Close: Story = { args: { distance: 12 } }
 export const FeatureLineupClose: Story = { args: { lineup: true, distance: 35 } }
 export const FeatureLineupGameplay: Story = { args: { lineup: true, distance: 120 } }
 export const FeatureLineupDistant: Story = { args: { lineup: true, distance: 240 } }
+export const FeatureLineupCompatibility: Story = {
+  args: { lineup: true, distance: 35, rendererReview: 'compatibility' },
+  parameters: { docs: { description: { story: 'Rejects the native candidate at the existing factory boundary, then renders actual world art through the real WebGL2 compatibility backend.' } } },
+}
+export const RendererRecovery: Story = {
+  args: { lineup: true, distance: 35, rendererReview: 'recovery' },
+  parameters: { docs: { description: { story: 'Story-only creation failure for both initial renderer candidates. Static category thumbnails stay available. Press Retry to use the normal real renderer and recover the same world scene. This does not simulate physical device loss or prove iOS support.' } } },
+}

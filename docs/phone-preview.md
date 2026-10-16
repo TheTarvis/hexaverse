@@ -269,3 +269,13 @@ gateway now returns200 and the exact committed JSON payload; adjacent/forbidden
 paths remain404. External unauthenticated requests still redirect to ngrok OAuth.
 No frontend rebuild, backend change, data reset, seed or user-cookie reuse occurred.
 Travis's signed-in phone refresh remains the final remote verification.
+
+Follow-up bootstrap audit checked45 resources across home/login/system pages,
+framework assets/CSS fonts, frozen galaxy and production GLBs with zero failures.
+The browser renders the local73-system/92-lane galaxy. Unauthenticated API reads
+return401, and deliberately invalid login/lookup/refresh probes return JSON400
+from the Auth emulator. These are route checks, not successful account login or
+token refresh. No additional public path was required. New compatibility/recovery
+review stories are included in the staged and verified static Storybook refresh;
+old hashed assets remain available to existing tabs. Exact external origin,
+identity allowlist and expiry are unchanged.
