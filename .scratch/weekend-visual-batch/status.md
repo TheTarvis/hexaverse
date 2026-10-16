@@ -336,3 +336,15 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   silent.29 synthetic gateway/SSO/diagnostics tests pass. No private traffic replayed.
 - Activation deferred until phone retry; requires a controlled same-job reload and
   gateway/module pin update. No new concrete live failure evidence or claimed fix.
+
+
+## Transport diagnostics active — 2026-10-16 22:42 UTC
+
+- Applied tested diagnostic commit as830cba6 and restarted the same preview job;
+  about6.1seconds between complete shutdown and supervisor restart.
+- Complete gzip home/login/system HTML and route/origin rejection verified.
+- Anonymous public root still redirects to OAuth; exact email policy, frontend
+  build/assets, source pins, ngrok inspection off and Oct19 00UTC expiry unchanged.
+- Private bounded error-only log is active and empty after healthy checks.
+- Incident remains open; no authenticated iPhone recovery or root cause confirmed.
+- Exact active source hashes and verification are in docs/phone-preview.md.

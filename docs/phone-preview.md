@@ -546,3 +546,27 @@ Keep the frontend/art/Storybook, origin, exact email restriction, ngrok inspecti
 flags and `2026-10-19T00:00:00Z` unchanged. Then verify healthy local responses stay
 silent and unauthorized external traffic still reaches the OAuth gate. This enables
 future evidence collection; it is not a confirmed fix for ERR_NGROK_3004.
+
+
+## Error diagnostics activated — 2026-10-16 22:42 UTC
+
+Prepared commit d60d909 was applied to the project branch as830cba6. The supervisor
+loads configuration once, so a gateway-only restart could not activate the optional
+flag. The same authorized process set was stopped22:42:32.49UTC and restarted
+22:42:38.62UTC (about6.1seconds). An immediate launchd bootstrap returned error5
+while teardown finished; the next bootstrap succeeded. No access restriction changed.
+Frontend48343, gateway48344 and ngrok48345 are owned by the relaunched supervisor.
+
+Active gateway SHA256: `8157fb8ee473cd9f7fc5bc436451dc2edefd9a3789b69657c83fcbcb3fd281d0`.
+Diagnostic module SHA256: `105f687c3e650891e2095b9fcd1453aa434ccad1fb6a9a072a6e6bdf24617f74`.
+All supervisor source/build/policy pins match. Frontend build/assets, exact Google
+email restriction, endpoint, disabled ngrok inspection/logging and
+`2026-10-19T00:00:00Z` cutoff are unchanged. Gateway now uses
+`--error-log /tmp/hexaverse-weekend-supervision/transport-errors.jsonl`.
+
+Verification: local `/`, `/login` and `/systems/sys_0_1` returned complete200 gzip
+HTML and decompressed successfully. Debug route404 and foreign-origin POST403;
+anonymous public root302 to idp.ngrok.com. The owned0600 diagnostic log remained
+zero bytes after healthy checks.29 synthetic gateway/SSO/diagnostics tests passed
+before activation. No authenticated edge session was exercised. ERR_NGROK_3004
+remains an open incident; this activation enables recurrence evidence, not a fix.
