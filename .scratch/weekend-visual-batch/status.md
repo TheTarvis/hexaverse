@@ -323,3 +323,16 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   HTTP/1.0/reusedHTTP1.1 responses complete locally. No real cookies/identity used.
 - No confirmed cause or fix. Services/art/policy/cutoff untouched; authenticated
   ngrok edge delivery remains the concrete missing validation. See phone-preview.md.
+
+
+## Error diagnostics prepared without interrupting retry
+
+- Isolated checkout protects live gateway hashes and restartability. Nothing applied
+  to running preview; existing source, artifacts, policy and cutoff remain unchanged.
+- Optional local error-only JSONL writer: timestamps/method/route templates/status/
+  fixed codes/byte counts only; no headers, cookies, auth/query/body/identity or stack.
+  Private0600 regular non-symlink file,256KiB cap and same preview expiry.
+- Refusal/truncation versus downstream cancellation distinguished; successful gzip
+  silent.29 synthetic gateway/SSO/diagnostics tests pass. No private traffic replayed.
+- Activation deferred until phone retry; requires a controlled same-job reload and
+  gateway/module pin update. No new concrete live failure evidence or claimed fix.

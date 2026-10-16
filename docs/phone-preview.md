@@ -514,3 +514,35 @@ headers and a fixture cookie. HTTP/1.0 and reused HTTP/1.1 compressed page reads
 complete. These checks do not exercise a real OAuth session through the ngrok edge.
 No speculative code change, service restart, exposure expansion or deadline change
 was made. Authenticated edge delivery remains unverified pending phone evidence.
+
+
+## Prepared error-only diagnostics — not activated
+
+Diagnostics are prepared in an isolated checkout so the live supervisor's pinned
+gateway files and current retry window remain untouched. Existing production stdout/
+stderr are discarded and ngrok inspection is disabled; these cannot reconstruct
+an upstream truncation after the fact. No new live failure evidence was obtained.
+
+The optional gateway `--error-log` accepts an absolute local file. Its JSONL records
+contain only UTC timestamp, fixed error category, method, route template (all dynamic
+IDs and asset names redacted), status/error code and received-byte count. No headers,
+cookies, authorization, query strings, bodies, error messages/stacks or identities
+are recorded. Normal successful responses are silent. Fixed code vocabularies also
+prevent a remote error message from entering a record. The file is owned0600,
+non-symlink/regular, capped at256KiB across reopen and gated by the same `--until`
+cutoff. The supervised gateway stops at that cutoff; full ngrok inspection remains off.
+
+Synthetic loopback tests distinguish refused upstream connections, incomplete
+Content-Length responses, browser stream cancellation and completed5xx responses.
+Fragmented gzip remains complete and silent. Redaction, file permissions/symlink
+refusal, byte cap across reopen, expiry and diagnostic-callback failure are covered.
+All29 gateway/SSO/diagnostics tests pass. No private traffic was replayed.
+
+Activation is deferred until Travis's imminent retry is resolved: stop the same
+launchd job, apply the prepared commit to the primary checkout, append
+`--error-log /tmp/hexaverse-weekend-supervision/transport-errors.jsonl` to its gateway
+command, and update gateway/new diagnostic-module source pins before restarting.
+Keep the frontend/art/Storybook, origin, exact email restriction, ngrok inspection/log
+flags and `2026-10-19T00:00:00Z` unchanged. Then verify healthy local responses stay
+silent and unauthorized external traffic still reaches the OAuth gate. This enables
+future evidence collection; it is not a confirmed fix for ERR_NGROK_3004.

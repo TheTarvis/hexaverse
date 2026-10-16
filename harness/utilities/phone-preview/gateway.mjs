@@ -7,6 +7,7 @@ import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ssoHelperAllowed, idpSignInAllowed } from './sso-policy.mjs'
+import { createTransportLog, transportPath, transportRecord } from './transport-diagnostics.mjs'
 
 const ID = '[A-Za-z0-9_-]{1,180}'
 const api = (pattern) => new RegExp(`^/v1/${pattern}$`)
@@ -129,7 +130,7 @@ async function serveStorybook(request, response, directory, expired) {
 
 /** All upstream hosts are fixed loopback; only their numeric ports are configurable. */
 export function createPreviewGateway({ previewOrigin, frontendPort = 20205, backendPort = 20201, authPort = 20211,
-  storybookDirectory = defaultStorybookDirectory, maxBodyBytes = 1_048_576, expiresAt, now = Date.now } = {}) {
+  storybookDirectory = defaultStorybookDirectory, maxBodyBytes = 1_048_576, expiresAt, now = Date.now, onTransportError } = {}) {
   let trusted
   try { trusted = new URL(previewOrigin) } catch { throw new Error('Explicit previewOrigin is required') }
   // Local QA is an explicit alternative, never an additional allowed origin on
@@ -149,6 +150,7 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
       throw new Error('Expiry must be a valid future UTC timestamp no more than seven days away')
     }
   }
+  if (onTransportError !== undefined && typeof onTransportError !== 'function') throw new Error('Invalid diagnostics callback')
   const expired = () => now() >= deadline
   const ports = { frontend: port(frontendPort), backend: port(backendPort), auth: port(authPort) }
   if (!Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1 || maxBodyBytes > 1_048_576) throw new Error('Invalid request body limit')
@@ -165,6 +167,13 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     const route = previewRoute(request.method, request.url)
     if (!route || request.headers['x-http-method-override'] || request.headers['x-method-override']) return reject(response, 404)
     if (route.service === 'auth' && ssoHelperPaths.has(route.path.split('?', 1)[0]) && !ssoHelperAllowed(route.path, trusted.origin)) return reject(response, 400)
+    let receivedBytes = 0, upstreamFailed = false, downstreamAborted = false, responseStatus
+    const reported = new Set()
+    const report = (event, code, status = responseStatus) => {
+      if (!onTransportError || expired() || reported.has(event)) return
+      reported.add(event)
+      try { onTransportError(transportRecord({ event, code, status, method: request.method, pathname: transportPath(route), receivedBytes }, now())) } catch { /* Diagnostics never break forwarding. */ }
+    }
     const declaredLength = Number(request.headers['content-length'] ?? 0)
     if (!Number.isSafeInteger(declaredLength) || declaredLength < 0 || declaredLength > maxBodyBytes) return reject(response, 413)
     if ((request.method === 'GET' || request.method === 'HEAD') && (declaredLength || request.headers['transfer-encoding'])) return reject(response, 404)
@@ -180,7 +189,7 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
         if (size > maxBodyBytes) { reject(response, 413); return }
         chunks.push(chunk)
       }
-    } catch { return reject(response, 400) }
+    } catch { report('request_aborted', 'DOWNSTREAM_ABORT', 400); return reject(response, 400) }
     if (expired()) return reject(response, 410)
     if (route.service === 'auth' && route.path.split('?', 1)[0] === signupPath) {
       // Firebase also uses this endpoint for anonymous signup/account linking.
@@ -208,16 +217,33 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     headers['content-length'] = size
     const upstream = http.request({ hostname: '127.0.0.1', port: ports[route.service], method: request.method, path: route.path, headers }, incoming => {
       if (expired()) { incoming.destroy(); reject(response, 410); return }
+      responseStatus = incoming.statusCode ?? 502
+      incoming.on('data', chunk => { receivedBytes += chunk.length })
+      const truncated = error => {
+        upstreamFailed = true
+        if (!downstreamAborted) report('upstream_truncated', error?.code ?? 'INCOMPLETE_UPSTREAM')
+        response.destroy()
+      }
+      incoming.once('aborted', () => truncated())
+      incoming.on('error', truncated)
+      incoming.once('end', () => { if (responseStatus >= 500) report('upstream_http_error', 'HTTP_5XX') })
       // Pipe each received chunk immediately; no compression or response buffer.
       response.writeHead(incoming.statusCode ?? 502, headersWithoutHop(incoming.headers))
-      incoming.on('error', () => response.destroy())
       incoming.pipe(response)
     })
-    upstream.on('error', () => reject(response, 502))
-    response.on('close', () => upstream.destroy())
+    upstream.on('error', error => {
+      upstreamFailed = true
+      if (!downstreamAborted && !reported.has('upstream_timeout') && !reported.has('upstream_truncated')) report('upstream_connection_error', error.code, 502)
+      reject(response, 502)
+    })
+    response.on('error', error => { report('downstream_response_error', error.code); response.destroy() })
+    response.on('close', () => {
+      if (!response.writableFinished && !upstreamFailed) { downstreamAborted = true; report('downstream_aborted', 'DOWNSTREAM_ABORT') }
+      upstream.destroy()
+    })
     // An SSE response may remain open. Request parsing and upstream connect are
     // bounded; no inactivity timer closes a healthy heartbeat stream.
-    upstream.setTimeout(60_000, () => upstream.destroy())
+    upstream.setTimeout(60_000, () => { upstreamFailed = true; report('upstream_timeout', 'UPSTREAM_TIMEOUT', 502); upstream.destroy() })
     upstream.on('response', () => upstream.setTimeout(0))
     upstream.end(Buffer.concat(chunks, size))
   })
@@ -241,13 +267,15 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const allowed = new Set(['--origin', '--until', '--port', '--frontend-port', '--backend-port', '--auth-port'])
+  const allowed = new Set(['--origin', '--until', '--port', '--frontend-port', '--backend-port', '--auth-port', '--error-log'])
   const args = {}
   for (let i = 2; i < process.argv.length; i += 2) {
     if (!allowed.has(process.argv[i]) || !process.argv[i + 1]) throw new Error('Use --origin and --until UTC-ISO-deadline for HTTPS; optional numeric port flags')
-    args[process.argv[i]] = ['--origin', '--until'].includes(process.argv[i]) ? process.argv[i + 1] : port(process.argv[i + 1])
+    args[process.argv[i]] = ['--origin', '--until', '--error-log'].includes(process.argv[i]) ? process.argv[i + 1] : port(process.argv[i + 1])
   }
-  const gateway = createPreviewGateway({ previewOrigin: args['--origin'], expiresAt: args['--until'], frontendPort: args['--frontend-port'], backendPort: args['--backend-port'], authPort: args['--auth-port'] })
+  const errorLog = args['--error-log'] ? createTransportLog({ filePath: args['--error-log'], expiresAt: args['--until'] }) : undefined
+  const gateway = createPreviewGateway({ previewOrigin: args['--origin'], expiresAt: args['--until'], frontendPort: args['--frontend-port'], backendPort: args['--backend-port'], authPort: args['--auth-port'], onTransportError: errorLog })
+  gateway.once('close', () => errorLog?.close())
   gateway.on('error', () => { console.error('Preview gateway could not listen'); process.exitCode = 1 })
   gateway.listen(args['--port'] ?? 20204, '127.0.0.1', () => {
     console.log(`Preview gateway listening on http://127.0.0.1:${gateway.address().port}; requires a separately authenticated outer gateway; never expose it bare`)
