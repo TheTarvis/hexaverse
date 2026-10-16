@@ -41,13 +41,15 @@ function ObjectThumbnail({ object, className }: { object: IndexedObject; classNa
 }
 
 /** Shared object browser. Opening details never issues a command. */
-export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, onFocus, offscreen, onOffscreen, canPlot = false, onPlot, systemName = 'System', detailContent, inspectorBody, compact = false, detailContentFor, tutorialTarget, plotHint, loading = false, failed = false, onRetry, disabled = false, selectedFleetId, onSelectFleet, onFocusFleet, fleetsLoading = false, fleetsFailed = false, onRetryFleets }: {
+export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, onFocus, offscreen, onOffscreen, canPlot = false, onPlot, systemName = 'System', detailContent, inspectorBody, compact = false, servicesWithoutDetails = false, detailContentFor, tutorialTarget, plotHint, loading = false, failed = false, onRetry, disabled = false, selectedFleetId, onSelectFleet, onFocusFleet, fleetsLoading = false, fleetsFailed = false, onRetryFleets }: {
   selectedFleetId?: string | null
   onSelectFleet?: (fleetId: string) => void
   onFocusFleet?: (fleetId: string) => void
   fleetsLoading?: boolean
   fleetsFailed?: boolean
   onRetryFleets?: () => void
+  /** Independently read station services remain usable when body telemetry fails. */
+  servicesWithoutDetails?: boolean
   compact?: boolean
   inspectorBody?: ReactNode
   detailContent?: ReactNode
@@ -101,7 +103,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
   return <div className={`${styles.indexShell} ${compact ? styles.compact : ''}`}>
     <Button plain ref={toggleRef} data-testid="system-index-toggle" aria-expanded={open} aria-controls="system-index" onClick={() => onOpen(!open)}>⌕ Objects · {available.length} <span>{open ? '−' : '+'}</span></Button>
     {/* Keep embedded command state mounted while its drawer is closed. */}
-    {(open || detailContent || inspectorBody) && <div style={!open ? { display: 'none' } : undefined} className={styles.indexPanels} data-details={!!detailObject} onKeyDown={event => {
+    {(open || detailContent || inspectorBody) && <div style={!open ? { display: 'none' } : undefined} className={styles.indexPanels} data-details={!!detailObject || servicesWithoutDetails} onKeyDown={event => {
       if (event.key !== 'Escape') return
       event.stopPropagation()
       if (details) closeDetails()
@@ -127,8 +129,9 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
         {!loading && !failed && !fleetsLoading && !fleetsFailed && matches.length === 0 && <p role="status">{available.length ? 'No known objects match. Try a name or type.' : 'No objects have been disclosed in this system.'}</p>}
         <small className={styles.muted}>Select an object to open or close its details.</small>
       </aside>
-      {(detailObject || detailContent || inspectorBody) && <aside style={!detailObject && !inspectorBody ? { display: 'none' } : inspectorBody ? { padding: 0, border: 0, background: 'transparent', overflow: 'visible' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.label ?? detailObject.name}` : undefined}>
+      {(detailObject || detailContent || inspectorBody) && <aside style={!detailObject && !inspectorBody && !servicesWithoutDetails ? { display: 'none' } : inspectorBody ? { padding: 0, border: 0, background: 'transparent', overflow: 'visible' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.label ?? detailObject.name}` : servicesWithoutDetails ? 'Docked station services' : undefined}>
         {inspectorBody}
+        {servicesWithoutDetails && !detailObject && <header className={styles.detailsHeader}><div><p>Docked station services</p><p className={styles.muted}>System objects are unavailable. Your station services are still connected.</p><Button plain onClick={onRetry}>Retry system objects</Button></div></header>}
         <div hidden={!!inspectorBody} style={{ display: inspectorBody ? 'none' : 'contents' }}>
         {detailObject && <header className={styles.detailsHeader}><p className={styles.eyebrow}>SELECTED {fleetFacts ? 'FLEET' : detailObject.group === 'Stations' ? 'STATION' : detailObject.group === 'Worlds' ? 'WORLD' : 'OBJECT'}</p><Button autoFocus plain className={styles.detailsClose} data-testid="details-back" aria-label="Close details and return to objects" title="Back to objects" onClick={closeDetails}>←</Button></header>}
         <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && detailObject.kind !== 'star' && <ObjectThumbnail object={detailObject} className={styles.portrait} />}</><div><h3>{detailObject.label ?? detailObject.name}</h3>{detailObject.catalogueRef && <p>{detailObject.catalogueRef}</p>}<p className={styles.muted}>{detailObject.kind}</p></div></div>
@@ -137,7 +140,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
         {open && !fleetFacts && detailObject.kind === 'star' && <SpacecraftPreview key={`star:${detailObject.name}:${detailObject.starClass ?? ''}`} kind="star" objectId={detailObject.name} starClass={detailObject.starClass} label={detailObject.label ?? detailObject.name} accentColor={0xffffff} />}
         {open && selectedPlanet && <SpacecraftPreview key={`${selectedPlanet}:${detailObject.name}`} kind={selectedPlanet} objectId={detailObject.name} label={detailObject.label ?? detailObject.name} accentColor={0xffffff} />}
         {fleetFacts ? <dl className={styles.objectFacts}><dt>Activity</dt><dd>{fleetFacts.activity}</dd><dt>System</dt><dd>{fleetFacts.systemLabel}</dd>{fleetFacts.attachedTo && <><dt>Attached host</dt><dd>{fleetFacts.attachedTo}</dd></>}<dt>Ships</dt><dd>{fleetFacts.shipCount ?? 'Unavailable'}</dd></dl> : <dl className={styles.objectFacts}><dt>Known from</dt><dd>{detailObject.knownFrom ?? 'Astronomical observation'}</dd><dt>Resources</dt><dd>{detailObject.resources ?? 'Not surveyed — inspect or scan this host.'}</dd><dt>Fleets here</dt><dd>{detailObject.fleets?.length ? detailObject.fleets.join(', ') : 'No known fleets'}</dd>{detailObject.group === 'Stations' && <><dt>Services</dt><dd>Sell cargo · Purchase fuel while docked</dd></>}</dl>}</>}
-          <div className={styles.detailServices} style={fleetFacts || detailObject?.name !== detailContentFor ? { display: 'none' } : undefined}>{detailContent}</div>
+          <div className={styles.detailServices} style={fleetFacts || !servicesWithoutDetails && detailObject?.name !== detailContentFor ? { display: 'none' } : undefined}>{detailContent}</div>
         </div>
         {detailObject && <div className={styles.indexActions}>
           <Button plain data-testid="index-focus" disabled={disabled} onClick={() => { if (fleetFacts) onFocusFleet?.(fleetFacts.id); else onFocus() }}>Focus {detailObject.label ?? detailObject.name} ⌖</Button>

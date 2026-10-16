@@ -128,3 +128,14 @@
 .workspaceVitals { position: absolute; z-index: 35; bottom: 0; inset-inline: 0; pointer-events: auto; }
 .workspace .systemColumn { gap: 12px; }
 @media (max-width: 760px) { .workspace { bottom: 72px; } }
+
+@media (max-width: 760px) {
+  .workspace { bottom: 204px; }
+  .workspaceVitals [data-testid='vitals-strip'] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: 144px; gap: 4px 12px; padding: 4px 12px; }
+  .workspaceVitals [data-testid='vitals-fleet-cell'] { grid-column: 1 / -1; min-width: 0; }
+  .workspaceVitals [data-testid='vitals-fleet-id'] { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .workspaceVitals [data-testid='vitals-fleet-chevron'] { min-width: 44px; min-height: 44px; flex-shrink: 0; }
+  .workspaceVitals [data-testid='vitals-hold-cell'] { max-height: 44px; overflow: auto; }
+  .workspaceVitals [data-testid='vitals-credits-cell'] { align-items: start; }
+  .workspaceVitals [data-testid='vitals-clock-cell'] { text-align: right; }
+}

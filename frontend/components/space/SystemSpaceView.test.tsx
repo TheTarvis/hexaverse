@@ -1500,3 +1500,46 @@ describe('compact command fleet gate travel', () => {
     expect(mutations.jump.mutate).not.toHaveBeenCalled()
   })
 })
+
+
+describe('reachable non-map HUD actions', () => {
+  it('keeps docked trading and holding usable when the interior and renderer are unavailable', async () => {
+    stage.available = false
+    setReads({ data: undefined, isError: true, error: new Error('interior unavailable') }, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
+    view()
+    await userEvent.click(screen.getByTestId('system-index-toggle'))
+    expect(screen.getByTestId('sell-section')).toBeVisible()
+    expect(screen.getByTestId('refuel-section')).toBeVisible()
+    expect(screen.getByTestId('stationkeep-control')).toBeVisible()
+    expect(screen.queryByTestId('celestial-actions')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByTestId('refuel-tons-input'), { target: { value: '3' } })
+    await userEvent.click(screen.getByTestId('refuel-button'))
+    expect(mutations.refuel.mutate).toHaveBeenCalledTimes(1)
+    await userEvent.click(screen.getByTestId('stationkeep-control'))
+    expect(mutations.hold.mutate).toHaveBeenCalledTimes(1)
+    await userEvent.click(screen.getByTestId('system-index-toggle'))
+    expect(screen.getByTestId('refuel-section')).not.toBeVisible()
+    await userEvent.click(screen.getByTestId('system-index-toggle'))
+    expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
+  })
+
+  it('offers the existing Cut drive verb in visible fleet status without needing the renderer', async () => {
+    stage.available = false
+    setReads({}, { data: [burningFleet()] })
+    view()
+    await userEvent.click(screen.getByTestId('travel-status-entry'))
+    const cut = screen.getByTestId('travel-cut-drive')
+    expect(cut).toBeVisible()
+    expect(cut).toBeEnabled()
+    act(() => { fireEvent.click(cut); fireEvent.click(cut) })
+    expect(mutations.cutDrive.mutate).toHaveBeenCalledTimes(1)
+    expect(mutations.cutDrive.mutate.mock.calls[0][0]).toBe('fleet_1')
+    expect(mutations.stop.mutate).not.toHaveBeenCalled()
+  })
+
+  it('does not offer Cut drive for a quiet parked fleet', async () => {
+    view()
+    await userEvent.click(screen.getByTestId('travel-status-entry'))
+    expect(screen.queryByTestId('travel-cut-drive')).not.toBeInTheDocument()
+  })
+})

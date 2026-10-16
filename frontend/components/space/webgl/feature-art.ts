@@ -224,10 +224,7 @@ export function createFeatureModel(kind: FeatureArtKind, objectId: string): THRE
       const offset = new THREE.Vector3(0.08, 0, -0.05)
       const points = [direction.clone().multiplyScalar(start).add(offset), direction.clone().multiplyScalar(end).add(offset)]
       // A restrained darker carrier retains the ray structure on light surfaces.
-      const carrier = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({
-        color: i % 4 ? 0x376b57 : 0x917447, transparent: true, opacity: 0.65, depthWrite: false,
-      }))
-      assembly.add(carrier)
+      trace(assembly, points, i % 4 ? 0x376b57 : 0x917447, 0.95, 0.014)
       trace(assembly, points, i % 4 ? 0xa1e5bd : 0xe4c580, 0.65, i % 3 === 0 ? 0.009 : 0)
       glow(assembly, i % 4 ? 0xadecc9 : 0xf0d69d, 0.09 + random() * 0.08, 0.9, direction.multiplyScalar(end).add(offset))
     }

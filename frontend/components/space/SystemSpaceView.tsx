@@ -54,7 +54,7 @@ import { useCommandGuide } from '@/hooks/use-command-guide'
 import { SystemObjectIndex } from './SystemObjectIndex'
 import { RecoveryTransmission } from './RecoveryTransmission'
 import commandStyles from './command-view.module.css'
-import { useMyFleets, useOrder, useStop, useJump } from '@/hooks/use-fleets'
+import { useMyFleets, useOrder, useStop, useJump, useCutDrive } from '@/hooks/use-fleets'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
 import { burnErrorCopy, commandErrorReason, isQuotedCapExceeded } from '@/lib/rejection-copy'
@@ -293,9 +293,11 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const travelOrder = useOrder()
   const travelStop = useStop()
   const travelJump = useJump()
+  const travelCutDrive = useCutDrive()
   const jumpGuard = useSubmitGuard()
   const travelGuard = useSubmitGuard()
   const stopGuard = useSubmitGuard()
+  const cutDriveGuard = useSubmitGuard()
   const [travelMode, setTravelMode] = useState<'review' | 'status' | null>(null)
   const [travelNotice, setTravelNotice] = useState<string | null>(null)
   const [travelError, setTravelError] = useState<string | null>(null)
@@ -959,6 +961,18 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       onSettled: () => { stopGuard.release(); setTravelPending(false) },
     })
   }
+  const cutTravelDrive = () => {
+    if (!statusFleet || statusFleet.state.Mode !== 0 || statusFleet.jump || statusFleet.systemId !== systemId || mineRunning || fleets.isError || travelPending || !cutDriveGuard.claim()) return
+    setTravelError(null); setTravelPending(true)
+    travelCutDrive.mutate(statusFleet.id, {
+      onSuccess: fleet => {
+        setTravelReceipt({ fleet, destination: 'Coasting', readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
+        setTravelNotice('Drive cut. The fleet is coasting.')
+      },
+      onError: error => setTravelError(burnErrorCopy(commandErrorReason(error))),
+      onSettled: () => { cutDriveGuard.release(); setTravelPending(false) },
+    })
+  }
   const jumpTravel = () => {
     if (!statusFleet?.laneId || statusFleet.jump || statusFleet.systemId !== systemId || mineRunning || fleets.isError || travelPending || !jumpGuard.claim()) return
     setTravelError(null); setTravelPending(true)
@@ -977,7 +991,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     fleets={allFleets} systemId={systemId} destination={travelMode === 'status' ? statusDestination : destinationLabel}
     quote={currentQuote} worldTime={worldTime} scale={servedScale} blocker={travelBlocker} notice={travelNotice} error={fleets.isError ? 'Fleet telemetry unavailable.' : travelError}
     pending={travelPending} warning={travelReceipt?.fleet.strandingWarning}
-    additionalActions={statusFleet?.laneId && !statusFleet.jump && statusFleet.systemId === systemId ? <Button outline data-testid="travel-jump" disabled={travelPending || mineRunning || fleets.isError} onClick={jumpTravel}>Jump through gate</Button> : undefined}
+    additionalActions={<>
+      {statusFleet?.state.Mode === 0 && statusFleet.state.Burn && statusFleet.state.Burn.ArriveMs > worldTime && !statusFleet.jump && statusFleet.systemId === systemId && <Button outline data-testid="travel-cut-drive" disabled={travelPending || mineRunning || fleets.isError} onClick={cutTravelDrive}>Cut drive</Button>}
+      {statusFleet?.laneId && !statusFleet.jump && statusFleet.systemId === systemId && <Button outline data-testid="travel-jump" disabled={travelPending || mineRunning || fleets.isError} onClick={jumpTravel}>Jump through gate</Button>}
+    </>}
     onFleet={id => { if (!travelGuard.held) { setActingFleetId(id); setTravelError(null) } }} onStart={startTravel} onStop={stopTravel}
     onBack={() => { if (!travelGuard.held) { setTravelMode(null); openObjectIndex(true) } }}
     onClose={() => { if (!travelGuard.held) setTravelMode(null) }} onRetry={burnPreview.retry} /> : null
@@ -1223,6 +1240,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={{ position: 'relative', inset: 'auto', width: '100%', height: '100%', ...(guiding && guide?.phase === 'wake' ? { display: 'none' } : {}) }}>
         <SystemObjectIndex
           compact
+          servicesWithoutDetails={interiorFailed && !!stationActionsHost}
           key={systemId}
           systemName={systemNames[systemId] ?? systemId}
           objects={[
@@ -1237,7 +1255,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             } })),
           ]}
           inspectorBody={travelMode === 'review' && objectIndexOpen && !!selection?.bodyId ? travelCard : undefined}
-          detailContent={stationActionsHost || (objectIndexOpen && selection?.bodyId) ? <>{stationActionsHost && <div style={stationActionsHost !== selection?.bodyId ? { display: "none" } : undefined}>{marketNotices}{fleetActions}</div>}{objectIndexOpen && interior.data?.features.filter(body => body.id === selection?.bodyId).map(body => <CelestialActions key={`${systemId}:${body.id}`} systemId={systemId} body={body} fleetId={acting && !actingRemote ? acting.id : null} onSettled={() => { void interior.refetch(); void fleets.refetch() }} />)}</> : undefined}
+          detailContent={stationActionsHost || (objectIndexOpen && selection?.bodyId) ? <>{stationActionsHost && <div style={stationActionsHost !== selection?.bodyId && !interiorFailed ? { display: "none" } : undefined}>{marketNotices}{fleetActions}</div>}{!interiorFailed && objectIndexOpen && interior.data?.features.filter(body => body.id === selection?.bodyId).map(body => <CelestialActions key={`${systemId}:${body.id}`} systemId={systemId} body={body} fleetId={acting && !actingRemote ? acting.id : null} onSettled={() => { void interior.refetch(); void fleets.refetch() }} />)}</> : undefined}
           detailContentFor={selection?.bodyId ?? stationActionsHost ?? undefined}
           selected={selection?.bodyId ?? null}
           selectedFleetId={inspectedFleetId}
