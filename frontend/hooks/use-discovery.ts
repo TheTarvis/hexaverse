@@ -3,11 +3,15 @@ import { discoveryService } from '@/lib/services/discovery-service'
 import { queryKeys } from '@/lib/query-keys'
 
 export function useSurveyOptions(fleetId: string | null) {
+  const phonePreview = process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true'
   return useQuery({
     queryKey: queryKeys.discovery.survey(fleetId ?? ''),
     queryFn: () => discoveryService.surveyOptions(fleetId!),
     enabled: !!fleetId,
-    refetchInterval: 1000,
+    // A bounded preview read cadence reduces tunnel quota usage. Survey commits
+    // still invalidate immediately; returning to the page refreshes stale facts.
+    refetchInterval: phonePreview ? 10_000 : 1000,
+    ...(phonePreview ? { staleTime: 0, refetchOnWindowFocus: true } : {}),
   })
 }
 
