@@ -52,3 +52,24 @@ path checks, not proof of exact visual parity.
   resized to1024, 1.34MB ruin/15,214 triangles and1.31MB debris/14,562 triangles.
 - Preparation: node harness/utilities/prepare-feature-asset.mjs <raw.glb> <candidate.glb>.
 - Total provider charges verified from task results:30 credits. No purchases.
+
+## Seven-category outcome matrix — 2026-10-16
+
+All seven are wired into production world/HUD coverage; integration is not final art acceptance.
+
+| Category | Current production output | Acceptance / remaining work |
+| --- | --- | --- |
+| Gate | Accepted round07 two-half GLB and portal, new static thumbnail | Model/world accepted and preserved; thumbnail integrated, final 32px review provisional. |
+| Anomaly | Violet broken halo and diffuse echoes, matching thumbnail | Integrated draft; final world/32px art acceptance pending. |
+| Ruin | Local fractured armor/ribs, matching thumbnail | Provisional manufactured art. Soft Meshy01 candidate review-only; sharper image-guided generation blocked on upload approval. |
+| Nebula | Layered noisy filaments/ribbons and dark gaps, matching thumbnail | Integrated revised draft; final world/32px acceptance pending. |
+| Gravity well | Dark core and bent nested traces, matching thumbnail | Integrated distinct draft; final world/32px acceptance pending. |
+| Debris | Jagged disconnected manufactured hull fragments, matching thumbnail | Provisional local art. Rounded intact-pod Meshy candidate rejected as production replacement. |
+| Radiation | Mint/gold streaks and particles on dark carriers, matching thumbnail | Integrated draft; low-resolution contrast and final world acceptance pending. |
+
+Functional HUD checkpoint62e392c passes418 combined tests. No known failing
+automated travel/workspace/scan test remains. Actual portrait production end-to-end
+play and iOS are not verified; desktop/phone Storybook bounds are not equivalent.
+Legacy broader action inventory and renderer-unavailable behavior still need
+manual integration review. Remote play is blocked by the unconfigured approved
+HTTPS route, emulator identity mismatch and pending exposure/identity decision.

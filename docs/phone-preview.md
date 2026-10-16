@@ -76,3 +76,71 @@ travel and reconnect; no browser request targets localhost on his phone; and
 private service/admin routes remain unreachable. Stop and remove the temporary
 endpoint after testing. The [project checklist](../.scratch/weekend-visual-batch/status.md)
 tracks approval and operational state; [HUD acceptance](hud.md) tracks usability.
+
+## Action-time audit — 2026-10-16
+
+- Installed `/opt/homebrew/bin/ngrok`, version **3.39.6**; `ngrok config check`
+  validates the existing configuration. An authtoken is configured, but its
+  validity/account entitlement has not been tested by connecting an agent.
+  Dashboard navigation reaches login, so account plan, quota and billing remain
+  unverified. No login, new grant or tunnel was created during this audit.
+- Published free entitlement includes HTTPS, five policy rules and three monthly
+  OAuth identities. Managed Google OAuth plus exact-email denial needs no new
+  OAuth client secret. This fits published free capabilities, but is not evidence
+  that the existing account can run it without charges. Verify its actual plan
+  before starting; do not upgrade or use a paid endpoint as a fallback.
+- Existing local config disagrees: backend `.env.local` uses `hexaverse-emulator`
+  for Firebase/GCP, while frontend `.env.local` uses `hexaverse-game-dev`.
+  These are configuration files, not a verified process-environment dump. Match
+  the preview's project identity deliberately before login, without migrating or
+  overwriting existing data. Backend config points Auth/Firestore/PubSub to local
+  emulators. Confirm effective connections before exposing any game data.
+- Services currently listen on wildcard addresses at 20200, 20201 and 20211.
+  No ngrok agent inspector listens on 4040. Do not change those existing listeners
+  silently; the added gateway would bind only to loopback and expose one origin.
+
+### Smallest gameplay route
+
+Prefer an existing email/password **test-emulator account** inside the Google
+outer gate. That avoids exposing the emulator's simulated Google identity picker
+or changing Firebase production authorized domains. The proposed gateway map is:
+
+| Public request | Local destination / restriction |
+| --- | --- |
+| App pages and assets | `127.0.0.1:20200`; block development/debug and service-admin surfaces, or serve an isolated local production build configured explicitly for emulators |
+| `/api/v1/…` | Strip `/api`, forward only required game/account route-and-method allowlist to `127.0.0.1:20201`; exclude push, administrative and debug routes |
+| `/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword` | POST only to Auth emulator 20211 |
+| `/identitytoolkit.googleapis.com/v1/accounts:lookup` | POST only to Auth emulator 20211 |
+| `/securetoken.googleapis.com/v1/token` | POST only to Auth emulator 20211 |
+| Other emulator host-prefixed paths, emulator admin/export/import/config/users/UI, Firestore, PubSub | Deny; never fall through to the app |
+
+The three Auth paths are verified SDK code paths, not a completed browser network
+trace. Observe an isolated local sign-in/restore/refresh flow and test the final
+allowlist before enabling exposure. No signup, reset-password, account editing,
+anonymous sign-in or Google emulator popup route is needed for this minimum.
+The SDK strips any path prefix from connectAuthEmulator, so the three exact
+host-prefixed paths must be at the origin root; an `/auth` prefix would fail.
+Production-build emulator support requires an explicit opt-in patch: the present
+Firebase setup enables emulators only in development. A relative `/api` base and
+same-origin HTTPS emulator origin URL also need a reversible patch.
+
+All routes first pass ngrok Google OAuth and an exact approved identity allowlist.
+`wilson.travis.t@gmail.com` is a suggested identity awaiting Travis's approval,
+not an installed access rule. Managed OAuth can ask for basic profile/email
+consent; no Drive/Gmail access is required. Existing ngrok agent token suffices if
+valid; no new API key or persistent grant is needed. Do not bypass a consent screen.
+
+Preserve ngrok session/nonce cookies unchanged and same-origin credentialed API
+requests. Start Google authentication through a top-level page; expired outer
+sessions can return redirects/HTML to fetch/SSE, requiring reauthentication and
+reconnect rather than treating HTML as game JSON. Preserve Firebase bearer tokens.
+SSE must flush immediately, retain 30-second heartbeats, avoid buffering and omit
+query tokens from gateway/inspector logs. Current world polling still needs quota
+monitoring; SSE is not a substitute already wired into that view.
+
+Proposed duration: one foreground 60-minute pilot, then a separately agreed weekend
+cutoff after phone verification. Stop ngrok and gateway processes on cutoff or
+request, confirm the URL no longer reaches the app, and remove only temporary
+preview configuration. Do not install launch agents or background persistence.
+Mac awake/network availability is required; ngrok free endpoints do not expire
+on their own. A weekend-long service is therefore not enabled by a pilot approval.
