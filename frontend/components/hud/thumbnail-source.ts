@@ -58,6 +58,10 @@ export async function renderHudThumbnail(kind: ThumbnailKind, canvas: HTMLCanvas
 
   const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.01, 100)
   camera.position.set(3, 2, -3)
+  // Fractured architecture and detached hull sections need their broad plate
+  // faces in the tiny crop; the low general-purpose angle reduced them to slivers.
+  // Match the elevated gameplay view without altering gate/celestial captures.
+  if (kind === 'ruin' || kind === 'debris') camera.position.set(2.4, 4.2, -3)
   camera.lookAt(0, 0, 0)
   if (feature || kind === 'gate') {
     // Fit the new compositions in camera space so thin silhouettes remain readable

@@ -14,7 +14,7 @@ function FeatureReview({ kind = 'ruin', comparison = false, animate = true, comp
     const scene = new THREE.Scene()
     addPreviewLights(scene)
     const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
-    camera.position.set(0, 3.8, comparison ? 14 : 4.8)
+    camera.position.set(0, compact ? 1.8 : 3.8, comparison ? 14 : compact ? 2.6 : 4.8)
     camera.lookAt(0, 0, 0)
     const models = (comparison ? kinds : [kind]).map((category, index) => {
       const model = createFeatureModel(category, `review-${category}`)
@@ -23,7 +23,7 @@ function FeatureReview({ kind = 'ruin', comparison = false, animate = true, comp
       return model
     })
     return { scene, camera, frame: (_delta, elapsed) => { models.forEach(model => advanceFeatureModel(model, elapsed * 1000)) } }
-  }, [kind, comparison])
+  }, [kind, comparison, compact])
   return <div style={{ background: '#080e19', minHeight: compact ? 0 : '100dvh', color: '#d6e2ef' }}>
     <WebGPUCanvas label={comparison ? 'Feature art comparison' : kind} createScene={createScene} animate={animate} style={{ height: compact ? 380 : '90dvh', width: '100%' }} />
     <p style={{ padding: '0 20px' }}>{comparison ? 'Back row: anomaly · ruin · nebula. Front row: gravity well · debris · radiation.' : kind}</p>
@@ -63,6 +63,19 @@ export const RuinProductionComparison: Story = {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 16, marginTop: 20 }}>
       <section><h2>Local procedural ruin</h2><FeatureReview kind="ruin" animate={false} compact /></section>
       <section><h2>Generated ruin candidate</h2><WebGPUModelView src="/models/space/ruin-candidate.glb" label="Generated ruin candidate" view="three-quarter" style={{ height: 380 }} /></section>
+      <section><h2>Accepted lane gate</h2><WebGPUModelView src="/models/space/lane-gate.glb" label="Accepted open lane gate" animation="Open" progress={1} playing={false} createEffect={createLaneGatePortal} view="three-quarter" style={{ height: 380 }} /></section>
+    </div>
+  </div>,
+}
+
+/** Local authored candidates, shared preview lighting and independent framing. */
+export const ManufacturedFamilyReview: Story = {
+  render: () => <div style={{ background: '#080e19', color: '#d6e2ef', minHeight: '100dvh', padding: 16 }}>
+    <h1 style={{ fontSize: 20, marginBottom: 12 }}>Manufactured family review</h1>
+    <p>Compare the broken architectural spine and detached hull sections against the accepted gate: broad gray armor, graphite structure, sparse amber details and readable negative space.</p>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 16, marginTop: 20 }}>
+      <section><h2>Fractured ruin</h2><FeatureReview kind="ruin" animate={false} compact /></section>
+      <section><h2>Separated hull debris</h2><FeatureReview kind="debris" animate={false} compact /></section>
       <section><h2>Accepted lane gate</h2><WebGPUModelView src="/models/space/lane-gate.glb" label="Accepted open lane gate" animation="Open" progress={1} playing={false} createEffect={createLaneGatePortal} view="three-quarter" style={{ height: 380 }} /></section>
     </div>
   </div>,

@@ -160,3 +160,19 @@ Ruin's tower/slab architecture and debris's overlapping silhouette remain specif
 unfinished work. Local revision steps are documented; Meshy upload is optional and
 still blocked. Protected preview/build remains unchanged during these local edits.
 No comparison image uploaded or published. Entire weekend work is not complete.
+
+## Local manufactured candidates improved
+
+- Ruin now has broken faceted spine/empty sector, three unequal buttresses and
+  detached plate; debris has one dominant hull plus three detached sections.
+- Raised only these two thumbnail capture angles; four separate debris components
+  survive32px (53/18/9/9 pixels at alpha64), with clear gaps. Other13 PNGs unchanged.
+- Added local instance-owned brushed-metal/roughness/bump detail after plain gray
+  looked plastic beside gate. Actual family comparison, dark/light32px, world
+  native/real WebGL2 and gameplay checks performed. Scoped64 tests/type/lint pass.
+- Geometry/readability criteria pass. Final close-view manufactured finish remains
+  incomplete: authored panel wear, fractured edge/cut surfaces and seam detail need
+  dedicated UV/PBR/fracture authoring or an acceptable image-guided replacement.
+  Best local candidates retained; rejected soft/rounded provider candidates unused.
+- Local Manufactured Family Review story only; protected compiled game/Storybook
+  unchanged. No comparison upload/publication, provider spend, push or consent action.

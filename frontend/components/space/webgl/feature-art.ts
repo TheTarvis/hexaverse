@@ -95,7 +95,35 @@ export function createFeatureModel(kind: FeatureArtKind, objectId: string): THRE
   })
 
   if (kind === 'ruin' || kind === 'debris') {
-    const primary = new THREE.MeshStandardMaterial({ color: 0xb6c1c7, roughness: 0.72, metalness: 0.66 })
+    // Instance-owned brushed metal/pitting. Broad plate faces need material
+    // variation at close range as well as geometric seams; plain gray was plastic.
+    const side = 128, surface = new Uint8Array(side * side * 4), relief = new Uint8Array(side * side * 4)
+    const grain = seeded('manufactured-01-brushed-armor')
+    for (let y = 0; y < side; y++) for (let x = 0; x < side; x++) {
+      const p = (y * side + x) * 4
+      const scratch = grain() < 0.018
+      const variation = (grain() - 0.5) * 15 + Math.sin(y * 2.7) * 3 - (scratch ? 36 : 0)
+      surface[p] = 177 + variation
+      surface[p + 1] = 188 + variation
+      surface[p + 2] = 199 + variation
+      surface[p + 3] = 255
+      relief[p] = relief[p + 1] = relief[p + 2] = 180 + variation
+      relief[p + 3] = 255
+    }
+    const armorMap = new THREE.DataTexture(surface, side, side)
+    armorMap.colorSpace = THREE.SRGBColorSpace
+    const armorRelief = new THREE.DataTexture(relief, side, side)
+    for (const texture of [armorMap, armorRelief]) {
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+      texture.magFilter = THREE.LinearFilter
+      texture.minFilter = THREE.LinearFilter
+      texture.needsUpdate = true
+    }
+    const primary = new THREE.MeshStandardMaterial({ color: 0xd0d7dc, map: armorMap,
+      roughness: 0.66, roughnessMap: armorRelief, metalness: 0.72, bumpMap: armorRelief, bumpScale: 0.006,
+      // Restrained neutral fill keeps dead armor readable under the world's
+      // low ambient light; no bloom, animation, warning or powered-energy accent.
+      emissive: 0x52606c, emissiveIntensity: 0.16 })
     const graphite = new THREE.MeshStandardMaterial({ color: 0x29333c, roughness: 0.84, metalness: 0.58 })
     const amber = new THREE.MeshStandardMaterial({ color: 0xc19145, emissive: 0xa96718, emissiveIntensity: 0.3, roughness: 0.55, metalness: 0.45 })
     const plate = (parent: THREE.Object3D, size: [number, number, number], position: [number, number, number], material: THREE.Material) => {
@@ -138,45 +166,84 @@ export function createFeatureModel(kind: FeatureArtKind, objectId: string): THRE
       return section
     }
     if (kind === 'ruin') {
-      // A collapsed architectural spine with uneven, leaning armored buttresses.
-      const foundation = hull(1.05, random())
-      foundation.position.set(-0.08, -0.23, 0)
-      foundation.rotation.set(0.14, -0.25, 0.06)
-      assembly.add(foundation)
-      for (let i = 0; i < 4; i++) {
-        const tower = new THREE.Group()
-        tower.position.set(-0.45 + i * 0.25, -0.02, 0.18 + Math.sin(i * 1.8) * 0.16)
-        tower.rotation.set(-0.1 + i * 0.12, i * 0.22, (i - 1) * 0.17)
-        const height = i === 1 ? 0.7 : 0.28 + random() * 0.22
-        plate(tower, [0.16, height, 0.22], [0, height * 0.4, 0], graphite)
-        const armor = hull(0.38 + random() * 0.12, random())
-        armor.rotation.z = Math.PI / 2 - 0.14
-        armor.position.set(-0.04, height * 0.45, 0)
-        tower.add(armor)
-        const crown = hull(0.35, random())
-        crown.rotation.set(i * 0.17, 0.2, (i - 1) * 0.25)
-        crown.position.y = height
-        tower.add(crown)
-        // Exposed snapped reinforcement extends irregularly above broken armor.
-        for (let j = 0; j < 2; j++) {
-          const strut = plate(tower, [0.028, height * 0.4, 0.045], [-0.065 + j * 0.12, height * 0.95, 0.05], graphite)
-          strut.rotation.z = (random() - 0.5) * 0.8
+      // One broken, faceted structural spine rather than towers on a floor slab.
+      // The missing sector and empty center survive the HUD crop. No portal or
+      // bilateral halves: this is an abandoned assembly, not another lane gate.
+      const sector = (start: number, end: number, inner: number, outer: number, depth: number, material: THREE.Material | THREE.Material[]) => {
+        const shape = new THREE.Shape()
+        const points: [number, number][] = []
+        for (let i = 0; i <= 8; i++) {
+          const angle = start + (end - start) * i / 8
+          points.push([Math.cos(angle) * outer, Math.sin(angle) * outer])
         }
-        assembly.add(tower)
+        // Staggered torn ends expose the underlying frame at both breaks.
+        points.push([Math.cos(end - 0.04) * (inner + 0.035), Math.sin(end - 0.04) * (inner + 0.035)])
+        for (let i = 8; i >= 0; i--) {
+          const angle = start + (end - start) * i / 8
+          points.push([Math.cos(angle) * inner, Math.sin(angle) * inner])
+        }
+        shape.moveTo(...points[0]!)
+        for (const point of points.slice(1)) shape.lineTo(...point)
+        shape.closePath()
+        const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelSize: 0.012, bevelThickness: 0.012, bevelSegments: 1, steps: 1 })
+        geometry.rotateX(-Math.PI / 2)
+        return new THREE.Mesh(geometry, material)
       }
-      const fallen = hull(0.52, random())
-      fallen.position.set(0.36, -0.1, -0.35)
-      fallen.rotation.set(0.25, 0.8, -0.3)
+      const spine = sector(0.03 * Math.PI, 1.36 * Math.PI, 0.57, 0.78, 0.14, graphite)
+      assembly.add(spine)
+      for (let i = 0; i < 5; i++) {
+        const start = (0.04 + i * 0.265) * Math.PI
+        const armor = sector(start, start + (0.22 + random() * 0.015) * Math.PI, 0.58, 0.81 + random() * 0.025, 0.055, [primary, graphite])
+        armor.position.y = 0.145
+        assembly.add(armor)
+        const seam = sector(start + 0.10, start + 0.13, 0.60, 0.79, 0.012, graphite)
+        seam.position.y = 0.215
+        assembly.add(seam)
+      }
+      for (let i = 0; i < 3; i++) {
+        const angle = [0.17, 0.67, 1.19][i]! * Math.PI
+        const height = [0.29, 0.56, 0.35][i]! + random() * 0.025
+        const shape = new THREE.Shape()
+        shape.moveTo(-0.19, 0)
+        shape.lineTo(0.29, 0)
+        shape.lineTo(0.13, height * 0.76)
+        shape.lineTo(0.05, height * 0.71)
+        shape.lineTo(0.01, height)
+        shape.lineTo(-0.07, height * 0.94)
+        shape.closePath()
+        const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.12, bevelEnabled: true, bevelSize: 0.018, bevelThickness: 0.014, bevelSegments: 2, steps: 1 })
+        const buttress = new THREE.Group()
+        buttress.position.set(Math.cos(angle) * 0.73, 0.18, -Math.sin(angle) * 0.73)
+        buttress.rotation.set(0, angle, i === 1 ? 0.23 : -0.07)
+        buttress.add(new THREE.Mesh(geometry, graphite))
+        const armor = new THREE.Mesh(geometry.clone(), [primary, graphite])
+        armor.scale.set(0.82, 0.88, 0.27)
+        armor.position.set(0.012, 0.025, 0.13)
+        buttress.add(armor)
+        plate(buttress, [0.045, height * 0.72, 0.028], [-0.025, height * 0.4, 0.18], graphite)
+        plate(buttress, [0.065, 0.025, 0.02], [0.10, 0.06, 0.18], amber)
+        const snapped = plate(buttress, [0.026, 0.15, 0.032], [-0.04, height + 0.015, 0.03], graphite)
+        snapped.rotation.z = i === 1 ? -0.35 : 0.21
+        assembly.add(buttress)
+      }
+      const fallen = hull(0.27, random())
+      fallen.position.set(0.57, 0.12, 0.56)
+      fallen.rotation.set(0.28, 0.8, -0.3)
       assembly.add(fallen)
-      assembly.rotation.y = 0.4
+      assembly.rotation.y = 0.12
     } else {
-      // A few substantial torn hull sections make a cohesive wreckage cluster.
-      for (let i = 0; i < 6; i++) {
-        const section = hull(i === 0 ? 0.82 : 0.38 + random() * 0.18, random())
-        const angle = i * 2.399
-        const radius = i === 0 ? 0 : 0.38 + random() * 0.12
-        section.position.set(Math.cos(angle) * radius, (random() - 0.5) * 0.28, Math.sin(angle) * radius)
-        section.rotation.set((random() - 0.5) * 0.9, angle, (random() - 0.5) * 0.6)
+      // Separate substantial hull sections; bounded seeded offsets preserve the
+      // authored negative spaces instead of collapsing into a compact plate pile.
+      const fragments = [
+        { size: 0.78, x: -0.18, y: 0.04, z: -0.12, yaw: 0.28, roll: 0.12 },
+        { size: 0.42, x: 0.80, y: 0.05, z: 0.0, yaw: -0.65, roll: -0.18 },
+        { size: 0.35, x: -0.50, y: 0.14, z: 0.75, yaw: 1.45, roll: 0.32 },
+        { size: 0.30, x: -0.60, y: -0.08, z: -0.80, yaw: -0.9, roll: -0.24 },
+      ]
+      for (const pose of fragments) {
+        const section = hull(pose.size, random())
+        section.position.set(pose.x + (random() - 0.5) * 0.035, pose.y, pose.z + (random() - 0.5) * 0.035)
+        section.rotation.set(0.12, pose.yaw, pose.roll)
         assembly.add(section)
       }
     }
