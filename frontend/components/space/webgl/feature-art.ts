@@ -74,17 +74,17 @@ export function createFeatureModel(kind: FeatureArtKind, objectId: string): THRE
     pulse(material)
     return sprite
   }
-  const trace = (parent: THREE.Object3D, points: THREE.Vector3[], color: number, opacity: number, width = 0) => {
+  const trace = (parent: THREE.Object3D, points: THREE.Vector3[], color: number, opacity: number, width = 0, blending: THREE.Blending = THREE.AdditiveBlending) => {
     if (width) {
       const curve = new THREE.CatmullRomCurve3(points)
       const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false,
-        blending: THREE.AdditiveBlending, toneMapped: false })
+        blending, toneMapped: false })
       const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, points.length * 2, width, 4, false), material)
       parent.add(mesh)
       pulse(material)
     } else {
       const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false,
-        blending: THREE.AdditiveBlending, toneMapped: false })
+        blending, toneMapped: false })
       parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material))
       pulse(material)
     }
@@ -186,7 +186,11 @@ export function createFeatureModel(kind: FeatureArtKind, objectId: string): THRE
       const echo = new THREE.Group()
       echo.position.set((random() - 0.5) * 0.18, (random() - 0.5) * 0.22, (random() - 0.5) * 0.18)
       echo.rotation.set(i * 0.34, i * 1.7, i * 0.2)
-      trace(echo, arc(0.5 + i * 0.06, random() * 6, Math.PI * (0.8 + random() * 0.45)), i % 2 ? 0xe6d9ff : 0x9b7bd4, 0.8, 0.012)
+      const points = arc(0.5 + i * 0.06, random() * 6, Math.PI * (0.8 + random() * 0.45))
+      // Violet carriers preserve the broken halo on light HUD surfaces, while
+      // the narrower luminous traces remain legible against dark world space.
+      trace(echo, points, 0x50366e, 0.85, 0.025, THREE.NormalBlending)
+      trace(echo, points, i % 2 ? 0xe6d9ff : 0x9b7bd4, 0.8, 0.012)
       assembly.add(echo)
       animate(echo, 'y', (i % 2 ? -1 : 1) * 0.035)
     }
@@ -211,7 +215,9 @@ export function createFeatureModel(kind: FeatureArtKind, objectId: string): THRE
       const radius = 0.32 + i * 0.085
       const points = arc(radius, 0.1 + i * 0.05, Math.PI * 1.92, 0.6)
       for (const p of points) p.y += Math.exp(-Math.hypot(p.x, p.z) * 3) * -0.65
-      trace(field, points, i % 2 ? 0x7199cb : 0xadc4e0, 0.35 + (6 - i) * 0.06, i === 1 ? 0.012 : 0)
+      // Two substantial nested traces survive the 32px crop on dark panels;
+      // the other fine traces retain the broad, flattened lens silhouette.
+      trace(field, points, i % 2 ? 0x7199cb : 0xadc4e0, 0.48 + (6 - i) * 0.055, i === 1 ? 0.018 : i === 3 ? 0.011 : 0)
     }
     animate(field, 'y', 0.018)
   } else {

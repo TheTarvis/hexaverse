@@ -147,3 +147,16 @@ Meshy private reference upload remains separately unapproved.
 - Bootstrap audit45 resources passes; API401 and invalid login/lookup/refresh JSON400
   confirm narrow routing. No further public paths added. Valid remote game login and
   token refresh still require actual user verification; no session cookie reused.
+
+## Local art completion decision
+
+See acceptance.md for explicit criteria, completed/remaining matrix and testable
+next steps. Gate thumbnail, anomaly, nebula, gravity well and radiation now pass
+the delegated art brief; this is an agent art decision, not personal Travis approval.
+Anomaly light-surface halo and gravity dark-surface lens strengthened locally.
+Feature-art20 tests, type/lint, native/WebGL2 world and actual32px reviews pass.
+Only those two PNGs changed; other13, including accepted gate, are unchanged.
+Ruin's tower/slab architecture and debris's overlapping silhouette remain specific
+unfinished work. Local revision steps are documented; Meshy upload is optional and
+still blocked. Protected preview/build remains unchanged during these local edits.
+No comparison image uploaded or published. Entire weekend work is not complete.
