@@ -25,3 +25,6 @@
 
 .root [data-testid='vitals-strip'] { background: #08121df2; color: var(--command-ink); border-color: #76e3ef30; }
 .root [data-testid='vitals-strip'] [data-testid='vitals-fleet-cell'] { color: var(--command-ink); }
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .theme[role='menu'] button { min-height: 44px; }
+}

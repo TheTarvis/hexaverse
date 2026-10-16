@@ -232,3 +232,22 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Mac must remain logged in, awake and connected; backend/emulators and ngrok
   quotas remain dependencies. iOS SSO is now user-validated; persistence/refresh
   and gameplay checks remain unverified. See phone-preview.md.
+
+
+## Requested mobile system correction delivered
+
+- Inspected Travis's Library screenshot IMG_1020.png: overlapping heading/launchers,
+  clipped recovery card/close control, objective/action overlap and bottom HUD overflow.
+- Shared responsive bands, bounded scrollable guide body with reachable actions,
+  safe-area/device viewport, wrapped/truncated fleet metrics and collapsible active
+  drawer. Landscape settings close verified44×44 inside viewport.
+- Chrome extension browser, local identity-free HUD/Mobile System fixture:375×667,
+  390×844,667×375,844×390 have scrollWidth===viewport width. Guide progression/dismiss,
+  panel switching/draft retention, settings scroll/reset/close, map selection and
+  fleet/account menus verified. Desktop1440×900 inspected. Physical iOS retest pending.
+- 204 distinct relevant tests pass; typecheck, scoped lint, validators and production
+  build pass. Root preview updated only with requested mobile fixes and prior login;
+  all57 public assets byte-identical, static Storybook/art unchanged. No Meshy/push.
+- Same launchd service, exact Google email policy and Oct19 00UTC cutoff; all owned
+  groups including tunnel still stopped by deadline supervision. No extra approval
+  needed for this same-access mobile update; no identity/account action performed.

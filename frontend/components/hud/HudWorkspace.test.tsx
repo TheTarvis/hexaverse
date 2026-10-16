@@ -162,3 +162,17 @@ it('does not steal focus moved elsewhere between a request and passive effect fl
   expect(screen.getByRole('button', { name: 'Console' })).toHaveAttribute('aria-pressed', 'true')
   expect(screen.getByLabelText('Console draft')).toBeVisible()
 })
+
+it('collapses the active phone drawer without hiding the panel or losing its draft', () => {
+  render(<HudWorkspace corporationId="one" panels={panels} />)
+  const draft = screen.getByLabelText('Object search')
+  fireEvent.change(draft, { target: { value: 'Retain this search' } })
+  fireEvent.click(screen.getByRole('button', { name: /^Objects$/ }))
+  expect(screen.getByRole('button', { name: /^Objects$/ })).toHaveAttribute('aria-pressed', 'false')
+  expect(screen.getByRole('region', { name: 'Objects panel' })).toHaveAttribute('data-mobile-active', 'false')
+  expect(screen.getByRole('region', { name: 'Objects panel' })).not.toHaveAttribute('hidden')
+  fireEvent.click(screen.getByRole('button', { name: /^Objects$/ }))
+  expect(screen.getByRole('region', { name: 'Objects panel' })).toHaveAttribute('data-mobile-active', 'true')
+  expect(draft).toHaveValue('Retain this search')
+  expect(window.localStorage.setItem).not.toHaveBeenCalled()
+})

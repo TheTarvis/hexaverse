@@ -56,7 +56,7 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
   const requestSequence = request?.sequence
   const known = layout.filter(item => panels.some(panel => panel.id === item.id))
   const visible = known.filter(item => item.visible)
-  const activeId = visible.some(item => item.id === active) ? active : visible[0]?.id
+  const activeId = active === null ? null : visible.some(item => item.id === active) ? active : visible[0]?.id
 
   useEffect(() => {
     try { setLayout(readLayout(window.localStorage.getItem(storageKey))) }
@@ -135,7 +135,7 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
       <div className={styles.launchers} aria-label="HUD panels">
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
-          return <Button key={item.id} plain disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setActive(item.id) }}>{panel.label}{!item.visible ? ' (hidden)' : ''}</Button>
+          return <Button key={item.id} plain disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setActive(item.visible && activeId === item.id ? null : item.id) }}>{panel.label}{!item.visible ? ' (hidden)' : ''}</Button>
         })}
       </div>
     </div>

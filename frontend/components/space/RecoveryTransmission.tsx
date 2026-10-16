@@ -50,8 +50,11 @@ export function RecoveryTransmission({ guide, fleet, bodies, station = null, sta
 
   return <aside className={styles.transmission} aria-label="Recovery transmission" data-testid="recovery-transmission" data-phase={guide.phase}>
     <div className={styles.signal}><span>⌁ RECOVERY SIGNAL</span><Button plain data-testid="dismiss-guide" aria-label="Dismiss startup guide" onClick={() => onSave({ ...guide, phase: 'dismissed' })}>×</Button></div>
+    <div className={styles.transmissionBody}>
     <p role="status" aria-live="polite" data-testid="recovery-copy">{copy}</p>
     <ol className={styles.checks} aria-label="Startup checks"><li data-testid="live-motor-check">{motorDone ? '✓ Confirmed' : '01 Pending'} · Motor function</li><li data-testid="live-mining-check">{miningDone ? '✓ Confirmed' : '02 Pending'} · Mining function</li><li data-testid="live-fuel-check">{guide.phase === 'done' ? '✓ Confirmed' : '03 Pending'} · Refuelling</li></ol>
+    </div>
+    <div className={styles.transmissionActions}>
     {guide.phase === 'wake' && <Button color="cyan" data-testid="begin-guide" onClick={() => onSave({ ...guide, phase: 'objects', targetId: null })}>Begin systems check</Button>}
     {guide.phase === 'objects' && <Button color="cyan" data-testid="guide-objects" onClick={onObjects}>Open Objects panel</Button>}
     {guide.phase === 'station' && <Button color="cyan" data-testid="guide-introduce-scan" onClick={() => onSave({ ...guide, phase: 'scan', stationId: station?.featureId ?? guide.stationId })}>Check sensors</Button>}
@@ -62,6 +65,7 @@ export function RecoveryTransmission({ guide, fleet, bodies, station = null, sta
     {guide.phase === 'extraction' && actionFailed && <Button color="cyan" data-testid="guide-retry" onClick={onRetryAction}>Retry extraction report</Button>}
     {['return', 'returning', 'sell', 'refuel'].includes(guide.phase) && !stationUnavailable && station && <Button color="cyan" data-testid="guide-station" onClick={() => { onSave({ ...guide, stationId: station.featureId }); onTarget(station.featureId) }}>Select station {station.featureId}</Button>}
     {guide.phase === 'done' && <Button color="cyan" data-testid="finish-guide" onClick={() => onSave({ ...guide, phase: 'dismissed' })}>Command network online</Button>}
+    </div>
     <small>Guide progress is saved in this browser.</small>
   </aside>
 }

@@ -426,3 +426,25 @@ account-creation result or broader gameplay acceptance are inferred.
 
 This documentation-only checkpoint leaves the running services, published artifacts,
 exact Google email restriction and `2026-10-19T00:00:00Z` cutoff unchanged.
+
+
+## Mobile system layout update — 2026-10-16
+
+Travis requested a mobile correction after his actual iOS screenshot. The protected
+frontend now includes the requested responsive HUD/onboarding fixes, device-width
+viewport and safe-area handling. This is a same-origin frontend update within the
+existing authorization: no route, identity restriction, permission or expiry expansion
+was needed. The supervisor still terminates all owned groups, including ngrok, at
+`2026-10-19T00:00:00Z` with the existing termination grace period.
+
+Source pointer: `/tmp/hexaverse-mobile-preview-root.txt`; provenance is recorded in
+that source's `preview-source.json`. It uses b0f42be plus approved login and mobile
+layout files. All57 public asset files are byte-identical to the prior SSO preview;
+no newer local art or comparison image was published. Static protected Storybook
+is unchanged. Temporary launchd supervision was reloaded to change only frontend
+source/build pins; gateway and ngrok policy/command/deadline remain unchanged.
+
+Chrome identity-free HUD fixture checks and204 distinct relevant tests pass; see
+[hud.md](hud.md) for dimensions, actions and limits. Actual iPhone visual retest is
+still pending. No identity was selected or account created during implementation;
+Travis's earlier actual iOS SSO success remains a separate confirmed checkpoint.

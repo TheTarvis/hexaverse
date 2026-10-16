@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Providers } from '@/components/providers'
 import { LayoutWrapper } from '@/components/layout-wrapper'
@@ -9,6 +9,9 @@ const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
 })
+
+// Keep device width/zoom and expose iOS safe-area insets to the full-screen HUD.
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover' }
 
 export const metadata: Metadata = {
   title: 'Hexaverse',

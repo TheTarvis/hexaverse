@@ -25,11 +25,14 @@ import styles from './floating-nav.module.css'
 export function FloatingNav() {
   const pathname = usePathname()
   const { user, account, signOut } = useAccountContext()
-  const [accountOpen, setAccountOpen] = useState(false)
   if (!user) return null
 
-  const onGalaxy = pathname === '/'
+  return <FloatingNavFrame onGalaxy={pathname === '/'} email={account?.email ?? user.email} onSignOut={signOut} />
+}
 
+/** Shared presentation for the live chrome and identity-free responsive fixtures. */
+export function FloatingNavFrame({ onGalaxy, email, onSignOut }: { onGalaxy: boolean; email: string | null; onSignOut: () => void }) {
+  const [accountOpen, setAccountOpen] = useState(false)
   return (
     <HudPanel as="div" tone="navigation" className={`fixed ${CONSOLE_DOCK_LANE_LEFT_CENTER} left-4 z-50 flex flex-col gap-1.5 p-3 ${styles.navigation}`} data-testid="floating-nav">
       <Link
@@ -43,11 +46,11 @@ export function FloatingNav() {
       <Button plain className={styles.accountToggle} aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>Account</Button>
       <div data-open={accountOpen} className={`mt-1 flex items-center gap-3 border-t border-zinc-200 pt-2 dark:border-zinc-800/50 ${styles.account}`}>
         <span className="max-w-[12rem] truncate text-xs text-zinc-300">
-          {account?.email ?? user.email}
+          {email}
         </span>
         <Button
           plain
-          onClick={() => signOut()}
+          onClick={onSignOut}
           data-testid="sign-out-button"
           className="!text-xs !text-white"
         >

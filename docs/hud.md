@@ -86,3 +86,49 @@ Future stealth/combat controls consume server-disclosed information through exis
 ownership boundaries. [Sensors and stealth](domains/sensors-and-stealth.md) records deferred
 concepts; HUD arrangement must not expose absent entities, identify anonymous
 contacts or turn historical positions into live tracks.
+
+
+## iOS layout correction — 2026-10-16
+
+Travis's actual iOS screenshot exposed header/launcher overlap, an offscreen recovery
+briefing, objective/action collisions and overflowing bottom controls. Mobile system
+HUD now budgets shared heading, toolbar, active drawer and navigation/vitals bands
+inside100dvh, with device viewport and safe-area insets. Recovery copy scrolls between
+reachable dismissal/action controls; its objective has a separate row. One phone
+panel is visible at a time; tapping its active launcher collapses it without losing
+drafts or preferences, restoring map input. Landscape uses a shorter toolbar/vitals
+budget. Long fleet/status text wraps or truncates within constrained grid tracks.
+
+Local Chrome extension-browser checks used the identity-free `HUD/Mobile System`
+Storybook fixture, built from the live HUD/recovery/vitals/navigation components.
+375×667,390×844,667×375 and844×390 all had document width equal to viewport width.
+Dismissal, guide progression, Objects/Command/Console switching, retained console
+text, settings scroll/reset/close, fleet/account menus and map-selection hit testing
+passed. Briefing controls and landscape settings close were measured44×44; desktop
+1440×900 rendering was also inspected. This is viewport emulation, not iOS rendering
+or physical touch/keyboard/Safari-chrome verification. Actual iPhone visual retest
+remains pending; successful iOS emulator SSO was separately confirmed earlier.
+
+204 distinct relevant component/integration tests pass, plus TypeScript, scoped
+lint, file validators and an isolated production build. Protected preview was updated
+with only these mobile fixes and prior approved login changes over b0f42be; all57
+public asset files are byte-identical to the previous published-art build. Static
+protected Storybook is unchanged; the new fixture remains local. See
+[preview operations](phone-preview.md) for unchanged email restriction and cutoff.
+
+
+Measured after-fix portrait bands at375×667 (CSS pixels):
+
+| Surface | Top | Height | Result |
+| --- | ---: | ---: | --- |
+| Objective | 200 | 45.5 | Separate from briefing/actions |
+| Recovery briefing | 253.5 | 202 | Fits above navigation |
+| Navigation | 475 | 48 | No vitals overlap |
+| Vitals | 523 | 144 | Ends at viewport foot |
+
+Before: the supplied iOS image clips the briefing close/text at the right edge and
+places the objective over the primary action; the local Chrome baseline also showed
+heading/launcher and briefing/panel overlap. After: local screenshots and DOM hit
+tests show separate bands and reachable controls. Chrome fixtures cannot certify
+Safari browser-chrome/safe-area behavior; that remains the concrete device retest.
+The local fixture is `http://127.0.0.1:20203/iframe.html?id=hud-mobile-system--onboarding&viewMode=story`.

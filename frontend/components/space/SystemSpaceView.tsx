@@ -1214,6 +1214,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         )}
       </div>
 
+      <div className={commandStyles.guideLayer}>
       {guiding && guide && acting && !dock.expanded && !(discoveryStarted && !interiorFailed) && (
         <RecoveryTransmission
           guide={guide}
@@ -1231,6 +1232,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
       )}
       {guiding && guide && <aside className={commandStyles.objectiveCard} aria-label="Current objective"><span className={commandStyles.signal}>CURRENT OBJECTIVE</span><p role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</p></aside>}
+      </div>
       <HudWorkspace
         corporationId={corporation?.id ?? sessionCorporation?.id ?? 'unavailable'}
         className={commandStyles.workspace}
