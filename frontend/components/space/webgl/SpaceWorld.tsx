@@ -41,6 +41,7 @@ import { TAN_HALF_FOV, MARK_FLOOR_DIV, drawRadiusFor } from '../space-projection
 import type { SceneMark, SceneModel } from '../space-scene'
 import type { SpaceFrame } from '../space-transform-loop'
 import { createSpacecraftModel, loadSpacecraftAsset, type SpacecraftKind } from './spacecraft-art'
+import { advanceLaneGatePortal, createLaneGateModel, loadLaneGateAsset } from './lane-gate-art'
 import { advancePlanetClouds, createPlanetModel, planetKind, createHexGrid, createBackdropMaterial } from './scene-art'
 
 import { createRendererOwner } from '@/components/render-guard/renderer-owner'
@@ -343,10 +344,13 @@ export function SpaceWorld({
     const meshes = new Map<string, MarkEntry>()
     const stars = new Map<THREE.Mesh, StarModel>()
     let rendererLive = true
-    const assets = new Map<SpacecraftKind, Promise<THREE.Group | null>>()
-    const sources = new Map<SpacecraftKind, THREE.Group>()
-    const spacecraftKind = (mark: SceneMark): SpacecraftKind | null =>
-      mark.kind === 'fleet' ? 'ship' : mark.kind === 'body' && mark.bodyType === 'station' ? 'station' : null
+    type ModelKind = SpacecraftKind | 'gate'
+    const assets = new Map<ModelKind, Promise<THREE.Group | null>>()
+    const sources = new Map<ModelKind, THREE.Group>()
+    const modelKindOf = (mark: SceneMark): ModelKind | null =>
+      mark.kind === 'gate' ? 'gate' : mark.kind === 'fleet' ? 'ship' : mark.kind === 'body' && mark.bodyType === 'station' ? 'station' : null
+    const createModel = (kind: ModelKind, tint: number, source?: THREE.Group) =>
+      kind === 'gate' ? createLaneGateModel(source) : createSpacecraftModel(kind, tint, source)
     const lines: THREE.Line[] = []
     /** Decorative streaks rebuilt every frame: the path ahead, drift headings. */
     const streaks: THREE.Line[] = []
@@ -397,8 +401,8 @@ export function SpaceWorld({
           new THREE.MeshBasicMaterial({ color: tint, wireframe: true, transparent: true, opacity: 0.8 }),
         )
       }
-      const modelKind = spacecraftKind(mark)
-      if (modelKind) return createSpacecraftModel(modelKind, tint, sources.get(modelKind))
+      const modelKind = modelKindOf(mark)
+      if (modelKind) return createModel(modelKind, tint, sources.get(modelKind))
       // Anonymous contacts never inherit incidental served body decoration.
       if (mark.kind === 'contact') {
         const mesh = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({ color: tint }))
@@ -517,17 +521,17 @@ export function SpaceWorld({
             world.children.splice(world.children.indexOf(entry.mesh), 1)
             world.children.splice(previousIndex, 0, entry.mesh)
           }
-          const modelKind = spacecraftKind(mark)
+          const modelKind = modelKindOf(mark)
           if (modelKind && !sources.has(modelKind)) {
             let pending = assets.get(modelKind)
             if (!pending) {
-              pending = loadSpacecraftAsset(modelKind).then(source => {
+              pending = (modelKind === 'gate' ? loadLaneGateAsset() : loadSpacecraftAsset(modelKind)).then(source => {
                 if (!rendererLive) { disposeResources(source, true, true); return null }
                 // Decode success does not imply usable geometry. Validate the same
                 // normalization path before publishing a source to synchronous
                 // appearance rebuilds; a bad source becomes a cached failure.
                 try {
-                  const probe = createSpacecraftModel(modelKind, tintOf(mark), source)
+                  const probe = createModel(modelKind, tintOf(mark), source)
                   disposeMesh(probe)
                 } catch {
                   disposeResources(source, true, true)
@@ -542,7 +546,7 @@ export function SpaceWorld({
             void pending.then(source => {
               if (!source || !rendererLive || meshes.get(mark.id) !== subscribed) return
               let replacement: THREE.Mesh
-              try { replacement = createSpacecraftModel(modelKind, tintOf(mark), source) }
+              try { replacement = createModel(modelKind, tintOf(mark), source) }
               catch { return } // A decoded but unusable model retains its fallback.
               replacement.position.copy(subscribed.mesh.position)
               replacement.scale.copy(subscribed.mesh.scale)
@@ -561,6 +565,7 @@ export function SpaceWorld({
         mesh.position.set(mark.position.x, mark.position.y, mark.position.z)
         const size = drawRadiusOf(mark)
         mesh.scale.setScalar(size)
+        if (mark.kind === 'gate') advanceLaneGatePortal(mesh, liveScene.decorativeTimeMs)
         if (cloudIds.has(mark.id)) advancePlanetClouds(mesh, cloudDelta)
         if (mark.kind === 'star') {
           if (cloudDelta > 0) stars.get(mesh)?.advance(cloudDelta)

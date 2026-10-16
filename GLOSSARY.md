@@ -23,6 +23,7 @@
 | Sweep | Area sensor search for hidden or unresolved objects. |
 | Analyze | Targeted examination that establishes a detected object's category and reveals more detailed information about it. |
 | Unresolved contact | Detected presence that has not yet been analyzed. |
+| Anomaly | An unexplained discovery awaiting analysis; it may prove to be a ship, an ancient artifact, an unusual physical phenomenon or something else. |
 | Stealth | Cat-and-mouse concealment in which a fleet's burns and scans expose its presence, while scanning a contact reveals more about it. |
 | Station | Dockable trading venue, distinct from mineable interior features. |
 | Credits | Corporation balance mutated through an idempotent transaction ledger. |

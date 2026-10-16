@@ -75,7 +75,7 @@ after production changes. Keep old references and prompt records intact.
 | --- | --- | --- |
 | Spacecraft (`utility-ship.glb`) | Existing asset; compatibility with the new shared direction unreviewed | Compare palette, materials and architecture with gate D; revise as needed |
 | Station (`orbital-station.glb`) | Existing asset; compatibility with the new shared direction unreviewed | Same family review; silhouette remains revisable |
-| Lane gate | D selected; concept uses revision 1 palette/art style | Refine geometry and opening motion, then review live-scene and HUD production |
+| Lane gate | Round 07 model, separate portal and integrated world appearance accepted with current textures | Render/review HUD thumbnail; revisit shared material roles and textures during family alignment |
 
 ## Design-session checkpoint
 

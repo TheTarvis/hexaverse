@@ -1,5 +1,7 @@
 # Lane gate design
 
+Status: model, portal effect and world appearance accepted. HUD thumbnail outstanding.
+
 ## Brief
 
 - Purpose: recognize a manufactured gateway to a subspace lane, distinct from ships, stations and hazards.
@@ -7,7 +9,7 @@
 - Nature: manufactured structure. Travis intends players to spend resources to build gates. This is design intent, not a claim that construction gameplay is implemented.
 - Style profile: [manufactured-01, revision 1](../../docs/art-direction.md), shared with the current spacecraft and station. The shared profile owns palette/material and family architecture decisions; this record owns gate geometry and motion.
 - Visual anchors: D's folding-lens direction; round 01's color palette and rendered industrial art style are accepted and recorded in the shared profile.
-- Open choices: final panel proportions/detail, opening travel, wormhole appearance and thumbnail simplifications.
+- Current model, opening width and portal appearance are accepted. HUD thumbnail simplifications remain open; shared texture alignment is deferred to the family material pass.
 - Fixed choices: manufactured and player-buildable; designed for both destinations; original D's broad metallic panel identity. Current direction is two independent synchronized rigid halves with minimal plumbing and no connecting chassis/hub.
 - Builders' identity, resource types/costs, gate mechanics and construction rules remain unspecified.
 
@@ -126,8 +128,9 @@ Travis: “no clue what i want it to look like yet the world is our oyster i'd l
   retains source scripts, models, screenshots and review records. Extract into
   `.scratch/hud-components/` to restore their original relative paths.
 - Production budget: 35 of 50 Meshy credits spent, 15 remain.
-- Next review should prioritize intended gameplay scale and the original model's
-  realism/depth. Runtime/HUD acceptance, world integration and portal effect remain open.
+- Model, portal effect and integrated world appearance are accepted following
+  world integration 13. The HUD thumbnail remains outstanding; shared texture
+  alignment is deferred to a family material pass.
 
 ## Portal field 11–12
 
@@ -144,3 +147,41 @@ Travis: “no clue what i want it to look like yet the world is our oyster i'd l
   Shared canvas/resource tests pass (6); lint and TypeScript checks pass.
 - This is a Storybook visual checkpoint, not world integration. No Meshy credits
   spent. Shared style remains manufactured-01 revision 1.
+
+
+## World integration 13
+
+- Travis accepted the current model and portal as good enough for now and
+  authorized world integration. Keep round 07's generated textures for this pass.
+- The world now loads `lane-gate.glb` through the same cached, stale-safe asset
+  lifecycle as ships and stations, replacing the octahedron after loading.
+  Failed loads retain a simple gate marker. Each instance owns its GPU resources.
+- Hardware uses the fully open `Open` pose; the separate portal uses the same
+  progress of 1. Served gates have no opening state, so gameplay triggers and
+  opening/closing transitions remain unspecified.
+- The aperture faces above the ecliptic for readability in the system camera.
+  This is illustrative orientation, not a new physical traversal rule.
+- Portal surface animation follows published decorative time and freezes under
+  reduced motion; served positions and selection continue normally.
+- Review the actual world renderer at Graphics / World Gate / Gameplay Scale
+  and Close in Storybook. Original model-review stories remain available.
+- HUD thumbnail generation/acceptance remains outstanding. Shared material-role
+  recoloring and a family texture pass remain future work; no new textures or
+  Meshy credits are needed for this integration.
+
+- Verification: 54 world-renderer tests pass, including gate loading, shared-load
+  reuse, full-open pose, selection/position preservation, decorative-time freeze,
+  stale completion, failed loads and disposal. TypeScript and scoped ESLint pass.
+  Browser review at gameplay and close scales passed in WebGL compatibility mode
+  with no page/console errors; headless WebGPU screenshots were blank, so native
+  WebGPU appearance remains unverified by this browser run.
+
+
+## Acceptance
+
+- Travis explicitly approved marking lane gate accepted after world integration.
+- Accepted scope: round 07 hardware, current generated textures, opening width,
+  separate blue portal effect and integrated world appearance.
+- The gate model/world visual task is complete. The HUD thumbnail remains a
+  separate unfinished coverage item. Future family material alignment does not
+  block this acceptance or revise the shared style profile.

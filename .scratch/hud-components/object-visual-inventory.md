@@ -10,9 +10,9 @@ appearance as a HUD thumbnail. No new gameplay types are proposed here.
 Manufactured objects currently share the `manufactured-01` profile in
 [shared art direction](../../docs/art-direction.md). The spacecraft and station
 remain revisable; accepted representative thumbnails do not freeze the family's
-architecture. Gate D's simplified two-half concept and color/art style are
-accepted; its generated GLB and opening animation are in Storybook for review.
-World/HUD acceptance remains open. Track family-wide
+architecture. Gate D's simplified two-half concept, generated round 07 model and separate
+portal effect and world appearance are accepted. The model and portal are integrated into the
+world; the HUD thumbnail remains outstanding. Track family-wide
 style changes and affected assets in that shared record.
 
 ## Object categories
@@ -31,7 +31,7 @@ separately served [lane gates](../../frontend/lib/types/system-space.ts), give
 | Gas giant | Procedural surface/cloud model | Accepted representative thumbnail | Additional cosmetic variants remain open. |
 | Ice world | Procedural planet model | Accepted representative thumbnail | No further work for the initial category image. |
 | Moon | Procedural planet model | Accepted representative thumbnail | No further work for the initial category image. |
-| Lane gate | Current scene uses faceted octahedron; new two-half GLB with Open animation available in Storybook Graphics / Model View | Missing; production model under review | Review generated model, material roles and separate wormhole effect; integrate and derive HUD art after acceptance. See [design record](lane-gate-design.md). |
+| Lane gate | Accepted round 07 two-half GLB and separate portal integrated in world; fully open pose, generated textures retained | Model, portal and world appearance accepted; HUD thumbnail missing | Render and review HUD art at 32px. Shared material-role/texture alignment remains future family work. See [design record](lane-gate-design.md). |
 | Anomaly | Generic tinted/translucent scene sphere | Missing | Decide a meaningful abstract visual; current scene primitive is only a reference. |
 | Ruin | Current scene uses a lit sphere | Missing | Select recognizable ruin art. |
 | Nebula | Generic tinted/translucent scene sphere | Missing | Select readable cloud/hazard art. |

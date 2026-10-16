@@ -81,7 +81,7 @@ function mapped(root: THREE.Object3D) {
 }
 async function resolve(index: number, scene = asset()) {
   expect(loading.calls[index], 'One local request for each eligible kind').toBeDefined()
-  await act(async () => { loading.calls[index]!.resolve({ scene }) })
+  await act(async () => { loading.calls[index]!.resolve({ scene, animations: scene.animations }) })
   return scene
 }
 function rings() {
@@ -181,7 +181,7 @@ describe('add-ship-station-models real scene integration', () => {
     for (const spy of disposed) expect(spy).toHaveBeenCalledTimes(1)
     h.scene.marks = [mark('same', 'station')]; await h.step()
     expect(mapped(bodies()[0]!)).toHaveLength(2)
-    expect(loading.calls).toHaveLength(1)
+    expect(loading.calls).toHaveLength(2) // Station and gate each load once.
   })
   it('Selection ring is exclusive while acting fleet positions still advance', async () => {
     const h = await mount([fleet(), { ...mark('station', 'station'), selected: true }], 'own')
@@ -275,4 +275,83 @@ it.each(['ship', 'station'] as const)('Scenario: Missing or invalid asset — de
   expect(loading.calls).toHaveLength(1)
   h.unmount()
   for (const spy of sourceDisposed) expect(spy).toHaveBeenCalledTimes(1)
+})
+
+
+describe('lane gate world integration', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      createImageData: (width: number, height: number) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+      putImageData: vi.fn(),
+    } as unknown as CanvasRenderingContext2D)
+  })
+  const gate = (id: string): SceneMark => ({ ...mark(id, 'gate'), kind: 'gate', selected: id === 'one' })
+  function gateAsset() {
+    const source = asset()
+    source.children[0]!.name = 'LeftHalf'
+    source.children[1]!.name = 'RightHalf'
+    source.animations = [new THREE.AnimationClip('Open', 1, [
+      new THREE.VectorKeyframeTrack('LeftHalf.position', [0, 1], [-1, 0, 0, -3, 0, 0]),
+      new THREE.VectorKeyframeTrack('RightHalf.position', [0, 1], [1, 0, 0, 3, 0, 0]),
+    ])]
+    return source
+  }
+  it('opens hardware and field once per instance, preserves picking scale, freezes decorative time, and owns resources', async () => {
+    const h = await mount([gate('one'), gate('two')])
+    expect(loading.calls.map(call => call.url)).toEqual(['/models/space/lane-gate.glb'])
+    const source = await resolve(0, gateAsset())
+    const originals = watch(source)
+    await h.step()
+    const [one, two] = bodies()
+    expect(bodies()).toHaveLength(2)
+    expect(one!.scale.x).toBe(2 * BODY_DRAW_SCALE)
+    expect(rings()).toHaveLength(1)
+    expect(one!.getObjectByName('LeftHalf')!.position.x).toBe(-3)
+    expect(one!.getObjectByName('RightHalf')!.position.x).toBe(3)
+    expect(source.getObjectByName('LeftHalf')!.position.x).toBe(-1)
+    const portal = one!.getObjectByName('LaneGatePortal')!
+    expect(portal.visible).toBe(true)
+    const filament = portal.children.find(child => child instanceof THREE.Line) as THREE.Line
+    const vertices = () => Array.from(filament.geometry.getAttribute('position').array)
+    const initial = vertices()
+    h.scene.decorativeTimeMs = 1000
+    await h.step()
+    expect(vertices()).not.toEqual(initial)
+    const frozen = vertices()
+    h.scene.positionTimeMs = 2000
+    h.scene.marks = [{ ...gate('one'), position: { x: 70, y: 2, z: -4 } }, gate('two')]
+    await h.step()
+    expect(vertices()).toEqual(frozen)
+    expect(one!.position.toArray()).toEqual([70, 2, -4])
+    const first = watch(one!), second = watch(two!)
+    const fieldResources = portal.children.filter(child => child instanceof THREE.Line).flatMap(child => [
+      vi.spyOn((child as THREE.Line).geometry, 'dispose'),
+      vi.spyOn((child as THREE.Line).material as THREE.Material, 'dispose'),
+    ])
+    h.scene.marks = [gate('two')]
+    await h.step()
+    for (const spy of [...first, ...fieldResources]) expect(spy).toHaveBeenCalledTimes(1)
+    for (const spy of [...second, ...originals]) expect(spy).not.toHaveBeenCalled()
+    h.unmount()
+    for (const spy of [...first, ...second, ...originals, ...fieldResources]) expect(spy).toHaveBeenCalledTimes(1)
+  })
+  it.each(['removed', 'unmounted'] as const)('ignores stale gate completion after %s', async action => {
+    const h = await mount([gate('one')])
+    if (action === 'unmounted') h.unmount()
+    else { h.scene.marks = []; await h.step() }
+    const source = gateAsset(), disposed = watch(source)
+    await resolve(0, source)
+    if (action === 'removed') { await h.step(); expect(bodies()).toHaveLength(0); h.unmount() }
+    for (const spy of disposed) expect(spy).toHaveBeenCalledTimes(1)
+  })
+  it('retains the fallback and caches a failed gate load', async () => {
+    const h = await mount([gate('one')])
+    const fallback = bodies()[0]
+    await act(async () => loading.calls[0]!.reject(new Error('missing gate')))
+    await h.step()
+    expect(bodies()[0]).toBe(fallback)
+    h.scene.marks = []; await h.step()
+    h.scene.marks = [gate('one')]; await h.step()
+    expect(loading.calls).toHaveLength(1)
+  })
 })
