@@ -348,3 +348,19 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Private bounded error-only log is active and empty after healthy checks.
 - Incident remains open; no authenticated iPhone recovery or root cause confirmed.
 - Exact active source hashes and verification are in docs/phone-preview.md.
+
+
+## Actual iPhone touch failure — scoped correction
+
+-23:33UTC feedback: fresh link loads, but taps/gestures blocked and chrome wasteful.
+  Transport root cause remains unknown; successful loading is not full usability.
+- Reproduced projected planet hit target intercepting camera Recenter in live-map
+  fixture. Isolated depth-sorted mark stacking below camera/HUD controls.
+- Unified pointer input: one-finger pan, pinch zoom, tap/drag separation, capture
+  and cancel/blur cleanup. Shared sheet ownership avoids stale inert restoration.
+- Compact map HUD menu and expandable telemetry; full-page cards/desktop retained.
+- Chromium browser-generated touch plus installed WebKit mobile touch checks pass;
+  actual physical iPhone acceptance and native iOS pinch remain pending.
+- Identity-free fixture only; no live commands or emulator identity selection.
+- Isolated preview source pointer: /tmp/hexaverse-touch-preview-root.txt. All57
+  published assets remain byte-identical; protected Storybook remains unchanged.

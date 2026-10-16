@@ -192,3 +192,52 @@ were reset. This is emulation; actual iPhone acceptance of this new pattern is p
 245 focused tests, TypeScript, scoped lint and file validators pass. Isolated build
 and all57 public-asset comparisons gate the same protected preview update. No
 identity selection, live fleet mutation, new art or external fixture publication.
+
+
+## Touch input and compact map correction — 2026-10-16
+
+Travis reported at23:33UTC that a fresh link loaded but taps, pan and zoom were
+unusable, with clipped controls and too much persistent chrome. Fresh-link success
+does not identify or close the earlier ERR_NGROK_3004 transport incident.
+
+An isolated live-SpaceStage browser test reproduced a concrete interception: a
+projected planet's depth-sorted DOM hit target covered Recenter. Hit transforms use
+large depth z-indices; these could escape above surrounding HUD controls. The map
+now creates a stacking context and its mark layer has a separate stacking context
+below camera controls, preserving depth order without intercepting the HUD.
+
+Touch camera input now uses one Pointer Events path, avoiding duplicate processing
+by separate touch handlers. One finger pans, two pointers pinch to zoom, mouse drag
+still orbits/right-drag pans, and stationary taps select once. Capture keeps drags
+owned through release outside the original target. Pointer cancellation, lost
+capture and window blur clear tracking; staggered pinch release cannot become a
+tap. Release displacement also rejects fast drags with no intermediate move event.
+Phone sheets share isolation ownership so overlapping handoffs cannot restore stale
+inert snapshots. Focus restoration uses preventScroll; the phone map is anchored to
+the dynamic viewport. No body scroll lock is installed.
+
+Map mode has a compact HUD menu rather than permanent Arrange HUD and three tabs.
+The single-line system heading and compact fleet strip leave the map available;
+telemetry expands explicitly. Galaxy/account and44px zoom/recenter remain reachable.
+Opened HUD cards retain full-viewport layout, mounted drafts and internal scrolling.
+Desktop docks and mouse/keyboard navigation remain available.
+
+Verification uses the identity-free HUD/Mobile System/Touch Map story, composed
+with the actual SpaceStage and production HUD. Chromium's Input.dispatchTouchEvent
+creates browser-generated touch/pointer sequences: one-finger pan, pinch zoom,
+stationary empty/body selection, cancel-then-tap and fallback recenter pass.
+375×667,390×844,844×390 and390×600 viewport changes pass card open/switch/close,
+settings, retained console drafts, elementFromPoint control/map checks, no horizontal
+overflow/root scroll and renewed pan after close. Installed headless WebKit passes
+mobile touch open/close, map tap selection and fallback zoom. This is browser-engine
+coverage, not physical iPhone acceptance or native iOS pinch verification. iOS18.5
+simulator runtimes exist, but the computer-use Simulator launch stalled; no native
+simulator result is claimed. No real identity, account or fleet was used.
+
+Runner: `.scratch/weekend-visual-batch/touch-regression.cjs`; local screenshots and
+logs: `/tmp/hexaverse-touch-qa/`, `/tmp/hexaverse-touch-browser.log`. These fixtures
+and evidence remain local and are not added to public assets or protected Storybook.
+
+Final scoped checks:1,063 tests across64 HUD/space files pass, TypeScript and scoped
+ESLint pass, file validators/diff checks pass, and the isolated production build
+passes. All57 published public assets compare byte-identical to the prior build.

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 
 // RED-PHASE SUITE — openspec change `add-vitals-strip`, capability
 // `system-console`: the container invariants (*The Vitals Strip Is Present
@@ -187,7 +187,7 @@ describe('VitalsStrip — no verb (contract, RULING 3)', () => {
     for (const el of allInteractive(container)) {
       const isChevron = el === chevron
       const isInsideMenu = el.closest('[data-testid="vitals-fleet-menu"]') !== null
-      expect(isChevron || isInsideMenu, `unexpected interactive element: ${el.outerHTML}`).toBe(true)
+      expect(isChevron || isInsideMenu || el.getAttribute('data-testid') === 'vitals-details-toggle', `unexpected interactive element: ${el.outerHTML}`).toBe(true)
     }
   })
 })
@@ -879,7 +879,7 @@ describe('VitalsStrip cost overlay — no figure, no control, no read (task 2.5)
     expect(fuelGauge()).toHaveAttribute('data-gauge-cost-state', 'unaffordable')
     const chevron = screen.getByTestId('vitals-fleet-chevron')
     for (const el of interactive(withQuote.container)) {
-      const ok = el === chevron || el.closest('[data-testid="vitals-fleet-menu"]') !== null
+      const ok = el === chevron || el.closest('[data-testid="vitals-fleet-menu"]') !== null || el.getAttribute('data-testid') === 'vitals-details-toggle'
       expect(ok, `unexpected interactive element: ${el.outerHTML}`).toBe(true)
     }
     const fuelTextWith = screen.getByTestId('vitals-fuel-cell').textContent
@@ -895,4 +895,16 @@ describe('VitalsStrip cost overlay — no figure, no control, no read (task 2.5)
     expect(liveWithout[0].textContent).toBe(liveTextWith)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+})
+
+
+it('toggles telemetry presentation without selecting another fleet', () => {
+  const { onSelectFleet } = strip()
+  const toggle = screen.getByTestId('vitals-details-toggle')
+  expect(screen.getByTestId('vitals-strip')).toHaveAttribute('data-expanded', 'false')
+  fireEvent.click(toggle)
+  expect(screen.getByTestId('vitals-strip')).toHaveAttribute('data-expanded', 'true')
+  fireEvent.click(toggle)
+  expect(screen.getByTestId('vitals-strip')).toHaveAttribute('data-expanded', 'false')
+  expect(onSelectFleet).not.toHaveBeenCalled()
 })

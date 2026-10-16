@@ -699,46 +699,64 @@ describe('SpaceStage — picking stays correct after the camera moves', () => {
   })
 })
 
-describe('SpaceStage — touch input', () => {
-  // Scenario: A single-finger touch drag orbits instead of zooming
-  it('Scenario: A single-finger touch drag orbits instead of zooming', async () => {
+describe('SpaceStage — touch pointer input', () => {
+  const touch = (id: number, x: number, y: number) => ({ pointerId: id, pointerType: 'touch', button: 0, clientX: x, clientY: y })
+  it('pans with one finger, preserves viewing angle and does not select after a drag', async () => {
     await stage()
     const before = JSON.parse(region().getAttribute('data-camera')!)
-    fireEvent.touchStart(region(), { touches: [{ identifier: 1, clientX: 400, clientY: 400 }] })
-    fireEvent.touchMove(region(), { touches: [{ identifier: 1, clientX: 470, clientY: 430 }] })
-    fireEvent.touchEnd(region(), { changedTouches: [{ identifier: 1, clientX: 470, clientY: 430 }] })
+    fireEvent.pointerDown(region(), touch(1, 400, 400))
+    fireEvent.pointerMove(region(), touch(1, 470, 430))
+    fireEvent.pointerUp(region(), touch(1, 470, 430))
     const after = JSON.parse(region().getAttribute('data-camera')!)
-    expect(after.yaw, 'a single-finger drag orbits, exactly as a primary-button drag does').not.toBe(
-      before.yaw,
-    )
-    expect(after.distance, 'and does NOT zoom').toBe(before.distance)
+    expect(after.target).not.toEqual(before.target)
+    expect(after.yaw).toBe(before.yaw)
+    expect(after.distance).toBe(before.distance)
+    expect(onSelect).not.toHaveBeenCalled()
   })
-
-  // Scenario: A stationary single-finger touch selects rather than orbits
-  it('Scenario: A stationary single-finger touch selects rather than orbits', async () => {
+  it('selects a body exactly once on a stationary touch pointer release', async () => {
     await stage()
-    const before = region().getAttribute('data-camera')
     const hit = screen.getByTestId('body-hit-feat-body-0')
-    fireEvent.touchStart(hit, { touches: [{ identifier: 1, clientX: 300, clientY: 300 }] })
-    fireEvent.touchMove(hit, { touches: [{ identifier: 1, clientX: 302, clientY: 301 }] })
-    fireEvent.touchEnd(hit, { changedTouches: [{ identifier: 1, clientX: 302, clientY: 301 }] })
-    // The gesture suppression this view needs to keep native pinch from
-    // competing must NOT itself prevent a tap within the threshold from
-    // producing a selection.
-    expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-0' })
-    expect(region().getAttribute('data-camera')).toBe(before)
+    fireEvent.pointerDown(hit, touch(1, 300, 300))
+    fireEvent.pointerMove(hit, touch(1, 302, 301))
+    fireEvent.pointerUp(hit, touch(1, 302, 301))
+    // Browsers also emit legacy touch events; they must not double-process it.
+    fireEvent.touchEnd(hit, { changedTouches: [{ clientX: 302, clientY: 301 }] })
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'feat-body-0' })
   })
-
-  // Scenario: A single-finger touch that moves past the tap threshold orbits
-  it('Scenario: A single-finger touch that moves past the tap threshold orbits', async () => {
+  it('does not select when a quick drag releases beyond the threshold without an intermediate move', async () => {
+    await stage()
+    const hit = screen.getByTestId('body-hit-feat-body-0')
+    fireEvent.pointerDown(hit, touch(1, 300, 300))
+    fireEvent.pointerUp(region(), touch(1, 340, 300))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+  it('pinches without orbiting or selecting, including staggered finger release', async () => {
     await stage()
     const before = JSON.parse(region().getAttribute('data-camera')!)
+    fireEvent.pointerDown(region(), touch(1, 200, 400))
+    fireEvent.pointerDown(region(), touch(2, 300, 400))
+    fireEvent.pointerMove(region(), touch(2, 380, 400))
+    const after = JSON.parse(region().getAttribute('data-camera')!)
+    expect(after.distance).toBeLessThan(before.distance)
+    expect(after.yaw).toBe(before.yaw)
+    fireEvent.pointerUp(region(), touch(2, 380, 400))
+    fireEvent.pointerMove(region(), touch(1, 210, 410))
+    fireEvent.pointerUp(region(), touch(1, 210, 410))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+  it('cancels a contact cleanly and accepts a fresh tap after cancellation or lost capture', async () => {
+    await stage()
     const hit = screen.getByTestId('body-hit-feat-body-0')
-    fireEvent.touchStart(hit, { touches: [{ identifier: 1, clientX: 300, clientY: 300 }] })
-    fireEvent.touchMove(hit, { touches: [{ identifier: 1, clientX: 340, clientY: 300 }] })
-    fireEvent.touchEnd(hit, { changedTouches: [{ identifier: 1, clientX: 340, clientY: 300 }] })
-    expect(onSelect, 'no selection change on release after a real drag').not.toHaveBeenCalled()
-    expect(JSON.parse(region().getAttribute('data-camera')!).yaw).not.toBe(before.yaw)
+    fireEvent.pointerDown(hit, touch(1, 300, 300))
+    fireEvent.pointerCancel(region(), touch(1, 300, 300))
+    fireEvent.pointerUp(region(), touch(1, 300, 300))
+    fireEvent.pointerDown(hit, touch(2, 300, 300))
+    fireEvent.lostPointerCapture(region(), touch(2, 300, 300))
+    fireEvent.pointerUp(region(), touch(2, 300, 300))
+    expect(onSelect).not.toHaveBeenCalled()
+    fireEvent.pointerDown(hit, touch(3, 300, 300))
+    fireEvent.pointerUp(region(), touch(3, 300, 300))
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'feat-body-0' })
   })
 })
 

@@ -211,7 +211,7 @@ it('closes phone settings to map with Escape and keeps layout edits', () => {
     fireEvent.click(move); fireEvent.keyDown(move, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(JSON.parse(saved.get(key('phone'))!)).toContainEqual({ id: 'console', lane: 'left', visible: true })
-    expect(screen.getByRole('button', { name: 'Arrange HUD' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'HUD menu' })).toHaveFocus()
   } finally { media.mockRestore() }
 })
 
@@ -230,6 +230,6 @@ it('keeps phone focus in the page when a travel-like transition removes its focu
     await waitFor(() => expect(screen.getByRole('button', { name: 'Close Command panel' })).toHaveFocus())
     fireEvent.click(screen.getByRole('button', { name: 'Close Command panel' }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Arrange HUD' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'HUD menu' })).toHaveFocus()
   } finally { media.mockRestore() }
 })

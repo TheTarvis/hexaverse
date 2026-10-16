@@ -22,7 +22,7 @@
 // excepted, the one sanctioned composite) — `e2e/helpers/space-view.ts`'s
 // `digits()` throws on zero or on two-or-more.
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Figure } from '@/components/figure/Figure'
 import { Gauge, type GaugeCost, type GaugeSegment } from './Gauge'
 import { VitalsStripFleetCell } from './VitalsStripFleetCell'
@@ -251,6 +251,7 @@ export function VitalsStrip({
   serverWorldTime,
   burnCost,
 }: VitalsStripProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const roster = acting?.roster
   const stranded = acting?.roster?.stranded ?? false
   const draining = status?.activityKind === 'underway'
@@ -258,8 +259,10 @@ export function VitalsStrip({
   return (
     <div
       data-testid="vitals-strip"
+      data-expanded={detailsOpen}
       className="pointer-events-auto flex h-14 items-center justify-between gap-4 border-t border-zinc-200 bg-zinc-50/95 px-4 backdrop-blur dark:border-white/[0.12] dark:bg-zinc-700/95"
     >
+      <button type="button" data-testid="vitals-details-toggle" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(value => !value)}>{detailsOpen ? 'Less telemetry' : 'Telemetry'}</button>
       <div data-testid="vitals-fleet-cell">
         <VitalsStripFleetCell
           acting={acting}

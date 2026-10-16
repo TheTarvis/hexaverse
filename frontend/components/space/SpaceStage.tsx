@@ -34,7 +34,6 @@ import {
   type FocusEvent as ReactFocusEvent,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
-  type TouchEvent as ReactTouchEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react'
 import { Figure } from '@/components/figure/Figure'
@@ -360,6 +359,7 @@ export function SpaceStage({
     secondary: boolean
   }
   const gestureRef = useRef<Gesture | null>(null)
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinchRef = useRef<number | null>(null)
 
   const isControl = (target: EventTarget | null): boolean =>
@@ -373,15 +373,33 @@ export function SpaceStage({
 
   const handlePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (!available || isControl(e.target)) return
+    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* Detached/cancelled input. */ }
+    if (pointers.current.size > 1) {
+      const [a, b] = [...pointers.current.values()]
+      pinchRef.current = touchDistance(a, b)
+      gestureRef.current = null
+      return
+    }
     gestureRef.current = {
       tracker: beginDrag(e.clientX, e.clientY),
       bodyId: bodyIdUnder(e.target),
-      secondary: e.button === 2,
+      secondary: e.pointerType === 'touch' || e.button === 2,
     }
   }, [available])
 
   const handlePointerMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!available || !pointers.current.has(e.pointerId)) return
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (pointers.current.size > 1) {
+        const [a, b] = [...pointers.current.values()]
+        const distance = touchDistance(a, b), previous = pinchRef.current
+        pinchRef.current = distance
+        if (previous) setCamera(prev => zoomByPinch(prev, previous, distance, extent))
+        return
+      }
       const gesture = gestureRef.current
       if (!gesture) return
       const { dx, dy } = advanceDrag(gesture.tracker, e.clientX, e.clientY)
@@ -400,7 +418,7 @@ export function SpaceStage({
         setCamera((prev) => orbitByPixels(prev, dx, dy))
       }
     },
-    [extent, setCamera],
+    [available, extent, setCamera],
   )
 
   const finishGesture = useCallback(
@@ -429,53 +447,29 @@ export function SpaceStage({
     [available, extent, setCamera],
   )
 
-  // --- touch ---------------------------------------------------------------
-
-  const handleTouchStart = useCallback(
-    (e: ReactTouchEvent<HTMLDivElement>) => {
-      if (!available || isControl(e.target)) return
-      if (e.touches.length >= 2) {
-        pinchRef.current = touchDistance(
-          { x: e.touches[0].clientX, y: e.touches[0].clientY },
-          { x: e.touches[1].clientX, y: e.touches[1].clientY },
-        )
-        gestureRef.current = null
-        return
-      }
-      const touch = e.touches[0]
-      if (!touch) return
-      gestureRef.current = {
-        tracker: beginDrag(touch.clientX, touch.clientY),
-        bodyId: bodyIdUnder(e.target),
-        secondary: false,
-      }
-    },
-    [available],
-  )
-
-  const handleTouchMove = useCallback(
-    (e: ReactTouchEvent<HTMLDivElement>) => {
-      if (e.touches.length >= 2) {
-        const next = touchDistance(
-          { x: e.touches[0].clientX, y: e.touches[0].clientY },
-          { x: e.touches[1].clientX, y: e.touches[1].clientY },
-        )
-        const previous = pinchRef.current
-        pinchRef.current = next
-        if (previous) setCamera((prev) => zoomByPinch(prev, previous, next, extent))
-        return
-      }
-      const gesture = gestureRef.current
-      const touch = e.touches[0]
-      if (!gesture || !touch) return
-      const { dx, dy } = advanceDrag(gesture.tracker, touch.clientX, touch.clientY)
-      // A single finger ORBITS, exactly as a primary-button drag does — it
-      // never zooms; zoom is the two-finger pinch alone.
-      if (!isGesture(gesture.tracker)) return
-      setCamera((prev) => orbitByPixels(prev, dx, dy))
-    },
-    [extent, setCamera],
-  )
+  const cancelGesture = useCallback(() => {
+    gestureRef.current = null
+    pinchRef.current = null
+    pointers.current.clear()
+  }, [])
+  useEffect(() => {
+    if (!available) cancelGesture()
+    window.addEventListener('blur', cancelGesture)
+    return () => window.removeEventListener('blur', cancelGesture)
+  }, [available, cancelGesture])
+  const releasePointer = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const tracked = pointers.current.has(event.pointerId)
+    const single = pointers.current.size === 1
+    pointers.current.delete(event.pointerId)
+    if (tracked && single) {
+      if (gestureRef.current) advanceDrag(gestureRef.current.tracker, event.clientX, event.clientY)
+      finishGesture(event.clientX, event.clientY, [])
+    }
+    else gestureRef.current = null
+    pinchRef.current = null
+    // A finger left after a pinch cannot become a tap; a new press starts a gesture.
+    try { event.currentTarget.releasePointerCapture(event.pointerId) } catch { /* Already lost. */ }
+  }, [finishGesture])
 
   const cameraJson = JSON.stringify(camera)
 
@@ -490,14 +484,16 @@ export function SpaceStage({
       // for an off-screen gate is a moving target.
       data-reframe-animated="false"
       className="absolute inset-0"
-      style={{ touchAction: 'none' }}
+      style={{ touchAction: 'none', isolation: 'isolate' }}
       onFocus={handleFocusIn}
       onBlur={handleFocusOut}
+      onContextMenu={event => event.preventDefault()}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
+      onPointerUpCapture={releasePointer}
+      onPointerCancel={cancelGesture}
+      onLostPointerCapture={event => { if (pointers.current.has(event.pointerId)) cancelGesture() }}
       onWheel={handleWheel}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
     >
       <SpaceCanvas
         onAvailabilityChange={handleAvailability}
@@ -543,58 +539,11 @@ export function SpaceStage({
             const live = frameRef.current?.projected.get(markId)
             reframeOn(live?.mark.position ?? coarsePosition)
           }}
-          onPointerUpCapture={(clientX, clientY, marks) => finishGesture(clientX, clientY, marks)}
+          onPointerUpCapture={() => { /* Region capture owns each release once. */ }}
         />}
       </SpaceCanvas>
-      {/* Pointer release and touch end are bound on the region itself so a
-          gesture that leaves the element it started on still resolves. */}
-      <PointerRelease
-        onPointerUp={(x, y) => finishGesture(x, y, [])}
-        onTouchEnd={(x, y) => {
-          pinchRef.current = null
-          finishGesture(x, y, [])
-        }}
-        host={host}
-        enabled={available}
-      />
     </div>
   )
-}
-
-// PointerRelease binds pointerup/touchend on the region host. They are bound
-// imperatively rather than as React props so a release that happens over a
-// child which stops propagation still resolves the gesture.
-function PointerRelease({
-  host,
-  enabled,
-  onPointerUp,
-  onTouchEnd,
-}: {
-  host: HTMLElement | null
-  enabled: boolean
-  onPointerUp: (x: number, y: number) => void
-  onTouchEnd: (x: number, y: number) => void
-}) {
-  const upRef = useRef(onPointerUp)
-  upRef.current = onPointerUp
-  const endRef = useRef(onTouchEnd)
-  endRef.current = onTouchEnd
-
-  useEffect(() => {
-    if (!host || !enabled) return
-    const up = (e: PointerEvent) => upRef.current(e.clientX, e.clientY)
-    const end = (e: TouchEvent) => {
-      const touch = e.changedTouches[0]
-      endRef.current(touch?.clientX ?? 0, touch?.clientY ?? 0)
-    }
-    host.addEventListener('pointerup', up)
-    host.addEventListener('touchend', end)
-    return () => {
-      host.removeEventListener('pointerup', up)
-      host.removeEventListener('touchend', end)
-    }
-  }, [host, enabled])
-  return null
 }
 
 interface SpaceLayersProps {
@@ -781,7 +730,7 @@ function SpaceLayers({
         role="group"
         aria-label="System camera"
         tabIndex={0}
-        className={`pointer-events-none absolute ${CONSOLE_DOCK_LANE_CAMERA} right-4 grid grid-cols-4 gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400`}
+        className={`pointer-events-none absolute z-20 ${CONSOLE_DOCK_LANE_CAMERA} right-4 grid grid-cols-4 gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400`}
         onKeyDown={(e) => {
           const step: Record<string, [number, number]> = {
             ArrowLeft: [-1, 0],
@@ -871,6 +820,9 @@ function SpaceLayers({
         {limitMessage}
       </span>
 
+      {/* Depth-sorted mark z-indices stay inside this layer, below camera
+          controls and outside HUD sheets. A near mark must never eat a HUD tap. */}
+      <div className="pointer-events-none absolute inset-0" style={{ isolation: 'isolate' }} data-testid="space-mark-layer">
       {/* --- hit targets: bodies, then lane gates --- */}
       <div className="pointer-events-none absolute inset-0">
         {bodies.map(hitButton)}
@@ -1068,6 +1020,7 @@ function SpaceLayers({
       {/* The selected mark, drawn — including a bare point in vacuum, which
           has no body mark to highlight and no intrinsic outline. */}
       {selection?.point && <span className="sr-only" data-testid="point-selection-mark" />}
+      </div>
     </>
   )
 }

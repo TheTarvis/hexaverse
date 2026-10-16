@@ -21,3 +21,10 @@
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   :global(body:has([data-phone-sheet='true'])) .navigation { visibility: hidden; pointer-events: none; }
 }
+
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  :global(body:has([data-testid='space-view'])) .navigation { left: max(12px, env(safe-area-inset-left)); right: auto; width: auto; max-width: calc(100% - 176px); bottom: calc(76px + env(safe-area-inset-bottom)); height: 44px; padding: 0 4px; gap: 4px; }
+  :global(body:has([data-testid='space-view'] [data-testid='vitals-strip'][data-expanded='true'])) .navigation { bottom: calc(156px + env(safe-area-inset-bottom)); }
+}
+
+.navigation .accountToggle { color: #b1edff; }

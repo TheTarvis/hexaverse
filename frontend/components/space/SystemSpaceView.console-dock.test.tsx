@@ -338,7 +338,7 @@ describe('SystemSpaceView + ConsoleDock - task 2.3 the Console control is not pa
     const chevron = screen.getByTestId('vitals-fleet-chevron')
     const menu = screen.queryByTestId('vitals-fleet-menu')
     for (const el of interactive) {
-      const ok = el === chevron || (menu !== null && menu.contains(el))
+      const ok = el === chevron || (menu !== null && menu.contains(el)) || el.getAttribute('data-testid') === 'vitals-details-toggle'
       expect(ok, `${el.outerHTML.slice(0, 80)} is the chevron or inside its menu`).toBe(true)
     }
     expect(strip.contains(open())).toBe(false)

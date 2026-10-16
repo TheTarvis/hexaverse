@@ -122,3 +122,16 @@
   .workspace[data-mobile-open='true'] .settings > section { flex: 1; min-height: 0; max-height: none; filter: none; }
   .workspace[data-mobile-open='true'] .settings .sheetHeading { padding-inline: 4px; margin-bottom: 12px; }
 }
+
+
+.phoneMenuToggle { display: none; }
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .workspace:not([data-mobile-open='true']) .recovery { top: calc(8px + env(safe-area-inset-top)); left: auto; width: auto; max-width: calc(100% - 24px); display: flex; flex-direction: column; align-items: flex-end; }
+  .phoneMenuToggle { display: inline-flex; background: #09131eee; border: 1px solid #435d70; }
+  .workspace:not([data-mobile-open='true']) .launchers,
+  .workspace:not([data-mobile-open='true']) .arrangeControl { display: none; }
+  .workspace[data-menu-open='true']:not([data-mobile-open='true']) .arrangeControl { display: inline-flex; }
+  .workspace[data-menu-open='true']:not([data-mobile-open='true']) .launchers { display: flex; flex-direction: column; width: 152px; padding: 4px; pointer-events: auto; }
+  .workspace[data-menu-open='true'] .launchers button { width: 100%; }
+  .workspace[data-mobile-open='true'] .phoneMenuToggle { display: none; }
+}
