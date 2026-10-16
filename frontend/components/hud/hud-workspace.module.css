@@ -68,6 +68,7 @@
 /* The primary phone controls remain direct taps, with desktop density unchanged. */
 @media (max-width: 760px), (pointer: coarse) {
   .workspace button { min-width: 44px; min-height: 44px; }
+  .workspace input, .workspace select { min-height: 44px; }
   .settings button[data-slot='hud-close'] {
     top: 0;
     right: 0;

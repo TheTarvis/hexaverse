@@ -86,3 +86,13 @@ never enter production commands. Final integrated checks are in progress.
   build passes; ordinary tracked tsconfig unchanged. Temporary QA servers stopped.
 - Renderer-unavailable behavior has regression-test coverage, not a forced live
   graphics-failure browser check. Real HTTPS/login/refresh/SSE/iOS remain pending.
+
+## Post-checkpoint phone tap review
+
+- Real Chrome390px station-row tap initially hit an invisible scene body target
+  above the HUD (depth z-index around5000). Scene stacking is now isolated below
+  workspace; actual DOM hit test and tap open the station's Sell/Refuel/Hold details.
+- No game mutation submitted. Mobile workspace inputs/selects now at least44px.
+- Scene/view110 tests pass. Preview remains unexposed; no local ngrok process or
+  agent4040 listener observed. No verified phone URL exists in this local session.
+- Approved domain migration underway, preserving numbered history and active scratch.

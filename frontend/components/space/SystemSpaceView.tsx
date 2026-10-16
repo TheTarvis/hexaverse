@@ -1135,7 +1135,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       {/* The canvas IS the window (spec #0002's canvas model, as the galaxy
           view does it): the stage fills the viewport and every panel floats
           over it. */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 isolate z-0">
         {interiorFailed ? (
           <div className="absolute inset-0 grid place-items-center p-6">
           <div
