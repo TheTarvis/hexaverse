@@ -205,3 +205,19 @@
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .workspaceVitals [data-testid='vitals-fleet-chevron'] { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
 }
+
+/* An open phone card owns the page viewport; background telemetry is map mode. */
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .commandView:has(.workspace[data-mobile-open='true']) .identity,
+  .commandView:has(.workspace[data-mobile-open='true']) .workspaceVitals,
+  .commandView:has(.workspace[data-mobile-open='true']) .guideLayer { visibility: hidden; }
+  .commandView:has(.workspace[data-mobile-open='true']) .workspace [aria-label='HUD workspace'] { visibility: visible; }
+  .commandView .guideLayer:has(.transmission) { position: fixed; inset: 0; height: 100dvh; z-index: 65; box-sizing: border-box; padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #08121d; }
+  .commandView .guideLayer .transmission { display: flex; flex: 1; height: auto; min-height: 0; max-height: none; padding: 12px; }
+  .guideLayer .transmissionBody { flex: 1; }
+  .guideLayer .transmissionActions { max-width: none; align-self: stretch; }
+  .commandView:has(.transmission) .identity,
+  .commandView:has(.transmission) .workspaceVitals { visibility: hidden; }
+  .workspaceCommand { height: 100%; }
+}
+.resumeGuide { position: absolute; top: var(--phone-toolbar-top, 100px); right: max(12px, env(safe-area-inset-right)); z-index: 45; min-height: 44px; background: #08121d; color: #b1edff; }

@@ -467,3 +467,25 @@ passes and all57 public files are byte-identical. Controlled supervisor reload
 retained the exact gateway/Google policy/static Storybook pins and cutoff. Subsequent
 login/Storybook checks return200, anonymous external login302 to ngrok OAuth, with no
 supervisor errors. No emulator identity selection or live gameplay mutation occurred.
+
+
+## Full-page mobile cards — 2026-10-16
+
+Travis explicitly requested that opened mobile cards fill the available page. The
+protected build now includes full-page Arrange HUD, Objects/Command/Console,
+travel/detail flows, recovery guide and fleet inspection. Background heading,
+navigation/vitals leave the opened page; a reachable close/title area and internal
+scrolling use100dvh/safe areas. Closing restores map input and mounted state.
+No browser Fullscreen API or new auth route/permission is involved.
+
+Source pointer: `/tmp/hexaverse-fullpage-preview-root.txt`; prior approved source
+plus only the responsive page/focus changes. Isolated build and245 focused tests,
+types/lint/validators pass. All57 public asset files are byte-identical to the prior
+preview, and protected static Storybook is unchanged. Same launchd service,
+exact Google identity policy and Oct19 00UTC cutoff, including tunnel termination.
+Desktop IAB viewport checks passed; actual iPhone acceptance of this new treatment
+is pending. Earlier “Looks better” feedback applied to the preceding mobile fix.
+
+Post-deploy checks: login/Storybook200, unauthenticated API401, emulator admin404,
+anonymous external login302 to ngrok OAuth. Supervisor43823 remains launchd-owned;
+all gateway/policy/Storybook and new build pins match, with no supervisor errors.

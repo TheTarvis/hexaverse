@@ -96,3 +96,17 @@ describe('own fleet persistent inspection and dock compatibility', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument()
   })
 })
+
+
+it('uses a full phone page for fleet details and restores fleet-picker focus on close', async () => {
+  const media = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  try {
+    render(<Hosted cell={props()} />)
+    await inspect()
+    expect(screen.getByRole('dialog', { name: 'Fleet fleet-one details' })).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByText('Outside camera').closest('[inert]')).not.toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Close fleet details' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(chevron()).toHaveFocus()
+  } finally { media.mockRestore() }
+})

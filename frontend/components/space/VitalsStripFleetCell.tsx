@@ -18,6 +18,8 @@
 // `listbox`. The visual tokens still match the rest of the strip's palette.
 
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
+import sheetStyles from './fleet-inspector.module.css'
 import { createPortal } from 'react-dom'
 import { HudPanel } from '@/components/hud/GameHud'
 import { Button } from '@/components/catalyst/button'
@@ -66,11 +68,18 @@ export function VitalsStripFleetCell({
   scale,
   worldTime,
 }: VitalsStripFleetCellProps) {
+  const phone = usePhoneHud()
+  const inspectorPage = useRef<HTMLDivElement>(null)
+  const restoreChevronFocus = useRef(false)
   const [open, setOpen] = useState(false)
   const [inspectedId, setInspectedId] = useState<string | null>(null)
   const inspectorClose = useRef<HTMLButtonElement>(null)
   const inspecting = !fleetsFailed && acting?.id === inspectedId && ownedFleets.some(fleet => fleet.id === inspectedId)
   const inspectable = !fleetsFailed && acting && ownedFleets.some(fleet => fleet.id === acting.id) ? acting : null
+  usePhoneSheet(phone && inspecting, inspectorPage, inspectedId)
+  useEffect(() => {
+    if (!inspecting && restoreChevronFocus.current) { restoreChevronFocus.current = false; chevronRef.current?.focus() }
+  }, [inspecting])
   useEffect(() => {
     if (!inspecting) setInspectedId(null)
     else inspectorClose.current?.focus()
@@ -118,7 +127,7 @@ export function VitalsStripFleetCell({
     setOpen(false)
     setInspectedId(inspectable.id)
   }
-  const closeInspector = () => { setInspectedId(null); chevronRef.current?.focus() }
+  const closeInspector = () => { restoreChevronFocus.current = true; setInspectedId(null); if (!phone) chevronRef.current?.focus() }
   const openMenu = () => { setInspectedId(null); setOpen(true) }
   const closeAndReturnFocus = () => {
     setOpen(false)
@@ -221,20 +230,23 @@ export function VitalsStripFleetCell({
         )}
       </div>
       {inspecting && acting && createPortal(
+        <div ref={inspectorPage} role={phone ? 'dialog' : undefined} aria-modal={phone || undefined} aria-label={phone ? `Fleet ${acting.id} details` : undefined} tabIndex={phone ? -1 : undefined} data-phone-sheet={phone} className={phone ? sheetStyles.page : undefined}>
         <HudPanel as="section" role="region" aria-label={`Fleet ${acting.id} details`}
-          data-testid="fleet-inspector" className="fixed z-[60] overflow-y-auto p-3" style={{ ...menuPosition, maxHeight: Math.max(menuPosition.maxHeight, 200) }}
+          data-testid="fleet-inspector" className={`fixed z-[60] overflow-y-auto p-3 ${phone ? sheetStyles.panel : ''}`} style={phone ? undefined : { ...menuPosition, maxHeight: Math.max(menuPosition.maxHeight, 200) }}
           onKeyDown={event => {
             if (event.key !== 'Escape') return
             event.preventDefault(); event.stopPropagation(); closeInspector()
           }}>
           <header className="flex items-center justify-between gap-2">
             <h3 className="break-all font-mono text-sm">{acting.id}</h3>
-            <Button plain style={{ color: 'var(--command-ink)' }} ref={inspectorClose} data-testid="fleet-inspector-close" aria-label="Close fleet details" onClick={closeInspector}>Close</Button>
+            <Button plain style={{ color: 'var(--command-ink)' }} ref={inspectorClose} data-mobile-close data-testid="fleet-inspector-close" aria-label="Close fleet details" onClick={closeInspector}>Close</Button>
           </header>
+          <div className={sheetStyles.body}>
           <SpacecraftPreview key={`ship:${acting.id}`} kind="ship" objectId={acting.id} label={acting.id}
             accentColor={acting.state.Mode === 0 ? 0xffb454 : acting.state.Mode === 2 ? 0xc4b5fd : 0x4ade80} />
           <VitalsStripPill status={status} stranded={stranded} scale={scale} worldTime={worldTime} />
-        </HudPanel>, document.body
+          </div>
+        </HudPanel></div>, document.body
       )}
       <VitalsStripPill status={status} stranded={stranded} scale={scale} worldTime={worldTime} />
     </div>

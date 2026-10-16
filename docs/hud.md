@@ -12,6 +12,10 @@ owns completion evidence and current blockers.
   foundation. Inspection and command-fleet choice remain separate, using
   [glossary](../GLOSSARY.md) meanings.
 - Players control which panels are visible and how they are arranged.
+- Mobile opened HUD cards use the full available page viewport, per Travis's
+  2026-10-16 direction: “For mobile the cards needs to be full screen there’s a
+  bunch of wasted space right now”. This supersedes the earlier bounded-drawer
+  phone layout. Close/back and internal scrolling remain reachable; desktop docks stay.
 - Desktop and portrait phones support readable decision facts and usable touch
   controls. Essential actions work without hover or simultaneous map visibility.
   Preserve desktop quality while adapting phone density.
@@ -35,7 +39,7 @@ Audit snapshot, 2026-10-16; these components are being integrated and reviewed.
   already supports bodies, gates and bounded points in empty space.
 - [HudWorkspace](../frontend/components/hud/HudWorkspace.tsx) is presentation
   only: objects, command and console panels use ordered left/right/bottom docks.
-  Phones use a launcher and one bounded active panel. Dock buttons support
+  Phones use a launcher and one full-page active panel. Dock buttons support
   touch/keyboard arrangement without dragging. This is the current reversible
   implementation choice, not an accepted final freeform editor.
 - Layout preferences are validated, versioned, per-corporation and local to the
@@ -157,3 +161,34 @@ is not proof of server physics, real transaction execution or actual iPhone game
 Station sell/refuel attachment, prices, pending/errors, successful refresh and retained
 quantity coverage ran in isolated component/system tests; live trading was not done.
 No existing emulator identity or Travis fleet state was selected or modified.
+
+
+## Full-page mobile cards — current direction, 2026-10-16
+
+Opened Arrange HUD, Objects, Command, Console and fleet inspection now occupy the
+available page viewport using100dvh and safe-area padding. System heading, bottom
+navigation and vitals are hidden/covered while a page is open. The fixed title/close
+row stays reachable; panel switching stays inside the page. Card content scrolls
+internally, including travel review/status and object/detail content. No browser
+Fullscreen API is used. Closing returns to the map without hiding the panel in saved
+preferences, ending travel or losing mounted drafts/browse context. Desktop dock
+layout and nonmodal inspection are retained.
+
+Phone pages expose modal semantics, make outside content inert, wrap keyboard focus,
+and restore map/picker focus on close. Replacing a focused action during Start/Back
+returns focus inside the page. Nested portalled form dialogs retain their own focus
+handling. Guide actions hand off to one HUD page at a time; a map-mode Resume guide
+control restores the unchanged saved lesson rather than reopening over a closed page.
+
+Local ChatGPT in-app browser (desktop browser with viewport overrides) verified
+375×667,390×844 and667×375. Modal bounds measured(0,0) with exactly the viewport
+width/height and document width equal to viewport width. Settings Reset is reachable
+after internal scrolling with the close control still at the top; Tab/Shift-Tab wrap
+within the page. Console draft and object search survived switching/Back; explicit
+Start/Stop, guide handoff/resume, fleet inspection and return to map input passed.
+Desktop1440×900 retained400px settings and no modal dialog. Browser viewport overrides
+were reset. This is emulation; actual iPhone acceptance of this new pattern is pending.
+
+245 focused tests, TypeScript, scoped lint and file validators pass. Isolated build
+and all57 public-asset comparisons gate the same protected preview update. No
+identity selection, live fleet mutation, new art or external fixture publication.

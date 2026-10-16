@@ -284,3 +284,29 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   public files; new source pointer /tmp/hexaverse-gameplay-preview-root.txt. Same
   launchd supervision and cutoff, exact Google policy/gateway/static Storybook pins.
   Post-reload login/Storybook200, anonymous external login302 to ngrok OAuth, no errors.
+
+
+## Full-page mobile HUD requested and implemented
+
+- New explicit direction: mobile cards fill the available page, superseding the
+  earlier bands/drawer treatment. Inspected second actual iOS Arrange HUD screenshot.
+- Settings and Objects/Command/Console occupy100dvh; heading/nav/vitals leave the
+  opened page. Fixed title/close, internal scroll and in-page switching; closing
+  restores map without changing saved visibility or discarding drafts/travel context.
+- Fleet details and recovery guide use the same page behavior. Guide-to-panel handoff
+  keeps one active modal and Resume guide available in map mode; saved lesson intact.
+- Background inert, modal focus loop and focus recovery after action replacement.
+  New regression cases cover page/map/draft lifecycle, settings Escape/persistence,
+  Start-like focus transition, guide handoff/resume and fleet-detail focus restoration.
+- 245 focused tests/typecheck/scoped lint/validators pass. Desktop IAB viewport checks:
+  375×667,390×844,667×375 cover full bounds/no horizontal overflow, scrolling settings
+  action/fixed close, draft/search retention, travel, guide and fleet detail. Desktop
+  1440×900 remains docked. Actual iPhone acceptance of full-page treatment pending.
+- Isolated build passes and all57 public assets compare byte-identically. Scoped
+  update deployed via same temporary launchd job; source pointer
+  /tmp/hexaverse-fullpage-preview-root.txt. Same identity policy/Oct19 00UTC deadline,
+  no Fullscreen API, new assets, Meshy or push.
+
+- Live verification after reload: supervisor43823 (launchd), frontend43824,
+  gateway43825, tunnel43826; no errors. Login/Storybook200, unauthenticated API401,
+  admin404, external login302 to ngrok Google protection. Exact policy/cutoff pins valid.

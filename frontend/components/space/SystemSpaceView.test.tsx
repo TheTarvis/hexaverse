@@ -1543,3 +1543,29 @@ describe('reachable non-map HUD actions', () => {
     expect(screen.queryByTestId('travel-cut-drive')).not.toBeInTheDocument()
   })
 })
+
+it('hands phone onboarding to one full-page panel and resumes the guide only when requested', async () => {
+  const { newGuide } = await import('@/lib/command-onboarding')
+  const guide = { ...newGuide('corp-1', 'fleet_1', SYSTEM_ID), phase: 'objects' as const }
+  const values = new Map([['hexaverse:command-guide:v1:corp-1', JSON.stringify(guide)]])
+  const media = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  vi.mocked(localStorage.getItem).mockImplementation(key => values.get(key) ?? null)
+  vi.mocked(localStorage.setItem).mockImplementation((key, value) => { values.set(key, value) })
+  try {
+    view()
+    expect(screen.getByRole('dialog', { name: 'Recovery transmission' })).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('guide-objects'))
+    expect(screen.queryByTestId('recovery-transmission')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Objects panel' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Close Objects panel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Resume guide' }))
+    expect(screen.getByRole('dialog', { name: 'Recovery transmission' })).toBeInTheDocument()
+    expect(screen.getByTestId('recovery-transmission')).toHaveAttribute('data-phase', 'station')
+    expect(mutations.order.mutate).not.toHaveBeenCalled()
+  } finally {
+    media.mockRestore()
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+    vi.mocked(localStorage.setItem).mockImplementation(() => {})
+  }
+})

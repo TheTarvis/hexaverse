@@ -1,5 +1,7 @@
 'use client'
 
+import { useRef } from 'react'
+import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
 import { Button } from '@/components/catalyst/button'
 import type { CommandGuide } from '@/lib/command-onboarding'
 import type { Fleet } from '@/lib/types/fleet'
@@ -21,6 +23,9 @@ export function RecoveryTransmission({ guide, fleet, bodies, station = null, sta
   onScan: () => void
   onObjects?: () => void
 }) {
+  const phone = usePhoneHud()
+  const sheetRef = useRef<HTMLElement>(null)
+  usePhoneSheet(phone, sheetRef, 'recovery')
   const target = bodies.find(body => body.id === guide.targetId)
   const candidate = bodies.find(body => body.type !== 'station' && body.id !== fleet.attachedTo && body.resources?.length)
   const label = target ? `${target.type.replaceAll('_', ' ')} ${target.id}` : guide.targetId
@@ -48,8 +53,8 @@ export function RecoveryTransmission({ guide, fleet, bodies, station = null, sta
   else if (guide.phase === 'refuel') copy = stationUnavailable || !atStation ? stationCopy : 'Sale confirmed. Use Refuel to buy fuel at the station. Review the live price, your credits and free hold: fuel shares cargo capacity. Purchase an affordable amount to complete this check.'
   else copy = 'Refuelling confirmed. You can travel, mine, sell cargo and replenish fuel. Before the next burn, budget enough fuel to reach a station again.'
 
-  return <aside className={styles.transmission} aria-label="Recovery transmission" data-testid="recovery-transmission" data-phase={guide.phase}>
-    <div className={styles.signal}><span>⌁ RECOVERY SIGNAL</span><Button plain data-testid="dismiss-guide" aria-label="Dismiss startup guide" onClick={() => onSave({ ...guide, phase: 'dismissed' })}>×</Button></div>
+  return <aside ref={sheetRef} role={phone ? 'dialog' : undefined} aria-modal={phone || undefined} tabIndex={phone ? -1 : undefined} data-phone-sheet={phone} onKeyDown={event => { if (phone && event.key === 'Escape') { event.stopPropagation(); onSave({ ...guide, phase: 'dismissed' }) } }} className={styles.transmission} aria-label="Recovery transmission" data-testid="recovery-transmission" data-phase={guide.phase}>
+    <div className={styles.signal}><span>⌁ RECOVERY SIGNAL</span><Button plain data-mobile-close data-testid="dismiss-guide" aria-label="Dismiss startup guide" onClick={() => onSave({ ...guide, phase: 'dismissed' })}>×</Button></div>
     <div className={styles.transmissionBody}>
     <p role="status" aria-live="polite" data-testid="recovery-copy">{copy}</p>
     <ol className={styles.checks} aria-label="Startup checks"><li data-testid="live-motor-check">{motorDone ? '✓ Confirmed' : '01 Pending'} · Motor function</li><li data-testid="live-mining-check">{miningDone ? '✓ Confirmed' : '02 Pending'} · Mining function</li><li data-testid="live-fuel-check">{guide.phase === 'done' ? '✓ Confirmed' : '03 Pending'} · Refuelling</li></ol>

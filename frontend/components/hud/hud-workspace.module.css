@@ -103,3 +103,22 @@
   .workspace button { min-width: 44px; }
   .settings button[data-slot='hud-close'] { top: 0; right: 0; width: 44px; height: 44px; min-height: 44px; padding: 12px; }
 }
+
+.sheetControls { display: flex; gap: 4px; }
+.sheetHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; min-height: 56px; padding-inline: 16px; color: #d5e7f1; background: #08121d; border-bottom: 1px solid #435d70; }
+.sheetHeading h2 { margin: 0; font-size: 18px; }
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .workspace[data-mobile-open='true'] { position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: 100%; z-index: 70; pointer-events: auto; background: #08121d; box-sizing: border-box; }
+  .workspace[data-mobile-open='true'] .stage { inset: 0; padding: env(safe-area-inset-top) max(0px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(0px, env(safe-area-inset-left)); }
+  .workspace[data-mobile-open='true'] .panel { height: 100%; max-height: 100%; align-self: stretch; }
+  .workspace[data-mobile-open='true'] .panelToolbar { min-height: 56px; flex-shrink: 0; padding: 0 12px 0 16px; font-size: 16px; }
+  .workspace[data-mobile-open='true'] .recovery { top: calc(60px + env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); z-index: 2; display: block; }
+  .workspace .recovery[hidden] { display: none; }
+  .workspace[data-mobile-open='true'] .panelContent { padding: 60px 12px 12px; overflow: auto; }
+  .workspace[data-mobile-open='true'] .panelContent > * { min-height: 0; }
+  .workspace[data-mobile-open='true'] .panelContent > div { flex: 1; }
+  .workspace[data-mobile-open='true'] .panelContent [data-slot='hud-card'] { max-height: none; min-height: 0; flex: 1; filter: none; }
+  .workspace[data-mobile-open='true'] .settings { inset: 0; width: 100%; max-height: none; padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); flex-direction: column; box-sizing: border-box; background: #08121d; }
+  .workspace[data-mobile-open='true'] .settings > section { flex: 1; min-height: 0; max-height: none; filter: none; }
+  .workspace[data-mobile-open='true'] .settings .sheetHeading { padding-inline: 4px; margin-bottom: 12px; }
+}

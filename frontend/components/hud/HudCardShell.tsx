@@ -34,6 +34,7 @@ export function HudCardShell({
 
   return (
     <section
+      data-slot="hud-card"
       ref={shellRef}
       aria-labelledby={title ? titleId : undefined}
       {...props}

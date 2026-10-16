@@ -36,6 +36,7 @@ import { CelestialActions } from './CelestialActions'
 // that is then the only clock on screen.
 
 import { Button } from '@/components/catalyst/button'
+import { usePhoneHud } from '@/hooks/use-phone-sheet'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
 import { HudWorkspace, type HudPanelId } from '@/components/hud/HudWorkspace'
@@ -298,6 +299,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const travelGuard = useSubmitGuard()
   const stopGuard = useSubmitGuard()
   const cutDriveGuard = useSubmitGuard()
+  const phoneHud = usePhoneHud()
+  const [guidePageVisible, setGuidePageVisible] = useState(true)
   const [travelMode, setTravelMode] = useState<'review' | 'status' | null>(null)
   const [travelNotice, setTravelNotice] = useState<string | null>(null)
   const [travelError, setTravelError] = useState<string | null>(null)
@@ -345,6 +348,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const [hudRequest, setHudRequest] = useState<{ id: HudPanelId; sequence: number }>()
   const [consoleAnnouncementOutlet, setConsoleAnnouncementOutlet] = useState<HTMLDivElement | null>(null)
   const requestHudPanel = useCallback((id: HudPanelId) => {
+    setGuidePageVisible(false)
     setHudRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 }))
   }, [])
   const openDockOn = useCallback((tab: ConsoleTabId) => {
@@ -1214,8 +1218,9 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         )}
       </div>
 
+      {phoneHud && guiding && !guidePageVisible && <Button plain className={commandStyles.resumeGuide} onClick={() => setGuidePageVisible(true)}>Resume guide</Button>}
       <div className={commandStyles.guideLayer}>
-      {guiding && guide && acting && !dock.expanded && !(discoveryStarted && !interiorFailed) && (
+      {(!phoneHud || guidePageVisible) && guiding && guide && acting && !dock.expanded && !(discoveryStarted && !interiorFailed) && (
         <RecoveryTransmission
           guide={guide}
           fleet={acting}

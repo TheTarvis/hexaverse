@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { HudWorkspace, type HudWorkspacePanel } from './HudWorkspace'
@@ -175,4 +175,61 @@ it('collapses the active phone drawer without hiding the panel or losing its dra
   expect(screen.getByRole('region', { name: 'Objects panel' })).toHaveAttribute('data-mobile-active', 'true')
   expect(draft).toHaveValue('Retain this search')
   expect(window.localStorage.setItem).not.toHaveBeenCalled()
+})
+
+
+it('uses a modal page sheet on phones, returns to map, and retains mounted drafts', () => {
+  const media = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  try {
+    render(<><button>Map action</button><HudWorkspace corporationId="phone" panels={panels} /></>)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Console$/ }))
+    const sheet = screen.getByRole('dialog', { name: 'Console panel' })
+    expect(sheet).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByText('Map action').parentElement).not.toHaveAttribute('inert')
+    expect(screen.getByText('Map action')).toHaveAttribute('inert')
+    expect(screen.getByRole('button', { name: 'Close Console panel' })).toHaveFocus()
+    fireEvent.change(screen.getByLabelText('Console draft'), { target: { value: 'Saved local draft' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: /^Objects$/ }))
+    expect(screen.getByRole('dialog', { name: 'Objects panel' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /^Console$/ }))
+    expect(screen.getByLabelText('Console draft')).toHaveValue('Saved local draft')
+    fireEvent.click(screen.getByRole('button', { name: 'Close Console panel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByText('Map action')).not.toHaveAttribute('inert')
+    expect(window.localStorage.setItem).not.toHaveBeenCalled()
+  } finally { media.mockRestore() }
+})
+
+it('closes phone settings to map with Escape and keeps layout edits', () => {
+  const media = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  try {
+    render(<HudWorkspace corporationId="phone" panels={panels} />)
+    settings()
+    expect(screen.getByRole('dialog', { name: 'Arrange HUD' })).toHaveAttribute('aria-modal', 'true')
+    const move = screen.getByRole('button', { name: 'Move Console to left' })
+    fireEvent.click(move); fireEvent.keyDown(move, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(JSON.parse(saved.get(key('phone'))!)).toContainEqual({ id: 'console', lane: 'left', visible: true })
+    expect(screen.getByRole('button', { name: 'Arrange HUD' })).toHaveFocus()
+  } finally { media.mockRestore() }
+})
+
+
+it('keeps phone focus in the page when a travel-like transition removes its focused action', async () => {
+  const media = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  function Journey() {
+    const [started, setStarted] = useState(false)
+    return started ? <p>Travelling</p> : <button onClick={() => setStarted(true)}>Start fixture trip</button>
+  }
+  try {
+    render(<HudWorkspace corporationId="phone" panels={[{ id: 'command', label: 'Command', children: <Journey /> }]} />)
+    fireEvent.click(screen.getByRole('button', { name: /^Command$/ }))
+    const start = screen.getByRole('button', { name: 'Start fixture trip' })
+    start.focus(); fireEvent.click(start)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close Command panel' })).toHaveFocus())
+    fireEvent.click(screen.getByRole('button', { name: 'Close Command panel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Arrange HUD' })).toHaveFocus()
+  } finally { media.mockRestore() }
 })

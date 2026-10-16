@@ -5,6 +5,7 @@ import clsx from 'clsx'
 import { Button } from '@/components/catalyst/button'
 import { HudCardShell } from './HudCardShell'
 import styles from './hud-workspace.module.css'
+import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
 
 export type HudPanelId = 'objects' | 'command' | 'console'
 type Lane = 'left' | 'right' | 'bottom'
@@ -40,12 +41,16 @@ export function HudWorkspace(props: HudWorkspaceProps) {
 }
 
 function Workspace({ corporationId, panels, className, request }: HudWorkspaceProps) {
+  const phone = usePhoneHud()
+  const workspaceRef = useRef<HTMLDivElement>(null)
   const storageKey = `hexaverse:hud-layout:v1:${corporationId}`
   const [layout, setLayout] = useState<Layout>(defaults)
   const [ready, setReady] = useState(false)
   const [settings, setSettings] = useState(false)
+  const [openedPanel, setOpenedPanel] = useState(false)
   const [active, setActive] = useState<HudPanelId | null>('objects')
   const [announcement, setAnnouncement] = useState('')
+  const restoreMapFocus = useRef(false)
   const recoveryRef = useRef<HTMLButtonElement>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
   const panelRefs = useRef(new Map<HudPanelId, HTMLElement>())
@@ -56,7 +61,13 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
   const requestSequence = request?.sequence
   const known = layout.filter(item => panels.some(panel => panel.id === item.id))
   const visible = known.filter(item => item.visible)
-  const activeId = active === null ? null : visible.some(item => item.id === active) ? active : visible[0]?.id
+  const activeId = (phone && !openedPanel) || active === null ? null : visible.some(item => item.id === active) ? active : visible[0]?.id
+
+  const sheetOpen = phone && (settings || !!activeId)
+  usePhoneSheet(sheetOpen, workspaceRef, settings ? 'settings' : activeId ?? null)
+  useEffect(() => {
+    if (phone && !sheetOpen && restoreMapFocus.current) { restoreMapFocus.current = false; recoveryRef.current?.focus() }
+  }, [phone, sheetOpen])
 
   useEffect(() => {
     try { setLayout(readLayout(window.localStorage.getItem(storageKey))) }
@@ -101,7 +112,9 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
     if (!ready || !request || !panels.some(panel => panel.id === request.id)) return
     const item = layout.find(panel => panel.id === request.id)!
     if (!item.visible) change(layout.map(panel => panel.id === request.id ? { ...panel, visible: true } : panel), `${panels.find(panel => panel.id === request.id)!.label} shown.`)
+    setOpenedPanel(true)
     setActive(request.id)
+    setSettings(false)
     // Requests are explicit owner events. Ordinary layout edits must not replay one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, request?.id, request?.sequence])
@@ -120,27 +133,30 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
     panel.focus()
   })
 
-  function closeSettings() { setSettings(false); recoveryRef.current?.focus() }
+  function closeSettings() { setSettings(false); if (phone) { restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) } else recoveryRef.current?.focus() }
+  function closePanel() { restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) }
   function reset() {
     setLayout(defaults); setActive('objects')
     try { window.localStorage.removeItem(storageKey); setAnnouncement('Default HUD layout restored.') }
     catch { setAnnouncement('Default HUD layout restored. Saved preferences could not be removed on this device.') }
   }
 
-  return <div className={clsx(styles.workspace, className)} data-testid="hud-workspace" onKeyDown={event => {
+  return <div ref={workspaceRef} className={clsx(styles.workspace, className)} data-testid="hud-workspace" data-mobile-open={sheetOpen} data-phone-sheet={sheetOpen} role={sheetOpen ? 'dialog' : undefined} aria-modal={sheetOpen || undefined} aria-label={sheetOpen ? settings ? 'Arrange HUD' : `${panels.find(panel => panel.id === activeId)?.label} panel` : undefined} tabIndex={sheetOpen ? -1 : undefined} onKeyDown={event => {
+    if (event.key === 'Escape' && phone && sheetOpen) { event.stopPropagation(); if (settings) closeSettings(); else closePanel(); return }
     if (event.key === 'Escape' && settings && settingsRef.current?.contains(event.target as Node)) { event.stopPropagation(); closeSettings() }
   }}>
-    <div className={styles.recovery}>
-      <Button plain ref={recoveryRef} aria-expanded={settings} aria-controls={settingsId} onClick={() => setSettings(value => !value)}>Arrange HUD</Button>
+    <div className={styles.recovery} hidden={phone && settings} inert={phone && settings}>
+      <Button plain hidden={phone && !!activeId && !settings} ref={recoveryRef} aria-expanded={settings} aria-controls={settingsId} onClick={() => setSettings(value => !value)}>Arrange HUD</Button>
       <div className={styles.launchers} aria-label="HUD panels">
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
-          return <Button key={item.id} plain disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setActive(item.visible && activeId === item.id ? null : item.id) }}>{panel.label}{!item.visible ? ' (hidden)' : ''}</Button>
+          return <Button key={item.id} plain disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id) }}>{panel.label}{!item.visible ? ' (hidden)' : ''}</Button>
         })}
       </div>
     </div>
     {settings && <div ref={settingsRef} id={settingsId} className={styles.settings}>
-      <HudCardShell title="Arrange HUD" lighting="none" onClose={closeSettings} closeLabel="Close HUD settings">
+      {phone && <header className={styles.sheetHeading}><h2>Arrange HUD</h2><Button plain data-mobile-close aria-label="Close HUD settings" onClick={closeSettings}>Close</Button></header>}
+      <HudCardShell title={phone ? undefined : "Arrange HUD"} lighting="none" onClose={phone ? undefined : closeSettings} closeLabel="Close HUD settings">
         <p className={styles.hint}>Choose what stays on screen. Move panels between docks and change their order.</p>
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
@@ -167,8 +183,8 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
         const lanePanels = visible.filter(panel => panel.lane === item.lane)
         const index = lanePanels.findIndex(panel => panel.id === item.id)
         const span = 6 / Math.max(1, lanePanels.length)
-        return <section key={item.id} ref={element => { if (element) panelRefs.current.set(item.id, element); else panelRefs.current.delete(item.id) }} tabIndex={-1} id={`${panelPrefix}-${item.id}`} aria-label={`${panel.label} panel`} hidden={!item.visible} data-panel={item.id} data-lane={item.lane} data-mobile-active={activeId === item.id} className={styles.panel} style={{ gridColumn: item.lane === 'left' ? '1' : item.lane === 'right' ? '3' : '1 / -1', gridRow: item.lane === 'bottom' ? `${7 + index}` : `${index * span + 1} / span ${span}` }}>
-          <div className={styles.panelToolbar}><span>{panel.label}</span><Button plain aria-label={`Hide ${panel.label}`} onClick={() => { recoveryRef.current?.focus(); toggle(item.id) }}>Hide</Button></div>
+        return <section key={item.id} ref={element => { if (element) panelRefs.current.set(item.id, element); else panelRefs.current.delete(item.id) }} tabIndex={-1} id={`${panelPrefix}-${item.id}`} aria-label={`${panel.label} panel`} hidden={!item.visible || phone && (settings || activeId !== item.id)} inert={phone && (settings || activeId !== item.id)} data-panel={item.id} data-lane={item.lane} data-mobile-active={activeId === item.id} className={styles.panel} style={{ gridColumn: item.lane === 'left' ? '1' : item.lane === 'right' ? '3' : '1 / -1', gridRow: item.lane === 'bottom' ? `${7 + index}` : `${index * span + 1} / span ${span}` }}>
+          <div className={styles.panelToolbar}><span>{panel.label}</span>{phone ? <div className={styles.sheetControls}><Button plain onClick={() => setSettings(true)}>Arrange HUD</Button><Button plain data-mobile-close aria-label={`Close ${panel.label} panel`} onClick={closePanel}>Close</Button></div> : <Button plain aria-label={`Hide ${panel.label}`} onClick={() => { recoveryRef.current?.focus(); toggle(item.id) }}>Hide</Button>}</div>
           <div className={styles.panelContent}>{panel.children}</div>
         </section>
       })}
