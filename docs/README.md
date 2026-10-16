@@ -37,7 +37,8 @@ Record each rule in its owner and link related domains rather than copying it.
 Update a resolved question where it lives; keep glossary definitions concise.
 Use [ADRs](agents/domain.md) sparingly for consequential, hard-to-reverse trade-offs.
 
-[Specs](specs/README.md) and [plans](plans/README.md) remain historical sources;
+[Archived rebuild records](history/2026-rebuild/README.md),
+[specs](specs/README.md) and [plans](plans/README.md) preserve history;
 older hex/ring mechanics, retired workflow commands and unchecked milestones do
 not become current requirements. [Defects](defects/) retain evidence; marketing
 and agent operational guidance keep their own roles. Imported skills remain unchanged.

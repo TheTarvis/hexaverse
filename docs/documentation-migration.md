@@ -3,7 +3,9 @@
 Approved by Travis on 2026-10-16: “Lets go with your doc idea.” The canonical
 entry point and nine domain owners are now written. This records source coverage,
 implementation gaps and retained history; it establishes no new gameplay scope.
-No historical source or scratch asset has been moved/deleted or pruned.
+A subsequent explicitly authorized cleanup archived five retired records and removed
+the obsolete numbered-spec template; original-path redirects remain. No scratch
+asset or active work was pruned. See the cleanup batch below.
 
 ## Confirmed documentation requirements
 
@@ -125,7 +127,7 @@ spec → production HUD record. Later does not automatically mean fully implemen
 
 ## Progress and scratch lifecycle
 
-1. **Done:** domain boundaries approved; all nine owners and README are written. Historical sources and active scratch remain in place.
+1. **Done:** domain boundaries approved; all nine owners and README are written. Historical paths remain discoverable; active scratch remains in place.
 2. **Initial pass done:** stations/travel first, then remaining owners, using targeted
    code/source audits. Continue refining individual domains as work changes. Reconcile historical sources, current code and accepted
    conversation decisions. Capture each rule once, with origin and open discrepancies;
@@ -148,3 +150,31 @@ Migration acceptance checks: phone-readable domain entry links; one owner per ru
 vs proposed vs implemented gaps distinguishable; no newly dangling links; no lost
 accepted decisions; no deletion of active work; current code/tests still authoritative
 for behavior. No gameplay behavior changes are part of this documentation migration.
+
+## Executed cleanup batch — 2026-10-16
+
+Travis explicitly requested actual cleanup after approving the domain migration.
+Five tracked, unchanged source records were archived under
+[history/2026-rebuild](history/2026-rebuild/README.md); the manifest gives exact
+paths, original hashes and line counts. Their old paths are short redirects:
+
+- `docs/plans/build-order.md`
+- `docs/plans/continous_space/chain.md`
+- `docs/plans/system-hud/chain.md`
+- `docs/specs/BACKLOG.md`
+- `docs/specs/0003-system-interior.md`
+
+This removes **3,228 lines of historical content from active source paths** while
+preserving the full records, including uniquely relevant unresolved history.
+The obsolete tracked `docs/specs/TEMPLATE.md` authoring scaffold (84 lines) was
+removed outright; it contains no gameplay decisions and remains Git-recoverable.
+Other canonical pages, historical sources, defects, operational records and all
+scratch/assets/budget/preview/state files are kept.
+
+Coverage is targeted source reconciliation, not exhaustive acceptance of historical
+rules. Current domain pages retain the accepted decisions; unresolved older
+statements remain marked historical in the full archive. Markdown links in archived
+snapshots were rebased, plain-text references retain their original source context.
+Incoming old paths remain valid, and the audit found no incoming #0003 anchor
+fragments requiring compatibility. Original-path numeric references remain intact.
+No gameplay code or imported skills changed. Parent review/commit owns the Git checkpoint.

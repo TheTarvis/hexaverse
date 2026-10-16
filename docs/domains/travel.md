@@ -29,11 +29,14 @@ travel already implements part of it. [HUD](../hud.md) owns review/commit intera
 - [CutDrive and Stop](../../backend/fleet/service.go) are distinct operations.
   CutDrive produces unpowered drift; Stop parks instantly at sufficiently low
   speed or commits a braking burn to a nearby point. Closing a status card does
-  neither. Existing fuel/refund rules remain authoritative in code/tests.
+  neither. Existing fuel/refund rules remain authoritative in code/tests. Burn
+  acceptance may warn about stranding without requiring a blanket return reserve;
+  this warning is not a promised rescue capability.
 - [Jump](../../backend/fleet/service.go) requires attachment to the lane's own
   gate, materializes the destination lane horizon before commit and carries
   fleet-owned transit state. There is no local-system position while in transit.
-  Its current eligibility is gate attachment, not a charted-lane prerequisite;
+  Attachment makes the fleet immediately eligible, with no dwell. Its current
+  eligibility is gate attachment, not a charted-lane prerequisite;
   older architecture/spec claims to the contrary are historical.
 - [Point picking](../../frontend/components/space/space-selection.ts) supports
   bounded pick-plane destinations and conversion to the wire vector. Production
