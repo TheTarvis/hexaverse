@@ -63,9 +63,9 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const redirect = sanitizeRedirect(searchParams.get('redirect'))
   const phonePreview = process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true'
-  const [signUpMode, setIsSignUp] = useState(!phonePreview && searchParams.get('signUp') === 'true')
-  // The isolated preview gateway supports existing-account email sign-in only.
-  const isSignUp = !phonePreview && signUpMode
+  // Preview supports user-entered email signup/sign-in against the emulator;
+  // Google SSO remains excluded from its narrow gateway.
+  const [isSignUp, setIsSignUp] = useState(searchParams.get('signUp') === 'true')
 
   // D13/M1 — a failed/cancelled mobile Google-redirect sign-in surfaces here,
   // through the same inline error surface and live region as any other
@@ -122,7 +122,7 @@ function LoginForm() {
       <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-zinc-50 p-8 dark:border-zinc-800/50 dark:bg-white/[0.12]">
         <Heading>{isSignUp ? 'Create your Hexaverse account' : 'Sign in to Hexaverse'}</Heading>
         <Text className="mt-1">
-          {isSignUp ? 'Create an account to get started.' : 'Welcome back.'}
+          {phonePreview ? 'Use a test-only email and password for this preview.' : isSignUp ? 'Create an account to get started.' : 'Welcome back.'}
         </Text>
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
@@ -186,6 +186,7 @@ function LoginForm() {
         <Button outline onClick={handleGoogle} disabled={loading} className="w-full">
           <GoogleIcon className="size-5" /> Continue with Google
         </Button>
+        </>}
 
         <Text className="mt-6 text-center">
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
@@ -197,7 +198,6 @@ function LoginForm() {
             {isSignUp ? 'Sign in' : 'Sign up'}
           </button>
         </Text>
-        </>}
       </div>
     </div>
   )

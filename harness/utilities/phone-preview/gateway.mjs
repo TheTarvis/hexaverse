@@ -26,10 +26,13 @@ const apiRules = {
   ],
 }
 const authPaths = new Set([
+  '/identitytoolkit.googleapis.com/v1/accounts:signUp',
   '/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword',
   '/identitytoolkit.googleapis.com/v1/accounts:lookup',
   '/securetoken.googleapis.com/v1/token',
 ])
+const signupPath = '/identitytoolkit.googleapis.com/v1/accounts:signUp'
+const signupFields = new Set(['email', 'password', 'returnSecureToken', 'clientType', 'captchaResponse', 'recaptchaVersion'])
 const appPages = new RegExp(`^(?:/|/login|/systems/${ID})$`)
 const staticAsset = /^\/_next\/static\/(?:[A-Za-z0-9_@.()[\]-]+\/)*[A-Za-z0-9_@.()[\]-]+\.(?:js|css|woff2?|ttf|otf|png|jpe?g|webp|gif|ico|svg)$/
 const publicAssets = new Set([
@@ -173,6 +176,17 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
       }
     } catch { return reject(response, 400) }
     if (expired()) return reject(response, 410)
+    if (route.service === 'auth' && route.path.split('?', 1)[0] === signupPath) {
+      // Firebase also uses this endpoint for anonymous signup/account linking.
+      // Approval covers user-entered email/password creation only. Never log or
+      // echo this body; reject unrelated capabilities before reaching Auth.
+      try {
+        const body = JSON.parse(Buffer.concat(chunks, size).toString('utf8'))
+        if (!request.headers['content-type']?.startsWith('application/json') || !body || Array.isArray(body) ||
+          typeof body.email !== 'string' || !body.email.trim() || typeof body.password !== 'string' || !body.password ||
+          Object.keys(body).some(key => !signupFields.has(key))) return reject(response, 400)
+      } catch { return reject(response, 400) }
+    }
     const headers = headersWithoutHop(request.headers)
     for (const key of spoofHeaders) delete headers[key]
     for (const key of Object.keys(headers)) if (/^x-(?:middleware|invoke|nextjs)-/.test(key)) delete headers[key]

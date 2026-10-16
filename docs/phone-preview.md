@@ -1,9 +1,11 @@
-# Authenticated phone preview proposal
+# Authenticated phone preview
 
-Status: proposal, 2026-10-16. Travis wants to test from iOS while away.
-Read-only diagnosis and this plan are authorized. Exposure, deployment, persistent
-access, credentials, purchases and security/network changes await explicit approval.
-No preview endpoint has been created by this plan.
+Status: protected preview active, 2026-10-16. Current user-approved endpoint is
+https://gulf-identity-scrap.ngrok-free.dev/ for exact Google identity
+wilson.travis.t@gmail.com until2026-10-19T00:00:00Z, with no paid charges.
+Email signup is now approved and available at `/login?signUp=true`; Travis enters
+his own test credentials. Earlier proposal/activation sections below are historical
+checkpoints; the latest signup/SSO checkpoint controls current access scope.
 
 ## Current environment
 
@@ -279,3 +281,54 @@ token refresh. No additional public path was required. New compatibility/recover
 review stories are included in the staged and verified static Storybook refresh;
 old hashed assets remain available to existing tabs. Exact external origin,
 identity allowlist and expiry are unchanged.
+
+## Approved email signup and pending simulated SSO
+
+Travis confirmed the phone galaxy loads, then found no way to create a game account.
+The isolated build intentionally excluded signup/Google while normal20200 retained
+both. That assumed an existing password test account, which had not been established:
+the default dev account was absent; the only listed emulator identity used google.com.
+Ngrok's real Google entrance is separate from game authentication.
+
+Travis explicitly approved enabling the existing email signup form and exactly
+POST `/identitytoolkit.googleapis.com/v1/accounts:signUp` to local Auth20211.
+Preview now supports email signup/sign-in while Google remains hidden. The gateway
+requires nonempty email/password JSON and rejects anonymous, linking-token, tenant,
+custom-user and unknown-field payloads before Auth. Installed Firebase SDK's initial
+signup fields and optional reCAPTCHA fields fit that allowlist. GET/HEAD/other methods,
+suffix/encoded variants, missing/wrong Origin, SSO/reset/update/admin remain denied.
+No credentials were entered, account created or local game data changed by the agent.
+
+Signup form verified at390×844 with no horizontal overflow, three fields and Create
+account; live gateway displays it after hydration. Login23 tests and gateway17 tests,
+TypeScript/scoped lint, required validators and isolated Next build pass. Empty-body
+signup returns400 without reaching Auth; wrong origin403; SSO/helper paths404.
+Unauthenticated external signup/form/Storybook requests still redirect to ngrok OAuth.
+Actual successful account creation/session restore remains Travis's own verification.
+
+The build uses a temporary source snapshot of b0f42be plus only the login changes,
+so subsequent local art candidates were NOT promoted. No environment files were
+copied; node_modules is a local link. `/tmp/hexaverse-signup-preview-root.txt` identifies
+that ephemeral source. Its frontend listens on loopback20207 under a foreground
+deadline supervisor; the20204 gateway now forwards there. During switch, previous
+gateway/frontend/ngrok processes were found ended; only the absent owned gateway
+and tunnel were restored, using the same unchanged traffic policy and deadline.
+No token value was read/configured. Temporary QA20208 was stopped. These remain
+foreground processes, not installed persistent services or an availability guarantee.
+
+User also requested SSO. Read-only installed-source audit confirms existing local
+Google sign-in uses Firebase's SIMULATED identity picker, not real Google auth or
+an additional Google consent grant. Required extra routes would be GET
+`/emulator/auth/handler`, GET `/emulator/auth/iframe`, and POST
+`/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp`. Mobile uses redirect;
+desktop popup. Helper resources include Google GAPI/fonts and unpkg Material assets.
+
+Crucially the emulator permits arbitrary claimed emails with email_verified=true.
+It can reuse/link existing local accounts, propagate their custom claims, and in
+some cases clear an unverified account's password/provider information. That can
+change existing local login methods and access local game data. This is not merely
+creating a harmless fresh test identity. No production project or Google account
+change is needed, but the additional local access implications need explicit review.
+No SSO/helper/IdP route was enabled and no OAuth grant accepted. Before any SSO
+exposure, approve its concrete existing-account effects or a separately isolated
+emulator identity store, and constrain provider/query/redirect/body parameters.

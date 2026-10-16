@@ -409,14 +409,13 @@ describe('LoginPage', () => {
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument()
   })
 
-  it.each(['', 'signUp=true'])('phone preview supports only existing email sign-in despite query %s', async query => {
+  it('phone preview offers email sign-in and signup while excluding Google SSO', async () => {
     vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', 'true')
-    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams(query) as unknown as ReturnType<typeof useSearchParams>)
     const { signIn, signUp, signInWithGoogle } = mockAccountContext()
     render(<LoginPage />)
     expect(screen.getByRole('heading', { name: 'Sign in to Hexaverse' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Continue with Google/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Sign up' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull()
     expect(screen.queryByTestId('login-confirm-password')).toBeNull()
     expect(screen.getByTestId('login-password')).toHaveAttribute('autocomplete', 'current-password')
@@ -424,6 +423,23 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByTestId('login-submit'))
     await waitFor(() => expect(signIn).toHaveBeenCalledWith('preview@example.com', 'preview-password'))
     expect(signUp).not.toHaveBeenCalled()
+    expect(signInWithGoogle).not.toHaveBeenCalled()
+  })
+
+  it('phone preview signup query renders the existing confirmation form and uses only email signup', async () => {
+    vi.stubEnv('NEXT_PUBLIC_PHONE_PREVIEW', 'true')
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams('signUp=true') as unknown as ReturnType<typeof useSearchParams>)
+    const { signIn, signUp, signInWithGoogle } = mockAccountContext()
+    render(<LoginPage />)
+    expect(screen.getByRole('heading', { name: 'Create your Hexaverse account' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Continue with Google/ })).toBeNull()
+    expect(screen.getByTestId('login-password')).toHaveAttribute('autocomplete', 'new-password')
+    expect(screen.getByTestId('login-confirm-password')).toBeInTheDocument()
+    fillCredentials('preview@example.com', 'preview-password')
+    fireEvent.change(screen.getByTestId('login-confirm-password'), { target: { value: 'preview-password' } })
+    fireEvent.click(screen.getByTestId('login-submit'))
+    await waitFor(() => expect(signUp).toHaveBeenCalledWith('preview@example.com', 'preview-password'))
+    expect(signIn).not.toHaveBeenCalled()
     expect(signInWithGoogle).not.toHaveBeenCalled()
   })
 

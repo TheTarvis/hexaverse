@@ -57,7 +57,8 @@ after(async () => {
 })
 function request(path, { method = 'GET', headers = {}, body, port = gatewayPort } = {}) {
   return new Promise((resolve, reject) => {
-    const outgoing = http.request({ hostname: '127.0.0.1', port, method, path, headers: { origin, ...headers } }, incoming => {
+    const outgoing = http.request({ hostname: '127.0.0.1', port, method, path,
+      headers: Object.fromEntries(Object.entries({ origin, ...headers }).filter(([, value]) => value !== undefined)) }, incoming => {
       const chunks = []
       incoming.on('data', chunk => chunks.push(chunk))
       incoming.on('end', () => resolve({ status: incoming.statusCode, headers: incoming.headers, body: Buffer.concat(chunks).toString() }))
@@ -200,17 +201,43 @@ test('raw path validation rejects encoded traversal, separators, debug/admin/pus
   assert.equal(seen.length, count, 'denied requests never reach any upstream')
 })
 
-test('only exact three browser Auth REST POST routes reach the emulator', async () => {
-  for (const path of ['/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword', '/identitytoolkit.googleapis.com/v1/accounts:lookup', '/securetoken.googleapis.com/v1/token']) {
+test('only exact four browser Auth REST POST routes reach the emulator', async () => {
+  for (const path of ['/identitytoolkit.googleapis.com/v1/accounts:signUp', '/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword', '/identitytoolkit.googleapis.com/v1/accounts:lookup', '/securetoken.googleapis.com/v1/token']) {
     assert.equal((await request(path)).status, 404)
-    const response = await request(`${path}?key=fixture-key`, { method: 'POST', body: 'grant_type=refresh_token', headers: { 'content-type': 'application/x-www-form-urlencoded' } })
+    const signup = path.endsWith(':signUp')
+    const body = signup ? JSON.stringify({ email: 'fixture@example.com', password: 'fixture-only', returnSecureToken: true, clientType: 'CLIENT_TYPE_WEB' }) : 'grant_type=refresh_token'
+    const response = await request(`${path}?key=fixture-key`, { method: 'POST', body, headers: { 'content-type': signup ? 'application/json' : 'application/x-www-form-urlencoded' } })
     assert.equal(response.status, 200)
     const received = JSON.parse(response.body)
     assert.equal(received.service, 'auth')
     assert.equal(received.url, `${path}?key=fixture-key`)
-    assert.equal(received.body, 'grant_type=refresh_token')
+    assert.equal(received.body, body)
     assert.equal((await request(`${path}/extra`, { method: 'POST' })).status, 404)
   }
+})
+
+test('email signup permits only its exact POST path and trusted origin, never adjacent Auth capabilities', async () => {
+  const signup = '/identitytoolkit.googleapis.com/v1/accounts:signUp'
+  const count = seen.length
+  for (const method of ['GET', 'HEAD', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal((await request(signup, { method })).status, 404)
+  }
+  for (const path of [`${signup}/extra`, `${signup}/`, signup.replace(':', '%3A'), signup.toLowerCase(),
+    '/identitytoolkit.googleapis.com/v1/accounts:update', '/identitytoolkit.googleapis.com/v1/accounts:sendOobCode',
+    '/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp', '/emulator/v1/projects/fixture/accounts']) {
+    assert.equal((await request(path, { method: 'POST' })).status, 404)
+  }
+  for (const origin of [undefined, 'null', 'https://other.example']) {
+    assert.equal((await request(signup, { method: 'POST', headers: { origin } })).status, 403)
+  }
+  for (const body of [{}, { email: 'fixture@example.com' }, { password: 'fixture-only' },
+    { email: '', password: 'fixture-only' },
+    { email: 'fixture@example.com', password: 'fixture-only', idToken: 'fixture-linking-token' },
+    { email: 'fixture@example.com', password: 'fixture-only', tenantId: 'other' },
+    { email: 'fixture@example.com', password: 'fixture-only', localId: 'existing-user' }]) {
+    assert.equal((await request(signup, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } })).status, 400)
+  }
+  assert.equal(seen.length, count, 'restricted signup variants never reach an upstream')
 })
 
 test('browser gameplay routes forward bearer, cookies, query and body; strip spoofed forwarding/hop headers', async () => {

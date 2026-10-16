@@ -176,3 +176,21 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   Best local candidates retained; rejected soft/rounded provider candidates unused.
 - Local Manufactured Family Review story only; protected compiled game/Storybook
   unchanged. No comparison upload/publication, provider spend, push or consent action.
+
+## Phone email signup ready; simulated SSO separately pending
+
+- User confirms phone galaxy now loads. Missing Google/signup explained by explicit
+  isolated preview mode, not normal20200/mobile UI. No existing password test user
+  was established; the only listed emulator account used simulated Google.
+- User explicitly approved email signup. Existing form now available at
+  https://gulf-identity-scrap.ngrok-free.dev/login?signUp=true with test-only copy.
+  Exact additional POST accounts:signUp requires email/password JSON; anonymous,
+  linking/tenant/admin payloads and all SSO/helper/reset routes remain blocked.
+- Login23 and gateway17 tests pass, type/lint/build/validators pass. Actual390px
+  form and live loopback gateway verified, no credential entry or account creation.
+- Isolated source snapshot preserves previously deployed art: new local natural/
+  manufactured refinements not promoted. New frontend20207 deadline-supervised;
+  gateway20204/unchanged ngrok policy restored after prior owned processes ended.
+- Exact Google allowlist/Oct19 00:00UTC expiry unchanged; no token/production/data/
+  purchase change. SSO requested but additional local impersonation/account-linking
+  implications require concrete approval; see docs/phone-preview.md.
