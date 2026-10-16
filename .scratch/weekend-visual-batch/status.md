@@ -107,3 +107,22 @@ never enter production commands. Final integrated checks are in progress.
 - Plan/quota remain unverified; no endpoint/live URL. Latest isolated polling build passes.
 - Docs migration d47d657 complete; recoverable old-doc cleanup is now authorized
   and in progress separately. Meshy reference upload remains blocked.
+
+## Current protected-preview checkpoint
+
+Supersedes pending-preview notes above: Travis created the Free ngrok account and
+configured its token himself. The protected endpoint and bounded gateway are
+running at https://gulf-identity-scrap.ngrok-free.dev/ and `/storybook/`, expiring
+2026-10-19T00:00:00Z. No duplicate launch, paid charge or push is authorized.
+
+Exact case-insensitive Google email allowlist is configured. Unauthenticated app,
+Storybook, API and forbidden paths redirect to ngrok authentication; read-only
+gateway routing checks reject admin/push/traversal/environment-file paths.
+Signed-in access remains unverified: visitor consent requests name/profile picture
+plus email. Stopped before Continue; Travis is reviewing on his phone. Do not
+accept expanded consent without explicit approval. See docs/phone-preview.md.
+
+Documentation migration and complete numbered-spec archival are committed through
+f2e7819. Domain-guide alignment is recommendation only pending user reaction;
+retain one glossary and treat the nine domain pages as topic references.
+Meshy private reference upload remains separately unapproved.

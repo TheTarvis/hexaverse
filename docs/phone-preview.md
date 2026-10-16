@@ -222,3 +222,35 @@ existing account dashboard; the configured agent token's account is still unknow
 Need the existing account's sign-in method or user-completed account creation before
 plan/quota verification. No tunnel, public endpoint, purchase or upgrade occurred.
 The isolated preview rebuild including reduced polling now passes.
+
+Account verification update: Travis created the account himself. Dashboard now
+shows Free, 0 B of 1 GB transfer used, zero HTTP requests, and zero active endpoints.
+A local fingerprint comparison found that the configured ngrok token differs from
+this account's displayed existing token; neither value was printed. No token was
+created, rotated or configured by the agent. Need explicit approval to configure
+this account's existing credential locally, or the existing configured token's
+correct account sign-in, before activation. The browser was returned to Usage.
+
+### Current checkpoint: protected endpoint running
+
+Travis completed token configuration himself. The existing ngrok process now serves
+https://gulf-identity-scrap.ngrok-free.dev/ and `/storybook/` through the bounded
+loopback gateway. Earlier pending-activation notes above are historical checkpoints.
+No token value was configured by the agent during this activation.
+
+The accepted traffic policy requires Google OAuth first, then denies identities
+other than `wilson.travis.t@gmail.com` using an anchored, case-insensitive match.
+Unauthenticated app, Storybook, API, emulator-admin, push and traversal requests
+all returned redirects to `idp.ngrok.com`; no application content was returned.
+Read-only router checks also reject emulator administration, push, traversal,
+environment files and GET requests to the POST-only Auth lookup route. These
+checks do not prove the signed-in or wrong-identity visitor flow.
+
+Visitor sign-in is paused before Continue: Google's consent screen requests name
+and profile picture in addition to email. The earlier email-only approval does
+not cover those additional fields. Travis has the links to review this consent
+on his phone; authenticated game/Storybook access remains unverified. Do not
+accept expanded consent or launch duplicate processes while awaiting feedback.
+The gateway deadline remains `2026-10-19T00:00:00Z`; the foreground ngrok
+supervisor independently stops its owned tunnel at that deadline. No paid plan,
+purchase, persistent service, credential change or deadline extension occurred.
