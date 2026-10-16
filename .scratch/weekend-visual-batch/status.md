@@ -310,3 +310,16 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Live verification after reload: supervisor43823 (launchd), frontend43824,
   gateway43825, tunnel43826; no errors. Login/Storybook200, unauthenticated API401,
   admin404, external login302 to ngrok Google protection. Exact policy/cutoff pins valid.
+
+
+## Open preview transport incident —22:29UTC
+
+- iPhone reports ERR_NGROK_3004. Previous anonymous302 checks were access-gate-only,
+  not proof of authenticated upstream health. Exact path/fresh phone retry requested.
+- Same four processes remain alive; no restart churn. Agent configured HTTP upstream
+  correctly. Request traces unavailable because inspection/logging remain disabled.
+- Root/login/system plain/gzip, Serais RSC/prefetch/reload/HEAD,30 production assets/
+  conditional reads, concurrent requests, synthetic non-secret auth-like headers and
+  HTTP/1.0/reusedHTTP1.1 responses complete locally. No real cookies/identity used.
+- No confirmed cause or fix. Services/art/policy/cutoff untouched; authenticated
+  ngrok edge delivery remains the concrete missing validation. See phone-preview.md.

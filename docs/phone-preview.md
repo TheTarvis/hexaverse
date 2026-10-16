@@ -489,3 +489,28 @@ is pending. Earlier “Looks better” feedback applied to the preceding mobile 
 Post-deploy checks: login/Storybook200, unauthenticated API401, emulator admin404,
 anonymous external login302 to ngrok OAuth. Supervisor43823 remains launchd-owned;
 all gateway/policy/Storybook and new build pins match, with no supervisor errors.
+
+
+## ERR_NGROK_3004 incident — 2026-10-16,22:29UTC
+
+Travis's iPhone screenshot reports an invalid/incomplete upstream HTTP response.
+Earlier anonymous302 health checks proved the OAuth gate only, not authenticated
+upstream delivery. Diagnosis remains open; no root cause or successful phone
+remediation is claimed. Exact failed path and a fresh authenticated phone retry
+have been requested. No user session cookies or identities were accessed.
+
+At22:30UTC the same supervisor/frontend/gateway/tunnel processes remained running
+without restart churn. Historical child stdout/stderr are deliberately discarded;
+ngrok inspection and request logging remain disabled, so there is no captured
+22:29 request trace. The agent still targets HTTP127.0.0.1:20204, which speaks HTTP;
+the common HTTPS-upstream mismatch in the [official error guide](https://ngrok.com/docs/errors/err_ngrok_3004)
+is not supported by this configuration.
+
+Safe local response audit: direct frontend20209 and gateway20204 root/login/system
+HTML200 with complete plain/gzip bodies; Serais `/systems/sys_0_1` HTML/RSC/prefetch/
+reload/HEAD responses complete. Thirty production assets and conditional reads
+pass through the gateway under concurrent load, synthetic non-secret OAuth-like
+headers and a fixture cookie. HTTP/1.0 and reused HTTP/1.1 compressed page reads
+complete. These checks do not exercise a real OAuth session through the ngrok edge.
+No speculative code change, service restart, exposure expansion or deadline change
+was made. Authenticated edge delivery remains unverified pending phone evidence.
