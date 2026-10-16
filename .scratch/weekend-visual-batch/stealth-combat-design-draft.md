@@ -112,3 +112,18 @@ data. This acceptance criterion does not authorize implementing the new tracking
 the visual/HUD phase. Record subsequent user decisions here or in the
 parent's shared brief; only resolved domain terms belong in GLOSSARY.md. Do not create a
 combat ADR, implementation backlog or authority to spend credits from this discussion alone.
+
+## Confirmed update — visibility and occlusion (2026-10-16)
+
+Travis confirmed the intended broad system scan is visibility/line-of-sight limited.
+Stars, planets and moons may occlude hidden ships; hiding behind or around bodies is
+intended. Docked ships should not automatically appear in a broad sweep; examining
+individual objects with Analyze may reveal more. Exact occlusion geometry, numerical
+ranges, docking disclosure and timing remain open. Analyze penetrating a star is NOT
+confirmed. These are design intentions, not changes to the current fog implementation.
+
+Research recommendation reported before canonical reorganization: maintain settled
+vocabulary in GLOSSARY.md, one dated confirmed/proposed/open/current-implementation
+concept record at docs/stealth-combat.md, and a conditional root CLAUDE.md pointer.
+That concept-document path and status headings are recommendations, not skill mandates.
+No canonical document move or broad rewrite has been performed.

@@ -1,6 +1,6 @@
 # Debris production candidate 01
 
-Status: parent submitted preview successfully after resolving authorization; preview succeeded. Local download blocked by this worker’s automatic approval review. Refinement not submitted.
+Status: textured candidate downloaded and reviewed; rejected as production replacement. Root completed external operations.
 
 ## Scope and authority
 
@@ -76,3 +76,16 @@ Preview exists remotely. Local model download and review remain blocked in this 
 Model face count, connected components, bounds, materials, texture maps and visual review
 remain pending. Parent notified with preview ID and exact next steps. Procedural debris
 remains unchanged.
+
+
+## Root completion and visual review
+
+Root submitted the2K PBR refine after supplying later explicit user authorization:
+`01a144e6-de44-75a0-aba3-c39a1784d151`, SUCCEEDED, consumed_credits10.
+Candidate total15 credits. Downloaded `debris-generated-01.glb`; delivery review copy
+`frontend/public/models/space/debris-candidate.glb` (1,312,120 bytes,14,562 triangles).
+Raw GLB reviewed in Chrome shared Model View: rounded largely intact pods, rather than
+fractured plated hull sections. Do not adopt as runtime debris. Revised procedural
+beveled/jagged hull cluster has a more appropriate silhouette. Preserve rejected output
+for provenance and comparisons; further generation requires a justified reference route.
+Earlier blocked/pending entries above are historical worker checkpoints.
