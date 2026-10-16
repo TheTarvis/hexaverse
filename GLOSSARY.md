@@ -26,6 +26,10 @@
 | Anomaly | An unexplained discovery awaiting analysis; it may prove to be a ship, an ancient artifact, an unusual physical phenomenon or something else. |
 | Last-known position | Position recorded at an object's last observation; it does not update without a new observation. |
 | Drive signature | Detectable emissions produced by an operating drive. |
+| Ship signature | Persistent signature belonging to an individual ship, which can be associated with learned or traded intelligence. |
+| Detected | Sensing stage in which a presence is known but its ship count is unknown. |
+| Resolved | Sensing stage in which distinct drives can be distinguished within a detected presence. |
+| Identified | Sensing stage in which a signature is associated with known intelligence. |
 | Signature analysis | Targeted examination of a signature that alerts the target being examined. |
 | Laser | Directed-energy weapon constrained by range and available power. |
 | Missile | Weapon with longer engagement range than a laser. |

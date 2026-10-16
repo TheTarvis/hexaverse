@@ -78,3 +78,23 @@ stories. Reuse foundation. Proposed acceptance: user can show/hide/arrange panel
 preferences locally and reset defaults, with keyboard controls and responsive layout.
 Report architectural choices before broad HUD changes. No new server preference domain
 without agreement; do not let customization hide essential recovery controls permanently.
+
+## Independent HUD implementation checkpoint (2026-10-16)
+
+Parent explicitly authorized independent HUD implementation while the rejected reference
+upload waits for consent. Presentation choice: bounded dock lanes with ordering buttons,
+not arbitrary pixel coordinates; layout can evolve without changing command/data ownership.
+Existing approved tokens: navy#080f18/#0b1621, ink#d5e7f1, muted#91a3b7,
+frame#435c70, cyan#b1edff. Preserve existing font roles and clipped frame lighting;
+use accepted HudCardShell for focused travel/settings. Avoid adding decorative UI systems.
+
+Desktop: objects left, command right, console bottom, vitals/navigation outside workspace.
+Phone: one bounded active panel with launcher. Settings/reset and asynchronous announcements
+must remain reachable even when all configurable panels hide. Stable containers preserve
+search, scan and log state on hide/move. Persist only validated layout, scoped by corporation.
+External explicit actions may reveal/activate the relevant panel. No gameplay state in storage.
+
+Travel uses existing server preview/quote/order/Stop behavior. Target review replaces inspector
+content, keeps browser mounted and preserves selected destination on fleet switch. Invalidate
+old quotes until the new fleet/target pair is ready; explicit Start only, guarded against double
+activation. Fixed point parking already exists; expose current capability, no new physics.

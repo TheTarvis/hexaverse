@@ -8,7 +8,11 @@ world clock. Local 3D views use WebGPU.
 ## Sources of truth
 
 Code and tests describe implemented behavior. `GLOSSARY.md` defines domain
-terms. For gameplay architecture and cross-domain relationships, read
+terms. For design-source authority and concept discovery, read `docs/design-index.md`.
+Before sensing, signatures, stealth, parking or combat work, read
+`docs/stealth-combat.md`; before HUD layout, mobile interaction or travel-card
+work, read `docs/hud.md`. For gameplay architecture and cross-domain
+relationships, read
 `docs/game-architecture.md`. `docs/vision.md`, `docs/lore.md`, `docs/specs/`
 and `docs/plans/` retain design context; historical checklists and unimplemented
 ideas are references, not an active backlog. The old implementation is archived
