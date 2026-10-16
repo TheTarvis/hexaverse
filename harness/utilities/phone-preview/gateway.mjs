@@ -33,6 +33,8 @@ const authPaths = new Set([
 const appPages = new RegExp(`^(?:/|/login|/systems/${ID})$`)
 const staticAsset = /^\/_next\/static\/(?:[A-Za-z0-9_@.()[\]-]+\/)*[A-Za-z0-9_@.()[\]-]+\.(?:js|css|woff2?|ttf|otf|png|jpe?g|webp|gif|ico|svg)$/
 const publicAssets = new Set([
+  // Frozen logged-out galaxy, loaded directly by galaxy-service (not /api).
+  '/galaxy/start-area.json',
   '/favicon.ico', '/icon.png', '/apple-icon.png', '/google-logo.svg',
   '/flywheel-icon.svg', '/flywheel-icon.png', '/flywheel-logo.png',
   '/flywheel-logo-light.svg', '/flywheel-logo-dark.svg', '/og-image.png',

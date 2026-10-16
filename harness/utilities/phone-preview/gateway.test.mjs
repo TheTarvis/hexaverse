@@ -77,6 +77,25 @@ test('configuration requires an explicit secure or literal loopback QA origin an
   assert.equal(servers.at(-1).address().address, '127.0.0.1')
 })
 
+test('logged-out galaxy forwards only the exact committed start-area asset to the frontend', async () => {
+  for (const method of ['GET', 'HEAD']) {
+    assert.deepEqual(previewRoute(method, '/galaxy/start-area.json'), { service: 'frontend', path: '/galaxy/start-area.json' })
+    const response = await request('/galaxy/start-area.json', { method })
+    assert.equal(response.status, 200)
+    if (method === 'GET') {
+      const received = JSON.parse(response.body)
+      assert.equal(received.service, 'frontend')
+      assert.equal(received.url, '/galaxy/start-area.json')
+    }
+  }
+  for (const target of ['/galaxy/other.json', '/galaxy/start-area.json/extra', '/galaxy/%73tart-area.json']) {
+    assert.equal(previewRoute('GET', target), null)
+    assert.equal((await request(target)).status, 404)
+  }
+  assert.equal(previewRoute('POST', '/galaxy/start-area.json'), null)
+  assert.equal((await request('/galaxy/start-area.json', { method: 'POST' })).status, 404)
+})
+
 test('explicit local QA origin accepts only its configured exact port and does not weaken external mode', async () => {
   const localOrigin = 'http://127.0.0.1:20204'
   const localPort = await listen(createPreviewGateway({ previewOrigin: localOrigin, frontendPort: servers[0].address().port }))

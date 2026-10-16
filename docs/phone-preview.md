@@ -254,3 +254,18 @@ accept expanded consent or launch duplicate processes while awaiting feedback.
 The gateway deadline remains `2026-10-19T00:00:00Z`; the foreground ngrok
 supervisor independently stops its owned tunnel at that deadline. No paid plan,
 purchase, persistent service, credential change or deadline extension occurred.
+
+### Logged-out galaxy regression corrected
+
+The first phone visit exposed a missing gateway asset route: galaxy-service loads
+the frozen `/galaxy/start-area.json` directly, while the gateway previously allowed
+only game pages, framework assets and a small public-asset set. The isolated Next
+server already returned200 with73 systems; the gateway returned404. Added only
+this exact static filename for GET/HEAD, with a regression test rejecting sibling
+files, suffixes, encoded variants and POST. All16 gateway tests pass.
+
+Reloaded only the gateway with the same URL, allowlist and UTC deadline. The live
+gateway now returns200 and the exact committed JSON payload; adjacent/forbidden
+paths remain404. External unauthenticated requests still redirect to ngrok OAuth.
+No frontend rebuild, backend change, data reset, seed or user-cookie reuse occurred.
+Travis's signed-in phone refresh remains the final remote verification.

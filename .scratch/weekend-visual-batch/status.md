@@ -126,3 +126,9 @@ Documentation migration and complete numbered-spec archival are committed throug
 f2e7819. Domain-guide alignment is recommendation only pending user reaction;
 retain one glossary and treat the nine domain pages as topic references.
 Meshy private reference upload remains separately unapproved.
+
+- Phone start-area404 diagnosed and fixed: exact `/galaxy/start-area.json` was
+  omitted from gateway public assets; Next already served the73-system file.
+  Gateway reloaded with same protection/deadline; now200 with byte-identical JSON.
+  Sibling/admin/push/env paths still404, outer unauthenticated access stillOAuth302.
+  All16 gateway tests pass; user's phone refresh remains pending. No cookies reused.
