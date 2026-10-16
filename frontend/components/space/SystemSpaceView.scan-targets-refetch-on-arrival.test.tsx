@@ -886,3 +886,26 @@ describe('SystemSpaceView + ScanControl — real network-level scan-target refet
     resolveRunning([])
   })
 })
+
+it('ends scan confirmation when an immediate running-inbox response precedes acceptance notification', async () => {
+  // Distinct timestamps expose ordering reliably: read completion can happen in
+  // the hook success callback before the component acceptance callback runs.
+  let wall = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => wall++)
+  try {
+    mockScanTargets.mockResolvedValue([{ hostId: HOST_ID, kind: 'body', durationMs: 3000 }])
+    mockListRunning.mockResolvedValue([])
+    mockListSettled.mockResolvedValue([{ id: 'instant-settle', type: 'scan', actor: FLEET_A, scope: SYSTEM_ID, committedAt: T0 - 5000, eta: T0 - 1000, status: 'done', resolvedAt: T0 - 500, worldTime: T0 }])
+    mockScan.mockResolvedValue(fleetFixture(FLEET_A))
+    setReads([fleetFixture(FLEET_A)])
+    renderView()
+    const user = userEvent.setup()
+    await waitFor(() => expect(screen.getByTestId('scan-target-select')).toHaveTextContent(HOST_ID))
+    await user.selectOptions(screen.getByTestId('scan-target-select'), HOST_ID)
+    await user.click(screen.getByTestId('scan-commit-button'))
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-report')).toBeInTheDocument()
+      expect(screen.queryByTestId('scan-commit-pending')).not.toBeInTheDocument()
+    })
+  } finally { clock.mockRestore() }
+})

@@ -1328,17 +1328,20 @@ describe('SystemSpaceView — the vitals strip is mounted and fed from the view\
 })
 
 
-it('opens real object details, selects without an order, and hands plotting to the existing course panel', async () => {
+it('opens real object details without an order and replaces them with travel review', async () => {
   view()
   await userEvent.click(screen.getByTestId('system-index-toggle'))
   await userEvent.click(screen.getByTestId('index-feat-body-0'))
   expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
   expect(screen.getByRole('complementary', { name: 'Details for feat-body-0' })).toHaveTextContent('metals')
-  expect(screen.getByTestId('space-command-column')).not.toBeVisible()
+  expect(screen.getByTestId('space-command-column')).toBeVisible()
   expect(mutations.order.mutate).not.toHaveBeenCalled()
   await userEvent.click(screen.getByTestId('index-focus'))
   expect(mutations.order.mutate).not.toHaveBeenCalled()
   await userEvent.click(screen.getByTestId('details-plot'))
+  expect(screen.getByTestId('compact-travel-card')).toBeVisible()
+  expect(screen.getByTestId('details-plot')).not.toBeVisible()
+  expect(screen.getByTestId('system-index-search')).not.toBeVisible()
   expect(screen.getByTestId('space-command-column')).toBeVisible()
   expect(mutations.order.mutate).not.toHaveBeenCalled()
 })
@@ -1451,4 +1454,49 @@ it('keeps docked station services in station details and preserves quantities ac
   expect(screen.getByTestId('refuel-section')).not.toBeVisible()
   await userEvent.click(screen.getByTestId('system-index-toggle'))
   expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
+})
+
+
+describe('compact command fleet gate travel', () => {
+  it('uses the owned fleet server lane and guards repeated activation even without a renderer', async () => {
+    const fleet = dockedFleet({ id: 'gate-command-fleet', attachedTo: 'gate-sys_-6_16', laneId: 'server-served-lane' })
+    stage.available = false
+    setReads({}, { data: [fleet] })
+    view()
+    await userEvent.click(screen.getByTestId('travel-status-entry'))
+    const jump = screen.getByTestId('travel-jump')
+    expect(jump).toBeEnabled()
+    expect(mutations.jump.mutate).not.toHaveBeenCalled()
+    act(() => {
+      fireEvent.click(jump)
+      fireEvent.click(jump)
+    })
+    expect(mutations.jump.mutate).toHaveBeenCalledTimes(1)
+    expect(mutations.jump.mutate.mock.calls[0][0]).toEqual({ fleetId: 'gate-command-fleet', laneId: 'server-served-lane' })
+    expect(mutations.order.mutate).not.toHaveBeenCalled()
+  })
+
+  it('keeps gate travel disabled while mining owns the movement channel', async () => {
+    setReads({}, { data: [dockedFleet({ attachedTo: 'gate-sys_-6_16', laneId: 'server-served-lane' })] })
+    useRunningMine.mockReturnValue({ data: { id: 'active-mine', type: 'mine', eta: T0 + 600000 } })
+    view()
+    await userEvent.click(screen.getByTestId('travel-status-entry'))
+    const jump = screen.getByTestId('travel-jump')
+    expect(jump).toBeDisabled()
+    fireEvent.click(jump)
+    expect(mutations.jump.mutate).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['ordinary body attachment', { attachedTo: 'feat-body-0', laneId: undefined }],
+    ['remote gate', { attachedTo: 'remote-gate', systemId: 'other-system', laneId: 'remote-lane' }],
+    ['fleet already in transit', { laneId: 'server-served-lane', jump: { laneId: 'server-served-lane', destSystemId: 'other-system', departMs: T0, arriveMs: T0 + 60000 } }],
+  ])('offers no jump for %s', async (_label, overrides) => {
+    setReads({}, { data: [dockedFleet(overrides)] })
+    view()
+    await userEvent.click(screen.getByTestId('travel-status-entry'))
+    expect(screen.getByTestId('compact-travel-card')).toBeVisible()
+    expect(screen.queryByTestId('travel-jump')).not.toBeInTheDocument()
+    expect(mutations.jump.mutate).not.toHaveBeenCalled()
+  })
 })

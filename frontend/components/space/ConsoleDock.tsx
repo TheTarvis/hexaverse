@@ -52,6 +52,10 @@ export interface ConsoleDockTab {
 }
 
 export interface ConsoleDockProps {
+  /** Panel placement leaves vitals/navigation with the owning HUD workspace. */
+  placement?: 'dock' | 'panel'
+  /** Always-visible host for announcements when the whole panel can be hidden. */
+  announcementOutlet?: HTMLElement | null
   expanded: boolean
   /** Incremented by the owner on every open request, including one made while already expanded. */
   openSeq: number
@@ -100,6 +104,8 @@ export function ConsoleDock({
   onCollapse,
   strip,
   tabs,
+  placement = 'dock',
+  announcementOutlet,
 }: ConsoleDockProps) {
   const regionId = useId()
   const idBase = useId()
@@ -117,12 +123,12 @@ export function ConsoleDock({
   useLayoutEffect(() => {
     document.documentElement.style.setProperty(
       CONSOLE_DOCK_HEIGHT_VAR,
-      expanded ? CONSOLE_DOCK_HEIGHT_EXPANDED : CONSOLE_DOCK_HEIGHT_COLLAPSED,
+      expanded && placement === 'dock' ? CONSOLE_DOCK_HEIGHT_EXPANDED : CONSOLE_DOCK_HEIGHT_COLLAPSED,
     )
     return () => {
       document.documentElement.style.removeProperty(CONSOLE_DOCK_HEIGHT_VAR)
     }
-  }, [expanded])
+  }, [expanded, placement])
 
   // Every open request moves focus to the selected tab, after the commit that
   // un-hides the region, including when the dock was already expanded.
@@ -197,8 +203,8 @@ export function ConsoleDock({
   return (
     <div
       data-testid="console-dock"
-      className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col"
-      style={expanded ? { height: CONSOLE_DOCK_HEIGHT_EXPANDED } : undefined}
+      className={placement === 'panel' ? 'pointer-events-auto relative flex min-h-9 flex-col' : 'pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col'}
+      style={expanded ? { height: placement === 'panel' ? 'min(22rem, 52dvh)' : CONSOLE_DOCK_HEIGHT_EXPANDED } : undefined}
     >
       {strip}
       <button
@@ -209,7 +215,7 @@ export function ConsoleDock({
         aria-controls={regionId}
         hidden={expanded}
         onClick={() => onOpen(selectedTab)}
-        className={`${CONTROL} absolute bottom-[calc(100%+0.5rem)] right-4 h-7 border border-zinc-200 bg-zinc-50/95 text-zinc-600 backdrop-blur dark:border-white/[0.12] dark:bg-zinc-700/95 dark:text-zinc-400`}
+        className={`${CONTROL} ${placement === 'panel' ? 'relative self-end' : 'absolute bottom-[calc(100%+0.5rem)] right-4'} h-7 border border-zinc-200 bg-zinc-50/95 text-zinc-600 backdrop-blur dark:border-white/[0.12] dark:bg-zinc-700/95 dark:text-zinc-400`}
       >
         Console
       </button>
@@ -261,7 +267,7 @@ export function ConsoleDock({
             <span aria-hidden="true">▾</span>
           </button>
         </div>
-        <ConsoleLiveOutletContext.Provider value={liveOutlet}>
+        <ConsoleLiveOutletContext.Provider value={announcementOutlet ?? liveOutlet}>
           {tabs.map((tab) => (
             <div
               key={tab.id}

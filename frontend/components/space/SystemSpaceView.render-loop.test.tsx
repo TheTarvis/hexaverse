@@ -244,6 +244,8 @@ describe('SystemSpaceView + the transform loop — task 2.1', () => {
       const onRender = vi.fn()
       renderProfiled(onRender)
       await settle()
+      // The dynamic renderer import finishes independently of fake world time.
+      await vi.waitFor(() => expect(screen.queryByTestId('camera-recenter')).not.toBeNull())
       // Fleet following keeps the ship centered; use the overview to test screen motion.
       fireEvent.click(screen.getByTestId('camera-recenter'))
       await settle()

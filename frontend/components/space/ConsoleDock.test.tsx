@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React, { useState, type ReactNode } from 'react'
-import { ConsoleDock, type ConsoleTabId } from './ConsoleDock'
+import { ConsoleDock, ConsoleLivePortal, type ConsoleTabId } from './ConsoleDock'
 
 // RED-PHASE TESTS - openspec change add-console-dock, tasks 1.1-1.5
 // (system-console: "The Console Dock Extends Beneath the Strip...", "The Dock
@@ -333,4 +333,21 @@ describe('ConsoleDock - task 1.5 focus', () => {
     expect(document.activeElement).toBe(open())
     expect(document.activeElement).not.toBe(document.body)
   })
+})
+
+
+it('keeps console announcements reachable when its customizable panel is hidden', () => {
+  const outlet = document.createElement('div')
+  document.body.append(outlet)
+  const view = render(<div hidden><ConsoleDock
+    placement="panel" announcementOutlet={outlet}
+    expanded={false} openSeq={0} selectedTab="log"
+    onOpen={() => {}} onSelectTab={() => {}} onCollapse={() => {}}
+    strip={null} tabs={[{ id: 'log', label: 'Log', content: <ConsoleLivePortal><p role="alert">Scan could not complete</p></ConsoleLivePortal> }]}
+  /></div>)
+  expect(within(outlet).getByRole('alert')).toBeVisible()
+  expect(screen.getByTestId('console-dock-region')).not.toBeVisible()
+  view.unmount()
+  expect(outlet).toBeEmptyDOMElement()
+  outlet.remove()
 })

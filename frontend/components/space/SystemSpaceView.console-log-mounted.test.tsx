@@ -389,13 +389,15 @@ describe('Task 1.4 - nothing of the log is reachable while the dock is collapsed
     expect(region()).toHaveAttribute('hidden')
 
     const visited: Element[] = []
-    screen.getByTestId('vitals-fleet-chevron').focus()
-    for (let i = 0; i < 60; i++) {
+    const anchor = screen.getByTestId('vitals-fleet-chevron')
+    anchor.focus()
+    for (let i = 0; i < 120; i++) {
       await user.tab()
       const el = document.activeElement
-      if (!el || el === document.body) break
-      visited.push(el)
+      if (el) visited.push(el)
+      if (el === anchor) break
     }
+    expect(visited.at(-1), 'the keyboard walk completed a full cycle').toBe(anchor)
     expect(visited, 'non-vacuity: the Tab walk visited the Console control').toContain(open())
     for (const el of visited) expect(region().contains(el), 'a focused stop was inside the collapsed dock region').toBe(false)
 

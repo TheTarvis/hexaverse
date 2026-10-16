@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   preview: vi.fn(),
   order: vi.fn(),
+  stop: vi.fn(),
   mine: vi.fn(),
   listRunning: vi.fn(),
   cancel: vi.fn(),
@@ -57,6 +58,7 @@ vi.mock('@/lib/services', () => ({
   fleetService: {
     preview: (...a: unknown[]) => mocks.preview(...a),
     order: (...a: unknown[]) => mocks.order(...a),
+    stop: (...a: unknown[]) => mocks.stop(...a),
     mine: (...a: unknown[]) => mocks.mine(...a),
     scanTargets: (...a: unknown[]) => mocks.scanTargets(...a),
     scan: (...a: unknown[]) => mocks.scan(...a),
@@ -83,7 +85,6 @@ vi.mock('@/hooks/use-fleets', async () => {
   })
   const jump = inert()
   const cutDrive = inert()
-  const stop = inert()
   const hold = inert()
   const release = inert()
   return {
@@ -91,7 +92,6 @@ vi.mock('@/hooks/use-fleets', async () => {
     useMyFleets: () => mocks.useMyFleets(),
     useJump: () => jump,
     useCutDrive: () => cutDrive,
-    useStop: () => stop,
     useHold: () => hold,
     useRelease: () => release,
   }
@@ -417,6 +417,7 @@ beforeEach(() => {
   running.clear()
   mocks.preview.mockResolvedValue(QUOTE)
   mocks.order.mockResolvedValue(burningFleet('fleet_1'))
+  mocks.stop.mockResolvedValue(fleet('fleet_1'))
   mocks.mine.mockResolvedValue({ id: 'act_mine_fleet_1', eta: T0 + 600_000 })
   mocks.listSettled.mockResolvedValue([])
   mocks.scanTargets.mockResolvedValue([])
@@ -1290,5 +1291,73 @@ describe('SystemSpaceView — burn cost overlay: affordability as text, silence,
     await flush(PREVIEW_REFRESH_MS)
     expect(previewCalls().length, 'exactly one request within one refresh interval').toBe(calls + 1)
     expectOverlay(15, 'affordable', 'the next response landed')
+  })
+})
+
+
+describe('compact production travel', () => {
+  const ready = (id = 'fleet_1') => { const f = fleet(id); return { ...f, roster: { ...f.roster, cargo: { fuel: 1000 } } } }
+  it('reviews a point without an order, commits only explicitly with quoted cap, and guards same-tick activation', async () => {
+    const submitted = deferred<ReturnType<typeof burningFleet>>()
+    mocks.order.mockReturnValueOnce(submitted.promise)
+    mount([ready()]); await flush()
+    await click('mock-select-point'); await click('travel-review-entry')
+    expect(screen.getByTestId('compact-travel-card')).toHaveTextContent('Point in space')
+    expect(screen.getByTestId('travel-start')).toBeEnabled()
+    expect(mocks.order).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(screen.getByTestId('travel-start')); fireEvent.click(screen.getByTestId('travel-start')) })
+    expect(mocks.order).toHaveBeenCalledTimes(1)
+    expect(orderRequest()).toEqual({ point: { X: 30, Y: 0, Z: -10 }, maxFuelTons: QUOTE.fuelCostTons * 1.1 })
+    await act(async () => submitted.resolve(burningFleet('fleet_1'))); await flush()
+    expect(screen.getByTestId('compact-travel-card')).toHaveTextContent('Travelling')
+    expect(screen.getByTestId('travel-stop')).toBeVisible()
+    await click('travel-stop')
+    expect(mocks.stop).toHaveBeenCalledWith('fleet_1')
+    expect(screen.getByTestId('compact-travel-card')).toHaveTextContent('Ready')
+  })
+  it('keeps unaffordable travel reviewable and prevents starting from stale estimates', async () => {
+    mocks.preview.mockResolvedValueOnce({ ...QUOTE, affordable: false, fuelCostTons: 1200 })
+    mount([ready()]); await flush(); await click('mock-select-point'); await click('travel-review-entry')
+    expect(screen.getByTestId('compact-travel-card')).toHaveTextContent('Fuel shortfall')
+    expect(screen.getByTestId('travel-start')).toBeDisabled()
+    mocks.preview.mockRejectedValue(new Error('offline'))
+    await flush(PREVIEW_REFRESH_MS)
+    expect(screen.getByTestId('compact-travel-card')).toHaveTextContent('out of date')
+    expect(screen.getByTestId('travel-start')).toBeDisabled()
+    expect(mocks.order).not.toHaveBeenCalled()
+  })
+  it('switches fleet without losing point target and cannot commit the prior fleet quote', async () => {
+    const replacement = deferred<typeof QUOTE>()
+    mocks.preview.mockImplementation((id: string) => id === 'fleet_b' ? replacement.promise : Promise.resolve(QUOTE))
+    mount([ready(), ready('fleet_b')]); await flush(); await click('mock-select-point'); await click('travel-review-entry')
+    fireEvent.change(screen.getByLabelText('Travel command fleet'), { target: { value: 'fleet_b' } }); await flush()
+    expect(selection()).toBe('point')
+    expect(screen.getByTestId('travel-start')).toBeDisabled()
+    expect(screen.getByTestId('compact-travel-card')).not.toHaveTextContent('Fuel cost')
+    await act(async () => replacement.resolve(QUOTE_2)); await flush()
+    expect(screen.getByTestId('travel-start')).toBeEnabled()
+    await click('travel-start')
+    expect(mocks.order.mock.calls[0][0]).toBe('fleet_b')
+    expect(orderRequest().maxFuelTons).toBeCloseTo(QUOTE_2.fuelCostTons * 1.1)
+  })
+  it('replaces body inspection and returns Back to the retained browse context without an order', async () => {
+    mount([ready()]); await flush()
+    await click('system-index-toggle')
+    fireEvent.change(screen.getByTestId('system-index-search'), { target: { value: 'rocky' } })
+    await click(`index-${OTHER}`); await click('details-plot')
+    expect(screen.getByTestId('compact-travel-card')).toBeVisible()
+    expect(screen.getByTestId('system-index-search')).not.toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /^Back$/ })); await flush()
+    expect(screen.queryByTestId('compact-travel-card')).not.toBeInTheDocument()
+    expect(screen.getByTestId('system-index-search')).toHaveValue('rocky')
+    expect(screen.getByTestId('details-plot')).toBeVisible()
+    expect(mocks.order).not.toHaveBeenCalled()
+  })
+  it('keeps a failed commitment in review with actionable feedback' , async () => {
+    mocks.order.mockRejectedValue(CAP_ERROR)
+    mount([ready()]); await flush(); await click('mock-select-point'); await click('travel-review-entry'); await click('travel-start')
+    expect(screen.getByTestId('travel-start')).toBeInTheDocument()
+    expect(screen.queryByTestId('travel-stop')).not.toBeInTheDocument()
+    expect(screen.getByTestId('compact-travel-card').querySelector('[role="alert"]')).not.toBeNull()
   })
 })

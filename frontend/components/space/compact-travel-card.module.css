@@ -1,0 +1,17 @@
+.card { width: 100%; min-width: 0; max-height: min(70dvh, 620px); }
+.content { display: flex; flex-direction: column; gap: 12px; overflow-wrap: anywhere; }
+.picker { display: flex; flex-direction: column; gap: 6px; color: #a1b3c6; font-size: 12px; }
+.facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; font-size: 13px; }
+.facts dt { color: #a1b3c6; }
+.facts dd { text-align: right; font-variant-numeric: tabular-nums; }
+.actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.actions button { min-height: 40px; }
+.warning { color: #f8ce85; font-size: 13px; line-height: 1.5; }
+.progress { width: 100%; accent-color: #76e3ef; height: 8px; }
+.host { position: absolute; z-index: 30; top: 128px; left: 32px; width: 340px; max-width: calc(100vw - 32px); pointer-events: auto; }
+.entry { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 760px) { .host { top: 112px; left: 16px; width: calc(100vw - 32px); } .card { max-height: calc(100dvh - 230px); } }
+@media (max-width: 760px), (pointer: coarse) {
+  .card button, .card select { min-height: 44px; }
+  .card button[aria-label='Close travel card'] { min-width: 44px; }
+}

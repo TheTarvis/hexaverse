@@ -387,29 +387,42 @@ describe('SystemSpaceView + ConsoleDock - task 2.5 no live region changes', () =
   })
 })
 
-describe('SystemSpaceView + ConsoleDock - task 2.6 the Tab walk on the view', () => {
-  it('Scenario: The dock\'s controls follow the strip\'s chevron in the tab order (collapsed row)', async () => {
+describe('SystemSpaceView + ConsoleDock - workspace keyboard reachability', () => {
+  async function tabCycle(user: ReturnType<typeof userEvent.setup>) {
+    const anchor = screen.getByTestId('vitals-fleet-chevron')
+    anchor.focus()
+    const visited: Element[] = []
+    for (let i = 0; i < 120; i++) {
+      await user.tab()
+      const element = document.activeElement
+      if (element) visited.push(element)
+      if (element === anchor) break
+    }
+    expect(visited.at(-1), 'the keyboard walk completes a full cycle').toBe(anchor)
+    expect(visited).toContain(screen.getByRole('button', { name: 'Arrange HUD' }))
+    expect(visited).toContain(within(screen.getByLabelText('HUD panels')).getByRole('button', { name: 'Console' }))
+    return visited
+  }
+  it('reaches workspace launchers, vitals and the console opener without entering collapsed content', async () => {
     const user = userEvent.setup()
     mount()
-    screen.getByTestId('vitals-fleet-chevron').focus()
-    await user.tab()
-    expect(document.activeElement).toBe(open())
+    const visited = await tabCycle(user)
+    expect(visited).toContain(open())
+    expect(visited.some(element => region().contains(element))).toBe(false)
   })
 
-  it('Scenario: The dock\'s controls follow the strip\'s chevron in the tab order (expanded row)', async () => {
+  it('reaches the expanded console selected tab and collapse control alongside workspace and vitals', async () => {
     const user = userEvent.setup()
     mount()
     fireEvent.click(open())
     expectExpanded()
-    screen.getByTestId('vitals-fleet-chevron').focus()
-    await user.tab()
-    // the selected tab is the one in the tab order (roving tabindex); a fresh expand selects Scan
-    expect(document.activeElement).toBe(screen.getByRole('tab', { selected: true }))
-    await user.tab()
-    expect(document.activeElement).toBe(collapseBtn())
+    const visited = await tabCycle(user)
+    const selectedTab = screen.getByRole('tab', { selected: true })
+    expect(visited).toContain(selectedTab)
+    expect(visited).toContain(collapseBtn())
+    expect(visited.indexOf(collapseBtn())).toBeGreaterThan(visited.indexOf(selectedTab))
   })
 })
-
 describe('SystemSpaceView + ConsoleDock - task 2.7 the log\'s placement', () => {
   const R = [record('sight-a'), record('sight-b', { position: { X: 41, Y: 0, Z: -9 } }), record('sight-c', { position: { X: 42, Y: 0, Z: -8 } })]
 
@@ -595,7 +608,8 @@ describe('SystemSpaceView + ConsoleDock - task 2.13 the dock\'s publication and 
 
     fireEvent.click(open())
     expectExpanded()
-    expect(prop()).toBe('13.75rem')
+    // Panel placement leaves the persistent vitals band at its fixed height.
+    expect(prop()).toBe('3.5rem')
     expect(screen.getByTestId('sightings-unavailable')).toHaveClass(CONSOLE_DOCK_LANE_LEFT_CENTER)
     expect(screen.getByTestId('space-command-column')).toHaveClass(CONSOLE_DOCK_LANE_COLUMN)
 

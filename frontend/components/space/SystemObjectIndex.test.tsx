@@ -109,3 +109,20 @@ it('keeps contact thumbnails anonymous and unknown feature thumbnails generic', 
   expect(details.querySelector('img')).toBeNull()
   expect(details.querySelector('canvas')).toBeNull()
 })
+
+
+it('keeps compact browser search and rows mounted while replacement travel body is reviewed', () => {
+  const props = { objects: [{ name: 'planet', kind: 'Rocky', group: 'Worlds', x: 0, y: 0 }], selected: 'planet', open: true, compact: true, onOpen: vi.fn(), onSelect: vi.fn(), onFocus: vi.fn() }
+  const { rerender } = render(<SystemIndex {...props} />)
+  fireEvent.change(screen.getByTestId('system-index-search'), { target: { value: 'rock' } })
+  fireEvent.click(screen.getByTestId('index-planet'))
+  const search = screen.getByTestId('system-index-search')
+  rerender(<SystemIndex {...props} inspectorBody={<p>Review this trip</p>} />)
+  expect(screen.getByText('Review this trip')).toBeVisible()
+  expect(search).not.toBeVisible()
+  expect(screen.getByRole('heading', { name: 'planet', hidden: true })).not.toBeVisible()
+  rerender(<SystemIndex {...props} />)
+  expect(screen.getByTestId('system-index-search')).toBe(search)
+  expect(search).toHaveValue('rock')
+  expect(screen.getByRole('heading', { name: 'planet' })).toBeVisible()
+})

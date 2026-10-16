@@ -29,8 +29,9 @@ Ruin/debris generated01 GLBs are review-only and not loaded by game code.
 
 Run revised world close/gameplay/distant and actual object-browser interaction review again
 before acceptance. Check low-resolution radiation contrast and manufactured hull readability.
-Renderer screenshots show actual browser output; backend was not independently identified,
-so do not claim native WebGPU and WebGL2 visual parity from this checkpoint alone.
+Chrome canvas data-renderer-backend confirmed native WebGPU in feature comparison
+and model review. Offline thumbnail capture explicitly uses WebGL2. These are separate
+path checks, not proof of exact visual parity.
 
 ## Completed verification
 

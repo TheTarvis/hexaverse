@@ -38,6 +38,7 @@ import { CelestialActions } from './CelestialActions'
 import { Button } from '@/components/catalyst/button'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
+import { HudWorkspace, type HudPanelId } from '@/components/hud/HudWorkspace'
 import { HudRoot, HudHeading, HudColumn } from '@/components/hud/GameHud'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useRouter } from 'next/navigation'
@@ -53,10 +54,16 @@ import { useCommandGuide } from '@/hooks/use-command-guide'
 import { SystemObjectIndex } from './SystemObjectIndex'
 import { RecoveryTransmission } from './RecoveryTransmission'
 import commandStyles from './command-view.module.css'
-import { useMyFleets } from '@/hooks/use-fleets'
+import { useMyFleets, useOrder, useStop, useJump } from '@/hooks/use-fleets'
+import { useSubmitGuard } from '@/hooks/use-submit-guard'
+import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
+import { burnErrorCopy, commandErrorReason, isQuotedCapExceeded } from '@/lib/rejection-copy'
+import { jumpErrorCopy } from '@/lib/jump-copy'
+import { CompactTravelCard } from './CompactTravelCard'
+import travelStyles from './compact-travel-card.module.css'
 import { useMarketBoard, useStation } from '@/hooks/use-market'
 import { useReducedMotion } from '@/hooks/use-reduced-motion'
-import { useScanTargets, useSettledScan } from '@/hooks/use-scan'
+import { useScanTargets, useSettledScan, type ScanCommitMarker } from '@/hooks/use-scan'
 import { useSightings } from '@/hooks/use-sightings'
 import { useSystemSpace } from '@/hooks/use-system-space'
 import { useCoarseWorldTime, useWorldClock, wallMsUntil, type WorldClock } from '@/lib/client-clock'
@@ -73,7 +80,7 @@ import { SightingLog } from './SightingLog'
 import { SpaceCommandPanel, type AcceptedBurnCommit } from './SpaceCommandPanel'
 import { SpaceStage } from './SpaceStage'
 import { buildSceneModel } from './space-scene'
-import { selectionKey, toggleSelection, type SpaceSelection } from './space-selection'
+import { selectionKey, selectionWireRequest, toggleSelection, type SpaceSelection } from './space-selection'
 import type { SceneFrameInputs, SpaceFrameSource } from './space-transform-loop'
 import { VitalsStrip } from './VitalsStrip'
 
@@ -283,6 +290,17 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const { corporation: sessionCorporation, isError: sessionFailed } = useCorporationSessionOptional()
   const creditsShown: number | null = sessionFailed ? null : (sessionCorporation?.credits ?? null)
 
+  const travelOrder = useOrder()
+  const travelStop = useStop()
+  const travelJump = useJump()
+  const jumpGuard = useSubmitGuard()
+  const travelGuard = useSubmitGuard()
+  const stopGuard = useSubmitGuard()
+  const [travelMode, setTravelMode] = useState<'review' | 'status' | null>(null)
+  const [travelNotice, setTravelNotice] = useState<string | null>(null)
+  const [travelError, setTravelError] = useState<string | null>(null)
+  const [travelPending, setTravelPending] = useState(false)
+  const [travelReceipt, setTravelReceipt] = useState<{ fleet: Fleet; destination: string; readCount: number | undefined } | null>(null)
   const [selection, setSelection] = useState<SpaceSelection | null>(null)
   const [inspectedFleetId, setInspectedFleetId] = useState<string | null>(null)
   useEffect(() => { setInspectedFleetId(null) }, [systemId, selection])
@@ -322,10 +340,16 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     openSeq: 0,
     tab: 'scan',
   })
+  const [hudRequest, setHudRequest] = useState<{ id: HudPanelId; sequence: number }>()
+  const [consoleAnnouncementOutlet, setConsoleAnnouncementOutlet] = useState<HTMLDivElement | null>(null)
+  const requestHudPanel = useCallback((id: HudPanelId) => {
+    setHudRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 }))
+  }, [])
   const openDockOn = useCallback((tab: ConsoleTabId) => {
     if (!isConsoleTabId(tab)) return
     setDock((d) => ({ expanded: true, openSeq: d.openSeq + 1, tab }))
-  }, [])
+    requestHudPanel('console')
+  }, [requestHudPanel])
   const selectDockTab = useCallback((tab: ConsoleTabId) => {
     if (!isConsoleTabId(tab)) return
     setDock((d) => ({ ...d, tab }))
@@ -367,6 +391,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const discoveryStarted = discovering && discoveredGuide === discoveryKey
   function openObjectIndex(open: boolean) {
     setObjectIndexOpen(open)
+    if (open) requestHudPanel('objects')
     if (open && discovering) {
       setDiscoveredGuide(discoveryKey)
       if (guide?.phase === 'objects') {
@@ -466,26 +491,20 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     [qc, guide, guiding, saveCommandGuide],
   )
   const actingRunningScan = useRunningScan(acting?.id ?? null)
-  const commitPendingMarker = useQuery<number | null>({
+  const commitPendingMarker = useQuery<ScanCommitMarker | null>({
     queryKey: queryKeys.fleets.scanCommitPending(acting?.id ?? ''),
     // Never actually fetched — `enabled: false` — this query exists purely
-    // as a reactive, cache-backed store `qc.setQueryData` writes into.
+    // as a reactive cache-backed store the scan mutation writes into.
     queryFn: () => null,
     enabled: false,
     initialData: null,
   })
-  const markScanCommitAccepted = useCallback(() => {
-    if (acting?.id) qc.setQueryData(queryKeys.fleets.scanCommitPending(acting.id), Date.now())
-  }, [qc, acting?.id])
-  // DERIVED, never imperatively cleared: once the running-status read's
-  // own `dataUpdatedAt`/`errorUpdatedAt` advances past the marker, a FRESH
-  // read has landed — carrying the sweep, carrying nothing (handing off to
-  // the settled report, P1b), or failing outright (handing off to the
-  // failed-read state, P1a) — and the window is over by construction.
-  const committedPending =
-    commitPendingMarker.data != null &&
-    commitPendingMarker.data > actingRunningScan.dataUpdatedAt &&
-    commitPendingMarker.data > actingRunningScan.errorUpdatedAt
+  // The scan mutation publishes this generation before refreshing the inbox.
+  // A completed read advances a counter even when timestamps are equal.
+  const scanInbox = qc.getQueryState(queryKeys.actions.running(acting?.id ?? ''))
+  const committedPending = commitPendingMarker.data != null &&
+    (scanInbox?.dataUpdateCount ?? 0) <= commitPendingMarker.data.dataUpdates &&
+    (scanInbox?.errorUpdateCount ?? 0) <= commitPendingMarker.data.errorUpdates
 
   // task 5.13's early-settle exit (F11-1, link8b-adversary-r11): the window
   // above ends one of three ways — a failed read (hands off to the
@@ -496,13 +515,13 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // that third exit has no other trigger for the post-settle follower
   // reads — the client never read a running sweep on this path, so it
   // never learned an eta, so `ScanSweepWatcher`'s own timer never arms.
-  // Detected on the pending->not-pending TRANSITION (a ref, not a stored
-  // flag) so this fires exactly once per window, reusing the same three
+  // Each completed marker is consumed once, including when React batches
+  // away the intermediate pending render, reusing the same three
   // follower reads `ScanSweepWatcher` already performs: the pile
   // (`refetchGhostFeed`), the settled-status inbox
   // (`actingSettledScanRefetchRef`), and the scan-target invalidation
   // scoped to the acting fleet.
-  const wasCommittedPendingRef = useRef(false)
+  const completedScanMarkers = useRef(new WeakSet<ScanCommitMarker>())
   // F11-2 (orchestrator ruling 2026-09-03, defect found during the F11-1
   // build): the empty-set copy this transition withholds below must be
   // withheld only for the report THIS transition explains, never for any
@@ -514,21 +533,22 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // settled-status read lands FRESH relative to it (the refetch just
   // below), whatever id it carries (if any) is captured as the report
   // this handoff explains.
-  const earlySettleMarkerRef = useRef<number | null>(null)
+  const earlySettleMarkerRef = useRef<ScanCommitMarker | null>(null)
   const earlySettleExplainedIdRef = useRef<string | null>(null)
   useEffect(() => {
-    const was = wasCommittedPendingRef.current
-    wasCommittedPendingRef.current = committedPending
-    if (!was || committedPending) return
+    const marker = commitPendingMarker.data
+    if (!marker || committedPending || completedScanMarkers.current.has(marker)) return
+    completedScanMarkers.current.add(marker)
     if (actingRunningScan.isError || actingRunningScan.data) return
-    earlySettleMarkerRef.current = Date.now()
+    const settled = qc.getQueryState(queryKeys.actions.settled(acting?.id ?? ''))
+    earlySettleMarkerRef.current = { dataUpdates: settled?.dataUpdateCount ?? 0, errorUpdates: settled?.errorUpdateCount ?? 0 }
     earlySettleExplainedIdRef.current = null
     rereadPilesAfterSettle()
     void actingSettledScanRefetchRef.current()
     if (actingIdRef.current) {
       void qc.invalidateQueries({ queryKey: queryKeys.fleets.scanTargets(actingIdRef.current) })
     }
-  }, [committedPending, actingRunningScan.isError, actingRunningScan.data, rereadPilesAfterSettle, qc])
+  }, [commitPendingMarker.data, committedPending, actingRunningScan.isError, actingRunningScan.data, acting?.id, rereadPilesAfterSettle, qc])
 
   // Derived every render, never imperatively cleared (mirrors
   // `committedPending`'s own derivation just above): while waiting for the
@@ -537,9 +557,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // while the id it carried is still the unacknowledged report on screen —
   // never for an older or later, unrelated one.
   if (earlySettleMarkerRef.current != null) {
+    const settled = qc.getQueryState(queryKeys.actions.settled(acting?.id ?? ''))
     const landedFresh =
-      actingSettledScan.dataUpdatedAt > earlySettleMarkerRef.current ||
-      actingSettledScan.errorUpdatedAt > earlySettleMarkerRef.current
+      (settled?.dataUpdateCount ?? 0) > earlySettleMarkerRef.current.dataUpdates ||
+      (settled?.errorUpdateCount ?? 0) > earlySettleMarkerRef.current.errorUpdates
     if (landedFresh) {
       earlySettleExplainedIdRef.current = actingSettledScan.data?.id ?? null
       earlySettleMarkerRef.current = null
@@ -795,6 +816,9 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const selectFleet = useCallback(
     (fleet: Fleet) => {
       setActingFleetId(fleet.id)
+      requestHudPanel('command')
+      setTravelReceipt(null)
+      setTravelNotice(null)
       setFleetFocus(previous => ({ fleetId: fleet.id, sequence: (previous?.sequence ?? 0) + 1 }))
       if (isInTransit(fleet)) {
         router.push('/')
@@ -805,7 +829,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         return
       }
     },
-    [router, systemId, setActingFleetId],
+    [router, systemId, setActingFleetId, requestHudPanel],
   )
 
   // --- derived panel inputs ------------------------------------------------
@@ -892,6 +916,71 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     commitWouldBeAccepted: previewWanted,
   })
   const currentQuote = burnPreview.preview && !burnPreview.stale ? burnPreview.preview : null
+  const destinationLabel = selection?.bodyId ? nameOf(selection.bodyId) : selection?.point ? 'Point in space' : 'Choose a destination'
+  const travelBlocker = fleets.isError ? 'Fleet telemetry unavailable. Retry the fleet read.'
+    : !acting ? 'Choose an owned fleet.' : actingRemote ? 'Choose a fleet in this system.'
+    : !selection ? 'Choose a destination.' : !canvasAvailable ? 'The system view is unavailable.'
+    : mineRunning ? 'Stop mining before travelling.' : dockedAtTarget ? 'This fleet is already at this destination.'
+    : selectionCommitted ? 'Travel to this destination is already committed.'
+    : burnPreview.stale ? 'The estimate is out of date. Request a fresh estimate.'
+    : burnPreview.noQuote ? 'The trip could not be estimated. Retry or choose another destination.'
+    : !currentQuote ? 'Calculating trip…' : !currentQuote.affordable ? 'Insufficient fuel for this trip.' : null
+  const startTravel = () => {
+    const request = selectionWireRequest(selection)
+    if (travelBlocker || !acting || !request || !currentQuote?.affordable || !travelGuard.claim()) return
+    const fleetId = acting.id, targetKey = selectionKey(selection), label = destinationLabel, agreedArrival = currentQuote.arriveMs
+    setTravelError(null); setTravelPending(true)
+    travelOrder.mutate({ fleetId, request: { ...request, maxFuelTons: currentQuote.fuelCostTons * BURN_FUEL_ALLOWANCE } }, {
+      onSuccess: fleet => {
+        const burn = fleet.state?.Burn
+        setTravelNotice(burn && burn.ArriveMs !== agreedArrival ? 'The accepted arrival differs from the estimate. Status reflects the accepted order.' : null)
+        handleCommitAccepted({ fleetId, departMs: burn?.DepartMs ?? null, arriveMs: burn?.ArriveMs ?? null, selectionKey: targetKey, strandingWarning: fleet.strandingWarning === true })
+        setTravelReceipt({ fleet, destination: label, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
+        setTravelMode('status')
+        setObjectIndexOpen(false)
+        requestHudPanel('command')
+      },
+      onError: error => {
+        const reason = commandErrorReason(error)
+        setTravelError(burnErrorCopy(reason))
+        if (isQuotedCapExceeded(reason)) burnPreview.retry()
+      },
+      onSettled: () => { travelGuard.release(); setTravelPending(false) },
+    })
+  }
+  const statusRead = travelReceipt ? allFleets.find(fleet => fleet.id === travelReceipt.fleet.id) : acting
+  const statusFleet = travelReceipt && fleetReadCount === travelReceipt.readCount ? travelReceipt.fleet : statusRead ?? null
+  const stopTravel = () => {
+    if (!statusFleet || fleets.isError || travelPending || !stopGuard.claim()) return
+    setTravelError(null); setTravelPending(true)
+    travelStop.mutate(statusFleet.id, {
+      onSuccess: fleet => setTravelReceipt({ fleet, destination: 'Stopping in place', readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount }),
+      onError: error => setTravelError(burnErrorCopy(commandErrorReason(error))),
+      onSettled: () => { stopGuard.release(); setTravelPending(false) },
+    })
+  }
+  const jumpTravel = () => {
+    if (!statusFleet?.laneId || statusFleet.jump || statusFleet.systemId !== systemId || mineRunning || fleets.isError || travelPending || !jumpGuard.claim()) return
+    setTravelError(null); setTravelPending(true)
+    travelJump.mutate({ fleetId: statusFleet.id, laneId: statusFleet.laneId }, {
+      onSuccess: fleet => {
+        setTravelReceipt({ fleet, destination: 'Inter-system transit', readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
+        setTravelNotice('Jump committed.')
+      },
+      onError: error => setTravelError(jumpErrorCopy(commandErrorReason(error))),
+      onSettled: () => { jumpGuard.release(); setTravelPending(false) },
+    })
+  }
+  const statusDestination = travelReceipt?.destination ?? (statusFleet?.state?.Burn?.Target.BodyId ? nameOf(statusFleet.state.Burn.Target.BodyId) : statusFleet?.state?.Burn?.Target.Point ? 'Point in space' : statusFleet?.attachedTo ? nameOf(statusFleet.attachedTo) : 'In this system')
+  const reviewTravel = () => { setTravelError(null); setTravelNotice(null); setTravelMode('review'); requestHudPanel(selection?.bodyId && objectIndexOpen ? 'objects' : 'command') }
+  const travelCard = travelMode ? <CompactTravelCard mode={travelMode} fleet={travelMode === 'status' ? statusFleet : acting}
+    fleets={allFleets} systemId={systemId} destination={travelMode === 'status' ? statusDestination : destinationLabel}
+    quote={currentQuote} worldTime={worldTime} scale={servedScale} blocker={travelBlocker} notice={travelNotice} error={fleets.isError ? 'Fleet telemetry unavailable.' : travelError}
+    pending={travelPending} warning={travelReceipt?.fleet.strandingWarning}
+    additionalActions={statusFleet?.laneId && !statusFleet.jump && statusFleet.systemId === systemId ? <Button outline data-testid="travel-jump" disabled={travelPending || mineRunning || fleets.isError} onClick={jumpTravel}>Jump through gate</Button> : undefined}
+    onFleet={id => { if (!travelGuard.held) { setActingFleetId(id); setTravelError(null) } }} onStart={startTravel} onStop={stopTravel}
+    onBack={() => { if (!travelGuard.held) { setTravelMode(null); openObjectIndex(true) } }}
+    onClose={() => { if (!travelGuard.held) setTravelMode(null) }} onRetry={burnPreview.retry} /> : null
   const showLoading = !interiorFailed && (canvasAvailable || rendererPending) && (interior.isLoading || !firstFrame)
 
 
@@ -1066,7 +1155,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               worldTime={worldTime}
               scale={servedScale}
               selection={selection}
-              onSelect={(picked) => { setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)) }}
+              onSelect={(picked) => { if (travelGuard.held) return; setTravelMode(null); setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)); if (picked?.point) requestHudPanel('command') }}
               onAvailabilityChange={setCanvasAvailable}
               onPendingChange={setRendererPending}
               onFirstFrame={handleFirstFrame}
@@ -1125,8 +1214,15 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
       )}
       {guiding && guide && <aside className={commandStyles.objectiveCard} aria-label="Current objective"><span className={commandStyles.signal}>CURRENT OBJECTIVE</span><p role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</p></aside>}
-      <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={guiding && guide?.phase === 'wake' ? { display: 'none' } : undefined}>
+      <HudWorkspace
+        corporationId={corporation?.id ?? sessionCorporation?.id ?? 'unavailable'}
+        className={commandStyles.workspace}
+        request={hudRequest}
+        panels={[
+          { id: 'objects', label: 'Objects', children: (
+      <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={{ position: 'relative', inset: 'auto', width: '100%', height: '100%', ...(guiding && guide?.phase === 'wake' ? { display: 'none' } : {}) }}>
         <SystemObjectIndex
+          compact
           key={systemId}
           systemName={systemNames[systemId] ?? systemId}
           objects={[
@@ -1140,6 +1236,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               ...(fleet.roster ? { shipCount: fleet.roster.ships.length } : {}),
             } })),
           ]}
+          inspectorBody={travelMode === 'review' && objectIndexOpen && !!selection?.bodyId ? travelCard : undefined}
           detailContent={stationActionsHost || (objectIndexOpen && selection?.bodyId) ? <>{stationActionsHost && <div style={stationActionsHost !== selection?.bodyId ? { display: "none" } : undefined}>{marketNotices}{fleetActions}</div>}{objectIndexOpen && interior.data?.features.filter(body => body.id === selection?.bodyId).map(body => <CelestialActions key={`${systemId}:${body.id}`} systemId={systemId} body={body} fleetId={acting && !actingRemote ? acting.id : null} onSettled={() => { void interior.refetch(); void fleets.refetch() }} />)}</> : undefined}
           detailContentFor={selection?.bodyId ?? stationActionsHost ?? undefined}
           selected={selection?.bodyId ?? null}
@@ -1155,27 +1252,28 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           tutorialTarget={guiding ? guide?.phase === 'station' ? guide.stationId : guide?.targetId : null}
           open={objectIndexOpen}
           onOpen={openObjectIndex}
-          onSelect={id => { setInspectedFleetId(null); setSelection({ bodyId: id }) }}
+          onSelect={id => { setTravelMode(null); setInspectedFleetId(null); setSelection({ bodyId: id }) }}
           onFocus={() => { if (selection?.bodyId) setGuideFocus(previous => ({ bodyId: selection.bodyId!, sequence: (previous?.sequence ?? 0) + 1 })) }}
           canPlot={!!acting && !actingRemote && !!selection?.bodyId && interior.data?.features.find(body => body.id === selection.bodyId)?.type !== 'star'}
-          onPlot={() => setObjectIndexOpen(false)}
+          onPlot={reviewTravel}
           loading={interior.isLoading}
           failed={interiorFailed}
           onRetry={() => void interior.refetch()}
           disabled={!canvasAvailable || interiorFailed || interior.isLoading || (!!inspectedFleetId && !scene.marks.some(mark => mark.kind === 'fleet' && mark.id === inspectedFleetId))}
         />
       </div>
-      {/* The command column floats over the canvas, top-right, scrolling
-          within the viewport when it outgrows it. The gaps between panels
-          pass pointer events through to the stage. Bottom inset raised above
-          the console dock and the camera cluster (the column lane of
-          `lib/console-dock-layout`) — its own [&>*]:pointer-events-auto children
-          would otherwise sit over the strip's clock and credits cells and
-          eat their pointer events. */}
+          ) },
+          { id: 'command', label: 'Command', children: (
+<div className={commandStyles.workspaceCommand}>
+        {!(travelMode === 'review' && objectIndexOpen && selection?.bodyId) && travelCard}
+        {!travelMode && <div className={travelStyles.entry}>
+          {selection && <Button color="cyan" data-testid="travel-review-entry" onClick={reviewTravel}>Travel here</Button>}
+          {acting && <Button outline data-testid="travel-status-entry" onClick={() => { setTravelReceipt(null); setTravelMode('status'); setTravelError(null); requestHudPanel('command') }}>Command fleet</Button>}
+        </div>}
       <HudColumn
         data-testid="space-command-column"
         side="left"
-        style={objectIndexOpen || (guiding && guide?.phase === 'wake') ? { display: 'none' } : undefined}
+        style={{ position: 'relative', inset: 'auto', width: '100%', maxHeight: 'none', ...(guiding && guide?.phase === 'wake' ? { display: 'none' } : {}) }}
         dockAware
         className={commandStyles.systemColumn}
       >
@@ -1244,12 +1342,9 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           onSelect={selectFleet}
         />
       </HudColumn>
-
-      {/* The console dock (openspec change `add-console-dock`,
-          `system-console`) — the LAST child of the view, full-width across
-          the foot, above the stage in z-order. Its top row is the vitals
-          strip (openspec change `add-vitals-strip`), fed entirely from reads
-          this view already holds: the strip issues no read of its own. */}
+      </div>
+          ) },
+          { id: 'console', label: 'Console', children: (
       <ConsoleDock
         expanded={dock.expanded}
         openSeq={dock.openSeq}
@@ -1278,7 +1373,6 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
                 onOpenLog={openLog}
                 committedPending={committedPending}
                 onCommitAccepted={(accepted) => {
-                  markScanCommitAccepted()
                   if (guiding && guide?.phase === 'scan' && accepted?.id === guide.fleetId && accepted.activeScanId) {
                     saveCommandGuide({ ...guide, phase: 'scanning', scanActionId: accepted.activeScanId })
                     collapseDock()
@@ -1290,8 +1384,16 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           },
           { id: 'log', label: 'Log', content: logTabContent },
         ]}
-        strip={
-        <VitalsStrip
+        strip={null}
+        placement="panel"
+        announcementOutlet={consoleAnnouncementOutlet}
+      />
+          ) },
+        ]}
+      />
+      <div ref={setConsoleAnnouncementOutlet} data-testid="workspace-console-announcements" />
+      <div className={commandStyles.workspaceVitals}>
+<VitalsStrip
           acting={acting}
           ownedFleets={allFleets}
           fleetsFailed={fleets.isError}
@@ -1306,8 +1408,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             ? { burnCost: { tons: currentQuote.fuelCostTons, affordable: currentQuote.affordable } }
             : {})}
         />
-        }
-      />
+      </div>
     </HudRoot>
   )
 }

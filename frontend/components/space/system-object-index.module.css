@@ -43,3 +43,9 @@
 
 
 .detailServices > aside { width: 100%; max-width: 100%; padding: 0; border: 0; background: transparent; }
+
+/* Workspace cards keep the browser mounted while one inspector replaces its rows. */
+.compact { width: 100%; }
+.compact .systemIndex, .compact .objectDetails { flex: 1 1 100%; width: 100%; min-width: 0; }
+.compact .indexPanels[data-details='true'] .systemIndex { display: none; }
+.compact .objectDetails { border-left: 1px solid #76e3ef44; }

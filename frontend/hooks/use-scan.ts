@@ -39,12 +39,21 @@ export function useScanTargets(fleetId: string | null): UseQueryResult<ScanTarge
 // useScan — commit a focused scan against a listed target's served host id.
 // A successful commit invalidates the running-scan inbox read and the
 // target list (task 4.9): the sensor slot just claimed changes both.
+/** Inbox generation observed immediately before a successful commit triggers its refresh. */
+export interface ScanCommitMarker { dataUpdates: number; errorUpdates: number }
+
 export function useScan(fleetId: string | null): UseMutationResult<Fleet, Error, { hostId: string }> {
   const qc = useQueryClient()
   return useMutation<Fleet, Error, { hostId: string }>({
     mutationFn: ({ hostId }) => fleetService.scan(fleetId as string, hostId),
     onSuccess: () => {
       if (!fleetId) return
+      const inbox = qc.getQueryState(queryKeys.actions.running(fleetId))
+      // Publish before invalidating: a fast response may finish before the
+      // caller's mutation callback. Counters also distinguish same-ms reads.
+      qc.setQueryData<ScanCommitMarker>(queryKeys.fleets.scanCommitPending(fleetId), {
+        dataUpdates: inbox?.dataUpdateCount ?? 0, errorUpdates: inbox?.errorUpdateCount ?? 0,
+      })
       void qc.invalidateQueries({ queryKey: queryKeys.actions.running(fleetId) })
       void qc.invalidateQueries({ queryKey: queryKeys.fleets.scanTargets(fleetId) })
     },

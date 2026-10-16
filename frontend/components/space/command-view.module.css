@@ -121,3 +121,10 @@
   .commandView:has(.objectiveCard) .objectBrowser { bottom: calc(var(--console-dock-height, 56px) + 300px); }
   .commandView .objectiveCard { bottom: calc(var(--console-dock-height, 56px) + 170px); }
 }
+
+/* Configurable content leaves the vitals/navigation lane permanently reachable. */
+.workspace { bottom: 72px; }
+.workspaceCommand { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.workspaceVitals { position: absolute; z-index: 35; bottom: 0; inset-inline: 0; pointer-events: auto; }
+.workspace .systemColumn { gap: 12px; }
+@media (max-width: 760px) { .workspace { bottom: 72px; } }
