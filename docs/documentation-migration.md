@@ -178,3 +178,20 @@ snapshots were rebased, plain-text references retain their original source conte
 Incoming old paths remain valid, and the audit found no incoming #0003 anchor
 fragments requiring compatibility. Original-path numeric references remain intact.
 No gameplay code or imported skills changed. Parent review/commit owns the Git checkpoint.
+
+## Complete numbered-spec folder cleanup — 2026-10-16
+
+Travis clarified that cleanup covers all of `docs/specs`. The
+[file-by-file audit](history/2026-rebuild/specs/README.md) inventories every remaining
+numbered path, index and backlog stub; each has a canonical owner and full archive
+provenance. Ten additional full specs (3,564 lines) and the original index (26 lines)
+were archived. All 13 remaining folder files are redirects/navigation, with no
+accepted/implemented badges or obsolete authoring marker. Existing #0003/BACKLOG
+archives were reused unchanged. Per-file reconciliation found no live WIP plan in
+that historical folder. Active scratch, budgets and assets remain untouched.
+
+Unique surviving invariants were captured in world/travel/actions/economy/discovery/
+ships owners before archival. Old scenario citations remain traceable. Genuine
+future decisions and the scheduler audience discrepancy are explicit in the audit;
+none authorizes a gameplay/security change. Full source records preserve unresolved
+history, avoiding blind deletion or promotion of old proposals into accepted rules.

@@ -1,26 +1,25 @@
-# Historical gameplay specs
+# Historical spec paths
 
-Current domain rules and open questions live in [canonical documentation](../README.md).
+Current game rules, settled intent and open questions live in
+[canonical documentation](../README.md). **This folder contains compatibility
+redirects only**, not accepted specs or an active backlog. Full historical records
+and per-file findings are in the [folder-wide audit](../history/2026-rebuild/specs/README.md).
 
-These numbered documents preserve gameplay intent from the early rebuild.
-Their statuses and scenario markers describe that period; code and tests are
-the source of truth for current behavior. New work uses the Matt Pocock skills
-and the local issue tracker described in `docs/agents/issue-tracker.md`.
-See `docs/game-architecture.md` for the domain reference.
+| Retained numbered path | Current owner |
+| --- | --- |
+| [0001-galaxy-generation.md](0001-galaxy-generation.md) | [world](../domains/world.md) |
+| [0002-galaxy-view.md](0002-galaxy-view.md) | [world](../domains/world.md) |
+| [0003-system-interior.md](0003-system-interior.md) | [world](../domains/world.md) |
+| [0004-movement-board.md](0004-movement-board.md) | [travel](../domains/travel.md) |
+| [0005-action-timer.md](0005-action-timer.md) | [actions-and-time](../domains/actions-and-time.md) |
+| [0006-scan-and-fog.md](0006-scan-and-fog.md) | [sensors-and-stealth](../domains/sensors-and-stealth.md) |
+| [0007-hex-board-view.md](0007-hex-board-view.md) | [hud](../hud.md) |
+| [0008-movement-galaxy.md](0008-movement-galaxy.md) | [travel](../domains/travel.md) |
+| [0009-spawn.md](0009-spawn.md) | [discovery-and-identity](../domains/discovery-and-identity.md) |
+| [0010-mine.md](0010-mine.md) | [economy](../domains/economy.md) |
+| [0011-fleet-roster.md](0011-fleet-roster.md) | [ships-and-fleets](../domains/ships-and-fleets.md) |
 
-## Index
-
-<!-- specs:index (the /spec tool appends rows below this line; keep it) -->
-| # | Spec | Status |
-|---|------|--------|
-| 0011 | [Fleet Roster (where is everything?)](0011-fleet-roster.md) | implemented |
-| 0010 | [Mine (extraction verb)](0010-mine.md) | accepted |
-| 0009 | [Spawn & Corporation Identity](0009-spawn.md) | implemented |
-| 0008 | [Inter-system Movement (galaxy graph)](0008-movement-galaxy.md) | accepted |
-| 0007 | [Hex Board View (system renderer)](0007-hex-board-view.md) | accepted |
-| 0006 | [Scan & Fog of War](0006-scan-and-fog.md) | accepted |
-| 0005 | [Action & Timer System](0005-action-timer.md) | accepted |
-| 0004 | [In-system movement (coast & thrust)](0004-movement-board.md) | accepted |
-| 0003 | [System interior generation](0003-system-interior.md) | accepted |
-| 0002 | [Galaxy view (galactic graph UI)](0002-galaxy-view.md) | accepted |
-| 0001 | [Galaxy generation](0001-galaxy-generation.md) | accepted |
+[BACKLOG.md](BACKLOG.md) is a historical redirect. The retired authoring template
+was removed in the earlier cleanup; current documents follow the domain format.
+Existing numeric/scenario citations remain traceable through these paths. No
+scratch implementation plan, asset or budget record was pruned.

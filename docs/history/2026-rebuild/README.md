@@ -30,3 +30,11 @@ Markdown links resolve; no incoming old-path anchor fragments were found. The
 3,228 original lines became 45 redirect lines; removing the 84-line template
 reduces active source-path content by **3,267 lines**. No source content was lost
 from the five archived records.
+
+## Complete specs-folder pass
+
+The [file-by-file audit](specs/README.md) records the subsequent whole-folder
+cleanup: ten additional full specs and the original index archived, all thirteen
+remaining paths classified and retained as redirects/navigation. Earlier #0003
+and BACKLOG snapshots remain unchanged. No historical spec metadata remains active
+in docs/specs; no scratch or asset cleanup was performed.

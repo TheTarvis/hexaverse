@@ -50,6 +50,12 @@ claims/home rights? Which knowledge products can players trade? Confirm those
 contracts separately. Active discovery/naming scratch work is implementation
 tracking; durable decisions belong here once verified, not in a second rulebook.
 
+Historical deferred intent: [backup/restore lore](../lore.md) and #0009 envision
+restoration into a new corporation with mechanically fresh state, while preserving
+narrative lineage. No implemented restore flow is established here. Death/restore
+rules, persistence of knowledge and player-facing restart need separate scoping;
+this is not permission to erase an existing corporation.
+
 ## Related sources
 
 [World](world.md), [stations](stations.md), [ships/fleets](ships-and-fleets.md),

@@ -19,7 +19,9 @@ Historical source: [goods-market decisions](../plans/goods-market.md).
   and the movement channel. Belt member targets resolve to their parent belt lode.
   [Resolution](../../backend/mine/resolver.go) clamps to remaining resources/free
   capacity, records exactly-once lode debit and credits cargo, reporting completion,
-  dry lode or full hold.
+  dry lode or full hold. Runs target tonnage of one resource kind; committed
+  ETA derives from tons/rate. There is no scan prerequisite. Resource depletion
+  deliberately gives players a reason to explore beyond a depleted host.
 - Cargo is pooled by fleet; all cargo, including fuel, occupies hold capacity.
   [Roster derivation](../../backend/fleet/roster.go) owns capacity/mining rate and
   free-hold arithmetic. Fuel is a reserved non-mineable cargo kind, not ore to sell.

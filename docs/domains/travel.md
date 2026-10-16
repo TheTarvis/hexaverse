@@ -43,6 +43,16 @@ travel already implements part of it. [HUD](../hud.md) owns review/commit intera
   [HUD integration](../hud.md) is under review; far-out/non-planar input still
   needs design rather than an assumed unrestricted coordinate editor.
 
+## Effective-state command invariant
+
+Every new order/cancellation evaluates the effective live position before solving,
+including when persisted storage still shows a burn that has already arrived.
+[Stale-arrival integration tests](../../backend/fleet/stale_arrival_integration_test.go)
+retain #0004/S1 and S2 as provenance. This invariant survives retirement of its
+hex/coast-era mechanics. Gate placement remains deliberate travel geography;
+old multi-hop route/crawl/hold checklists are superseded, not unfinished current work.
+Older FTL-technology/relay-corridor ideas require reconfirmation before becoming scope.
+
 ## Open questions
 
 How should players select far-out and non-planar holding positions? Are additional

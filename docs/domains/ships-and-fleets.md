@@ -12,6 +12,10 @@ ship/fleet controls and formations remain open. Persistent individual signatures
 are accepted; [sensors](sensors-and-stealth.md) owns their observation/grouping and
 identification rules. This does not authorize a new per-ship movement model.
 
+The established composition contract pools cargo at fleet level, sums hull hold/
+mining capability, and constrains movement by the limiting hull rates. Current
+code evidence is below; individual ship roles do not imply per-ship cargo UI.
+
 ## Current implementation and gaps
 
 [Fleet model](../../backend/fleet/model.go) stores one kinematic state and
@@ -24,6 +28,15 @@ output and uses limiting acceleration/lane rate. A missing legacy roster is read
 as one seed hull. Cargo is a fleet pool, not per-ship allocation. Owner-facing
 reads expose composition/cargo; [foreign-read tests](../../backend/fleet/roster_handler_test.go)
 check withholding. No split/merge/ship-transfer API was found in the current audit.
+
+## Own-fleet roster
+
+Players need an own-fleet roster from both galaxy and system views: truthful
+system/lane location, derived activity/countdown, and navigation to the fleet.
+Foreign fleets are not an ownership roster. [FleetRoster](../../frontend/components/fleet/FleetRoster.tsx)
+now conditionally owns commands when its mounting view has no command owner;
+otherwise the view owns them. The old #0011 “navigation only” restriction is
+superseded. Fleet naming/alerts from old wishlists remain future questions.
 
 ## Open questions
 
@@ -40,3 +53,7 @@ membership or command model. Combat capabilities follow [combat scoping](combat.
 Historical sources: [mine/composition decisions](../specs/0010-mine.md),
 [fleet roster](../specs/0011-fleet-roster.md),
 [continuous-space fleet decision](../plans/continous_space/decisions.md).
+
+Historical #0010's “additional hulls are unmanned drones” is not a newly settled
+rule for the later specialized-ship/escort direction. Reconcile role/control
+semantics during future ship design instead of silently importing that constraint.

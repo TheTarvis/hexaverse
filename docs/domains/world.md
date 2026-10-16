@@ -17,7 +17,8 @@ render served geometry. Historical hex/ring cells are not the current world mode
   seeded field, materialized in blocks by [galaxy service](../../backend/galaxy/service.go),
   with deterministic IDs/regions/gaps and lanes/bridges. The start-area asset is
   a frozen subset via [GenerateStartArea](../../backend/galaxy/generator.go), not
-  proof the whole galaxy is finite or generated at seed time.
+  proof the whole galaxy is finite or generated at seed time. [Lane records](../../backend/galaxy/model.go)
+  store topology, with travel costs derived; bridge lanes are mechanically ordinary lanes.
 - [Skeleton](../../backend/galaxy/skeleton.go) determines star/major-body types
   and mineability. [Interior generation](../../backend/system/generator.go)
   extends that skeleton with bodies, moons, belts and special features; composition
@@ -40,6 +41,23 @@ render served geometry. Historical hex/ring cells are not the current world mode
 - Hazard scan/movement modifier fields are generated data. The audit found no
   corresponding consumers in fleet/disclosure/mine/space; art and payload presence
   alone do not establish working hazard mechanics.
+
+## Galaxy view and knowledge boundary
+
+The galaxy uses native world coordinates, not force-directed rearrangement:
+[GalaxyGraph](../../frontend/components/galaxy/GalaxyGraph.tsx) renders custom
+Three geometry. [GalaxyView](../../frontend/components/galaxy/GalaxyView.tsx)
+provides a free astronomical skeleton inspector and wake-focus;
+[presence](../../frontend/components/galaxy/presence.ts) marks/recenters own fleets
+outside lane transit. [Camera rig](../../frontend/components/galaxy/camera-rig.ts)
+is Z-up with orbit, ground-plane pan and touch dolly/pan; tuning is not fixed here.
+[Galaxy query](../../frontend/hooks/use-galaxy.ts) separates authenticated live reads
+from the frozen logged-out landing asset and waits for auth resolution.
+
+[Galaxy handler](../../backend/galaxy/handler.go) projects the explicit charted-lane
+set, not every lane incident to an explored system. Historical purchased-intel
+writers and automatic explored-incidence reveal are not current implementations.
+Future camera following/bounds/handoff and discovery changes remain separate design.
 
 ## Open questions
 
