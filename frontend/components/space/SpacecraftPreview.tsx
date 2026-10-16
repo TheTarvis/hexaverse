@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type PointerEvent } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type PointerEvent } from 'react'
 import { Button } from '@/components/catalyst/button'
-import { createSpacecraftPreview, type PreviewKind, type PreviewStatus, type SpacecraftPreviewController } from './webgl/spacecraft-preview'
+import { WebGPUCanvas, type CanvasSceneFactory } from '@/components/graphics/WebGPUCanvas'
+import type { RendererCandidateFactory } from '@/components/render-guard/renderer-candidate'
+import { createSpacecraftPreviewScene, type PreviewKind, type PreviewAssetStatus, type SpacecraftPreviewScene } from './webgl/spacecraft-preview'
 
 export interface SpacecraftPreviewProps {
   kind: PreviewKind
@@ -10,37 +12,24 @@ export interface SpacecraftPreviewProps {
   label: string
   starClass?: string
   accentColor: number
+  rendererFactory?: RendererCandidateFactory
 }
 
-export function SpacecraftPreview({ kind, objectId, label, accentColor, starClass }: SpacecraftPreviewProps) {
-  const canvas = useRef<HTMLDivElement>(null)
-  const surface = useRef<HTMLDivElement>(null)
-  const controller = useRef<SpacecraftPreviewController | null>(null)
+export function SpacecraftPreview({ kind, objectId, label, accentColor, starClass, rendererFactory }: SpacecraftPreviewProps) {
+  const controller = useRef<SpacecraftPreviewScene | null>(null)
   const drag = useRef<{ id: number; x: number; y: number } | null>(null)
-  const [status, setStatus] = useState<PreviewStatus>('loading')
+  const [status, setStatus] = useState<PreviewAssetStatus>('loading')
   const instructions = useId()
   const currentAccent = useRef(accentColor)
   useEffect(() => {
     currentAccent.current = accentColor
     controller.current?.setAccentColor(accentColor)
   }, [accentColor])
-  useEffect(() => {
-    if (!canvas.current || !surface.current) return
-    let live = true
-    const instance = createSpacecraftPreview(document.createElement('canvas'), kind, currentAccent.current, next => { if (live) setStatus(next) }, objectId, {
-      starClass, createCanvas: () => document.createElement('canvas'), onCanvas: next => {
-        next.setAttribute('aria-hidden', 'true'); next.className = 'h-full w-full'; canvas.current?.replaceChildren(next)
-      },
-    })
-    controller.current = instance
-    const observer = new ResizeObserver(entries => {
-      const rect = entries[0]?.contentRect
-      if (rect) instance.resize(rect.width, rect.height)
-    })
-    observer.observe(surface.current)
-    const rect = surface.current.getBoundingClientRect()
-    instance.resize(rect.width, rect.height)
-    return () => { live = false; drag.current = null; observer.disconnect(); instance.dispose(); controller.current = null }
+  const createScene = useCallback<CanvasSceneFactory>(context => {
+    drag.current = null
+    const content = createSpacecraftPreviewScene(context, { kind, objectId, accentColor: currentAccent.current, starClass, onAssetStatus: setStatus })
+    controller.current = content
+    return content
   }, [kind, objectId, starClass])
   const endDrag = (event: PointerEvent<HTMLDivElement>) => {
     event.stopPropagation()
@@ -49,7 +38,7 @@ export function SpacecraftPreview({ kind, objectId, label, accentColor, starClas
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
   return <div onClick={event => event.stopPropagation()} onWheel={event => event.stopPropagation()}>
-    <div ref={surface} tabIndex={0} aria-label={`3D preview of ${label}`} aria-describedby={instructions}
+    <div tabIndex={0} aria-label={`3D preview of ${label}`} aria-describedby={instructions}
       data-testid="spacecraft-preview-surface"
       className="relative w-full rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
       style={{ height: 200, touchAction: 'none' }}
@@ -74,10 +63,11 @@ export function SpacecraftPreview({ kind, objectId, label, accentColor, starClas
         if (event.key === 'Home') controller.current?.reset()
         else controller.current?.rotate(...delta[event.key]!)
       }}>
-      <div ref={canvas} aria-hidden="true" className="h-full w-full" style={{ visibility: status === 'unavailable' ? 'hidden' : 'visible' }} />
+      <WebGPUCanvas label={`${label} model`} createScene={createScene} animate={kind === 'gas_giant' || kind === 'star'}
+        surface="preview" alpha stencil={false} maxResolution={384} maxFramesPerSecond={30} rendererFactory={rendererFactory}
+        style={{ background: 'transparent' }} />
     </div>
-    <p role="status" aria-live="polite" className="text-xs text-zinc-600 dark:text-zinc-400">{status === 'loading' ? 'Loading model preview…' : status === 'fallback' ? 'Simplified model preview.' : status === 'unavailable' ? 'Model preview unavailable.' : status === 'interrupted' ? 'Model preview interrupted.' : ''}</p>
-    {(status === 'unavailable' || status === 'interrupted') && <Button plain data-testid="spacecraft-preview-retry" onClick={() => controller.current?.retry()}>Retry preview</Button>}
+    <p role="status" aria-live="polite" className="text-xs text-zinc-600 dark:text-zinc-400">{status === 'loading' ? 'Loading model preview…' : status === 'fallback' ? 'Simplified model preview.' : ''}</p>
     <div className="flex items-center justify-between gap-2">
       <p id={instructions} className="text-xs text-zinc-600 dark:text-zinc-400">Drag or use arrow keys to rotate. Home resets.</p>
       <Button plain style={{ color: 'var(--command-ink)' }} data-testid="spacecraft-preview-reset" onClick={() => controller.current?.reset()}>Reset view</Button>

@@ -1,0 +1,34 @@
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+  overflow: hidden;
+  background: #09151f;
+  color: #d4e3eb;
+}
+
+.viewport, .canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas { display: block; }
+.notice > div { min-height: 0; padding: 12px; }
+.viewport { touch-action: none; }
+
+.notice {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  background: #09151fe8;
+}

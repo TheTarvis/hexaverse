@@ -19,7 +19,7 @@ import type { FailureCause, GuardStatus } from './guard-machine'
 export interface RendererStateNoticeProps {
   status: Extract<GuardStatus, 'unsupported' | 'interrupted'>
   cause: FailureCause | null
-  surface: 'board' | 'galaxy' | 'space'
+  surface: 'board' | 'galaxy' | 'space' | 'preview'
   retrying: boolean
   onRetry?: () => void
   // True iff focus was inside the canvas region at the moment this notice
@@ -35,10 +35,11 @@ const CAUSE_COPY: Record<FailureCause, string> = {
 
 const FALLBACK_COPY = 'The renderer is unavailable.'
 
-const SURFACE_LABEL: Record<'board' | 'galaxy' | 'space', string> = {
+const SURFACE_LABEL: Record<RendererStateNoticeProps['surface'], string> = {
   board: 'board',
   galaxy: 'galaxy view',
   space: 'system space view',
+  preview: '3D preview',
 }
 
 export function RendererStateNotice({

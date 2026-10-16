@@ -29,6 +29,13 @@ import userEvent from '@testing-library/user-event'
 import { RendererStateNotice } from './RendererStateNotice'
 
 describe('RendererStateNotice', () => {
+  it('names the preview surface with the same pinned renderer notice and retry affordance', () => {
+    render(<RendererStateNotice status="unsupported" cause="creation" surface="preview" retrying={false} onRetry={vi.fn()} />)
+    expect(screen.getByTestId('renderer-unsupported')).toHaveAttribute('data-surface', 'preview')
+    expect(screen.getByTestId('renderer-live-region')).toHaveTextContent('3D preview renderer')
+    expect(screen.getByTestId('renderer-retry')).toBeEnabled()
+  })
+
   it('renders the unsupported state with its testid and surface, naming a browser/GPU-capability cause (Scenario: Context creation failure shows a named unsupported state)', () => {
     render(
       <RendererStateNotice
