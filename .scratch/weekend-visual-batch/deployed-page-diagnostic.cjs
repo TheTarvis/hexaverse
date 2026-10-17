@@ -22,10 +22,13 @@ async function checkMobileNavigation(p,name){
  const toggle=p.getByTestId('system-index-toggle');if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.tap()
  const search=p.getByTestId('system-index-search')
  console.log(name,'SEARCH COMPUTED FONT',await search.evaluate(e=>getComputedStyle(e).fontSize))
- if(process.env.QA_NAV_BASELINE==='1'){await p.getByRole('button',{name:'Close Objects panel',exact:true}).tap();return}
+ if(process.env.QA_NAV_BASELINE==='1'){console.log(name,'TITLE BASELINE',await p.locator('[data-panel="objects"] > [data-slot="hud-card"]').evaluate(e=>{const c=e.getBoundingClientRect(),t=e.querySelector('[data-slot="hud-title"]').getBoundingClientRect();return {cardCenter:c.x+c.width/2,titleCenter:t.x+t.width/2,delta:t.x+t.width/2-c.x-c.width/2}}));await p.getByRole('button',{name:'Close Objects panel',exact:true}).tap();return}
  const fit=async()=>{
   const close=p.getByRole('dialog').locator('[data-slot="hud-header"] > [data-slot="hud-close"]:visible'),box=await close.boundingBox(),size=p.viewportSize()
   assert.ok(box&&box.width>=44&&box.height>=44&&box.x>=0&&box.y>=0&&box.x+box.width<=size.width&&box.y+box.height<=size.height,'Reachable close: '+JSON.stringify(box))
+  const card=close.locator('xpath=../..'),geometry=await card.evaluate(e=>{const c=e.getBoundingClientRect(),t=e.querySelector(':scope > [data-slot="hud-header"] > [data-slot="hud-title"]').getBoundingClientRect(),x=e.querySelector('[data-slot="hud-header"] > [data-slot="hud-close"]').getBoundingClientRect();return {delta:t.x+t.width/2-c.x-c.width/2,overlap:t.right>x.left}});assert.ok(Math.abs(geometry.delta)<1,'Title centered on card: '+JSON.stringify(geometry));assert.equal(geometry.overlap,false)
+  const asymmetric=await card.evaluate(e=>{const title=e.querySelector('[data-slot="hud-header"] > [data-slot="hud-title"]'),header=title.parentElement,original=title.firstElementChild.textContent,back=document.createElement('button');back.textContent='Back';back.style.cssText='grid-column:1;grid-row:1;justify-self:start;width:44px;height:44px';header.append(back);title.firstElementChild.textContent='An exceptionally long object name';const c=e.getBoundingClientRect(),t=title.getBoundingClientRect(),b=back.getBoundingClientRect(),x=header.querySelector('[data-slot="hud-close"]').getBoundingClientRect();const result={delta:t.x+t.width/2-c.x-c.width/2,overlap:t.left<b.right||t.right>x.left};back.remove();title.firstElementChild.textContent=original;return result});assert.ok(Math.abs(asymmetric.delta)<1&&!asymmetric.overlap,'Centered long title with asymmetric back/close: '+JSON.stringify(asymmetric))
+
   const nav=p.getByRole('navigation',{name:'HUD panels',exact:true});assert.equal(await nav.getByRole('button').count(),4)
   const n=await nav.boundingBox();assert.ok(n&&n.y>=0&&n.y+n.height<=size.height,'Navigation remains above content')
   assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
@@ -47,7 +50,7 @@ async function checkMobileNavigation(p,name){
   }
   assert.equal(await search.inputValue(),'qa-planet')
   await p.setViewportSize(size);await p.waitForTimeout(120)
-  await p.getByTestId('index-qa-planet').tap();assert.equal(await p.getByTestId('details-back').isVisible(),true)
+  await p.getByTestId('index-qa-planet').tap();assert.equal(await p.getByTestId('details-back').isVisible(),true);await fit()
   await go('Arrange HUD');await p.screenshot({path:out+'/'+name.toLowerCase()+'-mobile-arrange-'+size.width+'.png'})
   await go('Objects');assert.equal(await p.getByTestId('details-back').isVisible(),true)
   await p.getByTestId('details-back').tap();assert.equal(await search.inputValue(),'qa-planet')
@@ -56,6 +59,7 @@ async function checkMobileNavigation(p,name){
  await p.getByRole('button',{name:'Close Objects panel',exact:true}).tap()
  assert.equal(await p.getByRole('dialog').count(),0);assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
  await p.setViewportSize({width:390,height:844})
+ console.log(name,'TITLE GEOMETRY PASS: title midpoint matches card within 1 CSS px, long title with asymmetric Back/close has no overlap; real detail Back preserves root heading')
  console.log(name,'MOBILE NAV PASS: four persistent tabs including Arrange; 48px inset close outside scrolling, >=16px computed form text, focus/blur/reduced keyboard space, details/back/search retained, callbacks and one sheet owner release; native iPhone focus zoom pending')
 }
 async function checkHudInspector(p,name){
@@ -110,7 +114,7 @@ async function checkHudBaseline(p,name){
   await close.tap();assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
  }
  await p.setViewportSize({width:1280,height:900});await p.waitForTimeout(150)
- for(const id of ['objects','command','console'])await assertFrame(id)
+ for(const id of ['objects','command','console']){const owner=await assertFrame(id);assert.ok(await owner.locator(':scope > [data-slot="hud-card"]').evaluate(e=>{const c=e.getBoundingClientRect(),t=e.querySelector('[data-slot="hud-title"]').getBoundingClientRect();return Math.abs(t.x+t.width/2-c.x-c.width/2)<1}),'Desktop title centered: '+id)}
  const nav=await p.getByTestId('floating-nav').boundingBox(),consoleBox=await panel('console').boundingBox();assert.ok(nav&&consoleBox&&consoleBox.y+consoleBox.height<=nav.y,'Console frame must leave navigation reachable')
  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
  await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-desktop.png'})

@@ -548,3 +548,23 @@ surfaces, addressing the small-text condition associated with iOS focus zoom.
 Browser pinch zoom and viewport scale remain unrestricted. Desktop fine-pointer
 form text is unchanged. Browser engines and reduced viewport tests cannot establish
 native iPhone keyboard/focus-zoom acceptance; physical-device feedback is pending.
+
+## Card-centered workspace titles — 2026-10-17
+
+The first mobileHeader refinement used a space-between flex row and explicitly
+removed the baseline title's left:50% translation. This placed the title at the
+left of the phone header; its center measured about 110 px left of the card center
+at 390 px viewport width in both browser engines. The accepted plain Storybook card
+kept the original centered title, so its alignment differed from workspace phones.
+
+The shared phone header now has equal side tracks around a centered title track.
+The inset 48 px close occupies the right track; an empty or occupied left track
+cannot shift the title. Long titles truncate between reserved control areas.
+Desktop keeps the accepted centered positioning. Content Back remains independent
+of root dismissal; persistent tabs, safe-area/visual-viewport sizing, internal
+scrolling, 16 px phone inputs and unrestricted accessibility zoom stay unchanged.
+
+Geometry assertions compare title/card midpoints within 1 CSS px at 375/390 portrait,
+844 landscape and 1280 desktop. Phone checks also use a long title and unequal 44 px
+Back/48 px close controls, and real object detail/back transitions. Storybook's
+MobileHeaderAlignment story exercises the same shared shell.

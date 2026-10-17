@@ -217,12 +217,13 @@
 
 .header { display: contents; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  /* Phone chrome is an inset row; the luminous bevel remains decoration. */
+  /* Equal side tracks center the title on the card, independent of close/back
+     controls. Keep the luminous bevel decorative and dismissal inset. */
   .mobileHeader > .header {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(48px, 1fr) minmax(0, auto) minmax(48px, 1fr);
     flex: 0 0 auto;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
     padding: 20px 20px 4px;
   }
@@ -230,14 +231,19 @@
     position: relative;
     inset: auto;
     transform: none;
-    max-width: calc(100% - 60px);
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
     margin: 0;
     font-size: 13px;
   }
   .mobileHeader > .header > .close {
     position: relative;
     inset: auto;
-    flex: 0 0 48px;
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
     width: 48px;
     height: 48px;
     min-height: 48px;

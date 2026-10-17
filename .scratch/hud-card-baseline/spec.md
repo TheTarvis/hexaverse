@@ -112,3 +112,24 @@ and mining route checks in both engines through gateway 20204.60 tests / 6 files
 types/scoped lint pass; separate first-login/station and camera checks pass. Native
 phone acceptance remains pending. All 57assets, email gate, routes, diagnostic cap
 and Oct19 00UTC cutoff preserved. See docs/phone-preview.md for process evidence.
+
+## Card-centered title correction
+
+The mobileHeader flex override in 2efc4e6 removed the shared title's center anchor.
+Live 390 px viewport measurements: Chromium center delta -110.6875 px; WebKit
+-109.953125 px. The ordinary Storybook shell retained the baseline center anchor.
+Equal side tracks now center the title relative to the whole card, preserving
+inset 48 px dismissal and the existing mobile navigation/viewport/form behavior.
+Regression geometry covers narrow/landscape/desktop, real details Back and injected
+unequal 44 px Back/48 px close controls with a long truncating title. This is a browser
+layout check, not physical iPhone validation.
+
+Candidate KcC37CyGkxAjvy3gFc6Hr passes mobile and desktop title midpoint and
+no-overlap assertions in Chromium/WebKit actual production-route fixtures,
+including retained tabs/search/details/mining drafts, scroll and close. All 60 HUD
+unit tests, types/scoped lint and production/Storybook builds pass. Installed-engine
+Storybook baseline comparisons pass at 375/390/1280 widths. The user's local in-app
+browser also measures a centered title (offset -0.00390625 px at 375px viewport)
+and 48x48px close. All 57 public assets are unchanged. Capture:
+[Centered phone header](mobile-centered-title-phone.png). Native iPhone acceptance
+remains pending.

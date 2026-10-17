@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, fn, within } from 'storybook/test'
 import clsx from 'clsx'
+import { Button } from '@/components/catalyst/button'
 import { HudHeading, HudText } from './HudTypography'
 import { HudCardShell, type HudCardShellProps } from './HudCardShell'
 import styles from './hud-card-shell.stories.module.css'
@@ -163,5 +164,24 @@ export const NestedSections: Story = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelectorAll('[data-hud-framing="frame"]')).toHaveLength(1)
     await expect(canvasElement.querySelectorAll('[data-hud-framing="section"]')).toHaveLength(2)
+  },
+}
+
+
+export const MobileHeaderAlignment: Story = {
+  args: {
+    title: 'Objects',
+    mobileHeader: true,
+    lighting: 'none',
+    children: <><Button outline>Back to object list</Button><p>Back is an independent content action. The close control occupies only the right side of the header.</p></>,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const card = canvas.getByRole('region', { name: 'Objects' })
+    const title = canvas.getByRole('heading', { name: 'Objects' })
+    const center = (element: Element) => { const bounds = element.getBoundingClientRect(); return bounds.left + bounds.width / 2 }
+    await expect(Math.abs(center(title) - center(card))).toBeLessThan(1)
+    const close = canvas.getByRole('button', { name: 'Close inspector' })
+    await expect(title.getBoundingClientRect().right).toBeLessThanOrEqual(close.getBoundingClientRect().left)
   },
 }
