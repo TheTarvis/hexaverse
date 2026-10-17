@@ -511,3 +511,20 @@ No comparison image uploaded or published. Entire weekend work is not complete.
  assets, exact auth/routes/diagnostics/published Storybook/cutoff unchanged.
 - Durable local captures/spec: .scratch/hud-card-baseline/. No push or live writes.
  Physical iPhone visual acceptance pending; full emulator journeys not run.
+
+### Mobile HUD follow-up — 2026-10-17
+
+Implementation 2efc4e6 is deployed to the same protected preview as build
+4mNlQJf9OD5UVRpDcNTAz. All workspace views including Arrange now share the four
+persistent phone tabs and a visible inset 48 px close above scrolling content.
+Stable sheet handoffs retain drafts/details and avoid hidden-input focus restore.
+Phone/coarse HUD fields now compute16 px (previous search 14 px). Pinch accessibility
+zoom remains enabled. Physical iPhone keyboard/focus zoom still needs acceptance.
+
+60 tests / 6 files, types/scoped lint and production/Storybook builds pass; phone story
+interaction and candidate/live Chromium+WebKit synthetic route checks pass. Separate
+first-login/station and camera runs pass. All 57 public assets and 35 initial served
+JS/CSS files match; all 7 pins, exact-email gate/routes/diagnostics/Oct19 00UTC cutoff
+preserved. Errors 0 bytes; transport unchanged 347 bytes. Temporary 20215/20218 servers
+stopped; live supervisor 23541 / frontend 23542 / gateway 23543 / ngrok 23544. No push.
+Captures/spec:.scratch/hud-card-baseline; logs:/tmp/hexaverse-mobile-chrome-*.log.

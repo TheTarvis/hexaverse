@@ -880,3 +880,41 @@ foreign POST403 and anonymous external302 to idp.ngrok.com verified. Transport l
 release errors. Logs preserved. Evidence:/tmp/hexaverse-hud-live-
 {mine,station,first,camera}.log; durable captures/migration record in
 .scratch/hud-card-baseline/. Physical iPhone review remains pending.
+
+## Mobile workspace navigation refinement — 2026-10-17
+
+User phone feedback requested consistent tabs in Arrange, a clearer close target
+and correction of search-focus magnification. Implementation 2efc4e6 keeps the shared
+HudCardShell style and adds its mobileHeader to workspace/Arrange: fixed title,
+48 px inset close and Objects/Command/Console/Arrange controls above internal scroll.
+One workspace sheet owner persists through tab handoffs, avoiding stale focus
+restoration to hidden inputs. Shared phone/coarse HUD inputs/selects/textareas use
+16 px text. The previous live search computed 14 px in Chromium and WebKit; new search
+computes 16 px. Browser pinch/viewport accessibility zoom remains unrestricted.
+
+Live source:/private/tmp/hexaverse-mobile-chrome-ddd8b7dj. Build:
+4mNlQJf9OD5UVRpDcNTAz. Supervisor 23541 / frontend 23542 / gateway 23543 / ngrok 23544
+started 22:56:09 UTC. Initial launchd bootstrap raced asynchronous bootout; after the
+old group finished stopping, registration succeeded with the same service config.
+Only frontend source command/build pins changed. Gateway/ngrok commands, all 57
+public assets, Google allowlist wilson.travis.t@gmail.com, routes, published protected
+Storybook, diagnostics and 2026-10-19T00:00:00Z cutoff remain unchanged. No push.
+Temporary candidate 20215 and local Storybook 20218 listeners were stopped.
+
+Validation: 60 tests / 6 files, TypeScript/scoped lint, isolated production and Storybook
+builds pass. PhoneNavigation story interaction passes in Chromium. Synthetic actual
+production-route checks pass in Chromium/WebKit before and after deployment:
+375/390 portrait, 844 landscape, reduced keyboard space/focus/blur, all Arrange/panel
+handoffs, active callbacks, preserved search/details/back and mining drafts, fixed
+reachable close, content scroll and released inert. Separate candidate checks pass
+first-login/station drafts and retained gesture-only camera/desktop keyboard/mouse.
+No real identities or unmocked game writes. Engines do not reproduce native iOS
+focus magnification/keyboard; actual iPhone acceptance remains pending.
+
+Complete gzip home/login/system responses 200; system HTML stays no-store. All 35
+initial JS/CSS resources match deployed build bytes; seven active pins match.
+Anonymous edge access302 to identity gate; Storybook 200, debug/QA 404 and foreign
+Origin POST 403. Supervisor errors 0 bytes, transport log unchanged 347 bytes containing
+two historical downstream aborts, capped 256 KiB. Evidence:
+/tmp/hexaverse-mobile-{font-before,chrome-candidate,chrome-first-station,chrome-camera,chrome-live}.log
+and .scratch/hud-card-baseline/mobile-{search,arrange}-phone.png.

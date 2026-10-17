@@ -530,7 +530,7 @@ inspection/command-fleet ownership changed.
 ## Mobile workspace header and focus — 2026-10-17
 
 Objects, Command, Console and Arrange share the same four-destination navigation
-inside HudCardShell. Phone title, inset48px close and navigation stay outside the
+inside HudCardShell. Phone title, inset 48 px close and navigation stay outside the
 content scroll viewport, within the existing safe-area/visual-viewport owner. The
 close has a visible button surface separate from the illuminated beveled corner;
 desktop chrome keeps its existing density. Detail Back remains a content action.
@@ -542,8 +542,8 @@ preventScroll; tab changes never deliberately focus an input. Closing returns to
 the map/HUD control and releases background inert. Search, details, Console state,
 quantities and layout preferences remain mounted through Arrange handoffs.
 
-The previous production search computed to14px in Chromium and WebKit. Shared
-HUD input/select/textarea text now computes to at least16CSSpx on phone/coarse
+The previous production search computed to14 px in Chromium and WebKit. Shared
+HUD input/select/textarea text now computes to at least 16 CSS px on phone/coarse
 surfaces, addressing the small-text condition associated with iOS focus zoom.
 Browser pinch zoom and viewport scale remain unrestricted. Desktop fine-pointer
 form text is unchanged. Browser engines and reduced viewport tests cannot establish
