@@ -415,3 +415,15 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Temporary local QA route removed before final build; no fixture publication.
 - Snapshot pointer: /tmp/hexaverse-rootlock-preview-root.txt. Assets57/57 unchanged;
   existing exact auth, gateway diagnostics/routes, ngrok flags and Oct19cutoff retained.
+
+
+### Root document correction active12:10UTC
+
+- dece79e deployed, build LgIyBe9FOe9Jgw-TIDrs1; rootlock snapshot/pins in
+  docs/phone-preview.md. Active served system chunk contains document-owner marker.
+-1,072 tests/66 files, types/lint/validators and production-layout/route-clean build
+  pass. Temporary QA route/chunk removed and returns404.
+- All57 assets/auth/diagnostics/routes/ngrok flags/deadline unchanged; source pins
+  match, compressed service/access checks pass, transport log0bytes.
+- Physical iPhone Safari refresh behavior remains pending, not inferred from engine
+  tests or silence. Native Safari UI could not be reproduced with headless engines.

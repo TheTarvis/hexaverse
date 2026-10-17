@@ -639,3 +639,44 @@ card scrolling works. WebKit card touches are uncancelled and its card container
 scrolls programmatically; native two-finger WebKit/Safari tab UI remain untested.
 Pan fallback, post-close map cancellation, existing resize/card and desktop regressions
 pass. Physical iPhone retest is still required, including reserved-edge behavior.
+
+
+## System document scroll ownership deployed — 2026-10-17 12:10 UTC
+
+Commit dece79e adds SystemViewport/system-viewport-lock.ts to the production
+SystemSpaceView, locking mobile html/body for the route lifetime and handling
+non-scrollable HUD starts at document capture. Full-page sheets use visible viewport
+height/top, external navigation compensates for obscured bottom space, and route
+exit restores document styles/listeners. See docs/hud.md for exact findings and limits.
+
+Source /private/tmp/hexaverse-rootlock-preview-6t9znyk7 is the prior Safari snapshot
+with eight runtime overlays listed in preview-source.json. Pointer:
+/tmp/hexaverse-rootlock-preview-root.txt. All57 public assets compare byte-identical.
+Temporary loopback QA route/login/touch-qa and its compiled chunk were removed
+before the final build. Local test fixtures/evidence are not published; protected
+static Storybook is unchanged. Build ID: LgIyBe9FOe9Jgw-TIDrs1.
+
+The same supervised process set stopped12:10:25.21UTC and relaunched12:10:26.34UTC.
+Frontend94896, gateway94897 and ngrok94898 remain supervised. Only frontend source
+and build/manifest pins changed; all non-frontend commands/pins remain exact.
+At12:10:50UTC all pins match, home/login/system return complete200 gzip HTML, static
+Storybook200, removed QA/debug404, foreign-origin POST403, and anonymous external
+root302 to idp.ngrok.com. Exact Google/email policy, gateway routes/error-only
+diagnostics, ngrok inspection/logging off and2026-10-19T00:00:00Z cutoff unchanged.
+The diagnostic log remains0bytes.
+
+Deployed system HTML references page-80df1ffb44593e03.js containing the unique
+system-viewport-lock-v1 document-owner marker. The prior map fix was also positively
+verified in its old served chunk before replacement, rather than dismissing actual
+phone feedback as stale code. No identity was selected or gameplay action issued.
+
+1,072 tests across66 files, types/scoped lint/validators/diff checks and final isolated
+production build pass. A temporary actual Next production layout (RootLayout,
+Providers/portals, production shell/map/HUD, identity-free data) verifies baseline
+missed HUD cancellation versus new ownership in Chromium/WebKit, canvas/labels/
+heading/fleet starts, card scroll/close, modal-style restoration, visible fallbacks
+at375×667/390×600/844×390/390×844, and Next route-exit cleanup. Chromium native
+HUD downward drag leaves shell/document fixed; WebKit drag arbitration checks are
+constructed events. Safari's physical pull-to-refresh UI remains unreproduced and
+actual iPhone acceptance is pending. Service checks do not resolve the earlier
+ngrok root-cause question. No push or new art publication occurred.
