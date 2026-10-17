@@ -65,7 +65,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
   const activeId = (phone && !openedPanel) || active === null ? null : visible.some(item => item.id === active) ? active : visible[0]?.id
 
   const sheetOpen = phone && (settings || !!activeId)
-  usePhoneSheet(sheetOpen, workspaceRef, settings ? 'settings' : activeId ?? null)
+  usePhoneSheet(sheetOpen, workspaceRef, 'workspace')
   useEffect(() => {
     if (phone && !sheetOpen && restoreMapFocus.current) { restoreMapFocus.current = false; recoveryRef.current?.focus({ preventScroll: true }) }
   }, [phone, sheetOpen])
@@ -136,6 +136,30 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
     panel.focus({ preventScroll: true })
   })
 
+  // Handoffs stay inside one sheet owner. Focus the destination tab, never a
+  // hidden input (which would reopen the keyboard), without scrolling the page.
+  useLayoutEffect(() => {
+    if (!phone || !sheetOpen) return
+    const focused = document.activeElement
+    if (focused === document.body || focused?.closest('[hidden], [inert]')) {
+      workspaceRef.current?.querySelector<HTMLButtonElement>(`[data-workspace-tab="${settings ? 'arrange' : activeId}"][aria-pressed="true"]`)?.focus({ preventScroll: true })
+    }
+  }, [phone, sheetOpen, settings, activeId])
+
+  function navigation(selected: HudPanelId | 'arrange') {
+    return <nav className={styles.cardNavigation} aria-label="HUD panels">
+      {known.map(entry => {
+        const destination = panels.find(panel => panel.id === entry.id)!
+        return <Button plain key={entry.id} data-workspace-tab={entry.id} aria-pressed={selected === entry.id} onClick={() => {
+          if (!entry.visible) toggle(entry.id)
+          setSettings(false); setMenuOpen(false); setOpenedPanel(true); setActive(entry.id)
+          onPanelActivate?.(entry.id)
+        }}>{destination.label}</Button>
+      })}
+      <Button plain data-workspace-tab="arrange" aria-label="Arrange HUD" aria-pressed={selected === 'arrange'} onClick={() => setSettings(true)}>Arrange</Button>
+    </nav>
+  }
+
   function closeSettings() { setSettings(false); if (phone) { if (activeId) onPanelDismiss?.(activeId); restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) } else recoveryRef.current?.focus({ preventScroll: true }) }
   function closePanel() { if (activeId) onPanelDismiss?.(activeId); restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) }
   function reset() {
@@ -159,7 +183,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
       </div>
     </div>
     {settings && <div ref={settingsRef} id={settingsId} className={styles.settings}>
-      <HudCardShell title="Arrange HUD" lighting="none" onClose={closeSettings} closeLabel="Close HUD settings">
+      <HudCardShell title="Arrange HUD" lighting="none" mobileHeader toolbar={phone ? navigation('arrange') : undefined} onClose={closeSettings} closeLabel="Close HUD settings">
         <p className={styles.hint}>Choose what stays on screen. Move panels between docks and change their order.</p>
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
@@ -190,10 +214,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
           <HudCardShell title={panel.label} lighting="none" paused={!item.visible || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
             closeLabel={phone ? `Close ${panel.label} panel` : `Hide ${panel.label}`}
             onClose={phone ? closePanel : () => { recoveryRef.current?.focus({ preventScroll: true }); toggle(item.id) }}
-            toolbar={phone ? <nav className={styles.cardNavigation} aria-label="HUD panels">
-              {known.map(entry => { const destination = panels.find(panel => panel.id === entry.id)!; return <Button plain key={entry.id} aria-pressed={activeId === entry.id} onClick={() => { if (!entry.visible) toggle(entry.id); setMenuOpen(false); setOpenedPanel(true); setActive(entry.id); onPanelActivate?.(entry.id) }}>{destination.label}</Button> })}
-              <Button plain aria-label="Arrange HUD" onClick={() => setSettings(true)}>Arrange</Button>
-            </nav> : undefined}>
+            mobileHeader toolbar={phone ? navigation(item.id) : undefined}>
             {panel.children}
           </HudCardShell>
         </section>

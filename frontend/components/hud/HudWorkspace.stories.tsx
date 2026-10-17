@@ -42,3 +42,20 @@ export const Arrange: Story = {
     await expect(canvas.getByRole('status')).toHaveTextContent('Command moved up.')
   },
 }
+
+
+export const PhoneNavigation: Story = {
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  render: () => <Sample corporationId="storybook-workspace-phone-navigation" compact />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: 'Open command' }))
+    for (const name of ['Arrange HUD', 'Objects', 'Console', 'Arrange HUD', 'Command']) {
+      const navigation = within(canvas.getByRole('navigation', { name: 'HUD panels' }))
+      await userEvent.click(navigation.getByRole('button', { name }))
+      await expect(within(canvas.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true')
+    }
+    await userEvent.click(canvas.getByRole('button', { name: 'Close Command panel' }))
+    await expect(canvas.queryByRole('dialog')).not.toBeInTheDocument()
+  },
+}

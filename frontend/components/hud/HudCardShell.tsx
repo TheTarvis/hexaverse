@@ -19,6 +19,8 @@ export type HudCardShellProps = Omit<ComponentPropsWithoutRef<'section'>, 'title
   paused?: boolean
   /** Nested content shares its owning card's frame; detached overlays can opt in. */
   framing?: 'auto' | 'frame' | 'section'
+  /** Keep phone navigation and dismissal outside the scrolling content. */
+  mobileHeader?: boolean
   toolbar?: ReactNode
   closeTestId?: string
   closeButtonRef?: Ref<HTMLButtonElement>
@@ -34,6 +36,7 @@ export function HudCardShell({
   paused = false,
   framing = 'auto',
   toolbar,
+  mobileHeader = false,
   closeTestId,
   closeButtonRef,
   className,
@@ -45,28 +48,7 @@ export function HudCardShell({
   const titleId = useId()
   const shellRef = useRef<HTMLElement>(null)
 
-  return (
-    <section
-      data-slot="hud-card"
-      data-hud-framing={section ? 'section' : 'frame'}
-      ref={shellRef}
-      aria-labelledby={props['aria-label'] ? undefined : title ? titleId : undefined}
-      {...props}
-      className={clsx(styles.shell, section && styles.section, className)}
-    >
-      {!section && <><div aria-hidden="true" className={styles.surface} />
-      <div aria-hidden="true" className={styles.lights}>
-        {['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].map((corner) => (
-          <svg key={corner} className={styles[corner]} viewBox="0 0 32 32" fill="none">
-            <path d="M8 25 L25 8" />
-          </svg>
-        ))}
-      </div></>}
-      {!section && lighting === 'signal' && (
-        <Suspense fallback={null}>
-          <HudFrameLighting hostRef={shellRef} paused={paused} />
-        </Suspense>
-      )}
+  const chrome = <>
       {title && (
         <h2 id={titleId} data-slot="hud-title" className={styles.title} title={title}>
           <span>{title}</span>
@@ -87,10 +69,36 @@ export function HudCardShell({
           <XMarkIcon aria-hidden="true" />
         </Button>
       )}
+  </>
+
+  return (
+    <section
+      data-slot="hud-card"
+      data-hud-framing={section ? 'section' : 'frame'}
+      ref={shellRef}
+      aria-labelledby={props['aria-label'] ? undefined : title ? titleId : undefined}
+      {...props}
+      className={clsx(styles.shell, section && styles.section, mobileHeader && styles.mobileHeader, className)}
+    >
+      {!section && <><div aria-hidden="true" className={styles.surface} />
+      <div aria-hidden="true" className={styles.lights}>
+        {['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].map((corner) => (
+          <svg key={corner} className={styles[corner]} viewBox="0 0 32 32" fill="none">
+            <path d="M8 25 L25 8" />
+          </svg>
+        ))}
+      </div></>}
+      {!section && lighting === 'signal' && (
+        <Suspense fallback={null}>
+          <HudFrameLighting hostRef={shellRef} paused={paused} />
+        </Suspense>
+      )}
+      {mobileHeader ? <div className={styles.header} data-slot="hud-header">{chrome}</div> : chrome}
+      {mobileHeader && toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
       <CardFrameContext.Provider value={true}>
         <div className={styles.body} data-slot="hud-body">
           <div className={clsx(styles.content, contentClassName)} data-slot="hud-content">
-            {toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
+            {!mobileHeader && toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
             {children}
           </div>
         </div>

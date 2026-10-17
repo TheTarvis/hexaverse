@@ -142,3 +142,14 @@ it('allows detached overlays to explicitly own a frame and respects an explicit 
   render(<HudCardShell title="Command" lighting="none"><HudCardShell framing="frame" title="Fleet" aria-label="Fleet details" lighting="none">Details</HudCardShell></HudCardShell>)
   expect(screen.getByRole('region', { name: 'Fleet details' })).toHaveAttribute('data-hud-framing', 'frame')
 })
+
+
+it('keeps mobile dismissal and navigation outside its content scroll viewport', () => {
+  const close = vi.fn()
+  render(<HudCardShell title="Objects" lighting="none" mobileHeader onClose={close} toolbar={<nav aria-label="Panels">Objects / Arrange</nav>}><input aria-label="Search" /></HudCardShell>)
+  const content = screen.getByLabelText('Search').closest('[data-slot="hud-content"]')!
+  expect(content).not.toContainElement(screen.getByRole('button', { name: 'Close card' }))
+  expect(content).not.toContainElement(screen.getByRole('navigation', { name: 'Panels' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Close card' }))
+  expect(close).toHaveBeenCalledOnce()
+})

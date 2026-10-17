@@ -526,3 +526,25 @@ behavior and local visual captures from physical-phone acceptance. Hidden legacy
 Course/roster/flight-control paths are not a new visible design; navigation/vitals
 bars and application naming dialogs keep their own roles. No gameplay rules or
 inspection/command-fleet ownership changed.
+
+## Mobile workspace header and focus — 2026-10-17
+
+Objects, Command, Console and Arrange share the same four-destination navigation
+inside HudCardShell. Phone title, inset48px close and navigation stay outside the
+content scroll viewport, within the existing safe-area/visual-viewport owner. The
+close has a visible button surface separate from the illuminated beveled corner;
+desktop chrome keeps its existing density. Detail Back remains a content action.
+
+Workspace tab changes keep one phone-sheet isolation owner instead of tearing it
+down and restoring a previously focused search field between destinations. A
+hidden focused control hands focus to the selected destination tab with
+preventScroll; tab changes never deliberately focus an input. Closing returns to
+the map/HUD control and releases background inert. Search, details, Console state,
+quantities and layout preferences remain mounted through Arrange handoffs.
+
+The previous production search computed to14px in Chromium and WebKit. Shared
+HUD input/select/textarea text now computes to at least16CSSpx on phone/coarse
+surfaces, addressing the small-text condition associated with iOS focus zoom.
+Browser pinch zoom and viewport scale remain unrestricted. Desktop fine-pointer
+form text is unchanged. Browser engines and reduced viewport tests cannot establish
+native iPhone keyboard/focus-zoom acceptance; physical-device feedback is pending.

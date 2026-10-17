@@ -69,13 +69,6 @@
 @media (max-width: 760px), (pointer: coarse) {
   .workspace button { min-width: 44px; min-height: 44px; }
   .workspace input, .workspace select { min-height: 44px; }
-  .settings button[data-slot='hud-close'] {
-    top: 0;
-    right: 0;
-    width: 44px;
-    height: 44px;
-    padding: 12px;
-  }
   .panelToolbar { min-height: 44px; }
   .settingRow { gap: 6px; }
   .moves { flex-wrap: wrap; }
@@ -101,7 +94,6 @@
 }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .workspace button { min-width: 44px; }
-  .settings button[data-slot='hud-close'] { top: 0; right: 0; width: 44px; height: 44px; min-height: 44px; padding: 12px; }
 }
 
 .sheetControls { display: flex; gap: 4px; }
@@ -150,5 +142,5 @@
   .workspace[data-mobile-open='true'] .panelContent > div { flex: initial; height: auto; }
   .workspace[data-mobile-open='true'] .panelContent [data-hud-framing='section'] { flex: 0 0 auto; overflow: visible; }
   .workspace[data-mobile-open='true'] .settings { padding-top: calc(18px + env(safe-area-inset-top)); }
-  .panelCard > [data-slot='hud-close'] { top: -12px; right: -10px; }
+
 }

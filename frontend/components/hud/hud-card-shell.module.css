@@ -214,3 +214,44 @@
 .shell input, .shell select, .shell textarea { color: #dce8f0; background: #0c1b28; border-color: #435d70; }
 .shell input::placeholder, .shell textarea::placeholder { color: #91a3b7; }
 .shell option { color: #dce8f0; background: #0c1b28; }
+
+.header { display: contents; }
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  /* Phone chrome is an inset row; the luminous bevel remains decoration. */
+  .mobileHeader > .header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 20px 4px;
+  }
+  .mobileHeader > .header > .title {
+    position: relative;
+    inset: auto;
+    transform: none;
+    max-width: calc(100% - 60px);
+    margin: 0;
+    font-size: 13px;
+  }
+  .mobileHeader > .header > .close {
+    position: relative;
+    inset: auto;
+    flex: 0 0 48px;
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    padding: 12px;
+    border: 1px solid #435d70;
+    border-radius: 8px;
+    background: #0c1b28;
+  }
+  .mobileHeader > .header > .close svg { width: 22px; height: 22px; }
+  .mobileHeader > .toolbar { flex: 0 0 auto; padding: 4px 16px 8px; border-bottom: 1px solid #435d7066; }
+  .mobileHeader > .body > .content { clip-path: none; }
+}
+/* iOS focuses small text controls by magnifying the viewport. Keep readable
+   control text while leaving browser pinch zoom and viewport scale unrestricted. */
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px), (pointer: coarse) {
+  .shell input, .shell select, .shell textarea { font-size: 16px; line-height: 1.5; }
+}

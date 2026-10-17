@@ -266,3 +266,29 @@ it('notifies the content owner when its phone panel is dismissed without unmount
   expect(screen.getByLabelText('Console draft')).toBe(draft)
   expect(draft).toHaveValue('Still here')
 })
+
+
+it('keeps all four phone destinations and one sheet owner through Arrange handoffs', () => {
+  vi.mocked(window.matchMedia).mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  const activate = vi.fn(), dismiss = vi.fn()
+  render(<><button>Map background</button><HudWorkspace corporationId="navigation" panels={panels} onPanelActivate={activate} onPanelDismiss={dismiss} /></>)
+  fireEvent.click(screen.getByRole('button', { name: 'Objects' }))
+  const search = screen.getByLabelText('Object search')
+  fireEvent.change(search, { target: { value: 'Keep search' } })
+  const go = (name: string) => fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name }))
+  for (const name of ['Arrange HUD', 'Command', 'Arrange HUD', 'Console', 'Arrange HUD', 'Objects']) {
+    go(name)
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    const navigation = screen.getByRole('navigation', { name: 'HUD panels' })
+    expect(within(navigation).getAllByRole('button')).toHaveLength(4)
+    expect(within(navigation).getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Map background')).toHaveAttribute('inert')
+  }
+  expect(search).toHaveValue('Keep search')
+  expect(activate.mock.calls.map(([id]) => id)).toEqual(['objects', 'command', 'console', 'objects'])
+  fireEvent.click(screen.getByRole('button', { name: 'Close Objects panel' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getByText('Map background')).not.toHaveAttribute('inert')
+  expect(dismiss).toHaveBeenLastCalledWith('objects')
+  expect(screen.getByRole('button', { name: 'HUD menu' })).toHaveFocus()
+})

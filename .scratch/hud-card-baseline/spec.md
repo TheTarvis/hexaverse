@@ -83,3 +83,26 @@ Same protected URL, exact Google/email policy, routes, diagnostics, published
 Storybook and Oct19 00UTC cutoff. No push, identity selection or live game writes.
 Transport log retains only two historical client-aborted reads from18:03UTC.
 Physical iPhone appearance/usability still awaits Travis's review.
+
+## Mobile navigation refinement
+
+User phone feedback requested a reachable close, tabs in Arrange as well as panel
+pages, and a search-focus zoom fix. The accepted frame stays: mobileHeader on the
+existing HudCardShell puts title/48px inset close and all four navigation controls
+above the content scroll viewport. Arrange uses the same controls. Stable workspace
+sheet identity avoids focus restoration to a hidden search between destinations.
+Shared phone/coarse HUD fields use16px text; the old deployed search measured14px
+in both engines. No viewport zoom restriction, art change or gameplay change.
+
+Stories: HUD/Workspace/PhoneNavigation. Browser runner QA_MOBILE_NAV=1 covers375/
+390portrait and844landscape, reduced keyboard space, focus/blur, all Arrange/panel
+handoffs, selected tab callbacks, retained search/details/back, reachable close and
+single dialog/inert cleanup. Native iPhone keyboard/magnification remains pending.
+
+Candidate4mNlQJf9OD5UVRpDcNTAz passes the mobile navigation and mining baseline
+journeys in Chromium/WebKit, with16px computed search and no runtime errors or
+unmocked game writes. Separate camera runs pass selected-pivot touch transitions,
+card scrolling/dismissal, absent camera buttons and desktop mouse/keyboard input.
+Storybook build and the PhoneNavigation story interaction pass. All57 public assets
+are byte-identical to the accepted shared-HUD build. Captures:
+[Objects](mobile-search-phone.png) and [Arrange](mobile-arrange-phone.png).

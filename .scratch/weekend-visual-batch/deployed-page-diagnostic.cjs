@@ -14,6 +14,50 @@ if(process.env.QA_HUD_CASE==='mine'){
  interior.features[1].type='rocky';interior.features[1].resources=[{kind:'metals',richness:1}]
 }
 fleet.roster.fuelPricePerTon=2
+async function checkMobileNavigation(p,name){
+ const workspace=p.getByTestId('hud-workspace')
+ const go=async label=>{await p.getByRole('navigation',{name:'HUD panels',exact:true}).getByRole('button',{name:label,exact:true}).tap()}
+ const open=async()=>{await p.getByRole('button',{name:'HUD menu',exact:true}).tap();await p.getByRole('button',{name:'Objects',exact:true}).tap()}
+ await open()
+ const toggle=p.getByTestId('system-index-toggle');if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.tap()
+ const search=p.getByTestId('system-index-search')
+ console.log(name,'SEARCH COMPUTED FONT',await search.evaluate(e=>getComputedStyle(e).fontSize))
+ if(process.env.QA_NAV_BASELINE==='1'){await p.getByRole('button',{name:'Close Objects panel',exact:true}).tap();return}
+ const fit=async()=>{
+  const close=p.getByRole('dialog').locator('[data-slot="hud-header"] > [data-slot="hud-close"]:visible'),box=await close.boundingBox(),size=p.viewportSize()
+  assert.ok(box&&box.width>=44&&box.height>=44&&box.x>=0&&box.y>=0&&box.x+box.width<=size.width&&box.y+box.height<=size.height,'Reachable close: '+JSON.stringify(box))
+  const nav=p.getByRole('navigation',{name:'HUD panels',exact:true});assert.equal(await nav.getByRole('button').count(),4)
+  const n=await nav.boundingBox();assert.ok(n&&n.y>=0&&n.y+n.height<=size.height,'Navigation remains above content')
+  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ }
+ for(const size of [{width:375,height:667},{width:390,height:844},{width:844,height:390}]){
+  await p.setViewportSize(size);await p.waitForTimeout(150)
+  await search.fill('qa-planet');await search.focus()
+  assert.ok(await search.evaluate(e=>parseFloat(getComputedStyle(e).fontSize))>=16)
+  const scale=await p.evaluate(()=>visualViewport.scale)
+  await p.screenshot({path:out+'/'+name.toLowerCase()+'-mobile-search-'+size.width+'.png'})
+  // A reduced layout viewport models keyboard space; this does not reproduce
+  // native iOS keyboard or Safari automatic focus magnification.
+  await p.setViewportSize({...size,height:size.height>500?size.height-280:300});await p.waitForTimeout(120);await fit()
+  for(const label of ['Arrange HUD','Command','Arrange HUD','Console','Arrange HUD','Objects']){
+   await go(label);await fit()
+   assert.equal(await p.getByRole('dialog').count(),1)
+   assert.equal(await p.getByRole('navigation',{name:'HUD panels',exact:true}).getByRole('button',{name:label,exact:true}).getAttribute('aria-pressed'),'true')
+   assert.equal(await p.evaluate(()=>document.activeElement?.tagName==='INPUT'),false,'No hidden search focus on tab handoff')
+  }
+  assert.equal(await search.inputValue(),'qa-planet')
+  await p.setViewportSize(size);await p.waitForTimeout(120)
+  await p.getByTestId('index-qa-planet').tap();assert.equal(await p.getByTestId('details-back').isVisible(),true)
+  await go('Arrange HUD');await p.screenshot({path:out+'/'+name.toLowerCase()+'-mobile-arrange-'+size.width+'.png'})
+  await go('Objects');assert.equal(await p.getByTestId('details-back').isVisible(),true)
+  await p.getByTestId('details-back').tap();assert.equal(await search.inputValue(),'qa-planet')
+  await search.focus();await search.evaluate(e=>e.blur());await fit();assert.equal(await p.evaluate(()=>visualViewport.scale),scale)
+ }
+ await p.getByRole('button',{name:'Close Objects panel',exact:true}).tap()
+ assert.equal(await p.getByRole('dialog').count(),0);assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
+ await p.setViewportSize({width:390,height:844})
+ console.log(name,'MOBILE NAV PASS: four persistent tabs including Arrange; 48px inset close outside scrolling, >=16px computed form text, focus/blur/reduced keyboard space, details/back/search retained, callbacks and one sheet owner release; native iPhone focus zoom pending')
+}
 async function checkHudInspector(p,name){
  await p.getByTestId('vitals-fleet-chevron').tap();await p.getByTestId('vitals-fleet-inspect').tap()
  const dialog=p.getByRole('dialog',{name:'Fleet '+fleetId+' details',exact:true});assert.equal(await dialog.isVisible(),true)
@@ -31,7 +75,7 @@ async function checkHudBaseline(p,name){
  if(process.env.QA_HUD_CASE==='mine'){
   assert.equal(await command.getByTestId('mine-section').isVisible(),true);assert.equal(await command.getByTestId('stationkeep-control').isVisible(),true)
   await command.getByTestId('mine-tons-input').fill('3')
-  for(const id of ['mine-kind-select','mine-tons-input','mine-button','stationkeep-control']){const box=await command.getByTestId(id).boundingBox();assert.ok(box&&box.height>=44,'Phone action target: '+id)}
+  for(const id of ['mine-kind-select','mine-tons-input','mine-button','stationkeep-control']){const box=await command.getByTestId(id).boundingBox();assert.ok(box&&box.height>=44,'Phone action target: '+id);if(id.endsWith('input')||id.endsWith('select'))assert.ok(await command.getByTestId(id).evaluate(e=>parseFloat(getComputedStyle(e).fontSize))>=16,'Readable phone field: '+id)}
  }else assert.equal(await command.getByTestId('refuel-section').count(),0,'Station services belong to the station details')
  await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-command-'+(process.env.QA_HUD_CASE||'station')+'.png'})
  await p.getByRole('button',{name:'Objects',exact:true}).tap();await assertFrame('objects')
@@ -154,7 +198,7 @@ async function run(type,options,name){
  await p.route('**/emulator/auth/iframe**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Synthetic Auth frame</title>'}))
  await p.route('**/identitytoolkit.googleapis.com/**',async route=>{const path=new URL(route.request().url()).pathname;if(path.includes('signInWithPassword'))return route.fulfill({json:{localId:uid,email:'isolated@example.invalid',idToken:token,refreshToken:'synthetic-refresh',expiresIn:'3600',registered:true}});if(path.includes('lookup'))return route.fulfill({json:{users:[{localId:uid,email:'isolated@example.invalid',emailVerified:true,displayName:'Isolated QA',providerUserInfo:[],createdAt:'1000',lastLoginAt:'1000'}]}});return route.fulfill({status:400,json:{error:{message:'QA_AUTH_ROUTE_BLOCKED'}}})})
  await p.route('**/securetoken.googleapis.com/**',route=>route.fulfill({json:{access_token:token,id_token:token,refresh_token:'synthetic-refresh',expires_in:'3600',user_id:uid,token_type:'Bearer'}}))
- await p.route('**/api/**',async route=>{const u=new URL(route.request().url()),path=u.pathname.slice(4);requests.push(path);if((process.env.QA_ORBIT==='1'||process.env.QA_HUD_BASELINE==='1')&&path.endsWith('/orders/preview')&&route.request().method()==='POST'){fixtureWrites.push(path);return route.fulfill({json:{controlPoints:[],departMs:1000,arriveMs:2000,deltaV:1,fuelCostTons:1,affordable:true,strandingWarning:false}})}if(process.env.QA_FIRST_LOGIN==='1'&&path==='/v1/corporations'&&route.request().method()==='POST'){spawned=true;fixtureWrites.push(path);return route.fulfill({json:{corporation:{id:corp,accountId:uid,name:'Isolated QA',createdAt:0,credits:1000},fleet,homeSystem:{id:system,name:'QA System',region:'normal',coords:{x:0,y:0,z:0},skeleton:{starClass:'G',bodies:[]}},worldTime:1000}})}if(route.request().method()!=='GET'){writes.push(path);return route.fulfill({status:403,json:{error:'Synthetic QA forbids mutations'}})}
+ await p.route('**/api/**',async route=>{const u=new URL(route.request().url()),path=u.pathname.slice(4);requests.push(path);if((process.env.QA_ORBIT==='1'||process.env.QA_HUD_BASELINE==='1'||process.env.QA_MOBILE_NAV==='1')&&path.endsWith('/orders/preview')&&route.request().method()==='POST'){fixtureWrites.push(path);return route.fulfill({json:{controlPoints:[],departMs:1000,arriveMs:2000,deltaV:1,fuelCostTons:1,affordable:true,strandingWarning:false}})}if(process.env.QA_FIRST_LOGIN==='1'&&path==='/v1/corporations'&&route.request().method()==='POST'){spawned=true;fixtureWrites.push(path);return route.fulfill({json:{corporation:{id:corp,accountId:uid,name:'Isolated QA',createdAt:0,credits:1000},fleet,homeSystem:{id:system,name:'QA System',region:'normal',coords:{x:0,y:0,z:0},skeleton:{starClass:'G',bodies:[]}},worldTime:1000}})}if(route.request().method()!=='GET'){writes.push(path);return route.fulfill({status:403,json:{error:'Synthetic QA forbids mutations'}})}
  let data,status=200
  if(path==='/v1/accounts/firestore')data={id:uid,email:'isolated@example.invalid',name:'Isolated QA'}
  else if(path==='/v1/corporations/me'&&!spawned)return route.fulfill({status:200,contentType:'application/json',body:'null'})
@@ -194,6 +238,7 @@ async function run(type,options,name){
   await p.getByRole('button',{name:'Console',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
   await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();assert.equal(await p.getByRole('dialog').count(),0)
   const region=p.getByTestId('space-canvas-region'),camera=JSON.parse(await region.getAttribute('data-camera'));await region.focus();await region.press('+');assert.ok(JSON.parse(await region.getAttribute('data-camera')).distance<camera.distance)
+  if(process.env.QA_MOBILE_NAV==='1')await checkMobileNavigation(p,name)
   if(process.env.QA_HUD_BASELINE==='1')await checkHudBaseline(p,name)
   if(process.env.QA_HUD_INSPECTOR==='1')await checkHudInspector(p,name)
   if(process.env.QA_ORBIT==='1')await checkOrbit(p,c,name)
