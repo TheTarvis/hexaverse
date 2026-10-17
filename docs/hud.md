@@ -504,7 +504,8 @@ Command and Console panel. Settings, recovery/objective, fleet inspection and re
 fleet status use that same shell. Existing HudTypography and HudFacts own internal
 headings, copy and figures; Catalyst controls remain the control foundation.
 
-Nested HudCardShell content defaults to an unframed section, preserving independent
+Card roots remain positioned containing blocks so decorative surfaces stay inside
+their owner. Nested HudCardShell content defaults to an unframed section, preserving independent
 travel/action titles and dismissal without duplicate decorative borders or lighting
 renderers. Detached overlays explicitly request framing. Shared row/column facts
 and section spacing replace custom facts and dashed/left-edge action frames. HUD

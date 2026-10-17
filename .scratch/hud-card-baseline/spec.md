@@ -51,7 +51,7 @@ presentation preferences. HUD controls keep dark surfaces in either OS color sch
 
 ## Release evidence
 
-Final candidate build: mYdz1fGdVXm42qs8cOkrS. Mining, station services and first-login
+Final candidate build: -wmbFYvCfz67ugLHJP3zV. Mining, station services and first-login
 checks pass in Chromium/WebKit on actual application routes using synthetic data.
 Search, quantity drafts, detail back navigation, shared frame ownership, narrow
 375×667/390×844 and landscape844×390 close/scroll, and desktop1280×900 navigation
@@ -64,3 +64,10 @@ Logs: /tmp/hexaverse-hud-release-{mine,station,first}.log,
 /tmp/hexaverse-hud-inspector-release.log, /tmp/hexaverse-hud-camera-regression.log.
 Existing full emulator journeys were not run; unit/integration, installed browser
 checks and existing journey static checks are distinct evidence.
+
+Final visual review caught a legacy position:static objective-card rule letting
+its absolute decorative surface cover recovery. Corrected the containing block
+before deployment. A real-browser decoration-bounds assertion now protects the
+objective/recovery overlap in wake/objects/first-login fixtures; the saved recovery
+capture reflects the corrected build. All four final fixture runs pass in both
+engines: /tmp/hexaverse-hud-verified-{mine,station,first,camera}.log.

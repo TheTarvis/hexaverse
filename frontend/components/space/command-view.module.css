@@ -266,3 +266,8 @@
 }
 
 .commandView .objectiveCard { border: 0; padding: 0; background: transparent; }
+
+/* Shared frame decoration must stay positioned relative to the objective itself. */
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .commandView .guideLayer .objectiveCard { position: relative; inset: auto; flex: 0 0 auto; }
+}
