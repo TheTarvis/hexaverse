@@ -482,3 +482,15 @@ shows keyboard focus and retains limit announcements. Child controls keep their
 own keys; unavailable rendering disables camera keyboard input. No document input
 interception, touchstart cancellation or recovery/card ownership rules changed.
 This UI request does not establish actual iPhone two-finger orbit acceptance.
+
+Validation:148 tests/11 files, scoped lint, TypeScript and isolated production
+build pass. Real-route first-login and persisted-guide tests pass before/after
+deployment in Chromium/WebKit. Portrait390×844, landscape844×390, short390×600
+and desktop1280×900 have no camera cluster or horizontal overflow. Selected-pivot
+orbit, pinch/pan transitions, cancel and post-card-close pan/orbit work; desktop
+mouse orbit/right-drag pan and map keyboard shortcuts work. Chromium uses trusted
+native multi-touch and card scrolling; WebKit uses constructed gesture TouchLists
+and programmatic card scrolling, with native HUD/close taps. Existing emulator
+journeys were updated to canvas keyboard/geometry expectations and statically
+checked; their full emulator runs were not performed. Physical iPhone orbit remains
+unverified. Evidence:/tmp/hexaverse-gesture-only-{candidate,live}-{objects,first}.log.

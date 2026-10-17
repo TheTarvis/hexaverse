@@ -801,3 +801,39 @@ verified. Transport error log0bytes. Synthetic browser Auth/game fixtures includ
 an intercepted preview quote POST on selection; no real identities or game writes.
 Evidence:/tmp/hexaverse-mobile-orbit-{final-first,final-wake,final-objects,
 live-first,live-objects}.log; unit:/tmp/hexaverse-mobile-orbit-regression.log.
+
+## Camera buttons removed everywhere — active 2026-10-17 18:52UTC
+
+Travis requests removal on mobile, then explicitly extends that to desktop.
+Commit c7b3ec4 removes the entire camera button cluster, center-selection button,
+phone pan buttons and Rotate toggle/state. No hidden one-finger rotate mode remains.
+One finger pans, pinch zooms, two-finger parallel drag orbits. Desktop primary drag
+orbits, secondary drag pans and wheel zooms. Keyboard navigation now belongs to the
+focusable map: arrows orbit, Shift+arrows pan, +/- zoom, Home recenters, Enter
+selects center. Recovery/card ownership and touch cancellation rules are unchanged.
+
+Source:/private/tmp/hexaverse-gesture-only-ttis_ub1; build
+ny2xmLsnZmFwjFEgptsx2. Only runtime overlay is SpaceStage.tsx over the previous
+mobile-orbit snapshot; all57 public assets and accepted recovery CSS identical.
+Supervisor restarted18:52:41UTC: frontend9533, gateway9534, ngrok9535. Same exact
+Google/email policy, gateway/diagnostic/static Storybook pins, routes, ngrok flags
+and Oct19 00UTC cutoff. No push or new exposure.
+
+148 tests/11 files, scoped lint, TypeScript and production build pass. Updated
+legacy emulator journeys statically checked; full emulator journeys not run.
+Candidate and deployed first-login/recovery and persisted objects checks pass in
+Chromium/WebKit, with actual app routes and synthetic browser-intercepted data.
+No buttons at390×844/844×390/390×600/1280×900; no horizontal overflow. Orbit pivot,
+pan/pinch transitions/cancel and card close preserve gestures; native Chromium
+card scrolling passes. Desktop mouse and map keyboard camera inputs pass in both
+engines. Chromium multi-touch is browser-generated; WebKit drags are constructed
+TouchLists and its card scrolling is programmatic. Native HUD/close taps pass.
+Physical iPhone orbit acceptance remains pending; UI feedback is not acceptance.
+
+All32 initial JS/CSS files match deployed bytes; complete compressed home/login/
+system HTML200, backend/Auth/SDK iframe health, Storybook200, QA/debug404, foreign
+POST403 and anonymous external302 to idp.ngrok.com verified. Transport log347bytes
+contains only two historical downstream_aborted reads at18:03:06UTC, with zero
+received bytes; no new deployment errors. Log preserved. No identities selected,
+live game mutations or asset operations. Evidence:/tmp/hexaverse-gesture-only-
+{candidate,live}-{first,objects}.log; unit:/tmp/hexaverse-gesture-only-unit.log.

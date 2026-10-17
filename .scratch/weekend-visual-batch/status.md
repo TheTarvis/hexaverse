@@ -481,3 +481,17 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Build yXPU27qyhgZ6M8vmNK4x6;32 initial assets byte-verified,57 public assets
   unchanged, prior modal fix preserved. Same auth/diagnostics/routes/cutoff; errors0.
 - No push, identity selection, live game writes or external asset operations.
+
+### Camera buttons removed on all screens — active18:52UTC
+
+-c7b3ec4 removes desktop/mobile camera cluster, pan/zoom/recenter/Rotate buttons
+  and rotate-mode state. Touch pan/pinch/two-finger orbit remain; desktop mouse and
+  keyboard inputs remain on focusable canvas. No visible camera overlay.
+-148 tests/11 files, types/scoped lint/build pass. Updated legacy journeys statically
+  checked; full emulator journeys not run. Candidate/live real-route checks pass
+  in Chromium/WebKit for recovery, no controls, gestures/card scroll/close, desktop
+  mouse/keyboard and portrait/landscape/short/desktop layouts.
+- Build ny2xmLsnZmFwjFEgptsx2;32 initial JS/CSS files byte-verified.57 assets,
+  recovery fix, auth/routes/diagnostics/cutoff unchanged. No push or live writes.
+- Logs retain only two historical18:03 client-aborted reads; no new deployment
+  errors. Actual iPhone orbit acceptance remains pending.
