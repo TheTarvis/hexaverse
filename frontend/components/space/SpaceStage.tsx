@@ -187,6 +187,7 @@ export function SpaceStage({
 }: SpaceStageProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState(false)
+  const [touchOrbit, setTouchOrbit] = useState(false)
   const [camera, storeCamera] = useState<SpaceCamera>(() => defaultCamera(extent))
   const frameRef = useRef<SpaceFrame | null>(null)
   const setCamera = useCallback((next: SpaceCamera | ((prev: SpaceCamera) => SpaceCamera)) => {
@@ -365,6 +366,12 @@ export function SpaceStage({
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinchRef = useRef<number | null>(null)
   const touchPinched = useRef(false)
+  const touchPair = useRef<{ ids: string; center: DragTracker; distance: number } | null>(null)
+  const orbitPivot = useCallback((): DrawVec3 | undefined => {
+    if (selection?.bodyId) return frameRef.current?.projected.get(selection.bodyId)?.mark.position
+    const point = selection?.point
+    return point && ('x' in point ? point : { x: point.X, y: point.Y, z: point.Z })
+  }, [selection])
 
   const isControl = (target: EventTarget | null): boolean =>
     target instanceof Element &&
@@ -420,10 +427,10 @@ export function SpaceStage({
         const viewportPx = { width: frame.basis.widthPx, height: frame.basis.heightPx }
         setCamera((prev) => panByPixels(prev, dx, dy, viewportPx, extent))
       } else {
-        setCamera((prev) => orbitByPixels(prev, dx, dy))
+        setCamera((prev) => orbitByPixels(prev, dx, dy, orbitPivot()))
       }
     },
-    [available, extent, setCamera],
+    [available, extent, setCamera, orbitPivot],
   )
 
   const finishGesture = useCallback(
@@ -459,6 +466,7 @@ export function SpaceStage({
   const cancelGesture = useCallback(() => {
     gestureRef.current = null
     pinchRef.current = null
+    touchPair.current = null
     touchPinched.current = false
     pointers.current.clear()
   }, [])
@@ -487,23 +495,35 @@ export function SpaceStage({
     start: event => {
       if (event.touches.length >= 2) {
         const [a, b] = Array.from(event.touches)
-        pinchRef.current = touchDistance({ x: a.clientX, y: a.clientY }, { x: b.clientX, y: b.clientY })
+        touchPair.current = { ids: [a.identifier, b.identifier].sort().join(':'), center: beginDrag((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2), distance: touchDistance({ x: a.clientX, y: a.clientY }, { x: b.clientX, y: b.clientY }) }
         touchPinched.current = true
         gestureRef.current = null
       } else if (!touchPinched.current && event.touches[0]) {
         const point = event.touches[0]
-        gestureRef.current = { tracker: beginDrag(point.clientX, point.clientY), bodyId: bodyIdUnder(event.target), secondary: true, affordance: event.target instanceof Element ? event.target.closest<HTMLElement>(`[${AFFORDANCE_ATTR}]`) : null }
+        gestureRef.current = { tracker: beginDrag(point.clientX, point.clientY), bodyId: bodyIdUnder(event.target), secondary: !touchOrbit, affordance: event.target instanceof Element ? event.target.closest<HTMLElement>(`[${AFFORDANCE_ATTR}]`) : null }
       }
     },
     move: event => {
       if (event.touches.length >= 2) {
         const [a, b] = Array.from(event.touches)
         const next = touchDistance({ x: a.clientX, y: a.clientY }, { x: b.clientX, y: b.clientY })
-        const previous = pinchRef.current
-        pinchRef.current = next
+        const pair = touchPair.current
+        const ids = [a.identifier, b.identifier].sort().join(':')
         touchPinched.current = true
         gestureRef.current = null
-        if (previous) setCamera(camera => zoomByPinch(camera, previous, next, extent))
+        if (!pair || pair.ids !== ids) { touchActions.current.start(event); return true }
+        const { dx, dy } = advanceDrag(pair.center, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2)
+        const spread = next - pair.distance
+        const previous = pair.distance
+        pair.distance = next
+        // A stationary finger in a pinch shifts the centroid by half the spread.
+        // Orbit only common motion that dominates that radial component.
+        const rotate = isGesture(pair.center) && Math.hypot(dx, dy) > Math.abs(spread) * 0.75
+        const pivot = orbitPivot()
+        setCamera(camera => {
+          const zoomed = Math.abs(spread) >= 1 ? zoomByPinch(camera, previous, next, extent) : camera
+          return rotate ? orbitByPixels(zoomed, dx, dy, pivot) : zoomed
+        })
         return true
       }
       const gesture = gestureRef.current, point = event.touches[0]
@@ -511,18 +531,19 @@ export function SpaceStage({
       const { dx, dy } = advanceDrag(gesture.tracker, point.clientX, point.clientY)
       if (!isGesture(gesture.tracker)) return false
       const frame = frameRef.current
-      if (frame) setCamera(camera => panByPixels(camera, dx, dy, { width: frame.basis.widthPx, height: frame.basis.heightPx }, extent))
+      if (!gesture.secondary) setCamera(camera => orbitByPixels(camera, dx, dy, orbitPivot()))
+      else if (frame) setCamera(camera => panByPixels(camera, dx, dy, { width: frame.basis.widthPx, height: frame.basis.heightPx }, extent))
       return true
     },
     end: event => {
-      if (event.touches.length) { gestureRef.current = null; pinchRef.current = null; touchPinched.current = true; return true }
+      if (event.touches.length) { gestureRef.current = null; pinchRef.current = null; touchPair.current = null; touchPinched.current = true; return true }
       const point = event.changedTouches[0], gesture = gestureRef.current
       if (gesture && point) advanceDrag(gesture.tracker, point.clientX, point.clientY)
       const nativeAffordanceTap = !!gesture?.affordance && !isGesture(gesture.tracker) && !touchPinched.current
       if (nativeAffordanceTap) gestureRef.current = null // Native click owns fleet/ghost/offscreen taps.
       else if (point) finishGesture(point.clientX, point.clientY, [])
       else gestureRef.current = null
-      touchPinched.current = false; pinchRef.current = null
+      touchPinched.current = false; pinchRef.current = null; touchPair.current = null
       return !nativeAffordanceTap
     },
     cancel: cancelGesture,
@@ -598,6 +619,9 @@ export function SpaceStage({
           onHighlightGhost={onHighlightGhost}
           onSelect={(next) => onSelect?.(next)}
           onCamera={setCamera}
+          orbitPivot={orbitPivot()}
+          touchOrbit={touchOrbit}
+          onTouchOrbit={() => { cancelGesture(); setTouchOrbit(value => !value) }}
           onRecenter={recenter}
           onReframe={(markId, coarsePosition) => {
             const live = frameRef.current?.projected.get(markId)
@@ -642,6 +666,9 @@ interface SpaceLayersProps {
   onHighlightGhost?: (recordId: string | null) => void
   onSelect: (selection: SpaceSelection | null) => void
   onCamera: (next: (prev: SpaceCamera) => SpaceCamera) => void
+  orbitPivot?: SpaceCamera['target']
+  touchOrbit: boolean
+  onTouchOrbit: () => void
   onRecenter: () => void
   onReframe: (markId: string, coarsePosition: DrawVec3) => void
   onPointerUpCapture: (clientX: number, clientY: number, marks: PickMark[]) => void
@@ -674,6 +701,9 @@ function SpaceLayers({
   onHighlightGhost,
   onSelect,
   onCamera,
+  orbitPivot,
+  touchOrbit,
+  onTouchOrbit,
   onRecenter,
   onReframe,
 }: SpaceLayersProps) {
@@ -807,7 +837,7 @@ function SpaceLayers({
           const s = step[e.key]
           if (!s) return
           e.preventDefault()
-          onCamera((prev) => orbitBySteps(prev, s[0], s[1]))
+          onCamera((prev) => orbitBySteps(prev, s[0], s[1], orbitPivot))
         }}
       >
         {/* camera-orbit — the one focusable cell replacing the four
@@ -852,7 +882,7 @@ function SpaceLayers({
             if (e.shiftKey) {
               onCamera((prev) => panBySteps(prev, s[0], s[1], extent))
             } else {
-              onCamera((prev) => orbitBySteps(prev, s[0], s[1]))
+              onCamera((prev) => orbitBySteps(prev, s[0], s[1], orbitPivot))
             }
           }}
         >
@@ -864,7 +894,11 @@ function SpaceLayers({
       </div>
 
       {phone && <div data-space-camera-control data-testid="space-pan-controls" className="absolute z-20" style={{ right: 'max(12px, env(safe-area-inset-right))', bottom: 'calc(var(--phone-vitals-height, 64px) + 64px + env(safe-area-inset-bottom))' }}>
+        <p className="mb-1 max-w-56 rounded bg-black/70 px-2 py-1 text-[10px] text-zinc-300" data-testid="touch-camera-hint">{touchOrbit ? '1 finger rotates' : '1 finger pans'} · 2 fingers rotate · Pinch zooms</p>
+        <div className="flex justify-end gap-1">
+        <button type="button" data-testid="camera-touch-rotate" aria-label="Rotate camera with one finger" aria-pressed={touchOrbit} onClick={onTouchOrbit} className={BUTTON} style={{ minWidth: 76, height: 44, borderColor: touchOrbit ? '#67e8f9' : undefined }}>{touchOrbit ? '✓ Rotate' : '⟳ Rotate'}</button>
         <button type="button" aria-label="Pan controls" aria-expanded={panOpen} onClick={() => setPanOpen(value => !value)} className={BUTTON} style={{ width: 44, height: 44 }}>↔</button>
+        </div>
         {panOpen && <div role="group" aria-label="Pan the map" style={{ position: 'absolute', bottom: 52, right: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 44px)', gap: 4, padding: 4, background: '#08121df2' }}>
           {([['Pan left', -1, 0, '←'], ['Pan up', 0, 1, '↑'], ['Pan right', 1, 0, '→'], ['Pan down', 0, -1, '↓']] as const).map(([label, x, y, glyph], index) => <button key={label} type="button" aria-label={label} onClick={() => onCamera(previous => panBySteps(previous, x, y, extent))} className={BUTTON} style={{ width: 44, height: 44, gridColumn: index === 3 ? 2 : undefined }}>{glyph}</button>)}
         </div>}

@@ -176,12 +176,30 @@ function orbitBy(camera: SpaceCamera, dYaw: number, dPitch: number): SpaceCamera
   }
 }
 
-export function orbitByPixels(camera: SpaceCamera, dx: number, dy: number): SpaceCamera {
-  return orbitBy(camera, dx * ORBIT_RADIANS_PER_PX, dy * ORBIT_RADIANS_PER_PX)
+/** Rotate the entire view about a selected pivot, preserving its screen position.
+ * Changing pivots never recenters or changes distance; zero input is identity. */
+function orbitAround(camera: SpaceCamera, next: SpaceCamera, pivot?: SpaceCamera['target']): SpaceCamera {
+  if (!pivot || (next.yaw === camera.yaw && next.pitch === camera.pitch)) return next
+  const basis = (view: SpaceCamera) => {
+    const right = rightVector(view), up = screenUpVector(view)
+    return [right, up, { x: right.y * up.z - right.z * up.y, y: right.z * up.x - right.x * up.z, z: right.x * up.y - right.y * up.x }]
+  }
+  const offset = { x: camera.target.x - pivot.x, y: camera.target.y - pivot.y, z: camera.target.z - pivot.z }
+  const coordinates = basis(camera).map(axis => axis.x * offset.x + axis.y * offset.y + axis.z * offset.z)
+  const rotated = basis(next)
+  return { ...next, followFleetId: undefined, target: {
+    x: pivot.x + rotated.reduce((sum, axis, index) => sum + axis.x * coordinates[index], 0),
+    y: pivot.y + rotated.reduce((sum, axis, index) => sum + axis.y * coordinates[index], 0),
+    z: pivot.z + rotated.reduce((sum, axis, index) => sum + axis.z * coordinates[index], 0),
+  } }
 }
 
-export function orbitBySteps(camera: SpaceCamera, stepsX: number, stepsY: number): SpaceCamera {
-  return orbitBy(camera, stepsX * KEY_ORBIT_STEP, stepsY * KEY_ORBIT_STEP)
+export function orbitByPixels(camera: SpaceCamera, dx: number, dy: number, pivot?: SpaceCamera['target']): SpaceCamera {
+  return orbitAround(camera, orbitBy(camera, dx * ORBIT_RADIANS_PER_PX, dy * ORBIT_RADIANS_PER_PX), pivot)
+}
+
+export function orbitBySteps(camera: SpaceCamera, stepsX: number, stepsY: number, pivot?: SpaceCamera['target']): SpaceCamera {
+  return orbitAround(camera, orbitBy(camera, stepsX * KEY_ORBIT_STEP, stepsY * KEY_ORBIT_STEP), pivot)
 }
 
 /** Which pitch clamp the camera is resting on, or null. */

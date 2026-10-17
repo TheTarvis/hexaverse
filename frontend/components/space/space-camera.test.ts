@@ -439,3 +439,19 @@ it('frames the fleet in front of the star from slightly above, with a finite ori
   const origin = fleetCamera(100, 'fleet', { x: 0, y: 0, z: 0 })
   expect(Number.isFinite(origin.yaw) && Number.isFinite(origin.pitch)).toBe(true)
 })
+
+it('orbits around a selected object without recentering, changing distance or moving its screen position', () => {
+  const camera = { ...defaultCamera(100), target: { x: 8, y: 2, z: -3 }, followFleetId: 'fleet' }
+  const pivot = { x: 14, y: -2, z: 5 }
+  const before = viewBasisOf(camera, { width: 390, height: 844 })
+  const rotated = orbitByPixels(camera, 35, -20, pivot)
+  const after = viewBasisOf(rotated, { width: 390, height: 844 })
+  const dot = (basis: typeof before, axis: typeof before.right) => (pivot.x - basis.eye.x) * axis.x + (pivot.y - basis.eye.y) * axis.y + (pivot.z - basis.eye.z) * axis.z
+  for (const axis of ['right', 'up', 'forward'] as const) expect(dot(after, after[axis])).toBeCloseTo(dot(before, before[axis]), 10)
+  expect(rotated.distance).toBe(camera.distance)
+  expect(rotated.target).not.toEqual(pivot)
+  expect(rotated.followFleetId).toBeUndefined()
+  expect(orbitByPixels(camera, 0, 0, pivot)).toEqual(camera)
+  expect(orbitByPixels(camera, 10, 0).target).toEqual(camera.target)
+  expect(orbitByPixels(camera, 10, 0).followFleetId).toBe('fleet')
+})

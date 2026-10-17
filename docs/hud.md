@@ -438,3 +438,20 @@ response, app-created wake guide, Begin transition to objects, dismissal
 and restored controls in both engines. No existing identity or live API is used.
 The single intercepted fixture POST never leaves the browser; other mutations
 remain forbidden. Evidence: /tmp/hexaverse-invisible-modal-first-login.log.
+
+## Mobile camera orbit — 2026-10-17
+
+Travis confirms actual iPhone one-finger pan and zoom now work; orbit was missing.
+Default controls: one finger pans, two fingers moving together rotate, and changing
+finger spacing zooms. The visible Rotate toggle makes one finger rotate; switch it
+off to pan again. The nearby hint states the current mode. Controls remain44px.
+
+Orbit reuses desktop yaw/pitch rates and bounds. With a selected body/gate or point,
+it rotates the whole view around that live position while preserving its screen
+position, distance and framing; it does not recenter. Without selection it keeps
+the current target/fleet-follow pivot. Adding/removing fingers changes tracking
+only, never resets camera framing; a remaining finger after a pinch must be lifted
+before a new one-finger gesture. Stationary-finger pinch centroid movement does not
+rotate the view. Cancellation and card close retain working independent gestures.
+No document input interception or touchstart cancellation was added; the recovery
+modal visibility fix remains intact. Physical iPhone orbit acceptance is pending.

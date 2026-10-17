@@ -9,6 +9,60 @@ const uid='isolated-production-qa',corp='isolated-production-corp',system='sys_0
 const now=Math.floor(Date.now()/1000),token=[{alg:'none',typ:'JWT'},{sub:uid,user_id:uid,aud:'hexaverse-emulator',iss:'https://securetoken.google.com/hexaverse-emulator',iat:now,exp:now+3600,auth_time:now,email:'isolated@example.invalid',firebase:{identities:{},sign_in_provider:'password'}},''].map((v,i)=>i<2?Buffer.from(JSON.stringify(v)).toString('base64url'):v).join('.')
 const fleet={id:fleetId,corporationId:corp,own:true,systemId:system,worldTime:1000,position:{X:10,Y:0,Z:0},attachedTo:'qa-station',roster:{ships:[{class:'hauler'}],cargo:{fuel:60},cargoCapacity:100,freeHold:40,miningRate:1},state:{Mode:1,Burn:null,Drift:null,Park:{Kind:2,BodyId:'qa-station',Radius:0,PeriodMs:0,Phase:0,EpochMs:1000,Offset:{X:0,Y:0,Z:0},Point:{X:0,Y:0,Z:0}}}}
 const interior={systemId:system,extent:100,character:'normal',starClass:'G',worldTime:1000,scale:1,features:[{id:'qa-star',type:'star',space:{X:0,Y:0,Z:0},size:5},{id:'qa-planet',type:'planet',space:{X:20,Y:0,Z:8},size:2,resources:[]},{id:'qa-station',type:'station',space:{X:10,Y:0,Z:0},size:1}],laneGates:[],contacts:[]}
+async function checkOrbit(p,c,name){
+ const region=p.getByTestId('space-canvas-region'),read=async()=>JSON.parse(await region.getAttribute('data-camera'))
+ const session=name==='Chromium'?await c.newCDPSession(p):null
+ let last=[]
+ const emit=async(type,points)=>{
+  if(session)await session.send('Input.dispatchTouchEvent',{type,touchPoints:points.map(([x,y],id)=>({id,x,y}))})
+  else await p.evaluate(({type,points,last})=>{
+   const host=document.querySelector('[data-testid="space-canvas-region"]'),target=host.querySelector('canvas')
+   const list=points.map(([clientX,clientY],identifier)=>({identifier,target,clientX,clientY}))
+   const changed=(points.length?points:last).map(([clientX,clientY],identifier)=>({identifier,target,clientX,clientY}))
+   const event=document.createEvent('Event');event.initEvent(type.toLowerCase(),true,true)
+   Object.defineProperties(event,{touches:{value:list},changedTouches:{value:changed}});target.dispatchEvent(event)
+  },{type,points,last})
+  if(points.length)last=points
+  await p.waitForTimeout(80)
+ }
+ const closeFingers=()=>emit('touchEnd',[])
+ await p.getByTestId('body-hit-qa-planet').press('Enter')
+ assert.equal(await region.getAttribute('data-selection'),'qa-planet')
+ const before=await read()
+ await emit('touchStart',[[130,350]])
+ await emit('touchStart',[[130,350],[230,350]])
+ assert.deepEqual(await read(),before,'Adding a finger must not reset the camera')
+ await emit('touchMove',[[165,370],[265,370]])
+ const rotated=await read();assert.notEqual(rotated.yaw,before.yaw);assert.notEqual(rotated.pitch,before.pitch);assert.equal(rotated.distance,before.distance)
+ const eyeDistance=cam=>{const eye={x:cam.target.x+Math.cos(cam.pitch)*Math.sin(cam.yaw)*cam.distance,y:cam.target.y+Math.sin(cam.pitch)*cam.distance,z:cam.target.z+Math.cos(cam.pitch)*Math.cos(cam.yaw)*cam.distance};return Math.hypot(eye.x-20,eye.y,eye.z-8)}
+ assert.ok(Math.abs(eyeDistance(before)-eyeDistance(rotated))<1e-6,'Eye must rotate around the selected planet')
+ assert.equal(await region.getAttribute('data-selection'),'qa-planet')
+ await emit('touchMove',[[165,370],[305,370]])
+ const pinched=await read();assert.ok(pinched.distance<rotated.distance);assert.equal(pinched.yaw,rotated.yaw);assert.equal(pinched.pitch,rotated.pitch)
+ // Chromium delivers the remaining contact on touchEnd; WebKit fixture does too.
+ await emit('touchEnd',[[165,370]])
+ await emit('touchMove',[[180,385]])
+ assert.deepEqual(await read(),pinched,'Remaining finger cannot reset or select')
+ await closeFingers()
+ await emit('touchStart',[[160,350],[260,350]])
+ await emit('touchCancel',[])
+ const canceled=await read()
+ await emit('touchStart',[[160,350]]);await emit('touchMove',[[190,370]]);await closeFingers()
+ assert.equal((await read()).yaw,canceled.yaw);assert.notDeepEqual((await read()).target,canceled.target)
+ // Trusted native control taps in both engines; WebKit drags use constructed TouchLists.
+ const toggle=p.getByTestId('camera-touch-rotate');await toggle.tap();assert.equal(await toggle.getAttribute('aria-pressed'),'true')
+ const one=await read();await emit('touchStart',[[160,350]]);await emit('touchMove',[[195,365]]);await closeFingers();assert.notEqual((await read()).yaw,one.yaw)
+ await p.getByRole('button',{name:'HUD menu',exact:true}).tap();await p.getByRole('button',{name:'Console',exact:true}).tap();await p.getByRole('button',{name:'Close Console panel',exact:true}).tap()
+ assert.equal(await region.evaluate(e=>!!e.closest('[inert]')),false)
+ const postClose=await read();await emit('touchStart',[[160,350]]);await emit('touchMove',[[190,360]]);await closeFingers();assert.notEqual((await read()).yaw,postClose.yaw)
+ await toggle.tap();assert.equal(await toggle.getAttribute('aria-pressed'),'false')
+ // Toggle the selected planet off, then exercise the current camera target fallback.
+ await p.getByTestId('body-hit-qa-planet').press('Enter');assert.equal(await region.getAttribute('data-selection'),'')
+ const fallback=await read();await emit('touchStart',[[130,350],[230,350]]);await emit('touchMove',[[160,365],[260,365]]);await closeFingers()
+ assert.notEqual((await read()).yaw,fallback.yaw);assert.deepEqual((await read()).target,fallback.target)
+ console.log(name,'ORBIT PASS: selected pivot, pan/pinch/orbit transitions, cancel, one-finger toggle, card close, no-selection fallback;',session?'browser-generated trusted one/two-finger touches':'constructed TouchLists for drags; trusted native taps for Rotate and HUD')
+ await p.screenshot({path:out+'/'+name.toLowerCase()+'-orbit.png'})
+}
 async function run(type,options,name){
  const b=await type.launch({headless:true,...options});const errors=[],bad=[],requests=[],writes=[],fixtureWrites=[];let spawned=process.env.QA_FIRST_LOGIN!=='1'
  try{
@@ -23,7 +77,7 @@ async function run(type,options,name){
  await p.route('**/emulator/auth/iframe**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Synthetic Auth frame</title>'}))
  await p.route('**/identitytoolkit.googleapis.com/**',async route=>{const path=new URL(route.request().url()).pathname;if(path.includes('signInWithPassword'))return route.fulfill({json:{localId:uid,email:'isolated@example.invalid',idToken:token,refreshToken:'synthetic-refresh',expiresIn:'3600',registered:true}});if(path.includes('lookup'))return route.fulfill({json:{users:[{localId:uid,email:'isolated@example.invalid',emailVerified:true,displayName:'Isolated QA',providerUserInfo:[],createdAt:'1000',lastLoginAt:'1000'}]}});return route.fulfill({status:400,json:{error:{message:'QA_AUTH_ROUTE_BLOCKED'}}})})
  await p.route('**/securetoken.googleapis.com/**',route=>route.fulfill({json:{access_token:token,id_token:token,refresh_token:'synthetic-refresh',expires_in:'3600',user_id:uid,token_type:'Bearer'}}))
- await p.route('**/api/**',async route=>{const u=new URL(route.request().url()),path=u.pathname.slice(4);requests.push(path);if(process.env.QA_FIRST_LOGIN==='1'&&path==='/v1/corporations'&&route.request().method()==='POST'){spawned=true;fixtureWrites.push(path);return route.fulfill({json:{corporation:{id:corp,accountId:uid,name:'Isolated QA',createdAt:0,credits:1000},fleet,homeSystem:{id:system,name:'QA System',region:'normal',coords:{x:0,y:0,z:0},skeleton:{starClass:'G',bodies:[]}},worldTime:1000}})}if(route.request().method()!=='GET'){writes.push(path);return route.fulfill({status:403,json:{error:'Synthetic QA forbids mutations'}})}
+ await p.route('**/api/**',async route=>{const u=new URL(route.request().url()),path=u.pathname.slice(4);requests.push(path);if(process.env.QA_ORBIT==='1'&&path.endsWith('/orders/preview')&&route.request().method()==='POST'){fixtureWrites.push(path);return route.fulfill({json:{controlPoints:[],departMs:1000,arriveMs:2000,deltaV:1,fuelCostTons:1,affordable:true,strandingWarning:false}})}if(process.env.QA_FIRST_LOGIN==='1'&&path==='/v1/corporations'&&route.request().method()==='POST'){spawned=true;fixtureWrites.push(path);return route.fulfill({json:{corporation:{id:corp,accountId:uid,name:'Isolated QA',createdAt:0,credits:1000},fleet,homeSystem:{id:system,name:'QA System',region:'normal',coords:{x:0,y:0,z:0},skeleton:{starClass:'G',bodies:[]}},worldTime:1000}})}if(route.request().method()!=='GET'){writes.push(path);return route.fulfill({status:403,json:{error:'Synthetic QA forbids mutations'}})}
  let data,status=200
  if(path==='/v1/accounts/firestore')data={id:uid,email:'isolated@example.invalid',name:'Isolated QA'}
  else if(path==='/v1/corporations/me'&&!spawned)return route.fulfill({status:200,contentType:'application/json',body:'null'})
@@ -58,6 +112,8 @@ async function run(type,options,name){
   await p.getByRole('button',{name:'Console',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
   await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();assert.equal(await p.getByRole('dialog').count(),0)
   const camera=JSON.parse(await p.getByTestId('space-canvas-region').getAttribute('data-camera'));await p.getByTestId('camera-zoom-in').tap();assert.ok(JSON.parse(await p.getByTestId('space-canvas-region').getAttribute('data-camera')).distance<camera.distance)
+  if(process.env.QA_ORBIT==='1')await checkOrbit(p,c,name)
+  assert.equal(errors.length,0,'No errors after interactions: '+JSON.stringify({errors,writes,requests}))
   console.log(name,'REAL DEPLOYED ROUTE regression PASS: guide visible/dismiss fires, background inert released, HUD/Console/close/zoom callbacks work, no JS errors, no game writes')
   assert.equal(writes.length,0)
  }
