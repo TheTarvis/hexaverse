@@ -495,3 +495,19 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   recovery fix, auth/routes/diagnostics/cutoff unchanged. No push or live writes.
 - Logs retain only two historical18:03 client-aborted reads; no new deployment
   errors. Actual iPhone orbit acceptance remains pending.
+
+
+### Shared HUD card baseline active19:20UTC
+
+-3c4732b unifies visible cards around accepted HudCardShell/typography/facts;
+ 1039623 contains objective decoration so recovery copy remains visible.
+- Workspace panels, mining/travel/actions, Objects/details/services, Console,
+ settings, recovery/objective and fleet inspection share one owning frame; nested
+ content uses sections. Search/drafts/quantities/selected details remain mounted.
+-1,081 tests/66 files plus74 final targeted tests, types/lint and production/
+ Storybook builds pass. Candidate/live Chromium/WebKit real-route synthetic checks
+ cover all HUD groups, recovery, navigation and retained camera gestures.
+- Live build -wmbFYvCfz67ugLHJP3zV;33 initial JS/CSS assets byte-verified;57 public
+ assets, exact auth/routes/diagnostics/published Storybook/cutoff unchanged.
+- Durable local captures/spec: .scratch/hud-card-baseline/. No push or live writes.
+ Physical iPhone visual acceptance pending; full emulator journeys not run.

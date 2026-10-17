@@ -837,3 +837,46 @@ contains only two historical downstream_aborted reads at18:03:06UTC, with zero
 received bytes; no new deployment errors. Log preserved. No identities selected,
 live game mutations or asset operations. Evidence:/tmp/hexaverse-gesture-only-
 {candidate,live}-{first,objects}.log; unit:/tmp/hexaverse-gesture-only-unit.log.
+
+
+## Shared HUD card baseline — active 2026-10-17 19:20UTC
+
+Implementation3c4732b, pre-deployment containment correction1039623. Existing
+HudCardShell now owns workspace Objects/Command/Console, recovery/objective,
+settings, fleet inspector and remote-fleet surfaces. Nested travel/actions use
+unframed shared sections. Existing typography/facts and Catalyst controls replace
+ad-hoc dashed/left-edge surfaces; controls remain dark in either OS color scheme.
+Phone pages retain safe areas, mounted state and internal scrolling; desktop frame
+placement reserves navigation. Console activation/dismissal delegates to its
+existing state owner; tabs/logs/announcements retain controlled lifecycle.
+
+Source:/private/tmp/hexaverse-hud-baseline-ck3ach0k; build
+-wmbFYvCfz67ugLHJP3zV.20 runtime overlays exact to committed sources;57 public
+assets unchanged. Supervisor restarted19:20:49UTC: frontend14918, gateway14919,
+ngrok14920. All non-build pins, commands, exact Google/email auth, routes, published
+Storybook, error diagnostics and Oct19 00UTC cutoff unchanged. No push. Temporary
+candidate and Storybook listeners stopped; no QA route added to the build.
+
+1,081 tests/66 files pass, plus74 targeted tests after final control changes.
+TypeScript/scoped lint and production/Storybook builds pass. Existing full emulator
+journeys were not run. Nested-shell Storybook browser check verifies one frame/two
+sections. Before and after deployment, Chromium/WebKit real-route synthetic fixtures
+pass for mining/station services, retained drafts/search/detail-back, Console/log,
+settings, first-login and persisted recovery, detached fleet inspection, narrow/
+landscape phone and desktop layout/navigation clearance. The final visual review
+caught objective decoration covering recovery despite successful clicks; fixed its
+positioned containing block before deployment and added decoration-bounds checks.
+
+Mobile pan/pinch/two-finger orbit and desktop mouse/keyboard input remain. Chromium
+uses browser-generated multi-touch/card scroll; WebKit uses constructed TouchLists
+and programmatic card scroll, with native control taps. These checks do not prove
+physical iPhone visual acceptance. Auth/game responses are intercepted synthetic
+fixtures; no real identity selected or live gameplay mutated.
+
+All33 initial JS/CSS assets match served build bytes. Complete compressed home/
+login/system HTML200, backend/Auth/SDK iframe health, Storybook200, QA/debug404,
+foreign POST403 and anonymous external302 to idp.ngrok.com verified. Transport log
+347bytes contains only two historical downstream_aborted reads at18:03UTC; no new
+release errors. Logs preserved. Evidence:/tmp/hexaverse-hud-live-
+{mine,station,first,camera}.log; durable captures/migration record in
+.scratch/hud-card-baseline/. Physical iPhone review remains pending.

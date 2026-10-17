@@ -1,6 +1,6 @@
 # Shared HUD card baseline migration
 
-Status: validated release candidate; deployment pending · 2026-10-17
+Status: deployed and browser-verified 2026-10-17 19:20UTC · 2026-10-17
 
 ## Requested outcome and settled choices
 
@@ -71,3 +71,15 @@ before deployment. A real-browser decoration-bounds assertion now protects the
 objective/recovery overlap in wake/objects/first-login fixtures; the saved recovery
 capture reflects the corrected build. All four final fixture runs pass in both
 engines: /tmp/hexaverse-hud-verified-{mine,station,first,camera}.log.
+
+## Deployment
+
+Implementation3c4732b, containment correction1039623. Live build
+-wmbFYvCfz67ugLHJP3zV from/private/tmp/hexaverse-hud-baseline-ck3ach0k.
+All four post-deployment fixture runs pass in both engines:
+/tmp/hexaverse-hud-live-{mine,station,first,camera}.log.
+All33 initial JS/CSS assets match served bytes;57 public assets identical.
+Same protected URL, exact Google/email policy, routes, diagnostics, published
+Storybook and Oct19 00UTC cutoff. No push, identity selection or live game writes.
+Transport log retains only two historical client-aborted reads from18:03UTC.
+Physical iPhone appearance/usability still awaits Travis's review.
