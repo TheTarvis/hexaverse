@@ -551,9 +551,11 @@ describe('SpaceStage — off-screen reach', () => {
   it('Scenario: An off-screen lane gate is selectable by touch', async () => {
     await stage()
     const aff = screen.getByTestId('offscreen-gate-sys_-7_18')
-    fireEvent.touchStart(aff, { touches: [{ clientX: 10, clientY: 10 }] })
-    fireEvent.touchEnd(aff, { changedTouches: [{ clientX: 10, clientY: 10 }] })
-    await waitFor(() => expect(onSelect).toHaveBeenCalledWith({ bodyId: 'gate-sys_-7_18' }))
+    fireEvent.pointerDown(aff, { pointerType: 'touch', pointerId: 1, clientX: 10, clientY: 10, button: 0 })
+    fireEvent.touchStart(aff, { touches: [{ target: aff, clientX: 10, clientY: 10 }] })
+    fireEvent.pointerUp(aff, { pointerType: 'touch', pointerId: 1, clientX: 10, clientY: 10, button: 0 })
+    fireEvent.touchEnd(aff, { touches: [], changedTouches: [{ target: aff, clientX: 10, clientY: 10 }] })
+    await waitFor(() => expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'gate-sys_-7_18' }))
   })
 
   // Scenario: The affordance covers only off-screen marks
@@ -697,6 +699,19 @@ describe('SpaceStage — picking stays correct after the camera moves', () => {
     fireEvent.pointerUp(region(), { clientX: 2, clientY: 2, pointerId: 11 })
     expect(onSelect).toHaveBeenCalledWith(null)
   })
+})
+
+it('offers discrete phone pan controls without changing selection', async () => {
+  const previousMedia = window.matchMedia
+  window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  try {
+    await stage()
+    fireEvent.click(screen.getByRole('button', { name: 'Pan controls' }))
+    const before = JSON.parse(region().getAttribute('data-camera')!)
+    fireEvent.click(screen.getByRole('button', { name: 'Pan right' }))
+    expect(JSON.parse(region().getAttribute('data-camera')!).target).not.toEqual(before.target)
+    expect(onSelect).not.toHaveBeenCalled()
+  } finally { window.matchMedia = previousMedia }
 })
 
 describe('SpaceStage — touch pointer input', () => {

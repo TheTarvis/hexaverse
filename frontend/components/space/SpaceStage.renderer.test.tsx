@@ -96,6 +96,7 @@ function stage(over: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
   vi.spyOn(console, 'error').mockImplementation(() => {})
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => W })
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => H })

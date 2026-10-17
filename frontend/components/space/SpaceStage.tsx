@@ -36,6 +36,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react'
+import { usePhoneHud } from '@/hooks/use-phone-sheet'
+import { bindMapBrowserGestures } from './map-browser-gestures'
 import { Figure } from '@/components/figure/Figure'
 import { formatByUnit, formatInstant, instantScaleLabel } from '@/lib/format'
 import { unprojectToViewPlane, type DrawVec3, type DrawViewBasis } from '@/lib/space/draw'
@@ -357,6 +359,7 @@ export function SpaceStage({
     tracker: DragTracker
     bodyId: string | null
     secondary: boolean
+    affordance: HTMLElement | null
   }
   const gestureRef = useRef<Gesture | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -372,7 +375,7 @@ export function SpaceStage({
       : null
 
   const handlePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!available || isControl(e.target)) return
+    if (!available || isControl(e.target) && !(e.pointerType === 'touch' && e.target instanceof Element && e.target.closest(`[${AFFORDANCE_ATTR}]`))) return
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* Detached/cancelled input. */ }
@@ -386,6 +389,7 @@ export function SpaceStage({
       tracker: beginDrag(e.clientX, e.clientY),
       bodyId: bodyIdUnder(e.target),
       secondary: e.pointerType === 'touch' || e.button === 2,
+      affordance: e.pointerType === 'touch' && e.target instanceof Element ? e.target.closest<HTMLElement>(`[${AFFORDANCE_ATTR}]`) : null,
     }
   }, [available])
 
@@ -426,6 +430,10 @@ export function SpaceStage({
       const gesture = gestureRef.current
       gestureRef.current = null
       if (!gesture || isGesture(gesture.tracker)) return
+      if (gesture.affordance) {
+        if (gesture.affordance.isConnected && !gesture.affordance.closest('[inert], [hidden]')) gesture.affordance.click()
+        return
+      }
       if (gesture.bodyId) {
         onSelect?.({ bodyId: gesture.bodyId })
         return
@@ -471,6 +479,11 @@ export function SpaceStage({
     try { event.currentTarget.releasePointerCapture(event.pointerId) } catch { /* Already lost. */ }
   }, [finishGesture])
 
+  useLayoutEffect(() => {
+    if (!host || !available) return
+    return bindMapBrowserGestures(host)
+  }, [host, available])
+
   const cameraJson = JSON.stringify(camera)
 
   return (
@@ -484,7 +497,7 @@ export function SpaceStage({
       // for an off-screen gate is a moving target.
       data-reframe-animated="false"
       className="absolute inset-0"
-      style={{ touchAction: 'none', isolation: 'isolate' }}
+      style={{ touchAction: 'none', overscrollBehavior: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', isolation: 'isolate' }}
       onFocus={handleFocusIn}
       onBlur={handleFocusOut}
       onContextMenu={event => event.preventDefault()}
@@ -613,6 +626,8 @@ function SpaceLayers({
   onRecenter,
   onReframe,
 }: SpaceLayersProps) {
+  const phone = usePhoneHud()
+  const [panOpen, setPanOpen] = useState(false)
   // THE ONE READ of `scene.marks`, inside the canvas region's error
   // boundary: a throw while building the drawn state is contained here.
   const marks = scene.marks
@@ -796,6 +811,13 @@ function SpaceLayers({
         <CameraButton testId="camera-zoom-out" label="Zoom out" onPress={() => onCamera((p) => zoomBySteps(p, -1, extent))} atLimit={zoomLimit === 'max'} glyph="−" />
         <CameraButton testId="camera-recenter" label="Recenter" onPress={onRecenter} atLimit={false} glyph="⌖" />
       </div>
+
+      {phone && <div data-space-camera-control data-testid="space-pan-controls" className="absolute z-20" style={{ right: 'max(12px, env(safe-area-inset-right))', bottom: 'calc(var(--phone-vitals-height, 64px) + 64px + env(safe-area-inset-bottom))' }}>
+        <button type="button" aria-label="Pan controls" aria-expanded={panOpen} onClick={() => setPanOpen(value => !value)} className={BUTTON} style={{ width: 44, height: 44 }}>↔</button>
+        {panOpen && <div role="group" aria-label="Pan the map" style={{ position: 'absolute', bottom: 52, right: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 44px)', gap: 4, padding: 4, background: '#08121df2' }}>
+          {([['Pan left', -1, 0, '←'], ['Pan up', 0, 1, '↑'], ['Pan right', 1, 0, '→'], ['Pan down', 0, -1, '↓']] as const).map(([label, x, y, glyph], index) => <button key={label} type="button" aria-label={label} onClick={() => onCamera(previous => panBySteps(previous, x, y, extent))} className={BUTTON} style={{ width: 44, height: 44, gridColumn: index === 3 ? 2 : undefined }}>{glyph}</button>)}
+        </div>}
+      </div>}
 
       {/* select-pan-target-point — moved OUT of the wrapper (impl contract
           §10.1): a selection affordance, not a camera cell, so it does not

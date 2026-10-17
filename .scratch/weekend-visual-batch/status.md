@@ -374,3 +374,18 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   route blocks verified. Exact email/deadline/gateway diagnostics/art unchanged.
 - All source/build/policy pins match; diagnostic log0bytes. Actual iPhone retest
   remains pending. Operations and source snapshot are in docs/phone-preview.md.
+
+
+## Safari gesture arbitration correction — 2026-10-17
+
+-02:25UTC actual iPhone feedback: Safari refresh/tab gestures still claim input.
+- Found missing native nonpassive touch/gesture cancellation despite touch-action
+  none on canvas/region. React delegated touch listeners are passive.
+- Added map-owned capture/passive:false cancellation before first touch; no global
+  touch/zoom lock. Added directional pan fallback; cards remain scrollable.
+-1,067 tests/65 files, types/lint and isolated build pass. Native WebKit touchstart
+  cancellation/tap and constructed touch/gesture arbitration pass; actual WebKit
+  two-finger/native Safari UI remain unverified. Chromium native pan/pinch/card scroll
+  pass without page scroll/visual viewport zoom. Actual iPhone retest pending.
+- New snapshot pointer: /tmp/hexaverse-safari-preview-root.txt; all57 published
+  assets unchanged. Exact endpoint/auth/diagnostics/deadline remain required.

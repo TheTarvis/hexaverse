@@ -241,3 +241,59 @@ and evidence remain local and are not added to public assets or protected Storyb
 Final scoped checks:1,063 tests across64 HUD/space files pass, TypeScript and scoped
 ESLint pass, file validators/diff checks pass, and the isolated production build
 passes. All57 published public assets compare byte-identical to the prior build.
+
+
+## Safari browser gesture arbitration — 2026-10-17
+
+Actual iPhone feedback02:25UTC: a downward finger drag invokes refresh and pinch
+invokes Safari's tab UI. The prior pointer tests did not establish control of
+Safari's default gesture behavior. Physical iPhone acceptance remains pending.
+
+The inspected map canvas and region already have touch-action:none. Body hit and
+annotation targets have touch-action:auto but share that none ancestor. The route
+root is fixed100dvh with overflow:hidden/overscroll:none; document/body remain auto.
+The missing path was explicit native default cancellation: no nonpassive map touch
+or Safari GestureEvent handlers existed. React19's delegated touchstart/touchmove
+listeners are passive (verified in installed react-dom source), so adding only
+React touch props would not provide reliable preventDefault arbitration. This is
+a concrete implementation gap, not a captured trace proving Safari's exact cause.
+
+map-browser-gestures.ts now binds capture/passive:false touchstart and touchmove
+before the first map touch. It cancels default immediately for map-owned touches,
+including body/label starts. Safari gesturestart/change on the document are
+cancelled only while this map owns a touch; an outside-origin pinch, map camera
+button, inert map or closed/unmounted gesture is not claimed. End/cancel/blur and
+cleanup release ownership. The listener only arbitrates browser behavior; existing
+Pointer Events still own pan/pinch/selection. Touch affordances activate once via
+the pointer release path; legacy per-mark touchend cannot double-select.
+
+No document-wide touch blocker, body scroll lock or viewport maximum-scale/
+user-scalable restriction was added. Cards remain scroll containers, outside the
+map listener. Map-only selection/callout suppression and overscroll:none complement
+touch-action. Phone ↔ opens44px directional pan controls; zoom/recenter remain
+reachable if Safari reserves a gesture. Browser/OS gestures whose events never
+reach the page or are noncancelable cannot be promised suppressible; Safari's
+physical tab/edge behavior still needs the phone retest.
+
+Primary guidance: [Apple Safari event handling](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/HandlingEvents/HandlingEvents.html)
+describes preventDefault for custom touch/gesture behavior (archived guidance,
+with an explicit future-behavior caveat). [WebKit passive listener guidance](https://webkit.org/blog/8216/new-webkit-features-in-safari-11-1/)
+and [root-listener default clarification](https://bugs.webkit.org/show_bug.cgi?id=182521)
+explain why explicit passive:false is necessary for cancellation.
+
+Verification:1,067 HUD/space tests across65 files, types/scoped lint and isolated
+production build pass. Native trusted touchstart in both installed Chromium and
+WebKit is cancelable/defaultPrevented:true and still selects exactly once.
+Constructed TouchEvents with fixture TouchLists and gesture events verify first
+map/label start, movement, pinch arbitration and release in both engines. The older
+installed WebKit rejects new Touch(), so the fixture constructs TouchEvent then
+sets fixture TouchLists; those are not browser-generated two-finger touches.
+Chromium browser-generated downward pan/pinch change only camera state: page
+scroll, visualViewport scale and offset stay unchanged. Chromium native card scroll
+works; WebKit card touches are unblocked and its overflow:auto container can scroll
+programmatically. WebKit native two-finger pan/pinch/Safari tab UI are unverified.
+Pan fallback and restored map cancellation after card close pass in both engines.
+
+Runner: .scratch/weekend-visual-batch/safari-gesture-regression.cjs; local evidence
+/tmp/hexaverse-safari-arbitration.log. Existing touch/resize/card/desktop fixture
+remains local. No identity or live gameplay state was selected or modified.
