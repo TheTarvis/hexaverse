@@ -4,6 +4,7 @@ import { HudRoot, HudHeading } from '@/components/hud/GameHud'
 import { HudWorkspace } from '@/components/hud/HudWorkspace'
 import { HudCardShell } from '@/components/hud/HudCardShell'
 import { FloatingNavFrame } from '@/components/floating-nav'
+import { SystemViewport } from './SystemViewport'
 import { Button } from '@/components/catalyst/button'
 import { RecoveryTransmission } from './RecoveryTransmission'
 import { VitalsStrip } from './VitalsStrip'
@@ -15,7 +16,8 @@ import type { Fleet } from '@/lib/types/fleet'
 import styles from './command-view.module.css'
 
 const fleet: Fleet = { id: 'fleet_seed_63fd1929d_extremely_long_fixture_name', corporationId: 'mobile-fixture', own: true, position: { X: 0, Y: 0, Z: 0 }, worldTime: 1000, systemId: 'serais', roster: { ships: [{ class: 'hauler' }], cargo: { fuel: 60, water: 20 }, cargoCapacity: 100, freeHold: 20, miningRate: 1 }, state: { Mode: 1, Burn: null, Drift: null, Park: { Kind: 2, BodyId: 'feat-station', Radius: 0, PeriodMs: 0, Phase: 0, EpochMs: 1000, Offset: { X: 0, Y: 0, Z: 0 }, Point: { X: 0, Y: 0, Z: 0 } } } }
-function MobileSystemHud({ gameplay = false, interactiveMap = false }: { gameplay?: boolean; interactiveMap?: boolean }) {
+export function MobileSystemHud({ gameplay = false, interactiveMap = false, disableDocumentLock = false }: { gameplay?: boolean; interactiveMap?: boolean; disableDocumentLock?: boolean }) {
+  const Root = disableDocumentLock ? HudRoot : SystemViewport
   // In-memory demonstration only. Production quote/mutation ownership is tested
   // in SystemSpaceView; this fixture never calls services or Auth.
   const [owned, setOwned] = useState<Fleet[]>([fleet, { ...fleet, id: 'fleet_fixture_second', roster: { ...fleet.roster!, cargo: { fuel: 8 }, freeHold: 92 } }])
@@ -43,7 +45,7 @@ function MobileSystemHud({ gameplay = false, interactiveMap = false }: { gamepla
   const [canvasTaps, setCanvasTaps] = useState(0)
   const [request, setRequest] = useState<{ id: 'objects' | 'command' | 'console'; sequence: number }>()
   const open = (id: 'objects' | 'command' | 'console') => { setGuidePageVisible(false); setRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 })) }
-  return <><HudRoot className={styles.commandView} data-testid="space-view" data-map-selections={canvasTaps}>
+  return <><Root className={styles.commandView} data-testid="space-view" data-map-selections={canvasTaps}>
     {interactiveMap ? <SpaceStage systemId="touch-fixture" extent={100} worldTime={1000} scale={1} selection={null} onSelect={() => setCanvasTaps(value => value + 1)} frameSource={null} scene={{ marks: [
       { id: 'touch-star', kind: 'star', position: { x: 0, y: 0, z: 0 }, radius: 5, pickable: false, selected: false },
       { id: 'touch-planet', kind: 'body', position: { x: 18, y: 0, z: 8 }, radius: 3, pickable: true, selected: false },
@@ -61,7 +63,7 @@ function MobileSystemHud({ gameplay = false, interactiveMap = false }: { gamepla
       { id: 'console', label: 'Console', children: <HudCardShell title="Ship console" lighting="none"><label>Console draft<input aria-label="Console draft" /></label><p>Scan telemetry available. Map selections: {canvasTaps}</p>{gameplay && <Button outline onClick={arrive}>Fixture: settle station arrival</Button>}</HudCardShell> },
     ]} />
     <div className={styles.workspaceVitals}><VitalsStrip acting={gameplay ? acting : fleet} ownedFleets={gameplay ? owned : [fleet]} fleetsFailed={false} status={gameplay ? rosterRowStatus(acting, worldTime, id => id === 'serais' ? 'Serais' : id) : { where: 'Serais', activity: 'Docked', tone: 'idle', activityKind: 'docked', hostLabel: 'station feat-station-with-a-long-disclosed-name' }} onSelectFleet={gameplay ? selected => setActingId(selected.id) : () => {}} systemNames={{ serais: 'Serais' }} credits={1000} scale={1} worldTime={worldTime} serverWorldTime={worldTime} /></div>
-  </HudRoot><FloatingNavFrame onGalaxy={false} email="fixture@example.com" onSignOut={() => {}} /></>
+  </Root><FloatingNavFrame onGalaxy={false} email="fixture@example.com" onSignOut={() => {}} /></>
 }
 const meta = { title: 'HUD/Mobile System', component: MobileSystemHud, parameters: { layout: 'fullscreen', docs: { description: { component: 'Identity-free regression fixture using live HUD, recovery guide, navigation and vitals components. No Auth, API or game mutations. Map button counts local selections.' } } } } satisfies Meta<typeof MobileSystemHud>
 export default meta

@@ -35,12 +35,13 @@ import { CelestialActions } from './CelestialActions'
 // the interior read has failed, at the FLEET read's served scale, because
 // that is then the only clock on screen.
 
+import { SystemViewport } from './SystemViewport'
 import { Button } from '@/components/catalyst/button'
 import { usePhoneHud } from '@/hooks/use-phone-sheet'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
 import { HudWorkspace, type HudPanelId } from '@/components/hud/HudWorkspace'
-import { HudRoot, HudHeading, HudColumn } from '@/components/hud/GameHud'
+import { HudHeading, HudColumn } from '@/components/hud/GameHud'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -1093,7 +1094,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   )
 
   return (
-    <HudRoot
+    <SystemViewport
       data-testid="space-view"
       className={commandStyles.commandView}
     >
@@ -1434,7 +1435,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             : {})}
         />
       </div>
-    </HudRoot>
+    </SystemViewport>
   )
 }
 

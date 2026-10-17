@@ -149,7 +149,7 @@
 .transmission .signal { flex-shrink: 0; }
 .transmissionActions { flex-shrink: 0; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .commandView { --phone-vitals-height: 144px; --phone-toolbar-top: calc(100px + env(safe-area-inset-top)); --phone-panel-top: calc(200px + env(safe-area-inset-top)); --phone-bottom: calc(var(--phone-vitals-height) + 60px + env(safe-area-inset-bottom)); width: 100%; max-width: 100%; min-width: 0; height: 100dvh; }
+  .commandView { --phone-vitals-height: 144px; --phone-toolbar-top: calc(100px + env(safe-area-inset-top)); --phone-panel-top: calc(200px + env(safe-area-inset-top)); --phone-bottom: calc(var(--phone-vitals-height) + 60px + env(safe-area-inset-bottom)); width: 100%; max-width: 100%; min-width: 0; height: var(--system-viewport-height, 100dvh); }
   .identity { top: calc(12px + env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); }
   .identity h1 { margin-block: 4px; }
   .identity p { overflow-wrap: anywhere; }
@@ -212,7 +212,7 @@
   .commandView:has(.workspace[data-mobile-open='true']) .workspaceVitals,
   .commandView:has(.workspace[data-mobile-open='true']) .guideLayer { visibility: hidden; }
   .commandView:has(.workspace[data-mobile-open='true']) .workspace [aria-label='HUD workspace'] { visibility: visible; }
-  .commandView .guideLayer:has(.transmission) { position: fixed; inset: 0; height: 100dvh; z-index: 65; box-sizing: border-box; padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #08121d; }
+  .commandView .guideLayer:has(.transmission) { position: fixed; inset: 0; top: var(--system-viewport-top, 0px); bottom: auto; height: var(--system-viewport-height, 100dvh); z-index: 65; box-sizing: border-box; padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #08121d; }
   .commandView .guideLayer .transmission { display: flex; flex: 1; height: auto; min-height: 0; max-height: none; padding: 12px; }
   .guideLayer .transmissionBody { flex: 1; }
   .guideLayer .transmissionActions { max-width: none; align-self: stretch; }
@@ -225,7 +225,7 @@
 
 .workspaceVitals [data-testid='vitals-details-toggle'] { display: none; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .commandView { --phone-vitals-height: 64px; --phone-toolbar-top: calc(8px + env(safe-area-inset-top)); --phone-panel-top: calc(64px + env(safe-area-inset-top)); position: fixed; inset: 0; height: 100dvh; box-sizing: border-box; overscroll-behavior: none; }
+  .commandView { --phone-vitals-height: 64px; --phone-toolbar-top: calc(8px + env(safe-area-inset-top)); --phone-panel-top: calc(64px + env(safe-area-inset-top)); position: fixed; inset: 0; height: var(--system-viewport-height, 100dvh); box-sizing: border-box; overscroll-behavior: none; }
   .commandView:has([data-testid='vitals-strip'][data-expanded='true']) { --phone-vitals-height: 144px; }
   .identity { top: calc(8px + env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); right: calc(72px + env(safe-area-inset-right)); display: block; }
   .identity > p { display: none; }

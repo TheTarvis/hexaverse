@@ -297,3 +297,62 @@ Pan fallback and restored map cancellation after card close pass in both engines
 Runner: .scratch/weekend-visual-batch/safari-gesture-regression.cjs; local evidence
 /tmp/hexaverse-safari-arbitration.log. Existing touch/resize/card/desktop fixture
 remains local. No identity or live gameplay state was selected or modified.
+
+
+## System document ownership — 2026-10-17, current correction
+
+At11:56UTC Travis reports “One finger drag down still starts the refresh.” Parent
+inspection of the actual iPhone screenshot shows Safari's refresh spinner and the
+entire game shifted down beneath a black gap; compact chrome is present. This
+invalidates any assumption that the prior map-listener patch solved physical iOS.
+
+Read-only inspection of served `/systems/sys_0_1` HTML and27 referenced chunks
+confirmed the old nonpassive map listener and pan fallback in the active system
+chunk page-70f33cd104830626.js. Stale code was not presumed. The concrete scope gap:
+map listeners only saw map descendants, while html/body retained document scrolling.
+HUD/fleet/navigation/loading starts outside the map could miss cancellation. A
+local Next production-layout comparison reproduces that gap: constructed HUD-start
+drag is uncancelled under the prior shell and cancelled by the new document owner.
+That test does not reproduce Safari's native refresh UI.
+
+SystemSpaceView now mounts SystemViewport, which owns the mobile document until
+route exit (including loading/error states and opened cards). html overflow/height
+and body fixed position/height/overflow are locked, with exact prior inline values
+and priorities restored on exit or desktop transition. Ownership survives modal
+style restoration; shared roots retain the lock until the final owner releases it.
+No permanent application-wide lock or global touch-action:none is installed.
+
+A native document capture/passive:false listener covers the whole system page.
+Empty/noninteractive starts are cancelled immediately; real buttons retain native
+taps, with the first unconsumable drag move cancelled. Independently scrollable
+cards/portalled dialogs can scroll in available directions; top/bottom chaining is
+blocked. Inputs retain editing behavior. Multi-touch outside the map and zoomed
+visual viewport panning are not cancelled, and no user-scalable/maximum-scale
+restriction is added. Existing map gesture and tap/drag logic remains in place.
+This supersedes the earlier decision to leave document scroll ownership unchanged.
+
+The shell uses visualViewport height at scale1, with window.innerHeight fallback;
+normal map input never follows rubber-band offsetTop. A focused editor may use the
+keyboard's visual offset. Full-page sheets/guide/inspector inherit the same height
+and top variables, and external floating navigation accounts for the obscured
+bottom band. Camera/pan/vitals remain inside the visible shell plus safe-area inset.
+At accessibility zoom the shell keeps its unscaled dimensions rather than chasing
+the zoomed rectangle.
+
+Verification:1,072 tests across66 HUD/space files, types/scoped lint/file validators
+and production build pass. A temporary loopback-only `/login/touch-qa` production
+route composes the real RootLayout/Providers/portals, SystemViewport, live SpaceStage
+and production HUD with identity-free fixture data. Chromium and installed WebKit
+verify baseline/fixed HUD cancellation, canvas/label/heading/fleet start coverage,
+card scroll/close, modal-style restoration, fallback bounds at375×667/390×600/
+844×390/390×844, and an actual Next route exit restoring normal login document
+styles. Chromium browser-generated HUD downward drag leaves document and shell
+fixed and does not activate the button; native card scrolling also passes. WebKit
+HUD move arbitration uses constructed events; its native taps and route cleanup
+pass. The temporary route is removed before the final deployable rebuild.
+
+Existing map pinch/tap/resize/desktop regressions pass. Physical Safari pull-to-
+refresh and browser chrome cannot be reproduced with these headless engines; a
+physical iPhone retest remains required. No native Safari success is claimed.
+Evidence: .scratch/weekend-visual-batch/root-viewport-regression.cjs and local
+/tmp/hexaverse-root-production-qa.log; screenshots stay in/tmp/hexaverse-root-viewport-qa.

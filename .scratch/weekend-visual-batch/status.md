@@ -399,3 +399,19 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Physical Safari central pan/pinch retest and reserved browser-gesture limits remain
   pending. Native trusted touchstart/tap verified in both engines; WebKit two-finger
   behavior only covered with constructed TouchEvents, not physical Safari UI.
+
+
+## Root document correction after actual iPhone refresh failure — 2026-10-17
+
+-11:56UTC actual report/screenshot: Safari pull-to-refresh still shifts game down.
+- Confirmed served chunks contain prior Safari map fix; no stale-build assumption.
+- Found canvas-only listener scope left document/HUD starts unowned. Added mobile
+  system-route html/body lock, document capture arbitration and visual viewport shell.
+- Independent card/dialog scroll, native taps/editing, outside-map pinch/accessibility
+  zoom and exact route-exit style restoration retained. Physical Safari retest pending.
+-1,072 tests/66 files, types/lint pass. Real Next production-layout comparison in
+  Chromium/WebKit reproduces missed HUD cancellation and validates fixed ownership,
+  card-close/resize/fallback/route cleanup. Native Safari refresh UI not reproduced.
+- Temporary local QA route removed before final build; no fixture publication.
+- Snapshot pointer: /tmp/hexaverse-rootlock-preview-root.txt. Assets57/57 unchanged;
+  existing exact auth, gateway diagnostics/routes, ngrok flags and Oct19cutoff retained.

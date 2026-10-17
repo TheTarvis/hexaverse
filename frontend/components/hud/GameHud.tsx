@@ -1,11 +1,11 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode, ComponentPropsWithRef } from 'react'
 import { CONSOLE_DOCK_LANE_COLUMN } from '@/lib/console-dock-layout'
 import styles from './game-hud.module.css'
 
 type Props = HTMLAttributes<HTMLElement>
 
 /** Presentation only: callers retain selection, queries and command ownership. */
-export function HudRoot({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
+export function HudRoot({ className = '', ...props }: ComponentPropsWithRef<'div'>) {
   return <div {...props} className={`${styles.theme} ${styles.root} ${className}`} />
 }
 
