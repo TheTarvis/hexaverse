@@ -551,10 +551,9 @@ describe('SpaceStage — off-screen reach', () => {
   it('Scenario: An off-screen lane gate is selectable by touch', async () => {
     await stage()
     const aff = screen.getByTestId('offscreen-gate-sys_-7_18')
-    fireEvent.pointerDown(aff, { pointerType: 'touch', pointerId: 1, clientX: 10, clientY: 10, button: 0 })
     fireEvent.touchStart(aff, { touches: [{ target: aff, clientX: 10, clientY: 10 }] })
-    fireEvent.pointerUp(aff, { pointerType: 'touch', pointerId: 1, clientX: 10, clientY: 10, button: 0 })
     fireEvent.touchEnd(aff, { touches: [], changedTouches: [{ target: aff, clientX: 10, clientY: 10 }] })
+    fireEvent.click(aff) // Browser-owned native click, not a pointer-derived synthetic activation.
     await waitFor(() => expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'gate-sys_-7_18' }))
   })
 
@@ -714,64 +713,40 @@ it('offers discrete phone pan controls without changing selection', async () => 
   } finally { window.matchMedia = previousMedia }
 })
 
-describe('SpaceStage — touch pointer input', () => {
-  const touch = (id: number, x: number, y: number) => ({ pointerId: id, pointerType: 'touch', button: 0, clientX: x, clientY: y })
-  it('pans with one finger, preserves viewing angle and does not select after a drag', async () => {
-    await stage()
-    const before = JSON.parse(region().getAttribute('data-camera')!)
-    fireEvent.pointerDown(region(), touch(1, 400, 400))
-    fireEvent.pointerMove(region(), touch(1, 470, 430))
-    fireEvent.pointerUp(region(), touch(1, 470, 430))
+describe('SpaceStage — native touch input without a pointer stream', () => {
+  const point = (identifier: number, clientX: number, clientY: number) => ({ identifier, clientX, clientY })
+  const start = (target: Element, points = [point(1, 300, 300)]) => fireEvent.touchStart(target, { touches: points })
+  const move = (target: Element, points: ReturnType<typeof point>[]) => fireEvent.touchMove(target, { touches: points })
+  const end = (target: Element, changed = point(1, 300, 300), remaining: ReturnType<typeof point>[] = []) => fireEvent.touchEnd(target, { touches: remaining, changedTouches: [changed] })
+  it('pans with native touch moves even when touch pointer events are absent or cancelled', async () => {
+    await stage(); const before = JSON.parse(region().getAttribute('data-camera')!)
+    start(region(), [point(1,400,400)]); move(region(), [point(1,440,420)])
+    const partial = JSON.parse(region().getAttribute('data-camera')!)
+    fireEvent.pointerCancel(region(), {pointerType:'touch',pointerId:1})
+    move(region(), [point(1,470,430)]); end(region(),point(1,470,430))
     const after = JSON.parse(region().getAttribute('data-camera')!)
-    expect(after.target).not.toEqual(before.target)
-    expect(after.yaw).toBe(before.yaw)
-    expect(after.distance).toBe(before.distance)
-    expect(onSelect).not.toHaveBeenCalled()
+    expect(partial.target).not.toEqual(before.target); expect(after.target).not.toEqual(partial.target)
+    expect(after.yaw).toBe(before.yaw); expect(after.distance).toBe(before.distance); expect(onSelect).not.toHaveBeenCalled()
   })
-  it('selects a body exactly once on a stationary touch pointer release', async () => {
-    await stage()
-    const hit = screen.getByTestId('body-hit-feat-body-0')
-    fireEvent.pointerDown(hit, touch(1, 300, 300))
-    fireEvent.pointerMove(hit, touch(1, 302, 301))
-    fireEvent.pointerUp(hit, touch(1, 302, 301))
-    // Browsers also emit legacy touch events; they must not double-process it.
-    fireEvent.touchEnd(hit, { changedTouches: [{ clientX: 302, clientY: 301 }] })
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'feat-body-0' })
+  it('selects a body once after a native touch with jitter, ignoring a duplicate touch pointer stream', async () => {
+    await stage();const hit=screen.getByTestId('body-hit-feat-body-0')
+    fireEvent.pointerDown(hit,{pointerType:'touch',pointerId:1,clientX:300,clientY:300,button:0})
+    start(hit);move(hit,[point(1,302,301)])
+    fireEvent.pointerUp(hit,{pointerType:'touch',pointerId:1,clientX:302,clientY:301,button:0})
+    end(hit,point(1,302,301));expect(onSelect).toHaveBeenCalledExactlyOnceWith({bodyId:'feat-body-0'})
   })
-  it('does not select when a quick drag releases beyond the threshold without an intermediate move', async () => {
-    await stage()
-    const hit = screen.getByTestId('body-hit-feat-body-0')
-    fireEvent.pointerDown(hit, touch(1, 300, 300))
-    fireEvent.pointerUp(region(), touch(1, 340, 300))
-    expect(onSelect).not.toHaveBeenCalled()
+  it('does not select on a fast drag release beyond the threshold', async () => {
+    await stage();const hit=screen.getByTestId('body-hit-feat-body-0');start(hit);end(hit,point(1,340,300));expect(onSelect).not.toHaveBeenCalled()
   })
-  it('pinches without orbiting or selecting, including staggered finger release', async () => {
-    await stage()
-    const before = JSON.parse(region().getAttribute('data-camera')!)
-    fireEvent.pointerDown(region(), touch(1, 200, 400))
-    fireEvent.pointerDown(region(), touch(2, 300, 400))
-    fireEvent.pointerMove(region(), touch(2, 380, 400))
-    const after = JSON.parse(region().getAttribute('data-camera')!)
-    expect(after.distance).toBeLessThan(before.distance)
-    expect(after.yaw).toBe(before.yaw)
-    fireEvent.pointerUp(region(), touch(2, 380, 400))
-    fireEvent.pointerMove(region(), touch(1, 210, 410))
-    fireEvent.pointerUp(region(), touch(1, 210, 410))
-    expect(onSelect).not.toHaveBeenCalled()
+  it('pinches from native TouchLists and never selects on staggered finger release', async () => {
+    await stage();const before=JSON.parse(region().getAttribute('data-camera')!)
+    start(region(),[point(1,200,400)]);start(region(),[point(1,200,400),point(2,300,400)])
+    move(region(),[point(1,200,400),point(2,380,400)])
+    expect(JSON.parse(region().getAttribute('data-camera')!).distance).toBeLessThan(before.distance)
+    end(region(),point(2,380,400),[point(1,200,400)]);move(region(),[point(1,210,410)]);end(region(),point(1,210,410));expect(onSelect).not.toHaveBeenCalled()
   })
-  it('cancels a contact cleanly and accepts a fresh tap after cancellation or lost capture', async () => {
-    await stage()
-    const hit = screen.getByTestId('body-hit-feat-body-0')
-    fireEvent.pointerDown(hit, touch(1, 300, 300))
-    fireEvent.pointerCancel(region(), touch(1, 300, 300))
-    fireEvent.pointerUp(region(), touch(1, 300, 300))
-    fireEvent.pointerDown(hit, touch(2, 300, 300))
-    fireEvent.lostPointerCapture(region(), touch(2, 300, 300))
-    fireEvent.pointerUp(region(), touch(2, 300, 300))
-    expect(onSelect).not.toHaveBeenCalled()
-    fireEvent.pointerDown(hit, touch(3, 300, 300))
-    fireEvent.pointerUp(region(), touch(3, 300, 300))
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'feat-body-0' })
+  it('cancels native touch cleanly and accepts the next independent tap', async () => {
+    await stage();const hit=screen.getByTestId('body-hit-feat-body-0');start(hit);fireEvent.touchCancel(hit,{touches:[]});end(hit);expect(onSelect).not.toHaveBeenCalled();start(hit);end(hit);expect(onSelect).toHaveBeenCalledExactlyOnceWith({bodyId:'feat-body-0'})
   })
 })
 

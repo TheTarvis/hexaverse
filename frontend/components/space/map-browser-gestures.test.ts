@@ -1,52 +1,27 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { bindMapBrowserGestures } from './map-browser-gestures'
-
 let cleanup: (() => void) | undefined
 afterEach(() => { cleanup?.(); document.body.replaceChildren() })
 function fixture() {
-  const host = document.createElement('div'), label = document.createElement('span'), control = document.createElement('button'), outside = document.createElement('div')
-  control.dataset.spaceCameraControl = ''; host.append(label, control); document.body.append(host, outside)
-  cleanup = bindMapBrowserGestures(host)
-  return { host, label, control, outside }
+ const host=document.createElement('div'),label=document.createElement('span'),control=document.createElement('button'),outside=document.createElement('div')
+ control.dataset.spaceCameraControl='';host.append(label,control);document.body.append(host,outside)
+ const actions={start:vi.fn(),move:vi.fn(()=>true),end:vi.fn(()=>true),cancel:vi.fn()};cleanup=bindMapBrowserGestures(host,actions);return{host,label,control,outside,actions}
 }
-function touch(target: Element, type: string, targets: EventTarget[] = [target], cancelable = true) {
-  const event = new Event(type, { bubbles: true, cancelable })
-  Object.defineProperty(event, 'touches', { value: targets.map((target, identifier) => ({ target, identifier })) })
-  target.dispatchEvent(event)
-  return event
-}
-it('cancels the first map touch synchronously, move, and Safari gestures only while the map owns touches', () => {
-  const { label } = fixture()
-  expect(touch(label, 'touchstart').defaultPrevented).toBe(true)
-  expect(touch(label, 'touchmove').defaultPrevented).toBe(true)
-  for (const type of ['gesturestart', 'gesturechange']) {
-    const event = new Event(type, { bubbles: true, cancelable: true }); document.dispatchEvent(event)
-    expect(event.defaultPrevented).toBe(true)
-  }
-  expect(touch(label, 'touchend', []).defaultPrevented).toBe(true)
-  const after = new Event('gesturestart', { cancelable: true }); document.dispatchEvent(after)
-  expect(after.defaultPrevented).toBe(false)
+function touch(target:Element,type:string,targets:EventTarget[]=[target]){const event=new Event(type,{bubbles:true,cancelable:true});Object.defineProperty(event,'touches',{value:targets.map((target,identifier)=>({target,identifier}))});target.dispatchEvent(event);return event}
+it('preserves touchstart and only cancels consumed map moves/end, with no document interception',()=>{
+ const {host,label,actions}=fixture();const doc=vi.spyOn(document,'addEventListener');cleanup?.();cleanup=bindMapBrowserGestures(host,actions)
+ expect(doc).not.toHaveBeenCalledWith(expect.stringMatching(/touch|gesture/),expect.anything(),expect.anything());doc.mockRestore()
+ expect(touch(label,'touchstart').defaultPrevented).toBe(false);expect(actions.start).toHaveBeenCalled()
+ expect(touch(label,'touchmove').defaultPrevented).toBe(true);expect(touch(label,'touchend',[]).defaultPrevented).toBe(true)
+ const gesture=new Event('gesturestart',{cancelable:true});document.dispatchEvent(gesture);expect(gesture.defaultPrevented).toBe(false)
 })
-it('leaves controls and touches that begin outside the map available to the browser', () => {
-  const { label, control, outside, host } = fixture()
-  expect(touch(control, 'touchstart').defaultPrevented).toBe(false)
-  expect(touch(label, 'touchstart', [outside, label]).defaultPrevented).toBe(false)
-  host.setAttribute('inert', '')
-  expect(touch(label, 'touchstart').defaultPrevented).toBe(false)
-  host.removeAttribute('inert')
-  expect(touch(label, 'touchstart').defaultPrevented).toBe(true)
+it('leaves native controls, outside-origin touches, inert maps and unconsumed taps untouched',()=>{
+ const{host,label,control,outside,actions}=fixture();expect(touch(control,'touchstart').defaultPrevented).toBe(false);expect(actions.start).not.toHaveBeenCalled()
+ touch(label,'touchstart',[outside,label]);expect(actions.start).not.toHaveBeenCalled();host.setAttribute('inert','');touch(label,'touchstart');expect(actions.start).not.toHaveBeenCalled();host.removeAttribute('inert')
+ actions.move.mockReturnValue(false);actions.end.mockReturnValue(false);touch(label,'touchstart');expect(touch(label,'touchmove').defaultPrevented).toBe(false);expect(touch(label,'touchend',[]).defaultPrevented).toBe(false)
 })
-it('installs nonpassive capture listeners before the first touch and cleans up cancellation/blur', () => {
-  const { host, label } = fixture()
-  const spy = vi.spyOn(host, 'addEventListener')
-  cleanup?.(); cleanup = bindMapBrowserGestures(host)
-  expect(spy).toHaveBeenCalledWith('touchstart', expect.any(Function), { capture: true, passive: false })
-  expect(spy).toHaveBeenCalledWith('touchmove', expect.any(Function), { capture: true, passive: false })
-  touch(label, 'touchstart'); touch(label, 'touchcancel', [])
-  let gesture = new Event('gesturechange', { cancelable: true }); document.dispatchEvent(gesture); expect(gesture.defaultPrevented).toBe(false)
-  touch(label, 'touchstart'); window.dispatchEvent(new Event('blur'))
-  gesture = new Event('gesturechange', { cancelable: true }); document.dispatchEvent(gesture); expect(gesture.defaultPrevented).toBe(false)
-  cleanup?.(); cleanup = undefined
-  expect(touch(label, 'touchstart').defaultPrevented).toBe(false)
-  spy.mockRestore()
+it('cleans up native touch state on cancellation/blur and removes all host listeners',()=>{
+ const{label,actions}=fixture();touch(label,'touchstart');touch(label,'touchcancel',[]);expect(actions.cancel).toHaveBeenCalled();actions.move.mockClear();touch(label,'touchmove');expect(actions.move).not.toHaveBeenCalled()
+ touch(label,'touchstart');window.dispatchEvent(new Event('blur'));actions.move.mockClear();touch(label,'touchmove');expect(actions.move).not.toHaveBeenCalled()
+ cleanup?.();cleanup=undefined;actions.start.mockClear();touch(label,'touchstart');expect(actions.start).not.toHaveBeenCalled()
 })

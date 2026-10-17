@@ -427,3 +427,18 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   match, compressed service/access checks pass, transport log0bytes.
 - Physical iPhone Safari refresh behavior remains pending, not inferred from engine
   tests or silence. Native Safari UI could not be reproduced with headless engines.
+
+
+## Physical input lockout correction — 2026-10-17
+
+-12:27UTC user reports refresh stopped but all gestures/buttons dead. Universal
+  physical lockout not reproduced locally; no stale-build or success assumption.
+-0feef64 emergency rollback removed all document input interception at12:31UTC,
+  retaining CSS viewport/body layout. It does not cancel native clicks/card scroll.
+- Native map TouchEvent path replaces reliance on touch-derived pointers. Touchstart
+  is preserved; map movement updates camera even with pointer stream absent/cancelled.
+- Trusted Chromium/WebKit production-layout callbacks pass for HUD/menu/close,
+  fleet/map, zoom/pan/recenter, settings and in-memory travel. Constructed WebKit
+  multi-touch changes camera; Chromium native pan/pinch pass with pointers blocked.
+-1,072 tests/66 files, types/lint pass. No physical iPhone success claimed.
+- QA route removed before final build; no new global interception or art publication.

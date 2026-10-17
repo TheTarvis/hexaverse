@@ -43,12 +43,14 @@ export function MobileSystemHud({ gameplay = false, interactiveMap = false, disa
   const [guide, setGuide] = useState(() => ({ ...newGuide('mobile-fixture', fleet.id, 'serais'), ...(gameplay ? { phase: 'dismissed' as const } : {}) }))
   const [guidePageVisible, setGuidePageVisible] = useState(true)
   const [canvasTaps, setCanvasTaps] = useState(0)
+  const [fleetTaps, setFleetTaps] = useState(0)
   const [request, setRequest] = useState<{ id: 'objects' | 'command' | 'console'; sequence: number }>()
   const open = (id: 'objects' | 'command' | 'console') => { setGuidePageVisible(false); setRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 })) }
-  return <><Root className={styles.commandView} data-testid="space-view" data-map-selections={canvasTaps}>
-    {interactiveMap ? <SpaceStage systemId="touch-fixture" extent={100} worldTime={1000} scale={1} selection={null} onSelect={() => setCanvasTaps(value => value + 1)} frameSource={null} scene={{ marks: [
+  return <><Root className={styles.commandView} data-testid="space-view" data-map-selections={canvasTaps} data-map-fleet-activations={fleetTaps}>
+    {interactiveMap ? <SpaceStage systemId="touch-fixture" extent={100} worldTime={1000} scale={1} selection={null} onSelect={() => setCanvasTaps(value => value + 1)} onActivateFleet={() => setFleetTaps(value => value + 1)} frameSource={null} scene={{ marks: [
       { id: 'touch-star', kind: 'star', position: { x: 0, y: 0, z: 0 }, radius: 5, pickable: false, selected: false },
       { id: 'touch-planet', kind: 'body', position: { x: 18, y: 0, z: 8 }, radius: 3, pickable: true, selected: false },
+      { id: 'touch-fleet', kind: 'fleet', position: { x: -10, y: 0, z: 0 }, radius: .6, pickable: false, selected: false, fleetMode: 1 },
     ], curves: [], orbitRings: [], beltFields: [], positionTimeMs: 1000, decorativeTimeMs: 1000, omissions: [] }} /> : <button data-testid="fixture-canvas" aria-label="Select map position" onClick={() => setCanvasTaps(value => value + 1)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', color: '#91a3b7', background: 'radial-gradient(ellipse at center, #1a3447, #05060a)' }}>Map selections: {canvasTaps}</button>}
     <HudHeading className={styles.identity} data-testid="command-system-identity" eyebrow="Local space / Command network" title="Serais" detail={gameplay ? "2 fleets · 2 ships" : "1 fleets · 1 ships"} />
     {guide.phase !== 'dismissed' && !guidePageVisible && <Button plain className={styles.resumeGuide} onClick={() => setGuidePageVisible(true)}>Resume guide</Button>}

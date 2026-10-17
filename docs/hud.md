@@ -356,3 +356,56 @@ refresh and browser chrome cannot be reproduced with these headless engines; a
 physical iPhone retest remains required. No native Safari success is claimed.
 Evidence: .scratch/weekend-visual-batch/root-viewport-regression.cjs and local
 /tmp/hexaverse-root-production-qa.log; screenshots stay in/tmp/hexaverse-root-viewport-qa.
+
+
+## Input restoration after physical regression — 2026-10-17, current correction
+
+At12:27UTC Travis reports refresh stopped, but no finger gestures or buttons work
+after dece79e. The document capture interceptor is unsafe as a general solution:
+it cancels every unconsumable single-finger move, with no tap-jitter threshold, and
+can suppress synthesized native clicks. Map touchstart cancellation also depended
+on Safari continuing a derived pointer stream. These are concrete implementation
+risks; the exact universal physical lockout was not reproduced locally. Trusted
+Chromium taps with2/5/10px injected movement still activated HUD in the baseline
+(the engine emitted no touchmove at those distances), so no reproduced jitter cause
+is claimed. Inert/overlay leaks were not found in the production-layout tests.
+
+Emergency rollback0feef64 removed ALL document touch/gesture input listeners at
+12:31UTC. html/body layout and visible viewport sizing remain; the root owner is
+now layout-only, marked system-viewport-layout-only-v2. It never prevents document
+input or intercepts card scrolling, at boundaries or elsewhere. This supersedes
+the previous document capture/chaining strategy. No additional global input
+interception is added. Ordinary HUD/menu/close/pan/zoom buttons retain native clicks.
+
+Map input now owns native TouchEvents directly. Touchstart is not cancelled. Native
+touchmove pans or pinches after the gesture threshold; camera changes do not depend
+on the existence of touch-derived PointerEvents. Touch-pointer events are ignored
+by mouse/pen handlers, and a touch pointercancel cannot erase native touch tracking.
+Tap selection resolves at native touchend; fleet/ghost/offscreen taps retain their
+native click path. Owned map drag ends suppress compatibility clicks; legacy
+touchend handlers cannot duplicate selection. Safari gesture listeners exist only
+on the map host, never the document. Mouse/pen and keyboard behavior remain.
+
+Stronger evidence:1,072 tests across66 files, types/scoped lint/validators and build
+pass. New native touch regressions assert actual camera/selection callbacks with
+no pointer events and through touch pointer cancellation. A temporary local-only
+Next production-layout route blocks ALL touch pointer events before the app sees
+them. In both installed Chromium and WebKit, trusted touches select map/fleet once
+and activate HUD/menu/Objects/Console/Command/Close/settings/zoom/pan/recenter
+callbacks. In-memory fixture travel Start/Stop callbacks execute; no live verbs run.
+Card scrolling and absence of stale inert after closing are checked at390×844,
+844×390 and390×600, as is actual Next route-exit layout cleanup.
+
+In WebKit, constructed TouchEvents with fixture TouchLists assert actual pan and
+pinch camera changes (not merely defaultPrevented). Chromium also exercises
+browser-generated native pan/pinch while the entire touch-pointer stream is
+blocked. Native WebKit two-finger/Safari browser UI remain unverified; these
+headless results do not establish physical iPhone recovery. The native zoom/pan
+buttons are the demonstrated fallback when browser gestures are reserved. No
+another physical retest is presumed from silence, and no request is made until
+this stronger callback evidence is available.
+
+Runner: .scratch/weekend-visual-batch/input-restoration-regression.cjs; local
+evidence:/tmp/hexaverse-input-production-qa.log. Its temporary production QA route
+and fixture are removed before the final deployable rebuild. All57 public assets,
+authentication, gateway diagnostics/routes and preview cutoff remain unchanged.

@@ -37,7 +37,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react'
 import { usePhoneHud } from '@/hooks/use-phone-sheet'
-import { bindMapBrowserGestures } from './map-browser-gestures'
+import { bindMapBrowserGestures, type MapTouchActions } from './map-browser-gestures'
 import { Figure } from '@/components/figure/Figure'
 import { formatByUnit, formatInstant, instantScaleLabel } from '@/lib/format'
 import { unprojectToViewPlane, type DrawVec3, type DrawViewBasis } from '@/lib/space/draw'
@@ -364,6 +364,7 @@ export function SpaceStage({
   const gestureRef = useRef<Gesture | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinchRef = useRef<number | null>(null)
+  const touchPinched = useRef(false)
 
   const isControl = (target: EventTarget | null): boolean =>
     target instanceof Element &&
@@ -375,7 +376,7 @@ export function SpaceStage({
       : null
 
   const handlePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!available || isControl(e.target) && !(e.pointerType === 'touch' && e.target instanceof Element && e.target.closest(`[${AFFORDANCE_ATTR}]`))) return
+    if (!available || e.pointerType === 'touch' || isControl(e.target)) return
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* Detached/cancelled input. */ }
@@ -388,14 +389,14 @@ export function SpaceStage({
     gestureRef.current = {
       tracker: beginDrag(e.clientX, e.clientY),
       bodyId: bodyIdUnder(e.target),
-      secondary: e.pointerType === 'touch' || e.button === 2,
-      affordance: e.pointerType === 'touch' && e.target instanceof Element ? e.target.closest<HTMLElement>(`[${AFFORDANCE_ATTR}]`) : null,
+      secondary: e.button === 2,
+      affordance: null,
     }
   }, [available])
 
   const handlePointerMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (!available || !pointers.current.has(e.pointerId)) return
+      if (!available || e.pointerType === 'touch' || !pointers.current.has(e.pointerId)) return
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (pointers.current.size > 1) {
         const [a, b] = [...pointers.current.values()]
@@ -458,6 +459,7 @@ export function SpaceStage({
   const cancelGesture = useCallback(() => {
     gestureRef.current = null
     pinchRef.current = null
+    touchPinched.current = false
     pointers.current.clear()
   }, [])
   useEffect(() => {
@@ -466,6 +468,7 @@ export function SpaceStage({
     return () => window.removeEventListener('blur', cancelGesture)
   }, [available, cancelGesture])
   const releasePointer = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return
     const tracked = pointers.current.has(event.pointerId)
     const single = pointers.current.size === 1
     pointers.current.delete(event.pointerId)
@@ -479,9 +482,57 @@ export function SpaceStage({
     try { event.currentTarget.releasePointerCapture(event.pointerId) } catch { /* Already lost. */ }
   }, [finishGesture])
 
+  const touchActions = useRef<MapTouchActions>(null!)
+  touchActions.current = {
+    start: event => {
+      if (event.touches.length >= 2) {
+        const [a, b] = Array.from(event.touches)
+        pinchRef.current = touchDistance({ x: a.clientX, y: a.clientY }, { x: b.clientX, y: b.clientY })
+        touchPinched.current = true
+        gestureRef.current = null
+      } else if (!touchPinched.current && event.touches[0]) {
+        const point = event.touches[0]
+        gestureRef.current = { tracker: beginDrag(point.clientX, point.clientY), bodyId: bodyIdUnder(event.target), secondary: true, affordance: event.target instanceof Element ? event.target.closest<HTMLElement>(`[${AFFORDANCE_ATTR}]`) : null }
+      }
+    },
+    move: event => {
+      if (event.touches.length >= 2) {
+        const [a, b] = Array.from(event.touches)
+        const next = touchDistance({ x: a.clientX, y: a.clientY }, { x: b.clientX, y: b.clientY })
+        const previous = pinchRef.current
+        pinchRef.current = next
+        touchPinched.current = true
+        gestureRef.current = null
+        if (previous) setCamera(camera => zoomByPinch(camera, previous, next, extent))
+        return true
+      }
+      const gesture = gestureRef.current, point = event.touches[0]
+      if (!gesture || !point) return touchPinched.current
+      const { dx, dy } = advanceDrag(gesture.tracker, point.clientX, point.clientY)
+      if (!isGesture(gesture.tracker)) return false
+      const frame = frameRef.current
+      if (frame) setCamera(camera => panByPixels(camera, dx, dy, { width: frame.basis.widthPx, height: frame.basis.heightPx }, extent))
+      return true
+    },
+    end: event => {
+      if (event.touches.length) { gestureRef.current = null; pinchRef.current = null; touchPinched.current = true; return true }
+      const point = event.changedTouches[0], gesture = gestureRef.current
+      if (gesture && point) advanceDrag(gesture.tracker, point.clientX, point.clientY)
+      const nativeAffordanceTap = !!gesture?.affordance && !isGesture(gesture.tracker) && !touchPinched.current
+      if (nativeAffordanceTap) gestureRef.current = null // Native click owns fleet/ghost/offscreen taps.
+      else if (point) finishGesture(point.clientX, point.clientY, [])
+      else gestureRef.current = null
+      touchPinched.current = false; pinchRef.current = null
+      return !nativeAffordanceTap
+    },
+    cancel: cancelGesture,
+  }
   useLayoutEffect(() => {
     if (!host || !available) return
-    return bindMapBrowserGestures(host)
+    return bindMapBrowserGestures(host, {
+      start: event => touchActions.current.start(event), move: event => touchActions.current.move(event),
+      end: event => touchActions.current.end(event), cancel: () => touchActions.current.cancel(),
+    })
   }, [host, available])
 
   const cameraJson = JSON.stringify(camera)
@@ -504,8 +555,8 @@ export function SpaceStage({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUpCapture={releasePointer}
-      onPointerCancel={cancelGesture}
-      onLostPointerCapture={event => { if (pointers.current.has(event.pointerId)) cancelGesture() }}
+      onPointerCancel={event => { if (event.pointerType !== 'touch') cancelGesture() }}
+      onLostPointerCapture={event => { if (event.pointerType !== 'touch' && pointers.current.has(event.pointerId)) cancelGesture() }}
       onWheel={handleWheel}
     >
       <SpaceCanvas
