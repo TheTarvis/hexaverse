@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { HudFacts } from '@/components/hud/HudFacts'
+import { HudHeading } from '@/components/hud/HudTypography'
 import { Button } from '@/components/catalyst/button'
 import { Input } from '@/components/catalyst/input'
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '@/components/catalyst/dialog'
@@ -36,12 +38,13 @@ export function CelestialActions({ systemId, body, fleetId, onSettled }: {
   const target = options.data?.targets.find(target => target.bodyId === body.id)
   const history = body.discovery
   return <div className="space-y-3 text-sm" data-testid="celestial-actions">
-    <dl>
-      <dt>Owner</dt><dd>{body.ownerCorpId ?? 'Unclaimed'}</dd>
-      {history?.firstArrival && <><dt>First arrival</dt><dd>{history.firstArrival.corporationId} · {history.firstArrival.at}</dd></>}
-      {history?.firstSurvey && <><dt>First survey</dt><dd>{history.firstSurvey.corporationId} · {history.firstSurvey.at}</dd></>}
-      {history?.firstPlayerName && <><dt>Name confirmed</dt><dd>{history.firstPlayerName.corporationId} · {history.firstPlayerName.at}</dd></>}
-    </dl>
+    <HudHeading variant="section" level={3}>Discovery record</HudHeading>
+    <HudFacts layout="rows" items={[
+      { label: 'Owner', value: body.ownerCorpId ?? 'Unclaimed' },
+      ...(history?.firstArrival ? [{ label: 'First arrival', value: `${history.firstArrival.corporationId} · ${history.firstArrival.at}` }] : []),
+      ...(history?.firstSurvey ? [{ label: 'First survey', value: `${history.firstSurvey.corporationId} · ${history.firstSurvey.at}` }] : []),
+      ...(history?.firstPlayerName ? [{ label: 'Name confirmed', value: `${history.firstPlayerName.corporationId} · ${history.firstPlayerName.at}` }] : []),
+    ]} />
     {eligible && <>
       {body.namingProtected ? <p>This place has a protected name.</p> : <>
         <p>Survey range: {options.data?.range ?? '…'} units · Duration: {options.data ? options.data.durationMs / 1000 : '…'} world seconds</p>

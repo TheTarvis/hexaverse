@@ -11,12 +11,13 @@ export type HudFact = {
 
 type HudFactsProps = Omit<ComponentPropsWithoutRef<typeof DescriptionList>, 'children'> & {
   items: readonly HudFact[]
+  layout?: 'columns' | 'rows'
 }
 
 /** Compact labeled facts; callers supply text or figures without domain-specific layout. */
-export function HudFacts({ items, className, ...props }: HudFactsProps) {
+export function HudFacts({ items, layout = 'columns', className, ...props }: HudFactsProps) {
   return (
-    <DescriptionList {...props} className={clsx(styles.facts, className)}>
+    <DescriptionList {...props} className={clsx(styles.facts, layout === 'rows' && styles.rows, className)}>
       {items.map(({ label, value }) => (
         <div key={label} className={styles.fact}>
           <DescriptionTerm className={styles.term}>

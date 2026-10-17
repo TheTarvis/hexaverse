@@ -1,10 +1,12 @@
 'use client'
 
-import { lazy, Suspense, useId, useRef, type ComponentPropsWithoutRef } from 'react'
+import { createContext, lazy, Suspense, useContext, useId, useRef, type Ref, type ReactNode, type ComponentPropsWithoutRef } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 import { Button } from '@/components/catalyst/button'
 import styles from './hud-card-shell.module.css'
+
+const CardFrameContext = createContext(false)
 
 const HudFrameLighting = lazy(() => import('./HudFrameLighting').then(module => ({ default: module.HudFrameLighting })))
 
@@ -15,6 +17,11 @@ export type HudCardShellProps = Omit<ComponentPropsWithoutRef<'section'>, 'title
   contentClassName?: string
   lighting?: 'signal' | 'none'
   paused?: boolean
+  /** Nested content shares its owning card's frame; detached overlays can opt in. */
+  framing?: 'auto' | 'frame' | 'section'
+  toolbar?: ReactNode
+  closeTestId?: string
+  closeButtonRef?: Ref<HTMLButtonElement>
 }
 
 /** An unpositioned HUD surface. Callers own content, dimensions and dismissal state. */
@@ -25,30 +32,37 @@ export function HudCardShell({
   contentClassName,
   lighting = 'signal',
   paused = false,
+  framing = 'auto',
+  toolbar,
+  closeTestId,
+  closeButtonRef,
   className,
   children,
   ...props
 }: HudCardShellProps) {
+  const insideCard = useContext(CardFrameContext)
+  const section = framing === 'section' || framing === 'auto' && insideCard
   const titleId = useId()
   const shellRef = useRef<HTMLElement>(null)
 
   return (
     <section
       data-slot="hud-card"
+      data-hud-framing={section ? 'section' : 'frame'}
       ref={shellRef}
-      aria-labelledby={title ? titleId : undefined}
+      aria-labelledby={props['aria-label'] ? undefined : title ? titleId : undefined}
       {...props}
-      className={clsx(styles.shell, className)}
+      className={clsx(styles.shell, section && styles.section, className)}
     >
-      <div aria-hidden="true" className={styles.surface} />
+      {!section && <><div aria-hidden="true" className={styles.surface} />
       <div aria-hidden="true" className={styles.lights}>
         {['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].map((corner) => (
           <svg key={corner} className={styles[corner]} viewBox="0 0 32 32" fill="none">
             <path d="M8 25 L25 8" />
           </svg>
         ))}
-      </div>
-      {lighting === 'signal' && (
+      </div></>}
+      {!section && lighting === 'signal' && (
         <Suspense fallback={null}>
           <HudFrameLighting hostRef={shellRef} paused={paused} />
         </Suspense>
@@ -62,7 +76,10 @@ export function HudCardShell({
         <Button
           plain
           type="button"
+          ref={closeButtonRef}
+          data-testid={closeTestId}
           data-slot="hud-close"
+          data-mobile-close
           aria-label={closeLabel}
           onClick={onClose}
           className={styles.close}
@@ -70,9 +87,19 @@ export function HudCardShell({
           <XMarkIcon aria-hidden="true" />
         </Button>
       )}
-      <div className={styles.body}>
-        <div className={clsx(styles.content, contentClassName)}>{children}</div>
-      </div>
+      <CardFrameContext.Provider value={true}>
+        <div className={styles.body} data-slot="hud-body">
+          <div className={clsx(styles.content, contentClassName)} data-slot="hud-content">
+            {toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
+            {children}
+          </div>
+        </div>
+      </CardFrameContext.Provider>
     </section>
   )
+}
+
+/** A section inside an owning HUD card, with the existing section heading style. */
+export function HudSection({ children, className, ...props }: ComponentPropsWithoutRef<'section'>) {
+  return <section {...props} data-slot="hud-section" className={clsx(styles.contentSection, className)}>{children}</section>
 }

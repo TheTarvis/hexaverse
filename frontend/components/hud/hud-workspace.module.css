@@ -41,7 +41,7 @@
 .settingRow button[aria-pressed='true'] { background: #76e3ef20; }
 .stage {
   position: absolute;
-  inset: 122px 16px 16px;
+  inset: 122px 16px 112px;
   display: grid;
   grid-template-columns: minmax(0, 320px) minmax(24px, 1fr) minmax(0, 360px);
   grid-template-rows: repeat(6, minmax(0, 1fr)) repeat(3, minmax(0, max-content));
@@ -134,4 +134,21 @@
   .workspace[data-menu-open='true']:not([data-mobile-open='true']) .launchers { display: flex; flex-direction: column; width: 152px; padding: 4px; pointer-events: auto; }
   .workspace[data-menu-open='true'] .launchers button { width: 100%; }
   .workspace[data-mobile-open='true'] .phoneMenuToggle { display: none; }
+}
+
+/* One shared card owns each panel's chrome and scrolling. */
+.panelCard { flex: 1; width: 100%; min-height: 0; max-height: 100%; }
+.panelCard > [data-slot='hud-body'] > .panelContent { padding: 24px 16px 16px; gap: 16px; overflow: auto; overscroll-behavior: contain; }
+.panelCard [data-hud-framing='section'] { flex: 0 0 auto; max-height: none; }
+.cardNavigation { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; gap: 4px; }
+.cardNavigation button { padding-inline: 4px; min-width: 0; white-space: normal; font-size: 11px; }
+.cardNavigation button[aria-pressed='true'] { background: #76e3ef20; }
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .workspace[data-mobile-open='true'] .stage { padding: calc(18px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); box-sizing: border-box; }
+  .workspace[data-mobile-open='true'] .recovery[hidden] { display: none; }
+  .workspace[data-mobile-open='true'] .panelCard > [data-slot='hud-body'] > .panelContent { padding: 24px 12px 12px; }
+  .workspace[data-mobile-open='true'] .panelContent > div { flex: initial; height: auto; }
+  .workspace[data-mobile-open='true'] .panelContent [data-hud-framing='section'] { flex: 0 0 auto; overflow: visible; }
+  .workspace[data-mobile-open='true'] .settings { padding-top: calc(18px + env(safe-area-inset-top)); }
+  .panelCard > [data-slot='hud-close'] { top: -12px; right: -10px; }
 }

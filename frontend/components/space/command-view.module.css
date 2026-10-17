@@ -7,7 +7,7 @@
 .signal button { color: var(--command-muted); }
 .transmissionBody > p { margin: 12px 0 18px; font-size: 19px; font-weight: 300; line-height: 1.6; }
 .checks { display: flex; gap: 16px; margin: 0 0 18px; padding: 0; list-style: none; font: 10px/1.6 ui-monospace, monospace; color: var(--command-signal); }
-.transmission > small { display: block; margin-top: 10px; color: var(--command-muted); font-size: 9px; }
+.transmission small { display: block; margin-top: 10px; color: var(--command-muted); font-size: 9px; }
 .transmission > button { border-radius: 3px; font-size: 11px; letter-spacing: .05em; }
 @media (max-width: 760px) {
   .identity { top: 18px; left: 16px; }
@@ -38,7 +38,7 @@
 .commandView .transmission { left: 50%; top: 50%; bottom: auto; transform: translate(-50%, -50%); width: min(520px, calc(100% - 32px)); max-height: calc(100% - 240px); overflow-y: auto; padding: 24px 28px; z-index: 20; background: #071019ed; border: 1px solid #76e3ef22; border-top: 1px solid #76e3ef70; backdrop-filter: blur(10px); text-align: center; }
 .transmission .signal { text-align: left; }
 .transmission .checks { justify-content: center; flex-wrap: wrap; }
-.transmission[data-phase='wake'] .checks, .transmission[data-phase='wake'] > small { display: none; }
+.transmission[data-phase='wake'] .checks, .transmission[data-phase='wake'] small { display: none; }
 .transmission[data-phase='wake'] .transmissionBody > p { font-size: 24px; line-height: 1.6; }
 .commandView:has(.transmission[data-phase='wake']) [data-testid='space-offscreen-reach'] { display: none; }
 @media (max-width: 760px) {
@@ -74,13 +74,13 @@
 .transmission[data-phase='scan'] .checks,
 .transmission[data-phase='scanning'] .checks,
 .transmission[data-phase='contacts'] .checks,
-.transmission[data-phase='objects'] > small,
-.transmission[data-phase='station'] > small,
-.transmission[data-phase='scan'] > small,
-.transmission[data-phase='scanning'] > small,
-.transmission[data-phase='contacts'] > small,
+.transmission[data-phase='objects'] small,
+.transmission[data-phase='station'] small,
+.transmission[data-phase='scan'] small,
+.transmission[data-phase='scanning'] small,
+.transmission[data-phase='contacts'] small,
 .transmission[data-phase='target'] .checks,
-.transmission[data-phase='target'] > small { display: none; }
+.transmission[data-phase='target'] small { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .objectBrowser[data-attention='true'] [data-testid='system-index-toggle'] { animation: none; }
 }
@@ -102,7 +102,7 @@
 /* HUD-HIDDEN-CLEANUP: Cut drive / Stop row — awaiting replacement controls. */
 .commandView [data-testid='fleet-flight-controls'],
 /* HUD-HIDDEN-CLEANUP: Empty shell left by the retired flight controls. */
-.commandView [data-testid='space-fleet-panel']:has(> [data-testid='fleet-flight-controls']:only-of-type) {
+.commandView [data-testid='space-fleet-panel'][data-has-actions='false'] {
   display: none;
 }
 
@@ -163,7 +163,7 @@
   .transmission .signal { letter-spacing: .08em; }
   .transmission button { min-height: 44px; }
   .transmission .signal button { min-width: 44px; flex-shrink: 0; }
-  .transmission > small { display: none; }
+  .transmission small { display: none; }
   .workspaceVitals { bottom: env(safe-area-inset-bottom); min-width: 0; }
   .workspaceVitals [data-testid='vitals-strip'] { box-sizing: border-box; height: var(--phone-vitals-height); min-width: 0; width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; padding: 4px max(12px, env(safe-area-inset-right)) 4px max(12px, env(safe-area-inset-left)); }
   .workspaceVitals [data-testid='vitals-strip'] > * { min-width: 0; max-width: 100%; }
@@ -242,3 +242,27 @@
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .commandView [data-testid='select-pan-target-point'] { display: none; }
 }
+
+/* Shared workspace cards own decoration; command content is an unpositioned section. */
+.workspaceCommand { height: auto; }
+.workspace [data-testid='space-command-column'] { position: static; width: 100%; max-width: none; gap: 16px; overflow: visible; }
+.workspace [data-testid='space-command-column'] > * { flex-shrink: 0; }
+.workspace [data-testid='space-fleet-panel'] { max-width: none; width: 100%; }
+
+/* Console tabs and object details are content inside the workspace-owned frame. */
+.workspace [data-hud-inline='true'] [data-testid='console-dock-region'] { background: transparent; border: 0; backdrop-filter: none; }
+
+/* Recovery keeps its existing modal owner; the accepted shell supplies chrome. */
+.commandView .guideLayer .transmission, .commandView .transmission { padding: 0; border: 0; background: transparent; backdrop-filter: none; text-shadow: none; overflow: visible; }
+.recoveryCard { width: 100%; min-height: 0; max-height: 100%; }
+.recoveryContent { min-height: 0; overflow: hidden; }
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .commandView .guideLayer:has(.transmission) { padding-top: calc(18px + env(safe-area-inset-top)); }
+  .commandView .guideLayer .transmission { flex: 1; min-height: 0; }
+  .recoveryCard { height: 100%; max-height: 100%; }
+  .recoveryContent { display: flex; flex: 1; overflow: hidden; }
+  .recoveryContent .transmissionBody { flex: 1; min-height: 0; overflow: auto; }
+  .recoveryCard > [data-slot='hud-close'] { top: -12px; right: -10px; }
+}
+
+.commandView .objectiveCard { border: 0; padding: 0; background: transparent; }

@@ -21,8 +21,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
 import sheetStyles from './fleet-inspector.module.css'
 import { createPortal } from 'react-dom'
+import { HudCardShell } from '@/components/hud/HudCardShell'
+import { HudHeading as HudContentHeading } from '@/components/hud/HudTypography'
 import { HudPanel } from '@/components/hud/GameHud'
-import { Button } from '@/components/catalyst/button'
 import { SpacecraftPreview } from './SpacecraftPreview'
 import { VitalsStripPill } from './VitalsStripPill'
 import type { RosterRowStatus } from '@/components/fleet/roster-status'
@@ -231,22 +232,19 @@ export function VitalsStripFleetCell({
       </div>
       {inspecting && acting && createPortal(
         <div ref={inspectorPage} role={phone ? 'dialog' : undefined} aria-modal={phone || undefined} aria-label={phone ? `Fleet ${acting.id} details` : undefined} tabIndex={phone ? -1 : undefined} data-phone-sheet={phone} className={phone ? sheetStyles.page : undefined}>
-        <HudPanel as="section" role="region" aria-label={`Fleet ${acting.id} details`}
-          data-testid="fleet-inspector" className={`fixed z-[60] overflow-y-auto p-3 ${phone ? sheetStyles.panel : ''}`} style={phone ? undefined : { ...menuPosition, maxHeight: Math.max(menuPosition.maxHeight, 200) }}
+        <HudCardShell title="Fleet details" lighting="none" framing="frame" role="region" aria-label={`Fleet ${acting.id} details`} onClose={closeInspector} closeLabel="Close fleet details" closeTestId="fleet-inspector-close" closeButtonRef={inspectorClose}
+          data-testid="fleet-inspector" className={`fixed z-[60] w-72 max-w-[calc(100vw-24px)] ${phone ? sheetStyles.panel : ''}`} style={phone ? undefined : { ...menuPosition, maxHeight: Math.max(menuPosition.maxHeight, 200) }}
           onKeyDown={event => {
             if (event.key !== 'Escape') return
             event.preventDefault(); event.stopPropagation(); closeInspector()
           }}>
-          <header className="flex items-center justify-between gap-2">
-            <h3 className="break-all font-mono text-sm">{acting.id}</h3>
-            <Button plain style={{ color: 'var(--command-ink)' }} ref={inspectorClose} data-mobile-close data-testid="fleet-inspector-close" aria-label="Close fleet details" onClick={closeInspector}>Close</Button>
-          </header>
+<HudContentHeading size="compact" level={3}>{acting.id}</HudContentHeading>
           <div className={sheetStyles.body}>
           <SpacecraftPreview key={`ship:${acting.id}`} kind="ship" objectId={acting.id} label={acting.id}
             accentColor={acting.state.Mode === 0 ? 0xffb454 : acting.state.Mode === 2 ? 0xc4b5fd : 0x4ade80} />
           <VitalsStripPill status={status} stranded={stranded} scale={scale} worldTime={worldTime} />
           </div>
-        </HudPanel></div>, document.body
+        </HudCardShell></div>, document.body
       )}
       <VitalsStripPill status={status} stranded={stranded} scale={scale} worldTime={worldTime} />
     </div>

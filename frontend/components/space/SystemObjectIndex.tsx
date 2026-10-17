@@ -1,5 +1,7 @@
 'use client'
 
+import { HudFacts } from '@/components/hud/HudFacts'
+import { HudHeading, HudText } from '@/components/hud/HudTypography'
 import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
 import { planetKind } from './webgl/scene-art'
 import { SpacecraftPreview } from './SpacecraftPreview'
@@ -110,15 +112,15 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
       else { onOpen(false); document.querySelector<HTMLElement>('[data-testid="system-index-toggle"]')?.focus() }
     }}>
       <aside id="system-index" className={styles.systemIndex} aria-label="System index" style={inspectorBody ? { display: 'none' } : undefined}>
-        <p className={styles.eyebrow}>{systemName} / KNOWN OBJECTS</p>
+        <HudText variant="label">{systemName} / Known objects</HudText>
         <Input ref={searchRef} autoFocus data-testid="system-index-search" aria-label="Find a system object" placeholder="Find a world, station, fleet…" value={search} onChange={event => setSearch(event.target.value)} />
-        {loading && <p role="status">Loading system objects…</p>}
-        {failed && <div role="alert"><p>System objects are unavailable.</p><Button plain data-testid="index-retry" onClick={onRetry}>Retry</Button></div>}
-        {fleetsLoading && <p role="status">Loading fleets…</p>}
-        {fleetsFailed && <div role="alert"><p>Fleet telemetry is unavailable.</p><Button plain data-testid="index-fleets-retry" onClick={onRetryFleets}>Retry fleets</Button></div>}
+        {loading && <HudText variant="secondary" role="status">Loading system objects…</HudText>}
+        {failed && <div role="alert"><HudText variant="secondary">System objects are unavailable.</HudText><Button plain data-testid="index-retry" onClick={onRetry}>Retry</Button></div>}
+        {fleetsLoading && <HudText variant="secondary" role="status">Loading fleets…</HudText>}
+        {fleetsFailed && <div role="alert"><HudText variant="secondary">Fleet telemetry is unavailable.</HudText><Button plain data-testid="index-fleets-retry" onClick={onRetryFleets}>Retry fleets</Button></div>}
         {Array.from(new Set(available.map(object => object.group))).map(group => {
           const rows = matches.filter(object => object.group === group)
-          return rows.length > 0 && <section key={group}><p className={styles.eyebrow}>{group}</p>{rows.map(object => <div key={rowKey(object)} className={styles.indexRow} data-selected={object.fleet ? selectedFleetId === object.fleet.id : !fleetDetail && selected === object.name}>
+          return rows.length > 0 && <section key={group}><HudHeading variant="section" level={3}>{group}</HudHeading>{rows.map(object => <div key={rowKey(object)} className={styles.indexRow} data-selected={object.fleet ? selectedFleetId === object.fleet.id : !fleetDetail && selected === object.name}>
             <Button plain ref={el => { if (el) expandButtons.current.set(rowKey(object), el); else expandButtons.current.delete(rowKey(object)) }} data-testid={object.fleet ? `index-fleet-${object.fleet.id}` : `index-${object.name}`} aria-expanded={!!detailObject && rowKey(detailObject) === rowKey(object)} aria-controls="object-details" onClick={() => { if (object.fleet) onSelectFleet?.(object.fleet.id); else onSelect(object.name); setDetails(detailObject && rowKey(detailObject) === rowKey(object) ? null : rowKey(object)) }}>
               <ObjectThumbnail object={object} />
               <span className={styles.rowCopy}><strong>{object.label ?? object.name}</strong><small>{object.enclosingStar && `${object.enclosingStar} · `}{object.catalogueRef && `${object.catalogueRef} · `}{object.kind}{object.name === tutorialTarget ? ' · Tutorial destination' : ''}</small></span>
@@ -126,7 +128,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
             </Button>
           </div>)}</section>
         })}
-        {!loading && !failed && !fleetsLoading && !fleetsFailed && matches.length === 0 && <p role="status">{available.length ? 'No known objects match. Try a name or type.' : 'No objects have been disclosed in this system.'}</p>}
+        {!loading && !failed && !fleetsLoading && !fleetsFailed && matches.length === 0 && <HudText variant="secondary" role="status">{available.length ? 'No known objects match. Try a name or type.' : 'No objects have been disclosed in this system.'}</HudText>}
         <small className={styles.muted}>Select an object to open or close its details.</small>
       </aside>
       {(detailObject || detailContent || inspectorBody) && <aside style={!detailObject && !inspectorBody && !servicesWithoutDetails ? { display: 'none' } : inspectorBody ? { padding: 0, border: 0, background: 'transparent', overflow: 'visible' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.label ?? detailObject.name}` : servicesWithoutDetails ? 'Docked station services' : undefined}>
@@ -134,12 +136,20 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
         {servicesWithoutDetails && !detailObject && <header className={styles.detailsHeader}><div><p>Docked station services</p><p className={styles.muted}>System objects are unavailable. Your station services are still connected.</p><Button plain onClick={onRetry}>Retry system objects</Button></div></header>}
         <div hidden={!!inspectorBody} style={{ display: inspectorBody ? 'none' : 'contents' }}>
         {detailObject && <header className={styles.detailsHeader}><p className={styles.eyebrow}>SELECTED {fleetFacts ? 'FLEET' : detailObject.group === 'Stations' ? 'STATION' : detailObject.group === 'Worlds' ? 'WORLD' : 'OBJECT'}</p><Button autoFocus plain className={styles.detailsClose} data-testid="details-back" aria-label="Close details and return to objects" title="Back to objects" onClick={closeDetails}>←</Button></header>}
-        <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && detailObject.kind !== 'star' && <ObjectThumbnail object={detailObject} className={styles.portrait} />}</><div><h3>{detailObject.label ?? detailObject.name}</h3>{detailObject.catalogueRef && <p>{detailObject.catalogueRef}</p>}<p className={styles.muted}>{detailObject.kind}</p></div></div>
+        <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && detailObject.kind !== 'star' && <ObjectThumbnail object={detailObject} className={styles.portrait} />}</><div><HudHeading size="compact" level={3}>{detailObject.label ?? detailObject.name}</HudHeading>{detailObject.catalogueRef && <p>{detailObject.catalogueRef}</p>}<p className={styles.muted}>{detailObject.kind}</p></div></div>
         {open && fleetFacts && <SpacecraftPreview key={`fleet:${fleetFacts.id}`} kind="ship" objectId={fleetFacts.id} label={fleetFacts.id} accentColor={fleetFacts.mode === 0 ? 0xffb454 : fleetFacts.mode === 2 ? 0xc4b5fd : 0x4ade80} />}
         {open && !fleetFacts && detailObject.kind === 'station' && <SpacecraftPreview key={`station:${detailObject.name}`} kind="station" objectId={detailObject.name} label={detailObject.label ?? detailObject.name} accentColor={0x67e8f9} />}
         {open && !fleetFacts && detailObject.kind === 'star' && <SpacecraftPreview key={`star:${detailObject.name}:${detailObject.starClass ?? ''}`} kind="star" objectId={detailObject.name} starClass={detailObject.starClass} label={detailObject.label ?? detailObject.name} accentColor={0xffffff} />}
         {open && selectedPlanet && <SpacecraftPreview key={`${selectedPlanet}:${detailObject.name}`} kind={selectedPlanet} objectId={detailObject.name} label={detailObject.label ?? detailObject.name} accentColor={0xffffff} />}
-        {fleetFacts ? <dl className={styles.objectFacts}><dt>Activity</dt><dd>{fleetFacts.activity}</dd><dt>System</dt><dd>{fleetFacts.systemLabel}</dd>{fleetFacts.attachedTo && <><dt>Attached host</dt><dd>{fleetFacts.attachedTo}</dd></>}<dt>Ships</dt><dd>{fleetFacts.shipCount ?? 'Unavailable'}</dd></dl> : <dl className={styles.objectFacts}><dt>Known from</dt><dd>{detailObject.knownFrom ?? 'Astronomical observation'}</dd><dt>Resources</dt><dd>{detailObject.resources ?? 'Not surveyed — inspect or scan this host.'}</dd><dt>Fleets here</dt><dd>{detailObject.fleets?.length ? detailObject.fleets.join(', ') : 'No known fleets'}</dd>{detailObject.group === 'Stations' && <><dt>Services</dt><dd>Sell cargo · Purchase fuel while docked</dd></>}</dl>}</>}
+        <HudFacts layout="rows" items={fleetFacts ? [
+          { label: 'Activity', value: fleetFacts.activity }, { label: 'System', value: fleetFacts.systemLabel },
+          ...(fleetFacts.attachedTo ? [{ label: 'Attached host', value: fleetFacts.attachedTo }] : []), { label: 'Ships', value: fleetFacts.shipCount ?? 'Unavailable' },
+        ] : [
+          { label: 'Known from', value: detailObject.knownFrom ?? 'Astronomical observation' },
+          { label: 'Resources', value: detailObject.resources ?? 'Not surveyed — inspect or scan this host.' },
+          { label: 'Fleets here', value: detailObject.fleets?.length ? detailObject.fleets.join(', ') : 'No known fleets' },
+          ...(detailObject.group === 'Stations' ? [{ label: 'Services', value: 'Sell cargo · Purchase fuel while docked' }] : []),
+        ]} /></>}
           <div className={styles.detailServices} style={fleetFacts || !servicesWithoutDetails && detailObject?.name !== detailContentFor ? { display: 'none' } : undefined}>{detailContent}</div>
         </div>
         {detailObject && <div className={styles.indexActions}>

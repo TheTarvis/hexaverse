@@ -7,6 +7,7 @@
 // body or a fleet, so there is nothing to fall back from.
 
 import { useState } from 'react'
+import { HudHeading } from '@/components/hud/HudTypography'
 import { Button } from '@/components/catalyst/button'
 import { Figure } from '@/components/figure/Figure'
 import { useSightings } from '@/hooks/use-sightings'
@@ -153,12 +154,10 @@ export function SightingLog({
   return (
     <div
       data-testid="sighting-log"
-      className="flex flex-col gap-2 p-2"
+      className="flex flex-col gap-3 py-4"
     >
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[11px] font-medium uppercase tracking-wide text-zinc-400">
-          Sighting Log
-        </span>
+        <HudHeading variant="section" level={3}>Sighting Log</HudHeading>
         {/* An explicit refresh, distinct from the timer poll this
             capability refuses (`sighting-log`: *The Log Reads on Mount,
             After a Sweep Settles, and on Explicit Refresh — Never on a
@@ -174,16 +173,16 @@ export function SightingLog({
       </div>
 
       {pile.isError ? (
-        <div data-testid="sighting-log-error" className="text-[11px] text-zinc-500">
+        <div data-testid="sighting-log-error" className="text-sm text-zinc-400">
           <p>The sighting pile could not be read.</p>
           <Button type="button" plain onClick={() => void pile.refetch()}>
             Retry
           </Button>
         </div>
       ) : pile.isLoading ? (
-        <p className="text-[11px] text-zinc-500">Reading the pile…</p>
+        <p className="text-sm text-zinc-400">Reading the pile…</p>
       ) : records.length === 0 ? (
-        <p data-testid="sighting-log-empty" className="text-[11px] text-zinc-500">
+        <p data-testid="sighting-log-empty" className="text-sm text-zinc-400">
           No sightings yet. Run a focused scan to file one.
         </p>
       ) : (

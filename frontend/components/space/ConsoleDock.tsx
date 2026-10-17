@@ -28,6 +28,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react'
+import { HudText } from '@/components/hud/HudTypography'
 import { createPortal } from 'react-dom'
 import {
   CONSOLE_DOCK_HEIGHT_COLLAPSED,
@@ -89,9 +90,9 @@ export function ConsoleLivePortal({ children }: { children: ReactNode }) {
 
 export function ConsolePanelWaiting() {
   return (
-    <p data-testid="console-panel-waiting" className="p-2 text-[11px] text-zinc-600 dark:text-zinc-400">
+    <HudText variant="secondary" data-testid="console-panel-waiting" className="py-4">
       Waiting for the system read…
-    </p>
+    </HudText>
   )
 }
 
@@ -203,6 +204,7 @@ export function ConsoleDock({
   return (
     <div
       data-testid="console-dock"
+      data-hud-inline={placement === 'panel'}
       className={placement === 'panel' ? 'pointer-events-auto relative flex min-h-9 flex-col' : 'pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col'}
       style={expanded ? { height: placement === 'panel' ? 'min(22rem, 52dvh)' : CONSOLE_DOCK_HEIGHT_EXPANDED } : undefined}
     >
@@ -226,9 +228,9 @@ export function ConsoleDock({
         id={regionId}
         data-testid="console-dock-region"
         hidden={!expanded}
-        className="flex min-h-0 flex-1 flex-col border-t border-zinc-200 bg-zinc-50/95 backdrop-blur dark:border-white/[0.12] dark:bg-zinc-700/95"
+        className={placement === 'panel' ? "flex min-h-0 flex-1 flex-col bg-transparent" : "flex min-h-0 flex-1 flex-col border-t border-zinc-200 bg-zinc-50/95 backdrop-blur dark:border-white/[0.12] dark:bg-zinc-700/95"}
       >
-        <div className="flex h-9 shrink-0 items-center justify-between px-2">
+        <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b border-white/15 pb-2">
           <div role="tablist" aria-label="Console tabs" className="flex items-center gap-1">
             {tabs.map((tab) => {
               const selected = tab.id === selectedTab

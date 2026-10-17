@@ -4,3 +4,9 @@
 .page header h3 { min-width: 0; font-size: 13px; }
 .page header button { flex-shrink: 0; min-width: 44px; min-height: 44px; }
 .page .body { flex: 1; min-height: 0; overflow: auto; padding-block: 12px; }
+
+/* The inspector uses the same shell as workspace cards, inside its existing sheet. */
+.page { padding-top: calc(18px + env(safe-area-inset-top)); padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+.page .panel { overflow: visible; }
+.page .body { overflow: visible; padding: 0; }
+.page [data-slot='hud-close'] { top: -12px; right: -10px; }

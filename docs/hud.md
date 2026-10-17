@@ -1,6 +1,6 @@
 # System HUD
 
-Status: production integration in progress, 2026-10-16. Source: Travis's weekend
+Status: production integration in progress, updated 2026-10-17. Source: Travis's weekend
 authorization to build on the existing Storybook foundation, make the game
 playable, and let players show, hide and arrange their HUD. Mobile/touch usability
 is a main game requirement. The [project checklist](../.scratch/weekend-visual-batch/status.md)
@@ -494,3 +494,34 @@ and programmatic card scrolling, with native HUD/close taps. Existing emulator
 journeys were updated to canvas keyboard/geometry expectations and statically
 checked; their full emulator runs were not performed. Physical iPhone orbit remains
 unverified. Evidence:/tmp/hexaverse-gesture-only-{candidate,live}-{objects,first}.log.
+
+
+## Shared card baseline — 2026-10-17
+
+Travis requests the established HUD card foundation across visible game panels,
+starting with Command/mining. HudWorkspace now owns one HudCardShell per Objects,
+Command and Console panel. Settings, recovery/objective, fleet inspection and remote
+fleet status use that same shell. Existing HudTypography and HudFacts own internal
+headings, copy and figures; Catalyst controls remain the control foundation.
+
+Nested HudCardShell content defaults to an unframed section, preserving independent
+travel/action titles and dismissal without duplicate decorative borders or lighting
+renderers. Detached overlays explicitly request framing. Shared row/column facts
+and section spacing replace custom facts and dashed/left-edge action frames. HUD
+controls remain dark and readable regardless of OS color scheme. No new card style
+or public art was introduced; this does not finalize the still-open button studies.
+
+Workspace activate/dismiss events notify the existing Console owner, so selecting
+Console opens its contents directly while preserving controlled expansion, focus,
+mounted tabs and live announcements. Search, selected details, typed quantities,
+layout preferences and drafts remain mounted through navigation/hiding. One shared
+content viewport scrolls within each fullscreen phone card; close remains outside
+that viewport and reachable at safe-area edges. Desktop lanes retain arrangement
+while reserving navigation space. Gesture-only camera input and the recovery-modal
+visibility correction remain unchanged.
+
+The [migration record](../.scratch/hud-card-baseline/spec.md) distinguishes tested
+behavior and local visual captures from physical-phone acceptance. Hidden legacy
+Course/roster/flight-control paths are not a new visible design; navigation/vitals
+bars and application naming dialogs keep their own roles. No gameplay rules or
+inspection/command-fleet ownership changed.

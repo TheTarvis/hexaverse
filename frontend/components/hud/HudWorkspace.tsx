@@ -11,7 +11,7 @@ export type HudPanelId = 'objects' | 'command' | 'console'
 type Lane = 'left' | 'right' | 'bottom'
 type Layout = { id: HudPanelId; lane: Lane; visible: boolean }[]
 export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode }
-export interface HudWorkspaceProps { corporationId: string; panels: HudWorkspacePanel[]; className?: string; request?: { id: HudPanelId; sequence: number } }
+export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; onPanelActivate?: (id: HudPanelId) => void; corporationId: string; panels: HudWorkspacePanel[]; className?: string; request?: { id: HudPanelId; sequence: number } }
 const defaults: Layout = [
   { id: 'objects', lane: 'left', visible: true },
   { id: 'command', lane: 'right', visible: true },
@@ -40,7 +40,7 @@ export function HudWorkspace(props: HudWorkspaceProps) {
   return <Workspace key={props.corporationId} {...props} />
 }
 
-function Workspace({ corporationId, panels, className, request }: HudWorkspaceProps) {
+function Workspace({ corporationId, panels, className, request, onPanelDismiss, onPanelActivate }: HudWorkspaceProps) {
   const phone = usePhoneHud()
   const workspaceRef = useRef<HTMLDivElement>(null)
   const storageKey = `hexaverse:hud-layout:v1:${corporationId}`
@@ -86,6 +86,7 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
     const label = panels.find(panel => panel.id === id)!.label
     change(layout.map(panel => panel.id === id ? { ...panel, visible: !panel.visible } : panel), `${label} ${item.visible ? 'hidden' : 'shown'}.`)
     if (!item.visible) setActive(id)
+    else onPanelDismiss?.(id)
   }
   function move(id: HudPanelId, lane: Lane) {
     const item = layout.find(item => item.id === id)!
@@ -135,8 +136,8 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
     panel.focus({ preventScroll: true })
   })
 
-  function closeSettings() { setSettings(false); if (phone) { restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) } else recoveryRef.current?.focus({ preventScroll: true }) }
-  function closePanel() { restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) }
+  function closeSettings() { setSettings(false); if (phone) { if (activeId) onPanelDismiss?.(activeId); restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) } else recoveryRef.current?.focus({ preventScroll: true }) }
+  function closePanel() { if (activeId) onPanelDismiss?.(activeId); restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) }
   function reset() {
     setLayout(defaults); setActive('objects')
     try { window.localStorage.removeItem(storageKey); setAnnouncement('Default HUD layout restored.') }
@@ -147,19 +148,18 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
     if (event.key === 'Escape' && phone && sheetOpen) { event.stopPropagation(); if (settings) closeSettings(); else closePanel(); return }
     if (event.key === 'Escape' && settings && settingsRef.current?.contains(event.target as Node)) { event.stopPropagation(); closeSettings() }
   }}>
-    <div className={styles.recovery} hidden={phone && settings} inert={phone && settings}>
+    <div className={styles.recovery} hidden={phone && sheetOpen} inert={phone && sheetOpen}>
       <Button plain className={styles.phoneMenuToggle} ref={phone ? recoveryRef : undefined} aria-label="HUD menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}>HUD</Button>
       <Button plain className={styles.arrangeControl} hidden={phone && !!activeId && !settings} ref={phone ? undefined : recoveryRef} aria-expanded={settings} aria-controls={settingsId} onClick={() => { setMenuOpen(false); setSettings(value => !value) }}>Arrange HUD</Button>
       <div className={styles.launchers} aria-label="HUD panels">
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
-          return <Button key={item.id} plain disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setMenuOpen(false); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id) }}>{panel.label}{!item.visible ? ' (hidden)' : ''}</Button>
+          return <Button key={item.id} plain disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setMenuOpen(false); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id); if (!item.visible || activeId !== item.id) onPanelActivate?.(item.id) }}>{panel.label}{!item.visible ? ' (hidden)' : ''}</Button>
         })}
       </div>
     </div>
     {settings && <div ref={settingsRef} id={settingsId} className={styles.settings}>
-      {phone && <header className={styles.sheetHeading}><h2>Arrange HUD</h2><Button plain data-mobile-close aria-label="Close HUD settings" onClick={closeSettings}>Close</Button></header>}
-      <HudCardShell title={phone ? undefined : "Arrange HUD"} lighting="none" onClose={phone ? undefined : closeSettings} closeLabel="Close HUD settings">
+      <HudCardShell title="Arrange HUD" lighting="none" onClose={closeSettings} closeLabel="Close HUD settings">
         <p className={styles.hint}>Choose what stays on screen. Move panels between docks and change their order.</p>
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
@@ -187,8 +187,15 @@ function Workspace({ corporationId, panels, className, request }: HudWorkspacePr
         const index = lanePanels.findIndex(panel => panel.id === item.id)
         const span = 6 / Math.max(1, lanePanels.length)
         return <section key={item.id} ref={element => { if (element) panelRefs.current.set(item.id, element); else panelRefs.current.delete(item.id) }} tabIndex={-1} id={`${panelPrefix}-${item.id}`} aria-label={`${panel.label} panel`} hidden={!item.visible || phone && (settings || activeId !== item.id)} inert={phone && (settings || activeId !== item.id)} data-panel={item.id} data-lane={item.lane} data-mobile-active={activeId === item.id} className={styles.panel} style={{ gridColumn: item.lane === 'left' ? '1' : item.lane === 'right' ? '3' : '1 / -1', gridRow: item.lane === 'bottom' ? `${7 + index}` : `${index * span + 1} / span ${span}` }}>
-          <div className={styles.panelToolbar}><span>{panel.label}</span>{phone ? <div className={styles.sheetControls}><Button plain onClick={() => setSettings(true)}>Arrange HUD</Button><Button plain data-mobile-close aria-label={`Close ${panel.label} panel`} onClick={closePanel}>Close</Button></div> : <Button plain aria-label={`Hide ${panel.label}`} onClick={() => { recoveryRef.current?.focus({ preventScroll: true }); toggle(item.id) }}>Hide</Button>}</div>
-          <div className={styles.panelContent}>{panel.children}</div>
+          <HudCardShell title={panel.label} lighting="none" paused={!item.visible || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
+            closeLabel={phone ? `Close ${panel.label} panel` : `Hide ${panel.label}`}
+            onClose={phone ? closePanel : () => { recoveryRef.current?.focus({ preventScroll: true }); toggle(item.id) }}
+            toolbar={phone ? <nav className={styles.cardNavigation} aria-label="HUD panels">
+              {known.map(entry => { const destination = panels.find(panel => panel.id === entry.id)!; return <Button plain key={entry.id} aria-pressed={activeId === entry.id} onClick={() => { if (!entry.visible) toggle(entry.id); setMenuOpen(false); setOpenedPanel(true); setActive(entry.id); onPanelActivate?.(entry.id) }}>{destination.label}</Button> })}
+              <Button plain aria-label="Arrange HUD" onClick={() => setSettings(true)}>Arrange</Button>
+            </nav> : undefined}>
+            {panel.children}
+          </HudCardShell>
         </section>
       })}
     </div>

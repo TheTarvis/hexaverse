@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { Button } from '@/components/catalyst/button'
 import { Select } from '@/components/catalyst/select'
+import { HudFacts } from '@/components/hud/HudFacts'
 import { HudCardShell } from '@/components/hud/HudCardShell'
 import { HudHeading, HudText } from '@/components/hud/HudTypography'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
@@ -52,13 +53,13 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
         </label>
         <HudHeading size="compact">{destination}</HudHeading>
         <HudText variant="secondary">Outbound travel</HudText>
-        {quote ? <dl className={styles.facts}>
-          <dt>Arrival</dt><dd>{duration(quote.arriveMs - worldTime)}</dd>
-          <dt>Fuel cost</dt><dd>{tons(quote.fuelCostTons)}</dd>
-          <dt>Fuel ceiling</dt><dd>{tons(quote.fuelCostTons * BURN_FUEL_ALLOWANCE)}</dd>
-          <dt>Fuel aboard</dt><dd>{tons(fuel)}</dd>
-          <dt>{quote.affordable ? 'Fuel remaining' : 'Fuel shortfall'}</dt><dd>{tons(fuel === undefined ? undefined : quote.affordable ? Math.max(0, fuel - quote.fuelCostTons) : Math.max(0, quote.fuelCostTons - fuel))}</dd>
-        </dl> : <p role="status">{blocker || 'Calculating trip…'}</p>}
+        {quote ? <HudFacts items={[
+          { label: 'Arrival', value: duration(quote.arriveMs - worldTime) },
+          { label: 'Fuel cost', value: tons(quote.fuelCostTons) },
+          { label: 'Fuel ceiling', value: tons(quote.fuelCostTons * BURN_FUEL_ALLOWANCE) },
+          { label: 'Fuel aboard', value: tons(fuel) },
+          { label: quote.affordable ? 'Fuel remaining' : 'Fuel shortfall', value: tons(fuel === undefined ? undefined : quote.affordable ? Math.max(0, fuel - quote.fuelCostTons) : Math.max(0, quote.fuelCostTons - fuel)) },
+        ]} /> : <p role="status">{blocker || 'Calculating trip…'}</p>}
         {quote?.strandingWarning && <p className={styles.warning}>This trip may leave this fleet unable to reach a station or lane gate.</p>}
         {blocker && quote && <p role="status" className={styles.warning}>{blocker}</p>}
         {error && <p role="alert" className={styles.warning}>{error}</p>}

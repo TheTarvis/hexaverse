@@ -156,7 +156,7 @@ describe('SpaceStage — annotation placement', () => {
     const label = screen.getByTestId('space-annotation-feat-body-0')
     await waitFor(() => expect(label).toBeVisible())
     const before = label.style.transform
-    fireEvent.keyDown(screen.getByTestId('camera-orbit'), { key: 'ArrowRight' })
+    fireEvent.keyDown(screen.getByTestId('space-canvas-region'), { key: 'ArrowRight' })
     await waitFor(() => expect(label.style.transform).not.toBe(before))
     const hit = screen.getByTestId('body-hit-feat-body-0')
     fireEvent.touchStart(hit, { touches: [{ identifier: 1, clientX: 300, clientY: 300 }] })

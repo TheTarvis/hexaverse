@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React, { useState, type ReactNode } from 'react'
 import { ConsoleDock, ConsoleLivePortal, type ConsoleTabId } from './ConsoleDock'
@@ -350,4 +350,16 @@ it('keeps console announcements reachable when its customizable panel is hidden'
   view.unmount()
   expect(outlet).toBeEmptyDOMElement()
   outlet.remove()
+})
+
+it('preserves mounted tab state when a framed workspace uses the controlled Console in panel placement', () => {
+  const props = { placement: 'panel' as const, expanded: false, openSeq: 0, selectedTab: 'log' as const, onOpen: vi.fn(), onSelectTab: vi.fn(), onCollapse: vi.fn(), strip: null, tabs: [{ id: 'log' as const, label: 'Log', content: <input aria-label="Retained console draft" defaultValue="Keep" /> }] }
+  const view = render(<ConsoleDock {...props} />)
+  const input = screen.getByLabelText('Retained console draft')
+  expect(screen.getByTestId('console-dock-region')).not.toBeVisible()
+  fireEvent.change(input, { target: { value: 'Preserved' } })
+  view.rerender(<ConsoleDock {...props} expanded openSeq={1} />)
+  expect(screen.getByTestId('console-dock-region')).toBeVisible()
+  expect(screen.getByLabelText('Retained console draft')).toBe(input)
+  expect(input).toHaveValue('Preserved')
 })

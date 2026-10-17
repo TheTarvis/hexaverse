@@ -195,3 +195,22 @@
   .shell::before, .shell::after, .lights { display: none; }
   .title { background: Canvas; color: CanvasText; clip-path: none; border: 1px solid CanvasText; }
 }
+
+/* A card owns one frame and scroll viewport. Nested cards become content sections. */
+.section { min-height: 0; filter: none; }
+.section::before, .section::after { display: none; }
+.section .body, .section .content { padding: 0; clip-path: none; overflow: visible; }
+.section .content { gap: 12px; }
+.section .title { position: relative; top: auto; left: auto; transform: none; max-width: none; margin: 0 40px 12px 0; padding: 0; background: transparent; clip-path: none; }
+.section .title::before { display: none; }
+.section .title span { white-space: normal; overflow-wrap: anywhere; }
+.section .close { top: -8px; right: -8px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.contentSection { min-width: 0; margin: 0; padding-block: 16px; border-top: 1px solid #435d7066; display: flex; flex-direction: column; gap: 12px; }
+.contentSection:first-of-type { padding-top: 0; border-top: 0; }
+
+/* Game HUD cards keep their accepted dark controls in either OS color scheme. */
+.shell [data-slot='control']::before { display: none; }
+.shell input, .shell select, .shell textarea { color: #dce8f0; background: #0c1b28; border-color: #435d70; }
+.shell input::placeholder, .shell textarea::placeholder { color: #91a3b7; }
+.shell option { color: #dce8f0; background: #0c1b28; }

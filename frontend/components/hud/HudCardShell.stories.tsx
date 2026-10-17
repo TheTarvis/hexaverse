@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, fn, within } from 'storybook/test'
 import clsx from 'clsx'
+import { HudHeading, HudText } from './HudTypography'
 import { HudCardShell, type HudCardShellProps } from './HudCardShell'
 import styles from './hud-card-shell.stories.module.css'
 
@@ -151,4 +152,16 @@ export const SizeComparison: Story = {
     )
   },
   args: { showContentBounds: true },
+}
+
+export const NestedSections: Story = {
+  args: { title: 'Command', lighting: 'none', style: { width: 360, height: 520 } },
+  render: args => <HudCardShell {...args}>
+    <HudCardShell title="Fleet actions" lighting="none"><HudHeading size="compact">Peregrine</HudHeading><HudText variant="secondary">Mining metals · 40 t free hold</HudText></HudCardShell>
+    <HudCardShell title="Travel review" lighting="none"><HudText>One owning frame; travel and action sections retain their own meaning and controls.</HudText></HudCardShell>
+  </HudCardShell>,
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelectorAll('[data-hud-framing="frame"]')).toHaveLength(1)
+    await expect(canvasElement.querySelectorAll('[data-hud-framing="section"]')).toHaveLength(2)
+  },
 }

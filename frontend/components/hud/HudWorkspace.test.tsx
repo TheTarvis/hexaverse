@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
+import { HudCardShell } from './HudCardShell'
 import { HudWorkspace, type HudWorkspacePanel } from './HudWorkspace'
 
 const key = (corporation: string) => `hexaverse:hud-layout:v1:${corporation}`
@@ -11,6 +12,7 @@ const panels: HudWorkspacePanel[] = [
   { id: 'console', label: 'Console', children: <input aria-label="Console draft" defaultValue="" /> },
 ]
 beforeEach(() => {
+  window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
   saved = new Map()
   vi.mocked(window.localStorage.getItem).mockImplementation(name => saved.get(name) ?? null)
   vi.mocked(window.localStorage.setItem).mockReset().mockImplementation((name, value) => { saved.set(name, value) })
@@ -232,4 +234,35 @@ it('keeps phone focus in the page when a travel-like transition removes its focu
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByRole('button', { name: 'HUD menu' })).toHaveFocus()
   } finally { media.mockRestore() }
+})
+
+it('uses one shared frame per workspace panel and treats framed child cards as sections', () => {
+  const children = panels.map(panel => ({ ...panel, children: <HudCardShell title={`${panel.label} content`} lighting="none">{panel.children}</HudCardShell> }))
+  const view = render(<HudWorkspace corporationId="baseline" panels={children} />)
+  for (const id of ['objects', 'command', 'console']) {
+    const panel = view.container.querySelector(`[data-panel="${id}"]`)!
+    expect(panel.querySelectorAll('[data-hud-framing="frame"]')).toHaveLength(1)
+    expect(panel.querySelectorAll('[data-hud-framing="section"]')).toHaveLength(1)
+  }
+  const input = screen.getByLabelText('Object search')
+  fireEvent.change(input, { target: { value: 'Retain me' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Objects (hidden)' }))
+  expect(screen.getByLabelText('Object search')).toBe(input)
+  expect(input).toHaveValue('Retain me')
+})
+
+it('notifies the content owner when its phone panel is dismissed without unmounting it', () => {
+  window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  const dismiss = vi.fn(), activate = vi.fn()
+  render(<HudWorkspace corporationId="dismiss" panels={panels} onPanelDismiss={dismiss} onPanelActivate={activate} />)
+  fireEvent.click(screen.getByRole('button', { name: /^Console$/ }))
+  expect(activate).toHaveBeenCalledExactlyOnceWith('console')
+  const draft = screen.getByLabelText('Console draft')
+  fireEvent.change(draft, { target: { value: 'Still here' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Close Console panel' }))
+  expect(dismiss).toHaveBeenCalledExactlyOnceWith('console')
+  fireEvent.click(screen.getByRole('button', { name: /^Console$/ }))
+  expect(screen.getByLabelText('Console draft')).toBe(draft)
+  expect(draft).toHaveValue('Still here')
 })

@@ -49,3 +49,12 @@
 .compact .systemIndex, .compact .objectDetails { flex: 1 1 100%; width: 100%; min-width: 0; }
 .compact .indexPanels[data-details='true'] .systemIndex { display: none; }
 .compact .objectDetails { border-left: 1px solid #76e3ef44; }
+
+/* In a workspace, the shared outer card owns the frame and scroll viewport. */
+.compact { max-height: none; }
+.compact .indexPanels { display: block; flex: initial; }
+.compact .systemIndex, .compact .objectDetails { border: 0; background: transparent; padding: 0; overflow: visible; }
+.compact .detailsBody { overflow: visible; }
+.compact .detailsHeader { position: static; background: transparent; }
+.compact .objectDetails { margin-top: 16px; }
+.compact .inspectorTitle { margin-block: 8px 16px; }

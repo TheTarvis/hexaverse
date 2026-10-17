@@ -21,3 +21,7 @@
   border: 0;
   overflow-wrap: anywhere;
 }
+
+.details { color: #dce8f0; font-size: var(--hud-body-font-size, 14px); line-height: 1.55; }
+.rows { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.rows .fact { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr); gap: 12px; align-items: baseline; }

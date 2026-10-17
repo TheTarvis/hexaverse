@@ -2,6 +2,7 @@
 
 import { useRef } from 'react'
 import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
+import { HudCardShell } from '@/components/hud/HudCardShell'
 import { Button } from '@/components/catalyst/button'
 import type { CommandGuide } from '@/lib/command-onboarding'
 import type { Fleet } from '@/lib/types/fleet'
@@ -54,7 +55,7 @@ export function RecoveryTransmission({ guide, fleet, bodies, station = null, sta
   else copy = 'Refuelling confirmed. You can travel, mine, sell cargo and replenish fuel. Before the next burn, budget enough fuel to reach a station again.'
 
   return <aside ref={sheetRef} role={phone ? 'dialog' : undefined} aria-modal={phone || undefined} tabIndex={phone ? -1 : undefined} data-phone-sheet={phone} onKeyDown={event => { if (phone && event.key === 'Escape') { event.stopPropagation(); onSave({ ...guide, phase: 'dismissed' }) } }} className={styles.transmission} aria-label="Recovery transmission" data-testid="recovery-transmission" data-phase={guide.phase}>
-    <div className={styles.signal}><span>⌁ RECOVERY SIGNAL</span><Button plain data-mobile-close data-testid="dismiss-guide" aria-label="Dismiss startup guide" onClick={() => onSave({ ...guide, phase: 'dismissed' })}>×</Button></div>
+    <HudCardShell title="Recovery signal" lighting="none" className={styles.recoveryCard} contentClassName={styles.recoveryContent} closeLabel="Dismiss startup guide" closeTestId="dismiss-guide" onClose={() => onSave({ ...guide, phase: 'dismissed' })}>
     <div className={styles.transmissionBody}>
     <p role="status" aria-live="polite" data-testid="recovery-copy">{copy}</p>
     <ol className={styles.checks} aria-label="Startup checks"><li data-testid="live-motor-check">{motorDone ? '✓ Confirmed' : '01 Pending'} · Motor function</li><li data-testid="live-mining-check">{miningDone ? '✓ Confirmed' : '02 Pending'} · Mining function</li><li data-testid="live-fuel-check">{guide.phase === 'done' ? '✓ Confirmed' : '03 Pending'} · Refuelling</li></ol>
@@ -72,5 +73,6 @@ export function RecoveryTransmission({ guide, fleet, bodies, station = null, sta
     {guide.phase === 'done' && <Button color="cyan" data-testid="finish-guide" onClick={() => onSave({ ...guide, phase: 'dismissed' })}>Command network online</Button>}
     </div>
     <small>Guide progress is saved in this browser.</small>
+    </HudCardShell>
   </aside>
 }

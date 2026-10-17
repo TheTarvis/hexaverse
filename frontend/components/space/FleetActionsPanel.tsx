@@ -19,11 +19,13 @@
 // is rule-bearing (a floor clamp and a non-positive-period branch) and a
 // client copy of it is the mirror `space-kinematics` forbids.
 
-import { HudPanel } from '@/components/hud/GameHud'
+import { HudCardShell, HudSection } from '@/components/hud/HudCardShell'
+import { HudHeading, HudText } from '@/components/hud/HudTypography'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/catalyst/badge'
 import { Button } from '@/components/catalyst/button'
 import { Figure } from '@/components/figure/Figure'
+import { Select } from '@/components/catalyst/select'
 import { Input } from '@/components/catalyst/input'
 import { useCancelAction, useRunningMine } from '@/hooks/use-actions'
 import { useCutDrive, useHold, useMine, useRelease, useStop } from '@/hooks/use-fleets'
@@ -76,8 +78,6 @@ export interface FleetActionsPanelProps {
   onMineAccepted?: (accepted: { fleetId: string; featureId: string; actionId: string; kind: ResourceKind; tons: number; cargoBefore: number }) => void
 }
 
-const SECTION = 'mt-3 border-t border-dashed border-white/15 pt-3'
-const LABEL = 'font-mono text-[11px] font-medium tracking-wide text-zinc-400 uppercase'
 
 function clampTons(raw: string, max: number): number {
   const parsed = Number(raw)
@@ -341,16 +341,17 @@ export function FleetActionsPanel({
 
   if (!fleet) {
     return (
-      <HudPanel as="aside" data-testid="space-fleet-panel" className="flex w-72 max-w-[85vw] flex-col">
-        <p className="text-[11px] text-zinc-500">No fleet selected.</p>
-      </HudPanel>
+      <HudCardShell title="Fleet actions" lighting="none" data-testid="space-fleet-panel">
+        <HudText variant="secondary">No fleet selected.</HudText>
+      </HudCardShell>
     )
   }
 
   return (
-    <HudPanel as="aside"
+    <HudCardShell title="Fleet actions" lighting="none"
       data-testid="space-fleet-panel"
-      className="flex w-72 max-w-full flex-col self-start p-3"
+      data-has-actions={!!(mineOffered || interiorFailed || mineRunning || sellOffered || refuelOffered || parkMode)}
+      className="w-full min-w-0"
     >
       {/* The credit-balance readout and the cargo-hold readout RE-HOMED to
           the vitals strip (openspec change `add-vitals-strip`, RULING 7 —
@@ -367,16 +368,16 @@ export function FleetActionsPanel({
 
       {/* -------------------------------------------------------- mine */}
       {mineOffered && activeMineKind && (
-        <div data-testid="mine-section" className={SECTION}>
+        <HudSection data-testid="mine-section">
           <div className="flex items-center justify-between">
-            <span className={LABEL}>Mine</span>
+            <HudHeading variant="section" level={3}>Mine</HudHeading>
             <Badge color="cyan">DOCKED</Badge>
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <select
+            <Select
               data-testid="mine-kind-select"
               aria-label="Resource kind"
-              className="rounded-md border border-zinc-700/60 bg-transparent px-1 py-0.5 font-mono text-[11px]"
+              className="min-w-24 flex-1"
               value={activeMineKind}
               onChange={(e) => setMineKind(e.target.value as ResourceKind)}
             >
@@ -385,7 +386,7 @@ export function FleetActionsPanel({
                   {r.kind}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input
               data-testid="mine-tons-input"
               aria-label="Tons to mine"
@@ -394,7 +395,7 @@ export function FleetActionsPanel({
               onChange={(e) => setMineTons(clampTons(e.target.value, freeHold))}
             />
           </div>
-          <p className="mt-1 text-[11px] text-zinc-500">
+          <p className="mt-1 text-sm text-zinc-400">
             About{' '}
             <Figure
               raw={minePreviewMs}
@@ -407,23 +408,23 @@ export function FleetActionsPanel({
           <Button
             type="button"
             data-testid="mine-button"
-            color="dark/zinc"
+            color="cyan"
             className="mt-2 w-full"
             disabled={mineTons <= 0 || mineRunning}
             onClick={commitMine}
           >
             Mine
           </Button>
-        </div>
+        </HudSection>
       )}
       {interiorFailed && (
-        <div data-testid="mine-unavailable" className={`${SECTION} text-[11px] text-zinc-500`}>
+        <div data-testid="mine-unavailable" className="border-t border-white/15 pt-4 text-sm text-zinc-400">
           The system read failed, so this body&apos;s resources are unavailable. Retry the read to
           mine here.
         </div>
       )}
       {mineRunning && mineEta && (
-        <div className={`${SECTION} flex items-center justify-between`}>
+        <div className="flex items-center justify-between gap-3 border-t border-white/15 pt-4">
           <Figure
             raw={mineEta.eta - worldTime}
             unit="world-ms-span-left"
@@ -449,9 +450,9 @@ export function FleetActionsPanel({
 
       {/* -------------------------------------------------------- sell */}
       {sellOffered && (
-        <div data-testid="sell-section" className={SECTION}>
+        <HudSection data-testid="sell-section">
           <div className="flex items-center justify-between">
-            <span className={LABEL}>Sell</span>
+            <HudHeading variant="section" level={3}>Sell</HudHeading>
             <Badge color="cyan">DOCKED</Badge>
           </div>
           {priceChange !== null && (
@@ -474,10 +475,10 @@ export function FleetActionsPanel({
             </p>
           )}
           <div className="mt-2 flex items-center gap-2">
-            <select
+            <Select
               data-testid="sell-kind-select"
               aria-label="Cargo kind"
-              className="rounded-md border border-zinc-700/60 bg-transparent px-1 py-0.5 font-mono text-[11px]"
+              className="min-w-24 flex-1"
               value={activeSellKind ?? ''}
               onChange={(e) => setSellKind(e.target.value as ResourceKind)}
             >
@@ -486,7 +487,7 @@ export function FleetActionsPanel({
                   {q.kind}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input
               data-testid="sell-tons-input"
               aria-label="Tons to sell"
@@ -495,7 +496,7 @@ export function FleetActionsPanel({
               onChange={(e) => setSellTons(clampTons(e.target.value, sellHeld))}
             />
           </div>
-          <p className="mt-1 text-[11px] text-zinc-500">
+          <p className="mt-1 text-sm text-zinc-400">
             <Figure
               raw={sellPreview.totalProceeds}
               unit="credits"
@@ -506,21 +507,21 @@ export function FleetActionsPanel({
           <Button
             type="button"
             data-testid="sell-button"
-            color="dark/zinc"
+            color="cyan"
             className="mt-2 w-full"
             disabled={!activeSellKind || sellTons <= 0}
             onClick={commitSell}
           >
             Sell
           </Button>
-        </div>
+        </HudSection>
       )}
 
       {/* ------------------------------------------------------ refuel */}
       {refuelOffered && (
-        <div data-testid="refuel-section" className={SECTION}>
+        <HudSection data-testid="refuel-section">
           <div className="flex items-center justify-between">
-            <span className={LABEL}>Refuel</span>
+            <HudHeading variant="section" level={3}>Refuel</HudHeading>
             <Badge color="cyan">DOCKED</Badge>
           </div>
           <Input
@@ -531,7 +532,7 @@ export function FleetActionsPanel({
             value={String(refuelTons)}
             onChange={(e) => setRefuelTons(clampTons(e.target.value, freeHold))}
           />
-          <p className="mt-1 text-[11px] text-zinc-500">
+          <p className="mt-1 text-sm text-zinc-400">
             <Figure
               raw={refuelTons * fuelPrice}
               unit="credits"
@@ -543,32 +544,33 @@ export function FleetActionsPanel({
           <Button
             type="button"
             data-testid="refuel-button"
-            color="dark/zinc"
+            color="cyan"
             className="mt-2 w-full"
             disabled={refuelTons <= 0}
             onClick={commitRefuel}
           >
             Refuel
           </Button>
-        </div>
+        </HudSection>
       )}
 
       {/* --------------------------------------------- station-keeping */}
       {parkMode && (
-        <div className={SECTION}>
-          <button
+        <div className="flex flex-col gap-3 border-t border-white/15 pt-4">
+          <Button
             type="button"
+            outline
             data-testid="stationkeep-control"
-            className="w-full rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase tracking-wide text-zinc-300 hover:text-white"
+            className="w-full"
             onClick={parkMode === 'orbit' ? submitHold : submitRelease}
           >
             {parkMode === 'orbit' ? 'Hold here' : 'Resume orbit'}
-          </button>
+          </Button>
           {upkeepRate !== undefined && (
             // Rendered on BOTH park modes the field is served for: the live
             // drain while holding, and what holding WOULD cost before it is
             // taken.
-            <p className="mt-1 text-[11px] text-zinc-500">
+            <p className="mt-1 text-sm text-zinc-400">
               {parkMode === 'stationkeep' ? 'Drain' : 'Holding costs'}{' '}
               <Figure
                 raw={upkeepRate}
@@ -582,7 +584,7 @@ export function FleetActionsPanel({
       )}
 
       {/* TODO(HUD-HIDDEN-CLEANUP): Cut drive / Stop and their otherwise empty panel shell are CSS-hidden in the live system HUD. Retire this row and unused hooks after replacement controls land; retain resource actions. */}
-      <div data-testid="fleet-flight-controls" className={`${SECTION} flex gap-2`}>
+      <div data-testid="fleet-flight-controls" className="flex gap-2 border-t border-white/15 pt-4">
         <Button
           type="button"
           data-testid={`fleet-cmd-cut-drive-${fleet.id}`}
@@ -612,7 +614,7 @@ export function FleetActionsPanel({
           Stop
         </Button>
       </div>
-    </HudPanel>
+    </HudCardShell>
   )
 }
 

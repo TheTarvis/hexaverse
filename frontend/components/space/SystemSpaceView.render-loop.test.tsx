@@ -245,9 +245,9 @@ describe('SystemSpaceView + the transform loop — task 2.1', () => {
       renderProfiled(onRender)
       await settle()
       // The dynamic renderer import finishes independently of fake world time.
-      await vi.waitFor(() => expect(screen.queryByTestId('camera-recenter')).not.toBeNull())
+      await vi.waitFor(() => expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('tabindex', '0'))
       // Fleet following keeps the ship centered; use the overview to test screen motion.
-      fireEvent.click(screen.getByTestId('camera-recenter'))
+      fireEvent.keyDown(screen.getByTestId('space-canvas-region'), { key: 'Home' })
       await settle()
       onRender.mockClear()
 

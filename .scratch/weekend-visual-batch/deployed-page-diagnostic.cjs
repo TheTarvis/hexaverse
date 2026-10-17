@@ -9,6 +9,70 @@ const uid='isolated-production-qa',corp='isolated-production-corp',system='sys_0
 const now=Math.floor(Date.now()/1000),token=[{alg:'none',typ:'JWT'},{sub:uid,user_id:uid,aud:'hexaverse-emulator',iss:'https://securetoken.google.com/hexaverse-emulator',iat:now,exp:now+3600,auth_time:now,email:'isolated@example.invalid',firebase:{identities:{},sign_in_provider:'password'}},''].map((v,i)=>i<2?Buffer.from(JSON.stringify(v)).toString('base64url'):v).join('.')
 const fleet={id:fleetId,corporationId:corp,own:true,systemId:system,worldTime:1000,position:{X:10,Y:0,Z:0},attachedTo:'qa-station',roster:{ships:[{class:'hauler'}],cargo:{fuel:60},cargoCapacity:100,freeHold:40,miningRate:1},state:{Mode:1,Burn:null,Drift:null,Park:{Kind:2,BodyId:'qa-station',Radius:0,PeriodMs:0,Phase:0,EpochMs:1000,Offset:{X:0,Y:0,Z:0},Point:{X:0,Y:0,Z:0}}}}
 const interior={systemId:system,extent:100,character:'normal',starClass:'G',worldTime:1000,scale:1,features:[{id:'qa-star',type:'star',space:{X:0,Y:0,Z:0},size:5},{id:'qa-planet',type:'planet',space:{X:20,Y:0,Z:8},size:2,resources:[]},{id:'qa-station',type:'station',space:{X:10,Y:0,Z:0},size:1}],laneGates:[],contacts:[]}
+if(process.env.QA_HUD_CASE==='mine'){
+ fleet.attachedTo='qa-planet';fleet.position={X:20,Y:0,Z:8};fleet.state.Park={...fleet.state.Park,Kind:0,BodyId:'qa-planet',PeriodMs:60000};fleet.roster.stationKeepRateTonsPerSecond=.01
+ interior.features[1].type='rocky';interior.features[1].resources=[{kind:'metals',richness:1}]
+}
+fleet.roster.fuelPricePerTon=2
+async function checkHudInspector(p,name){
+ await p.getByTestId('vitals-fleet-chevron').tap();await p.getByTestId('vitals-fleet-inspect').tap()
+ const dialog=p.getByRole('dialog',{name:'Fleet '+fleetId+' details',exact:true});assert.equal(await dialog.isVisible(),true)
+ assert.equal(await p.getByTestId('fleet-inspector').getAttribute('data-hud-framing'),'frame')
+ await p.waitForTimeout(1200);await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-fleet-inspector.png'})
+ await p.getByTestId('fleet-inspector-close').tap();assert.equal(await p.getByRole('dialog').count(),0)
+ assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
+ console.log(name,'HUD INSPECTOR PASS: explicit shared frame, real preview, reachable dismissal and background interaction restored')
+}
+async function checkHudBaseline(p,name){
+ const open=async label=>{if(await p.getByRole('button',{name:'HUD menu',exact:true}).isVisible())await p.getByRole('button',{name:'HUD menu',exact:true}).tap();await p.getByRole('button',{name:label,exact:true}).tap()}
+ const panel=id=>p.locator('section[data-panel="'+id+'"]')
+ const assertFrame=async id=>{const owner=panel(id);assert.equal(await owner.locator('[data-hud-framing="frame"]').count(),1);assert.ok(await owner.locator(':scope > [data-slot="hud-card"]').isVisible());return owner}
+ await open('Command');const command=await assertFrame('command')
+ if(process.env.QA_HUD_CASE==='mine'){
+  assert.equal(await command.getByTestId('mine-section').isVisible(),true);assert.equal(await command.getByTestId('stationkeep-control').isVisible(),true)
+  await command.getByTestId('mine-tons-input').fill('3')
+  for(const id of ['mine-kind-select','mine-tons-input','mine-button','stationkeep-control']){const box=await command.getByTestId(id).boundingBox();assert.ok(box&&box.height>=44,'Phone action target: '+id)}
+ }else assert.equal(await command.getByTestId('refuel-section').count(),0,'Station services belong to the station details')
+ await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-command-'+(process.env.QA_HUD_CASE||'station')+'.png'})
+ await p.getByRole('button',{name:'Objects',exact:true}).tap();await assertFrame('objects')
+ const toggle=p.getByTestId('system-index-toggle');if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.tap()
+ const search=p.getByTestId('system-index-search');await search.fill('qa-planet');await p.getByTestId('index-qa-planet').tap()
+ assert.equal(await p.getByRole('heading',{name:'qa-planet',exact:true}).isVisible(),true)
+ await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-details.png'})
+ await p.getByTestId('details-back').tap();assert.equal(await search.inputValue(),'qa-planet')
+ if(process.env.QA_HUD_CASE!=='mine'){
+  await search.fill('qa-station');await p.getByTestId('index-qa-station').tap();await assertFrame('objects')
+  assert.equal(await p.getByTestId('refuel-section').isVisible(),true);await p.getByTestId('refuel-tons-input').fill('2')
+  await p.getByTestId('refuel-button').scrollIntoViewIfNeeded()
+  await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-station-services.png'})
+  await p.getByTestId('details-back').tap();await p.getByTestId('index-qa-station').tap();assert.equal(await p.getByTestId('refuel-tons-input').inputValue(),'2')
+  await p.getByTestId('details-back').tap()
+ }
+ await p.getByRole('button',{name:'Command',exact:true}).tap();await assertFrame('command')
+ if(process.env.QA_HUD_CASE==='mine')assert.equal(await command.getByTestId('mine-tons-input').inputValue(),'3')
+ await p.getByTestId('travel-status-entry').tap();await assertFrame('command');assert.equal(await command.locator('[data-hud-framing="section"]').count()>0,true)
+ await p.getByRole('button',{name:'Close travel card',exact:true}).tap()
+ await p.getByRole('button',{name:'Console',exact:true}).tap();await assertFrame('console')
+ await p.getByTestId('console-tab-log').tap();assert.equal(await p.getByTestId('sighting-log-empty').isVisible(),true)
+ await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-console.png'})
+ await p.getByRole('button',{name:'Arrange HUD',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Arrange HUD',exact:true}).isVisible(),true)
+ await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-settings.png'})
+ await p.getByRole('button',{name:'Close HUD settings',exact:true}).tap();assert.equal(await p.getByRole('dialog').count(),0)
+ for(const size of [{width:375,height:667},{width:844,height:390}]){
+  await p.setViewportSize(size);await open('Command');await assertFrame('command')
+  const close=p.getByRole('button',{name:'Close Command panel',exact:true}),box=await close.boundingBox();assert.ok(box&&box.x>=0&&box.y>=0&&box.x+box.width<=size.width&&box.y+box.height<=size.height)
+  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+  const scroll=command.locator(':scope > [data-slot="hud-card"] > [data-slot="hud-body"] > [data-slot="hud-content"]');await scroll.evaluate(e=>{e.scrollTop=e.scrollHeight});assert.equal(await close.isVisible(),true)
+  await close.tap();assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
+ }
+ await p.setViewportSize({width:1280,height:900});await p.waitForTimeout(150)
+ for(const id of ['objects','command','console'])await assertFrame(id)
+ const nav=await p.getByTestId('floating-nav').boundingBox(),consoleBox=await panel('console').boundingBox();assert.ok(nav&&consoleBox&&consoleBox.y+consoleBox.height<=nav.y,'Console frame must leave navigation reachable')
+ assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-desktop.png'})
+ await p.setViewportSize({width:390,height:844});await p.waitForTimeout(150)
+ console.log(name,'HUD BASELINE PASS: one shared frame per panel, Command/mining/travel sections, object facts/back/search, Console empty log, settings, retained input, narrow/landscape/desktop layout and reachable close, no stale inert')
+}
 async function checkOrbit(p,c,name){
  const region=p.getByTestId('space-canvas-region'),read=async()=>JSON.parse(await region.getAttribute('data-camera'))
  const session=name==='Chromium'?await c.newCDPSession(p):null
@@ -51,7 +115,7 @@ async function checkOrbit(p,c,name){
  assert.equal((await read()).yaw,canceled.yaw);assert.notDeepEqual((await read()).target,canceled.target)
  for(const id of ['space-camera-controls','space-pan-controls','camera-touch-rotate','camera-zoom-in','camera-zoom-out','camera-recenter','select-pan-target-point'])assert.equal(await p.getByTestId(id).count(),0)
  await p.getByRole('button',{name:'HUD menu',exact:true}).tap();await p.getByRole('button',{name:'Console',exact:true}).tap()
- const scroll=p.locator('section[data-panel="console"] > div').nth(1)
+ const scroll=p.locator('section[data-panel="console"] > [data-slot="hud-card"] > [data-slot="hud-body"] > [data-slot="hud-content"]')
  await scroll.evaluate(e=>{const spacer=document.createElement('div');spacer.style.flex='0 0 1600px';spacer.style.height='1600px';e.append(spacer)})
  if(session){await emit('touchStart',[[190,500]]);await emit('touchMove',[[190,400]]);await emit('touchMove',[[190,300]]);await closeFingers();assert.ok(await scroll.evaluate(e=>e.scrollTop)>0)}
  else{await scroll.evaluate(e=>{e.scrollTop=80});assert.ok(await scroll.evaluate(e=>e.scrollTop)>0)}
@@ -90,7 +154,7 @@ async function run(type,options,name){
  await p.route('**/emulator/auth/iframe**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Synthetic Auth frame</title>'}))
  await p.route('**/identitytoolkit.googleapis.com/**',async route=>{const path=new URL(route.request().url()).pathname;if(path.includes('signInWithPassword'))return route.fulfill({json:{localId:uid,email:'isolated@example.invalid',idToken:token,refreshToken:'synthetic-refresh',expiresIn:'3600',registered:true}});if(path.includes('lookup'))return route.fulfill({json:{users:[{localId:uid,email:'isolated@example.invalid',emailVerified:true,displayName:'Isolated QA',providerUserInfo:[],createdAt:'1000',lastLoginAt:'1000'}]}});return route.fulfill({status:400,json:{error:{message:'QA_AUTH_ROUTE_BLOCKED'}}})})
  await p.route('**/securetoken.googleapis.com/**',route=>route.fulfill({json:{access_token:token,id_token:token,refresh_token:'synthetic-refresh',expires_in:'3600',user_id:uid,token_type:'Bearer'}}))
- await p.route('**/api/**',async route=>{const u=new URL(route.request().url()),path=u.pathname.slice(4);requests.push(path);if(process.env.QA_ORBIT==='1'&&path.endsWith('/orders/preview')&&route.request().method()==='POST'){fixtureWrites.push(path);return route.fulfill({json:{controlPoints:[],departMs:1000,arriveMs:2000,deltaV:1,fuelCostTons:1,affordable:true,strandingWarning:false}})}if(process.env.QA_FIRST_LOGIN==='1'&&path==='/v1/corporations'&&route.request().method()==='POST'){spawned=true;fixtureWrites.push(path);return route.fulfill({json:{corporation:{id:corp,accountId:uid,name:'Isolated QA',createdAt:0,credits:1000},fleet,homeSystem:{id:system,name:'QA System',region:'normal',coords:{x:0,y:0,z:0},skeleton:{starClass:'G',bodies:[]}},worldTime:1000}})}if(route.request().method()!=='GET'){writes.push(path);return route.fulfill({status:403,json:{error:'Synthetic QA forbids mutations'}})}
+ await p.route('**/api/**',async route=>{const u=new URL(route.request().url()),path=u.pathname.slice(4);requests.push(path);if((process.env.QA_ORBIT==='1'||process.env.QA_HUD_BASELINE==='1')&&path.endsWith('/orders/preview')&&route.request().method()==='POST'){fixtureWrites.push(path);return route.fulfill({json:{controlPoints:[],departMs:1000,arriveMs:2000,deltaV:1,fuelCostTons:1,affordable:true,strandingWarning:false}})}if(process.env.QA_FIRST_LOGIN==='1'&&path==='/v1/corporations'&&route.request().method()==='POST'){spawned=true;fixtureWrites.push(path);return route.fulfill({json:{corporation:{id:corp,accountId:uid,name:'Isolated QA',createdAt:0,credits:1000},fleet,homeSystem:{id:system,name:'QA System',region:'normal',coords:{x:0,y:0,z:0},skeleton:{starClass:'G',bodies:[]}},worldTime:1000}})}if(route.request().method()!=='GET'){writes.push(path);return route.fulfill({status:403,json:{error:'Synthetic QA forbids mutations'}})}
  let data,status=200
  if(path==='/v1/accounts/firestore')data={id:uid,email:'isolated@example.invalid',name:'Isolated QA'}
  else if(path==='/v1/corporations/me'&&!spawned)return route.fulfill({status:200,contentType:'application/json',body:'null'})
@@ -99,6 +163,7 @@ async function run(type,options,name){
  else if(path==='/v1/systems/'+system)data=interior
  else if(path==='/v1/systems/'+system+'/station')data={systemId:system,featureId:'qa-station',createdAt:0}
  else if(path==='/v1/fleets')data={fleets:[fleet],worldTime:1000,scale:1}
+ else if(path.endsWith('/survey'))data={range:100,durationMs:1000,worldTime:1000,scale:1,sensorBusy:false,inTransit:false,survey:null,targets:[]}
  else if(path.endsWith('/scan-targets'))data={fleetId,systemId:system,worldTime:1000,targets:[]}
  else if(path==='/v1/market/board')data={worldTime:1000,refreshCadenceMs:30000,venues:[]}
  else if(path==='/v1/actions')data={actions:[]}
@@ -125,6 +190,8 @@ async function run(type,options,name){
   await p.getByRole('button',{name:'Console',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
   await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();assert.equal(await p.getByRole('dialog').count(),0)
   const region=p.getByTestId('space-canvas-region'),camera=JSON.parse(await region.getAttribute('data-camera'));await region.focus();await region.press('+');assert.ok(JSON.parse(await region.getAttribute('data-camera')).distance<camera.distance)
+  if(process.env.QA_HUD_BASELINE==='1')await checkHudBaseline(p,name)
+  if(process.env.QA_HUD_INSPECTOR==='1')await checkHudInspector(p,name)
   if(process.env.QA_ORBIT==='1')await checkOrbit(p,c,name)
   assert.equal(errors.length,0,'No errors after interactions: '+JSON.stringify({errors,writes,requests}))
   console.log(name,'REAL DEPLOYED ROUTE regression PASS: guide visible/dismiss fires, background inert released, HUD/Console/close/zoom callbacks work, no JS errors, no game writes')

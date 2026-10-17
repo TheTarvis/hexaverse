@@ -40,6 +40,8 @@ import { Button } from '@/components/catalyst/button'
 import { usePhoneHud } from '@/hooks/use-phone-sheet'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
+import { HudCardShell } from '@/components/hud/HudCardShell'
+import { HudText } from '@/components/hud/HudTypography'
 import { HudWorkspace, type HudPanelId } from '@/components/hud/HudWorkspace'
 import { HudHeading, HudColumn } from '@/components/hud/GameHud'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
@@ -1029,7 +1031,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
 {stationFailed && (
           <div
             data-testid="station-unavailable"
-            className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
+            className="flex flex-col gap-3 text-sm"
           >
             <p className="text-zinc-600 dark:text-zinc-400">
               The station read failed, so trading here is unavailable. Retry the read to sell or
@@ -1051,7 +1053,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {boardFailed && !stationFailed && (
           <div
             data-testid="market-board-unavailable"
-            className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
+            className="flex flex-col gap-3 text-sm"
           >
             <p className="text-zinc-600 dark:text-zinc-400">
               The price board could not be read, so selling is unavailable. Refuelling still works.
@@ -1237,9 +1239,11 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           onObjects={() => openObjectIndex(true)}
         />
       )}
-      {guiding && guide && <aside className={commandStyles.objectiveCard} aria-label="Current objective"><span className={commandStyles.signal}>CURRENT OBJECTIVE</span><p role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</p></aside>}
+      {guiding && guide && <HudCardShell lighting="none" className={commandStyles.objectiveCard} aria-label="Current objective"><HudText variant="label">Current objective</HudText><HudText role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</HudText></HudCardShell>}
       </div>
       <HudWorkspace
+        onPanelActivate={id => { if (id === 'console') openDockOn(dock.tab) }}
+        onPanelDismiss={id => { if (id === 'console') collapseDock() }}
         corporationId={corporation?.id ?? sessionCorporation?.id ?? 'unavailable'}
         className={commandStyles.workspace}
         request={hudRequest}
@@ -1306,7 +1310,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {fleets.isError && (
           <div
             data-testid="space-fleets-error"
-            className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]"
+            className="flex flex-col gap-3 text-sm"
           >
             <p className="text-zinc-600 dark:text-zinc-400">Your fleets could not be read.</p>
             <button
