@@ -409,3 +409,26 @@ Runner: .scratch/weekend-visual-batch/input-restoration-regression.cjs; local
 evidence:/tmp/hexaverse-input-production-qa.log. Its temporary production QA route
 and fixture are removed before the final deployable rebuild. All57 public assets,
 authentication, gateway diagnostics/routes and preview cutoff remain unchanged.
+
+
+## Invisible recovery modal — 2026-10-17
+
+The actual production system route reproduces the reported whole-page lockout
+when a persisted recovery guide is active. The inline ConsoleDock remains mounted
+inside its hidden workspace panel, and its console-dock-collapse button has
+aria-expanded=true. A broad workspace expanded-button selector therefore hid the
+guide layer. The invisible Recovery transmission still owned the phone modal and
+made the visible map, heading and HUD inert. No JavaScript exception was required.
+
+Remove that selector; the existing workspace data-mobile-open rule alone controls
+guide visibility when a real phone panel opens. This correction changes no gesture
+handlers. Real login and system routes with synthetic intercepted Auth/game data
+pass in Chromium and WebKit at390×844: persisted wake/objects guide is visible,
+dismiss releases inert, and HUD/Console/open/close/zoom callbacks work with zero
+browser errors and zero game writes. The production ConsoleDock is included;
+earlier component fixtures did not reproduce its hidden expanded button.
+
+Runner: .scratch/weekend-visual-batch/deployed-page-diagnostic.cjs. Evidence:
+/tmp/hexaverse-invisible-modal-after.log and /tmp/hexaverse-invisible-modal-wake.log.
+HTTPS origin is browser-intercepted to local production resource bytes; this does
+not validate the authenticated ngrok edge or establish physical iPhone acceptance.

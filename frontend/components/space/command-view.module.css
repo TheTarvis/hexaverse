@@ -191,7 +191,8 @@
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   /* The briefing owns the active drawer area until dismissed or advanced. */
   .commandView:has(.transmission) .workspace [aria-label='HUD workspace'] { visibility: hidden; }
-  .commandView:has(.workspace button[aria-expanded='true']) .guideLayer { visibility: hidden; }
+  /* Hidden panels can contain expanded controls. Only the workspace's actual
+     phone-page owner may hide the guide; see data-mobile-open rules below. */
 }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .workspaceVitals [data-testid='vitals-fleet-id'] { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
