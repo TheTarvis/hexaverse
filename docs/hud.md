@@ -465,3 +465,20 @@ pass. Chromium uses browser-generated trusted one/two-finger input; WebKit drags
 use constructed TouchLists while Rotate/HUD/close taps are browser-generated.
 No live game calls or identity selection. Runner:
 .scratch/weekend-visual-batch/deployed-page-diagnostic.cjs (QA_ORBIT=1).
+
+## Camera buttons removed — 2026-10-17, current direction
+
+Travis requests removal of the bottom-right camera buttons on mobile and desktop.
+This supersedes the Rotate toggle and button fallback above. No camera cluster,
+pan arrows, zoom/recenter buttons or center-selection button remains at any size.
+The transient rotate-mode state is deleted: one finger always pans, pinch zooms,
+and two fingers moving together orbit the selected object. The mobile gesture
+hint is available to assistive technology without a persistent visual overlay.
+
+Desktop primary drag orbits, secondary drag pans and wheel zooms. Tab focuses the
+map itself: arrows orbit, Shift+arrows pan, plus/minus zoom, Home recenters, and
+Enter selects the camera-center point. The map names these shortcuts accessibly,
+shows keyboard focus and retains limit announcements. Child controls keep their
+own keys; unavailable rendering disables camera keyboard input. No document input
+interception, touchstart cancellation or recovery/card ownership rules changed.
+This UI request does not establish actual iPhone two-finger orbit acceptance.

@@ -66,7 +66,6 @@ import {
   type DragTracker,
   type SpaceCamera,
 } from './space-camera'
-import { CONSOLE_DOCK_LANE_CAMERA } from '@/lib/console-dock-layout'
 import { resolvePick, type PickMark, type SpaceSelection } from './space-selection'
 import type { SceneMark, SceneModel } from './space-scene'
 import {
@@ -147,12 +146,6 @@ export interface SpaceStageProps {
 const CAMERA_CONTROL_ATTR = 'data-space-camera-control'
 const AFFORDANCE_ATTR = 'data-space-affordance'
 
-const BUTTON =
-  'pointer-events-auto flex h-8 w-8 items-center justify-center rounded-md border border-white/15' +
-  ' bg-black/60 font-mono text-sm text-zinc-300 backdrop-blur transition-colors' +
-  ' hover:bg-white/[0.16] hover:text-white' +
-  ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
-
 const LIMIT_MESSAGE = {
   zoom: 'The camera is as close or as far as it goes.',
   pan: 'The camera is at the edge of the system.',
@@ -187,7 +180,6 @@ export function SpaceStage({
 }: SpaceStageProps) {
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState(false)
-  const [touchOrbit, setTouchOrbit] = useState(false)
   const [camera, storeCamera] = useState<SpaceCamera>(() => defaultCamera(extent))
   const frameRef = useRef<SpaceFrame | null>(null)
   const setCamera = useCallback((next: SpaceCamera | ((prev: SpaceCamera) => SpaceCamera)) => {
@@ -500,7 +492,7 @@ export function SpaceStage({
         gestureRef.current = null
       } else if (!touchPinched.current && event.touches[0]) {
         const point = event.touches[0]
-        gestureRef.current = { tracker: beginDrag(point.clientX, point.clientY), bodyId: bodyIdUnder(event.target), secondary: !touchOrbit, affordance: event.target instanceof Element ? event.target.closest<HTMLElement>(`[${AFFORDANCE_ATTR}]`) : null }
+        gestureRef.current = { tracker: beginDrag(point.clientX, point.clientY), bodyId: bodyIdUnder(event.target), secondary: true, affordance: event.target instanceof Element ? event.target.closest<HTMLElement>(`[${AFFORDANCE_ATTR}]`) : null }
       }
     },
     move: event => {
@@ -531,8 +523,7 @@ export function SpaceStage({
       const { dx, dy } = advanceDrag(gesture.tracker, point.clientX, point.clientY)
       if (!isGesture(gesture.tracker)) return false
       const frame = frameRef.current
-      if (!gesture.secondary) setCamera(camera => orbitByPixels(camera, dx, dy, orbitPivot()))
-      else if (frame) setCamera(camera => panByPixels(camera, dx, dy, { width: frame.basis.widthPx, height: frame.basis.heightPx }, extent))
+      if (frame) setCamera(camera => panByPixels(camera, dx, dy, { width: frame.basis.widthPx, height: frame.basis.heightPx }, extent))
       return true
     },
     end: event => {
@@ -563,12 +554,22 @@ export function SpaceStage({
       ref={setHost}
       data-testid="space-canvas-region"
       data-camera={cameraJson}
+      tabIndex={available ? 0 : -1}
+      role="group"
+      aria-label="System map. Arrow keys rotate; hold Shift and press arrow keys to pan. Plus and minus zoom. Home recenters. Enter selects the camera center."
+      data-orbit-at-limit={atOrbitLimit(camera) ?? undefined}
+      data-zoom-at-limit={atZoomLimit(camera, extent) ?? undefined}
+      data-pan-at-limit={(['left', 'right', 'up', 'down'] as const).filter((_, index) => {
+        const [right, up] = [[-1, 0], [1, 0], [0, 1], [0, -1]][index]
+        const next = panBySteps(camera, right, up, extent)
+        return next.target.x === camera.target.x && next.target.y === camera.target.y && next.target.z === camera.target.z
+      }).join(' ') || undefined}
       data-selection={selectionAttr(selection)}
       data-draw-world-time={String(drawWorldTime)}
       // Reframing is immediate: an eased camera move under a player reaching
       // for an off-screen gate is a moving target.
       data-reframe-animated="false"
-      className="absolute inset-0"
+      className="absolute inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400"
       style={{ touchAction: 'none', overscrollBehavior: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', isolation: 'isolate' }}
       onFocus={handleFocusIn}
       onBlur={handleFocusOut}
@@ -579,6 +580,18 @@ export function SpaceStage({
       onPointerCancel={event => { if (event.pointerType !== 'touch') cancelGesture() }}
       onLostPointerCapture={event => { if (event.pointerType !== 'touch' && pointers.current.has(event.pointerId)) cancelGesture() }}
       onWheel={handleWheel}
+      onKeyDown={event => {
+        if (!available || event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
+        const step: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }
+        const direction = step[event.key]
+        if (direction) setCamera(previous => event.shiftKey ? panBySteps(previous, direction[0], direction[1], extent) : orbitBySteps(previous, direction[0], direction[1], orbitPivot()))
+        else if (event.key === '+' || event.key === '=') setCamera(previous => zoomBySteps(previous, 1, extent))
+        else if (event.key === '-' || event.key === '_') setCamera(previous => zoomBySteps(previous, -1, extent))
+        else if (event.key === 'Home') recenter()
+        else if (event.key === 'Enter') onSelect?.({ point: { ...camera.target } })
+        else return
+        event.preventDefault()
+      }}
     >
       <SpaceCanvas
         onAvailabilityChange={handleAvailability}
@@ -618,11 +631,6 @@ export function SpaceStage({
           onHoverGhost={setHoveredGhostId}
           onHighlightGhost={onHighlightGhost}
           onSelect={(next) => onSelect?.(next)}
-          onCamera={setCamera}
-          orbitPivot={orbitPivot()}
-          touchOrbit={touchOrbit}
-          onTouchOrbit={() => { cancelGesture(); setTouchOrbit(value => !value) }}
-          onRecenter={recenter}
           onReframe={(markId, coarsePosition) => {
             const live = frameRef.current?.projected.get(markId)
             reframeOn(live?.mark.position ?? coarsePosition)
@@ -665,11 +673,6 @@ interface SpaceLayersProps {
   onHoverGhost: (id: string | null) => void
   onHighlightGhost?: (recordId: string | null) => void
   onSelect: (selection: SpaceSelection | null) => void
-  onCamera: (next: (prev: SpaceCamera) => SpaceCamera) => void
-  orbitPivot?: SpaceCamera['target']
-  touchOrbit: boolean
-  onTouchOrbit: () => void
-  onRecenter: () => void
   onReframe: (markId: string, coarsePosition: DrawVec3) => void
   onPointerUpCapture: (clientX: number, clientY: number, marks: PickMark[]) => void
 }
@@ -700,15 +703,9 @@ function SpaceLayers({
   onHoverGhost,
   onHighlightGhost,
   onSelect,
-  onCamera,
-  orbitPivot,
-  touchOrbit,
-  onTouchOrbit,
-  onRecenter,
   onReframe,
 }: SpaceLayersProps) {
   const phone = usePhoneHud()
-  const [panOpen, setPanOpen] = useState(false)
   // THE ONE READ of `scene.marks`, inside the canvas region's error
   // boundary: a throw while building the drawn state is contained here.
   const marks = scene.marks
@@ -734,28 +731,8 @@ function SpaceLayers({
   const fleets = projected.filter((p) => p.mark.kind === 'fleet')
   const hasSelectedObject = marks.some(mark => mark.selected)
 
-  const panAtLimit = (right: number, up: number): boolean => {
-    const next = panBySteps(camera, right, up, extent)
-    return (
-      next.target.x === camera.target.x &&
-      next.target.y === camera.target.y &&
-      next.target.z === camera.target.z
-    )
-  }
   const zoomLimit = atZoomLimit(camera, extent)
   const orbitLimit = atOrbitLimit(camera)
-  // camera-orbit's own data-pan-at-limit (impl contract §10.3): the
-  // space-separated set of blocked pan directions, computed per render from
-  // the SAME panAtLimit helper the deleted camera-pan-* buttons used —
-  // never routed through camera-limit-status's single-slot priority chain.
-  const blockedPanDirections = (
-    [
-      panAtLimit(-1, 0) ? 'left' : null,
-      panAtLimit(1, 0) ? 'right' : null,
-      panAtLimit(0, 1) ? 'up' : null,
-      panAtLimit(0, -1) ? 'down' : null,
-    ].filter((d): d is string => d !== null)
-  ).join(' ')
   const limitMessage = zoomLimit
     ? LIMIT_MESSAGE.zoom
     : atPanLimit(camera, extent)
@@ -806,122 +783,7 @@ function SpaceLayers({
 
   return (
     <>
-      {/* --- camera controls: FIRST in the tab order, and gone entirely
-              while the canvas is unavailable (this whole layer is).
-              SHRUNK to exactly four sibling cells (openspec change
-              `add-vitals-strip`, `system-console`/`system-space-view`
-              MODIFIED *Space View Camera Is Keyboard-Operable*, impl
-              contract §10, RULING 10/23): `camera-orbit`, `camera-zoom-in`,
-              `camera-zoom-out`, `camera-recenter`. The eight
-              `camera-orbit-*`/`camera-pan-*` buttons are gone — discrete
-              pointer orbit is already served by canvas drag-to-orbit, and
-              keyboard pan moves onto `camera-orbit`'s own `Shift`+arrow
-              binding below. The wrapper's own pre-existing tabIndex/
-              onKeyDown (bare-arrow orbit) is UNCHANGED — it predates and is
-              independent of the four now-deleted `camera-orbit-*` buttons.
-              Re-anchored bottom-right, in the console dock's camera lane. --- */}
-      <div
-        {...{ [CAMERA_CONTROL_ATTR]: '' }}
-        data-testid="space-camera-controls"
-        role="group"
-        aria-label="System camera"
-        tabIndex={0}
-        className={`pointer-events-none absolute z-20 ${CONSOLE_DOCK_LANE_CAMERA} right-4 grid grid-cols-4 gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400`}
-        onKeyDown={(e) => {
-          const step: Record<string, [number, number]> = {
-            ArrowLeft: [-1, 0],
-            ArrowRight: [1, 0],
-            ArrowUp: [0, 1],
-            ArrowDown: [0, -1],
-          }
-          const s = step[e.key]
-          if (!s) return
-          e.preventDefault()
-          onCamera((prev) => orbitBySteps(prev, s[0], s[1], orbitPivot))
-        }}
-      >
-        {/* camera-orbit — the one focusable cell replacing the four
-            camera-orbit-* buttons. Bare arrows orbit; `Shift`+arrow pans,
-            with the deleted pan buttons' exact step vectors (Left [-1,0],
-            Right [1,0], Up [0,1], Down [0,-1]) and the existing pan bound
-            (impl contract §10.2). Both axes' at-limit state live here too
-            (§10.3): `camera-orbit-up`/`-down` are gone, so the orbit axis's
-            attribute moves onto the element that replaces them, and the pan
-            axis's attribute is NEW (never routed through
-            `camera-limit-status`'s single-slot zoom>pan>orbit chain, which
-            would mask it behind a simultaneous zoom clamp). */}
-        <div
-          {...{ [CAMERA_CONTROL_ATTR]: '' }}
-          data-testid="camera-orbit"
-          role="group"
-          tabIndex={0}
-          aria-label="Orbit the camera with arrow keys; hold Shift and press arrow keys to pan"
-          {...(orbitLimit ? { 'data-orbit-at-limit': orbitLimit } : {})}
-          {...(blockedPanDirections ? { 'data-pan-at-limit': blockedPanDirections } : {})}
-          className={
-            'pointer-events-auto flex h-8 w-8 items-center justify-center rounded-md border border-white/15' +
-            ' bg-black/60 font-mono text-sm text-zinc-300 backdrop-blur transition-colors' +
-            ' hover:bg-white/[0.16] hover:text-white' +
-            ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
-          }
-          onKeyDown={(e) => {
-            const step: Record<string, [number, number]> = {
-              ArrowLeft: [-1, 0],
-              ArrowRight: [1, 0],
-              ArrowUp: [0, 1],
-              ArrowDown: [0, -1],
-            }
-            const s = step[e.key]
-            if (!s) return
-            e.preventDefault()
-            // Stop here: the wrapper's OWN bare-arrow onKeyDown (unchanged,
-            // for when the wrapper itself is directly focused) would
-            // otherwise ALSO fire on the bubbling phase and double-apply
-            // the orbit step alongside this cell's own handling.
-            e.stopPropagation()
-            if (e.shiftKey) {
-              onCamera((prev) => panBySteps(prev, s[0], s[1], extent))
-            } else {
-              onCamera((prev) => orbitBySteps(prev, s[0], s[1], orbitPivot))
-            }
-          }}
-        >
-          ⟳
-        </div>
-        <CameraButton testId="camera-zoom-in" label="Zoom in" onPress={() => onCamera((p) => zoomBySteps(p, 1, extent))} atLimit={zoomLimit === 'min'} glyph="+" />
-        <CameraButton testId="camera-zoom-out" label="Zoom out" onPress={() => onCamera((p) => zoomBySteps(p, -1, extent))} atLimit={zoomLimit === 'max'} glyph="−" />
-        <CameraButton testId="camera-recenter" label="Recenter" onPress={onRecenter} atLimit={false} glyph="⌖" />
-      </div>
-
-      {phone && <div data-space-camera-control data-testid="space-pan-controls" className="absolute z-20" style={{ right: 'max(12px, env(safe-area-inset-right))', bottom: 'calc(var(--phone-vitals-height, 64px) + 64px + env(safe-area-inset-bottom))' }}>
-        <p className="mb-1 max-w-56 rounded bg-black/70 px-2 py-1 text-[10px] text-zinc-300" data-testid="touch-camera-hint">{touchOrbit ? '1 finger rotates' : '1 finger pans'} · 2 fingers rotate · Pinch zooms</p>
-        <div className="flex justify-end gap-1">
-        <button type="button" data-testid="camera-touch-rotate" aria-label="Rotate camera with one finger" aria-pressed={touchOrbit} onClick={onTouchOrbit} className={BUTTON} style={{ minWidth: 76, height: 44, borderColor: touchOrbit ? '#67e8f9' : undefined }}>{touchOrbit ? '✓ Rotate' : '⟳ Rotate'}</button>
-        <button type="button" aria-label="Pan controls" aria-expanded={panOpen} onClick={() => setPanOpen(value => !value)} className={BUTTON} style={{ width: 44, height: 44 }}>↔</button>
-        </div>
-        {panOpen && <div role="group" aria-label="Pan the map" style={{ position: 'absolute', bottom: 52, right: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 44px)', gap: 4, padding: 4, background: '#08121df2' }}>
-          {([['Pan left', -1, 0, '←'], ['Pan up', 0, 1, '↑'], ['Pan right', 1, 0, '→'], ['Pan down', 0, -1, '↓']] as const).map(([label, x, y, glyph], index) => <button key={label} type="button" aria-label={label} onClick={() => onCamera(previous => panBySteps(previous, x, y, extent))} className={BUTTON} style={{ width: 44, height: 44, gridColumn: index === 3 ? 2 : undefined }}>{glyph}</button>)}
-        </div>}
-      </div>}
-
-      {/* select-pan-target-point — moved OUT of the wrapper (impl contract
-          §10.1): a selection affordance, not a camera cell, so it does not
-          count against "exactly four". Carries CAMERA_CONTROL_ATTR itself,
-          since SpaceStage.tsx's own canvas-pick suppression
-          (`target.closest('[data-space-camera-control], [data-affordance]')`)
-          would otherwise fire both its own selection and the canvas pick on
-          one click, now that it is outside the wrapper's subtree. The
-          keyboard path to a POINT selection: without it — and without the
-          keyboard pan above — a keyboard-only player can only ever name the
-          star, the one point every burn solve rejects. */}
-      <CameraButton
-        testId="select-pan-target-point"
-        label="Select the point at the camera's centre"
-        onPress={() => onSelect({ point: { ...camera.target } })}
-        atLimit={false}
-        glyph="◎"
-        controlAttr
-      />
+      {phone && <span className="sr-only" data-testid="touch-camera-hint">One finger pans. Pinch zooms. Two fingers moving together rotate around the selection.</span>}
 
       <span className="sr-only" role="status" aria-live="polite" data-testid="camera-limit-status">
         {limitMessage}
@@ -1227,40 +1089,5 @@ function FleetFacts({
   )
 }
 
-function CameraButton({
-  testId,
-  label,
-  onPress,
-  atLimit,
-  glyph,
-  controlAttr,
-}: {
-  testId: string
-  label: string
-  onPress: () => void
-  atLimit: boolean
-  glyph: string
-  /** RULING 10/impl contract §10.1: `select-pan-target-point` moves out of
-   *  the `space-camera-controls` wrapper and must carry CAMERA_CONTROL_ATTR
-   *  itself, or the canvas-pick suppression at `:252` misses it. */
-  controlAttr?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      aria-label={label}
-      className={BUTTON}
-      {...(controlAttr ? { [CAMERA_CONTROL_ATTR]: '' } : {})}
-      {...(atLimit ? { 'data-at-limit': 'true' } : {})}
-      onClick={(e) => {
-        e.stopPropagation()
-        onPress()
-      }}
-    >
-      {glyph}
-    </button>
-  )
-}
 
 export default SpaceStage

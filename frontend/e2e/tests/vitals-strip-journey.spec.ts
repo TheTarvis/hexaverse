@@ -484,13 +484,12 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     await prepareCommandHud(page)
     // Measure the surfaces the player can actually reach in the current HUD.
     const objectBrowser = await box(page, 'live-object-browser')
-    const cameraCluster = await box(page, 'space-camera-controls')
+    await expect(page.getByTestId('space-camera-controls')).toHaveCount(0)
     const sightingsBox = await box(page, 'sightings-unavailable')
     const floatingNav = await box(page, 'floating-nav')
 
     const floatingSurfaces: [string, Box][] = [
       ['live-object-browser', objectBrowser],
-      ['space-camera-controls', cameraCluster],
       ['sightings-unavailable', sightingsBox],
       ['floating-nav', floatingNav],
     ]

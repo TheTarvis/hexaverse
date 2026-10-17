@@ -519,10 +519,10 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
         page.getByTestId('sightings-unavailable'),
         'the card must be up: the system-filtered sightings read is failed by the route predicate',
       ).toBeVisible({ timeout: 25_000 })
+      await expect(page.getByTestId('space-camera-controls')).toHaveCount(0)
       const surfaces: [string, Box][] = [
         ['live-object-browser', await measure('live-object-browser (collapsed)', 'live-object-browser')],
         ['sightings-unavailable', await measure('sightings-unavailable (collapsed)', 'sightings-unavailable')],
-        ['space-camera-controls', await measure('space-camera-controls (collapsed)', 'space-camera-controls')],
         ['floating-nav', await measure('floating-nav (collapsed)', 'floating-nav')],
         ['console-dock-open', await measure('console-dock-open (collapsed)', 'console-dock-open')],
       ]
@@ -536,7 +536,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
           expect(overlaps(surfaces[i]![1], surfaces[j]![1]), `${surfaces[i]![0]} must not overlap ${surfaces[j]![0]} (dock collapsed)`).toBe(false)
         }
       }
-      const nav = surfaces[3]![1]
+      const nav = surfaces.find(([name]) => name === 'floating-nav')![1]
       console.log(`[journey-leg-data] geometry-collapsed: nav foot ${r1(VIEWPORT.height - (nav.y + nav.height))} px above the viewport foot`)
       // Every control in each surface, hit-tested at its centre after scrolling within its surface.
       for (const [name] of surfaces) {
@@ -726,10 +726,10 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
         page.getByTestId('sightings-unavailable'),
         'the card must be up (the route predicate is still installed)',
       ).toBeVisible({ timeout: 25_000 })
+      await expect(page.getByTestId('space-camera-controls')).toHaveCount(0)
       const surfaces: [string, Box][] = [
         ['live-object-browser', await measure('live-object-browser (expanded)', 'live-object-browser')],
         ['sightings-unavailable', await measure('sightings-unavailable (expanded)', 'sightings-unavailable')],
-        ['space-camera-controls', await measure('space-camera-controls (expanded)', 'space-camera-controls')],
         ['floating-nav', await measure('floating-nav (expanded)', 'floating-nav')],
       ]
       const strip = await measure('vitals-strip (expanded, geometry)', 'vitals-strip')

@@ -291,13 +291,13 @@ describe('SpaceStage — camera controls are inert while unavailable', () => {
     // First the positive case, so "never render camera controls" fails.
     stage()
     await readyCanvas()
-    expect(screen.getByTestId('space-camera-controls')).toBeInTheDocument()
-    expect(screen.getByTestId('camera-recenter')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('tabindex', '0'))
+    expect(screen.queryByTestId('camera-recenter')).toBeNull()
 
     restore = stubUnsupported()
     const { unmount } = stage()
     await screen.findByTestId('renderer-unsupported')
-    expect(screen.queryAllByTestId('space-camera-controls')).toHaveLength(1) // only the first (available) render's
+    expect(screen.queryAllByTestId('space-camera-controls')).toHaveLength(0) // only the first (available) render's
     unmount()
   })
 
@@ -306,6 +306,7 @@ describe('SpaceStage — camera controls are inert while unavailable', () => {
     stage()
     await screen.findByTestId('renderer-unsupported')
     expect(screen.queryByTestId('space-camera-controls')).toBeNull()
+    expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('tabindex', '-1')
     expect(screen.queryByTestId('camera-recenter')).toBeNull()
     expect(screen.queryByTestId('camera-zoom-in')).toBeNull()
     expect(screen.queryByTestId('select-pan-target-point')).toBeNull()

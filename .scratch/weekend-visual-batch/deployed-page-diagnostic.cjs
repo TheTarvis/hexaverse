@@ -49,19 +49,32 @@ async function checkOrbit(p,c,name){
  const canceled=await read()
  await emit('touchStart',[[160,350]]);await emit('touchMove',[[190,370]]);await closeFingers()
  assert.equal((await read()).yaw,canceled.yaw);assert.notDeepEqual((await read()).target,canceled.target)
- // Trusted native control taps in both engines; WebKit drags use constructed TouchLists.
- const toggle=p.getByTestId('camera-touch-rotate');await toggle.tap();assert.equal(await toggle.getAttribute('aria-pressed'),'true')
- const one=await read();await emit('touchStart',[[160,350]]);await emit('touchMove',[[195,365]]);await closeFingers();assert.notEqual((await read()).yaw,one.yaw)
- await p.getByRole('button',{name:'HUD menu',exact:true}).tap();await p.getByRole('button',{name:'Console',exact:true}).tap();await p.getByRole('button',{name:'Close Console panel',exact:true}).tap()
+ for(const id of ['space-camera-controls','space-pan-controls','camera-touch-rotate','camera-zoom-in','camera-zoom-out','camera-recenter','select-pan-target-point'])assert.equal(await p.getByTestId(id).count(),0)
+ await p.getByRole('button',{name:'HUD menu',exact:true}).tap();await p.getByRole('button',{name:'Console',exact:true}).tap()
+ const scroll=p.locator('section[data-panel="console"] > div').nth(1)
+ await scroll.evaluate(e=>{const spacer=document.createElement('div');spacer.style.flex='0 0 1600px';spacer.style.height='1600px';e.append(spacer)})
+ if(session){await emit('touchStart',[[190,500]]);await emit('touchMove',[[190,400]]);await emit('touchMove',[[190,300]]);await closeFingers();assert.ok(await scroll.evaluate(e=>e.scrollTop)>0)}
+ else{await scroll.evaluate(e=>{e.scrollTop=80});assert.ok(await scroll.evaluate(e=>e.scrollTop)>0)}
+ await p.getByRole('button',{name:'Close Console panel',exact:true}).tap()
  assert.equal(await region.evaluate(e=>!!e.closest('[inert]')),false)
- const postClose=await read();await emit('touchStart',[[160,350]]);await emit('touchMove',[[190,360]]);await closeFingers();assert.notEqual((await read()).yaw,postClose.yaw)
- await toggle.tap();assert.equal(await toggle.getAttribute('aria-pressed'),'false')
+ const postClose=await read();await emit('touchStart',[[160,350]]);await emit('touchMove',[[190,360]]);await closeFingers();assert.equal((await read()).yaw,postClose.yaw);assert.notDeepEqual((await read()).target,postClose.target)
+ const postPan=await read();await emit('touchStart',[[130,350],[230,350]]);await emit('touchMove',[[160,365],[260,365]]);await closeFingers();assert.notEqual((await read()).yaw,postPan.yaw)
  // Toggle the selected planet off, then exercise the current camera target fallback.
  await p.getByTestId('body-hit-qa-planet').press('Enter');assert.equal(await region.getAttribute('data-selection'),'')
  const fallback=await read();await emit('touchStart',[[130,350],[230,350]]);await emit('touchMove',[[160,365],[260,365]]);await closeFingers()
  assert.notEqual((await read()).yaw,fallback.yaw);assert.deepEqual((await read()).target,fallback.target)
- console.log(name,'ORBIT PASS: selected pivot, pan/pinch/orbit transitions, cancel, one-finger toggle, card close, no-selection fallback;',session?'browser-generated trusted one/two-finger touches':'constructed TouchLists for drags; trusted native taps for Rotate and HUD')
- await p.screenshot({path:out+'/'+name.toLowerCase()+'-orbit.png'})
+ console.log(name,'ORBIT PASS: selected pivot, pan/pinch/orbit transitions, cancel, no buttons, card scroll/close, no-selection fallback;',session?'browser-generated trusted one/two-finger touches':'constructed TouchLists for drags; native HUD taps; programmatic card scrolling')
+ for(const viewport of [{width:390,height:844},{width:844,height:390},{width:390,height:600},{width:1280,height:900}]){
+  await p.setViewportSize(viewport);await p.waitForTimeout(100)
+  assert.equal(await p.locator('[data-testid="space-camera-controls"], [data-testid="space-pan-controls"], [data-testid="camera-touch-rotate"]').count(),0)
+  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+ }
+ const desktop=await read();await p.mouse.move(600,350);await p.mouse.down();await p.mouse.move(650,375,{steps:5});await p.mouse.up();assert.notEqual((await read()).yaw,desktop.yaw)
+ const orbitDesktop=await read();await p.mouse.down({button:'right'});await p.mouse.move(690,395,{steps:5});await p.mouse.up({button:'right'});assert.notDeepEqual((await read()).target,orbitDesktop.target)
+ await region.focus();const keys=await read();await region.press('Shift+ArrowRight');assert.notDeepEqual((await read()).target,keys.target);await region.press('ArrowLeft');assert.notEqual((await read()).yaw,keys.yaw);await region.press('+');assert.ok((await read()).distance<keys.distance);await region.press('Home');assert.deepEqual((await read()).target,{x:0,y:0,z:0})
+ console.log(name,'DESKTOP PASS: no buttons, mouse orbit/right-drag pan and keyboard orbit/pan/zoom/recenter; portrait/landscape/short/desktop layout has no camera cluster or horizontal overflow')
+ await p.screenshot({path:out+'/'+name.toLowerCase()+'-gesture-desktop.png'});await p.setViewportSize({width:390,height:844})
+ await p.screenshot({path:out+'/'+name.toLowerCase()+'-gesture-phone.png'})
 }
 async function run(type,options,name){
  const b=await type.launch({headless:true,...options});const errors=[],bad=[],requests=[],writes=[],fixtureWrites=[];let spawned=process.env.QA_FIRST_LOGIN!=='1'
@@ -111,7 +124,7 @@ async function run(type,options,name){
   assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
   await p.getByRole('button',{name:'Console',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
   await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();assert.equal(await p.getByRole('dialog').count(),0)
-  const camera=JSON.parse(await p.getByTestId('space-canvas-region').getAttribute('data-camera'));await p.getByTestId('camera-zoom-in').tap();assert.ok(JSON.parse(await p.getByTestId('space-canvas-region').getAttribute('data-camera')).distance<camera.distance)
+  const region=p.getByTestId('space-canvas-region'),camera=JSON.parse(await region.getAttribute('data-camera'));await region.focus();await region.press('+');assert.ok(JSON.parse(await region.getAttribute('data-camera')).distance<camera.distance)
   if(process.env.QA_ORBIT==='1')await checkOrbit(p,c,name)
   assert.equal(errors.length,0,'No errors after interactions: '+JSON.stringify({errors,writes,requests}))
   console.log(name,'REAL DEPLOYED ROUTE regression PASS: guide visible/dismiss fires, background inert released, HUD/Console/close/zoom callbacks work, no JS errors, no game writes')

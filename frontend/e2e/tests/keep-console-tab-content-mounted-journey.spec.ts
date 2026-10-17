@@ -123,7 +123,7 @@ const LEG_NAMES = [
   'highlight-survives',
   'menu-open-escape',
   'press-on-dock-not-a-pick',
-  'escape-from-camera-control',
+  'escape-from-camera-canvas',
   'failed-while-collapsed',
   'settle-reread-collapsed',
   'warm-return',
@@ -137,7 +137,7 @@ const MUST_PASS: LegName[] = [
   'escape-same-node',
   'menu-open-escape',
   'press-on-dock-not-a-pick',
-  'escape-from-camera-control',
+  'escape-from-camera-canvas',
   'failed-while-collapsed',
 ]
 interface LegOutcome {
@@ -553,9 +553,9 @@ test.describe('the console dock keeps the Log tab mounted - read at open, same n
   })
 
   // =========================================================================
-  // 2. Escape with the menu open; a press on the dock is not a pick; Escape from a camera control
+  // 2. Escape with the menu open; a press on the dock is not a pick; Escape from a camera canvas
   // =========================================================================
-  test('2: the fleet menu takes the first Escape; a pointer press on the dock picks nothing; Escape from a camera control keeps focus there', async () => {
+  test('2: the fleet menu takes the first Escape; a pointer press on the dock picks nothing; Escape from a camera canvas keeps focus there', async () => {
     await runLeg('menu-open-escape', async () => {
       await expandDock()
       const chevron = page.getByTestId('vitals-fleet-chevron')
@@ -655,16 +655,17 @@ test.describe('the console dock keeps the Log tab mounted - read at open, same n
       }
     })
 
-    await runLeg('escape-from-camera-control', async () => {
+    await runLeg('escape-from-camera-canvas', async () => {
       await expandDock()
-      const control = page.getByTestId('space-camera-controls').locator('button').first()
-      await logSubject('first real control in space-camera-controls', control)
-      await expect(control, 'the camera cluster carries a button').toHaveCount(1)
+      const control = page.getByTestId('space-canvas-region')
+      await logSubject('focusable system map', control)
+      await expect(page.getByTestId('space-camera-controls')).toHaveCount(0)
+      await expect(control).toHaveAttribute('tabindex', '0')
       await control.focus()
-      await expect(control, 'precondition: the camera control holds focus').toBeFocused()
+      await expect(control, 'precondition: the camera canvas holds focus').toBeFocused()
       await page.keyboard.press('Escape')
-      await expect(page.getByTestId('console-dock-region'), 'Escape with focus on a camera control collapsed the dock').toBeHidden({ timeout: 10_000 })
-      await expect(control, 'focus stayed on the camera control').toBeFocused()
+      await expect(page.getByTestId('console-dock-region'), 'Escape with focus on a camera canvas collapsed the dock').toBeHidden({ timeout: 10_000 })
+      await expect(control, 'focus stayed on the camera canvas').toBeFocused()
     })
   })
 
