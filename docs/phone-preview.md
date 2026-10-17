@@ -767,3 +767,37 @@ edge and physical iPhone acceptance remain unverified. Anonymous external reques
 returns302 to idp.ngrok.com. Complete gzip home/login/system HTML200, deployed CSS
 byte equality, Storybook200, debug/QA404, foreign-origin POST403, all active pins
 and zero-byte transport error log verified. System HTML retains no-store.
+
+## Mobile orbit — active 2026-10-17 18:01UTC
+
+Travis reports actual iPhone pan/zoom working and requests rotation around a
+selected object. Local commit54cc3ce adds parallel two-finger orbit and a visible
+one-finger Rotate toggle. Default one-finger pan and pinch zoom remain. Shared
+centroid motion is separated from finger spacing; a stationary-finger pinch does
+not rotate. Selected-object orbit preserves framing rather than recentering.
+No selection keeps the existing target/fleet-follow pivot. No document listeners,
+touchstart cancellation or recovery-modal changes were introduced.
+
+Source:/private/tmp/hexaverse-mobile-orbit-b5eje4ch; build
+yXPU27qyhgZ6M8vmNK4x6. Runtime overlay contains only SpaceStage.tsx and
+space-camera.ts over the accepted modal-fix snapshot;57 public assets identical.
+Supervisor restarted18:01:00UTC: frontend6722, gateway6723, ngrok6724. Existing
+Google/exact-email auth, gateway/diagnostic/static Storybook pins and routes,
+ngrok flags and Oct19 00UTC cutoff unchanged. No push.
+
+148 tests/11 files, TypeScript, scoped lint and production build pass. Final
+candidate first-login and persisted wake/objects routes pass in Chromium/WebKit.
+Post-deployment first-login and persisted objects/orbit checks also pass: guide
+visible/dismissed, inert released, selected pivot retained, pan/pinch/orbit and
+finger transitions/cancel work, Rotate toggle and HUD card close retain orbit,
+no-selection orbit uses current target. Chromium input is browser-generated native
+multi-touch. WebKit drags are constructed TouchLists; toggle/HUD/close taps are
+browser-generated. This does not establish physical iPhone orbit acceptance.
+
+All32 initial JS/CSS assets match deployed build bytes; complete compressed home,
+login and system responses verified. Backend health/Auth/SDK iframe pass;
+Storybook200, QA/debug404, foreign POST403 and anonymous external302 to idp.ngrok.com
+verified. Transport error log0bytes. Synthetic browser Auth/game fixtures include
+an intercepted preview quote POST on selection; no real identities or game writes.
+Evidence:/tmp/hexaverse-mobile-orbit-{final-first,final-wake,final-objects,
+live-first,live-objects}.log; unit:/tmp/hexaverse-mobile-orbit-regression.log.

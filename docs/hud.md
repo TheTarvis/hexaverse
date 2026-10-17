@@ -455,3 +455,13 @@ before a new one-finger gesture. Stationary-finger pinch centroid movement does 
 rotate the view. Cancellation and card close retain working independent gestures.
 No document input interception or touchstart cancellation was added; the recovery
 modal visibility fix remains intact. Physical iPhone orbit acceptance is pending.
+
+Validation:148 tests/11 files pass across camera, SpaceStage, renderer/transform,
+HUD, recovery and viewport ownership; TypeScript/scoped lint/build pass. Real
+production-route synthetic-data checks pass for first-login and persisted wake/
+objects states. Selected pivot/eye-distance preservation, no-selection target,
+pan/pinch/orbit transitions, cancellation, Rotate toggle and post-card-close orbit
+pass. Chromium uses browser-generated trusted one/two-finger input; WebKit drags
+use constructed TouchLists while Rotate/HUD/close taps are browser-generated.
+No live game calls or identity selection. Runner:
+.scratch/weekend-visual-batch/deployed-page-diagnostic.cjs (QA_ORBIT=1).

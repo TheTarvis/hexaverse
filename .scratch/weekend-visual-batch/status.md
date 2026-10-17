@@ -468,3 +468,16 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   active pins/CSS bytes verified, error log0bytes, no push. Physical iPhone pending.
 - Runner uses synthetic browser-intercepted Auth/game data; no real identity or
   game mutation. Logs:/tmp/hexaverse-invisible-modal-live-{first,wake,objects}.log.
+
+### Mobile orbit active18:01UTC
+
+-54cc3ce adds two-finger parallel orbit and labeled one-finger Rotate toggle.
+  One-finger pan/pinch zoom preserved; selected pivot retains framing; no selection
+  keeps current target. Finger transitions never reset the camera.
+-148 tests/11 files, types/scoped lint/build pass. Final first-login/wake/objects
+  real-route checks pass; deployed first-login and objects/orbit pass in both engines.
+- Chromium trusted multi-touch; WebKit constructed drags plus native taps. Actual
+  iPhone pan/zoom user-confirmed; new orbit acceptance remains pending.
+- Build yXPU27qyhgZ6M8vmNK4x6;32 initial assets byte-verified,57 public assets
+  unchanged, prior modal fix preserved. Same auth/diagnostics/routes/cutoff; errors0.
+- No push, identity selection, live game writes or external asset operations.
