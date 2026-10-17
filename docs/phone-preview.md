@@ -604,3 +604,38 @@ pan/pinch/taps/cancel and post-card/resize input pass; installed WebKit touch ca
 open/close, map tap and zoom fallback pass; desktop docks/mouse orbit pass after
 resize. Physical iPhone/native iOS pinch remain unverified. No identity selection,
 live gameplay mutation, new art, upload or push occurred.
+
+
+## Safari gesture arbitration update — 2026-10-17 02:34 UTC
+
+Commit db1b3f9 adds map-scoped nonpassive capture touch cancellation and gated
+Safari gesture cancellation, plus directional phone pan fallback. See docs/hud.md
+for the concrete implementation gap, primary references and physical-device limits.
+No global touch blocker, zoom restriction or body scroll lock was added.
+
+Source: /private/tmp/hexaverse-safari-preview-1pns2p8g; pointer:
+/tmp/hexaverse-safari-preview-root.txt. It reuses the previously published touch
+snapshot and overlays only SpaceStage.tsx plus map-browser-gestures.ts. All57 public
+assets compare byte-identical. Local fixtures/evidence are not published; protected
+static Storybook is unchanged. Build ID: mtPOKUcqkDqkyp2OvjhVz.
+
+The same supervised process set stopped02:34:34.14UTC and relaunched02:34:35.30UTC.
+Frontend74557, gateway74558 and ngrok74559 are supervised. Only frontend source
+and build/manifest pins changed; all active pins match. Exact endpoint/Google-email
+restriction, gateway routes/error-only diagnostics, ngrok inspection/logging off
+and2026-10-19T00:00:00Z cutoff remain unchanged. The candidate20215 listener stopped.
+
+At02:34:56UTC home/login/system pages returned complete200 gzip HTML; protected
+Storybook200; debug404; foreign-origin POST403; anonymous external root302 to
+idp.ngrok.com. Transport error log remains0bytes. These are service/access checks,
+not physical Safari gesture acceptance or an ngrok root-cause diagnosis.
+
+1,067 HUD/space tests across65 files, types/scoped lint, file validators, diff checks
+and isolated build pass. Browser-generated touchstart is defaultPrevented:true and
+still selects in installed Chromium and WebKit. Constructed TouchEvents with fixture
+TouchLists and gesture events test map-label cancellation/release in both engines.
+Chromium native pan/pinch preserve document scroll and visualViewport state; native
+card scrolling works. WebKit card touches are uncancelled and its card container
+scrolls programmatically; native two-finger WebKit/Safari tab UI remain untested.
+Pan fallback, post-close map cancellation, existing resize/card and desktop regressions
+pass. Physical iPhone retest is still required, including reserved-edge behavior.

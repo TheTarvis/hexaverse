@@ -389,3 +389,13 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   pass without page scroll/visual viewport zoom. Actual iPhone retest pending.
 - New snapshot pointer: /tmp/hexaverse-safari-preview-root.txt; all57 published
   assets unchanged. Exact endpoint/auth/diagnostics/deadline remain required.
+
+
+### Safari arbitration update active02:34UTC
+
+- db1b3f9 deployed, build mtPOKUcqkDqkyp2OvjhVz; operations in docs/phone-preview.md.
+- All pins match; complete compressed pages/access checks pass; transport log0bytes.
+- Assets57/57 unchanged; auth/diagnostics/routes/inspection/cutoff unchanged.
+- Physical Safari central pan/pinch retest and reserved browser-gesture limits remain
+  pending. Native trusted touchstart/tap verified in both engines; WebKit two-finger
+  behavior only covered with constructed TouchEvents, not physical Safari UI.
