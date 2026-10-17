@@ -528,3 +528,17 @@ JS/CSS files match; all 7 pins, exact-email gate/routes/diagnostics/Oct19 00UTC 
 preserved. Errors 0 bytes; transport unchanged 347 bytes. Temporary 20215/20218 servers
 stopped; live supervisor 23541 / frontend 23542 / gateway 23543 / ngrok 23544. No push.
 Captures/spec:.scratch/hud-card-baseline; logs:/tmp/hexaverse-mobile-chrome-*.log.
+
+### Centered card titles — 2026-10-17
+
+User spotted left-aligned mobile titles versus the Storybook baseline. The recent
+mobileHeader flex override had removed the baseline center anchor; measured live
+midpoint offset was about -110px. Commit e997380 uses equal side tracks around the
+title, retaining the 48px close and persistent tabs. Build KcC37CyGkxAjvy3gFc6Hr is
+live at the same protected endpoint with unchanged email policy, all 57 public
+assets, routes, diagnostics and October 19 00:00 UTC cutoff. All 35 served initial
+assets and seven pins match; errors 0 bytes / transport unchanged 347 bytes. Local
+browser mobile/desktop geometry, 60 unit tests, types/lint, production/Storybook
+builds and candidate Chromium/WebKit route checks pass. Native iPhone validation
+remains pending. Evidence: .scratch/hud-card-baseline/mobile-centered-title-phone.png
+and /tmp/hexaverse-centered-title-*.log. No push.

@@ -133,3 +133,9 @@ browser also measures a centered title (offset -0.00390625 px at 375px viewport)
 and 48x48px close. All 57 public assets are unchanged. Capture:
 [Centered phone header](mobile-centered-title-phone.png). Native iPhone acceptance
 remains pending.
+
+Deployed gateway checks pass the same title geometry, no-overlap, mobile and desktop
+baseline assertions in both engines with no runtime errors/unmocked game writes.
+Preview build KcC37CyGkxAjvy3gFc6Hr retains the seven verified pins and existing
+email/cutoff configuration; initial 35 asset responses match local build bytes.
+Temporary browser tab/listeners were cleaned up and viewport override reset.

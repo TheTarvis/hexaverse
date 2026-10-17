@@ -918,3 +918,43 @@ Origin POST 403. Supervisor errors 0 bytes, transport log unchanged 347 bytes co
 two historical downstream aborts, capped 256 KiB. Evidence:
 /tmp/hexaverse-mobile-{font-before,chrome-candidate,chrome-first-station,chrome-camera,chrome-live}.log
 and .scratch/hud-card-baseline/mobile-{search,arrange}-phone.png.
+
+## Centered shared-card titles — 2026-10-17
+
+User spotted mobile title alignment differing from the accepted Storybook shell.
+The mobileHeader flex row introduced in 2efc4e6 removed the title's 50% anchor and
+left-aligned it. Live 390px viewport measurements placed its midpoint roughly
+110px left of the card midpoint in both engines. Implementation e997380 replaces
+only that phone header's layout with equal side tracks and a central title track.
+The visible inset 48px close, persistent tabs, safe areas/internal scroll, retained
+state, 16px inputs and unrestricted browser accessibility zoom are preserved.
+
+Build KcC37CyGkxAjvy3gFc6Hr, source
+/private/tmp/hexaverse-centered-title-_8x6cshq, is deployed on the same protected
+endpoint. Supervisor 26657 / frontend 26658 / gateway 26659 / ngrok 26660 started
+23:57:18 UTC. Deployment waited for the previous supervisor to finish stopping.
+Only the frontend source command and build pins changed. All 57 public assets,
+Google exact-email policy, gateway/ngrok commands, routes, protected Storybook,
+diagnostic cap and 2026-10-19T00:00:00Z cutoff are unchanged. No push.
+
+60 HUD tests, types/scoped lint and production/Storybook builds pass. Candidate
+Chromium/WebKit production-route tests assert title/card midpoints within 1 CSS px
+at 375/390 portrait, 844 landscape and 1280 desktop, including long-title unequal
+Back/close geometry and actual detail/back transitions. Tabs/search/mining drafts,
+content scroll, dismissal and inert release pass. Baseline Storybook comparisons
+also pass. The user's local in-app browser measures -0.00390625px mobile title
+midpoint offset with 48x48px close, and 0px desktop offset. Native iPhone acceptance
+is not inferred from these checks.
+
+Complete gzip home/login/system responses return 200; system HTML stays no-store.
+All 35 initial JS/CSS files match the deployed build bytes and all seven pins match.
+Anonymous edge 302, Storybook 200, debug/QA 404 and foreign Origin POST 403 remain.
+Supervisor errors 0 bytes; transport unchanged 347 bytes (two historical aborts).
+Capture: .scratch/hud-card-baseline/mobile-centered-title-phone.png.
+Logs: /tmp/hexaverse-centered-title-{unit,static,story-browser,candidate,live}.log
+and /tmp/hexaverse-title-before.log.
+
+Final gateway20204 Chromium/WebKit runs also pass title geometry, mobile handoffs,
+mining drafts and desktop centering, with no JS errors or unmocked writes. Temporary
+candidate20215 and local Storybook20218 listeners were stopped; the in-app browser
+viewport override was reset and its temporary story tab closed.
