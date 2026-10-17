@@ -434,7 +434,7 @@ HTTPS origin is browser-intercepted to local production resource bytes; this doe
 not validate the authenticated ngrok edge or establish physical iPhone acceptance.
 
 First-login coverage also exercises the real wake form, entirely synthetic spawn
-response, app-created wake guide, Begin transition to objects, reload, dismissal
+response, app-created wake guide, Begin transition to objects, dismissal
 and restored controls in both engines. No existing identity or live API is used.
 The single intercepted fixture POST never leaves the browser; other mutations
 remain forbidden. Evidence: /tmp/hexaverse-invisible-modal-first-login.log.

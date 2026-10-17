@@ -734,3 +734,36 @@ and native WebKit two-finger/Safari UI remain unconfirmed. Stationary trusted ta
 and prior synthetic defaultPrevented checks did not reproduce the user's universal
 physical failure; those earlier checks were insufficient for acceptance. No new
 physical retest was requested before the stronger callback evidence was obtained.
+
+
+## Invisible recovery modal correction — active 2026-10-17 13:27UTC
+
+Commit520d8ee removes one broad CSS visibility selector. The hidden inline Console
+contains an expanded collapse button; the former selector hid an active Recovery
+transmission while its modal kept every background control inert. This reproduced
+the reported universal lockout on the real production route in Chromium/WebKit,
+without JavaScript errors. No additional gesture change was made.
+
+Active source:/private/tmp/hexaverse-modal-visibility-quiuqx95; build
+g6x-pM1Iv7ri05_u6lWi5. Only command-view.module.css differs at runtime from the
+previous native-touch snapshot. All57 public assets are identical. Supervisor
+restarted13:27:28UTC with frontend468 (Next479), gateway469 and ngrok470.
+Gateway/ngrok commands, exact Google identity policy, diagnostics/static Storybook
+pins and Oct19 00UTC cutoff are unchanged. No push or new exposure.
+
+Live first-login and persisted wake/objects tests pass in installed Chromium and
+WebKit at390×844. Real app login/system routes and ConsoleDock are used; Auth/game
+responses are intercepted synthetic fixtures. First-login uses the real wake form
+and app-created guide, with one browser-only mocked spawn; no identity is selected
+and no live game writes occur. Guide is visible, Begin works, dismissal releases
+inert, and HUD/Console/open/close/zoom callbacks work with zero browser errors.
+Avoid unnecessary navigation during initial GLB texture loading: it can produce
+expected aborted-load errors in the test itself.
+
+Evidence:/tmp/hexaverse-invisible-modal-live-{first,wake,objects}.log; runner
+.scratch/weekend-visual-batch/deployed-page-diagnostic.cjs. HTTPS origin is locally
+forwarded to deployed resource bytes by the browser test; authenticated ngrok
+edge and physical iPhone acceptance remain unverified. Anonymous external request
+returns302 to idp.ngrok.com. Complete gzip home/login/system HTML200, deployed CSS
+byte equality, Storybook200, debug/QA404, foreign-origin POST403, all active pins
+and zero-byte transport error log verified. System HTML retains no-store.

@@ -455,3 +455,16 @@ No comparison image uploaded or published. Entire weekend work is not complete.
 - Build qdpG4CBaaka42onE4x6L_, source/compiled chunk/pins verified; all57 assets,
   auth/routes/diagnostics/cutoff unchanged; transport log0bytes; no push.
 - Temporary QA routes removed from deployed build; private QA listener stopped.
+
+
+### Invisible recovery modal fix active13:27UTC
+
+-520d8ee removes the CSS selector that hid a recovery modal due to the hidden
+  Console collapse button's aria-expanded state, leaving the background inert.
+- Actual production route reproduces the failure before the fix. First-login
+  wake/form/app-created guide and persisted wake/objects pass in Chromium/WebKit
+  after deployment; visible card, dismissal, HUD/Console/close/zoom callbacks work.
+- Live build g6x-pM1Iv7ri05_u6lWi5;57 assets, auth/diagnostics/cutoff unchanged;
+  active pins/CSS bytes verified, error log0bytes, no push. Physical iPhone pending.
+- Runner uses synthetic browser-intercepted Auth/game data; no real identity or
+  game mutation. Logs:/tmp/hexaverse-invisible-modal-live-{first,wake,objects}.log.
