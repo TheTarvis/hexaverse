@@ -432,3 +432,9 @@ Runner: .scratch/weekend-visual-batch/deployed-page-diagnostic.cjs. Evidence:
 /tmp/hexaverse-invisible-modal-after.log and /tmp/hexaverse-invisible-modal-wake.log.
 HTTPS origin is browser-intercepted to local production resource bytes; this does
 not validate the authenticated ngrok edge or establish physical iPhone acceptance.
+
+First-login coverage also exercises the real wake form, entirely synthetic spawn
+response, app-created wake guide, Begin transition to objects, reload, dismissal
+and restored controls in both engines. No existing identity or live API is used.
+The single intercepted fixture POST never leaves the browser; other mutations
+remain forbidden. Evidence: /tmp/hexaverse-invisible-modal-first-login.log.
