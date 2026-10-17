@@ -442,3 +442,16 @@ No comparison image uploaded or published. Entire weekend work is not complete.
   multi-touch changes camera; Chromium native pan/pinch pass with pointers blocked.
 -1,072 tests/66 files, types/lint pass. No physical iPhone success claimed.
 - QA route removed before final build; no new global interception or art publication.
+
+
+### Input restoration active12:40UTC
+
+-0feef64 emergency document-input rollback active12:31UTC;47b9a8f native TouchEvent
+  restoration active12:40UTC. Global cancellation removed, layout retained.
+- Trusted Chromium/WebKit production callbacks pass with all touch-pointer events
+  blocked, including map/fleet, all HUD controls and pan/zoom fallback.
+- Immediate post-card-close trusted map tap and TouchEvent-only pan pass in both
+  engines without reload.1,072 tests/types/lint/build pass. Physical iOS unconfirmed.
+- Build qdpG4CBaaka42onE4x6L_, source/compiled chunk/pins verified; all57 assets,
+  auth/routes/diagnostics/cutoff unchanged; transport log0bytes; no push.
+- Temporary QA routes removed from deployed build; private QA listener stopped.

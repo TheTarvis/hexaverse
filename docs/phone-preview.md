@@ -680,3 +680,57 @@ HUD downward drag leaves shell/document fixed; WebKit drag arbitration checks ar
 constructed events. Safari's physical pull-to-refresh UI remains unreproduced and
 actual iPhone acceptance is pending. Service checks do not resolve the earlier
 ngrok root-cause question. No push or new art publication occurred.
+
+
+## Emergency input rollback and native-touch restoration — 2026-10-17
+
+Actual iPhone12:27UTC regression: refresh stopped but all fingers/buttons appear
+dead. Universal physical lockout could not be reproduced locally. The document
+interceptor's zero-threshold move cancellation is an unsafe click-suppression risk,
+and cancelled touches must not be assumed to keep producing pointer events.
+
+Emergency commit0feef64 removed ALL application document input interception while
+retaining viewport layout. It became active12:31:57UTC, build Gc95NqcOZceQZ1cbdWNTu
+from/private/tmp/hexaverse-input-rollback-9l90d206. This was a narrow rollback, not a
+claim of confirmed physical recovery.
+
+Commit47b9a8f subsequently moved map motion/selection to native TouchEvents and
+preserved native button/affordance click paths. Touchstart is never cancelled; only
+owned map gestures/end suppress compatibility behavior where necessary. Touch-
+pointer events are ignored by mouse/pen handling and cannot cancel native touch
+tracking. No document-level touch/gesture interception remains. See docs/hud.md.
+
+Final source:/private/tmp/hexaverse-native-touch-3at75qb3; pointer:
+/tmp/hexaverse-native-touch-root.txt. It overlays only SpaceStage.tsx and
+map-browser-gestures.ts over the emergency rollback snapshot. Build ID:
+qdpG4CBaaka42onE4x6L_. All57 public assets are byte-identical; auth/gateway/routes/
+diagnostics/ngrok flags/static Storybook/cutoff unchanged. Local QA route and its
+compiled chunk were removed before the final build; its gateway path returns404.
+
+The authorized process set relaunched12:40:57UTC: frontend96910, gateway96911 and
+ngrok96912 under supervisor96909. All pins match. Served system page-cf492bdf39a1e810.js
+contains native changedTouches input and system-viewport-layout-only-v2, and its
+bytes match the final snapshot's compiled chunk. Complete home/login/system gzip
+HTML and static Storybook200 verified; foreign POST403 and anonymous OAuth302
+verified. At12:43UTC transport log0bytes; exact Google/email and Oct19 00UTC cutoff
+remain unchanged. No identity was selected, live gameplay mutated, art uploaded or
+push performed.
+
+Stronger input evidence:1,072 tests/66 files, types/scoped lint/validators/build pass.
+Local Next production-layout QA blocks every touch-pointer event before the app:
+trusted Chromium/WebKit touches still select map/fleet exactly once and activate
+HUD/menu/open/close/settings/zoom/pan/recenter and in-memory travel Start/Stop
+callbacks at390×844/844×390/390×600. No stale inert after close; cards scroll; actual
+Next route exit restores layout. Constructed WebKit TouchEvents assert actual
+pan/pinch camera changes; Chromium also uses browser-generated native pan/pinch.
+A separate private production build with identical runtime sources confirms trusted
+map taps and TouchEvent-only pan immediately after each Objects/Console/Command
+close with no reload and no pointer stream. Its20215 listener was stopped.
+
+Evidence:/tmp/hexaverse-input-production-qa.log and/tmp/hexaverse-input-postclose.log;
+runner:.scratch/weekend-visual-batch/input-restoration-regression.cjs. QA fixtures
+remain private; the deployed snapshot never includes them. Physical iPhone success
+and native WebKit two-finger/Safari UI remain unconfirmed. Stationary trusted taps
+and prior synthetic defaultPrevented checks did not reproduce the user's universal
+physical failure; those earlier checks were insufficient for acceptance. No new
+physical retest was requested before the stronger callback evidence was obtained.
