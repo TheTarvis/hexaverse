@@ -3,7 +3,7 @@ import { PHONE_HUD_QUERY } from '@/hooks/use-phone-sheet'
 type SavedStyle = { element: HTMLElement; name: string; value: string; priority: string }
 type RootState = { styles: SavedStyle[] }
 const documents = new WeakMap<Document, { roots: Map<HTMLElement, RootState>; release: () => void; update: () => void }>()
-const marker = 'system-viewport-lock-v1'
+const marker = 'system-viewport-layout-only-v2'
 const properties = ['overflow', 'overflow-x', 'overflow-y', 'overscroll-behavior', 'overscroll-behavior-x', 'overscroll-behavior-y', 'height', 'max-height', 'position', 'top', 'left', 'right', 'width', 'scroll-behavior']
 const variables = ['--system-viewport-height', '--system-viewport-top', '--system-viewport-bottom']
 function save(element: HTMLElement, names: string[]): SavedStyle[] {
@@ -33,7 +33,6 @@ function acquire(root: HTMLElement) {
   const originalMarker = html.getAttribute('data-system-scroll-lock')
   const scroll = { x: win.scrollX, y: win.scrollY }
   const roots = new Map([[root, rootState]])
-  let touch: { id: number; x: number; y: number; target: Element | null } | null = null
   let lastHeight = win.innerHeight, lastTop = 0
   const update = () => {
     const viewport = win.visualViewport
@@ -51,44 +50,8 @@ function acquire(root: HTMLElement) {
     set(body, { position: 'fixed', top: '0px', left: '0px', right: '0px', width: '100%', height: `${win.innerHeight}px`, 'max-height': `${win.innerHeight}px`, overflow: 'hidden', 'overscroll-behavior': 'none' })
     for (const element of roots.keys()) set(element, { position: 'fixed', top: `${lastTop}px`, left: '0px', right: '0px', width: '100%', height: `${lastHeight}px`, 'max-height': `${lastHeight}px`, overflow: 'hidden', 'overscroll-behavior': 'none' })
   }
-  const elementTarget = (target: EventTarget | null) => target instanceof Element ? target : target instanceof Node ? target.parentElement : null
-  const editable = (target: Element | null) => !!target?.closest('input, textarea, select, [contenteditable="true"]')
-  const scrollable = (target: Element | null, dx: number, dy: number, requireRoom: boolean) => {
-    const vertical = Math.abs(dy) >= Math.abs(dx)
-    for (let node = target; node && node !== body && node !== html; node = node.parentElement) {
-      const css = win.getComputedStyle(node)
-      const overflow = vertical ? css.overflowY : css.overflowX
-      const max = vertical ? node.scrollHeight - node.clientHeight : node.scrollWidth - node.clientWidth
-      if (!/^(auto|scroll)$/.test(overflow) || max <= 1) continue
-      if (!requireRoom) return true
-      const position = vertical ? node.scrollTop : node.scrollLeft, delta = vertical ? dy : dx
-      if ((delta > 0 && position > 0) || (delta < 0 && position < max - 1)) return true
-    }
-    return false
-  }
-  const start = (event: TouchEvent) => {
-    if (event.touches.length !== 1 || (win.visualViewport?.scale ?? 1) > 1.01) { touch = null; return }
-    const point = event.touches[0], target = elementTarget(event.target)
-    touch = { id: point.identifier, x: point.clientX, y: point.clientY, target }
-    // Real buttons/inputs keep native taps/focus. Their first drag move is still
-    // cancelled below when no independent scroll container can consume it.
-    if (!target?.closest('button, a, input, textarea, select, [role="button"], [contenteditable="true"]') && !scrollable(target, 0, 1, false) && event.cancelable) event.preventDefault()
-  }
-  const move = (event: TouchEvent) => {
-    if (!touch || event.touches.length !== 1 || (win.visualViewport?.scale ?? 1) > 1.01) return
-    const point = Array.from(event.touches).find(point => point.identifier === touch!.id)
-    if (!point) return
-    const dx = point.clientX - touch.x, dy = point.clientY - touch.y
-    touch.x = point.clientX; touch.y = point.clientY
-    if (editable(touch.target) || scrollable(touch.target, dx, dy, true)) return
-    if (event.cancelable) event.preventDefault()
-  }
-  const end = () => { touch = null }
-  const options = { capture: true, passive: false }
-  doc.addEventListener('touchstart', start, options)
-  doc.addEventListener('touchmove', move, options)
-  doc.addEventListener('touchend', end, options)
-  doc.addEventListener('touchcancel', end, options)
+  // Layout ownership must never cancel document input. Native buttons and card
+  // scrolling keep their complete touch/click streams; only the map owns gestures.
   win.addEventListener('resize', update)
   win.visualViewport?.addEventListener('resize', update)
   win.visualViewport?.addEventListener('scroll', update)
@@ -104,8 +67,6 @@ function acquire(root: HTMLElement) {
     roots, update,
     release: () => {
       observer.disconnect()
-      doc.removeEventListener('touchstart', start, options); doc.removeEventListener('touchmove', move, options)
-      doc.removeEventListener('touchend', end, options); doc.removeEventListener('touchcancel', end, options)
       win.removeEventListener('resize', update); win.visualViewport?.removeEventListener('resize', update); win.visualViewport?.removeEventListener('scroll', update)
       restore(styles)
       if (originalMarker === null) html.removeAttribute('data-system-scroll-lock'); else html.setAttribute('data-system-scroll-lock', originalMarker)

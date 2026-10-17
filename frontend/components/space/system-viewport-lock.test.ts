@@ -37,26 +37,26 @@ it('locks both document roots, uses visual viewport height and restores exact ow
   expect(root.style.position).toBe('')
   expect(touch(root, 'touchstart').defaultPrevented).toBe(false)
 })
-it('claims empty/HUD drag starts while keeping native button taps and editable fields available', () => {
+it('never cancels document touches, including small finger movement on native HUD buttons', () => {
   const { map, button, root } = fixture()
-  expect(touch(map, 'touchstart').defaultPrevented).toBe(true)
+  expect(touch(map, 'touchstart').defaultPrevented).toBe(false)
   touch(map, 'touchend', 100, 100, 0)
   expect(touch(button, 'touchstart').defaultPrevented).toBe(false)
-  expect(touch(button, 'touchmove', 100, 130).defaultPrevented).toBe(true)
+  expect(touch(button, 'touchmove', 102, 101).defaultPrevented).toBe(false)
   const input = document.createElement('input'); root.append(input)
   expect(touch(input, 'touchstart').defaultPrevented).toBe(false)
   expect(touch(input, 'touchmove', 130, 100).defaultPrevented).toBe(false)
 })
-it('allows card scroll in available directions but blocks chaining at top/bottom and after card close', () => {
+it('does not intercept card scroll at either boundary or after card close', () => {
   const { content, scroll, map } = fixture()
   expect(touch(content, 'touchstart').defaultPrevented).toBe(false)
-  expect(touch(content, 'touchmove', 100, 130).defaultPrevented).toBe(true)
+  expect(touch(content, 'touchmove', 100, 130).defaultPrevented).toBe(false)
   scroll.scrollTop = 200
   expect(touch(content, 'touchmove', 100, 150).defaultPrevented).toBe(false)
   scroll.scrollTop = 400
-  expect(touch(content, 'touchmove', 100, 120).defaultPrevented).toBe(true)
+  expect(touch(content, 'touchmove', 100, 120).defaultPrevented).toBe(false)
   touch(content, 'touchend', 100, 100, 0); scroll.remove()
-  expect(touch(map, 'touchstart').defaultPrevented).toBe(true)
+  expect(touch(map, 'touchstart').defaultPrevented).toBe(false)
 })
 it('does not cancel browser pinch outside the map and does not fight accessibility viewport zoom', () => {
   const { button, root } = fixture()
