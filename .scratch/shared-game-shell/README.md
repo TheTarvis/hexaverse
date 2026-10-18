@@ -58,3 +58,9 @@ stop the existing supervisor, wait for its owned groups to exit, activate the
 candidate config and relaunch using the existing phone-preview procedure. Then run
 verify-deployment.py plus browser.cjs through the existing gateway, check anonymous
 edge denial, and inspect supervision/transport logs before claiming deployment.
+
+Read-only post-rejection health checks confirm the old home/login/system HTML and
+33 initial JS/CSS resources match the live iOS build, all seven pins are valid,
+Storybook returns200, debug/QA routes remain404, foreign-Origin writes remain403
+and the anonymous protected edge returns302. Supervision and transport error logs
+remain empty (`live-baseline.log`). The temporary candidate listener was stopped.
