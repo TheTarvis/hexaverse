@@ -19,6 +19,7 @@
 // The heavy, three-dependent renderer is pulled in via next/dynamic({ssr:false})
 // so three.js stays off the SSR/initial-render path entirely.
 
+import { SceneNavigationAction } from '@/components/hud/SceneNavigationAction'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
@@ -318,7 +319,7 @@ export function GalaxyView() {
 
   if (isLoading) {
     return (
-      <GameViewShell data-testid="galaxy-view">
+      <GameViewShell data-testid="galaxy-view" data-guest={isStartArea}>
         <GraphFallback label="Charting the galaxy…" />
       </GameViewShell>
     )
@@ -341,7 +342,7 @@ export function GalaxyView() {
   }
 
   return (
-    <GameViewShell data-testid="galaxy-view">
+    <GameViewShell data-testid="galaxy-view" data-guest={isStartArea}>
       <GameViewHeading eyebrow="Command network" title={isStartArea ? 'Start Area' : 'Live Galaxy'} detail={isStartArea ? 'Frozen · read-only' : 'Live · your galaxy'} />
       <GameViewScene>
       <CanvasRegionBoundary
@@ -367,13 +368,12 @@ export function GalaxyView() {
       </div>}
 
       </GameViewScene>
-      <GameViewWorkspace corporationId={isStartArea ? 'guest' : session.corporation?.id ?? 'unavailable'} panels={[
+      <GameViewWorkspace navigationAction={!isStartArea && selected ? <SceneNavigationAction destination="system" systemName={selected.name} onEnter={() => handleEnterSystem(selected.id)} /> : undefined} corporationId={isStartArea ? 'guest' : session.corporation?.id ?? 'unavailable'} panels={[
         { id: 'objects', label: 'Objects', children: <GalaxyObjectBrowser nodes={galaxy.nodes} selectedId={selectedId} onSelect={handleSelectSystemId}>
           <Inspector
             node={selected}
             connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
             stationQuotes={selectedStationQuotes}
-            onEnter={isStartArea ? null : handleEnterSystem}
             available={canvasAvailable}
             hasOwnFleet={ownFleets.length > 0}
           />
@@ -402,7 +402,7 @@ export function GalaxyView() {
           credits={session.isError ? null : session.corporation?.credits ?? null} scale={servedScale}
           worldTime={worldTime} serverWorldTime={servedWorldTime} />
       </GameViewVitals>}
-          {activeFleet && <FleetLocationPanel fleet={activeFleet} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleetsFailed} onFocus={id => activeFleet.jump ? handleSelectSystemId(id) : handleEnterSystem(id)} onOpen={handleEnterSystem} />}
+          {activeFleet && <FleetLocationPanel fleet={activeFleet} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleetsFailed} onFocus={handleSelectSystemId} />}
           {/* This view mounts no command panel of its own, so the roster
               rows ARE the fleet command surface here — declared explicitly
               (fleet-roster: "The Roster Row Is the Fleet Command Surface
@@ -525,14 +525,12 @@ function StatTile({ label, value }: { label: string; value: number }) {
 function Inspector({
   node,
   connections,
-  onEnter,
   available,
   hasOwnFleet,
   stationQuotes = null,
 }: {
   node: GalaxyNode | null
   connections: number
-  onEnter: ((systemId: string) => void) | null
   // add-renderer-availability-states (tasks.md 3.4): `available` is the
   // graph canvas region's live status; `hasOwnFleet` is whether the
   // requester has at least one own fleet in the roster — a real,
@@ -594,19 +592,6 @@ function Inspector({
           <dd className="font-mono text-white">Class {node.skeleton.starClass}</dd>
         </HudCardShell>
       </dl>
-
-      {/* Drill-in to the tactical board (#0002 Follow-ups 2026-07-11 —
-          un-defers Decision #4). */}
-      {onEnter && (
-        <Button
-          color="cyan"
-          onClick={() => onEnter(node.id)}
-          data-testid="enter-system-button"
-          className="w-full"
-        >
-          Enter system
-        </Button>
-      )}
 
       {/* Major-body skeleton — the free astronomical layer, ALWAYS shown
           (spec Decision #7); never gated by `discovered`. */}

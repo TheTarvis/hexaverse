@@ -369,10 +369,10 @@ describe('GalaxyView', () => {
     renderView()
 
     // No selection → no Enter affordance.
-    expect(screen.queryByTestId('enter-system-button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Enter selected system/ })).not.toBeInTheDocument()
 
     fireEvent.click(await screen.findByTestId('select-sys-0'))
-    fireEvent.click(screen.getByTestId('enter-system-button'))
+    fireEvent.click(screen.getByRole('button', { name: /^Enter selected system/ }))
     expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0')
   })
 
@@ -382,7 +382,7 @@ describe('GalaxyView', () => {
 
     fireEvent.click(await screen.findByTestId('select-sys-0'))
     expect(screen.getByTestId('inspector-name')).toHaveTextContent('Axion')
-    expect(screen.queryByTestId('enter-system-button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Enter selected system/ })).not.toBeInTheDocument()
   })
 
   it('marks the fleet’s system on the graph and targets it as home', async () => {
@@ -489,15 +489,20 @@ describe('GalaxyView', () => {
     await screen.findByTestId('mock-graph')
     fireEvent.click(screen.getByTestId('focus-selected-fleet'))
     expect(focusSpy).toHaveBeenCalledWith('sys-1')
-    fireEvent.click(screen.getByTestId('open-fleet-system'))
+    expect(screen.queryByTestId('open-fleet-system')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Enter selected system/ }))
     expect(pushSpy).toHaveBeenCalledWith('/systems/sys-1')
   })
 
-  it('focuses a local fleet by opening its system directly', () => {
+  it('focuses a local fleet system, then enters only through the shared navigation action', async () => {
     mockGalaxyState()
     mockUseMyFleets.mockReturnValue({ data: [parkedFleet('fleet_focus', 'sys-0')] } as unknown as ReturnType<typeof useMyFleets>)
     renderView()
+    await screen.findByTestId('mock-graph')
     fireEvent.click(screen.getByTestId('focus-selected-fleet'))
+    expect(focusSpy).toHaveBeenCalledWith('sys-0')
+    expect(pushSpy).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /^Enter selected system/ }))
     expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0')
   })
 
@@ -959,7 +964,7 @@ describe('GalaxyView', () => {
       fireEvent.click(screen.getByTestId('fleet-row-fleet_2'))
 
       expect(screen.getByTestId('inspector-name')).toHaveTextContent('Borealis')
-      expect(screen.getByTestId('enter-system-button')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Enter selected system/ })).toBeInTheDocument()
     })
 
     it('surrounding affordances remain usable for a logged-out visitor: counts, region breakdown, and sign-in prompt shown; the roster is not mounted (Scenario: Surrounding galaxy affordances remain usable for a logged-out visitor)', async () => {

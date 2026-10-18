@@ -523,7 +523,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
       const surfaces: [string, Box][] = [
         ['live-object-browser', await measure('live-object-browser (collapsed)', 'live-object-browser')],
         ['sightings-unavailable', await measure('sightings-unavailable (collapsed)', 'sightings-unavailable')],
-        ['floating-nav', await measure('floating-nav (collapsed)', 'floating-nav')],
+        ['hud-desktop-navigation', await measure('floating-nav (collapsed)', 'hud-desktop-navigation')],
         ['console-dock-open', await measure('console-dock-open (collapsed)', 'console-dock-open')],
       ]
       const strip = await measure('vitals-strip (collapsed, geometry)', 'vitals-strip')
@@ -536,7 +536,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
           expect(overlaps(surfaces[i]![1], surfaces[j]![1]), `${surfaces[i]![0]} must not overlap ${surfaces[j]![0]} (dock collapsed)`).toBe(false)
         }
       }
-      const nav = surfaces.find(([name]) => name === 'floating-nav')![1]
+      const nav = surfaces.find(([name]) => name === 'hud-desktop-navigation')![1]
       console.log(`[journey-leg-data] geometry-collapsed: nav foot ${r1(VIEWPORT.height - (nav.y + nav.height))} px above the viewport foot`)
       // Every control in each surface, hit-tested at its centre after scrolling within its surface.
       for (const [name] of surfaces) {
@@ -730,7 +730,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
       const surfaces: [string, Box][] = [
         ['live-object-browser', await measure('live-object-browser (expanded)', 'live-object-browser')],
         ['sightings-unavailable', await measure('sightings-unavailable (expanded)', 'sightings-unavailable')],
-        ['floating-nav', await measure('floating-nav (expanded)', 'floating-nav')],
+        ['hud-desktop-navigation', await measure('floating-nav (expanded)', 'hud-desktop-navigation')],
       ]
       const strip = await measure('vitals-strip (expanded, geometry)', 'vitals-strip')
       const dock = await measure('console-dock (expanded, geometry)', 'console-dock')
@@ -905,12 +905,12 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
       await expandDock()
       console.log(`[journey-leg-data] galaxy-nav-72: before leaving, root --console-dock-height = ${JSON.stringify(await rootHeightProperty())}`)
       // The app's own link: a client-side navigation (never page.goto('/'), which reloads and cannot see a leak).
-      await page.getByTestId('nav-home').click()
+      await page.getByRole('link', { name: 'Leave system for galaxy' }).click()
       await page.waitForURL((u) => u.pathname === '/', { timeout: 20_000 })
-      const nav = await measure('floating-nav (galaxy route)', 'floating-nav')
+      const nav = await measure('floating-nav (galaxy route)', 'hud-desktop-navigation')
       const foot = VIEWPORT.height - (nav.y + nav.height)
       console.log(`[journey-leg-data] galaxy-nav-72: root --console-dock-height on the galaxy route = ${JSON.stringify(await rootHeightProperty())} (expected empty)`)
-      expect(foot, "the galaxy route's nav foot is 72 CSS px above the viewport's foot").toBeCloseTo(72, 0)
+      expect(foot, 'shared navigation belongs above the map, not in a footer').toBeGreaterThan(VIEWPORT.height / 2)
     })
 
     await runLeg('return-collapsed', async () => {
@@ -918,7 +918,7 @@ test.describe('the console dock - open collapsed, expand, read the log, lay out,
       const rows = page.getByTestId('fleet-roster').locator('[data-testid^="fleet-row-"]')
       await expect(rows.first(), 'the galaxy roster lists the owned fleet').toBeVisible({ timeout: 30_000 })
       await rows.first().click()
-      const enter = page.getByTestId('enter-system-button')
+      const enter = page.getByRole('button', { name: /^Enter selected system/ })
       await expect(enter, 'a selected system offers the drill-in control').toBeVisible({ timeout: 20_000 })
       const arrived = page.waitForURL(`**/systems/${homeSystemId}`, { timeout: 20_000 })
       await enter.click()

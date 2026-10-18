@@ -40,9 +40,7 @@ vi.mock('@/components/wake-up-flow', () => ({
   WakeUpFlow: () => <div data-testid="wake-up-flow">Wake</div>,
 }))
 
-vi.mock('@/components/floating-nav', () => ({
-  FloatingNav: () => <div data-testid="floating-nav" />,
-}))
+
 
 import { usePathname } from 'next/navigation'
 import { useAccountContext } from '@/components/account-provider'
@@ -152,7 +150,7 @@ describe('LayoutWrapper', () => {
     )
 
     expect(screen.getByTestId('galaxy-content')).toBeInTheDocument()
-    expect(screen.getByTestId('floating-nav')).toBeInTheDocument()
+    expect(screen.queryByTestId('floating-nav')).not.toBeInTheDocument()
   })
 
   it('renders a protected route full-bleed with floating chrome (no sidebar shell)', () => {
@@ -171,7 +169,7 @@ describe('LayoutWrapper', () => {
     )
 
     expect(screen.getByTestId('content')).toBeInTheDocument()
-    expect(screen.getByTestId('floating-nav')).toBeInTheDocument()
+    expect(screen.queryByTestId('floating-nav')).not.toBeInTheDocument()
   })
 
   it('routes a signed-in but corpless account to the wake-up flow (even on home)', () => {
@@ -475,7 +473,7 @@ describe('LayoutWrapper', () => {
     // The app keeps rendering the last-known corporation — the error state must
     // NOT replace it, because a living corporation is already known.
     expect(screen.getByTestId('content')).toBeInTheDocument()
-    expect(screen.getByTestId('floating-nav')).toBeInTheDocument()
+    expect(screen.queryByTestId('floating-nav')).not.toBeInTheDocument()
     expect(screen.queryByTestId('gate-corp-error')).not.toBeInTheDocument()
     expect(screen.queryByTestId('wake-up-flow')).not.toBeInTheDocument()
   })

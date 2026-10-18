@@ -5,7 +5,6 @@ import { useEffect } from 'react'
 import { useAccountContext } from '@/components/account-provider'
 import { useCorporationContext } from '@/components/corporation-provider'
 import { WakeUpFlow } from '@/components/wake-up-flow'
-import { FloatingNav } from '@/components/floating-nav'
 import { Button } from '@/components/catalyst/button'
 import { Heading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
@@ -108,7 +107,6 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     return (
       <>
         {children}
-        <FloatingNav />
       </>
     )
   }

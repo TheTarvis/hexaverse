@@ -57,34 +57,15 @@ describe('console-dock-layout - task 2.12', () => {
     for (const rel of [
       'components/space/SystemSpaceView.tsx',
       'components/space/SpaceStage.tsx',
-      'components/floating-nav.tsx',
+      'components/hud/SceneNavigationAction.tsx',
     ]) {
       expect(read(rel).includes('bottom-[4.5rem]'), `${rel} still carries bottom-[4.5rem]`).toBe(false)
     }
   })
 
-  it('Scenario: No floating surface is covered by or covers the expanded dock (the camera cluster\'s className expression names CONSOLE_DOCK_LANE_CAMERA, comments stripped)', () => {
+  it('keeps the gesture-only keyboard map without reintroducing a floating camera cluster', () => {
     const src = stripComments(read('components/space/SpaceStage.tsx'))
-    const at = src.indexOf('data-testid="space-camera-controls"')
-    expect(at, 'the camera cluster element is in SpaceStage.tsx').toBeGreaterThan(-1)
-    // the JSX opening tag: back to the nearest `<div`, forward to the first `>` outside braces
-    const start = src.lastIndexOf('<div', at)
-    let depth = 0
-    let end = -1
-    for (let i = at; i < src.length; i++) {
-      const c = src[i]
-      if (c === '{') depth++
-      else if (c === '}') depth--
-      else if (c === '>' && depth === 0 && src[i - 1] !== '=') {
-        end = i
-        break
-      }
-    }
-    expect(start).toBeGreaterThan(-1)
-    expect(end).toBeGreaterThan(at)
-    const tag = src.slice(start, end)
-    const m = /className=(\{[\s\S]*?\}|"[^"]*")/.exec(tag)
-    expect(m, 'the cluster\'s opening tag has a className attribute').not.toBeNull()
-    expect(m![1]).toContain('CONSOLE_DOCK_LANE_CAMERA')
+    expect(src).not.toContain('data-testid="space-camera-controls"')
+    expect(src).toContain('aria-label="System map. Arrow keys rotate;')
   })
 })

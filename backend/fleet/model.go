@@ -65,6 +65,8 @@ type Fleet struct {
 	LastSurveyOutcome string        `json:"lastSurveyOutcome,omitempty" firestore:"lastSurveyOutcome,omitempty"`
 	Survey            *SurveyWindow `json:"survey,omitempty" firestore:"survey,omitempty"`
 	Id                string        `json:"id" firestore:"id"`
+	// Name is optional display metadata. Legacy fleets remain unnamed until explicitly named.
+	Name string `json:"name,omitempty" firestore:"name,omitempty"`
 	// CorporationId is carried from day one (dev-seeded until #0009), so
 	// ownership enforcement in M9 is not a retrofit.
 	CorporationId string `json:"corporationId" firestore:"corporationId"`

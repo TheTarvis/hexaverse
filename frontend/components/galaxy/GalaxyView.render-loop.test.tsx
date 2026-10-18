@@ -244,7 +244,7 @@ describe('GalaxyView + the coarse clock — task 3.4a', () => {
     mockGalaxyState()
     renderView()
     fireEvent.click(await screen.findByTestId('select-sys-0'))
-    fireEvent.click(screen.getByTestId('enter-system-button'))
+    fireEvent.click(screen.getByRole('button', { name: /^Enter selected system/ }))
     expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0')
   })
 

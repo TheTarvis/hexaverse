@@ -117,15 +117,17 @@
 
 
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .workspace:not([data-mobile-open='true']) .recovery { top: calc(8px + env(safe-area-inset-top)); left: auto; right: max(12px, env(safe-area-inset-right)); width: max-content; max-width: calc(100% - 24px); display: block; }
+  .workspace:not([data-mobile-open='true']) .recovery { top: var(--workspace-phone-navigation-top, calc(8px + env(safe-area-inset-top))); left: auto; right: max(12px, env(safe-area-inset-right)); width: max-content; max-width: calc(100% - 24px); display: block; }
 }
 
 /* One shared card owns each panel's chrome and scrolling. */
 .panelCard { flex: 1; width: 100%; min-height: 0; max-height: 100%; }
 .panelCard > [data-slot='hud-body'] > .panelContent { padding: 24px 16px 16px; gap: 16px; overflow: auto; overscroll-behavior: contain; }
 .panelCard [data-hud-framing='section'] { flex: 0 0 auto; max-height: none; }
-.cardNavigation { display: grid; grid-template-columns: repeat(4, 44px); width: max-content; max-width: 100%; box-sizing: border-box; gap: 4px; padding: 4px; margin-inline: auto; border: 1px solid #435d70; border-radius: 8px; background: #09131eee; pointer-events: auto; }
-.cardNavigation button { width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 12px; border-radius: 4px; }
+.cardNavigation { display: grid; grid-template-columns: repeat(4, 44px); grid-auto-flow: column; grid-auto-columns: 44px; width: max-content; max-width: 100%; box-sizing: border-box; gap: 4px; padding: 4px; margin-inline: auto; border: 1px solid #435d70; border-radius: 8px; background: #09131eee; pointer-events: auto; }
+.cardNavigation :is(button, a) { width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 12px; border-radius: 4px; }
+.cardNavigation > a, .launchers > a { color: #b1edff; }
+.cardNavigation > a:focus-visible, .launchers > a:focus-visible { outline: 2px solid #a5e9ff; outline-offset: 2px; }
 .cardNavigation button[aria-pressed='true'] { background: #76e3ef25; box-shadow: inset 0 0 0 1px #76e3ef; color: #e4f8ff; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .workspace[data-mobile-open='true'] .stage { padding: calc(18px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); box-sizing: border-box; }
@@ -136,3 +138,5 @@
   .workspace[data-mobile-open='true'] .settings { padding-top: calc(18px + env(safe-area-inset-top)); }
 
 }
+
+.launchers > a, .launchers > button[aria-label] { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 12px; }

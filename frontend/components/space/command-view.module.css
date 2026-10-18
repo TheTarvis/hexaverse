@@ -216,8 +216,8 @@
 
 /* A paused guide keeps its own row below the direct HUD navigation. */
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .commandView .resumeGuide { top: calc(72px + env(safe-area-inset-top)); }
-  .commandView:has(> .resumeGuide) .guideLayer { top: calc(124px + env(safe-area-inset-top)); }
+  .commandView .resumeGuide { top: calc(var(--game-navigation-bottom, 64px) + 8px + env(safe-area-inset-top)); }
+  .commandView:has(> .resumeGuide) .guideLayer { top: calc(var(--game-navigation-bottom, 64px) + 60px + env(safe-area-inset-top)); }
 }
 
 .workspaceCommand > [data-testid="fleet-roster"] { width: 100%; }

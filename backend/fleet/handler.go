@@ -629,6 +629,7 @@ type fleetDTO struct {
 	Survey        *SurveyWindow   `json:"survey,omitempty"`
 	ActiveScanId  string          `json:"activeScanId,omitempty"`
 	Id            string          `json:"id"`
+	Name          string          `json:"name,omitempty"`
 	CorporationId string          `json:"corporationId"`
 	SystemId      string          `json:"systemId"`
 	State         space.ShipState `json:"state"`
@@ -809,12 +810,15 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 	}
 
 	scanID := ""
+	name := ""
 	if own {
 		scanID = f.ActiveScanId
+		name = f.Name
 	}
 	return fleetDTO{
 		ActiveScanId: scanID, Survey: f.Survey,
 		Id:            f.Id,
+		Name:          name,
 		CorporationId: f.CorporationId,
 		SystemId:      f.SystemId,
 		State:         f.State,

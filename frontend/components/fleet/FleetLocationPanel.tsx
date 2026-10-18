@@ -1,5 +1,6 @@
 'use client'
 
+import { fleetLabel } from '@/lib/fleet-label'
 import { Button } from '@/components/catalyst/button'
 import { HudCardShell } from '@/components/hud/HudCardShell'
 import { HudHeading, HudText } from '@/components/hud/HudTypography'
@@ -15,14 +16,14 @@ export function FleetLocationPanel({ fleet, names, worldTime, scale, failed = fa
   scale: number | undefined
   failed?: boolean
   onFocus?: (systemId: string) => void
-  onOpen: (systemId: string) => void
+  onOpen?: (systemId: string) => void
 }) {
   const status = rosterRowStatus(fleet, worldTime, id => names[id] ?? id)
   const jump = fleet.jump
   const target = jump?.destSystemId ?? fleet.systemId
   const progress = jump ? Math.min(100, Math.max(0, (worldTime - jump.departMs) / Math.max(1, jump.arriveMs - jump.departMs) * 100)) : null
   return <HudCardShell title="Selected fleet" lighting="none" data-testid="fleet-location-panel" className="w-full">
-    <HudHeading variant="section" level={3}>Selected fleet · {fleet.roster?.ships.length ?? '—'} ships</HudHeading>
+    <HudHeading variant="section" level={3}>{fleetLabel(fleet)} · {fleet.roster?.ships.length ?? '—'} ships</HudHeading>
     {failed ? <p role="status">Fleet telemetry unavailable. Waiting for a fresh report.</p> : <>
       <HudText>{status.where}</HudText>
       <HudText variant="secondary">{status.activity}</HudText>
@@ -32,7 +33,7 @@ export function FleetLocationPanel({ fleet, names, worldTime, scale, failed = fa
       </>}
       <div className="flex flex-wrap gap-2">
         {onFocus && <Button plain className="!text-cyan-200" data-testid="focus-selected-fleet" onClick={() => onFocus(target)}>{jump ? 'Focus destination' : 'Focus fleet'}</Button>}
-        <Button color="cyan" data-testid="open-fleet-system" onClick={() => onOpen(target)}>{jump ? 'View destination' : 'Open fleet system'}</Button>
+        {onOpen && <Button color="cyan" data-testid="open-fleet-system" onClick={() => onOpen(target)}>{jump ? 'View destination' : 'Open fleet system'}</Button>}
       </div>
     </>}
   </HudCardShell>

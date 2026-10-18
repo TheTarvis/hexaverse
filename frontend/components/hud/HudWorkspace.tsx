@@ -13,7 +13,7 @@ export type HudPanelId = 'objects' | 'command' | 'console'
 type Lane = 'left' | 'right' | 'bottom'
 type Layout = { id: HudPanelId; lane: Lane; visible: boolean }[]
 export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode }
-export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; onPanelActivate?: (id: HudPanelId) => void; corporationId: string; panels: HudWorkspacePanel[]; className?: string; request?: { id: HudPanelId; sequence: number }; settingsContent?: ReactNode }
+export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; onPanelActivate?: (id: HudPanelId) => void; corporationId: string; panels: HudWorkspacePanel[]; className?: string; request?: { id: HudPanelId; sequence: number }; settingsContent?: ReactNode; navigationAction?: ReactNode }
 const defaults: Layout = [
   { id: 'objects', lane: 'left', visible: true },
   { id: 'command', lane: 'right', visible: true },
@@ -42,7 +42,7 @@ export function HudWorkspace(props: HudWorkspaceProps) {
   return <Workspace key={props.corporationId} {...props} />
 }
 
-function Workspace({ corporationId, panels, className, request, onPanelDismiss, onPanelActivate, settingsContent }: HudWorkspaceProps) {
+function Workspace({ corporationId, panels, className, request, onPanelDismiss, onPanelActivate, settingsContent, navigationAction }: HudWorkspaceProps) {
   const phone = usePhoneHud()
   const workspaceRef = useRef<HTMLDivElement>(null)
   const storageKey = `hexaverse:hud-layout:v1:${corporationId}`
@@ -162,6 +162,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
             onPanelActivate?.(entry.id)
           }}><HudIcon icon={icons[entry.id]} /></Button>
       })}
+      {navigationAction}
       <Button plain disabled={!ready} ref={floating && returnTo === 'arrange' ? recoveryRef : undefined}
         data-workspace-tab="arrange" aria-label="Arrange HUD" title="Arrange HUD" aria-controls={settingsId}
         aria-pressed={selected === 'arrange'} onClick={() => { if (floating) setReturnTo('arrange'); setSettings(true) }}>
@@ -185,12 +186,13 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
     <div className={styles.recovery} hidden={phone && sheetOpen} inert={phone && sheetOpen}>
       {phone ? navigation(null, true) : <>
       <Button plain className={styles.arrangeControl} ref={recoveryRef} aria-expanded={settings} aria-controls={settingsId} onClick={() => { setSettings(value => !value) }}>Arrange HUD</Button>
-      <div className={styles.launchers} aria-label="HUD panels">
+      <nav className={styles.launchers} aria-label="HUD panels" data-testid="hud-desktop-navigation">
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
           return <Button key={item.id} plain disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id); if (!item.visible || activeId !== item.id) onPanelActivate?.(item.id) }}>{panel.label}{!item.visible ? ' (hidden)' : ''}</Button>
         })}
-      </div>
+        {navigationAction}
+      </nav>
       </>}
     </div>
     {settings && <div ref={settingsRef} id={settingsId} className={styles.settings}>

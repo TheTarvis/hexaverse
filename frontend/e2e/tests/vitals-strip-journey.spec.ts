@@ -486,12 +486,12 @@ test.describe('the vitals strip — dock, switch, burn, and never overflow the v
     const objectBrowser = await box(page, 'live-object-browser')
     await expect(page.getByTestId('space-camera-controls')).toHaveCount(0)
     const sightingsBox = await box(page, 'sightings-unavailable')
-    const floatingNav = await box(page, 'floating-nav')
+    const floatingNav = await box(page, 'hud-desktop-navigation')
 
     const floatingSurfaces: [string, Box][] = [
       ['live-object-browser', objectBrowser],
       ['sightings-unavailable', sightingsBox],
-      ['floating-nav', floatingNav],
+      ['hud-desktop-navigation', floatingNav],
     ]
 
     // Scenario: No other floating surface covers a strip cell — "every such

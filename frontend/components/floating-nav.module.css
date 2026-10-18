@@ -1,6 +1,0 @@
-.navigation { width: max-content; pointer-events: none; }
-.navigation > a { min-height: 44px; pointer-events: auto; background: #08121df2; color: #b1edff; }
-@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .navigation { left: max(12px, env(safe-area-inset-left)); right: auto; width: max-content; max-width: calc(100% - 24px); bottom: calc(12px + env(safe-area-inset-bottom) + var(--system-viewport-bottom, 0px)); }
-  :global(body:has([data-phone-sheet='true'])) .navigation { visibility: hidden; pointer-events: none; }
-}

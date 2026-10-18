@@ -1,5 +1,6 @@
 'use client'
 
+import { fleetLabel } from '@/lib/fleet-label'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/catalyst/button'
 import { Select } from '@/components/catalyst/select'
@@ -46,10 +47,10 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
   return <HudCardShell title={mode === 'review' ? 'Travel review' : 'Command fleet'} onClose={onClose} closeLabel="Close travel card" className={styles.card}>
     <div className={styles.content} data-testid="compact-travel-card">
       {mode === 'review' ? <>
-        {onChooseFleet ? <div><HudText>Command fleet · {fleet ? `Fleet ${fleet.id.slice(-8)}` : 'Choose a fleet'}</HudText><Button outline onClick={onChooseFleet} disabled={pending}>Choose command fleet</Button></div> : <label className={styles.picker}>Command fleet
+        {onChooseFleet ? <div><HudText>Command fleet · {fleet ? fleetLabel(fleet) : 'Choose a fleet'}</HudText><Button outline onClick={onChooseFleet} disabled={pending}>Choose command fleet</Button></div> : <label className={styles.picker}>Command fleet
           <Select aria-label="Travel command fleet" value={fleet?.id ?? ''} disabled={pending} onChange={event => onFleet(event.target.value)}>
             {!fleet && <option value="">Choose a fleet</option>}
-            {fleets.map(item => <option key={item.id} value={item.id} disabled={!!item.jump || item.systemId !== systemId}>Fleet {item.id.slice(-6)}{item.jump ? ' · In transit' : item.systemId !== systemId ? ' · Other system' : ''}</option>)}
+            {fleets.map(item => <option key={item.id} value={item.id} disabled={!!item.jump || item.systemId !== systemId}>{fleetLabel(item)}{item.jump ? ' · In transit' : item.systemId !== systemId ? ' · Other system' : ''}</option>)}
           </Select>
         </label>}
         <HudHeading size="compact">{destination}</HudHeading>
@@ -70,7 +71,7 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
         </div>
         {!quote && <Button plain disabled={pending} onClick={onRetry}>Retry estimate</Button>}
       </> : <>
-        <HudHeading size="compact">{fleet ? `Fleet ${fleet.id.slice(-6)}` : 'Fleet unavailable'}</HudHeading>
+        <HudHeading size="compact">{fleet ? fleetLabel(fleet) : 'Fleet unavailable'}</HudHeading>
         <HudText>{fleet?.jump ? 'In inter-system transit' : traveling ? 'Travelling' : fleet?.state?.Mode === 2 ? 'Drifting' : 'Ready'} · {destination}</HudText>
         {burn && <><progress aria-label="Travel progress" value={progress} max={100} className={styles.progress} /><HudText>{Math.floor(progress)}% · {traveling ? duration(burn.ArriveMs - worldTime) : 'Arrived'}</HudText></>}
         {notice && <p role="status">{notice}</p>}

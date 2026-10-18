@@ -726,3 +726,26 @@ Original 624c4ff card chrome, fullscreen phone ownership, direct icons, mounted
 browsing/drafts, layout isolation, 16px fields and released iOS viewport behavior are
 preserved. [Evidence](../.scratch/footer-cleanup/README.md) records scoped checks,
 synthetic browser validation and deployment; native iPhone acceptance is separate.
+
+## Fleet names and grouped scene navigation — 2026-10-18
+
+Travis requests returned fleet names and enter/leave icons beside the existing HUD
+controls. The fleet model/owner response now has an optional `name` field. HUD
+labels prefer that served value; absent/blank legacy names retain an explicit ID
+fallback. This introduces no generated names, live renames, name-writing API or
+backfill. The [fleet domain](domains/ships-and-fleets.md) owns that boundary.
+
+The System workspace includes a labeled leave-to-galaxy icon; Galaxy includes a
+labeled enter icon only for an authenticated, disclosed selected system. The shared
+navigation is used both on the map and in the active phone card. Existing outline
+icons and 44px targets are reused. Phone identity and navigation occupy separate
+rows so five controls fit at320px without reducing targets. Paused-guide rows follow
+that navigation budget. Desktop uses the same action beside its existing launchers.
+The old footer component/spacing and inspector's separate Enter button are removed.
+Galaxy fleet focus stays a focus operation; the shared enter icon performs generic
+system entry. System's remote-command-fleet location action remains contextual.
+
+Original624c4ff card title/close, safe areas, single phone-sheet isolation,16px
+fields, unrestricted zoom, mounted drafts and command/inspection independence remain.
+[Evidence](../.scratch/scene-navigation/README.md) records checks, service refresh and
+protected deployment separately from physical-iPhone/full-emulator acceptance.

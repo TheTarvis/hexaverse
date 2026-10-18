@@ -30,6 +30,7 @@
 // because both views already run one and the roster must tick in step with
 // the picture.
 
+import { fleetLabel } from '@/lib/fleet-label'
 import { HudPanel } from '@/components/hud/GameHud'
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -187,7 +188,7 @@ export function FleetRoster({
                   title={f.id}
                   className={`flex min-h-16 w-full flex-col gap-1 rounded p-3 text-left ${active ? 'bg-cyan-400/10 text-white ring-1 ring-cyan-400/30' : ''}`}
                 >
-                  <span className="flex flex-wrap items-center justify-between gap-2 text-sm text-white"><strong>Fleet {f.id.slice(-8)}</strong>{active && <span className="text-xs text-cyan-200">Selected command fleet</span>}</span>
+                  <span className="flex flex-wrap items-center justify-between gap-2 text-sm text-white"><strong>{fleetLabel(f)}</strong>{active && <span className="text-xs text-cyan-200">Selected command fleet</span>}</span>
                   <span className="flex items-center gap-2">
                     <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[status.tone]}`} />
                     <span className="truncate text-sm text-white">{status.where}</span>

@@ -37,6 +37,15 @@ describe('fleetService', () => {
   // now returns the WHOLE envelope — `{ fleets, worldTime, scale }` — not
   // just the fleets array, so `GalaxyView`'s clock can anchor on the
   // envelope's served scale instead of dropping it.
+  it('preserves optional API names in list and detail responses while accepting legacy fleets', async () => {
+    const named = { ...fleet, name: 'Peregrine' }
+    mockGet.mockResolvedValueOnce(ok({ fleets: [named, fleet], worldTime: 1, scale: 1 }))
+    expect((await fleetService.listMine()).fleets).toEqual([named, fleet])
+    mockGet.mockResolvedValueOnce(ok(named))
+    expect((await fleetService.get(named.id)).name).toBe('Peregrine')
+    expect(fleet).not.toHaveProperty('name')
+  })
+
   it('lists the requester’s own fleets via GET /v1/fleets?mine=true, exposing the envelope\'s scale', async () => {
     const list: FleetList = { fleets: [fleet], worldTime: 123456, scale: 60 }
     mockGet.mockResolvedValue(ok(list))

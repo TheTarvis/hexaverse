@@ -36,7 +36,14 @@ system/lane location, derived activity/countdown, and navigation to the fleet.
 Foreign fleets are not an ownership roster. [FleetRoster](../../frontend/components/fleet/FleetRoster.tsx)
 now conditionally owns commands when its mounting view has no command owner;
 otherwise the view owns them. The old #0011 “navigation only” restriction is
-superseded. Fleet naming/alerts from old wishlists remain future questions.
+superseded. Fleet records now support optional owner-facing `name` metadata, returned by the
+fleet DTO on owner reads and omitted for foreign readers. The current model had no
+name field before this read-contract change; this does not establish that every
+live fleet has a stored name. Command and related own-fleet HUD text prefer the
+served name, with an explicit legacy-ID fallback when it is missing or blank.
+No names are generated, no live fleets are renamed, and no migration/backfill or
+name-writing endpoint is introduced. Assignment/renaming policy and alerts remain
+future questions. Commands, selection and query identity continue to use fleet IDs.
 
 ## Open questions
 

@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { HudRoot, HudHeading } from '@/components/hud/GameHud'
 import { HudWorkspace } from '@/components/hud/HudWorkspace'
 import { HudCardShell } from '@/components/hud/HudCardShell'
-import { FloatingNavFrame } from '@/components/floating-nav'
+import { SceneNavigationAction } from '@/components/hud/SceneNavigationAction'
 import { SystemViewport } from './SystemViewport'
 import { Button } from '@/components/catalyst/button'
 import { RecoveryTransmission } from './RecoveryTransmission'
@@ -56,7 +56,7 @@ export function MobileSystemHud({ gameplay = false, interactiveMap = false, disa
     {guide.phase !== 'dismissed' && !guidePageVisible && <Button plain className={styles.resumeGuide} onClick={() => setGuidePageVisible(true)}>Resume guide</Button>}
     {guide.phase !== 'dismissed' && guidePageVisible && <div className={styles.guideLayer}><RecoveryTransmission guide={guide} fleet={fleet} bodies={[]} interiorFailed={false} actionFailed={false} onRetryAction={() => {}} onSave={setGuide} onTarget={() => open('objects')} onObjects={() => open('objects')} onScan={() => open('console')} />
       <aside className={styles.objectiveCard} aria-label="Current objective"><span className={styles.signal}>CURRENT OBJECTIVE</span><p>Complete tutorial · 0/1</p></aside></div>}
-    <HudWorkspace className={styles.workspace} corporationId={gameplay ? "isolated-mobile-gameplay-fixture" : "isolated-mobile-responsive-fixture"} request={request} panels={[
+    <HudWorkspace navigationAction={<SceneNavigationAction destination="galaxy" />} className={styles.workspace} corporationId={gameplay ? "isolated-mobile-gameplay-fixture" : "isolated-mobile-responsive-fixture"} request={request} panels={[
       { id: 'objects', label: 'Objects', children: <HudCardShell title="Known objects" lighting="none"><input aria-label="Find objects" placeholder="Find objects" /><p>Station · feat-station</p><Button outline onClick={() => open('console')}>Open sensors</Button></HudCardShell> },
       { id: 'command', label: 'Command', children: gameplay ? <>
         {travelMode ? <CompactTravelCard mode={travelMode} fleet={acting} fleets={owned} systemId="serais" destination="Trading station · feat-station" quote={quote} worldTime={worldTime} scale={1} blocker={quote.affordable ? null : 'Insufficient fuel for this trip.'} onFleet={setActingId} onStart={startTravel} onStop={stopTravel} onBack={() => { setTravelMode(null); open('objects') }} onClose={() => setTravelMode(null)} onRetry={() => {}} /> : <HudCardShell title="Fixture travel" lighting="none"><p>In-memory state only. No live commands.</p><Button outline onClick={() => setTravelMode('review')}>Review course</Button><Button outline onClick={() => setTravelMode('status')}>Fleet status</Button></HudCardShell>}
@@ -65,7 +65,7 @@ export function MobileSystemHud({ gameplay = false, interactiveMap = false, disa
       { id: 'console', label: 'Console', children: <HudCardShell title="Ship console" lighting="none"><label>Console draft<input aria-label="Console draft" /></label><p>Scan telemetry available. Map selections: {canvasTaps}</p>{gameplay && <Button outline onClick={arrive}>Fixture: settle station arrival</Button>}</HudCardShell> },
     ]} />
     <div className={styles.workspaceVitals}><VitalsStrip acting={gameplay ? acting : fleet} ownedFleets={gameplay ? owned : [fleet]} fleetsFailed={false} status={gameplay ? rosterRowStatus(acting, worldTime, id => id === 'serais' ? 'Serais' : id) : { where: 'Serais', activity: 'Docked', tone: 'idle', activityKind: 'docked', hostLabel: 'station feat-station-with-a-long-disclosed-name' }} onSelectFleet={gameplay ? selected => setActingId(selected.id) : () => {}} systemNames={{ serais: 'Serais' }} credits={1000} scale={1} worldTime={worldTime} serverWorldTime={worldTime} /></div>
-  </Root><FloatingNavFrame onGalaxy={false} /></>
+  </Root></>
 }
 const meta = { title: 'HUD/Mobile System', component: MobileSystemHud, parameters: { layout: 'fullscreen', docs: { description: { component: 'Identity-free regression fixture using live HUD, recovery guide, navigation and vitals components. No Auth, API or game mutations. Map button counts local selections.' } } } } satisfies Meta<typeof MobileSystemHud>
 export default meta
