@@ -159,9 +159,15 @@ describe('SpaceStage — annotation placement', () => {
     fireEvent.keyDown(screen.getByTestId('space-canvas-region'), { key: 'ArrowRight' })
     await waitFor(() => expect(label.style.transform).not.toBe(before))
     const hit = screen.getByTestId('body-hit-feat-body-0')
+    // Shared controls own touch through Pointer Events. jsdom does not derive
+    // that stream from synthetic TouchEvents; release on the capture owner.
+    fireEvent.pointerDown(hit, { pointerId: 1, pointerType: 'touch', clientX: 300, clientY: 300, button: 0 })
+    fireEvent.pointerUp(screen.getByTestId('space-canvas-region'), { pointerId: 1, pointerType: 'touch', clientX: 300, clientY: 300, button: 0 })
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'feat-body-0' })
+    // A compatibility touch stream must not duplicate the owned pointer tap.
     fireEvent.touchStart(hit, { touches: [{ identifier: 1, clientX: 300, clientY: 300 }] })
     fireEvent.touchEnd(hit, { touches: [], changedTouches: [{ identifier: 1, clientX: 300, clientY: 300 }] })
-    expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-0' })
+    expect(onSelect).toHaveBeenCalledTimes(1)
     onSelect.mockClear()
     hit.focus()
     await userEvent.keyboard('{Enter}')
