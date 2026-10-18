@@ -520,91 +520,51 @@ it('has no mobile camera buttons or hidden rotate state', async () => {
   try {
     await stage()
     for (const id of ['space-camera-controls', 'space-pan-controls', 'camera-touch-rotate', 'select-pan-target-point']) expect(screen.queryByTestId(id)).not.toBeInTheDocument()
-    expect(screen.getByTestId('touch-camera-hint')).toHaveTextContent('One finger pans. Pinch zooms. Two fingers moving together rotate')
+    expect(screen.getByTestId('touch-camera-hint')).toHaveTextContent('One finger orbits. Two fingers pan and pinch zooms.')
   } finally { window.matchMedia = previousMedia }
 })
 
-describe('SpaceStage — native touch input without a pointer stream', () => {
-  const point = (identifier: number, clientX: number, clientY: number) => ({ identifier, clientX, clientY })
-  const start = (target: Element, points = [point(1, 300, 300)]) => fireEvent.touchStart(target, { touches: points })
-  const move = (target: Element, points: ReturnType<typeof point>[]) => fireEvent.touchMove(target, { touches: points })
-  const end = (target: Element, changed = point(1, 300, 300), remaining: ReturnType<typeof point>[] = []) => fireEvent.touchEnd(target, { touches: remaining, changedTouches: [changed] })
-  it('pans with native touch moves even when touch pointer events are absent or cancelled', async () => {
-    await stage(); const before = JSON.parse(region().getAttribute('data-camera')!)
-    start(region(), [point(1,400,400)]); move(region(), [point(1,440,420)])
-    const partial = JSON.parse(region().getAttribute('data-camera')!)
-    fireEvent.pointerCancel(region(), {pointerType:'touch',pointerId:1})
-    move(region(), [point(1,470,430)]); end(region(),point(1,470,430))
-    const after = JSON.parse(region().getAttribute('data-camera')!)
-    expect(partial.target).not.toEqual(before.target); expect(after.target).not.toEqual(partial.target)
-    expect(after.yaw).toBe(before.yaw); expect(after.distance).toBe(before.distance); expect(onSelect).not.toHaveBeenCalled()
+describe('SpaceStage — shared Galaxy touch controls', () => {
+  const touch = (type: 'pointerDown' | 'pointerMove' | 'pointerUp' | 'pointerCancel', target: Element, x: number, y: number, id = 1) => fireEvent[type](target, { clientX: x, clientY: y, pointerId: id, pointerType: 'touch', button: 0, isPrimary: id === 1 })
+  const read = () => JSON.parse(region().getAttribute('data-camera')!)
+  it('one finger orbits without selecting, including after phone layout changes', async () => {
+    await stage(); const before = read()
+    touch('pointerDown', region(), 300, 300); touch('pointerMove', region(), 360, 330); touch('pointerUp', region(), 360, 330)
+    expect(read().yaw).not.toBe(before.yaw); expect(read().target).toEqual(before.target); expect(onSelect).not.toHaveBeenCalled()
   })
-  it('selects a body once after a native touch with jitter, ignoring a duplicate touch pointer stream', async () => {
-    await stage();const hit=screen.getByTestId('body-hit-feat-body-0')
-    fireEvent.pointerDown(hit,{pointerType:'touch',pointerId:1,clientX:300,clientY:300,button:0})
-    start(hit);move(hit,[point(1,302,301)])
-    fireEvent.pointerUp(hit,{pointerType:'touch',pointerId:1,clientX:302,clientY:301,button:0})
-    end(hit,point(1,302,301));expect(onSelect).toHaveBeenCalledExactlyOnceWith({bodyId:'feat-body-0'})
+  it('two fingers pan and pinch without changing orbit or selecting on release', async () => {
+    await stage(); const before = read()
+    touch('pointerDown', region(), 200, 400); touch('pointerDown', region(), 300, 400, 2)
+    touch('pointerMove', region(), 230, 420); touch('pointerMove', region(), 330, 420, 2)
+    expect(read().target).not.toEqual(before.target); expect(read().yaw).toBeCloseTo(before.yaw); expect(read().pitch).toBeCloseTo(before.pitch)
+    touch('pointerMove', region(), 410, 420, 2); expect(read().distance).toBeLessThan(before.distance)
+    touch('pointerUp', region(), 410, 420, 2); touch('pointerUp', region(), 230, 420); expect(onSelect).not.toHaveBeenCalled()
   })
-  it('does not select on a fast drag release beyond the threshold', async () => {
-    await stage();const hit=screen.getByTestId('body-hit-feat-body-0');start(hit);end(hit,point(1,340,300));expect(onSelect).not.toHaveBeenCalled()
+  it('touch cancellation cannot select and the next independent tap selects once', async () => {
+    await stage(); const hit = screen.getByTestId('body-hit-feat-body-0')
+    touch('pointerDown', hit, 300, 300); touch('pointerCancel', region(), 300, 300); touch('pointerUp', region(), 300, 300); expect(onSelect).not.toHaveBeenCalled()
+    touch('pointerDown', hit, 300, 300); touch('pointerUp', region(), 300, 300); expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'feat-body-0' })
   })
-  it('pinches from native TouchLists and never selects on staggered finger release', async () => {
-    await stage();const before=JSON.parse(region().getAttribute('data-camera')!)
-    start(region(),[point(1,200,400)]);start(region(),[point(1,200,400),point(2,300,400)])
-    move(region(),[point(1,200,400),point(2,380,400)])
-    expect(JSON.parse(region().getAttribute('data-camera')!).distance).toBeLessThan(before.distance)
-    end(region(),point(2,380,400),[point(1,200,400)]);move(region(),[point(1,210,410)]);end(region(),point(1,210,410));expect(onSelect).not.toHaveBeenCalled()
-  })
-  it('orbits selected objects with parallel fingers, separates stationary-finger pinch, and keeps transition frames unchanged', async () => {
-    await stage({ selection: { bodyId: 'feat-body-0' } })
-    const read = () => JSON.parse(region().getAttribute('data-camera')!)
-    const before = read()
-    start(region(), [point(1,200,400)])
-    move(region(), [point(1,225,410)])
-    const panned = read()
-    start(region(), [point(1,225,410),point(2,325,410)])
-    expect(read()).toEqual(panned)
-    move(region(), [point(1,255,430),point(2,355,430)])
-    const rotated = read()
-    expect(rotated.yaw).not.toBe(panned.yaw)
-    expect(rotated.pitch).not.toBe(panned.pitch)
-    expect(rotated.distance).toBe(before.distance)
-    expect(rotated.target).not.toEqual(panned.target)
-    move(region(), [point(1,255,430),point(2,395,430)])
-    const zoomed = read()
-    expect(zoomed.distance).toBeLessThan(rotated.distance)
-    expect(zoomed.yaw).toBe(rotated.yaw)
-    expect(zoomed.pitch).toBe(rotated.pitch)
-    end(region(),point(2,395,430),[point(1,255,430)])
-    move(region(),[point(1,270,440)])
-    expect(read()).toEqual(zoomed)
-    end(region(),point(1,270,440))
-    expect(onSelect).not.toHaveBeenCalled()
-    start(region(),[point(1,300,400),point(2,400,400)])
-    fireEvent.touchCancel(region(),{touches:[]})
-    start(region(),[point(1,300,400)])
-    move(region(),[point(1,330,400)])
-    expect(read().yaw).toBe(zoomed.yaw)
-    expect(read().target).not.toEqual(zoomed.target)
-  })
-  it('always pans with one finger after phone layout changes, with no hidden rotate state', async () => {
-    const previousMedia = window.matchMedia
-    window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  it('uses input timestamps for double-tap focus even when handlers run late', async () => {
+    await stage(); const hit = screen.getByTestId('body-hit-feat-body-0')
+    const release = (at: number) => {
+      const event = new PointerEvent('pointerup', { bubbles: true, pointerId: 1, pointerType: 'touch', clientX: 300, clientY: 300 })
+      Object.defineProperty(event, 'timeStamp', { value: at }); fireEvent(region(), event)
+    }
+    touch('pointerDown', hit, 300, 300); release(100)
+    const processing = vi.spyOn(performance, 'now').mockReturnValue(10000)
     try {
-      await stage()
-      const read = () => JSON.parse(region().getAttribute('data-camera')!)
-      const before = read()
-      start(region()); move(region(),[point(1,340,320)]); end(region(),point(1,340,320))
-      expect(read().yaw).toBe(before.yaw)
-      expect(read().pitch).toBe(before.pitch)
-      expect(read().target).not.toEqual(before.target)
-      expect(read().distance).toBe(before.distance)
-      expect(onSelect).not.toHaveBeenCalled()
-    } finally { window.matchMedia = previousMedia }
+      touch('pointerDown', hit, 300, 300); release(200)
+      expect(read().target).toEqual(marks[1].position)
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'feat-body-0' })
+    } finally { processing.mockRestore() }
   })
-  it('cancels native touch cleanly and accepts the next independent tap', async () => {
-    await stage();const hit=screen.getByTestId('body-hit-feat-body-0');start(hit);fireEvent.touchCancel(hit,{touches:[]});end(hit);expect(onSelect).not.toHaveBeenCalled();start(hit);end(hit);expect(onSelect).toHaveBeenCalledExactlyOnceWith({bodyId:'feat-body-0'})
+  it('double-tap focuses the selected object without choosing a different command fleet', async () => {
+    await stage(); const hit = screen.getByTestId('body-hit-feat-body-0')
+    touch('pointerDown', hit, 300, 300); touch('pointerUp', region(), 300, 300)
+    const before = read(); touch('pointerDown', hit, 300, 300); touch('pointerUp', region(), 300, 300)
+    expect(read().target).toEqual(marks[1].position); expect(read().distance).toBeCloseTo(before.distance); expect(read().yaw).toBeCloseTo(before.yaw)
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'feat-body-0' })
   })
 })
 

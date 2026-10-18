@@ -1,22 +1,5 @@
-// The space view's PURE camera model — no React, no DOM (openspec change
-// `build-production-space-view`, `system-space-view`: *Space View Camera
-// Orbit, Pan, and Zoom*, *...Touch Pinch-Zoom*, *...Is Keyboard-Operable*,
-// *...Manual Recenter*). Every gesture is `(camera, input) -> camera`, so
-// the whole camera is testable without a canvas, exactly as
-// `components/board/board-camera.ts` was for the board view this replaces.
-//
-// IT LIVES HERE, NOT IN `lib/space/`. That directory admits only pure draw
-// math and its name guard polices it (tasks.md 1.4/1.5); a camera is view
-// state, not draw math.
-//
-// EVERY DISTANCE IS A MULTIPLE OF THE SERVED CONTINUOUS `extent`. The
-// default framing, the zoom clamps, the pan bound, the keyboard pan step
-// and the maximum pick radius are each ONE configured multiplier applied to
-// the interior read's own `extent` — never an absolute scene constant, and
-// never the retired board `radius`, whose producer is gone
-// (`system-space-view`: *The framing scales with the system's served
-// extent*). Their VALUES are design.md OQ-2, open for playtesting; their
-// SHAPE is the requirement.
+// System framing, legal bounds and selection threshold. All camera input lives
+// in the shared map-camera-rig; this module contains no gesture implementation.
 
 export interface SpaceCamera {
   /** Live fleet pivot, resolved by the transform loop. */
@@ -56,17 +39,8 @@ export const PITCH_MAX = 1.45
 export const DEFAULT_YAW = 0.6
 export const DEFAULT_PITCH = 0.72
 
-/** Radians of orbit per arrow-key press. */
-export const KEY_ORBIT_STEP = 0.05
-/** Fraction of the system's extent translated per pan-key press. */
+/** Extent-scaled step used only to predict directional limit announcements. */
 export const KEY_PAN_STEP_MULT = 0.05
-/** Multiplicative distance change per zoom-key press. */
-export const KEY_ZOOM_FACTOR = 0.9
-
-/** Radians of orbit per CSS pixel of primary drag. */
-const ORBIT_RADIANS_PER_PX = 0.006
-/** Distance change per wheel notch, as an exponential rate. */
-const WHEEL_ZOOM_RATE = 0.0015
 
 const TWO_PI = Math.PI * 2
 
@@ -166,42 +140,6 @@ function clampTarget(
   return slid
 }
 
-// --- orbit ---------------------------------------------------------------
-
-function orbitBy(camera: SpaceCamera, dYaw: number, dPitch: number): SpaceCamera {
-  return {
-    ...camera,
-    yaw: wrapAngle(camera.yaw + dYaw),
-    pitch: clampNumber(camera.pitch + dPitch, PITCH_MIN, PITCH_MAX),
-  }
-}
-
-/** Rotate the entire view about a selected pivot, preserving its screen position.
- * Changing pivots never recenters or changes distance; zero input is identity. */
-function orbitAround(camera: SpaceCamera, next: SpaceCamera, pivot?: SpaceCamera['target']): SpaceCamera {
-  if (!pivot || (next.yaw === camera.yaw && next.pitch === camera.pitch)) return next
-  const basis = (view: SpaceCamera) => {
-    const right = rightVector(view), up = screenUpVector(view)
-    return [right, up, { x: right.y * up.z - right.z * up.y, y: right.z * up.x - right.x * up.z, z: right.x * up.y - right.y * up.x }]
-  }
-  const offset = { x: camera.target.x - pivot.x, y: camera.target.y - pivot.y, z: camera.target.z - pivot.z }
-  const coordinates = basis(camera).map(axis => axis.x * offset.x + axis.y * offset.y + axis.z * offset.z)
-  const rotated = basis(next)
-  return { ...next, followFleetId: undefined, target: {
-    x: pivot.x + rotated.reduce((sum, axis, index) => sum + axis.x * coordinates[index], 0),
-    y: pivot.y + rotated.reduce((sum, axis, index) => sum + axis.y * coordinates[index], 0),
-    z: pivot.z + rotated.reduce((sum, axis, index) => sum + axis.z * coordinates[index], 0),
-  } }
-}
-
-export function orbitByPixels(camera: SpaceCamera, dx: number, dy: number, pivot?: SpaceCamera['target']): SpaceCamera {
-  return orbitAround(camera, orbitBy(camera, dx * ORBIT_RADIANS_PER_PX, dy * ORBIT_RADIANS_PER_PX), pivot)
-}
-
-export function orbitBySteps(camera: SpaceCamera, stepsX: number, stepsY: number, pivot?: SpaceCamera['target']): SpaceCamera {
-  return orbitAround(camera, orbitBy(camera, stepsX * KEY_ORBIT_STEP, stepsY * KEY_ORBIT_STEP), pivot)
-}
-
 /** Which pitch clamp the camera is resting on, or null. */
 export function atOrbitLimit(camera: SpaceCamera): 'min' | 'max' | null {
   if (camera.pitch <= PITCH_MIN + 1e-12) return 'min'
@@ -222,20 +160,6 @@ function panBy(camera: SpaceCamera, alongRight: number, alongUp: number, bound: 
   return { ...camera, followFleetId: undefined, target: clampTarget(camera.target, next, bound) }
 }
 
-export function panByPixels(
-  camera: SpaceCamera,
-  dx: number,
-  dy: number,
-  viewportPx: { width: number; height: number },
-  extent?: number,
-): SpaceCamera {
-  // World units per pixel at the pan target's depth. Dragging moves the
-  // scene with the pointer, so the target travels the other way.
-  const perPixel = camera.distance / Math.max(1, viewportPx.height)
-  const bound = panBound(extent ?? camera.distance / DEFAULT_DISTANCE_MULT)
-  return panBy(camera, -dx * perPixel, dy * perPixel, bound)
-}
-
 export function panBySteps(
   camera: SpaceCamera,
   stepsRight: number,
@@ -248,38 +172,6 @@ export function panBySteps(
 
 export function atPanLimit(camera: SpaceCamera, extent: number): boolean {
   return radius(camera.target) >= panBound(extent) * (1 - 1e-9)
-}
-
-// --- zoom ----------------------------------------------------------------
-
-// Zoom DOLLIES along the view direction toward the pan target: the target
-// is unchanged in world space and the viewing angle is unchanged, so the
-// centred point cannot move on screen — which is what both the wheel and
-// the pinch requirements demand, and why neither anchors under the cursor
-// or on the pinch midpoint.
-function zoomTo(camera: SpaceCamera, distance: number, extent: number): SpaceCamera {
-  const { min, max } = zoomRange(extent)
-  return { ...camera, distance: clampNumber(distance, min, max) }
-}
-
-export function zoomByWheel(camera: SpaceCamera, deltaY: number, extent: number): SpaceCamera {
-  return zoomTo(camera, camera.distance * Math.exp(deltaY * WHEEL_ZOOM_RATE), extent)
-}
-
-export function zoomBySteps(camera: SpaceCamera, notches: number, extent: number): SpaceCamera {
-  return zoomTo(camera, camera.distance * Math.pow(KEY_ZOOM_FACTOR, notches), extent)
-}
-
-export function zoomByPinch(
-  camera: SpaceCamera,
-  previousDistancePx: number,
-  nextDistancePx: number,
-  extent: number,
-): SpaceCamera {
-  // A degenerate (zero-separation) pinch has no ratio to apply — it must
-  // never produce a NaN or a zero distance.
-  if (!(previousDistancePx > 0) || !(nextDistancePx > 0)) return camera
-  return zoomTo(camera, camera.distance * (previousDistancePx / nextDistancePx), extent)
 }
 
 /** Which zoom clamp the camera is resting on, or null. */
@@ -340,8 +232,4 @@ export function advanceDrag(tracker: DragTracker, x: number, y: number): { dx: n
  */
 export function isGesture(tracker: DragTracker): boolean {
   return tracker.maxTravelPx >= DRAG_THRESHOLD_PX
-}
-
-export function touchDistance(a: { x: number; y: number }, b: { x: number; y: number }): number {
-  return Math.hypot(a.x - b.x, a.y - b.y)
 }

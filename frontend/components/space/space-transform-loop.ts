@@ -119,7 +119,7 @@ export interface SpaceTransformLoopOptions {
   host: HTMLElement
   registry: HitTargetRegistry
   annotationRegistry?: HitTargetRegistry
-  cameraRef: { readonly current: SpaceCamera }
+  cameraRef: { current: SpaceCamera }
   /** Written by the loop, read by everyone else. */
   frameRef: { current: SpaceFrame | null }
   /** `null` = publish `staticSceneRef.current` as-is (tests only). */
@@ -131,6 +131,7 @@ export interface SpaceTransformLoopOptions {
    * merely because a frame passed.
    */
   onViewChange?: (basis: DrawViewBasis) => void
+  prepareCamera?: (camera: SpaceCamera, advance: boolean, requested: SpaceCamera) => SpaceCamera
 }
 
 export interface TransformLoopHandle {
@@ -144,7 +145,7 @@ export interface TransformLoopHandle {
 }
 
 export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): TransformLoopHandle {
-  const { host, registry, annotationRegistry, cameraRef, frameRef, source, staticSceneRef, onViewChange, extent = 0 } = options
+  const { host, registry, annotationRegistry, cameraRef, frameRef, source, staticSceneRef, onViewChange, prepareCamera, extent = 0 } = options
 
   let rafId = 0
   let warned = false
@@ -163,7 +164,7 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
   }
 
   /** Steps 2–6: project, write, publish. Never builds a scene. */
-  const publish = (scene: SceneModel): void => {
+  const publish = (scene: SceneModel, advance = true): void => {
     const requestedCamera = cameraRef.current
     const fleet = requestedCamera.followFleetId
       ? scene.marks.find(mark => mark.kind === 'fleet' && mark.id === requestedCamera.followFleetId)
@@ -185,7 +186,7 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
     if (source?.inputsRef.current?.reducedMotion) transition = null
     const progress = transition ? Math.min(1, (now - transition.start) / 650) : 1
     const remaining = 1 - progress * progress * (3 - 2 * progress)
-    const camera = target ? {
+    const followedCamera = target ? {
       ...requestedCamera,
       target: {
         x: target.x + (transition?.offset.x ?? 0) * remaining,
@@ -195,6 +196,7 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
       distance: distance + (transition?.distance ?? 0) * remaining,
     } : requestedCamera
     if (progress === 1) transition = null
+    const camera = prepareCamera?.(followedCamera, advance, requestedCamera) ?? followedCamera
     const basis = viewBasisOf(camera, { width, height })
     const projected = new Map(projectMarks(scene, basis).map((p) => [p.mark.id, p] as const))
 
@@ -253,7 +255,7 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
         return
       }
       try {
-        publish(current.scene)
+        publish(current.scene, false)
       } catch (err) {
         warnOnce(err)
       }
@@ -268,7 +270,7 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
 export function useSpaceTransformLoop(
   options: Omit<SpaceTransformLoopOptions, 'host'> & { host: HTMLElement | null; enabled: boolean },
 ): { refresh(): void } {
-  const { host, enabled, registry, annotationRegistry, cameraRef, frameRef, source, staticSceneRef, onViewChange, extent = 0 } = options
+  const { host, enabled, registry, annotationRegistry, cameraRef, frameRef, source, staticSceneRef, onViewChange, prepareCamera, extent = 0 } = options
   const handleRef = useRef<TransformLoopHandle | null>(null)
 
   useEffect(() => {
@@ -282,6 +284,7 @@ export function useSpaceTransformLoop(
       source,
       staticSceneRef,
       onViewChange,
+      prepareCamera,
       extent,
     })
     handleRef.current = handle

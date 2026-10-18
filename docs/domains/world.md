@@ -49,8 +49,10 @@ The galaxy uses native world coordinates, not force-directed rearrangement:
 Three geometry. [GalaxyView](../../frontend/components/galaxy/GalaxyView.tsx)
 provides a free astronomical skeleton inspector and wake-focus;
 [presence](../../frontend/components/galaxy/presence.ts) marks/recenters own fleets
-outside lane transit. [Camera rig](../../frontend/components/galaxy/camera-rig.ts)
-is Z-up with orbit, ground-plane pan and touch dolly/pan; tuning is not fixed here.
+outside lane transit. The [shared camera rig](../../frontend/components/map/map-camera-rig.ts)
+provides orbit, ground-plane pan and touch dolly/pan to Galaxy and System. Galaxy
+adapts Z-up coordinates; System adapts Y-up coordinates and extent-based limits.
+The [HUD record](../hud.md) owns current input bindings; tuning is not fixed here.
 [Galaxy query](../../frontend/hooks/use-galaxy.ts) separates authenticated live reads
 from the frozen logged-out landing asset and waits for auth resolution.
 

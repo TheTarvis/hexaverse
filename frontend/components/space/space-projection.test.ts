@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { projectToScreen, unprojectToViewPlane } from '@/lib/space/draw'
 import { viewBasisOf, TAN_HALF_FOV, projectMarks, hitTargetTransform, OFFSCREEN_PX } from './space-projection'
-import { defaultCamera, panBySteps, orbitBySteps } from './space-camera'
+import { defaultCamera, panBySteps } from './space-camera'
 import type { SceneMark } from './space-scene'
 
 // Implementer-authored (openspec build-production-space-view). The basis is
@@ -15,7 +15,7 @@ const VIEWPORT = { width: 1200, height: 900 }
 
 describe('space-projection — the camera basis', () => {
   it('is orthonormal and looks at the pan target', () => {
-    const camera = orbitBySteps(panBySteps(defaultCamera(EXTENT), 2, 1, EXTENT), 3, -1)
+    const camera = { ...panBySteps(defaultCamera(EXTENT), 2, 1, EXTENT), yaw: 0.75, pitch: 0.67 }
     const basis = viewBasisOf(camera, VIEWPORT)
     const dot = (a: typeof basis.right, b: typeof basis.right) => a.x * b.x + a.y * b.y + a.z * b.z
     expect(dot(basis.right, basis.up)).toBeCloseTo(0, 9)
@@ -42,7 +42,7 @@ describe('space-projection — the camera basis', () => {
   })
 
   it('round-trips a point on the pick plane through screen space', () => {
-    const camera = orbitBySteps(panBySteps(defaultCamera(EXTENT), -1, 1, EXTENT), 2, 1)
+    const camera = { ...panBySteps(defaultCamera(EXTENT), -1, 1, EXTENT), yaw: 0.7, pitch: 0.77 }
     const basis = viewBasisOf(camera, VIEWPORT)
     for (const [px, py] of [
       [300, 200],

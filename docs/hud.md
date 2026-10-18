@@ -749,3 +749,31 @@ Original 624c4ff card title/close, safe areas, single phone-sheet isolation, 16p
 fields, unrestricted zoom, mounted drafts and command/inspection independence remain.
 [Evidence](../.scratch/scene-navigation/README.md) records checks, service refresh and
 protected deployment separately from physical-iPhone/full-emulator acceptance.
+
+## Shared Galaxy camera controls — 2026-10-18
+
+Travis requests Galaxy's controls in System and one shared implementation (DRY).
+Both production scenes now use MapCameraRig in components/map, extracted from
+Galaxy's OrbitControls-based rig. One finger/left drag orbits; two fingers pan and
+pinch dolly; right drag pans; middle drag dollies. Plain wheel pans on the ground
+plane and Ctrl+wheel dollies. Damping and bindings live in that one controller.
+Galaxy previously had no keyboard shortcuts; the shared controller now supplies
+arrows to orbit, Shift+arrows to pan, +/- to dolly and Home to recenter. System's
+Enter-to-select-center remains a scene-specific selection callback. No camera
+buttons or hidden gesture mode are added.
+
+System's adapter supplies Y-up coordinates, extent-based limits and framing;
+Galaxy retains Z-up coordinates and its existing framing. System double-tap/
+double-click focuses a body while retaining angle/distance, after which orbit
+pivots on it. Camera focus does not choose a command fleet. Orbit/dolly preserve
+fleet following; pan, recenter and other-object focus release it. Existing body,
+point, fleet and sighting selection boundaries remain separate.
+
+The transform loop resolves live following, steps the camera and publishes one
+basis for GPU drawing, DOM targets and point picking. Projection refreshes do not
+advance damping again; animation does not issue React state updates every frame.
+Input is disabled during renderer unavailability; notices/retry remain reachable.
+Native Pointer Events replace System's separate TouchList gesture mapping, using
+the same input path as Galaxy. Existing safe-area/focus handling, original card
+chrome, 16px fields and browser zoom accessibility remain unchanged. Physical
+iPhone gesture/focus acceptance remains separate from browser automation.

@@ -7,7 +7,7 @@ import { createRendererOwner, type RendererOwner, type RendererSnapshot } from '
 import type { RendererCandidateFactory } from '@/components/render-guard/renderer-candidate'
 import { REGION_PALETTE } from './region-palette'
 import { glowTexture } from './glow-texture'
-import { CameraRig } from './camera-rig'
+import { MapCameraRig as CameraRig } from '@/components/map/map-camera-rig'
 
 export interface GalaxyGraphController {
   recenter: () => void
@@ -202,9 +202,10 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
         canvas?.remove()
         canvas = next
         next.style.cssText = 'width:100%;height:100%;display:block'
-        next.setAttribute('aria-label', 'Interactive galaxy map')
+        next.tabIndex = 0
+        next.setAttribute('aria-label', 'Interactive galaxy map. Arrow keys orbit; Shift and arrow keys pan. Plus and minus zoom. Home recenters.')
         wrap.prepend(next)
-        rig = new CameraRig(camera, next, wrap, null, false)
+        rig = new CameraRig(camera, next, wrap, null, false, { onHome: () => controller.recenter() })
         if (target) { rig.controls.target.copy(target); rig.controls.update() }
         else { const node = home(); if (node) rig.recenter(node, 0); else rig.frameBounds(latest.current.galaxy.bounds) }
         const raycaster = new THREE.Raycaster()
@@ -226,7 +227,7 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
           down = null
           if (movement > 6 || owner?.snapshot().phase !== 'ready') return
           const node = pick(event)
-          const now = performance.now()
+          const now = event.timeStamp
           if (node && last.id === node.id && now - last.time < 350) {
             rig?.focus({ x: node.x, y: node.y, z: node.z }, 600)
             last = { id: '', time: -Infinity }

@@ -9,7 +9,7 @@ import {
 } from './space-transform-loop'
 import { hitTargetTransform } from './space-projection'
 import type { SceneModel } from './space-scene'
-import { fleetCamera, orbitBySteps, panBySteps, zoomBySteps, defaultCamera } from './space-camera'
+import { fleetCamera, panBySteps, defaultCamera } from './space-camera'
 
 // RED-PHASE SUITE — tasks 4.2, 4.3, 4.3a, 4.6, 4.8 (design.md Decision 3,
 // decided option B). The transform writer, extracted from GL construction,
@@ -345,7 +345,7 @@ it('follows the live fleet every frame without React updates, preserves orbit/zo
   fireNextFrame()
   expect(frameRef.current?.camera.target).toEqual(moved)
   expect(onViewChange).toHaveBeenCalledTimes(1)
-  cameraRef.current = zoomBySteps(orbitBySteps(frameRef.current!.camera, 2, 1), 1, EXTENT)
+  cameraRef.current = { ...frameRef.current!.camera, yaw: frameRef.current!.camera.yaw + 0.1, pitch: frameRef.current!.camera.pitch + 0.05, distance: frameRef.current!.camera.distance * 0.9 }
   fireNextFrame()
   expect(frameRef.current?.camera.yaw).toBe(cameraRef.current.yaw)
   expect(frameRef.current?.camera.distance).toBe(cameraRef.current.distance)
