@@ -958,3 +958,48 @@ Final gateway20204 Chromium/WebKit runs also pass title geometry, mobile handoff
 mining drafts and desktop centering, with no JS errors or unmocked writes. Temporary
 candidate20215 and local Storybook20218 listeners were stopped; the in-app browser
 viewport override was reset and its temporary story tab closed.
+
+## Original Storybook header/close restored — 2026-10-18
+
+Travis requests 1:1 original visuals, superseding the recent inset-header studies.
+Source baseline: commit 624c4ff, HudCardShell.tsx / hud-card-shell.module.css / Plain
+story. Implementation 9a0446b removes mobileHeader and its boxed controls, app close
+offset overrides and phone minimum sizing on close. The shared component now keeps
+the original 11px floating plaque, transparent 28px corner control and 14px X on
+phone and desktop. An invisible inward-aligned 44px Catalyst target preserves touch
+usability without changing the visual design. Original focus outlines remain.
+Tabs/Arrange, fullscreen ownership, scroll/safe areas, mounted details/drafts,
+16px inputs, accessible zoom and camera gestures are retained.
+
+Live build vInWVcxECS_kYn3wvSRH_, source
+/private/tmp/hexaverse-original-chrome-qsq6t1up. Supervisor 29105 / frontend 29106 /
+gateway 29107 / ngrok 29108 started 2026-10-18 00:16:24 UTC. Only the frontend source
+command/build pins changed. All 57 public assets, gateway/ngrok commands, Google
+exact-email allowlist, routes, protected Storybook, diagnostic cap and
+2026-10-19T00:00:00Z cutoff are unchanged. No push or new exposure.
+
+61 tests / 7 files, types/scoped lint and production/Storybook builds pass. A golden
+CSS fixture preserves original header/close rules verbatim, and a commit/hash-
+labeled JSON reference pins computed styles/geometry. Candidate Chromium/WebKit
+checks pass original Storybook/app parity side by side at phone and desktop sizes,
+long-title/Back separation, invisible-target edge-tap dismissal, desktop close/
+reopen, tabs, retained search/details/mining drafts, scroll and inert release.
+First-login/camera and inspector close checks also pass. The user's local browser
+verified original 11px/28px/14px visuals with an invisible 44px target, and both
+comparison artifacts. No unavoidable fidelity conflict was found. Native iPhone
+acceptance remains pending.
+
+Complete gzip home/login/system responses 200; system HTML remains no-store.
+All 34 initial JS/CSS resources match deployed build bytes; all seven pins match.
+Anonymous edge 302, Storybook 200, debug/QA 404 and foreign Origin POST 403 persist.
+Supervisor errors 0 bytes; transport unchanged at 347 bytes (two historical aborts).
+Evidence: .scratch/hud-card-baseline/original-vs-app-{phone,desktop}.svg and
+original-chrome-phone.png; /tmp/hexaverse-original-chrome-{unit-final,static-final,
+candidate,camera-first,inspector,live}.log. Comparison SVGs are local QA artifacts;
+none were added to the protected published Storybook or public game assets.
+
+Final deployed gateway20204 runs pass original Storybook/app parity at phone and
+desktop sizes in both Chromium/WebKit, including invisible target edge taps,
+desktop close/reopen and preserved HUD state, with no JS errors/unmocked writes.
+Temporary candidate20215 and local comparison Storybook20218 servers were stopped.
+The in-app browser override was reset and temporary inspection tabs closed.

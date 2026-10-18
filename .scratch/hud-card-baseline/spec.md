@@ -160,8 +160,8 @@ zoom are preserved. There is no unavoidable fidelity conflict in these checks.
 
 61 tests / 7 files, types/scoped lint and isolated production/Storybook builds pass.
 OriginalChromeAlignment checks the frozen computed properties; the actual local
-in-app browser measured 11px title, 28px control, 14px glyph and invisible44px target
-on phone and original28px control on desktop. Candidate first-login/camera checks
+in-app browser measured 11px title, 28px control, 14px glyph and invisible 44px target
+on phone and original 28px control on desktop. Candidate first-login/camera checks
 pass in Chromium/WebKit. Comparison artifacts place Storybook Plain and real app
 header captures side by side; frozen-property and geometry assertions prevent
 both surfaces drifting together undetected. Native iPhone acceptance is pending.
@@ -174,3 +174,10 @@ and desktop captures were reviewed in the user's local browser. Evidence:
 [Phone comparison](original-vs-app-phone.svg),
 [Desktop comparison](original-vs-app-desktop.svg),
 [Phone panel](original-chrome-phone.png).
+
+Live gateway20204 reruns also pass phone/desktop parity, original control geometry,
+invisible edge-tap close, desktop close/reopen and retained-state checks in both
+engines with no errors/unmocked writes. Build vInWVcxECS_kYn3wvSRH_ retains all 57
+public assets, seven verified pins, exact-email gate and October19 00UTC cutoff.
+All 34 initial served JS/CSS files match build bytes. Temporary test listeners and
+browser inspection tabs were cleaned up after verification.

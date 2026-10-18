@@ -542,3 +542,18 @@ browser mobile/desktop geometry, 60 unit tests, types/lint, production/Storybook
 builds and candidate Chromium/WebKit route checks pass. Native iPhone validation
 remains pending. Evidence: .scratch/hud-card-baseline/mobile-centered-title-phone.png
 and /tmp/hexaverse-centered-title-*.log. No push.
+
+### Original Storybook chrome restored — 2026-10-18
+
+Commit 9a0446b restores the original 624c4ff shared header/close on phone and desktop,
+removing the mobileHeader variant and app-specific close offsets/sizing. Visible
+11px plaque / transparent 28px control / 14px X; invisible 44px inward target. Tabs,
+fullscreen/scroll/safe areas, drafts/details, 16px fields and accessible zoom stay.
+Build vInWVcxECS_kYn3wvSRH_ is deployed to the same protected preview. All 57 public
+assets, email gate/routes/diagnostics and October 19 00:00 UTC cutoff remain unchanged.
+61 tests, types/lint, production/Storybook builds, frozen source/style references,
+candidate Chromium/WebKit parity/close/state checks, first-login/camera and inspector
+checks pass. Local browser reviewed phone and desktop side-by-side artifacts.
+All 34 served initial assets and 7 pins match; errors 0 bytes / transport 347 bytes.
+Physical iPhone acceptance remains pending. No push. See docs/phone-preview.md and
+.scratch/hud-card-baseline/original-vs-app-{phone,desktop}.svg.
