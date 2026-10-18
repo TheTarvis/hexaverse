@@ -14,6 +14,39 @@ if(process.env.QA_HUD_CASE==='mine'){
  interior.features[1].type='rocky';interior.features[1].resources=[{kind:'metals',richness:1}]
 }
 fleet.roster.fuelPricePerTon=2
+const originalChrome=JSON.parse(fs.readFileSync(__dirname+'/../../frontend/components/hud/__fixtures__/original-card-chrome.json','utf8'))
+async function chromeGeometry(card){
+ return card.evaluate((e,reference)=>{
+  const title=e.querySelector(':scope > [data-slot="hud-title"]'),close=e.querySelector(':scope > [data-slot="hud-close"]'),icon=close.querySelector('svg'),target=close.querySelector('span[aria-hidden="true"]')
+  const c=e.getBoundingClientRect(),t=title.getBoundingClientRect(),x=close.getBoundingClientRect(),hit=target.getBoundingClientRect()
+  const properties=(node,expected)=>Object.fromEntries(Object.keys(expected).map(k=>[k,getComputedStyle(node)[k]]))
+  return {title:properties(title,reference.title),close:properties(close,reference.close),icon:properties(icon,reference.icon),center:t.x+t.width/2-c.x-c.width/2,titleY:t.y+t.height/2-c.y,closeTop:x.y-c.y,closeRight:c.right-x.right,overlap:t.right>x.left&&t.bottom>x.top&&t.top<x.bottom,hit:{x:hit.x,y:hit.y,width:hit.width,height:hit.height,right:hit.right,bottom:hit.bottom}}
+ },originalChrome)
+}
+async function assertOriginalChrome(card){
+ const g=await chromeGeometry(card)
+ for(const key of ['title','close','icon'])assert.deepEqual(g[key],originalChrome[key],'Original 624c4ff '+key+' styling')
+ assert.ok(Math.abs(g.center)<1&&Math.abs(g.titleY)<1,'Original floating centered plaque: '+JSON.stringify(g))
+ assert.ok(Math.abs(g.closeTop+10)<1&&Math.abs(g.closeRight+10)<1,'Original corner close offsets')
+ assert.equal(g.overlap,false);assert.ok(g.hit.width>=44&&g.hit.height>=44)
+ return g
+}
+async function compareOriginalStory(p,name,card,label){
+ if(!process.env.QA_STORY_ORIGIN)return
+ const reference=await p.context().newPage()
+ try{
+  await reference.goto(process.env.QA_STORY_ORIGIN+'/iframe.html?id=hud-card-shell--plain&viewMode=story&args=title:Objects')
+  const shell=reference.locator('[data-hud-framing="frame"]');await shell.waitFor()
+  const bounds=await card.boundingBox();await shell.evaluate((e,width)=>{e.style.width=width+'px';e.style.maxWidth='none';e.parentElement.style.padding='18px 12px'},bounds.width)
+  await assertOriginalChrome(shell);await assertOriginalChrome(card)
+  const clip=async locator=>{const box=await locator.boundingBox();return {x:Math.max(0,box.x-12),y:Math.max(0,box.y-18),width:Math.min(box.width+24,p.viewportSize().width),height:125}}
+  const original=await reference.screenshot({clip:await clip(shell)}),actual=await p.screenshot({clip:await clip(card)})
+  const width=Math.ceil(bounds.width+24),svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+(width*2+32)+'" height="170" viewBox="0 0 '+(width*2+32)+' 170"><rect width="100%" height="100%" fill="#08121d"/><g fill="#d5e7f1" font-family="system-ui,sans-serif" font-size="12"><text x="8" y="18">Original Storybook · 624c4ff chrome</text><text x="'+(width+24)+'" y="18">Actual app · '+label+'</text></g><image x="8" y="26" width="'+width+'" height="125" href="data:image/png;base64,'+original.toString('base64')+'"/><image x="'+(width+24)+'" y="26" width="'+width+'" height="125" href="data:image/png;base64,'+actual.toString('base64')+'"/></svg>'
+  fs.writeFileSync(out+'/'+name.toLowerCase()+'-original-vs-app-'+label+'.svg',svg)
+  fs.writeFileSync(__dirname+'/../../frontend/.storybook/storybook-static/qa-'+name.toLowerCase()+'-original-vs-app-'+label+'.svg',svg)
+  console.log(name,'ORIGINAL STORY PARITY PASS',label,'frozen 624c4ff visual properties and side-by-side capture')
+ }finally{await reference.close()}
+}
 async function checkMobileNavigation(p,name){
  const workspace=p.getByTestId('hud-workspace')
  const go=async label=>{await p.getByRole('navigation',{name:'HUD panels',exact:true}).getByRole('button',{name:label,exact:true}).tap()}
@@ -24,10 +57,10 @@ async function checkMobileNavigation(p,name){
  console.log(name,'SEARCH COMPUTED FONT',await search.evaluate(e=>getComputedStyle(e).fontSize))
  if(process.env.QA_NAV_BASELINE==='1'){console.log(name,'TITLE BASELINE',await p.locator('[data-panel="objects"] > [data-slot="hud-card"]').evaluate(e=>{const c=e.getBoundingClientRect(),t=e.querySelector('[data-slot="hud-title"]').getBoundingClientRect();return {cardCenter:c.x+c.width/2,titleCenter:t.x+t.width/2,delta:t.x+t.width/2-c.x-c.width/2}}));await p.getByRole('button',{name:'Close Objects panel',exact:true}).tap();return}
  const fit=async()=>{
-  const close=p.getByRole('dialog').locator('[data-slot="hud-header"] > [data-slot="hud-close"]:visible'),box=await close.boundingBox(),size=p.viewportSize()
-  assert.ok(box&&box.width>=44&&box.height>=44&&box.x>=0&&box.y>=0&&box.x+box.width<=size.width&&box.y+box.height<=size.height,'Reachable close: '+JSON.stringify(box))
-  const card=close.locator('xpath=../..'),geometry=await card.evaluate(e=>{const c=e.getBoundingClientRect(),t=e.querySelector(':scope > [data-slot="hud-header"] > [data-slot="hud-title"]').getBoundingClientRect(),x=e.querySelector('[data-slot="hud-header"] > [data-slot="hud-close"]').getBoundingClientRect();return {delta:t.x+t.width/2-c.x-c.width/2,overlap:t.right>x.left}});assert.ok(Math.abs(geometry.delta)<1,'Title centered on card: '+JSON.stringify(geometry));assert.equal(geometry.overlap,false)
-  const asymmetric=await card.evaluate(e=>{const title=e.querySelector('[data-slot="hud-header"] > [data-slot="hud-title"]'),header=title.parentElement,original=title.firstElementChild.textContent,back=document.createElement('button');back.textContent='Back';back.style.cssText='grid-column:1;grid-row:1;justify-self:start;width:44px;height:44px';header.append(back);title.firstElementChild.textContent='An exceptionally long object name';const c=e.getBoundingClientRect(),t=title.getBoundingClientRect(),b=back.getBoundingClientRect(),x=header.querySelector('[data-slot="hud-close"]').getBoundingClientRect();const result={delta:t.x+t.width/2-c.x-c.width/2,overlap:t.left<b.right||t.right>x.left};back.remove();title.firstElementChild.textContent=original;return result});assert.ok(Math.abs(asymmetric.delta)<1&&!asymmetric.overlap,'Centered long title with asymmetric back/close: '+JSON.stringify(asymmetric))
+  const close=p.getByRole('dialog').locator('[data-slot="hud-card"] > [data-slot="hud-close"]:visible'),size=p.viewportSize(),card=close.locator('..')
+  const g=await assertOriginalChrome(card)
+  assert.ok(g.hit.x>=0&&g.hit.y>=0&&g.hit.right<=size.width&&g.hit.bottom<=size.height,'Invisible close target fits phone viewport: '+JSON.stringify(g.hit))
+  const asymmetric=await card.evaluate(e=>{const title=e.querySelector(':scope > [data-slot="hud-title"]'),original=title.firstElementChild.textContent,back=document.createElement('button');back.textContent='Back';e.querySelector('[data-slot="hud-toolbar"]').append(back);title.firstElementChild.textContent='An exceptionally long object name';const c=e.getBoundingClientRect(),t=title.getBoundingClientRect(),x=e.querySelector(':scope > [data-slot="hud-close"]').getBoundingClientRect();const result={delta:t.x+t.width/2-c.x-c.width/2,overlap:t.right>x.left&&t.bottom>x.top};back.remove();title.firstElementChild.textContent=original;return result});assert.ok(Math.abs(asymmetric.delta)<1&&!asymmetric.overlap,'Original long title with independent Back/close: '+JSON.stringify(asymmetric))
 
   const nav=p.getByRole('navigation',{name:'HUD panels',exact:true});assert.equal(await nav.getByRole('button').count(),4)
   const n=await nav.boundingBox();assert.ok(n&&n.y>=0&&n.y+n.height<=size.height,'Navigation remains above content')
@@ -38,7 +71,7 @@ async function checkMobileNavigation(p,name){
   await search.fill('qa-planet');await search.focus()
   assert.ok(await search.evaluate(e=>parseFloat(getComputedStyle(e).fontSize))>=16)
   const scale=await p.evaluate(()=>visualViewport.scale)
-  await p.screenshot({path:out+'/'+name.toLowerCase()+'-mobile-search-'+size.width+'.png'})
+  await p.screenshot({path:out+'/'+name.toLowerCase()+'-mobile-search-'+size.width+'.png'});if(size.width===375)await compareOriginalStory(p,name,p.locator('[data-panel="objects"] > [data-slot="hud-card"]'),'phone')
   // A reduced layout viewport models keyboard space; this does not reproduce
   // native iOS keyboard or Safari automatic focus magnification.
   await p.setViewportSize({...size,height:size.height>500?size.height-280:300});await p.waitForTimeout(120);await fit()
@@ -56,11 +89,11 @@ async function checkMobileNavigation(p,name){
   await p.getByTestId('details-back').tap();assert.equal(await search.inputValue(),'qa-planet')
   await search.focus();await search.evaluate(e=>e.blur());await fit();assert.equal(await p.evaluate(()=>visualViewport.scale),scale)
  }
- await p.getByRole('button',{name:'Close Objects panel',exact:true}).tap()
+ const expanded=p.getByRole('button',{name:'Close Objects panel',exact:true}).locator('span[aria-hidden="true"]'),hit=await expanded.boundingBox();await p.touchscreen.tap(hit.x+2,hit.y+hit.height/2)
  assert.equal(await p.getByRole('dialog').count(),0);assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
  await p.setViewportSize({width:390,height:844})
- console.log(name,'TITLE GEOMETRY PASS: title midpoint matches card within 1 CSS px, long title with asymmetric Back/close has no overlap; real detail Back preserves root heading')
- console.log(name,'MOBILE NAV PASS: four persistent tabs including Arrange; 48px inset close outside scrolling, >=16px computed form text, focus/blur/reduced keyboard space, details/back/search retained, callbacks and one sheet owner release; native iPhone focus zoom pending')
+ console.log(name,'ORIGINAL CHROME PASS: frozen 624c4ff plaque/close/icon properties and corner geometry, independent Back, invisible 44px target edge tap dismisses')
+ console.log(name,'MOBILE NAV PASS: four persistent tabs including Arrange; original 28px transparent close with invisible 44px target outside scrolling, >=16px computed form text, focus/blur/reduced keyboard space, details/back/search retained, callbacks and one sheet owner release; native iPhone focus zoom pending')
 }
 async function checkHudInspector(p,name){
  await p.getByTestId('vitals-fleet-chevron').tap();await p.getByTestId('vitals-fleet-inspect').tap()
@@ -114,10 +147,15 @@ async function checkHudBaseline(p,name){
   await close.tap();assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
  }
  await p.setViewportSize({width:1280,height:900});await p.waitForTimeout(150)
- for(const id of ['objects','command','console']){const owner=await assertFrame(id);assert.ok(await owner.locator(':scope > [data-slot="hud-card"]').evaluate(e=>{const c=e.getBoundingClientRect(),t=e.querySelector('[data-slot="hud-title"]').getBoundingClientRect();return Math.abs(t.x+t.width/2-c.x-c.width/2)<1}),'Desktop title centered: '+id)}
+ for(const id of ['objects','command','console']){const owner=await assertFrame(id);await assertOriginalChrome(owner.locator(':scope > [data-slot="hud-card"]'))}
+ await compareOriginalStory(p,name,p.locator('[data-panel="objects"] > [data-slot="hud-card"]'),'desktop')
  const nav=await p.getByTestId('floating-nav').boundingBox(),consoleBox=await panel('console').boundingBox();assert.ok(nav&&consoleBox&&consoleBox.y+consoleBox.height<=nav.y,'Console frame must leave navigation reachable')
  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
  await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-desktop.png'})
+ const savedSearch=await search.inputValue();await p.getByRole('button',{name:'Hide Objects',exact:true}).click();assert.equal(await panel('objects').isVisible(),false);assert.equal(await panel('command').isVisible(),true)
+ await p.getByRole('button',{name:'Objects (hidden)',exact:true}).click();await assertFrame('objects');assert.equal(await search.inputValue(),savedSearch)
+ console.log(name,'DESKTOP CLOSE PASS: original transparent control hides only its panel; launcher restores mounted search')
+
  await p.setViewportSize({width:390,height:844});await p.waitForTimeout(150)
  console.log(name,'HUD BASELINE PASS: one shared frame per panel, Command/mining/travel sections, object facts/back/search, Console empty log, settings, retained input, narrow/landscape/desktop layout and reachable close, no stale inert')
 }

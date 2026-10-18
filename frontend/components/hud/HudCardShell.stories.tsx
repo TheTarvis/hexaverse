@@ -1,10 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { expect, fn, within } from 'storybook/test'
+import { expect, fn, userEvent, within } from 'storybook/test'
 import clsx from 'clsx'
 import { Button } from '@/components/catalyst/button'
 import { HudHeading, HudText } from './HudTypography'
 import { HudCardShell, type HudCardShellProps } from './HudCardShell'
 import styles from './hud-card-shell.stories.module.css'
+import originalChrome from './__fixtures__/original-card-chrome.json'
 
 type StoryArgs = HudCardShellProps & {
   showClose: boolean
@@ -168,14 +169,13 @@ export const NestedSections: Story = {
 }
 
 
-export const MobileHeaderAlignment: Story = {
+export const OriginalChromeAlignment: Story = {
   args: {
     title: 'Objects',
-    mobileHeader: true,
     lighting: 'none',
     children: <><Button outline>Back to object list</Button><p>Back is an independent content action. The close control occupies only the right side of the header.</p></>,
   },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
     const card = canvas.getByRole('region', { name: 'Objects' })
     const title = canvas.getByRole('heading', { name: 'Objects' })
@@ -183,5 +183,12 @@ export const MobileHeaderAlignment: Story = {
     await expect(Math.abs(center(title) - center(card))).toBeLessThan(1)
     const close = canvas.getByRole('button', { name: 'Close inspector' })
     await expect(title.getBoundingClientRect().right).toBeLessThanOrEqual(close.getBoundingClientRect().left)
+    for (const [node, expected] of [[title, originalChrome.title], [close, originalChrome.close], [close.querySelector('svg')!, originalChrome.icon]] as const) {
+      const computed = getComputedStyle(node)
+      for (const [property, value] of Object.entries(expected)) await expect(computed[property as keyof CSSStyleDeclaration]).toBe(value)
+    }
+    await expect(title.getBoundingClientRect().top + title.getBoundingClientRect().height / 2).toBeCloseTo(card.getBoundingClientRect().top, 0)
+    await userEvent.click(close)
+    await expect(args.onClose).toHaveBeenCalled()
   },
 }

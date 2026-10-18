@@ -19,8 +19,6 @@ export type HudCardShellProps = Omit<ComponentPropsWithoutRef<'section'>, 'title
   paused?: boolean
   /** Nested content shares its owning card's frame; detached overlays can opt in. */
   framing?: 'auto' | 'frame' | 'section'
-  /** Keep phone navigation and dismissal outside the scrolling content. */
-  mobileHeader?: boolean
   toolbar?: ReactNode
   closeTestId?: string
   closeButtonRef?: Ref<HTMLButtonElement>
@@ -36,7 +34,6 @@ export function HudCardShell({
   paused = false,
   framing = 'auto',
   toolbar,
-  mobileHeader = false,
   closeTestId,
   closeButtonRef,
   className,
@@ -78,7 +75,7 @@ export function HudCardShell({
       ref={shellRef}
       aria-labelledby={props['aria-label'] ? undefined : title ? titleId : undefined}
       {...props}
-      className={clsx(styles.shell, section && styles.section, mobileHeader && styles.mobileHeader, className)}
+      className={clsx(styles.shell, section && styles.section, className)}
     >
       {!section && <><div aria-hidden="true" className={styles.surface} />
       <div aria-hidden="true" className={styles.lights}>
@@ -93,12 +90,11 @@ export function HudCardShell({
           <HudFrameLighting hostRef={shellRef} paused={paused} />
         </Suspense>
       )}
-      {mobileHeader ? <div className={styles.header} data-slot="hud-header">{chrome}</div> : chrome}
-      {mobileHeader && toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
+      {chrome}
+      {toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
       <CardFrameContext.Provider value={true}>
         <div className={styles.body} data-slot="hud-body">
           <div className={clsx(styles.content, contentClassName)} data-slot="hud-content">
-            {!mobileHeader && toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
             {children}
           </div>
         </div>

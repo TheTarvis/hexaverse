@@ -568,3 +568,28 @@ Geometry assertions compare title/card midpoints within 1 CSS px at 375/390 port
 844 landscape and 1280 desktop. Phone checks also use a long title and unequal 44 px
 Back/48 px close controls, and real object detail/back transitions. Storybook's
 MobileHeaderAlignment story exercises the same shared shell.
+
+## Current header and close contract: original Storybook chrome — 2026-10-18
+
+The visual source is HudCardShell and its Plain story from commit 624c4ff. This
+supersedes the inset mobile-header refinements above. Every framed app card and
+Storybook story uses the same component and original visual rules: 11px floating
+centered plaque; transparent 28x28px corner close at top/right -10px; 14px X with
+its original stroke/glow. The mobileHeader variant and app-specific close offsets
+are removed. Broad phone button sizing excludes the close; keyboard focus styling
+remains the original accessible outline.
+
+The existing Catalyst span supplies an invisible 44x44px pointer target, extended
+inward from the original control so it fits phone safe-area margins. Neither the
+visible button nor glyph is enlarged. Persistent panel/Arrange tabs remain fixed
+outside the internal content viewport, below the original chrome. Fullscreen
+phone ownership, mounted drafts/details/back state, 16px fields, unrestricted
+accessibility zoom and canvas gestures remain intact.
+
+The original title/close CSS is frozen verbatim under components/hud/__fixtures__
+and verified by HudCardShell.reference.test.ts. A commit/hash-labeled JSON fixture
+pins browser-computed styles and geometry; checks compare original Storybook and
+actual app side by side at phone/desktop widths, including long titles, independent
+Back, invisible-target edge taps and desktop hide/reopen. The reference must not
+be silently updated to make a changed design pass. Physical iPhone acceptance is
+still distinct from these browser checks.

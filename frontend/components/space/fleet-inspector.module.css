@@ -9,4 +9,3 @@
 .page { padding-top: calc(18px + env(safe-area-inset-top)); padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
 .page .panel { overflow: visible; }
 .page .body { overflow: visible; padding: 0; }
-.page [data-slot='hud-close'] { top: -12px; right: -10px; }

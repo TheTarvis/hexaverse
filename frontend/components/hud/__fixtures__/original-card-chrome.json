@@ -1,0 +1,29 @@
+{
+  "sourceCommit": "624c4ff",
+  "source": "frontend/components/hud/hud-card-shell.module.css",
+  "sourceSha256": "3f1e38f39719c1a73500213c152b7016661b6126125ba4c13942b31b5ac467fe",
+  "title": {
+    "position": "absolute",
+    "fontSize": "11px",
+    "fontWeight": "500",
+    "lineHeight": "20px",
+    "paddingTop": "4px",
+    "paddingRight": "19px",
+    "textTransform": "uppercase"
+  },
+  "close": {
+    "position": "absolute",
+    "width": "28px",
+    "height": "28px",
+    "paddingTop": "4px",
+    "borderTopWidth": "0px",
+    "borderRadius": "0px",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "color": "rgb(177, 237, 255)"
+  },
+  "icon": {
+    "width": "14px",
+    "height": "14px",
+    "strokeWidth": "2px"
+  }
+}

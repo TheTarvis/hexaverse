@@ -183,7 +183,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
       </div>
     </div>
     {settings && <div ref={settingsRef} id={settingsId} className={styles.settings}>
-      <HudCardShell title="Arrange HUD" lighting="none" mobileHeader toolbar={phone ? navigation('arrange') : undefined} onClose={closeSettings} closeLabel="Close HUD settings">
+      <HudCardShell title="Arrange HUD" lighting="none" toolbar={phone ? navigation('arrange') : undefined} onClose={closeSettings} closeLabel="Close HUD settings">
         <p className={styles.hint}>Choose what stays on screen. Move panels between docks and change their order.</p>
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
@@ -214,7 +214,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
           <HudCardShell title={panel.label} lighting="none" paused={!item.visible || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
             closeLabel={phone ? `Close ${panel.label} panel` : `Hide ${panel.label}`}
             onClose={phone ? closePanel : () => { recoveryRef.current?.focus({ preventScroll: true }); toggle(item.id) }}
-            mobileHeader toolbar={phone ? navigation(item.id) : undefined}>
+            toolbar={phone ? navigation(item.id) : undefined}>
             {panel.children}
           </HudCardShell>
         </section>

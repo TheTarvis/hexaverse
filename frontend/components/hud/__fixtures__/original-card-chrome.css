@@ -1,0 +1,70 @@
+.title {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  max-width: calc(100% - 112px);
+  margin: 0;
+  padding: 4px 19px;
+  background: linear-gradient(120deg, #7493a8, #314a5f 55%, #6d8a9e);
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+  color: #c0eaff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.title::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  z-index: -1;
+  background: #09131e;
+  clip-path: polygon(11px 0, calc(100% - 11px) 0, 100% 50%, calc(100% - 11px) 100%, 11px 100%, 0 50%);
+}
+
+.title span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell .close {
+  position: absolute;
+  z-index: 2;
+  top: -10px;
+  right: -10px;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #b1edff;
+  cursor: pointer;
+}
+
+.shell .close:hover {
+  color: #e4f8ff;
+}
+
+.shell .close:focus-visible {
+  outline: 2px solid #a5e9ff;
+  outline-offset: 3px;
+}
+
+.shell .close svg {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  color: inherit;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 3px rgb(44 194 255 / 65%));
+}

@@ -139,3 +139,38 @@ baseline assertions in both engines with no runtime errors/unmocked game writes.
 Preview build KcC37CyGkxAjvy3gFc6Hr retains the seven verified pins and existing
 email/cutoff configuration; initial 35 asset responses match local build bytes.
 Temporary browser tab/listeners were cleaned up and viewport override reset.
+
+## Original Storybook visual restoration — 2026-10-18
+
+Travis explicitly requests 1:1 original header/close fidelity on every viewport.
+The authority is commit 624c4ff's HudCardShell.tsx, hud-card-shell.module.css and
+Plain story. The earlier mobileHeader variant introduced a separate inset layout,
+13px title and boxed 48px/22px close. Broad app phone-button minimum sizing and
+recovery/inspector close offsets also differed from the original component.
+
+The mobileHeader API/layout is removed. Original title/close CSS is restored
+verbatim and frozen as __fixtures__/original-card-chrome.css. Original 11px plaque,
+28px transparent control, 14px glyph and top/right -10px geometry now apply to all
+framed cards through the same component. App minimum button rules exclude close;
+recovery/inspector positional overrides are gone. The Catalyst invisible target
+is 44x44px, aligned inward so it fits phone margins without changing visible art.
+Tabs remain outside scroll below the original header, and the single sheet owner,
+retained drafts/details/back, fullscreen safe areas, 16px fields and accessible
+zoom are preserved. There is no unavoidable fidelity conflict in these checks.
+
+61 tests / 7 files, types/scoped lint and isolated production/Storybook builds pass.
+OriginalChromeAlignment checks the frozen computed properties; the actual local
+in-app browser measured 11px title, 28px control, 14px glyph and invisible44px target
+on phone and original28px control on desktop. Candidate first-login/camera checks
+pass in Chromium/WebKit. Comparison artifacts place Storybook Plain and real app
+header captures side by side; frozen-property and geometry assertions prevent
+both surfaces drifting together undetected. Native iPhone acceptance is pending.
+
+Candidate vInWVcxECS_kYn3wvSRH_ passes phone and desktop original-style parity,
+invisible edge-tap dismissal, desktop hide/reopen, long titles, back/detail state,
+mining drafts, internal scroll and inert release in Chromium and WebKit. Inspector
+close and first-login/camera runs also pass in both engines. Side-by-side phone
+and desktop captures were reviewed in the user's local browser. Evidence:
+[Phone comparison](original-vs-app-phone.svg),
+[Desktop comparison](original-vs-app-desktop.svg),
+[Phone panel](original-chrome-phone.png).

@@ -67,7 +67,7 @@
 
 /* The primary phone controls remain direct taps, with desktop density unchanged. */
 @media (max-width: 760px), (pointer: coarse) {
-  .workspace button { min-width: 44px; min-height: 44px; }
+  .workspace button:not([data-slot='hud-close']) { min-width: 44px; min-height: 44px; }
   .workspace input, .workspace select { min-height: 44px; }
   .panelToolbar { min-height: 44px; }
   .settingRow { gap: 6px; }
@@ -87,13 +87,13 @@
   .panelContent { overscroll-behavior: contain; overflow-x: hidden; overflow-wrap: anywhere; }
   .panelContent > * { max-width: 100%; min-width: 0; }
   .settings { top: var(--phone-panel-top, 200px); left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); width: auto; bottom: 8px; max-height: none; }
-  .workspace button { min-height: 44px; }
+  .workspace button:not([data-slot='hud-close']) { min-height: 44px; }
 }
 @media (max-height: 500px) and (max-width: 1024px) {
   .recovery { grid-template-columns: auto minmax(0, 1fr); align-items: center; }
 }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .workspace button { min-width: 44px; }
+  .workspace button:not([data-slot='hud-close']) { min-width: 44px; }
 }
 
 .sheetControls { display: flex; gap: 4px; }
