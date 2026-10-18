@@ -27,6 +27,7 @@ export interface CompactTravelCardProps {
   warning?: boolean
   additionalActions?: ReactNode
   onFleet: (id: string) => void
+  onChooseFleet?: () => void
   onStart: () => void
   onStop: () => void
   onBack: () => void
@@ -35,7 +36,7 @@ export interface CompactTravelCardProps {
 }
 
 /** Presentation only. Quotes, command ownership and mutations stay in the system view. */
-export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, quote, worldTime, scale, blocker, notice, error, pending, warning, onFleet, onStart, onStop, onBack, onClose, onRetry, additionalActions }: CompactTravelCardProps) {
+export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, quote, worldTime, scale, blocker, notice, error, pending, warning, onFleet, onChooseFleet, onStart, onStop, onBack, onClose, onRetry, additionalActions }: CompactTravelCardProps) {
   const fuel = fleet?.roster?.cargo?.fuel
   const burn = fleet?.state?.Mode === 0 ? fleet.state.Burn : null
   const traveling = !!burn && burn.ArriveMs > worldTime
@@ -45,12 +46,12 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
   return <HudCardShell title={mode === 'review' ? 'Travel review' : 'Command fleet'} onClose={onClose} closeLabel="Close travel card" className={styles.card}>
     <div className={styles.content} data-testid="compact-travel-card">
       {mode === 'review' ? <>
-        <label className={styles.picker}>Command fleet
+        {onChooseFleet ? <div><HudText>Command fleet · {fleet ? `Fleet ${fleet.id.slice(-8)}` : 'Choose a fleet'}</HudText><Button outline onClick={onChooseFleet} disabled={pending}>Choose command fleet</Button></div> : <label className={styles.picker}>Command fleet
           <Select aria-label="Travel command fleet" value={fleet?.id ?? ''} disabled={pending} onChange={event => onFleet(event.target.value)}>
             {!fleet && <option value="">Choose a fleet</option>}
             {fleets.map(item => <option key={item.id} value={item.id} disabled={!!item.jump || item.systemId !== systemId}>Fleet {item.id.slice(-6)}{item.jump ? ' · In transit' : item.systemId !== systemId ? ' · Other system' : ''}</option>)}
           </Select>
-        </label>
+        </label>}
         <HudHeading size="compact">{destination}</HudHeading>
         <HudText variant="secondary">Outbound travel</HudText>
         {quote ? <HudFacts items={[

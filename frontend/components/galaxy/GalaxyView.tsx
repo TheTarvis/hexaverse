@@ -379,12 +379,6 @@ export function GalaxyView() {
           />
         </GalaxyObjectBrowser> },
         { id: 'command', label: 'Command', children: <div className="flex min-w-0 flex-col gap-4" data-testid="galaxy-command-column">
-          {activeFleet && <FleetLocationPanel fleet={activeFleet} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleetsFailed} onFocus={id => activeFleet.jump ? handleSelectSystemId(id) : handleEnterSystem(id)} onOpen={handleEnterSystem} />}
-          {/* This view mounts no command panel of its own, so the roster
-              rows ARE the fleet command surface here — declared explicitly
-              (fleet-roster: "The Roster Row Is the Fleet Command Surface
-              Where the Mounting View Provides None"), and every command a
-              row can offer is supplied below. */}
           <FleetRoster
             worldTime={worldTime}
             scale={servedScale}
@@ -401,6 +395,20 @@ export function GalaxyView() {
             onJump={handleJump}
             enabled={!isStartArea}
           />
+      {!isStartArea && <GameViewVitals placement="panel" aria-label="Command fleet telemetry" data-testid="galaxy-vitals">
+        <VitalsStrip mode="panel" acting={activeFleet} ownedFleets={ownFleets} fleetsFailed={!!fleetsFailed}
+          status={!fleetsFailed && activeFleet ? rosterRowStatus(activeFleet, worldTime, id => systemNames[id] ?? id) : null}
+          onSelectFleet={f => { setActiveFleetId(f.id); handleShowFleet(f) }} systemNames={systemNames}
+          credits={session.isError ? null : session.corporation?.credits ?? null} scale={servedScale}
+          worldTime={worldTime} serverWorldTime={servedWorldTime} />
+      </GameViewVitals>}
+          {activeFleet && <FleetLocationPanel fleet={activeFleet} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleetsFailed} onFocus={id => activeFleet.jump ? handleSelectSystemId(id) : handleEnterSystem(id)} onOpen={handleEnterSystem} />}
+          {/* This view mounts no command panel of its own, so the roster
+              rows ARE the fleet command surface here — declared explicitly
+              (fleet-roster: "The Roster Row Is the Fleet Command Surface
+              Where the Mounting View Provides None"), and every command a
+              row can offer is supplied below. */}
+
           {isStartArea && <Text>Sign in to command a fleet.</Text>}
         </div> },
         { id: 'console', label: 'Console', children: <div className="flex min-w-0 flex-col gap-4">
@@ -421,13 +429,7 @@ export function GalaxyView() {
         </div> },
       ]} />
       {isStartArea && <GameViewVitals><div className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><Button href="/login" color="cyan">Sign in</Button></div></GameViewVitals>}
-      {!isStartArea && <GameViewVitals data-testid="galaxy-vitals">
-        <VitalsStrip acting={activeFleet} ownedFleets={ownFleets} fleetsFailed={!!fleetsFailed}
-          status={!fleetsFailed && activeFleet ? rosterRowStatus(activeFleet, worldTime, id => systemNames[id] ?? id) : null}
-          onSelectFleet={f => { setActiveFleetId(f.id); handleShowFleet(f) }} systemNames={systemNames}
-          credits={session.isError ? null : session.corporation?.credits ?? null} scale={servedScale}
-          worldTime={worldTime} serverWorldTime={servedWorldTime} />
-      </GameViewVitals>}
+
     </GameViewShell>
   )
 }

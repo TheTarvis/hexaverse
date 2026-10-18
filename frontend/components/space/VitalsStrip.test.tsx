@@ -79,6 +79,22 @@ const dockedStatus: RosterRowStatus = {
 
 const systemNames = { 'sys-0': 'Axion', 'sys-1': 'Borealis' }
 
+describe('Command telemetry mode', () => {
+  it('preserves resolved dock status and telemetry without a duplicate selector', () => {
+    strip({ mode: 'panel', status: dockedStatus })
+    expect(screen.getByTestId('vitals-command-status')).toHaveTextContent('Docked at station feat-station')
+    expect(screen.getByTestId('vitals-fuel-tons')).toBeInTheDocument()
+    expect(screen.queryByTestId('vitals-fleet-chevron')).toBeNull()
+    expect(screen.queryByTestId('vitals-details-toggle')).toBeNull()
+  })
+  it('preserves burn target and ETA while keeping Command selection separate', () => {
+    strip({ mode: 'panel', status: underwayStatus })
+    expect(screen.getByTestId('vitals-command-status')).toHaveTextContent('Under way to planet body-1')
+    expect(screen.getByTestId('vitals-command-status').querySelector('[data-raw]')).not.toBeNull()
+    expect(screen.getByTestId('vitals-strip').querySelectorAll('button')).toHaveLength(0)
+  })
+})
+
 function strip(over: Record<string, unknown> = {}) {
   const onSelectFleet = vi.fn()
   const utils = render(

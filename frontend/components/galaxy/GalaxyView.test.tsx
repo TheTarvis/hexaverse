@@ -485,7 +485,7 @@ describe('GalaxyView', () => {
     mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
     renderView()
     expect(screen.getByTestId('fleet-location-panel')).toHaveTextContent('Axion → Borealis')
-    expect(screen.getByTestId('galaxy-vitals')).toHaveTextContent('fleet_transit')
+    expect(screen.getByTestId('fleet-row-fleet_transit')).toHaveAttribute('aria-pressed', 'true')
     await screen.findByTestId('mock-graph')
     fireEvent.click(screen.getByTestId('focus-selected-fleet'))
     expect(focusSpy).toHaveBeenCalledWith('sys-1')

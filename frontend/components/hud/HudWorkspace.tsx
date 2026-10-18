@@ -13,7 +13,7 @@ export type HudPanelId = 'objects' | 'command' | 'console'
 type Lane = 'left' | 'right' | 'bottom'
 type Layout = { id: HudPanelId; lane: Lane; visible: boolean }[]
 export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode }
-export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; onPanelActivate?: (id: HudPanelId) => void; corporationId: string; panels: HudWorkspacePanel[]; className?: string; request?: { id: HudPanelId; sequence: number } }
+export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; onPanelActivate?: (id: HudPanelId) => void; corporationId: string; panels: HudWorkspacePanel[]; className?: string; request?: { id: HudPanelId; sequence: number }; settingsContent?: ReactNode }
 const defaults: Layout = [
   { id: 'objects', lane: 'left', visible: true },
   { id: 'command', lane: 'right', visible: true },
@@ -42,7 +42,7 @@ export function HudWorkspace(props: HudWorkspaceProps) {
   return <Workspace key={props.corporationId} {...props} />
 }
 
-function Workspace({ corporationId, panels, className, request, onPanelDismiss, onPanelActivate }: HudWorkspaceProps) {
+function Workspace({ corporationId, panels, className, request, onPanelDismiss, onPanelActivate, settingsContent }: HudWorkspaceProps) {
   const phone = usePhoneHud()
   const workspaceRef = useRef<HTMLDivElement>(null)
   const storageKey = `hexaverse:hud-layout:v1:${corporationId}`
@@ -213,6 +213,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
           </fieldset>
         })}
         <Button outline disabled={!ready} onClick={reset}>Reset HUD layout</Button>
+        {settingsContent}
       </HudCardShell>
     </div>}
     <div className={styles.stage} aria-label="HUD workspace">

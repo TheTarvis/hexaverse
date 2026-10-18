@@ -199,7 +199,7 @@ const open = () => screen.getByTestId('console-dock-open')
 const region = () => screen.getByTestId('console-dock-region')
 const collapseBtn = () => screen.getByTestId('console-dock-collapse')
 const canvas = () => screen.getByTestId('space-canvas-region')
-const chevron = () => screen.getByTestId('vitals-fleet-chevron')
+const commandFleetRow = () => screen.getByTestId('fleet-row-fleet_1')
 const refreshControl = () => within(screen.getByTestId('console-panel-log')).getByRole('button', { name: 'Refresh sighting log' })
 
 // Since `move-scan-control-to-console-dock` a fresh expand shows the Scan tab;
@@ -290,7 +290,7 @@ describe('Task 2.2 - Escape with focus outside the dock', () => {
       name: "the strip's chevron with its menu closed",
       scenario: "Collapsing with focus on the strip's chevron leaves focus there",
       arrange: () => undefined,
-      focus: () => chevron(),
+      focus: () => commandFleetRow(),
     },
     {
       name: 'the document body',
@@ -371,12 +371,12 @@ describe('Task 2.3 - collapsing by a pointer press that moves no focus leaves fo
   it('Scenario: Collapsing by a pointer press that moves no focus leaves focus on the chevron', () => {
     mount()
     expand()
-    chevron().focus()
-    expect(document.activeElement, 'precondition: the chevron holds focus').toBe(chevron())
+    commandFleetRow().focus()
+    expect(document.activeElement, 'precondition: the chevron holds focus').toBe(commandFleetRow())
     // a click event with no mousedown: no focus moves (user.click would focus the collapse control)
     fireEvent.click(collapseBtn())
     expect(region()).toHaveAttribute('hidden')
-    expect(document.activeElement).toBe(chevron())
+    expect(document.activeElement).toBe(commandFleetRow())
   })
 })
 
@@ -438,36 +438,18 @@ describe('Task 2.4 - the selection, the acting fleet and every request are untou
 // ============================================================================
 // Task 2.5 - the fleet menu's precedence
 // ============================================================================
-describe("Task 2.5 - the fleet cell's menu takes Escape first", () => {
-  const rows: [string, (user: ReturnType<typeof userEvent.setup>) => Promise<void>][] = [
-    ['focus on a menu entry', async (user) => { await user.click(chevron()) }],
-    [
-      'focus on the chevron with the menu open',
-      async (user) => {
-        await user.click(chevron())
-        chevron().focus()
-      },
-    ],
-  ]
-  for (const [name, openMenu] of rows) it(`Scenario: Escape with the fleet cell's menu open closes the menu and leaves the dock expanded / Scenario: A held Escape that closed the menu does not also collapse the dock (${name})`, async () => {
+describe('Command fleet selection replaces the footer menu', () => {
+  it('has one direct selector; Escape collapses Console without changing the command fleet', async () => {
     const user = userEvent.setup()
     mount()
     expand()
-    await openMenu(user)
-    expect(screen.getByTestId('vitals-fleet-menu'), 'precondition: the menu is open').toBeInTheDocument()
-
+    expect(screen.queryByTestId('vitals-fleet-chevron')).toBeNull()
+    expect(screen.queryByTestId('vitals-fleet-menu')).toBeNull()
+    commandFleetRow().focus()
     await user.keyboard('{Escape}')
-    expect(screen.queryByTestId('vitals-fleet-menu'), 'the menu did not close').toBeNull()
-    expect(document.activeElement, 'focus is not on the chevron').toBe(chevron())
-    expect(region(), 'the first Escape collapsed the dock').not.toHaveAttribute('hidden')
-
-    // the held key: a repeated keydown following the closing keydown
-    fireEvent.keyDown(document.activeElement as Element, { key: 'Escape', repeat: true })
-    expect(region(), 'a repeated keydown collapsed the dock').not.toHaveAttribute('hidden')
-
-    // positive control: a second, fresh Escape collapses the dock
-    await user.keyboard('{Escape}')
-    expect(region(), 'the second Escape did not collapse the dock').toHaveAttribute('hidden')
+    expect(region()).toHaveAttribute('hidden')
+    expect(commandFleetRow()).toHaveAttribute('aria-pressed', 'true')
+    expect(commandFleetRow()).toHaveFocus()
   })
 })
 

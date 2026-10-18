@@ -37,6 +37,11 @@ interface AccountContextValue {
 
 const AccountContext = createContext<AccountContextValue | undefined>(undefined)
 
+/** Supplementary account controls may be omitted in identity-free HUD fixtures. */
+export function useAccountOptional() {
+  return useContext(AccountContext)
+}
+
 export function useAccountContext() {
   const context = useContext(AccountContext)
   if (context === undefined) {

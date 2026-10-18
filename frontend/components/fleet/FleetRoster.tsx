@@ -84,6 +84,7 @@ export interface FleetRosterProps {
   currentSystemId?: string | null
   // Clicked a row (not a command button). The view decides what that means.
   onSelect?: (fleet: Fleet) => void
+  selectionDisabled?: boolean
   // Command callbacks — the mounting view composes the order target (body id
   // or point) and the laneId for jump; this panel only hands back the fleet.
   // A view declaring `commandOwner="roster"` supplies all four.
@@ -105,13 +106,14 @@ export function FleetRoster({
   activeFleetId,
   currentSystemId,
   onSelect,
+  selectionDisabled = false,
   onBurn,
   onCutDrive,
   onStop,
   onJump,
   enabled = true,
 }: FleetRosterProps) {
-  const { data: fleets } = useMyFleets({ enabled })
+  const { data: fleets, isError } = useMyFleets({ enabled })
   const { data: galaxy } = useGalaxy()
   const [open, setOpen] = useState(true)
   const qc = useQueryClient()
@@ -138,14 +140,14 @@ export function FleetRoster({
     return m
   }, [galaxy])
 
-  const own = useMemo(() => fleets ?? [], [fleets])
+  const own = useMemo(() => enabled ? fleets ?? [] : [], [enabled, fleets])
   // Nothing to manage until the player has a hull (pre-spawn, or logged out).
   if (own.length === 0) return null
 
   const nameOf = (id: string) => nameById.get(id) ?? id
 
   return (
-    <HudPanel as="aside" data-testid="fleet-roster" className="flex w-72 max-w-full flex-col self-start">
+    <HudPanel as="aside" data-testid="fleet-roster" className="flex w-full max-w-full flex-col self-start">
       <button
         type="button"
         data-testid="fleet-roster-toggle"
@@ -153,13 +155,13 @@ export function FleetRoster({
         className="flex items-center justify-between gap-2 px-4 py-3 text-left"
       >
         <span className="text-sm font-medium text-white">
-          Fleets <span className="text-zinc-400">· {own.length}</span>
+          Command fleet <span className="text-zinc-400">· {own.length} available</span>
         </span>
         <span className="font-mono text-xs text-zinc-400">{open ? '▾' : '▸'}</span>
       </button>
 
       {open && (
-        <ul className="max-h-80 overflow-y-auto border-t border-zinc-200 dark:border-zinc-800/50">
+        <ul className="border-t border-zinc-200 dark:border-zinc-800/50">
           {own.map((f) => {
             const runningMine = minesByActor.get(f.id) ?? null
             const status = rosterRowStatus(f, worldTime, nameOf, runningMine)
@@ -180,9 +182,12 @@ export function FleetRoster({
                   data-testid={`fleet-row-${f.id}`}
                   data-active={active}
                   aria-pressed={active}
+                  disabled={selectionDisabled || isError}
                   onClick={() => onSelect?.(f)}
-                  className={`flex w-full flex-col gap-0.5 text-left ${active ? 'bg-cyan-400/10 text-white ring-1 ring-cyan-400/30' : ''}`}
+                  title={f.id}
+                  className={`flex min-h-16 w-full flex-col gap-1 rounded p-3 text-left ${active ? 'bg-cyan-400/10 text-white ring-1 ring-cyan-400/30' : ''}`}
                 >
+                  <span className="flex flex-wrap items-center justify-between gap-2 text-sm text-white"><strong>Fleet {f.id.slice(-8)}</strong>{active && <span className="text-xs text-cyan-200">Selected command fleet</span>}</span>
                   <span className="flex items-center gap-2">
                     <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[status.tone]}`} />
                     <span className="truncate text-sm text-white">{status.where}</span>

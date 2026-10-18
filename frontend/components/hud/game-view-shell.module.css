@@ -1,16 +1,16 @@
 .root { isolation: isolate; }
 .scene { position: absolute; inset: 0; isolation: isolate; z-index: 0; }
 .identity { position: absolute; top: 28px; left: 32px; pointer-events: none; z-index: 10; }
-.workspace { bottom: 72px; --workspace-toolbar-top: 120px; --workspace-panels-top: 168px; --workspace-settings-reserve: 188px; }
+.workspace { bottom: 0; --workspace-panels-bottom: 64px; --workspace-toolbar-top: 120px; --workspace-panels-top: 168px; --workspace-settings-reserve: 188px; }
 .vitals { position: absolute; z-index: 35; bottom: 0; inset-inline: 0; pointer-events: auto; min-width: 0; }
 .vitals [data-testid='vitals-details-toggle'] { display: none; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .root { --phone-vitals-height: 64px; --phone-toolbar-top: calc(8px + env(safe-area-inset-top)); --phone-panel-top: calc(64px + env(safe-area-inset-top)); --phone-bottom: calc(var(--phone-vitals-height) + 60px + env(safe-area-inset-bottom)); position: fixed; inset: 0; width: 100%; max-width: 100%; min-width: 0; height: var(--system-viewport-height, 100dvh); box-sizing: border-box; overscroll-behavior: none; }
+  .root { --phone-vitals-height: 0px; --phone-toolbar-top: calc(8px + env(safe-area-inset-top)); --phone-panel-top: calc(64px + env(safe-area-inset-top)); --phone-bottom: calc(64px + env(safe-area-inset-bottom)); position: fixed; inset: 0; width: 100%; max-width: 100%; min-width: 0; height: var(--system-viewport-height, 100dvh); box-sizing: border-box; overscroll-behavior: none; }
   .root:has([data-testid='vitals-strip'][data-expanded='true']) { --phone-vitals-height: 144px; }
   .identity { top: calc(8px + env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); right: calc(216px + env(safe-area-inset-right)); display: block; }
   .identity > p { display: none; }
   .identity h1 { margin: 0; font-size: 18px; line-height: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .workspace { bottom: var(--phone-bottom); }
+  .workspace { bottom: 0; }
   .vitals { bottom: env(safe-area-inset-bottom); }
   .vitals [data-testid='vitals-strip'] { position: relative; box-sizing: border-box; height: var(--phone-vitals-height); min-width: 0; width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; padding: 4px max(12px, env(safe-area-inset-right)) 4px max(12px, env(safe-area-inset-left)); }
   .vitals [data-testid='vitals-strip'] > * { min-width: 0; max-width: 100%; }
@@ -31,3 +31,9 @@
 @media (max-height: 500px) and (max-width: 1024px) {
   .vitals [data-testid='vitals-fleet-cell'] > div { grid-template-columns: minmax(0, 1fr) 44px minmax(0, 2fr); }
 }
+
+.telemetry { min-width: 0; }
+.telemetry [data-testid='vitals-strip'] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; min-width: 0; gap: 12px; padding: 12px 0; border: 0; background: transparent; }
+.telemetry [data-testid='vitals-strip'] > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.telemetry [data-testid='vitals-fuel-cell'], .telemetry [data-testid='hold-readout'] > div { flex-wrap: wrap; }
+.telemetry [data-testid='vitals-credits-cell'] { align-items: start; }

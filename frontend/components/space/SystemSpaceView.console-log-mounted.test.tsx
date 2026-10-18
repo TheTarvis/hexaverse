@@ -389,7 +389,7 @@ describe('Task 1.4 - nothing of the log is reachable while the dock is collapsed
     expect(region()).toHaveAttribute('hidden')
 
     const visited: Element[] = []
-    const anchor = screen.getByTestId('vitals-fleet-chevron')
+    const anchor = screen.getByTestId('fleet-row-fleet_1')
     anchor.focus()
     for (let i = 0; i < 120; i++) {
       await user.tab()

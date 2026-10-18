@@ -26,11 +26,14 @@ import { useRef, useState } from 'react'
 import { Figure } from '@/components/figure/Figure'
 import { Gauge, type GaugeCost, type GaugeSegment } from './Gauge'
 import { VitalsStripFleetCell } from './VitalsStripFleetCell'
+import { VitalsStripPill } from './VitalsStripPill'
 import type { RosterRowStatus } from '@/components/fleet/roster-status'
 import { formatByUnit, instantScaleLabel } from '@/lib/format'
 import type { Fleet, FleetRoster } from '@/lib/types/fleet'
 
 export interface VitalsStripProps {
+  /** Production telemetry lives in Command; legacy fixtures may retain the instrument strip. */
+  mode?: 'strip' | 'panel'
   /** The acting fleet, or null when none of the requester's fleets is in
    *  this system. */
   acting: Fleet | null
@@ -239,6 +242,7 @@ function ClockCell({
 }
 
 export function VitalsStrip({
+  mode = 'strip',
   acting,
   ownedFleets,
   fleetsFailed,
@@ -262,8 +266,8 @@ export function VitalsStrip({
       data-expanded={detailsOpen}
       className="pointer-events-auto flex h-14 items-center justify-between gap-4 border-t border-zinc-200 bg-zinc-50/95 px-4 backdrop-blur dark:border-white/[0.12] dark:bg-zinc-700/95"
     >
-      <button type="button" data-testid="vitals-details-toggle" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(value => !value)}>{detailsOpen ? 'Less telemetry' : 'Telemetry'}</button>
-      <div data-testid="vitals-fleet-cell">
+      {mode === 'strip' && <button type="button" data-testid="vitals-details-toggle" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(value => !value)}>{detailsOpen ? 'Less telemetry' : 'Telemetry'}</button>}
+      {mode === 'strip' && <div data-testid="vitals-fleet-cell">
         <VitalsStripFleetCell
           acting={acting}
           ownedFleets={ownedFleets}
@@ -275,7 +279,10 @@ export function VitalsStrip({
           scale={scale}
           worldTime={worldTime}
         />
-      </div>
+      </div>}
+      {mode === 'panel' && <div data-testid="vitals-command-status" className="col-span-2">
+        <VitalsStripPill status={status} stranded={stranded} scale={scale} worldTime={worldTime} />
+      </div>}
       <FuelCell roster={roster} scale={scale} draining={draining} {...(burnCost ? { burnCost } : {})} />
       <HoldCell roster={roster} scale={scale} />
       <CreditsCell credits={credits} scale={scale} />

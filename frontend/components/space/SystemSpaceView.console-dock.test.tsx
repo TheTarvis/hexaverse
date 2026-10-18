@@ -303,7 +303,7 @@ describe('SystemSpaceView + ConsoleDock - task 2.2 the strip reads the same in b
   it('Scenario: The strip reads the same in both states', () => {
     vi.useFakeTimers()
     mount()
-    const CELLS = ['vitals-fleet-cell', 'vitals-fuel-cell', 'vitals-hold-cell', 'vitals-credits-cell', 'vitals-clock-cell']
+    const CELLS = ['vitals-fuel-cell', 'vitals-hold-cell', 'vitals-credits-cell', 'vitals-clock-cell']
     const read = () =>
       CELLS.map((id) => {
         const cell = screen.getByTestId(id)
@@ -314,18 +314,18 @@ describe('SystemSpaceView + ConsoleDock - task 2.2 the strip reads the same in b
         }
       })
     const collapsed = read()
-    const chevronCollapsed = screen.queryByTestId('vitals-fleet-chevron') !== null
+    const commandFleet = screen.getByTestId('fleet-row-fleet_1')
 
-    // non-vacuous: the acting fleet's identity is in the fleet cell and every cell has text
-    expect(collapsed[0].text).toContain('fleet_1')
+    // Telemetry stays unchanged; Command owns the sole selected-fleet control.
+    expect(commandFleet).toHaveAttribute('aria-pressed', 'true')
     for (const c of collapsed) expect(c.text, c.id).not.toBe('')
-    expect(chevronCollapsed).toBe(true)
+    expect(screen.queryByTestId('vitals-fleet-chevron')).toBeNull()
 
     fireEvent.click(open())
     expectExpanded()
 
     expect(read()).toEqual(collapsed)
-    expect(screen.queryByTestId('vitals-fleet-chevron') !== null).toBe(true)
+    expect(commandFleet).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -334,13 +334,8 @@ describe('SystemSpaceView + ConsoleDock - task 2.3 the Console control is not pa
     mount()
     const strip = screen.getByTestId('vitals-strip')
     const interactive = Array.from(strip.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, [tabindex]'))
-    expect(interactive.length).toBeGreaterThan(0)
-    const chevron = screen.getByTestId('vitals-fleet-chevron')
-    const menu = screen.queryByTestId('vitals-fleet-menu')
-    for (const el of interactive) {
-      const ok = el === chevron || (menu !== null && menu.contains(el)) || el.getAttribute('data-testid') === 'vitals-details-toggle'
-      expect(ok, `${el.outerHTML.slice(0, 80)} is the chevron or inside its menu`).toBe(true)
-    }
+    expect(interactive).toHaveLength(0)
+    expect(screen.getByTestId('fleet-row-fleet_1')).toHaveAttribute('aria-pressed', 'true')
     expect(strip.contains(open())).toBe(false)
     expect(interactive).not.toContain(open())
   })
@@ -389,7 +384,7 @@ describe('SystemSpaceView + ConsoleDock - task 2.5 no live region changes', () =
 
 describe('SystemSpaceView + ConsoleDock - workspace keyboard reachability', () => {
   async function tabCycle(user: ReturnType<typeof userEvent.setup>) {
-    const anchor = screen.getByTestId('vitals-fleet-chevron')
+    const anchor = screen.getByTestId('fleet-row-fleet_1')
     anchor.focus()
     const visited: Element[] = []
     for (let i = 0; i < 120; i++) {

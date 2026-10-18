@@ -65,7 +65,7 @@ export function MobileSystemHud({ gameplay = false, interactiveMap = false, disa
       { id: 'console', label: 'Console', children: <HudCardShell title="Ship console" lighting="none"><label>Console draft<input aria-label="Console draft" /></label><p>Scan telemetry available. Map selections: {canvasTaps}</p>{gameplay && <Button outline onClick={arrive}>Fixture: settle station arrival</Button>}</HudCardShell> },
     ]} />
     <div className={styles.workspaceVitals}><VitalsStrip acting={gameplay ? acting : fleet} ownedFleets={gameplay ? owned : [fleet]} fleetsFailed={false} status={gameplay ? rosterRowStatus(acting, worldTime, id => id === 'serais' ? 'Serais' : id) : { where: 'Serais', activity: 'Docked', tone: 'idle', activityKind: 'docked', hostLabel: 'station feat-station-with-a-long-disclosed-name' }} onSelectFleet={gameplay ? selected => setActingId(selected.id) : () => {}} systemNames={{ serais: 'Serais' }} credits={1000} scale={1} worldTime={worldTime} serverWorldTime={worldTime} /></div>
-  </Root><FloatingNavFrame onGalaxy={false} email="fixture@example.com" onSignOut={() => {}} /></>
+  </Root><FloatingNavFrame onGalaxy={false} /></>
 }
 const meta = { title: 'HUD/Mobile System', component: MobileSystemHud, parameters: { layout: 'fullscreen', docs: { description: { component: 'Identity-free regression fixture using live HUD, recovery guide, navigation and vitals components. No Auth, API or game mutations. Map button counts local selections.' } } } } satisfies Meta<typeof MobileSystemHud>
 export default meta

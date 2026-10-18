@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { FloatingNav } from './floating-nav'
 
 vi.mock('next/navigation', () => ({
@@ -41,14 +41,16 @@ describe('FloatingNav', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('links to the galaxy, shows the email, and signs out', () => {
+  it('provides only the Galaxy button, keeping account controls out of the footer', () => {
     vi.mocked(usePathname).mockReturnValue('/systems/sys-0')
     render(<FloatingNav />)
 
     expect(screen.getByTestId('nav-home')).toHaveAttribute('href', '/')
-    expect(screen.getByTestId('floating-nav')).toHaveTextContent('pilot@hexaverse.test')
-    fireEvent.click(screen.getByTestId('sign-out-button'))
-    expect(signOut).toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: 'Galaxy' })).toHaveAttribute('href', '/')
+    expect(screen.getByTestId('floating-nav')).not.toHaveTextContent('pilot@hexaverse.test')
+    expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sign-out-button')).not.toBeInTheDocument()
+    expect(signOut).not.toHaveBeenCalled()
   })
 
   it('marks the galaxy link current on the home route', () => {

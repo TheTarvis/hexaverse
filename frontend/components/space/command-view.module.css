@@ -91,8 +91,6 @@
 .commandView [data-testid='space-offscreen-reach'],
 /* HUD-HIDDEN-CLEANUP: Standalone Focus fleet button — retired HUD action. */
 .commandView [data-testid='system-focus-fleet'],
-/* HUD-HIDDEN-CLEANUP: System Fleets card — hidden pending fleet UI redesign. */
-.commandView [data-testid='fleet-roster'],
 /* HUD-HIDDEN-CLEANUP: Legacy Course card — awaiting replacement burn flow. */
 .commandView [data-testid='preview-panel'],
 /* HUD-HIDDEN-CLEANUP: Cut drive / Stop row — awaiting replacement controls. */
@@ -221,3 +219,5 @@
   .commandView .resumeGuide { top: calc(72px + env(safe-area-inset-top)); }
   .commandView:has(> .resumeGuide) .guideLayer { top: calc(124px + env(safe-area-inset-top)); }
 }
+
+.workspaceCommand > [data-testid="fleet-roster"] { width: 100%; }

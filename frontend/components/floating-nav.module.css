@@ -1,30 +1,6 @@
-.accountToggle { display: none; }
-@media (max-width: 760px) {
-  .navigation { bottom: 144px; left: 12px; right: 12px; height: 48px; padding: 2px 8px; flex-direction: row; justify-content: space-between; align-items: center; }
-  .navigation > a, .navigation .accountToggle { display: inline-flex; align-items: center; min-height: 44px; }
-  .account { display: none; position: absolute; bottom: 100%; right: 0; padding: 12px; background: #08121df5; border: 1px solid #435d70; }
-  .account[data-open='true'] { display: flex; }
-  .account button { min-height: 44px; }
-}
-
+.navigation { width: max-content; pointer-events: none; }
+.navigation > a { min-height: 44px; pointer-events: auto; background: #08121df2; color: #b1edff; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .navigation { box-sizing: border-box; bottom: calc(144px + env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); width: auto; max-width: calc(100% - 24px); height: 48px; padding: 2px 8px; flex-direction: row; justify-content: space-between; align-items: center; }
-  .navigation > a, .navigation .accountToggle { display: inline-flex; align-items: center; min-height: 44px; }
-  .account { display: none; position: absolute; bottom: 100%; right: 0; width: min(320px, calc(100vw - 24px)); max-width: 100%; box-sizing: border-box; padding: 12px; background: #08121df5; border: 1px solid #435d70; flex-wrap: wrap; }
-  .account[data-open='true'] { display: flex; }
-  .account > span { min-width: 0; flex: 1; }
-  .account button { min-height: 44px; }
-}
-@media (max-height: 500px) and (max-width: 1024px) {
-  .navigation { bottom: calc(80px + env(safe-area-inset-bottom)); }
-}
-@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .navigation { left: max(12px, env(safe-area-inset-left)); right: auto; width: max-content; max-width: calc(100% - 24px); bottom: calc(12px + env(safe-area-inset-bottom) + var(--system-viewport-bottom, 0px)); }
   :global(body:has([data-phone-sheet='true'])) .navigation { visibility: hidden; pointer-events: none; }
 }
-
-@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  :global(body:has([data-testid='space-view'])) .navigation { left: max(12px, env(safe-area-inset-left)); right: auto; width: auto; max-width: calc(100% - 176px); bottom: calc(76px + env(safe-area-inset-bottom) + var(--system-viewport-bottom, 0px)); height: 44px; padding: 0 4px; gap: 4px; }
-  :global(body:has([data-testid='space-view'] [data-testid='vitals-strip'][data-expanded='true'])) .navigation { bottom: calc(156px + env(safe-area-inset-bottom) + var(--system-viewport-bottom, 0px)); }
-}
-
-.navigation .accountToggle { color: #b1edff; }

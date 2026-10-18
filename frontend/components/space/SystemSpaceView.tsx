@@ -824,6 +824,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
 
   const selectFleet = useCallback(
     (fleet: Fleet) => {
+      if (travelGuard.held || fleets.isError) return
+      setTravelError(null)
       setActingFleetId(fleet.id)
       requestHudPanel('command')
       setTravelReceipt(receipt => receipt?.fleet.id === fleet.id ? receipt : null)
@@ -838,7 +840,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         return
       }
     },
-    [router, systemId, setActingFleetId, requestHudPanel],
+    [router, systemId, setActingFleetId, requestHudPanel, travelGuard, fleets.isError],
   )
 
   // --- derived panel inputs ------------------------------------------------
@@ -995,7 +997,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const statusDestination = travelReceipt?.destination ?? (statusFleet?.state?.Burn?.Target.BodyId ? nameOf(statusFleet.state.Burn.Target.BodyId) : statusFleet?.state?.Burn?.Target.Point ? 'Point in space' : statusFleet?.attachedTo ? nameOf(statusFleet.attachedTo) : 'In this system')
   const reviewTravel = () => { setTravelError(null); setTravelNotice(null); setTravelMode('review'); requestHudPanel(selection?.bodyId && objectIndexOpen ? 'objects' : 'command') }
   const travelCard = travelMode ? <CompactTravelCard mode={travelMode} fleet={travelMode === 'status' ? statusFleet : acting}
-    fleets={allFleets} systemId={systemId} destination={travelMode === 'status' ? statusDestination : destinationLabel}
+    onChooseFleet={() => requestHudPanel('command')} fleets={allFleets} systemId={systemId} destination={travelMode === 'status' ? statusDestination : destinationLabel}
     quote={currentQuote} worldTime={worldTime} scale={servedScale} blocker={travelBlocker} notice={travelNotice} error={fleets.isError ? 'Fleet telemetry unavailable.' : travelError}
     pending={travelPending} warning={travelReceipt?.fleet.strandingWarning}
     additionalActions={<>
@@ -1295,6 +1297,24 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           ) },
           { id: 'command', label: 'Command', children: (
 <div className={commandStyles.workspaceCommand}>
+        <FleetRoster worldTime={worldTime} scale={servedScale} commandOwner="view" activeFleetId={acting?.id ?? null} currentSystemId={systemId} onSelect={selectFleet} selectionDisabled={travelPending || fleets.isError} />
+      <GameViewVitals placement="panel" aria-label="Command fleet telemetry">
+<VitalsStrip mode="panel"
+          acting={acting}
+          ownedFleets={allFleets}
+          fleetsFailed={fleets.isError}
+          status={vitalsStatus}
+          onSelectFleet={selectFleet}
+          systemNames={systemNames}
+          credits={creditsShown}
+          scale={servedScale}
+          worldTime={worldTime}
+          serverWorldTime={serverWorldTime}
+          {...(currentQuote
+            ? { burnCost: { tons: currentQuote.fuelCostTons, affordable: currentQuote.affordable } }
+            : {})}
+        />
+      </GameViewVitals>
         {!(travelMode === 'review' && objectIndexOpen && selection?.bodyId) && travelCard}
         {!travelMode && <div className={travelStyles.entry}>
           {selection && <Button color="cyan" data-testid="travel-review-entry" onClick={reviewTravel}>Travel here</Button>}
@@ -1362,15 +1382,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             (`fleet-roster`: "The roster renders no commands on a view that
             owns them itself"). No `isChartedGate` stub: withholding jump by
             asserting a falsehood is what the live requirement forbids. */}
-        {/* TODO(HUD-HIDDEN-CLEANUP): System roster is CSS-hidden; remove this usage after fleet UI redesign, preserving other shared consumers. */}
-        <FleetRoster
-          worldTime={worldTime}
-          scale={servedScale}
-          commandOwner="view"
-          activeFleetId={acting?.id ?? null}
-          currentSystemId={systemId}
-          onSelect={selectFleet}
-        />
+
       </HudColumn>
       </div>
           ) },
@@ -1422,23 +1434,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         ]}
       />
       <div ref={setConsoleAnnouncementOutlet} data-testid="workspace-console-announcements" />
-      <GameViewVitals className={commandStyles.workspaceVitals}>
-<VitalsStrip
-          acting={acting}
-          ownedFleets={allFleets}
-          fleetsFailed={fleets.isError}
-          status={vitalsStatus}
-          onSelectFleet={selectFleet}
-          systemNames={systemNames}
-          credits={creditsShown}
-          scale={servedScale}
-          worldTime={worldTime}
-          serverWorldTime={serverWorldTime}
-          {...(currentQuote
-            ? { burnCost: { tons: currentQuote.fuelCostTons, affordable: currentQuote.affordable } }
-            : {})}
-        />
-      </GameViewVitals>
+
     </GameViewShell>
   )
 }

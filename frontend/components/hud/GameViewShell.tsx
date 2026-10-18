@@ -5,6 +5,8 @@ import clsx from 'clsx'
 import { SystemViewport } from '@/components/space/SystemViewport'
 import { HudHeading } from './GameHud'
 import { HudWorkspace, type HudWorkspaceProps } from './HudWorkspace'
+import { GameAccountSettings } from './GameAccountSettings'
+import { HudHeading as HudContentHeading } from './HudTypography'
 import styles from './game-view-shell.module.css'
 
 /** Shared presentation only. Routes retain queries, selection, commands and renderer ownership. */
@@ -21,9 +23,12 @@ export function GameViewScene({ className, ...props }: ComponentPropsWithoutRef<
 }
 
 export function GameViewWorkspace({ className, ...props }: HudWorkspaceProps) {
-  return <HudWorkspace {...props} className={clsx(styles.workspace, className)} />
+  return <HudWorkspace settingsContent={<GameAccountSettings />} {...props} className={clsx(styles.workspace, className)} />
 }
 
-export function GameViewVitals({ className, ...props }: ComponentPropsWithoutRef<'div'>) {
-  return <div {...props} className={clsx(styles.vitals, className)} />
+export function GameViewVitals({ className, placement = 'footer', children, ...props }: ComponentPropsWithoutRef<'div'> & { placement?: 'footer' | 'panel' }) {
+  return <div {...props} className={clsx(placement === 'panel' ? styles.telemetry : styles.vitals, className)}>
+    {placement === 'panel' && <HudContentHeading variant="section" level={3}>Telemetry</HudContentHeading>}
+    {children}
+  </div>
 }

@@ -693,3 +693,36 @@ shared layout/corporation isolation and first-login/mobile sheet behavior.
 [Evidence](../.scratch/shared-game-shell/README.md) separates these checks from
 unverified physical-iPhone and full emulator gameplay acceptance. The access policy
 and existing 2026-10-19T00:00:00Z cutoff remain unchanged.
+
+## Footer cleanup and Command fleet selection — 2026-10-18
+
+Travis requested a Galaxy button in place of the footer chrome, Sign out in
+settings, and clearer fleet selection. His two supplied iPhone screenshots show
+three separate surfaces: FloatingNav's Galaxy/Account controls, the Telemetry
+toggle and VitalsStrip's raw fleet ID/dropdown/status band. The original references
+were inspected privately; they are not published game or Storybook assets.
+
+Authenticated map mode now has one Galaxy navigation button. The Account toggle,
+email/sign-out footer panel, telemetry expander and fleet dropdown are removed from
+production map chrome. Sign out and account identity live in an Account section of
+the existing Arrange HUD card; guest/identity-free fixtures omit account actions.
+There is no second settings owner, and opening/closing settings never signs out.
+
+Command owns the sole production command-fleet selector, reusing FleetRoster with
+full-width direct choices, location/activity and explicit selected text/aria-pressed
+state. The current API has no fleet-name field, so labels use “Fleet” plus a short
+ID suffix, with the full ID available on the row. No naming feature was introduced.
+The shared card content owns scrolling; the roster has no nested scrolling viewport.
+Objects' inspected fleet remains separate from the command fleet.
+
+Fuel, cargo/hold, credits and world time are preserved in labeled Command telemetry.
+This supersedes the earlier always-on/footer placement and telemetry-expander choice.
+Production travel review links to Command for fleet selection rather than mounting
+another dropdown. Switching uses the existing selection/quote lifecycle, preserves
+the destination, rejects the old fleet quote and cannot switch during an accepted
+command's pending submission. Existing commands and server authority are unchanged.
+
+Original 624c4ff card chrome, fullscreen phone ownership, direct icons, mounted
+browsing/drafts, layout isolation, 16px fields and released iOS viewport behavior are
+preserved. [Evidence](../.scratch/footer-cleanup/README.md) records scoped checks,
+synthetic browser validation and deployment; native iPhone acceptance is separate.
