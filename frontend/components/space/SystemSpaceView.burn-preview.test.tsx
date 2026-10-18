@@ -1342,7 +1342,6 @@ describe('compact production travel', () => {
   })
   it('replaces body inspection and returns Back to the retained browse context without an order', async () => {
     mount([ready()]); await flush()
-    await click('system-index-toggle')
     fireEvent.change(screen.getByTestId('system-index-search'), { target: { value: 'rocky' } })
     await click(`index-${OTHER}`); await click('details-plot')
     expect(screen.getByTestId('compact-travel-card')).toBeVisible()

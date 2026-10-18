@@ -1,3 +1,4 @@
+import { showObjects } from '../helpers/space-view'
 import { test, expect, type Page, type Locator, type TestInfo } from '@playwright/test'
 import { seededSystemId } from '../helpers/seeded-world'
 import type { WireGalaxy } from '../../lib/types/galaxy'
@@ -172,8 +173,7 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     await info.attach(`${backend}-adapters.json`, { body: JSON.stringify(await page.evaluate(() => (window as unknown as { __webgpuJourney: BrowserEvidence }).__webgpuJourney.adapters)), contentType: 'application/json' })
     await capture(page, canvas, info, `${backend}-system-initial.png`)
     await sustainedGrid(page, canvas, info, backend)
-    const toggle = page.getByTestId('system-index-toggle')
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+    await showObjects(page)
     await page.getByTestId('index-gpu-star').click()
     const details = page.getByRole('complementary', { name: 'Details for gpu-star' })
     const surface = details.getByTestId('spacecraft-preview-surface'), preview = surface.locator('canvas')
@@ -235,7 +235,7 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     await lose(page, canvas, backend)
     await expect(page.getByTestId('renderer-interrupted')).toBeVisible()
     await expect(region).toHaveAttribute('data-selection', 'gpu-rock')
-    await expect(page.getByTestId('system-index-toggle')).toBeEnabled()
+    await expect(page.getByRole('button', { name: /^Objects(?: \(hidden\))?$/ })).toBeEnabled()
     await frames(page, 12)
     await page.getByTestId('renderer-retry').click()
     await ready(canvas, backend)
@@ -252,7 +252,7 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     for (const spectralClass of ['O', 'unknown']) {
       servedWorld = { ...world, starClass: spectralClass }
       await page.reload(); await ready(canvas, backend)
-      if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+      await showObjects(page)
       await page.getByTestId('index-gpu-star').click(); await ready(preview, backend)
       await capture(page, preview, info, `${backend}-stellar-class-${spectralClass}.png`)
     }
@@ -261,14 +261,14 @@ for (const backend of ['webgpu', 'webgl2'] as const) {
     const assetURL = '**/models/space/orbital-station.glb'
     await page.route(assetURL, route => route.fulfill({ status: 404, body: 'Asset unavailable' }))
     await page.reload(); await ready(canvas, backend)
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+    await showObjects(page)
     await page.getByTestId('index-gpu-station').click()
     await ready(station.locator('canvas'), backend)
     await expect(station.getByRole('status')).toHaveText('Simplified model preview.')
     await capture(page, station.locator('canvas'), info, `${backend}-asset-fallback.png`)
     await page.unroute(assetURL)
     await page.reload(); await ready(canvas, backend)
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+    await showObjects(page)
     await page.getByTestId('index-gpu-station').click()
     await ready(station.locator('canvas'), backend)
     await expect(station.getByRole('status')).toHaveText('')

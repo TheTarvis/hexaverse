@@ -1242,8 +1242,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       {guiding && guide && <HudCardShell lighting="none" className={commandStyles.objectiveCard} aria-label="Current objective"><HudText variant="label">Current objective</HudText><HudText role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</HudText></HudCardShell>}
       </div>
       <HudWorkspace
-        onPanelActivate={id => { if (id === 'console') openDockOn(dock.tab) }}
-        onPanelDismiss={id => { if (id === 'console') collapseDock() }}
+        onPanelActivate={id => { if (id === 'objects') openObjectIndex(true); else if (id === 'console') openDockOn(dock.tab) }}
+        onPanelDismiss={id => { if (id === 'objects') setObjectIndexOpen(false); else if (id === 'console') collapseDock() }}
         corporationId={corporation?.id ?? sessionCorporation?.id ?? 'unavailable'}
         className={commandStyles.workspace}
         request={hudRequest}

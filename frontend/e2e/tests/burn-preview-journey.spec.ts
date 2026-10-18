@@ -17,7 +17,7 @@ test('current Objects selection can be inspected and plotted while the retired C
     await expect(details).toContainText(target.id)
     await expect(page.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', target.id)
     await details.getByRole('button', { name: 'Plot course ↗' }).click({ timeout: 10_000 })
-    await expect(page.getByTestId('system-index-toggle')).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByTestId('system-index-search')).toBeHidden()
     await expect(page.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', target.id)
     await expect(page.getByTestId('preview-panel')).toBeHidden()
     await expect(page.getByTestId('burn-button')).toBeHidden()

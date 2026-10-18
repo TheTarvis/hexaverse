@@ -64,7 +64,8 @@ test.describe('new user first activities', () => {
     await rows.first().click()
     await expect(page.getByTestId('vitals-fleet-id')).toHaveText(fleetId)
     await expect(page.getByTestId('hold-readout')).toBeVisible()
-    await expect(page.getByTestId('system-index-toggle')).toBeVisible()
+    await expect(page.getByTestId('system-index-toggle')).toHaveCount(0)
+    await expect(page.getByTestId('hud-workspace')).toBeAttached()
     await expect(page.getByTestId('burn-button'), 'the current HUD does not expose a burn commit').toBeHidden()
 
     // 5. Lane fog (`fleet-movement`/`corporation-spawn`: spawn charts home

@@ -229,22 +229,31 @@ export async function wakeNewCorp(page: Page, name: string, tag: string, options
   return { email, password, homeSystemId, fleetId }
 }
 
-/** Leave the optional tutorial and close Objects through real HUD controls. */
+/** Open the existing Objects card; there is no inner list disclosure. */
+export async function showObjects(page: Page): Promise<void> {
+  const panel = page.locator('section[data-panel="objects"]')
+  if (!await panel.isVisible()) await page.getByRole('button', { name: /^Objects(?: \(hidden\))?$/ }).click()
+  await expect(panel).toBeVisible({ timeout: 10_000 })
+}
+
+/** Leave the optional tutorial and close the outer Objects card. */
 export async function prepareCommandHud(page: Page): Promise<void> {
   const dismiss = page.getByTestId('dismiss-guide')
   if (await dismiss.isVisible()) await dismiss.click()
-  const objects = page.getByTestId('system-index-toggle')
-  await expect(objects).toBeVisible({ timeout: 10_000 })
-  if (await objects.getAttribute('aria-expanded') === 'true') await objects.click()
+  const close = page.getByRole('button', { name: /^(Hide Objects|Close Objects panel)$/ })
+  if (await close.isVisible()) await close.click()
 }
 
-/** Open current disclosed object details; no retired command-panel selectors. */
+/** Open current disclosed details through the always-visible search/list. */
 export async function openObjectDetails(page: Page, bodyId: string): Promise<Locator> {
-  const toggle = page.getByTestId('system-index-toggle')
-  await expect(toggle).toBeVisible({ timeout: 10_000 })
-  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+  await showObjects(page)
+  const reviewBack = page.getByTestId('compact-travel-card').getByRole('button', { name: 'Back', exact: true })
+  if (await reviewBack.isVisible()) await reviewBack.click()
   const details = page.getByRole('complementary', { name: `Details for ${bodyId}`, exact: true })
   if (!await details.isVisible()) {
+    const back = page.getByTestId('details-back')
+    if (await back.isVisible()) await back.click()
+    await page.getByTestId('system-index-search').fill('')
     const row = page.getByTestId(`index-${bodyId}`)
     await expect(row).toBeVisible({ timeout: 10_000 })
     await row.click({ timeout: 10_000 })

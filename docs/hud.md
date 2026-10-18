@@ -616,3 +616,20 @@ The two supplied screenshot Library IDs could not be read in the local session:
 Library screenshot/content tools were unavailable. Implementation was grounded in
 the actual four-destination menu and verified rendered routes instead. Physical
 iPhone acceptance remains separate from local-browser/engine checks.
+
+## Objects list and pinned search — 2026-10-18
+
+Opening Objects shows every available server-disclosed row immediately with an
+empty text query. The inner Objects disclosure is removed. This does not open a
+fullscreen panel on map entry; the existing workspace launcher owns that choice.
+Search remains pinned inside the actual card scroll viewport, without covering
+its fixed navigation/header. Typing filters known names/types; clearing restores
+all available rows. No category selector hides rows. Opening does not autofocus
+the field or summon a phone keyboard.
+
+Selection, detail Back, mounted action drafts and all existing actions retain their
+owners. Closing the outer card releases expensive previews while preserving
+browsing state. Escape backs out of details first, then reaches the workspace.
+Original shared header/close styling, direct icon strip, safe areas, 16px phone
+fields and accessible zoom remain unchanged. HUD/Objects Search demonstrates the
+same component with enough rows to exercise real internal scrolling.

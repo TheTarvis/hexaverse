@@ -1057,3 +1057,27 @@ focus restore, tutorial/resume/inert handoffs, retained drafts, original chrome
 parity and desktop behavior. Final browser errors[]; no live game writes. Temporary
 candidate20215 and local Storybook20218 listeners were stopped after verification.
 The in-app browser viewport was reset and its temporary inspection tab closed.
+
+## Battery-shutdown recovery — 2026-10-18 17:59 UTC
+
+Travis requested $spinup and restarting the existing tunnel after battery shutdown.
+The repository spinup skill was applied through GoLand MCP: dependencies already
+existed; firebase:emulators, dev:backend, dev:frontend, dev:agent and storybook were
+restored in IDE Run tabs. No existing listener required killing, no packages were
+installed, and test-emulator lanes were untouched. Frontend20200/login,
+backend20201/healthcheck, agent20202/health and Storybook20203 return200. Enabled
+Firebase Auth/Firestore/websocket/PubSub/UI/hub/logging ports are ready; storage
+is not enabled. These development services remain running after preview testing.
+
+Reboot cleared temporary preview builds and logs. Rebuilt accepted commit bd41074
+in /private/tmp/hexaverse-recovered-preview-66adydwd (build RPXd_Ngg6m1kqFBcDgvQ1)
+and restored the temporary launchd supervisor at
+/tmp/hexaverse-weekend-supervision/preview.plist. It owns only frontend20209,
+gateway20204 and ngrok. The same gulf-identity-scrap.ngrok-free.dev URL, exact
+Google-email allowlist, existing routes and Oct19 00:00UTC cutoff remain. No
+new login/power settings or exposure were introduced. Seven source/build/policy
+pins, bounded restart delays and process-group termination at cutoff are enforced.
+Local preview/login200 and anonymous external302 verified. Post-reboot error and
+transport logs start empty; the historical347-byte transport log was lost rather
+than preserved through reboot. The accepted build remains live until the Objects
+candidate finishes verification and the existing supervisor is switched.

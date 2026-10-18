@@ -1330,7 +1330,6 @@ describe('SystemSpaceView — the vitals strip is mounted and fed from the view\
 
 it('opens real object details without an order and replaces them with travel review', async () => {
   view()
-  await userEvent.click(screen.getByTestId('system-index-toggle'))
   await userEvent.click(screen.getByTestId('index-feat-body-0'))
   expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
   expect(screen.getByRole('complementary', { name: 'Details for feat-body-0' })).toHaveTextContent('metals')
@@ -1349,14 +1348,13 @@ it('opens real object details without an order and replaces them with travel rev
 it('withholds cached object details after interior failure and offers retry', async () => {
   setReads({ isError: true })
   view()
-  await userEvent.click(screen.getByTestId('system-index-toggle'))
   expect(screen.queryByTestId('index-feat-body-0')).not.toBeInTheDocument()
   expect(screen.getByText('System objects are unavailable.')).toBeVisible()
   await userEvent.click(screen.getByTestId('index-retry'))
   expect(interiorRefetch).toHaveBeenCalled()
 })
 
-it.each(['system-index-toggle', 'guide-target'])('advances object discovery through %s without issuing an order', async entry => {
+it.each(['index-feat-body-0', 'guide-target'])('advances object discovery through %s without issuing an order', async entry => {
   const { newGuide, saveGuide } = await import('@/lib/command-onboarding')
   const guide = { ...newGuide('corp-1', 'fleet_1', SYSTEM_ID), phase: 'target' as const, targetId: 'feat-body-0' }
   vi.mocked(localStorage.getItem).mockImplementation(key => key === 'hexaverse:command-guide:v1:corp-1' ? JSON.stringify(guide) : null)
@@ -1367,9 +1365,9 @@ it.each(['system-index-toggle', 'guide-target'])('advances object discovery thro
     await userEvent.click(screen.getByTestId(entry))
     expect(screen.queryByTestId('recovery-transmission')).not.toBeInTheDocument()
     expect(screen.getByTestId('tutorial-objective')).toHaveTextContent('Complete tutorial · 0/1')
-    expect(screen.getByTestId('system-index-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('system-index-search')).toBeVisible()
     expect(screen.getByTestId('live-object-browser')).toHaveAttribute('data-attention', 'false')
-    await userEvent.click(screen.getByTestId('system-index-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
     expect(screen.queryByTestId('recovery-transmission')).not.toBeInTheDocument()
     expect(mutations.order.mutate).not.toHaveBeenCalled()
   } finally {
@@ -1391,7 +1389,7 @@ it.each(['wake', 'target', 'done'] as const)('shows tutorial objective from %s w
   }
 })
 
-it.each(['system-index-toggle', 'guide-objects'])('introduces the station then scanning through %s', async entry => {
+it.each(['index-feat-station', 'guide-objects'])('introduces the station then scanning through %s', async entry => {
   const { newGuide } = await import('@/lib/command-onboarding')
   const guide = { ...newGuide('corp-1', 'fleet_1', SYSTEM_ID), phase: 'objects' as const }
   const values = new Map([['hexaverse:command-guide:v1:corp-1', JSON.stringify(guide)]])
@@ -1402,7 +1400,7 @@ it.each(['system-index-toggle', 'guide-objects'])('introduces the station then s
     await userEvent.click(screen.getByTestId(entry))
     expect(screen.getByTestId('recovery-transmission')).toHaveAttribute('data-phase', 'station')
     expect(screen.getByTestId('recovery-copy')).toHaveTextContent('home port')
-    expect(screen.getByTestId('system-index-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('system-index-search')).toBeVisible()
     await userEvent.click(screen.getByTestId('guide-introduce-scan'))
     expect(screen.getByTestId('recovery-copy')).toHaveTextContent('Let’s scan')
     expect(mutations.order.mutate).not.toHaveBeenCalled()
@@ -1440,7 +1438,6 @@ it('keeps docked station services in station details and preserves quantities ac
   view()
   expect(screen.getByTestId('sell-section')).not.toBeVisible()
   expect(screen.getByTestId('refuel-section')).not.toBeVisible()
-  await userEvent.click(screen.getByTestId('system-index-toggle'))
   await userEvent.click(screen.getByTestId(`index-${STATION.featureId}`))
   const details = screen.getByRole('complementary', { name: `Details for ${STATION.featureId}` })
   expect(details).toContainElement(screen.getByTestId('sell-section'))
@@ -1450,9 +1447,9 @@ it('keeps docked station services in station details and preserves quantities ac
   expect(screen.getByTestId('refuel-section')).not.toBeVisible()
   await userEvent.click(screen.getByTestId(`index-${STATION.featureId}`))
   expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
-  await userEvent.click(screen.getByTestId('system-index-toggle'))
+  await userEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
   expect(screen.getByTestId('refuel-section')).not.toBeVisible()
-  await userEvent.click(screen.getByTestId('system-index-toggle'))
+  await userEvent.click(screen.getByRole('button', { name: 'Objects (hidden)' }))
   expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
 })
 
@@ -1507,8 +1504,7 @@ describe('reachable non-map HUD actions', () => {
     stage.available = false
     setReads({ data: undefined, isError: true, error: new Error('interior unavailable') }, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
     view()
-    await userEvent.click(screen.getByTestId('system-index-toggle'))
-    expect(screen.getByTestId('sell-section')).toBeVisible()
+      expect(screen.getByTestId('sell-section')).toBeVisible()
     expect(screen.getByTestId('refuel-section')).toBeVisible()
     expect(screen.getByTestId('stationkeep-control')).toBeVisible()
     expect(screen.queryByTestId('celestial-actions')).not.toBeInTheDocument()
@@ -1517,9 +1513,9 @@ describe('reachable non-map HUD actions', () => {
     expect(mutations.refuel.mutate).toHaveBeenCalledTimes(1)
     await userEvent.click(screen.getByTestId('stationkeep-control'))
     expect(mutations.hold.mutate).toHaveBeenCalledTimes(1)
-    await userEvent.click(screen.getByTestId('system-index-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
     expect(screen.getByTestId('refuel-section')).not.toBeVisible()
-    await userEvent.click(screen.getByTestId('system-index-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: 'Objects (hidden)' }))
     expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
   })
 

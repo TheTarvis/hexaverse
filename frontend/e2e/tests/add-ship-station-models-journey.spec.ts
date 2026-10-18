@@ -1,3 +1,4 @@
+import { showObjects } from '../helpers/space-view'
 import { test, expect } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -76,8 +77,7 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   const stationDetails = page.getByRole('complementary', { name: `Details for ${stationId}` })
   const preview = stationDetails.getByTestId('spacecraft-preview-surface')
   async function openStationDetails() {
-    const toggle = page.getByTestId('system-index-toggle')
-    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+    await showObjects(page)
     const stationRow = page.getByTestId(`index-${stationId}`)
     await expect(stationRow).toBeVisible({ timeout: 10_000 })
     await stationRow.focus({ timeout: 10_000 })
@@ -128,7 +128,7 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   await expect(acting).toHaveAttribute('data-acting', 'true')
   await page.getByTestId('details-back').click()
   await expect(page.getByTestId('spacecraft-preview-surface')).toHaveCount(0)
-  await page.getByTestId('system-index-toggle').click()
+  await page.getByRole('button', { name: 'Hide Objects', exact: true }).click()
 
   // Exercise hit testing AFTER camera changes, not only in default framing.
   const orbit = page.getByRole('group', { name: 'Orbit the camera with arrow keys; hold Shift and press arrow keys to pan', exact: true })
@@ -148,8 +148,8 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   await expect(acting).toHaveAttribute('data-acting', 'true')
 
   // Inspect B while A acts and the station remains the gameplay target.
-  await page.getByTestId('system-index-toggle').click()
-  await expect(page.getByTestId('system-index-toggle')).toContainText('Objects · 5')
+  await showObjects(page)
+  await expect(page.getByTestId('system-index-results').locator('[aria-controls="object-details"]')).toHaveCount(5)
   await expect(page.getByTestId('index-fleet-art-remote-fleet')).toHaveCount(0)
   await expect(page.getByTestId('index-fleet-art-transit-fleet')).toHaveCount(0)
   const fleetRow = page.getByTestId(`index-fleet-${inspectedFleetId}`)
@@ -166,7 +166,7 @@ test('Scenario: local models and isolated previews survive interaction, failure 
   await expect(region).toHaveAttribute('data-camera', beforeInspect!)
   await objectPreview.press('Escape')
   await expect(fleetDetails).toHaveCount(0); await expect(fleetRow).toBeFocused()
-  await page.getByTestId('system-index-toggle').click()
+  await page.getByRole('button', { name: 'Hide Objects', exact: true }).click()
   // Now ACTUALLY activate B using its map affordance; target remains the station.
   const secondMark = page.getByTestId(`fleet-mark-${inspectedFleetId}`)
   await secondMark.focus(); await secondMark.press('Enter')

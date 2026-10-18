@@ -67,6 +67,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
   onPlot?: () => void
   objects: IndexedObject[]
   selected: string | null
+  /** Preview activity only. The disclosed-object list is always visible. */
   open: boolean
   onOpen: (open: boolean) => void
   onSelect: (name: string) => void
@@ -77,7 +78,6 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
   const [details, setDetails] = useState<string | null>(null)
   const expandButtons = useRef(new Map<string, HTMLElement>())
   const searchRef = useRef<HTMLInputElement>(null)
-  const toggleRef = useRef<HTMLButtonElement>(null)
   const rowKey = (object: IndexedObject) => JSON.stringify([object.fleet ? 'fleet' : 'body', object.fleet?.id ?? object.name])
   const available = objects.filter(object => object.fleet ? !fleetsFailed && !fleetsLoading : !failed && !loading)
   const fleetDetail = details?.startsWith('["fleet",') ?? false
@@ -98,22 +98,21 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
   }, [fleetDetail, detailObject, open])
   function closeDetails() {
     setDetails(null)
-    if (details) requestAnimationFrame(() => (expandButtons.current.get(details) ?? searchRef.current ?? toggleRef.current)?.focus())
+    if (details) requestAnimationFrame(() => (expandButtons.current.get(details) ?? searchRef.current)?.focus())
   }
   const [search, setSearch] = useState('')
   const matches = available.filter(object => `${object.label ?? object.name} ${object.catalogueRef ?? ""} ${object.kind}`.toLowerCase().includes(search.trim().toLowerCase()))
   return <div className={`${styles.indexShell} ${compact ? styles.compact : ''}`}>
-    <Button plain ref={toggleRef} data-testid="system-index-toggle" aria-expanded={open} aria-controls="system-index" onClick={() => onOpen(!open)}>⌕ Objects · {available.length} <span>{open ? '−' : '+'}</span></Button>
-    {/* Keep embedded command state mounted while its drawer is closed. */}
-    {(open || detailContent || inspectorBody) && <div style={!open ? { display: 'none' } : undefined} className={styles.indexPanels} data-details={!!detailObject || servicesWithoutDetails} onKeyDown={event => {
-      if (event.key !== 'Escape') return
-      event.stopPropagation()
-      if (details) closeDetails()
-      else { onOpen(false); document.querySelector<HTMLElement>('[data-testid="system-index-toggle"]')?.focus() }
+    {/* Rows stay visible; `open` controls expensive detail previews, not disclosure. */}
+    <div className={styles.indexPanels} data-details={!!detailObject || servicesWithoutDetails} onKeyDown={event => {
+      if (event.key === 'Escape' && details) { event.stopPropagation(); closeDetails() }
     }}>
       <aside id="system-index" className={styles.systemIndex} aria-label="System index" style={inspectorBody ? { display: 'none' } : undefined}>
+        <div className={styles.searchHeader} data-testid="system-index-search-header">
         <HudText variant="label">{systemName} / Known objects</HudText>
-        <Input ref={searchRef} autoFocus data-testid="system-index-search" aria-label="Find a system object" placeholder="Find a world, station, fleet…" value={search} onChange={event => setSearch(event.target.value)} />
+        <Input ref={searchRef} type="search" autoComplete="off" spellCheck={false} enterKeyHint="search" data-testid="system-index-search" aria-label="Find a system object" placeholder="Find a world, station, fleet…" value={search} onChange={event => setSearch(event.target.value)} />
+        </div>
+        <div data-testid="system-index-results">
         {loading && <HudText variant="secondary" role="status">Loading system objects…</HudText>}
         {failed && <div role="alert"><HudText variant="secondary">System objects are unavailable.</HudText><Button plain data-testid="index-retry" onClick={onRetry}>Retry</Button></div>}
         {fleetsLoading && <HudText variant="secondary" role="status">Loading fleets…</HudText>}
@@ -121,7 +120,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
         {Array.from(new Set(available.map(object => object.group))).map(group => {
           const rows = matches.filter(object => object.group === group)
           return rows.length > 0 && <section key={group}><HudHeading variant="section" level={3}>{group}</HudHeading>{rows.map(object => <div key={rowKey(object)} className={styles.indexRow} data-selected={object.fleet ? selectedFleetId === object.fleet.id : !fleetDetail && selected === object.name}>
-            <Button plain ref={el => { if (el) expandButtons.current.set(rowKey(object), el); else expandButtons.current.delete(rowKey(object)) }} data-testid={object.fleet ? `index-fleet-${object.fleet.id}` : `index-${object.name}`} aria-expanded={!!detailObject && rowKey(detailObject) === rowKey(object)} aria-controls="object-details" onClick={() => { if (object.fleet) onSelectFleet?.(object.fleet.id); else onSelect(object.name); setDetails(detailObject && rowKey(detailObject) === rowKey(object) ? null : rowKey(object)) }}>
+            <Button plain ref={el => { if (el) expandButtons.current.set(rowKey(object), el); else expandButtons.current.delete(rowKey(object)) }} data-testid={object.fleet ? `index-fleet-${object.fleet.id}` : `index-${object.name}`} aria-expanded={!!detailObject && rowKey(detailObject) === rowKey(object)} aria-controls="object-details" onClick={() => { if (!open) onOpen(true); if (object.fleet) onSelectFleet?.(object.fleet.id); else onSelect(object.name); setDetails(detailObject && rowKey(detailObject) === rowKey(object) ? null : rowKey(object)) }}>
               <ObjectThumbnail object={object} />
               <span className={styles.rowCopy}><strong>{object.label ?? object.name}</strong><small>{object.enclosingStar && `${object.enclosingStar} · `}{object.catalogueRef && `${object.catalogueRef} · `}{object.kind}{object.name === tutorialTarget ? ' · Tutorial destination' : ''}</small></span>
               <span aria-hidden="true" className={styles.rowChevron}>{detailObject && rowKey(detailObject) === rowKey(object) ? '‹' : '›'}</span>
@@ -130,6 +129,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
         })}
         {!loading && !failed && !fleetsLoading && !fleetsFailed && matches.length === 0 && <HudText variant="secondary" role="status">{available.length ? 'No known objects match. Try a name or type.' : 'No objects have been disclosed in this system.'}</HudText>}
         <small className={styles.muted}>Select an object to open or close its details.</small>
+        </div>
       </aside>
       {(detailObject || detailContent || inspectorBody) && <aside style={!detailObject && !inspectorBody && !servicesWithoutDetails ? { display: 'none' } : inspectorBody ? { padding: 0, border: 0, background: 'transparent', overflow: 'visible' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.label ?? detailObject.name}` : servicesWithoutDetails ? 'Docked station services' : undefined}>
         {inspectorBody}
@@ -159,6 +159,6 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
         </div>}
         </div>
       </aside>}
-    </div>}
+    </div>
   </div>
 }

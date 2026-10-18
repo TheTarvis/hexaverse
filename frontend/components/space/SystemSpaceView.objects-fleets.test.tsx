@@ -184,7 +184,7 @@ vi.mock('./SpacecraftPreview', () => ({ SpacecraftPreview: ({ objectId, kind, ac
 } }))
 const row = (id: string) => screen.getByTestId(`index-fleet-${id}`)
 const canvas = () => screen.getByTestId('space-canvas-region')
-function showIndex() { const toggle = screen.getByTestId('system-index-toggle'); if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle) }
+function showIndex() { const launcher = screen.queryByRole('button', { name: 'Objects (hidden)' }); if (launcher) fireEvent.click(launcher); expect(screen.getByTestId('system-index-search')).toBeVisible() }
 function inspect(id = 'fleet_2') { fireEvent.click(row(id)) }
 function seedPair() { useMyFleets.mockReturnValue(ownFleets([fleet('fleet_1'), fleet('fleet_2')])) }
 function noCommands() { for (const mutation of Object.values(mutations)) { expect(mutation.mutate).not.toHaveBeenCalled(); expect(mutation.mutateAsync).not.toHaveBeenCalled() } }
@@ -199,7 +199,7 @@ describe('Objects own-fleet parent integration', () => {
     const view = mount(); showIndex()
     for (const id of ['parked', 'burning', 'drifting']) expect(row(id)).toBeVisible()
     for (const id of ['remote', 'transit', 'no-position', 'foreign']) expect(screen.queryByTestId(`index-fleet-${id}`)).toBeNull()
-    expect(screen.getByTestId('system-index-toggle')).toHaveTextContent('Objects · 4')
+    expect(screen.getByTestId('system-index-results').querySelectorAll('[aria-controls="object-details"]')).toHaveLength(4)
     expect(screen.queryByTestId('test-preview')).toBeNull()
     fireEvent.change(screen.getByLabelText('Find a system object'), { target: { value: 'fleet' } })
     expect(row('parked')).toBeVisible(); expect(screen.queryByTestId('index-feat-star')).toBeNull()
@@ -211,7 +211,7 @@ describe('Objects own-fleet parent integration', () => {
     mount(); showIndex()
     expect(screen.queryByTestId('index-fleet-stale')).toBeNull()
     expect(screen.getByTestId('index-feat-star')).toBeEnabled()
-    expect(screen.getByTestId('system-index-toggle')).toHaveTextContent('Objects · 1')
+    expect(screen.getByTestId('system-index-results').querySelectorAll('[aria-controls="object-details"]')).toHaveLength(1)
     if (reason === 'failed') {
       const alert = screen.getAllByRole('alert').find(el => /fleet/i.test(el.textContent ?? '') && within(el).queryByRole('button', { name: /retry/i }))!
       expect(alert).toBeDefined(); fireEvent.click(within(alert).getByRole('button', { name: /retry/i }))
@@ -263,7 +263,7 @@ describe('Objects own-fleet parent integration', () => {
     expect(life.created).toEqual(['fleet_2']); expect(life.disposed).toEqual([])
     fireEvent.change(screen.getByLabelText('Find a system object'), { target: { value: 'no-match' } })
     expect(screen.getByTestId('test-preview')).toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('system-index-toggle')); expect(screen.queryByTestId('test-preview')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Objects' })); expect(screen.queryByTestId('test-preview')).toBeNull()
     showIndex(); expect(screen.getByTestId('test-preview')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('details-back')); expect(screen.queryByTestId('test-preview')).toBeNull()
   })

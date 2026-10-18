@@ -16,8 +16,8 @@ it('filters objects, handles empty search, and separates selection from focusing
   expect(screen.getByRole('status')).toHaveTextContent('No known objects match')
   fireEvent.keyDown(screen.getByTestId('system-index-search'), { key: 'Escape' })
   fireEvent.keyDown(screen.getByTestId('system-index-search'), { key: 'Escape' })
-  expect(onOpen).toHaveBeenCalledWith(false)
-  expect(screen.getByTestId('system-index-toggle')).toHaveFocus()
+  expect(onOpen).not.toHaveBeenCalled()
+  expect(screen.queryByTestId('system-index-toggle')).toBeNull()
 })
 
 

@@ -157,7 +157,6 @@ it('locates off-screen objects without plotting or changing the active fleet', (
   expect(screen.getByTestId('system-camera')).toHaveAttribute('data-focus', 'object')
   expect(screen.getByTestId('active-fleet')).toHaveAccessibleName('Nyxiour, selected fleet')
   expect(screen.getByTestId('preview-action')).toHaveTextContent('Plot course')
-  click('system-index-toggle')
   click('details-plot')
   expect(screen.getByTestId('preview-action')).toHaveTextContent('Engage drive')
 })

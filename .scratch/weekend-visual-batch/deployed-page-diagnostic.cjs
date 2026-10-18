@@ -14,6 +14,7 @@ if(process.env.QA_HUD_CASE==='mine'){
  interior.features[1].type='rocky';interior.features[1].resources=[{kind:'metals',richness:1}]
 }
 fleet.roster.fuelPricePerTon=2
+if(process.env.QA_OBJECTS_SEARCH==='1')for(let i=1;i<=20;i++)interior.features.push({id:'qa-extra-'+String(i).padStart(2,'0'),name:'QA Survey Site '+String(i).padStart(2,'0'),type:'rocky',space:{X:-60+i*2,Y:0,Z:-30},size:.6,resources:[]})
 const originalChrome=JSON.parse(fs.readFileSync(__dirname+'/../../frontend/components/hud/__fixtures__/original-card-chrome.json','utf8'))
 async function chromeGeometry(card){
  return card.evaluate((e,reference)=>{
@@ -68,7 +69,7 @@ async function checkMobileNavigation(p,name){
  await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();assert.equal(await consoleTrigger.evaluate(e=>e===document.activeElement),true)
  await p.setViewportSize({width:390,height:844});await p.waitForTimeout(120)
  await open()
- const toggle=p.getByTestId('system-index-toggle');if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.tap()
+ assert.equal(await p.getByTestId('system-index-toggle').count(),0)
  const search=p.getByTestId('system-index-search')
  console.log(name,'SEARCH COMPUTED FONT',await search.evaluate(e=>getComputedStyle(e).fontSize))
  if(process.env.QA_NAV_BASELINE==='1'){console.log(name,'TITLE BASELINE',await p.locator('[data-panel="objects"] > [data-slot="hud-card"]').evaluate(e=>{const c=e.getBoundingClientRect(),t=e.querySelector('[data-slot="hud-title"]').getBoundingClientRect();return {cardCenter:c.x+c.width/2,titleCenter:t.x+t.width/2,delta:t.x+t.width/2-c.x-c.width/2}}));await p.getByRole('button',{name:'Close Objects panel',exact:true}).tap();return}
@@ -112,6 +113,44 @@ async function checkMobileNavigation(p,name){
  console.log(name,'ORIGINAL CHROME PASS: frozen 624c4ff plaque/close/icon properties and corner geometry, independent Back, invisible 44px target edge tap dismisses')
  console.log(name,'MOBILE NAV PASS: four persistent tabs including Arrange; original 28px transparent close with invisible 44px target outside scrolling, >=16px computed form text, focus/blur/reduced keyboard space, details/back/search retained, callbacks and one sheet owner release; native iPhone focus zoom pending')
 }
+async function checkObjectsSearch(p,c,name){
+ assert.equal(await p.getByRole('dialog').count(),0,'Objects must not auto-open a fullscreen panel on entry')
+ const expected=interior.features.length+1,owner=p.locator('section[data-panel="objects"]'),search=p.getByTestId('system-index-search'),header=p.getByTestId('system-index-search-header')
+ const session=name==='Chromium'?await c.newCDPSession(p):null
+ for(const size of [{width:320,height:667},{width:375,height:667},{width:390,height:844},{width:844,height:390},{width:1280,height:900}]){
+  await p.setViewportSize(size);await p.waitForTimeout(120)
+  if(!await owner.isVisible())await p.getByRole('button',{name:/^Objects(?: \(hidden\))?$/}).tap()
+  assert.equal(await search.isVisible(),true);assert.equal(await search.inputValue(),'')
+  assert.equal(await search.evaluate(e=>e===document.activeElement),false,'Opening Objects must not summon the keyboard')
+  assert.equal(await p.getByTestId('system-index-toggle').count(),0)
+  const rows=p.getByTestId('system-index-results').locator('[aria-controls="object-details"]');assert.equal(await rows.count(),expected,'All available bodies/fleets render immediately')
+  assert.equal(await p.getByTestId('system-index-results').locator('select,[role="combobox"],[aria-haspopup="listbox"]').count(),0)
+  const scroll=owner.locator(':scope > [data-slot="hud-card"] > [data-slot="hud-body"] > [data-slot="hud-content"]')
+  assert.ok(await scroll.evaluate(e=>e.scrollHeight>e.clientHeight+200),'Real disclosed rows must overflow inside the card')
+  await scroll.evaluate(e=>{e.scrollTop=180});await p.waitForTimeout(100);const pinned=await header.boundingBox()
+  await scroll.evaluate(e=>{e.scrollTop=420});await p.waitForTimeout(100);const after=await header.boundingBox(),v=await scroll.boundingBox(),field=await search.boundingBox()
+  assert.ok(Math.abs(pinned.y-after.y)<1,'Search stays pinned while actual rows scroll: '+JSON.stringify({pinned,after}))
+  assert.ok(after.y>=v.y&&field.y+field.height<=v.y+v.height,'Search stays inside card viewport')
+  await scroll.evaluate(e=>{e.scrollTop=0});await p.waitForTimeout(80)
+  if(session){const box=await scroll.boundingBox(),h=await header.boundingBox(),x=box.x+box.width/2,start=box.y+box.height-24,end=Math.max(h.y+h.height+12,box.y+64);await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:0,x,y:start}]});for(let i=1;i<=5;i++)await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{id:0,x,y:start+(end-start)*i/5}]});await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await p.waitForTimeout(150);assert.ok(await scroll.evaluate(e=>e.scrollTop)>0,'Trusted touch scroll moves the real object list')}
+  // Mobile WebKit does not expose wheel or native swipe automation; sticky bounds and real keyboard scrolling are checked below.
+  await search.fill('QA Survey Site 03');assert.equal(await rows.count(),1);assert.equal(await p.getByTestId('index-qa-extra-03').isVisible(),true)
+  await search.fill('there-is-no-such-object');assert.equal(await rows.count(),0);assert.equal(await owner.getByText('No known objects match. Try a name or type.',{exact:true}).isVisible(),true)
+  await search.press('ControlOrMeta+A');await search.press('Backspace');assert.equal(await rows.count(),expected)
+  await scroll.evaluate(e=>{e.scrollTop=0});await rows.first().focus();await rows.first().press('PageDown');await p.waitForTimeout(150);assert.ok(await scroll.evaluate(e=>e.scrollTop)>0,'Keyboard scroll reaches the actual list')
+  const y=await header.boundingBox();assert.ok(y.y>=v.y&&y.y+y.height<=v.y+v.height)
+  await p.screenshot({path:out+'/'+name.toLowerCase()+'-objects-sticky-'+size.width+'.png'})
+  await search.fill('qa-planet');await scroll.evaluate(e=>{e.scrollTop=0});await p.waitForTimeout(80)
+  const select=p.getByTestId('index-qa-planet');if(size.width>=1000)await select.press('Enter');else await select.tap();assert.equal(await p.getByTestId('details-back').isVisible(),true)
+  if(size.width>=1000)await p.getByTestId('details-back').press('Enter');else await p.getByTestId('details-back').tap();assert.equal(await search.inputValue(),'qa-planet');await search.fill('');assert.equal(await rows.count(),expected)
+  await assertOriginalChrome(owner.locator(':scope > [data-slot="hud-card"]'))
+  const close=owner.getByRole('button',{name:/^(Close Objects panel|Hide Objects)$/});await close.tap();assert.equal(await owner.isVisible(),false)
+  assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
+ }
+ await p.setViewportSize({width:390,height:844});await p.waitForTimeout(150)
+ const close=p.getByRole('button',{name:/^Close (Objects|Command|Console) panel$/});if(await close.count())await close.tap()
+ console.log(name,'OBJECT SEARCH PASS: no disclosure or hidden category filter; all disclosed rows immediately visible; 320/375/390 portrait, landscape and desktop sticky search across real card scroll; typing/keyboard clear/no results; Chromium native touch plus both-engine PageDown (native WebKit swipe unavailable); detail/back and original chrome retained; no auto-open or autofocus')
+}
 async function checkHudInspector(p,name){
  await p.getByTestId('vitals-fleet-chevron').tap();await p.getByTestId('vitals-fleet-inspect').tap()
  const dialog=p.getByRole('dialog',{name:'Fleet '+fleetId+' details',exact:true});assert.equal(await dialog.isVisible(),true)
@@ -133,7 +172,7 @@ async function checkHudBaseline(p,name){
  }else assert.equal(await command.getByTestId('refuel-section').count(),0,'Station services belong to the station details')
  await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-command-'+(process.env.QA_HUD_CASE||'station')+'.png'})
  await p.getByRole('button',{name:'Objects',exact:true}).tap();await assertFrame('objects')
- const toggle=p.getByTestId('system-index-toggle');if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.tap()
+ assert.equal(await p.getByTestId('system-index-toggle').count(),0)
  const search=p.getByTestId('system-index-search');await search.fill('qa-planet');await p.getByTestId('index-qa-planet').tap()
  assert.equal(await p.getByRole('heading',{name:'qa-planet',exact:true}).isVisible(),true)
  await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-details.png'})
@@ -258,7 +297,7 @@ async function run(type,options,name){
  await p.route('**/emulator/auth/iframe**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Synthetic Auth frame</title>'}))
  await p.route('**/identitytoolkit.googleapis.com/**',async route=>{const path=new URL(route.request().url()).pathname;if(path.includes('signInWithPassword'))return route.fulfill({json:{localId:uid,email:'isolated@example.invalid',idToken:token,refreshToken:'synthetic-refresh',expiresIn:'3600',registered:true}});if(path.includes('lookup'))return route.fulfill({json:{users:[{localId:uid,email:'isolated@example.invalid',emailVerified:true,displayName:'Isolated QA',providerUserInfo:[],createdAt:'1000',lastLoginAt:'1000'}]}});return route.fulfill({status:400,json:{error:{message:'QA_AUTH_ROUTE_BLOCKED'}}})})
  await p.route('**/securetoken.googleapis.com/**',route=>route.fulfill({json:{access_token:token,id_token:token,refresh_token:'synthetic-refresh',expires_in:'3600',user_id:uid,token_type:'Bearer'}}))
- await p.route('**/api/**',async route=>{const u=new URL(route.request().url()),path=u.pathname.slice(4);requests.push(path);if((process.env.QA_ORBIT==='1'||process.env.QA_HUD_BASELINE==='1'||process.env.QA_MOBILE_NAV==='1')&&path.endsWith('/orders/preview')&&route.request().method()==='POST'){fixtureWrites.push(path);return route.fulfill({json:{controlPoints:[],departMs:1000,arriveMs:2000,deltaV:1,fuelCostTons:1,affordable:true,strandingWarning:false}})}if(process.env.QA_FIRST_LOGIN==='1'&&path==='/v1/corporations'&&route.request().method()==='POST'){spawned=true;fixtureWrites.push(path);return route.fulfill({json:{corporation:{id:corp,accountId:uid,name:'Isolated QA',createdAt:0,credits:1000},fleet,homeSystem:{id:system,name:'QA System',region:'normal',coords:{x:0,y:0,z:0},skeleton:{starClass:'G',bodies:[]}},worldTime:1000}})}if(route.request().method()!=='GET'){writes.push(path);return route.fulfill({status:403,json:{error:'Synthetic QA forbids mutations'}})}
+ await p.route('**/api/**',async route=>{const u=new URL(route.request().url()),path=u.pathname.slice(4);requests.push(path);if((process.env.QA_ORBIT==='1'||process.env.QA_HUD_BASELINE==='1'||process.env.QA_MOBILE_NAV==='1'||process.env.QA_OBJECTS_SEARCH==='1')&&path.endsWith('/orders/preview')&&route.request().method()==='POST'){fixtureWrites.push(path);return route.fulfill({json:{controlPoints:[],departMs:1000,arriveMs:2000,deltaV:1,fuelCostTons:1,affordable:true,strandingWarning:false}})}if(process.env.QA_FIRST_LOGIN==='1'&&path==='/v1/corporations'&&route.request().method()==='POST'){spawned=true;fixtureWrites.push(path);return route.fulfill({json:{corporation:{id:corp,accountId:uid,name:'Isolated QA',createdAt:0,credits:1000},fleet,homeSystem:{id:system,name:'QA System',region:'normal',coords:{x:0,y:0,z:0},skeleton:{starClass:'G',bodies:[]}},worldTime:1000}})}if(route.request().method()!=='GET'){writes.push(path);return route.fulfill({status:403,json:{error:'Synthetic QA forbids mutations'}})}
  let data,status=200
  if(path==='/v1/accounts/firestore')data={id:uid,email:'isolated@example.invalid',name:'Isolated QA'}
  else if(path==='/v1/corporations/me'&&!spawned)return route.fulfill({status:200,contentType:'application/json',body:'null'})
@@ -297,7 +336,7 @@ async function run(type,options,name){
   assert.ok(r&&n&&o&&r.y>=n.y+n.height&&o.y>=r.y+r.height,'Paused guide and icon strip own separate rows: '+JSON.stringify({r,n,o}))
   await p.getByRole('button',{name:'Console',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
   await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();await resume.tap()
-  assert.equal(await p.getByRole('dialog',{name:'Recovery transmission',exact:true}).isVisible(),true)
+  await p.getByRole('dialog',{name:'Recovery transmission',exact:true}).waitFor({state:'visible'})
   console.log(name,'GUIDE HANDOFF PASS: real guide opens Objects, icon Console roundtrip, resume row does not overlap icons/objective, modal isolation restores')
  }
  if(await p.getByTestId('dismiss-guide').count()){ await p.getByTestId('dismiss-guide').tap({timeout:4000}).then(()=>console.log(name,'dismiss fired')).catch(e=>console.log(name,'dismiss FAILED',e.message.split('\n')[0]))}
@@ -308,6 +347,7 @@ async function run(type,options,name){
   await p.getByRole('button',{name:'Console',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
   await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();assert.equal(await p.getByRole('dialog').count(),0)
   const region=p.getByTestId('space-canvas-region'),camera=JSON.parse(await region.getAttribute('data-camera'));await region.focus();await region.press('+');assert.ok(JSON.parse(await region.getAttribute('data-camera')).distance<camera.distance)
+  if(process.env.QA_OBJECTS_SEARCH==='1')await checkObjectsSearch(p,c,name)
   if(process.env.QA_MOBILE_NAV==='1')await checkMobileNavigation(p,name)
   if(process.env.QA_HUD_BASELINE==='1')await checkHudBaseline(p,name)
   if(process.env.QA_HUD_INSPECTOR==='1')await checkHudInspector(p,name)
@@ -317,7 +357,7 @@ async function run(type,options,name){
   assert.equal(writes.length,0)
  }
  console.log(name,'final errors',JSON.stringify(errors))
- await c.close()
+ await p.unrouteAll({behavior:'wait'});await c.close()
  }finally{await b.close()}
 }
 ;(async()=>{await run(chromium,{},'Chromium');await run(webkit,{executablePath:'/Users/travis/Library/Caches/ms-playwright/webkit-2182/pw_run.sh'},'WebKit')})().catch(e=>{console.error(e);process.exitCode=1})

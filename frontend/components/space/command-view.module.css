@@ -47,7 +47,7 @@
 }
 
 /* Guide the eye to the real control as well as the briefing shortcut. */
-.objectBrowser[data-attention='true'] [data-testid='system-index-toggle'] {
+.objectBrowser[data-attention='true'] [data-testid='system-index-search'] {
   outline: 2px solid #76e3ef;
   animation: objectsBeacon 1.6s ease-in-out infinite;
 }
@@ -82,7 +82,7 @@
 .transmission[data-phase='target'] .checks,
 .transmission[data-phase='target'] small { display: none; }
 @media (prefers-reduced-motion: reduce) {
-  .objectBrowser[data-attention='true'] [data-testid='system-index-toggle'] { animation: none; }
+  .objectBrowser[data-attention='true'] [data-testid='system-index-search'] { animation: none; }
 }
 
 /*

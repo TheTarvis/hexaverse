@@ -214,3 +214,34 @@ and no live game writes. Build trwcoovSMTxWb7fxtZDlG retains all57 public assets
 A first QA-forwarded thumbnail GET reset recovered with a direct200 matching read;
 only the QA GET forwarder gained one reset-only retry. No server changes/restart
 were needed. Temporary test servers/browser tabs were cleaned up afterward.
+
+## Objects list/search follow-up — 2026-10-18
+
+The supplied IMG_1045/IMG_1046 references were inspected for this request: the first
+showed the empty collapsed Objects disclosure, the second the populated list and
+keyboard. Remove that inner disclosure, retain text search above immediately
+populated disclosed rows, and keep it pinned during actual list scrolling. Do not
+auto-open the fullscreen card on route entry or autofocus its search. Original
+624c4ff shared card/header/close CSS and direct mobile icon controls are unchanged.
+Selection/Back, mounted drafts, outer-card show/hide and preview disposal remain.
+The search header masks the owning card's padded inset so rows cannot peek above it.
+
+383 tests across24 files pass; types/scoped lint, production and Storybook builds
+pass. Browser checks use real production bundles with intercepted synthetic
+Auth/game reads and quote responses; they issue no live game writes. Native
+Chromium touch and both-engine keyboard scrolling are distinct from physical iOS
+acceptance. Mobile WebKit exposes no native swipe/wheel automation. Local Chrome
+inspection after reboot is blocked by the disconnected browser control surface
+and native app timeout; physical iPhone acceptance remains pending.
+
+Final candidate dzvUlXJ5gttS9vxBEcbSW passes Chromium/WebKit Objects regression at
+320/375/390 portrait,844landscape and1280desktop: all disclosed rows, actual sticky
+bounds/internal overflow, typing/clear/no-results, PageDown, detail/Back and original
+chrome. Chromium native touch scroll passes; WebKit keyboard scroll passes, native
+swipe remains unavailable. Guide/resume/icon-Console/inert handoff passes in both
+engines with explicit visibility synchronization. All57 public assets match the
+accepted snapshot. [Phone](objects-sticky-search-phone.png) and
+[desktop](objects-sticky-search-desktop.png) captures preserve the rendered result.
+Full emulator-backed journeys were updated for retired selectors and type checked,
+but were not executed in this task. Local Storybook375 renders the actual30-row
+story; its play exercise restores the complete list after typing and clearing.

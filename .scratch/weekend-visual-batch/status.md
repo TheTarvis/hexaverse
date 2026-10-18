@@ -578,3 +578,33 @@ checks pass with errors[] and no game writes. First QA resource-forwarder reset
 was transient; asset returned200 with exact bytes, errors/transport stayed0/347.
 QA retries one reset GET only; production unchanged. Temporary20215/20218 listeners
 stopped, local browser viewport reset and tab closed.
+
+### Battery recovery and Objects continuation — 2026-10-18
+
+$spinup restored dependencies already on disk, all enabled Firebase development
+emulators, Go backend20201, Next frontend20200, Python agent20202 and Storybook20203
+in GoLand Run tabs. Health200 for each; no dependency reinstall or killed PIDs.
+Protected preview recovered at17:59UTC from accepted bd41074, build
+RPXd_Ngg6m1kqFBcDgvQ1, same endpoint/email/routes and Oct19 00UTC cutoff. Reboot
+cleared /tmp, so temporary source/build/supervisor were reconstructed; historical
+transport log bytes were lost. Live local200/anonymous external302 verified.
+Saved Objects implementation and all working-tree changes were preserved.
+
+Objects continuation removes the inner disclosure, shows all disclosed rows with
+empty query on card opening, pins text search inside the actual list scroll, and
+removes autofocus. It does not open a fullscreen card on entry. Shared original
+header/close/direct icons, actions, details/Back, drafts and preview lifecycle are
+retained. A standalone Storybook story exercises30 rows/search/no-results/clear.
+383 focused tests/24files, types/scoped lint and production/Storybook builds pass.
+Camera and synthetic first-login regressions pass in Chromium and WebKit. Local
+Chrome control is disconnected after reboot; native app access timed out. Physical
+iPhone and native WebKit swipe acceptance remain separate outstanding checks.
+
+Final candidate dzvUlXJ5gttS9vxBEcbSW passes Chromium/WebKit 320/375/390 portrait,
+844landscape and1280desktop real-bundle Objects/guide checks: sticky bounds over
+actual overflow, immediate24 synthetic rows, typing/clear/no-results, PageDown,
+selection/Back, chrome and inert release. Chromium native touch scroll passes;
+WebKit native swipe is unavailable. Errors[] and no live writes. Local Storybook
+375 renders30rows and play search/clear. Full emulator journeys not run. All57
+public assets and original shared-card CSS are byte-identical to accepted source.
+Captures: .scratch/hud-card-baseline/objects-sticky-search-{phone,desktop}.png.

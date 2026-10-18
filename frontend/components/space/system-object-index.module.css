@@ -1,7 +1,6 @@
 
 .indexShell { --muted: #91a3b7; --signal: #76e3ef; color: #dce6f0; display: flex; flex-direction: column; min-height: 0; max-height: 100%; width: 280px; }
-.indexShell > button { flex-shrink: 0; width: 100%; justify-content: space-between; border: 1px solid #76e3ef55; background: #071019ed; color: var(--signal); }
-.indexPanels { display: flex; align-items: stretch; margin-top: 8px; min-height: 0; flex: 1 1 auto; }
+.indexPanels { display: flex; align-items: stretch; margin-top: 0; min-height: 0; flex: 1 1 auto; }
 .systemIndex, .objectDetails { box-sizing: border-box; padding: 16px; min-height: 0; border: 1px solid #76e3ef44; background: #071019f5; scrollbar-width: thin; scrollbar-color: #76e3ef88 #071019; }
 .systemIndex { flex: 0 0 280px; overflow-y: auto; scrollbar-gutter: stable; }
 .systemIndex input { color: #dce6f0; background: #0c1b28; }
@@ -38,7 +37,7 @@
 }
 .portrait { flex-shrink: 0; }
 .indexShell button { color: #dce6f0; }
-.indexShell > button, .indexRow[data-selected='true'] > button { color: var(--signal); }
+.indexRow[data-selected='true'] > button { color: var(--signal); }
 .indexShell .primary { color: white; }
 
 
@@ -58,3 +57,10 @@
 .compact .detailsHeader { position: static; background: transparent; }
 .compact .objectDetails { margin-top: 16px; }
 .compact .inspectorTitle { margin-block: 8px 16px; }
+
+/* Search stays at the top of the owning list/card scroll viewport. No disclosure
+   or category filter can hide otherwise available objects. */
+.searchHeader { position: sticky; top: 0; z-index: 2; display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; background: #0b1621; }
+.compact .searchHeader { top: 12px; }
+/* Cover the card's existing padded inset so scrolled rows cannot peek above search. */
+.compact .searchHeader::before { content: ''; position: absolute; inset: -36px -16px 0; z-index: -1; background: inherit; pointer-events: none; }

@@ -49,7 +49,7 @@ test.describe('the continuous-space view through the current HUD', () => {
     await details.getByTestId('index-focus').click()
     await expect(details.getByTestId('details-plot')).toBeEnabled()
     await details.getByTestId('details-plot').click()
-    await expect(page.getByTestId('system-index-toggle')).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByTestId('system-index-search')).toBeHidden()
     await expect(page.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', lodeId!)
     await expect(page.getByTestId('burn-button'), 'Plot course currently does not expose a burn commit').toBeHidden()
     await expect(page.getByTestId('fleet-flight-controls')).toBeHidden()
