@@ -1081,3 +1081,32 @@ Local preview/login200 and anonymous external302 verified. Post-reboot error and
 transport logs start empty; the historical347-byte transport log was lost rather
 than preserved through reboot. The accepted build remains live until the Objects
 candidate finishes verification and the existing supervisor is switched.
+
+### Objects candidate deployed — 2026-10-18 18:18 UTC
+
+Local commit aafb57f removes the inner Objects disclosure and pins text search
+while showing all available rows immediately. Verified isolated production build
+**dzvUlXJ5gttS9vxBEcbSW** now serves through the existing supervisor. Only the
+frontend snapshot path and its two build pins changed; gateway/ngrok commands,
+exact Google-email restriction, deadline and existing published Storybook/art
+snapshot are unchanged. All57 public assets and original card-shell CSS match the
+accepted source. The new Objects search story is available in local Storybook20203.
+
+Complete compressed home/login/system HTML200 (system no-store),33initial served
+JS/CSS assets matching build bytes,7valid pins, anonymous edge302, Storybook200,
+debug/QA404 and foreign OriginPOST403 verified. Chromium/WebKit runs through the
+live gateway pass immediate24synthetic rows, sticky search over actual overflow,
+320/375/390portrait/844landscape/1280desktop, filtering/clear/no-results,
+keyboard/detail/Back/close, original chrome and guide/resume/inert handoffs.
+Errors[] and no live game writes; all game/Auth traffic uses synthetic intercepted
+fixtures. Native Chromium list touch and both-engine PageDown pass. Native WebKit
+swipe, physical iPhone acceptance and local user-Chrome inspection remain unverified;
+the latter's browser connection disappeared and native access timed out after reboot.
+
+383unit/component tests across24files, types/scoped lint and production/Storybook
+builds pass. Full emulator journeys were updated/type checked, not executed.
+Evidence: /tmp/hexaverse-objects-search-{regression,candidate-final,live,deployment}.log,
+/tmp/hexaverse-objects-camera-first.log and .scratch/hud-card-baseline/objects-sticky-search-
+{phone,desktop}.png. Supervisor errors and post-reboot transport logs remain0bytes.
+Stopped only temporary candidate20218 after validation; all requested development
+services, emulators and protected preview remain running. No push.

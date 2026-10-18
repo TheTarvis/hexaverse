@@ -608,3 +608,12 @@ WebKit native swipe is unavailable. Errors[] and no live writes. Local Storybook
 375 renders30rows and play search/clear. Full emulator journeys not run. All57
 public assets and original shared-card CSS are byte-identical to accepted source.
 Captures: .scratch/hud-card-baseline/objects-sticky-search-{phone,desktop}.png.
+
+Objects deployed18:18UTC: aafb57f, build dzvUlXJ5gttS9vxBEcbSW. Live gateway
+Chromium/WebKit Objects/guide/inert checks pass, errors[] and no live writes.
+Complete compressed pages200,33initial byte-matching JS/CSS assets,7pins,
+anonymous302,Storybook200,debug/QA404,foreignOriginPOST403. Same exact identity,
+Oct19 00UTC cutoff and pinned published Storybook/art; public assets unchanged.
+Post-reboot supervisor/transport logs0bytes. Temporary candidate20218 stopped;
+GoLand services/emulators and protected preview remain online. No push. Operational
+evidence and remaining physical iPhone/local-Chrome limitations: docs/phone-preview.md.
