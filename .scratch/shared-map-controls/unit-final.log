@@ -1,0 +1,236 @@
+
+ RUN  v3.2.7 /Users/travis/Projects/hexaverse/frontend
+
+ ✓ components/space/SystemSpaceView.objects-fleets.test.tsx (13 tests) 3816ms
+   ✓ Objects own-fleet parent integration > Scenario: Local fleets join count and search  538ms
+   ✓ Objects own-fleet parent integration > Scenario: Inspect fleet without changing acting or target  435ms
+   ✓ Objects own-fleet parent integration > Scenario: Eligibility changes withdraw fleet details — failed cannot resurrect  418ms
+   ✓ Objects own-fleet parent integration > Scenario: Eligibility changes withdraw fleet details — transit cannot resurrect  314ms
+   ✓ Objects own-fleet parent integration > Scenario: Close hide and live status refresh  493ms
+ ✓ components/space/SystemSpaceView.console-dock-escape.test.tsx (18 tests) 4054ms
+   ✓ Task 2.1 - Escape with focus inside the dock collapses it and moves focus to the Console control > Scenario: Escape with focus inside the dock collapses it and moves focus to the Console control (focus on the Log tab)  345ms
+   ✓ Task 2.1 - Escape with focus inside the dock collapses it and moves focus to the Console control > Scenario: Escape with focus inside the dock collapses it and moves focus to the Console control (focus on a control inside the panel (Refresh))  350ms
+   ✓ Task 2.6 - a pointer press on the dock leaves the selection unchanged > Scenario: A pointer press on any part of the dock leaves the selection unchanged  461ms
+ ✓ components/space/SystemSpaceView.console-dock.test.tsx (22 tests) 5158ms
+   ✓ SystemSpaceView + ConsoleDock - task 2.1 the default > Scenario: The view opens with the dock collapsed  332ms
+   ✓ SystemSpaceView + ConsoleDock - task 2.1 the default > Scenario: A reload shows the dock collapsed (a remount)  308ms
+   ✓ SystemSpaceView + ConsoleDock - task 2.1 the default > Scenario: Navigating to another system and back shows the dock collapsed  409ms
+   ✓ SystemSpaceView + ConsoleDock - workspace keyboard reachability > reaches workspace launchers, vitals and the console opener without entering collapsed content  465ms
+   ✓ SystemSpaceView + ConsoleDock - workspace keyboard reachability > reaches the expanded console selected tab and collapse control alongside workspace and vitals  433ms
+ ✓ components/space/SystemSpaceView.console-log-mounted.test.tsx (23 tests) 7999ms
+   ✓ Task 1.1 - the log keeps its rows and issues no request across a collapse and re-expand > Scenario: Pages loaded with load-more survive a collapse and re-expand  533ms
+   ✓ Task 1.1 - the log keeps its rows and issues no request across a collapse and re-expand > Scenario: A pile read that answers while the dock is collapsed is shown on re-expand  469ms
+   ✓ Task 1.1 - the log keeps its rows and issues no request across a collapse and re-expand > Scenario: A further page requested just before a collapse is listed on re-expand  437ms
+   ✓ Task 1.2 - a selected row keeps its highlight across a collapse and re-expand > Scenario: A selected row's highlight survives a collapse and re-expand  461ms
+   ✓ Task 1.4 - nothing of the log is reachable while the dock is collapsed > Scenario: Nothing of the log is reachable while the dock is collapsed / Scenario: A highlighted row is not presented while the dock is collapsed  717ms
+   ✓ Task 1.8 - showing the log tab issues no request > Scenario: Expanding and re-expanding after the first read issues no request (the Console control)  551ms
+   ✓ Task 1.8 - showing the log tab issues no request > Scenario: Escape collapsing the dock clears no selection (its request clause: a collapse by Escape then a re-expansion)  314ms
+   ✓ Task 1.8 - showing the log tab issues no request > Scenario: The report's link to the log issues no pile request  481ms
+   ✓ Task 1.8 - showing the log tab issues no request > Scenario: A later re-read of the interior neither removes the log nor issues a pile read (its request clause; control, green on arrival)  303ms
+   ✓ Task 1.10 - the settle re-read on the ETA-scheduled exit > Scenario: A pile read that answers while the dock is collapsed is shown on re-expand (the ETA-scheduled settle exit; closes drift-sighting-log-not-reread-after-sweep-settles)  331ms
+   ✓ Task 1.11 - the settle re-read on the early-settle exit > Scenario: A pile read that answers while the dock is collapsed is shown on re-expand (the early-settle exit)  1158ms
+ ✓ components/hud/HudWorkspace.test.tsx (20 tests) 3508ms
+   ✓ hydrates saved preferences without overwriting them, and isolates corporations  337ms
+   ✓ orders panels using keyboard-accessible controls and announces the change  428ms
+   ✓ restores defaults and removes only the current corporation layout key  302ms
+   ✓ uses a modal page sheet on phones, returns to map, and retains mounted drafts  315ms
+   ✓ keeps all four phone destinations and one sheet owner through Arrange handoffs  470ms
+ ✓ components/galaxy/GalaxyView.test.tsx (43 tests) 4106ms
+   ✓ GalaxyView > retains Galaxy search and inspection through hide/reopen without navigating  358ms
+ ✓ components/space/SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx (12 tests) 4187ms
+   ✓ SystemSpaceView + ScanControl — real network-level scan-target refetches (link8b-adversary-r8, F1/F2/F5/F6) > F5: re-issues a REAL network scan-targets read once the acting fleet lands and attaches, with no user action  404ms
+   ✓ SystemSpaceView + ScanControl — real network-level scan-target refetches (link8b-adversary-r8, F1/F2/F5/F6) > F2: an A -> B -> A re-selection issues a NEW network read for A, never A's earlier page  462ms
+   ✓ SystemSpaceView + ScanControl — real network-level scan-target refetches (link8b-adversary-r8, F1/F2/F5/F6) > Scenario: A sweep that settles inside the commit round trip still reports  1101ms
+stderr | components/space/SpaceStage.renderer.test.tsx > SpaceStage — the unsupported state > Scenario: An unexpected rendering error is contained to the canvas region
+[space] transform frame failed Error: space render boom
+    at Object.get marks [as marks] (/Users/travis/Projects/hexaverse/frontend/components/space/SpaceStage.renderer.test.tsx:184:15)
+    at projectMarks (/Users/travis/Projects/hexaverse/frontend/components/space/space-projection.ts:79:16)
+    at publish (/Users/travis/Projects/hexaverse/frontend/components/space/space-transform-loop.ts:201:31)
+    at frame (/Users/travis/Projects/hexaverse/frontend/components/space/space-transform-loop.ts:227:7)
+    at startSpaceTransformLoop (/Users/travis/Projects/hexaverse/frontend/components/space/space-transform-loop.ts:244:3)
+    at /Users/travis/Projects/hexaverse/frontend/components/space/space-transform-loop.ts:278:20
+    at Object.react_stack_bottom_frame (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+    at runWithFiberInDEV (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+    at commitHookEffectListMount (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+    at commitHookPassiveMountEffects (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13336:11)
+
+ ✓ components/space/SpaceStage.renderer.test.tsx (23 tests) 1363ms
+   ✓ SpaceStage — the unsupported state > Scenario: The unsupported state offers a retry affordance  341ms
+stderr | components/space/SystemSpaceView.sighting-log-no-ghost-reasons.test.tsx > SystemSpaceView + SightingLog — "no mark in the open system", determined from what the scene actually drew (sighting-log QA finding) > (a) a target-naming record stored at the origin says "no mark", even though it is in the open system and not a clean sweep
+[space] sighting sight-origin resolved to the scene origin and was omitted rather than drawn atop the star { id: 'sight-origin' }
+
+ ✓ components/space/SystemSpaceView.sighting-log-no-ghost-reasons.test.tsx (4 tests) 877ms
+   ✓ SystemSpaceView + SightingLog — "no mark in the open system", determined from what the scene actually drew (sighting-log QA finding) > (a) a target-naming record stored at the origin says "no mark", even though it is in the open system and not a clean sweep  409ms
+stderr | components/space/SystemSpaceView.test.tsx > hands phone onboarding to one full-page panel and resumes the guide only when requested
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/travis/Projects/hexaverse/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at /Users/travis/Projects/hexaverse/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7
+    at acquire (/Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:66:7)
+    at update (/Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:95:46)
+    at bindSystemViewport (/Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:98:3)
+    at /Users/travis/Projects/hexaverse/frontend/components/space/SystemViewport.tsx:9:40
+    at Object.react_stack_bottom_frame (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+    at runWithFiberInDEV (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+    at commitHookEffectListMount (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+    at commitHookLayoutEffects (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13213:11) undefined
+
+ ✓ components/galaxy/GalaxyView.render-loop.test.tsx (7 tests) 809ms
+stderr | components/space/SystemSpaceView.test.tsx > hands phone onboarding to one full-page panel and resumes the guide only when requested
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/travis/Projects/hexaverse/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at /Users/travis/Projects/hexaverse/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7
+    at Object.release (/Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:82:11)
+    at /Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:86:88
+    at /Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:99:63
+    at Object.react_stack_bottom_frame (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:26001:13)
+    at runWithFiberInDEV (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+    at commitHookEffectListUnmount (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13316:17)
+    at commitHookLayoutUnmountEffects (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13224:11)
+    at commitDeletionEffectsOnFiber (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:14373:13) undefined
+
+ ✓ components/space/SystemSpaceView.test.tsx (73 tests) 14818ms
+   ✓ SystemSpaceView — the data fan-in > Scenario: A failed interior read shows a retriable error in the canvas region  319ms
+   ✓ SystemSpaceView — the data fan-in > Scenario: A failed interior read leaves the fleet-state-anchored commands usable  803ms
+   ✓ SystemSpaceView — roster cross-navigation > Scenario: Selecting a fleet in another system navigates there  304ms
+   ✓ SystemSpaceView — roster cross-navigation > SDET-added: selecting a fleet in THIS system sets it acting and does not navigate  316ms
+   ✓ SystemSpaceView — the vitals strip is mounted and fed from the view's own reads (system-console) > Scenario: Switching the acting fleet leaves the selection unchanged  377ms
+   ✓ opens real object details without an order and replaces them with travel review  571ms
+   ✓ advances object discovery through index-feat-body-0 without issuing an order  626ms
+   ✓ advances object discovery through guide-target without issuing an order  417ms
+   ✓ introduces the station then scanning through index-feat-station  473ms
+   ✓ keeps docked station services in station details and preserves quantities across closing  649ms
+   ✓ reachable non-map HUD actions > keeps docked trading and holding usable when the interior and renderer are unavailable  489ms
+   ✓ hands phone onboarding to one full-page panel and resumes the guide only when requested  537ms
+ ✓ components/space/SpaceStage.interaction.test.tsx (41 tests) 5460ms
+   ✓ SpaceStage — keyboard tab order > Scenario: Tab reaches hit targets in the defined order  407ms
+   ✓ SpaceStage — keyboard camera > Scenario: Keyboard input at a clamp is distinguishable from no input  837ms
+   ✓ SpaceStage — keyboard camera > Scenario: A pan limit is still observable while the camera is also at the zoom clamp  690ms
+   ✓ SpaceStage — off-screen reach > Scenario: An off-screen body is selectable the same way  1180ms
+ ✓ components/space/SystemSpaceView.sighting-log-mount-ordering.test.tsx (3 tests) 814ms
+   ✓ SystemSpaceView / SightingLog — the mount-time settle-ordering race (sighting-log task 8.8) > issues no pile read while the settling interior read is still in flight, then one once it completes  433ms
+ ✓ components/space/SystemSpaceView.render-loop.test.tsx (6 tests) 3330ms
+   ✓ SystemSpaceView + the transform loop — task 2.1 > Scenario: Frames pass without the view rendering  800ms
+   ✓ SystemSpaceView + the transform loop — task 2.2 > Scenario: A counting figure advances without a per-frame render  717ms
+   ✓ SystemSpaceView + the transform loop — task 2.3 > Scenario: The animating view raises no update-depth diagnostic  531ms
+   ✓ SystemSpaceView + the transform loop — task 3.3 (SDET-added: data-world-time is the coarse value) > data-world-time on the sr-only space-world-clock span updates once per second, not once per frame  649ms
+   ✓ SystemSpaceView + reduced motion — task 2.5 (OQ1, folded in) > Scenario: Reduced motion freezes decorative animation while positions keep advancing  532ms
+ ✓ components/hud/HudCardShell.test.tsx (8 tests) 434ms
+   ✓ HUD card foundation > keeps content and dismissal usable before the first decorative frame  334ms
+ ✓ components/space/SpaceStage.transform-loop.test.tsx (6 tests) 574ms
+ ✓ components/space/SystemSpaceView.burn-preview.test.tsx (50 tests) 17430ms
+   ✓ SystemSpaceView — a running mine withholds the preview (lift-burn-preview-to-view 3.1-3.5) > Scenario: No preview is requested while a mine holds the movement channel — and a withheld preview is never presented as a failed one, nor the uncapped label shown beside the disabled Burn  409ms
+   ✓ SystemSpaceView — a running mine withholds the preview (lift-burn-preview-to-view 3.1-3.5) > Scenario: A mine that starts while a preview is shown withdraws it — a mine committed from this view, once the refreshed read answers  530ms
+   ✓ SystemSpaceView — a running mine withholds the preview (lift-burn-preview-to-view 3.1-3.5) > Scenario: A mine's completion restores the quote (its ETA passes)  552ms
+   ✓ SystemSpaceView — a running mine withholds the preview (lift-burn-preview-to-view 3.1-3.5) > Scenario: A cancelled mine restores the quote (cancelled through the real control)  462ms
+   ✓ SystemSpaceView — a running mine withholds the preview (lift-burn-preview-to-view 3.1-3.5) > Scenario: The mine suppression and the burn command's mine gate change together — at the ETA, with the read still reporting the mine  372ms
+   ✓ SystemSpaceView — a running mine withholds the preview (lift-burn-preview-to-view 3.1-3.5) > Scenario: A mine not yet read costs at most the requests until its read answers  523ms
+   ✓ SystemSpaceView — lane transit and the fleet's own host (3.6-3.10) > Scenario: A fleet docked at its selected target requests no preview — a lane-gate body  409ms
+   ✓ SystemSpaceView — lane transit and the fleet's own host (3.6-3.10) > Scenario: A fleet docked at its selected target requests no preview — a plain body (the mining host)  307ms
+   ✓ SystemSpaceView — lane transit and the fleet's own host (3.6-3.10) > Scenario: A withheld preview is never presented as a failed one — a previewed body the own-fleets read then reports the fleet attached to (a lane-gate body)  366ms
+   ✓ SystemSpaceView — lane transit and the fleet's own host (3.6-3.10) > Scenario: A withheld preview is never presented as a failed one — a previewed body the own-fleets read then reports the fleet attached to (a plain body (the mining host))  311ms
+   ✓ SystemSpaceView — lane transit and the fleet's own host (3.6-3.10) > Scenario: A fleet that has left its host previews that host like any other target — (regression guard)  375ms
+   ✓ SystemSpaceView — lane transit and the fleet's own host (3.6-3.10) > Scenario: Selecting a target shows a preview curve and its figures — (regression guard) parked, attached to nothing: a body, then a point  303ms
+   ✓ SystemSpaceView — refresh cadence, stale quotes, burning re-target, cap rejection (3.11-3.15) > Scenario: A stale figure never becomes a cap — (regression guard) a refresh that fails over shown figures marks them stale and a Burn sends no maxFuelTons  404ms
+   ✓ SystemSpaceView — refresh cadence, stale quotes, burning re-target, cap rejection (3.11-3.15) > Scenario: A burning fleet's re-target is previewed — (regression guard)  306ms
+   ✓ SystemSpaceView — refresh cadence, stale quotes, burning re-target, cap rejection (3.11-3.15) > Scenario: A cap rejection landing while the preview is withheld re-quotes nothing — the selection moved to the acting fleet's own host  335ms
+   ✓ SystemSpaceView — refresh cadence, stale quotes, burning re-target, cap rejection (3.11-3.15) > Scenario: Quote changes are not announced — (regression guard) a preview withdrawn by a mine becoming known; the landing announcement still fires  537ms
+   ✓ SystemSpaceView — a resumed preview presents nothing from before the withholding (3.16) > Scenario: A resumed preview presents nothing from before the withholding — the mine ends by ETA  912ms
+   ✓ SystemSpaceView — a resumed preview presents nothing from before the withholding (3.16) > Scenario: A resumed preview presents nothing from before the withholding — the mine ends by cancel through the real control  474ms
+   ✓ SystemSpaceView — a resumed preview presents nothing from before the withholding (3.16) > Scenario: A resumed preview presents nothing from before the withholding — the fleet leaves its host  443ms
+   ✓ SystemSpaceView — burn cost overlay: the refresh walk (3.4) > Scenario: A refresh in flight never blanks the overlay / A failed refresh withdraws the overlay and nothing else / A refresh sent after a failure draws no overlay while it is pending / A later successful refresh restores the overlay at the new cost and state / The overlay is never drawn without the fuel ceiling (3.4)  602ms
+   ✓ SystemSpaceView — burn cost overlay: selection and acting fleet (3.5) > Scenario: Replacing the selection never shows the previous target's cost / The served flag is shown even when the cost exceeds the fuel aboard / Clearing the selection withdraws the overlay (3.5)  411ms
+   ✓ compact production travel > reviews a point without an order, commits only explicitly with quoted cap, and guards same-tick activation  540ms
+   ✓ compact production travel > switches fleet without losing point target and cannot commit the prior fleet quote  460ms
+   ✓ compact production travel > replaces body inspection and returns Back to the retained browse context without an order  619ms
+   ✓ compact production travel > keeps a failed commitment in review with actionable feedback  423ms
+   ✓ retains the accepted travel response when status is closed and reopened before the fleet read catches up  478ms
+   ✓ keeps the accepted status for a same-fleet selection but never applies it to another command fleet  501ms
+ ✓ components/space/SpaceStage.sighting-ghost-selection-guard.test.tsx (5 tests) 433ms
+ ✓ components/space/SystemSpaceView.scan-refetch.test.tsx (3 tests) 519ms
+   ✓ SystemSpaceView — a running sweep self-schedules the settle refetch, per own fleet > Scenario: A non-acting fleet's running sweep still schedules a refetch at its ETA  301ms
+ ✓ components/space/SpaceStage.test.tsx (6 tests) 613ms
+ ✓ components/hud/SceneNavigationAction.test.tsx (2 tests) 322ms
+ ✓ components/hud/HudObjectThumbnail.test.tsx (24 tests) 375ms
+ ✓ components/hud/GameAccountSettings.test.tsx (3 tests) 520ms
+ ✓ components/galaxy/GalaxyObjectBrowser.test.tsx (2 tests) 491ms
+ ✓ components/space/SystemSpaceView.scan-settle-announcement.test.tsx (1 test) 410ms
+   ✓ SystemSpaceView — a settled sweep is announced through the shared polite live region (system-space-view "A Settled Sweep and the Scan Controls Are Reachable and Announced") > names that records were filed, in the SAME role="status" live region a burn/jump/mine landing already uses  409ms
+ ✓ components/hud/GameHud.test.tsx (1 test) 122ms
+ ✓ components/space/SpaceStage.fleet-mark.test.tsx (6 tests) 300ms
+ ✓ components/galaxy/bridge-lane-style.test.tsx (2 tests) 95ms
+stderr | components/galaxy/GalaxyGraph.test.tsx > GalaxyGraph owned renderer > Scenario: Primary first-frame rejection tries compatibility — fresh canvas keeps current graph
+[renderer] {
+  surface: 'galaxy',
+  stage: 'first-frame',
+  backend: 'webgpu',
+  detail: 'first frame failed'
+}
+
+stderr | components/galaxy/GalaxyGraph.test.tsx > GalaxyGraph owned renderer > Scenario: WebGPU device loss requires explicit recreation — latest graph resumes and stale canvas is retired
+[renderer] {
+  surface: 'galaxy',
+  stage: 'lost',
+  backend: 'webgpu',
+  detail: 'test device loss'
+}
+
+ ✓ components/galaxy/GalaxyGraph.test.tsx (7 tests) 336ms
+ ✓ components/galaxy/inspector-station.test.tsx (5 tests) 104ms
+ ✓ hooks/use-phone-sheet.test.tsx (1 test) 73ms
+ ✓ components/map/map-camera-rig.test.ts (16 tests) 80ms
+ ✓ components/space/space-transform-loop.test.ts (24 tests) 18ms
+ ✓ components/space/system-camera-adapter.test.ts (3 tests) 97ms
+ ✓ components/galaxy/camera-rig.test.ts (2 tests) 46ms
+ ✓ components/space/space-projection.test.ts (14 tests) 16ms
+ ✓ components/space/space-camera.test.ts (5 tests) 6ms
+ ✓ components/galaxy/renderer-test-harness.test.ts (1 test) 4ms
+ ✓ components/galaxy/presence.test.ts (7 tests) 4ms
+ ✓ components/hud/HudCardShell.reference.test.ts (1 test) 2ms
+ ✓ components/space/SystemSpaceView.stranding-notice.test.tsx (69 tests) 25065ms
+   ✓ harness smoke test (surface-commit-stranding-warning 2.1, 2.2) > SDET-added: reads are held until answered; reconnect() and poll() each cause exactly one read  401ms
+   ✓ harness smoke test (clear-burn-preview-on-commit 1.1) > SDET-added: point-2 selects a distinct point, preview requests are counted per fleet and per target, a held preview answers by index  597ms
+   ✓ 3.1 the gap before any read answers > Scenario: The notice is shown before any read has answered after the acceptance — and A warned commit shows the notice with the success feedback  489ms
+   ✓ 3.2 a read begun before the commit does not end the gap > Scenario: A read begun before the commit and answered after it does not end the gap  471ms
+   ✓ 3.3 the same burn keeps the notice > Scenario: A read reporting the same burn keeps the notice — across the committed target, a different body and none  523ms
+   ✓ 3.4 the projected clock passing the arrival > Scenario: The projected clock passing the arrival does not end the notice  413ms
+   ✓ 3.6 a stop > Scenario: A stop ends the notice, above or at the speed floor — the refreshed read answers a different burn, 70000 to 90000  500ms
+   ✓ 3.6 a stop > Scenario: A stop ends the notice, above or at the speed floor — the refreshed read answers a point park  484ms
+   ✓ 3.7 arrival > Scenario: Arrival at a body ends the notice  520ms
+   ✓ 3.7 arrival > Scenario: Arrival at a point ends the notice  378ms
+   ✓ 3.8 a different order placed elsewhere > Scenario: A different order placed elsewhere ends the notice, toward the same target or another — toward another target, 5000 to 80000  309ms
+   ✓ 3.8 a different order placed elsewhere > Scenario: A different order placed elsewhere ends the notice, toward the same target or another — toward the same target, 5000 to 61000  511ms
+   ✓ 3.9 an order that settled inside the round trip > Scenario: An order that settled inside the commit round trip never shows past the first read  436ms
+   ✓ 3.10 a failed read > Scenario: A failed read never removes the notice  758ms
+   ✓ 3.11 the acting fleet changes > Scenario: The notice follows the acting fleet and returns on the switch back  568ms
+   ✓ 3.12 each fleet keeps its own notice > Scenario: Each fleet keeps its own notice  724ms
+   ✓ 3.13 an unwarned later commit replaces the notice > Scenario: A later commit by the same fleet replaces the earlier notice  494ms
+   ✓ 3.14 a second warned commit replaces the notice > Scenario: A second warned commit by the same fleet replaces the notice and raises its own warning  632ms
+   ✓ 3.15 a rejected or failed commit > Scenario: A rejected or failed commit shows no notice and leaves an earlier one alone — a failure with no mapped reason  448ms
+   ✓ 3.16 a response without the stranding field > Scenario: A response without the stranding field shows no notice — the field absent  423ms
+   ✓ 3.16 a response without the stranding field > Scenario: A response without the stranding field shows no notice — the field false  521ms
+   ✓ 3.17 advisory and distinct from the preview line > Scenario: The notice is advisory and distinct from the preview's stranding line  448ms
+   ✓ 3.18 independent of the preview > Scenario: The notice does not depend on the preview — stale  383ms
+   ✓ 3.18 independent of the preview > Scenario: The notice does not depend on the preview — not requested  364ms
+   ✓ 3.20 reload and remount > Scenario: A reload shows no notice and leaves the persistent indication to the roster — stranded true  431ms
+   ✓ 3.20 reload and remount > Scenario: A reload shows no notice and leaves the persistent indication to the roster — stranded false  416ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.3 > Scenario: A read begun before the commit and answered after it does not end the committed selection  441ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.4 > Scenario: The projected clock passing the arrival does not end the committed selection  504ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.5 > Scenario: Cutting the drive ends the committed selection  557ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.6 > Scenario: A stop ends the committed selection, above or at the speed floor — the refreshed read answers a point park  472ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.7 > Scenario: A read reporting the order gone ends the committed selection — parked at a point  309ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.7 > Scenario: A read reporting the order gone ends the committed selection — a burn to the same target, 5000 to 61000  442ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.8 > Scenario: Arrival at the selected body hands over to the docked-at-target state  486ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.9 > Scenario: An order that settled inside the commit round trip never shows past the first read  455ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.10 > Scenario: A failed read changes nothing for the quote and the burn command  781ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.11 > Scenario: Another target is previewed and committable while the committed target stays committed — bodies  649ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.11 > Scenario: Another target is previewed and committable while the committed target stays committed — points  505ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.12 > Scenario: A second commit by the same fleet moves the committed selection — the second response warned  688ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.12 > Scenario: A second commit by the same fleet moves the committed selection — the second response unwarned  812ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.13 > Scenario: A response that lands after the selection was replaced withholds nothing for the new selection  363ms
+   ✓ the committed selection (clear-burn-preview-on-commit section 3) > 3.14 > Scenario: The committed selection follows the fleet — row one: both fleets commit toward the kept selection  329ms
+
+ Test Files  41 passed (41)
+      Tests  582 passed (582)
+   Start at  17:51:55
+   Duration  27.73s (transform 2.17s, setup 4.60s, collect 25.78s, tests 108.78s, environment 22.19s, prepare 4.92s)
+

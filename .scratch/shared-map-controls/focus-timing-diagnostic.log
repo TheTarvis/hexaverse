@@ -1,0 +1,20 @@
+FIRST TAP 715 qa-planet
+SECOND TAP 360 
+FOCUS EVENTS [{"kind":"pointerdown","at":7882.0999999996275,"target":"body-hit-qa-planet","x":254.16000366210938,"y":511.2099914550781},{"kind":"pointerup","at":7887.5,"target":"space-canvas-region","x":254.16000366210938,"y":511.2099914550781},{"kind":"lostpointercapture","at":7887.5999999996275,"target":"space-canvas-region","x":254.16000366210938,"y":511.2099914550781},{"kind":"pointerdown","at":8644,"target":"body-hit-qa-planet","x":254.16000366210938,"y":511.2099914550781},{"kind":"pointerup","at":8647.800000000745,"target":"space-canvas-region","x":254.16000366210938,"y":511.2099914550781},{"kind":"lostpointercapture","at":8647.900000000373,"target":"space-canvas-region","x":254.16000366210938,"y":511.2099914550781}] {"position":[19.102565088660285,29.67231023871629,27.922141968890386],"target":[0,0,0],"up":[0,1,0]} {"yaw":0.6,"pitch":0.72,"distance":45,"target":{"x":0,"y":0,"z":0}}
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   '/v1/fleets/qa-fleet-0002/orders/preview'
++ ]
+- []
+
+    at run (/Users/travis/Projects/hexaverse/.scratch/shared-map-controls/browser.cjs:255:37)
+    at async /Users/travis/Projects/hexaverse/.scratch/shared-map-controls/browser.cjs:264:49 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [Array],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

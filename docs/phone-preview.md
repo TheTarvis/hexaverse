@@ -1244,3 +1244,34 @@ galaxy/account APIs 401 and anonymous edge 302 remain correct. The
 [evidence record](../.scratch/scene-navigation/README.md) preserves initial failures
 and final checks. Physical-iPhone and full emulator gameplay acceptance remain
 unverified.
+
+### Shared Galaxy/System controls deployed — 2026-10-18 21:58 UTC
+
+Build **MkAAbDiRe8bzrMLMoKGOR** uses one extracted MapCameraRig in both scenes.
+System now follows Galaxy's one-finger/left-drag orbit, two-finger pan plus pinch,
+right-drag pan, middle-drag dolly, plain-wheel ground pan and Ctrl+wheel dolly.
+Keyboard shortcuts live in the same controller. System retains its Y-up/extent
+adapter, follow/picking/projection pipeline and scene-specific selection callbacks;
+no persistent renderer or gameplay rule change was introduced. Source local
+commit: 275bfb5; no push.
+
+The protected supervisor restarted at 21:58:03 UTC (frontend 27129, gateway 27130,
+ngrok 27131). Only the frontend snapshot and two build pins changed. Backend and
+emulators stayed running. Exact Google/email protection, gateway/ngrok commands,
+routes, 57 public assets, original card CSS, iOS files and the existing
+2026-10-19T00:00:00Z cutoff are unchanged. Temporary candidate 20218 is stopped.
+
+582 scoped tests / 41 files, types, scoped lint and production build pass. Six
+candidate Chromium/WebKit profiles cover portrait/landscape/desktop; final live
+phone checks pass in both engines. Chromium generates trusted touch sequences;
+WebKit drags use injected Pointer Events because native swipe automation is
+unavailable. Focus/orbit, gesture parity, keyboard, HUD/chrome and selection/quote
+regressions are covered without live writes or Sign out activation.
+
+Live HTML and 36 initial JS/CSS assets match the candidate; seven pins pass.
+Storybook 200, debug/QA 404, foreign-Origin POST 403, unauthenticated API 401 and
+anonymous edge 302 remain correct. Supervisor errors are empty; transport retains
+two prior aborted GETs, with no new record after activation. The
+[evidence record](../.scratch/shared-map-controls/README.md) retains the interrupted
+QA run and completed profile reruns. Physical-iPhone and full emulator gameplay
+acceptance remain unverified.

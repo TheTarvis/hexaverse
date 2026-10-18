@@ -1,0 +1,6 @@
+Chromium 390 galaxy SHARED CONTROLS PASS: mouse orbit/right-pan/middle-dolly; plain wheel ground-pan/Ctrl-wheel zoom; one-finger orbit/two-finger pan+pinch; keyboard orbit/pan/zoom/Home; trusted Chromium touches
+Chromium 390 system SHARED CONTROLS PASS: mouse orbit/right-pan/middle-dolly; plain wheel ground-pan/Ctrl-wheel zoom; one-finger orbit/two-finger pan+pinch; keyboard orbit/pan/zoom/Home; trusted Chromium touches
+Chromium 390 grouped-enter-leave-icons/no-footer/served-names/legacy-fallback/Command-selection/guest-auth/retained-state/Storybook-chrome PASS; no game writes or sign-out activation
+WebKit 390 galaxy SHARED CONTROLS PASS: mouse orbit/right-pan/middle-dolly; plain wheel ground-pan/Ctrl-wheel zoom; one-finger orbit/two-finger pan+pinch; keyboard orbit/pan/zoom/Home; WebKit injected Pointer Events (native drag unavailable)
+WebKit 390 system SHARED CONTROLS PASS: mouse orbit/right-pan/middle-dolly; plain wheel ground-pan/Ctrl-wheel zoom; one-finger orbit/two-finger pan+pinch; keyboard orbit/pan/zoom/Home; WebKit injected Pointer Events (native drag unavailable)
+WebKit 390 grouped-enter-leave-icons/no-footer/served-names/legacy-fallback/Command-selection/guest-auth/retained-state/Storybook-chrome PASS; no game writes or sign-out activation
