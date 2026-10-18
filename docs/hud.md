@@ -739,13 +739,13 @@ The System workspace includes a labeled leave-to-galaxy icon; Galaxy includes a
 labeled enter icon only for an authenticated, disclosed selected system. The shared
 navigation is used both on the map and in the active phone card. Existing outline
 icons and 44px targets are reused. Phone identity and navigation occupy separate
-rows so five controls fit at320px without reducing targets. Paused-guide rows follow
+rows so five controls fit at 320px without reducing targets. Paused-guide rows follow
 that navigation budget. Desktop uses the same action beside its existing launchers.
 The old footer component/spacing and inspector's separate Enter button are removed.
 Galaxy fleet focus stays a focus operation; the shared enter icon performs generic
 system entry. System's remote-command-fleet location action remains contextual.
 
-Original624c4ff card title/close, safe areas, single phone-sheet isolation,16px
+Original 624c4ff card title/close, safe areas, single phone-sheet isolation, 16px
 fields, unrestricted zoom, mounted drafts and command/inspection independence remain.
 [Evidence](../.scratch/scene-navigation/README.md) records checks, service refresh and
 protected deployment separately from physical-iPhone/full-emulator acceptance.

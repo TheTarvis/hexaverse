@@ -59,7 +59,7 @@ async function checkMobileNavigation(p,name){
   const buttons=nav.getByRole('button');assert.equal(await buttons.count(),4)
   for(const button of await buttons.all()){const b=await button.boundingBox();assert.ok(b.width>=44&&b.height>=44);assert.equal(await button.getAttribute('aria-pressed'),'false');assert.ok(await button.getAttribute('aria-label'));assert.equal(await button.locator('svg[aria-hidden="true"]').count(),1);assert.equal(await button.getAttribute('aria-expanded'),null)}
   const b=await nav.boundingBox(),identity=await p.getByTestId('command-system-identity').boundingBox();assert.ok(b.x>=0&&b.y>=0&&b.x+b.width<=size.width&&b.y+b.height<=size.height)
-  assert.ok(identity.x+identity.width<=b.x,'Identity reserves direct icon strip: '+JSON.stringify({identity,b}))
+  assert.ok(identity.y+identity.height<=b.y,'Identity and direct icon strip have separate rows: '+JSON.stringify({identity,b}))
   assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
   assert.equal(await p.evaluate(()=>!!document.elementFromPoint(innerWidth/2,innerHeight/2)?.closest('[data-testid="space-canvas-region"]')),true,'Map center stays unobstructed')
   await p.screenshot({path:out+'/'+name.toLowerCase()+'-direct-icons-map-'+size.width+'.png'})

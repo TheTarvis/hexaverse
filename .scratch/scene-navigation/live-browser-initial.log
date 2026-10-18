@@ -1,0 +1,26 @@
+Chromium 390 grouped-enter-leave-icons/no-footer/served-names/legacy-fallback/Command-selection/guest-auth/retained-state/Storybook-chrome PASS; no game writes or sign-out activation
+Chromium 844 grouped-enter-leave-icons/no-footer/served-names/legacy-fallback/Command-selection/guest-auth/retained-state/Storybook-chrome PASS; no game writes or sign-out activation
+Chromium 1280 grouped-enter-leave-icons/no-footer/served-names/legacy-fallback/Command-selection/guest-auth/retained-state/Storybook-chrome PASS; no game writes or sign-out activation
+WebKit 390 grouped-enter-leave-icons/no-footer/served-names/legacy-fallback/Command-selection/guest-auth/retained-state/Storybook-chrome PASS; no game writes or sign-out activation
+PAGE ERROR WebKit {"message":"ttps://gulf-identity-scrap.ngrok-free.dev/0975b7c9-bda3-4554-ace5-2da89c67be40 due to access control checks.","stack":"Fetch API cannot load blob:https://gulf-identity-scrap.ngrok-free.dev/0975b7c9-bda3-4554-ace5-2da89c67be40 due to access control checks.\n    at load (https://gulf-identity-scrap.ngrok-free.dev/_next/static/chunks/b0b91ffa-ed0ca7c4850bac14.js:1:305367)\n    at unknown (https://gulf-identity-scrap.ngrok-free.dev/_next/static/chunks/268-2c37b19eeef0501f.js:1:45711)\n    at Promise (:1:11)\n    at unknown (https://gulf-identity-scrap.ngrok-free.dev/_next/static/chunks/268-2c37b19eeef0501f.js:1:45596)","url":"https://gulf-identity-scrap.ngrok-free.dev/systems/sys_0_1"}
+PAGE ERROR WebKit {"message":"ttps://gulf-identity-scrap.ngrok-free.dev/e785de1e-d493-4dc4-8de4-df72bc54e899 due to access control checks.","stack":"Fetch API cannot load blob:https://gulf-identity-scrap.ngrok-free.dev/e785de1e-d493-4dc4-8de4-df72bc54e899 due to access control checks.\n    at load (https://gulf-identity-scrap.ngrok-free.dev/_next/static/chunks/b0b91ffa-ed0ca7c4850bac14.js:1:305367)\n    at unknown (https://gulf-identity-scrap.ngrok-free.dev/_next/static/chunks/268-2c37b19eeef0501f.js:1:45711)\n    at Promise (:1:11)\n    at unknown (https://gulf-identity-scrap.ngrok-free.dev/_next/static/chunks/268-2c37b19eeef0501f.js:1:45596)","url":"https://gulf-identity-scrap.ngrok-free.dev/systems/sys_0_1"}
+PAGE ERROR WebKit {"message":"ttps://gulf-identity-scrap.ngrok-free.dev/5f1e5dae-16e8-495d-8c3f-14c6f23ff264 due to access control checks.","stack":"Fetch API cannot load blob:https://gulf-identity-scrap.ngrok-free.dev/5f1e5dae-16e8-495d-8c3f-14c6f23ff264 due to access control checks.\n    at load (https://gulf-identity-scrap.ngrok-free.dev/_next/static/chunks/b0b91ffa-ed0ca7c4850bac14.js:1:305367)\n    at unknown (https://gulf-identity-scrap.ngrok-free.dev/_next/static/chunks/268-2c37b19eeef0501f.js:1:45711)\n    at Promise (:1:11)\n    at unknown (https://gulf-identity-scrap.ngrok-free.dev/_next/static/chunks/268-2c37b19eeef0501f.js:1:45596)","url":"https://gulf-identity-scrap.ngrok-free.dev/systems/sys_0_1"}
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   'ttps://gulf-identity-scrap.ngrok-free.dev/0975b7c9-bda3-4554-ace5-2da89c67be40 due to access control checks.',
++   'ttps://gulf-identity-scrap.ngrok-free.dev/e785de1e-d493-4dc4-8de4-df72bc54e899 due to access control checks.',
++   'ttps://gulf-identity-scrap.ngrok-free.dev/5f1e5dae-16e8-495d-8c3f-14c6f23ff264 due to access control checks.'
++ ]
+- []
+
+    at run (/Users/travis/Projects/hexaverse/.scratch/scene-navigation/browser.cjs:188:9)
+    at async /Users/travis/Projects/hexaverse/.scratch/scene-navigation/browser.cjs:197:121 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [Array],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

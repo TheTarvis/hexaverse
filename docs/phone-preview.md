@@ -1212,3 +1212,35 @@ transport error logs are empty. Native physical-iPhone acceptance and full emula
 gameplay journeys remain unverified. An earlier synthetic HTTPS WebKit blob-resource
 message did not recur in an isolated diagnostic or the final full candidate/live
 sweeps; no blob-error filtering is applied during assertions.
+
+### Fleet names and grouped navigation deployed — 2026-10-18 21:08 UTC
+
+Build **djrZX23fL1PNIxIAUI8rm** serves optional owner-facing fleet names with an
+explicit legacy-ID fallback, plus leave/selected-system-enter icons beside the
+existing HUD controls. The old footer, reserved spacing and duplicate inspector
+Enter control are removed. No live fleets were named, renamed or migrated; the
+optional read contract does not imply existing fleets contain names. Source local
+commit: a5c4e8e; no push.
+
+The backend alone was refreshed through GoLand dev:backend and is healthy on
+20201 (PID 19255); existing emulators stayed running. The protected supervisor
+restarted at 21:08:32 UTC (frontend 21074, gateway 21075, ngrok 21076), changing only
+the frontend snapshot path and its two build pins. Existing auth/email policy,
+gateway/ngrok commands, routes, all 57 public assets, original card CSS, released
+iOS fixes and 2026-10-19T00:00:00Z cutoff are unchanged. Candidate 20218 is stopped.
+
+501 frontend tests / 37 files, TypeScript, scoped lint, production build and backend
+fleet/corporations short tests and compilation pass. Candidate and final live
+Chromium/WebKit sweeps pass portrait/landscape/desktop with synthetic identities
+and blocked game writes. Both engines pass first-login/guide, full-page HUD,
+original chrome and 16px field checks. Initial live WebKit blob errors did not
+recur in the isolated landscape check or final full rerun; no assertion error
+filtering was added. Two downstream-aborted model/static requests are retained in
+transport diagnostics; supervisor errors are empty.
+
+Home/login/system HTML and 35 initial JS/CSS assets match the serving build; all
+seven pins pass. Storybook 200, debug/QA 404, foreign-Origin POST 403, unauthenticated
+galaxy/account APIs 401 and anonymous edge 302 remain correct. The
+[evidence record](../.scratch/scene-navigation/README.md) preserves initial failures
+and final checks. Physical-iPhone and full emulator gameplay acceptance remain
+unverified.
