@@ -181,3 +181,28 @@ engines with no errors/unmocked writes. Build vInWVcxECS_kYn3wvSRH_ retains all 
 public assets, seven verified pins, exact-email gate and October19 00UTC cutoff.
 All 34 initial served JS/CSS files match build bytes. Temporary test listeners and
 browser inspection tabs were cleaned up after verification.
+
+## Direct mobile icon navigation — 2026-10-18
+
+The four actual HUD menu destinations are Objects, Command, Console and Arrange.
+The dropdown and menu-open state are removed. One visible HudIcon/Heroicons strip
+provides direct 44px targets, accessible names/titles and pressed state on the map
+and in the active card toolbar. Desktop text controls remain. The phone heading
+reserves the strip width; paused-guide resume/objective rows do not cover it.
+Close/Escape restores the launch icon; mounted drafts/details and the single modal
+owner remain unchanged. The original 624c4ff header/close CSS is byte-identical.
+
+62 tests / 7 files, types/scoped lint and production/Storybook builds pass. Candidate
+trwcoovSMTxWb7fxtZDlG passes Chromium/WebKit real-route synthetic-data checks:
+320/375/390 portrait + 844 landscape, 44px labels/states, one visible nav, clear scene
+center, Enter/Space opening and Escape/close focus restore, guide-to-Objects/icon-
+Console/resume roundtrip, retained search/details/mining drafts, viewport resize/
+scroll and inert release. First-login/camera runs pass in both engines. Local
+in-app browser verifies direct opening/switching/Arrange, retained draft and close.
+All 57 public assets and original shared-card CSS are unchanged. No game writes.
+
+The two supplied Library screenshot IDs were inaccessible because the local
+session has no Library content tools; actual menu/source/rendered route evidence
+was used. Native iPhone acceptance remains pending. Captures:
+[Map icons](direct-icons-map-phone.png),
+[Panel icons](direct-icons-panel-phone.png).

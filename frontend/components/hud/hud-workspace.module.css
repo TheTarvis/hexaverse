@@ -116,25 +116,17 @@
 }
 
 
-.phoneMenuToggle { display: none; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .workspace:not([data-mobile-open='true']) .recovery { top: calc(8px + env(safe-area-inset-top)); left: auto; width: auto; max-width: calc(100% - 24px); display: flex; flex-direction: column; align-items: flex-end; }
-  .phoneMenuToggle { display: inline-flex; background: #09131eee; border: 1px solid #435d70; }
-  .workspace:not([data-mobile-open='true']) .launchers,
-  .workspace:not([data-mobile-open='true']) .arrangeControl { display: none; }
-  .workspace[data-menu-open='true']:not([data-mobile-open='true']) .arrangeControl { display: inline-flex; }
-  .workspace[data-menu-open='true']:not([data-mobile-open='true']) .launchers { display: flex; flex-direction: column; width: 152px; padding: 4px; pointer-events: auto; }
-  .workspace[data-menu-open='true'] .launchers button { width: 100%; }
-  .workspace[data-mobile-open='true'] .phoneMenuToggle { display: none; }
+  .workspace:not([data-mobile-open='true']) .recovery { top: calc(8px + env(safe-area-inset-top)); left: auto; right: max(12px, env(safe-area-inset-right)); width: max-content; max-width: calc(100% - 24px); display: block; }
 }
 
 /* One shared card owns each panel's chrome and scrolling. */
 .panelCard { flex: 1; width: 100%; min-height: 0; max-height: 100%; }
 .panelCard > [data-slot='hud-body'] > .panelContent { padding: 24px 16px 16px; gap: 16px; overflow: auto; overscroll-behavior: contain; }
 .panelCard [data-hud-framing='section'] { flex: 0 0 auto; max-height: none; }
-.cardNavigation { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; gap: 4px; }
-.cardNavigation button { padding-inline: 4px; min-width: 0; white-space: normal; font-size: 11px; }
-.cardNavigation button[aria-pressed='true'] { background: #76e3ef20; }
+.cardNavigation { display: grid; grid-template-columns: repeat(4, 44px); width: max-content; max-width: 100%; box-sizing: border-box; gap: 4px; padding: 4px; margin-inline: auto; border: 1px solid #435d70; border-radius: 8px; background: #09131eee; pointer-events: auto; }
+.cardNavigation button { width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 12px; border-radius: 4px; }
+.cardNavigation button[aria-pressed='true'] { background: #76e3ef25; box-shadow: inset 0 0 0 1px #76e3ef; color: #e4f8ff; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .workspace[data-mobile-open='true'] .stage { padding: calc(18px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); box-sizing: border-box; }
   .workspace[data-mobile-open='true'] .recovery[hidden] { display: none; }

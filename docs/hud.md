@@ -593,3 +593,26 @@ actual app side by side at phone/desktop widths, including long titles, independ
 Back, invisible-target edge taps and desktop hide/reopen. The reference must not
 be silently updated to make a changed design pass. Physical iPhone acceptance is
 still distinct from these browser checks.
+
+## Direct mobile HUD navigation — 2026-10-18
+
+The mobile HUD dropdown is replaced by four direct icon controls: Objects/search,
+Command/rocket, Console/chat and Arrange/sliders. They use existing HudIcon and
+Heroicons outlines, with accessible names/titles, aria-controls and aria-pressed
+state. Each control is 44x44 CSS px. The same strip floats beside the system heading
+on the map and appears in the open card's fixed toolbar; exactly one navigation
+landmark is visible at a time. Desktop keeps its existing text launchers/Arrange.
+No new destination, nested menu or gameplay action was added.
+
+The map reserves heading space for the compact 198px strip and keeps the scene
+center free. A paused tutorial's Resume guide button and objective have separate
+rows below it, preserving the route back to recovery without covering the icons.
+Enter/Space open destinations; Escape and close return focus to the launch icon.
+Panel drafts/details, layout preferences, single sheet isolation, fullscreen safe
+areas and internal scrolling retain their existing owners. The frozen 624c4ff card
+header/close CSS, 16px phone fields, unrestricted zoom and map gestures are unchanged.
+
+The two supplied screenshot Library IDs could not be read in the local session:
+Library screenshot/content tools were unavailable. Implementation was grounded in
+the actual four-destination menu and verified rendered routes instead. Physical
+iPhone acceptance remains separate from local-browser/engine checks.

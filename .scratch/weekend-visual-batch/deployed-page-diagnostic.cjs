@@ -50,7 +50,23 @@ async function compareOriginalStory(p,name,card,label){
 async function checkMobileNavigation(p,name){
  const workspace=p.getByTestId('hud-workspace')
  const go=async label=>{await p.getByRole('navigation',{name:'HUD panels',exact:true}).getByRole('button',{name:label,exact:true}).tap()}
- const open=async()=>{await p.getByRole('button',{name:'HUD menu',exact:true}).tap();await p.getByRole('button',{name:'Objects',exact:true}).tap()}
+ const open=async()=>{await p.getByRole('button',{name:'Objects',exact:true}).tap()}
+ for(const size of [{width:320,height:667},{width:375,height:667},{width:390,height:844},{width:844,height:390}]){
+  await p.setViewportSize(size);await p.waitForTimeout(120)
+  const nav=p.getByRole('navigation',{name:'HUD panels',exact:true});assert.equal(await nav.count(),1)
+  const buttons=nav.getByRole('button');assert.equal(await buttons.count(),4)
+  for(const button of await buttons.all()){const b=await button.boundingBox();assert.ok(b.width>=44&&b.height>=44);assert.equal(await button.getAttribute('aria-pressed'),'false');assert.ok(await button.getAttribute('aria-label'));assert.equal(await button.locator('svg[aria-hidden="true"]').count(),1);assert.equal(await button.getAttribute('aria-expanded'),null)}
+  const b=await nav.boundingBox(),identity=await p.getByTestId('command-system-identity').boundingBox();assert.ok(b.x>=0&&b.y>=0&&b.x+b.width<=size.width&&b.y+b.height<=size.height)
+  assert.ok(identity.x+identity.width<=b.x,'Identity reserves direct icon strip: '+JSON.stringify({identity,b}))
+  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+  assert.equal(await p.evaluate(()=>!!document.elementFromPoint(innerWidth/2,innerHeight/2)?.closest('[data-testid="space-canvas-region"]')),true,'Map center stays unobstructed')
+  await p.screenshot({path:out+'/'+name.toLowerCase()+'-direct-icons-map-'+size.width+'.png'})
+ }
+ const objectTrigger=p.getByRole('button',{name:'Objects',exact:true});await objectTrigger.focus();await objectTrigger.press('Enter');assert.equal(await p.getByRole('dialog',{name:'Objects panel',exact:true}).isVisible(),true)
+ await p.getByRole('button',{name:'Close Objects panel',exact:true}).press('Escape');assert.equal(await p.getByRole('dialog').count(),0);assert.equal(await objectTrigger.evaluate(e=>e===document.activeElement),true)
+ const consoleTrigger=p.getByRole('button',{name:'Console',exact:true});await consoleTrigger.focus();await consoleTrigger.press('Space');assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
+ await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();assert.equal(await consoleTrigger.evaluate(e=>e===document.activeElement),true)
+ await p.setViewportSize({width:390,height:844});await p.waitForTimeout(120)
  await open()
  const toggle=p.getByTestId('system-index-toggle');if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.tap()
  const search=p.getByTestId('system-index-search')
@@ -92,6 +108,7 @@ async function checkMobileNavigation(p,name){
  const expanded=p.getByRole('button',{name:'Close Objects panel',exact:true}).locator('span[aria-hidden="true"]'),hit=await expanded.boundingBox();await p.touchscreen.tap(hit.x+2,hit.y+hit.height/2)
  assert.equal(await p.getByRole('dialog').count(),0);assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
  await p.setViewportSize({width:390,height:844})
+ console.log(name,'DIRECT ICON NAV PASS: 320/375/390 portrait and landscape, one labeled 44px icon strip, reserved identity space/unobstructed map, Enter/Space open and Escape/close restore launch focus, active states and no dropdown')
  console.log(name,'ORIGINAL CHROME PASS: frozen 624c4ff plaque/close/icon properties and corner geometry, independent Back, invisible 44px target edge tap dismisses')
  console.log(name,'MOBILE NAV PASS: four persistent tabs including Arrange; original 28px transparent close with invisible 44px target outside scrolling, >=16px computed form text, focus/blur/reduced keyboard space, details/back/search retained, callbacks and one sheet owner release; native iPhone focus zoom pending')
 }
@@ -105,7 +122,7 @@ async function checkHudInspector(p,name){
  console.log(name,'HUD INSPECTOR PASS: explicit shared frame, real preview, reachable dismissal and background interaction restored')
 }
 async function checkHudBaseline(p,name){
- const open=async label=>{if(await p.getByRole('button',{name:'HUD menu',exact:true}).isVisible())await p.getByRole('button',{name:'HUD menu',exact:true}).tap();await p.getByRole('button',{name:label,exact:true}).tap()}
+ const open=async label=>{await p.getByRole('button',{name:label,exact:true}).tap()}
  const panel=id=>p.locator('section[data-panel="'+id+'"]')
  const assertFrame=async id=>{const owner=panel(id);assert.equal(await owner.locator('[data-hud-framing="frame"]').count(),1);assert.ok(await owner.locator(':scope > [data-slot="hud-card"]').isVisible());return owner}
  await open('Command');const command=await assertFrame('command')
@@ -200,7 +217,7 @@ async function checkOrbit(p,c,name){
  await emit('touchStart',[[160,350]]);await emit('touchMove',[[190,370]]);await closeFingers()
  assert.equal((await read()).yaw,canceled.yaw);assert.notDeepEqual((await read()).target,canceled.target)
  for(const id of ['space-camera-controls','space-pan-controls','camera-touch-rotate','camera-zoom-in','camera-zoom-out','camera-recenter','select-pan-target-point'])assert.equal(await p.getByTestId(id).count(),0)
- await p.getByRole('button',{name:'HUD menu',exact:true}).tap();await p.getByRole('button',{name:'Console',exact:true}).tap()
+ await p.getByRole('button',{name:'Console',exact:true}).tap()
  const scroll=p.locator('section[data-panel="console"] > [data-slot="hud-card"] > [data-slot="hud-body"] > [data-slot="hud-content"]')
  await scroll.evaluate(e=>{const spacer=document.createElement('div');spacer.style.flex='0 0 1600px';spacer.style.height='1600px';e.append(spacer)})
  if(session){await emit('touchStart',[[190,500]]);await emit('touchMove',[[190,400]]);await emit('touchMove',[[190,300]]);await closeFingers();assert.ok(await scroll.evaluate(e=>e.scrollTop)>0)}
@@ -272,10 +289,20 @@ async function run(type,options,name){
   assert.equal(errors.length,0,'No browser runtime/resource errors expected under configured HTTPS origin')
   if(process.env.QA_GUIDE_PHASE||process.env.QA_FIRST_LOGIN==='1'){const dialog=p.getByRole('dialog',{name:'Recovery transmission',exact:true});assert.equal(await dialog.isVisible(),true);assert.ok(snapshot.dialogs.some(item=>item.label==='Recovery transmission'&&item.visibility==='visible'))}
  }
+ if(process.env.QA_GUIDE_HANDOFF==='1'){
+  await p.getByTestId('guide-objects').tap();assert.equal(await p.getByRole('dialog',{name:'Objects panel',exact:true}).isVisible(),true)
+  await p.getByRole('button',{name:'Close Objects panel',exact:true}).tap()
+  const resume=p.getByRole('button',{name:'Resume guide',exact:true}),r=await resume.boundingBox(),n=await p.getByRole('navigation',{name:'HUD panels',exact:true}).boundingBox(),o=await p.locator('[aria-label="Current objective"]').boundingBox()
+  assert.ok(r&&n&&o&&r.y>=n.y+n.height&&o.y>=r.y+r.height,'Paused guide and icon strip own separate rows: '+JSON.stringify({r,n,o}))
+  await p.getByRole('button',{name:'Console',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
+  await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();await resume.tap()
+  assert.equal(await p.getByRole('dialog',{name:'Recovery transmission',exact:true}).isVisible(),true)
+  console.log(name,'GUIDE HANDOFF PASS: real guide opens Objects, icon Console roundtrip, resume row does not overlap icons/objective, modal isolation restores')
+ }
  if(await p.getByTestId('dismiss-guide').count()){ await p.getByTestId('dismiss-guide').tap({timeout:4000}).then(()=>console.log(name,'dismiss fired')).catch(e=>console.log(name,'dismiss FAILED',e.message.split('\n')[0]))}
- if(await p.getByRole('button',{name:'HUD menu',exact:true}).count()){await p.getByRole('button',{name:'HUD menu',exact:true}).tap({timeout:4000}).then(async()=>console.log(name,'HUD callback',await p.getByRole('button',{name:'HUD menu',exact:true}).getAttribute('aria-expanded'))).catch(e=>console.log(name,'HUD FAILED',e.message.split('\n')[0]))}
  if(process.env.QA_EXPECT_INTERACTIVE==='1'){
-  assert.equal(await p.getByRole('button',{name:'HUD menu',exact:true}).getAttribute('aria-expanded'),'true')
+  assert.equal(await p.getByRole('button',{name:'HUD menu',exact:true}).count(),0)
+  assert.equal(await p.getByRole('navigation',{name:'HUD panels',exact:true}).getByRole('button').count(),4)
   assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false)
   await p.getByRole('button',{name:'Console',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
   await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();assert.equal(await p.getByRole('dialog').count(),0)

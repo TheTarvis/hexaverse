@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode } f
 import clsx from 'clsx'
 import { Button } from '@/components/catalyst/button'
 import { HudCardShell } from './HudCardShell'
+import { HudIcon } from './HudIcon'
+import { MagnifyingGlassIcon, RocketLaunchIcon, ChatBubbleLeftRightIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline'
 import styles from './hud-workspace.module.css'
 import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
 
@@ -47,7 +49,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
   const [layout, setLayout] = useState<Layout>(defaults)
   const [ready, setReady] = useState(false)
   const [settings, setSettings] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [returnTo, setReturnTo] = useState<HudPanelId | 'arrange'>('objects')
   const [openedPanel, setOpenedPanel] = useState(false)
   const [active, setActive] = useState<HudPanelId | null>('objects')
   const [announcement, setAnnouncement] = useState('')
@@ -114,7 +116,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
     if (!ready || !request || !panels.some(panel => panel.id === request.id)) return
     const item = layout.find(panel => panel.id === request.id)!
     if (!item.visible) change(layout.map(panel => panel.id === request.id ? { ...panel, visible: true } : panel), `${panels.find(panel => panel.id === request.id)!.label} shown.`)
-    setMenuOpen(false)
+    setReturnTo(request.id)
     setOpenedPanel(true)
     setActive(request.id)
     setSettings(false)
@@ -146,17 +148,25 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
     }
   }, [phone, sheetOpen, settings, activeId])
 
-  function navigation(selected: HudPanelId | 'arrange') {
-    return <nav className={styles.cardNavigation} aria-label="HUD panels">
+  function navigation(selected: HudPanelId | 'arrange' | null, floating = false) {
+    const icons = { objects: MagnifyingGlassIcon, command: RocketLaunchIcon, console: ChatBubbleLeftRightIcon }
+    return <nav className={styles.cardNavigation} aria-label="HUD panels" data-testid="hud-icon-navigation">
       {known.map(entry => {
         const destination = panels.find(panel => panel.id === entry.id)!
-        return <Button plain key={entry.id} data-workspace-tab={entry.id} aria-pressed={selected === entry.id} onClick={() => {
-          if (!entry.visible) toggle(entry.id)
-          setSettings(false); setMenuOpen(false); setOpenedPanel(true); setActive(entry.id)
-          onPanelActivate?.(entry.id)
-        }}>{destination.label}</Button>
+        return <Button plain key={entry.id} disabled={!ready} ref={floating && returnTo === entry.id ? recoveryRef : undefined}
+          data-workspace-tab={entry.id} aria-label={destination.label} title={destination.label} aria-controls={`${panelPrefix}-${entry.id}`}
+          aria-pressed={selected === entry.id} onClick={() => {
+            if (floating) setReturnTo(entry.id)
+            if (!entry.visible) toggle(entry.id)
+            setSettings(false); setOpenedPanel(true); setActive(entry.id)
+            onPanelActivate?.(entry.id)
+          }}><HudIcon icon={icons[entry.id]} /></Button>
       })}
-      <Button plain data-workspace-tab="arrange" aria-label="Arrange HUD" aria-pressed={selected === 'arrange'} onClick={() => setSettings(true)}>Arrange</Button>
+      <Button plain disabled={!ready} ref={floating && returnTo === 'arrange' ? recoveryRef : undefined}
+        data-workspace-tab="arrange" aria-label="Arrange HUD" title="Arrange HUD" aria-controls={settingsId}
+        aria-pressed={selected === 'arrange'} onClick={() => { if (floating) setReturnTo('arrange'); setSettings(true) }}>
+        <HudIcon icon={AdjustmentsHorizontalIcon} />
+      </Button>
     </nav>
   }
 
@@ -168,19 +178,20 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
     catch { setAnnouncement('Default HUD layout restored. Saved preferences could not be removed on this device.') }
   }
 
-  return <div ref={workspaceRef} className={clsx(styles.workspace, className)} data-testid="hud-workspace" data-menu-open={menuOpen} data-mobile-open={sheetOpen} data-phone-sheet={sheetOpen} role={sheetOpen ? 'dialog' : undefined} aria-modal={sheetOpen || undefined} aria-label={sheetOpen ? settings ? 'Arrange HUD' : `${panels.find(panel => panel.id === activeId)?.label} panel` : undefined} tabIndex={sheetOpen ? -1 : undefined} onKeyDown={event => {
+  return <div ref={workspaceRef} className={clsx(styles.workspace, className)} data-testid="hud-workspace" data-mobile-open={sheetOpen} data-phone-sheet={sheetOpen} role={sheetOpen ? 'dialog' : undefined} aria-modal={sheetOpen || undefined} aria-label={sheetOpen ? settings ? 'Arrange HUD' : `${panels.find(panel => panel.id === activeId)?.label} panel` : undefined} tabIndex={sheetOpen ? -1 : undefined} onKeyDown={event => {
     if (event.key === 'Escape' && phone && sheetOpen) { event.stopPropagation(); if (settings) closeSettings(); else closePanel(); return }
     if (event.key === 'Escape' && settings && settingsRef.current?.contains(event.target as Node)) { event.stopPropagation(); closeSettings() }
   }}>
     <div className={styles.recovery} hidden={phone && sheetOpen} inert={phone && sheetOpen}>
-      <Button plain className={styles.phoneMenuToggle} ref={phone ? recoveryRef : undefined} aria-label="HUD menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}>HUD</Button>
-      <Button plain className={styles.arrangeControl} hidden={phone && !!activeId && !settings} ref={phone ? undefined : recoveryRef} aria-expanded={settings} aria-controls={settingsId} onClick={() => { setMenuOpen(false); setSettings(value => !value) }}>Arrange HUD</Button>
+      {phone ? navigation(null, true) : <>
+      <Button plain className={styles.arrangeControl} ref={recoveryRef} aria-expanded={settings} aria-controls={settingsId} onClick={() => { setSettings(value => !value) }}>Arrange HUD</Button>
       <div className={styles.launchers} aria-label="HUD panels">
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
-          return <Button key={item.id} plain disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setMenuOpen(false); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id); if (!item.visible || activeId !== item.id) onPanelActivate?.(item.id) }}>{panel.label}{!item.visible ? ' (hidden)' : ''}</Button>
+          return <Button key={item.id} plain disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id); if (!item.visible || activeId !== item.id) onPanelActivate?.(item.id) }}>{panel.label}{!item.visible ? ' (hidden)' : ''}</Button>
         })}
       </div>
+      </>}
     </div>
     {settings && <div ref={settingsRef} id={settingsId} className={styles.settings}>
       <HudCardShell title="Arrange HUD" lighting="none" toolbar={phone ? navigation('arrange') : undefined} onClose={closeSettings} closeLabel="Close HUD settings">

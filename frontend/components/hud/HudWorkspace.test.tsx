@@ -213,7 +213,7 @@ it('closes phone settings to map with Escape and keeps layout edits', () => {
     fireEvent.click(move); fireEvent.keyDown(move, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(JSON.parse(saved.get(key('phone'))!)).toContainEqual({ id: 'console', lane: 'left', visible: true })
-    expect(screen.getByRole('button', { name: 'HUD menu' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Arrange HUD' })).toHaveFocus()
   } finally { media.mockRestore() }
 })
 
@@ -232,7 +232,7 @@ it('keeps phone focus in the page when a travel-like transition removes its focu
     await waitFor(() => expect(screen.getByRole('button', { name: 'Close Command panel' })).toHaveFocus())
     fireEvent.click(screen.getByRole('button', { name: 'Close Command panel' }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole('button', { name: 'HUD menu' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Command' })).toHaveFocus()
   } finally { media.mockRestore() }
 })
 
@@ -290,5 +290,34 @@ it('keeps all four phone destinations and one sheet owner through Arrange handof
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(screen.getByText('Map background')).not.toHaveAttribute('inert')
   expect(dismiss).toHaveBeenLastCalledWith('objects')
-  expect(screen.getByRole('button', { name: 'HUD menu' })).toHaveFocus()
+  expect(screen.getByRole('button', { name: 'Objects' })).toHaveFocus()
+})
+
+
+it('offers direct labeled phone icons with one visible navigation and restores its launch focus', () => {
+  vi.mocked(window.matchMedia).mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
+  const activate = vi.fn()
+  render(<><button>Map action</button><HudWorkspace corporationId="direct-icons" panels={panels} onPanelActivate={activate} /></>)
+  const navigation = screen.getByRole('navigation', { name: 'HUD panels' })
+  expect(screen.queryByRole('button', { name: 'HUD menu' })).toBeNull()
+  expect(within(navigation).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Objects', 'Command', 'Console', 'Arrange HUD'])
+  for (const button of within(navigation).getAllByRole('button')) {
+    expect(button.tagName).toBe('BUTTON')
+    expect(button).toHaveAttribute('aria-pressed', 'false')
+    expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(button).not.toHaveAttribute('aria-expanded')
+  }
+  const trigger = within(navigation).getByRole('button', { name: 'Console' })
+  trigger.focus(); fireEvent.click(trigger)
+  expect(activate).toHaveBeenCalledWith('console')
+  expect(screen.getAllByRole('navigation', { name: 'HUD panels' })).toHaveLength(1)
+  expect(within(screen.getByRole('navigation')).getByRole('button', { name: 'Console' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.change(screen.getByLabelText('Console draft'), { target: { value: 'Preserve icon navigation draft' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Arrange HUD' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Console' }))
+  expect(screen.getByLabelText('Console draft')).toHaveValue('Preserve icon navigation draft')
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Close Console panel' }), { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(trigger).toHaveFocus()
+  expect(screen.getByText('Map action')).not.toHaveAttribute('inert')
 })

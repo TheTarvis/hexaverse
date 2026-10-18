@@ -10,7 +10,7 @@ import { Input } from '@/components/catalyst/input'
 const meta: Meta<typeof HudWorkspace> = {
   title: 'HUD/Workspace',
   component: HudWorkspace,
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'Docked layout around existing HUD content. Arrange with ordinary keyboard controls, show/hide panels, and reset local preferences. Panel contents remain mounted when moved or hidden. Navigation and vitals stay outside the customizable workspace. These stories use separate demonstration corporation storage keys.' } } },
+  parameters: { layout: 'fullscreen', docs: { description: { component: 'Phone HUD destinations use direct 44px icon controls on the map and the same strip inside an open card; desktop controls stay textual. Docked layout around existing HUD content. Arrange with ordinary keyboard controls, show/hide panels, and reset local preferences. Panel contents remain mounted when moved or hidden. Navigation and vitals stay outside the customizable workspace. These stories use separate demonstration corporation storage keys.' } } },
 }
 export default meta
 type Story = StoryObj<typeof meta>
@@ -23,7 +23,7 @@ function Sample({ corporationId = 'storybook-workspace', compact = false }: { co
     { id: 'console', label: 'Console', children: <HudCardShell title="Ship console" lighting="none"><p>Peregrine is ready. Choose a destination or hold position.</p><Input aria-label="Console message" placeholder="Message your fleet…" /></HudCardShell> },
   ]
   return <div style={{ width: compact ? 390 : '100%', maxWidth: '100%', height: compact ? 760 : '100vh', minHeight: 560, position: 'relative', overflow: 'hidden', color: '#d5e7f1', background: 'radial-gradient(ellipse at 48% 43%, #1a3447, #071019 60%)' }}>
-    <div style={{ position: 'absolute', top: 16, left: 16, right: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span>Borealis · Peregrine · Fuel 84%</span><Button plain onClick={() => setRequest(previous => ({ id: 'command', sequence: (previous?.sequence ?? 0) + 1 }))}>Open command</Button></div>
+    <div style={{ position: 'absolute', top: 16, left: 16, right: compact ? 216 : 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Borealis · Peregrine · Fuel 84%</span>{!compact && <Button plain onClick={() => setRequest(previous => ({ id: 'command', sequence: (previous?.sequence ?? 0) + 1 }))}>Open command</Button>}</div>
     <HudWorkspace corporationId={corporationId} panels={panels} request={request} />
   </div>
 }
@@ -49,7 +49,10 @@ export const PhoneNavigation: Story = {
   render: () => <Sample corporationId="storybook-workspace-phone-navigation" compact />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.click(canvas.getByRole('button', { name: 'Open command' }))
+    const direct = within(canvas.getByRole('navigation', { name: 'HUD panels' }))
+    await expect(direct.getAllByRole('button')).toHaveLength(4)
+    await expect(canvas.queryByRole('button', { name: 'HUD menu' })).not.toBeInTheDocument()
+    await userEvent.click(direct.getByRole('button', { name: 'Command' }))
     for (const name of ['Arrange HUD', 'Objects', 'Console', 'Arrange HUD', 'Command']) {
       const navigation = within(canvas.getByRole('navigation', { name: 'HUD panels' }))
       await userEvent.click(navigation.getByRole('button', { name }))

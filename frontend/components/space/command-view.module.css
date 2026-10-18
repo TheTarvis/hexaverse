@@ -228,7 +228,7 @@
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .commandView { --phone-vitals-height: 64px; --phone-toolbar-top: calc(8px + env(safe-area-inset-top)); --phone-panel-top: calc(64px + env(safe-area-inset-top)); position: fixed; inset: 0; height: var(--system-viewport-height, 100dvh); box-sizing: border-box; overscroll-behavior: none; }
   .commandView:has([data-testid='vitals-strip'][data-expanded='true']) { --phone-vitals-height: 144px; }
-  .identity { top: calc(8px + env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); right: calc(72px + env(safe-area-inset-right)); display: block; }
+  .identity { top: calc(8px + env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); right: calc(216px + env(safe-area-inset-right)); display: block; }
   .identity > p { display: none; }
   .identity h1 { margin: 0; font-size: 18px; line-height: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .workspaceVitals [data-testid='vitals-strip'] { position: relative; height: var(--phone-vitals-height); grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -269,4 +269,10 @@
 /* Shared frame decoration must stay positioned relative to the objective itself. */
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .commandView .guideLayer .objectiveCard { position: relative; inset: auto; flex: 0 0 auto; }
+}
+
+/* A paused guide keeps its own row below the direct HUD navigation. */
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .commandView .resumeGuide { top: calc(72px + env(safe-area-inset-top)); }
+  .commandView:has(> .resumeGuide) .guideLayer { top: calc(124px + env(safe-area-inset-top)); }
 }
