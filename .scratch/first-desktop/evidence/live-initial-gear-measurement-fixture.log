@@ -1,0 +1,5 @@
+Chromium FIRST CORPORATION VIEW {"objective":{"x":764,"y":395.5625,"width":520,"height":103.6875,"top":395.5625,"right":1284,"bottom":499.25,"left":764},"objectivePosition":"relative","arrange":{"x":16,"y":120,"width":44,"height":44,"top":120,"right":60,"bottom":164,"left":16},"arrangeText":"","arrangeInert":true,"focused":"Recovery transmission","closeFocused":false,"closeFocusVisible":false,"objectsHidden":true}
+Chromium SHARED CARD CSS LAST {"objective":{"x":764,"y":394.5625,"width":520,"height":103.6875,"top":394.5625,"right":1284,"bottom":498.25,"left":764},"objectivePosition":"relative","arrange":{"x":16,"y":120,"width":44,"height":44,"top":120,"right":60,"bottom":164,"left":16},"arrangeText":"","arrangeInert":true,"focused":"Recovery transmission","closeFocused":false,"closeFocusVisible":false,"objectsHidden":true}
+TypeError: Cannot read properties of null (reading 'width')
+    at run (/Users/travis/Projects/hexaverse/.scratch/first-desktop/browser.cjs:95:229)
+    at async /Users/travis/Projects/hexaverse/.scratch/first-desktop/browser.cjs:102:69

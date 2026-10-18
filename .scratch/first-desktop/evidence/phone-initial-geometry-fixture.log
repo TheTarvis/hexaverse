@@ -1,0 +1,12 @@
+Chromium FIRST CORPORATION VIEW {"objective":{"x":12,"y":18,"width":366,"height":115.6875,"top":18,"right":378,"bottom":133.6875,"left":12},"objectivePosition":"relative","arrange":{"x":329,"y":61,"width":44,"height":44,"top":61,"right":373,"bottom":105,"left":329},"arrangeText":"","focused":"Recovery transmission","closeFocused":false,"closeFocusVisible":false,"objectsHidden":true}
+Chromium SHARED CARD CSS LAST {"objective":{"x":12,"y":18,"width":366,"height":115.6875,"top":18,"right":378,"bottom":133.6875,"left":12},"objectivePosition":"relative","arrange":{"x":329,"y":61,"width":44,"height":44,"top":61,"right":373,"bottom":105,"left":329},"arrangeText":"","focused":"Recovery transmission","closeFocused":false,"closeFocusVisible":false,"objectsHidden":true}
+AssertionError [ERR_ASSERTION]: Objective and gear cannot overlap
+    at run (/Users/travis/Projects/hexaverse/.scratch/first-desktop/browser.cjs:354:11)
+    at async /Users/travis/Projects/hexaverse/.scratch/first-desktop/browser.cjs:377:69 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
