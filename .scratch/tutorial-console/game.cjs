@@ -33,7 +33,8 @@ async function run(type,options,name){
  try{
  for(const size of [{width:390,height:844},{width:844,height:390},{width:1280,height:900}].filter(size=>!process.env.QA_WIDTH||String(size.width)===process.env.QA_WIDTH)){
  const context=await browser.newContext({viewport:size,isMobile:size.width!==1280,hasTouch:size.width!==1280,reducedMotion:'reduce'})
- const p=await context.newPage(),errors=[],writes=[],reads=[];let corporation=corp,closing=false
+ const p=await context.newPage(),errors=[],writes=[],reads=[],previews=[];let corporation=corp,closing=false
+ p.on('requestfailed',r=>{if(process.env.QA_DEBUG_ERRORS==='1')console.log('REQUEST FAILED',name,new URL(r.url()).pathname,r.failure()?.errorText)})
  p.on('pageerror',e=>{errors.push(e.message);if(process.env.QA_DEBUG_ERRORS==='1')console.log('PAGE ERROR',name,JSON.stringify({message:e.message,stack:e.stack,url:p.url()}))})
  p.on('response',async r=>{if(process.env.QA_DEBUG_ERRORS==='1'&&new URL(r.url()).pathname.endsWith('.js')&&!(r.headers()['content-type']||'').includes('javascript'))console.log('BAD SCRIPT RESPONSE',JSON.stringify({url:r.url(),status:r.status(),type:r.headers()['content-type'],body:(await r.text()).slice(0,100)}))})
  if(origin.startsWith('https://'))await p.route(origin+'/**',async route=>{
@@ -53,6 +54,7 @@ async function run(type,options,name){
 
  await p.route('**/api/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname.slice(4);reads.push(path)
+  if(process.env.QA_ANNOTATION_TAP==='1'&&req.method()==='POST'&&path.endsWith('/orders/preview')){previews.push(path);return route.fulfill({json:{controlPoints:[],departMs:1000,arriveMs:2000,deltaV:1,fuelCostTons:1,affordable:true,strandingWarning:false}})}
   if(req.method()!=='GET'){writes.push(path);return route.fulfill({status:403,json:{error:'Synthetic QA forbids mutations'}})}
   let data,status=200
   if(path==='/v1/accounts/firestore')data={id:uid,email:'isolated@example.invalid',name:'Isolated QA'}
@@ -72,11 +74,26 @@ async function run(type,options,name){
  })
 
  async function signalPixels(card,scene){
-  const layer=card.locator(':scope > [data-slot="hud-frame-lighting"]');assert.equal(await layer.count(),1)
+  const layer=card.locator(':scope > [data-slot="hud-frame-lighting"]');await layer.waitFor({state:'attached',timeout:30000});assert.equal(await layer.count(),1)
   await layer.locator('canvas[data-renderer-ready="true"]').waitFor({timeout:30000})
   const path=out+'/game-'+name+'-'+scene+'-'+size.width
   await card.screenshot({path:path+'.png'});await layer.evaluate(element=>element.style.display='none')
   await card.screenshot({path:path+'-static.png'});await layer.evaluate(element=>element.style.display='')
+  if(process.env.QA_CLOSE_STATES==='1'){
+   const close=card.locator(':scope > [data-slot="hud-close"]')
+   for(const state of ['rest','hover','focus','active']){
+    await close.evaluate(e=>{const owner=e.closest('[role="dialog"]');if(owner)owner.focus();else e.blur()});await p.mouse.move(0,0)
+    if(state==='hover'||state==='active')await close.hover()
+    if(state==='focus')await close.press('ArrowLeft')
+    if(state==='active')await p.mouse.down()
+    const css=await close.evaluate(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect(),hit=e.querySelector('span[aria-hidden="true"]').getBoundingClientRect();return {background:s.backgroundColor,image:s.backgroundImage,shadow:s.boxShadow,outline:s.outlineStyle,outlineWidth:s.outlineWidth,focusVisible:e.matches(':focus-visible'),focused:e===document.activeElement,activeLabel:document.activeElement?.getAttribute('aria-label'),width:r.width,height:r.height,hitWidth:hit.width,hitHeight:hit.height}})
+    assert.equal(css.background,'rgba(0, 0, 0, 0)');assert.equal(css.image,'none');assert.equal(css.shadow,'none');assert.equal(css.width,28);assert.equal(css.height,28);assert.ok(css.hitWidth>=44&&css.hitHeight>=44)
+    if(state==='focus'){assert.ok(css.focusVisible,JSON.stringify(css));assert.equal(css.outline,'solid');assert.equal(css.outlineWidth,'2px')}
+    await card.screenshot({path:out+'/'+name+'-'+scene+'-'+size.width+'-close-'+state+'.png'})
+    console.log(name,scene,size.width,'CLOSE STATE',state,JSON.stringify(css))
+    if(state==='active'){await p.mouse.move(0,0);await p.mouse.up()}
+   }
+  }
   console.log(name,scene,size.width,'one visible signal owner, original chrome, reduced-motion static paired highlights')
  }
 
@@ -171,12 +188,16 @@ async function run(type,options,name){
  }
  assert.equal(await search.inputValue(),'QA System')
  assert.equal(await p.evaluate(()=>document.activeElement?.tagName==='INPUT'),false,'Handoffs do not focus an input')
+ async function seedTutorial(){
+  await p.evaluate(corp=>localStorage.setItem('hexaverse:hud-layout:v1:'+corp,JSON.stringify([{id:'objects',lane:'left',visible:true},{id:'command',lane:'right',visible:true},{id:'console',lane:'bottom',visible:true}])),corp)
+  await p.evaluate(({corp,fleetId,system})=>localStorage.setItem('hexaverse:command-guide:v1:'+corp,JSON.stringify({version:3,corporationId:corp,fleetId,systemId:system,phase:'wake',scanActionId:null,stationId:null,targetId:null,acceptedAt:null,mineActionId:null,resource:null,cargoBefore:0})),{corp,fleetId,system})
+  await p.evaluate(({corp,fleetId})=>sessionStorage.setItem('hexaverse:selected-fleet:v1:'+corp,fleetId),{corp,fleetId});
+ }
+ if(process.env.QA_DIRECT_TUTORIAL==='1')await seedTutorial()
  console.log(name,'STEP',"await p.getByTestId('galaxy-object-'+system).click();aw");await p.getByTestId('galaxy-object-'+system).click();await nav().getByRole('button',{name:'Enter selected system: QA System',exact:true}).click()
- await p.getByTestId('space-view').waitFor();await p.getByTestId('hud-workspace').waitFor()
- // Saved Console layouts are cleaned without losing the retained panels.
- await p.evaluate(corp=>localStorage.setItem('hexaverse:hud-layout:v1:'+corp,JSON.stringify([{id:'objects',lane:'left',visible:true},{id:'command',lane:'right',visible:true},{id:'console',lane:'bottom',visible:true}])),corp)
- await p.evaluate(({corp,fleetId,system})=>localStorage.setItem('hexaverse:command-guide:v1:'+corp,JSON.stringify({version:3,corporationId:corp,fleetId,systemId:system,phase:'wake',scanActionId:null,stationId:null,targetId:null,acceptedAt:null,mineActionId:null,resource:null,cargoBefore:0})),{corp,fleetId,system})
- await p.evaluate(({corp,fleetId})=>sessionStorage.setItem('hexaverse:selected-fleet:v1:'+corp,fleetId),{corp,fleetId});await p.reload();await p.getByTestId('begin-guide').waitFor()
+ await p.getByTestId('space-view').waitFor();await p.getByTestId('hud-workspace').waitFor();await p.waitForLoadState('networkidle')
+ if(process.env.QA_DIRECT_TUTORIAL!=='1'){await seedTutorial();await p.waitForLoadState('networkidle');await p.reload()}
+ await p.getByTestId('begin-guide').waitFor()
  assert.equal(await p.getByRole('button',{name:'Console',exact:true}).count(),0)
  assert.equal(await p.locator('[data-panel="console"]').count(),0)
  assert.equal(await p.getByTestId('console-dock-region').count(),0)
@@ -201,6 +222,16 @@ async function run(type,options,name){
  await p.getByRole('button',{name:'Resume guide',exact:true}).click()
  await p.getByTestId('dismiss-guide').click();assert.equal(await tutorial.count(),0)
  assert.equal(await p.getByTestId('space-canvas-region').evaluate(e=>!!e.closest('[inert]')),false,'Dismissal restores map input')
+ if(process.env.QA_ANNOTATION_TAP==='1'){
+  const map=p.getByTestId('space-canvas-region'),before=await map.getAttribute('data-camera')
+  await map.press('ArrowRight');await p.waitForFunction(before=>document.querySelector('[data-testid="space-canvas-region"]').getAttribute('data-camera')!==before,before)
+  await p.evaluate(()=>{window.__annotationEvents=[];for(const type of ['pointerdown','pointerup','touchstart','touchend'])document.addEventListener(type,e=>{if(e.target.closest?.('[data-testid="space-canvas-region"]'))window.__annotationEvents.push({type,trusted:e.isTrusted,pointerType:e.pointerType})},true)})
+  const body=p.getByTestId('body-hit-qa-planet');await body.tap()
+  assert.equal(await map.getAttribute('data-selection'),'qa-planet','Native touch selects after camera movement')
+  const events=await p.evaluate(()=>window.__annotationEvents);assert.ok(events.some(e=>e.type==='pointerdown'&&e.trusted&&e.pointerType==='touch'));assert.ok(events.some(e=>e.type==='pointerup'&&e.trusted&&e.pointerType==='touch'))
+  await body.press('Enter');assert.equal(await map.getAttribute('data-selection'),'','Keyboard activation independently toggles selected body')
+  console.log(name,'ANNOTATION NATIVE TOUCH/KEYBOARD PASS after camera orbit',JSON.stringify(events))
+ }
  console.log(name,size.width,'TUTORIAL/CONSOLE PASS: original chrome, paired highlights, mounted visibility owns isolation, Objects/Scan handoff and resume/dismiss; old preferences migrated; Console/log absent')
  const leave=nav().getByRole('link',{name:'Leave system for galaxy',exact:true});await leave.waitFor();assert.equal(await leave.getAttribute('href'),'/');assert.ok((await leave.boundingBox()).height>=44)
  assert.equal(await leave.evaluate(e=>getComputedStyle(e).color),'rgb(177, 237, 255)','Leave icon shares the readable HUD control tint')
@@ -211,6 +242,7 @@ async function run(type,options,name){
  await signalPixels(p.locator('[data-panel="objects"] > [data-slot="hud-card"]'),'system')
  await p.screenshot({path:out+'/'+name+'-system-'+size.width+'.png'})
  if(phone)await p.getByRole('button',{name:'Close Objects panel'}).click()
+ if(process.env.QA_DIRECT_TUTORIAL==='1'){assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);console.log(name,'FOCUSED SHARED CLOSE/TUTORIAL/NATIVE INPUT PASS; no page errors or gameplay writes');closing=true;await context.close();continue}
  await nav().getByRole('link',{name:'Leave system for galaxy',exact:true}).click();await p.getByRole('heading',{name:'Live Galaxy',exact:true}).first().waitFor()
  assert.equal(await p.getByRole('button',{name:/^Enter selected system/}).count(),0)
  await openPanel('Objects');await search.fill('QA System')
@@ -222,7 +254,7 @@ async function run(type,options,name){
  assert.equal(await p.evaluate(()=>localStorage.getItem('hexaverse:hud-layout:v1:guest')),null)
  await p.reload();await p.getByTestId('hud-workspace').waitFor()
  await p.waitForFunction(()=>document.querySelector('[data-panel="objects"]')?.getAttribute('data-lane')==='right')
- await p.goto(origin+'/systems/'+system);await p.getByTestId('space-view').waitFor();await p.getByTestId('hud-workspace').waitFor()
+ await p.goto(origin+'/systems/'+system);await p.getByTestId('space-view').waitFor();await p.getByTestId('hud-workspace').waitFor();await p.waitForLoadState('networkidle')
  await p.waitForFunction(()=>document.querySelector('[data-panel="objects"]')?.getAttribute('data-lane')==='right')
  corporation=corp+'-two';await p.reload();await p.getByTestId('hud-workspace').waitFor()
  // The second corporation may own a fresh guide; its layout still starts at defaults.
@@ -236,4 +268,4 @@ async function run(type,options,name){
  }
  }finally{await browser.close()}
 }
-;(async()=>{if(process.env.QA_ENGINE!=='webkit')await run(chromium,{},'Chromium');if(process.env.QA_ENGINE!=='chromium')await run(webkit,{executablePath:'/Users/travis/Library/Caches/ms-playwright/webkit-2182/pw_run.sh'},'WebKit')})().catch(e=>{console.error(e);process.exitCode=1})
+;(async()=>{if((process.env.QA_ENGINE||'').toLowerCase()!=='webkit')await run(chromium,{},'Chromium');if((process.env.QA_ENGINE||'').toLowerCase()!=='chromium')await run(webkit,{executablePath:'/Users/travis/Library/Caches/ms-playwright/webkit-2182/pw_run.sh'},'WebKit')})().catch(e=>{console.error(e);process.exitCode=1})

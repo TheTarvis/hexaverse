@@ -108,3 +108,19 @@ These are installed desktop browser engines, not a physical iPhone. Native iOS
 focus zoom, Safari chrome and device safe areas still need Travis's retest. The
 concurrent iOS global 16px field/viewport fixes were preserved. No persistent map
 canvas rewrite, API change or new gameplay behavior is part of this task.
+
+
+## Touch-test follow-up — 2026-10-18
+
+The previously recorded annotation failure is resolved by test-only commit
+`84af784`. It was a deterministic stale TouchEvent fixture after the shared
+controls moved back to Pointer Events in `275bfb5`, not a flaky assertion or a
+runtime change from the tutorial/Console task. The corrected test uses a touch
+pointer press/release on the capture owner, requires exactly one selection,
+checks a following compatibility touch stream cannot duplicate it, and retains
+keyboard selection. The full HUD/space/Galaxy suite now passes 1,085/1,085 tests
+across 74 files. Trusted native tap and keyboard selection after orbit also pass
+in installed Chromium/WebKit on the unchanged deployed build. See
+[close/control follow-up evidence](../close-highlight/README.md) for exact
+baseline hashes, failure/assertion and browser evidence. Physical iPhone
+acceptance remains separate.

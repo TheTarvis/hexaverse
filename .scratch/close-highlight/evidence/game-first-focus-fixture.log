@@ -1,0 +1,60 @@
+Chromium STEP await openPanel('Objects');await checkPhone()
+Chromium galaxy 390 CLOSE STATE rest {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"3px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium galaxy 390 CLOSE STATE hover {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"3px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium galaxy 390 CLOSE STATE focus {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"solid","outlineWidth":"2px","focusVisible":true,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium galaxy 390 CLOSE STATE active {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"3px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium galaxy 390 one visible signal owner, original chrome, reduced-motion static paired highlights
+Chromium STEP await p.goto(origin+'/login')
+Chromium STEP await p.waitForURL(origin+'/')
+Chromium STEP await openPanel('Command')
+Chromium STEP const account=p.getByRole
+Chromium STEP await openPanel('Objects');await checkPhone()
+Chromium STEP await p.getByTestId('galaxy-object-'+system).click();aw
+Chromium tutorial 390 CLOSE STATE rest {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"3px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium tutorial 390 CLOSE STATE hover {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"3px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium tutorial 390 CLOSE STATE focus {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"solid","outlineWidth":"2px","focusVisible":true,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium tutorial 390 CLOSE STATE active {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"3px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium tutorial 390 one visible signal owner, original chrome, reduced-motion static paired highlights
+Chromium 390 TUTORIAL/CONSOLE PASS: original chrome, paired highlights, mounted visibility owns isolation, Objects/Scan handoff and resume/dismiss; old preferences migrated; Console/log absent
+Chromium system 390 CLOSE STATE rest {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"3px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium system 390 CLOSE STATE hover {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"3px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium system 390 CLOSE STATE focus {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"solid","outlineWidth":"2px","focusVisible":true,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium system 390 CLOSE STATE active {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"3px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+Chromium system 390 one visible signal owner, original chrome, reduced-motion static paired highlights
+Chromium 390 grouped-enter-leave-icons/no-footer/served-names/legacy-fallback/Command-selection/guest-auth/retained-state/Storybook-chrome PASS; no game writes or sign-out activation
+WebKit STEP await openPanel('Objects');await checkPhone()
+WebKit galaxy 390 CLOSE STATE rest {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"0px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+WebKit galaxy 390 CLOSE STATE hover {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"0px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+WebKit galaxy 390 CLOSE STATE focus {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"solid","outlineWidth":"2px","focusVisible":true,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+WebKit galaxy 390 CLOSE STATE active {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"0px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+WebKit galaxy 390 one visible signal owner, original chrome, reduced-motion static paired highlights
+WebKit STEP await p.goto(origin+'/login')
+WebKit STEP await p.waitForURL(origin+'/')
+WebKit STEP await openPanel('Command')
+WebKit STEP const account=p.getByRole
+WebKit STEP await openPanel('Objects');await checkPhone()
+WebKit STEP await p.getByTestId('galaxy-object-'+system).click();aw
+WebKit tutorial 390 CLOSE STATE rest {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"0px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+WebKit tutorial 390 CLOSE STATE hover {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"0px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+WebKit tutorial 390 CLOSE STATE focus {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"solid","outlineWidth":"2px","focusVisible":true,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+WebKit tutorial 390 CLOSE STATE active {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"0px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+WebKit tutorial 390 one visible signal owner, original chrome, reduced-motion static paired highlights
+WebKit 390 TUTORIAL/CONSOLE PASS: original chrome, paired highlights, mounted visibility owns isolation, Objects/Scan handoff and resume/dismiss; old preferences migrated; Console/log absent
+WebKit system 390 CLOSE STATE rest {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"0px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+WebKit system 390 CLOSE STATE hover {"background":"rgba(0, 0, 0, 0)","image":"none","shadow":"none","outline":"none","outlineWidth":"0px","focusVisible":false,"width":28,"height":28,"hitWidth":44,"hitHeight":44}
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(css.focusVisible)
+
+    at signalPixels (/Users/travis/Projects/hexaverse/.scratch/tutorial-console/game.cjs:90:32)
+    at runNextTicks (node:internal/process/task_queues:64:5)
+    at process.processImmediate (node:internal/timers:472:9)
+    at async run (/Users/travis/Projects/hexaverse/.scratch/tutorial-console/game.cjs:237:2)
+    at async /Users/travis/Projects/hexaverse/.scratch/tutorial-console/game.cjs:265:121 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

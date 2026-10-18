@@ -1,0 +1,39 @@
+
+ RUN  v3.2.7 /Users/travis/Projects/hexaverse/frontend
+
+ ❯ components/space/space-annotations.test.tsx (7 tests | 1 failed) 563ms
+   ✓ SpaceStage — annotation placement > places a passive label in clear space instead of across a neighboring world 167ms
+   ✓ SpaceStage — annotation placement > suppresses a boxed-in passive label but discloses it when the object is hovered 52ms
+   ✓ SpaceStage — annotation placement > avoids the visible edge of a world whose center is outside the viewport 33ms
+   ✓ SpaceStage — annotation placement > restrains passive labels in a dense view while selected and hovered objects remain disclosed 207ms
+   ✓ SpaceStage — annotation placement > keeps the selected object labeled in a crowd and suppresses colliding labels 36ms
+   × SpaceStage — annotation placement > tracks camera movement without losing touch and keyboard selection 41ms
+     → expected "spy" to be called with arguments: [ { bodyId: 'feat-body-0' } ]
+
+Number of calls: 0
+
+   ✓ SpaceStage — annotation placement > uses a disclosed name without adding contact identity to annotations 27ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  components/space/space-annotations.test.tsx > SpaceStage — annotation placement > tracks camera movement without losing touch and keyboard selection
+AssertionError: expected "spy" to be called with arguments: [ { bodyId: 'feat-body-0' } ]
+
+Number of calls: 0
+
+ ❯ components/space/space-annotations.test.tsx:164:22
+    162|     fireEvent.touchStart(hit, { touches: [{ identifier: 1, clientX: 30…
+    163|     fireEvent.touchEnd(hit, { touches: [], changedTouches: [{ identifi…
+    164|     expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-0' })
+       |                      ^
+    165|     onSelect.mockClear()
+    166|     hit.focus()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  18:46:40
+   Duration  1.70s (transform 174ms, setup 82ms, collect 418ms, tests 563ms, environment 280ms, prepare 51ms)
+
