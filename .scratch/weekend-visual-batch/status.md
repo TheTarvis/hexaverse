@@ -557,3 +557,24 @@ checks pass. Local browser reviewed phone and desktop side-by-side artifacts.
 All 34 served initial assets and 7 pins match; errors 0 bytes / transport 347 bytes.
 Physical iPhone acceptance remains pending. No push. See docs/phone-preview.md and
 .scratch/hud-card-baseline/original-vs-app-{phone,desktop}.svg.
+
+### Direct mobile HUD navigation — 2026-10-18
+
+Commit 3e00a47 is deployed as build trwcoovSMTxWb7fxtZDlG. The mobile dropdown is now
+four direct 44px labeled/stateful icon buttons: Objects/Command/Console/Arrange.
+One strip on map or inside the active panel; desktop text controls unchanged.
+Heading space and paused-guide rows are reserved; original 624c4ff header/close,
+16px fields, accessible zoom, gestures and mounted panel state are preserved.
+62 tests, types/lint, production/Storybook builds, candidate Chromium/WebKit direct-
+icon/keyboard/tutorial/state/inert checks, first-login/camera and original chrome
+parity pass. Local browser verified navigation/draft/close. Library attachments
+were inaccessible (no content tools); physical iPhone acceptance is still pending.
+All 57 assets, 34 served initial resources / 7 pins, exact email gate/routes/diagnostics
+and October 19 00:00 UTC cutoff preserved. No push. Errors 0 bytes; transport 347 bytes.
+See docs/phone-preview.md and .scratch/hud-card-baseline/direct-icons-*-phone.png.
+
+Final deployed Chromium/WebKit direct-icon/tutorial/keyboard/state/original-chrome
+checks pass with errors[] and no game writes. First QA resource-forwarder reset
+was transient; asset returned200 with exact bytes, errors/transport stayed0/347.
+QA retries one reset GET only; production unchanged. Temporary20215/20218 listeners
+stopped, local browser viewport reset and tab closed.

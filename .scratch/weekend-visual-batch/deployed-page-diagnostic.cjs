@@ -250,7 +250,8 @@ async function run(type,options,name){
  p.on('pageerror',e=>errors.push(e.message.slice(0,1200)));p.on('console',m=>{if(m.type()==='error')errors.push(m.text().replace(/\?.*/g,'?<redacted>').slice(0,500))});p.on('response',r=>{const u=new URL(r.url());if(u.pathname.startsWith('/_next/')&&r.status()>=400)bad.push({path:u.pathname,status:r.status()})});p.on('requestfailed',r=>{const u=new URL(r.url());if(u.pathname.startsWith('/_next/'))bad.push({path:u.pathname,error:r.failure()?.errorText})})
  if(origin.startsWith('https://'))await p.route(origin+'/**',async route=>{
  const req=route.request(),u=new URL(req.url());const headers={...req.headers()};delete headers.host;delete headers.cookie;delete headers.authorization
- const response=await c.request.fetch((process.env.QA_UPSTREAM||'http://127.0.0.1:20204')+u.pathname+u.search,{method:req.method(),headers,data:req.postDataBuffer()||undefined,failOnStatusCode:false})
+ // Retry one reset GET connection in the QA resource forwarder; app writes stay intercepted.
+ const response=await c.request.fetch((process.env.QA_UPSTREAM||'http://127.0.0.1:20204')+u.pathname+u.search,{method:req.method(),headers,data:req.postDataBuffer()||undefined,failOnStatusCode:false,maxRetries:req.method()==='GET'?1:0})
  const hs={...response.headers()};for(const key of['content-encoding','content-length','transfer-encoding','connection','set-cookie'])delete hs[key]
  return route.fulfill({status:response.status(),headers:hs,body:await response.body()})
  })

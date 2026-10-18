@@ -1003,3 +1003,57 @@ desktop sizes in both Chromium/WebKit, including invisible target edge taps,
 desktop close/reopen and preserved HUD state, with no JS errors/unmocked writes.
 Temporary candidate20215 and local comparison Storybook20218 servers were stopped.
 The in-app browser override was reset and temporary inspection tabs closed.
+
+## Direct mobile HUD icons — 2026-10-18
+
+Implementation 3e00a47 replaces the phone HUD menu/dropdown with four direct icon
+buttons for the actual existing destinations: Objects, Command, Console, Arrange.
+They use HudIcon/Heroicons outline assets, accessible names/titles, aria-controls,
+pressed state and 44px targets. One strip appears beside the system heading on the
+map or inside the open card toolbar, with no second visible nav/dropdown. Desktop
+keeps existing text controls. The phone heading reserves the strip width, and the
+paused guide resume/objective controls occupy separate rows below it. Closing or
+Escape restores the launch icon. Layout/drafts/details, modal ownership and scroll
+remain mounted. Original 624c4ff card/header/close CSS, 16px inputs, unrestricted
+accessibility zoom and camera gestures are unchanged.
+
+Live build trwcoovSMTxWb7fxtZDlG, source
+/private/tmp/hexaverse-direct-icons-i51tcfp5. Supervisor 52451 / frontend 52452 /
+gateway 52453 / ngrok 52454 started 2026-10-18 11:42:09 UTC. Only the frontend command and
+build pins changed. All 57 public assets, exact Google/email policy, routes, protected
+published Storybook, diagnostics/ngrok flags and 2026-10-19T00:00:00Z cutoff remain
+unchanged. No push or new exposure.
+
+62 tests / 7 files, types/scoped lint, isolated production and Storybook builds pass.
+Candidate Chromium/WebKit synthetic actual-route checks pass 320/375/390 portrait,
+844 landscape, direct labels/active 44px controls, one nav/clear map center, keyboard
+Enter/Space open and Escape/close focus restore, preserved search/details/mining
+quantities, guide-to-Objects/icon-Console/resume and inert release. Original frozen
+Storybook chrome parity, first-login and touch/mouse/keyboard camera checks pass.
+The user's local browser verified direct open/switch/Arrange, retained draft and
+close, with original chrome intact. Native iPhone acceptance remains pending.
+
+The supplied Library screenshot IDs could not be opened: the local session exposed
+no Library content tools. Implementation was grounded in current source/rendered
+routes rather than claiming those attachments were inspected.
+
+Complete gzip home/login/system 200; system HTML stays no-store. All 34 initial
+JS/CSS responses match build bytes; all 7 pins match. Anonymous edge 302, Storybook 200,
+debug/QA 404 and foreign Origin POST 403 remain. Errors 0 bytes / unchanged 347 byte
+transport log (two historical downstream aborts). Captures:
+.scratch/hud-card-baseline/direct-icons-{map,panel}-phone.png. Evidence:
+/tmp/hexaverse-direct-icons-{unit,static-final,build,storybook,candidate,camera-first,live}.log.
+
+The first post-deploy QA run hit a reset GET connection in its browser-to-local
+resource forwarder while fetching the rocky thumbnail. A direct read returned 200
+and exactly matched the build; supervisor/transport logs stayed 0/347 bytes and all
+processes remained healthy. The QA forwarder now retries one ECONNRESET for GET
+only (Playwright maxRetries), never HTTP errors or gameplay writes. Original
+failure log: /tmp/hexaverse-direct-icons-live-first-reset.log. No production code,
+process restart, gate or exposure change was needed for this harness issue.
+
+The deployed rerun passes in Chromium and WebKit: direct44px icons, keyboard and
+focus restore, tutorial/resume/inert handoffs, retained drafts, original chrome
+parity and desktop behavior. Final browser errors[]; no live game writes. Temporary
+candidate20215 and local Storybook20218 listeners were stopped after verification.
+The in-app browser viewport was reset and its temporary inspection tab closed.

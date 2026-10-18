@@ -206,3 +206,11 @@ session has no Library content tools; actual menu/source/rendered route evidence
 was used. Native iPhone acceptance remains pending. Captures:
 [Map icons](direct-icons-map-phone.png),
 [Panel icons](direct-icons-panel-phone.png).
+
+Live gateway20204 reruns pass the same direct-icon, keyboard, tutorial/inert,
+original chrome and retained-state assertions in Chromium/WebKit, with errors[]
+and no live game writes. Build trwcoovSMTxWb7fxtZDlG retains all57 public assets,
+34initial served assets matching bytes,7pins and the exact email/Oct19 00UTC cutoff.
+A first QA-forwarded thumbnail GET reset recovered with a direct200 matching read;
+only the QA GET forwarder gained one reset-only retry. No server changes/restart
+were needed. Temporary test servers/browser tabs were cleaned up afterward.
