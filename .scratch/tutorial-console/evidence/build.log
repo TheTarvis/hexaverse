@@ -1,0 +1,46 @@
+   ▲ Next.js 15.5.27
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+   Using tsconfig file: tsconfig.phone-preview.json
+   Using tsconfig file: tsconfig.phone-preview.json
+   Using tsconfig file: tsconfig.phone-preview.json
+ ✓ Compiled successfully in 2.8s
+   Linting and checking validity of types ...
+
+./components/space/SystemSpaceView.stranding-notice.test.tsx
+398:7  Warning: 'rejectPreview' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/10) ...
+   Generating static pages (2/10) 
+   Generating static pages (4/10) 
+   Generating static pages (7/10) 
+ ✓ Generating static pages (10/10)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    7.06 kB         620 kB
+├ ○ /_not-found                            124 B         103 kB
+├ ○ /dev/login                           1.57 kB         265 kB
+├ ƒ /dev/system-storyboard                 199 B         441 kB
+├ ƒ /dev/system-storyboard/hud           13.1 kB         454 kB
+├ ○ /login                               4.05 kB         295 kB
+├ ○ /spike/audio                         7.16 kB         125 kB
+├ ○ /spike/intel                         4.89 kB         125 kB
+├ ○ /spike/space-3d                      3.69 kB         124 kB
+├ ○ /spike/stealth                       6.23 kB         127 kB
+└ ƒ /systems/[systemId]                    60 kB         702 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/1d8b127a-771e6e16a2e72479.js  54.2 kB
+  ├ chunks/637-57cc8e5eb8e0560d.js       46.5 kB
+  └ other shared chunks (total)          2.65 kB
+
+
+ƒ Middleware                             32.2 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -1,0 +1,54 @@
+
+ RUN  v3.2.7 /Users/travis/Projects/hexaverse/frontend
+
+ ✓ components/hud/HudCardShell.test.tsx (9 tests) 461ms
+   ✓ HUD card foundation > keeps content and dismissal usable before the first decorative frame  358ms
+ ✓ components/space/RecoveryTransmission.test.tsx (6 tests) 466ms
+   ✓ uses the shared illuminated card and releases modal isolation and focus on unmount  311ms
+ ✓ components/hud/HudWorkspace.test.tsx (22 tests) 1778ms
+   ✓ uses one shared signal layer per owning panel and settings without lighting nested sections  343ms
+ ✓ components/hud/SceneNavigationAction.test.tsx (2 tests) 282ms
+ ✓ components/space/SystemSpaceView.sensors-workspace.test.tsx (8 tests) 989ms
+ ✓ components/space/SystemSpaceView.scan-refetch.test.tsx (3 tests) 476ms
+ ✓ components/galaxy/GalaxyView.test.tsx (43 tests) 2100ms
+ ✓ components/hud/GameHud.test.tsx (1 test) 92ms
+ ✓ components/hud/HudObjectThumbnail.test.tsx (24 tests) 326ms
+ ✓ components/hud/GameAccountSettings.test.tsx (3 tests) 257ms
+ ✓ components/hud/HudCardShell.reference.test.ts (1 test) 2ms
+ ✓ components/space/SystemSpaceView.scan-settle-announcement.test.tsx (1 test) 113ms
+ ✓ components/space/SystemSpaceView.scan-targets-refetch-on-arrival.test.tsx (12 tests) 3037ms
+   ✓ SystemSpaceView + ScanControl — real network-level scan-target refetches (link8b-adversary-r8, F1/F2/F5/F6) > Scenario: A sweep that settles inside the commit round trip still reports  1080ms
+stderr | components/space/SystemSpaceView.test.tsx > hands phone onboarding to one full-page panel and resumes the guide only when requested
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/travis/Projects/hexaverse/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at /Users/travis/Projects/hexaverse/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7
+    at acquire (/Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:66:7)
+    at update (/Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:95:46)
+    at bindSystemViewport (/Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:98:3)
+    at /Users/travis/Projects/hexaverse/frontend/components/space/SystemViewport.tsx:9:40
+    at Object.react_stack_bottom_frame (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+    at runWithFiberInDEV (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+    at commitHookEffectListMount (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+    at commitHookLayoutEffects (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13213:11) undefined
+
+stderr | components/space/SystemSpaceView.test.tsx > hands phone onboarding to one full-page panel and resumes the guide only when requested
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/travis/Projects/hexaverse/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at /Users/travis/Projects/hexaverse/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7
+    at Object.release (/Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:82:11)
+    at /Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:86:88
+    at /Users/travis/Projects/hexaverse/frontend/components/space/system-viewport-lock.ts:99:63
+    at Object.react_stack_bottom_frame (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:26001:13)
+    at runWithFiberInDEV (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+    at commitHookEffectListUnmount (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13316:17)
+    at commitHookLayoutUnmountEffects (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:13224:11)
+    at commitDeletionEffectsOnFiber (/Users/travis/Projects/hexaverse/frontend/node_modules/react-dom/cjs/react-dom-client.development.js:14373:13) undefined
+
+ ✓ components/space/SystemSpaceView.test.tsx (73 tests) 5424ms
+   ✓ SystemSpaceView — the data fan-in > Scenario: A failed interior read leaves the fleet-state-anchored commands usable  448ms
+
+ Test Files  14 passed (14)
+      Tests  208 passed (208)
+   Start at  18:40:29
+   Duration  7.83s (transform 1.83s, setup 1.22s, collect 10.41s, tests 15.80s, environment 5.01s, prepare 998ms)
+

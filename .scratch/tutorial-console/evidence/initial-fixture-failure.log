@@ -1,0 +1,18 @@
+Chromium STEP await openPanel('Objects');await checkPhone()
+Chromium galaxy 390 one visible signal owner, original chrome, reduced-motion static paired highlights
+Chromium STEP await p.goto(origin+'/login')
+Chromium STEP await p.waitForURL(origin+'/')
+Chromium STEP await openPanel('Command')
+Chromium STEP const account=p.getByRole
+Chromium STEP await openPanel('Objects');await checkPhone()
+Chromium STEP await p.getByTestId('galaxy-object-'+system).click();aw
+Chromium STEP await p.reload();await p.getByTestId('begin-guide').wai
+locator.waitFor: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for getByTestId('begin-guide') to be visible[22m
+
+    at run (/Users/travis/Projects/hexaverse/.scratch/tutorial-console/game.cjs:179:137)
+    at async /Users/travis/Projects/hexaverse/.scratch/tutorial-console/game.cjs:239:49 {
+  log: [ "  - waiting for getByTestId('begin-guide') to be visible" ],
+  name: 'TimeoutError'
+}
