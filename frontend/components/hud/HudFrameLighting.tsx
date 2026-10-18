@@ -159,5 +159,5 @@ export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 0.7, paused
     }
   }, [hostRef])
 
-  return <div ref={layerRef} aria-hidden="true" className={styles.layer} />
+  return <div ref={layerRef} data-slot="hud-frame-lighting" aria-hidden="true" className={styles.layer} />
 }

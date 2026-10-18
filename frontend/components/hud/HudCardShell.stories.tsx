@@ -54,7 +54,15 @@ type Story = StoryObj<typeof meta>
 
 export const Tall: Story = {}
 
-export const Plain: Story = { args: { lighting: 'none' } }
+// Plain is the standard empty card, including its shared signal lighting.
+export const Plain: Story = {
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('[data-slot="hud-frame-lighting"]')).not.toBeNull()
+  },
+}
+
+/** Explicit CSS-only comparison; renderer failure retains this same static frame. */
+export const StaticFrame: Story = { args: { lighting: 'none' } }
 
 export const Wide: Story = {
   args: {

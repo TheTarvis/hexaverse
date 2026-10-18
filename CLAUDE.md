@@ -51,6 +51,10 @@ at `archive/pre-volt-reset` and commit `bf9c637`.
 
 ## Development
 
+Use local `main` for day-to-day work; Travis is the sole developer and requested
+this workflow. Preserve existing history when integrating prior branches. Do not
+push unless requested.
+
 Run root commands from the repository root. `npm run install:all` installs
 service dependencies. Start `npm run firebase:emulators`, `npm run dev:backend`
 and `npm run dev:frontend` in separate terminals; `npm run dev:agent` starts

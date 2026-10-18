@@ -777,3 +777,23 @@ Native Pointer Events replace System's separate TouchList gesture mapping, using
 the same input path as Galaxy. Existing safe-area/focus handling, original card
 chrome, 16px fields and browser zoom accessibility remain unchanged. Physical
 iPhone gesture/focus acceptance remains separate from browser automation.
+
+## Shared signal highlights — 2026-10-18
+
+Travis's Plain/Wide screenshots identify missing rim luminosity in Plain. The
+source difference was explicit configuration: Plain used lighting="none" from
+its original 624c4ff introduction, while Wide inherited signal lighting. This was
+not a new shader, clipping or chrome regression. HudFrameLighting's existing TSL
+shader produces two opposed moving peaks; CSS gradients and SVG corners supply
+the static frame. Plain now uses the same signal default as Wide; Static Frame is
+the explicitly named CSS-only comparison. Workspace Objects/Command/Console and
+Arrange owners also use the shared signal default, with their existing visibility
+and pause lifecycle. Nested sections do not add lighting renderers.
+
+No shader constants, material colors, header/close CSS, layout or frozen reference
+fixtures changed. Renderer failure retains the static CSS frame and usable
+content/close; reduced motion presents a static signal frame. Original chrome,
+mobile full-page sheet/focus ownership, 16px fields, sticky search, shared camera
+controls and public assets retain their existing contracts. Pixel comparisons
+check both opposed rim regions against the same rendered card with the signal
+layer hidden, separately from original chrome/layout assertions.

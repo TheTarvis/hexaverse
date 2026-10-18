@@ -196,7 +196,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
       </>}
     </div>
     {settings && <div ref={settingsRef} id={settingsId} className={styles.settings}>
-      <HudCardShell title="Arrange HUD" lighting="none" toolbar={phone ? navigation('arrange') : undefined} onClose={closeSettings} closeLabel="Close HUD settings">
+      <HudCardShell title="Arrange HUD" toolbar={phone ? navigation('arrange') : undefined} onClose={closeSettings} closeLabel="Close HUD settings">
         <p className={styles.hint}>Choose what stays on screen. Move panels between docks and change their order.</p>
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
@@ -225,7 +225,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
         const index = lanePanels.findIndex(panel => panel.id === item.id)
         const span = 6 / Math.max(1, lanePanels.length)
         return <section key={item.id} ref={element => { if (element) panelRefs.current.set(item.id, element); else panelRefs.current.delete(item.id) }} tabIndex={-1} id={`${panelPrefix}-${item.id}`} aria-label={`${panel.label} panel`} hidden={!item.visible || phone && (settings || activeId !== item.id)} inert={phone && (settings || activeId !== item.id)} data-panel={item.id} data-lane={item.lane} data-mobile-active={activeId === item.id} className={styles.panel} style={{ gridColumn: item.lane === 'left' ? '1' : item.lane === 'right' ? '3' : '1 / -1', gridRow: item.lane === 'bottom' ? `${7 + index}` : `${index * span + 1} / span ${span}` }}>
-          <HudCardShell title={panel.label} lighting="none" paused={!item.visible || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
+          <HudCardShell title={panel.label} paused={!item.visible || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
             closeLabel={phone ? `Close ${panel.label} panel` : `Hide ${panel.label}`}
             onClose={phone ? closePanel : () => { recoveryRef.current?.focus({ preventScroll: true }); toggle(item.id) }}
             toolbar={phone ? navigation(item.id) : undefined}>

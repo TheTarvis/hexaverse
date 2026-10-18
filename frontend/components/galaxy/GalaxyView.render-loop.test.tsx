@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React, { Profiler } from 'react'
@@ -198,6 +198,10 @@ function renderProfiled(onRender: React.ProfilerOnRenderCallback) {
     </QueryClientProvider>,
   )
 }
+
+// Exclude the decorative layer's initial lazy-module reveal from steady-state
+// animation assertions; its lifecycle is covered by HudCardShell tests.
+beforeAll(async () => { await import('@/components/hud/HudFrameLighting') })
 
 beforeEach(() => {
   vi.clearAllMocks()

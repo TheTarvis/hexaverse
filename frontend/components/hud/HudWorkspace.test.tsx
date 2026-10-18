@@ -321,3 +321,13 @@ it('offers direct labeled phone icons with one visible navigation and restores i
   expect(trigger).toHaveFocus()
   expect(screen.getByText('Map action')).not.toHaveAttribute('inert')
 })
+
+
+it('uses one shared signal layer per owning panel and settings without lighting nested sections', async () => {
+  const content = panels.map(panel => ({ ...panel, children: <HudCardShell title={`${panel.label} details`}>{panel.children}</HudCardShell> }))
+  const { container } = render(<HudWorkspace corporationId="lighting" panels={content} />)
+  await waitFor(() => expect(container.querySelectorAll('[data-panel] > [data-slot="hud-card"] > [data-slot="hud-frame-lighting"]')).toHaveLength(3))
+  expect(container.querySelectorAll('[data-hud-framing="section"] [data-slot="hud-frame-lighting"]')).toHaveLength(0)
+  settings()
+  await waitFor(() => expect(screen.getByRole('region', { name: 'Arrange HUD' }).querySelector(':scope > [data-slot="hud-frame-lighting"]')).not.toBeNull())
+})
