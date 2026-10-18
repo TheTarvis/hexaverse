@@ -140,3 +140,6 @@
 }
 
 .launchers > a, .launchers > button[aria-label] { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 12px; }
+
+/* Desktop settings uses the same direct, labeled target size as phone icons. */
+.workspace .arrangeControl { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 12px; }

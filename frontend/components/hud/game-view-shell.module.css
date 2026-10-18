@@ -1,7 +1,7 @@
 .root { isolation: isolate; }
 .scene { position: absolute; inset: 0; isolation: isolate; z-index: 0; }
 .identity { position: absolute; top: 28px; left: 32px; pointer-events: none; z-index: 10; }
-.workspace { bottom: 0; --workspace-panels-bottom: 16px; --workspace-toolbar-top: 120px; --workspace-panels-top: 168px; --workspace-settings-reserve: 188px; }
+.workspace { bottom: 0; --workspace-panels-bottom: 16px; --workspace-toolbar-top: 120px; --workspace-panels-top: 188px; --workspace-settings-reserve: 188px; }
 .vitals { position: absolute; z-index: 35; bottom: 0; inset-inline: 0; pointer-events: auto; min-width: 0; }
 .vitals [data-testid='vitals-details-toggle'] { display: none; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {

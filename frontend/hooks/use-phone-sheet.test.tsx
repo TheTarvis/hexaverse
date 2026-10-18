@@ -3,10 +3,10 @@ import { render, screen } from '@testing-library/react'
 import { it, expect } from 'vitest'
 import { usePhoneSheet } from './use-phone-sheet'
 
-function Sheet({ open, name }: { open: boolean; name: string }) {
+function Sheet({ open, name, initialFocus = 'close' }: { open: boolean; name: string; initialFocus?: 'root' | 'close' }) {
   const ref = useRef<HTMLDivElement>(null)
-  usePhoneSheet(open, ref, name)
-  return <div ref={ref}><button>{name}</button></div>
+  usePhoneSheet(open, ref, name, initialFocus)
+  return <div ref={ref} tabIndex={-1} data-testid={name}><button data-mobile-close>{name}</button></div>
 }
 it('hands isolation to the remaining sheet when an older sheet closes after its replacement opens', () => {
   function Host({ first, second }: { first: boolean; second: boolean }) {
@@ -22,4 +22,12 @@ it('hands isolation to the remaining sheet when an older sheet closes after its 
   expect(screen.getByText('Map')).not.toHaveAttribute('inert')
   expect(screen.getByText('First').closest('[inert]')).toBeNull()
   expect(screen.getByText('Second').closest('[inert]')).toBeNull()
+})
+
+it('can focus a noninteractive dialog root without selecting its dismiss control', () => {
+  const view = render(<Sheet open name="Recovery" initialFocus="root" />)
+  expect(screen.getByTestId('Recovery')).toHaveFocus()
+  expect(screen.getByText('Recovery')).not.toHaveFocus()
+  view.unmount()
+  expect(document.querySelector('[inert]')).toBeNull()
 })

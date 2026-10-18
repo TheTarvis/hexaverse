@@ -25,7 +25,7 @@ export function RecoveryTransmission({ guide, fleet, bodies, station = null, sta
   onObjects?: () => void
 }) {
   const sheetRef = useRef<HTMLElement>(null)
-  usePhoneSheet(true, sheetRef, 'recovery')
+  usePhoneSheet(true, sheetRef, 'recovery', 'root')
   const target = bodies.find(body => body.id === guide.targetId)
   const candidate = bodies.find(body => body.type !== 'station' && body.id !== fleet.attachedTo && body.resources?.length)
   const label = target ? `${target.type.replaceAll('_', ' ')} ${target.id}` : guide.targetId

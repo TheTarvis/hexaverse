@@ -840,3 +840,24 @@ That close mask is removed. The title plaque mask and all signal shape, intensit
 color and speed values remain unchanged. Original X styling/placement, invisible
 44px hit target and keyboard focus ring remain. Browser pixel comparisons and
 state checks are recorded in [close-control evidence](../.scratch/close-highlight/README.md).
+
+
+### Fresh corporation entry — 2026-10-18
+
+Travis's first desktop screenshot showed an objective frame behind Arrange and an
+empty Objects frame, with the tutorial X visibly focused after naming a corporation.
+Shared card and objective classes both set position with equal specificity; when
+card CSS arrived last, the objective became relative and shifted into the top-left
+navigation. The guide now owns a layout group for its objective and briefing;
+a separate objective wrapper owns placement rather than competing with card CSS.
+The wake briefing transiently suspends the whole Objects panel while its content
+is intentionally unavailable. Panel contents/preferences remain mounted/unchanged;
+advancing or dismissing the guide restores normal workspace ownership.
+
+Desktop Arrange HUD is a 44px gear icon with an accessible name; phone navigation
+uses the same gear. Desktop panels reserve room below the 44px toolbar and their
+floating title plaques. Recovery initially focuses its noninteractive dialog root,
+not dismiss. Tab/Shift-Tab, visible close, Escape, modal isolation, handoff and
+focus restoration remain; interactive controls keep their focus-visible outlines.
+See [fresh-entry evidence](../.scratch/first-desktop/README.md) for real flow
+fixtures, stylesheet-order checks and device/browser limits.

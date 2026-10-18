@@ -231,3 +231,16 @@
   .commandView .guideLayer:has(.transmission) { z-index: 80; }
   .commandView .guideLayer .transmission { max-height: none; }
 }
+
+/* Guide layout owns positioning; card chrome never competes with scene docks. */
+.commandView .objectiveDock { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); width: min(280px, calc(100% - 32px)); z-index: 40; pointer-events: none; }
+.commandView .objectiveDock > .objectiveCard { position: relative; inset: auto; width: 100%; max-width: none; }
+.commandView .transmission:focus { outline: none; }
+@media (min-width: 761px) and (min-height: 501px) {
+  .commandView .guideLayer:has(.transmission) { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 32px; box-sizing: border-box; z-index: 80; pointer-events: none; }
+  .commandView .guideLayer .transmission { position: relative; inset: auto; transform: none; flex: 0 1 auto; min-height: 0; max-height: calc(100% - 140px); pointer-events: auto; }
+  .commandView .guideLayer:has(.transmission) .objectiveDock { position: relative; inset: auto; transform: none; flex: 0 0 auto; order: -1; width: min(520px, calc(100% - 48px)); }
+}
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .commandView .guideLayer .objectiveDock { position: relative; inset: auto; transform: none; flex: 0 0 auto; order: -1; width: 100%; }
+}

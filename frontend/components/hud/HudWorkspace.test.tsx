@@ -339,3 +339,17 @@ it('migrates legacy Console entries without changing remaining hidden/dock prefe
   expect(screen.queryByRole('button', { name: /Console/ })).toBeNull()
   settings(); expect(screen.getByRole('button', { name: 'Reset HUD layout' })).toBeVisible()
 })
+
+it('temporarily suspends an empty panel without changing preferences or discarding its state', () => {
+  const view = render(<HudWorkspace corporationId="intro" panels={panels} />)
+  const input = screen.getByLabelText('Object search')
+  fireEvent.change(input, { target: { value: 'Retained search' } })
+  view.rerender(<HudWorkspace corporationId="intro" panels={panels.map(panel => ({ ...panel, suspended: panel.id === 'objects' }))} />)
+  expect(input).toBeInTheDocument()
+  expect(input).not.toBeVisible()
+  expect(screen.getByRole('button', { name: 'Arrange HUD' })).toBeInTheDocument()
+  expect(window.localStorage.setItem).not.toHaveBeenCalled()
+  view.rerender(<HudWorkspace corporationId="intro" panels={panels} />)
+  expect(input).toBeVisible()
+  expect(input).toHaveValue('Retained search')
+})

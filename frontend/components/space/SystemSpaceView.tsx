@@ -1173,7 +1173,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           onObjects={() => openObjectIndex(true)}
         />
       )}
-      {guiding && guide && <HudCardShell lighting="none" className={commandStyles.objectiveCard} aria-label="Current objective"><HudText variant="label">Current objective</HudText><HudText role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</HudText></HudCardShell>}
+      {guiding && guide && <div className={commandStyles.objectiveDock}><HudCardShell lighting="none" className={commandStyles.objectiveCard} aria-label="Current objective"><HudText variant="label">Current objective</HudText><HudText role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</HudText></HudCardShell></div>}
       </div>
       <GameViewWorkspace
         navigationAction={<SceneNavigationAction destination="galaxy" />}
@@ -1183,8 +1183,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         className={commandStyles.workspace}
         request={hudRequest}
         panels={[
-          { id: 'objects', label: 'Objects', children: (
-      <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={{ position: 'relative', inset: 'auto', width: '100%', height: '100%', ...(guiding && guide?.phase === 'wake' ? { display: 'none' } : {}) }}>
+          { id: 'objects', label: 'Objects', suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), children: (
+      <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={{ position: 'relative', inset: 'auto', width: '100%', height: '100%' }}>
         <SystemObjectIndex
           compact
           servicesWithoutDetails={interiorFailed && !!stationActionsHost}
@@ -1256,7 +1256,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       <HudColumn
         data-testid="space-command-column"
         side="left"
-        style={{ position: 'relative', inset: 'auto', width: '100%', maxHeight: 'none', ...(guiding && guide?.phase === 'wake' ? { display: 'none' } : {}) }}
+        style={{ position: 'relative', inset: 'auto', width: '100%', maxHeight: 'none' }}
         dockAware
         className={commandStyles.systemColumn}
       >

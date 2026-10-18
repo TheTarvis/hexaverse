@@ -5,14 +5,14 @@ import clsx from 'clsx'
 import { Button } from '@/components/catalyst/button'
 import { HudCardShell } from './HudCardShell'
 import { HudIcon } from './HudIcon'
-import { MagnifyingGlassIcon, RocketLaunchIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline'
+import { MagnifyingGlassIcon, RocketLaunchIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 import styles from './hud-workspace.module.css'
 import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
 
 export type HudPanelId = 'objects' | 'command'
 type Lane = 'left' | 'right' | 'bottom'
 type Layout = { id: HudPanelId; lane: Lane; visible: boolean }[]
-export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode }
+export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode; suspended?: boolean }
 export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; onPanelActivate?: (id: HudPanelId) => void; corporationId: string; panels: HudWorkspacePanel[]; className?: string; request?: { id: HudPanelId; sequence: number }; settingsContent?: ReactNode; navigationAction?: ReactNode }
 const defaults: Layout = [
   { id: 'objects', lane: 'left', visible: true },
@@ -62,7 +62,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
   const requestId = request?.id
   const requestSequence = request?.sequence
   const known = layout.filter(item => panels.some(panel => panel.id === item.id))
-  const visible = known.filter(item => item.visible)
+  const visible = known.filter(item => item.visible && !panels.find(panel => panel.id === item.id)?.suspended)
   const activeId = (phone && !openedPanel) || active === null ? null : visible.some(item => item.id === active) ? active : visible[0]?.id
 
   const sheetOpen = phone && (settings || !!activeId)
@@ -170,7 +170,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
       <Button plain disabled={!ready} ref={floating && returnTo === 'arrange' ? recoveryRef : undefined}
         data-workspace-tab="arrange" aria-label="Arrange HUD" title="Arrange HUD" aria-controls={settingsId}
         aria-pressed={selected === 'arrange'} onClick={() => { if (floating) setReturnTo('arrange'); setSettings(true) }}>
-        <HudIcon icon={AdjustmentsHorizontalIcon} />
+        <HudIcon icon={Cog6ToothIcon} />
       </Button>
     </nav>
   }
@@ -189,7 +189,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
   }}>
     <div className={styles.recovery} hidden={phone && sheetOpen} inert={phone && sheetOpen}>
       {phone ? navigation(null, true) : <>
-      <Button plain className={styles.arrangeControl} ref={recoveryRef} aria-expanded={settings} aria-controls={settingsId} onClick={() => { setSettings(value => !value) }}>Arrange HUD</Button>
+      <Button plain className={styles.arrangeControl} ref={recoveryRef} aria-expanded={settings} aria-controls={settingsId} aria-label="Arrange HUD" title="Arrange HUD" onClick={() => { setSettings(value => !value) }}><HudIcon icon={Cog6ToothIcon} /></Button>
       <nav className={styles.launchers} aria-label="HUD panels" data-testid="hud-desktop-navigation">
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
@@ -228,8 +228,8 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
         const lanePanels = visible.filter(panel => panel.lane === item.lane)
         const index = lanePanels.findIndex(panel => panel.id === item.id)
         const span = 6 / Math.max(1, lanePanels.length)
-        return <section key={item.id} ref={element => { if (element) panelRefs.current.set(item.id, element); else panelRefs.current.delete(item.id) }} tabIndex={-1} id={`${panelPrefix}-${item.id}`} aria-label={`${panel.label} panel`} hidden={!item.visible || phone && (settings || activeId !== item.id)} inert={phone && (settings || activeId !== item.id)} data-panel={item.id} data-lane={item.lane} data-mobile-active={activeId === item.id} className={styles.panel} style={{ gridColumn: item.lane === 'left' ? '1' : item.lane === 'right' ? '3' : '1 / -1', gridRow: item.lane === 'bottom' ? `${7 + index}` : `${index * span + 1} / span ${span}` }}>
-          <HudCardShell title={panel.label} paused={!item.visible || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
+        return <section key={item.id} ref={element => { if (element) panelRefs.current.set(item.id, element); else panelRefs.current.delete(item.id) }} tabIndex={-1} id={`${panelPrefix}-${item.id}`} aria-label={`${panel.label} panel`} hidden={!item.visible || panel.suspended || phone && (settings || activeId !== item.id)} inert={phone && (settings || activeId !== item.id)} data-panel={item.id} data-lane={item.lane} data-mobile-active={activeId === item.id} className={styles.panel} style={{ gridColumn: item.lane === 'left' ? '1' : item.lane === 'right' ? '3' : '1 / -1', gridRow: item.lane === 'bottom' ? `${7 + index}` : `${index * span + 1} / span ${span}` }}>
+          <HudCardShell title={panel.label} paused={!item.visible || panel.suspended || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
             closeLabel={phone ? `Close ${panel.label} panel` : `Hide ${panel.label}`}
             onClose={phone ? closePanel : () => { recoveryRef.current?.focus({ preventScroll: true }); toggle(item.id) }}
             toolbar={phone ? navigation(item.id) : undefined}>

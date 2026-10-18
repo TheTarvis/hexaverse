@@ -39,7 +39,7 @@ function updateSheetIsolation() {
 }
 
 /** Keep mounted HUD state in place while its phone sheet owns focus/input. */
-export function usePhoneSheet(open: boolean, scope: RefObject<HTMLElement | null>, identity: string | null) {
+export function usePhoneSheet(open: boolean, scope: RefObject<HTMLElement | null>, identity: string | null, initialFocus: 'close' | 'root' = 'close') {
   useEffect(() => {
     const root = scope.current
     if (!open || !root) return
@@ -49,14 +49,14 @@ export function usePhoneSheet(open: boolean, scope: RefObject<HTMLElement | null
     updateSheetIsolation()
     const focusable = () => Array.from(root.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]'))
       .filter(element => !element.closest('[inert], [hidden]') && element.getClientRects().length > 0)
-    const focusClose = () => {
-      const close = Array.from(root.querySelectorAll<HTMLElement>('[data-mobile-close]')).find(element => !element.closest('[hidden], [inert]'))
+    const focusInitial = () => {
+      const close = initialFocus === 'close' ? Array.from(root.querySelectorAll<HTMLElement>('[data-mobile-close]')).find(element => !element.closest('[hidden], [inert]')) : null
       ;(close ?? root).focus({ preventScroll: true })
     }
-    focusClose()
+    focusInitial()
     // Review/Start/Back can remove the focused control without closing its page.
     const observer = new MutationObserver(() => {
-      if (document.activeElement === document.body && !root.closest('[inert]')) focusClose()
+      if (document.activeElement === document.body && !root.closest('[inert]')) focusInitial()
     })
     observer.observe(root, { childList: true, subtree: true })
     const trap = (event: KeyboardEvent) => {
@@ -76,5 +76,5 @@ export function usePhoneSheet(open: boolean, scope: RefObject<HTMLElement | null
       updateSheetIsolation()
       if (previous?.isConnected && !previous.closest('[inert], [hidden]')) previous.focus({ preventScroll: true })
     }
-  }, [open, scope, identity])
+  }, [open, scope, identity, initialFocus])
 }
