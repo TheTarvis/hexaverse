@@ -829,3 +829,14 @@ Verification and the protected-preview build are recorded in
 [task evidence](../.scratch/tutorial-console/README.md). Physical iPhone rendering
 and focus-zoom acceptance still require a device retest; no viewport zoom lock was
 introduced by this change.
+
+
+### Transparent close control — 2026-10-18
+
+Travis's follow-up screenshot showed a dark square interrupting the frame glow
+around the X. The close button was already transparent in rest/hover/focus/active
+states; HudFrameLighting masked the button's rectangular bounds out of the light.
+That close mask is removed. The title plaque mask and all signal shape, intensity,
+color and speed values remain unchanged. Original X styling/placement, invisible
+44px hit target and keyboard focus ring remain. Browser pixel comparisons and
+state checks are recorded in [close-control evidence](../.scratch/close-highlight/README.md).

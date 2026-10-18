@@ -36,7 +36,6 @@ export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 0.7, paused
     const time = uniform(0)
     const gain = uniform(settings.current.intensity)
     const titleBox = uniform(new THREE.Vector4(0, 0, -1, -1))
-    const closeBox = uniform(new THREE.Vector4(0, 0, -1, -1))
 
     // Pixel-space half-planes describe the same fixed 20px chamfers as the CSS shell.
     const p = vec2(uv().x.sub(0.5), uv().y.oneMinus().sub(0.5)).mul(size)
@@ -51,9 +50,10 @@ export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 0.7, paused
     // Absolute cosine produces two matching peaks, exactly half a turn apart.
     const opposedPulses = exp(cos(angle.sub(time)).abs().sub(1).mul(22))
     const pulse = opposedPulses.mul(2.1).add(0.025)
+    // The title plaque masks its own backing; the transparent close control
+    // must not cut a rectangular hole in the illuminated rim.
     const titleMask = smoothstep(0, 1.5, max(p.x.sub(titleBox.x).abs().sub(titleBox.z), p.y.sub(titleBox.y).abs().sub(titleBox.w)))
-    const closeMask = smoothstep(0, 1.5, max(p.x.sub(closeBox.x).abs().sub(closeBox.z), p.y.sub(closeBox.y).abs().sub(closeBox.w)))
-    const alpha = rim.add(halo).mul(pulse).mul(gain).mul(titleMask).mul(closeMask).clamp(0, 0.95)
+    const alpha = rim.add(halo).mul(pulse).mul(gain).mul(titleMask).clamp(0, 0.95)
     const color = vec3(0.3, 0.76, 1).add(vec3(0.55, 0.23, 0).mul(rim))
     const material = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, toneMapped: false })
     material.fragmentNode = vec4(color, alpha)
@@ -120,7 +120,7 @@ export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 0.7, paused
       height = rect.height
       size.value.set(width + padding * 2, height + padding * 2)
       halfSize.value.set(width / 2, height / 2)
-      for (const [element, box] of [[host.querySelector('[data-slot="hud-title"]'), titleBox], [host.querySelector('[data-slot="hud-close"]'), closeBox]] as const) {
+      for (const [element, box] of [[host.querySelector('[data-slot="hud-title"]'), titleBox]] as const) {
         const bounds = element?.getBoundingClientRect()
         if (bounds) box.value.set(bounds.x + bounds.width / 2 - rect.x - width / 2, bounds.y + bounds.height / 2 - rect.y - height / 2, bounds.width / 2, bounds.height / 2)
         else box.value.set(0, 0, -1, -1)
@@ -130,7 +130,7 @@ export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 0.7, paused
     }
     const observer = new ResizeObserver(resize)
     observer.observe(host)
-    // Title/close changes can move masks without changing the shell's dimensions.
+    // Title changes can move its mask without changing the shell's dimensions.
     const chromeObserver = new MutationObserver(resize)
     chromeObserver.observe(host, { childList: true, subtree: true, characterData: true })
     const intersection = typeof IntersectionObserver !== 'undefined'
